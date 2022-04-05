@@ -1,0 +1,61 @@
+--TEST--
+016: SCCP + Schedule (Figure 3.9 from "Combining Analyses, Combining Optimization" by C.Click)
+--ARGS--
+--dump-use-lists --save
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 1;
+	int32_t c_5 = 2;
+	l_1 = START(l_21);
+	bool d_2 = PARAM(l_1, "cond", 0);
+	bool d_3 = COPY(c_4);
+	l_4 = END(l_1);
+	l_5 = LOOP_BEGIN(l_4, l_18);
+	int32_t d_6 = PHI(l_5, d_3, d_15);
+	bool d_7 = NE(d_6, c_4);
+	l_8 = IF(l_5, d_7);
+	l_9 = IF_TRUE(l_8);
+	uint32_t d_10 = COPY(c_5);
+	l_11 = END(l_9);
+	l_12 = IF_FALSE(l_8);
+	l_13 = END(l_12);
+	l_14 = MERGE(l_11, l_13);
+	uint32_t d_15 = PHI(l_14, d_10, d_6);
+	l_16 = IF(l_14, d_2);
+	l_17 = IF_TRUE(l_16);
+	l_18 = LOOP_END(l_17, l_5);
+	l_19 = IF_FALSE(l_16);
+	l_20 = LOOP_EXIT(l_19, l_5);
+	l_21 = RETURN(l_20, d_15);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 1;
+	l_1 = START(l_10);
+	bool d_2 = PARAM(l_1, "cond", 0);
+	l_3 = END(l_1);
+	l_4 = LOOP_BEGIN(l_3, l_7);
+	l_5 = IF(l_4, d_2);
+	l_6 = IF_TRUE(l_5);
+	l_7 = LOOP_END(l_6, l_4);
+	l_8 = IF_FALSE(l_5);
+	l_9 = LOOP_EXIT(l_8, l_4);
+	l_10 = RETURN(l_9, c_4);
+}
+{ # Use Lists
+00001(2): [00002, 00003]
+00002(1): [00005]
+00003(1): [00004]
+00004(1): [00005]
+00005(2): [00006, 00008]
+00006(1): [00007]
+00007(1): [00004]
+00008(1): [00009]
+00009(1): [00010]
+}

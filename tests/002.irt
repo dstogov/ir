@@ -1,0 +1,28 @@
+--TEST--
+002: Idetical constant merging
+--CODE--
+{
+	int32_t c_4 = 1;
+	int32_t c_5 = 1;
+	l_1 = START(l_7);
+	int32_t d_2 = PARAM(l_1, "a", 0);
+	int32_t d_3 = PARAM(l_1, "b", 1);
+	int32_t d_4 = ADD(d_2, c_4);
+	int32_t d_5 = ADD(d_3, c_4);
+	int32_t d_6 = MOD(d_4, d_5);
+	l_7 = RETURN(l_1, d_6);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 1;
+	l_1 = START(l_7);
+	int32_t d_2 = PARAM(l_1, "a", 0);
+	int32_t d_3 = PARAM(l_1, "b", 1);
+	int32_t d_4 = ADD(d_2, c_4);
+	int32_t d_5 = ADD(d_3, c_4);
+	int32_t d_6 = MOD(d_4, d_5);
+	l_7 = RETURN(l_1, d_6);
+}

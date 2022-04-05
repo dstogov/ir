@@ -1,0 +1,54 @@
+--TEST--
+023: DCE is performed as part of GCM/Scheduling/Linearization
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 10;
+	int32_t c_5 = 2;
+	int32_t c_6 = 1;
+	int32_t c_7 = 0;
+	l_1 = START(l_16);
+	int32_t d_2 = PARAM(l_1, "x", 0);
+	l_3 = END(l_1);
+	l_4 = LOOP_BEGIN(l_3, l_12);
+	int32_t d_5 = PHI(l_4, c_7, d_7);
+	int32_t d_6 = ADD(d_2, c_6);
+	int32_t d_7 = ADD(d_6, d_5);
+	int32_t d_8 = MUL(d_7, c_5);
+	int32_t xxx = DIV(d_8, c_4);  # dead code
+	bool d_9 = LT(d_7, c_4);
+	l_10 = IF(l_4, d_9);
+	l_11 = IF_TRUE(l_10);
+	l_12 = LOOP_END(l_11, l_4);
+	l_13 = IF_FALSE(l_10);
+	l_14 = LOOP_EXIT(l_13, l_4);
+	l_15 = BEGIN(l_14);
+	l_16 = RETURN(l_15, d_8);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 10;
+	int32_t c_5 = 1;
+	int32_t c_6 = 0;
+	l_1 = START(l_16);
+	int32_t d_2 = PARAM(l_1, "x", 0);
+	int32_t d_3 = ADD(d_2, c_5);
+	l_4 = END(l_1);
+	l_5 = LOOP_BEGIN(l_4, l_11);
+	int32_t d_6 = PHI(l_5, c_6, d_7);
+	int32_t d_7 = ADD(d_3, d_6);
+	bool d_8 = LT(d_7, c_4);
+	l_9 = IF(l_5, d_8);
+	l_10 = IF_TRUE(l_9);
+	l_11 = LOOP_END(l_10, l_5);
+	l_12 = IF_FALSE(l_9);
+	l_13 = LOOP_EXIT(l_12, l_5);
+	l_14 = BEGIN(l_13);
+	int32_t d_15 = ADD(d_7, d_7);
+	l_16 = RETURN(l_14, d_15);
+}

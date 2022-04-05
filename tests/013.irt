@@ -1,0 +1,127 @@
+--TEST--
+013: SCCP+GVN (Figure 3.11 from "Combining Analyses, Combining Optimization" by C.Click)
+--ARGS--
+--dump-use-lists --dump-gcm --save --dump-after-gcm
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 1;
+	int32_t c_5 = 2;
+	l_1 = START(l_34);
+	bool d_2 = PARAM(l_1, "cond", 0);
+	bool d_3 = PARAM(l_1, "z", 1);
+	bool d_4 = COPY(c_4);
+	bool d_5 = COPY(d_3);
+	l_6 = END(l_1);
+	l_7 = LOOP_BEGIN(l_6, l_31);
+	int32_t d_8 = PHI(l_7, d_4, d_19);
+	int32_t d_9 = PHI(l_7, d_5, d_28);
+	bool d_10 = NE(d_9, d_3);
+	l_11 = IF(l_7, d_10);
+	l_12 = IF_TRUE(l_11);
+	int32_t d_13 = COPY(c_5);
+	l_14 = END(l_12);
+	l_15 = IF_FALSE(l_11);
+	l_16 = END(l_15);
+	l_17 = MERGE(l_14, l_16);
+	int32_t d_18 = PHI(l_17, d_13, d_8);
+	int32_t d_19 = SUB(c_5, d_18);
+	bool d_20 = NE(d_19, c_4);
+	l_21 = IF(l_17, d_20);
+	l_22 = IF_TRUE(l_21);
+	int32_t d_23 = COPY(c_5);
+	l_24 = END(l_22);
+	l_25 = IF_FALSE(l_21);
+	l_26 = END(l_25);
+	l_27 = MERGE(l_24, l_26);
+	int32_t d_28 = PHI(l_27, d_23, d_9);
+	l_29 = IF(l_27, d_2);
+	l_30 = IF_TRUE(l_29);
+	l_31 = LOOP_END(l_30, l_7);
+	l_32 = IF_FALSE(l_29);
+	l_33 = LOOP_EXIT(l_32, l_7);
+	l_34 = RETURN(l_33, d_19);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 1;
+	int32_t c_5 = 2;
+	l_1 = START(l_30);
+	bool d_2 = PARAM(l_1, "cond", 0);
+	bool d_3 = PARAM(l_1, "z", 1);
+	l_4 = END(l_1);
+	l_5 = LOOP_BEGIN(l_4, l_27);
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	l_25 = IF(l_5, d_2);
+	l_26 = IF_TRUE(l_25);
+	l_27 = LOOP_END(l_26, l_5);
+	l_28 = IF_FALSE(l_25);
+	l_29 = LOOP_EXIT(l_28, l_5);
+	l_30 = RETURN(l_29, c_4);
+}
+{ # Use Lists
+00001(3): [00002, 00003, 00004]
+00002(1): [00025]
+00004(1): [00005]
+00005(1): [00025]
+00025(2): [00026, 00028]
+00026(1): [00027]
+00027(1): [00005]
+00028(1): [00029]
+00029(1): [00030]
+}
+{ # GCM
+1 -> 1
+2 -> 1
+3 -> 1
+4 -> 1
+5 -> 2
+6 -> 0
+7 -> 0
+8 -> 0
+9 -> 0
+10 -> 0
+11 -> 0
+12 -> 0
+13 -> 0
+14 -> 0
+15 -> 0
+16 -> 0
+17 -> 0
+18 -> 0
+19 -> 0
+20 -> 0
+21 -> 0
+22 -> 0
+23 -> 0
+24 -> 0
+25 -> 2
+26 -> 3
+27 -> 3
+28 -> 4
+29 -> 4
+30 -> 4
+}

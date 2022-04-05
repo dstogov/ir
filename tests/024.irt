@@ -1,0 +1,97 @@
+--TEST--
+024: SCCP (Removimg inputs of MERGE/PHI)
+--ARGS--
+--save --dump-after-sccp
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 1;
+	int32_t c_5 = 2;
+	int32_t c_6 = 3;
+	int32_t c_7 = 4;
+	l_1 = START(l_38);
+	int32_t d_2 = PARAM(l_1, "z", 0);
+	bool d_3 = PARAM(l_1, "cond", 1);
+	l_4 = SWITCH(l_1, d_2);
+	l_5 = CASE_VAL(l_4, c_4);
+	l_6 = END(l_5);
+	l_7 = CASE_VAL(l_4, c_5);
+	l_8 = END(l_7);
+	l_9 = CASE_VAL(l_4, c_6);
+	l_10 = END(l_9);
+	l_11 = CASE_DEFAULT(l_4);
+	l_12 = END(l_11);
+	l_13 = LOOP_BEGIN(l_12, l_25);
+	int32_t d_14 = PHI(l_13, c_4, d_22);
+	bool d_15 = NE(d_14, c_4);
+	l_16 = IF(l_13, d_15);
+	l_17 = IF_TRUE(l_16);
+	l_18 = END(l_17);
+	l_19 = IF_FALSE(l_16);
+	l_20 = END(l_19);
+	l_21 = MERGE(l_18, l_20);
+	int32_t d_22 = PHI(l_21, c_5, d_14);
+	l_23 = IF(l_21, d_3);
+	l_24 = IF_TRUE(l_23);
+	l_25 = LOOP_END(l_24, l_13);
+	l_26 = IF_FALSE(l_23);
+	l_27 = LOOP_EXIT(l_26, l_13);
+	bool d_28 = EQ(d_22, c_4);
+	l_29 = IF(l_27, d_28);
+	l_30 = IF_TRUE(l_29);
+	l_31 = RETURN(l_30, d_22);
+	l_32 = IF_FALSE(l_29);
+	l_33 = END(l_32);
+	l_34 = MERGE/4(l_6, l_8, l_10, l_33);
+	int32_t d_36 = PHI/4(l_34, c_4, c_5, c_6, c_7);
+	l_38 = RETURN(l_34, d_36, l_31);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 1;
+	int32_t c_5 = 2;
+	int32_t c_6 = 3;
+	int32_t c_7 = 4;
+	l_1 = START(l_38);
+	int32_t d_2 = PARAM(l_1, "z", 0);
+	bool d_3 = PARAM(l_1, "cond", 1);
+	l_4 = SWITCH(l_1, d_2);
+	l_5 = CASE_VAL(l_4, c_4);
+	l_6 = END(l_5);
+	l_7 = CASE_VAL(l_4, c_5);
+	l_8 = END(l_7);
+	l_9 = CASE_VAL(l_4, c_6);
+	l_10 = END(l_9);
+	l_11 = CASE_DEFAULT(l_4);
+	l_12 = END(l_11);
+	l_13 = LOOP_BEGIN(l_12, l_25);
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	NOP;
+	l_23 = IF(l_13, d_3);
+	l_24 = IF_TRUE(l_23);
+	l_25 = LOOP_END(l_24, l_13);
+	l_26 = IF_FALSE(l_23);
+	l_27 = LOOP_EXIT(l_26, l_13);
+	NOP;
+	NOP;
+	NOP;
+	l_31 = RETURN(l_27, c_4);
+	NOP;
+	NOP;
+	l_34 = MERGE/3(l_6, l_8, l_10);
+	NOP;
+	int32_t d_36 = PHI/3(l_34, c_4, c_5, c_6);
+	l_38 = RETURN(l_34, d_36, l_31);
+}

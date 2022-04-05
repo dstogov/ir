@@ -1,0 +1,99 @@
+--TEST--
+022: Translation out of SSA (Figure 8 (swap problen) from "Translating Out of Static Single Assignment Form" by Sreedhar)
+--ARGS--
+--save --dump-live-ranges --dump-cfg
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 1;
+	l_1 = START(l_13);
+	int32_t x1 = PARAM(l_1, "x", 0);
+	int32_t y1 = PARAM(l_1, "y", 1);
+	int32_t cond = PARAM(l_1, "z", 2);
+	l_3 = END(l_1);
+	l_4 = LOOP_BEGIN(l_3, l_9);
+	int32_t x2 = PHI(l_4, x1, x3);
+	int32_t y2 = PHI(l_4, y1, y3);
+	int32_t z = COPY(x2);
+	int32_t x3 = COPY(y2);
+	int32_t y3 = COPY(z);
+	l_7 = IF(l_4, cond);
+	l_8 = IF_TRUE(l_7);
+	l_9 = LOOP_END(l_8, l_4);
+	l_10 = IF_FALSE(l_7);
+	l_11 = LOOP_EXIT(l_10, l_4);
+	l_12 = BEGIN(l_11);
+	l_13 = RETURN(l_12, z);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	l_1 = START(l_15);
+	int32_t d_2 = PARAM(l_1, "x", 0);
+	int32_t d_3 = PARAM(l_1, "y", 1);
+	int32_t d_4 = PARAM(l_1, "z", 2);
+	l_5 = END(l_1);
+	l_6 = LOOP_BEGIN(l_5, l_11);
+	int32_t d_7 = PHI(l_6, d_2, d_8);
+	int32_t d_8 = PHI(l_6, d_3, d_7);
+	l_9 = IF(l_6, d_4);
+	l_10 = IF_TRUE(l_9);
+	l_11 = LOOP_END(l_10, l_6);
+	l_12 = IF_FALSE(l_9);
+	l_13 = LOOP_EXIT(l_12, l_6);
+	l_14 = BEGIN(l_13);
+	l_15 = RETURN(l_14, d_7);
+}
+{ # CFG
+BB1:
+	start=1
+	end=5
+	successors(1) [BB2]
+	dom_depth=0
+	dom_children [BB2]
+BB2:
+	start=6
+	end=9
+	successors(2) [BB3, BB4]
+	predecessors(2) [BB1, BB3]
+	dom_parent=BB1
+	dom_depth=1
+	dom_children [BB3, BB4]
+	LOOP_HEADER
+	loop_depth=1
+BB3:
+	start=10
+	end=11
+	successors(1) [BB2]
+	predecessors(1) [BB2]
+	dom_parent=BB2
+	dom_depth=2
+	loop_header=BB2
+	loop_depth=1
+	mov R1 -> TMP
+	mov R2 -> R1
+	mov TMP -> R2
+BB4:
+	start=12
+	end=13
+	successors(1) [BB5]
+	predecessors(1) [BB2]
+	dom_parent=BB2
+	dom_depth=2
+	dom_children [BB5]
+BB5:
+	start=14
+	end=15
+	predecessors(1) [BB4]
+	dom_parent=BB4
+	dom_depth=3
+}
+{ # LIVE-RANGES (vregs_count=3)
+R1 (d_2, d_7): [2-5, 7-15]
+R2 (d_3, d_8): [3-5, 8-11]
+R3 (d_4): [4-9, 10-11]
+}

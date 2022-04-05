@@ -1,0 +1,21 @@
+--TEST--
+003: Constant Folding
+--ARGS--
+--save --dump-after-load
+--CODE--
+{
+	int32_t c_4 = 1;
+	l_1 = START(l_3);
+	int32_t d_2 = ADD(c_4, c_4);
+	l_3 = RETURN(l_1, d_2);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 1;
+	int32_t c_5 = 2;
+	l_1 = START(l_2);
+	l_2 = RETURN(l_1, c_5);
+}

@@ -1,0 +1,659 @@
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+
+#ifndef _WIN32
+# include <dlfcn.h>
+# include <unistd.h>
+# include <fcntl.h>
+#endif
+
+#include "ir.h"
+#include "ir_private.h"
+
+#ifndef _WIN32
+# include "ir_elf.h"
+#endif
+
+#include <capstone/capstone.h>
+#define HAVE_CAPSTONE_ITER
+
+typedef struct _ir_sym_node {
+	uint64_t             addr;
+	uint64_t             end;
+	struct _ir_sym_node *parent;
+	struct _ir_sym_node *child[2];
+	unsigned char        info;
+	char                 name[1];
+} ir_sym_node;
+
+static ir_sym_node *_symbols = NULL;
+
+static void ir_syms_rotateleft(ir_sym_node *p)
+{
+	ir_sym_node *r = p->child[1];
+	p->child[1] = r->child[0];
+	if (r->child[0]) {
+		r->child[0]->parent = p;
+	}
+	r->parent = p->parent;
+	if (p->parent == NULL) {
+		_symbols = r;
+	} else if (p->parent->child[0] == p) {
+		p->parent->child[0] = r;
+	} else {
+		p->parent->child[1] = r;
+	}
+	r->child[0] = p;
+	p->parent = r;
+}
+
+static void ir_syms_rotateright(ir_sym_node *p)
+{
+	ir_sym_node *l = p->child[0];
+	p->child[0] = l->child[1];
+	if (l->child[1]) {
+		l->child[1]->parent = p;
+	}
+	l->parent = p->parent;
+	if (p->parent == NULL) {
+		_symbols = l;
+	} else if (p->parent->child[1] == p) {
+		p->parent->child[1] = l;
+	} else {
+		p->parent->child[0] = l;
+	}
+	l->child[1] = p;
+	p->parent = l;
+}
+
+void ir_disasm_add_symbol(const char *name,
+                          uint64_t    addr,
+                          uint64_t    size)
+{
+	ir_sym_node *sym;
+	size_t len = strlen(name);
+
+	sym = ir_mem_malloc(sizeof(ir_sym_node) + len + 1);
+	if (!sym) {
+		return;
+	}
+	sym->addr = addr;
+	sym->end  = (addr + size - 1);
+	memcpy((char*)&sym->name, name, len + 1);
+	sym->parent = sym->child[0] = sym->child[1] = NULL;
+	sym->info = 1;
+	if (_symbols) {
+		ir_sym_node *node = _symbols;
+
+		/* insert it into rbtree */
+		do {
+			if (sym->addr > node->addr) {
+				IR_ASSERT(sym->addr > (node->end));
+				if (node->child[1]) {
+					node = node->child[1];
+				} else {
+					node->child[1] = sym;
+					sym->parent = node;
+					break;
+				}
+			} else if (sym->addr < node->addr) {
+				if (node->child[0]) {
+					node = node->child[0];
+				} else {
+					node->child[0] = sym;
+					sym->parent = node;
+					break;
+				}
+			} else {
+				IR_ASSERT(sym->addr == node->addr);
+				if (strcmp(name, node->name) == 0 && sym->end < node->end) {
+					/* reduce size of the existing symbol */
+					node->end = sym->end;
+				}
+				free(sym);
+				return;
+			}
+		} while (1);
+
+		/* fix rbtree after instering */
+		while (sym && sym != _symbols && sym->parent->info == 1) {
+			if (sym->parent == sym->parent->parent->child[0]) {
+				node = sym->parent->parent->child[1];
+				if (node && node->info == 1) {
+					sym->parent->info = 0;
+					node->info = 0;
+					sym->parent->parent->info = 1;
+					sym = sym->parent->parent;
+				} else {
+					if (sym == sym->parent->child[1]) {
+						sym = sym->parent;
+						ir_syms_rotateleft(sym);
+					}
+					sym->parent->info = 0;
+					sym->parent->parent->info = 1;
+					ir_syms_rotateright(sym->parent->parent);
+				}
+			} else {
+				node = sym->parent->parent->child[0];
+				if (node && node->info == 1) {
+					sym->parent->info = 0;
+					node->info = 0;
+					sym->parent->parent->info = 1;
+					sym = sym->parent->parent;
+				} else {
+					if (sym == sym->parent->child[0]) {
+						sym = sym->parent;
+						ir_syms_rotateright(sym);
+					}
+					sym->parent->info = 0;
+					sym->parent->parent->info = 1;
+					ir_syms_rotateleft(sym->parent->parent);
+				}
+			}
+		}
+	} else {
+		_symbols = sym;
+	}
+	_symbols->info = 0;
+}
+
+static void ir_disasm_destroy_symbols(ir_sym_node *n)
+{
+	if (n) {
+		if (n->child[0]) {
+			ir_disasm_destroy_symbols(n->child[0]);
+		}
+		if (n->child[1]) {
+			ir_disasm_destroy_symbols(n->child[1]);
+		}
+		free(n);
+	}
+}
+
+static const char* ir_disasm_find_symbol(uint64_t  addr,
+                                         int64_t  *offset)
+{
+	ir_sym_node *node = _symbols;
+	while (node) {
+		if (addr < node->addr) {
+			node = node->child[0];
+		} else if (addr > node->end) {
+			node = node->child[1];
+		} else {
+			*offset = addr - node->addr;
+			return node->name;
+		}
+	}
+	return NULL;
+}
+
+static uint64_t ir_disasm_branch_target(csh cs, const cs_insn *insn)
+{
+	unsigned int i;
+
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
+	if (cs_insn_group(cs, insn, X86_GRP_JUMP)) {
+		for (i = 0; i < insn->detail->x86.op_count; i++) {
+			if (insn->detail->x86.operands[i].type == X86_OP_IMM) {
+				return insn->detail->x86.operands[i].imm;
+			}
+		}
+	}
+#elif defined(IR_TARGET_ARM64)
+	if (cs_insn_group(cs, insn, ARM64_GRP_JUMP)
+	 || insn->id == ARM64_INS_BL
+	 || insn->id == ARM64_INS_ADR) {
+		for (i = 0; i < insn->detail->arm64.op_count; i++) {
+			if (insn->detail->arm64.operands[i].type == ARM64_OP_IMM)
+				return insn->detail->arm64.operands[i].imm;
+		}
+	}
+#endif
+
+	return 0;
+}
+
+static const char* ir_disasm_resolver(uint64_t   addr,
+                                      int64_t   *offset)
+{
+#ifndef _WIN32
+	const char *name;
+	void *a = (void*)(uintptr_t)(addr);
+	Dl_info info;
+
+	name = ir_disasm_find_symbol(addr, offset);
+	if (name) {
+		return name;
+	}
+
+	if (dladdr(a, &info)
+	 && info.dli_sname != NULL
+	 && info.dli_saddr == a) {
+		return info.dli_sname;
+	}
+#else
+	const char *name;
+	name = ir_disasm_find_symbol(addr, offset);
+	if (name) {
+		return name;
+	}
+#endif
+
+	return NULL;
+}
+
+#define INVALID_IDX 0xffffffff
+
+typedef struct _ir_addrtab_bucket {
+	uint32_t    addr;
+	uint32_t    next;
+} ir_addrtab_bucket;
+
+typedef struct _ir_addrtab {
+	void       *data;
+	uint32_t    mask;
+	uint32_t    size;
+	uint32_t    count;
+	uint32_t    pos;
+} ir_addrtab;
+
+static uint32_t ir_addrtab_hash_size(uint32_t size)
+{
+	size -= 1;
+	size |= (size >> 1);
+	size |= (size >> 2);
+	size |= (size >> 4);
+	size |= (size >> 8);
+	size |= (size >> 16);
+	return size + 1;
+}
+
+static void ir_addrtab_resize(ir_addrtab *addrtab)
+{
+	uint32_t old_hash_size = (uint32_t)(-(int32_t)addrtab->mask);
+	char *old_data = addrtab->data;
+	uint32_t size = addrtab->size * 2;
+	uint32_t hash_size = ir_addrtab_hash_size(size);
+	char *data = ir_mem_malloc(hash_size * sizeof(uint32_t) + size * sizeof(ir_addrtab_bucket));
+	ir_addrtab_bucket *p;
+	uint32_t pos, i;
+
+	memset(data, -1, hash_size * sizeof(uint32_t));
+	addrtab->data = data + (hash_size * sizeof(uint32_t));
+	addrtab->mask = (uint32_t)(-(int32_t)hash_size);
+	addrtab->size = size;
+
+	memcpy(addrtab->data, old_data, addrtab->count * sizeof(ir_addrtab_bucket));
+	ir_mem_free(old_data - (old_hash_size * sizeof(uint32_t)));
+
+	i = addrtab->count;
+	pos = 0;
+	p = (ir_addrtab_bucket*)addrtab->data;
+	do {
+		uint32_t addr = p->addr | addrtab->mask;
+		p->next = ((uint32_t*)addrtab->data)[(int32_t)addr];
+		((uint32_t*)addrtab->data)[(int32_t)addr] = pos;
+		pos += sizeof(ir_addrtab_bucket);
+		p++;
+	} while (--i);
+}
+
+static void ir_addrtab_init(ir_addrtab *addrtab, uint32_t size)
+{
+	IR_ASSERT(size > 0);
+	uint32_t hash_size = ir_addrtab_hash_size(size);
+	char *data = ir_mem_malloc(hash_size * sizeof(uint32_t) + size * sizeof(ir_addrtab_bucket));
+	memset(data, -1, hash_size * sizeof(uint32_t));
+	addrtab->data = (data + (hash_size * sizeof(uint32_t)));
+	addrtab->mask = (uint32_t)(-(int32_t)hash_size);
+	addrtab->size = size;
+	addrtab->count = 0;
+	addrtab->pos = 0;
+}
+
+void ir_addrtab_free(ir_addrtab *addrtab)
+{
+	uint32_t hash_size = (uint32_t)(-(int32_t)addrtab->mask);
+	char *data = addrtab->data - (hash_size * sizeof(uint32_t));
+	ir_mem_free(data);
+	addrtab->data = NULL;
+}
+
+static int ir_addrtab_find(ir_addrtab *addrtab, uintptr_t addr)
+{
+	char *data = (char*)addrtab->data;
+	uint32_t pos = ((uint32_t*)data)[(int32_t)(addr | addrtab->mask)];
+	ir_addrtab_bucket *p;
+
+	while (pos != INVALID_IDX) {
+		p = (ir_addrtab_bucket*)(data + pos);
+		if (p->addr == addr) {
+			return pos / sizeof(ir_addrtab_bucket);
+		}
+		pos = p->next;
+	}
+	return -1;
+}
+
+static void ir_addrtab_add(ir_addrtab *addrtab, uintptr_t addr)
+{
+	char *data = (char*)addrtab->data;
+	uint32_t pos = ((uint32_t*)data)[(int32_t)(addr | addrtab->mask)];
+	ir_addrtab_bucket *p;
+
+	while (pos != INVALID_IDX) {
+		p = (ir_addrtab_bucket*)(data + pos);
+		if (p->addr == addr) {
+			return;
+		}
+		pos = p->next;
+	}
+
+	if (UNEXPECTED(addrtab->count >= addrtab->size)) {
+		ir_addrtab_resize(addrtab);
+		data = addrtab->data;
+	}
+
+	pos = addrtab->pos;
+	addrtab->pos += sizeof(ir_addrtab_bucket);
+	addrtab->count++;
+	p = (ir_addrtab_bucket*)(data + pos);
+	p->addr = addr;
+	addr |= addrtab->mask;
+	p->next = ((uint32_t*)data)[(int32_t)addr];
+	((uint32_t*)data)[(int32_t)addr] = pos;
+}
+
+static int ir_addrab_cmp(const void *b1, const void *b2)
+{
+	return ((ir_addrtab_bucket*)b1)->addr - ((ir_addrtab_bucket*)b2)->addr;
+}
+
+static void ir_addrtab_sort(ir_addrtab *addrtab)
+{
+	ir_addrtab_bucket *p;
+	uint32_t hash_size, pos, i;
+
+	if (!addrtab->count) {
+		return;
+	}
+
+	qsort(addrtab->data, addrtab->count, sizeof(ir_addrtab_bucket), ir_addrab_cmp);
+
+	hash_size = ir_addrtab_hash_size(addrtab->size);
+	memset((char*)addrtab->data - (hash_size * sizeof(uint32_t)), -1, hash_size * sizeof(uint32_t));
+
+	i = addrtab->count;
+	pos = 0;
+	p = (ir_addrtab_bucket*)addrtab->data;
+	do {
+		uint32_t addr = p->addr | addrtab->mask;
+		p->next = ((uint32_t*)addrtab->data)[(int32_t)addr];
+		((uint32_t*)addrtab->data)[(int32_t)addr] = pos;
+		pos += sizeof(ir_addrtab_bucket);
+		p++;
+	} while (--i);
+}
+
+int ir_disasm(const char    *name,
+              const void    *start,
+              size_t         size)
+{
+	const void *end = (void *)((char *)start + size);
+	ir_addrtab labels;
+	int l;
+	uint64_t addr;
+	csh cs;
+	cs_insn *insn;
+# ifdef HAVE_CAPSTONE_ITER
+	const uint8_t *cs_code;
+	size_t cs_size;
+	uint64_t cs_addr;
+# else
+	size_t count, i;
+# endif
+	const char *sym;
+	int64_t offset = 0;
+	char *p, *q, *r;
+
+# if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
+#  if defined(__x86_64__) || defined(_WIN64)
+	if (cs_open(CS_ARCH_X86, CS_MODE_64, &cs) != CS_ERR_OK)
+		return 0;
+#  else
+	if (cs_open(CS_ARCH_X86, CS_MODE_32, &cs) != CS_ERR_OK)
+		return 0;
+#  endif
+	cs_option(cs, CS_OPT_DETAIL, CS_OPT_ON);
+#  if DISASM_INTEL_SYNTAX
+	cs_option(cs, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
+#  else
+	cs_option(cs, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+#  endif
+# elif defined(IR_TARGET_ARM64)
+	if (cs_open(CS_ARCH_ARM64, CS_MODE_ARM, &cs) != CS_ERR_OK)
+		return 0;
+	cs_option(cs, CS_OPT_DETAIL, CS_OPT_ON);
+	cs_option(cs, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+# endif
+
+	if (name) {
+		fprintf(stderr, "%s:\n", name);
+	}
+
+	ir_addrtab_init(&labels, 32);
+
+# ifdef HAVE_CAPSTONE_ITER
+	cs_code = start;
+	cs_size = (uint8_t*)end - (uint8_t*)start;
+	cs_addr = (uint64_t)(uintptr_t)cs_code;
+	insn = cs_malloc(cs);
+	while (cs_disasm_iter(cs, &cs_code, &cs_size, &cs_addr, insn)) {
+		if ((addr = ir_disasm_branch_target(cs, insn))) {
+# else
+	count = cs_disasm(cs, start, (uint8_t*)end - (uint8_t*)start, (uintptr_t)start, 0, &insn);
+	for (i = 0; i < count; i++) {
+		if ((addr = ir_disasm_branch_target(cs, &(insn[i])))) {
+# endif
+			if (addr >= (uint64_t)(uintptr_t)start && addr < (uint64_t)(uintptr_t)end) {
+				ir_addrtab_add(&labels, (uint32_t)((uintptr_t)addr - (uintptr_t)start));
+			}
+		}
+	}
+
+	ir_addrtab_sort(&labels);
+
+# ifdef HAVE_CAPSTONE_ITER
+	cs_code = start;
+	cs_size = (uint8_t*)end - (uint8_t*)start;
+	cs_addr = (uint64_t)(uintptr_t)cs_code;
+	while (cs_disasm_iter(cs, &cs_code, &cs_size, &cs_addr, insn)) {
+		l = ir_addrtab_find(&labels, (uint32_t)((uintptr_t)insn->address - (uintptr_t)start));
+# else
+	for (i = 0; i < count; i++) {
+		l = ir_addrtab_find(&labels, (uint32_t)((uintptr_t)insn->address - (uintptr_t)start));
+# endif
+		if (l >= 0) {
+			fprintf(stderr, ".L%d:\n", l + 1);
+		}
+
+# ifdef HAVE_CAPSTONE_ITER
+		if (0) {
+			fprintf(stderr, "    %" PRIx64 ":", insn->address);
+		}
+		fprintf(stderr, "\t%s ", insn->mnemonic);
+		p = insn->op_str;
+# else
+		if (0) {
+			fprintf(stderr, "    %" PRIx64 ":", insn[i].address);
+		}
+		fprintf(stderr, "\t%s ", insn[i].mnemonic);
+		p = insn[i].op_str;
+# endif
+		/* Try to replace the target addresses with a symbols */
+		while ((q = strchr(p, 'x')) != NULL) {
+			if (p != q && *(q-1) == '0') {
+				r = q + 1;
+				addr = 0;
+				while (1) {
+					if (*r >= '0' && *r <= '9') {
+						addr = addr * 16 + (*r - '0');
+					} else if (*r >= 'A' && *r <= 'F') {
+						addr = addr * 16 + (*r - 'A' + 10);
+					} else if (*r >= 'a' && *r <= 'f') {
+						addr = addr * 16 + (*r - 'a' + 10);
+					} else {
+						break;
+					}
+					r++;
+				}
+				if (addr >= (uint64_t)(uintptr_t)start && addr < (uint64_t)(uintptr_t)end) {
+					l = ir_addrtab_find(&labels, (uint32_t)((uintptr_t)addr - (uintptr_t)start));
+					if (l >= 0) {
+						fprintf(stderr, ".L%d", l + 1);
+					} else {
+						fwrite(p, 1, r - p, stderr);
+					}
+				} else if ((sym = ir_disasm_resolver(addr, &offset))) {
+					fwrite(p, 1, q - p - 1, stderr);
+					fputs(sym, stderr);
+					if (offset != 0) {
+						if (offset > 0) {
+							fprintf(stderr, "+%" PRIx64, offset);
+						} else {
+							fprintf(stderr, "-%" PRIx64, offset);
+						}
+					}
+				} else {
+					fwrite(p, 1, r - p, stderr);
+				}
+				p = r;
+			} else {
+				fwrite(p, 1, q - p + 1, stderr);
+				p = q + 1;
+			}
+		}
+		fprintf(stderr, "%s\n", p);
+	}
+# ifdef HAVE_CAPSTONE_ITER
+	cs_free(insn, 1);
+# else
+	cs_free(insn, count);
+# endif
+	fprintf(stderr, "\n");
+
+	ir_addrtab_free(&labels);
+
+	cs_close(&cs);
+
+	return 1;
+}
+
+#ifndef _WIN32
+static void* ir_elf_read_sect(int fd, ir_elf_sectheader *sect)
+{
+	void *s = ir_mem_malloc(sect->size);
+
+	if (lseek(fd, sect->ofs, SEEK_SET) < 0) {
+		ir_mem_free(s);
+		return NULL;
+	}
+	if (read(fd, s, sect->size) != (ssize_t)sect->size) {
+		ir_mem_free(s);
+		return NULL;
+	}
+
+	return s;
+}
+
+static void ir_elf_load_symbols(void)
+{
+	ir_elf_header hdr;
+	ir_elf_sectheader sect;
+	int i;
+#if defined(__linux__)
+	int fd = open("/proc/self/exe", O_RDONLY);
+#elif defined(__NetBSD__)
+	int fd = open("/proc/curproc/exe", O_RDONLY);
+#elif defined(__FreeBSD__) || defined(__DragonFly__)
+	char path[PATH_MAX];
+	size_t pathlen = sizeof(path);
+	int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1};
+	if (sysctl(mib, 4, path, &pathlen, NULL, 0) == -1) {
+		return;
+	}
+	int fd = open(path, O_RDONLY);
+#elif defined(__sun)
+	int fd = open("/proc/self/path/a.out", O_RDONLY);
+#elif defined(__HAIKU__)
+	char path[PATH_MAX];
+	if (find_path(B_APP_IMAGE_SYMBOL, B_FIND_PATH_IMAGE_PATH,
+		NULL, path, sizeof(path)) != B_OK) {
+		return;
+	}
+
+	int fd = open(path, O_RDONLY);
+#else
+	// To complete eventually for other ELF platforms.
+	// Otherwise APPLE is Mach-O
+	int fd = -1;
+#endif
+
+	if (fd >= 0) {
+		if (read(fd, &hdr, sizeof(hdr)) == sizeof(hdr)
+		 && hdr.emagic[0] == '\177'
+		 && hdr.emagic[1] == 'E'
+		 && hdr.emagic[2] == 'L'
+		 && hdr.emagic[3] == 'F'
+		 && lseek(fd, hdr.shofs, SEEK_SET) >= 0) {
+			for (i = 0; i < hdr.shnum; i++) {
+				if (read(fd, &sect, sizeof(sect)) == sizeof(sect)
+				 && sect.type == ELFSECT_TYPE_SYMTAB) {
+					uint32_t n, count = sect.size / sizeof(ir_elf_symbol);
+					ir_elf_symbol *syms = ir_elf_read_sect(fd, &sect);
+					char *str_tbl;
+
+					if (syms) {
+						if (lseek(fd, hdr.shofs + sect.link * sizeof(sect), SEEK_SET) >= 0
+						 && read(fd, &sect, sizeof(sect)) == sizeof(sect)
+						 && (str_tbl = (char*)ir_elf_read_sect(fd, &sect)) != NULL) {
+							for (n = 0; n < count; n++) {
+								if (syms[n].name
+								 && (ELFSYM_TYPE(syms[n].info) == ELFSYM_TYPE_FUNC
+								  /*|| ELFSYM_TYPE(syms[n].info) == ELFSYM_TYPE_DATA*/)
+								 && (ELFSYM_BIND(syms[n].info) == ELFSYM_BIND_LOCAL
+								  /*|| ELFSYM_BIND(syms[n].info) == ELFSYM_BIND_GLOBAL*/)) {
+									ir_disasm_add_symbol(str_tbl + syms[n].name, syms[n].value, syms[n].size);
+								}
+							}
+							ir_mem_free(str_tbl);
+						}
+						ir_mem_free(syms);
+					}
+					if (lseek(fd, hdr.shofs + (i + 1) * sizeof(sect), SEEK_SET) < 0) {
+						break;
+					}
+				}
+			}
+		}
+		close(fd);
+	}
+}
+#endif
+
+int ir_disasm_init(void)
+{
+#ifndef _WIN32
+	ir_elf_load_symbols();
+#endif
+	return 1;
+}
+
+void ir_disasm_free(void)
+{
+	if (_symbols) {
+		ir_disasm_destroy_symbols(_symbols);
+		_symbols = NULL;
+	}
+}

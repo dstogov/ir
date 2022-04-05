@@ -1,0 +1,52 @@
+--TEST--
+011: Long multislot instructions
+--ARGS--
+--save --dump-after-gcm
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 1;
+	int32_t c_5 = 2;
+	int32_t c_6 = 3;
+	int32_t c_7 = 4;
+	l_1 = START(l_16);
+	int32_t d_2 = PARAM(l_1, "x", 0);
+	l_3 = SWITCH(l_1, d_2);
+	l_4 = CASE_VAL(l_3, c_4);
+	l_5 = END(l_4);
+	l_6 = CASE_VAL(l_3, c_5);
+	l_7 = END(l_6);
+	l_8 = CASE_VAL(l_3, c_6);
+	l_9 = END(l_8);
+	l_10 = CASE_DEFAULT(l_3);
+	l_11 = END(l_10);
+	l_12 = MERGE/4(l_5, l_7, l_9, l_11);
+	int32_t d_14 = PHI/4(l_12, c_4, c_5, c_6, c_7);
+	l_16 = RETURN(l_12, d_14);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 1;
+	int32_t c_5 = 2;
+	int32_t c_6 = 3;
+	int32_t c_7 = 4;
+	l_1 = START(l_16);
+	int32_t d_2 = PARAM(l_1, "x", 0);
+	l_3 = SWITCH(l_1, d_2);
+	l_4 = CASE_VAL(l_3, c_4);
+	l_5 = END(l_4);
+	l_6 = CASE_VAL(l_3, c_5);
+	l_7 = END(l_6);
+	l_8 = CASE_VAL(l_3, c_6);
+	l_9 = END(l_8);
+	l_10 = CASE_DEFAULT(l_3);
+	l_11 = END(l_10);
+	l_12 = MERGE/4(l_5, l_7, l_9, l_11);
+	int32_t d_14 = PHI/4(l_12, c_4, c_5, c_6, c_7);
+	l_16 = RETURN(l_12, d_14);
+}
