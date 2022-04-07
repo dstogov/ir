@@ -809,6 +809,49 @@ ir_regset ir_get_fixed_regset(ir_ctx *ctx, ir_ref ref)
 	return IR_REGSET_EMPTY;
 }
 
+static ir_reg ir_get_param_reg(ir_ctx *ctx, ir_ref ref)
+{
+	ir_use_list *use_list = &ctx->use_lists[1];
+	int i;
+	ir_ref use, *p;
+	ir_insn *insn;
+	int int_param = 0;
+	int fp_param = 0;
+	int int_reg_params_count = IR_REG_INT_ARGS;
+	int fp_reg_params_count = IR_REG_FP_ARGS;
+	const int8_t *int_reg_params = _ir_int_reg_params;
+	const int8_t *fp_reg_params = _ir_fp_reg_params;
+
+	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < use_list->count; i++, p++) {
+		use = *p;
+		insn = &ctx->ir_base[use];
+		if (insn->op == IR_PARAM) {
+			if (IR_IS_TYPE_INT(insn->type)) {
+				if (use == ref) {
+					if (int_param < int_reg_params_count) {
+						return int_reg_params[int_param];
+					} else {
+						return IR_REG_NONE;
+					}
+				}
+				int_param++;
+			} else if (IR_IS_TYPE_FP(insn->type)) {
+				if (use == ref) {
+					if (fp_param < fp_reg_params_count) {
+						return fp_reg_params[fp_param];
+					} else {
+						return IR_REG_NONE;
+					}
+				}
+				fp_param++;
+			} else {
+				IR_ASSERT(0);
+			}
+		}
+	}
+	return IR_REG_NONE;
+}
+
 ir_reg ir_uses_fixed_reg(ir_ctx *ctx, ir_ref ref, int op_num)
 {
 	ir_ref rule;
@@ -835,6 +878,10 @@ ir_reg ir_uses_fixed_reg(ir_ctx *ctx, ir_ref ref, int op_num)
 	} else if (rule == IR_RETURN_FP) {
 		if (op_num == 2) {
 			return IR_REG_XMM0;
+		}
+	} else if (rule == IR_SKIP_REG) {
+		if (ctx->ir_base[ref].op == IR_PARAM && op_num == 0) {
+			return ir_get_param_reg(ctx, ref);
 		}
 	}
 	return IR_REG_NONE;
@@ -3038,28 +3085,36 @@ static void ir_emit_load_params(ir_ctx *ctx)
 	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
 		use = *p;
 		insn = &ctx->ir_base[use];
-		if (insn->op == IR_PARAM && ctx->vregs[use]) {
-			if (IR_IS_TYPE_INT(insn->type)) {
-				if (int_param_num < int_reg_params_count) {
-					src_reg = int_reg_params[int_param_num];
+		if (insn->op == IR_PARAM) {
+			if (ctx->vregs[use]) {
+				if (IR_IS_TYPE_INT(insn->type)) {
+					if (int_param_num < int_reg_params_count) {
+						src_reg = int_reg_params[int_param_num];
+					} else {
+						// TODO: replace IR_REG_NONE by stack slot
+						src_reg = IR_REG_NONE;
+					}
+					int_param_num++;
 				} else {
-					// TODO: replace IR_REG_NONE by stack slot
-					src_reg = IR_REG_NONE;
+					if (fp_param_num < fp_reg_params_count) {
+						src_reg = fp_reg_params[fp_param_num];
+					} else {
+						// TODO: replace IR_REG_NONE by stack slot
+						src_reg = IR_REG_NONE;
+					}
+					fp_param_num++;
 				}
-				int_param_num++;
+				dst_reg = ctx->live_intervals[ctx->vregs[use]]->reg;
+				if (src_reg != dst_reg) {
+					// TODO: DO parallel move
+					ir_emit_param_move(ctx, insn->type, src_reg, ctx->vregs[use], insn->op2);
+				}
 			} else {
-				if (fp_param_num < fp_reg_params_count) {
-					src_reg = fp_reg_params[fp_param_num];
+				if (IR_IS_TYPE_INT(insn->type)) {
+					int_param_num++;
 				} else {
-					// TODO: replace IR_REG_NONE by stack slot
-					src_reg = IR_REG_NONE;
+					fp_param_num++;
 				}
-				fp_param_num++;
-			}
-			dst_reg = ctx->live_intervals[ctx->vregs[use]]->reg;
-			if (src_reg != dst_reg) {
-				// TODO: DO parallel move
-				ir_emit_param_move(ctx, insn->type, src_reg, ctx->vregs[use], insn->op2);
 			}
 		}
 	}

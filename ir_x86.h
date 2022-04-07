@@ -228,10 +228,10 @@ uint32_t __inline __ir_clz(uint32_t value) {
 # define IR_REG_FP_RET1  IR_REG_XMM0
 # define IR_REG_INT_ARGS 6
 # define IR_REG_FP_ARGS  8
-# define IR_REG_INT_ARG1 IR_REG_RSI
-# define IR_REG_INT_ARG2 IR_REG_RDI
-# define IR_REG_INT_ARG3 IR_REG_RCX
-# define IR_REG_INT_ARG4 IR_REG_RDX
+# define IR_REG_INT_ARG1 IR_REG_RDI
+# define IR_REG_INT_ARG2 IR_REG_RSI
+# define IR_REG_INT_ARG3 IR_REG_RDX
+# define IR_REG_INT_ARG4 IR_REG_RCX
 # define IR_REG_INT_ARG5 IR_REG_R8
 # define IR_REG_INT_ARG6 IR_REG_R9
 # define IR_REG_FP_ARG1  IR_REG_XMM0

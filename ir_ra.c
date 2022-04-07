@@ -309,7 +309,12 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					}
 					reg = ctx->rules ? ir_uses_fixed_reg(ctx, i, 0) : IR_REG_NONE;
 					if (reg != IR_REG_NONE) {
-						ir_add_fixed_live_range(ctx, reg, i * 2, i * 2);
+						if (insn->op == IR_PARAM) {
+							/* parameter register must be kept before it's copied */
+							ir_add_fixed_live_range(ctx, reg, 2, i * 2);
+						} else {
+							ir_add_fixed_live_range(ctx, reg, i * 2, i * 2);
+						}
 					}
 					ir_add_use(ctx, ctx->vregs[i], 0, i * 2, reg);
 					/* live.remove(opd) */
@@ -790,13 +795,29 @@ static bool ir_live_range_covers(ir_live_interval *ival, ir_ref position)
 	return 0;
 }
 
+static ir_ref ir_try_allocate_preferred_reg(ir_live_interval *ival, ir_ref *freeUntilPos)
+{
+	ir_use_pos *use_pos;
+
+	use_pos = ival->use_pos;
+	while (use_pos) {
+		if (use_pos->hint >= 0) {
+			if (ir_live_range_end(ival) <= freeUntilPos[use_pos->hint]) {
+				/* register available for the whole interval */
+				return use_pos->hint;
+			}
+		}
+		use_pos = use_pos->next;
+	}
+	return IR_REG_NONE;
+}
+
 static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, int current, uint32_t len, ir_bitset active, ir_bitset inactive)
 {
 	ir_ref freeUntilPos[IR_REG_NUM];
 	int i, reg;
 	ir_ref pos, next;
 	ir_live_interval *ival = ctx->live_intervals[current];
-	ir_use_pos *use_pos;
 	ir_regset available;
 
 	if (IR_IS_TYPE_FP(ival->type)) {
@@ -845,16 +866,10 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, int current, uint32_t len, i
 	} IR_BITSET_FOREACH_END();
 
 	/* Try to use hint */
-	use_pos = ival->use_pos;
-	while (use_pos) {
-		if (use_pos->hint >= 0) {
-			if (ir_live_range_end(ival) <= freeUntilPos[use_pos->hint]) {
-				/* register available for the whole interval */
-				ival->reg = use_pos->hint;
-				return reg;
-			}
-		}
-		use_pos = use_pos->next;
+	reg = ir_try_allocate_preferred_reg(ival, freeUntilPos);
+	if (reg != IR_REG_NONE) {
+		ival->reg = reg;
+		return reg;
 	}
 
 	reg = IR_REGSET_FIRST(available);
