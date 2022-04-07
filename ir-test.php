@@ -62,8 +62,30 @@ function run_test($test, $name, $code, $expect, $args) {
 	return true;
 }
 
+function find_tests_in_dir($dir, &$tests) {
+    $d = opendir($dir);
+    if ($d !== false) {
+	    while (($name = readdir($d)) !== false) {
+	    	if ($name  === '.' || $name === '..') continue;
+	    	$fn = "$dir/$name";
+	    	if (is_dir($fn)) {
+	    		find_tests_in_dir($fn, $tests);
+	    	} else if (substr($name, -4) === '.irt') {
+	    		$tests[] = $fn;
+	    	}
+	    }
+	    closedir($d);
+    }
+}
+
+function find_tests($dir) {
+    $tests = [];
+	find_tests_in_dir($dir, $tests);
+	return $tests;
+}
+
 function run_tests() {
-	$tests = glob("tests/*.irt");
+	$tests = find_tests("tests");
 	$bad = array();
 	$failed = array();
 	foreach($tests as $test) {

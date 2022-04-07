@@ -1,0 +1,16 @@
+--TEST--
+005: add function
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	double y = PARAM(l_1, "y", 2);
+	double ret = ADD(x, y);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	addsd %xmm1, %xmm0
+	retq 

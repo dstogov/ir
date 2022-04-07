@@ -10,3 +10,9 @@ gen_ir_fold_hash
 ir_test
 ir
 b.c
+
+tests/**/*.diff
+tests/**/*.exp
+tests/**/*.ir
+tests/**/*.out
+tests/**/*.log
