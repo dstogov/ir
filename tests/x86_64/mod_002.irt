@@ -1,0 +1,20 @@
+--TEST--
+002: mod function
+--ARGS--
+-S
+--CODE--
+{
+	int32_t c = 17;
+	l_1 = START(l_4);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t ret = MOD(x, c);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	movl %edi, %eax
+	movl $0x11, %ecx
+	cltd
+	idivl %ecx
+	movl %edx, %eax
+	retq

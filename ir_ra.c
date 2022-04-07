@@ -332,7 +332,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							/* intervals[opd].addRange(b.from, op.id) */
 							ir_add_live_range(ctx, ctx->vregs[input], ctx->ir_base[input].type, bb->start * 2, i * 2 + l);
 							reg = ctx->rules ? ir_uses_fixed_reg(ctx, i, j) : IR_REG_NONE;
-							if (reg != IR_REG_NONE) {
+							if (reg != IR_REG_NONE && !ir_result_reuses_op1(ctx, i)) {
 								ir_add_fixed_live_range(ctx, reg, i * 2 + 1, i * 2 + 1);
 							}
 							ir_add_use(ctx, ctx->vregs[input], j, i * 2 + l, reg);

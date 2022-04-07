@@ -1997,8 +1997,13 @@ void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		if (insn->op1 == insn->op2) {
 			op2_reg = IR_REG_RAX;
 		} else if (IR_IS_CONST_REF(insn->op2)) {
-			op2_reg = IR_REG_RCX;
-			ir_emit_load(ctx, type, insn->op2, IR_REG_RCX); // TODO: temporary register 2
+			if (insn->op == IR_MUL) {
+				op2_reg = IR_REG_RDX;
+				ir_emit_load(ctx, type, insn->op2, IR_REG_RDX); // TODO: temporary register 2
+			} else {
+				op2_reg = IR_REG_RCX;
+				ir_emit_load(ctx, type, insn->op2, IR_REG_RCX); // TODO: temporary register 2
+			}
 		}
 	}
 #if IR_DASM

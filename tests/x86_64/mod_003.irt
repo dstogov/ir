@@ -1,0 +1,19 @@
+--TEST--
+003: mod function
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t y = PARAM(l_1, "y", 2);
+	int32_t ret = MOD(y, x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	movl %esi, %eax
+	cltd
+	idivl %edi
+	movl %edx, %eax
+	retq

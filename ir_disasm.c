@@ -482,14 +482,24 @@ int ir_disasm(const char    *name,
 		if (0) {
 			fprintf(stderr, "    %" PRIx64 ":", insn->address);
 		}
-		fprintf(stderr, "\t%s ", insn->mnemonic);
 		p = insn->op_str;
+		if (strlen(p) == 0) {
+			fprintf(stderr, "\t%s\n", insn->mnemonic);
+			continue;
+		} else  {
+			fprintf(stderr, "\t%s ", insn->mnemonic);
+		}
 # else
 		if (0) {
 			fprintf(stderr, "    %" PRIx64 ":", insn[i].address);
 		}
-		fprintf(stderr, "\t%s ", insn[i].mnemonic);
 		p = insn[i].op_str;
+		if (strlen(p) == 0) {
+			fprintf(stderr, "\t%s\n", insn[i].mnemonic);
+			continue;
+		} else {
+			fprintf(stderr, "\t%s ", insn[i].mnemonic);
+		}
 # endif
 		/* Try to replace the target addresses with a symbols */
 		while ((q = strchr(p, 'x')) != NULL) {
