@@ -345,10 +345,21 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					}
 				}
 				/* CPU specific constraints */
-				if (ctx->rules && ctx->rules[i] > IR_LAST_OP) {
-					ir_regset regset = ir_get_fixed_regset(ctx, i);
-					ir_reg reg;
+				if (ctx->rules) {
+					ir_regset regset = IR_REGSET_EMPTY;
 
+					if (insn->op == IR_CALL) {
+						regset = IR_REGSET_SCRATCH;
+						if (insn->type != IR_VOID) {
+							if (IR_IS_TYPE_INT(insn->type)) {
+								IR_REGSET_EXCL(regset, IR_REG_INT_RET1);
+							} else if (IR_IS_TYPE_FP(insn->type)) {
+								IR_REGSET_EXCL(regset, IR_REG_FP_RET1);
+							}
+						}
+					} else if (ctx->rules[i] > IR_LAST_OP) {
+						regset = ir_get_fixed_regset(ctx, i);
+					}
 					if (regset != IR_REGSET_EMPTY) {
 						IR_REGSET_FOREACH(regset, reg) {
 							ir_add_fixed_live_range(ctx, reg, i * 2, i * 2 + 1);

@@ -194,7 +194,7 @@ int main(int argc, char **argv)
 	char *dump_file = NULL, *c_file = NULL;
 	FILE *f;
 	ir_ctx ctx;
-	bool emit_c = 0, dump_asm = 0;
+	bool emit_c = 0, dump_asm = 0, run = 0;
 	uint32_t dump = 0;
 	int opt_level = 2;
 	uint32_t mflags = 0;
@@ -298,6 +298,8 @@ int main(int argc, char **argv)
 			dump |= IR_DUMP_FINAL;
 		} else if (strcmp(argv[i], "-S") == 0) {
 			dump_asm = 1;
+		} else if (strcmp(argv[i], "--run") == 0) {
+			run = 1;
 		} else if (strcmp(argv[i], "-mavx") == 0) {
 			mflags |= IR_AVX;
 		} else if (argv[i][0] == '-') {
@@ -341,7 +343,7 @@ int main(int argc, char **argv)
 	if (emit_c) {
 		ctx.flags |= IR_GEN_C;
 	}
-	if (dump_asm) {
+	if (dump_asm || run) {
 		ctx.flags |= IR_GEN_NATIVE;
 	}
 
@@ -371,13 +373,31 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (dump_asm) {
+	if (dump_asm || run) {
 		size_t size;
-		const void *entry = ir_emit(&ctx, &size);
+		void *entry = ir_emit(&ctx, &size);
 
 		if (entry) {
-			ir_disasm_add_symbol("test", (uintptr_t)entry, size);
-			ir_disasm("test", entry, size);
+			if (dump_asm) {
+				ir_disasm_add_symbol("test", (uintptr_t)entry, size);
+				ir_disasm("test", entry, size);
+			}
+			if (run) {
+				int (*func)(void) = entry;
+				int ret;
+
+				ir_perf_map_register("test", entry, size);
+				ir_perf_jitdump_open();
+				ir_perf_jitdump_register("test", entry,	size);
+
+				ir_mem_unprotect(entry, 4096);
+				ir_gdb_register("test", entry, size, 0, 0);
+				ir_mem_protect(entry, 4096);
+
+				ret = func();
+				fflush(stdout);
+				fprintf(stderr, "\nexit code = %d\n", ret);
+			}
 		}
 	}
 

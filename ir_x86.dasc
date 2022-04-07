@@ -199,21 +199,28 @@
 ||	}
 |.endmacro
 
-|.macro ASM_REG_REF_OP, op, type, dst, src
+|.macro ASM_REG_REF_OP, _op, type, dst, src
 ||	if (IR_IS_CONST_REF(src)) {
 ||		ir_insn *_insn = &ctx->ir_base[src];
-|		ASM_REG_IMM_OP op, type, dst, _insn->val.u32 // TODO:
+||		if (_insn->op == IR_STR) {
+||			int label = ctx->cfg_blocks_count - src;
+|			//ASM_REG_MEM_OP _op, type, dst, [=>label]
+|			lea Ra(dst), aword [=>label] // TODO: mov -> lea
+||			_insn->emit_const = 1;
+||		} else {
+|			ASM_REG_IMM_OP _op, type, dst, _insn->val.u32 // TODO:
+||		}
 ||	} else {
 ||		ir_live_interval *ival = ctx->live_intervals[ctx->vregs[src]];
 ||		if (ival->reg >= 0) {
-|			ASM_REG_REG_OP op, type, dst, ival->reg
+|			ASM_REG_REG_OP _op, type, dst, ival->reg
 ||		} else if (ival->stack_spill_pos) {
 ||			if (ctx->flags & IR_USE_FRAME_POINTER) {
 ||				int32_t offset = -ival->stack_spill_pos;
-|				ASM_REG_MEM_OP op, type, dst, [rbp+offset]
+|				ASM_REG_MEM_OP _op, type, dst, [rbp+offset]
 ||			} else {
 ||				int32_t offset = data->stack_frame_size - ival->stack_spill_pos;
-|				ASM_REG_MEM_OP op, type, dst, [rsp+offset]
+|				ASM_REG_MEM_OP _op, type, dst, [rsp+offset]
 ||			}
 ||		}
 ||	}
@@ -1176,6 +1183,15 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 		case IR_PI:
 		case IR_PARAM:
 			return IR_SKIP_REG;
+
+//		case IR_CALL:
+//		case IR_TAILCALL:
+//		case IR_ALLOCA:
+//		case IR_VLOAD:
+//		case IR_VSTORE:
+//		case IR_LOAD:
+//		case IR_STORE:
+
 		case IR_VAR:
 		case IR_START:
 		case IR_BEGIN:
@@ -2810,6 +2826,82 @@ static void ir_emit_copy_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
+#define IS_32BIT(addr) (((uintptr_t)(addr)) <= 0x7fffffff)
+#define IS_SIGNED_32BIT(val) ((((intptr_t)(val)) <= 0x7fffffff) && (((intptr_t)(val)) >= (-2147483647 - 1)))
+
+static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	void *addr;
+	int j, n;
+	ir_ref arg;
+	ir_insn *arg_insn;
+	uint8_t type;
+	ir_reg src, dst;
+	int int_param = 0;
+	int fp_param = 0;
+	int int_reg_params_count = IR_REG_INT_ARGS;
+	int fp_reg_params_count = IR_REG_FP_ARGS;
+	const int8_t *int_reg_params = _ir_int_reg_params;
+	const int8_t *fp_reg_params = _ir_fp_reg_params;
+
+	addr = (void*)printf; // TODO: func name reolution
+	ir_disasm_add_symbol("printf", (uintptr_t)addr, sizeof(void*));
+
+	// TODO: use parallel copy
+	n = ir_input_edges_count(ctx, insn);
+	for (j = 3; j <= n; j++) {
+		arg = insn->ops[j];
+		src = ir_ref_reg(ctx, arg);
+		arg_insn = &ctx->ir_base[arg];
+		type = arg_insn->type;
+		if (IR_IS_TYPE_INT(type)) {
+			if (int_param < int_reg_params_count) {
+				dst = int_reg_params[int_param];
+				if (src >= 0) {
+					if (src != dst) {
+						| ASM_REG_REG_OP mov, type, dst, src
+					}
+				} else {
+					ir_emit_load(ctx, type, arg, dst);
+				}
+			} else {
+				// TODO: pass arg throgh stack
+			}
+			int_param++;
+		} else if (IR_IS_TYPE_FP(type)) {
+			if (fp_param < fp_reg_params_count) {
+				dst = fp_reg_params[fp_param];
+				if (src >= 0) {
+					if (src != dst) {
+						|	ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, type, dst, src
+					}
+				} else {
+					ir_emit_fp_load(ctx, type, arg, dst);
+				}
+			} else {
+				// TODO: pass arg throgh stack
+			}
+			fp_param++;
+		} else {
+			IR_ASSERT(0);
+		}
+	}
+
+	|	sub rsp, sizeof(void*) // TODO: stack alignment
+
+//	if (IS_SIGNED_32BIT(addr)) { // TODO: 32-bit IP relative or 64-bit absolute address
+//		|	call qword &addr
+//	} else {
+		|	mov64 rax, ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
+		|	call rax
+//	}
+
+	|	add rsp, sizeof(void*) // TODO: stack alignment
+
+}
+
 static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, int from, int to)
 {
 #if IR_DASM
@@ -3631,6 +3723,9 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 				case IR_RETURN_FP:
 					ir_emit_return_fp(ctx, insn);
 					break;
+				case IR_CALL:
+					ir_emit_call(ctx, i, insn);
+					break;
 				default:
 					IR_ASSERT(0 && "NIY rule/insruction");
 					break;
@@ -3681,6 +3776,41 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 					IR_ASSERT(0);
 				}
 #endif
+			} else if (insn->op == IR_STR) {
+				int label = ctx->cfg_blocks_count + i;
+				const char *str = ir_get_str(ctx, insn->val.addr);
+				int i = 0;
+
+				if (!has_rodata) {
+					|.rodata
+					has_rodata = 1;
+				}
+				|.align 8
+				|=>label:
+				while (str[i]) {
+					char c = str[i];
+
+					if (c == '\\') {
+						if (str[i+1] == '\\') {
+							i++;
+							c = '\\';
+						} else if (str[i+1] == 'n') {
+							i++;
+							c = '\n';
+						} else if (str[i+1] == 'r') {
+							i++;
+							c = '\r';
+						} else if (str[i+1] == 't') {
+							i++;
+							c = '\t';
+						}
+
+					}
+					|.byte c
+					i++;
+				}
+				|.byte 0
+
 			} else {
 				IR_ASSERT(0);
 			}
