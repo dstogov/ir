@@ -1,6 +1,9 @@
 #ifndef IR_PRIVATE_H
 #define IR_PRIVATE_H
 
+#define IR_ALIGNED_SIZE(size, alignment) \
+	(((size) + ((alignment) - 1)) & ~((alignment) - 1))
+
 #define IR_MAX(a, b)          (((a) > (b)) ? (a) : (b))
 #define IR_MIN(a, b)          (((a) < (b)) ? (a) : (b))
 

@@ -476,6 +476,7 @@ typedef struct _ir_use_list {
 
 /* x86 related */
 #define IR_AVX               (1<<24)
+#define IR_HAS_CALLS         (1<<25)
 
 typedef enum _ir_fold_action {
 	IR_FOLD_DO_RESTART,

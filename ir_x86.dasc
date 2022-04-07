@@ -1184,7 +1184,10 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 		case IR_PARAM:
 			return IR_SKIP_REG;
 
-//		case IR_CALL:
+		case IR_CALL:
+			ctx->flags |= IR_HAS_CALLS;
+			return IR_CALL;
+
 //		case IR_TAILCALL:
 //		case IR_ALLOCA:
 //		case IR_VLOAD:
@@ -1208,7 +1211,7 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 		case IR_RETURN:
 			if (!insn->op2) {
 				return IR_RETURN_VOID;
-			} else if (IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)) {
+			} else if (IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
 				return IR_RETURN_INT;
 			} else {
 				return IR_RETURN_FP;
@@ -2764,7 +2767,7 @@ void ir_emit_return_fp(ir_ctx *ctx, ir_insn *insn)
 {
 	ir_reg op2_reg = ir_ref_reg(ctx, insn->op2);
 
-	if (op2_reg != IR_REG_INT_RET1) {
+	if (op2_reg != IR_REG_FP_RET1) {
 		ir_emit_fp_load(ctx, ctx->ir_base[insn->op2].type, insn->op2, IR_REG_FP_RET1);
 	}
 	ir_emit_return_void(ctx);
@@ -2829,10 +2832,26 @@ static void ir_emit_copy_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 #define IS_32BIT(addr) (((uintptr_t)(addr)) <= 0x7fffffff)
 #define IS_SIGNED_32BIT(val) ((((intptr_t)(val)) <= 0x7fffffff) && (((intptr_t)(val)) >= (-2147483647 - 1)))
 
+#include <dlfcn.h>
+
+static void *ir_resolve_sym_name(const char *name)
+{
+	void *handle = NULL;
+	void *addr;
+
+#ifdef RTLD_DEFAULT
+	handle = RTLD_DEFAULT;
+#endif
+	addr = dlsym(handle, name);
+	IR_ASSERT(addr != NULL);
+	return addr;
+}
+
 static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
+	const char *name;
 	void *addr;
 	int j, n;
 	ir_ref arg;
@@ -2846,8 +2865,8 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	const int8_t *int_reg_params = _ir_int_reg_params;
 	const int8_t *fp_reg_params = _ir_fp_reg_params;
 
-	addr = (void*)printf; // TODO: func name reolution
-	ir_disasm_add_symbol("printf", (uintptr_t)addr, sizeof(void*));
+	name = ir_get_str(ctx, ctx->ir_base[insn->op2].val.addr);
+	addr = ir_resolve_sym_name(name);
 
 	// TODO: use parallel copy
 	n = ir_input_edges_count(ctx, insn);
@@ -2889,16 +2908,12 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 	}
 
-	|	sub rsp, sizeof(void*) // TODO: stack alignment
-
 //	if (IS_SIGNED_32BIT(addr)) { // TODO: 32-bit IP relative or 64-bit absolute address
 //		|	call qword &addr
 //	} else {
 		|	mov64 rax, ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
 		|	call rax
 //	}
-
-	|	add rsp, sizeof(void*) // TODO: stack alignment
 
 }
 
@@ -3340,6 +3355,19 @@ static void ir_cals_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
 		}
 	}
 	data->stack_frame_size += additional_size;
+
+	if (ctx->flags & IR_HAS_CALLS) {
+		/* Stack must be 16 byte aligned */
+		if (ctx->flags & IR_USE_FRAME_POINTER) {
+			while (IR_ALIGNED_SIZE(data->stack_frame_size + sizeof(void*) * 2, 16) != data->stack_frame_size + sizeof(void*) * 2) {
+				data->stack_frame_size += 8;
+			}
+		} else {
+			while (IR_ALIGNED_SIZE(data->stack_frame_size + sizeof(void*), 16) != data->stack_frame_size + sizeof(void*)) {
+				data->stack_frame_size += 8;
+			}
+		}
+	}
 }
 
 void *ir_emit(ir_ctx *ctx, size_t *size)

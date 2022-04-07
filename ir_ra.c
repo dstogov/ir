@@ -350,20 +350,18 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 
 					if (insn->op == IR_CALL) {
 						regset = IR_REGSET_SCRATCH;
-						if (insn->type != IR_VOID) {
-							if (IR_IS_TYPE_INT(insn->type)) {
-								IR_REGSET_EXCL(regset, IR_REG_INT_RET1);
-							} else if (IR_IS_TYPE_FP(insn->type)) {
-								IR_REGSET_EXCL(regset, IR_REG_FP_RET1);
-							}
+						if (regset != IR_REGSET_EMPTY) {
+							IR_REGSET_FOREACH(regset, reg) {
+								ir_add_fixed_live_range(ctx, reg, i * 2, i * 2);
+							}  IR_REGSET_FOREACH_END();
 						}
 					} else if (ctx->rules[i] > IR_LAST_OP) {
 						regset = ir_get_fixed_regset(ctx, i);
-					}
-					if (regset != IR_REGSET_EMPTY) {
-						IR_REGSET_FOREACH(regset, reg) {
-							ir_add_fixed_live_range(ctx, reg, i * 2, i * 2 + 1);
-						}  IR_REGSET_FOREACH_END();
+						if (regset != IR_REGSET_EMPTY) {
+							IR_REGSET_FOREACH(regset, reg) {
+								ir_add_fixed_live_range(ctx, reg, i * 2, i * 2 + 1);
+							}  IR_REGSET_FOREACH_END();
+						}
 					}
 				}
 			}
