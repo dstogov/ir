@@ -13,4 +13,4 @@
 --EXPECT--
 test:
 	addsd %xmm1, %xmm0
-	retq 
+	retq

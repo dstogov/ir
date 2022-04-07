@@ -13,4 +13,4 @@
 --EXPECT--
 test:
 	subsd %xmm1, %xmm0
-	retq 
+	retq

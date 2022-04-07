@@ -14,4 +14,4 @@
 test:
 	movl %esi, %eax
 	addl %edi, %eax
-	retq 
+	retq

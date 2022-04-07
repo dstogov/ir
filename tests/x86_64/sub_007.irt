@@ -13,4 +13,4 @@
 --EXPECT--
 test:
 	vsubsd %xmm1, %xmm0, %xmm0
-	retq 
+	retq

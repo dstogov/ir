@@ -14,4 +14,4 @@
 test:
 	subsd %xmm0, %xmm1
 	movapd %xmm1, %xmm0
-	retq 
+	retq

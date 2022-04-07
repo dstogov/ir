@@ -63,19 +63,19 @@ function run_test($test, $name, $code, $expect, $args) {
 }
 
 function find_tests_in_dir($dir, &$tests) {
-    $d = opendir($dir);
-    if ($d !== false) {
-	    while (($name = readdir($d)) !== false) {
-	    	if ($name  === '.' || $name === '..') continue;
-	    	$fn = "$dir/$name";
-	    	if (is_dir($fn)) {
-	    		find_tests_in_dir($fn, $tests);
-	    	} else if (substr($name, -4) === '.irt') {
-	    		$tests[] = $fn;
-	    	}
-	    }
-	    closedir($d);
-    }
+	$d = opendir($dir);
+	if ($d !== false) {
+		while (($name = readdir($d)) !== false) {
+			if ($name  === '.' || $name === '..') continue;
+			$fn = "$dir/$name";
+			if (is_dir($fn)) {
+				find_tests_in_dir($fn, $tests);
+			} else if (substr($name, -4) === '.irt') {
+				$tests[] = $fn;
+			}
+		}
+		closedir($d);
+	}
 }
 
 function find_tests($dir) {
