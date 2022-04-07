@@ -793,6 +793,71 @@ bool ir_needs_def_reg(ir_ctx *ctx, ir_ref ref)
 	return ctx->rules[ref] != IR_SKIP;
 }
 
+ir_regset ir_get_fixed_regset(ir_ctx *ctx, ir_ref ref)
+{
+	ir_ref rule;
+
+	rule = ctx->rules[ref];
+//	if (rule == IR_SHIFT) {
+//		return IR_REGSET(IR_REG_RCX);
+//	if (rule == IR_MUL_INT || rule == IR_DIV_INT || rule == IR_MOD_INT) {
+//		return IR_REGSET(IR_REG_RAX) | IR_REGSET(IR_REG_RDX);
+//	}
+	if (rule == IR_MOD_INT && IR_IS_CONST_REF(ctx->ir_base[ref].op1)) {
+		return IR_REGSET(IR_REG_RAX);
+	}
+	return IR_REGSET_EMPTY;
+}
+
+ir_reg ir_uses_fixed_reg(ir_ctx *ctx, ir_ref ref, int op_num)
+{
+	ir_ref rule;
+
+	rule = ctx->rules[ref];
+	if (rule == IR_SHIFT) {
+		if (op_num == 2) {
+			return IR_REG_RCX;
+		}
+	} else if (rule == IR_MUL_INT || rule == IR_DIV_INT) {
+		if (op_num == 0 || op_num == 1) {
+			return IR_REG_RAX;
+		}
+	} else if (rule == IR_MOD_INT) {
+		if (op_num == 0) {
+			return IR_REG_RDX;
+		} else if (op_num == 1) {
+			return IR_REG_RAX;
+		}
+	} else if (rule == IR_RETURN_INT) {
+		if (op_num == 2) {
+			return IR_REG_RAX;
+		}
+	} else if (rule == IR_RETURN_FP) {
+		if (op_num == 2) {
+			return IR_REG_XMM0;
+		}
+	}
+	return IR_REG_NONE;
+}
+
+bool ir_result_reuses_op1(ir_ctx *ctx, ir_ref ref)
+{
+	ir_ref rule;
+
+	rule = ctx->rules[ref];
+	switch (rule) {
+		case IR_BINOP_INT:
+		case IR_BINOP_SSE2:
+		case IR_SHIFT:
+		case IR_SHIFT_CONST:
+		case IR_MUL_INT:
+		case IR_DIV_INT:
+		case IR_MOD_INT:
+			return 1;
+	}
+	return 0;
+}
+
 static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 {
 	ir_insn *op1_insn, *op2_insn;
@@ -1865,25 +1930,41 @@ void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (op2_reg < 0) {
 		if (insn->op1 == insn->op2) {
 			op2_reg = IR_REG_RAX;
-		} else {
-			op2_reg = IR_REG_RDX;
-			ir_emit_load(ctx, type, insn->op2, IR_REG_RDX);
+		} else if (IR_IS_CONST_REF(insn->op2)) {
+			op2_reg = IR_REG_RCX;
+			ir_emit_load(ctx, type, insn->op2, IR_REG_RCX); // TODO: temporary register 2
 		}
 	}
 #if IR_DASM
 	if (insn->op == IR_MUL) {
 		if (IR_IS_TYPE_SIGNED(insn->type)) {
-			|	ASM_REG_OP imul, type, op2_reg
+			if (op2_reg >= 0) {
+				|	ASM_REG_OP imul, type, op2_reg
+			} else {
+				|	ASM_REF_OP imul, type, insn->op2
+			}
 		} else {
-			|	ASM_REG_OP mul, type, op2_reg
+			if (op2_reg >= 0) {
+				|	ASM_REG_OP mul, type, op2_reg
+			} else {
+				|	ASM_REF_OP mul, type, insn->op2
+			}
 		}
 	} else {
 		if (IR_IS_TYPE_SIGNED(type)) {
 			|	cdq
-			|	ASM_REG_OP idiv, type, op2_reg
+			if (op2_reg >= 0) {
+				|	ASM_REG_OP idiv, type, op2_reg
+			} else {
+				|	ASM_REF_OP idiv, type, insn->op2
+			}
 		} else {
 			|	ASM_REG_REG_OP xor, type, IR_REG_RDX, IR_REG_RDX
-			|	ASM_REG_OP div, type, op2_reg
+			if (op2_reg >= 0) {
+				|	ASM_REG_OP div, type, op2_reg
+			} else {
+				|	ASM_REF_OP div, type, insn->op2
+			}
 		}
 	}
 #else
@@ -3569,7 +3650,8 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 
 	ret = dasm_encode(&data.dasm_state, entry);
 	if (ret != DASM_S_OK) {
-		ir_mem_free(entry);
+		IR_ASSERT(0);
+		ir_mem_unmap(entry, 4096);
 		return NULL;
 	}
 	dasm_free(&data.dasm_state);

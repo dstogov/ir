@@ -485,8 +485,17 @@ typedef enum _ir_fold_action {
 	IR_FOLD_DO_CONST
 } ir_fold_action;
 
+typedef struct _ir_use_pos       ir_use_pos;
 typedef struct _ir_live_range    ir_live_range;
 typedef struct _ir_live_interval ir_live_interval;
+
+struct _ir_use_pos {
+	uint16_t       op_num;
+	int8_t         hint;
+	int8_t         reg;
+	ir_ref         pos;
+	ir_use_pos    *next;
+};
 
 struct _ir_live_range {
 	ir_ref         start;
@@ -499,6 +508,7 @@ struct _ir_live_interval {
 	int8_t         reg;
 	int32_t        stack_spill_pos;
 	ir_live_range  range;
+	ir_use_pos    *use_pos;
 };
 
 typedef struct _ir_ctx {
@@ -672,7 +682,6 @@ void ir_free_live_intervals(ir_live_interval **live_intervals, int count);
 int ir_match(ir_ctx *ctx);
 void *ir_emit(ir_ctx *ctx, size_t *size);
 
-bool ir_needs_def_reg(ir_ctx *ctx, ir_ref ref);
 const char *ir_reg_name(int8_t reg, ir_type type);
 
 /* Target CPU disassembler (implementation in ir_disasm.c) */

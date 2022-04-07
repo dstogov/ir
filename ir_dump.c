@@ -252,6 +252,8 @@ void ir_dump_live_ranges(ir_ctx *ctx, FILE *f)
 
 		if (ival) {
 			ir_live_range *p = &ival->range;;
+			ir_use_pos *use_pos;
+
 			for (j = 1; j < ctx->insns_count; j++) {
 				if (ctx->vregs[j] == i) {
 					break;
@@ -267,13 +269,30 @@ void ir_dump_live_ranges(ir_ctx *ctx, FILE *f)
 			if (ival->reg >= 0) {
 				fprintf(f, " [%%%s]", ir_reg_name(ival->reg, ival->type));
 			}
-			fprintf(f, ": [%d-%d", p->start, p->end);
+			fprintf(f, ": [%d-%d%c", p->start / 2, p->end / 2, p->end % 2 == 0 ? '[' : ']');
 			p = p->next;
 			while (p) {
-				fprintf(f, ", %d-%d", p->start, p->end);
+				fprintf(f, ", [%d-%d%c", p->start / 2, p->end / 2, p->end % 2 == 0 ? '[' : ']');
+
 				p = p->next;
 			}
-			fprintf(f, "]\n");
+			use_pos = ival->use_pos;
+			while (use_pos) {
+				if (!use_pos->op_num) {
+					fprintf(f, ", DEF(%d", use_pos->pos / 2);
+				} else {
+					fprintf(f, ", USE(%d/%d", use_pos->pos / 2, use_pos->op_num);
+				}
+				if (use_pos->hint >= 0) {
+					fprintf(f, ", hint=%%%s", ir_reg_name(use_pos->hint, ival->type));
+				}
+				fprintf(f, ")");
+				if (use_pos->reg >= 0) {
+					fprintf(f, " [%%%s]", ir_reg_name(use_pos->reg, ival->type));
+				}
+				use_pos = use_pos->next;
+			}
+			fprintf(f, "\n");
 		}
 	}
 	fprintf(f, "}\n");
