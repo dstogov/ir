@@ -1,0 +1,17 @@
+--TEST--
+004: ge function
+--ARGS--
+-S
+--CODE--
+{
+	double c = 0;
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	bool ret = GE(x, c);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	ucomisd 8(%rip), %xmm0
+	setae %al
+	retq
