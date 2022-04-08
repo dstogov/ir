@@ -1,0 +1,19 @@
+--TEST--
+001: not function
+--ARGS--
+--emit-c
+--CODE--
+{
+	l_1 = START(l_4);
+	bool x = PARAM(l_1, "x", 1);
+	bool ret = NOT(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+bool test(bool x)
+{
+	bool d_1 = x;
+	bool d_2;
+	d_2 = !d_1;
+	return d_2;
+}

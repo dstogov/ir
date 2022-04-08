@@ -769,6 +769,7 @@ typedef enum _ir_rule {
 	IR_DIV_PWR2,
 	IR_MOD_PWR2,
 
+	IR_BOOL_NOT_INT,
 	IR_OP_INT,
 	IR_BINOP_INT,			 // res=reg(GP), op1.reg(GP, hint=res), op2=any
 	IR_BINOP_SSE2,			 // res=reg(FP), op1.reg(FP, hint=res), op2=reg(FP)|mem
@@ -1073,7 +1074,18 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 //		case IR_OVERFLOW:
 		case IR_BSWAP:
 		case IR_NOT:
-			return IR_OP_INT;
+			if (insn->type == IR_BOOL) {
+				if (IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)) {
+					return IR_BOOL_NOT_INT;
+				} else {
+					IR_ASSERT(0); // TODO: IR_BOOL_NOT_FP
+				}
+			} else if (IR_IS_TYPE_INT(insn->type)) {
+				return IR_OP_INT;
+			} else {
+				IR_ASSERT(0);
+			}
+			break;
 		case IR_NEG:
 			if (IR_IS_TYPE_INT(insn->type)) {
 				return IR_OP_INT;
@@ -1763,6 +1775,36 @@ void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	} else {
 		IR_ASSERT(0);
 	}
+	if (def_reg != reg) {
+		ir_emit_store(ctx, insn->type, reg, def);
+	}
+}
+
+void ir_emit_bool_not_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_reg def_reg = ir_ref_reg(ctx, def);
+	ir_reg op1_reg = ir_ref_reg(ctx, insn->op1);
+	ir_reg reg;
+	ir_type type = ctx->ir_base[insn->op1].type;
+
+	if (op1_reg >= 0) {
+		|	ASM_REG_REG_OP test, type, op1_reg, op1_reg
+	} else {
+		|	ASM_REF_IMM_OP cmp, type, insn->op1, 0
+	}
+
+	if (def_reg >= 0) {
+		reg = def_reg;
+	} else if (op1_reg >= 0 && ir_last_use(ctx, insn->op1)) {
+		reg = op1_reg;
+	} else {
+		reg = IR_REG_RAX; // TODO: temporary register
+	}
+
+	|	setne Rb(reg)
+
 	if (def_reg != reg) {
 		ir_emit_store(ctx, insn->type, reg, def);
 	}
@@ -3251,6 +3293,9 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 					break;
 				case IR_OP_INT:
 					ir_emit_op_int(ctx, i, insn);
+					break;
+				case IR_BOOL_NOT_INT:
+					ir_emit_bool_not_int(ctx, i, insn);
 					break;
 				case IR_BINOP_INT:
 					ir_emit_binop_int(ctx, i, insn);

@@ -17,7 +17,7 @@
 
 -  range inference and PI node
 -  SCCP edge cases
--  Folding after SCCP
+-  Folding after SCCP (see combo4.ir)
 
 -  local scheduling according to data dependencies, register presure and pipeline stalls
 -  basic block trace scheduling
@@ -35,6 +35,7 @@
 
 ?  register allocation
 	+  linear scan
+		-   allocate scratch registers first
 		-	separate INT and FP allocation phases 
     +  use positions
 	?  fixed registers constraints

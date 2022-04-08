@@ -148,16 +148,28 @@ void ir_dump_use_lists(ir_ctx *ctx, FILE *f)
 static int ir_dump_dessa_move(ir_ctx *ctx, uint8_t type, int from, int to)
 {
 	FILE *f = ctx->data;
+	int8_t reg;
 
 	if (IR_IS_CONST_REF(from)) {
 		fprintf(f, "\tmov c_%d -> ", -from);
 	} else if (from) {
-		fprintf(f, "\tmov R%d -> ", from);
+		fprintf(f, "\tmov R%d", from);
+		reg = ctx->live_intervals[from]->reg;
+		if (reg >= 0) {
+			fprintf(f, " [%%%s]", ir_reg_name(reg, type));
+		}
+		fprintf(f, " -> ");
 	} else {
 		fprintf(f, "\tmov TMP -> ");
 	}
+
 	if (to) {
-		fprintf(f, "R%d\n", to);
+		fprintf(f, "R%d", to);
+		reg = ctx->live_intervals[to]->reg;
+		if (reg >= 0) {
+			fprintf(f, " [%%%s]", ir_reg_name(reg, type));
+		}
+		fprintf(f, "\n");
 	} else {
 		fprintf(f, "TMP\n");
 	}

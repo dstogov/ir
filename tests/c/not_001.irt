@@ -1,7 +1,7 @@
 --TEST--
 001: not function
 --ARGS--
--S
+--emit-c
 --CODE--
 {
 	l_1 = START(l_4);
@@ -10,7 +10,10 @@
 	l_4 = RETURN(l_1, ret);
 }
 --EXPECT--
-test:
-	movl %edi, %eax
-	notl %eax
-	retq
+int32_t test(int32_t x)
+{
+	int32_t d_1 = x;
+	int32_t d_2;
+	d_2 = ~d_1;
+	return d_2;
+}

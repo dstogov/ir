@@ -81,4 +81,5 @@ clean:
 	ir.dot ir.pdf 2.log \
 	b perf.data perf.data.old perf.data.jitted \
 	tests/*.diff tests/*.out tests/*.exp tests/*.ir \
-	tests/x86_64/*.diff tests/x86_64/*.out tests/x86_64/*.exp tests/x86_64/*.ir
+	tests/x86_64/*.diff tests/x86_64/*.out tests/x86_64/*.exp tests/x86_64/*.ir \
+	tests/c/*.diff tests/c/*.out tests/c/*.exp tests/c/*.ir

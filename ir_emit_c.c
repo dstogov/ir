@@ -87,6 +87,76 @@ static void ir_emit_binary_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, cons
 	fprintf(f, ";\n");
 }
 
+static void ir_emit_signed_cast(FILE *f, ir_type type)
+{
+	if (!IR_IS_TYPE_SIGNED(type)) {
+		switch (ir_type_size[type]) {
+			case 1:
+				fprintf(f, "(int8_t)");
+				break;
+			case 2:
+				fprintf(f, "(int16_t)");
+				break;
+			case 4:
+				fprintf(f, "(int32_t)");
+				break;
+			case 8:
+				fprintf(f, "(int64_t)");
+				break;
+			default:
+				IR_ASSERT(0);
+		}
+	}
+}
+
+static void ir_emit_unsigned_cast(FILE *f, ir_type type)
+{
+	if (!IR_IS_TYPE_UNSIGNED(type)) {
+		switch (ir_type_size[type]) {
+			case 1:
+				fprintf(f, "(uint8_t)");
+				break;
+			case 2:
+				fprintf(f, "(uint16_t)");
+				break;
+			case 4:
+				fprintf(f, "(uint32_t)");
+				break;
+			case 8:
+				fprintf(f, "(uint64_t)");
+				break;
+			default:
+				IR_ASSERT(0);
+		}
+	}
+}
+
+static void ir_emit_signed_binary_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *op)
+{
+	uint8_t t1 = ctx->ir_base[insn->op1].type;
+
+	ir_emit_def_ref(ctx, f, def);
+	ir_emit_signed_cast(f, t1);
+	ir_emit_ref(ctx, f, insn->op1);
+	fprintf(f, " %s ", op);
+	ir_emit_signed_cast(f, t1);
+	ir_emit_ref(ctx, f, insn->op2);
+	fprintf(f, ";\n");
+}
+
+static void ir_emit_unsigned_binary_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *op)
+{
+	uint8_t t1 = ctx->ir_base[insn->op1].type;
+
+	ir_emit_def_ref(ctx, f, def);
+	ir_emit_unsigned_cast(f, t1);
+	ir_emit_ref(ctx, f, insn->op1);
+	fprintf(f, " %s ", op);
+	ir_emit_unsigned_cast(f, t1);
+	ir_emit_ref(ctx, f, insn->op2);
+	fprintf(f, ";\n");
+}
+
 static void ir_emit_unsigned_comparison_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *op, const char *fop)
 {
 	uint8_t t1 = ctx->ir_base[insn->op1].type;
@@ -96,35 +166,61 @@ static void ir_emit_unsigned_comparison_op(ir_ctx *ctx, FILE *f, int def, ir_ins
 	ir_emit_def_ref(ctx, f, def);
 	if (t1 == IR_FLOAT || t1 == IR_DOUBLE) {
 		fprintf(f, "!(");
-	} else if (t1 == IR_I8) {
-		fprintf(f, "(uint8_t)");
-	} else if (t1 == IR_I16) {
-		fprintf(f, "(uint16_t)");
-	} else if (t1 == IR_I32) {
-		fprintf(f, "(uint32_t)");
-	} else if (t1 == IR_I64) {
-		fprintf(f, "(uint64_t)");
+	} else {
+		ir_emit_unsigned_cast(f, t1);
 	}
 	ir_emit_ref(ctx, f, insn->op1);
 	if (t1 == IR_FLOAT || t1 == IR_DOUBLE) {
 		fprintf(f, " %s ", fop);
 	} else {
 		fprintf(f, " %s ", op);
-		if (t1 == IR_I8) {
-			fprintf(f, "(uint8_t)");
-		} else if (t1 == IR_I16) {
-			fprintf(f, "(uint16_t)");
-		} else if (t1 == IR_I32) {
-			fprintf(f, "(uint32_t)");
-		} else if (t1 == IR_I64) {
-			fprintf(f, "(uint64_t)");
-		}
+		ir_emit_unsigned_cast(f, t1);
 	}
 	ir_emit_ref(ctx, f, insn->op2);
 	if (t1 == IR_FLOAT || t1 == IR_DOUBLE) {
 		fprintf(f, ")");
 	}
 	fprintf(f, ";\n");
+}
+
+static void ir_emit_rol_ror(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *op1, const char *op2)
+{
+	uint8_t t1 = ctx->ir_base[insn->op1].type;
+
+	ir_emit_def_ref(ctx, f, def);
+	fprintf(f, "(");
+	ir_emit_unsigned_cast(f, t1);
+	ir_emit_ref(ctx, f, insn->op1);
+	fprintf(f, " %s ", op1);
+	ir_emit_unsigned_cast(f, t1);
+	ir_emit_ref(ctx, f, insn->op2);
+	fprintf(f, ") | (");
+	ir_emit_unsigned_cast(f, t1);
+	ir_emit_ref(ctx, f, insn->op1);
+	fprintf(f, " %s (%d", op2, ir_type_size[t1] * 8);
+	fprintf(f, " - ");
+	ir_emit_unsigned_cast(f, t1);
+	ir_emit_ref(ctx, f, insn->op2);
+	fprintf(f, "));\n");
+}
+
+static void ir_emit_bswap(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
+{
+	ir_emit_def_ref(ctx, f, def);
+
+	switch (ir_type_size[insn->type]) {
+		case 4:
+			fprintf(f, "__builtin_bswap32(");
+			break;
+		case 8:
+			fprintf(f, "__builtin_bswap64(");
+			break;
+		default:
+			IR_ASSERT(0);
+	}
+
+	ir_emit_ref(ctx, f, insn->op1);
+	fprintf(f, ");\n");
 }
 
 static void ir_emit_minmax_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
@@ -585,12 +681,24 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 //					ir_emit_func1df_op(ctx, f, i, insn, "pow", "powf");
 //				case IR_ABS:
 //					ir_emit_func1df_op(ctx, f, i, insn, "fabs", "fabsf", "abs", "llab");
-//				case IR_SHL:
-//				case IR_SHR:
-//				case IR_SAR:
-//				case IR_ROL:
-//				case IR_ROR:
-//				case IR_BSWAP:
+				case IR_SHL:
+					ir_emit_binary_op(ctx, f, i, insn, "<<");
+					break;
+				case IR_SHR:
+					ir_emit_unsigned_binary_op(ctx, f, i, insn, ">>");
+					break;
+				case IR_SAR:
+					ir_emit_signed_binary_op(ctx, f, i, insn, ">>");
+					break;
+				case IR_ROL:
+					ir_emit_rol_ror(ctx, f, i, insn, "<<", ">>");
+					break;
+				case IR_ROR:
+					ir_emit_rol_ror(ctx, f, i, insn, ">>", "<<");
+					break;
+				case IR_BSWAP:
+					ir_emit_bswap(ctx, f, i, insn);
+					break;
 				case IR_COPY:
 					ir_emit_copy(ctx, f, i, insn);
 					break;
