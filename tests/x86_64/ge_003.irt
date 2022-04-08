@@ -1,0 +1,17 @@
+--TEST--
+003: ge function
+--ARGS--
+-S
+--CODE--
+{
+	int32_t c = 0;
+	l_1 = START(l_4);
+	int32_t x = PARAM(l_1, "x", 1);
+	bool ret = GE(x, c);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	testl %edi, %edi
+	setge %al
+	retq

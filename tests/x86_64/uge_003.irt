@@ -1,17 +1,16 @@
 --TEST--
-002: ult function
+003: uge function
 --ARGS--
 -S
 --CODE--
 {
-	uint32_t c = 17;
+	uint32_t c = 0;
 	l_1 = START(l_4);
 	uint32_t x = PARAM(l_1, "x", 1);
-	bool ret = ULT(x, c);
+	bool ret = UGE(x, c);
 	l_4 = RETURN(l_1, ret);
 }
 --EXPECT--
 test:
-	cmpl $0x11, %edi
-	setb %al
+	movb $1, %al
 	retq
