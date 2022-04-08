@@ -1071,19 +1071,26 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 //		case IR_SUB_OV:
 //		case IR_MUL_OV:
 //		case IR_OVERFLOW:
+		case IR_BSWAP:
 		case IR_NOT:
 			return IR_OP_INT;
 		case IR_NEG:
 			if (IR_IS_TYPE_INT(insn->type)) {
 				return IR_OP_INT;
 			} else {
-				IR_ASSERT(0); return IR_SKIP; // xorps
+				IR_ASSERT(0); return IR_SKIP; // xorpd .LC0(%rip), %xmm0; 0 0x80000000 0 0
+				                              // vxorpd .LC0(%rip), %xmm0, %xmm0
+				                              // xorps .LC0(%rip), %xmm0; 0x80000000 0 0 0
+				                              // vxorps .LC0(%rip), %xmm0, %xmm0
 			}
 		case IR_ABS:
 			if (IR_IS_TYPE_INT(insn->type)) {
-				IR_ASSERT(0); return IR_SKIP; // TODO: ???
+				IR_ASSERT(0); return IR_SKIP; // movl %edi, %eax; negl %eax; cmovs %edi, %eax
 			} else {
-				IR_ASSERT(0); return IR_SKIP; // andps
+				IR_ASSERT(0); return IR_SKIP; // andpd .LC0(%rip), %xmm0; 0xffffffff 0x7fffffff 0 0
+				                              // vandpd .LC0(%rip), %xmm0, %xmm0
+				                              // andps .LC0(%rip), %xmm0; 0x7fffffff 0 0 0
+				                              // vandps .LC0(%rip), %xmm0, %xmm0
 			}
 		case IR_OR:
 			if (IR_IS_CONST_REF(insn->op2)) {
@@ -1164,7 +1171,6 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 				return IR_SHIFT_CONST;
 			}
 			return IR_SHIFT;
-//		case IR_BSWAP:
 //		case IR_MIN:
 //		case IR_MAX:
 //		case IR_COND:
@@ -1743,6 +1749,17 @@ void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		|	ASM_REG_OP not, insn->type, reg
 	} else if (insn->op == IR_NEG) {
 		|	ASM_REG_OP neg, insn->type, reg
+	} else if (insn->op == IR_BSWAP) {
+		switch (ir_type_size[insn->type]) {
+			case 4:
+				|	bswap Rd(reg)
+				break;
+			case 8:
+				|	bswap Rq(reg)
+				break;
+			default:
+				IR_ASSERT(0);
+		}
 	} else {
 		IR_ASSERT(0);
 	}

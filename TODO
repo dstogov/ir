@@ -1,0 +1,93 @@
+-  type casting nodes
+-  overflow detection nodes 
+-  va_arg nodes
+-  BSTART, BEND nodes (to free data allocated by ALLOCA)
+-  ENTRY node for multy-entry units
+-  IJMP
+-  guards
+-  variable name binding
+
+-  VLOAD, VSTORE -> SSA
+
+?  reassociation folding rules
+-  folding engine improvement (one rule for few patterns)
+
+-  irreducable loops detection
+-  irreducable loops support
+
+-  range inference and PI node
+-  SCCP edge cases
+-  Folding after SCCP
+
+-  local scheduling according to data dependencies, register presure and pipeline stalls
+-  basic block trace scheduling
+
+?  C code generation
+	- VLOAD, VSTORE
+
+?  instruction selection
+	- xor, btsl=INCL, btrl=EXCL, btl=IN, bsr, maxss, maxsd, minss, minsd
+    - MOVZX to avoid a SHIFT and AND instruction
+    - Using CMOVcc to remove branches
+    - mov rax, 123456789abcdef0h ; 10 bytes (64-bit constant)
+    - mov rax, -100 ; 7 bytes (32-bit sign-extended)
+    - mov eax, 100 ; 5 bytes (32-bit zero-extended)
+
+?  register allocation
+	+  linear scan
+		-	separate INT and FP allocation phases 
+    +  use positions
+	?  fixed registers constraints
+		+  fixed input
+		+  fixed output
+		+  fixed tmp
+		+  fixed intervals for parameters
+		-  accurate fixed interval construction
+	-  constraints
+	    -  kill
+	    -  restricted regset
+	-  temporary registers
+	?  spills
+        +  spill slot allocation ( uniqe for each VREG)
+    	-  uniqe for each VREG
+		-  SpillRange ???
+	-  splitting
+		-  SplitAt
+	-  splinting
+		-  spill only at cold path if possible	
+	?  hints
+		+  hints for fixed input/outpu registers
+		+  hints for parameter nodes
+		-  hints for call arguments
+		-  hints propagation
+		-  hints and low priority
+
+?  code generation
+	-  POW, NEG (fp), ABS, OVERFLOW, MIN, MAX, COND, TAILCALL, ALLOCA, VLOAD, VSTORE, LOAD, STORE
+	-  SWITCH
+	-  ir_last_use
+	-  64-bit constant (ir_emit_ref, ir_emit_dssa_move)
+	-  binop_int $imm, mem
+	-  commutative insns and swap (binop_int, mul, binop_sse, binop_avx, cmp_int, cmp_fp, cmp_br_int)
+	-  dessa_move (push, pop)
+	-  param_move	 
+	-  temporary register (e.g. for unsupported immediate operand in mul, div)
+    -  temporary register for swap (dessa3.ir)
+    -  temporary register for spill loads and stores
+	-  parallel parameter loading
+	-  parallel argument passing
+	-  return merge/split
+	?  binary code emission
+		+ DynAsm
+		- BinAsm
+
+?  disassembler
+    -  .rodata section and relative data labels
+
+-  modules (functions, data objecs, import, export, prototypes, forward declarations, memory segments, ref data, expr data) 
+-  C compiler
+-  interpreter
+-  alias analyzes
+
+-  PHP support
+

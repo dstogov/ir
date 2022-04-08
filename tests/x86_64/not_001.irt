@@ -1,0 +1,16 @@
+--TEST--
+001: nit function
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t ret = NOT(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	movl %edi, %eax
+	notl %eax
+	retq
