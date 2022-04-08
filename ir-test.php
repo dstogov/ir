@@ -81,6 +81,7 @@ function find_tests_in_dir($dir, &$tests) {
 function find_tests($dir) {
     $tests = [];
 	find_tests_in_dir($dir, $tests);
+	sort($tests);
 	return $tests;
 }
 

@@ -1,0 +1,17 @@
+--TEST--
+001: ult function
+--ARGS--
+-S
+--CODE--
+{
+	uint32_t c = 17;
+	l_1 = START(l_4);
+	uint32_t x = PARAM(l_1, "x", 1);
+	bool ret = ULT(x, c);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	cmpl $0x11, %edi
+	setb %al
+	retq
