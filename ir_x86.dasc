@@ -1,4 +1,3 @@
-#define IR_DASM 1
 #define IR_X64 1
 
 #include "ir.h"
@@ -647,9 +646,7 @@
 typedef struct _ir_backend_data {
 	uint32_t  stack_frame_size;
 	ir_regset used_preserved_regs;
-#if IR_DASM
 	dasm_State *dasm_state;
-#endif
 } ir_backend_data;
 
 #define IR_GP_REG_NAME(code, name64, name32, name16, name8, name8h) \
@@ -1302,197 +1299,49 @@ static bool ir_last_use(ir_ctx *ctx, ir_ref ref)
 	return 0;
 }
 
-#if !IR_DASM
-static char ir_int_suffix(uint8_t type)
-{
-	switch (ir_type_size[type]) {
-		case 1: return 'b';
-		case 2: return 'w';
-		case 4: return 'l';
-		case 8: return 'q';
-		default: break;
-	 }
-	IR_ASSERT(0);
-	return '?';
-}
-
-static char ir_fp_suffix(uint8_t type)
-{
-	if (type == IR_DOUBLE) {
-		return 'd';
-	} else if (type == IR_FLOAT) {
-		return 's';
-	}
-	IR_ASSERT(0);
-	return '?';
-}
-
-static void ir_emit_reg(int8_t reg, ir_type type)
-{
-	fprintf(stderr, "%%%s", ir_reg_name(reg, type));
-}
-
-static void ir_emit_vreg(ir_ctx *ctx, int v)
-{
-	ir_live_interval *ival = ctx->live_intervals[v];
-
-	if (ival->reg >= 0) {
-		ir_emit_reg(ival->reg, ival->type);
-	} else if (ival->stack_spill_pos) {
-		if (ctx->flags & IR_USE_FRAME_POINTER) {
-			fprintf(stderr, "%d(%%rbp)", -ival->stack_spill_pos);
-		} else {
-			ir_backend_data *data = ctx->data;
-			fprintf(stderr, "%d(%%rsp)", data->stack_frame_size - ival->stack_spill_pos);
-		}
-	} else {
-		fprintf(stderr, "d_%d", v);
-		IR_ASSERT(0 && "NIY TODO: unassigned spill slot");
-	}
-}
-
-static void ir_emit_ref(ir_ctx *ctx, ir_ref ref)
-{
-	if (IR_IS_CONST_REF(ref)) {
-		ir_insn *insn = &ctx->ir_base[ref];
-
-		if (IR_IS_TYPE_INT(insn->type)) {
-			// TODO: support for 64-bit constant
-			fprintf(stderr, "$");
-			ir_print_const(ctx, insn, stderr);
-		} else if (IR_IS_TYPE_FP(insn->type)) {
-			fprintf(stderr, ".LLC%d(%%rip)", -ref);
-			insn->emit_const = 1;
-		}
-	} else {
-		ir_emit_vreg(ctx, ctx->vregs[ref]);
-	}
-}
-#endif
-
 static void ir_emit_load(ir_ctx *ctx, ir_type type, ir_ref src, ir_reg reg)
 {
-#if IR_DASM
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
 	|	ASM_REG_REF_OP mov, type, reg, src
-#else
-	fprintf(stderr, "\tmov%c ", ir_int_suffix(type));
-	ir_emit_ref(ctx, src);
-	fprintf(stderr, ", ");
-	ir_emit_reg(reg, type);
-	fprintf(stderr, "\n");
-#endif
 }
 
 static void ir_emit_store(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref dst)
 {
-#if IR_DASM
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
 	|	ASM_REF_REG_OP mov, type, dst, reg
-#else
-	fprintf(stderr, "\tmov%c ", ir_int_suffix(type));
-	ir_emit_reg(reg, type);
-	fprintf(stderr, ", ");
-	ir_emit_ref(ctx, dst);
-	fprintf(stderr, "\n");
-#endif
 }
 
 static void ir_emit_fp_load(ir_ctx *ctx, ir_type type, ir_ref src, ir_reg reg)
 {
-#if IR_DASM
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
 	|	ASM_FP_MOV_REG_REF_OP type, reg, src
-#else
-	char suffix = ir_fp_suffix(type);
-
-	if (ir_ref_reg(ctx, src) >= 0) {
-		if (ctx->flags & IR_AVX) {
-			fprintf(stderr, "\tvmovap%c ", suffix);
-		} else {
-			fprintf(stderr, "\tmovap%c ", suffix);
-		}
-	} else {
-		if (ctx->flags & IR_AVX) {
-			fprintf(stderr, "\tvmovs%c ", suffix);
-		} else {
-			fprintf(stderr, "\tmovs%c ", suffix);
-		}
-	}
-	ir_emit_ref(ctx, src);
-	fprintf(stderr, ", ");
-	ir_emit_reg(reg, type);
-	fprintf(stderr, "\n");
-#endif
 }
 
 static void ir_emit_fp_store(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref dst)
 {
-#if IR_DASM
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
 	|	ASM_FP_MOV_REF_REG_OP type, dst, reg
-#else
-	char suffix = ir_fp_suffix(type);
-
-	if (ir_ref_reg(ctx, dst) >= 0) {
-		if (ctx->flags & IR_AVX) {
-			fprintf(stderr, "\tvmovap%c ", suffix);
-		} else {
-			fprintf(stderr, "\tmovap%c ", suffix);
-		}
-	} else {
-		if (ctx->flags & IR_AVX) {
-			fprintf(stderr, "\tvmovs%c ", suffix);
-		} else {
-			fprintf(stderr, "\tmovs%c ", suffix);
-		}
-	}
-	ir_emit_reg(reg, type);
-	fprintf(stderr, ", ");
-	ir_emit_ref(ctx, dst);
-	fprintf(stderr, "\n");
-#endif
 }
 
 static void ir_emit_prologue(ir_ctx *ctx)
 {
 	ir_backend_data *data = ctx->data;
-#if IR_DASM
 	dasm_State **Dst = &data->dasm_state;
-#endif
 
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
-#if IR_DASM
 		|	push rbp
 		|	mov rbp, rsp
-#else
-		if (IR_X64) {
-			fprintf(stderr, "\tpushq %%rbp\n");
-			fprintf(stderr, "\tmovq %%rsp, %%rbp\n");
-		} else {
-			fprintf(stderr, "\tpushl %%ebp\n");
-			fprintf(stderr, "\tmovl %%esp, %%ebp\n");
-		}
-#endif
 	}
 	if (data->stack_frame_size) {
-#if IR_DASM
 		|	sub rsp, data->stack_frame_size
-#else
-		if (IR_X64) {
-			fprintf(stderr, "\tsubq $%d, %%rsp\n", data->stack_frame_size);
-		} else {
-			fprintf(stderr, "\tsubl $%d, %%esp\n", data->stack_frame_size);
-		}
-#endif
 	}
 	if (data->used_preserved_regs) {
 		int offset;
@@ -1506,33 +1355,10 @@ static void ir_emit_prologue(ir_ctx *ctx)
 		for (i = 0; i < IR_REG_NUM; i++) {
 			if (IR_REGSET_IN(data->used_preserved_regs, i)) {
 				if (i < IR_REG_FP_FIRST) {
-#if IR_DASM
-						ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_RBP : IR_REG_RSP;
+					ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_RBP : IR_REG_RSP;
 
-						|	mov aword [Ra(fp)+offset], Ra(i)
-#else
-					if (IR_X64) {
-						fprintf(stderr, "\tmovl ");
-					} else {
-						fprintf(stderr, "\tmovq ");
-					}
-					ir_emit_reg(i, IR_ADDR);
-					fprintf(stderr, ", %d", offset);
-					if (IR_X64) {
-						if (ctx->flags & IR_USE_FRAME_POINTER) {
-							fprintf(stderr, "(%%rbp)");
-						} else {
-							fprintf(stderr, "(%%rsp)");
-						}
-					} else {
-						if (ctx->flags & IR_USE_FRAME_POINTER) {
-							fprintf(stderr, "(%%ebp)");
-						} else {
-							fprintf(stderr, "(%%esp)");
-						}
-					}
-					fprintf(stderr, "\n");
-#endif
+					|	mov aword [Ra(fp)+offset], Ra(i)
+
 					offset -= sizeof(void*);
 				} else {
 					IR_ASSERT(0 && "NIY FP register saing");
@@ -1545,9 +1371,7 @@ static void ir_emit_prologue(ir_ctx *ctx)
 static void ir_emit_epilogue(ir_ctx *ctx)
 {
 	ir_backend_data *data = ctx->data;
-#if IR_DASM
 	dasm_State **Dst = &data->dasm_state;
-#endif
 
 	if (data->used_preserved_regs) {
 		int offset;
@@ -1561,34 +1385,10 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 		for (i = 0; i < IR_REG_NUM; i++) {
 			if (IR_REGSET_IN(data->used_preserved_regs, i)) {
 				if (i < IR_REG_FP_FIRST) {
-#if IR_DASM
 					ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_RBP : IR_REG_RSP;
 
 					|	mov Ra(i), aword [Ra(fp)+offset]
-#else
-					if (IR_X64) {
-						fprintf(stderr, "\tmovl ");
-					} else {
-						fprintf(stderr, "\tmovq ");
-					}
-					fprintf(stderr, "%d", offset);
-					if (IR_X64) {
-						if (ctx->flags & IR_USE_FRAME_POINTER) {
-							fprintf(stderr, "(%%rbp)");
-						} else {
-							fprintf(stderr, "(%%rsp)");
-						}
-					} else {
-						if (ctx->flags & IR_USE_FRAME_POINTER) {
-							fprintf(stderr, "(%%ebp)");
-						} else {
-							fprintf(stderr, "(%%esp)");
-						}
-					}
-					fprintf(stderr, ", ");
-					ir_emit_reg(i, IR_ADDR);
-					fprintf(stderr, "\n");
-#endif
+
 					offset -= sizeof(void*);
 				} else {
 					IR_ASSERT(0 && "NIY FP register saing");
@@ -1598,28 +1398,10 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 	}
 
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
-#if IR_DASM
 		|	mov rsp, rbp
 		|	pop rbp
-#else
-		if (IR_X64) {
-			fprintf(stderr, "\tmovq %%rbp, %%rsp\n");
-			fprintf(stderr, "\tpopq %%rbp\n");
-		} else {
-			fprintf(stderr, "\tmovl %%ebp, %%esp\n");
-			fprintf(stderr, "\tpopl %%ebp\n");
-		}
-#endif
 	} else if (data->stack_frame_size) {
-#if IR_DASM
 		|	add rsp, data->stack_frame_size
-#else
-		if (IR_X64) {
-			fprintf(stderr, "\taddq $%d, %%rsp\n", data->stack_frame_size);
-		} else {
-			fprintf(stderr, "\taddl $%d, %%esp\n", data->stack_frame_size);
-		}
-#endif
 	}
 }
 
@@ -1630,12 +1412,8 @@ void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg op1_reg = ir_ref_reg(ctx, insn->op1);
 	ir_reg op2_reg = ir_ref_reg(ctx, insn->op2);
 	ir_reg reg;
-#if IR_DASM
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-#else
-	char suffix = ir_int_suffix(type);
-#endif
 
 	if (def_reg >= 0) {
 		reg = def_reg;
@@ -1654,7 +1432,6 @@ void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		op2_reg = reg;
 	}
 
-#if IR_DASM
 	if (op2_reg >= 0) {
 		switch (insn->op) {
 			case IR_ADD:
@@ -1704,31 +1481,11 @@ void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 		}
 	}
-#else
-	switch (insn->op) {
-		case IR_ADD: fprintf(stderr, "\tadd%c ", suffix); break;
-		case IR_SUB: fprintf(stderr, "\tsub%c ", suffix); break;
-		case IR_MUL: fprintf(stderr, "\timul%c ", suffix); break;
-		case IR_OR:  fprintf(stderr, "\tor%c ", suffix); break;
-		case IR_AND: fprintf(stderr, "\tand%c ", suffix); break;
-		case IR_XOR: fprintf(stderr, "\txor%c ", suffix); break;
-		default:     IR_ASSERT(0 && "NIY binary op"); break;
-	}
-	if (op2_reg >= 0) {
-		ir_emit_reg(op2_reg, type);
-	} else {
-		ir_emit_ref(ctx, insn->op2);
-	}
-	fprintf(stderr, ", ");
-	ir_emit_reg(reg, type);
-	fprintf(stderr, "\n");
-#endif
 	if (def_reg != reg) {
 		ir_emit_store(ctx, type, reg, def);
 	}
 }
 
-#if IR_DASM
 void ir_emit_incdec(ir_ctx *ctx, uint32_t rule, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
@@ -1975,7 +1732,6 @@ void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_emit_store(ctx, insn->type, reg, def);
 	}
 }
-#endif
 
 void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
@@ -1983,12 +1739,8 @@ void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg op1_reg = ir_ref_reg(ctx, insn->op1);
 	ir_reg op2_reg = ir_ref_reg(ctx, insn->op2);
 	ir_reg def_reg = ir_ref_reg(ctx, def);
-#if IR_DASM
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-#else
-	char suffix = ir_int_suffix(type);
-#endif
 
 	if (op1_reg != IR_REG_RAX) {
 		ir_emit_load(ctx, type, insn->op1, IR_REG_RAX);
@@ -2006,7 +1758,6 @@ void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 		}
 	}
-#if IR_DASM
 	if (insn->op == IR_MUL) {
 		if (IR_IS_TYPE_SIGNED(insn->type)) {
 			if (op2_reg >= 0) {
@@ -2038,36 +1789,13 @@ void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 		}
 	}
-#else
-	if (insn->op == IR_MUL) {
-		if (IR_IS_TYPE_SIGNED(insn->type)) {
-			fprintf(stderr, "\timul%c ", suffix);
-		} else {
-			fprintf(stderr, "\tmul%c ", suffix);
-		}
-	} else {
-		if (IR_IS_TYPE_SIGNED(type)) {
-			fprintf(stderr, "\tcdq\n");
-			fprintf(stderr, "\tidiv%c ", suffix);
-		} else {
-			fprintf(stderr, "\txor ");
-			ir_emit_reg(IR_REG_RDX, type);
-			fprintf(stderr, " ,");
-			ir_emit_reg(IR_REG_RDX, type);
-			fprintf(stderr, "\n");
-			fprintf(stderr, "\tdiv%c ", suffix);
-		}
-	}
-	ir_emit_reg(op2_reg, type);
-	fprintf(stderr, "\n");
-#endif
+
 	if (insn->op == IR_MUL || insn->op == IR_DIV) {
 		if (def_reg != IR_REG_RAX) {
 			ir_emit_store(ctx, type, IR_REG_RAX, def);
 		}
 	} else if (insn->op == IR_MOD) {
 		if (ir_type_size[type] == 1) {
-#if IR_DASM
 			ir_live_interval *ival = ctx->live_intervals[ctx->vregs[def]];
 			if (ival->reg >= 0) {
 				|	mov al, ah
@@ -2081,11 +1809,6 @@ void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					|	mov byte [rsp+offset], ah
 				}
 			}
-#else
-			fprintf(stderr, "\tmov%c %%ah, ", suffix);
-			ir_emit_ref(ctx, def);
-			fprintf(stderr, "\n");
-#endif
 		} else if (def_reg != IR_REG_RDX) {
 			ir_emit_store(ctx, type, IR_REG_RDX, def);
 		}
@@ -2101,12 +1824,8 @@ void ir_emit_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg op1_reg = ir_ref_reg(ctx, insn->op1);
 	ir_reg op2_reg = ir_ref_reg(ctx, insn->op2);
 	ir_reg reg;
-#if IR_DASM
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-#else
-	char suffix = ir_fp_suffix(type);
-#endif
 
 	if (def_reg >= 0) {
 		reg = def_reg;
@@ -2123,7 +1842,6 @@ void ir_emit_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (op2_reg < 0 && insn->op1 == insn->op2) {
 		op2_reg = reg;
 	}
-#if IR_DASM
 	if (op2_reg >= 0) {
 		switch (insn->op) {
 			case IR_ADD:
@@ -2161,23 +1879,6 @@ void ir_emit_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 		}
 	}
-#else
-	switch (insn->op) {
-		case IR_ADD: fprintf(stderr, "\tadds%c ", suffix); break;
-		case IR_SUB: fprintf(stderr, "\tsubs%c ", suffix); break;
-		case IR_MUL: fprintf(stderr, "\tmuls%c ", suffix); break;
-		case IR_DIV: fprintf(stderr, "\tdivs%c ", suffix); break;
-		default:     IR_ASSERT(0 && "NIY binary op"); break;
-	}
-	if (op2_reg >= 0) {
-		ir_emit_reg(op2_reg, type);
-	} else {
-		ir_emit_ref(ctx, insn->op2);
-	}
-	fprintf(stderr, ", ");
-	ir_emit_reg(reg, type);
-	fprintf(stderr, "\n");
-#endif
 	if (def_reg != reg) {
 		ir_emit_fp_store(ctx, type, reg, def);
 	}
@@ -2190,12 +1891,8 @@ void ir_emit_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg op1_reg = ir_ref_reg(ctx, insn->op1);
 	ir_reg op2_reg = ir_ref_reg(ctx, insn->op2);
 	ir_reg reg;
-#if IR_DASM
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-#else
-	char suffix = ir_fp_suffix(type);
-#endif
 
 	if (def_reg >= 0) {
 		reg = def_reg;
@@ -2214,7 +1911,6 @@ void ir_emit_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		op2_reg = reg;
 	}
 
-#if IR_DASM
 	if (op2_reg >= 0) {
 		switch (insn->op) {
 			case IR_ADD:
@@ -2252,29 +1948,6 @@ void ir_emit_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 		}
 	}
-#else
-	switch (insn->op) {
-		case IR_ADD: fprintf(stderr, "\tvadds%c ", suffix); break;
-		case IR_SUB: fprintf(stderr, "\tvsubs%c ", suffix); break;
-		case IR_MUL: fprintf(stderr, "\tvmuls%c ", suffix); break;
-		case IR_DIV: fprintf(stderr, "\tvdivs%c ", suffix); break;
-		default:     IR_ASSERT(0 && "NIY binary op"); break;
-	}
-	if (op2_reg >= 0) {
-		ir_emit_reg(op2_reg, type);
-	} else {
-		ir_emit_ref(ctx, insn->op2);
-	}
-	fprintf(stderr, ", ");
-//	if (op1_reg >= 0) {
-		ir_emit_reg(op1_reg, type);
-//	} else {
-//		ir_emit_ref(ctx, insn->op1);
-//	}
-	fprintf(stderr, ", ");
-	ir_emit_reg(reg, type);
-	fprintf(stderr, "\n");
-#endif
 	if (def_reg != reg) {
 		ir_emit_fp_store(ctx, type, reg, def);
 	}
@@ -2287,12 +1960,8 @@ void ir_emit_cmp_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg op2_reg = ir_ref_reg(ctx, insn->op2);
 	ir_reg def_reg = ir_ref_reg(ctx, def);
 	ir_reg reg;
-#if IR_DASM
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-#else
-	char suffix = ir_int_suffix(type);
-#endif
 
 	if (def_reg >= 0) {
 		reg = def_reg;
@@ -2309,7 +1978,6 @@ void ir_emit_cmp_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 	}
 
-#if IR_DASM
 	if (op2_reg >= 0) {
 		|	ASM_REF_REG_OP cmp, type, insn->op1, op2_reg
 	} else if (op1_reg >= 0) {
@@ -2350,37 +2018,6 @@ void ir_emit_cmp_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			IR_ASSERT(0 && "NIY binary op");
 			break;
 	}
-#else
-	fprintf(stderr, "\tcmp%c ", suffix);
-	if (op2_reg >= 0) {
-		ir_emit_reg(op2_reg, type);
-	} else {
-		ir_emit_ref(ctx, insn->op2);
-	}
-	fprintf(stderr, ", ");
-	if (op1_reg >= 0) {
-		ir_emit_reg(op1_reg, type);
-	} else {
-		ir_emit_ref(ctx, insn->op1);
-	}
-	fprintf(stderr, "\n");
-	switch (insn->op) {
-		case IR_EQ:  fprintf(stderr, "\tsete "); break;
-		case IR_NE:  fprintf(stderr, "\tsetne "); break;
-		case IR_LT:  fprintf(stderr, "\tsetl "); break;
-		case IR_GE:  fprintf(stderr, "\tsetge "); break;
-		case IR_LE:  fprintf(stderr, "\tsetle "); break;
-		case IR_GT:  fprintf(stderr, "\tsetg "); break;
-		case IR_ULT: fprintf(stderr, "\tsetb "); break;
-		case IR_UGE: fprintf(stderr, "\tsetae "); break;
-		case IR_ULE: fprintf(stderr, "\tsetbe "); break;
-		case IR_UGT: fprintf(stderr, "\tseta "); break;
-		default:     IR_ASSERT(0 && "NIY binary op"); break;
-	}
-
-	ir_emit_reg(reg, insn->type);
-	fprintf(stderr, "\n");
-#endif
 	if (reg != def_reg) {
 		ir_emit_store(ctx, insn->type, reg, def);
 	}
@@ -2393,12 +2030,8 @@ void ir_emit_cmp_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg op2_reg = ir_ref_reg(ctx, insn->op2);
 	ir_reg def_reg = ir_ref_reg(ctx, def);
 	ir_reg reg;
-#if IR_DASM
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-#else
-	char suffix = ir_fp_suffix(type);
-#endif
 
 	if (def_reg >= 0) {
 		reg = def_reg;
@@ -2411,7 +2044,6 @@ void ir_emit_cmp_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_emit_fp_load(ctx, type, insn->op1, op1_reg);
 	}
 
-#if IR_DASM
 	if (op1_reg >= 0) {
 		|	ASM_FP_REG_REF_OP ucomiss, ucomisd, vucomiss, vucomisd, type, op1_reg, insn->op2
 	} else {
@@ -2445,40 +2077,6 @@ void ir_emit_cmp_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			IR_ASSERT(0 && "NIY binary op");
 			break;
 	}
-#else
-	if (ctx->flags & IR_AVX) {
-		fprintf(stderr, "\tvucomis%c ", suffix);
-	} else {
-		fprintf(stderr, "\tucomis%c ", suffix);
-	}
-	if (op2_reg >= 0) {
-		ir_emit_reg(op2_reg, type);
-	} else {
-		ir_emit_ref(ctx, insn->op2);
-	}
-	fprintf(stderr, ", ");
-	if (op1_reg >= 0) {
-		ir_emit_reg(op1_reg, type);
-	} else {
-		ir_emit_ref(ctx, insn->op1);
-	}
-	fprintf(stderr, "\n");
-	switch (insn->op) {
-		case IR_EQ:  fprintf(stderr, "\tsete "); break;
-		case IR_NE:  fprintf(stderr, "\tsetne "); break;
-		case IR_LT:  fprintf(stderr, "\tsetb "); break;
-		case IR_GE:  fprintf(stderr, "\tsetae "); break;
-		case IR_LE:  fprintf(stderr, "\tsetbe "); break;
-		case IR_GT:  fprintf(stderr, "\tseta "); break;
-//		case IR_ULT: fprintf(stderr, "\tsetb "); break;
-//		case IR_UGE: fprintf(stderr, "\tsetae "); break;
-//		case IR_ULE: fprintf(stderr, "\tsetbe "); break;
-//		case IR_UGT: fprintf(stderr, "\tseta "); break;
-		default:     IR_ASSERT(0 && "NIY binary op"); break;
-	}
-	ir_emit_reg(reg, insn->type);
-	fprintf(stderr, "\n");
-#endif
 	if (reg != def_reg) {
 		ir_emit_store(ctx, insn->type, reg, def);
 	}
@@ -2519,7 +2117,6 @@ static void ir_emit_jcc(ir_ctx *ctx, uint8_t op, int b, ir_ref def, ir_insn *ins
 		false_block = 0;
 	}
 
-#if IR_DASM
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	if (int_cmp) {
@@ -2590,40 +2187,6 @@ static void ir_emit_jcc(ir_ctx *ctx, uint8_t op, int b, ir_ref def, ir_insn *ins
 	if (false_block) {
 		|	jmp =>false_block
 	}
-#else
-	if (int_cmp) {
-		switch (op) {
-			case IR_EQ:  fprintf(stderr, "\tje .LL%d\n", true_block); break;
-			case IR_NE:  fprintf(stderr, "\tjne .LL%d\n", true_block); break;
-			case IR_LT:  fprintf(stderr, "\tjl .LL%d\n", true_block); break;
-			case IR_GE:  fprintf(stderr, "\tjge .LL%d\n", true_block); break;
-			case IR_LE:  fprintf(stderr, "\tjle .LL%d\n", true_block); break;
-			case IR_GT:  fprintf(stderr, "\tjg .LL%d\n", true_block); break;
-			case IR_ULT: fprintf(stderr, "\tjb .LL%d\n", true_block); break;
-			case IR_UGE: fprintf(stderr, "\tjae .LL%d\n", true_block); break;
-			case IR_ULE: fprintf(stderr, "\tjbe .LL%d\n", true_block); break;
-			case IR_UGT: fprintf(stderr, "\tja .LL%d\n", true_block); break;
-			default:     IR_ASSERT(0 && "NIY binary op"); break;
-		}
-	} else {
-		switch (op) {
-			case IR_EQ:  fprintf(stderr, "\tje .LL%d\n", true_block); break;
-			case IR_NE:  fprintf(stderr, "\tjne .LL%d\n", true_block); break;
-			case IR_LT:  fprintf(stderr, "\tjb .LL%d\n", true_block); break;
-			case IR_GE:  fprintf(stderr, "\tjae .LL%d\n", true_block); break;
-			case IR_LE:  fprintf(stderr, "\tjbe .LL%d\n", true_block); break;
-			case IR_GT:  fprintf(stderr, "\tja .LL%d\n", true_block); break;
-//			case IR_ULT: fprintf(stderr, "\tjb .LL%d\n", true_block); break;
-//			case IR_UGE: fprintf(stderr, "\tjae .LL%d\n", true_block); break;
-//			case IR_ULE: fprintf(stderr, "\tjbe .LL%d\n", true_block); break;
-//			case IR_UGT: fprintf(stderr, "\tja .LL%d\n", true_block); break;
-			default:     IR_ASSERT(0 && "NIY binary op"); break;
-		}
-	}
-	if (false_block) {
-		fprintf(stderr, "\tjmp .LL%d\n", false_block);
-	}
-#endif
 }
 
 void ir_emit_cmp_and_branch_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
@@ -2643,7 +2206,6 @@ void ir_emit_cmp_and_branch_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 		}
 	}
 
-#if IR_DASM
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	if (op2_reg >= 0) {
@@ -2651,22 +2213,6 @@ void ir_emit_cmp_and_branch_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 	} else if (op1_reg >= 0) {
 		|	ASM_REG_REF_OP cmp, type, op1_reg, cmp_insn->op2
 	}
-#else
-	char suffix = ir_int_suffix(type);
-	fprintf(stderr, "\tcmp%c ", suffix);
-	if (op2_reg >= 0) {
-		ir_emit_reg(op2_reg, type);
-	} else {
-		ir_emit_ref(ctx, cmp_insn->op2);
-	}
-	fprintf(stderr, ", ");
-	if (op1_reg >= 0) {
-		ir_emit_reg(op1_reg, type);
-	} else {
-		ir_emit_ref(ctx, cmp_insn->op1);
-	}
-	fprintf(stderr, "\n");
-#endif
 	ir_emit_jcc(ctx, cmp_insn->op, b, def, insn, 1);
 }
 
@@ -2682,7 +2228,6 @@ void ir_emit_cmp_and_branch_fp(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 		op1_reg = IR_REG_XMM0; // TODO: temporary register
 		ir_emit_fp_load(ctx, type, cmp_insn->op1, op1_reg);
 	}
-#if IR_DASM
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	if (op1_reg >= 0) {
@@ -2691,22 +2236,6 @@ void ir_emit_cmp_and_branch_fp(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 		//	ASM_FP_REF_REG_OP ucomiss, ucomisd, vucomiss, vucomisd, type, cmp_insn->op1, op2_reg
 		IR_ASSERT(0);
 	}
-#else
-	char suffix = ir_fp_suffix(type);
-	if (ctx->flags & IR_AVX) {
-		fprintf(stderr, "\tvucomis%c ", suffix);
-	} else {
-		fprintf(stderr, "\tucomis%c ", suffix);
-	}
-	ir_emit_ref(ctx, cmp_insn->op2);
-	fprintf(stderr, ", ");
-	if (op1_reg) {
-		ir_emit_reg(op1_reg, type);
-	} else {
-		ir_emit_ref(ctx, cmp_insn->op1);
-	}
-	fprintf(stderr, "\n");
-#endif
 	ir_emit_jcc(ctx, cmp_insn->op, b, def, insn, 0);
 }
 
@@ -2714,48 +2243,24 @@ void ir_emit_if_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 {
 	ir_type type = ctx->ir_base[insn->op2].type;
 	ir_reg op2_reg = ir_ref_reg(ctx, insn->op2);
-#if IR_DASM
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-#else
-	char suffix = ir_int_suffix(type);
-#endif
 
 	if (op2_reg >= 0) {
-#if IR_DASM
 		|	ASM_REG_REG_OP test, type, op2_reg, op2_reg
-#else
-		fprintf(stderr, "\ttest%c ", suffix);
-		ir_emit_reg(op2_reg, type);
-		fprintf(stderr, ", ");
-		ir_emit_reg(op2_reg, type);
-		fprintf(stderr, "\n");
-#endif
 	} else {
-#if IR_DASM
 		|	ASM_REF_IMM_OP cmp, type, insn->op2, 0
-#else
-		fprintf(stderr, "\tcmp%c $0, ", suffix);
-		ir_emit_ref(ctx, insn->op2);
-		fprintf(stderr, "\n");
-#endif
 	}
 	ir_emit_jcc(ctx, IR_NE, b, def, insn, 1);
 }
 
 void ir_emit_return_void(ir_ctx *ctx)
 {
-#if IR_DASM
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-#endif
 
 	ir_emit_epilogue(ctx);
-#if IR_DASM
 	|	ret
-#else
-	fprintf(stderr, "\tret\n");
-#endif
 }
 
 void ir_emit_return_int(ir_ctx *ctx, ir_insn *insn)
@@ -2792,21 +2297,10 @@ static void ir_emit_copy_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	} else if (op1_reg >= 0) {
 		ir_emit_store(ctx, type, op1_reg, def);
 	} else if (IR_IS_CONST_REF(insn->op1)) {
-#if IR_DASM
 		ir_backend_data *data = ctx->data;
 		dasm_State **Dst = &data->dasm_state;
 
 		|	ASM_REF_IMM_OP mov, type, def, insn->op1
-#else
-		char suffix = ir_int_suffix(type);
-
-		/* mov $imm, mem */
-		fprintf(stderr, "\tmov%c ", suffix);
-		ir_emit_ref(ctx, insn->op1);
-		fprintf(stderr, ", ");
-		ir_emit_ref(ctx, def);
-		fprintf(stderr, "\n");
-#endif
 	} else {
 		reg = IR_REG_RAX; // TODO: temporary register
 		ir_emit_load(ctx, type, insn->op1, reg);
@@ -2924,12 +2418,8 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, int from, int to)
 {
-#if IR_DASM
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-#else
-	char suffix;
-#endif
 	ir_insn *from_insn;
 	int8_t to_reg, from_reg, dst_reg;
 
@@ -2938,30 +2428,11 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, int from, int to)
 		to_reg = to ? ir_vreg_reg(ctx, to) : IR_REG_RAX; // %rax is a temporary register
 		from_reg = from ? ir_vreg_reg(ctx, from) : IR_REG_RAX; // %rax is a temporary register
 		if (IR_IS_CONST_REF(from) && to_reg >= 0 && IR_IS_TYPE_INT(from_insn->type) && from_insn->val.u64 == 0) {
-#if IR_DASM
 			|	ASM_REG_REG_OP xor, type, to_reg, to_reg
-#else
-			suffix = ir_int_suffix(type);
-			fprintf(stderr, "\txor%c ", suffix);
-			ir_emit_reg(to_reg, type);
-			fprintf(stderr, ", ");
-			ir_emit_reg(to_reg, type);
-			fprintf(stderr, "\n");
-#endif
 		} else if (from > 0 && from_reg < 0 && to_reg < 0) {
-#if IR_DASM
 			|	ASM_VREGX_OP push, IR_ADDR, from
 			|	ASM_VREG_OP pop, IR_ADDR, to
-#else
-			fprintf(stderr, "\tpushq ");
-			ir_emit_vreg(ctx, from);
-			fprintf(stderr, "\n");
-			fprintf(stderr, "\tpopq ");
-			ir_emit_vreg(ctx, to);
-			fprintf(stderr, "\n");
-#endif
 		} else {
-#if IR_DASM
 			if (from_reg >= 0 && to_reg >= 0) {
 				| ASM_REG_REG_OP mov, type, to_reg, from_reg
 			} else if (to_reg >= 0 && IR_IS_CONST_REF(from)) {
@@ -2974,26 +2445,6 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, int from, int to)
 			} else if (to_reg >= 0) {
 				| ASM_REG_VREG_OP mov, type, to_reg, from
 			}
-#else
-			suffix = ir_int_suffix(type);
-			fprintf(stderr, "\tmov%c ", suffix);
-			if (IR_IS_CONST_REF(from)) {
-				// TODO: support for 64-bit constant
-				fprintf(stderr, "$");
-				ir_print_const(ctx, from_insn, stderr);
-			} else if (from_reg >= 0) {
-				ir_emit_reg(from_reg, type);
-			} else {
-				ir_emit_vreg(ctx, from);
-			}
-			fprintf(stderr, ", ");
-			if (to_reg >= 0) {
-				ir_emit_reg(to_reg, type);
-			} else {
-				ir_emit_vreg(ctx, to);
-			}
-			fprintf(stderr, "\n");
-#endif
 		}
 	} else {
 		to_reg = to ? ir_vreg_reg(ctx, to) : IR_REG_XMM0; // %xmm0 is a temporary register
@@ -3002,7 +2453,6 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, int from, int to)
 		if (to_reg < 0 && from_reg < 0) {
 			to_reg = IR_REG_XMM0; // TODO: temporary register
 		}
-#if IR_DASM
 		if (IR_IS_CONST_REF(from) && to_reg >= 0
 		 && from_insn->type == IR_FLOAT && from_insn->val.f == 0) {
 			if (ctx->flags & IR_AVX) {
@@ -3029,71 +2479,11 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, int from, int to)
 		if (to_reg != dst_reg) {
 			|	ASM_FP_MOV_VREG_REG_OP type, to, to_reg
 		}
-#else
-		char suffix = ir_fp_suffix(type);
-
-		if (IR_IS_CONST_REF(from) && to_reg >= 0
-		 && ((from_insn->type == IR_FLOAT && from_insn->val.f == 0) ||
-		     (from_insn->type == IR_DOUBLE && from_insn->val.d == 0))) {
-			if (ctx->flags & IR_AVX) {
-				fprintf(stderr, "\tvxorp%c ", suffix);
-				ir_emit_reg(to_reg, type);
-				fprintf(stderr, ", ");
-			} else {
-				fprintf(stderr, "\txorp%c ", suffix);
-			}
-			ir_emit_reg(to_reg, type);
-			fprintf(stderr, ", ");
-			ir_emit_reg(to_reg, type);
-			fprintf(stderr, "\n");
-		} else {
-		    if (to_reg >= 0 && from_reg >= 0) {
-				if (ctx->flags & IR_AVX) {
-					fprintf(stderr, "\tvmovap%c ", suffix);
-				} else {
-					fprintf(stderr, "\tmovap%c ", suffix);
-				}
-		    } else {
-				if (ctx->flags & IR_AVX) {
-					fprintf(stderr, "\tvmovs%c ", suffix);
-				} else {
-					fprintf(stderr, "\tmovs%c ", suffix);
-				}
-			}
-			if (IR_IS_CONST_REF(from)) {
-				fprintf(stderr, ".LLC%d(%%rip)", -from);
-				from_insn->emit_const = 1;
-			} else if (from_reg >= 0) {
-				ir_emit_reg(from_reg, type);
-			} else {
-				ir_emit_vreg(ctx, from);
-			}
-			fprintf(stderr, ", ");
-			if (to_reg >= 0) {
-				ir_emit_reg(to_reg, type);
-			} else {
-				ir_emit_vreg(ctx, to);
-			}
-			fprintf(stderr, "\n");
-		}
-		if (to_reg != dst_reg) {
-			if (ctx->flags & IR_AVX) {
-				fprintf(stderr, "\tvmovs%c ", suffix);
-			} else {
-				fprintf(stderr, "\tmovs%c ", suffix);
-			}
-			ir_emit_reg(to_reg, type);
-			fprintf(stderr, ", ");
-			ir_emit_vreg(ctx, to);
-			fprintf(stderr, "\n");
-		}
-#endif
 	}
 	return 1;
 }
 static void ir_emit_param_move(ir_ctx *ctx, uint8_t type, int from_reg, int to, ir_ref name)
 {
-#if IR_DASM
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	ir_live_interval *ival = ctx->live_intervals[to];
@@ -3144,37 +2534,6 @@ static void ir_emit_param_move(ir_ctx *ctx, uint8_t type, int from_reg, int to, 
 			}
 		}
 	}
-#else
-	char suffix;
-
-	if (IR_IS_TYPE_INT(type)) {
-		suffix = ir_int_suffix(type);
-		fprintf(stderr, "\tmov%c ", suffix);
-	} else {
-		suffix = ir_fp_suffix(type);
-		if (from_reg >= 0 && ctx->live_intervals[to]->reg >= 0) {
-			if (ctx->flags & IR_AVX) {
-				fprintf(stderr, "\tvmovap%c ", suffix);
-			} else {
-				fprintf(stderr, "\tmovap%c ", suffix);
-			}
-		} else {
-			if (ctx->flags & IR_AVX) {
-				fprintf(stderr, "\tvmovs%c ", suffix);
-			} else {
-				fprintf(stderr, "\tmovs%c ", suffix);
-			}
-		}
-	}
-	if (from_reg >= 0) {
-		ir_emit_reg(from_reg, type);
-	} else {
-		fprintf(stderr, "%s", ir_get_str(ctx, name)); // TODO: replace param name by stack slot
-	}
-	fprintf(stderr, ", ");
-	ir_emit_vreg(ctx, to);
-	fprintf(stderr, " # %s\n", ir_get_str(ctx, name));
-#endif
 }
 
 
@@ -3383,11 +2742,9 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 	ir_insn *insn;
 	uint32_t *rule;
 	ir_backend_data data;
-#if IR_DASM
 	dasm_State **Dst;
 	int ret;
 	void *entry;
-#endif
 
 	ctx->data = &data;
 	data.stack_frame_size = 0;
@@ -3400,14 +2757,12 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 		ir_cals_stack_frame_size(ctx, &data);
 	}
 
-#if IR_DASM
 	Dst = &data.dasm_state;
 	data.dasm_state = NULL;
 	dasm_init(&data.dasm_state, DASM_MAXSECTION);
 //	dasm_setupglobal(&data.dasm_state, dasm_labels, ir_lb_MAX);
 	dasm_setup(&data.dasm_state, dasm_actions);
 	dasm_growpc(&data.dasm_state, ctx->cfg_blocks_count + 1 + ctx->consts_count + 1);
-#endif
 
 	if (ctx->flags & IR_FUNCTION) {
 		ir_emit_prologue(ctx);
@@ -3419,18 +2774,13 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 //			continue;
 //		}
 //		if (ir_needs_block_label(ctx, b)) {
-#if IR_DASM
 			|=>b:
-#else
-			fprintf(stderr, ".LL%d:\n", b);
-#endif
 //		}
 		for (i = bb->start, insn = ctx->ir_base + i, rule = ctx->rules + i; i <= bb->end;) {
 			switch (*rule) {
 				case IR_SKIP:
 				case IR_SKIP_REG:
 					break;
-#if IR_DASM
 				case IR_LEA_OB:
 					{
 						ir_reg def_reg = ir_ref_reg(ctx, i);
@@ -3696,7 +3046,6 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 				case IR_OP_INT:
 					ir_emit_op_int(ctx, i, insn);
 					break;
-#endif
 				case IR_BINOP_INT:
 					ir_emit_binop_int(ctx, i, insn);
 					break;
@@ -3740,11 +3089,7 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 					IR_ASSERT(bb->successors_count == 1);
 					target = ir_skip_empty_blocks(ctx, ctx->cfg_edges[bb->successors]);
 					if (target != ir_skip_empty_blocks(ctx, b + 1)) {
-#if IR_DASM
 						|	jmp =>target
-#else
-						fprintf(stderr, "\tjmp .LL%d\n", target);
-#endif
 					}
 					break;
 				case IR_RETURN_VOID:
@@ -3775,7 +3120,6 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 	for (i = IR_UNUSED + 1, insn = ctx->ir_base - i; i < ctx->consts_count; i++, insn--) {
 		if (insn->emit_const) {
 			if (IR_IS_TYPE_FP(insn->type)) {
-#if IR_DASM
 				int label = ctx->cfg_blocks_count + i;
 
 				if (!has_rodata) {
@@ -3793,22 +3137,6 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 				} else {
 					IR_ASSERT(0);
 				}
-#else
-				if (!has_rodata) {
-					fprintf(stderr, "\t.section .rodata\n");
-					has_rodata = 1;
-				}
-				fprintf(stderr, "\t.align %d\n", ir_type_size[insn->type]);
-				fprintf(stderr, ".LLC%d:\n", i);
-				if (insn->type == IR_DOUBLE) {
-					fprintf(stderr, "\t.long %d\n", insn->val.u32);
-					fprintf(stderr, "\t.long %d\n", insn->val.u32_hi);
-				} else if (insn->type == IR_FLOAT) {
-					fprintf(stderr, "\t.long %d\n", insn->val.u32);
-				} else {
-					IR_ASSERT(0);
-				}
-#endif
 			} else if (insn->op == IR_STR) {
 				int label = ctx->cfg_blocks_count + i;
 				const char *str = ir_get_str(ctx, insn->val.addr);
@@ -3850,14 +3178,9 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 		}
 	}
 	if (has_rodata) {
-#if IR_DASM
 		|.code
-#else
-		fprintf(stderr, "\t.text\n");
-#endif
 	}
 
-#if IR_DASM
 	ret = dasm_link(&data.dasm_state, size);
 	if (ret != DASM_S_OK) {
 		return 0;
@@ -3878,7 +3201,4 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 	ir_mem_protect(entry, 4096);
 
 	return entry;
-#else
-	return NULL;
-#endif
 }
