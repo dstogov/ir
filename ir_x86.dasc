@@ -23,7 +23,7 @@
 
 |.actionlist dasm_actions
 |.globals ir_lb
-|.section code, cold_code, rodata
+|.section code, cold_code, rodata, jmp_table
 
 |.macro ASM_REG_OP, op, type, reg
 ||	switch (ir_type_size[type]) {
@@ -647,6 +647,7 @@ typedef struct _ir_backend_data {
 	uint32_t  stack_frame_size;
 	ir_regset used_preserved_regs;
 	dasm_State *dasm_state;
+	int rodata_label, jmp_table_label;
 } ir_backend_data;
 
 #define IR_GP_REG_NAME(code, name64, name32, name16, name8, name8h) \
@@ -2586,6 +2587,174 @@ static void ir_emit_copy_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
+static void ir_emit_switch(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_type type;
+	ir_use_list *use_list;
+	ir_insn *use_insn, *val;
+	ir_ref i, *p, use, n;
+	int label, default_label = 0;
+	int count;
+	int64_t min, max;;
+	int32_t offset;
+
+	type = ctx->ir_base[insn->op2].type;
+	if (IR_IS_TYPE_SIGNED(type)) {
+		min = 0x7fffffffffffffff;
+		max = 0x8000000000000000;
+	} else {
+		min = 0x0;
+		max = 0xffffffffffffffff;
+	}
+
+	use_list = &ctx->use_lists[def];
+	n = use_list->count;
+	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
+		use = *p;
+		use_insn = &ctx->ir_base[use];
+		if (use_insn->op == IR_CASE_VAL) {
+			val = &ctx->ir_base[use_insn->op2];
+			if (IR_IS_TYPE_SIGNED(type)) {
+				IR_ASSERT(IR_IS_TYPE_SIGNED(val->type));
+				min = IR_MIN(min, val->val.i64);
+				max = IR_MAX(max, val->val.i64);
+			} else {
+				IR_ASSERT(!IR_IS_TYPE_SIGNED(val->type));
+				min = (int64_t)IR_MIN((uint64_t)min, val->val.u64);
+				max = (int64_t)IR_MAX((uint64_t)max, val->val.u64);
+			}
+			count++;
+		} else if (use_insn->op == IR_CASE_DEFAULT) {
+			default_label = ir_skip_empty_blocks(ctx, ctx->bb_num[use]);
+		} else {
+			IR_ASSERT(0);
+		}
+	}
+
+
+	/* Generate a table jmp or a seqence of calls */
+	if ((max-min) < count * 8) {
+		int *labels = ir_mem_malloc(sizeof(int) * (max - min + 1));
+		ir_reg op2_reg = ir_ref_reg(ctx, insn->op2);
+		ir_reg reg;
+
+		if (op2_reg > 0) {
+			reg = op2_reg;
+		} else {
+			reg = IR_REG_RAX; // TODO: remporary register
+			ir_emit_load(ctx, type, insn->op2, reg);
+		}
+
+		offset = -min * 8;
+		for (i = 0; i <= (max-min+1); i++) {
+			labels[i] = default_label;
+		}
+		for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
+			use = *p;
+			use_insn = &ctx->ir_base[use];
+			if (use_insn->op == IR_CASE_VAL) {
+				val = &ctx->ir_base[use_insn->op2];
+				label = ir_skip_empty_blocks(ctx, ctx->bb_num[use]);
+				labels[val->val.i64 - min] = label;
+			}
+		}
+
+		|	ASM_REG_IMM_OP cmp, type, reg, min
+		if (IR_IS_TYPE_SIGNED(type)) {
+			|	jl =>default_label
+		} else {
+			|	jb =>default_label
+		}
+		|	ASM_REG_IMM_OP cmp, type, reg, max
+		if (IR_IS_TYPE_SIGNED(type)) {
+			|	jg =>default_label
+		} else {
+			|	ja =>default_label
+		}
+		|.if X64
+			switch (ir_type_size[type]) {
+				case 1:
+					if (IR_IS_TYPE_SIGNED(type)) {
+						|	movsx Ra(reg), Rb(reg)
+					} else {
+						|	movzx Ra(reg), Rb(reg)
+					}
+					break;
+				case 2:
+					if (IR_IS_TYPE_SIGNED(type)) {
+						|	movsx Ra(reg), Rw(reg)
+					} else {
+						|	movzx Ra(reg), Rw(reg)
+					}
+					break;
+				case 4:
+					if (IR_IS_TYPE_SIGNED(type)) {
+						|	movsxd Ra(reg), Rd(reg)
+					} else {
+						|	mov Rd(reg), Rd(reg)
+					}
+					break;
+				case 8:
+					break;
+				default:
+					IR_ASSERT(0);
+			}
+			|	lea r0, aword [>1] // TODO: r0 temporary register
+			|	jmp aword [r0 + Ra(reg)*8 + offset]
+		|.else
+			switch (ir_type_size[type]) {
+				case 1:
+					if (IR_IS_TYPE_SIGNED(type)) {
+						|	movsx Ra(reg), Rb(reg)
+					} else {
+						|	movzx Ra(reg), Rb(reg)
+					}
+					break;
+				case 2:
+					if (IR_IS_TYPE_SIGNED(type)) {
+						|	movsx Ra(reg), Rw(reg)
+					} else {
+						|	movzx Ra(reg), Rw(reg)
+					}
+					break;
+				case 4:
+					break;
+				default:
+					IR_ASSERT(0);
+			}
+		|	jmp aword [offset + Ra(reg) * 4 + >1]
+		|.endif
+		|.jmp_table
+		if (!data->jmp_table_label) {
+			data->jmp_table_label = ctx->cfg_blocks_count + ctx->consts_count + 3;
+			|=>data->jmp_table_label:
+		}
+		|.align aword
+		|1:
+		for (i = 0; i <= (max-min+1); i++) {
+			|	.aword =>labels[i]
+		}
+		|.code
+		ir_mem_free(labels);
+	} else {
+		for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
+			use = *p;
+			use_insn = &ctx->ir_base[use];
+			if (use_insn->op == IR_CASE_VAL) {
+				val = &ctx->ir_base[use_insn->op2];
+				label = ir_skip_empty_blocks(ctx, ctx->bb_num[use]);
+				|	ASM_REF_IMM_OP cmp, type, insn->op2, val->val.i32 // TODO: 64-bit constant support
+				|	je =>label
+			}
+		}
+		if (default_label) {
+			|	jmp =>default_label
+		}
+	}
+}
+
 #define IS_32BIT(addr) (((uintptr_t)(addr)) <= 0x7fffffff)
 #define IS_SIGNED_32BIT(val) ((((intptr_t)(val)) <= 0x7fffffff) && (((intptr_t)(val)) >= (-2147483647 - 1)))
 
@@ -2997,6 +3166,8 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 	ctx->data = &data;
 	data.stack_frame_size = 0;
 	data.used_preserved_regs = 0;
+	data.rodata_label = 0;
+	data.jmp_table_label = 0;
 
 	if (!ctx->live_intervals) {
 		ir_allocate_unique_spill_slots(ctx);
@@ -3010,7 +3181,7 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 	dasm_init(&data.dasm_state, DASM_MAXSECTION);
 	dasm_setupglobal(&data.dasm_state, dasm_labels, ir_lb_MAX);
 	dasm_setup(&data.dasm_state, dasm_actions);
-	dasm_growpc(&data.dasm_state, ctx->cfg_blocks_count + 1 + ctx->consts_count + 1 + 1);
+	dasm_growpc(&data.dasm_state, ctx->cfg_blocks_count + 1 + ctx->consts_count + 1 + 1 + 1);
 
 	if (ctx->flags & IR_FUNCTION) {
 		ir_emit_prologue(ctx);
@@ -3332,6 +3503,9 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 				case IR_IF_INT:
 					ir_emit_if_int(ctx, b, i, insn);
 					break;
+				case IR_SWITCH:
+					ir_emit_switch(ctx, i, insn);
+					break;
 				case IR_END:
 				case IR_LOOP_END:
 					if (bb->flags & IR_BB_DESSA_MOVES) {
@@ -3367,17 +3541,16 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 		}
 	}
 
-	int rodata_label = 0;
 	for (i = IR_UNUSED + 1, insn = ctx->ir_base - i; i < ctx->consts_count; i++, insn--) {
 		if (insn->emit_const) {
 			if (IR_IS_TYPE_FP(insn->type)) {
 				int label = ctx->cfg_blocks_count + i;
 
-				if (!rodata_label) {
-					rodata_label = ctx->cfg_blocks_count + ctx->consts_count + 2;
+				if (!data.rodata_label) {
+					data.rodata_label = ctx->cfg_blocks_count + ctx->consts_count + 2;
 
 					|.rodata
-					|=>rodata_label:
+					|=>data.rodata_label:
 				}
 				if (insn->type == IR_DOUBLE) {
 					|.align 8
@@ -3395,11 +3568,11 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 				const char *str = ir_get_str(ctx, insn->val.addr);
 				int i = 0;
 
-				if (!rodata_label) {
-					rodata_label = ctx->cfg_blocks_count + ctx->consts_count + 2;
+				if (!data.rodata_label) {
+					data.rodata_label = ctx->cfg_blocks_count + ctx->consts_count + 2;
 
 					|.rodata
-					|=>rodata_label:
+					|=>data.rodata_label:
 				}
 				|.align 8
 				|=>label:
@@ -3432,7 +3605,7 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 			}
 		}
 	}
-	if (rodata_label) {
+	if (data.rodata_label) {
 		|.code
 	}
 
@@ -3446,8 +3619,11 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 
 	ret = dasm_encode(&data.dasm_state, entry);
 
-	if (rodata_label) {
-		int rodata = dasm_getpclabel(&data.dasm_state, rodata_label);
+	if (data.rodata_label) {
+		int rodata = dasm_getpclabel(&data.dasm_state, data.rodata_label);
+		*size = rodata;
+	} else if (data.jmp_table_label) {
+		int rodata = dasm_getpclabel(&data.dasm_state, data.jmp_table_label);
 		*size = rodata;
 	}
 
