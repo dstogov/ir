@@ -247,8 +247,8 @@ int ir_mem_flush(void *ptr, size_t size);
 	_(ALLOCA,       a1X1, src, num, ___) /* alloca(num)                 */ \
 	_(VLOAD,        l2,   src, ref, ___) /* load value of local var     */ \
 	_(VSTORE,       s3,   src, ref, def) /* store value to local var    */ \
-    _(LOAD,         l2,   src, ref, ___) /* load from memory            */ \
-    _(STORE,        s3,   src, ref, def) /* store to memory             */ \
+	_(LOAD,         l2,   src, ref, ___) /* load from memory            */ \
+	_(STORE,        s3,   src, ref, def) /* store to memory             */ \
 	/* memory reference ops (A, H, U, S, TMP, STR, NEW, X, V) ???       */ \
 	\
 	/* control-flow nodes                                               */ \
