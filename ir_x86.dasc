@@ -2773,6 +2773,97 @@ static void *ir_resolve_sym_name(const char *name)
 	return addr;
 }
 
+typedef struct _ir_copy {
+	ir_ref from;
+	ir_reg to;
+} ir_copy;
+
+int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	int i;
+	ir_ref from;
+	ir_reg to, from_reg;
+	ir_type type;
+	ir_ref *loc, *pred;
+	ir_regset todo, ready;
+
+	loc = ir_mem_calloc(IR_REG_NUM * 2, sizeof(ir_ref));
+	pred = loc + IR_REG_NUM;
+	memset(loc, IR_REG_NONE, IR_REG_NUM * sizeof(ir_ref));
+	todo = IR_REGSET_EMPTY;
+	ready = IR_REGSET_EMPTY;
+
+	for (i = 0; i < count; i++) {
+		from = copies[i].from;
+		from_reg = IR_IS_CONST_REF(from) ? IR_REG_NONE : ctx->live_intervals[ctx->vregs[from]]->reg;
+		to = copies[i].to;
+		if (IR_IS_CONST_REF(from) || ctx->live_intervals[ctx->vregs[from]]->reg == IR_REG_NONE) {
+			pred[to] = from;
+			IR_REGSET_INCL(todo, to);
+		} else if (from_reg != to) {
+			loc[from_reg] = from_reg;
+			pred[to] = from;
+			IR_REGSET_INCL(todo, to);
+		}
+	}
+
+	IR_REGSET_FOREACH(todo, i) {
+		if (loc[i] == IR_REG_NONE) {
+			IR_REGSET_INCL(ready, i);
+		}
+	} IR_REGSET_FOREACH_END();
+
+	while (todo != IR_REGSET_EMPTY) {
+		ir_ref /*a, b,*/ c;
+
+		while (ready != IR_REGSET_EMPTY) {
+			to = IR_REGSET_FIRST(ready);
+			IR_REGSET_EXCL(ready, to);
+			from = pred[to];
+			type = ctx->ir_base[from].type;
+			from_reg = IR_IS_CONST_REF(from) ? IR_REG_NONE : ctx->live_intervals[ctx->vregs[from]]->reg;
+			if (from_reg == IR_REG_NONE) {
+				if (IR_IS_TYPE_INT(type)) {
+					ir_emit_load(ctx, type, from, to);
+				} else {
+					ir_emit_fp_load(ctx, type, from, to);
+				}
+			} else {
+				c = loc[from_reg];
+				if (IR_IS_TYPE_INT(type)) {
+					|	ASM_REG_REG_OP mov, type, to, c
+				} else {
+					|	ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, type, to, c
+				}
+				loc[from_reg] = to;
+				if (from_reg == c && pred[from_reg]) {
+					IR_REGSET_INCL(ready, from_reg);
+				}
+			}
+		}
+		to = IR_REGSET_FIRST(todo);
+		IR_REGSET_EXCL(todo, to);
+		from = pred[to];
+		from_reg = IR_IS_CONST_REF(from) ? IR_REG_NONE : ctx->live_intervals[ctx->vregs[from]]->reg;
+		if (from_reg != IR_REG_NONE && to != loc[from_reg]) {
+			type = ctx->ir_base[from].type;
+			if (IR_IS_TYPE_INT(type)) {
+				|	ASM_REG_REG_OP mov, type, IR_REG_R0, to // TODO: Temporary register
+			} else {
+				|	ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, type, IR_REG_XMM0, to // TODO: Temporary register
+			}
+			loc[to] = 0;
+			IR_REGSET_INCL(ready, to);
+		}
+	}
+
+	ir_mem_free(loc);
+
+	return 1;
+}
+
 static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
@@ -2786,16 +2877,18 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg src, dst;
 	int int_param = 0;
 	int fp_param = 0;
+	int count = 0;
 	int int_reg_params_count = IR_REG_INT_ARGS;
 	int fp_reg_params_count = IR_REG_FP_ARGS;
 	const int8_t *int_reg_params = _ir_int_reg_params;
 	const int8_t *fp_reg_params = _ir_fp_reg_params;
+	ir_copy *copies;
 
 	name = ir_get_str(ctx, ctx->ir_base[insn->op2].val.addr);
 	addr = ir_resolve_sym_name(name);
 
-	// TODO: use parallel copy
 	n = ir_input_edges_count(ctx, insn);
+	copies = ir_mem_malloc((n - 2) * sizeof(ir_copy));
 	for (j = 3; j <= n; j++) {
 		arg = insn->ops[j];
 		src = ir_ref_reg(ctx, arg);
@@ -2804,12 +2897,10 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		if (IR_IS_TYPE_INT(type)) {
 			if (int_param < int_reg_params_count) {
 				dst = int_reg_params[int_param];
-				if (src >= 0) {
-					if (src != dst) {
-						| ASM_REG_REG_OP mov, type, dst, src
-					}
-				} else {
-					ir_emit_load(ctx, type, arg, dst);
+				if (src != dst) {
+					copies[count].from = arg;
+					copies[count].to = dst;
+					count++;
 				}
 			} else {
 				// TODO: pass arg throgh stack
@@ -2818,12 +2909,10 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		} else if (IR_IS_TYPE_FP(type)) {
 			if (fp_param < fp_reg_params_count) {
 				dst = fp_reg_params[fp_param];
-				if (src >= 0) {
-					if (src != dst) {
-						|	ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, type, dst, src
-					}
-				} else {
-					ir_emit_fp_load(ctx, type, arg, dst);
+				if (src != dst) {
+					copies[count].from = arg;
+					copies[count].to = dst;
+					count++;
 				}
 			} else {
 				// TODO: pass arg throgh stack
@@ -2833,6 +2922,8 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			IR_ASSERT(0);
 		}
 	}
+	ir_parallel_copy(ctx, copies, count);
+	ir_mem_free(copies);
 
 //	if (IS_SIGNED_32BIT(addr)) { // TODO: 32-bit IP relative or 64-bit absolute address
 //		|	call qword &addr
@@ -2841,6 +2932,21 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		|	call rax
 //	}
 
+	if (insn->type != IR_VOID) {
+		if (IR_IS_TYPE_INT(insn->type)) {
+			dst = ir_ref_reg(ctx, def);
+			if (dst != IR_REG_INT_RET1) {
+				ir_emit_store(ctx, insn->type, IR_REG_INT_RET1, def);
+			}
+		} else if (IR_IS_TYPE_FP(insn->type)) {
+			dst = ir_ref_reg(ctx, def);
+			if (dst != IR_REG_FP_RET1) {
+				ir_emit_fp_store(ctx, insn->type, IR_REG_FP_RET1, def);
+			}
+		} else {
+			IR_ASSERT(0);
+		}
+	}
 }
 
 static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, int from, int to)

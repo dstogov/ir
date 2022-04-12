@@ -76,7 +76,7 @@
 	-  temporary register for swap (dessa3.ir)
 	-  temporary register for spill loads and stores
 	-  parallel parameter loading
-	-  parallel argument passing
+	+  parallel argument passing
 	-  return merge/split
 	?  binary code emission
 		+ DynAsm
