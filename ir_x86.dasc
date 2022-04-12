@@ -64,18 +64,19 @@
 |.endmacro
 
 |.macro ASM_REF_OP, op, type, ref
-||	ir_live_interval *ival = ctx->live_intervals[ctx->vregs[ref]];
-||	if (ival->reg >= 0) {
-|		ASM_REG_OP op, type, ival->reg
-||	} else if (ival->stack_spill_pos) {
-||		if (ctx->flags & IR_USE_FRAME_POINTER) {
-||			int32_t offset = -ival->stack_spill_pos;
-|			ASM_MEM_OP op, type, [rbp+offset]
+||	do {
+||		ir_reg _reg = ir_ref_reg(ctx, ref);
+||		if (_reg >= 0) {
+|			ASM_REG_OP op, type, _reg
 ||		} else {
-||			int32_t offset = data->stack_frame_size - ival->stack_spill_pos;
-|			ASM_MEM_OP op, type, [rsp+offset]
+||			int32_t offset = ir_ref_spill_slot(ctx, ref);
+||			if (ctx->flags & IR_USE_FRAME_POINTER) {
+|				ASM_MEM_OP op, type, [rbp+offset]
+||			} else {
+|				ASM_MEM_OP op, type, [rsp+offset]
+||			}
 ||		}
-||	}
+||	} while (0);
 |.endmacro
 
 |.macro ASM_REG_REG_OP, op, type, dst, src
@@ -174,18 +175,19 @@
 |.endmacro
 
 |.macro ASM_VREG_OP, op, type, vreg
-||	ir_live_interval *ival = ctx->live_intervals[vreg];
-||	if (ival->reg >= 0) {
-|		op Ra(ival->reg)
-||	} else if (ival->stack_spill_pos) {
-||		if (ctx->flags & IR_USE_FRAME_POINTER) {
-||			int32_t offset = -ival->stack_spill_pos;
-|			op aword [rbp+offset]
+||	do {
+||		ir_reg _reg = ir_vreg_reg(ctx, vreg);
+||		if (_reg >= 0) {
+|			op Ra(_reg)
 ||		} else {
-||			int32_t offset = data->stack_frame_size - ival->stack_spill_pos;
-|			op aword [rsp+offset]
+||			int32_t offset = ir_vreg_spill_slot(ctx, vreg);
+||			if (ctx->flags & IR_USE_FRAME_POINTER) {
+|				op aword [rbp+offset]
+||			} else {
+|				op aword [rsp+offset]
+||			}
 ||		}
-||	}
+||	} while (0);
 |.endmacro
 
 |.macro ASM_VREGX_OP, op, type, vreg
@@ -210,15 +212,14 @@
 |			ASM_REG_IMM_OP _op, type, dst, _insn->val.u32 // TODO:
 ||		}
 ||	} else {
-||		ir_live_interval *ival = ctx->live_intervals[ctx->vregs[src]];
-||		if (ival->reg >= 0) {
-|			ASM_REG_REG_OP _op, type, dst, ival->reg
-||		} else if (ival->stack_spill_pos) {
+||		ir_reg _reg = ir_ref_reg(ctx, src);
+||		if (_reg >= 0) {
+|			ASM_REG_REG_OP _op, type, dst, _reg
+||		} else {
+||			int32_t offset = ir_ref_spill_slot(ctx, src);
 ||			if (ctx->flags & IR_USE_FRAME_POINTER) {
-||				int32_t offset = -ival->stack_spill_pos;
 |				ASM_REG_MEM_OP _op, type, dst, [rbp+offset]
 ||			} else {
-||				int32_t offset = data->stack_frame_size - ival->stack_spill_pos;
 |				ASM_REG_MEM_OP _op, type, dst, [rsp+offset]
 ||			}
 ||		}
@@ -226,79 +227,84 @@
 |.endmacro
 
 |.macro ASM_VREG_IMM_OP, op, type, dst, src
-||	ir_insn *_insn = &ctx->ir_base[src];
-||	ir_live_interval *ival = ctx->live_intervals[dst];
-||	if (ival->reg >= 0) {
-|		ASM_REG_IMM_OP op, type, ival->reg, _insn->val.u32
-||	} else if (ival->stack_spill_pos) {
-||		if (ctx->flags & IR_USE_FRAME_POINTER) {
-||			int32_t offset = -ival->stack_spill_pos;
-|			ASM_MEM_IMM_OP op, type, [rbp+offset], _insn->val.u32
+||	do {
+||		ir_insn *_insn = &ctx->ir_base[src];
+||		ir_reg _reg = ir_vreg_reg(ctx, dst);
+||		if (_reg >= 0) {
+|			ASM_REG_IMM_OP op, type, _reg, _insn->val.u32
 ||		} else {
-||			int32_t offset = data->stack_frame_size - ival->stack_spill_pos;
-|			ASM_MEM_IMM_OP op, type, [rsp+offset], _insn->val.u32
+||			int32_t offset = ir_vreg_spill_slot(ctx, dst);
+||			if (ctx->flags & IR_USE_FRAME_POINTER) {
+|				ASM_MEM_IMM_OP op, type, [rbp+offset], _insn->val.u32
+||			} else {
+|				ASM_MEM_IMM_OP op, type, [rsp+offset], _insn->val.u32
+||			}
 ||		}
-||	}
+||	} while (0);
 |.endmacro
 
 |.macro ASM_VREG_REG_OP, op, type, dst, src
-||	ir_live_interval *ival = ctx->live_intervals[dst];
-||	if (ival->reg >= 0) {
-|		ASM_REG_REG_OP op, type, ival->reg, src
-||	} else if (ival->stack_spill_pos) {
-||		if (ctx->flags & IR_USE_FRAME_POINTER) {
-||			int32_t offset = -ival->stack_spill_pos;
-|			ASM_MEM_REG_OP op, type, [rbp+offset], src
+||	do {
+||		ir_reg _reg = ir_vreg_reg(ctx, dst);
+||		if (_reg >= 0) {
+|			ASM_REG_REG_OP op, type, _reg, src
 ||		} else {
-||			int32_t offset = data->stack_frame_size - ival->stack_spill_pos;
-|			ASM_MEM_REG_OP op, type, [rsp+offset], src
+||			int32_t offset = ir_vreg_spill_slot(ctx, dst);
+||			if (ctx->flags & IR_USE_FRAME_POINTER) {
+|				ASM_MEM_REG_OP op, type, [rbp+offset], src
+||			} else {
+|				ASM_MEM_REG_OP op, type, [rsp+offset], src
+||			}
 ||		}
-||	}
+||	} while (0);
 |.endmacro
 
 |.macro ASM_REG_VREG_OP, op, type, dst, src
-||	ir_live_interval *ival = ctx->live_intervals[src];
-||	if (ival->reg >= 0) {
-|		ASM_REG_REG_OP op, type, dst, ival->reg
-||	} else if (ival->stack_spill_pos) {
-||		if (ctx->flags & IR_USE_FRAME_POINTER) {
-||			int32_t offset = -ival->stack_spill_pos;
-|			ASM_REG_MEM_OP op, type, dst, [rbp+offset]
+||	do {
+||		ir_reg _reg = ir_vreg_reg(ctx, src);
+||		if (_reg >= 0) {
+|			ASM_REG_REG_OP op, type, dst, _reg
 ||		} else {
-||			int32_t offset = data->stack_frame_size - ival->stack_spill_pos;
-|			ASM_REG_MEM_OP op, type, dst, [rsp+offset]
+||			int32_t offset = ir_vreg_spill_slot(ctx, src);
+||			if (ctx->flags & IR_USE_FRAME_POINTER) {
+|				ASM_REG_MEM_OP op, type, dst, [rbp+offset]
+||			} else {
+|				ASM_REG_MEM_OP op, type, dst, [rsp+offset]
+||			}
 ||		}
-||	}
+||	} while (0);
 |.endmacro
 
 |.macro ASM_REF_REG_OP, op, type, dst, src
-||	ir_live_interval *ival = ctx->live_intervals[ctx->vregs[dst]];
-||	if (ival->reg >= 0) {
-|		ASM_REG_REG_OP op, type, ival->reg, src
-||	} else if (ival->stack_spill_pos) {
-||		if (ctx->flags & IR_USE_FRAME_POINTER) {
-||			int32_t offset = -ival->stack_spill_pos;
-|			ASM_MEM_REG_OP op, type, [rbp+offset], src
+||	do {
+||		ir_reg _reg = ir_ref_reg(ctx, dst);
+||		if (_reg >= 0) {
+|			ASM_REG_REG_OP op, type, _reg, src
 ||		} else {
-||			int32_t offset = data->stack_frame_size - ival->stack_spill_pos;
-|			ASM_MEM_REG_OP op, type, [rsp+offset], src
+||			int32_t offset = ir_ref_spill_slot(ctx, dst);
+||			if (ctx->flags & IR_USE_FRAME_POINTER) {
+|				ASM_MEM_REG_OP op, type, [rbp+offset], src
+||			} else {
+|				ASM_MEM_REG_OP op, type, [rsp+offset], src
+||			}
 ||		}
-||	}
+||	} while (0);
 |.endmacro
 
 |.macro ASM_REF_IMM_OP, op, type, dst, src
-||	ir_live_interval *ival = ctx->live_intervals[ctx->vregs[dst]];
-||	if (ival->reg >= 0) {
-|		ASM_REG_IMM_OP op, type, ival->reg, src
-||	} else if (ival->stack_spill_pos) {
-||		if (ctx->flags & IR_USE_FRAME_POINTER) {
-||			int32_t offset = -ival->stack_spill_pos;
-|			ASM_MEM_IMM_OP op, type, [rbp+offset], src
+||	do {
+||		ir_reg _reg = ir_ref_reg(ctx, dst);
+||		if (_reg >= 0) {
+|			ASM_REG_IMM_OP op, type, _reg, src
 ||		} else {
-||			int32_t offset = data->stack_frame_size - ival->stack_spill_pos;
-|			ASM_MEM_IMM_OP op, type, [rsp+offset], src
+||			int32_t offset = ir_ref_spill_slot(ctx, dst);
+||			if (ctx->flags & IR_USE_FRAME_POINTER) {
+|				ASM_MEM_IMM_OP op, type, [rbp+offset], src
+||			} else {
+|				ASM_MEM_IMM_OP op, type, [rsp+offset], src
+||			}
 ||		}
-||	}
+||	} while (0);
 |.endmacro
 
 |.macro ASM_REG_REG_IMUL, type, dst, src
@@ -354,15 +360,14 @@
 ||		ir_insn *_insn = &ctx->ir_base[src];
 |		ASM_REG_IMM_IMUL type, dst, _insn->val.u32 // TODO:
 ||	} else {
-||		ir_live_interval *ival = ctx->live_intervals[ctx->vregs[src]];
-||		if (ival->reg >= 0) {
-|			ASM_REG_REG_IMUL type, dst, ival->reg
-||		} else if (ival->stack_spill_pos) {
+||		ir_reg _reg = ir_ref_reg(ctx, src);
+||		if (_reg >= 0) {
+|			ASM_REG_REG_IMUL type, dst, _reg
+||		} else {
+||			int32_t offset = ir_ref_spill_slot(ctx, src);
 ||			if (ctx->flags & IR_USE_FRAME_POINTER) {
-||				int32_t offset = -ival->stack_spill_pos;
 |				ASM_REG_MEM_IMUL type, dst, [rbp+offset]
 ||			} else {
-||				int32_t offset = data->stack_frame_size - ival->stack_spill_pos;
 |				ASM_REG_MEM_IMUL type, dst, [rsp+offset]
 ||			}
 ||		}
@@ -406,15 +411,14 @@
 |		ASM_SSE2_REG_MEM_OP fop, dop, type, dst, [=>label]
 ||		_insn->emit_const = 1;
 ||	} else {
-||		ir_live_interval *ival = ctx->live_intervals[ctx->vregs[src]];
-||		if (ival->reg >= 0) {
-|			ASM_SSE2_REG_REG_OP fop, dop, type, dst, ival->reg
-||		} else if (ival->stack_spill_pos) {
+||		ir_reg _reg = ir_ref_reg(ctx, src);
+||		if (_reg >= 0) {
+|			ASM_SSE2_REG_REG_OP fop, dop, type, dst, _reg
+||		} else {
+||			int32_t offset = ir_ref_spill_slot(ctx, src);
 ||			if (ctx->flags & IR_USE_FRAME_POINTER) {
-||				int32_t offset = -ival->stack_spill_pos;
 |				ASM_SSE2_REG_MEM_OP fop, dop, type, dst, [rbp+offset]
 ||			} else {
-||				int32_t offset = data->stack_frame_size - ival->stack_spill_pos;
 |				ASM_SSE2_REG_MEM_OP fop, dop, type, dst, [rsp+offset]
 ||			}
 ||		}
@@ -422,18 +426,19 @@
 |.endmacro
 
 |.macro ASM_SSE2_REF_REG_OP, fop, dop, type, dst, src
-||	ir_live_interval *ival = ctx->live_intervals[ctx->vregs[dst]];
-||	if (ival->reg >= 0) {
-|		ASM_SSE2_REG_REG_OP fop, dop, type, ival->reg, src
-||	} else if (ival->stack_spill_pos) {
-||		if (ctx->flags & IR_USE_FRAME_POINTER) {
-||			int32_t offset = -ival->stack_spill_pos;
-|			ASM_SSE2_MEM_REG_OP fop, dop, type, [rbp+offset], src
-||		} else {
-||			int32_t offset = data->stack_frame_size - ival->stack_spill_pos;
-|			ASM_SSE2_MEM_REG_OP fop, dop, type, [rsp+offset], src
+||	do {
+||		ir_reg _reg = ir_ref_reg(ctx, dst);
+||		if (_reg >= 0) {
+|			ASM_SSE2_REG_REG_OP fop, dop, type, _reg, src
+||		} else if (ival->stack_spill_pos) {
+||			int32_t offset = ir_ref_spill_slot(ctx, dst);
+||			if (ctx->flags & IR_USE_FRAME_POINTER) {
+|				ASM_SSE2_MEM_REG_OP fop, dop, type, [rbp+offset], src
+||			} else {
+|				ASM_SSE2_MEM_REG_OP fop, dop, type, [rsp+offset], src
+||			}
 ||		}
-||	}
+||	} while (0);
 |.endmacro
 
 |.macro ASM_AVX_REG_REG_REG_OP, fop, dop, type, dst, op1, op2
@@ -463,15 +468,14 @@
 |		ASM_AVX_REG_REG_MEM_OP fop, dop, type, dst, op1, [=>label]
 ||		_insn->emit_const = 1;
 ||	} else {
-||		ir_live_interval *ival = ctx->live_intervals[ctx->vregs[op2]];
-||		if (ival->reg >= 0) {
-|			ASM_AVX_REG_REG_REG_OP fop, dop, type, dst, op1, ival->reg
-||		} else if (ival->stack_spill_pos) {
+||		ir_reg _reg = ir_ref_reg(ctx, op2);
+||		if (_reg >= 0) {
+|			ASM_AVX_REG_REG_REG_OP fop, dop, type, dst, op1, _reg
+||		} else {
+||			int32_t offset = ir_ref_spill_slot(ctx, op2);
 ||			if (ctx->flags & IR_USE_FRAME_POINTER) {
-||				int32_t offset = -ival->stack_spill_pos;
 |				ASM_AVX_REG_REG_MEM_OP fop, dop, type, dst, op1, [rbp+offset]
 ||			} else {
-||				int32_t offset = data->stack_frame_size - ival->stack_spill_pos;
 |				ASM_AVX_REG_REG_MEM_OP fop, dop, type, dst, op1, [rsp+offset]
 ||			}
 ||		}
@@ -539,15 +543,14 @@
 |		ASM_FP_REG_MEM_OP fop, dop, avx_fop, avx_dop, type, dst, [=>label]
 ||		_insn->emit_const = 1;
 ||	} else {
-||		ir_live_interval *ival = ctx->live_intervals[ctx->vregs[src]];
-||		if (ival->reg >= 0) {
-|			ASM_FP_REG_REG_OP fop, dop, avx_fop, avx_dop, type, dst, ival->reg
-||		} else if (ival->stack_spill_pos) {
+||		ir_reg _reg = ir_ref_reg(ctx, src);
+||		if (_reg >= 0) {
+|			ASM_FP_REG_REG_OP fop, dop, avx_fop, avx_dop, type, dst, _reg
+||		} else {
+||			int32_t offset = ir_ref_spill_slot(ctx, src);
 ||			if (ctx->flags & IR_USE_FRAME_POINTER) {
-||				int32_t offset = -ival->stack_spill_pos;
 |				ASM_FP_REG_MEM_OP fop, dop, avx_fop, avx_dop, type, dst, [rbp+offset]
 ||			} else {
-||				int32_t offset = data->stack_frame_size - ival->stack_spill_pos;
 |				ASM_FP_REG_MEM_OP fop, dop, avx_fop, avx_dop, type, dst, [rsp+offset]
 ||			}
 ||		}
@@ -555,18 +558,19 @@
 |.endmacro
 
 |.macro ASM_FP_REF_REG_OP, fop, dop, avx_fop, avx_dop, type, dst, src
-||	ir_live_interval *ival = ctx->live_intervals[ctx->vregs[dst]];
-||	if (ival->reg >= 0) {
-|		ASM_FP_REG_REG_OP fop, dop, avx_fop, avx_dop, type, ival->reg, src
-||	} else if (ival->stack_spill_pos) {
-||		if (ctx->flags & IR_USE_FRAME_POINTER) {
-||			int32_t offset = -ival->stack_spill_pos;
-|			ASM_FP_MEM_REG_OP fop, dop, avx_fop, avx_dop, type, [rbp+offset], src
+||	do {
+||		ir_reg _reg = ir_cef_reg(ctx, dst);
+||		if (_reg >= 0) {
+|			ASM_FP_REG_REG_OP fop, dop, avx_fop, avx_dop, type, _reg, src
 ||		} else {
-||			int32_t offset = data->stack_frame_size - ival->stack_spill_pos;
-|			ASM_FP_MEM_REG_OP fop, dop, avx_fop, avx_dop, type, [rsp+offset], src
+||			int32_t offset = ir_ref_spill_slot(ctx, dst);
+||			if (ctx->flags & IR_USE_FRAME_POINTER) {
+|				ASM_FP_MEM_REG_OP fop, dop, avx_fop, avx_dop, type, [rbp+offset], src
+||			} else {
+|				ASM_FP_MEM_REG_OP fop, dop, avx_fop, avx_dop, type, [rsp+offset], src
+||			}
 ||		}
-||	}
+||	} while (0);
 |.endmacro
 
 |.macro ASM_FP_MOV_REG_REF_OP, type, dst, src
@@ -576,15 +580,14 @@
 |		ASM_FP_REG_MEM_OP movss, movsd, vmovss, vmovsd, type, dst, [=>label]
 ||		_insn->emit_const = 1;
 ||	} else {
-||		ir_live_interval *ival = ctx->live_intervals[ctx->vregs[src]];
-||		if (ival->reg >= 0) {
-|			ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, type, dst, ival->reg
-||		} else if (ival->stack_spill_pos) {
+||		ir_reg _reg = ir_ref_reg(ctx, src);
+||		if (_reg >= 0) {
+|			ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, type, dst, _reg
+||		} else {
+||			int32_t offset = ir_ref_spill_slot(ctx, src);
 ||			if (ctx->flags & IR_USE_FRAME_POINTER) {
-||				int32_t offset = -ival->stack_spill_pos;
 |				ASM_FP_REG_MEM_OP movss, movsd, vmovss, vmovsd, type, dst, [rbp+offset]
 ||			} else {
-||				int32_t offset = data->stack_frame_size - ival->stack_spill_pos;
 |				ASM_FP_REG_MEM_OP movss, movsd, vmovss, vmovsd, type, dst, [rsp+offset]
 ||			}
 ||		}
@@ -592,18 +595,19 @@
 |.endmacro
 
 |.macro ASM_FP_MOV_REF_REG_OP, type, dst, src
-||	ir_live_interval *ival = ctx->live_intervals[ctx->vregs[dst]];
-||	if (ival->reg >= 0) {
-|		ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, type, ival->reg, src
-||	} else if (ival->stack_spill_pos) {
-||		if (ctx->flags & IR_USE_FRAME_POINTER) {
-||			int32_t offset = -ival->stack_spill_pos;
-|			ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [rbp+offset], src
+||	do {
+||		ir_reg _reg = ir_ref_reg(ctx, dst);
+||		if (_reg >= 0) {
+|			ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, type, _reg, src
 ||		} else {
-||			int32_t offset = data->stack_frame_size - ival->stack_spill_pos;
-|			ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [rsp+offset], src
+||			int32_t offset = ir_ref_spill_slot(ctx, dst);
+||			if (ctx->flags & IR_USE_FRAME_POINTER) {
+|				ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [rbp+offset], src
+||			} else {
+|				ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [rsp+offset], src
+||			}
 ||		}
-||	}
+||	} while (0);
 |.endmacro
 
 |.macro ASM_FP_MOV_REG_VREG_OP, type, dst, src
@@ -613,15 +617,14 @@
 |		ASM_FP_REG_MEM_OP movss, movsd, vmovss, vmovsd, type, dst, [=>label]
 ||		_insn->emit_const = 1;
 ||	} else {
-||		ir_live_interval *ival = ctx->live_intervals[src];
-||		if (ival->reg >= 0) {
-|			ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, type, dst, ival->reg
-||		} else if (ival->stack_spill_pos) {
+||		ir_reg _reg = ir_vreg_reg(ctx, src);
+||		if (_reg >= 0) {
+|			ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, type, dst, _reg
+||		} else {
+||			int32_t offset = ir_vreg_spill_slot(ctx, src);
 ||			if (ctx->flags & IR_USE_FRAME_POINTER) {
-||				int32_t offset = -ival->stack_spill_pos;
 |				ASM_FP_REG_MEM_OP movss, movsd, vmovss, vmovsd, type, dst, [rbp+offset]
 ||			} else {
-||				int32_t offset = data->stack_frame_size - ival->stack_spill_pos;
 |				ASM_FP_REG_MEM_OP movss, movsd, vmovss, vmovsd, type, dst, [rsp+offset]
 ||			}
 ||		}
@@ -629,18 +632,19 @@
 |.endmacro
 
 |.macro ASM_FP_MOV_VREG_REG_OP, type, dst, src
-||	ir_live_interval *ival = ctx->live_intervals[dst];
-||	if (ival->reg >= 0) {
-|		ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, type, ival->reg, src
-||	} else if (ival->stack_spill_pos) {
-||		if (ctx->flags & IR_USE_FRAME_POINTER) {
-||			int32_t offset = -ival->stack_spill_pos;
-|			ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [rbp+offset], src
+||	do {
+||		ir_reg _reg = ir_vreg_reg(ctx, dst);
+||		if (_reg >= 0) {
+|			ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, type, _reg, src
 ||		} else {
-||			int32_t offset = data->stack_frame_size - ival->stack_spill_pos;
-|			ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [rsp+offset], src
+||			int32_t offset = ir_vreg_spill_slot(ctx, dst);
+||			if (ctx->flags & IR_USE_FRAME_POINTER) {
+|				ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [rbp+offset], src
+||			} else {
+|				ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [rsp+offset], src
+||			}
 ||		}
-||	}
+||	} while (0);
 |.endmacro
 
 typedef struct _ir_backend_data {
@@ -1306,9 +1310,39 @@ static ir_reg ir_vreg_reg(ir_ctx *ctx, ir_ref v)
 	return v < 0 ? IR_REG_NONE : ctx->live_intervals[v]->reg;
 }
 
+static ir_reg ir_vreg_spill_slot(ir_ctx *ctx, ir_ref v)
+{
+	int32_t offset;
+
+	IR_ASSERT(v >= 0);
+	offset = ctx->live_intervals[v]->stack_spill_pos;
+	IR_ASSERT(offset != 0);
+	if (ctx->flags & IR_USE_FRAME_POINTER) {
+		return -offset;
+	} else {
+		ir_backend_data *data = ctx->data;
+		return data->stack_frame_size - offset;
+	}
+}
+
 static ir_reg ir_ref_reg(ir_ctx *ctx, ir_ref ref)
 {
 	return ref < 0 ? IR_REG_NONE : ctx->live_intervals[ctx->vregs[ref]]->reg;
+}
+
+static ir_reg ir_ref_spill_slot(ir_ctx *ctx, ir_ref ref)
+{
+	int32_t offset;
+
+	IR_ASSERT(ref >= 0);
+	offset = ctx->live_intervals[ctx->vregs[ref]]->stack_spill_pos;
+	IR_ASSERT(offset != 0);
+	if (ctx->flags & IR_USE_FRAME_POINTER) {
+		return -offset;
+	} else {
+		ir_backend_data *data = ctx->data;
+		return data->stack_frame_size - offset;
+	}
 }
 
 static bool ir_last_use(ir_ctx *ctx, ir_ref ref)
@@ -1875,9 +1909,10 @@ void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	} else if (insn->op == IR_MOD) {
 		if (ir_type_size[type] == 1) {
 			ir_live_interval *ival = ctx->live_intervals[ctx->vregs[def]];
-			if (ival->reg >= 0) {
+			ir_reg reg = ir_ref_reg(ctx, def);
+			if (reg >= 0) {
 				|	mov al, ah
-				|	mov Rb(ival->reg), al
+				|	mov Rb(reg), al
 			} else if (ival->stack_spill_pos) {
 				if (ctx->flags & IR_USE_FRAME_POINTER) {
 					int32_t offset = -ival->stack_spill_pos;
@@ -2797,9 +2832,9 @@ int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count)
 
 	for (i = 0; i < count; i++) {
 		from = copies[i].from;
-		from_reg = IR_IS_CONST_REF(from) ? IR_REG_NONE : ctx->live_intervals[ctx->vregs[from]]->reg;
+		from_reg = ir_ref_reg(ctx, from);
 		to = copies[i].to;
-		if (IR_IS_CONST_REF(from) || ctx->live_intervals[ctx->vregs[from]]->reg == IR_REG_NONE) {
+		if (from_reg == IR_REG_NONE) {
 			pred[to] = from;
 			IR_REGSET_INCL(todo, to);
 		} else if (from_reg != to) {
@@ -2823,7 +2858,7 @@ int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count)
 			IR_REGSET_EXCL(ready, to);
 			from = pred[to];
 			type = ctx->ir_base[from].type;
-			from_reg = IR_IS_CONST_REF(from) ? IR_REG_NONE : ctx->live_intervals[ctx->vregs[from]]->reg;
+			from_reg = ir_ref_reg(ctx, from);
 			if (from_reg == IR_REG_NONE) {
 				if (IR_IS_TYPE_INT(type)) {
 					ir_emit_load(ctx, type, from, to);
@@ -2846,7 +2881,7 @@ int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count)
 		to = IR_REGSET_FIRST(todo);
 		IR_REGSET_EXCL(todo, to);
 		from = pred[to];
-		from_reg = IR_IS_CONST_REF(from) ? IR_REG_NONE : ctx->live_intervals[ctx->vregs[from]]->reg;
+		from_reg = ir_ref_reg(ctx, from);
 		if (from_reg != IR_REG_NONE && to != loc[from_reg]) {
 			type = ctx->ir_base[from].type;
 			if (IR_IS_TYPE_INT(type)) {
@@ -3008,7 +3043,7 @@ static void ir_emit_param_move(ir_ctx *ctx, uint8_t type, int from_reg, int to, 
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	ir_live_interval *ival = ctx->live_intervals[to];
-	ir_reg to_reg = ival->reg;
+	ir_reg to_reg = ir_ref_reg(ctx, to);
 	ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_RBP : IR_REG_RSP;
 	int32_t offset;
 
@@ -3096,7 +3131,7 @@ static void ir_emit_load_params(ir_ctx *ctx)
 					}
 					fp_param_num++;
 				}
-				dst_reg = ctx->live_intervals[ctx->vregs[use]]->reg;
+				dst_reg = ir_ref_reg(ctx, use);
 				if (src_reg != dst_reg) {
 					// TODO: DO parallel move
 					ir_emit_param_move(ctx, insn->type, src_reg, ctx->vregs[use], insn->op2);
