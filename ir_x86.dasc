@@ -1946,7 +1946,7 @@ void ir_emit_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		reg = op1_reg;
 	} else {
 		// TODO: commutative insns
-		reg = IR_REG_XMM0; // TODO: temporary register
+		reg = IR_REG_XMM7; // TODO: temporary register
 	}
 
 	if (op1_reg != reg) {
@@ -2013,7 +2013,7 @@ void ir_emit_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		reg = op1_reg;
 	} else {
 		// TODO: commutative insns
-		reg = IR_REG_XMM0; // TODO: temporary register
+		reg = IR_REG_XMM7; // TODO: temporary register
 	}
 
 	if (op1_reg < 0) {
@@ -2616,7 +2616,7 @@ static void ir_emit_copy_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	} else if (op1_reg >= 0) {
 		ir_emit_fp_store(ctx, type, op1_reg, def);
 	} else {
-		reg = IR_REG_XMM0; // TODO: temporary register
+		reg = IR_REG_XMM7; // TODO: temporary register
 		ir_emit_fp_load(ctx, type, insn->op1, reg);
 		ir_emit_fp_store(ctx, type, reg, def);
 	}
@@ -2887,7 +2887,7 @@ int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count)
 			if (IR_IS_TYPE_INT(type)) {
 				|	ASM_REG_REG_OP mov, type, IR_REG_R0, to // TODO: Temporary register
 			} else {
-				|	ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, type, IR_REG_XMM0, to // TODO: Temporary register
+				|	ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, type, IR_REG_XMM7, to // TODO: Temporary register
 			}
 			loc[to] = 0;
 			IR_REGSET_INCL(ready, to);
