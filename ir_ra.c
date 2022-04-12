@@ -929,8 +929,26 @@ static int ir_live_range_cmp(const void *r1, const void *r2, void *data)
 	return lrg2->start - lrg1->start;
 }
 
+static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, int from, int to)
+{
+	if (to == 0) {
+		ir_block *bb = ctx->data;
+
+		if (IR_IS_TYPE_INT(type)) {
+			ir_add_fixed_live_range(ctx, IR_REG_R0, bb->end * 2, bb->end * 2); // TODO: Temporary register
+		} else if (IR_IS_TYPE_FP(type)) {
+			ir_add_fixed_live_range(ctx, IR_REG_XMM0, bb->end * 2, bb->end * 2); // TODO: Temporary register
+		} else {
+			IR_ASSERT(0);
+		}
+	}
+	return 1;
+}
+
 static int ir_linear_scan(ir_ctx *ctx)
 {
+	int b;
+	ir_block *bb;
 	ir_worklist unhandled;
 	ir_bitset active, inactive;
 	ir_live_interval *ival;
@@ -944,6 +962,15 @@ static int ir_linear_scan(ir_ctx *ctx)
 		return 0;
 	}
 
+	/* Add fixed intervals for temporary registers used for DESSA moves */
+	for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
+		if (bb->flags & IR_BB_DESSA_MOVES) {
+			ctx->data = bb;
+			ir_gen_dessa_moves(ctx, b, ir_fix_dessa_tmps);
+		}
+	}
+
+	ctx->data = &data;
 	data.stack_frame_size = 0;
 	ir_worklist_init(&unhandled, ctx->vregs_count + 1);
 	len = ir_bitset_len(ctx->vregs_count + 1 + IR_REG_NUM);

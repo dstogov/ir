@@ -73,7 +73,7 @@
 	-  dessa_move (push, pop)
 	-  param_move	 
 	-  temporary register (e.g. for unsupported immediate operand in mul, div)
-	-  temporary register for swap (dessa3.ir)
+	+  temporary register for swap (dessa3.ir)
 	-  temporary register for spill loads and stores
 	-  parallel parameter loading
 	+  parallel argument passing
