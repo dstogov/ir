@@ -65,7 +65,7 @@
 
 ?  code generation
 	-  POW, NEG (fp), ABS, OVERFLOW, MIN, MAX, COND, TAILCALL, ALLOCA, VLOAD, VSTORE, LOAD, STORE
-	-  SWITCH
+	+  SWITCH
 	-  ir_last_use
 	-  64-bit constant (ir_emit_ref, ir_emit_dssa_move)
 	-  binop_int $imm, mem
@@ -73,14 +73,15 @@
 	-  dessa_move (push, pop)
 	-  param_move	 
 	-  temporary register (e.g. for unsupported immediate operand in mul, div)
-    -  temporary register for swap (dessa3.ir)
-    -  temporary register for spill loads and stores
+	-  temporary register for swap (dessa3.ir)
+	-  temporary register for spill loads and stores
 	-  parallel parameter loading
 	-  parallel argument passing
 	-  return merge/split
 	?  binary code emission
 		+ DynAsm
 		- BinAsm
+	- 32-bit x86 code
 
 ?  disassembler
     -  .rodata section and relative data labels
