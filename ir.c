@@ -813,15 +813,33 @@ void ir_array_insert(ir_array *a, uint32_t i, ir_ref val)
 	if (a->refs[a->size - 1]) {
 		ir_array_grow(a, a->size + 1);
 	}
-	memmove(a->refs + i, a->refs + i + 1, (a->size - i - 1) * sizeof(ir_ref));
+	memmove(a->refs + i + 1, a->refs + i, (a->size - i - 1) * sizeof(ir_ref));
 	a->refs[i] = val;
 }
 
 void ir_array_remove(ir_array *a, uint32_t i)
 {
 	IR_ASSERT(i < a->size);
-	memmove(a->refs + i + 1, a->refs + i, (a->size - i - 1) * sizeof(ir_ref));
+	memmove(a->refs + i, a->refs + i + 1, (a->size - i - 1) * sizeof(ir_ref));
 	a->refs[a->size - 1] = IR_UNUSED;
+}
+
+void ir_list_insert(ir_list *l, uint32_t i, ir_ref val)
+{
+	IR_ASSERT(i < l->len);
+	if (l->len >= l->a.size) {
+		ir_array_grow(&l->a, l->a.size + 1);
+	}
+	memmove(l->a.refs + i + 1, l->a.refs + i, (l->len - i) * sizeof(ir_ref));
+	l->a.refs[i] = val;
+	l->len++;
+}
+
+void ir_list_remove(ir_list *l, uint32_t i)
+{
+	IR_ASSERT(i < l->len);
+	memmove(l->a.refs + i, l->a.refs + i + 1, (l->len - i) * sizeof(ir_ref));
+	l->len--;
 }
 
 bool ir_list_contains(ir_list *l, ir_ref val)

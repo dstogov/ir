@@ -344,7 +344,7 @@ IR_ALWAYS_INLINE ir_ref ir_array_at(ir_array *a, uint32_t i)
 	return a->refs[i];
 }
 
-IR_ALWAYS_INLINE void ir_array_map(ir_array *a, uint32_t i, ir_ref val)
+IR_ALWAYS_INLINE void ir_array_set(ir_array *a, uint32_t i, ir_ref val)
 {
 	if (i >= a->size) {
 		ir_array_grow(a, i);
@@ -359,6 +359,8 @@ typedef struct _ir_list {
 } ir_list;
 
 bool ir_list_contains(ir_list *l, ir_ref val);
+void ir_list_insert(ir_list *l, uint32_t i, ir_ref val);
+void ir_list_remove(ir_list *l, uint32_t i);
 
 IR_ALWAYS_INLINE void ir_list_init(ir_list *l, uint32_t size)
 {
@@ -389,7 +391,7 @@ IR_ALWAYS_INLINE uint32_t ir_list_capasity(ir_list *l)
 
 IR_ALWAYS_INLINE void ir_list_push(ir_list *l, ir_ref val)
 {
-	ir_array_map(&l->a, l->len++, val);
+	ir_array_set(&l->a, l->len++, val);
 }
 
 IR_ALWAYS_INLINE ir_ref ir_list_pop(ir_list *l)
@@ -408,18 +410,6 @@ IR_ALWAYS_INLINE ir_ref ir_list_at(ir_list *l, uint32_t i)
 {
 	IR_ASSERT(i < l->len);
 	return ir_array_at(&l->a, i);
-}
-
-IR_ALWAYS_INLINE void ir_list_insert(ir_list *l, uint32_t i, ir_ref val)
-{
-	ir_array_insert(&l->a, i, val);
-	l->len++;
-}
-
-IR_ALWAYS_INLINE void ir_list_remove(ir_list *l, uint32_t i)
-{
-	ir_array_remove(&l->a, i);
-	l->len--;
 }
 
 /* Worklist (unique list) */
