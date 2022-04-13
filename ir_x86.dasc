@@ -3038,12 +3038,13 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, int from, int to)
 	}
 	return 1;
 }
+
 static void ir_emit_param_move(ir_ctx *ctx, uint8_t type, int from_reg, int to, ir_ref name)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	ir_live_interval *ival = ctx->live_intervals[to];
-	ir_reg to_reg = ir_ref_reg(ctx, to);
+	ir_reg to_reg = ir_vreg_reg(ctx, to);
 	ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_RBP : IR_REG_RSP;
 	int32_t offset;
 
