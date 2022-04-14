@@ -796,24 +796,25 @@ typedef enum _ir_rule {
 
 /* instruction selection */
 
-bool ir_needs_def_reg(ir_ctx *ctx, ir_ref ref)
+bool ir_needs_vreg(ir_ctx *ctx, ir_ref ref)
 {
 	IR_ASSERT(ctx->rules);
 	return ctx->rules[ref] != IR_SKIP;
 }
 
-ir_regset ir_get_fixed_regset(ir_ctx *ctx, ir_ref ref)
+ir_regset ir_get_scratch_regset(ir_ctx *ctx, ir_ref ref)
 {
 	ir_ref rule;
 
 	rule = ctx->rules[ref];
-//	if (rule == IR_SHIFT) {
-//		return IR_REGSET(IR_REG_RCX);
-//	if (rule == IR_MUL_INT || rule == IR_DIV_INT || rule == IR_MOD_INT) {
-//		return IR_REGSET(IR_REG_RAX) | IR_REGSET(IR_REG_RDX);
-//	}
-	if (rule == IR_MOD_INT && IR_IS_CONST_REF(ctx->ir_base[ref].op1)) {
-		return IR_REGSET(IR_REG_RAX);
+	if (rule == IR_SHIFT) {
+		return IR_REGSET(IR_REG_RCX);
+	} else if (rule == IR_MUL_INT || rule == IR_DIV_INT) {
+		return IR_REGSET(IR_REG_RDX); /* %rax - used as result */
+	} else if (rule == IR_MOD_INT) {
+		return IR_REGSET(IR_REG_RAX); /* %rdx - used as result */
+	} else if (rule == IR_CALL) {
+		return IR_REGSET_SCRATCH;
 	}
 	return IR_REGSET_EMPTY;
 }
@@ -896,7 +897,7 @@ ir_reg ir_uses_fixed_reg(ir_ctx *ctx, ir_ref ref, int op_num)
 	return IR_REG_NONE;
 }
 
-bool ir_result_reuses_op1(ir_ctx *ctx, ir_ref ref)
+bool ir_result_reuses_op1_reg(ir_ctx *ctx, ir_ref ref)
 {
 	ir_ref rule;
 
@@ -908,7 +909,6 @@ bool ir_result_reuses_op1(ir_ctx *ctx, ir_ref ref)
 		case IR_SHIFT_CONST:
 		case IR_MUL_INT:
 		case IR_DIV_INT:
-		case IR_MOD_INT:
 			return 1;
 	}
 	return 0;

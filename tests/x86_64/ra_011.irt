@@ -1,0 +1,21 @@
+--TEST--
+011: Register Allocation (ADD + DIV)
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	uint32_t x_1 = PARAM(l_1, "x", 1);
+	uint32_t y_1 = PARAM(l_1, "y", 2);
+	uint32_t z_1 = PARAM(l_1, "z", 3);
+	uint32_t x_2 = ADD(x_1, y_1);
+	uint32_t x_3 = DIV(x_2, z_1);
+	l_4 = RETURN(l_1, x_3);
+}
+--EXPECT--
+test:
+	movl %edx, %ecx
+	leal (%rsi, %rdi), %eax
+	xorl %edx, %edx
+	divl %ecx
+	retq

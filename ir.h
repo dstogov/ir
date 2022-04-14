@@ -486,21 +486,32 @@ typedef enum _ir_fold_action {
 	IR_FOLD_DO_CONST
 } ir_fold_action;
 
+typedef ir_ref                   ir_live_pos;
 typedef struct _ir_use_pos       ir_use_pos;
 typedef struct _ir_live_range    ir_live_range;
 typedef struct _ir_live_interval ir_live_interval;
 
+#define IR_LIVE_POS_TO_REF(pos)          ((pos) / 4)
+#define IR_LIVE_POS_TO_SUB_REF(pos)      ((pos) % 4)
+
+#define IR_LIVE_POS_FROM_REF(ref)        ((ref) * 4)
+
+#define IR_START_LIVE_POS_FROM_REF(ref)  ((ref) * 4)
+#define IR_GAP_LIVE_POS_FROM_REF(ref)    ((ref) * 4 + 1)
+#define IR_USE_LIVE_POS_FROM_REF(ref)    ((ref) * 4 + 2)
+#define IR_DEF_LIVE_POS_FROM_REF(ref)    ((ref) * 4 + 3)
+#define IR_END_LIVE_POS_FROM_REF(ref)    ((ref) * 4 + 3)
+
 struct _ir_use_pos {
-	uint16_t       op_num;
+	uint16_t       op_num; /* 0 - means result */
 	int8_t         hint;
-	int8_t         reg;
-	ir_ref         pos;
+	ir_live_pos    pos;
 	ir_use_pos    *next;
 };
 
 struct _ir_live_range {
-	ir_ref         start;
-	ir_ref         end;
+	ir_live_pos    start; /* inclusive */
+	ir_live_pos    end;   /* exclusive */
 	ir_live_range *next;
 };
 
@@ -510,6 +521,8 @@ struct _ir_live_interval {
 	int32_t        stack_spill_pos;
 	ir_live_range  range;
 	ir_use_pos    *use_pos;
+	ir_live_interval *top;
+	ir_live_interval *next;
 };
 
 typedef struct _ir_ctx {

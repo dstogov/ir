@@ -263,7 +263,7 @@ void ir_dump_live_ranges(ir_ctx *ctx, FILE *f)
 		ir_live_interval *ival = ctx->live_intervals[i];
 
 		if (ival) {
-			ir_live_range *p = &ival->range;;
+			ir_live_range *p;
 			ir_use_pos *use_pos;
 
 			for (j = 1; j < ctx->insns_count; j++) {
@@ -278,34 +278,71 @@ void ir_dump_live_ranges(ir_ctx *ctx, FILE *f)
 				}
 			}
 			fprintf(f, ")");
-			if (ival->reg >= 0) {
-				fprintf(f, " [%%%s]", ir_reg_name(ival->reg, ival->type));
+			if (ival->next) {
+				fprintf(f, "\n\t");
+			} else if (ival->reg >= 0) {
+				fprintf(f, " ");
 			}
-			fprintf(f, ": [%d-%d%c", p->start / 2, p->end / 2, p->end % 2 == 0 ? '[' : ']');
+			do {
+				if (ival->reg >= 0) {
+					fprintf(f, "[%%%s]", ir_reg_name(ival->reg, ival->type));
+				}
+				p = &ival->range;
+				fprintf(f, ": [%d.%d-%d.%d)",
+					IR_LIVE_POS_TO_REF(p->start), IR_LIVE_POS_TO_SUB_REF(p->start),
+					IR_LIVE_POS_TO_REF(p->end), IR_LIVE_POS_TO_SUB_REF(p->end));
+				p = p->next;
+				while (p) {
+					fprintf(f, ", [%d.%d-%d.%d)",
+						IR_LIVE_POS_TO_REF(p->start), IR_LIVE_POS_TO_SUB_REF(p->start),
+						IR_LIVE_POS_TO_REF(p->end), IR_LIVE_POS_TO_SUB_REF(p->end));
+
+					p = p->next;
+				}
+				use_pos = ival->use_pos;
+				while (use_pos) {
+					if (!use_pos->op_num) {
+						fprintf(f, ", DEF(%d.%d",
+							IR_LIVE_POS_TO_REF(use_pos->pos), IR_LIVE_POS_TO_SUB_REF(use_pos->pos));
+					} else {
+						fprintf(f, ", USE(%d.%d/%d",
+							IR_LIVE_POS_TO_REF(use_pos->pos), IR_LIVE_POS_TO_SUB_REF(use_pos->pos),
+							use_pos->op_num);
+					}
+					if (use_pos->hint >= 0) {
+						fprintf(f, ", hint=%%%s", ir_reg_name(use_pos->hint, ival->type));
+					}
+					fprintf(f, ")");
+					use_pos = use_pos->next;
+				}
+				if (ival->next) {
+					fprintf(f, "\n\t");
+				}
+				ival = ival->next;
+			} while (ival);
+			fprintf(f, "\n");
+		}
+	}
+#if 1
+	for (i = ctx->vregs_count + 1; i < ctx->vregs_count + 1 +32; i++) {
+		ir_live_interval *ival = ctx->live_intervals[i];
+
+		if (ival) {
+			ir_live_range *p = &ival->range;
+			fprintf(f, "[%%%s] : [%d.%d-%d.%d)",
+				ir_reg_name(ival->reg, IR_ADDR),
+				IR_LIVE_POS_TO_REF(p->start), IR_LIVE_POS_TO_SUB_REF(p->start),
+				IR_LIVE_POS_TO_REF(p->end), IR_LIVE_POS_TO_SUB_REF(p->end));
 			p = p->next;
 			while (p) {
-				fprintf(f, ", [%d-%d%c", p->start / 2, p->end / 2, p->end % 2 == 0 ? '[' : ']');
-
+				fprintf(f, ", [%d.%d-%d.%d)",
+					IR_LIVE_POS_TO_REF(p->start), IR_LIVE_POS_TO_SUB_REF(p->start),
+					IR_LIVE_POS_TO_REF(p->end), IR_LIVE_POS_TO_SUB_REF(p->end));
 				p = p->next;
-			}
-			use_pos = ival->use_pos;
-			while (use_pos) {
-				if (!use_pos->op_num) {
-					fprintf(f, ", DEF(%d", use_pos->pos / 2);
-				} else {
-					fprintf(f, ", USE(%d/%d", use_pos->pos / 2, use_pos->op_num);
-				}
-				if (use_pos->hint >= 0) {
-					fprintf(f, ", hint=%%%s", ir_reg_name(use_pos->hint, ival->type));
-				}
-				fprintf(f, ")");
-				if (use_pos->reg >= 0) {
-					fprintf(f, " [%%%s]", ir_reg_name(use_pos->reg, ival->type));
-				}
-				use_pos = use_pos->next;
 			}
 			fprintf(f, "\n");
 		}
 	}
+#endif
 	fprintf(f, "}\n");
 }

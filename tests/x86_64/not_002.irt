@@ -1,0 +1,16 @@
+--TEST--
+002: not function
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	bool x = PARAM(l_1, "x", 1);
+	bool ret = NOT(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	testb %dil, %dil
+	setne %al
+	retq

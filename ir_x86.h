@@ -275,9 +275,11 @@ uint32_t __inline __ir_clz(uint32_t value) {
 
 #endif
 
-bool ir_needs_def_reg(ir_ctx *ctx, ir_ref ref);
-ir_regset ir_get_fixed_regset(ir_ctx *ctx, ir_ref ref);
+bool ir_needs_vreg(ir_ctx *ctx, ir_ref ref);
+
+/* Registers modified by the given instruction */
+ir_regset ir_get_scratch_regset(ir_ctx *ctx, ir_ref ref);
 ir_reg ir_uses_fixed_reg(ir_ctx *ctx, ir_ref ref, int op_num);
-bool ir_result_reuses_op1(ir_ctx *ctx, ir_ref ref);
+bool ir_result_reuses_op1_reg(ir_ctx *ctx, ir_ref ref);
 
 #endif /* IR_X86_H */
