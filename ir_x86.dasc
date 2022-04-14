@@ -3457,7 +3457,7 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 						ir_reg def_reg = ir_ref_reg(ctx, i);
 						ir_reg op1_reg = ir_ref_reg(ctx, insn->op1);
 						ir_insn *op2_insn = &ctx->ir_base[insn->op2];
-						ir_reg op2_reg = ir_ref_reg(ctx, op2_insn->op2);
+						ir_reg op2_reg = ir_ref_reg(ctx, op2_insn->op1);
 						int32_t offset = ctx->ir_base[op2_insn->op2].val.i32;
 
 						IR_ASSERT(def_reg >= 0 && op1_reg >= 0 && op2_reg >= 0);
