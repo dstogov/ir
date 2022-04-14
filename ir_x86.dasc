@@ -945,7 +945,7 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 						// const
 					} else if (op2_insn->val.i64 == 0) {
 						return IR_COPY_INT;
-					} else if (ir_type_size[insn->type] == sizeof(void*)) {
+					} else if (ir_type_size[insn->type] >= 4) {
 						if (insn->op1 > bb->start && insn->op1 < ref && ctx->use_lists[insn->op1].count == 1) {
 							if (!ctx->rules[insn->op1]) {
 								ctx->rules[insn->op1] = ir_match_insn(ctx, insn->op1, bb);
@@ -977,7 +977,7 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 						    }
 						}
 					}
-				} else if (insn->op == IR_ADD && ir_type_size[insn->type] == sizeof(void*)) {
+				} else if (insn->op == IR_ADD && ir_type_size[insn->type] >= 4) {
 					if (insn->op1 > bb->start && insn->op1 < ref && ctx->use_lists[insn->op1].count == 1) {
 						if (!ctx->rules[insn->op1]) {
 							ctx->rules[insn->op1] = ir_match_insn(ctx, insn->op1, bb);
@@ -1023,7 +1023,7 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 						// 0
 					} else if (op2_insn->val.u64 == 1) {
 						return IR_COPY_INT;
-					} else if (ir_type_size[insn->type] == sizeof(void*)) {
+					} else if (ir_type_size[insn->type] >= 4) {
 						if (op2_insn->val.u64 == 2 || op2_insn->val.u64 == 4 || op2_insn->val.u64 == 8) {
 							return IR_LEA_SI; // lea ret, [op1.reg*op2.scale]
 						} else if (op2_insn->val.u64 == 3 || op2_insn->val.u64 == 5 || op2_insn->val.u64 == 9) {
@@ -1162,7 +1162,7 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 					// const
 				} else if (op2_insn->val.u64 == 0) {
 					return IR_COPY_INT;
-				} else if (ir_type_size[insn->type] == sizeof(void*)) {
+				} else if (ir_type_size[insn->type] >= 4) {
 					if (op2_insn->val.u64 == 1) {
 						// lea [op1*2]
 					} else if (op2_insn->val.u64 == 2) {
@@ -3352,7 +3352,11 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 						if (insn->op == IR_SUB) {
 							offset = -offset;
 						}
-						|	lea Ra(def_reg), aword [Ra(op1_reg)+offset]
+						if (ir_type_size[insn->type] == 4) {
+							|	lea Rd(def_reg), dword [Rd(op1_reg)+offset]
+						} else {
+							|	lea Ra(def_reg), aword [Ra(op1_reg)+offset]
+						}
 					}
 					break;
 				case IR_LEA_SI:
@@ -3363,11 +3367,23 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 
 						IR_ASSERT(def_reg >= 0 && op1_reg >= 0);
 						if (scale == 2) {
-							|	lea Ra(def_reg), aword [Ra(op1_reg)*2]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op1_reg)*2]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op1_reg)*2]
+							}
 						} else if (scale == 4) {
-							|	lea Ra(def_reg), aword [Ra(op1_reg)*4]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op1_reg)*4]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op1_reg)*4]
+							}
 						} else if (scale == 8) {
-							|	lea Ra(def_reg), aword [Ra(op1_reg)*8]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op1_reg)*8]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op1_reg)*8]
+							}
 						} else {
 							IR_ASSERT(0);
 						}
@@ -3381,11 +3397,23 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 
 						IR_ASSERT(def_reg >= 0 && op1_reg >= 0);
 						if (scale == 3) {
-							|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op1_reg)*2]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op1_reg)+Rd(op1_reg)*2]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op1_reg)*2]
+							}
 						} else if (scale == 5) {
-							|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op1_reg)*4]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op1_reg)+Rd(op1_reg)*4]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op1_reg)*4]
+							}
 						} else if (scale == 9) {
-							|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op1_reg)*8]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op1_reg)+Rd(op1_reg)*8]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op1_reg)*8]
+							}
 						} else {
 							IR_ASSERT(0);
 						}
@@ -3398,7 +3426,11 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 						ir_reg op2_reg = ir_ref_reg(ctx, insn->op2);
 
 						IR_ASSERT(def_reg >= 0 && op1_reg >= 0 && op2_reg >= 0);
-						|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op2_reg)]
+						if (ir_type_size[insn->type] == 4) {
+							|	lea Rd(def_reg), dword [Rd(op1_reg)+Rd(op2_reg)]
+						} else {
+							|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op2_reg)]
+						}
 					}
 					break;
 				case IR_LEA_OB_I:
@@ -3413,7 +3445,11 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 						if (op1_insn->op == IR_SUB) {
 							offset = -offset;
 						}
-						|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op2_reg)+offset]
+						if (ir_type_size[insn->type] == 4) {
+							|	lea Rd(def_reg), dword [Rd(op1_reg)+Rd(op2_reg)+offset]
+						} else {
+							|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op2_reg)+offset]
+						}
 					}
 					break;
 				case IR_LEA_I_OB:
@@ -3428,7 +3464,11 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 						if (op2_insn->op == IR_SUB) {
 							offset = -offset;
 						}
-						|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op2_reg)+offset]
+						if (ir_type_size[insn->type] == 4) {
+							|	lea Rd(def_reg), dword [Rd(op1_reg)+Rd(op2_reg)+offset]
+						} else {
+							|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op2_reg)+offset]
+						}
 					}
 					break;
 				case IR_LEA_SI_O:
@@ -3444,11 +3484,23 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 							offset = -offset;
 						}
 						if (scale == 2) {
-							|	lea Ra(def_reg), aword [Ra(op1_reg)*2+offset]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op1_reg)*2+offset]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op1_reg)*2+offset]
+							}
 						} else if (scale == 4) {
-							|	lea Ra(def_reg), aword [Ra(op1_reg)*4+offset]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op1_reg)*4+offset]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op1_reg)*4+offset]
+							}
 						} else if (scale == 8) {
-							|	lea Ra(def_reg), aword [Ra(op1_reg)*8+offset]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op1_reg)*8+offset]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op1_reg)*8+offset]
+							}
 						} else {
 							IR_ASSERT(0);
 						}
@@ -3467,11 +3519,23 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 							offset = -offset;
 						}
 						if (scale == 3) {
-							|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op1_reg)*2+offset]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op1_reg)+Rd(op1_reg)*2+offset]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op1_reg)*2+offset]
+							}
 						} else if (scale == 5) {
-							|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op1_reg)*4+offset]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op1_reg)+Rd(op1_reg)*4+offset]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op1_reg)*4+offset]
+							}
 						} else if (scale == 6) {
-							|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op1_reg)*8+offset]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op1_reg)+Rd(op1_reg)*8+offset]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op1_reg)*8+offset]
+							}
 						} else {
 							IR_ASSERT(0);
 						}
@@ -3489,7 +3553,11 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 						if (insn->op == IR_SUB) {
 							offset = -offset;
 						}
-						|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op2_reg)+offset]
+						if (ir_type_size[insn->type] == 4) {
+							|	lea Rd(def_reg), dword [Rd(op1_reg)+Rd(op2_reg)+offset]
+						} else {
+							|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op2_reg)+offset]
+						}
 					}
 					break;
 				case IR_LEA_OB_SI:
@@ -3507,11 +3575,23 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 							offset = -offset;
 						}
 						if (scale == 2) {
-							|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op2_reg)*2+offset]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op1_reg)+Rd(op2_reg)*2+offset]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op2_reg)*2+offset]
+							}
 						} else if (scale == 4) {
-							|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op2_reg)*4+offset]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op1_reg)+Rd(op2_reg)*4+offset]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op2_reg)*4+offset]
+							}
 						} else if (scale == 8) {
-							|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op2_reg)*8+offset]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op1_reg)+Rd(op2_reg)*8+offset]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op2_reg)*8+offset]
+							}
 						} else {
 							IR_ASSERT(0);
 						}
@@ -3532,11 +3612,23 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 							offset = -offset;
 						}
 						if (scale == 2) {
-							|	lea Ra(def_reg), aword [Ra(op2_reg)+Ra(op1_reg)*2+offset]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op2_reg)+Rd(op1_reg)*2+offset]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op2_reg)+Ra(op1_reg)*2+offset]
+							}
 						} else if (scale == 4) {
-							|	lea Ra(def_reg), aword [Ra(op2_reg)+Ra(op1_reg)*4+offset]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op2_reg)+Rd(op1_reg)*4+offset]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op2_reg)+Ra(op1_reg)*4+offset]
+							}
 						} else if (scale == 8) {
-							|	lea Ra(def_reg), aword [Ra(op2_reg)+Ra(op1_reg)*8+offset]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op2_reg)+Rd(op1_reg)*8+offset]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op2_reg)+Ra(op1_reg)*8+offset]
+							}
 						} else {
 							IR_ASSERT(0);
 						}
@@ -3552,11 +3644,23 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 
 						IR_ASSERT(def_reg >= 0 && op1_reg >= 0 && op2_reg >= 0);
 						if (scale == 2) {
-							|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op2_reg)*2]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op1_reg)+Rd(op2_reg)*2]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op2_reg)*2]
+							}
 						} else if (scale == 4) {
-							|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op2_reg)*4]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op1_reg)+Rd(op2_reg)*4]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op2_reg)*4]
+							}
 						} else if (scale == 8) {
-							|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op2_reg)*8]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op1_reg)+Rd(op2_reg)*8]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op1_reg)+Ra(op2_reg)*8]
+							}
 						} else {
 							IR_ASSERT(0);
 						}
@@ -3572,11 +3676,23 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 
 						IR_ASSERT(def_reg >= 0 && op1_reg >= 0 && op2_reg >= 0);
 						if (scale == 2) {
-							|	lea Ra(def_reg), aword [Ra(op2_reg)+Ra(op1_reg)*2]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op2_reg)+Rd(op1_reg)*2]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op2_reg)+Ra(op1_reg)*2]
+							}
 						} else if (scale == 4) {
-							|	lea Ra(def_reg), aword [Ra(op2_reg)+Ra(op1_reg)*4]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), dword [Rd(op2_reg)+Rd(op1_reg)*4]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op2_reg)+Ra(op1_reg)*4]
+							}
 						} else if (scale == 8) {
-							|	lea Ra(def_reg), aword [Ra(op2_reg)+Ra(op1_reg)*8]
+							if (ir_type_size[insn->type] == 4) {
+								|	lea Rd(def_reg), aword [Rd(op2_reg)+Rd(op1_reg)*8]
+							} else {
+								|	lea Ra(def_reg), aword [Ra(op2_reg)+Ra(op1_reg)*8]
+							}
 						} else {
 							IR_ASSERT(0);
 						}

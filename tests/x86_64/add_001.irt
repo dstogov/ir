@@ -12,6 +12,5 @@
 }
 --EXPECT--
 test:
-	movl %esi, %eax
-	addl %edi, %eax
+	leal (%rsi, %rdi), %eax
 	retq
