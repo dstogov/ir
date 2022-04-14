@@ -329,7 +329,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							} else {
 								reg = ctx->rules ? ir_uses_fixed_reg(ctx, i, j) : IR_REG_NONE;
 								if (reg != IR_REG_NONE) {
-									use_pos = IR_GAP_LIVE_POS_FROM_REF(i);
+									use_pos = IR_START_LIVE_POS_FROM_REF(i); // TODO: ???
 									ir_add_fixed_live_range(ctx, reg,
 										IR_USE_LIVE_POS_FROM_REF(i), IR_DEF_LIVE_POS_FROM_REF(i));
 								} else {

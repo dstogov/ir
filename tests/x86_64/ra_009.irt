@@ -13,3 +13,13 @@
 	l_4 = RETURN(l_1, x_3);
 }
 --EXPECT--
+test:
+	movl %edx, %ecx
+	movl %edi, %eax
+	xorl %edx, %edx
+	divl %esi
+	movl %edx, %eax
+	xorl %edx, %edx
+	divl %ecx
+	movl %edx, %eax
+	retq
