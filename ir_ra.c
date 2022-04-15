@@ -27,7 +27,6 @@ int ir_assign_virtual_registers(ir_ctx *ctx)
 		for (i = bb->start, insn = ctx->ir_base + i; i <= bb->end;) {
 			ctx->prev_insn_len[i] = n; /* The first insn of BB keeps BB number in prev_insn_len[] */
 			flags = ir_op_flags[insn->op];
-//			if (flags & IR_OP_FLAG_DATA) {
 			if ((flags & IR_OP_FLAG_DATA) || ((flags & IR_OP_FLAG_MEM) && insn->type != IR_VOID)) {
 				if ((insn->op == IR_PARAM || insn->op == IR_VAR) && ctx->use_lists[i].count == 0) {
 					/* pass */
@@ -41,24 +40,6 @@ int ir_assign_virtual_registers(ir_ctx *ctx)
 			insn += n;
 		}
 	}
-#if 0
-	n = 1;
-	for (i = IR_UNUSED + 1, insn = ctx->ir_base + i; i < ctx->insns_count;) {
-		insn->prev_len = n;
-		flags = ir_op_flags[insn->op];
-		if (flags & IR_OP_FLAG_DATA) {
-			if ((insn->op == IR_PARAM || insn->op == IR_VAR) && ctx->use_lists[i].count == 0) {
-				/* pass */
-			} else {
-				vregs[i] = ++vregs_count;
-			}
-		}
-		n = ir_operands_count(ctx, insn);
-		n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
-		i += n;
-		insn += n;
-	}
-#endif
 	ctx->vregs_count = vregs_count;
 	ctx->vregs = vregs;
 
@@ -453,8 +434,8 @@ static ir_live_pos ir_vregs_overlap(ir_ctx *ctx, uint32_t r1, uint32_t r2)
 	ir_live_range *lrg2 = &ctx->live_intervals[r2]->range;
 
 	while (1) {
-		if (lrg1->start < lrg2->end) { // TODO: less or less-or-equal
-			if (lrg2->start < lrg1->end) { // TODO: less or less-or-equal
+		if (lrg1->start < lrg2->end) {
+			if (lrg2->start < lrg1->end) {
 				return IR_MAX(lrg1->start, lrg2->start);
 			} else {
 				lrg1 = lrg1->next;
@@ -641,8 +622,8 @@ int ir_coalesce(ir_ctx *ctx)
 			ctx->vregs_count = n;
 		}
 		ir_mem_free(offsets);
-	}
 #endif
+	}
 
 	return 1;
 }
@@ -790,7 +771,7 @@ static bool ir_live_range_covers(ir_live_interval *ival, ir_live_pos position)
 	ir_live_range *live_range = &ival->range;
 
 	do {
-		if (position >= live_range->start && position < live_range->end) { // TODO: less or less-or-equal
+		if (position >= live_range->start && position < live_range->end) {
 			return 1;
 		}
 		live_range = live_range->next;
@@ -1088,7 +1069,6 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 		/* all other intervals are used before current, so it is best to spill current itself */
 		/* assign spill slot to current */
 		/* split current before its first use position that requires a register */
-//		IR_ASSERT(0 && "spill between");
 		ir_live_interval *child = ir_split_interval_at(ival, next_use_pos - 2); // TODO: split between
 		ctx->live_intervals[current] = child;
 		ir_add_to_unhandled(ctx, unhandled, current);
@@ -1111,8 +1091,8 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 	}
 
 	/* make sure that current does not intersect with the fixed interval for reg */
-	// if current intersects with the fixed interval for reg then
-		// split current before this intersection
+	// TODO: if current intersects with the fixed interval for reg then
+		// TODO: split current before this intersection
 
 	return IR_REG_NONE;
 }
@@ -1200,7 +1180,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 		/* for each interval i in active */
 		IR_BITSET_FOREACH(active, len, i) {
 			ival = ctx->live_intervals[i];
-			if (ir_live_range_end(ival) <= position) { // TODO: less or less-or-equal
+			if (ir_live_range_end(ival) <= position) {
 				/* move i from active to handled */
 				ir_bitset_excl(active, i);
 			} else if (!ir_live_range_covers(ival, position)) {
@@ -1213,7 +1193,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 		/* for each interval i in inactive */
 		IR_BITSET_FOREACH(inactive, len, i) {
 			ival = ctx->live_intervals[i];
-			if (ir_live_range_end(ival) <= position) { // TODO: less or less-or-equal
+			if (ir_live_range_end(ival) <= position) {
 				/* move i from inactive to handled */
 				ir_bitset_excl(inactive, i);
 			} else if (ir_live_range_covers(ival, position)) {
