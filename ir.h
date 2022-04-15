@@ -505,6 +505,7 @@ typedef struct _ir_live_interval ir_live_interval;
 struct _ir_use_pos {
 	uint16_t       op_num; /* 0 - means result */
 	int8_t         hint;
+	uint32_t       hint_vreg;
 	ir_live_pos    pos;
 	ir_use_pos    *next;
 };

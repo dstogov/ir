@@ -168,7 +168,6 @@ static void ir_add_use_pos(ir_ctx *ctx, int v, ir_use_pos *use_pos)
 		p = p->next;
 	}
 
-
 	if (prev) {
 		use_pos->next = prev->next;
 		prev->next = use_pos;
@@ -178,13 +177,14 @@ static void ir_add_use_pos(ir_ctx *ctx, int v, ir_use_pos *use_pos)
 	}
 }
 
-static void ir_add_use(ir_ctx *ctx, int v, int op_num, ir_live_pos pos, ir_reg hint)
+static void ir_add_use(ir_ctx *ctx, int v, int op_num, ir_live_pos pos, ir_reg hint, uint32_t hint_vreg)
 {
 	ir_use_pos *use_pos;
 
 	use_pos = ir_mem_malloc(sizeof(ir_use_pos));
 	use_pos->op_num = op_num;
 	use_pos->hint = hint;
+	use_pos->hint_vreg = hint_vreg;
 	use_pos->pos = pos;
 
 	ir_add_use_pos(ctx, v, use_pos);
@@ -269,6 +269,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 				if (ctx->vregs[i] && ir_bitset_in(live, ctx->vregs[i])) {
 					if (insn->op != IR_PHI) {
 						ir_live_pos def_pos;
+						uint32_t hint_vreg = 0;
 
 						reg = ctx->rules ? ir_uses_fixed_reg(ctx, i, 0) : IR_REG_NONE;
 						if (reg != IR_REG_NONE) {
@@ -283,15 +284,16 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							}
 						} else if (ctx->rules && ir_result_reuses_op1_reg(ctx, i)) {
 							def_pos = IR_GAP_LIVE_POS_FROM_REF(i);
+							hint_vreg = ctx->vregs[insn->op1];
 						} else {
 							def_pos = IR_DEF_LIVE_POS_FROM_REF(i);
 						}
 						/* intervals[opd].setFrom(op.id) */
 						ir_fix_live_range(ctx, ctx->vregs[i],
 							IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
-						ir_add_use(ctx, ctx->vregs[i], 0, def_pos, reg);
+						ir_add_use(ctx, ctx->vregs[i], 0, def_pos, reg, hint_vreg);
 					} else {
-						ir_add_use(ctx, ctx->vregs[i], 0, IR_DEF_LIVE_POS_FROM_REF(i), reg);
+						ir_add_use(ctx, ctx->vregs[i], 0, IR_DEF_LIVE_POS_FROM_REF(i), IR_REG_NONE, 0);
 					}
 					/* live.remove(opd) */
 					ir_bitset_excl(live, ctx->vregs[i]);
@@ -307,6 +309,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 
 							if (ctx->rules && j == 1 && ir_result_reuses_op1_reg(ctx, i)) {
 								use_pos = IR_START_LIVE_POS_FROM_REF(i); // TODO: ???
+								reg = IR_REG_NONE;
 							} else {
 								reg = ctx->rules ? ir_uses_fixed_reg(ctx, i, j) : IR_REG_NONE;
 								if (reg != IR_REG_NONE) {
@@ -320,7 +323,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							/* intervals[opd].addRange(b.from, op.id) */
 							ir_add_live_range(ctx, ctx->vregs[input], ctx->ir_base[input].type,
 								IR_START_LIVE_POS_FROM_REF(bb->start), use_pos);
-							ir_add_use(ctx, ctx->vregs[input], j, use_pos, reg);
+							ir_add_use(ctx, ctx->vregs[input], j, use_pos, reg, 0);
 							/* live.add(opd) */
 							ir_bitset_incl(live, ctx->vregs[input]);
 						}
@@ -472,6 +475,9 @@ static void ir_vregs_join(ir_ctx *ctx, uint32_t r1, uint32_t r2)
 	use_pos = ival->use_pos;
 	while (use_pos) {
 		ir_use_pos *next_use_pos = use_pos->next;
+		if (use_pos->hint_vreg == r1) {
+			use_pos->hint_vreg = 0;
+		}
 		ir_add_use_pos(ctx, r1, use_pos);
 		use_pos = next_use_pos;
 	}
@@ -841,7 +847,7 @@ static void ir_allocate_spill_slot(ir_ctx *ctx, int current, ir_lsra_data *data)
 	}
 }
 
-static ir_reg ir_try_allocate_preferred_reg(ir_live_interval *ival, ir_live_pos *freeUntilPos)
+static ir_reg ir_try_allocate_preferred_reg(ir_ctx *ctx, ir_live_interval *ival, ir_live_pos *freeUntilPos)
 {
 	ir_use_pos *use_pos;
 
@@ -855,6 +861,21 @@ static ir_reg ir_try_allocate_preferred_reg(ir_live_interval *ival, ir_live_pos 
 		}
 		use_pos = use_pos->next;
 	}
+
+	use_pos = ival->use_pos;
+	while (use_pos) {
+		if (use_pos->hint_vreg) {
+			ir_reg reg = ctx->live_intervals[use_pos->hint_vreg]->reg;
+			if (reg >= 0) {
+				if (ir_live_range_end(ival) <= freeUntilPos[reg]) {
+					/* register available for the whole interval */
+					return reg;
+				}
+			}
+		}
+		use_pos = use_pos->next;
+	}
+
 	return IR_REG_NONE;
 }
 
@@ -929,7 +950,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, int current, uint32_t len, i
 	} IR_BITSET_FOREACH_END();
 
 	/* Try to use hint */
-	reg = ir_try_allocate_preferred_reg(ival, freeUntilPos);
+	reg = ir_try_allocate_preferred_reg(ctx, ival, freeUntilPos);
 	if (reg != IR_REG_NONE) {
 		ival->reg = reg;
 		return reg;
