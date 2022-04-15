@@ -1226,6 +1226,7 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 		case IR_LOOP_BEGIN:
 //		case IR_LOOP_END:
 		case IR_LOOP_EXIT:
+		case IR_UNREACHABLE:
 			return IR_SKIP;
 		case IR_RETURN:
 			if (!insn->op2) {
@@ -2904,12 +2905,8 @@ int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count)
 	return 1;
 }
 
-static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+static void ir_emit_arguments(ir_ctx *ctx, ir_insn *insn)
 {
-	ir_backend_data *data = ctx->data;
-	dasm_State **Dst = &data->dasm_state;
-	const char *name;
-	void *addr;
 	int j, n;
 	ir_ref arg;
 	ir_insn *arg_insn;
@@ -2923,9 +2920,6 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	const int8_t *int_reg_params = _ir_int_reg_params;
 	const int8_t *fp_reg_params = _ir_fp_reg_params;
 	ir_copy *copies;
-
-	name = ir_get_str(ctx, ctx->ir_base[insn->op2].val.addr);
-	addr = ir_resolve_sym_name(name);
 
 	n = ir_input_edges_count(ctx, insn);
 	copies = ir_mem_malloc((n - 2) * sizeof(ir_copy));
@@ -2964,6 +2958,20 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 	ir_parallel_copy(ctx, copies, count);
 	ir_mem_free(copies);
+}
+
+static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	const char *name;
+	void *addr;
+	ir_reg dst;
+
+	name = ir_get_str(ctx, ctx->ir_base[insn->op2].val.addr);
+	addr = ir_resolve_sym_name(name);
+
+	ir_emit_arguments(ctx, insn);
 
 //	if (IS_SIGNED_32BIT(addr)) { // TODO: 32-bit IP relative or 64-bit absolute address
 //		|	call qword &addr
@@ -2987,6 +2995,28 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			IR_ASSERT(0);
 		}
 	}
+}
+
+static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	const char *name;
+	void *addr;
+
+	name = ir_get_str(ctx, ctx->ir_base[insn->op2].val.addr);
+	addr = ir_resolve_sym_name(name);
+
+	ir_emit_arguments(ctx, insn);
+
+	ir_emit_epilogue(ctx);
+
+//	if (IS_SIGNED_32BIT(addr)) { // TODO: 32-bit IP relative or 64-bit absolute address
+//		|	call qword &addr
+//	} else {
+		|	mov64 rax, ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
+		|	jmp rax
+//	}
 }
 
 static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, int from, int to)
@@ -3791,6 +3821,8 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 					break;
 				case IR_CALL:
 					ir_emit_call(ctx, i, insn);
+				case IR_TAILCALL:
+					ir_emit_tailcall(ctx, i, insn);
 					break;
 				default:
 					IR_ASSERT(0 && "NIY rule/insruction");
