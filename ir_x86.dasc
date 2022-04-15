@@ -1701,7 +1701,12 @@ void ir_emit_shift(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	} else {
 		reg = IR_REG_RAX; // TODO: temporary register
 	}
+	IR_ASSERT(reg != IR_REG_RCX);
 	if (op1_reg != reg) {
+		if (reg == op2_reg) {
+			ir_emit_load(ctx, insn->type, insn->op2, IR_REG_RCX);
+			op2_reg = IR_REG_RCX;
+		}
 		ir_emit_load(ctx, insn->type, insn->op1, reg);
 	}
 	if (op2_reg != IR_REG_RCX) {
