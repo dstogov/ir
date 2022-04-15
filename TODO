@@ -35,7 +35,7 @@
 
 ?  register allocation
 	+  linear scan
-		-   allocate scratch registers first
+		+   allocate scratch registers first
 		-	separate INT and FP allocation phases 
     +  use positions
 	?  fixed registers constraints
@@ -52,14 +52,13 @@
         +  spill slot allocation ( uniqe for each VREG)
     	-  uniqe for each VREG
 		-  SpillRange ???
-	-  splitting
-		-  SplitAt
+	?  splitting
 	-  splinting
 		-  spill only at cold path if possible	
 	?  hints
 		+  hints for fixed input/outpu registers
 		+  hints for parameter nodes
-		-  hints for call arguments
+		+  hints for call arguments
 		-  hints propagation
 		-  hints and low priority
 

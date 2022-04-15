@@ -962,6 +962,12 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, int current, uint32_t len, i
 		if (freeUntilPos[i] > pos) {
 			pos = freeUntilPos[i];
 			reg = i;
+		} else if (freeUntilPos[i] == pos
+				&& !IR_REGSET_IN(IR_REGSET_SCRATCH, reg)
+				&& IR_REGSET_IN(IR_REGSET_SCRATCH, i)) {
+			/* prefer caller-saved registers to avoid save/restore in prologue/epilogue */
+			pos = freeUntilPos[i];
+			reg = i;
 		}
 	} IR_REGSET_FOREACH_END();
 
