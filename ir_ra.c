@@ -626,6 +626,21 @@ int ir_coalesce(ir_ctx *ctx)
 				}
 			}
 			ctx->vregs_count = n;
+			for (i = 1, n = 1; i <= ctx->vregs_count; i++) {
+				if (ctx->live_intervals[i]) {
+					ir_use_pos *use_pos = ctx->live_intervals[i]->use_pos;
+
+					while (use_pos) {
+						if (use_pos->hint_vreg) {
+							use_pos->hint_vreg -= offsets[use_pos->hint_vreg];
+							if (use_pos->hint_vreg == i) {
+								use_pos->hint_vreg = 0;
+							}
+						}
+						use_pos = use_pos->next;
+					}
+				}
+			}
 		}
 		ir_mem_free(offsets);
 #endif
