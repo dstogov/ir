@@ -64,7 +64,7 @@
 
 ?  code generation
 	-  POW, NEG (fp), ABS, OVERFLOW, MIN, MAX, COND
-	-  TAILCALL
+	+  TAILCALL
 	-  ALLOCA, VLOAD, VSTORE, LOAD, STORE
 	+  SWITCH
 	-  ir_last_use
