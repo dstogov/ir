@@ -3020,7 +3020,7 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, int from, int to)
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	ir_insn *from_insn;
-	int8_t to_reg, from_reg, dst_reg;
+	int8_t to_reg, from_reg;
 
 	from_insn =&ctx->ir_base[from];
 	if (IR_IS_TYPE_INT(type)) {
@@ -3062,23 +3062,17 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, int from, int to)
 	} else {
 		to_reg = to ? ir_vreg_reg(ctx, to) : IR_REG_XMM0; // %xmm0 is a temporary register
 		from_reg = from ? ir_vreg_reg(ctx, from) : IR_REG_XMM0; // %xmm0 is a temporary register
-		dst_reg = to_reg;
-		if (to_reg < 0 && from_reg < 0) {
-			to_reg = IR_REG_XMM0; // TODO: temporary register 2
+		if (from_reg < 0) {
+			from_reg = (to_reg >= 0) ? to_reg : IR_REG_XMM0; // TODO: temporary register 2
+
+			if (IR_IS_CONST_REF(from)) {
+				ir_emit_fp_load(ctx, from_insn->type, from, from_reg);
+			} else {
+				|	ASM_FP_REG_VREG_MOV type, from_reg, from
+			}
 		}
-		if (IR_IS_CONST_REF(from) && to_reg >= 0) {
-			ir_emit_fp_load(ctx, from_insn->type, from, to_reg);
-		} else {
-		    if (to_reg >= 0 && from_reg >= 0) {
-				|	ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, type, to_reg, from_reg
-		    } else if (from_reg >= 0) {
-				|	ASM_FP_VREG_REG_MOV type, to, from_reg
-		    } else if (to_reg >= 0) {
-				|	ASM_FP_REG_VREG_MOV type, to_reg, from
-		    }
-		}
-		if (to_reg != dst_reg) {
-			|	ASM_FP_VREG_REG_MOV type, to, to_reg
+		if (from_reg != to_reg) {
+			|	ASM_FP_VREG_REG_MOV type, to, from_reg
 		}
 	}
 	return 1;
