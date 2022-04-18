@@ -15,7 +15,10 @@
 #include "dynasm/dasm_proto.h"
 #include "dynasm/dasm_x86.h"
 
-#define IR_IS_SIGNED_32BIT(val) ((((intptr_t)(val)) <= 0x7fffffff) && (((intptr_t)(val)) >= (-2147483647 - 1)))
+#define IR_IS_SIGNED_32BIT(val)   ((((intptr_t)(val)) <= 0x7fffffff) && (((intptr_t)(val)) >= (-2147483647 - 1)))
+#define IR_IS_UNSIGNED_32BIT(val) ((((uintptr_t)(val)) <= 0xffffffff) && (((uintptr_t)(val)) >= 0))
+#define IR_IS_32BIT(type, val)    (IR_IS_TYPE_SIGNED(type) ? IR_IS_SIGNED_32BIT((val).i64) : IR_IS_UNSIGNED_32BIT((val).u64))
+
 
 |.if X64
 |.arch x64
@@ -224,7 +227,7 @@
 |.macro ASM_REG_REF_OP, _op, type, dst, src
 ||	if (IR_IS_CONST_REF(src)) {
 ||		ir_insn *_insn = &ctx->ir_base[src];
-||		IR_ASSERT(IR_IS_SIGNED_32BIT(_insn->val.i64)); // TODO:
+||		IR_ASSERT(IR_IS_SIGNED_32BIT(_insn->val.i64));
 |		ASM_REG_IMM_OP _op, type, dst, _insn->val.i32
 ||	} else {
 ||		ir_reg _reg = ir_ref_reg(ctx, src);
@@ -241,58 +244,13 @@
 ||	}
 |.endmacro
 
-|.macro ASM_VREG_IMM_MOV, type, dst, src
-||	do {
-||		ir_insn *_insn = &ctx->ir_base[src];
-||		ir_reg _reg = ir_vreg_reg(ctx, dst);
-||		if (_reg >= 0) {
-||			if (ir_type_size[type] == 8 && !IR_IS_SIGNED_32BIT(_insn->val.i64)) {
-|				mov64 Ra(_reg), _insn->val.i64
-||			} else if (_insn->val.i64 == 0) {
-|				ASM_REG_REG_OP xor, type, _reg, _reg
-||			} else {
-|				ASM_REG_IMM_OP mov, type, _reg, _insn->val.i32
-||			}
-||		} else {
-||			int32_t offset = ir_vreg_spill_slot(ctx, dst);
-||			IR_ASSERT(IR_IS_SIGNED_32BIT(_insn->val.i64)); // TODO:
-||			if (ctx->flags & IR_USE_FRAME_POINTER) {
-|				ASM_MEM_IMM_OP mov, type, [rbp+offset], _insn->val.i32
-||			} else {
-|				ASM_MEM_IMM_OP mov, type, [rsp+offset], _insn->val.i32
-||			}
-||		}
-||	} while (0);
-|.endmacro
-
 |.macro ASM_VREG_REG_MOV, type, dst, src
 ||	do {
-||		ir_reg _reg = ir_vreg_reg(ctx, dst);
-||		if (_reg >= 0) {
-|			ASM_REG_REG_OP mov, type, _reg, src
+||		int32_t offset = ir_vreg_spill_slot(ctx, dst);
+||		if (ctx->flags & IR_USE_FRAME_POINTER) {
+|			ASM_MEM_REG_OP mov, type, [rbp+offset], src
 ||		} else {
-||			int32_t offset = ir_vreg_spill_slot(ctx, dst);
-||			if (ctx->flags & IR_USE_FRAME_POINTER) {
-|				ASM_MEM_REG_OP mov, type, [rbp+offset], src
-||			} else {
-|				ASM_MEM_REG_OP mov, type, [rsp+offset], src
-||			}
-||		}
-||	} while (0);
-|.endmacro
-
-|.macro ASM_REG_VREG_MOV, type, dst, src
-||	do {
-||		ir_reg _reg = ir_vreg_reg(ctx, src);
-||		if (_reg >= 0) {
-|			ASM_REG_REG_OP mov, type, dst, _reg
-||		} else {
-||			int32_t offset = ir_vreg_spill_slot(ctx, src);
-||			if (ctx->flags & IR_USE_FRAME_POINTER) {
-|				ASM_REG_MEM_OP mov, type, dst, [rbp+offset]
-||			} else {
-|				ASM_REG_MEM_OP mov, type, dst, [rsp+offset]
-||			}
+|			ASM_MEM_REG_OP mov, type, [rsp+offset], src
 ||		}
 ||	} while (0);
 |.endmacro
@@ -380,7 +338,7 @@
 |.macro ASM_REG_REF_IMUL, type, dst, src
 ||	if (IR_IS_CONST_REF(src)) {
 ||		ir_insn *_insn = &ctx->ir_base[src];
-||		IR_ASSERT(IR_IS_SIGNED_32BIT(_insn->val.i64)); // TODO:
+||		IR_ASSERT(IR_IS_SIGNED_32BIT(_insn->val.i64));
 |		ASM_REG_IMM_IMUL type, dst, _insn->val.i32
 ||	} else {
 ||		ir_reg _reg = ir_ref_reg(ctx, src);
@@ -1527,6 +1485,11 @@ void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		op2_reg = reg;
 	}
 
+	if (op2_reg < 0 && IR_IS_CONST_REF(insn->op2) && ir_type_size[type] == 8 && !IR_IS_32BIT(type, ctx->ir_base[insn->op2].val)) {
+		op2_reg = (reg == def_reg && reg != IR_REG_RAX) ? IR_REG_RAX : IR_REG_RDX; // TODO: temporary register for 64-bit constant
+		ir_emit_load(ctx, type, insn->op2, op2_reg);
+	}
+
 	if (op2_reg >= 0) {
 		switch (insn->op) {
 			case IR_ADD:
@@ -2120,6 +2083,10 @@ void ir_emit_cmp_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			ir_emit_load(ctx, type, insn->op1, op1_reg);
 		}
 	}
+	if (op2_reg < 0 && IR_IS_CONST_REF(insn->op2) && ir_type_size[type] == 8 && !IR_IS_32BIT(type, ctx->ir_base[insn->op2].val)) {
+		op2_reg = (reg == op1_reg && reg != IR_REG_RAX) ? IR_REG_RAX : IR_REG_RDX; // TODO: temporary register for 64-bit constant
+		ir_emit_load(ctx, type, insn->op2, op2_reg);
+	}
 
 	op = insn->op;
 	if (op2_reg >= 0) {
@@ -2473,6 +2440,8 @@ static void ir_emit_jcc(ir_ctx *ctx, uint8_t op, int b, ir_ref def, ir_insn *ins
 
 void ir_emit_cmp_and_branch_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 {
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
 	ir_insn *cmp_insn = &ctx->ir_base[insn->op2];
 	ir_type type = ctx->ir_base[cmp_insn->op1].type;
 	ir_reg op1_reg = ir_ref_reg(ctx, cmp_insn->op1);
@@ -2488,9 +2457,10 @@ void ir_emit_cmp_and_branch_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 			ir_emit_load(ctx, type, cmp_insn->op1, op1_reg);
 		}
 	}
-
-	ir_backend_data *data = ctx->data;
-	dasm_State **Dst = &data->dasm_state;
+	if (op2_reg < 0 && IR_IS_CONST_REF(cmp_insn->op2) && ir_type_size[type] == 8 && !IR_IS_32BIT(type, ctx->ir_base[cmp_insn->op2].val)) {
+		op2_reg = (op1_reg != IR_REG_RAX) ? IR_REG_RAX : IR_REG_RDX; // TODO: temporary register for 64-bit constant
+		ir_emit_load(ctx, type, cmp_insn->op2, op2_reg);
+	}
 
 	op = cmp_insn->op;
 	if (op2_reg >= 0) {
@@ -3056,29 +3026,37 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, int from, int to)
 	if (IR_IS_TYPE_INT(type)) {
 		to_reg = to ? ir_vreg_reg(ctx, to) : IR_REG_RAX; // %rax is a temporary register
 		from_reg = from ? ir_vreg_reg(ctx, from) : IR_REG_RAX; // %rax is a temporary register
-		if (IR_IS_CONST_REF(from) && to_reg >= 0 && IR_IS_TYPE_INT(from_insn->type) && from_insn->val.u64 == 0) {
-			|	ASM_REG_REG_OP xor, type, to_reg, to_reg
-		} else if (from > 0 && from_reg < 0 && to_reg < 0) {
+		if (from > 0 && from_reg < 0 && to_reg < 0) {
 			|	ASM_VREG_OP push, IR_ADDR, from
 			|	ASM_VREG_OP pop, IR_ADDR, to
 		} else {
 			if (from_reg >= 0 && to_reg >= 0) {
 				|	ASM_REG_REG_OP mov, type, to_reg, from_reg
 			} else if (to_reg >= 0 && IR_IS_CONST_REF(from)) {
-				ir_insn *_insn = &ctx->ir_base[from];
-				if (ir_type_size[type] == 8 && !IR_IS_SIGNED_32BIT(_insn->val.i64)) {
-					|	mov64 Ra(to_reg), _insn->val.i64
-				} else if (_insn->val.i64 == 0) {
-					|	ASM_REG_REG_OP xor, type, to_reg, to_reg
-				} else {
-					|	ASM_REG_IMM_OP mov, type, to_reg, _insn->val.i32
-				}
+				ir_emit_load(ctx, type, from, to_reg);
 			} else if (IR_IS_CONST_REF(from)) {
-				|	ASM_VREG_IMM_MOV type, to, from
+				ir_insn *_insn = &ctx->ir_base[from];
+				int32_t offset = ir_vreg_spill_slot(ctx, to);
+				if (ir_type_size[type] == 8 && !IR_IS_SIGNED_32BIT(_insn->val.i64)) {
+					ir_reg tmp_reg = IR_REG_RDX; // TODO temporary register 2
+					ir_emit_load(ctx, type, from, tmp_reg);
+					|	ASM_VREG_REG_MOV type, to, tmp_reg
+				} else {
+					if (ctx->flags & IR_USE_FRAME_POINTER) {
+						|	ASM_MEM_IMM_OP mov, type, [rbp+offset], _insn->val.i32
+					} else {
+						|	ASM_MEM_IMM_OP mov, type, [rsp+offset], _insn->val.i32
+					}
+				}
 			} else if (from_reg >= 0) {
 				|	ASM_VREG_REG_MOV type, to, from_reg
 			} else if (to_reg >= 0) {
-				|	ASM_REG_VREG_MOV type, to_reg, from
+				int32_t offset = ir_vreg_spill_slot(ctx, from);
+				if (ctx->flags & IR_USE_FRAME_POINTER) {
+					|	ASM_REG_MEM_OP mov, type, to_reg, [rbp+offset]
+				} else {
+					|	ASM_REG_MEM_OP mov, type, to_reg, [rsp+offset]
+				}
 			}
 		}
 	} else {
@@ -3086,7 +3064,7 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, int from, int to)
 		from_reg = from ? ir_vreg_reg(ctx, from) : IR_REG_XMM0; // %xmm0 is a temporary register
 		dst_reg = to_reg;
 		if (to_reg < 0 && from_reg < 0) {
-			to_reg = IR_REG_XMM0; // TODO: temporary register
+			to_reg = IR_REG_XMM0; // TODO: temporary register 2
 		}
 		if (IR_IS_CONST_REF(from) && to_reg >= 0) {
 			ir_emit_fp_load(ctx, from_insn->type, from, to_reg);

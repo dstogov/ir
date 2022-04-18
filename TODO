@@ -70,7 +70,9 @@
 	-  ir_last_use
 	-  64-bit constant (ir_emit_ref, ir_emit_dssa_move)
 	    +  64-bit load
-	    -  64-bit load into temporary register
+	    +  64-bit load into temporary register
+		-  64-bit constants in dessa
+		-  64-bit constants in switch
 		-  64-bit IR_IS_POWER_OF_TWO and IR_LOG2
 	-  binop_int $imm, mem
 	-  commutative insns and swap (binop_int, mul, binop_sse, binop_avx, cmp_int, cmp_fp, cmp_br_int)
