@@ -179,22 +179,6 @@
 ||	}
 |.endmacro
 
-|.macro ASM_VREG_OP, op, type, vreg
-||	do {
-||		ir_reg _reg = ir_vreg_reg(ctx, vreg);
-||		if (_reg >= 0) {
-|			op Ra(_reg)
-||		} else {
-||			int32_t offset = ir_vreg_spill_slot(ctx, vreg);
-||			if (ctx->flags & IR_USE_FRAME_POINTER) {
-|				op aword [rbp+offset]
-||			} else {
-|				op aword [rsp+offset]
-||			}
-||		}
-||	} while (0);
-|.endmacro
-
 |.macro ASM_REG_REF_MOV, type, dst, src
 ||	if (IR_IS_CONST_REF(src)) {
 ||		ir_insn *_insn = &ctx->ir_base[src];
@@ -242,17 +226,6 @@
 ||			}
 ||		}
 ||	}
-|.endmacro
-
-|.macro ASM_VREG_REG_MOV, type, dst, src
-||	do {
-||		int32_t offset = ir_vreg_spill_slot(ctx, dst);
-||		if (ctx->flags & IR_USE_FRAME_POINTER) {
-|			ASM_MEM_REG_OP mov, type, [rbp+offset], src
-||		} else {
-|			ASM_MEM_REG_OP mov, type, [rsp+offset], src
-||		}
-||	} while (0);
 |.endmacro
 
 |.macro ASM_REF_REG_OP, op, type, dst, src
@@ -592,12 +565,7 @@
 |.endmacro
 
 |.macro ASM_FP_REG_VREG_MOV, type, dst, src
-||	if (IR_IS_CONST_REF(src)) {
-||		ir_insn *_insn = &ctx->ir_base[src];
-||		int label = ctx->cfg_blocks_count - src;
-|		ASM_FP_REG_MEM_OP movss, movsd, vmovss, vmovsd, type, dst, [=>label]
-||		_insn->emit_const = 1;
-||	} else {
+||	do {
 ||		ir_reg _reg = ir_vreg_reg(ctx, src);
 ||		if (_reg >= 0) {
 |			ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, type, dst, _reg
@@ -609,7 +577,7 @@
 |				ASM_FP_REG_MEM_OP movss, movsd, vmovss, vmovsd, type, dst, [rsp+offset]
 ||			}
 ||		}
-||	}
+||	} while (0);
 |.endmacro
 
 |.macro ASM_FP_VREG_REG_MOV, type, dst, src
@@ -3026,37 +2994,44 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, int from, int to)
 	if (IR_IS_TYPE_INT(type)) {
 		to_reg = to ? ir_vreg_reg(ctx, to) : IR_REG_RAX; // %rax is a temporary register
 		from_reg = from ? ir_vreg_reg(ctx, from) : IR_REG_RAX; // %rax is a temporary register
-		if (from > 0 && from_reg < 0 && to_reg < 0) {
-			|	ASM_VREG_OP push, IR_ADDR, from
-			|	ASM_VREG_OP pop, IR_ADDR, to
-		} else {
-			if (from_reg >= 0 && to_reg >= 0) {
-				|	ASM_REG_REG_OP mov, type, to_reg, from_reg
-			} else if (to_reg >= 0 && IR_IS_CONST_REF(from)) {
+		if (from_reg >= 0 && to_reg >= 0) {
+			|	ASM_REG_REG_OP mov, type, to_reg, from_reg
+			return 1;
+		} else if (IR_IS_CONST_REF(from)) {
+			if (to_reg >= 0) {
 				ir_emit_load(ctx, type, from, to_reg);
-			} else if (IR_IS_CONST_REF(from)) {
+				return 1;
+			} else {
 				ir_insn *_insn = &ctx->ir_base[from];
 				int32_t offset = ir_vreg_spill_slot(ctx, to);
 				if (ir_type_size[type] == 8 && !IR_IS_SIGNED_32BIT(_insn->val.i64)) {
-					ir_reg tmp_reg = IR_REG_RDX; // TODO temporary register 2
-					ir_emit_load(ctx, type, from, tmp_reg);
-					|	ASM_VREG_REG_MOV type, to, tmp_reg
+					from_reg = IR_REG_RDX; // TODO temporary register 2
+					ir_emit_load(ctx, type, from, from_reg);
 				} else {
 					if (ctx->flags & IR_USE_FRAME_POINTER) {
 						|	ASM_MEM_IMM_OP mov, type, [rbp+offset], _insn->val.i32
 					} else {
 						|	ASM_MEM_IMM_OP mov, type, [rsp+offset], _insn->val.i32
 					}
+					return 1;
 				}
-			} else if (from_reg >= 0) {
-				|	ASM_VREG_REG_MOV type, to, from_reg
-			} else if (to_reg >= 0) {
-				int32_t offset = ir_vreg_spill_slot(ctx, from);
-				if (ctx->flags & IR_USE_FRAME_POINTER) {
-					|	ASM_REG_MEM_OP mov, type, to_reg, [rbp+offset]
-				} else {
-					|	ASM_REG_MEM_OP mov, type, to_reg, [rsp+offset]
-				}
+			}
+		}
+		if (from_reg < 0) {
+			int32_t offset = ir_vreg_spill_slot(ctx, from);
+			from_reg = to_reg >= 0 ? to_reg : IR_REG_RDX; // TODO temporary register 2
+			if (ctx->flags & IR_USE_FRAME_POINTER) {
+				|	ASM_REG_MEM_OP mov, type, from_reg, [rbp+offset]
+			} else {
+				|	ASM_REG_MEM_OP mov, type, from_reg, [rsp+offset]
+			}
+		}
+		if (from_reg != to_reg) {
+			int32_t offset = ir_vreg_spill_slot(ctx, to);
+			if (ctx->flags & IR_USE_FRAME_POINTER) {
+				|	ASM_MEM_REG_OP mov, type, [rbp+offset], from_reg
+			} else {
+				|	ASM_MEM_REG_OP mov, type, [rsp+offset], from_reg
 			}
 		}
 	} else {
