@@ -244,6 +244,19 @@ static void ir_sccp_replace_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_r
 	insn->optx = IR_NOP;
 }
 
+static void ir_sccp_replace_use(ir_ctx *ctx, ir_ref ref, ir_ref use, ir_ref new_use)
+{
+	ir_use_list *use_list = &ctx->use_lists[ref];
+	ir_ref i, n, *p;
+
+	n = use_list->count;
+	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
+		if (*p == use) {
+			*p = new_use;
+		}
+	}
+}
+
 static void ir_sccp_remove_if(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_ref dst)
 {
 	ir_ref j, n, *p, use, next;
@@ -259,7 +272,7 @@ static void ir_sccp_remove_if(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_ref 
 			next_insn = &ctx->ir_base[next];
 			/* remove IF and IF_TRUE/FALSE from double linked control list */
 			next_insn->op1 = insn->op1;
-			ctx->use_edges[ctx->use_lists[insn->op1].refs] = next;
+			ir_sccp_replace_use(ctx, insn->op1, ref, next);
 			/* remove IF and IF_TRUE/FALSE instructions */
 			ir_sccp_replace_insn(ctx, _values, ref, IR_UNUSED);
 			ir_sccp_replace_insn(ctx, _values, use, IR_UNUSED);
@@ -303,7 +316,7 @@ static void ir_sccp_remove_unreachable_merge_inputs(ir_ctx *ctx, ir_insn *_value
 				IR_ASSERT(prev && next);
 				/* remove MERGE and input END from double linked control list */
 				next_insn->op1 = prev;
-				ctx->use_edges[ctx->use_lists[prev].refs] = next;
+				ir_sccp_replace_use(ctx, prev, input, next);
 				/* remove MERGE and input END instructions */
 				ir_sccp_replace_insn(ctx, _values, ref, IR_UNUSED);
 				ir_sccp_replace_insn(ctx, _values, input, IR_UNUSED);
@@ -560,7 +573,13 @@ int ir_sccp(ir_ctx *ctx)
 		for (j = 0, p = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
 			use = *p;
 			insn = &ctx->ir_base[use];
-			if (insn->op != IR_PHI || IR_IS_REACHABLE(insn->op1)) {
+			if ((ir_op_flags[insn->op] & IR_OP_FLAG_DATA)) {
+				if (insn->op != IR_PHI || IR_IS_REACHABLE(insn->op1)) {
+					if (!IR_IS_BOTTOM(use)) {
+						ir_bitset_incl(worklist, use);
+					}
+				}
+			} else if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN || IR_IS_REACHABLE(insn->op1)) {
 				if (!IR_IS_BOTTOM(use)) {
 					ir_bitset_incl(worklist, use);
 				}
@@ -600,8 +619,27 @@ int ir_sccp(ir_ctx *ctx)
 			ir_sccp_replace_insn(ctx, _values, i, _values[i].op1);
 #endif
 		} else if (IR_IS_TOP(i)) {
-			if (ctx->ir_base[i].op != IR_PARAM && ctx->ir_base[i].op != IR_VAR) {
-				/* remove unreachable instruction */
+			/* remove unreachable instruction */
+			insn = &ctx->ir_base[i];
+			if (ir_op_flags[insn->op] & IR_OP_FLAG_DATA) {
+				if (insn->op != IR_PARAM && insn->op != IR_VAR) {
+					ir_sccp_replace_insn(ctx, _values, i, IR_UNUSED);
+				}
+			} else {
+				if (insn->op == IR_RETURN || insn->op == IR_UNREACHABLE) {
+					ir_ref ref = ctx->ir_base[1].op1;
+					if (ref == i) {
+						ctx->ir_base[1].op1 = insn->op3;
+					} else {
+						do {
+							if (ctx->ir_base[ref].op3 == i) {
+								ctx->ir_base[ref].op3 = insn->op3;
+								break;
+							}
+							ref = ctx->ir_base[ref].op3;
+						} while (ref);
+					}
+				}
 				ir_sccp_replace_insn(ctx, _values, i, IR_UNUSED);
 			}
 		} else if (_values[i].op == IR_IF) {
