@@ -338,7 +338,7 @@ int main(int argc, char **argv)
 	ctx.flags |= mflags;
 
 	if (opt_level > 0) {
-		ctx.flags |= IR_OPT_FOLDING;
+		ctx.flags |= IR_OPT_FOLDING | IR_OPT_CODEGEN;
 	}
 	if (emit_c) {
 		ctx.flags |= IR_GEN_C;

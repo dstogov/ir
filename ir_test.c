@@ -115,10 +115,31 @@ void run(mandelbrot_t mandelbrot)
 	printf ("C Elapsed %0.3f\n", query_time);
 }
 
-int main()
+int main(int argc, char **argv)
 {
     ir_ctx ctx;
     FILE *f;
+    int i;
+	int opt_level = 2;
+	uint32_t mflags = 0;
+
+	for (i = 1; i < argc; i++) {
+		if (argv[i][0] == '-' && argv[i][1] == 'O' && strlen(argv[i]) == 3) {
+			if (argv[i][2] == '0') {
+				opt_level = 0;
+			} else if (argv[i][2] == '1') {
+				opt_level = 1;
+			} else if (argv[i][2] == '2') {
+				opt_level = 2;
+			} else {
+				/* pass */
+			}
+		} else if (strcmp(argv[i], "-mavx") == 0) {
+			mflags |= IR_AVX;
+		} else {
+			/* pass*/
+		}
+	}
 
 	IR_ASSERT(IR_UNUSED == 0);
 	IR_ASSERT(IR_NOP == 0);
@@ -134,21 +155,33 @@ int main()
 	IR_ASSERT((IR_UGE ^ 3) == IR_ULE);
 
     ir_init(&ctx, 256, 1024);
-	ctx.flags |= IR_FUNCTION | IR_OPT_FOLDING;
+	ctx.flags |= IR_FUNCTION;
+	ctx.flags |= mflags;
+	if (opt_level > 0) {
+		ctx.flags |= IR_OPT_FOLDING | IR_OPT_CODEGEN;
+	}
     gen_mandelbrot(&ctx);
 
 	ir_build_def_use_lists(&ctx);
-	ir_sccp(&ctx);
+	if (opt_level > 1) {
+		ir_sccp(&ctx);
+	}
 	ir_build_cfg(&ctx);
-	ir_build_dominators_tree(&ctx);
-	ir_find_loops(&ctx);
-	ir_gcm(&ctx);
-	ir_schedule(&ctx);
+	if (opt_level > 0) {
+		ir_build_dominators_tree(&ctx);
+		ir_find_loops(&ctx);
+		ir_gcm(&ctx);
+		ir_schedule(&ctx);
+	}
 	ir_match(&ctx);
 	ir_assign_virtual_registers(&ctx);
-	ir_compute_live_ranges(&ctx);
-	ir_coalesce(&ctx);
-	ir_reg_alloc(&ctx);
+	if (opt_level > 0) {
+		ir_compute_live_ranges(&ctx);
+		ir_coalesce(&ctx);
+		ir_reg_alloc(&ctx);
+	} else {
+		ir_compute_dessa_moves(&ctx);
+	}
 
     ir_truncate(&ctx);
 //    ir_dump(&ctx, stderr);

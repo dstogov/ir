@@ -469,10 +469,11 @@ typedef struct _ir_use_list {
 #define IR_IRREDUCIBLE_CFG   (1<<2)
 
 #define IR_OPT_FOLDING       (1<<16)
-#define IR_OPT_IN_SCCP       (1<<17)
-#define IR_LINEAR            (1<<18)
-#define IR_GEN_NATIVE        (1<<19)
-#define IR_GEN_C             (1<<20)
+#define IR_OPT_CODEGEN       (1<<17)
+#define IR_OPT_IN_SCCP       (1<<18)
+#define IR_LINEAR            (1<<19)
+#define IR_GEN_NATIVE        (1<<20)
+#define IR_GEN_C             (1<<22)
 
 /* x86 related */
 #define IR_AVX               (1<<24)
