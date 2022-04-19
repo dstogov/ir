@@ -22,9 +22,6 @@
 -  local scheduling according to data dependencies, register presure and pipeline stalls
 -  basic block trace scheduling
 
-?  C code generation
-	- VLOAD, VSTORE
-
 ?  instruction selection
 	- xor, btsl=INCL, btrl=EXCL, btl=IN, bsr, maxss, maxsd, minss, minsd
     - MOVZX to avoid a SHIFT and AND instruction

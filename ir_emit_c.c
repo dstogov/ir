@@ -26,7 +26,6 @@ static void ir_emit_ref(ir_ctx *ctx, FILE *f, ir_ref ref)
 	if (IR_IS_CONST_REF(ref)) {
 		ir_print_const(ctx, &ctx->ir_base[ref], f);
 	} else {
-#if 1
 		ir_insn *insn = &ctx->ir_base[ref];
 		if (insn->op == IR_VLOAD) {
 			ir_insn *var = &ctx->ir_base[insn->op2];
@@ -35,14 +34,12 @@ static void ir_emit_ref(ir_ctx *ctx, FILE *f, ir_ref ref)
 			fprintf(f, "%s", ir_get_str(ctx, var->op2));
 			return;
 		}
-#endif
 		fprintf(f, "d_%d", ctx->vregs[ref]);
 	}
 }
 
 static void ir_emit_def_ref(ir_ctx *ctx, FILE *f, ir_ref def)
 {
-#if 1
 	ir_use_list *use_list = &ctx->use_lists[def];
 	if (use_list->count == 1) {
 		ir_ref use = ctx->use_edges[use_list->refs];
@@ -56,13 +53,11 @@ static void ir_emit_def_ref(ir_ctx *ctx, FILE *f, ir_ref def)
 			return;
 		}
 	}
-#endif
 	fprintf(f, "\td_%d = ", ctx->vregs[def]);
 }
 
 static void ir_emit_copy(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 {
-//	fprintf(f, "\td_%d = ", ctx->vregs[def]);
 	ir_emit_def_ref(ctx, f, def);
 	ir_emit_ref(ctx, f, insn->op1);
 	fprintf(f, ";\n");
@@ -70,7 +65,6 @@ static void ir_emit_copy(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 
 static void ir_emit_unary_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *op)
 {
-//	fprintf(f, "\td_%d = ", ctx->vregs[def]);
 	ir_emit_def_ref(ctx, f, def);
 	fprintf(f, "%s", op);
 	ir_emit_ref(ctx, f, insn->op1);
@@ -79,7 +73,6 @@ static void ir_emit_unary_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const
 
 static void ir_emit_binary_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *op)
 {
-//	fprintf(f, "\td_%d = ", ctx->vregs[def]);
 	ir_emit_def_ref(ctx, f, def);
 	ir_emit_ref(ctx, f, insn->op1);
 	fprintf(f, " %s ", op);
@@ -162,7 +155,6 @@ static void ir_emit_unsigned_comparison_op(ir_ctx *ctx, FILE *f, int def, ir_ins
 	uint8_t t1 = ctx->ir_base[insn->op1].type;
 
 	IR_ASSERT(t1 == ctx->ir_base[insn->op1].type);
-//	fprintf(f, "\td_%d = ", ctx->vregs[def]);
 	ir_emit_def_ref(ctx, f, def);
 	if (t1 == IR_FLOAT || t1 == IR_DOUBLE) {
 		fprintf(f, "!(");
@@ -245,7 +237,6 @@ static void ir_emit_minmax_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 
 static void ir_emit_conditional_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 {
-//	fprintf(f, "\td_%d = ", ctx->vregs[def]);
 	ir_emit_def_ref(ctx, f, def);
 	ir_emit_ref(ctx, f, insn->op1);
 	fprintf(f, " ? ");
@@ -362,7 +353,6 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 	int j, n;
 
 	if (insn->type != IR_VOID) {
-//		fprintf(f, "\td_%d = ", ctx->vregs[def]);
 		ir_emit_def_ref(ctx, f, def);
 	}
 	if (IR_IS_CONST_REF(insn->op2)) {
@@ -413,21 +403,8 @@ static void ir_emit_alloca(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 	fprintf(f, "alloca(%d);\n", insn->op2);
 }
 
-static void ir_emit_vload(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
-{
-#if 0
-	ir_insn *var;
-
-	IR_ASSERT(insn->op2 > 0);
-	var = &ctx->ir_base[insn->op2];
-	IR_ASSERT(var->op == IR_VAR/* || var->op == IR_PARAM*/);
-	fprintf(f, "\td_%d = %s;\n", ctx->vregs[def], ir_get_str(ctx, var->op2));
-#endif
-}
-
 static void ir_emit_vstore(ir_ctx *ctx, FILE *f, ir_insn *insn)
 {
-#if 1
 	if (ctx->use_lists[insn->op3].count != 1) {
 		ir_insn *var;
 
@@ -438,7 +415,6 @@ static void ir_emit_vstore(ir_ctx *ctx, FILE *f, ir_insn *insn)
 		ir_emit_ref(ctx, f, insn->op3);
 		fprintf(f, ";\n");
 	}
-#endif
 }
 
 static void ir_emit_load(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
@@ -569,7 +545,16 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 					if (insn->op == IR_PARAM) {
 						fprintf(f, "\t%s d_%d = %s;\n", ir_type_cname[insn->type], ctx->vregs[i], ir_get_str(ctx, insn->op2));
 					} else {
-						fprintf(f, "\t%s d_%d;\n", ir_type_cname[insn->type], ctx->vregs[i]);
+						ir_use_list *use_list = &ctx->use_lists[i];
+
+						if ((insn->op == IR_VAR)
+						 || (insn->op == IR_VLOAD)
+						 || (use_list->count == 1
+						  && ctx->ir_base[ctx->use_edges[use_list->refs]].op == IR_VSTORE)) {
+							/* skip, we use variable name instead */
+						} else {
+							fprintf(f, "\t%s d_%d;\n", ir_type_cname[insn->type], ctx->vregs[i]);
+						}
 					}
 				} else if (insn->op == IR_PARAM) {
 					IR_ASSERT(0 && "unexpected PARAM");
@@ -608,6 +593,7 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 				case IR_VAR:
 				case IR_PHI:
 				case IR_PI:
+				case IR_VLOAD:
 					/* skip */
 					break;
 				case IR_EQ:
@@ -739,9 +725,6 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 					break;
 				case IR_ALLOCA:
 					ir_emit_alloca(ctx, f, i, insn);
-					break;
-				case IR_VLOAD:
-					ir_emit_vload(ctx, f, i, insn);
 					break;
 				case IR_VSTORE:
 					ir_emit_vstore(ctx, f, insn);
