@@ -187,11 +187,15 @@
 |			lea Ra(dst), aword [=>label]
 ||			_insn->emit_const = 1;
 ||		} else if (ir_type_size[type] == 8 && !IR_IS_SIGNED_32BIT(_insn->val.i64)) {
-|			mov64 Ra(dst), _insn->val.i64
+||			if (IR_IS_UNSIGNED_32BIT(_insn->val.u64)) {
+|				mov Rd(dst), _insn->val.u32 // zero extended load
+||          } else {
+|				mov64 Ra(dst), _insn->val.i64
+||			}
 ||		} else if (_insn->val.i64 == 0) {
 |			ASM_REG_REG_OP xor, type, dst, dst
 ||		} else {
-|			ASM_REG_IMM_OP mov, type, dst, _insn->val.i32
+|			ASM_REG_IMM_OP mov, type, dst, _insn->val.i32 // sign extended load
 ||		}
 ||	} else {
 ||		ir_reg _reg = ir_ref_reg(ctx, src);

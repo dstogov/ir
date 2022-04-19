@@ -29,9 +29,6 @@
 	- xor, btsl=INCL, btrl=EXCL, btl=IN, bsr, maxss, maxsd, minss, minsd
     - MOVZX to avoid a SHIFT and AND instruction
     - Using CMOVcc to remove branches
-    - mov rax, 123456789abcdef0h ; 10 bytes (64-bit constant)
-    - mov rax, -100 ; 7 bytes (32-bit sign-extended)
-    - mov eax, 100 ; 5 bytes (32-bit zero-extended)
 
 ?  register allocation
 	+  linear scan
