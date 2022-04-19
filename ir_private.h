@@ -9,7 +9,7 @@
 
 #define IR_IS_POWER_OF_TWO(x) (!((x) & ((x) - 1)))
 
-#define IR_LOG2(x) ir_ntz(x)
+#define IR_LOG2(x) ir_ntzl(x)
 
 IR_ALWAYS_INLINE uint8_t ir_rol8(uint8_t op1, uint8_t op2)
 {
@@ -115,6 +115,39 @@ IR_ALWAYS_INLINE uint32_t ir_ntz(uint32_t num)
 	if (num == 0) return 32;
 
 	n = 1;
+	if ((num & 0x0000ffff) == 0) {n += 16; num = num >> 16;}
+	if ((num & 0x000000ff) == 0) {n +=  8; num = num >>  8;}
+	if ((num & 0x0000000f) == 0) {n +=  4; num = num >>  4;}
+	if ((num & 0x00000003) == 0) {n +=  2; num = num >>  2;}
+	return n - (num & 1);
+#endif
+}
+
+/* Number of trailing zero bits (0x01 -> 0; 0x40 -> 6; 0x00 -> LEN) */
+IR_ALWAYS_INLINE uint32_t ir_ntzl(uint64_t num)
+{
+#if (defined(__GNUC__) || __has_builtin(__builtin_ctzl))
+	return __builtin_ctzl(num);
+#elif defined(_WIN32)
+	unsigned long index;
+
+#if defined(_WIN64)
+	if (!BitScanForward64(&index, num)) {
+#else
+	if (!BitScanForward(&index, num)) {
+#endif
+		/* undefined behavior */
+		return 64;
+	}
+
+	return (uint32_t) index;
+#else
+	uint32_t n;
+
+	if (num == Z_UL(0)) return 64;
+
+	n = 1;
+	if ((num & 0xffffffff) == 0) {n += 32; num = num >> Z_UL(32);}
 	if ((num & 0x0000ffff) == 0) {n += 16; num = num >> 16;}
 	if ((num & 0x000000ff) == 0) {n +=  8; num = num >>  8;}
 	if ((num & 0x0000000f) == 0) {n +=  4; num = num >>  4;}

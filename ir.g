@@ -255,7 +255,7 @@ DECNUMBER(uint32_t t, ir_val *val):
 
 HEXNUMBER(uint32_t t, ir_val *val):
 	/0x[0-9A-Fa-f]+/
-	{val->i64 = strtoll((const char*)yy_text + 2, NULL, 16);}
+	{val->u64 = strtoull((const char*)yy_text + 2, NULL, 16);}
 ;
 
 FLOATNUMBER(uint32_t t, ir_val *val):

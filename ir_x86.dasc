@@ -972,12 +972,12 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 						// 0
 					} else if (op2_insn->val.u64 == 1) {
 						return IR_COPY_INT;
-					} else if (ir_type_size[insn->type] >= 4) {
-						if (op2_insn->val.u64 == 2 || op2_insn->val.u64 == 4 || op2_insn->val.u64 == 8) {
-							return IR_LEA_SI; // lea ret, [op1.reg*op2.scale]
-						} else if (op2_insn->val.u64 == 3 || op2_insn->val.u64 == 5 || op2_insn->val.u64 == 9) {
-							return IR_LEA_SIB; // lea ret, [op1.reg+op1.reg*op2.scale]
-						}
+					} else if (ir_type_size[insn->type] >= 4 &&
+							(op2_insn->val.u64 == 2 || op2_insn->val.u64 == 4 || op2_insn->val.u64 == 8)) {
+						return IR_LEA_SI; // lea ret, [op1.reg*op2.scale]
+					} else if (ir_type_size[insn->type] >= 4 &&
+							(op2_insn->val.u64 == 3 || op2_insn->val.u64 == 5 || op2_insn->val.u64 == 9)) {
+						return IR_LEA_SIB; // lea ret, [op1.reg+op1.reg*op2.scale]
 					} else if (op2_insn->val.u64 == 2) {
 						return IR_MUL_2; // add op1, op1
 					} else if (IR_IS_POWER_OF_TWO(op2_insn->val.u64)) {
@@ -1610,7 +1610,7 @@ void ir_emit_mod_pwr2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg def_reg = ir_ref_reg(ctx, def);
 	ir_reg op1_reg = ir_ref_reg(ctx, insn->op1);
-	uint32_t mask = IR_LOG2(ctx->ir_base[insn->op2].val.u64) - 1;
+	uint64_t mask = ctx->ir_base[insn->op2].val.u64 - 1;
 	ir_reg reg;
 
 	if (def_reg >= 0) {
@@ -1620,10 +1620,15 @@ void ir_emit_mod_pwr2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	} else {
 		reg = IR_REG_RAX; // TODO: temporary register
 	}
-	if (op1_reg != reg) {
-		ir_emit_load(ctx, insn->type, insn->op1, reg);
+	if (IR_IS_UNSIGNED_32BIT(mask)) {
+		if (op1_reg != reg) {
+			ir_emit_load(ctx, insn->type, insn->op1, reg);
+		}
+		|	ASM_REG_IMM_OP and, insn->type, reg, mask
+	} else {
+		ir_emit_load(ctx, insn->type, insn->op2, reg);
+		|	ASM_REG_REF_OP and, insn->type, reg, insn->op1
 	}
-	|	ASM_REG_IMM_OP and, insn->type, reg, mask
 	if (def_reg != reg) {
 		ir_emit_store(ctx, insn->type, reg, def);
 	}
