@@ -245,7 +245,7 @@ int ir_mem_flush(void *ptr, size_t size);
 	_(TAILCALL,     xN,   src, def, def) /* CALL+RETURN                 */ \
 	\
 	/* memory reference and load/store ops                              */ \
-	_(ALLOCA,       a1X1, src, num, ___) /* alloca(num)                 */ \
+	_(ALLOCA,       a2,   src, def, ___) /* alloca(def)                 */ \
 	_(VLOAD,        l2,   src, var, ___) /* load value of local var     */ \
 	_(VSTORE,       s3,   src, var, def) /* store value to local var    */ \
 	_(LOAD,         l2,   src, ref, ___) /* load from memory            */ \

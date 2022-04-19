@@ -93,7 +93,7 @@ void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 #define ir_op_flag_s2      (ir_op_flag_s | 2 | (2 << IR_OP_FLAG_OPERANS_SHIFT))
 #define ir_op_flag_s3      (ir_op_flag_s | 3 | (3 << IR_OP_FLAG_OPERANS_SHIFT))
 #define ir_op_flag_xN      (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_CALL | 4 | (4 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_a1X1    (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_ALLOC | 1 | (2 << IR_OP_FLAG_OPERANS_SHIFT))
+#define ir_op_flag_a2      (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_ALLOC | 2 | (2 << IR_OP_FLAG_OPERANS_SHIFT))
 
 #define ir_op_kind____     IR_OPND_UNUSED
 #define ir_op_kind_def     IR_OPND_DATA

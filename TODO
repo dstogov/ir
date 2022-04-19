@@ -60,7 +60,7 @@
 	-  POW, NEG (fp), ABS, OVERFLOW, MIN, MAX, COND
 	+  TAILCALL
 	+  VLOAD, VSTORE
-	-  ALLOCA, LOAD, STORE
+	?  ALLOCA, LOAD, STORE
 	+  SWITCH
 	-  ir_last_use
 	-  binop_int $imm, mem

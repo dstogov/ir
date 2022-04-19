@@ -745,6 +745,10 @@ typedef enum _ir_rule {
 	IR_VLOAD_FP,
 	IR_VSTORE_INT,
 	IR_VSTORE_FP,
+	IR_LOAD_INT,
+	IR_LOAD_FP,
+	IR_STORE_INT,
+	IR_STORE_FP,
 	IR_IF_INT,               // op1=reg(GP)|mem
 	IR_RETURN_VOID,          //
 	IR_RETURN_INT,           // op1=reg(GP, hint=%rax)|mem|imm
@@ -1154,8 +1158,16 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 			ctx->flags |= IR_HAS_CALLS;
 			return IR_CALL;
 
-//		case IR_TAILCALL:
-//		case IR_ALLOCA:
+		case IR_VAR:
+			if (ctx->use_lists[ref].count > 0) {
+				return IR_VAR;
+			} else {
+				return IR_SKIP;
+			}
+			break;
+		case IR_ALLOCA:
+			ctx->flags |= IR_USE_FRAME_POINTER;
+			return IR_ALLOCA;
 		case IR_VLOAD:
 			if (IR_IS_TYPE_INT(insn->type)) {
 				return IR_VLOAD_INT;
@@ -1170,14 +1182,18 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 				return IR_VSTORE_FP;
 			}
 			break;
-//		case IR_LOAD:
-//		case IR_STORE:
-
-		case IR_VAR:
-			if (ctx->use_lists[ref].count > 0) {
-				return IR_VAR;
+		case IR_LOAD:
+			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op3].type)) {
+				return IR_LOAD_INT;
 			} else {
-				return IR_SKIP;
+				return IR_LOAD_FP;
+			}
+			break;
+		case IR_STORE:
+			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op3].type)) {
+				return IR_STORE_INT;
+			} else {
+				return IR_STORE_FP;
 			}
 			break;
 		case IR_START:
@@ -2695,6 +2711,110 @@ static void ir_emit_vstore_fp(ir_ctx *ctx, ir_insn *insn)
 	|	ASM_FP_VREG_REG_MOV type, ctx->vregs[insn->op2], reg
 }
 
+static void ir_emit_load_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_ref type = insn->type;
+	ir_reg op2_reg = ir_ref_reg(ctx, insn->op2);
+	ir_reg def_reg = ir_ref_reg(ctx, def);
+	ir_reg reg;
+
+	if (def_reg >= 0) {
+		reg = def_reg;
+	} else {
+		reg = IR_REG_RAX; // TODO: temporary register
+	}
+	if (op2_reg < 0) {
+		op2_reg = IR_REG_RAX; // TODO: temporary register
+		ir_emit_load(ctx, type, insn->op2, op2_reg);
+	}
+	|	ASM_REG_MEM_OP mov, type, reg, [Ra(op2_reg)]
+	if (def_reg != reg) {
+		ir_emit_store(ctx, type, reg, def);
+	}
+}
+
+static void ir_emit_load_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_ref type = insn->type;
+	ir_reg op2_reg = ir_ref_reg(ctx, insn->op2);
+	ir_reg def_reg = ir_ref_reg(ctx, def);
+	ir_reg reg;
+
+	if (def_reg >= 0) {
+		reg = def_reg;
+	} else {
+		reg = IR_REG_XMM7; // TODO: temporary register
+	}
+	if (op2_reg < 0) {
+		op2_reg = IR_REG_RAX; // TODO: temporary register
+		ir_emit_load(ctx, type, insn->op2, op2_reg);
+	}
+	|	ASM_FP_REG_MEM_OP movss, movsd, vmovss, vmovsd, type, reg, [Ra(op2_reg)]
+	if (def_reg != reg) {
+		ir_emit_fp_store(ctx, type, reg, def);
+	}
+}
+
+static void ir_emit_store_int(ir_ctx *ctx, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_ref type = ctx->ir_base[insn->op3].type;
+	ir_reg op2_reg = ir_ref_reg(ctx, insn->op2);
+	ir_reg op3_reg = ir_ref_reg(ctx, insn->op3);
+	ir_reg reg;
+
+	if (op3_reg >= 0) {
+		reg = op3_reg;
+	} else {
+		reg = IR_REG_RAX; // TODO: temporary register
+		ir_emit_load(ctx, type, insn->op3, reg);
+	}
+	if (op2_reg < 0) {
+		op2_reg = IR_REG_RAX; // TODO: temporary register
+		ir_emit_load(ctx, type, insn->op2, op2_reg);
+	}
+	|	ASM_MEM_REG_OP mov, type, [Ra(op2_reg)], reg
+}
+
+static void ir_emit_store_fp(ir_ctx *ctx, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_ref type = ctx->ir_base[insn->op3].type;
+	ir_reg op2_reg = ir_ref_reg(ctx, insn->op2);
+	ir_reg op3_reg = ir_ref_reg(ctx, insn->op3);
+	ir_reg reg;
+
+	if (op3_reg >= 0) {
+		reg = op3_reg;
+	} else {
+		reg = IR_REG_XMM7; // TODO: temporary register
+		ir_emit_fp_load(ctx, type, insn->op3, reg);
+	}
+	if (op2_reg < 0) {
+		op2_reg = IR_REG_RAX; // TODO: temporary register
+		ir_emit_load(ctx, type, insn->op2, op2_reg);
+	}
+	IR_ASSERT(ctx->vregs[insn->op2]);
+	|	ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [Ra(op2_reg)], reg
+}
+
+static void ir_emit_alloca(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+
+	// TODO: alignment
+	|	ASM_REG_REF_OP sub, IR_ADDR, IR_REG_RSP, insn->op2
+	ir_emit_store(ctx, IR_ADDR, IR_REG_RSP, def);
+	// TODO: stack frame alignment
+}
+
 static void ir_emit_switch(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
@@ -3945,6 +4065,21 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 					break;
 				case IR_VSTORE_FP:
 					ir_emit_vstore_fp(ctx, insn);
+					break;
+				case IR_LOAD_INT:
+					ir_emit_load_int(ctx, i, insn);
+					break;
+				case IR_LOAD_FP:
+					ir_emit_load_fp(ctx, i, insn);
+					break;
+				case IR_STORE_INT:
+					ir_emit_store_int(ctx, insn);
+					break;
+				case IR_STORE_FP:
+					ir_emit_store_fp(ctx, insn);
+					break;
+				case IR_ALLOCA:
+					ir_emit_alloca(ctx, i, insn);
 					break;
 				default:
 					IR_ASSERT(0 && "NIY rule/insruction");

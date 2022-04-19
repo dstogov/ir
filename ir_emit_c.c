@@ -400,7 +400,9 @@ static void ir_emit_tailcall(ir_ctx *ctx, FILE *f, ir_insn *insn)
 static void ir_emit_alloca(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 {
 	ir_emit_def_ref(ctx, f, def);
-	fprintf(f, "alloca(%d);\n", insn->op2);
+	fprintf(f, "alloca(");
+	ir_emit_ref(ctx, f, insn->op2);
+	fprintf(f, ");\n");
 }
 
 static void ir_emit_vstore(ir_ctx *ctx, FILE *f, ir_insn *insn)
