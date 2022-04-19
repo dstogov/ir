@@ -237,6 +237,7 @@ val(ir_parser_ctx *p, uint32_t n, ir_ref *ref):
 
 const(uint8_t t, ir_val *val):
 		DECNUMBER(t, val)
+	|	HEXNUMBER(t, val)
 	|	FLOATNUMBER(t, val)
 	|	CHARACTER(val)
 ;
@@ -250,6 +251,11 @@ ID(const char **str, size_t *len):
 DECNUMBER(uint32_t t, ir_val *val):
 	/[\-]?[0-9]+/
 	{if (t >= IR_DOUBLE) val->d = atof((const char*)yy_text); else val->i64 = atoll((const char*)yy_text);}
+;
+
+HEXNUMBER(uint32_t t, ir_val *val):
+	/0x[0-9A-Fa-f]+/
+	{val->i64 = strtoll((const char*)yy_text + 2, NULL, 16);}
 ;
 
 FLOATNUMBER(uint32_t t, ir_val *val):
