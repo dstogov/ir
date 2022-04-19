@@ -131,7 +131,7 @@ int ir_gcm(ir_ctx *ctx)
 			for (k = 1, p = insn->ops + 1; k <= n; k++, p++) {
 				ref = *p;
 				if (ref > 0) {
-					if (IR_OPND_KIND(flags, k) == IR_OPND_DATA) {
+					if (IR_OPND_KIND(flags, k) == IR_OPND_DATA || IR_OPND_KIND(flags, k) == IR_OPND_VAR) {
 						ir_list_push(&queue, ref);
 					}
 				}
@@ -271,6 +271,7 @@ static int ir_copy(ir_ctx *new_ctx, ir_ctx *ctx, ir_ref *_next, bool preserve_co
 			ref = *p;
 			switch (IR_OPND_KIND(flags, k)) {
 				case IR_OPND_DATA:
+				case IR_OPND_VAR:
 					if (IR_IS_CONST_REF(ref) && !preserve_constants_order) {
 						if (ctx->ir_base[-ref].op == IR_FUNC) {
 							ref = ir_const_func(new_ctx, ir_str(new_ctx, ir_get_str(ctx, ctx->ir_base[ref].val.addr)));

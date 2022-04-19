@@ -49,6 +49,7 @@ void ir_save(ir_ctx *ctx, FILE *f)
 			if (ref) {
 				switch (opnd_kind) {
 					case IR_OPND_DATA:
+					case IR_OPND_VAR:
 						if (IR_IS_CONST_REF(ref)) {
 							fprintf(f, "%sc_%d", first ? "(" : ", ", -ref);
 						} else {

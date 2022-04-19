@@ -373,7 +373,7 @@ static void ir_sccp_mark_reachable_data(ir_ctx *ctx, ir_bitset worklist, ir_insn
 
 	n = ir_input_edges_count(ctx, insn);
 	for (j = 1; j <= n; j++) {
-		if (IR_OPND_KIND(flags, j) == IR_OPND_DATA) {
+		if (IR_OPND_KIND(flags, j) == IR_OPND_DATA || IR_OPND_KIND(flags, j) == IR_OPND_VAR) {
 			use = insn->ops[j];
 			if (use > 0 && IR_IS_TOP(use) && !ir_bitset_in(worklist, use)) {
 				ir_bitset_incl(worklist, use);
@@ -557,7 +557,7 @@ int ir_sccp(ir_ctx *ctx)
 				flags = ir_op_flags[insn->op];
 				n = ir_input_edges_count(ctx, insn);
 				for (j = 1; j <= n; j++) {
-					if (IR_OPND_KIND(flags, j) == IR_OPND_DATA) {
+					if (IR_OPND_KIND(flags, j) == IR_OPND_DATA || IR_OPND_KIND(flags, j) == IR_OPND_VAR) {
 						use = insn->ops[j];
 						if (use > 0 && IR_IS_TOP(use) && !ir_bitset_in(worklist, use)) {
 							ir_bitset_incl(worklist, use);

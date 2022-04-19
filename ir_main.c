@@ -145,13 +145,9 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, const char *dump_
 		 && !_save(ctx, dump, IR_DUMP_AFTER_SCHEDULE, dump_file)) {
 			return 0;
 		}
-	}
-
-	if (opt_level == 0 && (ctx->flags & (IR_GEN_NATIVE|IR_GEN_C))) {
+	} else if (ctx->flags & (IR_GEN_NATIVE|IR_GEN_C)) {
 		ir_build_def_use_lists(ctx);
 		ir_build_cfg(ctx);
-		ir_assign_virtual_registers(ctx);
-		ir_compute_dessa_moves(ctx);
 	}
 
 	if (ctx->flags & IR_GEN_NATIVE) {
@@ -173,10 +169,13 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, const char *dump_
 		 && !_save(ctx, dump, IR_DUMP_AFTER_COALESCING, dump_file)) {
 			return 0;
 		}
-	}
 
-	if (ctx->flags & IR_GEN_NATIVE) {
-		ir_reg_alloc(ctx);
+		if (ctx->flags & IR_GEN_NATIVE) {
+			ir_reg_alloc(ctx);
+		}
+	} else if (ctx->flags & (IR_GEN_NATIVE|IR_GEN_C)) {
+		ir_assign_virtual_registers(ctx);
+		ir_compute_dessa_moves(ctx);
 	}
 
 	if ((dump & (IR_DUMP_FINAL|IR_DUMP_AFTER_ALL))

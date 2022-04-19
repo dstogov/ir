@@ -30,6 +30,8 @@ int ir_assign_virtual_registers(ir_ctx *ctx)
 			if ((flags & IR_OP_FLAG_DATA) || ((flags & IR_OP_FLAG_MEM) && insn->type != IR_VOID)) {
 				if ((insn->op == IR_PARAM || insn->op == IR_VAR) && ctx->use_lists[i].count == 0) {
 					/* pass */
+				} else if (insn->op == IR_VAR && ctx->use_lists[i].count > 0) {
+					vregs[i] = ++vregs_count; /* for spill slot */
 				} else if (!ctx->rules || ir_needs_vreg(ctx, i)) {
 					vregs[i] = ++vregs_count;
 				}
@@ -51,6 +53,28 @@ int ir_assign_virtual_registers(ir_ctx *ctx)
  * See "Linear Scan Register Allocation on SSA Form", Christian Wimmer and
  * Michael Franz, CGO'10 (2010), Figure 4.
  */
+static void ir_add_local_var(ir_ctx *ctx, int v, uint8_t type)
+{
+	ir_live_interval *ival = ctx->live_intervals[v];
+
+	IR_ASSERT(!ival);
+
+	ival = ir_mem_malloc(sizeof(ir_live_interval));
+	IR_ASSERT(type != IR_VOID);
+	ival->type = type;
+	ival->reg = IR_REG_NONE;
+	ival->stack_spill_pos = 0; // not allocated
+	ival->range.start = 0;
+	ival->range.end = ctx->insns_count;
+	ival->range.next = NULL;
+	ival->use_pos = NULL;
+
+	ival->top = ival;
+	ival->next = NULL;
+
+	ctx->live_intervals[v] = ival;
+}
+
 static void ir_add_live_range(ir_ctx *ctx, int v, uint8_t type, ir_live_pos start, ir_live_pos end)
 {
 	ir_live_interval *ival = ctx->live_intervals[v];
@@ -266,37 +290,43 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 			insn = &ctx->ir_base[i];
 			flags = ir_op_flags[insn->op];
 			if ((flags & IR_OP_FLAG_DATA) || ((flags & IR_OP_FLAG_MEM) && insn->type != IR_VOID)) {
-				if (ctx->vregs[i] && ir_bitset_in(live, ctx->vregs[i])) {
-					if (insn->op != IR_PHI) {
-						ir_live_pos def_pos;
-						uint32_t hint_vreg = 0;
+				if (ctx->vregs[i]) {
+					if (ir_bitset_in(live, ctx->vregs[i])) {
+						if (insn->op != IR_PHI) {
+							ir_live_pos def_pos;
+							uint32_t hint_vreg = 0;
 
-						reg = ctx->rules ? ir_uses_fixed_reg(ctx, i, 0) : IR_REG_NONE;
-						if (reg != IR_REG_NONE) {
-							def_pos = IR_GAP_LIVE_POS_FROM_REF(i);
-							if (insn->op == IR_PARAM) {
-								/* parameter register must be kept before it's copied */
-								ir_add_fixed_live_range(ctx, reg,
-									IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
+							reg = ctx->rules ? ir_uses_fixed_reg(ctx, i, 0) : IR_REG_NONE;
+							if (reg != IR_REG_NONE) {
+								def_pos = IR_GAP_LIVE_POS_FROM_REF(i);
+								if (insn->op == IR_PARAM) {
+									/* parameter register must be kept before it's copied */
+									ir_add_fixed_live_range(ctx, reg,
+										IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
+								} else {
+									ir_add_fixed_live_range(ctx, reg,
+										IR_START_LIVE_POS_FROM_REF(i), def_pos);
+								}
+							} else if (ctx->rules && ir_result_reuses_op1_reg(ctx, i)) {
+								def_pos = IR_GAP_LIVE_POS_FROM_REF(i);
+								hint_vreg = ctx->vregs[insn->op1];
 							} else {
-								ir_add_fixed_live_range(ctx, reg,
-									IR_START_LIVE_POS_FROM_REF(i), def_pos);
+								def_pos = IR_DEF_LIVE_POS_FROM_REF(i);
 							}
-						} else if (ctx->rules && ir_result_reuses_op1_reg(ctx, i)) {
-							def_pos = IR_GAP_LIVE_POS_FROM_REF(i);
-							hint_vreg = ctx->vregs[insn->op1];
+							/* intervals[opd].setFrom(op.id) */
+							ir_fix_live_range(ctx, ctx->vregs[i],
+								IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
+							ir_add_use(ctx, ctx->vregs[i], 0, def_pos, reg, hint_vreg);
 						} else {
-							def_pos = IR_DEF_LIVE_POS_FROM_REF(i);
+							ir_add_use(ctx, ctx->vregs[i], 0, IR_DEF_LIVE_POS_FROM_REF(i), IR_REG_NONE, 0);
 						}
-						/* intervals[opd].setFrom(op.id) */
-						ir_fix_live_range(ctx, ctx->vregs[i],
-							IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
-						ir_add_use(ctx, ctx->vregs[i], 0, def_pos, reg, hint_vreg);
-					} else {
-						ir_add_use(ctx, ctx->vregs[i], 0, IR_DEF_LIVE_POS_FROM_REF(i), IR_REG_NONE, 0);
+						/* live.remove(opd) */
+						ir_bitset_excl(live, ctx->vregs[i]);
+					} else if (insn->op == IR_VAR) {
+						if (ctx->use_lists[i].count > 0) {
+							ir_add_local_var(ctx, ctx->vregs[i], insn->type);
+						}
 					}
-					/* live.remove(opd) */
-					ir_bitset_excl(live, ctx->vregs[i]);
 				}
 			}
 			if (insn->op != IR_PHI) {
@@ -1196,7 +1226,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 	inactive = ir_bitset_malloc(ctx->vregs_count + 1 + IR_REG_NUM);
 
 	for (i = 1; i <= ctx->vregs_count; i++) {
-		if (ctx->live_intervals[i]) {
+		if (ctx->live_intervals[i] && ctx->live_intervals[i]->range.start > 0) {
 			ir_list_push(&unhandled, i);
 		}
 	}
@@ -1264,7 +1294,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 			ival = ival->top;
 			ctx->live_intervals[i] = ival;
 			if (ival->next || ival->reg == IR_REG_NONE) {
-				ir_allocate_spill_slot(ctx, current, &data);
+				ir_allocate_spill_slot(ctx, i, &data);
 			}
 		}
 	}

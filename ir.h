@@ -141,6 +141,7 @@ int ir_mem_flush(void *ptr, size_t size);
  * ___ - unused
  * def - reference to a definition op (data-flow use-def dependency edge)
  * ref - memory reference (data-flow use-def dependency edge)
+ * var - variable reference (data-flow use-def dependency edge)
  * arg - argument referene CALL/TAILCALL/CARG->CARG
  * src - reference to a previous control region (IF, IF_TRUE, IF_FALSE, LOOP_BEGIN, LOOP_END, RETURN)
  * reg - data-control dependency on region (PHI, VAR, PARAM)
@@ -245,8 +246,8 @@ int ir_mem_flush(void *ptr, size_t size);
 	\
 	/* memory reference and load/store ops                              */ \
 	_(ALLOCA,       a1X1, src, num, ___) /* alloca(num)                 */ \
-	_(VLOAD,        l2,   src, ref, ___) /* load value of local var     */ \
-	_(VSTORE,       s3,   src, ref, def) /* store value to local var    */ \
+	_(VLOAD,        l2,   src, var, ___) /* load value of local var     */ \
+	_(VSTORE,       s3,   src, var, def) /* store value to local var    */ \
 	_(LOAD,         l2,   src, ref, ___) /* load from memory            */ \
 	_(STORE,        s3,   src, ref, def) /* store to memory             */ \
 	/* memory reference ops (A, H, U, S, TMP, STR, NEW, X, V) ???       */ \
@@ -295,6 +296,7 @@ int ir_mem_flush(void *ptr, size_t size);
 #define IR_OPND_CONTROL_REF 0x4
 #define IR_OPND_STR         0x5
 #define IR_OPND_NUM         0x6
+#define IR_OPND_VAR         0x7
 
 #define IR_OP_FLAGS(op_flags, op1_flags, op2_flags, op3_flags) \
 	((op_flags) | ((op1_flags) << 20) | ((op2_flags) << 24) | ((op3_flags) << 28))
