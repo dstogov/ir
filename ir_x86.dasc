@@ -2586,16 +2586,16 @@ static void ir_emit_switch(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_ref i, *p, use, n;
 	int label, default_label = 0;
 	int count;
-	int64_t min, max;;
-	int32_t offset;
+	ir_val min, max;
+	int64_t offset;
 
 	type = ctx->ir_base[insn->op2].type;
 	if (IR_IS_TYPE_SIGNED(type)) {
-		min = 0x7fffffffffffffff;
-		max = 0x8000000000000000;
+		min.u64 = 0x7fffffffffffffff;
+		max.u64 = 0x8000000000000000;
 	} else {
-		min = 0x0;
-		max = 0xffffffffffffffff;
+		min.u64 = 0xffffffffffffffff;
+		max.u64 = 0x0;
 	}
 
 	use_list = &ctx->use_lists[def];
@@ -2607,12 +2607,12 @@ static void ir_emit_switch(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			val = &ctx->ir_base[use_insn->op2];
 			if (IR_IS_TYPE_SIGNED(type)) {
 				IR_ASSERT(IR_IS_TYPE_SIGNED(val->type));
-				min = IR_MIN(min, val->val.i64);
-				max = IR_MAX(max, val->val.i64);
+				min.i64 = IR_MIN(min.i64, val->val.i64);
+				max.i64 = IR_MAX(max.i64, val->val.i64);
 			} else {
 				IR_ASSERT(!IR_IS_TYPE_SIGNED(val->type));
-				min = (int64_t)IR_MIN((uint64_t)min, val->val.u64);
-				max = (int64_t)IR_MAX((uint64_t)max, val->val.u64);
+				min.u64 = (int64_t)IR_MIN(min.u64, val->val.u64);
+				max.u64 = (int64_t)IR_MAX(max.u64, val->val.u64);
 			}
 			count++;
 		} else if (use_insn->op == IR_CASE_DEFAULT) {
@@ -2624,8 +2624,8 @@ static void ir_emit_switch(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 
 	/* Generate a table jmp or a seqence of calls */
-	if ((max-min) < count * 8) {
-		int *labels = ir_mem_malloc(sizeof(int) * (max - min + 1));
+	if ((max.i64-min.i64) < count * 8) {
+		int *labels = ir_mem_malloc(sizeof(int) * (max.i64 - min.i64 + 1));
 		ir_reg op2_reg = ir_ref_reg(ctx, insn->op2);
 		ir_reg reg;
 
@@ -2636,8 +2636,7 @@ static void ir_emit_switch(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			ir_emit_load(ctx, type, insn->op2, reg);
 		}
 
-		offset = -min * 8;
-		for (i = 0; i <= (max-min+1); i++) {
+		for (i = 0; i <= (max.i64 - min.i64 + 1); i++) {
 			labels[i] = default_label;
 		}
 		for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
@@ -2646,26 +2645,42 @@ static void ir_emit_switch(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			if (use_insn->op == IR_CASE_VAL) {
 				val = &ctx->ir_base[use_insn->op2];
 				label = ir_skip_empty_blocks(ctx, ctx->bb_num[use]);
-				labels[val->val.i64 - min] = label;
+				labels[val->val.i64 - min.i64] = label;
 			}
 		}
 
-		IR_ASSERT(IR_IS_SIGNED_32BIT(min)); // TODO
-		IR_ASSERT(IR_IS_SIGNED_32BIT(max)); // TODO
-
-		|	ASM_REG_IMM_OP cmp, type, reg, min
-		if (IR_IS_TYPE_SIGNED(type)) {
-			|	jl =>default_label
+		if (IR_IS_32BIT(type, max)) {
+			|	ASM_REG_IMM_OP cmp, type, reg, max.i32
 		} else {
-			|	jb =>default_label
+			|	mov64 r2, max.i64 // TODO: temporary register 2
+			|	ASM_REG_REG_OP cmp, type, reg, IR_REG_R2
 		}
-		|	ASM_REG_IMM_OP cmp, type, reg, max
 		if (IR_IS_TYPE_SIGNED(type)) {
 			|	jg =>default_label
 		} else {
 			|	ja =>default_label
 		}
-		|.if X64
+
+		if (IR_IS_32BIT(type, min)) {
+			offset = -min.i64 * 8;
+			if (IR_IS_SIGNED_32BIT(offset)) {
+				|	ASM_REG_IMM_OP cmp, type, reg, min.i32
+			} else {
+				|	ASM_REG_REG_OP sub, type, reg, (int32_t)offset // TODO: reg clobbering
+				offset = 0;
+			}
+		} else {
+			|	mov64 r2, min.i64 // TODO: temporary register 2
+			|	ASM_REG_REG_OP sub, type, reg, IR_REG_R2 // TODO: reg clobbering
+			offset = 0;
+		}
+		if (IR_IS_TYPE_SIGNED(type)) {
+			|	jl =>default_label
+		} else {
+			|	jb =>default_label
+		}
+		if (sizeof(void*) == 8) {
+			|.if X64
 			switch (ir_type_size[type]) {
 				case 1:
 					if (IR_IS_TYPE_SIGNED(type)) {
@@ -2693,9 +2708,11 @@ static void ir_emit_switch(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				default:
 					IR_ASSERT(0);
 			}
-			|	lea r0, aword [>1] // TODO: r0 temporary register
-			|	jmp aword [r0 + Ra(reg)*8 + offset]
-		|.else
+			|	lea r2, aword [>1] // TODO: r0 temporary register 2
+			|	jmp aword [r2 + Ra(reg)*8 + (int32_t)offset]
+			|.endif
+		} else {
+			|.if not X64
 			switch (ir_type_size[type]) {
 				case 1:
 					if (IR_IS_TYPE_SIGNED(type)) {
@@ -2714,10 +2731,11 @@ static void ir_emit_switch(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				case 4:
 					break;
 				default:
-					IR_ASSERT(0);
+					IR_ASSERT(0 && "Unsupported type size");
 			}
-		|	jmp aword [offset + Ra(reg) * 4 + >1]
-		|.endif
+			|	jmp aword [(int32_t)offset + Ra(reg) * 4 + >1]
+			|.endif
+		}
 		|.jmp_table
 		if (!data->jmp_table_label) {
 			data->jmp_table_label = ctx->cfg_blocks_count + ctx->consts_count + 3;
@@ -2725,7 +2743,7 @@ static void ir_emit_switch(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 		|.align aword
 		|1:
-		for (i = 0; i <= (max-min+1); i++) {
+		for (i = 0; i <= (max.i64 - min.i64 + 1); i++) {
 			|	.aword =>labels[i]
 		}
 		|.code
@@ -2737,8 +2755,13 @@ static void ir_emit_switch(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			if (use_insn->op == IR_CASE_VAL) {
 				val = &ctx->ir_base[use_insn->op2];
 				label = ir_skip_empty_blocks(ctx, ctx->bb_num[use]);
-				IR_ASSERT(IR_IS_SIGNED_32BIT(val->val.i64)); // TODO
-				|	ASM_REF_IMM_OP cmp, type, insn->op2, val->val.i32
+				if (IR_IS_32BIT(type, val->val)) {
+					|	ASM_REF_IMM_OP cmp, type, insn->op2, val->val.i32
+				} else {
+					ir_reg reg = IR_REG_RAX; // TODO: Temporary register
+					|	mov64 Ra(reg), val->val.i64
+					|	ASM_REF_REG_OP cmp, type, insn->op2, reg
+				}
 				|	je =>label
 			}
 		}
