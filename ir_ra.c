@@ -370,7 +370,8 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					if (regset != IR_REGSET_EMPTY) {
 						IR_REGSET_FOREACH(regset, reg) {
 							ir_add_fixed_live_range(ctx, reg,
-								IR_LOAD_LIVE_POS_FROM_REF(i), // TODO: ???
+								IR_LOAD_LIVE_POS_FROM_REF(i), // TODO: LOAD instead of USE disables register usage for input
+								                              // this is necessary for DIV and MOD, but not for MUL
 								IR_DEF_LIVE_POS_FROM_REF(i));
 						}  IR_REGSET_FOREACH_END();
 					}
