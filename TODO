@@ -57,7 +57,10 @@
 		-  hints and low priority
 
 ?  code generation
-	-  POW, NEG (fp), ABS, OVERFLOW, MIN, MAX, COND
+	-  POW, NEG (fp), ABS
+	-  OVERFLOW
+	-  MIN, MAX, COND
+	-  CAST
 	+  TAILCALL
 	+  VLOAD, VSTORE
 	?  ALLOCA, LOAD, STORE
