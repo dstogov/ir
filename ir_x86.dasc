@@ -1089,7 +1089,6 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 				}
 			}
 			return IR_MOD_INT;
-//		case IR_POW:
 //		case IR_CAST:
 //		case IR_ADD_OV:
 //		case IR_SUB_OV:

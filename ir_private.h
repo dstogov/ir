@@ -51,50 +51,6 @@ IR_ALWAYS_INLINE uint64_t ir_ror64(uint64_t op1, uint64_t op2)
 	return (op1 >> op2) | (op1 << (64 - op2));
 }
 
-IR_ALWAYS_INLINE int64_t ir_ipow(int64_t op1, int64_t op2)
-{
-	int64_t ret = 1;
-
-	if (op2 == 0) {
-		return 1;
-	} else if (op1 == 0) {
-		return 0;
-	}
-
-	while (op2 >= 1) {
-		if (op2 % 2) {
-			op2--;
-			ret = ret * op1;
-		} else {
-			op2 /= 2;
-			op1 = op1 * op1;
-		}
-	}
-	return ret;
-}
-
-IR_ALWAYS_INLINE uint64_t ir_upow(uint64_t op1, uint64_t op2)
-{
-	uint64_t ret = 1;
-
-	if (op2 == 0) {
-		return 1;
-	} else if (op1 == 0) {
-		return 0;
-	}
-
-	while (op2 >= 1) {
-		if (op2 % 2) {
-			op2--;
-			ret = ret * op1;
-		} else {
-			op2 /= 2;
-			op1 = op1 * op1;
-		}
-	}
-	return ret;
-}
-
 /* Number of trailing zero bits (0x01 -> 0; 0x40 -> 6; 0x00 -> LEN) */
 IR_ALWAYS_INLINE uint32_t ir_ntz(uint32_t num)
 {

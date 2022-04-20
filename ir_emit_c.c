@@ -246,6 +246,33 @@ static void ir_emit_conditional_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 	fprintf(f, ";\n");
 }
 
+static void ir_emit_abs(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
+{
+	ir_type type = ctx->ir_base[insn->op1].type;
+
+	ir_emit_def_ref(ctx, f, def);
+	if (IR_IS_TYPE_FP(type)) {
+		if (type == IR_DOUBLE) {
+			fprintf(f, "fabs(");
+		} else {
+			fprintf(f, "fabsf(");
+		}
+		ir_emit_ref(ctx, f, insn->op1);
+		fprintf(f, ")\n");
+	} else {
+		if (IR_IS_TYPE_SIGNED(type)) {
+			ir_emit_ref(ctx, f, insn->op1);
+			fprintf(f, " < 0 ? -");
+			ir_emit_ref(ctx, f, insn->op1);
+			fprintf(f, " : ");
+			ir_emit_ref(ctx, f, insn->op1);
+		} else {
+			ir_emit_ref(ctx, f, insn->op1);
+		}
+		fprintf(f, ";\n");
+	}
+}
+
 static int ir_skip_empty_blocks(ir_ctx *ctx, int b)
 {
 	while (ctx->cfg_blocks[b].flags & IR_BB_MAY_SKIP) {
@@ -681,10 +708,9 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 				case IR_COND:
 					ir_emit_conditional_op(ctx, f, i, insn);
 					break;
-//				case IR_POW:
-//					ir_emit_func1df_op(ctx, f, i, insn, "pow", "powf");
-//				case IR_ABS:
-//					ir_emit_func1df_op(ctx, f, i, insn, "fabs", "fabsf", "abs", "llab");
+				case IR_ABS:
+					ir_emit_abs(ctx, f, i, insn);
+					break;
 				case IR_SHL:
 					ir_emit_binary_op(ctx, f, i, insn, "<<");
 					break;

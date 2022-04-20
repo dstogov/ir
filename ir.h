@@ -197,7 +197,6 @@ int ir_mem_flush(void *ptr, size_t size);
 	_(MUL,          d2,   def, def, ___) /* multiplication              */ \
 	_(DIV,          d2,   def, def, ___) /* division                    */ \
 	_(MOD,          d2,   def, def, ___) /* modulo                      */ \
-	_(POW,          d2,   def, def, ___) /* power                       */ \
 	_(NEG,          d1,   def, ___, ___) /* change sign                 */ \
 	_(ABS,          d1,   def, ___, ___) /* absolute value              */ \
 	/* (LDEXP, MIN, MAX, FPMATH)                                        */ \
