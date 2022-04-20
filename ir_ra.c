@@ -101,8 +101,8 @@ static void ir_add_live_range(ir_ctx *ctx, int v, uint8_t type, ir_live_pos star
 	IR_ASSERT(type == IR_VOID || type == ival->type);
 	p = &ival->range;
 	prev = NULL;
-	while (p && end + 1 >= p->start) {
-		if (p->end + 1 >= start) {
+	while (p && end >= p->start) {
+		if (p->end >= start) {
 			if (start < p->start) {
 				p->start = start;
 			}
@@ -110,7 +110,7 @@ static void ir_add_live_range(ir_ctx *ctx, int v, uint8_t type, ir_live_pos star
 				p->end = end;
 				/* merge with next */
 				next = p->next;
-				while (next && p->end + 1 >= next->start) {
+				while (next && p->end >= next->start) {
 					if (next->end > p->end) {
 						p->end = next->end;
 					}
@@ -298,17 +298,17 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 
 							reg = ctx->rules ? ir_uses_fixed_reg(ctx, i, 0) : IR_REG_NONE;
 							if (reg != IR_REG_NONE) {
-								def_pos = IR_GAP_LIVE_POS_FROM_REF(i);
+								def_pos = IR_SAVE_LIVE_POS_FROM_REF(i);
 								if (insn->op == IR_PARAM) {
 									/* parameter register must be kept before it's copied */
 									ir_add_fixed_live_range(ctx, reg,
 										IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
 								} else {
 									ir_add_fixed_live_range(ctx, reg,
-										IR_START_LIVE_POS_FROM_REF(i), def_pos);
+										IR_DEF_LIVE_POS_FROM_REF(i), def_pos);
 								}
 							} else if (ctx->rules && ir_result_reuses_op1_reg(ctx, i)) {
-								def_pos = IR_GAP_LIVE_POS_FROM_REF(i);
+								def_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
 								hint_vreg = ctx->vregs[insn->op1];
 							} else {
 								def_pos = IR_DEF_LIVE_POS_FROM_REF(i);
@@ -338,14 +338,18 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							ir_live_pos use_pos;
 
 							if (ctx->rules && j == 1 && ir_result_reuses_op1_reg(ctx, i)) {
-								use_pos = IR_START_LIVE_POS_FROM_REF(i); // TODO: ???
-								reg = IR_REG_NONE;
+								use_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
+								reg = ctx->rules ? ir_uses_fixed_reg(ctx, i, j) : IR_REG_NONE;
+								if (reg != IR_REG_NONE) {
+									ir_add_fixed_live_range(ctx, reg,
+										use_pos, IR_USE_LIVE_POS_FROM_REF(i));
+								}
 							} else {
 								reg = ctx->rules ? ir_uses_fixed_reg(ctx, i, j) : IR_REG_NONE;
 								if (reg != IR_REG_NONE) {
-									use_pos = IR_START_LIVE_POS_FROM_REF(i); // TODO: ???
+									use_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
 									ir_add_fixed_live_range(ctx, reg,
-										IR_USE_LIVE_POS_FROM_REF(i), IR_DEF_LIVE_POS_FROM_REF(i));
+										use_pos, IR_USE_LIVE_POS_FROM_REF(i));
 								} else {
 									use_pos = IR_USE_LIVE_POS_FROM_REF(i);
 								}
@@ -366,7 +370,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					if (regset != IR_REGSET_EMPTY) {
 						IR_REGSET_FOREACH(regset, reg) {
 							ir_add_fixed_live_range(ctx, reg,
-								IR_GAP_LIVE_POS_FROM_REF(i),
+								IR_LOAD_LIVE_POS_FROM_REF(i), // TODO: ???
 								IR_DEF_LIVE_POS_FROM_REF(i));
 						}  IR_REGSET_FOREACH_END();
 					}

@@ -772,9 +772,9 @@ ir_regset ir_get_scratch_regset(ir_ctx *ctx, ir_ref ref)
 	if (rule == IR_SHIFT) {
 		return IR_REGSET(IR_REG_RCX);
 	} else if (rule == IR_MUL_INT || rule == IR_DIV_INT) {
-		return IR_REGSET(IR_REG_RDX); /* %rax - used as result */
+		return IR_REGSET(IR_REG_RAX) | IR_REGSET(IR_REG_RDX); /* %rax - used as result */
 	} else if (rule == IR_MOD_INT) {
-		return IR_REGSET(IR_REG_RAX); /* %rdx - used as result */
+		return IR_REGSET(IR_REG_RAX) | IR_REGSET(IR_REG_RDX); /* %rdx - used as result */
 	} else if (rule == IR_CALL) {
 		return IR_REGSET_SCRATCH;
 	}

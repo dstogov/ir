@@ -501,10 +501,11 @@ typedef struct _ir_live_interval ir_live_interval;
 #define IR_LIVE_POS_FROM_REF(ref)        ((ref) * 4)
 
 #define IR_START_LIVE_POS_FROM_REF(ref)  ((ref) * 4)
-#define IR_GAP_LIVE_POS_FROM_REF(ref)    ((ref) * 4 + 1)
-#define IR_USE_LIVE_POS_FROM_REF(ref)    ((ref) * 4 + 2)
-#define IR_DEF_LIVE_POS_FROM_REF(ref)    ((ref) * 4 + 3)
-#define IR_END_LIVE_POS_FROM_REF(ref)    ((ref) * 4 + 3)
+#define IR_LOAD_LIVE_POS_FROM_REF(ref)   ((ref) * 4 + 0)
+#define IR_USE_LIVE_POS_FROM_REF(ref)    ((ref) * 4 + 1)
+#define IR_DEF_LIVE_POS_FROM_REF(ref)    ((ref) * 4 + 2)
+#define IR_SAVE_LIVE_POS_FROM_REF(ref)   ((ref) * 4 + 3)
+#define IR_END_LIVE_POS_FROM_REF(ref)    ((ref) * 4 + 4)
 
 struct _ir_use_pos {
 	uint16_t       op_num; /* 0 - means result */
