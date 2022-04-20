@@ -1,0 +1,15 @@
+--TEST--
+002: neg function
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	double ret = NEG(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	xorpd 8(%rip), %xmm0
+	retq

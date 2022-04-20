@@ -606,6 +606,10 @@ typedef struct _ir_backend_data {
 	ir_regset   used_preserved_regs;
 	dasm_State *dasm_state;
 	int         rodata_label, jmp_table_label;
+	bool        double_neg_const;
+	bool        float_neg_const;
+	bool        double_abs_const;
+	bool        float_abs_const;
 } ir_backend_data;
 
 #define IR_GP_REG_NAME(code, name64, name32, name16, name8, name8h) \
@@ -729,7 +733,9 @@ typedef enum _ir_rule {
 	IR_MOD_PWR2,
 
 	IR_BOOL_NOT_INT,
+	IR_ABS_INT,
 	IR_OP_INT,
+	IR_OP_FP,
 	IR_BINOP_INT,			 // res=reg(GP), op1.reg(GP, hint=res), op2=any
 	IR_BINOP_SSE2,			 // res=reg(FP), op1.reg(FP, hint=res), op2=reg(FP)|mem
 	IR_BINOP_AVX,            // res=reg(FP), op1.reg(FP), op2=reg(FP)|mem
@@ -1107,19 +1113,13 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 			if (IR_IS_TYPE_INT(insn->type)) {
 				return IR_OP_INT;
 			} else {
-				IR_ASSERT(0); return IR_SKIP; // xorpd .LC0(%rip), %xmm0; 0 0x80000000 0 0
-				                              // vxorpd .LC0(%rip), %xmm0, %xmm0
-				                              // xorps .LC0(%rip), %xmm0; 0x80000000 0 0 0
-				                              // vxorps .LC0(%rip), %xmm0, %xmm0
+				return IR_OP_FP;
 			}
 		case IR_ABS:
 			if (IR_IS_TYPE_INT(insn->type)) {
-				IR_ASSERT(0); return IR_SKIP; // movl %edi, %eax; negl %eax; cmovs %edi, %eax
+				return IR_ABS_INT; // movl %edi, %eax; negl %eax; cmovs %edi, %eax
 			} else {
-				IR_ASSERT(0); return IR_SKIP; // andpd .LC0(%rip), %xmm0; 0xffffffff 0x7fffffff 0 0
-				                              // vandpd .LC0(%rip), %xmm0, %xmm0
-				                              // andps .LC0(%rip), %xmm0; 0x7fffffff 0 0 0
-				                              // vandps .LC0(%rip), %xmm0, %xmm0
+				return IR_OP_FP;
 			}
 		case IR_OR:
 			if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
@@ -1860,6 +1860,147 @@ void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 	if (def_reg != reg) {
 		ir_emit_store(ctx, insn->type, reg, def);
+	}
+}
+
+void ir_emit_abs_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_reg def_reg = ir_ref_reg(ctx, def);
+	ir_reg op1_reg = ir_ref_reg(ctx, insn->op1);
+	ir_reg reg;
+
+	if (def_reg >= 0) {
+		reg = def_reg;
+	} else {
+		reg = IR_REG_RAX; // TODO: temporary register
+	}
+
+	if (op1_reg < 0) {
+		op1_reg = IR_REG_RDX; // TODO: temporary register
+		ir_emit_load(ctx, insn->type, insn->op1, op1_reg);
+	}
+
+	|	ASM_REG_REG_OP mov, insn->type, reg, op1_reg
+	|	ASM_REG_OP neg, insn->type, reg
+	switch (ir_type_size[insn->type]) {
+		case 1:
+		case 2:
+			|	cmovs Rw(reg), Rw(op1_reg)
+			break;
+		case 4:
+			|	cmovs Rd(reg), Rd(op1_reg)
+			break;
+		case 8:
+			|	cmovs Rq(reg), Rq(op1_reg)
+			break;
+		default:
+			IR_ASSERT(0);
+	}
+
+	if (def_reg != reg) {
+		ir_emit_store(ctx, insn->type, reg, def);
+	}
+}
+
+void ir_rodata(ir_ctx *ctx)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+
+	|.rodata
+	if (!data->rodata_label) {
+		int label = data->rodata_label = ctx->cfg_blocks_count + ctx->consts_count + 2;
+		|=>label:
+	}
+}
+
+void ir_emit_op_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_reg def_reg = ir_ref_reg(ctx, def);
+	ir_reg op1_reg = ir_ref_reg(ctx, insn->op1);
+	ir_reg reg;
+
+	if (def_reg >= 0) {
+		reg = def_reg;
+	} else if (op1_reg >= 0 && ir_last_use(ctx, insn->op1)) {
+		reg = op1_reg;
+	} else {
+		reg = IR_REG_XMM7; // TODO: temporary register
+	}
+	if (op1_reg != reg) {
+		ir_emit_fp_load(ctx, insn->type, insn->op1, reg);
+	}
+	if (insn->op == IR_NEG) {
+		if (insn->type == IR_DOUBLE) {
+			if (!data->double_neg_const) {
+				data->double_neg_const = 1;
+				ir_rodata(ctx);
+				|.align 8
+				|->double_neg_const:
+				|.dword 0, 0x80000000, 0, 0
+				|.code
+			}
+			if (ctx->flags & IR_AVX) {
+				|	vxorpd xmm(reg-IR_REG_XMM0), xmm(reg-IR_REG_XMM0), [->double_neg_const]
+			} else {
+				|	xorpd xmm(reg-IR_REG_XMM0), [->double_neg_const]
+			}
+		} else {
+			IR_ASSERT(insn->type == IR_FLOAT);
+			if (!data->float_neg_const) {
+				data->float_neg_const = 1;
+				ir_rodata(ctx);
+				|.align 8
+				|->float_neg_const:
+				|.dword 0x80000000, 0, 0, 0
+				|.code
+			}
+			if (ctx->flags & IR_AVX) {
+				|	vxorps xmm(reg-IR_REG_XMM0), xmm(reg-IR_REG_XMM0), [->float_neg_const]
+			} else {
+				|	xorps xmm(reg-IR_REG_XMM0), [->float_neg_const]
+			}
+		}
+	} else if (insn->op == IR_ABS) {
+		if (insn->type == IR_DOUBLE) {
+			if (!data->double_abs_const) {
+				data->double_abs_const = 1;
+				ir_rodata(ctx);
+				|.align 8
+				|->double_abs_const:
+				|.dword 0xffffffff, 0x7fffffff, 0, 0
+				|.code
+			}
+			if (ctx->flags & IR_AVX) {
+				|	vandpd xmm(reg-IR_REG_XMM0), xmm(reg-IR_REG_XMM0), [->double_abs_const]
+			} else {
+				|	andpd xmm(reg-IR_REG_XMM0), [->double_abs_const]
+			}
+		} else {
+			IR_ASSERT(insn->type == IR_FLOAT);
+			if (!data->float_abs_const) {
+				data->float_abs_const = 1;
+				ir_rodata(ctx);
+				|.align 8
+				|->float_abs_const:
+				|.dword 0x7fffffff, 0, 0, 0
+				|.code
+			}
+			if (ctx->flags & IR_AVX) {
+				|	vandps xmm(reg-IR_REG_XMM0), xmm(reg-IR_REG_XMM0), [->float_abs_const]
+			} else {
+				|	andps xmm(reg-IR_REG_XMM0), [->float_abs_const]
+			}
+		}
+	} else {
+		IR_ASSERT(0);
+	}
+	if (def_reg != reg) {
+		ir_emit_fp_store(ctx, insn->type, reg, def);
 	}
 }
 
@@ -3674,6 +3815,10 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 	data.used_preserved_regs = 0;
 	data.rodata_label = 0;
 	data.jmp_table_label = 0;
+	data.double_neg_const = 0;
+	data.float_neg_const = 0;
+	data.double_abs_const = 0;
+	data.float_abs_const = 0;
 
 	if (!ctx->live_intervals) {
 		ir_allocate_unique_spill_slots(ctx);
@@ -4088,8 +4233,14 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 				case IR_OP_INT:
 					ir_emit_op_int(ctx, i, insn);
 					break;
+				case IR_ABS_INT:
+					ir_emit_abs_int(ctx, i, insn);
+					break;
 				case IR_BOOL_NOT_INT:
 					ir_emit_bool_not_int(ctx, i, insn);
+					break;
+				case IR_OP_FP:
+					ir_emit_op_fp(ctx, i, insn);
 					break;
 				case IR_BINOP_INT:
 					ir_emit_binop_int(ctx, i, insn);
@@ -4197,6 +4348,9 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 		}
 	}
 
+	if (data.rodata_label) {
+		|.rodata
+	}
 	for (i = IR_UNUSED + 1, insn = ctx->ir_base - i; i < ctx->consts_count; i++, insn--) {
 		if (insn->emit_const) {
 			if (IR_IS_TYPE_FP(insn->type)) {

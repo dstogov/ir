@@ -57,7 +57,8 @@
 		-  hints and low priority
 
 ?  code generation
-	-  POW, NEG (fp), ABS
+	-  POW,
+	+  NEG (fp), ABS
 	-  OVERFLOW
 	-  MIN, MAX, COND
 	-  CAST
