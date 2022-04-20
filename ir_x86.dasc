@@ -824,6 +824,45 @@ static ir_reg ir_get_param_reg(ir_ctx *ctx, ir_ref ref)
 	return IR_REG_NONE;
 }
 
+static ir_reg ir_get_arg_reg(ir_ctx *ctx, ir_insn *insn, int op_num)
+{
+	int j, n;
+	ir_type type;
+	int int_param = 0;
+	int fp_param = 0;
+	int int_reg_params_count = IR_REG_INT_ARGS;
+	int fp_reg_params_count = IR_REG_FP_ARGS;
+	const int8_t *int_reg_params = _ir_int_reg_params;
+	const int8_t *fp_reg_params = _ir_fp_reg_params;
+
+	n = ir_input_edges_count(ctx, insn);
+	for (j = 3; j <= n; j++) {
+		type = ctx->ir_base[insn->ops[j]].type;
+		if (IR_IS_TYPE_INT(type)) {
+			if (j == op_num) {
+				if (int_param < int_reg_params_count) {
+					return int_reg_params[int_param];
+				} else {
+					return IR_REG_NONE;
+				}
+			}
+			int_param++;
+		} else if (IR_IS_TYPE_FP(type)) {
+			if (j == op_num) {
+				if (fp_param < fp_reg_params_count) {
+					return fp_reg_params[fp_param];
+				} else {
+					return IR_REG_NONE;
+				}
+			}
+			fp_param++;
+		} else {
+			IR_ASSERT(0);
+		}
+	}
+	return IR_REG_NONE;
+}
+
 ir_reg ir_uses_fixed_reg(ir_ctx *ctx, ir_ref ref, int op_num)
 {
 	ir_ref rule;
@@ -854,6 +893,17 @@ ir_reg ir_uses_fixed_reg(ir_ctx *ctx, ir_ref ref, int op_num)
 	} else if (rule == IR_SKIP_REG) {
 		if (ctx->ir_base[ref].op == IR_PARAM && op_num == 0) {
 			return ir_get_param_reg(ctx, ref);
+		}
+	} else if (rule == IR_CALL || (rule == IR_TAILCALL && op_num > 0)) {
+		ir_insn *insn = &ctx->ir_base[ref];
+		if (op_num == 0) {
+			if (IR_IS_TYPE_INT(insn->type)) {
+				return IR_REG_RAX;
+			} else {
+				return IR_REG_XMM0;
+			}
+		} else {
+			return ir_get_arg_reg(ctx, insn, op_num);
 		}
 	}
 	return IR_REG_NONE;
