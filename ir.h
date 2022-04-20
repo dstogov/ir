@@ -97,19 +97,19 @@ int ir_mem_flush(void *ptr, size_t size);
 #define IR_TYPE_CHAR       (IR_TYPE_SPECIAL|IR_TYPE_SIGNED)
 
 #define IR_TYPES(_) \
-	_(BOOL,   bool,      b,    "%u",        IR_TYPE_BOOL)     \
-	_(U8,     uint8_t,   u8,   "%u",        IR_TYPE_UNSIGNED) \
-	_(U16,    uint16_t,  u16,  "%u",        IR_TYPE_UNSIGNED) \
-	_(U32,    uint32_t,  u32,  "%u",        IR_TYPE_UNSIGNED) \
-	_(U64,    uint64_t,  u64,  "%" PRIu64,  IR_TYPE_UNSIGNED) \
-	_(ADDR,   uintptr_t, addr, "%" PRIxPTR, IR_TYPE_ADDR)     \
-	_(CHAR,   char,      c,    "'%c'",      IR_TYPE_CHAR)     \
-	_(I8,     int8_t,    i8,   "%d",        IR_TYPE_SIGNED)   \
-	_(I16,    int16_t,   i16,  "%d",        IR_TYPE_SIGNED)   \
-	_(I32,    int32_t,   i32,  "%d",        IR_TYPE_SIGNED)   \
-	_(I64,    int64_t,   i64,  "%" PRIi64,  IR_TYPE_SIGNED)   \
-	_(DOUBLE, double,    d,    "%g",        IR_TYPE_FP)       \
-	_(FLOAT,  float,     f,    "%f",        IR_TYPE_FP)       \
+	_(BOOL,   bool,      b,    IR_TYPE_BOOL)     \
+	_(U8,     uint8_t,   u8,   IR_TYPE_UNSIGNED) \
+	_(U16,    uint16_t,  u16,  IR_TYPE_UNSIGNED) \
+	_(U32,    uint32_t,  u32,  IR_TYPE_UNSIGNED) \
+	_(U64,    uint64_t,  u64,  IR_TYPE_UNSIGNED) \
+	_(ADDR,   uintptr_t, addr, IR_TYPE_ADDR)     \
+	_(CHAR,   char,      c,    IR_TYPE_CHAR)     \
+	_(I8,     int8_t,    i8,   IR_TYPE_SIGNED)   \
+	_(I16,    int16_t,   i16,  IR_TYPE_SIGNED)   \
+	_(I32,    int32_t,   i32,  IR_TYPE_SIGNED)   \
+	_(I64,    int64_t,   i64,  IR_TYPE_SIGNED)   \
+	_(DOUBLE, double,    d,    IR_TYPE_FP)       \
+	_(FLOAT,  float,     f,    IR_TYPE_FP)       \
 
 #define IR_IS_TYPE_UNSIGNED(t) ((t) < IR_CHAR)
 #define IR_IS_TYPE_SIGNED(t)   ((t) >= IR_CHAR && (t) < IR_DOUBLE)
@@ -246,6 +246,7 @@ int ir_mem_flush(void *ptr, size_t size);
 	\
 	/* memory reference and load/store ops                              */ \
 	_(ALLOCA,       a2,   src, def, ___) /* alloca(def)                 */ \
+	_(VADDR,        d1,   var, ___, ___) /* load address of local var   */ \
 	_(VLOAD,        l2,   src, var, ___) /* load value of local var     */ \
 	_(VSTORE,       s3,   src, var, def) /* store value to local var    */ \
 	_(LOAD,         l2,   src, ref, ___) /* load from memory            */ \
@@ -307,7 +308,7 @@ int ir_mem_flush(void *ptr, size_t size);
 #define IR_OPND_KIND(flags, i) \
 	(((flags) >> (16 + (4 * (((i) > 3) ? 3 : (i))))) & 0xf)
 
-#define IR_TYPE_ENUM(name, type, field, format, flags)  IR_ ## name,
+#define IR_TYPE_ENUM(name, type, field, flags) IR_ ## name,
 #define IR_OP_ENUM(name, flags, op1, op2, op3) IR_ ## name,
 
 typedef enum _ir_type {

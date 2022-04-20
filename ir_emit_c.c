@@ -405,6 +405,17 @@ static void ir_emit_alloca(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 	fprintf(f, ");\n");
 }
 
+static void ir_emit_vaddr(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
+{
+	ir_insn *var = &ctx->ir_base[insn->op1];
+
+	ir_emit_def_ref(ctx, f, def);
+	fprintf(f, "&");
+	IR_ASSERT(var->op == IR_VAR/* || var->op == IR_PARAM*/);
+	fprintf(f, "%s", ir_get_str(ctx, var->op2));
+	fprintf(f, ";\n");
+}
+
 static void ir_emit_vstore(ir_ctx *ctx, FILE *f, ir_insn *insn)
 {
 	if (ctx->use_lists[insn->op3].count != 1) {
@@ -549,8 +560,13 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 					} else {
 						ir_use_list *use_list = &ctx->use_lists[i];
 
-						if ((insn->op == IR_VAR)
-						 || (insn->op == IR_VLOAD)
+						if (insn->op == IR_VAR) {
+							if (use_list->count > 0) {
+								fprintf(f, "\t%s %s;\n", ir_type_cname[insn->type], ir_get_str(ctx, insn->op2));
+							} else {
+								/* skip */
+							}
+						} else if ((insn->op == IR_VLOAD)
 						 || (use_list->count == 1
 						  && ctx->ir_base[ctx->use_edges[use_list->refs]].op == IR_VSTORE)) {
 							/* skip, we use variable name instead */
@@ -727,6 +743,9 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 					break;
 				case IR_ALLOCA:
 					ir_emit_alloca(ctx, f, i, insn);
+					break;
+				case IR_VADDR:
+					ir_emit_vaddr(ctx, f, i, insn);
 					break;
 				case IR_VSTORE:
 					ir_emit_vstore(ctx, f, insn);

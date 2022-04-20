@@ -1303,7 +1303,7 @@ static ir_reg ir_vreg_spill_slot(ir_ctx *ctx, ir_ref v)
 		return -offset;
 	} else {
 		ir_backend_data *data = ctx->data;
-		return data->stack_frame_size - offset;
+		return data->stack_frame_size - sizeof(void*) - offset;
 	}
 }
 
@@ -1323,7 +1323,7 @@ static ir_reg ir_ref_spill_slot(ir_ctx *ctx, ir_ref ref)
 		return -offset;
 	} else {
 		ir_backend_data *data = ctx->data;
-		return data->stack_frame_size - offset;
+		return data->stack_frame_size - sizeof(void*) - offset;
 	}
 }
 
@@ -1403,7 +1403,7 @@ static void ir_emit_prologue(ir_ctx *ctx)
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
 			offset = -(int)sizeof(void*);
 		} else {
-			offset = data->stack_frame_size;
+			offset = data->stack_frame_size - (int)sizeof(void*);
 		}
 		for (i = 0; i < IR_REG_NUM; i++) {
 			if (IR_REGSET_IN(data->used_preserved_regs, i)) {
@@ -1433,7 +1433,7 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
 			offset = -(int)sizeof(void*);
 		} else {
-			offset = data->stack_frame_size;
+			offset = data->stack_frame_size - (int)sizeof(void*);
 		}
 		for (i = 0; i < IR_REG_NUM; i++) {
 			if (IR_REGSET_IN(data->used_preserved_regs, i)) {
@@ -2623,6 +2623,32 @@ static void ir_emit_copy_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
+static void ir_emit_vaddr(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_ref type = insn->type;
+	ir_reg def_reg = ir_ref_reg(ctx, def);
+	ir_reg reg;
+	int32_t offset;
+
+	if (def_reg >= 0) {
+		reg = def_reg;
+	} else {
+		reg = IR_REG_RAX; // TODO: temporary register
+	}
+	IR_ASSERT(ctx->vregs[insn->op1]);
+	offset = ir_vreg_spill_slot(ctx, ctx->vregs[insn->op1]);
+	if (ctx->flags & IR_USE_FRAME_POINTER) {
+		|	lea Ra(reg), aword [rbp+offset]
+	} else {
+		|	lea Ra(reg), aword [rsp+offset]
+	}
+	if (def_reg != reg) {
+		ir_emit_store(ctx, type, reg, def);
+	}
+}
+
 static void ir_emit_vload_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
@@ -2673,23 +2699,32 @@ static void ir_emit_vstore_int(ir_ctx *ctx, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-	ir_ref type = ctx->ir_base[insn->op3].type;
+	ir_insn *val_insn = &ctx->ir_base[insn->op3];
+	ir_ref type = val_insn->type;
 	ir_reg op3_reg = ir_ref_reg(ctx, insn->op3);
 	ir_reg reg;
 	int32_t offset;
 
-	if (op3_reg >= 0) {
-		reg = op3_reg;
-	} else {
-		reg = IR_REG_RAX; // TODO: temporary register
-		ir_emit_load(ctx, type, insn->op3, reg);
-	}
 	IR_ASSERT(ctx->vregs[insn->op2]);
 	offset = ir_vreg_spill_slot(ctx, ctx->vregs[insn->op2]);
-	if (ctx->flags & IR_USE_FRAME_POINTER) {
-		|	ASM_MEM_REG_OP mov, type, [rbp+offset], reg
+	if (IR_IS_CONST_REF(insn->op3) && IR_IS_32BIT(type, val_insn->val)) {
+		if (ctx->flags & IR_USE_FRAME_POINTER) {
+			|	ASM_MEM_IMM_OP mov, type, [rbp+offset], val_insn->val.i32
+		} else {
+			|	ASM_MEM_IMM_OP mov, type, [rsp+offset], val_insn->val.i32
+		}
 	} else {
-		|	ASM_MEM_REG_OP mov, type, [rsp+offset], reg
+		if (op3_reg >= 0) {
+			reg = op3_reg;
+		} else {
+			reg = IR_REG_RAX; // TODO: temporary register
+			ir_emit_load(ctx, type, insn->op3, reg);
+		}
+		if (ctx->flags & IR_USE_FRAME_POINTER) {
+			|	ASM_MEM_REG_OP mov, type, [rbp+offset], reg
+		} else {
+			|	ASM_MEM_REG_OP mov, type, [rsp+offset], reg
+		}
 	}
 }
 
@@ -2701,13 +2736,13 @@ static void ir_emit_vstore_fp(ir_ctx *ctx, ir_insn *insn)
 	ir_reg op3_reg = ir_ref_reg(ctx, insn->op3);
 	ir_reg reg;
 
+	IR_ASSERT(ctx->vregs[insn->op2]);
 	if (op3_reg >= 0) {
 		reg = op3_reg;
 	} else {
 		reg = IR_REG_XMM7; // TODO: temporary register
 		ir_emit_fp_load(ctx, type, insn->op3, reg);
 	}
-	IR_ASSERT(ctx->vregs[insn->op2]);
 	|	ASM_FP_VREG_REG_MOV type, ctx->vregs[insn->op2], reg
 }
 
@@ -2763,22 +2798,27 @@ static void ir_emit_store_int(ir_ctx *ctx, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-	ir_ref type = ctx->ir_base[insn->op3].type;
+	ir_insn *val_insn = &ctx->ir_base[insn->op3];
+	ir_ref type = val_insn->type;
 	ir_reg op2_reg = ir_ref_reg(ctx, insn->op2);
 	ir_reg op3_reg = ir_ref_reg(ctx, insn->op3);
 	ir_reg reg;
 
-	if (op3_reg >= 0) {
-		reg = op3_reg;
-	} else {
-		reg = IR_REG_RAX; // TODO: temporary register
-		ir_emit_load(ctx, type, insn->op3, reg);
-	}
 	if (op2_reg < 0) {
 		op2_reg = IR_REG_RAX; // TODO: temporary register
 		ir_emit_load(ctx, type, insn->op2, op2_reg);
 	}
-	|	ASM_MEM_REG_OP mov, type, [Ra(op2_reg)], reg
+	if (IR_IS_CONST_REF(insn->op3) && IR_IS_32BIT(type, val_insn->val)) {
+		|	ASM_MEM_IMM_OP mov, type, [Ra(op2_reg)], val_insn->val.i32
+	} else {
+		if (op3_reg >= 0) {
+			reg = op3_reg;
+		} else {
+			reg = IR_REG_RAX; // TODO: temporary register
+			ir_emit_load(ctx, type, insn->op3, reg);
+		}
+		|	ASM_MEM_REG_OP mov, type, [Ra(op2_reg)], reg
+	}
 }
 
 static void ir_emit_store_fp(ir_ctx *ctx, ir_insn *insn)
@@ -4054,6 +4094,9 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 					break;
 				case IR_TAILCALL:
 					ir_emit_tailcall(ctx, i, insn);
+					break;
+				case IR_VADDR:
+					ir_emit_vaddr(ctx, i, insn);
 					break;
 				case IR_VLOAD_INT:
 					ir_emit_vload_int(ctx, i, insn);

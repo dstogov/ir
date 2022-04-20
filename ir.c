@@ -6,11 +6,11 @@
 
 #include <math.h>
 
-#define IR_TYPE_FLAGS(name, type, field, format, flags) ((flags)|sizeof(type)),
-#define IR_TYPE_NAME(name, type, field, format, flags)  #name,
-#define IR_TYPE_CNAME(name, type, field, format, flags) #type,
-#define IR_TYPE_SIZE(name, type, field, format, flags) sizeof(type),
-#define IR_OP_NAME(name, flags, op1, op2, op3) #name,
+#define IR_TYPE_FLAGS(name, type, field, flags) ((flags)|sizeof(type)),
+#define IR_TYPE_NAME(name, type, field, flags)  #name,
+#define IR_TYPE_CNAME(name, type, field, flags) #type,
+#define IR_TYPE_SIZE(name, type, field, flags)  sizeof(type),
+#define IR_OP_NAME(name, flags, op1, op2, op3)  #name,
 
 const uint8_t ir_type_flags[IR_LAST_TYPE] = {
 	0,
@@ -36,9 +36,6 @@ const char *ir_op_name[IR_LAST_OP] = {
 	IR_OPS(IR_OP_NAME)
 };
 
-#define IR_TYPE_CASE(name, type, field, format, flags) \
-	case IR_ ## name: fprintf(f, format, insn->val.field); break;
-
 void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 {
 	if (insn->op == IR_FUNC) {
@@ -50,8 +47,61 @@ void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 	}
 	IR_ASSERT(IR_IS_CONST(insn->op));
 	switch (insn->type) {
-		IR_TYPES(IR_TYPE_CASE)
+		case IR_BOOL:
+			fprintf(f, "%u", insn->val.b);
+			break;
+		case IR_U8:
+			fprintf(f, "%u", insn->val.u8);
+			break;
+		case IR_U16:
+			fprintf(f, "%u", insn->val.u16);
+			break;
+		case IR_U32:
+			fprintf(f, "%u", insn->val.u32);
+			break;
+		case IR_U64:
+			fprintf(f, "%" PRIu64, insn->val.u64);
+			break;
+		case IR_ADDR:
+			fprintf(f, "%" PRIxPTR, insn->val.addr);
+			break;
+		case IR_CHAR:
+			if (insn->val.c == '\\') {
+				fprintf(f, "'\\\\'");
+			} else if (insn->val.c >= ' ') {
+				fprintf(f, "'%c'", insn->val.c);
+			} else if (insn->val.c == '\t') {
+				fprintf(f, "'\\t'");
+			} else if (insn->val.c == '\r') {
+				fprintf(f, "'\\r'");
+			} else if (insn->val.c == '\n') {
+				fprintf(f, "'\\n'");
+			} else if (insn->val.c == '\0') {
+				fprintf(f, "'\\0'");
+			} else {
+				fprintf(f, "%u", insn->val.c);
+			}
+			break;
+		case IR_I8:
+			fprintf(f, "%d", insn->val.i8);
+			break;
+		case IR_I16:
+			fprintf(f, "%d", insn->val.i16);
+			break;
+		case IR_I32:
+			fprintf(f, "%d", insn->val.i32);
+			break;
+		case IR_I64:
+			fprintf(f, "%" PRIi64, insn->val.i64);
+			break;
+		case IR_DOUBLE:
+			fprintf(f, "%g", insn->val.d);
+			break;
+		case IR_FLOAT:
+			fprintf(f, "%f", insn->val.f);
+			break;
 		default:
+			IR_ASSERT(0);
 			break;
 	}
 }

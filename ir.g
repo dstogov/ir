@@ -265,7 +265,23 @@ FLOATNUMBER(uint32_t t, ir_val *val):
 
 CHARACTER(ir_val *val):
 	/'([^'\\]|\\.)*'/
-	{val->i64 = (char)yy_text[1];}
+	{
+		if ((char)yy_text[1] != '\\') {
+			val->i64 = (char)yy_text[1];
+		} else if ((char)yy_text[2] == '\\') {
+			val->i64 = '\\';
+		} else if ((char)yy_text[2] == 'r') {
+			val->i64 = '\r';
+		} else if ((char)yy_text[2] == 'n') {
+			val->i64 = '\n';
+		} else if ((char)yy_text[2] == 't') {
+			val->i64 = '\t';
+		} else if ((char)yy_text[2] == '0') {
+			val->i64 = '\0';
+		} else {
+			IR_ASSERT(0);
+		}
+    }
 ;
 
 STRING(const char **str, size_t *len):
