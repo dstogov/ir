@@ -388,7 +388,7 @@
 ||		ir_reg _reg = ir_ref_reg(ctx, dst);
 ||		if (_reg >= 0) {
 |			ASM_SSE2_REG_REG_OP fop, dop, type, _reg, src
-||		} else if (ival->stack_spill_pos) {
+||		} else {
 ||			int32_t offset = ir_ref_spill_slot(ctx, dst);
 ||			if (ctx->flags & IR_USE_FRAME_POINTER) {
 |				ASM_SSE2_MEM_REG_OP fop, dop, type, [rbp+offset], src
@@ -601,10 +601,11 @@
 |.endmacro
 
 typedef struct _ir_backend_data {
-	uint32_t  stack_frame_size;
-	ir_regset used_preserved_regs;
+	int32_t     stack_frame_size;
+	int32_t     stack_frame_alignment;
+	ir_regset   used_preserved_regs;
 	dasm_State *dasm_state;
-	int rodata_label, jmp_table_label;
+	int         rodata_label, jmp_table_label;
 } ir_backend_data;
 
 #define IR_GP_REG_NAME(code, name64, name32, name16, name8, name8h) \
@@ -1294,16 +1295,16 @@ static ir_reg ir_vreg_reg(ir_ctx *ctx, ir_ref v)
 
 static ir_reg ir_vreg_spill_slot(ir_ctx *ctx, ir_ref v)
 {
+	ir_backend_data *data = ctx->data;
 	int32_t offset;
 
 	IR_ASSERT(v >= 0);
 	offset = ctx->live_intervals[v]->stack_spill_pos;
 	IR_ASSERT(offset != 0);
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
-		return -offset;
+		return offset - data->stack_frame_size - data->stack_frame_alignment - sizeof(void*);
 	} else {
-		ir_backend_data *data = ctx->data;
-		return data->stack_frame_size - offset;
+		return offset + data->stack_frame_alignment - sizeof(void*);
 	}
 }
 
@@ -1314,16 +1315,16 @@ static ir_reg ir_ref_reg(ir_ctx *ctx, ir_ref ref)
 
 static ir_reg ir_ref_spill_slot(ir_ctx *ctx, ir_ref ref)
 {
+	ir_backend_data *data = ctx->data;
 	int32_t offset;
 
 	IR_ASSERT(ref >= 0);
 	offset = ctx->live_intervals[ctx->vregs[ref]]->stack_spill_pos;
 	IR_ASSERT(offset != 0);
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
-		return -offset;
+		return data->stack_frame_size - data->stack_frame_alignment + offset - sizeof(void*);
 	} else {
-		ir_backend_data *data = ctx->data;
-		return data->stack_frame_size - offset;
+		return offset + data->stack_frame_alignment - sizeof(void*);
 	}
 }
 
@@ -1905,17 +1906,15 @@ void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 	} else if (insn->op == IR_MOD) {
 		if (ir_type_size[type] == 1) {
-			ir_live_interval *ival = ctx->live_intervals[ctx->vregs[def]];
 			ir_reg reg = ir_ref_reg(ctx, def);
 			if (reg >= 0) {
 				|	mov al, ah
 				|	mov Rb(reg), al
-			} else if (ival->stack_spill_pos) {
+			} else {
+				int32_t offset = ir_ref_spill_slot(ctx, def);
 				if (ctx->flags & IR_USE_FRAME_POINTER) {
-					int32_t offset = -ival->stack_spill_pos;
 					|	mov byte [rbp+offset], ah
 				} else {
-					int32_t offset = data->stack_frame_size - ival->stack_spill_pos;
 					|	mov byte [rsp+offset], ah
 				}
 			}
@@ -3347,7 +3346,6 @@ static void ir_emit_param_move(ir_ctx *ctx, uint8_t type, int from_reg, int to, 
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-	ir_live_interval *ival = ctx->live_intervals[to];
 	ir_reg to_reg = ir_vreg_reg(ctx, to);
 	ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_RBP : IR_REG_RSP;
 	int32_t offset;
@@ -3357,9 +3355,7 @@ static void ir_emit_param_move(ir_ctx *ctx, uint8_t type, int from_reg, int to, 
 			if (to_reg >= 0) {
 				|	ASM_REG_REG_OP mov, type, to_reg, from_reg
 			} else {
-				IR_ASSERT(ctx->live_intervals[to]->stack_spill_pos);
-				offset = (ctx->flags & IR_USE_FRAME_POINTER) ?
-					-ival->stack_spill_pos : data->stack_frame_size - ival->stack_spill_pos;
+				offset = ir_vreg_spill_slot(ctx, to);
 				|	ASM_MEM_REG_OP mov, type, [Ra(fp)+offset], from_reg
 			}
 		} else {
@@ -3368,8 +3364,7 @@ static void ir_emit_param_move(ir_ctx *ctx, uint8_t type, int from_reg, int to, 
 				|	ASM_REG_MEM_OP mov, type, to_reg, [Ra(fp)+offset]
 			} else {
 				|	ASM_REG_MEM_OP mov, type, IR_REG_R0, [Ra(fp)+offset] // TODO: tmp
-				offset = (ctx->flags & IR_USE_FRAME_POINTER) ?
-					-ival->stack_spill_pos : data->stack_frame_size - ival->stack_spill_pos;
+				offset = ir_vreg_spill_slot(ctx, to);
 				|	ASM_MEM_REG_OP mov, type, [Ra(fp)+offset], IR_REG_R0 // TODO: tmp
 			}
 		}
@@ -3378,9 +3373,7 @@ static void ir_emit_param_move(ir_ctx *ctx, uint8_t type, int from_reg, int to, 
 			if (to_reg >= 0) {
 				|	ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, type, from_reg, to_reg
 			} else {
-				IR_ASSERT(ctx->live_intervals[to]->stack_spill_pos);
-				offset = (ctx->flags & IR_USE_FRAME_POINTER) ?
-					-ival->stack_spill_pos : data->stack_frame_size - ival->stack_spill_pos;
+				offset = ir_vreg_spill_slot(ctx, to);
 				|	ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [Ra(fp)+offset], from_reg
 			}
 		} else {
@@ -3389,8 +3382,7 @@ static void ir_emit_param_move(ir_ctx *ctx, uint8_t type, int from_reg, int to, 
 				|	ASM_FP_REG_MEM_OP movss, movsd, vmovss, vmovsd, type, to_reg, [Ra(fp)+offset]
 			} else {
 				|	ASM_FP_REG_MEM_OP movss, movsd, vmovss, vmovsd, type, IR_REG_R0, [Ra(fp)+offset] // TODO: tmp
-				offset = (ctx->flags & IR_USE_FRAME_POINTER) ?
-					-ival->stack_spill_pos : data->stack_frame_size - ival->stack_spill_pos;
+				offset = ir_vreg_spill_slot(ctx, to);
 				|	ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [Ra(fp)+offset], IR_REG_R0 // TODO: tmp
 			}
 		}
@@ -3524,6 +3516,21 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 		}
 		bb->flags |= flags;
 	}
+
+	if (ctx->flags & IR_HAS_CALLS) {
+		/* Stack must be 16 byte aligned */
+		if (ctx->flags & IR_USE_FRAME_POINTER) {
+			while (IR_ALIGNED_SIZE(data->stack_frame_size + sizeof(void*) * 2, 16) != data->stack_frame_size + sizeof(void*) * 2) {
+				data->stack_frame_size += 8;
+				data->stack_frame_alignment += 8;
+			}
+		} else {
+			while (IR_ALIGNED_SIZE(data->stack_frame_size + sizeof(void*), 16) != data->stack_frame_size + sizeof(void*)) {
+				data->stack_frame_size += 8;
+				data->stack_frame_alignment += 8;
+			}
+		}
+	}
 }
 
 static void ir_mark_empty_blocks(ir_ctx *ctx)
@@ -3556,7 +3563,7 @@ static void ir_mark_empty_blocks(ir_ctx *ctx)
 	}
 }
 
-static void ir_cals_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
+static void ir_calc_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
 {
 	int i;
 	ir_live_interval **p, *ival;
@@ -3586,10 +3593,12 @@ static void ir_cals_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
 			while (IR_ALIGNED_SIZE(data->stack_frame_size + sizeof(void*) * 2, 16) != data->stack_frame_size + sizeof(void*) * 2) {
 				data->stack_frame_size += 8;
+				data->stack_frame_alignment += 8;
 			}
 		} else {
 			while (IR_ALIGNED_SIZE(data->stack_frame_size + sizeof(void*), 16) != data->stack_frame_size + sizeof(void*)) {
 				data->stack_frame_size += 8;
+				data->stack_frame_alignment += 8;
 			}
 		}
 	}
@@ -3611,6 +3620,7 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 
 	ctx->data = &data;
 	data.stack_frame_size = 0;
+	data.stack_frame_alignment = 0;
 	data.used_preserved_regs = 0;
 	data.rodata_label = 0;
 	data.jmp_table_label = 0;
@@ -3619,7 +3629,7 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 		ir_allocate_unique_spill_slots(ctx);
 	} else {
 		ir_mark_empty_blocks(ctx);
-		ir_cals_stack_frame_size(ctx, &data);
+		ir_calc_stack_frame_size(ctx, &data);
 	}
 
 	Dst = &data.dasm_state;
