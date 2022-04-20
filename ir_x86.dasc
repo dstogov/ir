@@ -1303,7 +1303,7 @@ static ir_reg ir_vreg_spill_slot(ir_ctx *ctx, ir_ref v)
 		return -offset;
 	} else {
 		ir_backend_data *data = ctx->data;
-		return data->stack_frame_size - sizeof(void*) - offset;
+		return data->stack_frame_size - offset;
 	}
 }
 
@@ -1323,7 +1323,7 @@ static ir_reg ir_ref_spill_slot(ir_ctx *ctx, ir_ref ref)
 		return -offset;
 	} else {
 		ir_backend_data *data = ctx->data;
-		return data->stack_frame_size - sizeof(void*) - offset;
+		return data->stack_frame_size - offset;
 	}
 }
 
