@@ -4051,6 +4051,7 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 					break;
 				case IR_CALL:
 					ir_emit_call(ctx, i, insn);
+					break;
 				case IR_TAILCALL:
 					ir_emit_tailcall(ctx, i, insn);
 					break;
