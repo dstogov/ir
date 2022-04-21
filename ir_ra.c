@@ -63,6 +63,7 @@ static void ir_add_local_var(ir_ctx *ctx, int v, uint8_t type)
 	IR_ASSERT(type != IR_VOID);
 	ival->type = type;
 	ival->reg = IR_REG_NONE;
+	ival->flags = 0;
 	ival->stack_spill_pos = 0; // not allocated
 	ival->range.start = 0;
 	ival->range.end = ctx->insns_count;
@@ -85,6 +86,7 @@ static void ir_add_live_range(ir_ctx *ctx, int v, uint8_t type, ir_live_pos star
 		IR_ASSERT(type != IR_VOID);
 		ival->type = type;
 		ival->reg = IR_REG_NONE;
+		ival->flags = 0;
 		ival->stack_spill_pos = 0; // not allocated
 		ival->range.start = start;
 		ival->range.end = end;
@@ -155,6 +157,7 @@ static void ir_add_fixed_live_range(ir_ctx *ctx, ir_reg reg, ir_live_pos start, 
 		ival = ir_mem_malloc(sizeof(ir_live_interval));
 		ival->type = IR_VOID;
 		ival->reg = reg;
+		ival->flags = 0;
 		ival->stack_spill_pos = 0; // not allocated
 		ival->range.start = start;
 		ival->range.end = end;
@@ -201,14 +204,14 @@ static void ir_add_use_pos(ir_ctx *ctx, int v, ir_use_pos *use_pos)
 	}
 }
 
-static void ir_add_use(ir_ctx *ctx, int v, int op_num, ir_live_pos pos, ir_reg hint, uint32_t hint_vreg)
+static void ir_add_use(ir_ctx *ctx, int v, int op_num, ir_live_pos pos, ir_reg hint, ir_ref hint_ref)
 {
 	ir_use_pos *use_pos;
 
 	use_pos = ir_mem_malloc(sizeof(ir_use_pos));
 	use_pos->op_num = op_num;
 	use_pos->hint = hint;
-	use_pos->hint_vreg = hint_vreg;
+	use_pos->hint_ref = hint_ref;
 	use_pos->pos = pos;
 
 	ir_add_use_pos(ctx, v, use_pos);
@@ -294,7 +297,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					if (ir_bitset_in(live, ctx->vregs[i])) {
 						if (insn->op != IR_PHI) {
 							ir_live_pos def_pos;
-							uint32_t hint_vreg = 0;
+							ir_ref hint_ref = 0;
 
 							reg = ctx->rules ? ir_uses_fixed_reg(ctx, i, 0) : IR_REG_NONE;
 							if (reg != IR_REG_NONE) {
@@ -309,14 +312,14 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 								}
 							} else if (ctx->rules && ir_result_reuses_op1_reg(ctx, i)) {
 								def_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
-								hint_vreg = ctx->vregs[insn->op1];
+								hint_ref = insn->op1;
 							} else {
 								def_pos = IR_DEF_LIVE_POS_FROM_REF(i);
 							}
 							/* intervals[opd].setFrom(op.id) */
 							ir_fix_live_range(ctx, ctx->vregs[i],
 								IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
-							ir_add_use(ctx, ctx->vregs[i], 0, def_pos, reg, hint_vreg);
+							ir_add_use(ctx, ctx->vregs[i], 0, def_pos, reg, hint_ref);
 						} else {
 							ir_add_use(ctx, ctx->vregs[i], 0, IR_DEF_LIVE_POS_FROM_REF(i), IR_REG_NONE, 0);
 						}
@@ -350,6 +353,9 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 									use_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
 									ir_add_fixed_live_range(ctx, reg,
 										use_pos, IR_USE_LIVE_POS_FROM_REF(i));
+								} else if (j > 1 && input == insn->op1 && ctx->rules && ir_result_reuses_op1_reg(ctx, i)) {
+									/* Input is the same as "op1" */
+									use_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
 								} else {
 									use_pos = IR_USE_LIVE_POS_FROM_REF(i);
 								}
@@ -497,6 +503,10 @@ static void ir_vregs_join(ir_ctx *ctx, uint32_t r1, uint32_t r2)
 	ir_live_range *next;
 	ir_use_pos *use_pos;
 
+#if 0
+	fprintf(stderr, "COALESCE %d -> %d\n", r2, r1);
+#endif
+
 	ir_add_live_range(ctx, r1, ival->type, live_range->start, live_range->end);
 	live_range = live_range->next;
 	while (live_range) {
@@ -510,8 +520,8 @@ static void ir_vregs_join(ir_ctx *ctx, uint32_t r1, uint32_t r2)
 	use_pos = ival->use_pos;
 	while (use_pos) {
 		ir_use_pos *next_use_pos = use_pos->next;
-		if (use_pos->hint_vreg == r1) {
-			use_pos->hint_vreg = 0;
+		if (ctx->vregs[use_pos->hint_ref] == r1) {
+			use_pos->hint_ref = 0;
 		}
 		ir_add_use_pos(ctx, r1, use_pos);
 		use_pos = next_use_pos;
@@ -519,24 +529,47 @@ static void ir_vregs_join(ir_ctx *ctx, uint32_t r1, uint32_t r2)
 
 	ir_mem_free(ival);
 	ctx->live_intervals[r2] = NULL;
+	ctx->live_intervals[r1]->flags |= IR_LIVE_INTERVAL_COALESCED;
 }
 
 static bool ir_try_coalesce(ir_ctx *ctx, ir_ref from, ir_ref to)
 {
-	if (ctx->vregs[from] != ctx->vregs[to]
-	 && !ir_vregs_overlap(ctx, ctx->vregs[from], ctx->vregs[to])) {
-		if (ctx->vregs[from] < ctx->vregs[to]) {
-#if 0
-			fprintf(stderr, "COALESCE %d -> %d\n", ctx->vregs[to], ctx->vregs[from]);
-#endif
-			ir_vregs_join(ctx, ctx->vregs[from], ctx->vregs[to]);
-			ctx->vregs[to] = ctx->vregs[from];
+	ir_ref i;
+	int v1 = ctx->vregs[from];
+	int v2 = ctx->vregs[to];
+
+	if (v1 != v2 && !ir_vregs_overlap(ctx, v1, v2)) {
+		uint8_t f1 = ctx->live_intervals[v1]->flags;
+		uint8_t f2 = ctx->live_intervals[v2]->flags;
+
+		if ((f1 & IR_LIVE_INTERVAL_COALESCED) && !(f2 & IR_LIVE_INTERVAL_COALESCED)) {
+			ir_vregs_join(ctx, v1, v2);
+			ctx->vregs[to] = v1;
+		} else if ((f2 & IR_LIVE_INTERVAL_COALESCED) && !(f1 & IR_LIVE_INTERVAL_COALESCED)) {
+			ir_vregs_join(ctx, v2, v1);
+			ctx->vregs[from] = v2;
+		} else if (v1 < v2) {
+			ir_vregs_join(ctx, v1, v2);
+			if (f2 & IR_LIVE_INTERVAL_COALESCED) {
+				for (i = 0; i < ctx->insns_count; i++) {
+					if (ctx->vregs[i] == v2) {
+						ctx->vregs[i] = v1;
+					}
+				}
+			} else {
+				ctx->vregs[to] = v1;
+			}
 		} else {
-#if 0
-			fprintf(stderr, "COALESCE %d -> %d\n", ctx->vregs[from], ctx->vregs[to]);
-#endif
-			ir_vregs_join(ctx, ctx->vregs[to], ctx->vregs[from]);
-			ctx->vregs[from] = ctx->vregs[to];
+			ir_vregs_join(ctx, v2, v1);
+			if (f1 & IR_LIVE_INTERVAL_COALESCED) {
+				for (i = 0; i < ctx->insns_count; i++) {
+					if (ctx->vregs[i] == v1) {
+						ctx->vregs[i] = v2;
+					}
+				}
+			} else {
+				ctx->vregs[from] = v2;
+			}
 		}
 		return 1;
 	}
@@ -566,6 +599,126 @@ static int ir_block_cmp(const void *b1, const void *b2, void *data)
 	} else {
 		return 1;
 	}
+}
+
+static void ir_swap_operands(ir_ctx *ctx, ir_ref i, ir_insn *insn)
+{
+	ir_live_pos pos = IR_USE_LIVE_POS_FROM_REF(i);
+	ir_live_pos load_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
+	ir_live_interval *ival;
+	ir_live_range *r;
+	ir_use_pos *p;
+	ir_ref tmp;
+
+	tmp = insn->op1;
+	insn->op1 = insn->op2;
+	insn->op2 = tmp;
+
+	ival = ctx->live_intervals[ctx->vregs[insn->op2]];
+	p = ival->use_pos;
+	while (p) {
+		if (p->pos == pos) {
+			p->pos = load_pos;
+			p->op_num = 1;
+			break;
+		}
+		p = p->next;
+	}
+
+	ival = ctx->live_intervals[ctx->vregs[i]];
+	p = ival->use_pos;
+	while (p) {
+		if (p->pos == pos) {
+			p->hint_ref = insn->op1;
+			break;
+		}
+		p = p->next;
+	}
+
+	if (insn->op1 > 0 && ctx->vregs[insn->op1]) {
+		ival = ctx->live_intervals[ctx->vregs[i]];
+		r = &ival->range;
+		while (r) {
+			if (r->end == load_pos) {
+				r->end = pos;
+				break;
+			}
+			r = r->next;
+		}
+		p = ival->use_pos;
+		while (p) {
+			if (p->pos == load_pos) {
+				p->pos = pos;
+				p->op_num = 2;
+				break;
+			}
+			p = p->next;
+		}
+	}
+}
+
+static int ir_hint_conflict(ir_ctx *ctx, ir_ref ref, int use, int def)
+{
+	ir_use_pos *p;
+	ir_reg r1 = IR_REG_NONE;
+	ir_reg r2 = IR_REG_NONE;
+
+	p = ctx->live_intervals[use]->use_pos;
+	while (p) {
+		if (IR_LIVE_POS_TO_REF(p->pos) == ref) {
+			break;
+		}
+		if (p->hint != IR_REG_NONE) {
+			r1 = p->hint;
+		}
+		p = p->next;
+	}
+
+	p = ctx->live_intervals[def]->use_pos;
+	while (p) {
+		if (IR_LIVE_POS_TO_REF(p->pos) > ref) {
+			if (p->hint != IR_REG_NONE) {
+				r2 = p->hint;
+				break;
+			}
+		}
+		p = p->next;
+	}
+	return r1 != r2 && r1 != IR_REG_NONE && r2 != IR_REG_NONE;
+}
+
+static int ir_try_swap_operands(ir_ctx *ctx, ir_ref i, ir_insn *insn)
+{
+	if (insn->op1 > 0
+	 && ctx->vregs[insn->op1] != ctx->vregs[i]
+	 && !ir_vregs_overlap(ctx, ctx->vregs[insn->op1], ctx->vregs[i])
+	 && !ir_hint_conflict(ctx, i, ctx->vregs[insn->op1], ctx->vregs[i])) {
+		/* pass */
+	} else if (insn->op2 > 0 && insn->op1 != insn->op2
+		&& (ir_op_flags[insn->op] & IR_OP_FLAG_COMMUTATIVE)) {
+		if (ctx->vregs[insn->op2] != ctx->vregs[i]) {
+			ir_live_pos pos = IR_USE_LIVE_POS_FROM_REF(i);
+			ir_live_pos load_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
+			ir_live_interval *ival = ctx->live_intervals[ctx->vregs[insn->op2]];
+			ir_live_range *r = &ival->range;
+
+			while (r) {
+				if (r->end == pos) {
+					r->end = load_pos;
+					if (!ir_vregs_overlap(ctx, ctx->vregs[insn->op2], ctx->vregs[i])
+					 && !ir_hint_conflict(ctx, i, ctx->vregs[insn->op2], ctx->vregs[i])) {
+						ir_swap_operands(ctx, i, insn);
+						return 1;
+					} else {
+						r->end = pos;
+					}
+					break;
+				}
+				r = r->next;
+			}
+		}
+	}
+	return 0;
 }
 
 int ir_coalesce(ir_ctx *ctx)
@@ -637,6 +790,33 @@ int ir_coalesce(ir_ctx *ctx)
 	}
 	ir_worklist_free(&blocks);
 
+#if 1
+	if (ctx->rules) {
+		/* try to swap operands of commutative instructions for better register allocation */
+		for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
+			for (i = bb->start, insn = ctx->ir_base + i; i <= bb->end;) {
+				if (ir_result_reuses_op1_reg(ctx, i)) {
+					if (insn->op2 > 0 && insn->op1 != insn->op2
+					 && (ir_op_flags[insn->op] & IR_OP_FLAG_COMMUTATIVE)) {
+						ir_try_swap_operands(ctx, i, insn);
+					}
+//					if (insn->op1 > 0) {
+//						ir_try_coalesce(ctx, insn->op1, i);
+//					}
+//				} else if (insn->op == IR_COPY) {
+//					if (insn->op1 > 0) {
+//						ir_try_coalesce(ctx, insn->op1, i);
+//					}
+				}
+				n = ir_operands_count(ctx, insn);
+				n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
+				i += n;
+				insn += n;
+			}
+		}
+	}
+#endif
+
 	if (compact) {
 #if 1
 		offsets = ir_mem_calloc(ctx->vregs_count + 1, sizeof(uint32_t));
@@ -661,21 +841,6 @@ int ir_coalesce(ir_ctx *ctx)
 				}
 			}
 			ctx->vregs_count = n;
-			for (i = 1, n = 1; i <= ctx->vregs_count; i++) {
-				if (ctx->live_intervals[i]) {
-					ir_use_pos *use_pos = ctx->live_intervals[i]->use_pos;
-
-					while (use_pos) {
-						if (use_pos->hint_vreg) {
-							use_pos->hint_vreg -= offsets[use_pos->hint_vreg];
-							if (use_pos->hint_vreg == i) {
-								use_pos->hint_vreg = 0;
-							}
-						}
-						use_pos = use_pos->next;
-					}
-				}
-			}
 		}
 		ir_mem_free(offsets);
 #endif
@@ -862,6 +1027,7 @@ static ir_live_interval *ir_split_interval_at(ir_live_interval *ival, ir_live_po
 	child = ir_mem_malloc(sizeof(ir_live_interval));
 	child->type = ival->type;
 	child->reg = IR_REG_NONE;
+	child->flags = 0;
 	child->stack_spill_pos = 0; // not allocated
 	child->range.start = pos;
 	child->range.end = p->end;
@@ -914,8 +1080,8 @@ static ir_reg ir_try_allocate_preferred_reg(ir_ctx *ctx, ir_live_interval *ival,
 
 	use_pos = ival->use_pos;
 	while (use_pos) {
-		if (use_pos->hint_vreg) {
-			ir_reg reg = ctx->live_intervals[use_pos->hint_vreg]->reg;
+		if (use_pos->hint_ref) {
+			ir_reg reg = ctx->live_intervals[ctx->vregs[use_pos->hint_ref]]->reg;
 			if (reg >= 0) {
 				if (ir_live_range_end(ival) <= freeUntilPos[reg]) {
 					/* register available for the whole interval */

@@ -508,10 +508,12 @@ typedef struct _ir_live_interval ir_live_interval;
 #define IR_SAVE_LIVE_POS_FROM_REF(ref)   ((ref) * 4 + 3)
 #define IR_END_LIVE_POS_FROM_REF(ref)    ((ref) * 4 + 4)
 
+#define IR_LIVE_INTERVAL_COALESCED       (1<<0)
+
 struct _ir_use_pos {
 	uint16_t       op_num; /* 0 - means result */
 	int8_t         hint;
-	uint32_t       hint_vreg;
+	ir_ref         hint_ref;
 	ir_live_pos    pos;
 	ir_use_pos    *next;
 };
@@ -523,11 +525,12 @@ struct _ir_live_range {
 };
 
 struct _ir_live_interval {
-	uint8_t        type;
-	int8_t         reg;
-	int32_t        stack_spill_pos;
-	ir_live_range  range;
-	ir_use_pos    *use_pos;
+	uint8_t           type;
+	int8_t            reg;
+	uint8_t           flags;
+	int32_t           stack_spill_pos;
+	ir_live_range     range;
+	ir_use_pos       *use_pos;
 	ir_live_interval *top;
 	ir_live_interval *next;
 };

@@ -925,8 +925,8 @@ bool ir_result_reuses_op1_reg(ir_ctx *ctx, ir_ref ref)
 		case IR_BINOP_SSE2:
 		case IR_SHIFT:
 		case IR_SHIFT_CONST:
-		case IR_MUL_INT: // use fixed register
-		case IR_DIV_INT: // use fixed register
+//		case IR_MUL_INT: // use fixed register
+//		case IR_DIV_INT: // use fixed register
 		case IR_COPY:
 		case IR_INC:
 		case IR_DEC:

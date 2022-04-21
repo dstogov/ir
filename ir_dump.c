@@ -316,8 +316,8 @@ void ir_dump_live_ranges(ir_ctx *ctx, FILE *f)
 					if (use_pos->hint >= 0) {
 						fprintf(f, ", hint=%%%s", ir_reg_name(use_pos->hint, ival->type));
 					}
-					if (use_pos->hint_vreg) {
-						fprintf(f, ", hint=R%d", use_pos->hint_vreg);
+					if (use_pos->hint_ref) {
+						fprintf(f, ", hint=R%d", ctx->vregs[use_pos->hint_ref]);
 					}
 					fprintf(f, ")");
 					use_pos = use_pos->next;
