@@ -68,9 +68,9 @@
 	+  VLOAD, VSTORE, VADDR
 	?  ALLOCA, LOAD, STORE
 	+  SWITCH
-	-  ir_last_use
+	?  ir_last_use
 	-  binop_int $imm, mem
-	-  commutative insns and swap (binop_int, mul, binop_sse, binop_avx, cmp_int, cmp_fp, cmp_br_int)
+	?  commutative insns and swap (binop_int, mul, binop_sse, binop_avx, cmp_int, cmp_fp, cmp_br_int)
 	-  temporary register (e.g. for unsupported immediate operand in mul, div, and 64-bit constants)
 	?  temporary register for swap (dessa3.ir)
 	-  temporary register for spill loads and stores
