@@ -112,6 +112,7 @@ void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 #define ir_op_flag_d0      ir_op_flag_d
 #define ir_op_flag_d1      (ir_op_flag_d | 1 | (1 << IR_OP_FLAG_OPERANS_SHIFT))
 #define ir_op_flag_d2      (ir_op_flag_d | 2 | (2 << IR_OP_FLAG_OPERANS_SHIFT))
+#define ir_op_flag_d2C     (ir_op_flag_d | IR_OP_FLAG_COMMUTATIVE | 2 | (2 << IR_OP_FLAG_OPERANS_SHIFT))
 #define ir_op_flag_d3      (ir_op_flag_d | 3 | (3 << IR_OP_FLAG_OPERANS_SHIFT))
 #define ir_op_flag_dP      (ir_op_flag_d | 5 | (5 << IR_OP_FLAG_OPERANS_SHIFT)) // PHI (number of operands encoded in op1->op1)
 #define ir_op_flag_r       IR_OP_FLAG_DATA                                      // "d" and "r" are the same now

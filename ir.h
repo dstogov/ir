@@ -135,6 +135,7 @@ int ir_mem_flush(void *ptr, size_t size);
  * N     - number of arguments is defined in the insn->inputs_count (MERGE)
  * P     - number of arguments is defined in the op1->inputs_count (PHI)
  * X1-X3 - number of extra data ops
+ * C     - commutative operation ("d2C" => IR_OP_FLAG_DATA + IR_OP_FLAG_COMMUTATIVE)
  *
  * operand types
  * -------------
@@ -178,8 +179,8 @@ int ir_mem_flush(void *ptr, size_t size);
 	_(C_FLOAT,      r0,   ___, ___, ___) /* constant                    */ \
 	\
 	/* equality ops  */                                                    \
-	_(EQ,           d2,   def, def, ___) /* equal                       */ \
-	_(NE,           d2,   def, def, ___) /* not equal                   */ \
+	_(EQ,           d2C,  def, def, ___) /* equal                       */ \
+	_(NE,           d2C,  def, def, ___) /* not equal                   */ \
 	\
 	/* comparison ops (order matters, LT must be a modulo of 4 !!!)     */ \
 	_(LT,           d2,   def, def, ___) /* less                        */ \
@@ -192,9 +193,9 @@ int ir_mem_flush(void *ptr, size_t size);
 	_(UGT,          d2,   def, def, ___) /* unsigned greater            */ \
 	\
 	/* arithmetic ops                                                   */ \
-	_(ADD,          d2,   def, def, ___) /* addition                    */ \
+	_(ADD,          d2C,  def, def, ___) /* addition                    */ \
 	_(SUB,          d2,   def, def, ___) /* subtraction (must be ADD+1) */ \
-	_(MUL,          d2,   def, def, ___) /* multiplication              */ \
+	_(MUL,          d2C,  def, def, ___) /* multiplication              */ \
 	_(DIV,          d2,   def, def, ___) /* division                    */ \
 	_(MOD,          d2,   def, def, ___) /* modulo                      */ \
 	_(NEG,          d1,   def, ___, ___) /* change sign                 */ \
@@ -205,16 +206,16 @@ int ir_mem_flush(void *ptr, size_t size);
 	_(CAST,         d1,   def, ___, ___) /* type conversion             */ \
 	\
 	/* overflow-check ???                                               */ \
-	_(ADD_OV,       d2,   def, def, ___) /* addition                    */ \
+	_(ADD_OV,       d2C,  def, def, ___) /* addition                    */ \
 	_(SUB_OV,       d2,   def, def, ___) /* subtraction                 */ \
-	_(MUL_OV,       d2,   def, def, ___) /* multiplication              */ \
+	_(MUL_OV,       d2C,  def, def, ___) /* multiplication              */ \
 	_(OVERFLOW,     d1,   def, ___, ___) /* overflow check add/sub/mul  */ \
 	\
 	/* bitwise and shift ops                                            */ \
 	_(NOT,          d1,   def, ___, ___) /* bitwise NOT                 */ \
-	_(OR,           d2,   def, def, ___) /* bitwise OR                  */ \
-	_(AND,          d2,   def, def, ___) /* bitwise AND                 */ \
-	_(XOR,          d2,   def, def, ___) /* bitwise XOR                 */ \
+	_(OR,           d2C,  def, def, ___) /* bitwise OR                  */ \
+	_(AND,          d2C,  def, def, ___) /* bitwise AND                 */ \
+	_(XOR,          d2C,  def, def, ___) /* bitwise XOR                 */ \
 	_(SHL,	        d2,   def, def, ___) /* logic shift left            */ \
 	_(SHR,	        d2,   def, def, ___) /* logic shift right           */ \
 	_(SAR,	        d2,   def, def, ___) /* arithmetic shift right      */ \
@@ -223,8 +224,8 @@ int ir_mem_flush(void *ptr, size_t size);
 	_(BSWAP,        d1,   def, ___, ___) /* byte swap                   */ \
 	\
 	/* branch-less conditional ops                                      */ \
-	_(MIN,	        d2,   def, def, ___) /* min(op1, op2)               */ \
-	_(MAX,	        d2,   def, def, ___) /* max(op1, op2)               */ \
+	_(MIN,	        d2C,  def, def, ___) /* min(op1, op2)               */ \
+	_(MAX,	        d2C,  def, def, ___) /* max(op1, op2)               */ \
 	_(COND,	        d3,   def, def, def) /* op1 ? op2 : op3             */ \
 	\
 	/* data-flow and miscellaneous ops                                  */ \
@@ -283,6 +284,7 @@ int ir_mem_flush(void *ptr, size_t size);
 #define IR_OP_FLAG_DATA          (1<<8)
 #define IR_OP_FLAG_CONTROL       (1<<9)
 #define IR_OP_FLAG_MEM           (1<<10)
+#define IR_OP_FLAG_COMMUTATIVE   (1<<11)
 
 #define IR_OP_FLAG_MEM_LOAD      ((0<<6)|(0<<7))
 #define IR_OP_FLAG_MEM_STORE     ((0<<6)|(1<<7))
