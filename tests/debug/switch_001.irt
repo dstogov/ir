@@ -1,0 +1,52 @@
+--TEST--
+SWITCH 001
+--ARGS--
+-S
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 1;
+	int32_t c_5 = 2;
+	int32_t c_6 = 3;
+	int32_t c_7 = 4;
+	l_1 = START(l_16);
+	int32_t d_2 = PARAM(l_1, "z", 0);
+	l_4 = SWITCH(l_1, d_2);
+	l_5 = CASE_VAL(l_4, c_4);
+	int32_t x_1 = COPY(c_4);
+	l_6 = END(l_5);
+	l_7 = CASE_VAL(l_4, c_5);
+	int32_t x_2 = COPY(c_5);
+	l_8 = END(l_7);
+	l_9 = CASE_VAL(l_4, c_6);
+	int32_t x_3 = COPY(c_6);
+	l_10 = END(l_9);
+	l_11 = CASE_DEFAULT(l_4);
+	int32_t x_4 = COPY(c_7);
+	l_12 = END(l_11);
+	l_13 = MERGE/4(l_6, l_8, l_10, l_12);
+	int32_t ret = PHI/4(l_13, x_1, x_2, x_3, x_4);
+	l_16 = RETURN(l_13, ret);
+}
+--EXPECT--
+test:
+	cmpl $3, %edi
+	jg .L1
+	cmpl $1, %edi
+	jl .L1
+	movslq %edi, %rdi
+	leaq 0x24(%rip), %rdx
+	jmpq *-8(%rdx, %rdi, 8)
+	movl $1, %eax
+	jmp .L2
+	movl $2, %eax
+	jmp .L2
+	movl $3, %eax
+	jmp .L2
+.L1:
+	movl $4, %eax
+.L2:
+	retq
+

@@ -1440,6 +1440,28 @@ static int ir_linear_scan(ir_ctx *ctx)
 			}
 		} IR_BITSET_FOREACH_END();
 
+#if 1 && IR_DEBUG
+		ival = ctx->live_intervals[current];
+		ir_insn *insn = &ctx->ir_base[IR_LIVE_POS_TO_REF(ival->range.start)];
+		if (insn->op == IR_VLOAD) {
+			ir_insn *var = &ctx->ir_base[insn->op2];
+			IR_ASSERT(var->op == IR_VAR);
+			if (strcmp(ir_get_str(ctx, var->op2), "_spill_") == 0) {
+				ir_allocate_spill_slot(ctx, current, &data);
+				continue;
+			}
+		}
+		insn = &ctx->ir_base[IR_LIVE_POS_TO_REF(ival->range.end)];
+		if (insn->op == IR_VSTORE) {
+			ir_insn *var = &ctx->ir_base[insn->op2];
+			IR_ASSERT(var->op == IR_VAR);
+			if (strcmp(ir_get_str(ctx, var->op2), "_spill_") == 0) {
+				ir_allocate_spill_slot(ctx, current, &data);
+				continue;
+			}
+		}
+#endif
+
 		reg = ir_try_allocate_free_reg(ctx, current, len, active, inactive, &unhandled);
 		if (reg == IR_REG_NONE) {
 #if 1

@@ -1,0 +1,44 @@
+--TEST--
+Combo 001
+--ARGS--
+-S
+--CODE--
+# Figure 3.9 from "Combining Analyses, Combining Optimization" by C.Click
+#func test(bool): uint32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t i_1 = 1;
+	int32_t i_2 = 2;
+	ll_1 = START(ll_16);                     
+	bool cond = PARAM(ll_1, "cond", 0);
+	int32_t x_0 = COPY(i_1);
+	ll_2 = END(ll_1);
+	ll_3 = LOOP_BEGIN(ll_2, ll_12);
+	int32_t x_1 = PHI(ll_3, x_0, x_3);
+	bool b = NE(x_1, i_1);
+	ll_4 = IF(ll_3, b);
+	ll_5 = IF_TRUE(ll_4);
+	uint32_t x_2 = COPY(i_2);
+	ll_6 = END(ll_5);
+	ll_7 = IF_FALSE(ll_4);
+	ll_72 = END(ll_7);
+	ll_8 = MERGE(ll_6, ll_72);
+	uint32_t x_3 = PHI(ll_8, x_2, x_1);
+	ll_10 = IF(ll_8, cond);
+	ll_11 = IF_TRUE(ll_10);
+	ll_12 = LOOP_END(ll_11, ll_3);
+	ll_13 = IF_FALSE(ll_10);
+	ll_14 = LOOP_EXIT(ll_13, ll_3);
+	ll_16 = RETURN(ll_14, x_3);
+}
+--EXPECT--
+test:
+.L1:
+	testb %dil, %dil
+	je .L2
+	jmp .L1
+.L2:
+	movl $1, %eax
+	retq
