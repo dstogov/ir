@@ -4,22 +4,21 @@ Swap operands of commutative instruction
 -S
 --CODE--
 {
-	l_1 = START(l_4);
-	int32_t x = PARAM(l_1, "x", 1);
-	int32_t v = VAR(l_1, "_spill_");
-	int32_t y, l_2 = VLOAD(l_1, v);
-	int32_t ret = AND(y, x);
-	l_3 = VSTORE(l_2, v, ret);
-	l_4 = RETURN(l_3);
+	l_1 = START(l_5);
+	double x = PARAM(l_1, "x", 1);
+	double y = PARAM(l_1, "y", 2);
+	double v = VAR(l_1, "_spill_");
+	l_2 = VSTORE(l_1, v, y);
+	double z, l_3 = VLOAD(l_2, v);
+	double ret = ADD(z, x);
+	l_4 = VSTORE(l_3, v, ret);
+	l_5 = RETURN(l_4);
 }
 --EXPECT--
 test:
-	subq $0x18, %rsp
-	movl 0x10(%rsp), %eax
-	movl %eax, (%rsp)
-	andl (%rsp), %edi
-	movl %edi, 8(%rsp)
-	movl 8(%rsp), %eax
-	movl %eax, 0x10(%rsp)
-	addq $0x18, %rsp
+	subq $8, %rsp
+	movsd %xmm1, (%rsp)
+	addsd (%rsp), %xmm0
+	movsd %xmm0, (%rsp)
+	addq $8, %rsp
 	retq

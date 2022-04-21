@@ -1531,6 +1531,18 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 	}
 }
 
+static bool ir_is_same_mem(ir_ctx *ctx, ir_ref r1, ir_ref r2)
+{
+	int32_t o1, o2;
+
+	if (IR_IS_CONST_REF(r1) || IR_IS_CONST_REF(r2)) {
+		return 0;
+	}
+	o1 = ctx->live_intervals[ctx->vregs[r1]]->stack_spill_pos;
+	o2 = ctx->live_intervals[ctx->vregs[r2]]->stack_spill_pos;
+	return o1 == o2 && o1;
+}
+
 void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_type type = insn->type;
@@ -1539,7 +1551,7 @@ void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg def_reg = ir_ref_reg(ctx, def);
 	ir_reg op1_reg = ir_ref_reg(ctx, op1);
 	ir_reg op2_reg = ir_ref_reg(ctx, op2);
-	ir_reg reg;
+	ir_reg reg = IR_REG_NONE;
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
@@ -1547,8 +1559,11 @@ void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		reg = def_reg;
 	} else if (op1_reg >= 0 && ir_last_use(ctx, op1, def)) {
 		reg = op1_reg;
+	} else if (insn->op != IR_MUL && op1 != op2 && ir_is_same_mem(ctx, def, op1) && (IR_IS_CONST_REF(op2) || op2_reg >= 0)) {
+		// TODO: add mem, RegOrImm
 	} else if (op1 != op2 && (ir_op_flags[insn->op] & IR_OP_FLAG_COMMUTATIVE) &&
-			op2_reg >= 0  && ir_last_use(ctx, op2, def)) {
+			((insn->op != IR_MUL && ir_is_same_mem(ctx, def, op2) && (IR_IS_CONST_REF(op1) || op1_reg >= 0)) ||
+			 (op2_reg >= 0 && ir_last_use(ctx, op2, def)))) {
 		/* swap operands */
 		reg = op2_reg;
 		op2_reg = op1_reg;
@@ -1556,7 +1571,6 @@ void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		op1 = op2;
 		op2 = insn->op1;
 	} else {
-		// TODO: add $imm, mem
 		reg = IR_REG_RAX; // TODO: temporary register
 	}
 
@@ -1572,7 +1586,58 @@ void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_emit_load(ctx, type, op2, op2_reg);
 	}
 
-	if (op2_reg >= 0) {
+	if (reg < 0) {
+		if (op2_reg >= 0) {
+			switch (insn->op) {
+				case IR_ADD:
+					|	ASM_REF_REG_OP add, type, def, op2_reg
+					break;
+				case IR_SUB:
+					|	ASM_REF_REG_OP sub, type, def, op2_reg
+					break;
+//				case IR_MUL:
+//					|	ASM_REF_REG_IMUL type, def, op2_reg
+//					break;
+				case IR_OR:
+					|	ASM_REF_REG_OP or, type, def, op2_reg
+					break;
+				case IR_AND:
+					|	ASM_REF_REG_OP and, type, def, op2_reg
+					break;
+				case IR_XOR:
+					|	ASM_REF_REG_OP xor, type, def, op2_reg
+					break;
+				default:
+					IR_ASSERT(0 && "NIY binary op");
+					break;
+			}
+		} else {
+			int32_t val = ctx->ir_base[op2].val.i32;
+			switch (insn->op) {
+				case IR_ADD:
+					|	ASM_REF_IMM_OP add, type, def, val
+					break;
+				case IR_SUB:
+					|	ASM_REF_IMM_OP sub, type, def, val
+					break;
+//				case IR_MUL:
+//					|	ASM_REF_IMM_IMUL type, def, val
+//					break;
+				case IR_OR:
+					|	ASM_REF_IMM_OP or, type, def, val
+					break;
+				case IR_AND:
+					|	ASM_REF_IMM_OP and, type, def, val
+					break;
+				case IR_XOR:
+					|	ASM_REF_IMM_OP xor, type, def, val
+					break;
+				default:
+					IR_ASSERT(0 && "NIY binary op");
+					break;
+			}
+		}
+	} else if (op2_reg >= 0) {
 		switch (insn->op) {
 			case IR_ADD:
 				|	ASM_REG_REG_OP add, type, reg, op2_reg
@@ -2897,13 +2962,18 @@ static void ir_emit_vload_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg reg;
 	int32_t offset;
 
+	IR_ASSERT(ctx->vregs[insn->op2]);
+	offset = ir_vreg_spill_slot(ctx, ctx->vregs[insn->op2]);
 	if (def_reg >= 0) {
 		reg = def_reg;
 	} else {
+#if 1 && IR_DEBUG
+		if (offset == ir_ref_spill_slot(ctx, def)) {
+			return; // fake load
+		}
+#endif
 		reg = IR_REG_RAX; // TODO: temporary register
 	}
-	IR_ASSERT(ctx->vregs[insn->op2]);
-	offset = ir_vreg_spill_slot(ctx, ctx->vregs[insn->op2]);
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
 		|	ASM_REG_MEM_OP mov, type, reg, [rbp+offset]
 	} else {
@@ -2925,6 +2995,12 @@ static void ir_emit_vload_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (def_reg >= 0) {
 		reg = def_reg;
 	} else {
+#if 1 && IR_DEBUG
+		int32_t offset = ir_vreg_spill_slot(ctx, ctx->vregs[insn->op2]);
+		if (offset == ir_ref_spill_slot(ctx, def)) {
+			return; // fake load
+		}
+#endif
 		reg = IR_REG_XMM7; // TODO: temporary register
 	}
 	IR_ASSERT(ctx->vregs[insn->op2]);
@@ -2956,6 +3032,11 @@ static void ir_emit_vstore_int(ir_ctx *ctx, ir_insn *insn)
 		if (op3_reg >= 0) {
 			reg = op3_reg;
 		} else {
+#if 1 && IR_DEBUG
+			if (insn->op3 > 0 && offset == ir_ref_spill_slot(ctx, insn->op3)) {
+				return; // fake store
+			}
+#endif
 			reg = IR_REG_RAX; // TODO: temporary register
 			ir_emit_load(ctx, type, insn->op3, reg);
 		}
@@ -2979,6 +3060,12 @@ static void ir_emit_vstore_fp(ir_ctx *ctx, ir_insn *insn)
 	if (op3_reg >= 0) {
 		reg = op3_reg;
 	} else {
+#if 1 && IR_DEBUG
+		int32_t offset = ir_vreg_spill_slot(ctx, ctx->vregs[insn->op2]);
+		if (insn->op3 > 0 && offset == ir_ref_spill_slot(ctx, insn->op3)) {
+			return; // fake store
+		}
+#endif
 		reg = IR_REG_XMM7; // TODO: temporary register
 		ir_emit_fp_load(ctx, type, insn->op3, reg);
 	}

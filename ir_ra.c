@@ -1447,7 +1447,14 @@ static int ir_linear_scan(ir_ctx *ctx)
 			ir_insn *var = &ctx->ir_base[insn->op2];
 			IR_ASSERT(var->op == IR_VAR);
 			if (strcmp(ir_get_str(ctx, var->op2), "_spill_") == 0) {
-				ir_allocate_spill_slot(ctx, current, &data);
+				if (ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos) {
+					ctx->live_intervals[current]->stack_spill_pos =
+						ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos;
+				} else {
+					ir_allocate_spill_slot(ctx, current, &data);
+					ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos =
+						ctx->live_intervals[current]->stack_spill_pos;
+				}
 				continue;
 			}
 		}
@@ -1456,7 +1463,14 @@ static int ir_linear_scan(ir_ctx *ctx)
 			ir_insn *var = &ctx->ir_base[insn->op2];
 			IR_ASSERT(var->op == IR_VAR);
 			if (strcmp(ir_get_str(ctx, var->op2), "_spill_") == 0) {
-				ir_allocate_spill_slot(ctx, current, &data);
+				if (ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos) {
+					ctx->live_intervals[current]->stack_spill_pos =
+						ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos;
+				} else {
+					ir_allocate_spill_slot(ctx, current, &data);
+					ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos =
+						ctx->live_intervals[current]->stack_spill_pos;
+				}
 				continue;
 			}
 		}
