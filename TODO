@@ -26,22 +26,24 @@
 ?  instruction selection
 	- xor, btsl=INCL, btrl=EXCL, btl=IN, bsr, maxss, maxsd, minss, minsd
     - MOVZX to avoid a SHIFT and AND instruction
-    - Using CMOVcc to remove branches
+    - Use CMOVcc to remove branches
 
 ?  register allocation
 	+  linear scan
 		+   allocate scratch registers first
 		-	separate INT and FP allocation phases 
     +  use positions
-	?  fixed registers constraints
+	+  fixed registers constraints
 		+  fixed input
 		+  fixed output
 		+  fixed tmp
 		+  fixed intervals for parameters
-		-  accurate fixed interval construction
+		+  accurate fixed interval construction
 	-  constraints
+	    +  result reuses op1
 	    -  kill
 	    -  restricted regset
+	    -  must be in register
 	-  temporary registers
 	?  spills
 		+  spill slot allocation (uniqe for each VREG)
@@ -53,6 +55,7 @@
 		+  hints for fixed input/outpu registers
 		+  hints for parameter nodes
 		+  hints for call arguments
+		+  hints for nodes that reuse input (result reuses op1)
 		-  hints propagation
 		-  hints and low priority
 
@@ -68,13 +71,11 @@
 	-  ir_last_use
 	-  binop_int $imm, mem
 	-  commutative insns and swap (binop_int, mul, binop_sse, binop_avx, cmp_int, cmp_fp, cmp_br_int)
-	-  param_move	 
 	-  temporary register (e.g. for unsupported immediate operand in mul, div, and 64-bit constants)
 	?  temporary register for swap (dessa3.ir)
 	-  temporary register for spill loads and stores
-	-  parallel parameter loading
 	+  parallel argument passing
-	-  stack arguments
+	-  stack arguments and parameters
 	-  return merge/split
 	?  binary code emission
 		+ DynAsm
