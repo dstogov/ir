@@ -3241,10 +3241,40 @@ static void ir_emit_alloca(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
-	// TODO: alignment
-	|	ASM_REG_REF_OP sub, IR_ADDR, IR_REG_RSP, insn->op2
+	if (IR_IS_CONST_REF(insn->op2)) {
+		ir_insn *val = &ctx->ir_base[insn->op2];
+		int32_t size = val->val.i32;
+
+		IR_ASSERT(IR_IS_TYPE_INT(val->type));
+		IR_ASSERT(IR_IS_TYPE_UNSIGNED(val->type) || val->val.i64 > 0);
+		IR_ASSERT(IR_IS_SIGNED_32BIT(val->val.i64));
+
+		if (ctx->flags & IR_HAS_CALLS) {
+			/* Stack must be 16 byte aligned */
+			size = IR_ALIGNED_SIZE(size, 16);
+		} else {
+			size = IR_ALIGNED_SIZE(size, 8);
+		}
+		|	ASM_REG_IMM_OP sub, IR_ADDR, IR_REG_RSP, size
+	} else {
+		int32_t alignment = (ctx->flags & IR_HAS_CALLS) ? 16 : 8;
+		ir_reg op2_reg = ir_ref_reg(ctx, insn->op2);
+		ir_reg reg;
+
+		if (op2_reg >=0 && ir_last_use(ctx, insn->op2, def)) {
+			reg = op2_reg;
+		} else {
+		    reg = IR_REG_RAX; // TODO: temporary register
+		}
+		if (reg != op2_reg) {
+			ir_emit_load(ctx, IR_ADDR, insn->op2, reg);
+		}
+
+		|	ASM_REG_IMM_OP add, IR_ADDR, reg, (alignment-1)
+		|	ASM_REG_IMM_OP and, IR_ADDR, reg, ~(alignment-1)
+		|	ASM_REG_REG_OP sub, IR_ADDR, IR_REG_RSP, reg
+	}
 	ir_emit_store(ctx, IR_ADDR, IR_REG_RSP, def);
-	// TODO: stack frame alignment
 }
 
 static void ir_emit_switch(ir_ctx *ctx, ir_ref def, ir_insn *insn)

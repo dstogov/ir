@@ -66,7 +66,7 @@
 	-  CAST
 	+  TAILCALL
 	+  VLOAD, VSTORE, VADDR
-	?  ALLOCA, LOAD, STORE
+	+  ALLOCA, LOAD, STORE
 	+  SWITCH
 	?  ir_last_use
 	+  binop_int $imm, mem

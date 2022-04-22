@@ -88,7 +88,7 @@ test:
 	movsd %xmm7, -0x28(%rbp)
 	xorpd %xmm7, %xmm7
 	movsd %xmm7, -0x20(%rbp)
-	subq $4, %rsp
+	subq $8, %rsp
 	movq %rsp, %rax
 	movl $0, (%rax)
 .L1:
