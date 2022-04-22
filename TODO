@@ -1,7 +1,6 @@
 -  type casting nodes
 -  overflow detection nodes 
 -  va_arg nodes
-+  VADDR to pass VAR by address
 -  BSTART, BEND nodes (to free data allocated by ALLOCA)
 -  ENTRY node for multy-entry units
 -  IJMP
@@ -27,59 +26,41 @@
 	- xor, btsl=INCL, btrl=EXCL, btl=IN, bsr, maxss, maxsd, minss, minsd
     - MOVZX to avoid a SHIFT and AND instruction
     - Use CMOVcc to remove branches
+    - BURS ???
 
 ?  register allocation
 	+  linear scan
-		+   allocate scratch registers first
-		-	separate INT and FP allocation phases 
-    +  use positions
-	+  fixed registers constraints
-		+  fixed input
-		+  fixed output
-		+  fixed tmp
-		+  fixed intervals for parameters
-		+  accurate fixed interval construction
+		+  allocate scratch registers first
+		-  temporary registers
+		-  separate INT and FP allocation phases
 	-  constraints
-	    +  result reuses op1
 	    -  kill
 	    -  restricted regset
 	    -  must be in register
 	-  temporary registers
 	?  spills
-		+  spill slot allocation (uniqe for each VREG)
 		-  spill slot allocation (packed/aligned according to SpillRange)
 	?  splitting
+	    -  find optimal split position
+	    -  resolution
 	-  splinting
 		-  spill only at cold path if possible	
 	?  hints
-		+  hints for fixed input/outpu registers
-		+  hints for parameter nodes
-		+  hints for call arguments
-		+  hints for nodes that reuse input (result reuses op1)
 		-  hints propagation
 		-  hints and low priority
 
 ?  code generation
-	+  NEG (fp), ABS
 	-  OVERFLOW
 	-  MIN, MAX, COND
 	-  CAST
-	+  TAILCALL
-	+  VLOAD, VSTORE, VADDR
-	+  ALLOCA, LOAD, STORE
-	+  SWITCH
 	?  ir_last_use
-	+  binop_int $imm, mem
-	?  commutative insns and swap (binop_int, mul, binop_sse, binop_avx, cmp_int, cmp_fp, cmp_br_int)
+	?  operands swap (cmp_int, cmp_fp, cmp_br_int)
 	-  temporary register (e.g. for unsupported immediate operand in mul, div, and 64-bit constants)
 	?  temporary register for swap (dessa3.ir)
 	-  temporary register for spill loads and stores
-	+  parallel argument passing
 	-  stack arguments and parameters
 	-  return merge/split
-	?  binary code emission
-		+ DynAsm
-		- BinAsm
+	?  binary code emission without DynAsm
 	- 32-bit x86 code
 
 ?  disassembler
@@ -91,4 +72,3 @@
 -  alias analyzes
 
 -  PHP support
-
