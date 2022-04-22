@@ -1380,11 +1380,24 @@ static ir_reg ir_ref_spill_slot(ir_ctx *ctx, ir_ref ref)
 	offset = ctx->live_intervals[ctx->vregs[ref]]->stack_spill_pos;
 	IR_ASSERT(offset != 0);
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
-		return data->stack_frame_size - data->stack_frame_alignment + offset - sizeof(void*);
+		return offset - data->stack_frame_size - data->stack_frame_alignment - sizeof(void*);
 	} else {
 		return offset + data->stack_frame_alignment - sizeof(void*);
 	}
 }
+
+static bool ir_is_same_mem(ir_ctx *ctx, ir_ref r1, ir_ref r2)
+{
+	int32_t o1, o2;
+
+	if (IR_IS_CONST_REF(r1) || IR_IS_CONST_REF(r2)) {
+		return 0;
+	}
+	o1 = ctx->live_intervals[ctx->vregs[r1]]->stack_spill_pos;
+	o2 = ctx->live_intervals[ctx->vregs[r2]]->stack_spill_pos;
+	return o1 == o2 && o1;
+}
+
 
 static bool ir_last_use(ir_ctx *ctx, ir_ref ref, ir_ref def)
 {
@@ -1529,18 +1542,6 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 	} else if (data->stack_frame_size) {
 		|	add rsp, data->stack_frame_size
 	}
-}
-
-static bool ir_is_same_mem(ir_ctx *ctx, ir_ref r1, ir_ref r2)
-{
-	int32_t o1, o2;
-
-	if (IR_IS_CONST_REF(r1) || IR_IS_CONST_REF(r2)) {
-		return 0;
-	}
-	o1 = ctx->live_intervals[ctx->vregs[r1]]->stack_spill_pos;
-	o2 = ctx->live_intervals[ctx->vregs[r2]]->stack_spill_pos;
-	return o1 == o2 && o1;
 }
 
 void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
@@ -2955,30 +2956,18 @@ static void ir_emit_vaddr(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 static void ir_emit_vload_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
-	ir_backend_data *data = ctx->data;
-	dasm_State **Dst = &data->dasm_state;
 	ir_ref type = insn->type;
 	ir_reg def_reg = ir_ref_reg(ctx, def);
 	ir_reg reg;
-	int32_t offset;
 
-	IR_ASSERT(ctx->vregs[insn->op2]);
-	offset = ir_vreg_spill_slot(ctx, ctx->vregs[insn->op2]);
 	if (def_reg >= 0) {
 		reg = def_reg;
+	} else if (ir_is_same_mem(ctx, insn->op2, def)) {
+		return; // fake load
 	} else {
-#if 1 && IR_DEBUG
-		if (offset == ir_ref_spill_slot(ctx, def)) {
-			return; // fake load
-		}
-#endif
 		reg = IR_REG_RAX; // TODO: temporary register
 	}
-	if (ctx->flags & IR_USE_FRAME_POINTER) {
-		|	ASM_REG_MEM_OP mov, type, reg, [rbp+offset]
-	} else {
-		|	ASM_REG_MEM_OP mov, type, reg, [rsp+offset]
-	}
+	ir_emit_load(ctx, type, insn->op2, reg);
 	if (def_reg != reg) {
 		ir_emit_store(ctx, type, reg, def);
 	}
@@ -2986,25 +2975,18 @@ static void ir_emit_vload_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 static void ir_emit_vload_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
-	ir_backend_data *data = ctx->data;
-	dasm_State **Dst = &data->dasm_state;
 	ir_ref type = insn->type;
 	ir_reg def_reg = ir_ref_reg(ctx, def);
 	ir_reg reg;
 
 	if (def_reg >= 0) {
 		reg = def_reg;
+	} else if (ir_is_same_mem(ctx, insn->op2, def)) {
+		return; // fake load
 	} else {
-#if 1 && IR_DEBUG
-		int32_t offset = ir_vreg_spill_slot(ctx, ctx->vregs[insn->op2]);
-		if (offset == ir_ref_spill_slot(ctx, def)) {
-			return; // fake load
-		}
-#endif
 		reg = IR_REG_XMM7; // TODO: temporary register
 	}
-	IR_ASSERT(ctx->vregs[insn->op2]);
-	|	ASM_FP_REG_VREG_MOV type, reg, ctx->vregs[insn->op2]
+	ir_emit_fp_load(ctx, type, insn->op2, reg);
 	if (def_reg != reg) {
 		ir_emit_fp_store(ctx, type, reg, def);
 	}
@@ -3020,9 +3002,9 @@ static void ir_emit_vstore_int(ir_ctx *ctx, ir_insn *insn)
 	ir_reg reg;
 	int32_t offset;
 
-	IR_ASSERT(ctx->vregs[insn->op2]);
-	offset = ir_vreg_spill_slot(ctx, ctx->vregs[insn->op2]);
 	if (IR_IS_CONST_REF(insn->op3) && IR_IS_32BIT(type, val_insn->val)) {
+		IR_ASSERT(ctx->vregs[insn->op2]);
+		offset = ir_vreg_spill_slot(ctx, ctx->vregs[insn->op2]);
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
 			|	ASM_MEM_IMM_OP mov, type, [rbp+offset], val_insn->val.i32
 		} else {
@@ -3031,45 +3013,31 @@ static void ir_emit_vstore_int(ir_ctx *ctx, ir_insn *insn)
 	} else {
 		if (op3_reg >= 0) {
 			reg = op3_reg;
+		} else if (ir_is_same_mem(ctx, insn->op3, insn->op2)) {
+			return; // fake store
 		} else {
-#if 1 && IR_DEBUG
-			if (insn->op3 > 0 && offset == ir_ref_spill_slot(ctx, insn->op3)) {
-				return; // fake store
-			}
-#endif
 			reg = IR_REG_RAX; // TODO: temporary register
 			ir_emit_load(ctx, type, insn->op3, reg);
 		}
-		if (ctx->flags & IR_USE_FRAME_POINTER) {
-			|	ASM_MEM_REG_OP mov, type, [rbp+offset], reg
-		} else {
-			|	ASM_MEM_REG_OP mov, type, [rsp+offset], reg
-		}
+		ir_emit_store(ctx, type, reg, insn->op2);
 	}
 }
 
 static void ir_emit_vstore_fp(ir_ctx *ctx, ir_insn *insn)
 {
-	ir_backend_data *data = ctx->data;
-	dasm_State **Dst = &data->dasm_state;
 	ir_ref type = ctx->ir_base[insn->op3].type;
 	ir_reg op3_reg = ir_ref_reg(ctx, insn->op3);
 	ir_reg reg;
 
-	IR_ASSERT(ctx->vregs[insn->op2]);
 	if (op3_reg >= 0) {
 		reg = op3_reg;
+	} else if (ir_is_same_mem(ctx, insn->op3, insn->op2)) {
+		return; // fake store
 	} else {
-#if 1 && IR_DEBUG
-		int32_t offset = ir_vreg_spill_slot(ctx, ctx->vregs[insn->op2]);
-		if (insn->op3 > 0 && offset == ir_ref_spill_slot(ctx, insn->op3)) {
-			return; // fake store
-		}
-#endif
 		reg = IR_REG_XMM7; // TODO: temporary register
 		ir_emit_fp_load(ctx, type, insn->op3, reg);
 	}
-	|	ASM_FP_VREG_REG_MOV type, ctx->vregs[insn->op2], reg
+	ir_emit_fp_store(ctx, type, reg, insn->op2);
 }
 
 static void ir_emit_load_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
@@ -3814,20 +3782,43 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 					/* skip */
 					if (ctx->vregs[i]) {
 						if (!ctx->live_intervals[ctx->vregs[i]]) {
-							ir_live_interval *ival = ir_mem_malloc(sizeof(ir_live_interval));
+							ir_live_interval *ival = ir_mem_calloc(1, sizeof(ir_live_interval));
 							ctx->live_intervals[ctx->vregs[i]] = ival;
 							ival->type = insn->type;
 							ival->reg = IR_REG_NONE;
-							ival->range.start = 0;
-							ival->range.end = 0;
-							ival->range.next = NULL;
-//							if (insn->op == IR_PARAM) {
-//								fprintf(f, "\t%s d_%d = %s;\n", ir_type_cname[insn->type], ctx->vregs[i], ir_get_str(ctx, insn->op2));
-//							} else {
-								data->stack_frame_size += 8; // ir_type_size[insn->type]; // TODO: alignment
-								ival->stack_spill_pos = data->stack_frame_size;
-//								fprintf(f, "\t%s d_%d;\n", ir_type_cname[insn->type], ctx->vregs[i]);
-//							}
+							data->stack_frame_size += 8; // ir_type_size[insn->type]; // TODO: alignment
+							ival->stack_spill_pos = data->stack_frame_size;
+							if (insn->op == IR_VAR) {
+								ir_use_list *use_list = &ctx->use_lists[i];
+								ir_reg i, n, *p, use;
+								ir_insn *use_insn;
+
+								n = use_list->count;
+								for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
+									use = *p;
+									use_insn = &ctx->ir_base[use];
+									if (use_insn->op == IR_VLOAD) {
+										if (ctx->vregs[use]
+										 && !ctx->live_intervals[ctx->vregs[use]]) {
+											ir_live_interval *ival = ir_mem_calloc(1, sizeof(ir_live_interval));
+											ctx->live_intervals[ctx->vregs[use]] = ival;
+											ival->type = insn->type;
+											ival->reg = IR_REG_NONE;
+											ival->stack_spill_pos = data->stack_frame_size;
+										}
+									} else if (use_insn->op == IR_VSTORE) {
+										if (!IR_IS_CONST_REF(use_insn->op3)
+										 && ctx->vregs[use_insn->op3]
+										 && !ctx->live_intervals[ctx->vregs[use_insn->op3]]) {
+											ir_live_interval *ival = ir_mem_calloc(1, sizeof(ir_live_interval));
+											ctx->live_intervals[ctx->vregs[insn->op3]] = ival;
+											ival->type = insn->type;
+											ival->reg = IR_REG_NONE;
+											ival->stack_spill_pos = data->stack_frame_size;
+										}
+									}
+								}
+							}
 						} else if (insn->op == IR_PARAM) {
 							IR_ASSERT(0 && "unexpected PARAM");
 							return;

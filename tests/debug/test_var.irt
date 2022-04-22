@@ -29,21 +29,17 @@ Mandelbrot Test (var)
 	l_1_5 = VSTORE(l_1_4, i, c_6);
 	l_10 = END(l_1_5);
 	l_11 = LOOP_BEGIN(l_10, l_37);
-
 	int32_t d_14, l_11_1 = VLOAD(l_11, i);
 	int32_t d_15 = ADD(d_14, c_7);
 	l_11_2 = VSTORE(l_11_1, i, d_15);
-	
 	double temp = VAR(l_11, "temp");
 	double zr_1, l_11_3 = VLOAD(l_11_2, zr);
 	double zi_1, l_11_4 = VLOAD(l_11_3, zi);
 	double d_17 = MUL(zr_1, zi_1);
 	l_11_5 = VSTORE(l_11_4, temp, d_17);
-	
 	double zr2 = VAR(l_11, "zr2");
 	double d_19 = MUL(zr_1, zr_1);
 	l_11_6 = VSTORE(l_11_5, zr2, d_19);
-	
 	double zi2 = VAR(l_11, "zi2");
 	double d_21 = MUL(zi_1, zi_1);
 	l_11_7 = VSTORE(l_11_6, zi2, d_21);
