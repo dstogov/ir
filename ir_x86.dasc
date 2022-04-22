@@ -1561,7 +1561,7 @@ void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	} else if (op1_reg >= 0 && ir_last_use(ctx, op1, def)) {
 		reg = op1_reg;
 	} else if (insn->op != IR_MUL && op1 != op2 && ir_is_same_mem(ctx, def, op1) && (IR_IS_CONST_REF(op2) || op2_reg >= 0)) {
-		// TODO: add mem, RegOrImm
+		/* add mem, RegOrImm */
 	} else if (op1 != op2 && (ir_op_flags[insn->op] & IR_OP_FLAG_COMMUTATIVE) &&
 			((insn->op != IR_MUL && ir_is_same_mem(ctx, def, op2) && (IR_IS_CONST_REF(op1) || op1_reg >= 0)) ||
 			 (op2_reg >= 0 && ir_last_use(ctx, op2, def)))) {
@@ -1698,22 +1698,32 @@ void ir_emit_incdec(ir_ctx *ctx, uint32_t rule, ir_ref def, ir_insn *insn)
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg def_reg = ir_ref_reg(ctx, def);
 	ir_reg op1_reg = ir_ref_reg(ctx, insn->op1);
-	ir_reg reg;
+	ir_reg reg = IR_REG_NONE;
 
 	if (def_reg >= 0) {
 		reg = def_reg;
 	} else if (op1_reg >= 0 && ir_last_use(ctx, insn->op1, def)) {
 		reg = op1_reg;
+	} else if (ir_is_same_mem(ctx, def, insn->op1)) {
+		/* inc mem */
 	} else {
 		reg = IR_REG_RAX; // TODO: temporary register
 	}
 	if (op1_reg != reg) {
 		ir_emit_load(ctx, insn->type, insn->op1, reg);
 	}
-	if (rule == IR_INC) {
-		|	ASM_REG_OP inc, insn->type, reg
+	if (reg < 0) {
+		if (rule == IR_INC) {
+			|	ASM_REF_OP inc, insn->type, def
+		} else {
+			|	ASM_REF_OP dec, insn->type, def
+		}
 	} else {
-		|	ASM_REG_OP dec, insn->type, reg
+		if (rule == IR_INC) {
+			|	ASM_REG_OP inc, insn->type, reg
+		} else {
+			|	ASM_REG_OP dec, insn->type, reg
+		}
 	}
 	if (def_reg != reg) {
 		ir_emit_store(ctx, insn->type, reg, def);
@@ -1726,19 +1736,25 @@ void ir_emit_mul2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg def_reg = ir_ref_reg(ctx, def);
 	ir_reg op1_reg = ir_ref_reg(ctx, insn->op1);
-	ir_reg reg;
+	ir_reg reg = IR_REG_NONE;
 
 	if (def_reg >= 0) {
 		reg = def_reg;
 	} else if (op1_reg >= 0 && ir_last_use(ctx, insn->op1, def)) {
 		reg = op1_reg;
+	} else if (ir_is_same_mem(ctx, def, insn->op1)) {
+		/* shl mem, 1 */
 	} else {
 		reg = IR_REG_RAX; // TODO: temporary register
 	}
 	if (op1_reg != reg) {
 		ir_emit_load(ctx, insn->type, insn->op1, reg);
 	}
-	|	ASM_REG_REG_OP add, insn->type, reg, reg
+	if (reg < 0) {
+		|	ASM_REF_IMM_OP add, insn->type, def, 1
+	} else {
+		|	ASM_REG_REG_OP add, insn->type, reg, reg
+	}
 	if (def_reg != reg) {
 		ir_emit_store(ctx, insn->type, reg, def);
 	}
@@ -1750,20 +1766,26 @@ void ir_emit_mul_pwr2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg def_reg = ir_ref_reg(ctx, def);
 	ir_reg op1_reg = ir_ref_reg(ctx, insn->op1);
-	ir_reg reg;
+	ir_reg reg = IR_REG_NONE;
 	uint32_t shift = IR_LOG2(ctx->ir_base[insn->op2].val.u64);
 
 	if (def_reg >= 0) {
 		reg = def_reg;
 	} else if (op1_reg >= 0 && ir_last_use(ctx, insn->op1, def)) {
 		reg = op1_reg;
+	} else if (ir_is_same_mem(ctx, def, insn->op1)) {
+		/* shl mem, Imm */
 	} else {
 		reg = IR_REG_RAX; // TODO: temporary register
 	}
 	if (op1_reg != reg) {
 		ir_emit_load(ctx, insn->type, insn->op1, reg);
 	}
-	|	ASM_REG_IMM_OP shl, insn->type, reg, shift
+	if (reg < 0) {
+		|	ASM_REF_IMM_OP shl, insn->type, def, shift
+	} else {
+		|	ASM_REG_IMM_OP shl, insn->type, reg, shift
+	}
 	if (def_reg != reg) {
 		ir_emit_store(ctx, insn->type, reg, def);
 	}
@@ -1776,19 +1798,25 @@ void ir_emit_div_pwr2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg def_reg = ir_ref_reg(ctx, def);
 	ir_reg op1_reg = ir_ref_reg(ctx, insn->op1);
 	uint32_t shift = IR_LOG2(ctx->ir_base[insn->op2].val.u64);
-	ir_reg reg;
+	ir_reg reg = IR_REG_NONE;
 
 	if (def_reg >= 0) {
 		reg = def_reg;
 	} else if (op1_reg >= 0 && ir_last_use(ctx, insn->op1, def)) {
 		reg = op1_reg;
+	} else if (ir_is_same_mem(ctx, def, insn->op1)) {
+		/* shr mem, Imm */
 	} else {
 		reg = IR_REG_RAX; // TODO: temporary register
 	}
 	if (op1_reg != reg) {
 		ir_emit_load(ctx, insn->type, insn->op1, reg);
 	}
-	|	ASM_REG_IMM_OP shr, insn->type, reg, shift
+	if (reg < 0) {
+		|	ASM_REF_IMM_OP shr, insn->type, def, shift
+	} else {
+		|	ASM_REG_IMM_OP shr, insn->type, reg, shift
+	}
 	if (def_reg != reg) {
 		ir_emit_store(ctx, insn->type, reg, def);
 	}
@@ -1801,26 +1829,38 @@ void ir_emit_mod_pwr2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg def_reg = ir_ref_reg(ctx, def);
 	ir_reg op1_reg = ir_ref_reg(ctx, insn->op1);
 	uint64_t mask = ctx->ir_base[insn->op2].val.u64 - 1;
-	ir_reg reg;
+	ir_reg reg = IR_REG_NONE;
 
 	if (def_reg >= 0) {
 		reg = def_reg;
 	} else if (op1_reg >= 0 && ir_last_use(ctx, insn->op1, def)) {
 		reg = op1_reg;
+	} else if (ir_is_same_mem(ctx, def, insn->op1)) {
+		/* and mem, Imm */
 	} else {
 		reg = IR_REG_RAX; // TODO: temporary register
 	}
-	if (IR_IS_UNSIGNED_32BIT(mask)) {
-		if (op1_reg != reg) {
-			ir_emit_load(ctx, insn->type, insn->op1, reg);
+	if (reg < 0) {
+		if (!IR_IS_UNSIGNED_32BIT(mask)) {
+			ir_reg op2_reg = IR_REG_RAX; // TODO: temporary register for 64-bit constant
+			|	mov64 Ra(op2_reg), mask
+			|	ASM_REF_REG_OP and, insn->type, def, op2_reg
+		} else {
+			|	ASM_REF_IMM_OP and, insn->type, def, mask
 		}
-		|	ASM_REG_IMM_OP and, insn->type, reg, mask
 	} else {
-		ir_emit_load(ctx, insn->type, insn->op2, reg);
-		|	ASM_REG_REF_OP and, insn->type, reg, insn->op1
-	}
-	if (def_reg != reg) {
-		ir_emit_store(ctx, insn->type, reg, def);
+		if (IR_IS_UNSIGNED_32BIT(mask)) {
+			if (op1_reg != reg) {
+				ir_emit_load(ctx, insn->type, insn->op1, reg);
+			}
+			|	ASM_REG_IMM_OP and, insn->type, reg, mask
+		} else {
+			ir_emit_load(ctx, insn->type, insn->op2, reg);
+			|	ASM_REG_REF_OP and, insn->type, reg, insn->op1
+		}
+		if (def_reg != reg) {
+			ir_emit_store(ctx, insn->type, reg, def);
+		}
 	}
 }
 
@@ -1832,12 +1872,14 @@ void ir_emit_shift(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg def_reg = ir_ref_reg(ctx, def);
 	ir_reg op1_reg = ir_ref_reg(ctx, insn->op1);
 	ir_reg op2_reg = ir_ref_reg(ctx, insn->op2);
-	ir_reg reg;
+	ir_reg reg = IR_REG_NONE;
 
 	if (def_reg >= 0) {
 		reg = def_reg;
 	} else if (op1_reg >= 0 && ir_last_use(ctx, insn->op1, def)) {
 		reg = op1_reg;
+	} else if (ir_is_same_mem(ctx, def, insn->op1)) {
+		/* shl mem, cl */
 	} else {
 		reg = IR_REG_RAX; // TODO: temporary register
 	}
@@ -1852,24 +1894,46 @@ void ir_emit_shift(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (op2_reg != IR_REG_RCX) {
 		ir_emit_load(ctx, insn->type, insn->op2, IR_REG_RCX);
 	}
-	switch (insn->op) {
-		case IR_SHL:
-			|	ASM_REG_IMM_OP shl, insn->type, reg, cl
-			break;
-		case IR_SHR:
-			|	ASM_REG_IMM_OP shr, insn->type, reg, cl
-			break;
-		case IR_SAR:
-			|	ASM_REG_IMM_OP sar, insn->type, reg, cl
-			break;
-		case IR_ROL:
-			|	ASM_REG_IMM_OP rol, insn->type, reg, cl
-			break;
-		case IR_ROR:
-			|	ASM_REG_IMM_OP ror, insn->type, reg, cl
-			break;
-		default:
-			IR_ASSERT(0);
+	if (reg < 0) {
+		switch (insn->op) {
+			case IR_SHL:
+				|	ASM_REF_IMM_OP shl, insn->type, def, cl
+				break;
+			case IR_SHR:
+				|	ASM_REF_IMM_OP shr, insn->type, def, cl
+				break;
+			case IR_SAR:
+				|	ASM_REF_IMM_OP sar, insn->type, def, cl
+				break;
+			case IR_ROL:
+				|	ASM_REF_IMM_OP rol, insn->type, def, cl
+				break;
+			case IR_ROR:
+				|	ASM_REF_IMM_OP ror, insn->type, def, cl
+				break;
+			default:
+				IR_ASSERT(0);
+		}
+	} else {
+		switch (insn->op) {
+			case IR_SHL:
+				|	ASM_REG_IMM_OP shl, insn->type, reg, cl
+				break;
+			case IR_SHR:
+				|	ASM_REG_IMM_OP shr, insn->type, reg, cl
+				break;
+			case IR_SAR:
+				|	ASM_REG_IMM_OP sar, insn->type, reg, cl
+				break;
+			case IR_ROL:
+				|	ASM_REG_IMM_OP rol, insn->type, reg, cl
+				break;
+			case IR_ROR:
+				|	ASM_REG_IMM_OP ror, insn->type, reg, cl
+				break;
+			default:
+				IR_ASSERT(0);
+		}
 	}
 	if (def_reg != reg) {
 		ir_emit_store(ctx, insn->type, reg, def);
@@ -1883,36 +1947,60 @@ void ir_emit_shift_const(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg def_reg = ir_ref_reg(ctx, def);
 	ir_reg op1_reg = ir_ref_reg(ctx, insn->op1);
 	uint32_t shift = ctx->ir_base[insn->op2].val.u64;
-	ir_reg reg;
+	ir_reg reg = IR_REG_NONE;
 
 	if (def_reg >= 0) {
 		reg = def_reg;
 	} else if (op1_reg >= 0 && ir_last_use(ctx, insn->op1, def)) {
 		reg = op1_reg;
+	} else if (ir_is_same_mem(ctx, def, insn->op1)) {
+		/* shl mem, Imm */
 	} else {
 		reg = IR_REG_RAX; // TODO: temporary register
 	}
 	if (op1_reg != reg) {
 		ir_emit_load(ctx, insn->type, insn->op1, reg);
 	}
-	switch (insn->op) {
-		case IR_SHL:
-			|	ASM_REG_IMM_OP shl, insn->type, reg, shift
-			break;
-		case IR_SHR:
-			|	ASM_REG_IMM_OP shr, insn->type, reg, shift
-			break;
-		case IR_SAR:
-			|	ASM_REG_IMM_OP sar, insn->type, reg, shift
-			break;
-		case IR_ROL:
-			|	ASM_REG_IMM_OP rol, insn->type, reg, shift
-			break;
-		case IR_ROR:
-			|	ASM_REG_IMM_OP ror, insn->type, reg, shift
-			break;
-		default:
-			IR_ASSERT(0);
+	if (reg < 0) {
+		switch (insn->op) {
+			case IR_SHL:
+				|	ASM_REF_IMM_OP shl, insn->type, def, shift
+				break;
+			case IR_SHR:
+				|	ASM_REF_IMM_OP shr, insn->type, def, shift
+				break;
+			case IR_SAR:
+				|	ASM_REF_IMM_OP sar, insn->type, def, shift
+				break;
+			case IR_ROL:
+				|	ASM_REF_IMM_OP rol, insn->type, def, shift
+				break;
+			case IR_ROR:
+				|	ASM_REF_IMM_OP ror, insn->type, def, shift
+				break;
+			default:
+				IR_ASSERT(0);
+		}
+	} else {
+		switch (insn->op) {
+			case IR_SHL:
+				|	ASM_REG_IMM_OP shl, insn->type, reg, shift
+				break;
+			case IR_SHR:
+				|	ASM_REG_IMM_OP shr, insn->type, reg, shift
+				break;
+			case IR_SAR:
+				|	ASM_REG_IMM_OP sar, insn->type, reg, shift
+				break;
+			case IR_ROL:
+				|	ASM_REG_IMM_OP rol, insn->type, reg, shift
+				break;
+			case IR_ROR:
+				|	ASM_REG_IMM_OP ror, insn->type, reg, shift
+				break;
+			default:
+				IR_ASSERT(0);
+		}
 	}
 	if (def_reg != reg) {
 		ir_emit_store(ctx, insn->type, reg, def);
@@ -1925,12 +2013,14 @@ void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg def_reg = ir_ref_reg(ctx, def);
 	ir_reg op1_reg = ir_ref_reg(ctx, insn->op1);
-	ir_reg reg;
+	ir_reg reg = IR_REG_NONE;
 
 	if (def_reg >= 0) {
 		reg = def_reg;
 	} else if (op1_reg >= 0 && ir_last_use(ctx, insn->op1, def)) {
 		reg = op1_reg;
+	} else if (insn->op != IR_BSWAP && ir_is_same_mem(ctx, def, insn->op1)) {
+		/* not mem */
 	} else {
 		reg = IR_REG_RAX; // TODO: temporary register
 	}
@@ -1938,9 +2028,17 @@ void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_emit_load(ctx, insn->type, insn->op1, reg);
 	}
 	if (insn->op == IR_NOT) {
-		|	ASM_REG_OP not, insn->type, reg
+		if (reg < 0) {
+			|	ASM_REF_OP not, insn->type, def
+		} else {
+			|	ASM_REG_OP not, insn->type, reg
+		}
 	} else if (insn->op == IR_NEG) {
-		|	ASM_REG_OP neg, insn->type, reg
+		if (reg < 0) {
+			|	ASM_REF_OP neg, insn->type, def
+		} else {
+			|	ASM_REG_OP neg, insn->type, reg
+		}
 	} else if (insn->op == IR_BSWAP) {
 		switch (ir_type_size[insn->type]) {
 			case 4:
@@ -2901,7 +2999,7 @@ static void ir_emit_copy_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_backend_data *data = ctx->data;
 		dasm_State **Dst = &data->dasm_state;
 		|	ASM_REF_IMM_OP mov, type, def, ctx->ir_base[insn->op1].val.i32
-	} else {
+	} else if (!ir_is_same_mem(ctx, insn->op1, def)) {
 		reg = IR_REG_RAX; // TODO: temporary register
 		ir_emit_load(ctx, type, insn->op1, reg);
 		ir_emit_store(ctx, type, reg, def);
@@ -2921,7 +3019,7 @@ static void ir_emit_copy_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_emit_fp_load(ctx, type, insn->op1, def_reg);
 	} else if (op1_reg >= 0) {
 		ir_emit_fp_store(ctx, type, op1_reg, def);
-	} else {
+	} else if (!ir_is_same_mem(ctx, insn->op1, def)) {
 		reg = IR_REG_XMM7; // TODO: temporary register
 		ir_emit_fp_load(ctx, type, insn->op1, reg);
 		ir_emit_fp_store(ctx, type, reg, def);
