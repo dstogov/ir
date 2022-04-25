@@ -1113,6 +1113,42 @@ static void ir_add_to_unhandled(ir_ctx *ctx, ir_list *unhandled, int current)
 	}
 }
 
+static ir_block *ir_block_from_live_pos(ir_ctx *ctx, ir_live_pos pos)
+{
+	int b;
+	ir_block *bb;
+	ir_ref ref = IR_LIVE_POS_TO_REF(pos);
+
+	// TODO: use binary search or map
+	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; b++, bb++) {
+		if (ref >= bb->start && ref <= bb->end) {
+			return bb;
+		}
+	}
+	IR_ASSERT(0);
+}
+
+static ir_live_pos ir_find_optimal_split_position(ir_ctx *ctx, ir_live_pos min_pos, ir_live_pos max_pos)
+{
+	ir_block *min_bb, *max_bb;
+
+	if (min_pos == max_pos) {
+		return max_pos;
+	}
+
+	IR_ASSERT(min_pos < max_pos);
+	min_bb = ir_block_from_live_pos(ctx, min_pos);
+	max_bb = ir_block_from_live_pos(ctx, max_pos);
+
+	if (min_bb == max_bb) {
+		return max_pos;
+	}
+
+	// TODO: search for an optimal block boundary
+
+	return max_pos;
+}
+
 static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, int current, uint32_t len, ir_bitset active, ir_bitset inactive, ir_list *unhandled)
 {
 	ir_live_pos freeUntilPos[IR_REG_NUM];
@@ -1201,7 +1237,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, int current, uint32_t len, i
 		/* register available for the first part of the interval */
 		ival->reg = reg;
 		/* split current before freeUntilPos[reg] */
-		ir_live_interval *child = ir_split_interval_at(ival, pos);
+		ir_live_interval *child = ir_split_interval_at(ival, pos); // TODO: Split/Spill Pos
 		ctx->live_intervals[current] = child;
 		ir_add_to_unhandled(ctx, unhandled, current);
 
@@ -1216,6 +1252,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, int current, uint32_t len, i
 static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir_bitset active, ir_bitset inactive, ir_list *unhandled)
 {
 	ir_live_pos nextUsePos[IR_REG_NUM];
+	ir_live_pos blockPos[IR_REG_NUM];
 	int i, reg;
 	ir_live_pos pos, next_use_pos;
 	ir_live_interval *ival = ctx->live_intervals[current];
@@ -1223,10 +1260,11 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 	ir_regset available;
 
 	use_pos = ival->use_pos;
-	if (use_pos->pos > ival->range.start) {
+	if (use_pos->pos >= ival->range.start) {
 		next_use_pos = use_pos->pos;
 	} else {
-		while (use_pos && use_pos->pos <= ival->range.start) {
+		while (use_pos && use_pos->pos < ival->range.start) {
+			// TODO: skip usages that don't require register
 			use_pos = use_pos->next;
 		}
 		if (!use_pos) {
@@ -1241,6 +1279,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 		/* set nextUsePos of all physical registers to maxInt */
 		for (i = IR_REG_FP_FIRST; i <= IR_REG_FP_LAST; i++) {
 			nextUsePos[i] = 0x7fffffff;
+			blockPos[i] = 0x7fffffff;
 		}
 	} else {
 		available = IR_REGSET_GP;
@@ -1250,6 +1289,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 		/* set nextUsePos of all physical registers to maxInt */
 		for (i = IR_REG_GP_FIRST; i <= IR_REG_GP_LAST; i++) {
 			nextUsePos[i] = 0x7fffffff;
+			blockPos[i] = 0x7fffffff;
 		}
 	}
 
@@ -1259,22 +1299,10 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 		reg = ctx->live_intervals[i]->reg;
 		IR_ASSERT(reg >= 0);
 		if (IR_REGSET_IN(available, reg)) {
-			use_pos = ctx->live_intervals[i]->use_pos;
-			while (use_pos && use_pos->pos < ival->range.start) {
-				use_pos = use_pos->next;
-			}
-			IR_ASSERT(use_pos);
-			nextUsePos[reg] = use_pos->pos;
-		}
-	} IR_BITSET_FOREACH_END();
-
-	/* for each interval it in inactive intersecting with current */
-	IR_BITSET_FOREACH(inactive, len, i) {
-		/* freeUntilPos[it.reg] = next intersection of it with current */
-		reg = ctx->live_intervals[i]->reg;
-		IR_ASSERT(reg >= 0);
-		if (IR_REGSET_IN(available, reg)) {
-			if (ir_vregs_overlap(ctx, current, i)) {
+			if (ctx->live_intervals[i]->type == IR_VOID) {
+				/* fixed intervals */
+				nextUsePos[reg] = 0;
+			} else {
 				use_pos = ctx->live_intervals[i]->use_pos;
 				while (use_pos && use_pos->pos < ival->range.start) {
 					use_pos = use_pos->next;
@@ -1287,8 +1315,38 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 		}
 	} IR_BITSET_FOREACH_END();
 
+	/* for each interval it in inactive intersecting with current */
+	IR_BITSET_FOREACH(inactive, len, i) {
+		/* freeUntilPos[it.reg] = next intersection of it with current */
+		reg = ctx->live_intervals[i]->reg;
+		IR_ASSERT(reg >= 0);
+		if (IR_REGSET_IN(available, reg)) {
+			ir_live_pos overlap = ir_vregs_overlap(ctx, current, i);
+
+			if (overlap) {
+				if (ctx->live_intervals[i]->type == IR_VOID) {
+					/* fixed intervals */
+					if (overlap < nextUsePos[reg]) {
+						nextUsePos[reg] = overlap;
+					}
+					if (overlap < blockPos[reg]) {
+						blockPos[reg] = overlap;
+					}
+				} else {
+					use_pos = ctx->live_intervals[i]->use_pos;
+					while (use_pos && use_pos->pos < ival->range.start) {
+						use_pos = use_pos->next;
+					}
+					IR_ASSERT(use_pos);
+					if (use_pos->pos < nextUsePos[reg]) {
+						nextUsePos[reg] = use_pos->pos;
+					}
+				}
+			}
+		}
+	} IR_BITSET_FOREACH_END();
+
 	// TODO: support for register hinting
-	// TODO: support for fixed register and intervals that cannot be spilled
 
 	/* reg = register with highest nextUsePos */
 	reg = IR_REGSET_FIRST(available);
@@ -1306,30 +1364,55 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 		/* all other intervals are used before current, so it is best to spill current itself */
 		/* assign spill slot to current */
 		/* split current before its first use position that requires a register */
-		ir_live_interval *child = ir_split_interval_at(ival, next_use_pos - 2); // TODO: split between
+		ir_live_pos split_pos = ir_find_optimal_split_position(ctx, ival->range.start, next_use_pos);
+
+		ir_live_interval *child = ir_split_interval_at(ival, split_pos);
 		ctx->live_intervals[current] = child;
 		ir_add_to_unhandled(ctx, unhandled, current);
 		return IR_REG_NONE;
 	} else {
 		/* spill intervals that currently block reg */
+
+		/* current.reg = reg */
+		ival->reg = reg;
 		IR_BITSET_FOREACH(active, len, i) {
 			if (reg == ctx->live_intervals[i]->reg) {
-				/* current.reg = reg */
-				ival->reg = reg;
 				/* split active interval for reg at position */
-				ir_live_interval *child = ir_split_interval_at(ctx->live_intervals[i], ival->range.start);
+				IR_ASSERT(ctx->live_intervals[i]->type != IR_VOID);
+				ir_live_interval *child = ir_split_interval_at(ctx->live_intervals[i], ival->range.start); // TODO: Split Pos
 				ctx->live_intervals[i] = child;
 				ir_add_to_unhandled(ctx, unhandled, i);
 				ir_bitset_excl(active, i);
-				return reg;
+				break;
 			}
 		} IR_BITSET_FOREACH_END();
-		// TODO: split any inactive interval for reg at the end of its lifetime hole
-	}
 
-	/* make sure that current does not intersect with the fixed interval for reg */
-	// TODO: if current intersects with the fixed interval for reg then
-		// TODO: split current before this intersection
+		/* split any inactive interval for reg at the end of its lifetime hole */
+		IR_BITSET_FOREACH(inactive, len, i) {
+			/* freeUntilPos[it.reg] = next intersection of it with current */
+			if (reg == ctx->live_intervals[i]->reg) {
+				ir_live_pos overlap = ir_vregs_overlap(ctx, current, i);
+
+				if (overlap) {
+					IR_ASSERT(ctx->live_intervals[i]->type != IR_VOID);
+					ir_live_interval *child = ir_split_interval_at(ctx->live_intervals[i], overlap); // TODO: Split Pos
+					ctx->live_intervals[i] = child;
+					ir_add_to_unhandled(ctx, unhandled, i);
+					ir_bitset_excl(inactive, i);
+				}
+			}
+		} IR_BITSET_FOREACH_END();
+
+		if (ir_live_range_end(ival) > blockPos[reg]) {
+			/* spilling make a register free only for the first part of current */
+			/* split current at optimal position before block_pos[reg] */
+			ir_live_interval *child = ir_split_interval_at(ival, blockPos[reg]); // TODO: Split Pos
+			ctx->live_intervals[current] = child;
+			ir_add_to_unhandled(ctx, unhandled, current);
+		}
+
+		return reg;
+	}
 
 	return IR_REG_NONE;
 }
