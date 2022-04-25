@@ -614,7 +614,7 @@ static void ir_swap_operands(ir_ctx *ctx, ir_ref i, ir_insn *insn)
 	insn->op1 = insn->op2;
 	insn->op2 = tmp;
 
-	ival = ctx->live_intervals[ctx->vregs[insn->op2]];
+	ival = ctx->live_intervals[ctx->vregs[insn->op1]];
 	p = ival->use_pos;
 	while (p) {
 		if (p->pos == pos) {
@@ -628,15 +628,15 @@ static void ir_swap_operands(ir_ctx *ctx, ir_ref i, ir_insn *insn)
 	ival = ctx->live_intervals[ctx->vregs[i]];
 	p = ival->use_pos;
 	while (p) {
-		if (p->pos == pos) {
+		if (p->pos == load_pos) {
 			p->hint_ref = insn->op1;
 			break;
 		}
 		p = p->next;
 	}
 
-	if (insn->op1 > 0 && ctx->vregs[insn->op1]) {
-		ival = ctx->live_intervals[ctx->vregs[i]];
+	if (insn->op2 > 0 && ctx->vregs[insn->op2]) {
+		ival = ctx->live_intervals[ctx->vregs[insn->op2]];
 		r = &ival->range;
 		while (r) {
 			if (r->end == load_pos) {
