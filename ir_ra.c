@@ -1099,13 +1099,14 @@ static void ir_add_to_unhandled(ir_ctx *ctx, ir_list *unhandled, int current)
 {
 	ir_live_pos pos = ctx->live_intervals[current]->range.start;
 
-	if (ir_list_len(unhandled) == 0 || pos <= ctx->live_intervals[ir_list_peek(unhandled)]->range.start) {
+	if (ir_list_len(unhandled) == 0 || pos < ctx->live_intervals[ir_list_peek(unhandled)]->range.start) {
 		ir_list_push(unhandled, current);
 	} else {
 		uint32_t i = ir_list_len(unhandled);
 		while (i > 0) {
 			i--;
-			if (pos <= ctx->live_intervals[ir_list_at(unhandled, i)]->range.start) {
+			if (pos < ctx->live_intervals[ir_list_at(unhandled, i)]->range.start) {
+				i++;
 				break;
 			}
 		}
