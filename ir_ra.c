@@ -1019,7 +1019,7 @@ static ir_live_interval *ir_split_interval_at(ir_live_interval *ival, ir_live_po
 
 	use_pos = ival->use_pos;
 	prev_use_pos = NULL;
-	while (use_pos && pos > use_pos->pos) {
+	while (use_pos && (pos > use_pos->pos || (pos == use_pos->pos && use_pos->op_num != 0))) {
 		prev_use_pos = use_pos;
 		use_pos = use_pos->next;
 	}
@@ -1233,8 +1233,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, int current, uint32_t len, i
 		/* register available for the whole interval */
 		ival->reg = reg;
 		return reg;
-	} else {
-#if 1
+	} else if (pos > ival->range.start) {
 		/* register available for the first part of the interval */
 		ival->reg = reg;
 		/* split current before freeUntilPos[reg] */
@@ -1244,9 +1243,8 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, int current, uint32_t len, i
 
 		//ir_allocate_spill_slot(ctx, current, ctx->data);
 		return reg;
-#else
+	} else {
 		return IR_REG_NONE;
-#endif
 	}
 }
 
@@ -1261,19 +1259,15 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 	ir_regset available;
 
 	use_pos = ival->use_pos;
-	if (use_pos->pos >= ival->range.start) {
-		next_use_pos = use_pos->pos;
-	} else {
-		while (use_pos && use_pos->pos < ival->range.start) {
-			// TODO: skip usages that don't require register
-			use_pos = use_pos->next;
-		}
-		if (!use_pos) {
-			/* spill */
-			return IR_REG_NONE;
-		}
-		next_use_pos = use_pos->pos;
+	while (use_pos && use_pos->pos < ival->range.start) {
+		// TODO: skip usages that don't require register
+		use_pos = use_pos->next;
 	}
+	if (!use_pos) {
+		/* spill */
+		return IR_REG_NONE;
+	}
+	next_use_pos = use_pos->pos;
 
 	if (IR_IS_TYPE_FP(ival->type)) {
 		available = IR_REGSET_FP;
