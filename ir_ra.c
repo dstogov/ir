@@ -833,7 +833,7 @@ int ir_coalesce(ir_ctx *ctx)
 		if (n != ctx->vregs_count) {
 			j = ctx->vregs_count - n;
 			for (i = n + 1; i <= ctx->vregs_count + IR_REG_NUM; i++) {
-				ctx->live_intervals[i] = NULL;//ctx->live_intervals[i + j];
+				ctx->live_intervals[i] = ctx->live_intervals[i + j];
 			}
 			for (j = 1; j < ctx->insns_count; j++) {
 				if (ctx->vregs[j]) {
