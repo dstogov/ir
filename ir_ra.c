@@ -1302,8 +1302,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 				while (use_pos && use_pos->pos < ival->range.start) {
 					use_pos = use_pos->next;
 				}
-				IR_ASSERT(use_pos);
-				if (use_pos->pos < nextUsePos[reg]) {
+				if (use_pos && use_pos->pos < nextUsePos[reg]) {
 					nextUsePos[reg] = use_pos->pos;
 				}
 			}
@@ -1332,8 +1331,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 					while (use_pos && use_pos->pos < ival->range.start) {
 						use_pos = use_pos->next;
 					}
-					IR_ASSERT(use_pos);
-					if (use_pos->pos < nextUsePos[reg]) {
+					if (use_pos && use_pos->pos < nextUsePos[reg]) {
 						nextUsePos[reg] = use_pos->pos;
 					}
 				}
