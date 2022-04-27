@@ -194,7 +194,9 @@ static void ir_add_use_pos(ir_ctx *ctx, int v, ir_use_pos *use_pos)
 	ir_use_pos *prev = NULL;
 	ir_use_pos *p = ival->use_pos;
 
-	while (p && (p->pos < use_pos->pos || (p->pos == use_pos->pos && p->op_num < use_pos->op_num))) {
+	while (p && (p->pos < use_pos->pos ||
+			(p->pos == use_pos->pos &&
+				(use_pos->op_num == 0 || p->op_num < use_pos->op_num)))) {
 		prev = p;
 		p = p->next;
 	}
