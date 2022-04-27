@@ -1514,9 +1514,29 @@ static int ir_linear_scan(ir_ctx *ctx)
 
 	qsort_r(unhandled.a.refs, ir_list_len(&unhandled), sizeof(ir_ref), ir_live_range_cmp, ctx);
 
-	while (ir_list_len(&unhandled) != 0) {
-		current = ir_list_pop(&unhandled);
-		position = ctx->live_intervals[current]->range.start;
+	while (1) {
+		if (ir_list_len(&unhandled) == 0) {
+			position = 0x7fffffff;
+			IR_BITSET_FOREACH(active, len, i) {
+				ival = ctx->live_intervals[i];
+				if (ival->next) {
+					if (ival->next->range.start < position) {
+						position = ival->next->range.start;
+						current = i;
+					}
+				}
+			} IR_BITSET_FOREACH_END();
+
+			if (position < 0x7fffffff) {
+				ir_bitset_excl(active, current);
+				ctx->live_intervals[current] = ctx->live_intervals[current]->next;
+			} else {
+				break;
+			}
+		} else {
+			current = ir_list_pop(&unhandled);
+			position = ctx->live_intervals[current]->range.start;
+		}
 
 		/* for each interval i in active */
 		IR_BITSET_FOREACH(active, len, i) {
@@ -1600,6 +1620,18 @@ static int ir_linear_scan(ir_ctx *ctx)
 			ir_allocate_spill_slot(ctx, current, &data);
 		}
 	}
+
+#ifdef IR_DEBUG
+	/* all intervals must be processed */
+	IR_BITSET_FOREACH(active, len, i) {
+		ival = ctx->live_intervals[i];
+		IR_ASSERT(!ival->next);
+	} IR_BITSET_FOREACH_END();
+	IR_BITSET_FOREACH(inactive, len, i) {
+		ival = ctx->live_intervals[i];
+		IR_ASSERT(!ival->next);
+	} IR_BITSET_FOREACH_END();
+#endif
 
 	ir_mem_free(inactive);
 	ir_mem_free(active);
