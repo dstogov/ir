@@ -1321,12 +1321,13 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 		reg = ctx->live_intervals[i]->reg;
 		IR_ASSERT(reg >= 0);
 		if (IR_REGSET_IN(available, reg)) {
+			// TODO: intervals that can't be spilled should be handled as fixed
 			if (ctx->live_intervals[i]->type == IR_VOID) {
 				/* fixed intervals */
-				nextUsePos[reg] = 0;
+				blockPos[reg] = nextUsePos[reg] = 0;
 			} else {
 				use_pos = ctx->live_intervals[i]->use_pos;
-				while (use_pos && use_pos->pos < ival->range.start) {
+				while (use_pos && use_pos->pos <= ival->range.start) { // TODO: less or less-or-equal
 					use_pos = use_pos->next;
 				}
 				if (use_pos && use_pos->pos < nextUsePos[reg]) {
