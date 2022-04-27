@@ -1378,68 +1378,68 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 		/* split current before its first use position that requires a register */
 		ir_live_pos split_pos = ir_find_optimal_split_position(ctx, ival->range.start, next_use_pos);
 
-		ir_live_interval *child = ir_split_interval_at(ival, split_pos);
-		ctx->live_intervals[current] = child;
-		ir_add_to_unhandled(ctx, unhandled, current);
-
-#ifdef IR_DEBUG
-		if (ctx->flags & IR_DEBUG_RA) {
-			ir_dump_live_ranges(ctx, stderr);
-		}
-#endif
-
-		return IR_REG_NONE;
-	} else {
-		/* spill intervals that currently block reg */
-
-		/* current.reg = reg */
-		ival->reg = reg;
-		IR_BITSET_FOREACH(active, len, i) {
-			if (reg == ctx->live_intervals[i]->reg) {
-				/* split active interval for reg at position */
-				IR_ASSERT(ctx->live_intervals[i]->type != IR_VOID);
-				ir_live_interval *child = ir_split_interval_at(ctx->live_intervals[i], ival->range.start); // TODO: Split Pos
-				ctx->live_intervals[i] = child;
-				ir_add_to_unhandled(ctx, unhandled, i);
-				ir_bitset_excl(active, i);
-				break;
-			}
-		} IR_BITSET_FOREACH_END();
-
-		/* split any inactive interval for reg at the end of its lifetime hole */
-		IR_BITSET_FOREACH(inactive, len, i) {
-			/* freeUntilPos[it.reg] = next intersection of it with current */
-			if (reg == ctx->live_intervals[i]->reg) {
-				ir_live_pos overlap = ir_vregs_overlap(ctx, current, i);
-
-				if (overlap) {
-					IR_ASSERT(ctx->live_intervals[i]->type != IR_VOID);
-					ir_live_interval *child = ir_split_interval_at(ctx->live_intervals[i], overlap); // TODO: Split Pos
-					ctx->live_intervals[i] = child;
-					ir_add_to_unhandled(ctx, unhandled, i);
-					ir_bitset_excl(inactive, i);
-				}
-			}
-		} IR_BITSET_FOREACH_END();
-
-		if (ir_live_range_end(ival) > blockPos[reg]) {
-			/* spilling make a register free only for the first part of current */
-			/* split current at optimal position before block_pos[reg] */
-			ir_live_interval *child = ir_split_interval_at(ival, blockPos[reg]); // TODO: Split Pos
+		if (split_pos > ival->range.start) {
+			ir_live_interval *child = ir_split_interval_at(ival, split_pos);
 			ctx->live_intervals[current] = child;
 			ir_add_to_unhandled(ctx, unhandled, current);
-		}
 
 #ifdef IR_DEBUG
-		if (ctx->flags & IR_DEBUG_RA) {
-			ir_dump_live_ranges(ctx, stderr);
-		}
+			if (ctx->flags & IR_DEBUG_RA) {
+				ir_dump_live_ranges(ctx, stderr);
+			}
 #endif
 
-		return reg;
+			return IR_REG_NONE;
+		}
 	}
 
-	return IR_REG_NONE;
+	/* spill intervals that currently block reg */
+
+	/* current.reg = reg */
+	ival->reg = reg;
+	IR_BITSET_FOREACH(active, len, i) {
+		if (reg == ctx->live_intervals[i]->reg) {
+			/* split active interval for reg at position */
+			IR_ASSERT(ctx->live_intervals[i]->type != IR_VOID);
+			ir_live_interval *child = ir_split_interval_at(ctx->live_intervals[i], ival->range.start); // TODO: Split Pos
+			ctx->live_intervals[i] = child;
+			ir_add_to_unhandled(ctx, unhandled, i);
+			ir_bitset_excl(active, i);
+			break;
+		}
+	} IR_BITSET_FOREACH_END();
+
+	/* split any inactive interval for reg at the end of its lifetime hole */
+	IR_BITSET_FOREACH(inactive, len, i) {
+		/* freeUntilPos[it.reg] = next intersection of it with current */
+		if (reg == ctx->live_intervals[i]->reg) {
+			ir_live_pos overlap = ir_vregs_overlap(ctx, current, i);
+
+			if (overlap) {
+				IR_ASSERT(ctx->live_intervals[i]->type != IR_VOID);
+				ir_live_interval *child = ir_split_interval_at(ctx->live_intervals[i], overlap); // TODO: Split Pos
+				ctx->live_intervals[i] = child;
+				ir_add_to_unhandled(ctx, unhandled, i);
+				ir_bitset_excl(inactive, i);
+			}
+		}
+	} IR_BITSET_FOREACH_END();
+
+	if (ir_live_range_end(ival) > blockPos[reg]) {
+		/* spilling make a register free only for the first part of current */
+		/* split current at optimal position before block_pos[reg] */
+		ir_live_interval *child = ir_split_interval_at(ival, blockPos[reg]); // TODO: Split Pos
+		ctx->live_intervals[current] = child;
+		ir_add_to_unhandled(ctx, unhandled, current);
+	}
+
+#ifdef IR_DEBUG
+	if (ctx->flags & IR_DEBUG_RA) {
+		ir_dump_live_ranges(ctx, stderr);
+	}
+#endif
+
+	return reg;
 }
 
 static int ir_live_range_cmp(const void *r1, const void *r2, void *data)
