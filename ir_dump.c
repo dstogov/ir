@@ -261,7 +261,7 @@ void ir_dump_live_ranges(ir_ctx *ctx, FILE *f)
 	}
 	fprintf(f, "{ # LIVE-RANGES (vregs_count=%d)\n", ctx->vregs_count);
 	for (i = 1; i <= ctx->vregs_count; i++) {
-		ir_live_interval *ival = ctx->live_intervals[i];
+		ir_live_interval *ival = ctx->live_intervals[i]->top;
 
 		if (ival) {
 			ir_live_range *p;

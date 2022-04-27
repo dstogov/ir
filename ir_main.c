@@ -1,4 +1,5 @@
 #include "ir.h"
+#include <stdlib.h>
 
 static void help(const char *cmd)
 {
@@ -22,6 +23,12 @@ static void help(const char *cmd)
 		"  --dump-use-lists           - dump def->use lists\n"
 		"  --dump-cfg                 - dump CFG (Control Flow Graph)\n"
 		"  --dump-gcm                 - dump GCM schedule (Global Code Motion)\n"
+#ifdef IR_DEBUG
+		"  --debug-sccp               - debug SCCP optimization pass\n"
+		"  --debug-gcm                - debug GCM optimization pass\n"
+		"  --debug-ra                 - debug register allocator\n"
+		"  --debug-regset <bit-mask>  - restrict available register set\n"
+#endif
 		"  --version\n"
 		"  --help\n",
 		cmd);
@@ -301,6 +308,21 @@ int main(int argc, char **argv)
 			run = 1;
 		} else if (strcmp(argv[i], "-mavx") == 0) {
 			mflags |= IR_AVX;
+#ifdef IR_DEBUG
+		} else if (strcmp(argv[i], "--debug-sccp") == 0) {
+			mflags |= IR_DEBUG_SCCP;
+		} else if (strcmp(argv[i], "--debug-gcm") == 0) {
+			mflags |= IR_DEBUG_GCM;
+		} else if (strcmp(argv[i], "--debug-ra") == 0) {
+			mflags |= IR_DEBUG_RA;
+		} else if (strcmp(argv[i], "--debug-regset") == 0) {
+			if (i + 1 == argc || argv[i + 1][0] == '-') {
+				fprintf(stderr, "ERROR: Invalid usage' (use --help)\n");
+				return 1;
+			}
+			debug_regset = strtoul(argv[i + 1], NULL, 0);
+			i++;
+#endif
 		} else if (argv[i][0] == '-') {
 			fprintf(stderr, "ERROR: Unknown option '%s' (use --help)\n", argv[i]);
 			return 1;

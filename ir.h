@@ -483,6 +483,13 @@ typedef struct _ir_use_list {
 #define IR_AVX               (1<<24)
 #define IR_HAS_CALLS         (1<<25)
 
+/* debug relted */
+#ifdef IR_DEBUG
+# define IR_DEBUG_SCCP        (1<<28)
+# define IR_DEBUG_GCM         (1<<29)
+# define IR_DEBUG_RA          (1<<30)
+#endif
+
 typedef enum _ir_fold_action {
 	IR_FOLD_DO_RESTART,
 	IR_FOLD_DO_CSE,
@@ -692,6 +699,10 @@ int ir_schedule(ir_ctx *ctx);
 
 /* Liveness & Register Allocation (implementation in ir_ra.c) */
 typedef int (*emit_copy_t)(ir_ctx *ctx, uint8_t type, int from, int to);
+
+#ifdef IR_DEBUG
+extern uint32_t debug_regset;
+#endif
 
 int ir_assign_virtual_registers(ir_ctx *ctx);
 int ir_compute_live_ranges(ir_ctx *ctx);

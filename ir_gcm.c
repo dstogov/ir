@@ -151,10 +151,12 @@ int ir_gcm(ir_ctx *ctx)
 		}
 	}
 
-#if 0
-	fprintf(stderr, "GCM Schedule Early\n");
-	for (i = 1; i < ctx->insns_count; i++) {
-		fprintf(stderr, "%d -> %d\n", i, _blocks[i]);
+#ifdef IR_DEBUG
+	if (ctx->flags & IR_DEBUG_GCM) {
+		fprintf(stderr, "GCM Schedule Early\n");
+		for (i = 1; i < ctx->insns_count; i++) {
+			fprintf(stderr, "%d -> %d\n", i, _blocks[i]);
+		}
 	}
 #endif
 
@@ -195,10 +197,12 @@ int ir_gcm(ir_ctx *ctx)
 	ir_mem_free(visited);
 	ir_list_free(&queue);
 
-#if 0
-	fprintf(stderr, "GCM Schedule Late\n");
-	for (i = 1; i < ctx->insns_count; i++) {
-		fprintf(stderr, "%d -> %d\n", i, _blocks[i]);
+#ifdef IR_DEBUG
+	if (ctx->flags & IR_DEBUG_GCM) {
+		fprintf(stderr, "GCM Schedule Late\n");
+		for (i = 1; i < ctx->insns_count; i++) {
+			fprintf(stderr, "%d -> %d\n", i, _blocks[i]);
+		}
 	}
 #endif
 

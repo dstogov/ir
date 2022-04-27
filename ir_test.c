@@ -1,5 +1,6 @@
 #include "ir.h"
 #include <sys/time.h>
+#include <stdlib.h>
 
 #define BAILOUT 16
 #define MAX_ITERATIONS 1000
@@ -136,6 +137,21 @@ int main(int argc, char **argv)
 			}
 		} else if (strcmp(argv[i], "-mavx") == 0) {
 			mflags |= IR_AVX;
+#ifdef IR_DEBUG
+		} else if (strcmp(argv[i], "--debug-sccp") == 0) {
+			mflags |= IR_DEBUG_SCCP;
+		} else if (strcmp(argv[i], "--debug-gcm") == 0) {
+			mflags |= IR_DEBUG_GCM;
+		} else if (strcmp(argv[i], "--debug-ra") == 0) {
+			mflags |= IR_DEBUG_RA;
+		} else if (strcmp(argv[i], "--debug-regset") == 0) {
+			if (i + 1 == argc || argv[i + 1][0] == '-') {
+				fprintf(stderr, "ERROR: Invalid usage' (use --help)\n");
+				return 1;
+			}
+			debug_regset = strtoul(argv[i + 1], NULL, 0);
+			i++;
+#endif
 		} else {
 			/* pass*/
 		}

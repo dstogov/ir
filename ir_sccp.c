@@ -587,26 +587,28 @@ int ir_sccp(ir_ctx *ctx)
 		}
 	}
 
-#if 0
-	for (i = 1; i < ctx->insns_count; i++) {
-		if (IR_IS_CONST(_values[i].op)) {
-			fprintf(stderr, "%d. CONST(", i);
-			ir_print_const(ctx, &_values[i], stderr);
-			fprintf(stderr, ")\n");
+#ifdef IR_DEBUG
+	if (ctx->flags & IR_DEBUG_SCCP) {
+		for (i = 1; i < ctx->insns_count; i++) {
+			if (IR_IS_CONST(_values[i].op)) {
+				fprintf(stderr, "%d. CONST(", i);
+				ir_print_const(ctx, &_values[i], stderr);
+				fprintf(stderr, ")\n");
 #if IR_COMBO_COPY_PROPAGATION
-		} else if (_values[i].op == IR_COPY) {
-			fprintf(stderr, "%d. COPY(%d)\n", i, _values[i].op1);
+			} else if (_values[i].op == IR_COPY) {
+				fprintf(stderr, "%d. COPY(%d)\n", i, _values[i].op1);
 #endif
-		} else if (IR_IS_TOP(i)) {
-			fprintf(stderr, "%d. TOP\n", i);
-		} else if (_values[i].op == IR_IF) {
-			fprintf(stderr, "%d. IF(%d)\n", i, _values[i].op1);
-		} else if (_values[i].op == IR_MERGE || _values[i].op == IR_LOOP_BEGIN) {
-			fprintf(stderr, "%d. MERGE(%d)\n", i, _values[i].op1);
-		} else if (!IR_IS_BOTTOM(i)) {
-			fprintf(stderr, "%d. %d\n", i, _values[i].op);
+			} else if (IR_IS_TOP(i)) {
+				fprintf(stderr, "%d. TOP\n", i);
+			} else if (_values[i].op == IR_IF) {
+				fprintf(stderr, "%d. IF(%d)\n", i, _values[i].op1);
+			} else if (_values[i].op == IR_MERGE || _values[i].op == IR_LOOP_BEGIN) {
+				fprintf(stderr, "%d. MERGE(%d)\n", i, _values[i].op1);
+			} else if (!IR_IS_BOTTOM(i)) {
+				fprintf(stderr, "%d. %d\n", i, _values[i].op);
+			}
 		}
-	}
+    }
 #endif
 
 	for (i = 1; i < ctx->insns_count; i++) {

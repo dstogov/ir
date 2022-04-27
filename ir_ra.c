@@ -6,6 +6,10 @@
 
 #include "ir_x86.h"
 
+#ifdef IR_DEBUG
+uint32_t debug_regset = 0xffffffff; /* all 32 regisers */
+#endif
+
 /* RA - Register Allocation, Liveness, Coalescing and SSA Resolution */
 
 int ir_assign_virtual_registers(ir_ctx *ctx)
@@ -1175,6 +1179,10 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, int current, uint32_t len, i
 		}
 	}
 
+#ifdef IR_DEBUG
+	available &= debug_regset;
+#endif
+
 	/* for each interval it in active */
 	IR_BITSET_FOREACH(active, len, i) {
 		/* freeUntilPos[it.reg] = 0 */
@@ -1242,6 +1250,13 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, int current, uint32_t len, i
 		ir_add_to_unhandled(ctx, unhandled, current);
 
 		//ir_allocate_spill_slot(ctx, current, ctx->data);
+
+#ifdef IR_DEBUG
+		if (ctx->flags & IR_DEBUG_RA) {
+			ir_dump_live_ranges(ctx, stderr);
+		}
+#endif
+
 		return reg;
 	} else {
 		return IR_REG_NONE;
@@ -1287,6 +1302,10 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 			blockPos[i] = 0x7fffffff;
 		}
 	}
+
+#ifdef IR_DEBUG
+	available &= debug_regset;
+#endif
 
 	/* for each interval it in active */
 	IR_BITSET_FOREACH(active, len, i) {
@@ -1362,6 +1381,13 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 		ir_live_interval *child = ir_split_interval_at(ival, split_pos);
 		ctx->live_intervals[current] = child;
 		ir_add_to_unhandled(ctx, unhandled, current);
+
+#ifdef IR_DEBUG
+		if (ctx->flags & IR_DEBUG_RA) {
+			ir_dump_live_ranges(ctx, stderr);
+		}
+#endif
+
 		return IR_REG_NONE;
 	} else {
 		/* spill intervals that currently block reg */
@@ -1403,6 +1429,12 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 			ctx->live_intervals[current] = child;
 			ir_add_to_unhandled(ctx, unhandled, current);
 		}
+
+#ifdef IR_DEBUG
+		if (ctx->flags & IR_DEBUG_RA) {
+			ir_dump_live_ranges(ctx, stderr);
+		}
+#endif
 
 		return reg;
 	}
