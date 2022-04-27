@@ -1025,9 +1025,17 @@ static ir_live_interval *ir_split_interval_at(ir_live_interval *ival, ir_live_po
 
 	use_pos = ival->use_pos;
 	prev_use_pos = NULL;
-	while (use_pos && (pos > use_pos->pos || (pos == use_pos->pos && use_pos->op_num != 0))) {
-		prev_use_pos = use_pos;
-		use_pos = use_pos->next;
+
+	if (p->start == pos) {
+		while (use_pos && pos > use_pos->pos) {
+			prev_use_pos = use_pos;
+			use_pos = use_pos->next;
+		}
+	} else {
+		while (use_pos && pos >= use_pos->pos) {
+			prev_use_pos = use_pos;
+			use_pos = use_pos->next;
+		}
 	}
 
 	child = ir_mem_malloc(sizeof(ir_live_interval));
