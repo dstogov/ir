@@ -1383,7 +1383,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 		/* all other intervals are used before current, so it is best to spill current itself */
 		/* assign spill slot to current */
 		/* split current before its first use position that requires a register */
-		ir_live_pos split_pos = ir_find_optimal_split_position(ctx, ival->range.start, next_use_pos);
+		ir_live_pos split_pos = ir_find_optimal_split_position(ctx, ival->range.start, next_use_pos - 1);
 
 		if (split_pos > ival->range.start) {
 			ir_live_interval *child = ir_split_interval_at(ival, split_pos);
@@ -1421,7 +1421,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 				ir_bitset_excl(active, i);
 				ctx->live_intervals[i] = child;
 				if (child->use_pos) {
-					ir_live_pos split_pos = ir_find_optimal_split_position(ctx, ival->range.start, child->use_pos->pos);
+					ir_live_pos split_pos = ir_find_optimal_split_position(ctx, ival->range.start, child->use_pos->pos - 1);
 
 					if (split_pos > ival->range.start) {
 						child = ir_split_interval_at(child, split_pos);
