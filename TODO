@@ -37,7 +37,7 @@
 	-  constraints
 	    -  kill
 	    -  restricted regset
-	    -  must be in register
+	    +  must be in register
 	-  temporary registers
 	?  spills
 		-  spill slot allocation (packed/aligned according to SpillRange)

@@ -946,6 +946,24 @@ bool ir_result_reuses_op1_reg(ir_ctx *ctx, ir_ref ref)
 	return 0;
 }
 
+uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num)
+{
+	ir_ref rule;
+
+	rule = ctx->rules[ref];
+	switch (rule) {
+		case IR_BINOP_INT:
+		case IR_BINOP_SSE2:
+		case IR_BINOP_AVX:
+		case IR_MUL_INT:
+		case IR_DIV_INT:
+		case IR_MOD_INT:
+			return (op_num == 2) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
+	}
+
+	return IR_USE_MUST_BE_IN_REG;
+}
+
 static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 {
 	ir_insn *op2_insn;

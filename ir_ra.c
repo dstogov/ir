@@ -219,6 +219,7 @@ static void ir_add_use(ir_ctx *ctx, int v, int op_num, ir_live_pos pos, ir_reg h
 	use_pos->hint = hint;
 	use_pos->hint_ref = hint_ref;
 	use_pos->pos = pos;
+	use_pos->flags = ctx->rules ? ir_get_use_flags(ctx, IR_LIVE_POS_TO_REF(pos), op_num) : 0;
 
 	ir_add_use_pos(ctx, v, use_pos);
 }
@@ -1284,6 +1285,9 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 		// TODO: skip usages that don't require register
 		use_pos = use_pos->next;
 	}
+	while (use_pos && !(use_pos->flags & IR_USE_MUST_BE_IN_REG)) {
+		use_pos = use_pos->next;
+	}
 	if (!use_pos) {
 		/* spill */
 		return IR_REG_NONE;
@@ -1328,6 +1332,9 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 				while (use_pos && use_pos->pos <= ival->range.start) { // TODO: less or less-or-equal
 					use_pos = use_pos->next;
 				}
+				while (use_pos && !(use_pos->flags & (IR_USE_MUST_BE_IN_REG|IR_USE_SHOULD_BE_IN_REG))) {
+					use_pos = use_pos->next;
+				}
 				if (use_pos && use_pos->pos < nextUsePos[reg]) {
 					nextUsePos[reg] = use_pos->pos;
 				}
@@ -1355,6 +1362,9 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 				} else {
 					use_pos = ctx->live_intervals[i]->use_pos;
 					while (use_pos && use_pos->pos < ival->range.start) {
+						use_pos = use_pos->next;
+					}
+					while (use_pos && !(use_pos->flags & (IR_USE_MUST_BE_IN_REG|IR_USE_SHOULD_BE_IN_REG))) {
 						use_pos = use_pos->next;
 					}
 					if (use_pos && use_pos->pos < nextUsePos[reg]) {

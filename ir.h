@@ -517,9 +517,13 @@ typedef struct _ir_live_interval ir_live_interval;
 
 #define IR_LIVE_INTERVAL_COALESCED       (1<<0)
 
+#define IR_USE_MUST_BE_IN_REG            (1<<0)
+#define IR_USE_SHOULD_BE_IN_REG          (1<<1)
+
 struct _ir_use_pos {
 	uint16_t       op_num; /* 0 - means result */
 	int8_t         hint;
+	uint8_t        flags;
 	ir_ref         hint_ref;
 	ir_live_pos    pos;
 	ir_use_pos    *next;
