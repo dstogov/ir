@@ -1257,8 +1257,6 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, int current, uint32_t len, i
 		/* split current before freeUntilPos[reg] */
 		ir_split_interval_at(ival, pos); // TODO: Split/Spill Pos
 
-		//ir_allocate_spill_slot(ctx, current, ctx->data);
-
 #ifdef IR_DEBUG
 		if (ctx->flags & IR_DEBUG_RA) {
 			ir_dump_live_ranges(ctx, stderr);
@@ -1625,8 +1623,6 @@ static int ir_linear_scan(ir_ctx *ctx)
 			if (ctx->live_intervals[current]->reg != IR_REG_NONE) {
 				ir_bitset_incl(active, current);
 			}
-		} else {
-			ir_allocate_spill_slot(ctx, current, &data);
 		}
 	}
 
