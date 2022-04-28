@@ -1417,7 +1417,18 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 
 			if (overlap) {
 				IR_ASSERT(ctx->live_intervals[i]->type != IR_VOID);
-				ir_split_interval_at(ctx->live_intervals[i], ival->range.start); // TODO: Split Pos
+				ir_live_interval *child = ir_split_interval_at(ctx->live_intervals[i], ival->range.start); // TODO: Split Pos
+				ir_bitset_excl(active, i);
+				ctx->live_intervals[i] = child;
+				if (child->use_pos) {
+					ir_live_pos split_pos = ir_find_optimal_split_position(ctx, ival->range.start, child->use_pos->pos);
+
+					if (split_pos > ival->range.start) {
+						child = ir_split_interval_at(child, split_pos);
+						ctx->live_intervals[i] = child;
+					}
+					ir_add_to_unhandled(ctx, unhandled, i);
+				}
 			}
 			break;
 		}
