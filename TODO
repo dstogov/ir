@@ -29,6 +29,7 @@
     - BURS ???
 
 ?  register allocation
+    -  do we need UsePositions for Phi (at Phi position or at block start position), DESSA use positions, LOOP?
 	+  linear scan
 		+  allocate scratch registers first
 		-  temporary registers
