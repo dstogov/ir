@@ -318,6 +318,8 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 										IR_DEF_LIVE_POS_FROM_REF(i), def_pos);
 								}
 							} else if (ctx->rules && ir_result_reuses_op1_reg(ctx, i)) {
+								/* We add two uses to emulate move from op1 to res */
+								ir_add_use(ctx, ctx->vregs[i], 0, IR_DEF_LIVE_POS_FROM_REF(i), reg, hint_ref);
 								def_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
 								hint_ref = insn->op1;
 							} else {
@@ -997,7 +999,7 @@ typedef struct _ir_lsra_data {
 			int _vreg = (vreg); \
 			ir_live_interval *_ival = (ival); \
 			ir_live_pos _start = _ival->range.start; \
-			ir_live_pos _end = ir_live_range_end(_ival); \
+			ir_live_pos _end = ir_ival_end(_ival); \
 			fprintf(stderr, action " R%d [%d.%d...%d.%d)" comment "\n", \
 				_vreg, \
 				IR_LIVE_POS_TO_REF(_start), IR_LIVE_POS_TO_SUB_REF(_start), \
@@ -1009,7 +1011,7 @@ typedef struct _ir_lsra_data {
 			int _vreg = (vreg); \
 			ir_live_interval *_ival = (ival); \
 			ir_live_pos _start = _ival->range.start; \
-			ir_live_pos _end = ir_live_range_end(_ival); \
+			ir_live_pos _end = ir_ival_end(_ival); \
 			fprintf(stderr, action " R%d [%d.%d...%d.%d) to %s" comment "\n", \
 				_vreg, \
 				IR_LIVE_POS_TO_REF(_start), IR_LIVE_POS_TO_SUB_REF(_start), \
@@ -1022,7 +1024,7 @@ typedef struct _ir_lsra_data {
 			int _vreg = (vreg); \
 			ir_live_interval *_ival = (ival); \
 			ir_live_pos _start = _ival->range.start; \
-			ir_live_pos _end = ir_live_range_end(_ival); \
+			ir_live_pos _end = ir_ival_end(_ival); \
 			ir_live_pos _pos = (pos); \
 			fprintf(stderr, "      ---- Split R%d [%d.%d...%d.%d) at %d.%d\n", \
 				_vreg, \
@@ -1036,7 +1038,7 @@ typedef struct _ir_lsra_data {
 			int _vreg = (vreg); \
 			ir_live_interval *_ival = (ival); \
 			ir_live_pos _start = _ival->range.start; \
-			ir_live_pos _end = ir_live_range_end(_ival); \
+			ir_live_pos _end = ir_ival_end(_ival); \
 			ir_live_pos _pos = (pos); \
 			fprintf(stderr, action " R%d [%d.%d...%d.%d) assigned to %s at %d.%d\n", \
 				_vreg, \
@@ -1053,7 +1055,7 @@ typedef struct _ir_lsra_data {
 # define IR_LOG_LSRA_CONFLICT(action, vreg, ival, pos);
 #endif
 
-static ir_live_pos ir_live_range_end(ir_live_interval *ival)
+static ir_live_pos ir_ival_end(ir_live_interval *ival)
 {
 	ir_live_range *live_range = &ival->range;
 
@@ -1063,7 +1065,7 @@ static ir_live_pos ir_live_range_end(ir_live_interval *ival)
 	return live_range->end;
 }
 
-static bool ir_live_range_covers(ir_live_interval *ival, ir_live_pos position)
+static bool ir_ival_covers(ir_live_interval *ival, ir_live_pos position)
 {
 	ir_live_range *live_range = &ival->range;
 
@@ -1077,12 +1079,30 @@ static bool ir_live_range_covers(ir_live_interval *ival, ir_live_pos position)
 	return 0;
 }
 
+static bool ir_ival_has_hole_between(ir_live_interval *ival, ir_live_pos from, ir_live_pos to)
+{
+	ir_live_range *r = &ival->range;
+
+	while (r) {
+		if (from < r->start) {
+			return 1;
+		} else if (to <= r->end) {
+			return 0;
+		} else if (from >= r->end) {
+			return 1;
+		}
+		r = r->next;
+	}
+	return 0;
+}
+
+
 static ir_live_pos ir_last_use_pos_before(ir_live_interval *ival, ir_live_pos pos, uint8_t flags)
 {
 	ir_live_pos ret = 0;
 	ir_use_pos *p = ival->use_pos;
 
-	while (p && p->pos < pos) {
+	while (p && p->pos <= pos) {
 		if (p->flags & flags) {
 			ret = p->pos;
 		}
@@ -1102,6 +1122,46 @@ static ir_live_pos ir_first_use_pos_after(ir_live_interval *ival, ir_live_pos po
 		p = p->next;
 	}
 	return p ? p->pos : 0x7fffffff;
+}
+
+static ir_block *ir_block_from_live_pos(ir_ctx *ctx, ir_live_pos pos)
+{
+	int b;
+	ir_block *bb;
+	ir_ref ref = IR_LIVE_POS_TO_REF(pos);
+
+	// TODO: use binary search or map
+	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; b++, bb++) {
+		if (ref >= bb->start && ref <= bb->end) {
+			return bb;
+		}
+	}
+	IR_ASSERT(0);
+}
+
+static ir_live_pos ir_find_optimal_split_position(ir_ctx *ctx, int v, ir_live_interval *ival, ir_live_pos min_pos, ir_live_pos max_pos)
+{
+	ir_block *min_bb, *max_bb;
+
+	if (min_pos == max_pos) {
+		return max_pos;
+	}
+
+	IR_ASSERT(min_pos < max_pos);
+	IR_ASSERT(min_pos >= ival->range.start);
+	IR_ASSERT(max_pos < ir_ival_end(ival));
+
+	min_bb = ir_block_from_live_pos(ctx, min_pos);
+	max_bb = ir_block_from_live_pos(ctx, max_pos);
+
+	if (min_bb == max_bb
+	 || ir_ival_has_hole_between(ival, min_pos, max_pos)) {  // TODO: ???
+		return max_pos;
+	}
+
+	// TODO: search for an optimal block boundary
+
+	return IR_LOAD_LIVE_POS_FROM_REF(max_bb->start);
 }
 
 static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, int v, ir_live_interval *ival, ir_live_pos pos)
@@ -1125,7 +1185,6 @@ static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, int v, ir_live_interv
 		/* split between ranges */
 		pos = p->start;
 	}
-
 
 	use_pos = ival->use_pos;
 	prev_use_pos = NULL;
@@ -1188,7 +1247,7 @@ static ir_reg ir_try_allocate_preferred_reg(ir_ctx *ctx, ir_live_interval *ival,
 	use_pos = ival->use_pos;
 	while (use_pos) {
 		if (use_pos->hint >= 0) {
-			if (ir_live_range_end(ival) <= freeUntilPos[use_pos->hint]) {
+			if (ir_ival_end(ival) <= freeUntilPos[use_pos->hint]) {
 				/* register available for the whole interval */
 				return use_pos->hint;
 			}
@@ -1201,7 +1260,7 @@ static ir_reg ir_try_allocate_preferred_reg(ir_ctx *ctx, ir_live_interval *ival,
 		if (use_pos->hint_ref) {
 			ir_reg reg = ctx->live_intervals[ctx->vregs[use_pos->hint_ref]]->reg;
 			if (reg >= 0) {
-				if (ir_live_range_end(ival) <= freeUntilPos[reg]) {
+				if (ir_ival_end(ival) <= freeUntilPos[reg]) {
 					/* register available for the whole interval */
 					return reg;
 				}
@@ -1230,42 +1289,6 @@ static void ir_add_to_unhandled(ir_ctx *ctx, ir_list *unhandled, int current)
 		}
 		ir_list_insert(unhandled, i, current);
 	}
-}
-
-static ir_block *ir_block_from_live_pos(ir_ctx *ctx, ir_live_pos pos)
-{
-	int b;
-	ir_block *bb;
-	ir_ref ref = IR_LIVE_POS_TO_REF(pos);
-
-	// TODO: use binary search or map
-	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; b++, bb++) {
-		if (ref >= bb->start && ref <= bb->end) {
-			return bb;
-		}
-	}
-	IR_ASSERT(0);
-}
-
-static ir_live_pos ir_find_optimal_split_position(ir_ctx *ctx, ir_live_pos min_pos, ir_live_pos max_pos)
-{
-	ir_block *min_bb, *max_bb;
-
-	if (min_pos == max_pos) {
-		return max_pos;
-	}
-
-	IR_ASSERT(min_pos < max_pos);
-	min_bb = ir_block_from_live_pos(ctx, min_pos);
-	max_bb = ir_block_from_live_pos(ctx, max_pos);
-
-	if (min_bb == max_bb) {
-		return max_pos;
-	}
-
-	// TODO: search for an optimal block boundary
-
-	return max_pos;
 }
 
 static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, int current, uint32_t len, ir_bitset active, ir_bitset inactive)
@@ -1352,7 +1375,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, int current, uint32_t len, i
 	if (!pos) {
 		/* no register available without spilling */
 		return IR_REG_NONE;
-	} else if (ir_live_range_end(ival) <= pos) {
+	} else if (ir_ival_end(ival) <= pos) {
 		/* register available for the whole interval */
 		ival->reg = reg;
 		IR_LOG_LSRA_ASSIGN("    ---- Assign", current, ival, " (available without spilling)");
@@ -1363,7 +1386,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, int current, uint32_t len, i
 		ir_live_pos split_pos = ir_last_use_pos_before(ival, pos,
 			IR_USE_MUST_BE_IN_REG | IR_USE_SHOULD_BE_IN_REG);
 		if (split_pos > ival->range.start) {
-			split_pos = ir_find_optimal_split_position(ctx, split_pos, pos);
+			split_pos = ir_find_optimal_split_position(ctx, current, ival, split_pos, pos);
 			ir_split_interval_at(ctx, current, ival, split_pos);
 			ival->reg = reg;
 			IR_LOG_LSRA_ASSIGN("    ---- Assign", current, ival, " (available without spilling for the first part)");
@@ -1483,7 +1506,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 		/* all other intervals are used before current, so it is best to spill current itself */
 		/* assign spill slot to current */
 		/* split current before its first use position that requires a register */
-		ir_live_pos split_pos = ir_find_optimal_split_position(ctx, ival->range.start, next_use_pos - 1);
+		ir_live_pos split_pos = ir_find_optimal_split_position(ctx, current, ival, ival->range.start, next_use_pos - 1);
 
 		if (split_pos > ival->range.start) {
 			IR_LOG_LSRA("    ---- Conflict with others", current, ival, " (all others are used before)");
@@ -1496,13 +1519,13 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 		}
 	}
 
-	if (ir_live_range_end(ival) > blockPos[reg]) {
+	if (ir_ival_end(ival) > blockPos[reg]) {
 		/* spilling make a register free only for the first part of current */
 		IR_LOG_LSRA("    ---- Conflict with others", current, ival, " (spilling make a register free only for the first part)");
 		/* split current at optimal position before block_pos[reg] */
 		ir_live_pos split_pos = ir_last_use_pos_before(ival,  blockPos[reg] + 1,
 			IR_USE_MUST_BE_IN_REG | IR_USE_SHOULD_BE_IN_REG);
-		split_pos = ir_find_optimal_split_position(ctx, split_pos, blockPos[reg]);
+		split_pos = ir_find_optimal_split_position(ctx, current, ival, split_pos, blockPos[reg]);
 		ir_split_interval_at(ctx, current, ival, split_pos);
 	}
 
@@ -1519,9 +1542,12 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 				IR_ASSERT(other->type != IR_VOID);
 				IR_LOG_LSRA_CONFLICT("      ---- Conflict with active", i, other, overlap);
 
-				split_pos = ir_last_use_pos_before(other, ival->range.start, IR_USE_MUST_BE_IN_REG) + 1;
+				split_pos = ir_last_use_pos_before(other, ival->range.start, IR_USE_MUST_BE_IN_REG);
+				if (split_pos < ival->range.start) {
+					split_pos++; // TODO: ???
+				}
 				if (split_pos > other->range.start) {
-					split_pos = ival->range.start;//ir_find_optimal_split_position(ctx, split_pos, ival->range.start);
+					split_pos = ir_find_optimal_split_position(ctx, i, other, split_pos, ival->range.start);
 					ir_live_interval *child = ir_split_interval_at(ctx, i, other, split_pos);
 					ir_bitset_excl(active, i);
 					IR_LOG_LSRA("      ---- Finish", i, other, "");
@@ -1533,10 +1559,10 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 				}
 
 				split_pos = ir_first_use_pos_after(other, ival->range.start, IR_USE_MUST_BE_IN_REG | IR_USE_SHOULD_BE_IN_REG) - 1;
-				if (split_pos >= ir_live_range_end(other)) {
+				if (split_pos >= ir_ival_end(other)) {
 					other = other->next;
 				} else if (split_pos > other->range.start) {
-					split_pos = split_pos;//ir_find_optimal_split_position(ctx, ival->range.start, split_pos);
+					split_pos = ir_find_optimal_split_position(ctx, i, other, ival->range.start, split_pos);
 					ir_live_interval *child = ir_split_interval_at(ctx, i, other, split_pos);
 					IR_LOG_LSRA("      ---- Spill", i, other, "");
 					other = child;
@@ -1692,14 +1718,14 @@ static int ir_linear_scan(ir_ctx *ctx)
 		/* for each interval i in active */
 		IR_BITSET_FOREACH(active, len, i) {
 			ival = ctx->live_intervals[i];
-			if (ir_live_range_end(ival) <= position) {
+			if (ir_ival_end(ival) <= position) {
 				/* move i from active to handled */
 				ir_bitset_excl(active, i);
 				if (ival->next) {
 					ctx->live_intervals[i] = ival->next;
 					ir_add_to_unhandled(ctx, &unhandled, i);
 				}
-			} else if (!ir_live_range_covers(ival, position)) {
+			} else if (!ir_ival_covers(ival, position)) {
 				/* move i from active to inactive */
 				ir_bitset_excl(active, i);
 				ir_bitset_incl(inactive, i);
@@ -1709,14 +1735,14 @@ static int ir_linear_scan(ir_ctx *ctx)
 		/* for each interval i in inactive */
 		IR_BITSET_FOREACH(inactive, len, i) {
 			ival = ctx->live_intervals[i];
-			if (ir_live_range_end(ival) <= position) {
+			if (ir_ival_end(ival) <= position) {
 				/* move i from inactive to handled */
 				ir_bitset_excl(inactive, i);
 				if (ival->next) {
 					ctx->live_intervals[i] = ival->next;
 					ir_add_to_unhandled(ctx, &unhandled, i);
 				}
-			} else if (ir_live_range_covers(ival, position)) {
+			} else if (ir_ival_covers(ival, position)) {
 				/* move i from active to inactive */
 				ir_bitset_excl(inactive, i);
 				ir_bitset_incl(active, i);
