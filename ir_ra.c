@@ -614,7 +614,7 @@ static void ir_swap_operands(ir_ctx *ctx, ir_ref i, ir_insn *insn)
 	ir_live_pos load_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
 	ir_live_interval *ival;
 	ir_live_range *r;
-	ir_use_pos *p;
+	ir_use_pos *p, *p1 = NULL, *p2 = NULL;
 	ir_ref tmp;
 
 	tmp = insn->op1;
@@ -627,6 +627,7 @@ static void ir_swap_operands(ir_ctx *ctx, ir_ref i, ir_insn *insn)
 		if (p->pos == pos) {
 			p->pos = load_pos;
 			p->op_num = 1;
+			p1 = p;
 			break;
 		}
 		p = p->next;
@@ -657,10 +658,16 @@ static void ir_swap_operands(ir_ctx *ctx, ir_ref i, ir_insn *insn)
 			if (p->pos == load_pos) {
 				p->pos = pos;
 				p->op_num = 2;
+				p2 = p;
 				break;
 			}
 			p = p->next;
 		}
+	}
+	if (p1 && p2) {
+		uint8_t tmp = p1->flags;
+		p1->flags = p2->flags;
+		p2->flags = tmp;
 	}
 }
 
@@ -1332,7 +1339,8 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 				while (use_pos && use_pos->pos <= ival->range.start) { // TODO: less or less-or-equal
 					use_pos = use_pos->next;
 				}
-				while (use_pos && !(use_pos->flags & (IR_USE_MUST_BE_IN_REG|IR_USE_SHOULD_BE_IN_REG))) {
+				while (use_pos && !(use_pos->flags & IR_USE_MUST_BE_IN_REG)) {
+//				while (use_pos && !(use_pos->flags & (IR_USE_MUST_BE_IN_REG|IR_USE_SHOULD_BE_IN_REG))) {
 					use_pos = use_pos->next;
 				}
 				if (use_pos && use_pos->pos < nextUsePos[reg]) {
@@ -1364,7 +1372,8 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 					while (use_pos && use_pos->pos < ival->range.start) {
 						use_pos = use_pos->next;
 					}
-					while (use_pos && !(use_pos->flags & (IR_USE_MUST_BE_IN_REG|IR_USE_SHOULD_BE_IN_REG))) {
+					while (use_pos && !(use_pos->flags & IR_USE_MUST_BE_IN_REG)) {
+//					while (use_pos && !(use_pos->flags & (IR_USE_MUST_BE_IN_REG|IR_USE_SHOULD_BE_IN_REG))) {
 						use_pos = use_pos->next;
 					}
 					if (use_pos && use_pos->pos < nextUsePos[reg]) {
