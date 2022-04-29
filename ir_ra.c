@@ -991,6 +991,68 @@ typedef struct _ir_lsra_data {
 	uint32_t stack_frame_size;
 } ir_lsra_data;
 
+#ifdef IR_DEBUG
+# define IR_LOG_LSRA(action, vreg, ival, comment) do { \
+		if (ctx->flags & IR_DEBUG_RA) { \
+			int _vreg = (vreg); \
+			ir_live_interval *_ival = (ival); \
+			ir_live_pos _start = _ival->range.start; \
+			ir_live_pos _end = ir_live_range_end(_ival); \
+			fprintf(stderr, action " R%d [%d.%d...%d.%d)" comment "\n", \
+				_vreg, \
+				IR_LIVE_POS_TO_REF(_start), IR_LIVE_POS_TO_SUB_REF(_start), \
+				IR_LIVE_POS_TO_REF(_end), IR_LIVE_POS_TO_SUB_REF(_end)); \
+		} \
+	} while (0)
+# define IR_LOG_LSRA_ASSIGN(action, vreg, ival, comment) do { \
+		if (ctx->flags & IR_DEBUG_RA) { \
+			int _vreg = (vreg); \
+			ir_live_interval *_ival = (ival); \
+			ir_live_pos _start = _ival->range.start; \
+			ir_live_pos _end = ir_live_range_end(_ival); \
+			fprintf(stderr, action " R%d [%d.%d...%d.%d) to %s" comment "\n", \
+				_vreg, \
+				IR_LIVE_POS_TO_REF(_start), IR_LIVE_POS_TO_SUB_REF(_start), \
+				IR_LIVE_POS_TO_REF(_end), IR_LIVE_POS_TO_SUB_REF(_end), \
+				ir_reg_name(_ival->reg, _ival->type)); \
+		} \
+	} while (0)
+# define IR_LOG_LSRA_SPLIT(vreg, ival, pos) do { \
+		if (ctx->flags & IR_DEBUG_RA) { \
+			int _vreg = (vreg); \
+			ir_live_interval *_ival = (ival); \
+			ir_live_pos _start = _ival->range.start; \
+			ir_live_pos _end = ir_live_range_end(_ival); \
+			ir_live_pos _pos = (pos); \
+			fprintf(stderr, "      ---- Split R%d [%d.%d...%d.%d) at %d.%d\n", \
+				_vreg, \
+				IR_LIVE_POS_TO_REF(_start), IR_LIVE_POS_TO_SUB_REF(_start), \
+				IR_LIVE_POS_TO_REF(_end), IR_LIVE_POS_TO_SUB_REF(_end), \
+				IR_LIVE_POS_TO_REF(_pos), IR_LIVE_POS_TO_SUB_REF(_pos)); \
+		} \
+	} while (0)
+# define IR_LOG_LSRA_CONFLICT(action, vreg, ival, pos) do { \
+		if (ctx->flags & IR_DEBUG_RA) { \
+			int _vreg = (vreg); \
+			ir_live_interval *_ival = (ival); \
+			ir_live_pos _start = _ival->range.start; \
+			ir_live_pos _end = ir_live_range_end(_ival); \
+			ir_live_pos _pos = (pos); \
+			fprintf(stderr, action " R%d [%d.%d...%d.%d) assigned to %s at %d.%d\n", \
+				_vreg, \
+				IR_LIVE_POS_TO_REF(_start), IR_LIVE_POS_TO_SUB_REF(_start), \
+				IR_LIVE_POS_TO_REF(_end), IR_LIVE_POS_TO_SUB_REF(_end), \
+				ir_reg_name(_ival->reg, _ival->type), \
+				IR_LIVE_POS_TO_REF(_pos), IR_LIVE_POS_TO_SUB_REF(_pos)); \
+		} \
+	} while (0)
+#else
+# define IR_LOG_LSRA(action, vreg, ival, comment)
+# define IR_LOG_LSRA_ASSIGN(vreg, ival, comment)
+# define IR_LOG_LSRA_SPLIT(vreg, ival, pos)
+# define IR_LOG_LSRA_CONFLICT(action, vreg, ival, pos);
+#endif
+
 static ir_live_pos ir_live_range_end(ir_live_interval *ival)
 {
 	ir_live_range *live_range = &ival->range;
@@ -1015,12 +1077,13 @@ static bool ir_live_range_covers(ir_live_interval *ival, ir_live_pos position)
 	return 0;
 }
 
-static ir_live_interval *ir_split_interval_at(ir_live_interval *ival, ir_live_pos pos)
+static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, int v, ir_live_interval *ival, ir_live_pos pos)
 {
 	ir_live_interval *child;
 	ir_live_range *p, *prev;
 	ir_use_pos *use_pos, *prev_use_pos;
 
+	IR_LOG_LSRA_SPLIT(v, ival, pos);
 	IR_ASSERT(pos > ival->range.start);
 
 	p = &ival->range;
@@ -1232,6 +1295,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, int current, uint32_t len, i
 	reg = ir_try_allocate_preferred_reg(ctx, ival, freeUntilPos);
 	if (reg != IR_REG_NONE) {
 		ival->reg = reg;
+		IR_LOG_LSRA_ASSIGN("    ---- Assign", current, ival, " (hint available without spilling)");
 		return reg;
 	}
 
@@ -1258,19 +1322,19 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, int current, uint32_t len, i
 	} else if (ir_live_range_end(ival) <= pos) {
 		/* register available for the whole interval */
 		ival->reg = reg;
+		IR_LOG_LSRA_ASSIGN("    ---- Assign", current, ival, " (available without spilling)");
 		return reg;
 	} else if (pos > ival->range.start) {
 		/* register available for the first part of the interval */
-		ival->reg = reg;
 		/* split current before freeUntilPos[reg] */
-		ir_split_interval_at(ival, pos); // TODO: Split/Spill Pos
-
+		ir_split_interval_at(ctx, current, ival, pos); // TODO: Split/Spill Pos
+		ival->reg = reg;
+		IR_LOG_LSRA_ASSIGN("    ---- Assign", current, ival, " (available without spilling for the first part)");
 #ifdef IR_DEBUG
-		if (ctx->flags & IR_DEBUG_RA) {
-			ir_dump_live_ranges(ctx, stderr);
-		}
+//		if (ctx->flags & IR_DEBUG_RA) {
+//			ir_dump_live_ranges(ctx, stderr);
+//		}
 #endif
-
 		return reg;
 	} else {
 		return IR_REG_NONE;
@@ -1297,6 +1361,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 	}
 	if (!use_pos) {
 		/* spill */
+		IR_LOG_LSRA("    ---- Spill", current, ival, " (no use pos that must be in reg)");
 		return IR_REG_NONE;
 	}
 	next_use_pos = use_pos->pos;
@@ -1405,47 +1470,52 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 		ir_live_pos split_pos = ir_find_optimal_split_position(ctx, ival->range.start, next_use_pos - 1);
 
 		if (split_pos > ival->range.start) {
-			ir_live_interval *child = ir_split_interval_at(ival, split_pos);
+			ir_live_interval *child = ir_split_interval_at(ctx, current, ival, split_pos);
 			ctx->live_intervals[current] = child;
 			ir_add_to_unhandled(ctx, unhandled, current);
 
+			IR_LOG_LSRA("    ---- Spill", current, ival, " (all others are used before)");
 #ifdef IR_DEBUG
-			if (ctx->flags & IR_DEBUG_RA) {
-				ir_dump_live_ranges(ctx, stderr);
-			}
+//			if (ctx->flags & IR_DEBUG_RA) {
+//				ir_dump_live_ranges(ctx, stderr);
+//			}
 #endif
 
 			return IR_REG_NONE;
 		}
 	}
 
-	/* current.reg = reg */
-	ival->reg = reg;
-
 	if (ir_live_range_end(ival) > blockPos[reg]) {
 		/* spilling make a register free only for the first part of current */
 		/* split current at optimal position before block_pos[reg] */
-		ir_split_interval_at(ival, blockPos[reg]); // TODO: Split Pos
+		ir_split_interval_at(ctx, current, ival, blockPos[reg]); // TODO: Split Pos
 	}
 
 	/* spill intervals that currently block reg */
 	IR_BITSET_FOREACH(active, len, i) {
-		if (reg == ctx->live_intervals[i]->reg) {
+		ir_live_interval *other = ctx->live_intervals[i];
+
+		if (reg == other->reg) {
 			/* split active interval for reg at position */
 			ir_live_pos overlap = ir_vregs_overlap(ctx, current, i);
 
 			if (overlap) {
-				IR_ASSERT(ctx->live_intervals[i]->type != IR_VOID);
-				ir_live_interval *child = ir_split_interval_at(ctx->live_intervals[i], ival->range.start); // TODO: Split Pos
+				IR_ASSERT(other->type != IR_VOID);
+				IR_LOG_LSRA_CONFLICT("      ---- Conflict with active", i, other, overlap);
+				ir_live_interval *child = ir_split_interval_at(ctx, i, other, ival->range.start); // TODO: Split Pos
 				ir_bitset_excl(active, i);
 				ctx->live_intervals[i] = child;
+				IR_LOG_LSRA("      ---- Finish", i, other, "");
 				if (child->use_pos) {
 					ir_live_pos split_pos = ir_find_optimal_split_position(ctx, ival->range.start, child->use_pos->pos - 1);
 
 					if (split_pos > ival->range.start) {
-						child = ir_split_interval_at(child, split_pos);
+						other = child;
+						child = ir_split_interval_at(ctx, i, child, split_pos);
 						ctx->live_intervals[i] = child;
+						IR_LOG_LSRA("      ---- Spill", i, other, "");
 					}
+					IR_LOG_LSRA("      ---- Queue", i, child, "");
 					ir_add_to_unhandled(ctx, unhandled, i);
 				}
 			}
@@ -1456,20 +1526,26 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 	/* split any inactive interval for reg at the end of its lifetime hole */
 	IR_BITSET_FOREACH(inactive, len, i) {
 		/* freeUntilPos[it.reg] = next intersection of it with current */
-		if (reg == ctx->live_intervals[i]->reg) {
+		ir_live_interval *other = ctx->live_intervals[i];
+
+		if (reg == other->reg) {
 			ir_live_pos overlap = ir_vregs_overlap(ctx, current, i);
 
 			if (overlap) {
-				IR_ASSERT(ctx->live_intervals[i]->type != IR_VOID);
-				ir_split_interval_at(ctx->live_intervals[i], overlap); // TODO: Split Pos
+				IR_ASSERT(other->type != IR_VOID);
+				IR_LOG_LSRA_CONFLICT("      ---- Conflict with inactive", i, other, overlap);
+				ir_split_interval_at(ctx, i, other, overlap); // TODO: Split Pos
 			}
 		}
 	} IR_BITSET_FOREACH_END();
 
+	/* current.reg = reg */
+	ival->reg = reg;
+	IR_LOG_LSRA_ASSIGN("    ---- Assign", current, ival, " (after splitting others)");
 #ifdef IR_DEBUG
-	if (ctx->flags & IR_DEBUG_RA) {
-		ir_dump_live_ranges(ctx, stderr);
-	}
+//	if (ctx->flags & IR_DEBUG_RA) {
+//		ir_dump_live_ranges(ctx, stderr);
+//	}
 #endif
 
 	return reg;
@@ -1551,6 +1627,14 @@ static int ir_linear_scan(ir_ctx *ctx)
 
 	qsort_r(unhandled.a.refs, ir_list_len(&unhandled), sizeof(ir_ref), ir_live_range_cmp, ctx);
 
+#ifdef IR_DEBUG
+	if (ctx->flags & IR_DEBUG_RA) {
+		fprintf(stderr, "----\n");
+		ir_dump_live_ranges(ctx, stderr);
+		fprintf(stderr, "---- Start LSRA\n");
+	}
+#endif
+
 	while (1) {
 		if (ir_list_len(&unhandled) == 0) {
 			position = 0x7fffffff;
@@ -1566,14 +1650,17 @@ static int ir_linear_scan(ir_ctx *ctx)
 
 			if (position < 0x7fffffff) {
 				ir_bitset_excl(active, current);
-				ctx->live_intervals[current] = ctx->live_intervals[current]->next;
+				ival = ctx->live_intervals[current] = ctx->live_intervals[current]->next;
 			} else {
 				break;
 			}
 		} else {
 			current = ir_list_pop(&unhandled);
-			position = ctx->live_intervals[current]->range.start;
+			ival = ctx->live_intervals[current];
+			position = ival->range.start;
 		}
+
+		IR_LOG_LSRA("  ---- Processing", current, ival, "...");
 
 		/* for each interval i in active */
 		IR_BITSET_FOREACH(active, len, i) {
@@ -1682,6 +1769,14 @@ static int ir_linear_scan(ir_ctx *ctx)
 			}
 		}
 	}
+
+#ifdef IR_DEBUG
+	if (ctx->flags & IR_DEBUG_RA) {
+		fprintf(stderr, "---- Finish LSRA\n");
+		ir_dump_live_ranges(ctx, stderr);
+		fprintf(stderr, "----\n");
+	}
+#endif
 
 	return 1;
 }
