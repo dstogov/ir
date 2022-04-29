@@ -1341,6 +1341,33 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, int current, uint32_t len, i
 	}
 }
 
+static ir_live_pos ir_last_use_pos_before(ir_live_interval *ival, ir_live_pos pos, uint8_t flags)
+{
+	ir_live_pos ret = 0;
+	ir_use_pos *p = ival->use_pos;
+
+	while (p && p->pos < pos) {
+		if (p->flags & flags) {
+			ret = p->pos;
+		}
+		p = p->next;
+	}
+	return ret;
+}
+
+static ir_live_pos ir_first_use_pos_after(ir_live_interval *ival, ir_live_pos pos, uint8_t flags)
+{
+	ir_use_pos *p = ival->use_pos;
+
+	while (p && p->pos <= pos) {
+		p = p->next;
+	}
+	while (p && !(p->flags & flags)) {
+		p = p->next;
+	}
+	return p ? p->pos : 0x7fffffff;
+}
+
 static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir_bitset active, ir_bitset inactive, ir_list *unhandled)
 {
 	ir_live_pos nextUsePos[IR_REG_NUM];
@@ -1352,10 +1379,6 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 	ir_regset available;
 
 	use_pos = ival->use_pos;
-	while (use_pos && use_pos->pos < ival->range.start) {
-		// TODO: skip usages that don't require register
-		use_pos = use_pos->next;
-	}
 	while (use_pos && !(use_pos->flags & IR_USE_MUST_BE_IN_REG)) {
 		use_pos = use_pos->next;
 	}
@@ -1400,16 +1423,10 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 				/* fixed intervals */
 				blockPos[reg] = nextUsePos[reg] = 0;
 			} else {
-				use_pos = ctx->live_intervals[i]->use_pos;
-				while (use_pos && use_pos->pos <= ival->range.start) { // TODO: less or less-or-equal
-					use_pos = use_pos->next;
-				}
-				while (use_pos && !(use_pos->flags & IR_USE_MUST_BE_IN_REG)) {
-//				while (use_pos && !(use_pos->flags & (IR_USE_MUST_BE_IN_REG|IR_USE_SHOULD_BE_IN_REG))) {
-					use_pos = use_pos->next;
-				}
-				if (use_pos && use_pos->pos < nextUsePos[reg]) {
-					nextUsePos[reg] = use_pos->pos;
+				pos = ir_first_use_pos_after(ctx->live_intervals[i], ival->range.start,
+					IR_USE_MUST_BE_IN_REG /* | IR_USE_SHOULD_BE_IN_REG */);
+				if (pos < nextUsePos[reg]) {
+					nextUsePos[reg] = pos;
 				}
 			}
 		}
@@ -1433,16 +1450,10 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 						blockPos[reg] = overlap;
 					}
 				} else {
-					use_pos = ctx->live_intervals[i]->use_pos;
-					while (use_pos && use_pos->pos < ival->range.start) {
-						use_pos = use_pos->next;
-					}
-					while (use_pos && !(use_pos->flags & IR_USE_MUST_BE_IN_REG)) {
-//					while (use_pos && !(use_pos->flags & (IR_USE_MUST_BE_IN_REG|IR_USE_SHOULD_BE_IN_REG))) {
-						use_pos = use_pos->next;
-					}
-					if (use_pos && use_pos->pos < nextUsePos[reg]) {
-						nextUsePos[reg] = use_pos->pos;
+					pos = ir_first_use_pos_after(ctx->live_intervals[i], ival->range.start,
+						IR_USE_MUST_BE_IN_REG /* | IR_USE_SHOULD_BE_IN_REG */);
+					if (pos < nextUsePos[reg]) {
+						nextUsePos[reg] = pos;
 					}
 				}
 			}
@@ -1494,6 +1505,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 	/* spill intervals that currently block reg */
 	IR_BITSET_FOREACH(active, len, i) {
 		ir_live_interval *other = ctx->live_intervals[i];
+		ir_live_pos split_pos;
 
 		if (reg == other->reg) {
 			/* split active interval for reg at position */
@@ -1502,21 +1514,36 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 			if (overlap) {
 				IR_ASSERT(other->type != IR_VOID);
 				IR_LOG_LSRA_CONFLICT("      ---- Conflict with active", i, other, overlap);
-				ir_live_interval *child = ir_split_interval_at(ctx, i, other, ival->range.start); // TODO: Split Pos
-				ir_bitset_excl(active, i);
-				ctx->live_intervals[i] = child;
-				IR_LOG_LSRA("      ---- Finish", i, other, "");
-				if (child->use_pos) {
-					ir_live_pos split_pos = ir_find_optimal_split_position(ctx, ival->range.start, child->use_pos->pos - 1);
 
-					if (split_pos > ival->range.start) {
-						other = child;
-						child = ir_split_interval_at(ctx, i, child, split_pos);
-						ctx->live_intervals[i] = child;
-						IR_LOG_LSRA("      ---- Spill", i, other, "");
-					}
-					IR_LOG_LSRA("      ---- Queue", i, child, "");
+				split_pos = ir_last_use_pos_before(other, ival->range.start, IR_USE_MUST_BE_IN_REG) + 1;
+				if (split_pos > other->range.start) {
+					split_pos = ival->range.start;//ir_find_optimal_split_position(ctx, split_pos, ival->range.start);
+					ir_live_interval *child = ir_split_interval_at(ctx, i, other, split_pos); // TODO: Split Pos
+					ir_bitset_excl(active, i);
+					IR_LOG_LSRA("      ---- Finish", i, other, "");
+					other = child;
+				} else {
+					other->reg = IR_REG_NONE;
+					ir_bitset_excl(active, i);
+					IR_LOG_LSRA("      ---- Spill and Finish", i, other, " (it must not be in reg)");
+				}
+
+				split_pos = ir_first_use_pos_after(other, ival->range.start, IR_USE_MUST_BE_IN_REG | IR_USE_SHOULD_BE_IN_REG) - 1;
+				if (split_pos >= ir_live_range_end(other)) {
+					other = other->next;
+				} else if (split_pos > other->range.start) {
+					split_pos = split_pos;//ir_find_optimal_split_position(ctx, ival->range.start, split_pos);
+					ir_live_interval *child = ir_split_interval_at(ctx, i, other, split_pos);
+					IR_LOG_LSRA("      ---- Spill", i, other, "");
+					other = child;
+				} else {
+					// TODO: this may cause enless loop
+				}
+
+				if (other) {
+					ctx->live_intervals[i] = other;
 					ir_add_to_unhandled(ctx, unhandled, i);
+					IR_LOG_LSRA("      ---- Queue", i, other, "");
 				}
 			}
 			break;
