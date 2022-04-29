@@ -1121,6 +1121,12 @@ static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, int v, ir_live_interv
 	}
 	IR_ASSERT(p);
 
+	if (pos < p->start) {
+		/* split between ranges */
+		pos = p->start;
+	}
+
+
 	use_pos = ival->use_pos;
 	prev_use_pos = NULL;
 
