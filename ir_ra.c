@@ -1506,7 +1506,15 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 		/* all other intervals are used before current, so it is best to spill current itself */
 		/* assign spill slot to current */
 		/* split current before its first use position that requires a register */
-		ir_live_pos split_pos = ir_find_optimal_split_position(ctx, current, ival, ival->range.start, next_use_pos - 1);
+		ir_live_pos split_pos;
+
+		if (next_use_pos == ival->range.start) {
+			IR_ASSERT(use_pos && use_pos->op_num == 0);
+			/* split right after definition */
+			split_pos = next_use_pos + 1;
+		} else {
+			split_pos = ir_find_optimal_split_position(ctx, current, ival, ival->range.start, next_use_pos - 1);
+		}
 
 		if (split_pos > ival->range.start) {
 			IR_LOG_LSRA("    ---- Conflict with others", current, ival, " (all others are used before)");

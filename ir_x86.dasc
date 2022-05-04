@@ -959,6 +959,8 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num)
 		case IR_DIV_INT:
 		case IR_MOD_INT:
 			return (op_num == 2) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
+		case IR_PARAM:
+			return IR_USE_SHOULD_BE_IN_REG;
 	}
 
 	return IR_USE_MUST_BE_IN_REG;
