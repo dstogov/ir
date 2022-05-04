@@ -1159,7 +1159,20 @@ static ir_live_pos ir_find_optimal_split_position(ir_ctx *ctx, int v, ir_live_in
 		return max_pos;
 	}
 
-	// TODO: search for an optimal block boundary
+	if (min_bb->loop_depth < max_bb->loop_depth) {
+		/* Split at the end of the loop entry */
+		do {
+			if (max_bb->loop_header) {
+				max_bb = &ctx->cfg_blocks[max_bb->loop_header];
+			}
+			max_bb = &ctx->cfg_blocks[ctx->cfg_edges[max_bb->predecessors]];
+			IR_ASSERT(ir_ival_covers(ival, IR_DEF_LIVE_POS_FROM_REF(max_bb->end)));
+		} while (min_bb->loop_depth < max_bb->loop_depth);
+
+		return IR_DEF_LIVE_POS_FROM_REF(max_bb->end);
+	}
+
+	IR_ASSERT(min_bb->loop_depth == max_bb->loop_depth); // TODO: Can "min_bb" be in a deeper loop than "max_bb" ???
 
 	return IR_LOAD_LIVE_POS_FROM_REF(max_bb->start);
 }

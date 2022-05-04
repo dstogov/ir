@@ -42,7 +42,7 @@
 	?  spills
 		-  spill slot allocation (packed/aligned according to SpillRange)
 	?  splitting
-	    -  find optimal split position
+	    +  find optimal split position
 	    -  resolution
 	-  splinting
 		-  spill only at cold path if possible	
