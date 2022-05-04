@@ -3817,7 +3817,7 @@ static void ir_emit_param_move(ir_ctx *ctx, uint8_t type, int from_reg, int to, 
 	} else {
 		if (from_reg >= 0) {
 			if (to_reg >= 0) {
-				|	ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, type, from_reg, to_reg
+				|	ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, type, to_reg, from_reg
 			} else {
 				offset = ir_vreg_spill_slot(ctx, to);
 				|	ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [Ra(fp)+offset], from_reg
