@@ -1240,13 +1240,13 @@ static void ir_allocate_spill_slot(ir_ctx *ctx, int current, ir_lsra_data *data)
 	}
 }
 
-static ir_reg ir_try_allocate_preferred_reg(ir_ctx *ctx, ir_live_interval *ival, ir_live_pos *freeUntilPos)
+static ir_reg ir_try_allocate_preferred_reg(ir_ctx *ctx, ir_live_interval *ival, ir_regset available, ir_live_pos *freeUntilPos)
 {
 	ir_use_pos *use_pos;
 
 	use_pos = ival->use_pos;
 	while (use_pos) {
-		if (use_pos->hint >= 0) {
+		if (use_pos->hint >= 0 && IR_REGSET_IN(available, use_pos->hint)) {
 			if (ir_ival_end(ival) <= freeUntilPos[use_pos->hint]) {
 				/* register available for the whole interval */
 				return use_pos->hint;
@@ -1348,7 +1348,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, int current, uint32_t len, i
 	} IR_BITSET_FOREACH_END();
 
 	/* Try to use hint */
-	reg = ir_try_allocate_preferred_reg(ctx, ival, freeUntilPos);
+	reg = ir_try_allocate_preferred_reg(ctx, ival, available, freeUntilPos);
 	if (reg != IR_REG_NONE) {
 		ival->reg = reg;
 		IR_LOG_LSRA_ASSIGN("    ---- Assign", current, ival, " (hint available without spilling)");
