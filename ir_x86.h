@@ -275,6 +275,13 @@ uint32_t __inline __ir_clz(uint32_t value) {
 
 #endif
 
+typedef struct _ir_tmp_reg {
+	uint8_t num;
+	uint8_t type;
+	uint8_t start;
+	uint8_t end;
+} ir_tmp_reg;
+
 bool ir_needs_vreg(ir_ctx *ctx, ir_ref ref);
 
 /* Registers modified by the given instruction */
@@ -282,5 +289,6 @@ ir_regset ir_get_scratch_regset(ir_ctx *ctx, ir_ref ref);
 ir_reg ir_uses_fixed_reg(ir_ctx *ctx, ir_ref ref, int op_num);
 bool ir_result_reuses_op1_reg(ir_ctx *ctx, ir_ref ref);
 uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num);
+int ir_get_temporary_regs(ir_ctx *ctx, ir_ref ref, ir_tmp_reg *tmp_regs);
 
 #endif /* IR_X86_H */

@@ -1,0 +1,20 @@
+--TEST--
+001: alloca function
+--ARGS--
+-S
+--CODE--
+{
+	int32_t size = 10;
+	l_1 = START(l_4);
+	uintptr_t ret, l_2 = ALLOCA(l_1, size);
+	l_4 = RETURN(l_2, ret);
+}
+--EXPECT--
+test:
+	pushq %rbp
+	movq %rsp, %rbp
+	subq $0x10, %rsp
+	movq %rsp, %rax
+	movq %rbp, %rsp
+	popq %rbp
+	retq

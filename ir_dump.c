@@ -260,27 +260,32 @@ void ir_dump_live_ranges(ir_ctx *ctx, FILE *f)
 		return;
 	}
 	fprintf(f, "{ # LIVE-RANGES (vregs_count=%d)\n", ctx->vregs_count);
-	for (i = 1; i <= ctx->vregs_count; i++) {
-		ir_live_interval *ival = ctx->live_intervals[i]->top;
+	for (i = 0; i <= ctx->vregs_count; i++) {
+		ir_live_interval *ival = ctx->live_intervals[i];
 
 		if (ival) {
 			ir_live_range *p;
 			ir_use_pos *use_pos;
 
-			for (j = 1; j < ctx->insns_count; j++) {
-				if (ctx->vregs[j] == i) {
-					break;
+			ival = ival->top;
+			if (i == 0) {
+				fprintf(f, "TMP");
+			} else {
+				for (j = 1; j < ctx->insns_count; j++) {
+					if (ctx->vregs[j] == i) {
+						break;
+					}
 				}
-			}
-			fprintf(f, "R%d (d_%d", i, j);
-			for (j++; j < ctx->insns_count; j++) {
-				if (ctx->vregs[j] == i) {
-					fprintf(f, ", d_%d", j);
+				fprintf(f, "R%d (d_%d", i, j);
+				for (j++; j < ctx->insns_count; j++) {
+					if (ctx->vregs[j] == i) {
+						fprintf(f, ", d_%d", j);
+					}
 				}
-			}
-			fprintf(f, ")");
-			if (ival->stack_spill_pos) {
-				fprintf(f, " [SPILL=0x%x]", ival->stack_spill_pos);
+				fprintf(f, ")");
+				if (ival->stack_spill_pos) {
+					fprintf(f, " [SPILL=0x%x]", ival->stack_spill_pos);
+				}
 			}
 			if (ival->next) {
 				fprintf(f, "\n\t");

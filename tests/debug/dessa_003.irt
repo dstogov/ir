@@ -32,19 +32,19 @@ DESSA 003
 }
 --EXPECT--
 test:
-	movl %edx, %r8d
+	movl %edx, %ecx
 	movl %edi, %eax
-	movl $0xc, %ecx
+	movl $0xc, %edi
 	cltd
-	idivl %ecx
-	movl %eax, %ecx
+	idivl %edi
+	movl %eax, %edx
 .L1:
-	testl %r8d, %r8d
+	testl %ecx, %ecx
 	je .L2
 	movl %esi, %eax
-	movl %ecx, %esi
-	movl %eax, %ecx
+	movl %edx, %esi
+	movl %eax, %edx
 	jmp .L1
 .L2:
-	movl %ecx, %eax
+	movl %edx, %eax
 	retq

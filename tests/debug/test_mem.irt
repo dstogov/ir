@@ -84,10 +84,10 @@ test:
 	subsd 0xc8(%rip), %xmm1
 	movsd %xmm1, -0x38(%rbp)
 	movsd %xmm0, -0x30(%rbp)
-	xorpd %xmm7, %xmm7
-	movsd %xmm7, -0x28(%rbp)
-	xorpd %xmm7, %xmm7
-	movsd %xmm7, -0x20(%rbp)
+	xorpd %xmm0, %xmm0
+	movsd %xmm0, -0x28(%rbp)
+	xorpd %xmm0, %xmm0
+	movsd %xmm0, -0x20(%rbp)
 	subq $8, %rsp
 	movq %rsp, %rax
 	movl $0, (%rax)

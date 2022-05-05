@@ -71,8 +71,8 @@ test:
 .L2:
 	retq
 .L3:
-	movabsq $0x2000003e8, %rax
-	cmpq %rax, %rax
+	movabsq $0x2000003e8, %rcx
+	cmpq %rcx, %rax
 	jl .L4
 	movabsq $0x200000000, %rax
 	retq

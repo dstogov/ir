@@ -77,10 +77,10 @@ test:
 	subsd 0xdc(%rip), %xmm1
 	movsd %xmm1, (%rsp)
 	movsd %xmm0, 8(%rsp)
-	xorpd %xmm7, %xmm7
-	movsd %xmm7, 0x10(%rsp)
-	xorpd %xmm7, %xmm7
-	movsd %xmm7, 0x18(%rsp)
+	xorpd %xmm0, %xmm0
+	movsd %xmm0, 0x10(%rsp)
+	xorpd %xmm0, %xmm0
+	movsd %xmm0, 0x18(%rsp)
 	movl $0, 0x20(%rsp)
 .L1:
 	movl 0x20(%rsp), %eax

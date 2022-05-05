@@ -76,17 +76,17 @@ test:
 	subq $0xa0, %rsp
 	movsd %xmm0, (%rsp)
 	movsd %xmm1, 8(%rsp)
-	movsd 8(%rsp), %xmm7
-	subsd 0x168(%rip), %xmm7
-	movsd %xmm7, 0x18(%rsp)
-	movsd 0x18(%rsp), %xmm7
-	movsd %xmm7, 0x10(%rsp)
-	movsd (%rsp), %xmm7
-	movsd %xmm7, 0x20(%rsp)
-	xorpd %xmm7, %xmm7
-	movsd %xmm7, 0x28(%rsp)
-	xorpd %xmm7, %xmm7
-	movsd %xmm7, 0x30(%rsp)
+	movsd 8(%rsp), %xmm0
+	subsd 0x168(%rip), %xmm0
+	movsd %xmm0, 0x18(%rsp)
+	movsd 0x18(%rsp), %xmm0
+	movsd %xmm0, 0x10(%rsp)
+	movsd (%rsp), %xmm0
+	movsd %xmm0, 0x20(%rsp)
+	xorpd %xmm0, %xmm0
+	movsd %xmm0, 0x28(%rsp)
+	xorpd %xmm0, %xmm0
+	movsd %xmm0, 0x30(%rsp)
 	movl $0, 0x38(%rsp)
 .L1:
 	movl 0x38(%rsp), %eax
@@ -94,42 +94,42 @@ test:
 	movl %eax, 0x40(%rsp)
 	movl 0x40(%rsp), %eax
 	movl %eax, 0x38(%rsp)
-	movsd 0x30(%rsp), %xmm7
-	mulsd 0x28(%rsp), %xmm7
-	movsd %xmm7, 0x50(%rsp)
-	movsd 0x50(%rsp), %xmm7
-	movsd %xmm7, 0x48(%rsp)
-	movsd 0x30(%rsp), %xmm7
-	mulsd %xmm7, %xmm7
-	movsd %xmm7, 0x60(%rsp)
-	movsd 0x60(%rsp), %xmm7
-	movsd %xmm7, 0x58(%rsp)
-	movsd 0x28(%rsp), %xmm7
-	mulsd %xmm7, %xmm7
-	movsd %xmm7, 0x70(%rsp)
-	movsd 0x70(%rsp), %xmm7
-	movsd %xmm7, 0x68(%rsp)
-	movsd 0x58(%rsp), %xmm7
-	subsd 0x68(%rsp), %xmm7
-	movsd %xmm7, 0x78(%rsp)
-	movsd 0x78(%rsp), %xmm7
-	addsd 0x10(%rsp), %xmm7
-	movsd %xmm7, 0x80(%rsp)
-	movsd 0x80(%rsp), %xmm7
-	movsd %xmm7, 0x30(%rsp)
-	movsd 0x48(%rsp), %xmm7
-	addsd %xmm7, %xmm7
-	movsd %xmm7, 0x88(%rsp)
-	movsd 0x88(%rsp), %xmm7
-	addsd 0x20(%rsp), %xmm7
-	movsd %xmm7, 0x90(%rsp)
-	movsd 0x90(%rsp), %xmm7
-	movsd %xmm7, 0x28(%rsp)
-	movsd 0x68(%rsp), %xmm7
-	addsd 0x58(%rsp), %xmm7
-	movsd %xmm7, 0x98(%rsp)
-	movsd 0x98(%rsp), %xmm7
-	ucomisd 0x38(%rip), %xmm7
+	movsd 0x30(%rsp), %xmm0
+	mulsd 0x28(%rsp), %xmm0
+	movsd %xmm0, 0x50(%rsp)
+	movsd 0x50(%rsp), %xmm0
+	movsd %xmm0, 0x48(%rsp)
+	movsd 0x30(%rsp), %xmm0
+	mulsd %xmm0, %xmm0
+	movsd %xmm0, 0x60(%rsp)
+	movsd 0x60(%rsp), %xmm0
+	movsd %xmm0, 0x58(%rsp)
+	movsd 0x28(%rsp), %xmm0
+	mulsd %xmm0, %xmm0
+	movsd %xmm0, 0x70(%rsp)
+	movsd 0x70(%rsp), %xmm0
+	movsd %xmm0, 0x68(%rsp)
+	movsd 0x58(%rsp), %xmm0
+	subsd 0x68(%rsp), %xmm0
+	movsd %xmm0, 0x78(%rsp)
+	movsd 0x78(%rsp), %xmm0
+	addsd 0x10(%rsp), %xmm0
+	movsd %xmm0, 0x80(%rsp)
+	movsd 0x80(%rsp), %xmm0
+	movsd %xmm0, 0x30(%rsp)
+	movsd 0x48(%rsp), %xmm0
+	addsd %xmm0, %xmm0
+	movsd %xmm0, 0x88(%rsp)
+	movsd 0x88(%rsp), %xmm0
+	addsd 0x20(%rsp), %xmm0
+	movsd %xmm0, 0x90(%rsp)
+	movsd 0x90(%rsp), %xmm0
+	movsd %xmm0, 0x28(%rsp)
+	movsd 0x68(%rsp), %xmm0
+	addsd 0x58(%rsp), %xmm0
+	movsd %xmm0, 0x98(%rsp)
+	movsd 0x98(%rsp), %xmm0
+	ucomisd 0x38(%rip), %xmm0
 	ja .L2
 	jmp .L3
 .L2:

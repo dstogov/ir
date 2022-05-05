@@ -38,7 +38,11 @@
 	    -  kill
 	    -  restricted regset
 	    +  must be in register
-	-  temporary registers
+	?  temporary registers
+		-  switch
+		-  arguments loading
+		-  parameter passing
+		-  dessa
 	?  spills
 		-  spill slot allocation (packed/aligned according to SpillRange)
 	?  splitting
@@ -55,10 +59,11 @@
 	-  MIN, MAX, COND
 	-  CAST
 	?  ir_last_use
-	?  operands swap (cmp_int, cmp_fp, cmp_br_int)
-	-  temporary register (e.g. for unsupported immediate operand in mul, div, and 64-bit constants)
+	-  update memory (binop_int, mul_div_mod_pwr2, shift, shift_const, op_int, copy_int/fp?)
+	?  operands swap (binop_int, binop_sse, binop_avx, cmp_int, cmp_fp, cmp_br_int)
+	+  temporary register (e.g. for unsupported immediate operand in mul, div, and 64-bit constants)
 	?  temporary register for swap (dessa3.ir)
-	-  temporary register for spill loads and stores
+	+  temporary register for spill loads and stores
 	-  stack arguments and parameters
 	-  return merge/split
 	?  binary code emission without DynAsm

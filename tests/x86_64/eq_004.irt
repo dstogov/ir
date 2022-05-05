@@ -14,6 +14,6 @@
 test:
 	ucomisd 0x10(%rip), %xmm0
 	setnp %al
-	movl $0, %edx
-	cmovnel %edx, %eax
+	movl $0, %ecx
+	cmovnel %ecx, %eax
 	retq

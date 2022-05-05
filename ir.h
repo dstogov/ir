@@ -503,19 +503,29 @@ typedef struct _ir_use_pos       ir_use_pos;
 typedef struct _ir_live_range    ir_live_range;
 typedef struct _ir_live_interval ir_live_interval;
 
-#define IR_LIVE_POS_TO_REF(pos)          ((pos) / 4)
-#define IR_LIVE_POS_TO_SUB_REF(pos)      ((pos) % 4)
+#define IR_SUB_REFS_COUNT                4
 
-#define IR_LIVE_POS_FROM_REF(ref)        ((ref) * 4)
+#define IR_LOAD_SUB_REF                  0
+#define IR_USE_SUB_REF                   1
+#define IR_DEF_SUB_REF                   2
+#define IR_SAVE_SUB_REF                  3
 
-#define IR_START_LIVE_POS_FROM_REF(ref)  ((ref) * 4)
-#define IR_LOAD_LIVE_POS_FROM_REF(ref)   ((ref) * 4 + 0)
-#define IR_USE_LIVE_POS_FROM_REF(ref)    ((ref) * 4 + 1)
-#define IR_DEF_LIVE_POS_FROM_REF(ref)    ((ref) * 4 + 2)
-#define IR_SAVE_LIVE_POS_FROM_REF(ref)   ((ref) * 4 + 3)
-#define IR_END_LIVE_POS_FROM_REF(ref)    ((ref) * 4 + 4)
+#define IR_LIVE_POS_TO_REF(pos)          ((pos) / IR_SUB_REFS_COUNT)
+#define IR_LIVE_POS_TO_SUB_REF(pos)      ((pos) % IR_SUB_REFS_COUNT)
 
-#define IR_LIVE_INTERVAL_COALESCED       (1<<0)
+#define IR_LIVE_POS_FROM_REF(ref)        ((ref) * IR_SUB_REFS_COUNT)
+
+#define IR_START_LIVE_POS_FROM_REF(ref)  ((ref) * IR_SUB_REFS_COUNT)
+#define IR_LOAD_LIVE_POS_FROM_REF(ref)   ((ref) * IR_SUB_REFS_COUNT + IR_LOAD_SUB_REF)
+#define IR_USE_LIVE_POS_FROM_REF(ref)    ((ref) * IR_SUB_REFS_COUNT + IR_USE_SUB_REF)
+#define IR_DEF_LIVE_POS_FROM_REF(ref)    ((ref) * IR_SUB_REFS_COUNT + IR_DEF_SUB_REF)
+#define IR_SAVE_LIVE_POS_FROM_REF(ref)   ((ref) * IR_SUB_REFS_COUNT + IR_SAVE_SUB_REF)
+#define IR_END_LIVE_POS_FROM_REF(ref)    ((ref) * IR_SUB_REFS_COUNT + IR_SUB_REFS_COUNT)
+
+/* ir_live_interval.flags bits (two low bits are reserved for reg_num */
+#define IR_LIVE_INTERVAL_REG_NUM_MASK    0x3
+#define IR_LIVE_INTERVAL_COALESCED       (1<<2)
+#define IR_LIVE_INTERVAL_TEMP            (1<<3)
 
 #define IR_USE_MUST_BE_IN_REG            (1<<0)
 #define IR_USE_SHOULD_BE_IN_REG          (1<<1)
@@ -546,6 +556,13 @@ struct _ir_live_interval {
 	ir_live_interval *next;
 };
 
+#define IR_REG_SPILL_LOAD  (1<<6)
+#define IR_REG_SPILL_STORE (1<<5)
+#define IR_REG_NUM(r) \
+	((r) == IR_REG_NONE ? IR_REG_NONE : ((r) & ~(IR_REG_SPILL_LOAD|IR_REG_SPILL_STORE)))
+
+typedef int8_t ir_regs[4];
+
 typedef struct _ir_ctx {
 	ir_insn           *ir_base;
 	ir_ref             insns_count;
@@ -567,6 +584,7 @@ typedef struct _ir_ctx {
     uint32_t          *vregs;
     ir_live_interval **live_intervals;
     ir_live_range     *unused_live_ranges;
+    ir_regs           *regs;
     union {
 	    uint32_t      *prev_insn_len;
 	    uint32_t	  *bb_num;

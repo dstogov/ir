@@ -1,18 +1,17 @@
 --TEST--
-005: lt function
+012: sub function
 --ARGS--
 -S -mavx
 --CODE--
 {
-	double c = 0;
+	double c = 0.5;
 	l_1 = START(l_4);
 	double x = PARAM(l_1, "x", 1);
-	bool ret = LT(x, c);
+	double ret = SUB(c, x);
 	l_4 = RETURN(l_1, ret);
 }
 --EXPECT--
 test:
-	vxorpd %xmm1, %xmm1, %xmm1
-	vucomisd %xmm0, %xmm1
-	seta %al
+	vmovsd 8(%rip), %xmm1
+	vsubsd %xmm0, %xmm1, %xmm0
 	retq

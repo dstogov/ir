@@ -177,6 +177,46 @@ static void ir_add_fixed_live_range(ir_ctx *ctx, ir_reg reg, ir_live_pos start, 
 	ir_add_live_range(ctx, v, IR_VOID, start, end);
 }
 
+static void ir_add_tmp(ir_ctx *ctx, ir_ref ref, uint8_t num, ir_tmp_reg tmp_reg)
+{
+	ir_live_interval *ival = ir_mem_malloc(sizeof(ir_live_interval));
+
+	ival->type = tmp_reg.type;
+	ival->reg = IR_REG_NONE;
+	ival->flags = IR_LIVE_INTERVAL_TEMP | num;
+	ival->stack_spill_pos = 0; // not allocated
+	ival->range.start = IR_START_LIVE_POS_FROM_REF(ref) + tmp_reg.start;
+	ival->range.end = IR_START_LIVE_POS_FROM_REF(ref) + tmp_reg.end;
+	ival->range.next = NULL;
+	ival->use_pos = NULL;
+
+	if (!ctx->live_intervals[0]) {
+		ival->top = ival;
+		ival->next = NULL;
+		ctx->live_intervals[0] = ival;
+	} else if (ival->range.start >= ctx->live_intervals[0]->top->range.start) {
+		ir_live_interval *prev = ctx->live_intervals[0]->top;
+
+		while (prev->next && ival->range.start >= prev->next->range.start) {
+			prev = prev->next;
+		}
+		ival->top = prev->top;
+		ival->next = prev->next;
+		prev->next = ival;
+	} else {
+		ir_live_interval *next = ctx->live_intervals[0];
+
+		ival->top = ival;
+		ival->next = next;
+		ctx->live_intervals[0] = ival;
+		while (next) {
+			next->top = ival;
+			next = next->next;
+		}
+	}
+	return;
+}
+
 static void ir_fix_live_range(ir_ctx *ctx, int v, ir_live_pos old_start, ir_live_pos new_start)
 {
 	ir_live_range *p = &ctx->live_intervals[v]->range;
@@ -299,6 +339,15 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 		for (i = bb->end; i > bb->start; i -= ctx->prev_insn_len[i]) {
 			insn = &ctx->ir_base[i];
 			flags = ir_op_flags[insn->op];
+			if (ctx->rules) {
+				ir_tmp_reg tmp_regs[4];
+				int n = ir_get_temporary_regs(ctx, i, tmp_regs);
+
+				while (n > 0) {
+					n--;
+					ir_add_tmp(ctx, i, tmp_regs[n].num, tmp_regs[n]);
+				}
+			}
 			if ((flags & IR_OP_FLAG_DATA) || ((flags & IR_OP_FLAG_MEM) && insn->type != IR_VOID)) {
 				if (ctx->vregs[i]) {
 					if (ir_bitset_in(live, ctx->vregs[i])) {
@@ -321,7 +370,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 								/* We add two uses to emulate move from op1 to res */
 								ir_add_use(ctx, ctx->vregs[i], 0, IR_DEF_LIVE_POS_FROM_REF(i), reg, hint_ref);
 								def_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
-								hint_ref = insn->op1;
+								hint_ref = IR_IS_CONST_REF(insn->op1) ? 0 : insn->op1;
 							} else {
 								def_pos = IR_DEF_LIVE_POS_FROM_REF(i);
 							}
@@ -1050,7 +1099,7 @@ typedef struct _ir_lsra_data {
 	} while (0)
 #else
 # define IR_LOG_LSRA(action, vreg, ival, comment)
-# define IR_LOG_LSRA_ASSIGN(vreg, ival, comment)
+# define IR_LOG_LSRA_ASSIGN(action, vreg, ival, comment)
 # define IR_LOG_LSRA_SPLIT(vreg, ival, pos)
 # define IR_LOG_LSRA_CONFLICT(action, vreg, ival, pos);
 #endif
@@ -1137,6 +1186,7 @@ static ir_block *ir_block_from_live_pos(ir_ctx *ctx, ir_live_pos pos)
 		}
 	}
 	IR_ASSERT(0);
+	return NULL;
 }
 
 static ir_live_pos ir_find_optimal_split_position(ir_ctx *ctx, int v, ir_live_interval *ival, ir_live_pos min_pos, ir_live_pos max_pos)
@@ -1419,16 +1469,20 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 	ir_use_pos *use_pos;
 	ir_regset available;
 
-	use_pos = ival->use_pos;
-	while (use_pos && !(use_pos->flags & IR_USE_MUST_BE_IN_REG)) {
-		use_pos = use_pos->next;
+	if (!(ival->flags & IR_LIVE_INTERVAL_TEMP)) {
+		use_pos = ival->use_pos;
+		while (use_pos && !(use_pos->flags & IR_USE_MUST_BE_IN_REG)) {
+			use_pos = use_pos->next;
+		}
+		if (!use_pos) {
+			/* spill */
+			IR_LOG_LSRA("    ---- Spill", current, ival, " (no use pos that must be in reg)");
+			return IR_REG_NONE;
+		}
+		next_use_pos = use_pos->pos;
+	} else {
+		next_use_pos = ival->range.end;
 	}
-	if (!use_pos) {
-		/* spill */
-		IR_LOG_LSRA("    ---- Spill", current, ival, " (no use pos that must be in reg)");
-		return IR_REG_NONE;
-	}
-	next_use_pos = use_pos->pos;
 
 	if (IR_IS_TYPE_FP(ival->type)) {
 		available = IR_REGSET_FP;
@@ -1515,7 +1569,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 	} IR_REGSET_FOREACH_END();
 
 	/* if first usage of current is after nextUsePos[reg] then */
-	if (next_use_pos > pos) {
+	if (next_use_pos > pos && !(ival->flags & IR_LIVE_INTERVAL_TEMP)) {
 		/* all other intervals are used before current, so it is best to spill current itself */
 		/* assign spill slot to current */
 		/* split current before its first use position that requires a register */
@@ -1687,7 +1741,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 	active = ir_bitset_malloc(ctx->vregs_count + 1 + IR_REG_NUM);
 	inactive = ir_bitset_malloc(ctx->vregs_count + 1 + IR_REG_NUM);
 
-	for (i = 1; i <= ctx->vregs_count; i++) {
+	for (i = 0; i <= ctx->vregs_count; i++) {
 		if (ctx->live_intervals[i] && ctx->live_intervals[i]->range.start > 0) {
 			ir_list_push(&unhandled, i);
 		}
@@ -1833,6 +1887,10 @@ static int ir_linear_scan(ir_ctx *ctx)
 	ir_mem_free(active);
 	ir_list_free(&unhandled);
 
+	if (ctx->live_intervals[0]) {
+		ctx->live_intervals[0] = ctx->live_intervals[0]->top;
+	}
+
 	for (i = 1; i <= ctx->vregs_count; i++) {
 		ival = ctx->live_intervals[i];
 		if (ival) {
@@ -1855,7 +1913,60 @@ static int ir_linear_scan(ir_ctx *ctx)
 	return 1;
 }
 
+static void assign_regs(ir_ctx *ctx)
+{
+	uint32_t i;
+	ir_live_interval *ival;
+	ir_use_pos *use_pos;
+	int8_t reg;
+
+	ctx->regs = ir_mem_malloc(sizeof(ir_regs) * ctx->insns_count);
+	memset(ctx->regs, IR_REG_NONE, sizeof(ir_regs) * ctx->insns_count);
+
+	for (i = 1; i <= ctx->vregs_count; i++) {
+		ival = ctx->live_intervals[i];
+		if (ival) {
+			ival = ival->top;
+			do {
+				if (ival->reg >= 0) {
+					use_pos = ival->use_pos;
+					while (use_pos) {
+						reg = ival->reg;
+						if (ival->top->stack_spill_pos){
+							// TODO: Insert spill loads and stotres in optimal positons (resolution)
+
+							if (use_pos->op_num == 0) {
+								reg |= IR_REG_SPILL_STORE;
+							} else {
+								reg |= IR_REG_SPILL_LOAD;
+							}
+						}
+						ctx->regs[IR_LIVE_POS_TO_REF(use_pos->pos)][use_pos->op_num] = reg;
+						use_pos = use_pos->next;
+					}
+				}
+				ival = ival->next;
+			} while (ival);
+		}
+	}
+
+	/* Temporary registers */
+	ival = ctx->live_intervals[0];
+	if (ival) {
+		ival = ival->top;
+		do {
+			IR_ASSERT(ival->reg != IR_REG_NONE);
+			ctx->regs[IR_LIVE_POS_TO_REF(ival->range.start)][ival->flags & IR_LIVE_INTERVAL_REG_NUM_MASK] = ival->reg;
+			ival = ival->next;
+		} while (ival);
+	}
+}
+
 int ir_reg_alloc(ir_ctx *ctx)
 {
-	return ir_linear_scan(ctx);
+	if (ir_linear_scan(ctx)) {
+		assign_regs(ctx);
+		return 1;
+	}
+	return 0;
 }

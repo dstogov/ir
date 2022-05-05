@@ -56,9 +56,9 @@ test:
 	subq $0x78, %rsp
 	movsd %xmm0, (%rsp)
 	movsd %xmm1, 8(%rsp)
-	movsd 8(%rsp), %xmm7
-	subsd 0x10b(%rip), %xmm7
-	movsd %xmm7, 0x10(%rsp)
+	movsd 8(%rsp), %xmm0
+	subsd 0x10b(%rip), %xmm0
+	movsd %xmm0, 0x10(%rsp)
 	xorpd %xmm0, %xmm0
 	movsd %xmm0, 0x18(%rsp)
 	xorpd %xmm0, %xmm0
@@ -68,32 +68,32 @@ test:
 	movl 0x28(%rsp), %eax
 	addl $1, %eax
 	movl %eax, 0x30(%rsp)
-	movsd 0x20(%rsp), %xmm7
-	mulsd 0x18(%rsp), %xmm7
-	movsd %xmm7, 0x38(%rsp)
-	movsd 0x20(%rsp), %xmm7
-	mulsd %xmm7, %xmm7
-	movsd %xmm7, 0x40(%rsp)
-	movsd 0x18(%rsp), %xmm7
-	mulsd %xmm7, %xmm7
-	movsd %xmm7, 0x48(%rsp)
-	movsd 0x40(%rsp), %xmm7
-	subsd 0x48(%rsp), %xmm7
-	movsd %xmm7, 0x50(%rsp)
-	movsd 0x50(%rsp), %xmm7
-	addsd 0x10(%rsp), %xmm7
-	movsd %xmm7, 0x58(%rsp)
-	movsd 0x38(%rsp), %xmm7
-	addsd %xmm7, %xmm7
-	movsd %xmm7, 0x60(%rsp)
-	movsd 0x60(%rsp), %xmm7
-	addsd (%rsp), %xmm7
-	movsd %xmm7, 0x68(%rsp)
-	movsd 0x48(%rsp), %xmm7
-	addsd 0x40(%rsp), %xmm7
-	movsd %xmm7, 0x70(%rsp)
-	movsd 0x70(%rsp), %xmm7
-	ucomisd 0x4f(%rip), %xmm7
+	movsd 0x20(%rsp), %xmm0
+	mulsd 0x18(%rsp), %xmm0
+	movsd %xmm0, 0x38(%rsp)
+	movsd 0x20(%rsp), %xmm0
+	mulsd %xmm0, %xmm0
+	movsd %xmm0, 0x40(%rsp)
+	movsd 0x18(%rsp), %xmm0
+	mulsd %xmm0, %xmm0
+	movsd %xmm0, 0x48(%rsp)
+	movsd 0x40(%rsp), %xmm0
+	subsd 0x48(%rsp), %xmm0
+	movsd %xmm0, 0x50(%rsp)
+	movsd 0x50(%rsp), %xmm0
+	addsd 0x10(%rsp), %xmm0
+	movsd %xmm0, 0x58(%rsp)
+	movsd 0x38(%rsp), %xmm0
+	addsd %xmm0, %xmm0
+	movsd %xmm0, 0x60(%rsp)
+	movsd 0x60(%rsp), %xmm0
+	addsd (%rsp), %xmm0
+	movsd %xmm0, 0x68(%rsp)
+	movsd 0x48(%rsp), %xmm0
+	addsd 0x40(%rsp), %xmm0
+	movsd %xmm0, 0x70(%rsp)
+	movsd 0x70(%rsp), %xmm0
+	ucomisd 0x4f(%rip), %xmm0
 	ja .L2
 	jmp .L3
 .L2:
