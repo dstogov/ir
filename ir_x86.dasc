@@ -3781,47 +3781,48 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, int from, int to)
 	return 1;
 }
 
-static void ir_emit_param_move(ir_ctx *ctx, uint8_t type, int from_reg, int to, ir_ref name)
+static void ir_emit_param_move(ir_ctx *ctx, uint8_t type, ir_reg from_reg, ir_reg to_reg, ir_ref to)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-	ir_reg to_reg = ir_vreg_reg(ctx, to);
 	ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_RBP : IR_REG_RSP;
 	int32_t offset;
 
 	if (IR_IS_TYPE_INT(type)) {
-		if (from_reg >= 0) {
-			if (to_reg >= 0) {
+		if (from_reg != IR_REG_NONE) {
+			if (to_reg != IR_REG_NONE) {
 				|	ASM_REG_REG_OP mov, type, to_reg, from_reg
 			} else {
-				offset = ir_vreg_spill_slot(ctx, to);
+				offset = ir_ref_spill_slot(ctx, to);
 				|	ASM_MEM_REG_OP mov, type, [Ra(fp)+offset], from_reg
 			}
 		} else {
 			offset = (ctx->flags & IR_USE_FRAME_POINTER) ? -8 : -8; // TODO:
-			if (to_reg >= 0) {
+			if (to_reg != IR_REG_NONE) {
 				|	ASM_REG_MEM_OP mov, type, to_reg, [Ra(fp)+offset]
 			} else {
+				IR_ASSERT(0); // TODO: temporary register
 				|	ASM_REG_MEM_OP mov, type, IR_REG_R0, [Ra(fp)+offset] // TODO: tmp
-				offset = ir_vreg_spill_slot(ctx, to);
+				offset = ir_ref_spill_slot(ctx, to);
 				|	ASM_MEM_REG_OP mov, type, [Ra(fp)+offset], IR_REG_R0 // TODO: tmp
 			}
 		}
 	} else {
-		if (from_reg >= 0) {
-			if (to_reg >= 0) {
+		if (from_reg != IR_REG_NONE) {
+			if (to_reg != IR_REG_NONE) {
 				|	ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, type, to_reg, from_reg
 			} else {
-				offset = ir_vreg_spill_slot(ctx, to);
+				offset = ir_ref_spill_slot(ctx, to);
 				|	ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [Ra(fp)+offset], from_reg
 			}
 		} else {
 			offset = (ctx->flags & IR_USE_FRAME_POINTER) ? -8 : -8; // TODO:
-			if (to_reg >= 0) {
+			if (to_reg != IR_REG_NONE) {
 				|	ASM_FP_REG_MEM_OP movss, movsd, vmovss, vmovsd, type, to_reg, [Ra(fp)+offset]
 			} else {
+				IR_ASSERT(0); // TODO: temporary register
 				|	ASM_FP_REG_MEM_OP movss, movsd, vmovss, vmovsd, type, IR_REG_R0, [Ra(fp)+offset] // TODO: tmp
-				offset = ir_vreg_spill_slot(ctx, to);
+				offset = ir_ref_spill_slot(ctx, to);
 				|	ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [Ra(fp)+offset], IR_REG_R0 // TODO: tmp
 			}
 		}
@@ -3866,22 +3867,14 @@ static void ir_emit_load_params(ir_ctx *ctx)
 					}
 					fp_param_num++;
 				}
-#if 1
 				dst_reg = IR_REG_NUM(ctx->regs[use][0]);
 				if (src_reg != dst_reg) {
-					// TODO: DO parallel move
-					ir_emit_param_move(ctx, insn->type, src_reg, ctx->vregs[use], insn->op2);
+					// TODO: parallel move
+					ir_emit_param_move(ctx, insn->type, src_reg, dst_reg, use);
 				}
 				if (dst_reg != IR_REG_NONE && (ctx->regs[use][0] & IR_REG_SPILL_STORE)) {
 					ir_emit_spill_store(ctx, insn->type, dst_reg, use);
 				}
-#else
-				dst_reg = ir_ref_reg(ctx, use);
-				if (src_reg != dst_reg) {
-					// TODO: DO parallel move
-					ir_emit_param_move(ctx, insn->type, src_reg, ctx->vregs[use], insn->op2);
-				}
-#endif
 			} else {
 				if (IR_IS_TYPE_INT(insn->type)) {
 					int_param_num++;
