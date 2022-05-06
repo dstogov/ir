@@ -24,11 +24,11 @@ test:
 	subq $8, %rsp
 	movq %rbx, (%rsp)
 	movl %edi, %ebx
-	leaq 0x27(%rip), %rdi
 	movl %ecx, %eax
 	movl %esi, %ecx
 	movl %edx, %esi
 	movl %eax, %edx
+	leaq 0x1f(%rip), %rdi
 	movabsq $_IO_printf, %rax
 	callq *%rax
 	leal (%rax, %rbx), %eax

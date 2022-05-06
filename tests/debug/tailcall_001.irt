@@ -16,8 +16,8 @@ Simple CALL
 }
 --EXPECT--
 test:
+	leaq 0x11(%rip), %rdi
 	movl $0x2a, %esi
-	leaq 0xc(%rip), %rdi
 	movabsq $_IO_printf, %rax
 	jmpq *%rax
 

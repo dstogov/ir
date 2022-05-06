@@ -17,8 +17,8 @@ Simple CALL
 --EXPECT--
 test:
 	subq $8, %rsp
+	leaq 0x1d(%rip), %rdi
 	movl $0x2a, %esi
-	leaq 0x18(%rip), %rdi
 	movabsq $_IO_printf, %rax
 	callq *%rax
 	addq $8, %rsp
