@@ -951,8 +951,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, int b, emit_copy_t emit_copy)
 	int succ, j, k = 0, n = 0;
 	ir_block *bb, *succ_bb;
 	ir_use_list *use_list;
-	uint8_t *type;
-	uint32_t *loc, *pred;
+	ir_ref *loc, *pred;
 	uint32_t len;
 	ir_bitset todo, ready;
 
@@ -974,12 +973,11 @@ int ir_gen_dessa_moves(ir_ctx *ctx, int b, emit_copy_t emit_copy)
 	}
 	IR_ASSERT(k != 0);
 
-	type = ir_mem_calloc((ctx->vregs_count + 1), sizeof(uint8_t));
-	loc = ir_mem_calloc((ctx->vregs_count + 1) * 2, sizeof(uint32_t));
-	pred = loc + (ctx->vregs_count + 1);
-	len = ir_bitset_len(ctx->vregs_count + 1);
-	todo = ir_bitset_malloc(ctx->vregs_count + 1);
-	ready = ir_bitset_malloc(ctx->vregs_count + 1);
+	loc = ir_mem_calloc(ctx->insns_count * 2, sizeof(ir_ref));
+	pred = loc + ctx->insns_count;
+	len = ir_bitset_len(ctx->insns_count);
+	todo = ir_bitset_malloc(ctx->insns_count);
+	ready = ir_bitset_malloc(ctx->insns_count);
 
 	for (j = 0; j < use_list->count; j++) {
 		ir_ref ref = ctx->use_edges[use_list->refs + j];
@@ -987,12 +985,11 @@ int ir_gen_dessa_moves(ir_ctx *ctx, int b, emit_copy_t emit_copy)
 		if (insn->op == IR_PHI) {
 			ir_ref input = insn->ops[k];
 			if (IR_IS_CONST_REF(input)) {
-				emit_copy(ctx, insn->type, input, ctx->vregs[ref]);
+				emit_copy(ctx, insn->type, input, ref);
 			} else if (ctx->vregs[input] != ctx->vregs[ref]) {
-				loc[ctx->vregs[input]] = ctx->vregs[input];
-				pred[ctx->vregs[ref]] = ctx->vregs[input];
-				type[ctx->vregs[ref]] = insn->type;
-				ir_bitset_incl(todo, ctx->vregs[ref]);
+				loc[input] = input;
+				pred[ref] = input;
+				ir_bitset_incl(todo, ref);
 				n++;
 			}
 		}
@@ -1011,7 +1008,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, int b, emit_copy_t emit_copy)
 			b = ir_bitset_pop_first(ready, len);
 			a = pred[b];
 			c = loc[a];
-			emit_copy(ctx, type[b], c, b);
+			emit_copy(ctx, ctx->ir_base[b].type, c, b);
 			loc[a] = b;
 			if (a == c && pred[a]) {
 				ir_bitset_incl(ready, a);
@@ -1019,7 +1016,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, int b, emit_copy_t emit_copy)
 		}
 		b = ir_bitset_pop_first(todo, len);
 		if (b != loc[pred[b]]) {
-			emit_copy(ctx, type[b], b, 0);
+			emit_copy(ctx, ctx->ir_base[b].type, b, 0);
 			loc[b] = 0;
 			ir_bitset_incl(ready, b);
 		}
@@ -1028,7 +1025,6 @@ int ir_gen_dessa_moves(ir_ctx *ctx, int b, emit_copy_t emit_copy)
 	ir_mem_free(ready);
 	ir_mem_free(todo);
 	ir_mem_free(loc);
-	ir_mem_free(type);
 
 	return 1;
 }
@@ -1639,7 +1635,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 					IR_LOG_LSRA("      ---- Spill", i, other, "");
 					other = child;
 				} else {
-					// TODO: this may cause enless loop
+					// TODO: this may cause endless loop
 				}
 
 				if (other) {
@@ -1685,7 +1681,7 @@ static int ir_live_range_cmp(const void *r1, const void *r2, void *data)
 	return lrg2->start - lrg1->start;
 }
 
-static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, int from, int to)
+static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 {
 	if (to == 0) {
 		ir_block *bb = ctx->data;

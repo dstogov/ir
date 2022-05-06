@@ -1,12 +1,12 @@
 #include "ir.h"
 #include "ir_private.h"
 
-static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, int from, int to)
+static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 {
 	FILE *f = ctx->data;
 
 	if (to) {
-		fprintf(f, "\td_%d = ", to);
+		fprintf(f, "\td_%d = ", ctx->vregs[to]);
 	} else {
 		fprintf(f, "\ttmp = ");
 	}
@@ -14,7 +14,7 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, int from, int to)
 		ir_print_const(ctx, &ctx->ir_base[from], f);
 		fprintf(f, ";\n");
 	} else if (from) {
-		fprintf(f, "d_%d;\n", from);
+		fprintf(f, "d_%d;\n", ctx->vregs[from]);
 	} else {
 		fprintf(f, "tmp;\n");
 	}

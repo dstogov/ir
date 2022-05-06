@@ -146,7 +146,7 @@ void ir_dump_use_lists(ir_ctx *ctx, FILE *f)
 	}
 }
 
-static int ir_dump_dessa_move(ir_ctx *ctx, uint8_t type, int from, int to)
+static int ir_dump_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 {
 	FILE *f = ctx->data;
 	int8_t reg;
@@ -154,8 +154,8 @@ static int ir_dump_dessa_move(ir_ctx *ctx, uint8_t type, int from, int to)
 	if (IR_IS_CONST_REF(from)) {
 		fprintf(f, "\tmov c_%d -> ", -from);
 	} else if (from) {
-		fprintf(f, "\tmov R%d", from);
-		reg = ctx->live_intervals[from]->reg;
+		fprintf(f, "\tmov R%d", ctx->vregs[from]);
+		reg = ctx->live_intervals[ctx->vregs[from]]->reg;
 		if (reg >= 0) {
 			fprintf(f, " [%%%s]", ir_reg_name(reg, type));
 		}
@@ -165,8 +165,8 @@ static int ir_dump_dessa_move(ir_ctx *ctx, uint8_t type, int from, int to)
 	}
 
 	if (to) {
-		fprintf(f, "R%d", to);
-		reg = ctx->live_intervals[to]->reg;
+		fprintf(f, "R%d", ctx->vregs[to]);
+		reg = ctx->live_intervals[ctx->vregs[to]]->reg;
 		if (reg >= 0) {
 			fprintf(f, " [%%%s]", ir_reg_name(reg, type));
 		}
