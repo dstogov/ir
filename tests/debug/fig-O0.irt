@@ -72,6 +72,14 @@ test:
 	movl %edx, 0x10(%rsp)
 	movl %ecx, 0x18(%rsp)
 	movl %r9d, 0x20(%rsp)
+	movl -8(%rsp), %eax
+	movl %eax, 0x28(%rsp)
+	movl -8(%rsp), %eax
+	movl %eax, 0x30(%rsp)
+	movl -8(%rsp), %eax
+	movl %eax, 0x38(%rsp)
+	movl -8(%rsp), %eax
+	movl %eax, 0x40(%rsp)
 	movl (%rsp), %edx
 	movl %edx, 0x48(%rsp)
 	movl 0x18(%rsp), %edx
