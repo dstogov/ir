@@ -3706,7 +3706,7 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	dasm_State **Dst = &data->dasm_state;
 	const char *name;
 	void *addr;
-	ir_reg dst;
+	ir_reg def_reg;
 
 	name = ir_get_str(ctx, ctx->ir_base[insn->op2].val.addr);
 	addr = ir_resolve_sym_name(name);
@@ -3722,13 +3722,27 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	if (insn->type != IR_VOID) {
 		if (IR_IS_TYPE_INT(insn->type)) {
-			dst = ir_ref_reg(ctx, def);
-			if (dst != IR_REG_INT_RET1) {
+			def_reg = IR_REG_NUM(ctx->regs[def][0]);
+			if (def_reg != IR_REG_NONE) {
+				if (def_reg != IR_REG_INT_RET1) {
+					|	ASM_REG_REG_OP mov, insn->type, def_reg, IR_REG_INT_RET1
+				}
+				if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
+					ir_emit_spill_store(ctx, insn->type, def_reg, def);
+				}
+			} else {
 				ir_emit_store(ctx, insn->type, IR_REG_INT_RET1, def);
 			}
 		} else if (IR_IS_TYPE_FP(insn->type)) {
-			dst = ir_ref_reg(ctx, def);
-			if (dst != IR_REG_FP_RET1) {
+			def_reg = IR_REG_NUM(ctx->regs[def][0]);
+			if (def_reg != IR_REG_NONE) {
+				if (def_reg != IR_REG_FP_RET1) {
+					|	ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, insn->type, def_reg, IR_REG_FP_RET1
+				}
+				if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
+					ir_emit_spill_store(ctx, insn->type, def_reg, def);
+				}
+			} else {
 				ir_emit_fp_store(ctx, insn->type, IR_REG_FP_RET1, def);
 			}
 		} else {
