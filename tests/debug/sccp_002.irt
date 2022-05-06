@@ -55,8 +55,8 @@ test:
 	cmpl $1, %edi
 	jl .L1
 	movslq %edi, %rdi
-	leaq 0x2c(%rip), %rdx
-	jmpq *-8(%rdx, %rdi, 8)
+	leaq 0x2c(%rip), %rax
+	jmpq *-8(%rax, %rdi, 8)
 	movl $1, %eax
 	jmp .L3
 	movl $2, %eax
