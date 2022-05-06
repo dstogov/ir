@@ -3531,10 +3531,10 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count)
 	ir_type type;
 	ir_regset todo, ready;
 
-	loc = ir_mem_calloc(IR_REG_NUM * 3, sizeof(int8_t));
+	loc = ir_mem_malloc(IR_REG_NUM * 3 * sizeof(int8_t));
 	pred = loc + IR_REG_NUM;
 	types = pred + IR_REG_NUM;
-	memset(loc, IR_REG_NONE, IR_REG_NUM * sizeof(int8_t));
+	memset(loc, IR_REG_NONE, IR_REG_NUM * 2 * sizeof(int8_t));
 	todo = IR_REGSET_EMPTY;
 	ready = IR_REGSET_EMPTY;
 
@@ -3570,7 +3570,7 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count)
 				|	ASM_FP_REG_REG_OP movaps, movapd, vmovaps, vmovapd, type, to, c
 			}
 			loc[from_reg] = to;
-			if (from_reg == c && pred[from_reg]) {
+			if (from_reg == c && pred[from_reg] != IR_REG_NONE) {
 				IR_REGSET_INCL(ready, from_reg);
 			}
 		}
