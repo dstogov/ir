@@ -522,11 +522,7 @@ typedef struct _ir_live_interval ir_live_interval;
 #define IR_SAVE_LIVE_POS_FROM_REF(ref)   ((ref) * IR_SUB_REFS_COUNT + IR_SAVE_SUB_REF)
 #define IR_END_LIVE_POS_FROM_REF(ref)    ((ref) * IR_SUB_REFS_COUNT + IR_SUB_REFS_COUNT)
 
-/* ir_live_interval.flags bits (two low bits are reserved for reg_num */
-#define IR_LIVE_INTERVAL_REG_NUM_MASK    0x3
-#define IR_LIVE_INTERVAL_COALESCED       (1<<2)
-#define IR_LIVE_INTERVAL_TEMP            (1<<3)
-
+/* ir_use_pos.flags bits */
 #define IR_USE_MUST_BE_IN_REG            (1<<0)
 #define IR_USE_SHOULD_BE_IN_REG          (1<<1)
 
@@ -544,6 +540,13 @@ struct _ir_live_range {
 	ir_live_pos    end;   /* exclusive */
 	ir_live_range *next;
 };
+
+/* ir_live_interval.flags bits (two low bits are reserved for reg_num */
+#define IR_LIVE_INTERVAL_REG_NUM_MASK    0x3
+#define IR_LIVE_INTERVAL_FIXED           (1<<2)
+#define IR_LIVE_INTERVAL_TEMP            (1<<3)
+#define IR_LIVE_INTERVAL_VAR             (1<<4)
+#define IR_LIVE_INTERVAL_COALESCED       (1<<5)
 
 struct _ir_live_interval {
 	uint8_t           type;

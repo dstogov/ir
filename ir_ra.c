@@ -67,7 +67,7 @@ static void ir_add_local_var(ir_ctx *ctx, int v, uint8_t type)
 	IR_ASSERT(type != IR_VOID);
 	ival->type = type;
 	ival->reg = IR_REG_NONE;
-	ival->flags = 0;
+	ival->flags = IR_LIVE_INTERVAL_VAR;
 	ival->stack_spill_pos = 0; // not allocated
 	ival->range.start = 0;
 	ival->range.end = ctx->insns_count;
@@ -161,7 +161,7 @@ static void ir_add_fixed_live_range(ir_ctx *ctx, ir_reg reg, ir_live_pos start, 
 		ival = ir_mem_malloc(sizeof(ir_live_interval));
 		ival->type = IR_VOID;
 		ival->reg = reg;
-		ival->flags = 0;
+		ival->flags = IR_LIVE_INTERVAL_FIXED;
 		ival->stack_spill_pos = 0; // not allocated
 		ival->range.start = start;
 		ival->range.end = end;
@@ -1513,9 +1513,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 		reg = ctx->live_intervals[i]->reg;
 		IR_ASSERT(reg >= 0);
 		if (IR_REGSET_IN(available, reg)) {
-			// TODO: intervals that can't be spilled should be handled as fixed
-			if (ctx->live_intervals[i]->type == IR_VOID) {
-				/* fixed intervals */
+			if (ctx->live_intervals[i]->flags & (IR_LIVE_INTERVAL_FIXED|IR_LIVE_INTERVAL_TEMP)) {
 				blockPos[reg] = nextUsePos[reg] = 0;
 			} else {
 				pos = ir_first_use_pos_after(ctx->live_intervals[i], ival->range.start,
@@ -1536,8 +1534,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 			ir_live_pos overlap = ir_vregs_overlap(ctx, current, i);
 
 			if (overlap) {
-				if (ctx->live_intervals[i]->type == IR_VOID) {
-					/* fixed intervals */
+				if (ctx->live_intervals[i]->flags & (IR_LIVE_INTERVAL_FIXED|IR_LIVE_INTERVAL_TEMP)) {
 					if (overlap < nextUsePos[reg]) {
 						nextUsePos[reg] = overlap;
 					}
@@ -1742,7 +1739,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 	inactive = ir_bitset_malloc(ctx->vregs_count + 1 + IR_REG_NUM);
 
 	for (i = 0; i <= ctx->vregs_count; i++) {
-		if (ctx->live_intervals[i] && ctx->live_intervals[i]->range.start > 0) {
+		if (ctx->live_intervals[i] && !(ctx->live_intervals[i]->flags & IR_LIVE_INTERVAL_VAR)) {
 			ir_list_push(&unhandled, i);
 		}
 	}
