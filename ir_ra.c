@@ -1302,13 +1302,15 @@ static void ir_allocate_spill_slot(ir_ctx *ctx, int current, ir_lsra_data *data)
 static ir_reg ir_try_allocate_preferred_reg(ir_ctx *ctx, ir_live_interval *ival, ir_regset available, ir_live_pos *freeUntilPos)
 {
 	ir_use_pos *use_pos;
+	ir_reg reg;
 
 	use_pos = ival->use_pos;
 	while (use_pos) {
-		if (use_pos->hint >= 0 && IR_REGSET_IN(available, use_pos->hint)) {
-			if (ir_ival_end(ival) <= freeUntilPos[use_pos->hint]) {
+		reg = use_pos->hint;
+		if (reg >= 0 && IR_REGSET_IN(available, reg)) {
+			if (ir_ival_end(ival) <= freeUntilPos[reg]) {
 				/* register available for the whole interval */
-				return use_pos->hint;
+				return reg;
 			}
 		}
 		use_pos = use_pos->next;
@@ -1317,12 +1319,34 @@ static ir_reg ir_try_allocate_preferred_reg(ir_ctx *ctx, ir_live_interval *ival,
 	use_pos = ival->use_pos;
 	while (use_pos) {
 		if (use_pos->hint_ref) {
-			ir_reg reg = ctx->live_intervals[ctx->vregs[use_pos->hint_ref]]->reg;
-			if (reg >= 0) {
+			reg = ctx->live_intervals[ctx->vregs[use_pos->hint_ref]]->reg;
+			if (reg >= 0 && IR_REGSET_IN(available, reg)) {
 				if (ir_ival_end(ival) <= freeUntilPos[reg]) {
 					/* register available for the whole interval */
 					return reg;
 				}
+			}
+		}
+		use_pos = use_pos->next;
+	}
+
+	return IR_REG_NONE;
+}
+
+static ir_reg ir_get_preferred_reg(ir_ctx *ctx, ir_live_interval *ival, ir_regset available)
+{
+	ir_use_pos *use_pos;
+	ir_reg reg;
+
+	use_pos = ival->use_pos;
+	while (use_pos) {
+		reg = use_pos->hint;
+		if (reg >= 0 && IR_REGSET_IN(available, reg)) {
+			return reg;
+		} else if (use_pos->hint_ref) {
+			reg = ctx->live_intervals[ctx->vregs[use_pos->hint_ref]]->reg;
+			if (reg >= 0 && IR_REGSET_IN(available, reg)) {
+				return reg;
 			}
 		}
 		use_pos = use_pos->next;
@@ -1445,9 +1469,16 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, int current, uint32_t len, i
 		ir_live_pos split_pos = ir_last_use_pos_before(ival, pos,
 			IR_USE_MUST_BE_IN_REG | IR_USE_SHOULD_BE_IN_REG);
 		if (split_pos > ival->range.start) {
+			ir_reg pref_reg;
+
 			split_pos = ir_find_optimal_split_position(ctx, current, ival, split_pos, pos);
 			ir_split_interval_at(ctx, current, ival, split_pos);
-			ival->reg = reg;
+			pref_reg = ir_try_allocate_preferred_reg(ctx, ival, available, freeUntilPos);
+			if (pref_reg != IR_REG_NONE) {
+				ival->reg = pref_reg;
+			} else {
+				ival->reg = reg;
+			}
 			IR_LOG_LSRA_ASSIGN("    ---- Assign", current, ival, " (available without spilling for the first part)");
 			return reg;
 		}
@@ -1548,10 +1579,13 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, int current, uint32_t len, ir
 		}
 	} IR_BITSET_FOREACH_END();
 
-	// TODO: support for register hinting
+	/* register hinting */
+	reg = ir_get_preferred_reg(ctx, ival, available);
+	if (reg == IR_REG_NONE) {
+		reg = IR_REGSET_FIRST(available);
+	}
 
 	/* reg = register with highest nextUsePos */
-	reg = IR_REGSET_FIRST(available);
 	IR_REGSET_EXCL(available, reg);
 	pos = nextUsePos[reg];
 	IR_REGSET_FOREACH(available, i) {
