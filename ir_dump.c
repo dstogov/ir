@@ -1,5 +1,7 @@
 #include "ir.h"
 
+#include "ir_x86.h"
+
 void ir_dump(ir_ctx *ctx, FILE *f)
 {
 	ir_ref i, j, n, ref, *p;
@@ -340,7 +342,7 @@ void ir_dump_live_ranges(ir_ctx *ctx, FILE *f)
 		}
 	}
 #if 1
-	for (i = ctx->vregs_count + 1; i < ctx->vregs_count + 1 +32; i++) {
+	for (i = ctx->vregs_count + 1; i <= ctx->vregs_count + IR_REG_NUM; i++) {
 		ir_live_interval *ival = ctx->live_intervals[i];
 
 		if (ival) {

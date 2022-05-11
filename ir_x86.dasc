@@ -3868,7 +3868,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 	ctx->regs = ir_mem_malloc(sizeof(ir_regs) * ctx->insns_count);
 	memset(ctx->regs, IR_REG_NONE, sizeof(ir_regs) * ctx->insns_count);
 
-	ctx->live_intervals = ir_mem_calloc(ctx->vregs_count + 1, sizeof(ir_live_interval*));
+	ctx->live_intervals = ir_mem_calloc(ctx->vregs_count + 1 + IR_REG_NUM, sizeof(ir_live_interval*));
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
 		bb->flags &= ~IR_BB_MAY_SKIP;
 		flags = IR_BB_MAY_SKIP;
@@ -3919,6 +3919,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 							ival->reg = IR_REG_NONE;
 							data->stack_frame_size += 8; // ir_type_size[insn->type]; // TODO: alignment
 							ival->stack_spill_pos = data->stack_frame_size;
+							ival->top = ival;
 							if (insn->op == IR_VAR) {
 								ir_use_list *use_list = &ctx->use_lists[i];
 								ir_reg i, n, *p, use;
@@ -3936,6 +3937,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 											ival->type = insn->type;
 											ival->reg = IR_REG_NONE;
 											ival->stack_spill_pos = data->stack_frame_size;
+											ival->top = ival;
 										}
 									} else if (use_insn->op == IR_VSTORE) {
 										if (!IR_IS_CONST_REF(use_insn->op3)
@@ -3946,6 +3948,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 											ival->type = insn->type;
 											ival->reg = IR_REG_NONE;
 											ival->stack_spill_pos = data->stack_frame_size;
+											ival->top = ival;
 										}
 									}
 								}
