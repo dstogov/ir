@@ -897,7 +897,7 @@ int ir_coalesce(ir_ctx *ctx)
 		n--;
 		if (n != ctx->vregs_count) {
 			j = ctx->vregs_count - n;
-			for (i = n + 1; i <= ctx->vregs_count + IR_REG_NUM; i++) {
+			for (i = n + 1; i <= n + IR_REG_NUM; i++) {
 				ctx->live_intervals[i] = ctx->live_intervals[i + j];
 			}
 			for (j = 1; j < ctx->insns_count; j++) {
@@ -1869,20 +1869,22 @@ static int ir_linear_scan(ir_ctx *ctx)
 				continue;
 			}
 		}
-		insn = &ctx->ir_base[IR_LIVE_POS_TO_REF(ival->range.end)];
-		if (insn->op == IR_VSTORE) {
-			ir_insn *var = &ctx->ir_base[insn->op2];
-			IR_ASSERT(var->op == IR_VAR);
-			if (strcmp(ir_get_str(ctx, var->op2), "_spill_") == 0) {
-				if (ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos) {
-					ctx->live_intervals[current]->stack_spill_pos =
-						ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos;
-				} else {
-					ir_allocate_spill_slot(ctx, current, &data);
-					ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos =
-						ctx->live_intervals[current]->stack_spill_pos;
+		if (IR_LIVE_POS_TO_REF(ival->range.end) < ctx->insns_count) {
+			insn = &ctx->ir_base[IR_LIVE_POS_TO_REF(ival->range.end)];
+			if (insn->op == IR_VSTORE) {
+				ir_insn *var = &ctx->ir_base[insn->op2];
+				IR_ASSERT(var->op == IR_VAR);
+				if (strcmp(ir_get_str(ctx, var->op2), "_spill_") == 0) {
+					if (ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos) {
+						ctx->live_intervals[current]->stack_spill_pos =
+							ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos;
+					} else {
+						ir_allocate_spill_slot(ctx, current, &data);
+						ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos =
+							ctx->live_intervals[current]->stack_spill_pos;
+					}
+					continue;
 				}
-				continue;
 			}
 		}
 #endif
