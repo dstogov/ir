@@ -547,16 +547,19 @@ struct _ir_live_range {
 #define IR_LIVE_INTERVAL_TEMP            (1<<3)
 #define IR_LIVE_INTERVAL_VAR             (1<<4)
 #define IR_LIVE_INTERVAL_COALESCED       (1<<5)
+#define IR_LIVE_INTERVAL_HAS_HINTS       (1<<6)
 
 struct _ir_live_interval {
 	uint8_t           type;
 	int8_t            reg;
 	uint8_t           flags;
+	int32_t           vreg;
 	int32_t           stack_spill_pos;
 	ir_live_range     range;
 	ir_use_pos       *use_pos;
 	ir_live_interval *top;
 	ir_live_interval *next;
+	ir_live_interval *list_next; /* linked list of active, inactive or unhandled intervals */
 };
 
 #define IR_REG_SPILL_LOAD  (1<<6)

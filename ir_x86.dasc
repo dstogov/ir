@@ -3915,6 +3915,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 							ctx->live_intervals[ctx->vregs[i]] = ival;
 							ival->type = insn->type;
 							ival->reg = IR_REG_NONE;
+							ival->vreg = ctx->vregs[i];
 							data->stack_frame_size += 8; // ir_type_size[insn->type]; // TODO: alignment
 							ival->stack_spill_pos = data->stack_frame_size;
 							ival->top = ival;
@@ -3934,6 +3935,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 											ctx->live_intervals[ctx->vregs[use]] = ival;
 											ival->type = insn->type;
 											ival->reg = IR_REG_NONE;
+											ival->vreg = ctx->vregs[use];
 											ival->stack_spill_pos = data->stack_frame_size;
 											ival->top = ival;
 										}
@@ -3945,6 +3947,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 											ctx->live_intervals[ctx->vregs[insn->op3]] = ival;
 											ival->type = insn->type;
 											ival->reg = IR_REG_NONE;
+											ival->vreg = ctx->vregs[insn->op3];
 											ival->stack_spill_pos = data->stack_frame_size;
 											ival->top = ival;
 										}
