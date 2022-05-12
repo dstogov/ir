@@ -936,6 +936,7 @@ int ir_coalesce(ir_ctx *ctx)
 			if (ctx->live_intervals[i]) {
 				if (i != n) {
 					ctx->live_intervals[n] = ctx->live_intervals[i];
+					ctx->live_intervals[n]->vreg = n;
 					offsets[i] = i - n;
 				}
 				n++;
@@ -946,6 +947,9 @@ int ir_coalesce(ir_ctx *ctx)
 			j = ctx->vregs_count - n;
 			for (i = n + 1; i <= n + IR_REG_NUM; i++) {
 				ctx->live_intervals[i] = ctx->live_intervals[i + j];
+				if (ctx->live_intervals[i]) {
+					ctx->live_intervals[i]->vreg = i;
+				}
 			}
 			for (j = 1; j < ctx->insns_count; j++) {
 				if (ctx->vregs[j]) {
