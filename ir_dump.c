@@ -316,21 +316,27 @@ void ir_dump_live_ranges(ir_ctx *ctx, FILE *f)
 				}
 				use_pos = ival->use_pos;
 				while (use_pos) {
-					if (!use_pos->op_num) {
-						fprintf(f, ", DEF(%d.%d",
-							IR_LIVE_POS_TO_REF(use_pos->pos), IR_LIVE_POS_TO_SUB_REF(use_pos->pos));
-					} else {
-						fprintf(f, ", USE(%d.%d/%d",
+					if (use_pos->flags & IR_PHI_USE) {
+						fprintf(f, ", PHI_USE(%d.%d, phi=d_%d/%d)",
 							IR_LIVE_POS_TO_REF(use_pos->pos), IR_LIVE_POS_TO_SUB_REF(use_pos->pos),
-							use_pos->op_num);
+							use_pos->hint_ref, use_pos->op_num);
+					} else {
+						if (!use_pos->op_num) {
+							fprintf(f, ", DEF(%d.%d",
+								IR_LIVE_POS_TO_REF(use_pos->pos), IR_LIVE_POS_TO_SUB_REF(use_pos->pos));
+						} else {
+							fprintf(f, ", USE(%d.%d/%d",
+								IR_LIVE_POS_TO_REF(use_pos->pos), IR_LIVE_POS_TO_SUB_REF(use_pos->pos),
+								use_pos->op_num);
+						}
+						if (use_pos->hint >= 0) {
+							fprintf(f, ", hint=%%%s", ir_reg_name(use_pos->hint, ival->type));
+						}
+						if (use_pos->hint_ref) {
+							fprintf(f, ", hint=R%d", ctx->vregs[use_pos->hint_ref]);
+						}
+						fprintf(f, ")");
 					}
-					if (use_pos->hint >= 0) {
-						fprintf(f, ", hint=%%%s", ir_reg_name(use_pos->hint, ival->type));
-					}
-					if (use_pos->hint_ref) {
-						fprintf(f, ", hint=R%d", ctx->vregs[use_pos->hint_ref]);
-					}
-					fprintf(f, ")");
 					use_pos = use_pos->next;
 				}
 				if (ival->next) {

@@ -525,6 +525,7 @@ typedef struct _ir_live_interval ir_live_interval;
 /* ir_use_pos.flags bits */
 #define IR_USE_MUST_BE_IN_REG            (1<<0)
 #define IR_USE_SHOULD_BE_IN_REG          (1<<1)
+#define IR_PHI_USE                       (1<<2)
 
 struct _ir_use_pos {
 	uint16_t       op_num; /* 0 - means result */

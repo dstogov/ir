@@ -406,6 +406,7 @@ typedef struct _ir_backend_data {
 	int32_t     stack_frame_size;
 	int32_t     stack_frame_alignment;
 	ir_regset   used_preserved_regs;
+	uint32_t    dessa_from_block;
 	dasm_State *dasm_state;
 	int         rodata_label, jmp_table_label;
 	bool        double_neg_const;
@@ -1391,11 +1392,6 @@ static int ir_skip_empty_blocks(ir_ctx *ctx, int b)
 		b++;
 	}
 	return b;
-}
-
-static ir_reg ir_ref_reg(ir_ctx *ctx, ir_ref ref)
-{
-	return ref < 0 ? IR_REG_NONE : ctx->live_intervals[ctx->vregs[ref]]->reg;
 }
 
 static ir_reg ir_ref_spill_slot(ir_ctx *ctx, ir_ref ref)
@@ -3705,13 +3701,50 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
+	uint32_t from_block = data->dessa_from_block;
+	ir_block *from_bb = &ctx->cfg_blocks[from_block];
+	ir_ref ref = from_bb->end;
 	int8_t to_reg, from_reg;
+	ir_block *to_bb;
+	int j, k = 0;
+	ir_ref phi = 0;
+	bool spill_store = 0;
+
+	IR_ASSERT(from_bb->successors_count == 1);
+	to_bb = &ctx->cfg_blocks[ctx->cfg_edges[from_bb->successors]];
+	for (j = 0; j < to_bb->predecessors_count; j++) {
+		if (ctx->cfg_edges[to_bb->predecessors + j] == from_block) {
+			k = j + 2;
+			break;
+		}
+	}
+	IR_ASSERT(k != 0);
+	if (to) {
+		phi = to;
+	} else {
+		ir_use_list *use_list = &ctx->use_lists[from];
+
+		for (j = 0; j < use_list->count; j++) {
+			ir_ref use = ctx->use_edges[use_list->refs + j];
+			ir_insn *insn = &ctx->ir_base[use];
+			if (insn->op == IR_PHI && insn->ops[k] == from && insn->op1 == to_bb->start) {
+				phi = use;
+				break;
+			}
+		}
+	}
+	IR_ASSERT(phi != 0);
 
 	if (IR_IS_TYPE_INT(type)) {
-		to_reg = to ? ir_ref_reg(ctx, to) : IR_REG_RAX; // TODO: %rax is a temporary register (see ir_fix_dessa_tmps)
-		from_reg = from ? ir_ref_reg(ctx, from) : IR_REG_RAX; // TODO: %rax is a temporary register (see ir_fix_dessa_tmps)
-		if (from > 0 && from_reg >= 0 && ctx->live_intervals[ctx->vregs[from]]->top->stack_spill_pos) {
+		to_reg = to ? ctx->regs[phi][0] : ctx->regs[ref][0]; /* temporary register for integer swap (see ir_fix_dessa_tmps) */
+		from_reg = from ? ctx->regs[phi][k] : ctx->regs[ref][0]; /* temporary register for integer swap (see ir_fix_dessa_tmps) */
+		if (from_reg != IR_REG_NONE && (from_reg & IR_REG_SPILL_LOAD)) {
+			from_reg &= ~IR_REG_SPILL_LOAD;
 			ir_emit_load(ctx, type, from_reg, from);
+		}
+		if (to_reg != IR_REG_NONE && (to_reg & IR_REG_SPILL_STORE)) {
+			to_reg &= ~IR_REG_SPILL_STORE;
+			spill_store = 1;
 		}
 		if (from_reg >= 0 && to_reg >= 0) {
 			if (from_reg != to_reg) {
@@ -3725,19 +3758,25 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 			|	ASM_MREF_IMM_OP mov, type, to, ctx->ir_base[from].val.i32
 		} else if (IR_IS_CONST_REF(from) && ir_type_size[type] == 8 && IR_IS_UNSIGNED_32BIT(ctx->ir_base[from].val.u64)) {
 			|	mov Rd(to), ctx->ir_base[from].val.u32
-		} else {
-			from_reg = IR_REG_RDX; // TODO temporary register 2
+		} else if (IR_IS_CONST_REF(from) || !ir_is_same_mem(ctx, from, to)) {
+			from_reg = ctx->regs[ref][1]; /* temporary register for int mem->mem (see ir_fix_dessa_tmps) */
+			IR_ASSERT(from_reg != IR_REG_NONE);
 			ir_emit_load(ctx, type, from_reg, from);
 			ir_emit_store(ctx, type, to, from_reg);
 		}
-		if (to > 0 && to_reg >= 0 && ctx->live_intervals[ctx->vregs[to]]->top->stack_spill_pos) {
+		if (spill_store) {
 			ir_emit_store(ctx, type, to, to_reg);
 		}
 	} else {
-		to_reg = to ? ir_ref_reg(ctx, to) : IR_REG_XMM0; // TODO: %xmm0 is a temporary register (see ir_fix_dessa_tmps)
-		from_reg = from ? ir_ref_reg(ctx, from) : IR_REG_XMM0; // TODO: %xmm0 is a temporary register (see ir_fix_dessa_tmps)
-		if (from > 0 && from_reg >= 0 && ctx->live_intervals[ctx->vregs[from]]->top->stack_spill_pos) {
+		to_reg = to ? ctx->regs[phi][0] : ctx->regs[ref][2]; /* temporary register for fp swap (see ir_fix_dessa_tmps) */
+		from_reg = from ? ctx->regs[phi][k] : ctx->regs[ref][2]; /* temporary register for fp swap (see ir_fix_dessa_tmps) */
+		if (from_reg != IR_REG_NONE && (from_reg & IR_REG_SPILL_LOAD)) {
+			from_reg &= ~IR_REG_SPILL_LOAD;
 			ir_emit_load(ctx, type, from_reg, from);
+		}
+		if (to_reg != IR_REG_NONE && (to_reg & IR_REG_SPILL_STORE)) {
+			to_reg &= ~IR_REG_SPILL_STORE;
+			spill_store = 1;
 		}
 		if (from_reg >= 0 && to_reg >= 0) {
 			if (from_reg != to_reg) {
@@ -3747,12 +3786,13 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 			ir_emit_load(ctx, type, to_reg, from);
 		} else if (from_reg >= 0) {
 			ir_emit_store(ctx, type, to, from_reg);
-		} else {
-			from_reg = IR_REG_XMM0; // TODO temporary register 2
+		} else if (IR_IS_CONST_REF(from) || !ir_is_same_mem(ctx, from, to)) {
+			from_reg = ctx->regs[ref][3]; /* temporary register for fp mem->mem (see ir_fix_dessa_tmps) */
+			IR_ASSERT(from_reg != IR_REG_NONE);
 			ir_emit_load(ctx, type, from_reg, from);
 			ir_emit_store(ctx, type, to, from_reg);
 		}
-		if (to > 0 && to_reg >= 0 && ctx->live_intervals[ctx->vregs[to]]->top->stack_spill_pos) {
+		if (spill_store) {
 			ir_emit_store(ctx, type, to, to_reg);
 		}
 	}
@@ -3860,6 +3900,41 @@ static ir_reg ir_get_free_reg(ir_type type, ir_regset available)
 	}
 	IR_ASSERT(!IR_REGSET_IS_EMPTY(available));
 	return IR_REGSET_FIRST(available);
+}
+
+static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
+{
+	ir_backend_data *data = ctx->data;
+	ir_ref ref = ctx->cfg_blocks[data->dessa_from_block].end;
+
+	if (to == 0) {
+		if (IR_IS_TYPE_INT(type)) {
+			if (ctx->regs[ref][0] == IR_REG_NONE) {
+				ctx->regs[ref][0] = ctx->regs[ref][1] != IR_REG_RAX ? IR_REG_RAX : IR_REG_RDX;
+			}
+		} else if (IR_IS_TYPE_FP(type)) {
+			if (ctx->regs[ref][2] == IR_REG_NONE) {
+				ctx->regs[ref][2] = ctx->regs[ref][3] != IR_REG_XMM0 ? IR_REG_XMM0 : IR_REG_XMM1;
+			}
+		} else {
+			IR_ASSERT(0);
+			return 0;
+		}
+	} else if (from != 0) {
+		if (IR_IS_TYPE_INT(type)) {
+			if (ctx->regs[ref][1] == IR_REG_NONE) {
+				ctx->regs[ref][1] = ctx->regs[ref][0] != IR_REG_RAX ? IR_REG_RAX : IR_REG_RDX;
+			}
+		} else if (IR_IS_TYPE_FP(type)) {
+			if (ctx->regs[ref][3] == IR_REG_NONE) {
+				ctx->regs[ref][3] = ctx->regs[ref][2] != IR_REG_XMM0 ? IR_REG_XMM0 : IR_REG_XMM1;
+			}
+		} else {
+			IR_ASSERT(0);
+			return 0;
+		}
+	}
+	return 1;
 }
 
 static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
@@ -4008,6 +4083,10 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 			rule += n;
 		}
 		bb->flags |= flags;
+		if (bb->flags & IR_BB_DESSA_MOVES) {
+			data->dessa_from_block = b;
+			ir_gen_dessa_moves(ctx, b, ir_fix_dessa_tmps);
+		}
 	}
 
 	if (ctx->flags & IR_HAS_CALLS) {
@@ -4700,6 +4779,7 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 				case IR_END:
 				case IR_LOOP_END:
 					if (bb->flags & IR_BB_DESSA_MOVES) {
+						data.dessa_from_block = b;
 						ir_gen_dessa_moves(ctx, b, ir_emit_dessa_move);
 					}
 					IR_ASSERT(bb->successors_count == 1);

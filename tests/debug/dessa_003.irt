@@ -37,14 +37,12 @@ test:
 	movl $0xc, %edi
 	cltd
 	idivl %edi
-	movl %eax, %edx
 .L1:
 	testl %ecx, %ecx
 	je .L2
-	movl %edx, %eax
-	movl %esi, %edx
-	movl %eax, %esi
+	movl %eax, %edx
+	movl %esi, %eax
+	movl %edx, %esi
 	jmp .L1
 .L2:
-	movl %edx, %eax
 	retq

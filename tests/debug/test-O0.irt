@@ -111,7 +111,6 @@ test:
 	movsd %xmm0, 0x18(%rsp)
 	movsd 0x58(%rsp), %xmm0
 	movsd %xmm0, 0x20(%rsp)
-	movl 0x30(%rsp), %edx
-	movl %edx, 0x28(%rsp)
+	movl 0x30(%rsp), %eax
+	movl %eax, 0x28(%rsp)
 	jmp .L1
-
