@@ -2537,7 +2537,7 @@ static void ir_emit_jmp_true(ir_ctx *ctx, int b, ir_ref def)
 	ir_use_list *use_list;
 	ir_insn *use_insn;
 	ir_ref i, *p, use, n;
-	int true_block = 0, false_block = 0, next_block;
+	int true_block = 0, false_block = 0;
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
@@ -2556,8 +2556,7 @@ static void ir_emit_jmp_true(ir_ctx *ctx, int b, ir_ref def)
 	}
 	IR_ASSERT(true_block && false_block);
 
-	next_block = ir_skip_empty_blocks(ctx, b + 1);
-	if (true_block != next_block) {
+	if (b == ctx->cfg_blocks_count || true_block != ir_skip_empty_blocks(ctx, b + 1)) {
 		|	jmp =>true_block
 	}
 }
@@ -2567,7 +2566,7 @@ static void ir_emit_jmp_false(ir_ctx *ctx, int b, ir_ref def)
 	ir_use_list *use_list;
 	ir_insn *use_insn;
 	ir_ref i, *p, use, n;
-	int true_block = 0, false_block = 0, next_block;
+	int true_block = 0, false_block = 0;
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
@@ -2586,8 +2585,7 @@ static void ir_emit_jmp_false(ir_ctx *ctx, int b, ir_ref def)
 	}
 	IR_ASSERT(true_block && false_block);
 
-	next_block = ir_skip_empty_blocks(ctx, b + 1);
-	if (false_block != next_block) {
+	if (b == ctx->cfg_blocks_count || true_block != ir_skip_empty_blocks(ctx, b + 1)) {
 		|	jmp =>false_block
 	}
 }
@@ -2616,7 +2614,7 @@ static void ir_emit_jcc(ir_ctx *ctx, uint8_t op, int b, ir_ref def, ir_insn *ins
 	}
 	IR_ASSERT(true_block && false_block);
 
-	next_block = ir_skip_empty_blocks(ctx, b + 1);
+	next_block = b == ctx->cfg_blocks_count ? 0 : ir_skip_empty_blocks(ctx, b + 1);
 	if (true_block == next_block) {
 		if (int_cmp || (op != IR_GT && op != IR_GE)) {
 			/* swap to avoid unconditional JMP if this doesn't introduce additional JP instruction */
@@ -2628,7 +2626,7 @@ static void ir_emit_jcc(ir_ctx *ctx, uint8_t op, int b, ir_ref def, ir_insn *ins
 			true_block = false_block;
 			false_block = 0;
 		}
-	} else if (false_block != next_block) {
+	} else if (false_block == next_block) {
 		false_block = 0;
 	}
 
@@ -4693,7 +4691,7 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 					}
 					IR_ASSERT(bb->successors_count == 1);
 					target = ir_skip_empty_blocks(ctx, ctx->cfg_edges[bb->successors]);
-					if (target != ir_skip_empty_blocks(ctx, b + 1)) {
+					if (b == ctx->cfg_blocks_count || target != ir_skip_empty_blocks(ctx, b + 1)) {
 						|	jmp =>target
 					}
 					break;
