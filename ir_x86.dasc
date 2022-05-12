@@ -758,8 +758,14 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num)
 		case IR_DIV_INT:
 		case IR_MOD_INT:
 		case IR_IF_INT:
-		case IR_CMP_FP:
 			return (op_num == 2) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
+		case IR_CMP_FP:
+			insn = &ctx->ir_base[ref];
+			if (insn->op == IR_LT || insn->op == IR_LE) {
+				return (op_num == 1) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
+			} else {
+				return (op_num == 2) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
+			}
 		case IR_SKIP_REG: /* PARAM PHI PI */
 			insn = &ctx->ir_base[ref];
 			if (insn->op == IR_PARAM && op_num == 0) {
@@ -791,7 +797,11 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num)
 							return IR_USE_SHOULD_BE_IN_REG;
 					    }
 					} else {
-						return (op_num == 2) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
+						if (insn->op == IR_LT || insn->op == IR_LE) {
+							return (op_num == 1) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
+						} else {
+							return (op_num == 2) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
+						}
 					}
 					break;
 			}
