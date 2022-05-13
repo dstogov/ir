@@ -336,6 +336,9 @@ void ir_dump_live_ranges(ir_ctx *ctx, FILE *f)
 							fprintf(f, ", hint=R%d", ctx->vregs[use_pos->hint_ref]);
 						}
 						fprintf(f, ")");
+						if (use_pos->flags & IR_USE_MUST_BE_IN_REG) {
+							fprintf(f, "!");
+						}
 					}
 					use_pos = use_pos->next;
 				}

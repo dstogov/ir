@@ -298,7 +298,7 @@ static void ir_add_phi_use(ir_ctx *ctx, int v, int op_num, ir_live_pos pos, ir_r
 	use_pos->hint = IR_REG_NONE;
 	use_pos->hint_ref = phi_ref;
 	use_pos->pos = pos;
-	use_pos->flags = ctx->rules ? ir_get_use_flags(ctx, IR_LIVE_POS_TO_REF(pos), op_num) : 0;
+	use_pos->flags = ctx->rules ? ir_get_use_flags(ctx, phi_ref, op_num) : 0;
 	use_pos->flags |= IR_PHI_USE;
 
 	ir_add_use_pos(ctx, v, use_pos);
@@ -1621,6 +1621,12 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 	available &= debug_regset;
 #endif
 
+	if (IR_REGSET_IS_EMPTY(available)) {
+		fprintf(stderr, "LSRA Internal Error: No registers available. Allocation is not possible\n");
+		IR_ASSERT(0);
+		exit(-1);
+	}
+
 	/* for each interval it in active */
 	other = *active;
 	while (other) {
@@ -1632,7 +1638,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 				blockPos[reg] = nextUsePos[reg] = 0;
 			} else {
 				pos = ir_first_use_pos_after(other, ival->range.start,
-					IR_USE_MUST_BE_IN_REG /* | IR_USE_SHOULD_BE_IN_REG */);
+					IR_USE_MUST_BE_IN_REG /* | IR_USE_SHOULD_BE_IN_REG */); // TODO: ???
 				if (pos < nextUsePos[reg]) {
 					nextUsePos[reg] = pos;
 				}
@@ -1660,7 +1666,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 					}
 				} else {
 					pos = ir_first_use_pos_after(other, ival->range.start,
-						IR_USE_MUST_BE_IN_REG /* | IR_USE_SHOULD_BE_IN_REG */);
+						IR_USE_MUST_BE_IN_REG /* | IR_USE_SHOULD_BE_IN_REG */); // TODO: ???
 					if (pos < nextUsePos[reg]) {
 						nextUsePos[reg] = pos;
 					}
@@ -1739,15 +1745,20 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 				IR_ASSERT(other->type != IR_VOID);
 				IR_LOG_LSRA_CONFLICT("      ---- Conflict with active", other, overlap);
 
-				split_pos = ir_last_use_pos_before(other, ival->range.start, IR_USE_MUST_BE_IN_REG);
-				if (split_pos < ival->range.start) {
-					split_pos++; // TODO: ???
+				split_pos = ir_last_use_pos_before(other, ival->range.start, IR_USE_MUST_BE_IN_REG | IR_USE_SHOULD_BE_IN_REG);
+				if (split_pos == 0) {
+					split_pos = ival->range.start;
 				}
+				split_pos = ir_find_optimal_split_position(ctx, other, split_pos, ival->range.start);
 				if (split_pos > other->range.start) {
-					split_pos = ir_find_optimal_split_position(ctx, other, split_pos, ival->range.start);
 					child = ir_split_interval_at(ctx, other, split_pos);
 					IR_LOG_LSRA("      ---- Finish", other, "");
 				} else {
+					if (ir_first_use_pos_after(other, other->range.start, IR_USE_MUST_BE_IN_REG) < ir_ival_end(other)) {
+						fprintf(stderr, "LSRA Internal Error: Unsolvable conflict. Allocation is not possible\n");
+						IR_ASSERT(0);
+						exit(-1);
+					}
 					child = other;
 					other->reg = IR_REG_NONE;
 					if (prev) {
@@ -1758,17 +1769,17 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 					IR_LOG_LSRA("      ---- Spill and Finish", other, " (it must not be in reg)");
 				}
 
-				split_pos = ir_first_use_pos_after(child, ival->range.start, IR_USE_MUST_BE_IN_REG | IR_USE_SHOULD_BE_IN_REG) - 1;
-				if (split_pos >= ir_ival_end(child)) {
-					/* pass */
-				} else if (split_pos > child->range.start) {
+				split_pos = ir_first_use_pos_after(child, ival->range.start, IR_USE_MUST_BE_IN_REG | IR_USE_SHOULD_BE_IN_REG) - 1; // TODO: ???
+				if (split_pos > child->range.start && split_pos < ir_ival_end(child)) {
 					split_pos = ir_find_optimal_split_position(ctx, child, ival->range.start, split_pos);
 					child2 = ir_split_interval_at(ctx, child, split_pos);
 					IR_LOG_LSRA("      ---- Spill", child, "");
 					ir_add_to_unhandled(unhandled, child2);
 					IR_LOG_LSRA("      ---- Queue", child2, "");
-				} else {
+				} else if (child != other) {
 					// TODO: this may cause endless loop
+					ir_add_to_unhandled(unhandled, child);
+					IR_LOG_LSRA("      ---- Queue", child, "");
 				}
 			}
 			break;

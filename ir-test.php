@@ -52,7 +52,7 @@ function run_test($test, $name, $code, $expect, $args) {
 		if (!@file_put_contents("$base.exp", "$expect\n")) {
 			return false;
 		}
-		if (@system("diff $base.exp $output > $base.diff") != 0) {
+		if (@system("diff -u $base.exp $output > $base.diff") != 0) {
 			return false;
 		}
 		return false;
