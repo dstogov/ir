@@ -315,6 +315,8 @@ int main(int argc, char **argv)
 			mflags |= IR_DEBUG_GCM;
 		} else if (strcmp(argv[i], "--debug-ra") == 0) {
 			mflags |= IR_DEBUG_RA;
+#endif
+#ifdef IR_DEBUG_REGSET
 		} else if (strcmp(argv[i], "--debug-regset") == 0) {
 			if (i + 1 == argc || argv[i + 1][0] == '-') {
 				fprintf(stderr, "ERROR: Invalid usage' (use --help)\n");

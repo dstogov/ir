@@ -6,7 +6,7 @@
 
 #include "ir_x86.h"
 
-#ifdef IR_DEBUG
+#ifdef IR_DEBUG_REGSET
 uint32_t debug_regset = 0xffffffff; /* all 32 regisers */
 #endif
 
@@ -1474,7 +1474,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 		}
 	}
 
-#ifdef IR_DEBUG
+#ifdef IR_DEBUG_REGSET
 	available &= debug_regset;
 #endif
 
@@ -1617,7 +1617,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 		}
 	}
 
-#ifdef IR_DEBUG
+#ifdef IR_DEBUG_REGSET
 	available &= debug_regset;
 #endif
 

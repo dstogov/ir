@@ -14,6 +14,9 @@ typedef uint8_t bool;
 #ifdef IR_DEBUG
 # include <assert.h>
 # define IR_ASSERT(x) assert(x)
+# ifndef IR_DEBUG_REGSET
+#  define IR_DEBUG_REGSET
+# endif
 #else
 # define IR_ASSERT(x)
 #endif
@@ -729,7 +732,7 @@ int ir_schedule(ir_ctx *ctx);
 /* Liveness & Register Allocation (implementation in ir_ra.c) */
 typedef int (*emit_copy_t)(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to);
 
-#ifdef IR_DEBUG
+#ifdef IR_DEBUG_REGSET
 extern uint32_t debug_regset;
 #endif
 
