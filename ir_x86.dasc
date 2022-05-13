@@ -595,7 +595,7 @@ ir_regset ir_get_scratch_regset(ir_ctx *ctx, ir_ref ref, ir_live_pos *start, ir_
 		*end = IR_DEF_SUB_REF;
 		return IR_REGSET(IR_REG_RAX) | IR_REGSET(IR_REG_RDX); /* %rdx - used as result */
 	} else if (rule == IR_CALL) {
-		*start = IR_LOAD_SUB_REF;
+		*start = IR_USE_SUB_REF;
 		*end = IR_DEF_SUB_REF;
 		return IR_REGSET_SCRATCH;
 	}

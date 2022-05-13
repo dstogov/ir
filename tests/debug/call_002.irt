@@ -1,0 +1,21 @@
+--TEST--
+Indirect CALL
+--ARGS--
+-S
+--CODE--
+{
+	uintptr_t c_6 = "hello %d!\n";
+	l_1 = START(l_4);
+	uintptr_t f = PARAM(l_1, "f", 1);
+	int32_t p = PARAM(l_1, "p", 2);
+	int32_t d_2, l_2 = CALL/2(l_1, f, c_6, p);
+	l_4 = RETURN(l_2, d_2);
+}
+--EXPECT--
+test:
+	subq $8, %rsp
+	movq %rdi, %rax
+	leaq 0xa(%rip), %rdi
+	callq *%rax
+	addq $8, %rsp
+	retq
