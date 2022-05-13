@@ -466,6 +466,12 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							ir_add_use(ctx, ctx->vregs[input], j, use_pos, reg, 0);
 							/* live.add(opd) */
 							ir_bitset_incl(live, ctx->vregs[input]);
+						} else if (ctx->rules) {
+							reg = ir_uses_fixed_reg(ctx, i, j);
+							if (reg != IR_REG_NONE) {
+								ir_add_fixed_live_range(ctx, reg,
+									IR_LOAD_LIVE_POS_FROM_REF(i), IR_USE_LIVE_POS_FROM_REF(i));
+							}
 						}
 					}
 				}
