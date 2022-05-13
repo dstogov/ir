@@ -285,7 +285,7 @@ typedef struct _ir_tmp_reg {
 bool ir_needs_vreg(ir_ctx *ctx, ir_ref ref);
 
 /* Registers modified by the given instruction */
-ir_regset ir_get_scratch_regset(ir_ctx *ctx, ir_ref ref);
+ir_regset ir_get_scratch_regset(ir_ctx *ctx, ir_ref ref, ir_live_pos *start, ir_live_pos *end);
 ir_reg ir_uses_fixed_reg(ir_ctx *ctx, ir_ref ref, int op_num);
 bool ir_result_reuses_op1_reg(ir_ctx *ctx, ir_ref ref);
 uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num);

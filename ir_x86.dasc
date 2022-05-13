@@ -573,18 +573,30 @@ bool ir_needs_vreg(ir_ctx *ctx, ir_ref ref)
 	return ctx->rules[ref] != IR_SKIP;
 }
 
-ir_regset ir_get_scratch_regset(ir_ctx *ctx, ir_ref ref)
+ir_regset ir_get_scratch_regset(ir_ctx *ctx, ir_ref ref, ir_live_pos *start, ir_live_pos *end)
 {
 	ir_ref rule;
 
 	rule = ctx->rules[ref];
 	if (rule == IR_SHIFT) {
+		*start = IR_LOAD_SUB_REF;
+		*end = IR_DEF_SUB_REF;
 		return IR_REGSET(IR_REG_RCX);
-	} else if (rule == IR_MUL_INT || rule == IR_DIV_INT) {
-		return IR_REGSET(IR_REG_RAX) | IR_REGSET(IR_REG_RDX); /* %rax - used as result */
+	} else if (rule == IR_MUL_INT) {
+		*start = IR_USE_SUB_REF;
+		*end = IR_DEF_SUB_REF;
+		return IR_REGSET(IR_REG_RDX); /* %rax - used as input and result */
+	} else if (rule == IR_DIV_INT) {
+		*start = IR_LOAD_SUB_REF;
+		*end = IR_DEF_SUB_REF;
+		return IR_REGSET(IR_REG_RDX); /* %rax - used as input and result */
 	} else if (rule == IR_MOD_INT) {
+		*start = IR_LOAD_SUB_REF;
+		*end = IR_DEF_SUB_REF;
 		return IR_REGSET(IR_REG_RAX) | IR_REGSET(IR_REG_RDX); /* %rdx - used as result */
 	} else if (rule == IR_CALL) {
+		*start = IR_LOAD_SUB_REF;
+		*end = IR_DEF_SUB_REF;
 		return IR_REGSET_SCRATCH;
 	}
 	return IR_REGSET_EMPTY;

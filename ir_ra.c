@@ -471,14 +471,14 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 				}
 				/* CPU specific constraints */
 				if (ctx->rules) {
-					ir_regset regset = ir_get_scratch_regset(ctx, i);
+					ir_live_pos start, end;
+					ir_regset regset = ir_get_scratch_regset(ctx, i, &start, &end);
 
 					if (regset != IR_REGSET_EMPTY) {
 						IR_REGSET_FOREACH(regset, reg) {
 							ir_add_fixed_live_range(ctx, reg,
-								IR_LOAD_LIVE_POS_FROM_REF(i), // TODO: LOAD instead of USE disables register usage for input
-								                              // this is necessary for DIV and MOD, but not for MUL
-								IR_DEF_LIVE_POS_FROM_REF(i));
+								IR_START_LIVE_POS_FROM_REF(i) + start,
+								IR_START_LIVE_POS_FROM_REF(i) + end);
 						}  IR_REGSET_FOREACH_END();
 					}
 				}
