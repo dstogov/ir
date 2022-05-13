@@ -64,7 +64,7 @@
 	+  temporary register for swap (dessa3.ir)
 	+  temporary register for spill loads and stores
 	-  temporary register for swap during parallel parameter pssing
-	-  IR_CMP_AND_BRANCH_FP invalid position of tmp variables (fib.ir)
+	+  IR_CMP_AND_BRANCH_FP invalid position of tmp variables (fib.ir)
 	-  stack arguments and parameters
 	-  return merge/split
 	?  binary code emission without DynAsm

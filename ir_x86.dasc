@@ -845,12 +845,10 @@ int ir_get_temporary_regs(ir_ctx *ctx, ir_ref ref, ir_tmp_reg *tmp_regs)
 				return 1;
 			}
 			break;
-		case IR_CMP_AND_BRANCH_INT:
-			insn = &ctx->ir_base[ref];
-			ref = insn->op2;
 		case IR_CMP_INT:
 			insn = &ctx->ir_base[ref];
 			n = 0;
+cmp_int:
 			if (IR_IS_CONST_REF(insn->op1)) {
 				ir_insn *val_insn = &ctx->ir_base[insn->op1];
 				if (ir_type_size[val_insn->type] == 8 && !IR_IS_32BIT(val_insn->type, val_insn->val)) {
@@ -887,29 +885,7 @@ int ir_get_temporary_regs(ir_ctx *ctx, ir_ref ref, ir_tmp_reg *tmp_regs)
 			tmp_regs[0].start = IR_DEF_SUB_REF;
 			tmp_regs[0].end = IR_SAVE_SUB_REF;
 			n = 1;
-			if (insn->op == IR_LT || insn->op == IR_LE) {
-				if (IR_IS_CONST_REF(insn->op2)) {
-					ir_insn *val_insn = &ctx->ir_base[insn->op2];
-					tmp_regs[n].num = 2;
-					tmp_regs[n].type = val_insn->type;
-					tmp_regs[n].start = IR_LOAD_SUB_REF;
-					tmp_regs[n].end = IR_DEF_SUB_REF;
-					n++;
-				}
-			} else {
-				if (IR_IS_CONST_REF(insn->op1)) {
-					ir_insn *val_insn = &ctx->ir_base[insn->op1];
-					tmp_regs[n].num = 1;
-					tmp_regs[n].type = val_insn->type;
-					tmp_regs[n].start = IR_LOAD_SUB_REF;
-					tmp_regs[n].end = IR_DEF_SUB_REF;
-					n++;
-				}
-			}
-			return n;
-		case IR_CMP_AND_BRANCH_FP:
-			insn = &ctx->ir_base[ctx->ir_base[ref].op2];
-			n = 0;
+cmp_fp:
 			if (insn->op == IR_LT || insn->op == IR_LE) {
 				if (IR_IS_CONST_REF(insn->op2)) {
 					ir_insn *val_insn = &ctx->ir_base[insn->op2];
@@ -985,6 +961,31 @@ int ir_get_temporary_regs(ir_ctx *ctx, ir_ref ref, ir_tmp_reg *tmp_regs)
 				n++;
 			}
 			return n;
+		case IR_SKIP:
+			insn = &ctx->ir_base[ref];
+			switch (insn->op) {
+				case IR_EQ:
+				case IR_NE:
+				case IR_LT:
+				case IR_GE:
+				case IR_LE:
+				case IR_GT:
+				case IR_ULT:
+				case IR_UGE:
+				case IR_ULE:
+				case IR_UGT:
+					if (IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)) {
+						/* part of IR_CMP_AND_BRANCH_INT */
+						n = 0;
+						goto cmp_int;
+					} else {
+						/* part of IR_CMP_AND_BRANCH_FP */
+						n = 0;
+						goto cmp_fp;
+					}
+					break;
+			}
+			break;
 	}
 	return 0;
 }
@@ -2740,12 +2741,6 @@ static void ir_emit_cmp_and_branch_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *
 	ir_reg op1_reg = ctx->regs[insn->op2][1];
 	ir_reg op2_reg = ctx->regs[insn->op2][2];
 
-	if (op1_reg == IR_REG_NONE) {
-		op1_reg = ctx->regs[def][1]; // temporary register for constant
-	}
-	if (op2_reg == IR_REG_NONE) {
-		op2_reg = ctx->regs[def][2]; // temporary register for constant
-	}
 	if (op1_reg != IR_REG_NONE && (op1_reg & IR_REG_SPILL_LOAD)) {
 		op1_reg &= ~IR_REG_SPILL_LOAD;
 		ir_emit_load(ctx, type, op1_reg, op1);
@@ -2811,13 +2806,13 @@ static void ir_emit_cmp_and_branch_fp(ir_ctx *ctx, int b, ir_ref def, ir_insn *i
 		op ^= 3;
 		op1 = cmp_insn->op2;
 		op2 = cmp_insn->op1;
-		op1_reg = ctx->regs[insn->op2][2] != IR_REG_NONE ? ctx->regs[insn->op2][2] : ctx->regs[def][2];
-		op2_reg = ctx->regs[insn->op2][1] != IR_REG_NONE ? ctx->regs[insn->op2][1] : ctx->regs[def][1];
+		op1_reg = ctx->regs[insn->op2][2];
+		op2_reg = ctx->regs[insn->op2][1];
 	} else {
 		op1 = cmp_insn->op1;
 		op2 = cmp_insn->op2;
-		op1_reg = ctx->regs[insn->op2][1] != IR_REG_NONE ? ctx->regs[insn->op2][1] : ctx->regs[def][1];
-		op2_reg = ctx->regs[insn->op2][2] != IR_REG_NONE ? ctx->regs[insn->op2][2] : ctx->regs[def][2];
+		op1_reg = ctx->regs[insn->op2][1];
+		op2_reg = ctx->regs[insn->op2][2];
 	}
 
 	if (op1_reg == IR_REG_NONE && op2_reg != IR_REG_NONE && (op == IR_EQ || op == IR_NE)) {
