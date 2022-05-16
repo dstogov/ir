@@ -66,123 +66,123 @@ Fig -O0
 }
 --EXPECT--
 test:
-	subq $0x128, %rsp
+	subq $0x98, %rsp
 	movl %edi, (%rsp)
-	movl %esi, 8(%rsp)
-	movl %edx, 0x10(%rsp)
-	movl %ecx, 0x18(%rsp)
-	movl %r9d, 0x20(%rsp)
+	movl %esi, 4(%rsp)
+	movl %edx, 8(%rsp)
+	movl %ecx, 0xc(%rsp)
+	movl %r9d, 0x10(%rsp)
 	movl -8(%rsp), %eax
-	movl %eax, 0x28(%rsp)
+	movl %eax, 0x14(%rsp)
 	movl -8(%rsp), %eax
-	movl %eax, 0x30(%rsp)
+	movl %eax, 0x18(%rsp)
 	movl -8(%rsp), %eax
-	movl %eax, 0x38(%rsp)
+	movl %eax, 0x1c(%rsp)
 	movl -8(%rsp), %eax
-	movl %eax, 0x40(%rsp)
+	movl %eax, 0x20(%rsp)
 	movl (%rsp), %eax
-	movl %eax, 0x48(%rsp)
+	movl %eax, 0x24(%rsp)
+	movl 0xc(%rsp), %eax
+	movl %eax, 0x28(%rsp)
+	movl 0x10(%rsp), %eax
+	movl %eax, 0x2c(%rsp)
+	movl 0x14(%rsp), %eax
+	movl %eax, 0x30(%rsp)
 	movl 0x18(%rsp), %eax
-	movl %eax, 0x50(%rsp)
-	movl 0x20(%rsp), %eax
-	movl %eax, 0x58(%rsp)
+	movl %eax, 0x34(%rsp)
+.L1:
+	cmpl $0, 0x1c(%rsp)
+	je .L2
+	movl 8(%rsp), %eax
+	imull 4(%rsp), %eax
+	movl %eax, 0x38(%rsp)
+	movl 0x38(%rsp), %eax
+	addl $4, %eax
+	movl %eax, 0x3c(%rsp)
+	movl 8(%rsp), %eax
+	movl %eax, 0x40(%rsp)
+	movl 0x40(%rsp), %eax
+	movl %eax, 0x54(%rsp)
 	movl 0x28(%rsp), %eax
+	movl %eax, 0x58(%rsp)
+	movl 0x38(%rsp), %eax
+	movl %eax, 0x5c(%rsp)
+	movl 0x3c(%rsp), %eax
 	movl %eax, 0x60(%rsp)
 	movl 0x30(%rsp), %eax
+	movl %eax, 0x64(%rsp)
+	movl 0x34(%rsp), %eax
 	movl %eax, 0x68(%rsp)
-.L1:
-	cmpl $0, 0x38(%rsp)
-	je .L2
-	movl 0x10(%rsp), %eax
-	imull 8(%rsp), %eax
-	movl %eax, 0x70(%rsp)
-	movl 0x70(%rsp), %eax
-	addl $4, %eax
-	movl %eax, 0x78(%rsp)
-	movl 0x10(%rsp), %eax
-	movl %eax, 0x80(%rsp)
-	movl 0x80(%rsp), %eax
-	movl %eax, 0xa8(%rsp)
-	movl 0x50(%rsp), %eax
-	movl %eax, 0xb0(%rsp)
-	movl 0x70(%rsp), %eax
-	movl %eax, 0xb8(%rsp)
-	movl 0x78(%rsp), %eax
-	movl %eax, 0xc0(%rsp)
-	movl 0x60(%rsp), %eax
-	movl %eax, 0xc8(%rsp)
-	movl 0x68(%rsp), %eax
-	movl %eax, 0xd0(%rsp)
 	jmp .L3
 .L2:
-	movl 0x10(%rsp), %eax
-	movl %eax, 0x88(%rsp)
-	movl 0x88(%rsp), %eax
-	imull 8(%rsp), %eax
-	movl %eax, 0x90(%rsp)
-	movl 0x48(%rsp), %eax
-	imull 8(%rsp), %eax
-	movl %eax, 0x98(%rsp)
-	movl 0x98(%rsp), %eax
-	addl $1, %eax
-	movl %eax, 0xa0(%rsp)
-	movl 0x48(%rsp), %eax
-	movl %eax, 0xa8(%rsp)
-	movl 0x88(%rsp), %eax
-	movl %eax, 0xb0(%rsp)
-	movl 0x90(%rsp), %eax
-	movl %eax, 0xb8(%rsp)
-	movl 0x58(%rsp), %eax
-	movl %eax, 0xc0(%rsp)
-	movl 0x98(%rsp), %eax
-	movl %eax, 0xc8(%rsp)
-	movl 0xa0(%rsp), %eax
-	movl %eax, 0xd0(%rsp)
-.L3:
-	movl 0xa8(%rsp), %eax
-	imull 8(%rsp), %eax
-	movl %eax, 0xd8(%rsp)
-	movl 0xd8(%rsp), %eax
-	addl $1, %eax
-	movl %eax, 0xe0(%rsp)
-	cmpl $0, 0x40(%rsp)
-	je .L4
-	movl 0xa8(%rsp), %eax
+	movl 8(%rsp), %eax
+	movl %eax, 0x44(%rsp)
+	movl 0x44(%rsp), %eax
+	imull 4(%rsp), %eax
 	movl %eax, 0x48(%rsp)
-	movl 0xb0(%rsp), %eax
+	movl 0x24(%rsp), %eax
+	imull 4(%rsp), %eax
+	movl %eax, 0x4c(%rsp)
+	movl 0x4c(%rsp), %eax
+	addl $1, %eax
 	movl %eax, 0x50(%rsp)
-	movl 0xc0(%rsp), %eax
+	movl 0x24(%rsp), %eax
+	movl %eax, 0x54(%rsp)
+	movl 0x44(%rsp), %eax
 	movl %eax, 0x58(%rsp)
-	movl 0xc8(%rsp), %eax
+	movl 0x48(%rsp), %eax
+	movl %eax, 0x5c(%rsp)
+	movl 0x2c(%rsp), %eax
 	movl %eax, 0x60(%rsp)
-	movl 0xd0(%rsp), %eax
+	movl 0x4c(%rsp), %eax
+	movl %eax, 0x64(%rsp)
+	movl 0x50(%rsp), %eax
 	movl %eax, 0x68(%rsp)
+.L3:
+	movl 0x54(%rsp), %eax
+	imull 4(%rsp), %eax
+	movl %eax, 0x6c(%rsp)
+	movl 0x6c(%rsp), %eax
+	addl $1, %eax
+	movl %eax, 0x70(%rsp)
+	cmpl $0, 0x20(%rsp)
+	je .L4
+	movl 0x54(%rsp), %eax
+	movl %eax, 0x24(%rsp)
+	movl 0x58(%rsp), %eax
+	movl %eax, 0x28(%rsp)
+	movl 0x60(%rsp), %eax
+	movl %eax, 0x2c(%rsp)
+	movl 0x64(%rsp), %eax
+	movl %eax, 0x30(%rsp)
+	movl 0x68(%rsp), %eax
+	movl %eax, 0x34(%rsp)
 	jmp .L1
 .L4:
-	movl 0xa8(%rsp), %eax
+	movl 0x54(%rsp), %eax
+	addl 4(%rsp), %eax
+	movl %eax, 0x74(%rsp)
+	movl 0x74(%rsp), %eax
 	addl 8(%rsp), %eax
-	movl %eax, 0xe8(%rsp)
-	movl 0xe8(%rsp), %eax
-	addl 0x10(%rsp), %eax
-	movl %eax, 0xf0(%rsp)
-	movl 0xf0(%rsp), %eax
-	addl 0xb0(%rsp), %eax
-	movl %eax, 0xf8(%rsp)
-	movl 0xf8(%rsp), %eax
-	addl 0xb8(%rsp), %eax
-	movl %eax, 0x100(%rsp)
-	movl 0x100(%rsp), %eax
-	addl 0xc0(%rsp), %eax
-	movl %eax, 0x108(%rsp)
-	movl 0x108(%rsp), %eax
-	addl 0xc8(%rsp), %eax
-	movl %eax, 0x110(%rsp)
-	movl 0x110(%rsp), %eax
-	addl 0xd0(%rsp), %eax
-	movl %eax, 0x118(%rsp)
-	movl 0x118(%rsp), %eax
-	addl 0xe0(%rsp), %eax
-	movl %eax, 0x120(%rsp)
-	movl 0x120(%rsp), %eax
-	addq $0x128, %rsp
+	movl %eax, 0x78(%rsp)
+	movl 0x78(%rsp), %eax
+	addl 0x58(%rsp), %eax
+	movl %eax, 0x7c(%rsp)
+	movl 0x7c(%rsp), %eax
+	addl 0x5c(%rsp), %eax
+	movl %eax, 0x80(%rsp)
+	movl 0x80(%rsp), %eax
+	addl 0x60(%rsp), %eax
+	movl %eax, 0x84(%rsp)
+	movl 0x84(%rsp), %eax
+	addl 0x64(%rsp), %eax
+	movl %eax, 0x88(%rsp)
+	movl 0x88(%rsp), %eax
+	addl 0x68(%rsp), %eax
+	movl %eax, 0x8c(%rsp)
+	movl 0x8c(%rsp), %eax
+	addl 0x70(%rsp), %eax
+	movl %eax, 0x90(%rsp)
+	movl 0x90(%rsp), %eax
+	addq $0x98, %rsp
 	retq

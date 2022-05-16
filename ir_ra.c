@@ -69,7 +69,7 @@ static void ir_add_local_var(ir_ctx *ctx, int v, uint8_t type)
 	ival->reg = IR_REG_NONE;
 	ival->flags = IR_LIVE_INTERVAL_VAR;
 	ival->vreg = v;
-	ival->stack_spill_pos = 0; // not allocated
+	ival->stack_spill_pos = -1; // not allocated
 	ival->range.start = 0;
 	ival->range.end = ctx->insns_count;
 	ival->range.next = NULL;
@@ -93,7 +93,7 @@ static void ir_add_live_range(ir_ctx *ctx, int v, uint8_t type, ir_live_pos star
 		ival->reg = IR_REG_NONE;
 		ival->flags = 0;
 		ival->vreg = v;
-		ival->stack_spill_pos = 0; // not allocated
+		ival->stack_spill_pos = -1; // not allocated
 		ival->range.start = start;
 		ival->range.end = end;
 		ival->range.next = NULL;
@@ -165,7 +165,7 @@ static void ir_add_fixed_live_range(ir_ctx *ctx, ir_reg reg, ir_live_pos start, 
 		ival->reg = reg;
 		ival->flags = IR_LIVE_INTERVAL_FIXED;
 		ival->vreg = v;
-		ival->stack_spill_pos = 0; // not allocated
+		ival->stack_spill_pos = -1; // not allocated
 		ival->range.start = start;
 		ival->range.end = end;
 		ival->range.next = NULL;
@@ -188,7 +188,7 @@ static void ir_add_tmp(ir_ctx *ctx, ir_ref ref, ir_tmp_reg tmp_reg)
 	ival->reg = IR_REG_NONE;
 	ival->flags = IR_LIVE_INTERVAL_TEMP | tmp_reg.num;
 	ival->vreg = 0;
-	ival->stack_spill_pos = 0; // not allocated
+	ival->stack_spill_pos = -1; // not allocated
 	ival->range.start = IR_START_LIVE_POS_FROM_REF(ref) + tmp_reg.start;
 	ival->range.end = IR_START_LIVE_POS_FROM_REF(ref) + tmp_reg.end;
 	ival->range.next = NULL;
@@ -1091,7 +1091,8 @@ int ir_gen_dessa_moves(ir_ctx *ctx, int b, emit_copy_t emit_copy)
  * Christian Wimmer VEE'10 (2005), Figure 2.
  */
 typedef struct _ir_lsra_data {
-	uint32_t stack_frame_size;
+	int32_t stack_frame_size;
+	int32_t unused_slot;
 } ir_lsra_data;
 
 #ifdef IR_DEBUG
@@ -1324,7 +1325,7 @@ static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, ir_live_interval *iva
 	child->reg = IR_REG_NONE;
 	child->flags = 0;
 	child->vreg = ival->vreg;
-	child->stack_spill_pos = 0; // not allocated
+	child->stack_spill_pos = -1; // not allocated
 	child->range.start = pos;
 	child->range.end = p->end;
 	child->range.next = p->next;
@@ -1360,9 +1361,21 @@ static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, ir_live_interval *iva
 static void ir_allocate_spill_slot(ir_ctx *ctx, ir_live_interval *ival, ir_lsra_data *data)
 {
 	ival = ival->top;
-	if (ival->stack_spill_pos == 0) {
-		data->stack_frame_size += 8; // ir_type_size[insn->type]; // TODO: alignment
-		ival->stack_spill_pos = data->stack_frame_size;
+	if (ival->stack_spill_pos == -1) {
+		IR_ASSERT(ival->type != IR_VOID);
+		uint8_t size = ir_type_size[ival->type];
+		if (size == 8) {
+			ival->stack_spill_pos = data->stack_frame_size;
+			data->stack_frame_size += 8;
+		} else if (data->unused_slot) {
+			ival->stack_spill_pos = data->unused_slot;
+			data->unused_slot = 0;
+		} else {
+			ival->stack_spill_pos = data->stack_frame_size;
+			data->stack_frame_size += 4;
+			data->unused_slot = data->stack_frame_size;
+			data->stack_frame_size += 4;
+		}
 	}
 }
 
@@ -1887,6 +1900,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 
 	ctx->data = &data;
 	data.stack_frame_size = 0;
+	data.unused_slot = 0;
 
 	for (j = 1; j <= ctx->vregs_count; j++) {
 		ival = ctx->live_intervals[j];
@@ -1982,7 +1996,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 			ir_insn *var = &ctx->ir_base[insn->op2];
 			IR_ASSERT(var->op == IR_VAR);
 			if (strcmp(ir_get_str(ctx, var->op2), "_spill_") == 0) {
-				if (ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos) {
+				if (ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos != -1) {
 					ival->stack_spill_pos =
 						ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos;
 				} else {
@@ -1999,7 +2013,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 				ir_insn *var = &ctx->ir_base[insn->op2];
 				IR_ASSERT(var->op == IR_VAR);
 				if (strcmp(ir_get_str(ctx, var->op2), "_spill_") == 0) {
-					if (ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos) {
+					if (ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos != -1) {
 						ival->stack_spill_pos =
 							ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos;
 					} else {
@@ -2072,7 +2086,7 @@ static void assign_regs(ir_ctx *ctx)
 					use_pos = ival->use_pos;
 					while (use_pos) {
 						reg = ival->reg;
-						if (ival->top->stack_spill_pos){
+						if (ival->top->stack_spill_pos != -1) {
 							// TODO: Insert spill loads and stotres in optimal positons (resolution)
 
 							if (use_pos->op_num == 0) {

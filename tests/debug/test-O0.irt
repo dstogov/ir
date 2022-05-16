@@ -53,7 +53,7 @@ Mandelbrot Test (-O0)
 }
 --EXPECT--
 test:
-	subq $0x78, %rsp
+	subq $0x70, %rsp
 	movsd %xmm0, (%rsp)
 	movsd %xmm1, 8(%rsp)
 	movsd 8(%rsp), %xmm0
@@ -67,50 +67,50 @@ test:
 .L1:
 	movl 0x28(%rsp), %eax
 	addl $1, %eax
-	movl %eax, 0x30(%rsp)
+	movl %eax, 0x2c(%rsp)
 	movsd 0x20(%rsp), %xmm0
 	mulsd 0x18(%rsp), %xmm0
-	movsd %xmm0, 0x38(%rsp)
+	movsd %xmm0, 0x30(%rsp)
 	movsd 0x20(%rsp), %xmm0
 	mulsd %xmm0, %xmm0
-	movsd %xmm0, 0x40(%rsp)
+	movsd %xmm0, 0x38(%rsp)
 	movsd 0x18(%rsp), %xmm0
 	mulsd %xmm0, %xmm0
-	movsd %xmm0, 0x48(%rsp)
-	movsd 0x40(%rsp), %xmm0
-	subsd 0x48(%rsp), %xmm0
-	movsd %xmm0, 0x50(%rsp)
-	movsd 0x50(%rsp), %xmm0
-	addsd 0x10(%rsp), %xmm0
-	movsd %xmm0, 0x58(%rsp)
+	movsd %xmm0, 0x40(%rsp)
 	movsd 0x38(%rsp), %xmm0
-	addsd %xmm0, %xmm0
-	movsd %xmm0, 0x60(%rsp)
-	movsd 0x60(%rsp), %xmm0
-	addsd (%rsp), %xmm0
-	movsd %xmm0, 0x68(%rsp)
+	subsd 0x40(%rsp), %xmm0
+	movsd %xmm0, 0x48(%rsp)
 	movsd 0x48(%rsp), %xmm0
-	addsd 0x40(%rsp), %xmm0
-	movsd %xmm0, 0x70(%rsp)
-	movsd 0x70(%rsp), %xmm0
+	addsd 0x10(%rsp), %xmm0
+	movsd %xmm0, 0x50(%rsp)
+	movsd 0x30(%rsp), %xmm0
+	addsd %xmm0, %xmm0
+	movsd %xmm0, 0x58(%rsp)
+	movsd 0x58(%rsp), %xmm0
+	addsd (%rsp), %xmm0
+	movsd %xmm0, 0x60(%rsp)
+	movsd 0x40(%rsp), %xmm0
+	addsd 0x38(%rsp), %xmm0
+	movsd %xmm0, 0x68(%rsp)
+	movsd 0x68(%rsp), %xmm0
 	ucomisd 0x4f(%rip), %xmm0
 	ja .L2
 	jmp .L3
 .L2:
-	movl 0x30(%rsp), %eax
-	addq $0x78, %rsp
+	movl 0x2c(%rsp), %eax
+	addq $0x70, %rsp
 	retq
 .L3:
-	cmpl $0x3e8, 0x30(%rsp)
+	cmpl $0x3e8, 0x2c(%rsp)
 	jl .L4
 	xorl %eax, %eax
-	addq $0x78, %rsp
+	addq $0x70, %rsp
 	retq
 .L4:
-	movsd 0x68(%rsp), %xmm0
+	movsd 0x60(%rsp), %xmm0
 	movsd %xmm0, 0x18(%rsp)
-	movsd 0x58(%rsp), %xmm0
+	movsd 0x50(%rsp), %xmm0
 	movsd %xmm0, 0x20(%rsp)
-	movl 0x30(%rsp), %eax
+	movl 0x2c(%rsp), %eax
 	movl %eax, 0x28(%rsp)
 	jmp .L1

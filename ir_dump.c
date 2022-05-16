@@ -288,7 +288,7 @@ void ir_dump_live_ranges(ir_ctx *ctx, FILE *f)
 					}
 				}
 				fprintf(f, ")");
-				if (ival->stack_spill_pos) {
+				if (ival->stack_spill_pos != -1) {
 					fprintf(f, " [SPILL=0x%x]", ival->stack_spill_pos);
 				}
 			}
