@@ -30,41 +30,22 @@
 
 ?  register allocation
 	+  linear scan
-		+  allocate scratch registers first
 		-  separate INT and FP allocation phases
-	-  constraints
-	    -  kill
-	    -  restricted regset
-	    +  must be in register
-	+  temporary registers
-		+  switch
-		?  arguments loading
-		+  parameter passing
-		+  dessa
 	?  spills
 	    +  spill everywhere code placement
 	    -  optimal spill code placement through resolution
 		-  spill slot allocation (packed/aligned according to SpillRange)
-	?  splitting
-	    +  find optimal split position
 	-  splinting
 		-  spill only at cold path if possible	
 	?  hints
-		+  hints propagation
 		-  hints and low priority
 
 ?  code generation
 	-  OVERFLOW
 	-  MIN, MAX, COND
 	-  CAST
-	?  ir_last_use
 	-  update memory (binop_int, mul_div_mod_pwr2, shift, shift_const, op_int, copy_int/fp?)
 	?  operands swap (binop_int, binop_sse, binop_avx, cmp_int, cmp_fp, cmp_br_int)
-	+  temporary register (e.g. for unsupported immediate operand in mul, div, and 64-bit constants)
-	+  temporary register for swap (dessa3.ir)
-	+  temporary register for spill loads and stores
-	+  temporary register for swap during parallel parameter pssing
-	+  IR_CMP_AND_BRANCH_FP invalid position of tmp variables (fib.ir)
 	-  stack arguments and parameters
 	-  return merge/split
 	?  binary code emission without DynAsm
