@@ -50,7 +50,7 @@
 	-  splinting
 		-  spill only at cold path if possible	
 	?  hints
-		-  hints propagation
+		+  hints propagation
 		-  hints and low priority
 
 ?  code generation

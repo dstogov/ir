@@ -1237,7 +1237,7 @@ static ir_block *ir_block_from_live_pos(ir_ctx *ctx, ir_live_pos pos)
 	return NULL;
 }
 
-static ir_live_pos ir_find_optimal_split_position(ir_ctx *ctx, ir_live_interval *ival, ir_live_pos min_pos, ir_live_pos max_pos)
+static ir_live_pos ir_find_optimal_split_position(ir_ctx *ctx, ir_live_interval *ival, ir_live_pos min_pos, ir_live_pos max_pos, bool prefer_max)
 {
 	ir_block *min_bb, *max_bb;
 
@@ -1254,7 +1254,7 @@ static ir_live_pos ir_find_optimal_split_position(ir_ctx *ctx, ir_live_interval 
 
 	if (min_bb == max_bb
 	 || ir_ival_has_hole_between(ival, min_pos, max_pos)) {  // TODO: ???
-		return max_pos;
+		return (prefer_max) ? max_pos : min_pos;
 	}
 
 	if (min_bb->loop_depth < max_bb->loop_depth) {
@@ -1525,9 +1525,8 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 	}
 
 	/* reg = register with highest freeUntilPos */
-	reg = IR_REGSET_FIRST(available);
-	IR_REGSET_EXCL(available, reg);
-	pos = freeUntilPos[reg];
+	reg = IR_REG_NONE;
+	pos = 0;
 	IR_REGSET_FOREACH(available, i) {
 		if (freeUntilPos[i] > pos) {
 			pos = freeUntilPos[i];
@@ -1559,7 +1558,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 		if (split_pos > ival->range.start) {
 			ir_reg pref_reg;
 
-			split_pos = ir_find_optimal_split_position(ctx, ival, split_pos, pos);
+			split_pos = ir_find_optimal_split_position(ctx, ival, split_pos, pos, 0);
 			other = ir_split_interval_at(ctx, ival, split_pos);
 			pref_reg = ir_try_allocate_preferred_reg(ctx, ival, available, freeUntilPos);
 			if (pref_reg != IR_REG_NONE) {
@@ -1709,7 +1708,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 			/* split right after definition */
 			split_pos = next_use_pos + 1;
 		} else {
-			split_pos = ir_find_optimal_split_position(ctx, ival, ival->range.start, next_use_pos - 1);
+			split_pos = ir_find_optimal_split_position(ctx, ival, ival->range.start, next_use_pos - 1, 1);
 		}
 
 		if (split_pos > ival->range.start) {
@@ -1728,7 +1727,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 		/* split current at optimal position before block_pos[reg] */
 		ir_live_pos split_pos = ir_last_use_pos_before(ival,  blockPos[reg] + 1,
 			IR_USE_MUST_BE_IN_REG | IR_USE_SHOULD_BE_IN_REG);
-		split_pos = ir_find_optimal_split_position(ctx, ival, split_pos, blockPos[reg]);
+		split_pos = ir_find_optimal_split_position(ctx, ival, split_pos, blockPos[reg], 1);
 		other = ir_split_interval_at(ctx, ival, split_pos);
 		ir_add_to_unhandled(unhandled, other);
 		IR_LOG_LSRA("      ---- Queue", other, "");
@@ -1754,7 +1753,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 				if (split_pos == 0) {
 					split_pos = ival->range.start;
 				}
-				split_pos = ir_find_optimal_split_position(ctx, other, split_pos, ival->range.start);
+				split_pos = ir_find_optimal_split_position(ctx, other, split_pos, ival->range.start, 1);
 				if (split_pos > other->range.start) {
 					child = ir_split_interval_at(ctx, other, split_pos);
 					IR_LOG_LSRA("      ---- Finish", other, "");
@@ -1776,7 +1775,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 
 				split_pos = ir_first_use_pos_after(child, ival->range.start, IR_USE_MUST_BE_IN_REG | IR_USE_SHOULD_BE_IN_REG) - 1; // TODO: ???
 				if (split_pos > child->range.start && split_pos < ir_ival_end(child)) {
-					split_pos = ir_find_optimal_split_position(ctx, child, ival->range.start, split_pos);
+					split_pos = ir_find_optimal_split_position(ctx, child, ival->range.start, split_pos, 1);
 					child2 = ir_split_interval_at(ctx, child, split_pos);
 					IR_LOG_LSRA("      ---- Spill", child, "");
 					ir_add_to_unhandled(unhandled, child2);
@@ -2111,8 +2110,53 @@ static void assign_regs(ir_ctx *ctx)
 	}
 }
 
+static void ir_add_hint(ir_ctx *ctx, ir_ref ref, ir_live_pos pos, ir_reg hint)
+{
+	ir_live_interval *ival = ctx->live_intervals[ctx->vregs[ref]];
+	ir_use_pos *use_pos = ival->use_pos;
+
+	while (use_pos) {
+		if (use_pos->pos == pos) {
+			if (use_pos->hint == IR_REG_NONE) {
+				use_pos->hint = hint;
+			}
+		}
+		use_pos = use_pos->next;
+	}
+}
+
+static void ir_hint_propagation(ir_ctx *ctx)
+{
+	int i;
+	ir_live_interval *ival;
+	ir_use_pos *use_pos;
+	ir_use_pos *hint_use_pos;
+
+	for (i = 1; i <= ctx->vregs_count; i++) {
+		ival = ctx->live_intervals[i];
+		if (ival) {
+			use_pos = ival->use_pos;
+			hint_use_pos = NULL;
+			while (use_pos) {
+				if (use_pos->hint_ref) {
+					hint_use_pos = use_pos;
+				} else if (use_pos->hint != IR_REG_NONE) {
+					if (hint_use_pos) {
+						if (use_pos->op_num != 0) {
+							ir_add_hint(ctx, hint_use_pos->hint_ref, hint_use_pos->pos, use_pos->hint);
+						}
+						hint_use_pos = NULL;
+					}
+				}
+				use_pos = use_pos->next;
+			}
+		}
+	}
+}
+
 int ir_reg_alloc(ir_ctx *ctx)
 {
+	ir_hint_propagation(ctx);
 	if (ir_linear_scan(ctx)) {
 		assign_regs(ctx);
 		return 1;
