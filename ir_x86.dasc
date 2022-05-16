@@ -4102,7 +4102,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 				case IR_SKIP_REG: /* PARAM PHI PI */
 					/* skip */
 					if (ctx->rules && *rule != IR_CMP_AND_BRANCH_INT && *rule != IR_CMP_AND_BRANCH_FP) {
-						available = IR_REGSET_UNION(IR_REGSET_GP, IR_REGSET_FP);
+						available = IR_REGSET_SCRATCH;
 					}
 					if (ctx->vregs[i]) {
 						if (ir_get_use_flags(ctx, i, 0) & IR_USE_MUST_BE_IN_REG) {
@@ -4168,6 +4168,14 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 
 					insn_flags = ir_op_flags[insn->op];
 					n = ir_input_edges_count(ctx, insn);
+					if (n > 0) {
+						ir_live_pos start, end;
+						ir_regset scratch = ir_get_scratch_regset(ctx, i, &start, &end);
+
+						if (!IR_REGSET_IS_EMPTY(scratch) && start == IR_LOAD_SUB_REF) {
+							available = IR_REGSET_DIFFERENCE(available, scratch);
+						}
+					}
 					for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
 						ir_ref input = *p;
 						if (IR_OPND_KIND(insn_flags, j) == IR_OPND_DATA && input > 0 && ctx->vregs[input]) {
