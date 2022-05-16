@@ -33,8 +33,9 @@
 		-  separate INT and FP allocation phases
 	?  spills
 	    +  spill everywhere code placement
+		+  packed/aligned spill slot allocation
+		-  spill slot coalescing
 	    -  optimal spill code placement through resolution
-		-  spill slot allocation (packed/aligned according to SpillRange)
 	-  splinting
 		-  spill only at cold path if possible	
 	?  hints
