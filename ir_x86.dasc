@@ -781,7 +781,14 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num)
 			}
 		case IR_CALL:
 		case IR_TAILCALL:
-			return (op_num == 2) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
+			if (op_num > 2) {
+				insn = &ctx->ir_base[ref];
+				if (ir_get_arg_reg(ctx, insn, op_num) == IR_REG_NONE) {
+					return IR_USE_MUST_BE_IN_REG;
+				}
+				return IR_USE_SHOULD_BE_IN_REG;
+			}
+			return IR_USE_SHOULD_BE_IN_REG;
 		case IR_SKIP_REG: /* PARAM PHI PI */
 			insn = &ctx->ir_base[ref];
 			if (insn->op == IR_PARAM && op_num == 0) {
