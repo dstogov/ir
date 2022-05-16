@@ -15,7 +15,7 @@
 test:
 	movl %esi, %ecx
 	shll %cl, %edi
-	movl %esi, %eax
 	movl %edi, %ecx
+	movl %esi, %eax
 	shll %cl, %eax
 	retq

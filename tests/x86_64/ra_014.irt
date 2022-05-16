@@ -13,8 +13,8 @@
 }
 --EXPECT--
 test:
-	movl %edi, %eax
 	movl %esi, %ecx
+	movl %edi, %eax
 	shll %cl, %eax
 	movl %eax, %ecx
 	movl %edi, %eax

@@ -1207,7 +1207,7 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 					// const
 				} else if (op2_insn->val.i64 == 0) {
 					return IR_COPY_INT;
-				} else if (op2_insn->val.i64 == -1) { // TODO: type len
+				} else if (op2_insn->val.i64 == -1) {
 					// -1
 				}
 			}
@@ -1219,7 +1219,7 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 					// const
 				} else if (op2_insn->val.i64 == 0) {
 					// 0
-				} else if (op2_insn->val.i64 == -1) { // TODO: type len
+				} else if (op2_insn->val.i64 == -1) {
 					return IR_COPY_INT;
 				}
 			}
@@ -1782,44 +1782,22 @@ static void ir_emit_shift(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		op1_reg &= ~IR_REG_SPILL_LOAD;
 		ir_emit_load(ctx, type, op1_reg, insn->op1);
 	}
-	if (def_reg != op2_reg) {
-		// TODO: this special case seems useless
-		if (def_reg != op1_reg) {
-			if (op1_reg >= 0) {
-				ir_emit_mov(ctx, type, def_reg, op1_reg);
-			} else {
-				ir_emit_load(ctx, type, def_reg, insn->op1);
-			}
+	if (op2_reg != IR_REG_NONE && (op2_reg & IR_REG_SPILL_LOAD)) {
+		op2_reg &= ~IR_REG_SPILL_LOAD;
+		ir_emit_load(ctx, type, op2_reg, insn->op2);
+	}
+	if (op2_reg != IR_REG_RCX) {
+		if (op2_reg >= 0) {
+			ir_emit_mov(ctx, type, IR_REG_RCX, op2_reg);
+		} else {
+			ir_emit_load(ctx, type, IR_REG_RCX, insn->op2);
 		}
-		if (op2_reg != IR_REG_NONE && (op2_reg & IR_REG_SPILL_LOAD)) {
-			op2_reg &= ~IR_REG_SPILL_LOAD;
-			ir_emit_load(ctx, type, op2_reg, insn->op2);
-		}
-		if (op2_reg != IR_REG_RCX) {
-			if (op2_reg >= 0) {
-				ir_emit_mov(ctx, type, IR_REG_RCX, op2_reg);
-			} else {
-				ir_emit_load(ctx, type, IR_REG_RCX, insn->op2);
-			}
-		}
-	} else {
-		if (op2_reg != IR_REG_NONE && (op2_reg & IR_REG_SPILL_LOAD)) {
-			op2_reg &= ~IR_REG_SPILL_LOAD;
-			ir_emit_load(ctx, type, op2_reg, insn->op2);
-		}
-		if (op2_reg != IR_REG_RCX) {
-			if (op2_reg >= 0) {
-				ir_emit_mov(ctx, type, IR_REG_RCX, op2_reg);
-			} else {
-				ir_emit_load(ctx, type, IR_REG_RCX, insn->op2);
-			}
-		}
-		if (def_reg != op1_reg) {
-			if (op1_reg >= 0) {
-				ir_emit_mov(ctx, type, def_reg, op1_reg);
-			} else {
-				ir_emit_load(ctx, type, def_reg, insn->op1);
-			}
+	}
+	if (def_reg != op1_reg) {
+		if (op1_reg >= 0) {
+			ir_emit_mov(ctx, type, def_reg, op1_reg);
+		} else {
+			ir_emit_load(ctx, type, def_reg, insn->op1);
 		}
 	}
 	switch (insn->op) {
