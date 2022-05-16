@@ -1092,7 +1092,9 @@ int ir_gen_dessa_moves(ir_ctx *ctx, int b, emit_copy_t emit_copy)
  */
 typedef struct _ir_lsra_data {
 	int32_t stack_frame_size;
-	int32_t unused_slot;
+	int32_t unused_slot_4;
+	int32_t unused_slot_2;
+	int32_t unused_slot_1;
 } ir_lsra_data;
 
 #ifdef IR_DEBUG
@@ -1362,19 +1364,56 @@ static void ir_allocate_spill_slot(ir_ctx *ctx, ir_live_interval *ival, ir_lsra_
 {
 	ival = ival->top;
 	if (ival->stack_spill_pos == -1) {
-		IR_ASSERT(ival->type != IR_VOID);
 		uint8_t size = ir_type_size[ival->type];
+
 		if (size == 8) {
 			ival->stack_spill_pos = data->stack_frame_size;
 			data->stack_frame_size += 8;
-		} else if (data->unused_slot) {
-			ival->stack_spill_pos = data->unused_slot;
-			data->unused_slot = 0;
+		} else if (size == 4) {
+			if (data->unused_slot_4) {
+				ival->stack_spill_pos = data->unused_slot_4;
+				data->unused_slot_4 = 0;
+			} else {
+				ival->stack_spill_pos = data->stack_frame_size;
+				data->unused_slot_4 = data->stack_frame_size + 4;
+				data->stack_frame_size += 8;
+			}
+		} else if (size == 2) {
+			if (data->unused_slot_2) {
+				ival->stack_spill_pos = data->unused_slot_2;
+				data->unused_slot_2 = 0;
+			} else if (data->unused_slot_4) {
+				ival->stack_spill_pos = data->unused_slot_4;
+				data->unused_slot_2 = data->unused_slot_4 + 2;
+				data->unused_slot_4 = 0;
+			} else {
+				ival->stack_spill_pos = data->stack_frame_size;
+				data->unused_slot_2 = data->stack_frame_size + 2;
+				data->unused_slot_4 = data->stack_frame_size + 4;
+				data->stack_frame_size += 8;
+			}
+		} else if (size == 1) {
+			if (data->unused_slot_1) {
+				ival->stack_spill_pos = data->unused_slot_1;
+				data->unused_slot_1 = 0;
+			} else if (data->unused_slot_2) {
+				ival->stack_spill_pos = data->unused_slot_2;
+				data->unused_slot_1 = data->unused_slot_2 + 1;
+				data->unused_slot_2 = 0;
+			} else if (data->unused_slot_4) {
+				ival->stack_spill_pos = data->unused_slot_4;
+				data->unused_slot_1 = data->unused_slot_4 + 1;
+				data->unused_slot_2 = data->unused_slot_4 + 2;
+				data->unused_slot_4 = 0;
+			} else {
+				ival->stack_spill_pos = data->stack_frame_size;
+				data->unused_slot_1 = data->stack_frame_size + 1;
+				data->unused_slot_2 = data->stack_frame_size + 2;
+				data->unused_slot_4 = data->stack_frame_size + 4;
+				data->stack_frame_size += 8;
+			}
 		} else {
-			ival->stack_spill_pos = data->stack_frame_size;
-			data->stack_frame_size += 4;
-			data->unused_slot = data->stack_frame_size;
-			data->stack_frame_size += 4;
+			IR_ASSERT(0);
 		}
 	}
 }
@@ -1900,7 +1939,9 @@ static int ir_linear_scan(ir_ctx *ctx)
 
 	ctx->data = &data;
 	data.stack_frame_size = 0;
-	data.unused_slot = 0;
+	data.unused_slot_4 = 0;
+	data.unused_slot_2 = 0;
+	data.unused_slot_1 = 0;
 
 	for (j = 1; j <= ctx->vregs_count; j++) {
 		ival = ctx->live_intervals[j];

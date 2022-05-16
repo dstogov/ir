@@ -404,7 +404,9 @@
 
 typedef struct _ir_backend_data {
 	int32_t     stack_frame_size;
-	int32_t     unused_slot;
+	int32_t     unused_slot_4;
+	int32_t     unused_slot_2;
+	int32_t     unused_slot_1;
 	int32_t     stack_frame_alignment;
 	ir_regset   used_preserved_regs;
 	uint32_t    dessa_from_block;
@@ -4003,19 +4005,56 @@ static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 
 static void ir_allocate_spill_slot(ir_ctx *ctx, ir_live_interval *ival, ir_backend_data *data)
 {
-	IR_ASSERT(ival->type != IR_VOID);
 	uint8_t size = ir_type_size[ival->type];
+
 	if (size == 8) {
 		ival->stack_spill_pos = data->stack_frame_size;
 		data->stack_frame_size += 8;
-	} else if (data->unused_slot) {
-		ival->stack_spill_pos = data->unused_slot;
-		data->unused_slot = 0;
+	} else if (size == 4) {
+		if (data->unused_slot_4) {
+			ival->stack_spill_pos = data->unused_slot_4;
+			data->unused_slot_4 = 0;
+		} else {
+			ival->stack_spill_pos = data->stack_frame_size;
+			data->unused_slot_4 = data->stack_frame_size + 4;
+			data->stack_frame_size += 8;
+		}
+	} else if (size == 2) {
+		if (data->unused_slot_2) {
+			ival->stack_spill_pos = data->unused_slot_2;
+			data->unused_slot_2 = 0;
+		} else if (data->unused_slot_4) {
+			ival->stack_spill_pos = data->unused_slot_4;
+			data->unused_slot_2 = data->unused_slot_4 + 2;
+			data->unused_slot_4 = 0;
+		} else {
+			ival->stack_spill_pos = data->stack_frame_size;
+			data->unused_slot_2 = data->stack_frame_size + 2;
+			data->unused_slot_4 = data->stack_frame_size + 4;
+			data->stack_frame_size += 8;
+		}
+	} else if (size == 1) {
+		if (data->unused_slot_1) {
+			ival->stack_spill_pos = data->unused_slot_1;
+			data->unused_slot_1 = 0;
+		} else if (data->unused_slot_2) {
+			ival->stack_spill_pos = data->unused_slot_2;
+			data->unused_slot_1 = data->unused_slot_2 + 1;
+			data->unused_slot_2 = 0;
+		} else if (data->unused_slot_4) {
+			ival->stack_spill_pos = data->unused_slot_4;
+			data->unused_slot_1 = data->unused_slot_4 + 1;
+			data->unused_slot_2 = data->unused_slot_4 + 2;
+			data->unused_slot_4 = 0;
+		} else {
+			ival->stack_spill_pos = data->stack_frame_size;
+			data->unused_slot_1 = data->stack_frame_size + 1;
+			data->unused_slot_2 = data->stack_frame_size + 2;
+			data->unused_slot_4 = data->stack_frame_size + 4;
+			data->stack_frame_size += 8;
+		}
 	} else {
-		ival->stack_spill_pos = data->stack_frame_size;
-		data->stack_frame_size += 4;
-		data->unused_slot = data->stack_frame_size;
-		data->stack_frame_size += 4;
+		IR_ASSERT(0);
 	}
 }
 
@@ -4275,7 +4314,9 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 
 	ctx->data = &data;
 	data.stack_frame_size = 0;
-	data.unused_slot = 0;
+	data.unused_slot_4 = 0;
+	data.unused_slot_2 = 0;
+	data.unused_slot_1 = 0;
 	data.stack_frame_alignment = 0;
 	data.used_preserved_regs = 0;
 	data.rodata_label = 0;
