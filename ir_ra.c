@@ -198,8 +198,8 @@ static void ir_add_tmp(ir_ctx *ctx, ir_ref ref, ir_tmp_reg tmp_reg)
 		ival->top = ival;
 		ival->next = NULL;
 		ctx->live_intervals[0] = ival;
-	} else if (ival->range.start >= ctx->live_intervals[0]->top->range.start) {
-		ir_live_interval *prev = ctx->live_intervals[0]->top;
+	} else if (ival->range.start >= ctx->live_intervals[0]->range.start) {
+		ir_live_interval *prev = ctx->live_intervals[0];
 
 		while (prev->next && ival->range.start >= prev->next->range.start) {
 			prev = prev->next;
@@ -226,7 +226,6 @@ static bool ir_has_tmp(ir_ctx *ctx, ir_ref ref, uint8_t num)
 	ir_live_interval *ival = ctx->live_intervals[0];
 
 	if (ival) {
-		ival = ival->top;
 		while (ival && IR_LIVE_POS_TO_REF(ival->range.start) <= ref) {
 			if (IR_LIVE_POS_TO_REF(ival->range.start) == ref
 			 && ival->flags == (IR_LIVE_INTERVAL_TEMP | num)) {
@@ -2035,15 +2034,9 @@ static int ir_linear_scan(ir_ctx *ctx)
 	}
 #endif
 
-	if (ctx->live_intervals[0]) {
-		ctx->live_intervals[0] = ctx->live_intervals[0]->top;
-	}
-
 	for (j = 1; j <= ctx->vregs_count; j++) {
 		ival = ctx->live_intervals[j];
 		if (ival) {
-			ival = ival->top;
-			ctx->live_intervals[j] = ival;
 			if (ival->next || ival->reg == IR_REG_NONE) {
 				ir_allocate_spill_slot(ctx, ival, &data);
 			}
@@ -2075,7 +2068,6 @@ static void assign_regs(ir_ctx *ctx)
 	for (i = 1; i <= ctx->vregs_count; i++) {
 		ival = ctx->live_intervals[i];
 		if (ival) {
-			ival = ival->top;
 			do {
 				if (ival->reg >= 0) {
 					use_pos = ival->use_pos;
@@ -2111,7 +2103,6 @@ static void assign_regs(ir_ctx *ctx)
 	/* Temporary registers */
 	ival = ctx->live_intervals[0];
 	if (ival) {
-		ival = ival->top;
 		do {
 			IR_ASSERT(ival->reg != IR_REG_NONE);
 			ctx->regs[IR_LIVE_POS_TO_REF(ival->range.start)][ival->flags & IR_LIVE_INTERVAL_REG_NUM_MASK] = ival->reg;

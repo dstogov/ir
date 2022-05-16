@@ -273,7 +273,6 @@ void ir_dump_live_ranges(ir_ctx *ctx, FILE *f)
 			ir_live_range *p;
 			ir_use_pos *use_pos;
 
-			ival = ival->top;
 			if (i == 0) {
 				fprintf(f, "TMP");
 			} else {
