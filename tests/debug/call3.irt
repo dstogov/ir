@@ -1,0 +1,34 @@
+--TEST--
+CALL with parallel argument passing
+--ARGS--
+-S
+--CODE--
+{
+	uintptr_t c_6 = "hello %d!\n";
+	l_1 = START(l_4);
+	int32_t p_1 = PARAM(l_1, "p1", 1);
+	int32_t p_2 = PARAM(l_1, "p2", 2);
+	int32_t p_3 = PARAM(l_1, "p3", 3);
+	int32_t p_4 = PARAM(l_1, "p4", 4);
+	uintptr_t fp = PARAM(l_1, "fp", 5);
+	uintptr_t f, l_11 = LOAD(l_1, fp);	
+	int32_t d_2, l_2 = CALL/4(l_11, f, c_6, p_3, p_4, p_2);
+	int32_t d_3 = ADD(d_2, p_1);
+	l_4 = RETURN(l_2, d_3);
+}
+--EXPECT--
+test:
+	subq $8, %rsp
+	movq %rbx, (%rsp)
+	movl %edi, %ebx
+	movq (%r8), %rax
+	movl %ecx, %r8d
+	movl %esi, %ecx
+	movl %edx, %esi
+	movl %r8d, %edx
+	leaq 0x12(%rip), %rdi
+	callq *%rax
+	leal (%rax, %rbx), %eax
+	movq (%rsp), %rbx
+	addq $8, %rsp
+	retq

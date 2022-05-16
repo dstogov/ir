@@ -36,10 +36,10 @@
 	    -  kill
 	    -  restricted regset
 	    +  must be in register
-	?  temporary registers
+	+  temporary registers
 		+  switch
-		-  arguments loading
-		-  parameter passing
+		?  arguments loading
+		+  parameter passing
 		+  dessa
 	?  spills
 	    +  spill everywhere code placement
@@ -63,7 +63,7 @@
 	+  temporary register (e.g. for unsupported immediate operand in mul, div, and 64-bit constants)
 	+  temporary register for swap (dessa3.ir)
 	+  temporary register for spill loads and stores
-	-  temporary register for swap during parallel parameter pssing
+	+  temporary register for swap during parallel parameter pssing
 	+  IR_CMP_AND_BRANCH_FP invalid position of tmp variables (fib.ir)
 	-  stack arguments and parameters
 	-  return merge/split

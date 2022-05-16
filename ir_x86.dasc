@@ -730,6 +730,31 @@ ir_reg ir_uses_fixed_reg(ir_ctx *ctx, ir_ref ref, int op_num)
 	return IR_REG_NONE;
 }
 
+static bool ir_may_need_tmp_reg_for_int_args_swap(ir_ctx *ctx, ir_ref ref)
+{
+	ir_insn *insn = &ctx->ir_base[ref];
+	int j, n;
+	ir_type type;
+	int int_param = 0;
+	int int_reg_params_count = IR_REG_INT_ARGS;
+
+	n = ir_input_edges_count(ctx, insn);
+	for (j = 3; j <= n; j++) {
+		type = ctx->ir_base[insn->ops[j]].type;
+		if (IR_IS_TYPE_INT(type)) {
+			if (int_param < int_reg_params_count) {
+				if (int_param > 0) {
+					return 1;
+				}
+			} else {
+				return 0;
+			}
+			int_param++;
+		}
+	}
+	return 0;
+}
+
 bool ir_result_reuses_op1_reg(ir_ctx *ctx, ir_ref ref)
 {
 	ir_ref rule;
@@ -983,6 +1008,16 @@ cmp_fp:
 				n++;
 			}
 			return n;
+		case IR_CALL:
+		case IR_TAILCALL:
+			if (ir_may_need_tmp_reg_for_int_args_swap(ctx, ref)) {
+				tmp_regs[0].num = 1;
+				tmp_regs[0].type = IR_ADDR;
+				tmp_regs[0].start = IR_LOAD_SUB_REF;
+				tmp_regs[0].end = IR_USE_SUB_REF;
+				return 1;
+			}
+			break;
 		case IR_SKIP:
 			insn = &ctx->ir_base[ref];
 			switch (insn->op) {
@@ -3442,7 +3477,7 @@ typedef struct _ir_copy {
 	ir_reg  to;
 } ir_copy;
 
-static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count)
+static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_reg, ir_reg tmp_fp_reg)
 {
 	int i;
 	int8_t *pred, *loc, *types;
@@ -3499,11 +3534,16 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count)
 		if (to != loc[from_reg]) {
 			type = types[to];
 			if (IR_IS_TYPE_INT(type)) {
-				ir_emit_mov(ctx, type, IR_REG_R0, to); // TODO: Temporary register
+				IR_ASSERT(tmp_reg != IR_REG_NONE);
+				IR_ASSERT(tmp_reg >= IR_REG_GP_FIRST && tmp_reg <= IR_REG_GP_LAST);
+				ir_emit_mov(ctx, type, tmp_reg, to);
+				loc[to] = tmp_reg;
 			} else {
-				ir_emit_fp_mov(ctx, type, IR_REG_XMM7, to); // TODO: Temporary register
+				IR_ASSERT(tmp_fp_reg != IR_REG_NONE);
+				IR_ASSERT(tmp_fp_reg >= IR_REG_FP_FIRST && tmp_fp_reg <= IR_REG_FP_LAST);
+				ir_emit_fp_mov(ctx, type, tmp_fp_reg, to);
+				loc[to] = tmp_fp_reg;
 			}
-			loc[to] = 0;
 			IR_REGSET_INCL(ready, to);
 		}
 	}
@@ -3513,7 +3553,7 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count)
 	return 1;
 }
 
-static void ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+static void ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg tmp_reg)
 {
 	int j, n;
 	ir_ref arg;
@@ -3575,7 +3615,7 @@ static void ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 	}
 	if (count) {
-		ir_parallel_copy(ctx, copies, count);
+		ir_parallel_copy(ctx, copies, count, tmp_reg, IR_REG_FP_LAST);
 	}
 	ir_mem_free(copies);
 
@@ -3625,7 +3665,7 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg def_reg;
 
-	ir_emit_arguments(ctx, def, insn);
+	ir_emit_arguments(ctx, def, insn, ctx->regs[def][1]);
 
 	if (IR_IS_CONST_REF(insn->op2)) {
 		const char *name = ir_get_str(ctx, ctx->ir_base[insn->op2].val.addr);
@@ -3688,7 +3728,7 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-	ir_emit_arguments(ctx, def, insn);
+	ir_emit_arguments(ctx, def, insn, ctx->regs[def][1]);
 
 	ir_emit_epilogue(ctx);
 
