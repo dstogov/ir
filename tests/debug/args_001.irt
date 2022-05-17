@@ -22,7 +22,7 @@
 }
 --EXPECT--
 test:
-	subq $0x38, %rsp
+	subq $0x28, %rsp
 	movl $6, (%rsp)
 	movl $7, 8(%rsp)
 	movl $8, 0x10(%rsp)
@@ -37,7 +37,7 @@ test:
 	movabsq $0x100000000, %r9
 	movabsq $_IO_printf, %rax
 	callq *%rax
-	addq $0x38, %rsp
+	addq $0x28, %rsp
 	retq
 
 1 2 3 4 0x100000000 6 7 8 9 0x100000000
