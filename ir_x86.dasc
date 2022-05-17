@@ -883,7 +883,6 @@ int ir_get_temporary_regs(ir_ctx *ctx, ir_ref ref, ir_tmp_reg *tmp_regs)
 				}
 			}
 			break;
-//		case IR_MUL_INT: // use hardcoded %rdx
 		case IR_DIV_INT:
 		case IR_MOD_INT:
 			insn = &ctx->ir_base[ref];
