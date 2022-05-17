@@ -1,0 +1,48 @@
+--TEST--
+002: Argument Passing
+--ARGS--
+-S --run
+--CODE--
+{
+	double c_1 = 0.1;
+	double c_2 = 0.2;
+	double c_3 = 0.3;
+	double c_4 = 0.4;
+	double c_5 = 0.5;
+	double c_6 = 0.6;
+	double c_7 = 0.7;
+	double c_8 = 0.8;
+	double c_9 = 0.9;
+	double c_10 = 0.0;
+	uintptr_t f = func(printf);
+	uintptr_t fmt = "%g %g %g %g %g %g %g %g %g %g\n";
+	l_1 = START(l_3);
+	int32_t d_2, l_2 = CALL/11(l_1, f, fmt, c_1, c_2, c_3, c_4, c_5, c_6, c_7, c_8, c_9, c_10);
+	l_3 = RETURN(l_2, d_2);
+}
+--EXPECT--
+test:
+	subq $8, %rsp
+	leaq -0x10(%rsp), %rsp
+	movsd 0xb6(%rip), %xmm15
+	movsd %xmm15, (%rsp)
+	xorpd %xmm15, %xmm15
+	movsd %xmm15, 8(%rsp)
+	leaq 0xa5(%rip), %rdi
+	movsd 0x55(%rip), %xmm0
+	movsd 0x55(%rip), %xmm1
+	movsd 0x55(%rip), %xmm2
+	movsd 0x55(%rip), %xmm3
+	movsd 0x55(%rip), %xmm4
+	movsd 0x55(%rip), %xmm5
+	movsd 0x55(%rip), %xmm6
+	movsd 0x55(%rip), %xmm7
+	movabsq $_IO_printf, %rax
+	callq *%rax
+	leaq 0x10(%rsp), %rsp
+	addq $8, %rsp
+	retq
+
+0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 0
+
+exit code = 38

@@ -1,0 +1,47 @@
+--TEST--
+001: Argument Passing
+--ARGS--
+-S --run
+--CODE--
+{
+	int8_t c_1 = 1;
+	int16_t c_2 = 2;
+	int32_t c_3 = 3;
+	int64_t c_4 = 4;
+	int64_t c_5 = 0x100000000;
+	uint8_t c_6 = 6;
+	uint16_t c_7 = 7;
+	uint32_t c_8 = 8;
+	int64_t c_9 = 9;
+	int64_t c_10 = 0x100000000;
+	uintptr_t f = func(printf);
+	uintptr_t fmt = "%d %d %d %lld 0x%llx %d %d %d %lld 0x%llx\n";
+	l_1 = START(l_3);
+	int32_t d_2, l_2 = CALL/11(l_1, f, fmt, c_1, c_2, c_3, c_4, c_5, c_6, c_7, c_8, c_9, c_10);
+	l_3 = RETURN(l_2, d_2);
+}
+--EXPECT--
+test:
+	subq $8, %rsp
+	leaq -0x30(%rsp), %rsp
+	movl $6, (%rsp)
+	movl $7, 8(%rsp)
+	movl $8, 0x10(%rsp)
+	movq $9, 0x18(%rsp)
+	movabsq $0x100000000, %rax
+	movq %rax, 0x20(%rsp)
+	leaq 0x39(%rip), %rdi
+	movq $1, %rsi
+	movw $2, %dx
+	movl $3, %ecx
+	movq $4, %r8
+	movabsq $0x100000000, %r9
+	movabsq $_IO_printf, %rax
+	callq *%rax
+	leaq 0x30(%rsp), %rsp
+	addq $8, %rsp
+	retq
+
+1 2 3 4 0x100000000 6 7 8 9 0x100000000
+
+exit code = 40

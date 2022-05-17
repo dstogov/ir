@@ -3556,6 +3556,42 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 	return 1;
 }
 
+static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn)
+{
+	int j, n;
+	ir_type type;
+	int int_param = 0;
+	int fp_param = 0;
+	int int_reg_params_count = IR_REG_INT_ARGS;
+	int fp_reg_params_count = IR_REG_FP_ARGS;
+	int32_t used_stack = 0;
+
+	n = ir_input_edges_count(ctx, insn);
+	for (j = 3; j <= n; j++) {
+		type = ctx->ir_base[insn->ops[j]].type;
+		if (IR_IS_TYPE_INT(type)) {
+			if (int_param >= int_reg_params_count) {
+				used_stack += sizeof(void*);
+			}
+			int_param++;
+		} else if (IR_IS_TYPE_FP(type)) {
+			if (fp_param >= fp_reg_params_count) {
+				used_stack += sizeof(void*);
+			}
+			fp_param++;
+		} else {
+			IR_ASSERT(0);
+		}
+	}
+
+	if (used_stack % 16 != 0) {
+		/* Stack must be 16 byte aligned */
+		used_stack += 8;
+	}
+
+	return used_stack;
+}
+
 static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg tmp_reg)
 {
 	ir_backend_data *data = ctx->data;
@@ -3572,10 +3608,20 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 	int fp_reg_params_count = IR_REG_FP_ARGS;
 	const int8_t *int_reg_params = _ir_int_reg_params;
 	const int8_t *fp_reg_params = _ir_fp_reg_params;
-	int32_t used_stack = 0;
+	int32_t used_stack, stack_offset = 0;
 	ir_copy *copies;
 	bool has_mem_const_args = 0;
 	ir_reg tmp_fp_reg = IR_REG_FP_LAST; /* Temporary register for FP loads and swap */
+
+	if (0) {
+		// TODO: support for preallocated stack
+		used_stack = 0;
+	} else {
+		used_stack = ir_call_used_stack(ctx, insn);
+		if (used_stack) {
+			|	lea rsp, [rsp-used_stack]
+		}
+	}
 
 	n = ir_input_edges_count(ctx, insn);
 	copies = ir_mem_malloc((n - 2) * sizeof(ir_copy));
@@ -3620,43 +3666,42 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 			}
 		} else {
 			/* Pass argument through stack */
-			if (0) {
-				// TODO: support for preallocated stack
-			} else {
-				used_stack += sizeof(void*);
-				if (IR_IS_TYPE_INT(type)) {
-					if (IR_IS_CONST_REF(arg)) {
-						ir_val *val = &ctx->ir_base[arg].val;
-						if (IR_IS_SIGNED_32BIT(val->i64)) {
-							|	push val->i32
+			if (IR_IS_TYPE_INT(type)) {
+				if (IR_IS_CONST_REF(arg)) {
+					ir_val *val = &ctx->ir_base[arg].val;
+					if (IR_IS_SIGNED_32BIT(val->i64)) {
+						if (ir_type_size[type] <= 4) {
+							|	mov dword [rsp+stack_offset], val->i32
 						} else {
-							IR_ASSERT(tmp_reg != IR_REG_NONE);
-							|	mov64 Ra(tmp_reg), val->i64
-							|	push Ra(tmp_reg)
+							|	mov qword [rsp+stack_offset], val->i32
 						}
 					} else {
-						IR_ASSERT(src_reg != IR_REG_NONE);
-						if (src_reg & IR_REG_SPILL_LOAD) {
-							src_reg &= ~IR_REG_SPILL_LOAD;
-							ir_emit_load(ctx, type, src_reg, arg);
-						}
-						|	push Ra(src_reg)
+						IR_ASSERT(tmp_reg != IR_REG_NONE);
+						|	mov64 Ra(tmp_reg), val->i64
+						|	mov [rsp+stack_offset], Ra(tmp_reg)
 					}
 				} else {
-					if (IR_IS_CONST_REF(arg)) {
-						ir_emit_load(ctx, type, tmp_fp_reg, arg);
-						src_reg = tmp_fp_reg;
-					} else {
-						IR_ASSERT(src_reg != IR_REG_NONE);
-						if (src_reg & IR_REG_SPILL_LOAD) {
-							src_reg &= ~IR_REG_SPILL_LOAD;
-							ir_emit_load(ctx, type, src_reg, arg);
-						}
+					IR_ASSERT(src_reg != IR_REG_NONE);
+					if (src_reg & IR_REG_SPILL_LOAD) {
+						src_reg &= ~IR_REG_SPILL_LOAD;
+						ir_emit_load(ctx, type, src_reg, arg);
 					}
-					|	sub rsp, sizeof(void*)
-					|	ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [rsp], src_reg
+					|	ASM_MEM_REG_OP, mov, type, [rsp+stack_offset], src_reg
 				}
+			} else {
+				if (IR_IS_CONST_REF(arg)) {
+					ir_emit_load(ctx, type, tmp_fp_reg, arg);
+					src_reg = tmp_fp_reg;
+				} else {
+					IR_ASSERT(src_reg != IR_REG_NONE);
+					if (src_reg & IR_REG_SPILL_LOAD) {
+						src_reg &= ~IR_REG_SPILL_LOAD;
+						ir_emit_load(ctx, type, src_reg, arg);
+					}
+				}
+				|	ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [rsp+stack_offset], src_reg
 			}
+			stack_offset += sizeof(void*);
 		}
 	}
 	if (count) {
@@ -3691,6 +3736,9 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 			}
 			if (dst_reg != IR_REG_NONE && (IR_IS_CONST_REF(arg) || src_reg == IR_REG_NONE)) {
 				if (IR_IS_TYPE_INT(type)) {
+					if (IR_IS_CONST_REF(arg) && ir_type_size[type] == 1) {
+						type = IR_ADDR;
+					}
 					ir_emit_load(ctx, type, dst_reg, arg);
 				} else {
 					ir_emit_load(ctx, type, dst_reg, arg);
@@ -3735,8 +3783,7 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
     }
 
 	if (used_stack) {
-		// TODO: support for preallocated stack
-		|	add rsp, used_stack
+		|	lea rsp, [rsp+used_stack]
 	}
 
 	if (insn->type != IR_VOID) {
