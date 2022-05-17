@@ -9,6 +9,7 @@ static void help(const char *cmd)
 		"  -O[012]                    - optimiztion level\n"
 		"  -S                         - dump final target assembler code\n"
 		"  -mavx                      - use AVX instruction set\n"
+		"  -muse-fp                   - use base frame pointer register\n"
 		"  --emit-c [file-name]       - convert to C source\n"
 		"  --save [file-name]         - save IR\n"
 		"  --dot  [file-name]         - dump IR graph\n"
@@ -308,6 +309,8 @@ int main(int argc, char **argv)
 			run = 1;
 		} else if (strcmp(argv[i], "-mavx") == 0) {
 			mflags |= IR_AVX;
+		} else if (strcmp(argv[i], "-muse-fp") == 0) {
+			mflags |= IR_USE_FRAME_POINTER;
 #ifdef IR_DEBUG
 		} else if (strcmp(argv[i], "--debug-sccp") == 0) {
 			mflags |= IR_DEBUG_SCCP;

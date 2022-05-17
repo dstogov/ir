@@ -137,6 +137,8 @@ int main(int argc, char **argv)
 			}
 		} else if (strcmp(argv[i], "-mavx") == 0) {
 			mflags |= IR_AVX;
+		} else if (strcmp(argv[i], "-muse-fp") == 0) {
+			mflags |= IR_USE_FRAME_POINTER;
 #ifdef IR_DEBUG
 		} else if (strcmp(argv[i], "--debug-sccp") == 0) {
 			mflags |= IR_DEBUG_SCCP;

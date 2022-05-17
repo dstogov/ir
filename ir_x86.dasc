@@ -408,6 +408,7 @@ typedef struct _ir_backend_data {
 	int32_t     unused_slot_2;
 	int32_t     unused_slot_1;
 	int32_t     stack_frame_alignment;
+	int32_t     call_stack_size;
 	ir_regset   used_preserved_regs;
 	uint32_t    dessa_from_block;
 	dasm_State *dasm_state;
@@ -1471,9 +1472,9 @@ static ir_reg ir_ref_spill_slot(ir_ctx *ctx, ir_ref ref)
 	offset = ctx->live_intervals[ctx->vregs[ref]]->stack_spill_pos;
 	IR_ASSERT(offset != -1);
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
-		return offset - data->stack_frame_size - data->stack_frame_alignment;
+		return offset - data->stack_frame_size;
 	} else {
-		return offset + data->stack_frame_alignment;
+		return offset + data->call_stack_size + data->stack_frame_alignment;
 	}
 }
 
@@ -1532,10 +1533,10 @@ static void ir_emit_load(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref src)
 		offset = ctx->live_intervals[ctx->vregs[src]]->stack_spill_pos;
 		IR_ASSERT(offset != -1);
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
-			offset = offset - data->stack_frame_size - data->stack_frame_alignment;
+			offset = offset - data->stack_frame_size;
 			fp = IR_REG_RBP;
 		} else {
-			offset = offset + data->stack_frame_alignment;
+			offset = offset + data->call_stack_size + data->stack_frame_alignment;
 			fp = IR_REG_RSP;
 		}
 
@@ -1558,10 +1559,10 @@ static void ir_emit_store(ir_ctx *ctx, ir_type type, ir_ref dst, ir_reg reg)
 	offset = ctx->live_intervals[ctx->vregs[dst]]->stack_spill_pos;
 	IR_ASSERT(offset != -1);
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
-		offset = offset - data->stack_frame_size - data->stack_frame_alignment;
+		offset = offset - data->stack_frame_size;
 		fp = IR_REG_RBP;
 	} else {
-		offset = offset + data->stack_frame_alignment;
+		offset = offset + data->call_stack_size + data->stack_frame_alignment;
 		fp = IR_REG_RSP;
 	}
 
@@ -1611,7 +1612,7 @@ static void ir_emit_prologue(ir_ctx *ctx)
 		|	mov rbp, rsp
 	}
 	if (data->stack_frame_size) {
-		|	sub rsp, data->stack_frame_size
+		|	sub rsp, (data->stack_frame_size + data->call_stack_size)
 	}
 	if (data->used_preserved_regs) {
 		int offset;
@@ -1620,7 +1621,7 @@ static void ir_emit_prologue(ir_ctx *ctx)
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
 			offset = -(int)sizeof(void*);
 		} else {
-			offset = data->stack_frame_size - (int)sizeof(void*);
+			offset = data->stack_frame_size + data->call_stack_size - (int)sizeof(void*);
 		}
 		for (i = 0; i < IR_REG_NUM; i++) {
 			if (IR_REGSET_IN(data->used_preserved_regs, i)) {
@@ -1650,7 +1651,7 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
 			offset = -(int)sizeof(void*);
 		} else {
-			offset = data->stack_frame_size - (int)sizeof(void*);
+			offset = data->stack_frame_size + data->call_stack_size - (int)sizeof(void*);
 		}
 		for (i = 0; i < IR_REG_NUM; i++) {
 			if (IR_REGSET_IN(data->used_preserved_regs, i)) {
@@ -1671,7 +1672,7 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 		|	mov rsp, rbp
 		|	pop rbp
 	} else if (data->stack_frame_size) {
-		|	add rsp, data->stack_frame_size
+		|	add rsp, (data->stack_frame_size + data->call_stack_size)
 	}
 }
 
@@ -3626,6 +3627,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 		used_stack = 0;
 	} else {
 		used_stack = ir_call_used_stack(ctx, insn);
+		data->call_stack_size += used_stack;
 		if (used_stack) {
 			|	sub rsp, used_stack
 		}
@@ -3798,6 +3800,7 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	if (used_stack) {
 		|	add rsp, used_stack
+		data->call_stack_size -= used_stack;
 	}
 
 	if (insn->type != IR_VOID) {
@@ -4019,9 +4022,9 @@ static void ir_emit_load_params(ir_ctx *ctx)
 	int32_t stack_offset = 0;
 
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
-		stack_offset = sizeof(void*); /* skip old frame pointer */
+		stack_offset = sizeof(void*); /* skip old frame pointer and return address */
 	} else {
-		stack_offset = data->stack_frame_size + data->stack_frame_alignment;
+		stack_offset = data->stack_frame_size + data->call_stack_size; /* skip return address */
 	}
 	n = use_list->count;
 	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
@@ -4384,6 +4387,28 @@ static void ir_mark_empty_blocks(ir_ctx *ctx)
 	}
 }
 
+static void ir_preallocate_call_stack(ir_ctx *ctx, ir_backend_data *data)
+{
+	int call_stack_size, peak_call_stack_size = 0;
+	ir_ref i, n;
+	ir_insn *insn;
+
+	for (i = 1, insn = ctx->ir_base + 1; i < ctx->insns_count;) {
+		if (insn->op == IR_CALL) {
+			call_stack_size = ir_call_used_stack(ctx, insn);
+			if (call_stack_size > peak_call_stack_size) {
+				peak_call_stack_size = call_stack_size;
+			}
+		}
+		n = ir_operands_count(ctx, insn);
+		n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
+		i += n;
+		insn += n;
+	}
+	data->call_stack_size = peak_call_stack_size;
+	ctx->flags |= IR_PREALLOCATED_STACK;
+}
+
 static void ir_calc_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
 {
 	int i;
@@ -4418,11 +4443,11 @@ static void ir_calc_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
 				data->stack_frame_alignment += 8;
 			}
 		} else {
-			// TODO: Preallocate stack for calls (ctx->flags |= IR_PREALLOCATED_STACK)
 			while (IR_ALIGNED_SIZE(data->stack_frame_size + sizeof(void*), 16) != data->stack_frame_size + sizeof(void*)) {
 				data->stack_frame_size += 8;
 				data->stack_frame_alignment += 8;
 			}
+			ir_preallocate_call_stack(ctx, data);
 		}
 	}
 }
@@ -4447,6 +4472,7 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 	data.unused_slot_2 = 0;
 	data.unused_slot_1 = 0;
 	data.stack_frame_alignment = 0;
+	data.call_stack_size = 0;
 	data.used_preserved_regs = 0;
 	data.rodata_label = 0;
 	data.jmp_table_label = 0;
