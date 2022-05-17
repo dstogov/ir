@@ -3956,12 +3956,11 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 	return 1;
 }
 
-static void ir_emit_param_move(ir_ctx *ctx, uint8_t type, ir_reg from_reg, ir_reg to_reg, ir_ref to)
+static void ir_emit_param_move(ir_ctx *ctx, uint8_t type, ir_reg from_reg, ir_reg to_reg, ir_ref to, int32_t offset)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_RBP : IR_REG_RSP;
-	int32_t offset;
 
 	IR_ASSERT(from_reg != IR_REG_NONE || to_reg != IR_REG_NONE);
 
@@ -3973,7 +3972,6 @@ static void ir_emit_param_move(ir_ctx *ctx, uint8_t type, ir_reg from_reg, ir_re
 				ir_emit_store(ctx, type, to, from_reg);
 			}
 		} else {
-			offset = (ctx->flags & IR_USE_FRAME_POINTER) ? -8 : -8; // TODO:
 			|	ASM_REG_MEM_OP mov, type, to_reg, [Ra(fp)+offset]
 		}
 	} else {
@@ -3984,7 +3982,6 @@ static void ir_emit_param_move(ir_ctx *ctx, uint8_t type, ir_reg from_reg, ir_re
 				ir_emit_store(ctx, type, to, from_reg);
 			}
 		} else {
-			offset = (ctx->flags & IR_USE_FRAME_POINTER) ? -8 : -8; // TODO:
 			|	ASM_FP_REG_MEM_OP movss, movsd, vmovss, vmovsd, type, to_reg, [Ra(fp)+offset]
 		}
 	}
@@ -3992,6 +3989,7 @@ static void ir_emit_param_move(ir_ctx *ctx, uint8_t type, ir_reg from_reg, ir_re
 
 static void ir_emit_load_params(ir_ctx *ctx)
 {
+	ir_backend_data *data = ctx->data;
 	ir_use_list *use_list = &ctx->use_lists[1];
 	ir_insn *insn;
 	ir_ref i, n, *p, use;
@@ -4004,7 +4002,13 @@ static void ir_emit_load_params(ir_ctx *ctx)
 	int fp_reg_params_count = IR_REG_FP_ARGS;
 	const int8_t *int_reg_params = _ir_int_reg_params;
 	const int8_t *fp_reg_params = _ir_fp_reg_params;
+	int32_t stack_offset = 0;
 
+	if (ctx->flags & IR_USE_FRAME_POINTER) {
+		stack_offset = sizeof(void*); /* skip old frame pointer */
+	} else {
+		stack_offset = data->stack_frame_size + data->stack_frame_alignment;
+	}
 	n = use_list->count;
 	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
 		use = *p;
@@ -4015,23 +4019,22 @@ static void ir_emit_load_params(ir_ctx *ctx)
 					if (int_param_num < int_reg_params_count) {
 						src_reg = int_reg_params[int_param_num];
 					} else {
-						// TODO: replace IR_REG_NONE by stack slot
 						src_reg = IR_REG_NONE;
+						stack_offset += sizeof(void*);
 					}
 					int_param_num++;
 				} else {
 					if (fp_param_num < fp_reg_params_count) {
 						src_reg = fp_reg_params[fp_param_num];
 					} else {
-						// TODO: replace IR_REG_NONE by stack slot
 						src_reg = IR_REG_NONE;
+						stack_offset += sizeof(void*);
 					}
 					fp_param_num++;
 				}
 				dst_reg = IR_REG_NUM(ctx->regs[use][0]);
 				if (src_reg != dst_reg) {
-					// TODO: parallel move
-					ir_emit_param_move(ctx, insn->type, src_reg, dst_reg, use);
+					ir_emit_param_move(ctx, insn->type, src_reg, dst_reg, use, stack_offset);
 				}
 				if (dst_reg != IR_REG_NONE && (ctx->regs[use][0] & IR_REG_SPILL_STORE)) {
 					ir_emit_store(ctx, insn->type, use, dst_reg);

@@ -69,10 +69,10 @@ test:
 	subq $0x10, %rsp
 	movq %rbx, 8(%rsp)
 	movq %rbp, (%rsp)
-	movl -8(%rsp), %eax
-	movl -8(%rsp), %r8d
-	movl -8(%rsp), %r10d
-	movl -8(%rsp), %r11d
+	movl 0x18(%rsp), %eax
+	movl 0x20(%rsp), %r8d
+	movl 0x28(%rsp), %r10d
+	movl 0x30(%rsp), %r11d
 	movl %edx, %ebx
 	imull %esi, %ebx
 	leal 4(%rbx), %ebp
