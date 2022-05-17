@@ -3613,7 +3613,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 	bool has_mem_const_args = 0;
 	ir_reg tmp_fp_reg = IR_REG_FP_LAST; /* Temporary register for FP loads and swap */
 
-	if (0) {
+	if (insn->op == IR_CALL && (ctx->flags & IR_PREALLOCATED_STACK)) {
 		// TODO: support for preallocated stack
 		used_stack = 0;
 	} else {
@@ -4401,6 +4401,7 @@ static void ir_calc_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
 				data->stack_frame_alignment += 8;
 			}
 		} else {
+			// TODO: Preallocate stack for calls (ctx->flags |= IR_PREALLOCATED_STACK)
 			while (IR_ALIGNED_SIZE(data->stack_frame_size + sizeof(void*), 16) != data->stack_frame_size + sizeof(void*)) {
 				data->stack_frame_size += 8;
 				data->stack_frame_alignment += 8;

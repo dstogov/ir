@@ -471,20 +471,21 @@ typedef struct _ir_use_list {
 	ir_ref        count;
 } ir_use_list;
 
-#define IR_FUNCTION          (1<<0)
-#define IR_USE_FRAME_POINTER (1<<1)
-#define IR_IRREDUCIBLE_CFG   (1<<2)
+#define IR_FUNCTION           (1<<0)
+#define IR_USE_FRAME_POINTER  (1<<1)
+#define IR_PREALLOCATED_STACK (1<<2)
+#define IR_IRREDUCIBLE_CFG    (1<<3)
 
-#define IR_OPT_FOLDING       (1<<16)
-#define IR_OPT_CODEGEN       (1<<17)
-#define IR_OPT_IN_SCCP       (1<<18)
-#define IR_LINEAR            (1<<19)
-#define IR_GEN_NATIVE        (1<<20)
-#define IR_GEN_C             (1<<22)
+#define IR_OPT_FOLDING        (1<<16)
+#define IR_OPT_CODEGEN        (1<<17)
+#define IR_OPT_IN_SCCP        (1<<18)
+#define IR_LINEAR             (1<<19)
+#define IR_GEN_NATIVE         (1<<20)
+#define IR_GEN_C              (1<<22)
 
 /* x86 related */
-#define IR_AVX               (1<<24)
-#define IR_HAS_CALLS         (1<<25)
+#define IR_AVX                (1<<24)
+#define IR_HAS_CALLS          (1<<25)
 
 /* debug relted */
 #ifdef IR_DEBUG
