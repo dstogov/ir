@@ -47,7 +47,9 @@
 	-  CAST
 	-  update memory (binop_int, mul_div_mod_pwr2, shift, shift_const, op_int, copy_int/fp?)
 	?  operands swap (binop_int, binop_sse, binop_avx, cmp_int, cmp_fp, cmp_br_int)
-	-  stack arguments and parameters
+	-  IR_PREALLOCATED_STACK
+	-  spill slots for parameters
+	-  improve register allocation speific to arguments passing
 	-  return merge/split
 	?  binary code emission without DynAsm
 	- 32-bit x86 code
