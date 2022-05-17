@@ -1619,18 +1619,17 @@ static void ir_emit_prologue(ir_ctx *ctx)
 		uint32_t i;
 
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
-			offset = -(int)sizeof(void*);
+			offset = 0;
 		} else {
-			offset = data->stack_frame_size + data->call_stack_size - (int)sizeof(void*);
+			offset = data->stack_frame_size + data->call_stack_size;
 		}
 		for (i = 0; i < IR_REG_NUM; i++) {
 			if (IR_REGSET_IN(data->used_preserved_regs, i)) {
 				if (i < IR_REG_FP_FIRST) {
 					ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_RBP : IR_REG_RSP;
 
-					|	mov aword [Ra(fp)+offset], Ra(i)
-
 					offset -= sizeof(void*);
+					|	mov aword [Ra(fp)+offset], Ra(i)
 				} else {
 					IR_ASSERT(0 && "NIY FP register saing");
 				}
@@ -1649,18 +1648,17 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 		uint32_t i;
 
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
-			offset = -(int)sizeof(void*);
+			offset = 0;
 		} else {
-			offset = data->stack_frame_size + data->call_stack_size - (int)sizeof(void*);
+			offset = data->stack_frame_size + data->call_stack_size;
 		}
 		for (i = 0; i < IR_REG_NUM; i++) {
 			if (IR_REGSET_IN(data->used_preserved_regs, i)) {
 				if (i < IR_REG_FP_FIRST) {
 					ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_RBP : IR_REG_RSP;
 
-					|	mov Ra(i), aword [Ra(fp)+offset]
-
 					offset -= sizeof(void*);
+					|	mov Ra(i), aword [Ra(fp)+offset]
 				} else {
 					IR_ASSERT(0 && "NIY FP register saing");
 				}
