@@ -23,23 +23,22 @@
 --EXPECT--
 test:
 	subq $8, %rsp
-	leaq -0x10(%rsp), %rsp
-	movsd 0xb6(%rip), %xmm15
-	movsd %xmm15, (%rsp)
-	xorpd %xmm15, %xmm15
-	movsd %xmm15, 8(%rsp)
-	leaq 0xa5(%rip), %rdi
-	movsd 0x55(%rip), %xmm0
-	movsd 0x55(%rip), %xmm1
-	movsd 0x55(%rip), %xmm2
-	movsd 0x55(%rip), %xmm3
-	movsd 0x55(%rip), %xmm4
-	movsd 0x55(%rip), %xmm5
-	movsd 0x55(%rip), %xmm6
-	movsd 0x55(%rip), %xmm7
+	subq $0x10, %rsp
+	movabsq $0x3feccccccccccccd, %rax
+	movq %rax, (%rsp)
+	movq $0, 8(%rsp)
+	leaq 0x9a(%rip), %rdi
+	movsd 0x52(%rip), %xmm0
+	movsd 0x52(%rip), %xmm1
+	movsd 0x52(%rip), %xmm2
+	movsd 0x52(%rip), %xmm3
+	movsd 0x52(%rip), %xmm4
+	movsd 0x52(%rip), %xmm5
+	movsd 0x52(%rip), %xmm6
+	movsd 0x52(%rip), %xmm7
 	movabsq $_IO_printf, %rax
 	callq *%rax
-	leaq 0x10(%rsp), %rsp
+	addq $0x10, %rsp
 	addq $8, %rsp
 	retq
 

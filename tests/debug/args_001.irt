@@ -23,14 +23,14 @@
 --EXPECT--
 test:
 	subq $8, %rsp
-	leaq -0x30(%rsp), %rsp
+	subq $0x30, %rsp
 	movl $6, (%rsp)
 	movl $7, 8(%rsp)
 	movl $8, 0x10(%rsp)
 	movq $9, 0x18(%rsp)
 	movabsq $0x100000000, %rax
 	movq %rax, 0x20(%rsp)
-	leaq 0x39(%rip), %rdi
+	leaq 0x3a(%rip), %rdi
 	movq $1, %rsi
 	movw $2, %dx
 	movl $3, %ecx
@@ -38,7 +38,7 @@ test:
 	movabsq $0x100000000, %r9
 	movabsq $_IO_printf, %rax
 	callq *%rax
-	leaq 0x30(%rsp), %rsp
+	addq $0x30, %rsp
 	addq $8, %rsp
 	retq
 

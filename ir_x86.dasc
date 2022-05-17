@@ -733,9 +733,11 @@ ir_reg ir_uses_fixed_reg(ir_ctx *ctx, ir_ref ref, int op_num)
 	return IR_REG_NONE;
 }
 
-static bool ir_may_need_tmp_reg_for_int_args_swap(ir_ctx *ctx, ir_ref ref)
+static bool ir_call_needs_tmp_int_reg(ir_ctx *ctx, ir_ref ref)
 {
 	ir_insn *insn = &ctx->ir_base[ref];
+	ir_ref arg;
+	ir_insn *arg_insn;
 	int j, n;
 	ir_type type;
 	int int_param = 0;
@@ -743,16 +745,22 @@ static bool ir_may_need_tmp_reg_for_int_args_swap(ir_ctx *ctx, ir_ref ref)
 
 	n = ir_input_edges_count(ctx, insn);
 	for (j = 3; j <= n; j++) {
-		type = ctx->ir_base[insn->ops[j]].type;
+		arg = insn->ops[j];
+		arg_insn = &ctx->ir_base[arg];
+		type = arg_insn->type;
 		if (IR_IS_TYPE_INT(type)) {
 			if (int_param < int_reg_params_count) {
 				if (int_param > 0) {
-					return 1;
+					return 1; /* for swap */
 				}
 			} else {
 				return 0;
 			}
 			int_param++;
+		} else if (type == IR_DOUBLE) {
+			if (IR_IS_CONST_REF(arg) && arg_insn->val.i64 != 0) {
+				return 1;
+			}
 		}
 	}
 	return 0;
@@ -1012,7 +1020,7 @@ cmp_fp:
 			return n;
 		case IR_CALL:
 		case IR_TAILCALL:
-			if (ir_may_need_tmp_reg_for_int_args_swap(ctx, ref)) {
+			if (ir_call_needs_tmp_int_reg(ctx, ref)) {
 				tmp_regs[0].num = 1;
 				tmp_regs[0].type = IR_ADDR;
 				tmp_regs[0].start = IR_LOAD_SUB_REF;
@@ -3619,7 +3627,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 	} else {
 		used_stack = ir_call_used_stack(ctx, insn);
 		if (used_stack) {
-			|	lea rsp, [rsp-used_stack]
+			|	sub rsp, used_stack
 		}
 	}
 
@@ -3690,16 +3698,22 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 				}
 			} else {
 				if (IR_IS_CONST_REF(arg)) {
-					ir_emit_load(ctx, type, tmp_fp_reg, arg);
-					src_reg = tmp_fp_reg;
+					ir_val *val = &ctx->ir_base[arg].val;
+					if (ir_type_size[type] == 4 || val->i64 == 0) {
+						|	mov qword [rsp+stack_offset], val->i32
+					} else {
+						IR_ASSERT(tmp_reg != IR_REG_NONE);
+						|	mov64 Rq(tmp_reg), val->i64
+						|	mov qword [rsp+stack_offset], Ra(tmp_reg)
+					}
 				} else {
 					IR_ASSERT(src_reg != IR_REG_NONE);
 					if (src_reg & IR_REG_SPILL_LOAD) {
 						src_reg &= ~IR_REG_SPILL_LOAD;
 						ir_emit_load(ctx, type, src_reg, arg);
 					}
+					|	ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [rsp+stack_offset], src_reg
 				}
-				|	ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [rsp+stack_offset], src_reg
 			}
 			stack_offset += sizeof(void*);
 		}
@@ -3783,7 +3797,7 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
     }
 
 	if (used_stack) {
-		|	lea rsp, [rsp+used_stack]
+		|	add rsp, used_stack
 	}
 
 	if (insn->type != IR_VOID) {
