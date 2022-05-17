@@ -768,8 +768,8 @@ bool ir_result_reuses_op1_reg(ir_ctx *ctx, ir_ref ref)
 		case IR_BINOP_SSE2:
 		case IR_SHIFT:
 		case IR_SHIFT_CONST:
-//		case IR_MUL_INT: // use fixed register
-//		case IR_DIV_INT: // use fixed register
+		case IR_MUL_INT:
+		case IR_DIV_INT:
 		case IR_COPY_INT:
 		case IR_COPY_FP:
 		case IR_INC:
@@ -4105,13 +4105,18 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 						available = IR_REGSET_SCRATCH;
 					}
 					if (ctx->vregs[i]) {
-						if (ir_get_use_flags(ctx, i, 0) & IR_USE_MUST_BE_IN_REG) {
+						ir_reg reg = ir_uses_fixed_reg(ctx, i, 0);
+
+						if (reg != IR_REG_NONE && IR_REGSET_IN(available, reg)) {
+							IR_REGSET_EXCL(available, reg);
+							ctx->regs[i][0] = reg | IR_REG_SPILL_STORE;
+						} else if (ir_get_use_flags(ctx, i, 0) & IR_USE_MUST_BE_IN_REG) {
 							if (insn->op == IR_VLOAD
 							 && ctx->live_intervals[ctx->vregs[i]]
 							 && ctx->live_intervals[ctx->vregs[i]]->stack_spill_pos != -1) {
 								/* pass */
 							} else {
-								ir_reg reg = ir_get_free_reg(insn->type, available);
+								reg = ir_get_free_reg(insn->type, available);
 								IR_REGSET_EXCL(available, reg);
 								ctx->regs[i][0] = reg | IR_REG_SPILL_STORE;
 							}
@@ -4182,12 +4187,19 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 							if (j == 1 && ir_result_reuses_op1_reg(ctx, i)) {
 								ir_reg reg = ctx->regs[i][0] & ~IR_REG_SPILL_STORE;
 								ctx->regs[i][1] = reg | IR_REG_SPILL_LOAD;
-							} else if (ir_get_use_flags(ctx, i, j) & IR_USE_MUST_BE_IN_REG) {
-								ir_reg reg = ir_get_free_reg(ctx->ir_base[input].type, available);
-								IR_REGSET_EXCL(available, reg);
-								ctx->regs[i][j] = reg | IR_REG_SPILL_LOAD;
-							} else if (j > 1 && input == insn->op1 && ctx->regs[i][1] != IR_REG_NONE) {
-								ctx->regs[i][j] = ctx->regs[i][1];
+							} else {
+								ir_reg reg = ir_uses_fixed_reg(ctx, i, j);
+
+								if (reg != IR_REG_NONE && IR_REGSET_IN(available, reg)) {
+									IR_REGSET_EXCL(available, reg);
+									ctx->regs[i][j] = reg | IR_REG_SPILL_LOAD;
+								} else if (ir_get_use_flags(ctx, i, j) & IR_USE_MUST_BE_IN_REG) {
+									reg = ir_get_free_reg(ctx->ir_base[input].type, available);
+									IR_REGSET_EXCL(available, reg);
+									ctx->regs[i][j] = reg | IR_REG_SPILL_LOAD;
+								} else if (j > 1 && input == insn->op1 && ctx->regs[i][1] != IR_REG_NONE) {
+									ctx->regs[i][j] = ctx->regs[i][1];
+								}
 							}
 						}
 					}
