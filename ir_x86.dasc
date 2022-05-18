@@ -819,10 +819,6 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num)
 		case IR_CALL:
 		case IR_TAILCALL:
 			if (op_num > 2) {
-				insn = &ctx->ir_base[ref];
-				if (ir_get_arg_reg(ctx, insn, op_num) == IR_REG_NONE) {
-					return IR_USE_MUST_BE_IN_REG;
-				}
 				return IR_USE_SHOULD_BE_IN_REG;
 			}
 			return IR_USE_SHOULD_BE_IN_REG;
@@ -3631,6 +3627,8 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 		}
 	}
 
+	/* 1. move all arguments that should be passed through stack
+	 *    and collect arguments that should be passed through registers */
 	n = ir_input_edges_count(ctx, insn);
 	copies = ir_mem_malloc((n - 2) * sizeof(ir_copy));
 	for (j = 3; j <= n; j++) {
@@ -3656,7 +3654,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 			IR_ASSERT(0);
 		}
 		if (dst_reg != IR_REG_NONE && (IR_IS_CONST_REF(arg) || src_reg == IR_REG_NONE)) {
-			/* delay constant and memory arguments for second pass */
+			/* delay CONST->REG and MEM->REG moves to third pass */
 			has_mem_const_args = 1;
 			continue;
 		}
@@ -3667,13 +3665,14 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 				ir_emit_load(ctx, type, src_reg, arg);
 			}
 			if (src_reg != dst_reg) {
+				/* delay REG->REG moves to second pass */
 				copies[count].type = type;
 				copies[count].from = src_reg;
 				copies[count].to = dst_reg;
 				count++;
 			}
 		} else {
-			/* Pass argument through stack */
+			/* Pass argument through stack (REG->MEM, IMM->MEM, MEM->MEM moves) */
 			if (IR_IS_TYPE_INT(type)) {
 				if (IR_IS_CONST_REF(arg)) {
 					ir_val *val = &ctx->ir_base[arg].val;
@@ -3688,13 +3687,16 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 						|	mov64 Ra(tmp_reg), val->i64
 						|	mov [rsp+stack_offset], Ra(tmp_reg)
 					}
-				} else {
-					IR_ASSERT(src_reg != IR_REG_NONE);
+				} else if (src_reg != IR_REG_NONE) {
 					if (src_reg & IR_REG_SPILL_LOAD) {
 						src_reg &= ~IR_REG_SPILL_LOAD;
 						ir_emit_load(ctx, type, src_reg, arg);
 					}
 					|	ASM_MEM_REG_OP, mov, type, [rsp+stack_offset], src_reg
+				} else {
+					IR_ASSERT(tmp_reg != IR_REG_NONE);
+					ir_emit_load(ctx, type, tmp_reg, arg);
+					|	ASM_MEM_REG_OP, mov, type, [rsp+stack_offset], tmp_reg
 				}
 			} else {
 				if (IR_IS_CONST_REF(arg)) {
@@ -3706,23 +3708,29 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 						|	mov64 Rq(tmp_reg), val->i64
 						|	mov qword [rsp+stack_offset], Ra(tmp_reg)
 					}
-				} else {
-					IR_ASSERT(src_reg != IR_REG_NONE);
+				} else if (src_reg != IR_REG_NONE) {
 					if (src_reg & IR_REG_SPILL_LOAD) {
 						src_reg &= ~IR_REG_SPILL_LOAD;
 						ir_emit_load(ctx, type, src_reg, arg);
 					}
 					|	ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [rsp+stack_offset], src_reg
+				} else {
+					IR_ASSERT(tmp_fp_reg != IR_REG_NONE);
+					ir_emit_load(ctx, type, tmp_fp_reg, arg);
+					|	ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [rsp+stack_offset], tmp_fp_reg
 				}
 			}
 			stack_offset += sizeof(void*);
 		}
 	}
+
+	/* 2. move all arguments that should be passed from one register to anouther (REG->REG movs) */
 	if (count) {
 		ir_parallel_copy(ctx, copies, count, tmp_reg, tmp_fp_reg);
 	}
 	ir_mem_free(copies);
 
+	/* 3. move the remaining memory and immediate values to registers */
 	if (has_mem_const_args) {
 		int_param = 0;
 		fp_param = 0;
