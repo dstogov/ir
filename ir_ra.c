@@ -2031,43 +2031,6 @@ static int ir_linear_scan(ir_ctx *ctx)
 			other = prev ? prev->list_next : inactive;
 		}
 
-#if 1 && IR_DEBUG
-		ir_insn *insn = &ctx->ir_base[IR_LIVE_POS_TO_REF(ival->range.start)];
-		if (insn->op == IR_VLOAD) {
-			ir_insn *var = &ctx->ir_base[insn->op2];
-			IR_ASSERT(var->op == IR_VAR);
-			if (strcmp(ir_get_str(ctx, var->op2), "_spill_") == 0) {
-				if (ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos != -1) {
-					ival->stack_spill_pos =
-						ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos;
-				} else {
-					ir_allocate_spill_slot(ctx, ival, &data);
-					ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos =
-						ival->stack_spill_pos;
-				}
-				continue;
-			}
-		}
-		if (IR_LIVE_POS_TO_REF(ival->range.end) < ctx->insns_count) {
-			insn = &ctx->ir_base[IR_LIVE_POS_TO_REF(ival->range.end)];
-			if (insn->op == IR_VSTORE) {
-				ir_insn *var = &ctx->ir_base[insn->op2];
-				IR_ASSERT(var->op == IR_VAR);
-				if (strcmp(ir_get_str(ctx, var->op2), "_spill_") == 0) {
-					if (ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos != -1) {
-						ival->stack_spill_pos =
-							ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos;
-					} else {
-						ir_allocate_spill_slot(ctx, ival, &data);
-						ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos =
-							ival->stack_spill_pos;
-					}
-					continue;
-				}
-			}
-		}
-#endif
-
 		reg = ir_try_allocate_free_reg(ctx, ival, &active, inactive, &unhandled);
 		if (reg == IR_REG_NONE) {
 			reg = ir_allocate_blocked_reg(ctx, ival, &active, inactive, &unhandled);
