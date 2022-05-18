@@ -3399,7 +3399,8 @@ static void ir_emit_vstore_int(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 	int32_t offset;
 	ir_reg fp;
 
-	if (op3_reg == IR_REG_NONE && !IR_IS_CONST_REF(insn->op3) && ir_is_same_mem(ctx, insn->op3, insn->op2)) {
+	if ((op3_reg == IR_REG_NONE || (op3_reg & IR_REG_SPILL_LOAD))
+	 && !IR_IS_CONST_REF(insn->op3) && ir_is_same_mem(ctx, insn->op3, insn->op2)) {
 		return; // fake store
 	}
 	if (IR_IS_CONST_REF(insn->op3) && IR_IS_32BIT(type, val_insn->val)) {
@@ -3424,7 +3425,8 @@ static void ir_emit_vstore_fp(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 	ir_ref type = ctx->ir_base[insn->op3].type;
 	ir_reg op3_reg = ctx->regs[ref][3];
 
-	if (op3_reg == IR_REG_NONE && !IR_IS_CONST_REF(insn->op3) && ir_is_same_mem(ctx, insn->op3, insn->op2)) {
+	if ((op3_reg == IR_REG_NONE || (op3_reg & IR_REG_SPILL_LOAD))
+	 && !IR_IS_CONST_REF(insn->op3) && ir_is_same_mem(ctx, insn->op3, insn->op2)) {
 		return; // fake store
 	}
 	IR_ASSERT(op3_reg != IR_REG_NONE);
@@ -4566,7 +4568,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 							ival->top = ival;
 							if (insn->op == IR_VAR) {
 								ir_use_list *use_list = &ctx->use_lists[i];
-								ir_reg i, n, *p, use;
+								ir_ref i, n, *p, use;
 								ir_insn *use_insn;
 								int32_t stack_spill_pos = ival->stack_spill_pos;
 
@@ -4590,7 +4592,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 										 && ctx->vregs[use_insn->op3]
 										 && !ctx->live_intervals[ctx->vregs[use_insn->op3]]) {
 											ir_live_interval *ival = ir_mem_calloc(1, sizeof(ir_live_interval));
-											ctx->live_intervals[ctx->vregs[insn->op3]] = ival;
+											ctx->live_intervals[ctx->vregs[use_insn->op3]] = ival;
 											ival->type = insn->type;
 											ival->reg = IR_REG_NONE;
 											ival->vreg = ctx->vregs[insn->op3];
