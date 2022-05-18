@@ -45,7 +45,6 @@
 	-  OVERFLOW
 	-  MIN, MAX, COND
 	-  CAST
-	-  update memory (binop_int, mul_div_mod_pwr2, shift, shift_const, op_int, copy_int/fp?)
 	?  operands swap (binop_int, binop_sse, binop_avx, cmp_int, cmp_fp, cmp_br_int)
 	-  spill slots for parameters
 	-  return merge/split

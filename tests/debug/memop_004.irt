@@ -1,0 +1,23 @@
+--TEST--
+004: Memory update (inc/dec)
+--ARGS--
+-S
+--CODE--
+{
+	int8_t c = 1;
+	l_1 = START(l_5);
+	int8_t y = PARAM(l_1, "y", 1);
+	int8_t v = VAR(l_1, "_spill_");
+	l_2 = VSTORE(l_1, v, y);
+	int8_t z, l_3 = VLOAD(l_2, v);
+	int8_t ret = ADD(z, c);
+	l_4 = VSTORE(l_3, v, ret);
+	l_5 = RETURN(l_4);
+}
+--EXPECT--
+test:
+	subq $8, %rsp
+	movb %dil, (%rsp)
+	incb (%rsp)
+	addq $8, %rsp
+	retq
