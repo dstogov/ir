@@ -1468,9 +1468,9 @@ static ir_reg ir_ref_spill_slot(ir_ctx *ctx, ir_ref ref)
 	offset = ctx->live_intervals[ctx->vregs[ref]]->stack_spill_pos;
 	IR_ASSERT(offset != -1);
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
-		return offset - data->stack_frame_size;
+		return offset - (data->stack_frame_size - data->stack_frame_alignment);
 	} else {
-		return offset + data->call_stack_size + data->stack_frame_alignment;
+		return offset + data->call_stack_size;
 	}
 }
 
@@ -1529,10 +1529,10 @@ static void ir_emit_load(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref src)
 		offset = ctx->live_intervals[ctx->vregs[src]]->stack_spill_pos;
 		IR_ASSERT(offset != -1);
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
-			offset = offset - data->stack_frame_size;
+			offset = offset - (data->stack_frame_size - data->stack_frame_alignment);
 			fp = IR_REG_RBP;
 		} else {
-			offset = offset + data->call_stack_size + data->stack_frame_alignment;
+			offset = offset + data->call_stack_size;
 			fp = IR_REG_RSP;
 		}
 
@@ -1555,10 +1555,10 @@ static void ir_emit_store(ir_ctx *ctx, ir_type type, ir_ref dst, ir_reg reg)
 	offset = ctx->live_intervals[ctx->vregs[dst]]->stack_spill_pos;
 	IR_ASSERT(offset != -1);
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
-		offset = offset - data->stack_frame_size;
+		offset = offset - (data->stack_frame_size - data->stack_frame_alignment);
 		fp = IR_REG_RBP;
 	} else {
-		offset = offset + data->call_stack_size + data->stack_frame_alignment;
+		offset = offset + data->call_stack_size;
 		fp = IR_REG_RSP;
 	}
 
