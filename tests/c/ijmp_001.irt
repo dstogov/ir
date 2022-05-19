@@ -1,0 +1,16 @@
+--TEST--
+001: IJMP - computed goto
+--ARGS--
+--emit-c
+--CODE--
+{
+	l_1 = START(l_2);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	l_2 = IJMP(l_1, p);
+}
+--EXPECT--
+void test(uintptr_t p)
+{
+	uintptr_t d_1 = p;
+	goto *(void**)(d_1);
+}

@@ -424,6 +424,13 @@ static void ir_emit_tailcall(ir_ctx *ctx, FILE *f, ir_insn *insn)
 	}
 }
 
+static void ir_emit_ijmp(ir_ctx *ctx, FILE *f, ir_insn *insn)
+{
+	fprintf(f, "\tgoto *(void**)(");
+	ir_emit_ref(ctx, f, insn->op2);
+	fprintf(f, ");\n");
+}
+
 static void ir_emit_alloca(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 {
 	ir_emit_def_ref(ctx, f, def);
@@ -766,6 +773,9 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 					break;
 				case IR_TAILCALL:
 					ir_emit_tailcall(ctx, f, insn);
+					break;
+				case IR_IJMP:
+					ir_emit_ijmp(ctx, f, insn);
 					break;
 				case IR_ALLOCA:
 					ir_emit_alloca(ctx, f, i, insn);

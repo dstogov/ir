@@ -68,7 +68,7 @@ void ir_dump_dot(ir_ctx *ctx, FILE *f)
 		if (flags & IR_OP_FLAG_CONTROL) {
 			if (insn->op == IR_START) {
 				fprintf(f, "\t{rank=min; n%d [label=\"%d: %s\",shape=box,style=\"rounded,filled\",fillcolor=red,rank=min];}\n", i, i, ir_op_name[insn->op]);
-			} else if (insn->op == IR_RETURN || insn->op == IR_UNREACHABLE) {
+			} else if (insn->op == IR_RETURN || insn->op == IR_UNREACHABLE || IR_IJMP) {
 				fprintf(f, "\t{rank=max; n%d [label=\"%d: %s\",shape=box,style=\"rounded,filled\",fillcolor=red,rank=max];}\n", i, i, ir_op_name[insn->op]);
 			} else if (flags & IR_OP_FLAG_MEM) {
 				fprintf(f, "\tn%d [label=\"%d: %s\",shape=box,style=filled,fillcolor=pink];\n", i, i, ir_op_name[insn->op]);

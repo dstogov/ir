@@ -272,7 +272,7 @@ int ir_mem_flush(void *ptr, size_t size);
 	_(LOOP_BEGIN,   c2,   src, src, ___) /* loop start                  */ \
 	_(LOOP_END,     c1X1, src, beg, ___) /* loop end                    */ \
 	_(LOOP_EXIT,    c1X1, src, beg, ___) /* loop exit                   */ \
-	/* (IJMP)                                                           */ \
+	_(IJMP,         c2X1, src, def, ret) /* computed goto               */ \
 	\
 	/* guards (floating or not) ???                                     */ \
 	_(GUARD_TRUE,   c2,   src, def, ___) /* IF without second successor */ \
@@ -436,7 +436,8 @@ typedef struct _ir_strtab {
 	((op) == IR_MERGE || (op) == IR_LOOP_BEGIN)
 
 #define IR_IS_BB_END(op) \
-	((op) == IR_RETURN || (op) == IR_END || (op) == IR_LOOP_END || (op) == IR_IF || (op) == IR_SWITCH)
+	((op) == IR_RETURN || (op) == IR_END || (op) == IR_LOOP_END || (op) == IR_IF || \
+	 (op) == IR_SWITCH || (op) == IR_IJMP || (op) == IR_UNREACHABLE)
 
 #define IR_BB_UNREACHABLE      (1<<0)
 #define IR_BB_LOOP_HEADER      (1<<1)
