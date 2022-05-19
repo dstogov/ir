@@ -546,8 +546,8 @@ struct _ir_live_range {
 	ir_live_range *next;
 };
 
-/* ir_live_interval.flags bits (two low bits are reserved for reg_num */
-#define IR_LIVE_INTERVAL_REG_NUM_MASK    0x3
+/* ir_live_interval.flags bits (two low bits are reserved for temporary register number) */
+#define IR_LIVE_INTERVAL_TEMP_NUM_MASK   0x3
 #define IR_LIVE_INTERVAL_FIXED           (1<<2)
 #define IR_LIVE_INTERVAL_TEMP            (1<<3)
 #define IR_LIVE_INTERVAL_VAR             (1<<4)

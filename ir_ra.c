@@ -2122,7 +2122,7 @@ static void assign_regs(ir_ctx *ctx)
 	if (ival) {
 		do {
 			IR_ASSERT(ival->reg != IR_REG_NONE);
-			ctx->regs[IR_LIVE_POS_TO_REF(ival->range.start)][ival->flags & IR_LIVE_INTERVAL_REG_NUM_MASK] = ival->reg;
+			ctx->regs[IR_LIVE_POS_TO_REF(ival->range.start)][ival->flags & IR_LIVE_INTERVAL_TEMP_NUM_MASK] = ival->reg;
 			ival = ival->next;
 		} while (ival);
 	}
