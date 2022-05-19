@@ -95,6 +95,23 @@
 ||	}
 |.endmacro
 
+|.macro ASM_REG_REG_OP2, op, type, dst, src
+||	switch (ir_type_size[type]) {
+||		case 1:
+||		case 2:
+|			op Rw(dst), Rw(src)
+|| 			break;
+||		case 4:
+|			op Rd(dst), Rd(src)
+|| 			break;
+||		case 8:
+|			op Rq(dst), Rq(src)
+|| 			break;
+|| 		default:
+||			IR_ASSERT(0);
+||	}
+|.endmacro
+
 |.macro ASM_REG_IMM_OP, op, type, dst, src
 ||	switch (ir_type_size[type]) {
 ||		case 1:
@@ -556,6 +573,7 @@ typedef enum _ir_rule {
 	                         // op1=mem, op2=reg(GP)|imm
 	IR_CMP_AND_BRANCH_FP,    // op1=reg(FP), op2=reg(FP)|mem
 	IR_OVERFLOW_AND_BRANCH,
+	IR_MIN_MAX_INT,
 
 	IR_MEM_OP_INT,
 	IR_MEM_INC,
@@ -803,6 +821,7 @@ bool ir_result_reuses_op1_reg(ir_ctx *ctx, ir_ref ref)
 		case IR_MOD_PWR2:
 		case IR_OP_INT:
 		case IR_OP_FP:
+		case IR_MIN_MAX_INT:
 			return 1;
 	}
 	return 0;
@@ -824,6 +843,8 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num)
 		case IR_MOD_INT:
 		case IR_IF_INT:
 			return (op_num == 2) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
+		case IR_MIN_MAX_INT:
+			return (op_num == 1) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
 		case IR_CMP_FP:
 			insn = &ctx->ir_base[ref];
 			if (insn->op == IR_LT || insn->op == IR_LE) {
@@ -906,6 +927,7 @@ int ir_get_temporary_regs(ir_ctx *ctx, ir_ref ref, ir_tmp_reg *tmp_regs)
 			break;
 		case IR_DIV_INT:
 		case IR_MOD_INT:
+		case IR_MIN_MAX_INT:
 			insn = &ctx->ir_base[ref];
 			if (IR_IS_CONST_REF(insn->op2) && insn->op1 != insn->op2) {
 				tmp_regs[0].num = 2;
@@ -1271,10 +1293,6 @@ binop_fp:
 			}
 			return IR_MOD_INT;
 //		case IR_CAST:
-//		case IR_ADD_OV:
-//		case IR_SUB_OV:
-//		case IR_MUL_OV:
-//		case IR_OVERFLOW:
 		case IR_BSWAP:
 		case IR_NOT:
 			if (insn->type == IR_BOOL) {
@@ -1370,8 +1388,14 @@ binop_fp:
 				return IR_SHIFT_CONST;
 			}
 			return IR_SHIFT;
-//		case IR_MIN:
-//		case IR_MAX:
+		case IR_MIN:
+		case IR_MAX:
+			if (IR_IS_TYPE_INT(insn->type)) {
+				return IR_MIN_MAX_INT;
+			} else {
+				goto binop_fp;
+			}
+			break;
 //		case IR_COND:
 		case IR_COPY:
 			if (IR_IS_TYPE_INT(insn->type)) {
@@ -1962,6 +1986,63 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
+static void ir_emit_min_max_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_type type = insn->type;
+	ir_ref op1 = insn->op1;
+	ir_ref op2 = insn->op2;
+	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
+	ir_reg op1_reg = ctx->regs[def][1];
+	ir_reg op2_reg = ctx->regs[def][2];
+
+	IR_ASSERT(def_reg != IR_REG_NONE && op2_reg != IR_REG_NONE);
+
+	if (op1_reg != IR_REG_NONE && (op1_reg & IR_REG_SPILL_LOAD)) {
+		op1_reg &= ~IR_REG_SPILL_LOAD;
+		ir_emit_load(ctx, type, op1_reg, op1);
+	}
+	if (def_reg != op1_reg) {
+		if (op1_reg >= 0) {
+			ir_emit_mov(ctx, type, def_reg, op1_reg);
+		} else {
+			ir_emit_load(ctx, type, def_reg, op1);
+		}
+	}
+
+	if (op1 == op2) {
+		return;
+	}
+
+	if (IR_IS_CONST_REF(op2)) {
+		ir_emit_load(ctx, type, op2_reg, op2);
+	} else if (op2_reg & IR_REG_SPILL_LOAD) {
+		op2_reg &= ~IR_REG_SPILL_LOAD;
+		ir_emit_load(ctx, type, op2_reg, op2);
+	}
+
+	|	ASM_REG_REG_OP cmp, type, def_reg, op2_reg
+	if (insn->op == IR_MIN) {
+		if (IR_IS_TYPE_SIGNED(type)) {
+			|	ASM_REG_REG_OP2 cmovl, type, def_reg, op2_reg
+		} else {
+			|	ASM_REG_REG_OP2 cmovb, type, def_reg, op2_reg
+		}
+	} else {
+		IR_ASSERT(insn->op == IR_MAX);
+		if (IR_IS_TYPE_SIGNED(type)) {
+			|	ASM_REG_REG_OP2 cmovg, type, def_reg, op2_reg
+		} else {
+			|	ASM_REG_REG_OP2 cmova, type, def_reg, op2_reg
+		}
+	}
+
+	if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
+		ir_emit_store(ctx, type, def, def_reg);
+	}
+}
+
 static void ir_emit_overflow(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
@@ -2518,20 +2599,7 @@ static void ir_emit_abs_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	ir_emit_mov(ctx, insn->type, def_reg, op1_reg);
 	|	ASM_REG_OP neg, insn->type, def_reg
-	switch (ir_type_size[insn->type]) {
-		case 1:
-		case 2:
-			|	cmovs Rw(def_reg), Rw(op1_reg)
-			break;
-		case 4:
-			|	cmovs Rd(def_reg), Rd(op1_reg)
-			break;
-		case 8:
-			|	cmovs Rq(def_reg), Rq(op1_reg)
-			break;
-		default:
-			IR_ASSERT(0);
-	}
+	|	ASM_REG_REG_OP2, cmovs, type, def_reg, op1_reg
 	if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
 		ir_emit_store(ctx, type, def, def_reg);
 	}
@@ -2816,6 +2884,12 @@ static void ir_emit_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			case IR_DIV:
 				|	ASM_SSE2_REG_REG_OP divss, divsd, type, def_reg, op2_reg
 				break;
+			case IR_MIN:
+				|	ASM_SSE2_REG_REG_OP minss, minsd, type, def_reg, op2_reg
+				break;
+			case IR_MAX:
+				|	ASM_SSE2_REG_REG_OP maxss, maxsd, type, def_reg, op2_reg
+				break;
 			default:
 				IR_ASSERT(0 && "NIY binary op");
 				break;
@@ -2833,6 +2907,12 @@ static void ir_emit_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 			case IR_DIV:
 				|	ASM_SSE2_REG_MREF_OP divss, divsd, type, def_reg, op2
+				break;
+			case IR_MIN:
+				|	ASM_SSE2_REG_MREF_OP minss, minsd, type, def_reg, op2
+				break;
+			case IR_MAX:
+				|	ASM_SSE2_REG_MREF_OP maxss, maxsd, type, def_reg, op2
 				break;
 			default:
 				IR_ASSERT(0 && "NIY binary op");
@@ -2884,6 +2964,12 @@ static void ir_emit_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			case IR_DIV:
 				|	ASM_AVX_REG_REG_REG_OP vdivss, vdivsd, type, def_reg, op1_reg, op2_reg
 				break;
+			case IR_MIN:
+				|	ASM_AVX_REG_REG_REG_OP vminss, vminsd, type, def_reg, op1_reg, op2_reg
+				break;
+			case IR_MAX:
+				|	ASM_AVX_REG_REG_REG_OP vmaxss, vmaxsd, type, def_reg, op1_reg, op2_reg
+				break;
 			default:
 				IR_ASSERT(0 && "NIY binary op");
 				break;
@@ -2901,6 +2987,10 @@ static void ir_emit_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 			case IR_DIV:
 				|	ASM_AVX_REG_REG_MREF_OP vdivss, vdivsd, type, def_reg, op1_reg, op2
+			case IR_MIN:
+				|	ASM_AVX_REG_REG_MREF_OP vminss, vminsd, type, def_reg, op1_reg, op2
+			case IR_MAX:
+				|	ASM_AVX_REG_REG_MREF_OP vmaxss, vmaxsd, type, def_reg, op1_reg, op2
 				break;
 			default:
 				IR_ASSERT(0 && "NIY binary op");
@@ -5669,6 +5759,9 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 					break;
 				case IR_SWITCH:
 					ir_emit_switch(ctx, i, insn);
+					break;
+				case IR_MIN_MAX_INT:
+					ir_emit_min_max_int(ctx, i, insn);
 					break;
 				case IR_OVERFLOW:
 					ir_emit_overflow(ctx, i, insn);

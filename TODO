@@ -35,7 +35,7 @@
 	-  separate INT and FP allocation phases (for performance)
 
 ?  code generation
-	-  MIN, MAX, COND
+	-  COND
 	-  CAST
 	-  return merge/split
 	?  binary code emission without DynAsm
