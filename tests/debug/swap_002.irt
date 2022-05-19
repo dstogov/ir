@@ -1,0 +1,26 @@
+--TEST--
+002: Swap operands of commutative instruction
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_5);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t y = PARAM(l_1, "y", 2);
+	int32_t v = VAR(l_1, "_spill_");
+	l_2 = VSTORE(l_1, v, y);
+	int32_t z, l_3 = VLOAD(l_2, v);
+	int32_t ret = AND(z, x);
+	int32_t ret2 = ADD(ret, ret);
+	l_4 = VSTORE(l_3, v, ret2);
+	l_5 = RETURN(l_4);
+}
+--EXPECT--
+test:
+	subq $8, %rsp
+	movl %esi, (%rsp)
+	andl (%rsp), %edi
+	leal (%rdi, %rdi), %eax
+	movl %eax, (%rsp)
+	addq $8, %rsp
+	retq

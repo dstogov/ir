@@ -1,5 +1,5 @@
 --TEST--
-Swap operands of commutative instruction
+001: Swap operands of commutative instruction
 --ARGS--
 -S
 --CODE--

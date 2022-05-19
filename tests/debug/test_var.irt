@@ -74,7 +74,7 @@ Mandelbrot Test (var)
 --EXPECT--
 test:
 	subq $0x40, %rsp
-	subsd 0xcc(%rip), %xmm1
+	subsd 0xc4(%rip), %xmm1
 	movsd %xmm1, (%rsp)
 	movsd %xmm0, 8(%rsp)
 	xorpd %xmm0, %xmm0
@@ -97,14 +97,12 @@ test:
 	movsd %xmm1, 0x38(%rsp)
 	movsd 0x30(%rsp), %xmm0
 	subsd 0x38(%rsp), %xmm0
-	movsd (%rsp), %xmm1
-	addsd %xmm0, %xmm1
-	movsd %xmm1, 0x18(%rsp)
+	addsd (%rsp), %xmm0
+	movsd %xmm0, 0x18(%rsp)
 	movsd 0x28(%rsp), %xmm0
 	addsd %xmm0, %xmm0
-	movsd 8(%rsp), %xmm1
-	addsd %xmm0, %xmm1
-	movsd %xmm1, 0x10(%rsp)
+	addsd 8(%rsp), %xmm0
+	movsd %xmm0, 0x10(%rsp)
 	movsd 0x30(%rsp), %xmm0
 	addsd 0x38(%rsp), %xmm0
 	ucomisd 0x2b(%rip), %xmm0

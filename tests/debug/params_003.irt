@@ -1,0 +1,45 @@
+--TEST--
+003: Parameter Loading and argument passing
+--ARGS--
+-S
+--CODE--
+{
+	uintptr_t f = func(printf);
+	uintptr_t fmt = "%d %d %d %d %d %d %d %d %d %d\n";
+	l_1 = START(l_3);
+	int32_t p_1 = PARAM(l_1, "p_1", 1);
+	int32_t p_2 = PARAM(l_1, "p_2", 2);
+	int32_t p_3 = PARAM(l_1, "p_3", 3);
+	int32_t p_4 = PARAM(l_1, "p_4", 4);
+	int32_t p_5 = PARAM(l_1, "p_5", 5);
+	int32_t p_6 = PARAM(l_1, "p_6", 6);
+	int32_t p_7 = PARAM(l_1, "p_7", 7);
+	int32_t p_8 = PARAM(l_1, "p_8", 8);
+	int32_t p_9 = PARAM(l_1, "p_9", 9);
+	int32_t p_10 = PARAM(l_1, "p_10", 10);
+	int32_t ret, l_2 = CALL/11(l_1, f, fmt, p_1, p_2, p_3, p_4, p_5, p_6, p_7, p_8, p_9, p_10);
+	l_3 = RETURN(l_2, ret);
+}
+--EXPECT--
+test:
+	subq $0x28, %rsp
+	movl %r9d, %eax
+	movl %eax, (%rsp)
+	movl 0x30(%rsp), %r10d
+	movl %r10d, 8(%rsp)
+	movl 0x38(%rsp), %r10d
+	movl %r10d, 0x10(%rsp)
+	movl 0x40(%rsp), %r10d
+	movl %r10d, 0x18(%rsp)
+	movl 0x48(%rsp), %r10d
+	movl %r10d, 0x20(%rsp)
+	movl %r8d, %r9d
+	movl %ecx, %r8d
+	movl %edx, %ecx
+	movl %esi, %edx
+	movl %edi, %esi
+	leaq 0x13(%rip), %rdi
+	movabsq $_IO_printf, %rax
+	callq *%rax
+	addq $0x28, %rsp
+	retq
