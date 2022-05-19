@@ -29,17 +29,11 @@
     - BURS ???
 
 ?  register allocation
-	+  linear scan
-		-  separate INT and FP allocation phases
-	?  spills
-	    +  spill everywhere code placement
-		+  packed/aligned spill slot allocation
-		-  spill slot coalescing
-	    -  optimal spill code placement through resolution
-	-  splinting
-		-  spill only at cold path if possible	
-	?  hints
-		-  hints and low priority
+	-  hints and low priority registers (prevent allocating registers that are used as hints in the following intersecting intervals) 
+	-  spill slot coalescing
+	-  optimal spill code placement through resolution
+	-  splinting (spill only at cold path if possible)
+	-  separate INT and FP allocation phases (for performance)
 
 ?  code generation
 	-  OVERFLOW
