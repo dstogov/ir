@@ -1,0 +1,19 @@
+--TEST--
+004: type conversion BITS
+--ARGS--
+--emit-c
+--CODE--
+{
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	uint8_t ret = BITS(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+uint8_t test(double x)
+{
+	double d_1 = x;
+	uint8_t d_2;
+	{union {double d; uint64_t bits;} _u; _u.d = d_1; d_2 = _u.bits;}
+	return d_2;
+}

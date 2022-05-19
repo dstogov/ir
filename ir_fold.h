@@ -819,6 +819,163 @@ IR_FOLD(MAX(C_FLOAT, C_FLOAT))
 	IR_FOLD_COPY(op1_insn->val.f >= op2_insn->val.f ? op1 : op2);
 }
 
+IR_FOLD(SEXT(C_I8))
+IR_FOLD(SEXT(C_U8))
+{
+	IR_ASSERT(IR_IS_TYPE_INT(IR_OPT_TYPE(opt)));
+	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] > ir_type_size[IR_OPT_TYPE(op1_insn->type)]);
+	IR_FOLD_CONST_I((int64_t)op1_insn->val.i8);
+}
+
+IR_FOLD(SEXT(C_I16))
+IR_FOLD(SEXT(C_U16))
+{
+	IR_ASSERT(IR_IS_TYPE_INT(IR_OPT_TYPE(opt)));
+	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] > ir_type_size[IR_OPT_TYPE(op1_insn->type)]);
+	IR_FOLD_CONST_I((int64_t)op1_insn->val.i16);
+}
+
+IR_FOLD(SEXT(C_I32))
+IR_FOLD(SEXT(C_U32))
+{
+	IR_ASSERT(IR_IS_TYPE_INT(IR_OPT_TYPE(opt)));
+	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] > ir_type_size[IR_OPT_TYPE(op1_insn->type)]);
+	IR_FOLD_CONST_I((int64_t)op1_insn->val.i32);
+}
+
+IR_FOLD(ZEXT(C_I8))
+IR_FOLD(ZEXT(C_U8))
+{
+	IR_ASSERT(IR_IS_TYPE_INT(IR_OPT_TYPE(opt)));
+	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] > ir_type_size[IR_OPT_TYPE(op1_insn->type)]);
+	IR_FOLD_CONST_U((uint64_t)op1_insn->val.u8);
+}
+
+IR_FOLD(ZEXT(C_I16))
+IR_FOLD(ZEXT(C_U16))
+{
+	IR_ASSERT(IR_IS_TYPE_INT(IR_OPT_TYPE(opt)));
+	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] > ir_type_size[IR_OPT_TYPE(op1_insn->type)]);
+	IR_FOLD_CONST_U((uint64_t)op1_insn->val.u16);
+}
+
+IR_FOLD(ZEXT(C_I32))
+IR_FOLD(ZEXT(C_U32))
+{
+	IR_ASSERT(IR_IS_TYPE_INT(IR_OPT_TYPE(opt)));
+	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] > ir_type_size[IR_OPT_TYPE(op1_insn->type)]);
+	IR_FOLD_CONST_U((uint64_t)op1_insn->val.u32);
+}
+
+IR_FOLD(BITS(C_I8))
+IR_FOLD(BITS(C_I16))
+IR_FOLD(BITS(C_I32))
+IR_FOLD(BITS(C_I64))
+IR_FOLD(BITS(C_U8))
+IR_FOLD(BITS(C_U16))
+IR_FOLD(BITS(C_U32))
+IR_FOLD(BITS(C_U64))
+IR_FOLD(BITS(C_FLOAT))
+IR_FOLD(BITS(C_DOUBLE))
+{
+	switch (IR_OPT_TYPE(opt)) {
+		case IR_I8:
+			IR_FOLD_CONST_I(op1_insn->val.i8);
+		case IR_I16:
+			IR_FOLD_CONST_I(op1_insn->val.i16);
+		case IR_I32:
+			IR_FOLD_CONST_I(op1_insn->val.i32);
+		case IR_I64:
+			IR_FOLD_CONST_I(op1_insn->val.i64);
+		case IR_U8:
+			IR_FOLD_CONST_U(op1_insn->val.u8);
+		case IR_U16:
+			IR_FOLD_CONST_U(op1_insn->val.u16);
+		case IR_U32:
+			IR_FOLD_CONST_U(op1_insn->val.u32);
+		case IR_U64:
+			IR_FOLD_CONST_U(op1_insn->val.u64);
+		default:
+			IR_ASSERT(0);
+	}
+}
+
+IR_FOLD(INT2FP(C_I8))
+IR_FOLD(INT2FP(C_I16))
+IR_FOLD(INT2FP(C_I32))
+IR_FOLD(INT2FP(C_I64))
+{
+	if (IR_OPT_TYPE(opt) == IR_DOUBLE) {
+		IR_FOLD_CONST_D((double)op1_insn->val.i64);
+	} else {
+		IR_ASSERT(IR_OPT_TYPE(opt) == IR_FLOAT);
+		IR_FOLD_CONST_F((float)op1_insn->val.i64);
+	}
+}
+
+IR_FOLD(INT2FP(C_U8))
+IR_FOLD(INT2FP(C_U16))
+IR_FOLD(INT2FP(C_U32))
+IR_FOLD(INT2FP(C_U64))
+{
+	if (IR_OPT_TYPE(opt) == IR_DOUBLE) {
+		IR_FOLD_CONST_F((double)op1_insn->val.u64);
+	} else {
+		IR_ASSERT(IR_OPT_TYPE(opt) == IR_FLOAT);
+		IR_FOLD_CONST_F((float)op1_insn->val.u64);
+	}
+}
+
+IR_FOLD(FP2INT(C_FLOAT))
+{
+	IR_ASSERT(IR_IS_TYPE_INT(IR_OPT_TYPE(opt)));
+	switch (IR_OPT_TYPE(opt)) {
+		case IR_I8:
+			IR_FOLD_CONST_I((int8_t)op1_insn->val.f);
+		case IR_I16:
+			IR_FOLD_CONST_I((int16_t)op1_insn->val.f);
+		case IR_I32:
+			IR_FOLD_CONST_I((int32_t)op1_insn->val.f);
+		case IR_I64:
+			IR_FOLD_CONST_I((int64_t)op1_insn->val.f);
+		case IR_U8:
+			IR_FOLD_CONST_U((uint8_t)op1_insn->val.f);
+		case IR_U16:
+			IR_FOLD_CONST_U((uint16_t)op1_insn->val.f);
+		case IR_U32:
+			IR_FOLD_CONST_U((uint32_t)op1_insn->val.f);
+		case IR_U64:
+			IR_FOLD_CONST_U((uint64_t)op1_insn->val.f);
+		default:
+			IR_ASSERT(0);
+	}
+}
+
+IR_FOLD(FP2INT(C_DOUBLE))
+{
+	IR_ASSERT(IR_IS_TYPE_INT(IR_OPT_TYPE(opt)));
+	switch (IR_OPT_TYPE(opt)) {
+		case IR_I8:
+			IR_FOLD_CONST_I((int8_t)op1_insn->val.d);
+		case IR_I16:
+			IR_FOLD_CONST_I((int16_t)op1_insn->val.d);
+		case IR_I32:
+			IR_FOLD_CONST_I((int32_t)op1_insn->val.d);
+		case IR_I64:
+			IR_FOLD_CONST_I((int64_t)op1_insn->val.d);
+		case IR_U8:
+			IR_FOLD_CONST_U((uint8_t)op1_insn->val.d);
+		case IR_U16:
+			IR_FOLD_CONST_U((uint16_t)op1_insn->val.d);
+		case IR_U32:
+			IR_FOLD_CONST_U((uint32_t)op1_insn->val.d);
+		case IR_U64:
+			IR_FOLD_CONST_U((uint64_t)op1_insn->val.d);
+		default:
+			IR_ASSERT(0);
+	}
+}
+
 // TODO: constant functions (e.g.  sin, cos)
 
 /* Copy Propagation */

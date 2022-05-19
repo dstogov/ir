@@ -206,7 +206,11 @@ int ir_mem_flush(void *ptr, size_t size);
 	/* (LDEXP, MIN, MAX, FPMATH)                                        */ \
 	\
 	/* type conversion ops ???                                          */ \
-	_(CAST,         d1,   def, ___, ___) /* type conversion             */ \
+	_(SEXT,         d1,   def, ___, ___) /* sign extension              */ \
+	_(ZEXT,         d1,   def, ___, ___) /* zero extension              */ \
+	_(BITS,         d1,   def, ___, ___) /* binary representation       */ \
+	_(INT2FP,       d1,   def, ___, ___) /* int to float conversion     */ \
+	_(FP2INT,       d1,   def, ___, ___) /* float to int conversion     */ \
 	\
 	/* overflow-check ???                                               */ \
 	_(ADD_OV,       d2C,  def, def, ___) /* addition                    */ \

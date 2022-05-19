@@ -32,7 +32,7 @@
 	-  separate INT and FP allocation phases (for performance)
 
 ?  code generation
-	-  COND
+	-  SEXT, ZEXT, BITS, INT2FP, FP2INT
 	-  CAST
 	-  32-bit x86 back-end
 	-  binary code emission without DynAsm ???
