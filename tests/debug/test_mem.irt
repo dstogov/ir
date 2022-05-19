@@ -81,7 +81,7 @@ test:
 	pushq %rbp
 	movq %rsp, %rbp
 	subq $0x38, %rsp
-	subsd 0xc8(%rip), %xmm1
+	subsd 0xc0(%rip), %xmm1
 	movsd %xmm1, -0x38(%rbp)
 	movsd %xmm0, -0x30(%rbp)
 	xorpd %xmm0, %xmm0
@@ -105,8 +105,7 @@ test:
 	mulsd %xmm1, %xmm1
 	movsd %xmm1, -8(%rbp)
 	movsd -0x10(%rbp), %xmm0
-	movsd -8(%rbp), %xmm1
-	subsd %xmm1, %xmm0
+	subsd -8(%rbp), %xmm0
 	movsd -0x38(%rbp), %xmm1
 	addsd %xmm0, %xmm1
 	movsd %xmm1, -0x20(%rbp)
@@ -115,10 +114,9 @@ test:
 	movsd -0x30(%rbp), %xmm1
 	addsd %xmm0, %xmm1
 	movsd %xmm1, -0x28(%rbp)
-	movsd -8(%rbp), %xmm0
-	movsd -0x10(%rbp), %xmm1
-	addsd %xmm0, %xmm1
-	ucomisd 0x2e(%rip), %xmm1
+	movsd -0x10(%rbp), %xmm0
+	addsd -8(%rbp), %xmm0
+	ucomisd 0x2e(%rip), %xmm0
 	ja .L2
 	jmp .L3
 .L2:
@@ -136,4 +134,3 @@ test:
 	retq
 .L4:
 	jmp .L1
-

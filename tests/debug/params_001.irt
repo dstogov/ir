@@ -28,12 +28,9 @@
 }
 --EXPECT--
 test:
-	subq $8, %rsp
-	movq %rbx, (%rsp)
-	movl 0x10(%rsp), %eax
-	movl 0x18(%rsp), %r10d
-	movl 0x20(%rsp), %r11d
-	movl 0x28(%rsp), %ebx
+	movl 8(%rsp), %eax
+	movl 0x10(%rsp), %r10d
+	movl 0x18(%rsp), %r11d
 	leal (%rsi, %rdi), %esi
 	leal (%rsi, %rdx), %edx
 	leal (%rdx, %rcx), %ecx
@@ -42,7 +39,5 @@ test:
 	leal (%rcx, %rax), %eax
 	leal (%rax, %r10), %eax
 	leal (%rax, %r11), %eax
-	subl %ebx, %eax
-	movq (%rsp), %rbx
-	addq $8, %rsp
+	subl 0x20(%rsp), %eax
 	retq

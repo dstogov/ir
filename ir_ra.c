@@ -70,8 +70,8 @@ static void ir_add_local_var(ir_ctx *ctx, int v, uint8_t type)
 	ival->flags = IR_LIVE_INTERVAL_VAR;
 	ival->vreg = v;
 	ival->stack_spill_pos = -1; // not allocated
-	ival->range.start = 0;
-	ival->range.end = ctx->insns_count;
+	ival->range.start = IR_START_LIVE_POS_FROM_REF(1);
+	ival->range.end = IR_END_LIVE_POS_FROM_REF(ctx->insns_count - 1);
 	ival->range.next = NULL;
 	ival->use_pos = NULL;
 
@@ -413,6 +413,13 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 								def_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
 								hint_ref = IR_IS_CONST_REF(insn->op1) ? 0 : insn->op1;
 							} else {
+								if (insn->op == IR_PARAM) {
+									/* We may reuse parameter stack slot for spilling */
+									ctx->live_intervals[ctx->vregs[i]]->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
+								} else if (insn->op == IR_VLOAD) {
+									/* Load may be fused into the useage instruction */
+									ctx->live_intervals[ctx->vregs[i]]->flags |= IR_LIVE_INTERVAL_MEM_LOAD;
+								}
 								def_pos = IR_DEF_LIVE_POS_FROM_REF(i);
 							}
 							/* intervals[opd].setFrom(op.id) */
@@ -1362,59 +1369,56 @@ static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, ir_live_interval *iva
 
 static void ir_allocate_spill_slot(ir_ctx *ctx, ir_live_interval *ival, ir_lsra_data *data)
 {
-	ival = ival->top;
-	if (ival->stack_spill_pos == -1) {
-		uint8_t size = ir_type_size[ival->type];
+	uint8_t size = ir_type_size[ival->type];
 
-		if (size == 8) {
-			ival->stack_spill_pos = data->stack_frame_size;
-			data->stack_frame_size += 8;
-		} else if (size == 4) {
-			if (data->unused_slot_4) {
-				ival->stack_spill_pos = data->unused_slot_4;
-				data->unused_slot_4 = 0;
-			} else {
-				ival->stack_spill_pos = data->stack_frame_size;
-				data->unused_slot_4 = data->stack_frame_size + 4;
-				data->stack_frame_size += 8;
-			}
-		} else if (size == 2) {
-			if (data->unused_slot_2) {
-				ival->stack_spill_pos = data->unused_slot_2;
-				data->unused_slot_2 = 0;
-			} else if (data->unused_slot_4) {
-				ival->stack_spill_pos = data->unused_slot_4;
-				data->unused_slot_2 = data->unused_slot_4 + 2;
-				data->unused_slot_4 = 0;
-			} else {
-				ival->stack_spill_pos = data->stack_frame_size;
-				data->unused_slot_2 = data->stack_frame_size + 2;
-				data->unused_slot_4 = data->stack_frame_size + 4;
-				data->stack_frame_size += 8;
-			}
-		} else if (size == 1) {
-			if (data->unused_slot_1) {
-				ival->stack_spill_pos = data->unused_slot_1;
-				data->unused_slot_1 = 0;
-			} else if (data->unused_slot_2) {
-				ival->stack_spill_pos = data->unused_slot_2;
-				data->unused_slot_1 = data->unused_slot_2 + 1;
-				data->unused_slot_2 = 0;
-			} else if (data->unused_slot_4) {
-				ival->stack_spill_pos = data->unused_slot_4;
-				data->unused_slot_1 = data->unused_slot_4 + 1;
-				data->unused_slot_2 = data->unused_slot_4 + 2;
-				data->unused_slot_4 = 0;
-			} else {
-				ival->stack_spill_pos = data->stack_frame_size;
-				data->unused_slot_1 = data->stack_frame_size + 1;
-				data->unused_slot_2 = data->stack_frame_size + 2;
-				data->unused_slot_4 = data->stack_frame_size + 4;
-				data->stack_frame_size += 8;
-			}
+	if (size == 8) {
+		ival->stack_spill_pos = data->stack_frame_size;
+		data->stack_frame_size += 8;
+	} else if (size == 4) {
+		if (data->unused_slot_4) {
+			ival->stack_spill_pos = data->unused_slot_4;
+			data->unused_slot_4 = 0;
 		} else {
-			IR_ASSERT(0);
+			ival->stack_spill_pos = data->stack_frame_size;
+			data->unused_slot_4 = data->stack_frame_size + 4;
+			data->stack_frame_size += 8;
 		}
+	} else if (size == 2) {
+		if (data->unused_slot_2) {
+			ival->stack_spill_pos = data->unused_slot_2;
+			data->unused_slot_2 = 0;
+		} else if (data->unused_slot_4) {
+			ival->stack_spill_pos = data->unused_slot_4;
+			data->unused_slot_2 = data->unused_slot_4 + 2;
+			data->unused_slot_4 = 0;
+		} else {
+			ival->stack_spill_pos = data->stack_frame_size;
+			data->unused_slot_2 = data->stack_frame_size + 2;
+			data->unused_slot_4 = data->stack_frame_size + 4;
+			data->stack_frame_size += 8;
+		}
+	} else if (size == 1) {
+		if (data->unused_slot_1) {
+			ival->stack_spill_pos = data->unused_slot_1;
+			data->unused_slot_1 = 0;
+		} else if (data->unused_slot_2) {
+			ival->stack_spill_pos = data->unused_slot_2;
+			data->unused_slot_1 = data->unused_slot_2 + 1;
+			data->unused_slot_2 = 0;
+		} else if (data->unused_slot_4) {
+			ival->stack_spill_pos = data->unused_slot_4;
+			data->unused_slot_1 = data->unused_slot_4 + 1;
+			data->unused_slot_2 = data->unused_slot_4 + 2;
+			data->unused_slot_4 = 0;
+		} else {
+			ival->stack_spill_pos = data->stack_frame_size;
+			data->unused_slot_1 = data->stack_frame_size + 1;
+			data->unused_slot_2 = data->stack_frame_size + 2;
+			data->unused_slot_4 = data->stack_frame_size + 4;
+			data->stack_frame_size += 8;
+		}
+	} else {
+		IR_ASSERT(0);
 	}
 }
 
@@ -1912,6 +1916,58 @@ static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 	return 1;
 }
 
+static bool ir_ival_spill_for_fuse_load(ir_ctx *ctx, ir_live_interval *ival, ir_lsra_data *data)
+{
+	ir_use_pos *use_pos = ival->use_pos;
+	ir_insn *insn;
+
+	if (ival->flags & IR_LIVE_INTERVAL_MEM_PARAM) {
+		IR_ASSERT(ival->top == ival && !ival->next && use_pos && use_pos->op_num == 0);
+		insn = &ctx->ir_base[IR_LIVE_POS_TO_REF(use_pos->pos)];
+		IR_ASSERT(insn->op == IR_PARAM);
+		use_pos =use_pos->next;
+		if (use_pos && (use_pos->next || (use_pos->flags & IR_USE_MUST_BE_IN_REG))) {
+			return 0;
+		}
+
+		if (use_pos) {
+			ir_block *bb = ir_block_from_live_pos(ctx, use_pos->pos);
+			if (bb->loop_depth) {
+				return 0;
+			}
+		}
+
+		return 1;
+	} else if (ival->flags & IR_LIVE_INTERVAL_MEM_LOAD) {
+		insn = &ctx->ir_base[IR_LIVE_POS_TO_REF(use_pos->pos)];
+		IR_ASSERT(insn->op == IR_VLOAD);
+		use_pos =use_pos->next;
+		if (use_pos && (use_pos->next || (use_pos->flags & IR_USE_MUST_BE_IN_REG))) {
+			return 0;
+		}
+
+		if (use_pos) {
+			ir_block *bb = ir_block_from_live_pos(ctx, use_pos->pos);
+			if (bb->loop_depth && bb != ir_block_from_live_pos(ctx, ival->use_pos->pos)) {
+				return 0;
+			}
+		}
+
+		IR_ASSERT(ctx->ir_base[insn->op2].op == IR_VAR);
+		if (ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos != -1) {
+			ival->stack_spill_pos =
+				ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos;
+		} else {
+			ir_allocate_spill_slot(ctx, ival, data);
+			ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos =
+				ival->stack_spill_pos;
+		}
+
+		return 1;
+	}
+	return 0;
+}
+
 static int ir_linear_scan(ir_ctx *ctx)
 {
 	int b;
@@ -1945,8 +2001,15 @@ static int ir_linear_scan(ir_ctx *ctx)
 
 	for (j = 1; j <= ctx->vregs_count; j++) {
 		ival = ctx->live_intervals[j];
-		if (ival && !(ival->flags & IR_LIVE_INTERVAL_VAR)) {
-			ir_add_to_unhandled(&unhandled, ival);
+		if (ival) {
+			if (ival->flags & IR_LIVE_INTERVAL_VAR) {
+				if (ival->stack_spill_pos == -1) {
+					ir_allocate_spill_slot(ctx, ival, &data);
+				}
+			} else if (!(ival->flags & (IR_LIVE_INTERVAL_MEM_PARAM|IR_LIVE_INTERVAL_MEM_LOAD))
+					|| !ir_ival_spill_for_fuse_load(ctx, ival, &data)) {
+				ir_add_to_unhandled(&unhandled, ival);
+			}
 		}
 	}
 
@@ -2053,7 +2116,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 
 	for (j = 1; j <= ctx->vregs_count; j++) {
 		ival = ctx->live_intervals[j];
-		if (ival) {
+		if (ival && ival->stack_spill_pos == -1 && !(ival->flags & IR_LIVE_INTERVAL_MEM_PARAM)) {
 			if (ival->next || ival->reg == IR_REG_NONE) {
 				ir_allocate_spill_slot(ctx, ival, &data);
 			}

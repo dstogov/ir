@@ -28,8 +28,6 @@
 }
 --EXPECT--
 test:
-	movsd 8(%rsp), %xmm8
-	movsd 0x10(%rsp), %xmm9
 	addsd %xmm0, %xmm1
 	addsd %xmm2, %xmm1
 	addsd %xmm3, %xmm1
@@ -38,6 +36,6 @@ test:
 	addsd %xmm6, %xmm1
 	addsd %xmm7, %xmm1
 	movapd %xmm1, %xmm0
-	addsd %xmm8, %xmm0
-	subsd %xmm9, %xmm0
+	addsd 8(%rsp), %xmm0
+	subsd 0x10(%rsp), %xmm0
 	retq

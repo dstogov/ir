@@ -553,11 +553,13 @@ struct _ir_live_range {
 #define IR_LIVE_INTERVAL_VAR             (1<<4)
 #define IR_LIVE_INTERVAL_COALESCED       (1<<5)
 #define IR_LIVE_INTERVAL_HAS_HINTS       (1<<6)
+#define IR_LIVE_INTERVAL_MEM_PARAM       (1<<7)
+#define IR_LIVE_INTERVAL_MEM_LOAD        (1<<8)
 
 struct _ir_live_interval {
 	uint8_t           type;
 	int8_t            reg;
-	uint8_t           flags;
+	uint16_t          flags;
 	int32_t           vreg;
 	int32_t           stack_spill_pos;
 	ir_live_range     range;

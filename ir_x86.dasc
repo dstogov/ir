@@ -4381,7 +4381,9 @@ static void ir_emit_load_params(ir_ctx *ctx)
 			}
 			if (ctx->vregs[use]) {
 				dst_reg = IR_REG_NUM(ctx->regs[use][0]);
-				IR_ASSERT(src_reg != IR_REG_NONE || dst_reg != IR_REG_NONE);
+				IR_ASSERT(src_reg != IR_REG_NONE || dst_reg != IR_REG_NONE ||
+					stack_offset == ctx->live_intervals[ctx->vregs[use]]->stack_spill_pos +
+						((ctx->flags & IR_USE_FRAME_POINTER) ? -data->stack_frame_size : data->call_stack_size));
 				if (src_reg != dst_reg) {
 					ir_emit_param_move(ctx, insn->type, src_reg, dst_reg, use, stack_offset);
 				}
@@ -4495,6 +4497,66 @@ static void ir_allocate_spill_slot(ir_ctx *ctx, ir_live_interval *ival, ir_backe
 	}
 }
 
+static void ir_fix_param_spills(ir_ctx *ctx)
+{
+	ir_backend_data *data = ctx->data;
+	ir_use_list *use_list = &ctx->use_lists[1];
+	ir_insn *insn;
+	ir_ref i, n, *p, use;
+	int int_param_num = 0;
+	int fp_param_num = 0;
+	ir_reg src_reg;
+	// TODO: Calling convention specific
+	int int_reg_params_count = IR_REG_INT_ARGS;
+	int fp_reg_params_count = IR_REG_FP_ARGS;
+	const int8_t *int_reg_params = _ir_int_reg_params;
+	const int8_t *fp_reg_params = _ir_fp_reg_params;
+	int32_t stack_offset = 0;
+
+	if (ctx->flags & IR_USE_FRAME_POINTER) {
+		/* skip old frame pointer and return address */
+		stack_offset = sizeof(void*) + (data->stack_frame_size - data->stack_frame_alignment);
+	} else {
+		 /* skip return address */
+		stack_offset = data->stack_frame_size;
+	}
+	n = use_list->count;
+	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
+		use = *p;
+		insn = &ctx->ir_base[use];
+		if (insn->op == IR_PARAM) {
+			if (IR_IS_TYPE_INT(insn->type)) {
+				if (int_param_num < int_reg_params_count) {
+					src_reg = int_reg_params[int_param_num];
+				} else {
+					src_reg = IR_REG_NONE;
+					stack_offset += sizeof(void*);
+				}
+				int_param_num++;
+			} else {
+				if (fp_param_num < fp_reg_params_count) {
+					src_reg = fp_reg_params[fp_param_num];
+				} else {
+					src_reg = IR_REG_NONE;
+					stack_offset += sizeof(void*);
+				}
+				fp_param_num++;
+			}
+			if (ctx->vregs[use]) {
+				if (src_reg == IR_REG_NONE) {
+					ir_live_interval *ival = ctx->live_intervals[ctx->vregs[use]];
+					if ((ival->flags & IR_LIVE_INTERVAL_MEM_PARAM)
+					 && ival->stack_spill_pos == -1
+					 && (ival->next || ival->reg == IR_REG_NONE)) {
+						ival->stack_spill_pos = stack_offset;
+						ctx->regs[use][0] = IR_REG_NONE;
+					}
+				}
+			}
+		}
+	}
+}
+
 static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 {
 	int b;
@@ -4552,7 +4614,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 							 && ctx->live_intervals[ctx->vregs[i]]
 							 && ctx->live_intervals[ctx->vregs[i]]->stack_spill_pos != -1) {
 								/* pass */
-							} else {
+							} else if (insn->op != IR_PARAM) {
 								reg = ir_get_free_reg(insn->type, available);
 								IR_REGSET_EXCL(available, reg);
 								ctx->regs[i][0] = reg | IR_REG_SPILL_STORE;
@@ -4564,7 +4626,12 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 							ival->type = insn->type;
 							ival->reg = IR_REG_NONE;
 							ival->vreg = ctx->vregs[i];
-							ir_allocate_spill_slot(ctx, ival, data);
+							ival->stack_spill_pos = -1;
+							if (insn->op == IR_PARAM && reg == IR_REG_NONE) {
+								ival->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
+							} else {
+								ir_allocate_spill_slot(ctx, ival, data);
+							}
 							ival->top = ival;
 							if (insn->op == IR_VAR) {
 								ir_use_list *use_list = &ctx->use_lists[i];
@@ -4681,6 +4748,8 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 			}
 		}
 	}
+
+	ir_fix_param_spills(ctx);
 }
 
 static void ir_mark_empty_blocks(ir_ctx *ctx)
@@ -4777,6 +4846,8 @@ static void ir_calc_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
 			}
 		}
 	}
+
+	ir_fix_param_spills(ctx);
 }
 
 static void* dasm_labels[ir_lb_MAX];

@@ -74,7 +74,7 @@ Mandelbrot Test (var)
 --EXPECT--
 test:
 	subq $0x40, %rsp
-	subsd 0xdc(%rip), %xmm1
+	subsd 0xcc(%rip), %xmm1
 	movsd %xmm1, (%rsp)
 	movsd %xmm0, 8(%rsp)
 	xorpd %xmm0, %xmm0
@@ -96,8 +96,7 @@ test:
 	mulsd %xmm1, %xmm1
 	movsd %xmm1, 0x38(%rsp)
 	movsd 0x30(%rsp), %xmm0
-	movsd 0x38(%rsp), %xmm1
-	subsd %xmm1, %xmm0
+	subsd 0x38(%rsp), %xmm0
 	movsd (%rsp), %xmm1
 	addsd %xmm0, %xmm1
 	movsd %xmm1, 0x18(%rsp)
@@ -106,10 +105,9 @@ test:
 	movsd 8(%rsp), %xmm1
 	addsd %xmm0, %xmm1
 	movsd %xmm1, 0x10(%rsp)
-	movsd 0x38(%rsp), %xmm0
-	movsd 0x30(%rsp), %xmm1
-	addsd %xmm0, %xmm1
-	ucomisd 0x33(%rip), %xmm1
+	movsd 0x30(%rsp), %xmm0
+	addsd 0x38(%rsp), %xmm0
+	ucomisd 0x2b(%rip), %xmm0
 	ja .L2
 	jmp .L3
 .L2:
@@ -117,12 +115,10 @@ test:
 	addq $0x40, %rsp
 	retq
 .L3:
-	movl 0x20(%rsp), %eax
-	cmpl $0x3e8, %eax
+	cmpl $0x3e8, 0x20(%rsp)
 	jl .L4
 	xorl %eax, %eax
 	addq $0x40, %rsp
 	retq
 .L4:
 	jmp .L1
-

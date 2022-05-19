@@ -46,7 +46,6 @@
 	-  MIN, MAX, COND
 	-  CAST
 	?  operands swap (binop_int, binop_sse, binop_avx, cmp_int, cmp_fp, cmp_br_int)
-	-  spill slots for parameters
 	-  return merge/split
 	?  binary code emission without DynAsm
 	- 32-bit x86 code
