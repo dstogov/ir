@@ -555,6 +555,7 @@ typedef enum _ir_rule {
 	IR_CMP_AND_BRANCH_INT,   // op1=reg(GP), op2=reg(GP)|mem|imm
 	                         // op1=mem, op2=reg(GP)|imm
 	IR_CMP_AND_BRANCH_FP,    // op1=reg(FP), op2=reg(FP)|mem
+	IR_OVERFLOW_AND_BRANCH,
 
 	IR_MEM_OP_INT,
 	IR_MEM_INC,
@@ -1231,6 +1232,17 @@ binop_fp:
 				goto binop_fp;
 			}
 			break;
+		case IR_ADD_OV:
+		case IR_SUB_OV:
+			IR_ASSERT(IR_IS_TYPE_INT(insn->type));
+			goto binop_int;
+		case IR_MUL_OV:
+			IR_ASSERT(IR_IS_TYPE_INT(insn->type));
+			if (IR_IS_TYPE_SIGNED(insn->type) && ir_type_size[insn->type] != 1) {
+				goto binop_int;
+			} else {
+				return IR_MUL_INT;
+			}
 		case IR_DIV:
 			if (IR_IS_TYPE_INT(insn->type)) {
 				if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
@@ -1564,15 +1576,16 @@ store_int:
 		case IR_IF:
 			if (insn->op2 > bb->start && insn->op2 < ref && ctx->use_lists[insn->op2].count == 1) {
 				op2_insn = &ctx->ir_base[insn->op2];
-				if (op2_insn
-				 && op2_insn->op >= IR_EQ
-				 && op2_insn->op <= IR_UGT) {
+				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT) {
 					ctx->rules[insn->op2] = IR_SKIP;
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
 						return IR_CMP_AND_BRANCH_INT;
 					} else {
 						return IR_CMP_AND_BRANCH_FP;
 					}
+				} else if (op2_insn->op == IR_OVERFLOW) {
+					ctx->rules[insn->op2] = IR_SKIP;
+					return IR_OVERFLOW_AND_BRANCH;
 				}
 			}
 			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
@@ -1892,12 +1905,15 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 		switch (insn->op) {
 			case IR_ADD:
+			case IR_ADD_OV:
 				|	ASM_REG_REG_OP add, type, def_reg, op2_reg
 				break;
 			case IR_SUB:
+			case IR_SUB_OV:
 				|	ASM_REG_REG_OP sub, type, def_reg, op2_reg
 				break;
 			case IR_MUL:
+			case IR_MUL_OV:
 				|	ASM_REG_REG_IMUL type, def_reg, op2_reg
 				break;
 			case IR_OR:
@@ -1916,12 +1932,15 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	} else {
 		switch (insn->op) {
 			case IR_ADD:
+			case IR_ADD_OV:
 				|	ASM_REG_MREF_OP add, type, def_reg, op2
 				break;
 			case IR_SUB:
+			case IR_SUB_OV:
 				|	ASM_REG_MREF_OP sub, type, def_reg, op2
 				break;
 			case IR_MUL:
+			case IR_MUL_OV:
 				|	ASM_REG_MREF_IMUL type, def_reg, op2
 				break;
 			case IR_OR:
@@ -1940,6 +1959,79 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 	if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
 		ir_emit_store(ctx, type, def, def_reg);
+	}
+}
+
+static void ir_emit_overflow(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
+	ir_type type = ctx->ir_base[insn->op1].type;
+
+	IR_ASSERT(def_reg != IR_REG_NONE);
+	IR_ASSERT(IR_IS_TYPE_INT(type));
+	if (IR_IS_TYPE_SIGNED(type)) {
+		|	seto Rb(def_reg)
+	} else {
+		|	setc Rb(def_reg)
+	}
+	if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
+		ir_emit_store(ctx, insn->type, def, def_reg);
+	}
+}
+
+static void ir_emit_overflow_and_branch(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_insn *overflow_insn = &ctx->ir_base[insn->op2];
+	ir_type type = ctx->ir_base[overflow_insn->op1].type;
+	ir_use_list *use_list;
+	ir_insn *use_insn;
+	ir_ref i, *p, use, n;
+	int true_block = 0, false_block = 0, next_block;
+	bool reverse = 0;
+
+	use_list = &ctx->use_lists[def];
+	n = use_list->count;
+	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
+		use = *p;
+		use_insn = &ctx->ir_base[use];
+		if (use_insn->op == IR_IF_TRUE) {
+			true_block = ir_skip_empty_blocks(ctx, ctx->bb_num[use]);
+		} else if (use_insn->op == IR_IF_FALSE) {
+			false_block = ir_skip_empty_blocks(ctx, ctx->bb_num[use]);
+		} else {
+			IR_ASSERT(0);
+		}
+	}
+	IR_ASSERT(true_block && false_block);
+
+	next_block = b == ctx->cfg_blocks_count ? 0 : ir_skip_empty_blocks(ctx, b + 1);
+	if (true_block == next_block) {
+		reverse = 1;
+		true_block = false_block;
+		false_block = 0;
+	} else if (false_block == next_block) {
+		false_block = 0;
+	}
+
+	if (IR_IS_TYPE_SIGNED(type)) {
+		if (reverse) {
+			|	jno =>true_block
+		} else {
+			|	jo =>true_block
+		}
+	} else {
+		if (reverse) {
+			|	jnc =>true_block
+		} else {
+			|	jc =>true_block
+		}
+	}
+	if (false_block) {
+		|	jmp =>false_block
 	}
 }
 
@@ -2504,14 +2596,14 @@ static void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (op2_reg == IR_REG_NONE && op1 == op2) {
 		op2_reg = IR_REG_RAX;
 	} else if (IR_IS_CONST_REF(op2)) {
-		if (insn->op == IR_MUL) {
+		if (insn->op == IR_MUL || insn->op == IR_MUL_OV) {
 			op2_reg = IR_REG_RDX;
 		} else {
 			IR_ASSERT(op2_reg != IR_REG_NONE);
 		}
 		ir_emit_load(ctx, type, op2_reg, op2);
 	}
-	if (insn->op == IR_MUL) {
+	if (insn->op == IR_MUL || insn->op == IR_MUL_OV) {
 		if (IR_IS_TYPE_SIGNED(insn->type)) {
 			if (op2_reg >= 0) {
 				|	ASM_REG_OP imul, type, op2_reg
@@ -2543,7 +2635,7 @@ static void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 	}
 
-	if (insn->op == IR_MUL || insn->op == IR_DIV) {
+	if (insn->op == IR_MUL || insn->op == IR_MUL_OV || insn->op == IR_DIV) {
 		if (def_reg != IR_REG_RAX) {
 			if (def_reg != IR_REG_NONE) {
 				ir_emit_mov(ctx, type, def_reg, IR_REG_RAX);
@@ -5577,6 +5669,12 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 					break;
 				case IR_SWITCH:
 					ir_emit_switch(ctx, i, insn);
+					break;
+				case IR_OVERFLOW:
+					ir_emit_overflow(ctx, i, insn);
+					break;
+				case IR_OVERFLOW_AND_BRANCH:
+					ir_emit_overflow_and_branch(ctx, b, i, insn);
 					break;
 				case IR_END:
 				case IR_LOOP_END:

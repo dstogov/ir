@@ -1,5 +1,4 @@
 -  type casting nodes
--  overflow detection nodes 
 -  va_arg nodes
 -  BSTART, BEND nodes (to free data allocated by ALLOCA)
 -  ENTRY node for multy-entry units
@@ -36,7 +35,6 @@
 	-  separate INT and FP allocation phases (for performance)
 
 ?  code generation
-	-  OVERFLOW
 	-  MIN, MAX, COND
 	-  CAST
 	-  return merge/split
