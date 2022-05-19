@@ -1967,6 +1967,7 @@ static void ir_emit_mem_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		offset = 0;
 	} else {
 		IR_ASSERT(0);
+		return;
 	}
 
 	if (IR_IS_CONST_REF(op2) && ir_type_size[type] == 8 && !IR_IS_32BIT(type, ctx->ir_base[op2].val)) {
@@ -2091,6 +2092,7 @@ static void ir_emit_mem_mul_div_mod_pwr2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		offset = 0;
 	} else {
 		IR_ASSERT(0);
+		return;
 	}
 
 	if (op_insn->op == IR_MUL) {
@@ -2188,6 +2190,7 @@ static void ir_emit_mem_shift(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		offset = 0;
 	} else {
 		IR_ASSERT(0);
+		return;
 	}
 
 	if (op2_reg != IR_REG_NONE && (op2_reg & IR_REG_SPILL_LOAD)) {
@@ -2292,6 +2295,7 @@ static void ir_emit_mem_shift_const(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		offset = 0;
 	} else {
 		IR_ASSERT(0);
+		return;
 	}
 
 	switch (op_insn->op) {
@@ -2386,8 +2390,8 @@ static void ir_emit_mem_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		offset = 0;
 	} else {
 		IR_ASSERT(0);
+		return;
 	}
-
 
 	if (op_insn->op == IR_ADD) {
 		|	ASM_MEM_OP inc, type, [Ra(reg)+offset]
