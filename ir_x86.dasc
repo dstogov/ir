@@ -4343,8 +4343,8 @@ static void ir_emit_load_params(ir_ctx *ctx)
 	ir_ref i, n, *p, use;
 	int int_param_num = 0;
 	int fp_param_num = 0;
-	int src_reg; /* negative values represent arguments on CPU stack */
-	int dst_reg;
+	ir_reg src_reg;
+	ir_reg dst_reg;
 	// TODO: Calling convention specific
 	int int_reg_params_count = IR_REG_INT_ARGS;
 	int fp_reg_params_count = IR_REG_FP_ARGS;
