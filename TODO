@@ -1,4 +1,3 @@
--  type casting nodes
 -  va_arg nodes
 -  BSTART, BEND nodes (to free data allocated by ALLOCA)
 -  ENTRY node for multy-entry units
@@ -10,8 +9,7 @@
 ?  reassociation folding rules
 -  folding engine improvement (one rule for few patterns)
 
--  irreducable loops detection
--  irreducable loops support
+-  irreducable loops detection/support
 
 -  range inference and PI node
 -  SCCP edge cases
@@ -36,15 +34,14 @@
 ?  code generation
 	-  COND
 	-  CAST
-	-  return merge/split
-	?  binary code emission without DynAsm
-	- 32-bit x86 code
+	-  32-bit x86 back-end
+	-  binary code emission without DynAsm ???
 
 ?  disassembler
     -  .rodata section and relative data labels
 
 -  modules (functions, data objecs, import, export, prototypes, forward declarations, memory segments, ref data, expr data) 
--  C compiler
+-  C front-end
 -  interpreter
 -  alias analyzes
 
