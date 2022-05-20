@@ -1,0 +1,19 @@
+--TEST--
+011: type conversion TRUNC
+--ARGS--
+--emit-c
+--CODE--
+{
+	l_1 = START(l_4);
+	int32_t x = PARAM(l_1, "x", 1);
+	int8_t ret = TRUNC(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+int8_t test(int32_t x)
+{
+	int32_t d_1 = x;
+	int8_t d_2;
+	d_2 = (uint8_t)(uint32_t)d_1;
+	return d_2;
+}
