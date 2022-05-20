@@ -1,0 +1,15 @@
+--TEST--
+007: type conversion FP2INT
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	float x = PARAM(l_1, "x", 1);
+	uint32_t ret = FP2INT(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	cvtss2si %xmm0, %rax
+	retq

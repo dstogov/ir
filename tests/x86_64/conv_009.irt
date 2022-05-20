@@ -1,7 +1,7 @@
 --TEST--
 009: type conversion FP2FP
 --ARGS--
---emit-c
+-S
 --CODE--
 {
 	l_1 = START(l_4);
@@ -10,10 +10,6 @@
 	l_4 = RETURN(l_1, ret);
 }
 --EXPECT--
-float test(double x)
-{
-	double d_1 = x;
-	float d_2;
-	d_2 = d_1;
-	return d_2;
-}
+test:
+	cvtsd2ss %xmm0, %xmm0
+	retq
