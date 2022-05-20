@@ -1,0 +1,19 @@
+--TEST--
+010: type conversion BITCAST
+--ARGS--
+--emit-c
+--CODE--
+{
+	l_1 = START(l_4);
+	uint64_t x = PARAM(l_1, "x", 1);
+	double ret = BITCAST(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+double test(uint64_t x)
+{
+	uint64_t d_1 = x;
+	double d_2;
+	{union {double d; uint64_t bits;} _u; _u.bits = d_1; d_2 = _u.d;}
+	return d_2;
+}

@@ -1,5 +1,5 @@
 --TEST--
-004: type conversion INT2FP
+006: type conversion INT2FP
 --ARGS--
 --emit-c
 --CODE--

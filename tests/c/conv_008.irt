@@ -1,19 +1,19 @@
 --TEST--
-007: type conversion FP2INT
+008: type conversion FP2FP
 --ARGS--
 --emit-c
 --CODE--
 {
 	l_1 = START(l_4);
 	float x = PARAM(l_1, "x", 1);
-	uint32_t ret = INT2FP(x);
+	double ret = INT2FP(x);
 	l_4 = RETURN(l_1, ret);
 }
 --EXPECT--
-uint32_t test(float x)
+double test(float x)
 {
 	float d_1 = x;
-	uint32_t d_2;
+	double d_2;
 	d_2 = d_1;
 	return d_2;
 }

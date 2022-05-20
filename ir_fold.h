@@ -867,17 +867,46 @@ IR_FOLD(ZEXT(C_U32))
 	IR_FOLD_CONST_U((uint64_t)op1_insn->val.u32);
 }
 
-IR_FOLD(BITS(C_I8))
-IR_FOLD(BITS(C_I16))
-IR_FOLD(BITS(C_I32))
-IR_FOLD(BITS(C_I64))
-IR_FOLD(BITS(C_U8))
-IR_FOLD(BITS(C_U16))
-IR_FOLD(BITS(C_U32))
-IR_FOLD(BITS(C_U64))
-IR_FOLD(BITS(C_FLOAT))
-IR_FOLD(BITS(C_DOUBLE))
+IR_FOLD(TRUNC(C_I16))
+IR_FOLD(TRUNC(C_I32))
+IR_FOLD(TRUNC(C_I64))
+IR_FOLD(TRUNC(C_U16))
+IR_FOLD(TRUNC(C_U32))
+IR_FOLD(TRUNC(C_U64))
 {
+	IR_ASSERT(IR_IS_TYPE_INT(IR_OPT_TYPE(opt)));
+	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] < ir_type_size[IR_OPT_TYPE(op1_insn->type)]);
+	switch (IR_OPT_TYPE(opt)) {
+		case IR_I8:
+			IR_FOLD_CONST_I(op1_insn->val.i8);
+		case IR_I16:
+			IR_FOLD_CONST_I(op1_insn->val.i16);
+		case IR_I32:
+			IR_FOLD_CONST_I(op1_insn->val.i32);
+		case IR_U8:
+			IR_FOLD_CONST_U(op1_insn->val.u8);
+		case IR_U16:
+			IR_FOLD_CONST_U(op1_insn->val.u16);
+		case IR_U32:
+			IR_FOLD_CONST_U(op1_insn->val.u32);
+		default:
+			IR_ASSERT(0);
+	}
+}
+
+
+IR_FOLD(BITCAST(C_I8))
+IR_FOLD(BITCAST(C_I16))
+IR_FOLD(BITCAST(C_I32))
+IR_FOLD(BITCAST(C_I64))
+IR_FOLD(BITCAST(C_U8))
+IR_FOLD(BITCAST(C_U16))
+IR_FOLD(BITCAST(C_U32))
+IR_FOLD(BITCAST(C_U64))
+IR_FOLD(BITCAST(C_FLOAT))
+IR_FOLD(BITCAST(C_DOUBLE))
+{
+	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] == ir_type_size[IR_OPT_TYPE(op1_insn->type)]);
 	switch (IR_OPT_TYPE(opt)) {
 		case IR_I8:
 			IR_FOLD_CONST_I(op1_insn->val.i8);
@@ -895,6 +924,10 @@ IR_FOLD(BITS(C_DOUBLE))
 			IR_FOLD_CONST_U(op1_insn->val.u32);
 		case IR_U64:
 			IR_FOLD_CONST_U(op1_insn->val.u64);
+		case IR_FLOAT:
+			IR_FOLD_CONST_F(op1_insn->val.f);
+		case IR_DOUBLE:
+			IR_FOLD_CONST_D(op1_insn->val.d);
 		default:
 			IR_ASSERT(0);
 	}
@@ -919,7 +952,7 @@ IR_FOLD(INT2FP(C_U32))
 IR_FOLD(INT2FP(C_U64))
 {
 	if (IR_OPT_TYPE(opt) == IR_DOUBLE) {
-		IR_FOLD_CONST_F((double)op1_insn->val.u64);
+		IR_FOLD_CONST_D((double)op1_insn->val.u64);
 	} else {
 		IR_ASSERT(IR_OPT_TYPE(opt) == IR_FLOAT);
 		IR_FOLD_CONST_F((float)op1_insn->val.u64);
@@ -973,6 +1006,26 @@ IR_FOLD(FP2INT(C_DOUBLE))
 			IR_FOLD_CONST_U((uint64_t)op1_insn->val.d);
 		default:
 			IR_ASSERT(0);
+	}
+}
+
+IR_FOLD(FP2FP(C_FLOAT))
+{
+	if (IR_OPT_TYPE(opt) == IR_DOUBLE) {
+		IR_FOLD_CONST_D((double)op1_insn->val.f);
+	} else {
+		IR_ASSERT(IR_OPT_TYPE(opt) == IR_FLOAT);
+		IR_FOLD_COPY(op1);
+	}
+}
+
+IR_FOLD(FP2FP(C_DOUBLE))
+{
+	if (IR_OPT_TYPE(opt) == IR_DOUBLE) {
+		IR_FOLD_COPY(op1);
+	} else {
+		IR_ASSERT(IR_OPT_TYPE(opt) == IR_FLOAT);
+		IR_FOLD_CONST_F((float)op1_insn->val.d);
 	}
 }
 

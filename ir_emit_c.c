@@ -218,6 +218,8 @@ static void ir_emit_bswap(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 static void ir_emit_sext(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 {
 	IR_ASSERT(IR_IS_TYPE_INT(insn->type));
+	IR_ASSERT(IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type));
+	IR_ASSERT(ir_type_size[insn->type] > ir_type_size[ctx->ir_base[insn->op1].type]);
 	ir_emit_def_ref(ctx, f, def);
 	switch (ir_type_size[insn->type]) {
 		case 1:
@@ -235,7 +237,6 @@ static void ir_emit_sext(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 		default:
 			IR_ASSERT(0);
 	}
-	IR_ASSERT(IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type));
 	switch (ir_type_size[ctx->ir_base[insn->op1].type]) {
 		case 1:
 			fprintf(f, "(int8_t)");
@@ -259,6 +260,8 @@ static void ir_emit_sext(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 static void ir_emit_zext(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 {
 	IR_ASSERT(IR_IS_TYPE_INT(insn->type));
+	IR_ASSERT(IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type));
+	IR_ASSERT(ir_type_size[insn->type] > ir_type_size[ctx->ir_base[insn->op1].type]);
 	ir_emit_def_ref(ctx, f, def);
 	switch (ir_type_size[insn->type]) {
 		case 1:
@@ -276,7 +279,6 @@ static void ir_emit_zext(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 		default:
 			IR_ASSERT(0);
 	}
-	IR_ASSERT(IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type));
 	switch (ir_type_size[ctx->ir_base[insn->op1].type]) {
 		case 1:
 			fprintf(f, "(uint8_t)");
@@ -297,25 +299,91 @@ static void ir_emit_zext(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 	fprintf(f, ";\n");
 }
 
-static void ir_emit_bits(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
+static void ir_emit_trunc(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 {
 	IR_ASSERT(IR_IS_TYPE_INT(insn->type));
-	if (IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)) {
-		ir_emit_def_ref(ctx, f, def);
-		ir_emit_ref(ctx, f, insn->op1);
-		fprintf(f, ";\n");
-	} else if (ctx->ir_base[insn->op1].type == IR_DOUBLE) {
-		fprintf(f, "\t{union {double d; uint64_t bits;} _u; _u.d = ");
-		ir_emit_ref(ctx, f, insn->op1);
-		fprintf(f, "; ");
-		ir_emit_ref(ctx, f, def);
-		fprintf(f, " = _u.bits;}\n");
-	} else if (ctx->ir_base[insn->op1].type == IR_FLOAT) {
-		fprintf(f, "\t{union {float f; uint32_t bits;} _u; _u.f = ");
-		ir_emit_ref(ctx, f, insn->op1);
-		fprintf(f, "; ");
-		ir_emit_ref(ctx, f, def);
-		fprintf(f, " = _u.bits;}\n");
+	IR_ASSERT(IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type));
+	IR_ASSERT(ir_type_size[insn->type] < ir_type_size[ctx->ir_base[insn->op1].type]);
+	ir_emit_def_ref(ctx, f, def);
+	switch (ir_type_size[insn->type]) {
+		case 1:
+			fprintf(f, "(uint8_t)");
+			break;
+		case 2:
+			fprintf(f, "(uint16_t)");
+			break;
+		case 4:
+			fprintf(f, "(uint32_t)");
+			break;
+		case 8:
+			fprintf(f, "(uint64_t)");
+			break;
+		default:
+			IR_ASSERT(0);
+	}
+	switch (ir_type_size[ctx->ir_base[insn->op1].type]) {
+		case 1:
+			fprintf(f, "(uint8_t)");
+			break;
+		case 2:
+			fprintf(f, "(uint16_t)");
+			break;
+		case 4:
+			fprintf(f, "(uint32_t)");
+			break;
+		case 8:
+			fprintf(f, "(uint64_t)");
+			break;
+		default:
+			IR_ASSERT(0);
+	}
+	ir_emit_ref(ctx, f, insn->op1);
+	fprintf(f, ";\n");
+}
+
+static void ir_emit_bitcast(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
+{
+	IR_ASSERT(ir_type_size[insn->type] == ir_type_size[ctx->ir_base[insn->op1].type]);
+	if (IR_IS_TYPE_INT(insn->type)) {
+		if (IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)) {
+			ir_emit_def_ref(ctx, f, def);
+			ir_emit_ref(ctx, f, insn->op1);
+			fprintf(f, ";\n");
+		} else if (ctx->ir_base[insn->op1].type == IR_DOUBLE) {
+			fprintf(f, "\t{union {double d; uint64_t bits;} _u; _u.d = ");
+			ir_emit_ref(ctx, f, insn->op1);
+			fprintf(f, "; ");
+			ir_emit_ref(ctx, f, def);
+			fprintf(f, " = _u.bits;}\n");
+		} else if (ctx->ir_base[insn->op1].type == IR_FLOAT) {
+			fprintf(f, "\t{union {float f; uint32_t bits;} _u; _u.f = ");
+			ir_emit_ref(ctx, f, insn->op1);
+			fprintf(f, "; ");
+			ir_emit_ref(ctx, f, def);
+			fprintf(f, " = _u.bits;}\n");
+		} else {
+			IR_ASSERT(0);
+		}
+	} else if (IR_IS_TYPE_FP(insn->type)) {
+		if (IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)) {
+			if (insn->type == IR_DOUBLE) {
+				fprintf(f, "\t{union {double d; uint64_t bits;} _u; _u.bits = ");
+				ir_emit_ref(ctx, f, insn->op1);
+				fprintf(f, "; ");
+				ir_emit_ref(ctx, f, def);
+				fprintf(f, " = _u.d;}\n");
+			} else if (insn->type == IR_FLOAT) {
+				fprintf(f, "\t{union {float f; uint32_t bits;} _u; _u.buts = ");
+				ir_emit_ref(ctx, f, insn->op1);
+				fprintf(f, "; ");
+				ir_emit_ref(ctx, f, def);
+				fprintf(f, " = _u.f;}\n");
+			} else {
+				IR_ASSERT(0);
+			}
+		} else {
+			IR_ASSERT(0);
+		}
 	} else {
 		IR_ASSERT(0);
 	}
@@ -855,11 +923,15 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 				case IR_ZEXT:
 					ir_emit_zext(ctx, f, i, insn);
 					break;
-				case IR_BITS:
-					ir_emit_bits(ctx, f, i, insn);
+				case IR_TRUNC:
+					ir_emit_trunc(ctx, f, i, insn);
+					break;
+				case IR_BITCAST:
+					ir_emit_bitcast(ctx, f, i, insn);
 					break;
 				case IR_INT2FP:
 				case IR_FP2INT:
+				case IR_FP2FP:
 					ir_emit_conv(ctx, f, i, insn);
 					break;
 				case IR_COPY:
