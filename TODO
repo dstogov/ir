@@ -19,7 +19,7 @@
 -  basic block trace scheduling
 
 ?  instruction selection
-	- xor, btsl=INCL, btrl=EXCL, btl=IN, bsr, maxss, maxsd, minss, minsd
+	- xor, btsl=INCL, btrl=EXCL, btl=IN, bsr
     - MOVZX to avoid a SHIFT and AND instruction
     - Use CMOVcc to remove branches
     - BURS ???
