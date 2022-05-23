@@ -37,8 +37,6 @@ Combo 001
 test:
 .L1:
 	testb %dil, %dil
-	je .L2
-	jmp .L1
-.L2:
+	jne .L1
 	movl $1, %eax
 	retq

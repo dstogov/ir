@@ -51,24 +51,22 @@ SCCP 002
 --EXPECT--
 test:
 	cmpl $3, %edi
-	jg .L1
+	jg .L2
 	cmpl $1, %edi
-	jl .L1
+	jl .L2
 	movslq %edi, %rdi
-	leaq 0x2c(%rip), %rax
+	leaq 0x24(%rip), %rax
 	jmpq *-8(%rax, %rdi, 8)
 	movl $1, %eax
-	jmp .L3
-	movl $2, %eax
-	jmp .L3
-	movl $3, %eax
-	jmp .L3
 .L1:
-	testb %sil, %sil
-	je .L2
+	retq
+	movl $2, %eax
+	jmp .L1
+	movl $3, %eax
 	jmp .L1
 .L2:
+	testb %sil, %sil
+	jne .L2
 	movl $1, %eax
 	retq
-.L3:
-	retq
+

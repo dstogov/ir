@@ -67,15 +67,8 @@ test:
 	addsd %xmm4, %xmm6
 	ucomisd 0x33(%rip), %xmm6
 	ja .L2
-	jmp .L3
-.L2:
-	retq
-.L3:
 	cmpl $0x3e8, %eax
-	jl .L4
-	xorl %eax, %eax
-	retq
-.L4:
+	jg .L3
 	mulsd %xmm2, %xmm3
 	subsd %xmm5, %xmm4
 	movapd %xmm4, %xmm2
@@ -83,4 +76,8 @@ test:
 	addsd %xmm3, %xmm3
 	addsd %xmm0, %xmm3
 	jmp .L1
-
+.L2:
+	retq
+.L3:
+	xorl %eax, %eax
+	retq

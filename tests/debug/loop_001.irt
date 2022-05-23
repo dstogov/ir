@@ -35,8 +35,6 @@ test:
 .L1:
 	leal (%rax, %rcx), %ecx
 	cmpl $0xa, %ecx
-	jg .L2
-	jmp .L1
-.L2:
+	jl .L1
 	leal (%rcx, %rcx), %eax
 	retq

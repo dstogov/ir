@@ -41,7 +41,5 @@ test:
 	imull %esi, %eax
 .L1:
 	testb %dil, %dil
-	je .L2
-	jmp .L1
-.L2:
+	jne .L1
 	retq

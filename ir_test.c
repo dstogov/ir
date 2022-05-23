@@ -199,6 +199,7 @@ int main(int argc, char **argv)
 		ir_compute_live_ranges(&ctx);
 		ir_coalesce(&ctx);
 		ir_reg_alloc(&ctx);
+		ir_schedule_blocks(&ctx);
 	} else {
 		ir_compute_dessa_moves(&ctx);
 	}

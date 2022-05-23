@@ -181,6 +181,8 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, const char *dump_
 		if (ctx->flags & IR_GEN_NATIVE) {
 			ir_reg_alloc(ctx);
 		}
+
+		ir_schedule_blocks(ctx);
 	} else if (ctx->flags & (IR_GEN_NATIVE|IR_GEN_C)) {
 		ir_assign_virtual_registers(ctx);
 		ir_compute_dessa_moves(ctx);

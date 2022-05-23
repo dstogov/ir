@@ -37,22 +37,21 @@ test:
 	je .L1
 	movabsq $0x200000001, %rax
 	cmpq %rax, %rdi
-	je .L2
+	je .L3
 	movabsq $0x2000003ea, %rax
 	cmpq %rax, %rdi
-	je .L3
-	jmp .L4
+	je .L4
+	jmp .L5
 .L1:
 	movabsq $0x200000000, %rax
-	jmp .L5
 .L2:
-	movabsq $0x200000001, %rax
-	jmp .L5
-.L3:
-	movabsq $0x2000003ea, %rax
-	jmp .L5
-.L4:
-	movabsq $0x200000003, %rax
-.L5:
 	retq
-
+.L3:
+	movabsq $0x200000001, %rax
+	jmp .L2
+.L4:
+	movabsq $0x2000003ea, %rax
+	jmp .L2
+.L5:
+	movabsq $0x200000003, %rax
+	jmp .L2

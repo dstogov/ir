@@ -731,6 +731,7 @@ void ir_build_def_use_lists(ir_ctx *ctx);
 int ir_build_cfg(ir_ctx *ctx);
 int ir_build_dominators_tree(ir_ctx *ctx);
 int ir_find_loops(ir_ctx *ctx);
+int ir_schedule_blocks(ir_ctx *ctx);
 
 /* SCCP - Sparse Conditional Constant Propagation (implementation in ir_sccp.c) */
 int ir_sccp(ir_ctx *ctx);

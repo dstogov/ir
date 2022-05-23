@@ -422,3 +422,130 @@ next:
 
 	return 1;
 }
+
+int ir_schedule_blocks(ir_ctx *ctx)
+{
+	uint32_t len = ir_bitset_len(ctx->cfg_blocks_count + 1);
+	ir_bitset blocks = ir_bitset_malloc(ctx->cfg_blocks_count + 1);
+	uint32_t b, *p, successor, best_successor, j;
+	ir_block *bb, *successor_bb, *best_successor_bb;
+	uint32_t *list, *map;
+	uint32_t count = 0;
+	bool reorder = 0;
+
+	list = ir_mem_malloc(sizeof(uint32_t) * (ctx->cfg_blocks_count + 1) * 2);
+	map = list + (ctx->cfg_blocks_count + 1);
+	for (b = 1; b <= ctx->cfg_blocks_count; b++) {
+		ir_bitset_incl(blocks, b);
+	}
+
+	while (!ir_bitset_empty(blocks, len)) {
+		b = ir_bitset_pop_first(blocks, len);
+		bb = &ctx->cfg_blocks[b];
+		do {
+			if (bb->predecessors_count == 2) {
+				uint32_t predecessor = ctx->cfg_edges[bb->predecessors];
+
+				if (!ir_bitset_in(blocks, predecessor)) {
+					predecessor = ctx->cfg_edges[bb->predecessors + 1];
+				}
+				if (ir_bitset_in(blocks, predecessor)) {
+					ir_block *predecessor_bb = &ctx->cfg_blocks[predecessor];
+
+					if (predecessor_bb->successors_count == 1
+					 && predecessor_bb->predecessors_count == 1
+					 && predecessor_bb->end == predecessor_bb->start + 1
+					 && !(predecessor_bb->flags & IR_BB_DESSA_MOVES)) {
+						ir_bitset_excl(blocks, predecessor);
+						count++;
+						list[count] = predecessor;
+						map[predecessor] = count;
+						if (predecessor != count) {
+							reorder = 1;
+						}
+					}
+				}
+			}
+			count++;
+			list[count] = b;
+			map[b] = count;
+			if (b != count) {
+				reorder = 1;
+			}
+			if (!bb->successors_count) {
+				break;
+			}
+			best_successor_bb = NULL;
+			for (b = 0, p = &ctx->cfg_edges[bb->successors]; b < bb->successors_count; b++, p++) {
+				successor = *p;
+				successor_bb = &ctx->cfg_blocks[successor];
+				if (ir_bitset_in(blocks, successor)) {
+					if (!best_successor_bb || successor_bb->loop_depth > best_successor_bb->loop_depth) {
+						// TODO: use block frequency
+						best_successor = successor;
+						best_successor_bb = successor_bb;
+					}
+				}
+			}
+			if (!best_successor_bb) {
+				if (bb->successors_count == 1
+				 && bb->predecessors_count == 1
+				 && bb->end == bb->start + 1
+				 && !(bb->flags & IR_BB_DESSA_MOVES)) {
+					uint32_t predecessor = ctx->cfg_edges[bb->predecessors];
+					ir_block *predecessor_bb = &ctx->cfg_blocks[predecessor];
+
+					if (predecessor_bb->successors_count == 2) {
+						b = ctx->cfg_edges[predecessor_bb->successors];
+
+						if (!ir_bitset_in(blocks, b)) {
+							b = ctx->cfg_edges[predecessor_bb->successors + 1];
+						}
+						if (ir_bitset_in(blocks, b)) {
+							bb = &ctx->cfg_blocks[b];
+							ir_bitset_excl(blocks, b);
+							continue;
+						}
+					}
+				}
+				break;
+			}
+			b = best_successor;
+			bb = best_successor_bb;
+			ir_bitset_excl(blocks, b);
+		} while (1);
+	}
+
+	if (reorder) {
+		ir_block *cfg_blocks = ir_mem_calloc(sizeof(ir_block), ctx->cfg_blocks_count + 1);
+
+		for (b = 1, bb = cfg_blocks + 1; b <= count; b++, bb++) {
+			*bb = ctx->cfg_blocks[list[b]];
+			if (bb->dom_parent > 0) {
+				bb->dom_parent = map[bb->dom_parent];
+			}
+			if (bb->dom_child > 0) {
+				bb->dom_child = map[bb->dom_child];
+			}
+			if (bb->dom_next_child > 0) {
+				bb->dom_next_child = map[bb->dom_next_child];
+			}
+			if (bb->loop_header > 0) {
+				bb->loop_header = map[bb->loop_header];
+			}
+			ctx->bb_num[bb->start] = b;
+		}
+		for (j = 0; j < ctx->cfg_edges_count; j++) {
+			if (ctx->cfg_edges[j] > 0) {
+				ctx->cfg_edges[j] = map[ctx->cfg_edges[j]];
+			}
+		}
+		ir_mem_free(ctx->cfg_blocks);
+		ctx->cfg_blocks = cfg_blocks;
+	}
+
+	ir_mem_free(list);
+	ir_mem_free(blocks);
+
+	return 1;
+}

@@ -67,16 +67,9 @@ test:
 	addsd %xmm4, %xmm6
 	ucomisd 0x42(%rip), %xmm6
 	ja .L2
-	jmp .L3
-.L2:
-	retq
-.L3:
 	movabsq $0x2000003e8, %rcx
 	cmpq %rcx, %rax
-	jl .L4
-	movabsq $0x200000000, %rax
-	retq
-.L4:
+	jg .L3
 	mulsd %xmm2, %xmm3
 	subsd %xmm5, %xmm4
 	movapd %xmm4, %xmm2
@@ -84,4 +77,8 @@ test:
 	addsd %xmm3, %xmm3
 	addsd %xmm0, %xmm3
 	jmp .L1
-
+.L2:
+	retq
+.L3:
+	movabsq $0x200000000, %rax
+	retq
