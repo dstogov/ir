@@ -498,8 +498,9 @@ typedef struct _ir_use_list {
 
 /* debug relted */
 #ifdef IR_DEBUG
-# define IR_DEBUG_SCCP        (1<<28)
-# define IR_DEBUG_GCM         (1<<29)
+# define IR_DEBUG_SCCP        (1<<27)
+# define IR_DEBUG_GCM         (1<<28)
+# define IR_DEBUG_SCHEDULE    (1<<29)
 # define IR_DEBUG_RA          (1<<30)
 #endif
 

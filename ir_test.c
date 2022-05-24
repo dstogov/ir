@@ -144,6 +144,8 @@ int main(int argc, char **argv)
 			mflags |= IR_DEBUG_SCCP;
 		} else if (strcmp(argv[i], "--debug-gcm") == 0) {
 			mflags |= IR_DEBUG_GCM;
+		} else if (strcmp(argv[i], "--debug-schedule") == 0) {
+			mflags |= IR_DEBUG_SCHEDULE;
 		} else if (strcmp(argv[i], "--debug-ra") == 0) {
 			mflags |= IR_DEBUG_RA;
 #endif

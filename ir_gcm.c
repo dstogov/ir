@@ -390,6 +390,69 @@ int ir_schedule(ir_ctx *ctx)
 		_prev[k] = i;
 	}
 
+#ifdef IR_DEBUG
+	if (ctx->flags & IR_DEBUG_SCHEDULE) {
+		fprintf(stderr, "Before Schedule\n");
+		for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; b++, bb++) {
+			for (i = bb->start; i <= bb->end && i > 0; i = _next[i]) {
+				fprintf(stderr, "%d -> %d\n", i, b);
+			}
+		}
+	}
+#endif
+
+	/* Topological sort according dependencies inside each basic block */
+	uint32_t len = ir_bitset_len(ctx->insns_count);
+	ir_bitset scheduled = ir_bitset_malloc(ctx->insns_count);
+	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; b++, bb++) {
+		ir_bitset_clear(scheduled, len);
+		for (i = bb->start; i <= bb->end && i > 0; i = _next[i]) {
+			ir_ref n, j, *p, def;
+
+restart:
+			insn = &ctx->ir_base[i];
+			n = ir_input_edges_count(ctx, insn);
+			for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
+				def = *p;
+				if (def && _blocks[def] == b
+						&& !ir_bitset_in(scheduled, def)
+						&& insn->op != IR_PHI
+						&& insn->op != IR_PI) {
+					/* "def" should be before "i" to satisfy dependency */
+#ifdef IR_DEBUG
+					if (ctx->flags & IR_DEBUG_SCHEDULE) {
+						fprintf(stderr, "Wrong dependency %d:%d -> %d\n", b, def, i);
+					}
+#endif
+					/* remove "def" */
+					_prev[_next[def]] = _prev[def];
+					_next[_prev[def]] = _next[def];
+					/* insert before "i" */
+					_prev[def] = _prev[i];
+					_next[def] = i;
+					_next[_prev[i]] = def;
+					_prev[i] = def;
+					/* restart from "def" */
+					i = def;
+					goto restart;
+				}
+			}
+			ir_bitset_incl(scheduled, i);
+		}
+	}
+	ir_mem_free(scheduled);
+
+#ifdef IR_DEBUG
+	if (ctx->flags & IR_DEBUG_SCHEDULE) {
+		fprintf(stderr, "After Schedule\n");
+		for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; b++, bb++) {
+			for (i = bb->start; i <= bb->end && i > 0; i = _next[i]) {
+				fprintf(stderr, "%d -> %d\n", i, b);
+			}
+		}
+	}
+#endif
+
 	ir_mem_free(_prev);
 
 	/* Linearization */

@@ -27,6 +27,7 @@ static void help(const char *cmd)
 #ifdef IR_DEBUG
 		"  --debug-sccp               - debug SCCP optimization pass\n"
 		"  --debug-gcm                - debug GCM optimization pass\n"
+		"  --debug-schedule           - debug SCHEDULE optimization pass\n"
 		"  --debug-ra                 - debug register allocator\n"
 		"  --debug-regset <bit-mask>  - restrict available register set\n"
 #endif
@@ -318,6 +319,8 @@ int main(int argc, char **argv)
 			mflags |= IR_DEBUG_SCCP;
 		} else if (strcmp(argv[i], "--debug-gcm") == 0) {
 			mflags |= IR_DEBUG_GCM;
+		} else if (strcmp(argv[i], "--debug-schedule") == 0) {
+			mflags |= IR_DEBUG_SCHEDULE;
 		} else if (strcmp(argv[i], "--debug-ra") == 0) {
 			mflags |= IR_DEBUG_RA;
 #endif
