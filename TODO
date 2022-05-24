@@ -16,7 +16,6 @@
 -  Folding after SCCP (see combo4.ir)
 
 -  local scheduling according to data dependencies, register presure and pipeline stalls
--  basic block trace scheduling
 
 ?  instruction selection
 	- xor, btsl=INCL, btrl=EXCL, btl=IN, bsr

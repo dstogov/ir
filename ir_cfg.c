@@ -425,6 +425,8 @@ next:
 
 /* A variation of "Top-down Positioning" algorithm described by
  * Karl Pettis and Robert C. Hansen "Profile Guided Code Positioning"
+ *
+ * TODO: Switch to "Bottom-up Positioning" algorithm
  */
 int ir_schedule_blocks(ir_ctx *ctx)
 {
