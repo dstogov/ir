@@ -295,6 +295,7 @@ static int ir_copy(ir_ctx *new_ctx, ir_ctx *ctx, ir_ref *_next, bool preserve_co
 					ref = ir_str(new_ctx, ir_get_str(ctx, ref));
 					break;
 				case IR_OPND_NUM:
+				case IR_OPND_PROB:
 					break;
 				default:
 					IR_ASSERT(0);

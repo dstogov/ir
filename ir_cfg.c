@@ -423,13 +423,18 @@ next:
 	return 1;
 }
 
+/* A variation of "Top-down Positioning" algorithm described by
+ * Karl Pettis and Robert C. Hansen "Profile Guided Code Positioning"
+ */
 int ir_schedule_blocks(ir_ctx *ctx)
 {
 	uint32_t len = ir_bitset_len(ctx->cfg_blocks_count + 1);
 	ir_bitset blocks = ir_bitset_malloc(ctx->cfg_blocks_count + 1);
 	uint32_t b, *p, successor, best_successor, j;
 	ir_block *bb, *successor_bb, *best_successor_bb;
+	ir_insn *insn;
 	uint32_t *list, *map;
+	uint32_t prob, best_successor_prob;
 	uint32_t count = 0;
 	bool reorder = 0;
 
@@ -478,12 +483,28 @@ int ir_schedule_blocks(ir_ctx *ctx)
 			best_successor_bb = NULL;
 			for (b = 0, p = &ctx->cfg_edges[bb->successors]; b < bb->successors_count; b++, p++) {
 				successor = *p;
-				successor_bb = &ctx->cfg_blocks[successor];
 				if (ir_bitset_in(blocks, successor)) {
-					if (!best_successor_bb || successor_bb->loop_depth > best_successor_bb->loop_depth) {
+					successor_bb = &ctx->cfg_blocks[successor];
+					insn = &ctx->ir_base[successor_bb->start];
+					if (insn->op == IR_IF_TRUE || insn->op == IR_IF_FALSE || insn->op == IR_CASE_DEFAULT) {
+						prob = insn->op2;
+					} else if (insn->op == IR_CASE_VAL) {
+						prob = insn->op3;
+					} else {
+						prob = 0;
+					}
+					if (!best_successor_bb
+					 || successor_bb->loop_depth > best_successor_bb->loop_depth) {
 						// TODO: use block frequency
 						best_successor = successor;
 						best_successor_bb = successor_bb;
+						best_successor_prob = prob;
+					} else if ((best_successor_prob && prob && prob > best_successor_prob)
+							|| (!best_successor_prob && prob && prob > 100 / bb->successors_count)
+							|| (best_successor_prob && !prob && best_successor_prob < 100 / bb->successors_count)) {
+						best_successor = successor;
+						best_successor_bb = successor_bb;
+						best_successor_prob = prob;
 					}
 				}
 			}

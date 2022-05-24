@@ -153,6 +153,7 @@ int ir_mem_flush(void *ptr, size_t size);
  * ret - reference to a previous RETURN instruction (RETURN)
  * str - string: variable/argument name (VAR, PARAM, CALL, TAILCALL)
  * num - number: argument number (PARAM)
+ * prb - branch probability 1-99 (0 - unspecified): (IF_TRUE, IF_FALSE, CASE_VAL, CASE_DEFAULT)
  *
  * The order of IR opcodes is carefully selected for efficient folding.
  * - foldable instruction go first
@@ -269,11 +270,11 @@ int ir_mem_flush(void *ptr, size_t size);
 	_(BEGIN,        c1,   src, ___, ___) /* block start                 */ \
 	_(END,          c1,   src, ___, ___) /* block end                   */ \
 	_(IF,           c2,   src, def, ___) /* conditional control split   */ \
-	_(IF_TRUE,      c1,   src, ___, ___) /* IF TRUE proj.               */ \
-	_(IF_FALSE,     c1,   src, ___, ___) /* IF FALSE proj.              */ \
+	_(IF_TRUE,      c1X1, src, prb, ___) /* IF TRUE proj.               */ \
+	_(IF_FALSE,     c1X1, src, prb, ___) /* IF FALSE proj.              */ \
 	_(SWITCH,       c2,   src, def, ___) /* multi-way control split     */ \
-	_(CASE_VAL,     c2,   src, def, ___) /* switch proj.                */ \
-	_(CASE_DEFAULT, c1,   src, ___, ___) /* switch proj.                */ \
+	_(CASE_VAL,     c2X1, src, def, prb) /* switch proj.                */ \
+	_(CASE_DEFAULT, c1X1, src, prb, ___) /* switch proj.                */ \
 	_(MERGE,        cN,   src, src, src) /* control merge               */ \
 	_(LOOP_BEGIN,   c2,   src, src, ___) /* loop start                  */ \
 	_(LOOP_END,     c1X1, src, beg, ___) /* loop end                    */ \
@@ -284,21 +285,21 @@ int ir_mem_flush(void *ptr, size_t size);
 	_(GUARD_TRUE,   c2,   src, def, ___) /* IF without second successor */ \
 	_(GUARD_FALSE,  c2,   src, def, ___) /* IF without second successor */ \
 
-#define IR_OP_FLAG_OPERANS_SHIFT 3
+#define IR_OP_FLAG_OPERANDS_SHIFT 3
 
-#define IR_OP_FLAG_EDGES_MSK     0x07
-#define IR_OP_FLAG_OPERANS_MSK   0x38
-#define IR_OP_FLAG_MEM_MASK      ((1<<6)|(1<<7))
+#define IR_OP_FLAG_EDGES_MSK      0x07
+#define IR_OP_FLAG_OPERANDS_MSK   0x38
+#define IR_OP_FLAG_MEM_MASK       ((1<<6)|(1<<7))
 
-#define IR_OP_FLAG_DATA          (1<<8)
-#define IR_OP_FLAG_CONTROL       (1<<9)
-#define IR_OP_FLAG_MEM           (1<<10)
-#define IR_OP_FLAG_COMMUTATIVE   (1<<11)
+#define IR_OP_FLAG_DATA           (1<<8)
+#define IR_OP_FLAG_CONTROL        (1<<9)
+#define IR_OP_FLAG_MEM            (1<<10)
+#define IR_OP_FLAG_COMMUTATIVE    (1<<11)
 
-#define IR_OP_FLAG_MEM_LOAD      ((0<<6)|(0<<7))
-#define IR_OP_FLAG_MEM_STORE     ((0<<6)|(1<<7))
-#define IR_OP_FLAG_MEM_CALL      ((1<<6)|(0<<7))
-#define IR_OP_FLAG_MEM_ALLOC     ((1<<6)|(1<<7))
+#define IR_OP_FLAG_MEM_LOAD       ((0<<6)|(0<<7))
+#define IR_OP_FLAG_MEM_STORE      ((0<<6)|(1<<7))
+#define IR_OP_FLAG_MEM_CALL       ((1<<6)|(0<<7))
+#define IR_OP_FLAG_MEM_ALLOC      ((1<<6)|(1<<7))
 
 #define IR_OPND_UNUSED      0x0
 #define IR_OPND_DATA        0x1
@@ -308,12 +309,13 @@ int ir_mem_flush(void *ptr, size_t size);
 #define IR_OPND_STR         0x5
 #define IR_OPND_NUM         0x6
 #define IR_OPND_VAR         0x7
+#define IR_OPND_PROB        0x8
 
 #define IR_OP_FLAGS(op_flags, op1_flags, op2_flags, op3_flags) \
 	((op_flags) | ((op1_flags) << 20) | ((op2_flags) << 24) | ((op3_flags) << 28))
 
 #define IR_INPUT_EDGES_COUNT(flags) (flags & IR_OP_FLAG_EDGES_MSK)
-#define IR_OPERANDS_COUNT(flags)    ((flags & IR_OP_FLAG_OPERANS_MSK) >> IR_OP_FLAG_OPERANS_SHIFT)
+#define IR_OPERANDS_COUNT(flags)    ((flags & IR_OP_FLAG_OPERANDS_MSK) >> IR_OP_FLAG_OPERANDS_SHIFT)
 
 #define IR_OPND_KIND(flags, i) \
 	(((flags) >> (16 + (4 * (((i) > 3) ? 3 : (i))))) & 0xf)

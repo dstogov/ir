@@ -107,44 +107,44 @@ void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 }
 
 #define ir_op_flag_v       0
-#define ir_op_flag_v0X3    (0 | (3 << IR_OP_FLAG_OPERANS_SHIFT))
+#define ir_op_flag_v0X3    (0 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_d       IR_OP_FLAG_DATA
 #define ir_op_flag_d0      ir_op_flag_d
-#define ir_op_flag_d1      (ir_op_flag_d | 1 | (1 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_d2      (ir_op_flag_d | 2 | (2 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_d2C     (ir_op_flag_d | IR_OP_FLAG_COMMUTATIVE | 2 | (2 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_d3      (ir_op_flag_d | 3 | (3 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_dP      (ir_op_flag_d | 5 | (5 << IR_OP_FLAG_OPERANS_SHIFT)) // PHI (number of operands encoded in op1->op1)
+#define ir_op_flag_d1      (ir_op_flag_d | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_d2      (ir_op_flag_d | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_d2C     (ir_op_flag_d | IR_OP_FLAG_COMMUTATIVE | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_d3      (ir_op_flag_d | 3 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_dP      (ir_op_flag_d | 5 | (5 << IR_OP_FLAG_OPERANDS_SHIFT)) // PHI (number of operands encoded in op1->op1)
 #define ir_op_flag_r       IR_OP_FLAG_DATA                                      // "d" and "r" are the same now
 #define ir_op_flag_r0      ir_op_flag_r
-#define ir_op_flag_r0X1    (ir_op_flag_r | 0 | (1 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_r1      (ir_op_flag_r | 1 | (1 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_r1X1    (ir_op_flag_r | 1 | (2 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_r1X2    (ir_op_flag_r | 1 | (3 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_r2      (ir_op_flag_r | 2 | (2 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_r3      (ir_op_flag_r | 3 | (3 << IR_OP_FLAG_OPERANS_SHIFT))
+#define ir_op_flag_r0X1    (ir_op_flag_r | 0 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_r1      (ir_op_flag_r | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_r1X1    (ir_op_flag_r | 1 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_r1X2    (ir_op_flag_r | 1 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_r2      (ir_op_flag_r | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_r3      (ir_op_flag_r | 3 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_c       IR_OP_FLAG_CONTROL
 #define ir_op_flag_c0      ir_op_flag_c
-#define ir_op_flag_c0X1    (ir_op_flag_c | 0 | (1 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_c0X2    (ir_op_flag_c | 0 | (2 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_c1      (ir_op_flag_c | 1 | (1 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_c1X1    (ir_op_flag_c | 1 | (2 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_c2      (ir_op_flag_c | 2 | (2 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_c2X1    (ir_op_flag_c | 2 | (3 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_c3      (ir_op_flag_c | 3 | (3 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_cN      (ir_op_flag_c | 4 | (4 << IR_OP_FLAG_OPERANS_SHIFT)) // MERGE (number of operands encoded in op1)
+#define ir_op_flag_c0X1    (ir_op_flag_c | 0 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_c0X2    (ir_op_flag_c | 0 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_c1      (ir_op_flag_c | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_c1X1    (ir_op_flag_c | 1 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_c2      (ir_op_flag_c | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_c2X1    (ir_op_flag_c | 2 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_c3      (ir_op_flag_c | 3 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_cN      (ir_op_flag_c | 4 | (4 << IR_OP_FLAG_OPERANDS_SHIFT)) // MERGE (number of operands encoded in op1)
 #define ir_op_flag_l       (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_LOAD)
 #define ir_op_flag_l0      ir_op_flag_l
-#define ir_op_flag_l1      (ir_op_flag_l | 1 | (1 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_l2      (ir_op_flag_l | 2 | (2 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_l3      (ir_op_flag_l | 3 | (3 << IR_OP_FLAG_OPERANS_SHIFT))
+#define ir_op_flag_l1      (ir_op_flag_l | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_l2      (ir_op_flag_l | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_l3      (ir_op_flag_l | 3 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_s       (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_STORE)
 #define ir_op_flag_s0      ir_op_flag_s
-#define ir_op_flag_s1      (ir_op_flag_s | 1 | (1 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_s2      (ir_op_flag_s | 2 | (2 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_s3      (ir_op_flag_s | 3 | (3 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_xN      (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_CALL | 4 | (4 << IR_OP_FLAG_OPERANS_SHIFT))
-#define ir_op_flag_a2      (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_ALLOC | 2 | (2 << IR_OP_FLAG_OPERANS_SHIFT))
+#define ir_op_flag_s1      (ir_op_flag_s | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_s2      (ir_op_flag_s | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_s3      (ir_op_flag_s | 3 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_xN      (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_CALL | 4 | (4 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_a2      (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_ALLOC | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 
 #define ir_op_kind____     IR_OPND_UNUSED
 #define ir_op_kind_def     IR_OPND_DATA
@@ -157,6 +157,7 @@ void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 #define ir_op_kind_num     IR_OPND_NUM
 #define ir_op_kind_fld     IR_OPND_STR
 #define ir_op_kind_var     IR_OPND_VAR
+#define ir_op_kind_prb     IR_OPND_PROB
 
 #define _IR_OP_FLAGS(name, flags, op1, op2, op3) \
 	IR_OP_FLAGS(ir_op_flag_ ## flags, ir_op_kind_ ## op1, ir_op_kind_ ## op2, ir_op_kind_ ## op3),

@@ -67,6 +67,10 @@ void ir_save(ir_ctx *ctx, FILE *f)
 						fprintf(f, "%s\"%s\"", first ? "(" : ", ", ir_get_str(ctx, ref));
 						first = 0;
 						break;
+					case IR_OPND_PROB:
+						if (ref == 0) {
+							break;
+						}
 					case IR_OPND_NUM:
 						fprintf(f, "%s%d", first ? "(" : ", ", ref);
 						first = 0;
