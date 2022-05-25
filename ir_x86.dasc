@@ -41,9 +41,11 @@
 ||		case 4:
 |			op Rd(reg)
 || 			break;
+|.if X64
 ||		case 8:
 |			op Rq(reg)
 || 			break;
+|.endif
 || 		default:
 ||			IR_ASSERT(0);
 ||	}
@@ -60,9 +62,11 @@
 ||		case 4:
 |			op dword mem
 || 			break;
+|.if X64
 ||		case 8:
 |			op qword mem
 || 			break;
+|.endif
 || 		default:
 ||			IR_ASSERT(0);
 ||	}
@@ -87,9 +91,11 @@
 ||		case 4:
 |			op Rd(dst), Rd(src)
 || 			break;
+|.if X64
 ||		case 8:
 |			op Rq(dst), Rq(src)
 || 			break;
+|.endif
 || 		default:
 ||			IR_ASSERT(0);
 ||	}
@@ -104,9 +110,11 @@
 ||		case 4:
 |			op Rd(dst), Rd(src)
 || 			break;
+|.if X64
 ||		case 8:
 |			op Rq(dst), Rq(src)
 || 			break;
+|.endif
 || 		default:
 ||			IR_ASSERT(0);
 ||	}
@@ -123,9 +131,11 @@
 ||		case 4:
 |			op Rd(dst), src
 || 			break;
+|.if X64
 ||		case 8:
 |			op Rq(dst), src
 || 			break;
+|.endif
 || 		default:
 ||			IR_ASSERT(0);
 ||	}
@@ -142,9 +152,11 @@
 ||		case 4:
 |			op dword dst, Rd(src)
 || 			break;
+|.if X64
 ||		case 8:
 |			op qword dst, Rq(src)
 || 			break;
+|.endif
 || 		default:
 ||			IR_ASSERT(0);
 ||	}
@@ -161,9 +173,11 @@
 ||		case 4:
 |			op dword dst, src
 || 			break;
+|.if X64
 ||		case 8:
 |			op qword dst, src
 || 			break;
+|.endif
 || 		default:
 ||			IR_ASSERT(0);
 ||	}
@@ -180,9 +194,11 @@
 ||		case 4:
 |			op Rd(dst), dword src
 || 			break;
+|.if X64
 ||		case 8:
 |			op Rq(dst), qword src
 || 			break;
+|.endif
 || 		default:
 ||			IR_ASSERT(0);
 ||	}
@@ -224,9 +240,11 @@
 ||		case 4:
 |			imul Rd(dst), Rd(src)
 || 			break;
+|.if X64
 ||		case 8:
 |			imul Rq(dst), Rq(src)
 || 			break;
+|.endif
 || 		default:
 ||			IR_ASSERT(0);
 ||	}
@@ -240,9 +258,11 @@
 ||		case 4:
 |			imul Rd(dst), src
 || 			break;
+|.if X64
 ||		case 8:
 |			imul Rq(dst), src
 || 			break;
+|.endif
 || 		default:
 ||			IR_ASSERT(0);
 ||	}
@@ -256,9 +276,11 @@
 ||		case 4:
 |			imul Rd(dst), dword src
 || 			break;
+|.if X64
 ||		case 8:
 |			imul Rq(dst), qword src
 || 			break;
+|.endif
 || 		default:
 ||			IR_ASSERT(0);
 ||	}
@@ -1700,11 +1722,14 @@ static void ir_emit_load(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref src)
 				|	lea Ra(reg), aword [=>label]
 				insn->emit_const = 1;
 			} else if (ir_type_size[type] == 8 && !IR_IS_SIGNED_32BIT(insn->val.i64)) {
+				IR_ASSERT(sizeof(void*) == 8);
+|.if X64
 				if (IR_IS_UNSIGNED_32BIT(insn->val.u64)) {
 					|	mov Rd(reg), insn->val.u32 // zero extended load
 				} else {
 					|	mov64 Ra(reg), insn->val.i64
 				}
+|.endif
 			} else if (insn->val.i64 == 0) {
 				|	ASM_REG_REG_OP xor, type, reg, reg
 			} else {
@@ -1819,11 +1844,11 @@ static void ir_emit_prologue(ir_ctx *ctx)
 	dasm_State **Dst = &data->dasm_state;
 
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
-		|	push rbp
-		|	mov rbp, rsp
+		|	push Ra(IR_REG_RBP)
+		|	mov Ra(IR_REG_RBP), Ra(IR_REG_RSP)
 	}
 	if (data->stack_frame_size + data->call_stack_size) {
-		|	sub rsp, (data->stack_frame_size + data->call_stack_size)
+		|	sub Ra(IR_REG_RSP), (data->stack_frame_size + data->call_stack_size)
 	}
 	if (data->used_preserved_regs) {
 		int offset;
@@ -1878,10 +1903,10 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 	}
 
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
-		|	mov rsp, rbp
-		|	pop rbp
+		|	mov Ra(IR_REG_RSP), Ra(IR_REG_RBP)
+		|	pop Ra(IR_REG_RBP)
 	} else if (data->stack_frame_size + data->call_stack_size) {
-		|	add rsp, (data->stack_frame_size + data->call_stack_size)
+		|	add Ra(IR_REG_RSP), (data->stack_frame_size + data->call_stack_size)
 	}
 }
 
@@ -2527,9 +2552,11 @@ static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			case 4:
 				|	bswap Rd(def_reg)
 				break;
+|.if X64
 			case 8:
 				|	bswap Rq(def_reg)
 				break;
+|.endif
 			default:
 				IR_ASSERT(0);
 		}
@@ -3614,22 +3641,28 @@ static void ir_emit_sext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|	movsx Rw(def_reg), Rb(op1_reg)
 			} else if (ir_type_size[dst_type] == 4) {
 				|	movsx Rd(def_reg), Rb(op1_reg)
+|.if X64
 			} else if (ir_type_size[dst_type] == 8) {
 				|	movsx Rq(def_reg), Rb(op1_reg)
+|.endif
 			} else {
 				IR_ASSERT(0);
 			}
 		} else if (ir_type_size[src_type] == 2) {
 			if (ir_type_size[dst_type] == 4) {
 				|	movsx Rd(def_reg), Rw(op1_reg)
+|.if X64
 			} else if (ir_type_size[dst_type] == 8) {
 				|	movsx Rq(def_reg), Rw(op1_reg)
+|.endif
 			} else {
 				IR_ASSERT(0);
 			}
+|.if X64
 		} else if (ir_type_size[src_type] == 4) {
 			IR_ASSERT(ir_type_size[dst_type] == 8);
 			|	movsxd Rq(def_reg), Rd(op1_reg)
+|.endif
 		} else {
 			IR_ASSERT(0);
 		}
@@ -3644,22 +3677,28 @@ static void ir_emit_sext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|	movsx Rw(def_reg), byte [Ra(fp)+offset]
 			} else if (ir_type_size[dst_type] == 4) {
 				|	movsx Rd(def_reg), byte [Ra(fp)+offset]
+|.if X64
 			} else if (ir_type_size[dst_type] == 8) {
 				|	movsx Rq(def_reg), byte [Ra(fp)+offset]
+|.endif
 			} else {
 				IR_ASSERT(0);
 			}
 		} else if (ir_type_size[src_type] == 2) {
 			if (ir_type_size[dst_type] == 4) {
 				|	movsx Rd(def_reg), word [Ra(fp)+offset]
+|.if X64
 			} else if (ir_type_size[dst_type] == 8) {
 				|	movsx Rq(def_reg), word [Ra(fp)+offset]
+|.endif
 			} else {
 				IR_ASSERT(0);
 			}
+|.if X64
 		} else if (ir_type_size[src_type] == 4) {
 			IR_ASSERT(ir_type_size[dst_type] == 8);
 			|	movsxd Rq(def_reg), dword [Ra(fp)+offset]
+|.endif
 		} else {
 			IR_ASSERT(0);
 		}
@@ -3693,22 +3732,28 @@ static void ir_emit_zext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|	movzx Rw(def_reg), Rb(op1_reg)
 			} else if (ir_type_size[dst_type] == 4) {
 				|	movzx Rd(def_reg), Rb(op1_reg)
+|.if X64
 			} else if (ir_type_size[dst_type] == 8) {
 				|	movzx Rq(def_reg), Rb(op1_reg)
+|.endif
 			} else {
 				IR_ASSERT(0);
 			}
 		} else if (ir_type_size[src_type] == 2) {
 			if (ir_type_size[dst_type] == 4) {
 				|	movzx Rd(def_reg), Rw(op1_reg)
+|.if X64
 			} else if (ir_type_size[dst_type] == 8) {
 				|	movzx Rq(def_reg), Rw(op1_reg)
+|.endif
 			} else {
 				IR_ASSERT(0);
 			}
+|.if X64
 		} else if (ir_type_size[src_type] == 4) {
 			IR_ASSERT(ir_type_size[dst_type] == 8);
 			|	mov Rd(def_reg), Rd(op1_reg)
+|.endif
 		} else {
 			IR_ASSERT(0);
 		}
@@ -3723,22 +3768,28 @@ static void ir_emit_zext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|	movzx Rw(def_reg), byte [Ra(fp)+offset]
 			} else if (ir_type_size[dst_type] == 4) {
 				|	movzx Rd(def_reg), byte [Ra(fp)+offset]
+|.if X64
 			} else if (ir_type_size[dst_type] == 8) {
 				|	movzx Rq(def_reg), byte [Ra(fp)+offset]
+|.endif
 			} else {
 				IR_ASSERT(0);
 			}
 		} else if (ir_type_size[src_type] == 2) {
 			if (ir_type_size[dst_type] == 4) {
 				|	movzx Rd(def_reg), word [Ra(fp)+offset]
+|.if X64
 			} else if (ir_type_size[dst_type] == 8) {
 				|	movzx Rq(def_reg), word [Ra(fp)+offset]
+|.endif
 			} else {
 				IR_ASSERT(0);
 			}
+|.if X64
 		} else if (ir_type_size[src_type] == 4) {
 			IR_ASSERT(ir_type_size[dst_type] == 8);
 			|	mov Rd(def_reg), dword [Ra(fp)+offset]
+|.endif
 		} else {
 			IR_ASSERT(0);
 		}
@@ -3810,11 +3861,14 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		IR_ASSERT(IR_IS_TYPE_INT(dst_type));
 		if (op1_reg != IR_REG_NONE) {
 			if (src_type == IR_DOUBLE) {
+				IR_ASSERT(sizeof(void*) == 8);
+|.if X64
 				if (ctx->flags & IR_AVX) {
 					|	vmovd Rq(def_reg), xmm(op1_reg-IR_REG_XMM0)
 				} else {
 					|	movd Rq(def_reg), xmm(op1_reg-IR_REG_XMM0)
 				}
+|.endif
 			} else {
 				IR_ASSERT(src_type == IR_FLOAT);
 				if (ctx->flags & IR_AVX) {
@@ -3826,7 +3880,10 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		} else if (IR_IS_CONST_REF(insn->op1)) {
 			ir_insn *_insn = &ctx->ir_base[insn->op1];
 			if (src_type == IR_DOUBLE) {
+				IR_ASSERT(sizeof(void*) == 8);
+|.if X64
 				|	mov64 Rq(def_reg), _insn->val.i64
+|.endif
 			} else {
 				IR_ASSERT(src_type == IR_FLOAT);
 				|	mov Rd(def_reg), _insn->val.i32
@@ -3835,7 +3892,10 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			int32_t offset = ir_ref_spill_slot(ctx, insn->op1);
 			ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_RBP : IR_REG_RSP;
 			if (src_type == IR_DOUBLE) {
+				IR_ASSERT(sizeof(void*) == 8);
+|.if X64
 				|	mov Rq(def_reg), qword [Ra(fp)+offset]
+|.endif
 			} else {
 				IR_ASSERT(src_type == IR_FLOAT);
 				|	mov Rd(def_reg), dword [Ra(fp)+offset]
@@ -3845,11 +3905,14 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		IR_ASSERT(IR_IS_TYPE_INT(src_type));
 		if (op1_reg != IR_REG_NONE) {
 			if (dst_type == IR_DOUBLE) {
+				IR_ASSERT(sizeof(void*) == 8);
+|.if X64
 				if (ctx->flags & IR_AVX) {
 					|	vmovd xmm(def_reg-IR_REG_XMM0), Rq(op1_reg)
 				} else {
 					|	movd xmm(def_reg-IR_REG_XMM0), Rq(op1_reg)
 				}
+|.endif
 			} else {
 				IR_ASSERT(dst_type == IR_FLOAT);
 				if (ctx->flags & IR_AVX) {
@@ -3909,6 +3972,8 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 			}
 		} else {
+			IR_ASSERT(sizeof(void*) == 8);
+|.if X64
 			if (dst_type == IR_DOUBLE) {
 				if (ctx->flags & IR_AVX) {
 					|	vcvtsi2sd xmm(def_reg-IR_REG_XMM0), xmm(def_reg-IR_REG_XMM0), Rq(op1_reg)
@@ -3923,6 +3988,7 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					|	cvtsi2ss xmm(def_reg-IR_REG_XMM0), Rq(op1_reg)
 				}
 			}
+|.endif
 		}
 	} else {
 		int32_t offset = ir_ref_spill_slot(ctx, insn->op1);
@@ -3944,6 +4010,8 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 			}
 		} else {
+			IR_ASSERT(sizeof(void*) == 8);
+|.if X64
 			if (dst_type == IR_DOUBLE) {
 				if (ctx->flags & IR_AVX) {
 					|	vcvtsi2sd xmm(def_reg-IR_REG_XMM0), xmm(def_reg-IR_REG_XMM0), qword [Ra(fp)+offset]
@@ -3958,6 +4026,7 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					|	cvtsi2ss xmm(def_reg-IR_REG_XMM0), qword [Ra(fp)+offset]
 				}
 			}
+|.endif
 		}
 	}
 	if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
@@ -4003,6 +4072,8 @@ static void ir_emit_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 			}
 		} else {
+			IR_ASSERT(sizeof(void*) == 8);
+|.if X64
 			if (src_type == IR_DOUBLE) {
 				if (ctx->flags & IR_AVX) {
 					|	vcvtsd2si Rq(def_reg), xmm(op1_reg-IR_REG_XMM0)
@@ -4017,6 +4088,7 @@ static void ir_emit_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					|	cvtss2si Rq(def_reg), xmm(op1_reg-IR_REG_XMM0)
 				}
 			}
+|.endif
 		}
 	} else if (IR_IS_CONST_REF(insn->op1)) {
 		ir_insn *_insn = &ctx->ir_base[insn->op1];
@@ -4039,6 +4111,8 @@ static void ir_emit_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 			}
 		} else {
+			IR_ASSERT(sizeof(void*) == 8);
+|.if X64
 			if (src_type == IR_DOUBLE) {
 				if (ctx->flags & IR_AVX) {
 					|	vcvtsd2si Rq(def_reg), qword [=>label]
@@ -4053,6 +4127,7 @@ static void ir_emit_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					|	cvtss2si Rq(def_reg), dword [=>label]
 				}
 			}
+|.endif
 		}
 	} else {
 		int32_t offset = ir_ref_spill_slot(ctx, insn->op1);
@@ -4074,6 +4149,8 @@ static void ir_emit_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 			}
 		} else {
+			IR_ASSERT(sizeof(void*) == 8);
+|.if X64
 			if (src_type == IR_DOUBLE) {
 				if (ctx->flags & IR_AVX) {
 					|	vcvtsd2si Rq(def_reg), qword [Ra(fp)+offset]
@@ -4088,6 +4165,7 @@ static void ir_emit_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					|	cvtss2si Rq(def_reg), dword [Ra(fp)+offset]
 				}
 			}
+|.endif
 		}
 	}
 	if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
@@ -4465,7 +4543,7 @@ static void ir_emit_alloca(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		|	ASM_REG_REG_OP sub, IR_ADDR, IR_REG_RSP, def_reg
 	}
 	if (def_reg != IR_REG_NONE) {
-		|	mov Ra(def_reg), rsp
+		|	mov Ra(def_reg), Ra(IR_REG_RSP)
 		if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
 			ir_emit_store(ctx, insn->type, def, def_reg);
 		}
@@ -4555,8 +4633,11 @@ static void ir_emit_switch(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 		if (IR_IS_32BIT(type, max)) {
 			|	ASM_REG_IMM_OP cmp, type, op2_reg, max.i32
 		} else {
+			IR_ASSERT(sizeof(void*) == 8);
+|.if X64
 			|	mov64 Rq(tmp_reg), max.i64
 			|	ASM_REG_REG_OP cmp, type, op2_reg, tmp_reg
+|.endif
 		}
 		if (IR_IS_TYPE_SIGNED(type)) {
 			|	jg =>default_label
@@ -4573,9 +4654,12 @@ static void ir_emit_switch(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 				offset = 0;
 			}
 		} else {
+			IR_ASSERT(sizeof(void*) == 8);
+|.if X64
 			|	mov64 Rq(tmp_reg), min.i64
 			|	ASM_REG_REG_OP sub, type, op2_reg, tmp_reg // TODO: reg clobbering
 			offset = 0;
+|.endif
 		}
 		if (IR_IS_TYPE_SIGNED(type)) {
 			|	jl =>default_label
@@ -4583,7 +4667,7 @@ static void ir_emit_switch(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 			|	jb =>default_label
 		}
 		if (sizeof(void*) == 8) {
-			|.if X64
+|.if X64
 			switch (ir_type_size[type]) {
 				case 1:
 					if (IR_IS_TYPE_SIGNED(type)) {
@@ -4613,9 +4697,9 @@ static void ir_emit_switch(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 			}
 			|	lea Ra(tmp_reg), aword [>1]
 			|	jmp aword [Ra(tmp_reg)+Ra(op2_reg)*8+(int32_t)offset]
-			|.endif
+|.endif
 		} else {
-			|.if not X64
+|.if not X64
 			switch (ir_type_size[type]) {
 				case 1:
 					if (IR_IS_TYPE_SIGNED(type)) {
@@ -4636,8 +4720,10 @@ static void ir_emit_switch(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 				default:
 					IR_ASSERT(0 && "Unsupported type size");
 			}
-			|	jmp aword [(int32_t)offset + Ra(op2_reg) * 4 + >1]
-			|.endif
+			|//	jmp aword [Ra(op2_reg)*4+(int32_t)offset+>1]
+			|	lea Ra(op2_reg), aword [Ra(op2_reg)*4+(int32_t)offset] // TODO: reg clobbering
+			|	jmp aword [Ra(op2_reg)+>1]
+|.endif
 		}
 		|.jmp_table
 		if (!data->jmp_table_label) {
@@ -4662,8 +4748,11 @@ static void ir_emit_switch(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 				if (IR_IS_32BIT(type, val->val)) {
 					|	ASM_REG_IMM_OP cmp, type, op2_reg, val->val.i32
 				} else {
+					IR_ASSERT(sizeof(void*) == 8);
+|.if X64
 					|	mov64 Ra(tmp_reg), val->val.i64
 					|	ASM_REG_REG_OP cmp, type, op2_reg, tmp_reg
+|.endif
 				}
 				|	je =>label
 			}
@@ -4838,7 +4927,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 		used_stack = ir_call_used_stack(ctx, insn, 1);
 		data->call_stack_size += used_stack;
 		if (used_stack) {
-			|	sub rsp, used_stack
+			|	sub Ra(IR_REG_RSP), used_stack
 		}
 	}
 
@@ -4893,46 +4982,61 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 					ir_val *val = &ctx->ir_base[arg].val;
 					if (IR_IS_SIGNED_32BIT(val->i64)) {
 						if (ir_type_size[type] <= 4) {
-							|	mov dword [rsp+stack_offset], val->i32
+							|	mov dword [Ra(IR_REG_RSP)+stack_offset], val->i32
 						} else {
+							IR_ASSERT(sizeof(void*) == 8);
+|.if X64
 							|	mov qword [rsp+stack_offset], val->i32
+|.endif
 						}
 					} else {
+						IR_ASSERT(sizeof(void*) == 8);
+|.if X64
 						IR_ASSERT(tmp_reg != IR_REG_NONE);
 						|	mov64 Ra(tmp_reg), val->i64
 						|	mov [rsp+stack_offset], Ra(tmp_reg)
+|.endif
 					}
 				} else if (src_reg != IR_REG_NONE) {
 					if (src_reg & IR_REG_SPILL_LOAD) {
 						src_reg &= ~IR_REG_SPILL_LOAD;
 						ir_emit_load(ctx, type, src_reg, arg);
 					}
-					|	ASM_MEM_REG_OP, mov, type, [rsp+stack_offset], src_reg
+					|	ASM_MEM_REG_OP, mov, type, [Ra(IR_REG_RSP)+stack_offset], src_reg
 				} else {
 					IR_ASSERT(tmp_reg != IR_REG_NONE);
 					ir_emit_load(ctx, type, tmp_reg, arg);
-					|	ASM_MEM_REG_OP, mov, type, [rsp+stack_offset], tmp_reg
+					|	ASM_MEM_REG_OP, mov, type, [Ra(IR_REG_RSP)+stack_offset], tmp_reg
 				}
 			} else {
 				if (IR_IS_CONST_REF(arg)) {
 					ir_val *val = &ctx->ir_base[arg].val;
-					if (ir_type_size[type] == 4 || val->i64 == 0) {
-						|	mov qword [rsp+stack_offset], val->i32
+					if (ir_type_size[type] == 4) {
+						|	mov dword [Ra(IR_REG_RSP)+stack_offset], val->i32
+					} else if (sizeof(void*) == 8) {
+|.if X64
+						if (val->i64 == 0) {
+							|	mov qword [rsp+stack_offset], val->i32
+						} else {
+							IR_ASSERT(tmp_reg != IR_REG_NONE);
+							|	mov64 Rq(tmp_reg), val->i64
+							|	mov qword [rsp+stack_offset], Ra(tmp_reg)
+						}
+|.endif
 					} else {
-						IR_ASSERT(tmp_reg != IR_REG_NONE);
-						|	mov64 Rq(tmp_reg), val->i64
-						|	mov qword [rsp+stack_offset], Ra(tmp_reg)
+						ir_emit_load(ctx, type, tmp_fp_reg, arg);
+						|	movsd qword [Ra(IR_REG_RSP)+stack_offset], xmm(tmp_fp_reg-IR_REG_XMM0)
 					}
 				} else if (src_reg != IR_REG_NONE) {
 					if (src_reg & IR_REG_SPILL_LOAD) {
 						src_reg &= ~IR_REG_SPILL_LOAD;
 						ir_emit_load(ctx, type, src_reg, arg);
 					}
-					|	ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [rsp+stack_offset], src_reg
+					|	ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [Ra(IR_REG_RSP)+stack_offset], src_reg
 				} else {
 					IR_ASSERT(tmp_fp_reg != IR_REG_NONE);
 					ir_emit_load(ctx, type, tmp_fp_reg, arg);
-					|	ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [rsp+stack_offset], tmp_fp_reg
+					|	ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [Ra(IR_REG_RSP)+stack_offset], tmp_fp_reg
 				}
 			}
 			stack_offset += sizeof(void*);
@@ -4997,12 +5101,14 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		const char *name = ir_get_str(ctx, ctx->ir_base[insn->op2].val.addr);
 		void *addr = ir_resolve_sym_name(name);
 
-//		if (IS_SIGNED_32BIT(addr)) { // TODO: 32-bit IP relative or 64-bit absolute address
-//			|	call qword &addr
-//		} else {
+		if (sizeof(void*) == 4 /*|| IS_SIGNED_32BIT(addr)*/) { // TODO: 32-bit IP relative or 64-bit absolute address
+			|	call aword &addr
+		} else {
+|.if X64
 			|	mov64 rax, ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
 			|	call rax
-//		}
+|.endif
+		}
     } else {
 		ir_reg op2_reg = ctx->regs[def][2];
 
@@ -5020,7 +5126,7 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
     }
 
 	if (used_stack) {
-		|	add rsp, used_stack
+		|	add Ra(IR_REG_RSP), used_stack
 		data->call_stack_size -= used_stack;
 	}
 
@@ -5069,12 +5175,14 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		const char *name = ir_get_str(ctx, ctx->ir_base[insn->op2].val.addr);
 		void *addr = ir_resolve_sym_name(name);
 
-//		if (IS_SIGNED_32BIT(addr)) { // TODO: 32-bit IP relative or 64-bit absolute address
-//			|	call qword &addr
-//		} else {
+		if (sizeof(void*) == 4 /*|| IS_SIGNED_32BIT(addr)*/) { // TODO: 32-bit IP relative or 64-bit absolute address
+			|	jmp aword &addr
+		} else {
+|.if X64
 			|	mov64 rax, ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
 			|	jmp rax
-//		}
+|.endif
+		}
     } else {
 		ir_reg op2_reg = ctx->regs[def][2];
 

@@ -257,6 +257,7 @@ uint32_t __inline __ir_clz(uint32_t value) {
 #else
 
 # define IR_REG_INT_RET1   IR_REG_RAX
+# define IR_REG_FP_RET1    IR_REG_XMM0 // TODO: ???
 # define IR_REG_INT_ARGS   0
 # define IR_REG_FP_ARGS    0
 
@@ -271,7 +272,7 @@ uint32_t __inline __ir_clz(uint32_t value) {
 # define IR_REGSET_PRESERVED \
 	(IR_REGSET(IR_REG_RBX) \
 	| IR_REGSET(IR_REG_RBP) \
-	| IR_REGSET_INTRAVLA(IR_REG_RSI, IR_REG_RDI))
+	| IR_REGSET_INTERVAL(IR_REG_RSI, IR_REG_RDI))
 
 #endif
 
