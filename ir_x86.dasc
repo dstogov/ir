@@ -5370,9 +5370,9 @@ static void ir_emit_load_params(ir_ctx *ctx)
 	int32_t stack_offset = 0;
 
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
-		stack_offset = sizeof(void*); /* skip old frame pointer and return address */
+		stack_offset = sizeof(void*) * 2; /* skip old frame pointer and return address */
 	} else {
-		stack_offset = data->stack_frame_size + data->call_stack_size; /* skip return address */
+		stack_offset = sizeof(void*) + data->stack_frame_size + data->call_stack_size; /* skip return address */
 	}
 	n = use_list->count;
 	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
@@ -5384,7 +5384,6 @@ static void ir_emit_load_params(ir_ctx *ctx)
 					src_reg = int_reg_params[int_param_num];
 				} else {
 					src_reg = IR_REG_NONE;
-					stack_offset += sizeof(void*);
 				}
 				int_param_num++;
 			} else {
@@ -5392,7 +5391,6 @@ static void ir_emit_load_params(ir_ctx *ctx)
 					src_reg = fp_reg_params[fp_param_num];
 				} else {
 					src_reg = IR_REG_NONE;
-					stack_offset += sizeof(void*);
 				}
 				fp_param_num++;
 			}
@@ -5406,6 +5404,13 @@ static void ir_emit_load_params(ir_ctx *ctx)
 				}
 				if (dst_reg != IR_REG_NONE && (ctx->regs[use][0] & IR_REG_SPILL_STORE)) {
 					ir_emit_store(ctx, insn->type, use, dst_reg);
+				}
+			}
+			if (src_reg == IR_REG_NONE) {
+				if (sizeof(void*) == 8) {
+					stack_offset += sizeof(void*);
+				} else {
+					stack_offset += IR_MAX(sizeof(void*), ir_type_size[insn->type]);
 				}
 			}
 		}
