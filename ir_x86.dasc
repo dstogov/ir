@@ -765,10 +765,12 @@ ir_reg ir_uses_fixed_reg(ir_ctx *ctx, ir_ref ref, int op_num)
 		if (op_num == 2) {
 			return IR_REG_RAX;
 		}
+#ifdef IR_REG_FP_RET1
 	} else if (rule == IR_RETURN_FP) {
 		if (op_num == 2) {
-			return IR_REG_XMM0;
+			return IR_REG_FP_RET1;
 		}
+#endif
 	} else if (rule == IR_SKIP_REG) {
 		if (ctx->ir_base[ref].op == IR_PARAM && op_num == 0) {
 			return ir_get_param_reg(ctx, ref);
@@ -3014,8 +3016,10 @@ static void ir_emit_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 			case IR_DIV:
 				|	ASM_AVX_REG_REG_MREF_OP vdivss, vdivsd, type, def_reg, op1_reg, op2
+				break;
 			case IR_MIN:
 				|	ASM_AVX_REG_REG_MREF_OP vminss, vminsd, type, def_reg, op1_reg, op2
+				break;
 			case IR_MAX:
 				|	ASM_AVX_REG_REG_MREF_OP vmaxss, vmaxsd, type, def_reg, op1_reg, op2
 				break;
@@ -3600,10 +3604,10 @@ static void ir_emit_return_int(ir_ctx *ctx, ir_reg ref, ir_insn *insn)
 static void ir_emit_return_fp(ir_ctx *ctx, ir_reg ref, ir_insn *insn)
 {
 	ir_reg op2_reg = ctx->regs[ref][2];
+	ir_type type = ctx->ir_base[insn->op2].type;
 
+#ifdef IR_REG_FP_RET1
 	if (op2_reg != IR_REG_FP_RET1) {
-		ir_type type = ctx->ir_base[insn->op2].type;
-
 		if (op2_reg != IR_REG_NONE) {
 			if (!(op2_reg & IR_REG_SPILL_LOAD)) {
 				ir_emit_fp_mov(ctx, type, IR_REG_FP_RET1, op2_reg);
@@ -3614,6 +3618,33 @@ static void ir_emit_return_fp(ir_ctx *ctx, ir_reg ref, ir_insn *insn)
 			ir_emit_load(ctx, type, IR_REG_FP_RET1, insn->op2);
 		}
 	}
+#else
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+
+	if (op2_reg == IR_REG_NONE || (op2_reg & IR_REG_SPILL_LOAD)) {
+		int32_t offset = ir_ref_spill_slot(ctx, insn->op2);
+		ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_RBP : IR_REG_RSP;
+		if (type == IR_FLOAT) {
+			|	fld dword [Ra(fp)+offset]
+		} else if (type == IR_DOUBLE) {
+			|	fld qword [Ra(fp)+offset]
+		} else {
+			IR_ASSERT(0);
+		}
+	} else {
+		int32_t offset = 0; // TODO: ???
+		ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_RBP : IR_REG_RSP;
+		|	ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [Ra(fp)+offset], op2_reg
+		if (type == IR_FLOAT) {
+			|	fld dword [Ra(fp)+offset]
+		} else if (type == IR_DOUBLE) {
+			|	fld qword [Ra(fp)+offset]
+		} else {
+			IR_ASSERT(0);
+		}
+	}
+#endif
 	ir_emit_return_void(ctx);
 }
 
@@ -4878,12 +4909,12 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn, bool align)
 		type = ctx->ir_base[insn->ops[j]].type;
 		if (IR_IS_TYPE_INT(type)) {
 			if (int_param >= int_reg_params_count) {
-				used_stack += sizeof(void*);
+				used_stack += IR_MAX(sizeof(void*), ir_type_size[type]);
 			}
 			int_param++;
 		} else if (IR_IS_TYPE_FP(type)) {
 			if (fp_param >= fp_reg_params_count) {
-				used_stack += sizeof(void*);
+				used_stack += IR_MAX(sizeof(void*), ir_type_size[type]);
 			}
 			fp_param++;
 		} else {
@@ -4893,7 +4924,7 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn, bool align)
 
 	if (align && used_stack % 16 != 0) {
 		/* Stack must be 16 byte aligned */
-		used_stack += 8;
+		used_stack += sizeof(void*);
 	}
 
 	return used_stack;
@@ -5145,6 +5176,7 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 		} else if (IR_IS_TYPE_FP(insn->type)) {
 			def_reg = IR_REG_NUM(ctx->regs[def][0]);
+#ifdef IR_REG_FP_RET1
 			if (def_reg != IR_REG_NONE) {
 				if (def_reg != IR_REG_FP_RET1) {
 					ir_emit_fp_mov(ctx, insn->type, def_reg, IR_REG_FP_RET1);
@@ -5155,6 +5187,9 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			} else {
 				ir_emit_store(ctx, insn->type, def, IR_REG_FP_RET1);
 			}
+#else
+			IR_ASSERT(0); // TODO: float/double return value
+#endif
 		} else {
 			IR_ASSERT(0);
 		}
@@ -5760,13 +5795,13 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 		/* Stack must be 16 byte aligned */
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
 			while (IR_ALIGNED_SIZE(data->stack_frame_size + sizeof(void*) * 2, 16) != data->stack_frame_size + sizeof(void*) * 2) {
-				data->stack_frame_size += 8;
-				data->stack_frame_alignment += 8;
+				data->stack_frame_size += sizeof(void*);
+				data->stack_frame_alignment += sizeof(void*);
 			}
 		} else {
 			while (IR_ALIGNED_SIZE(data->stack_frame_size + sizeof(void*), 16) != data->stack_frame_size + sizeof(void*)) {
-				data->stack_frame_size += 8;
-				data->stack_frame_alignment += 8;
+				data->stack_frame_size += sizeof(void*);
+				data->stack_frame_alignment += sizeof(void*);
 			}
 		}
 	}
@@ -5802,6 +5837,44 @@ static void ir_mark_empty_blocks(ir_ctx *ctx)
 			bb->flags |= flags;
 		}
 	}
+}
+
+static uint8_t ir_get_return_type(ir_ctx *ctx)
+{
+	ir_ref ref;
+	ir_insn *insn;
+	uint8_t ret_type = 255;
+
+	/* Check all RETURN nodes */
+	ref = ctx->ir_base[1].op1;
+	while (ref) {
+		insn = &ctx->ir_base[ref];
+		if (insn->op == IR_RETURN) {
+			if (ret_type == 255) {
+				if (insn->op2) {
+					ret_type = ctx->ir_base[insn->op2].type;
+				} else {
+					ret_type = IR_VOID;
+				}
+			} else if (insn->op2) {
+				if (ret_type != ctx->ir_base[insn->op2].type) {
+					IR_ASSERT(0 && "conflicting return types");
+					return 0;
+				}
+			} else {
+				if (ret_type != IR_VOID) {
+					IR_ASSERT(0 && "conflicting return types");
+					return 0;
+				}
+			}
+		}
+		ref = ctx->ir_base[ref].op3;
+	}
+
+	if (ret_type == 255) {
+		ret_type = IR_VOID;
+	}
+	return ret_type;
 }
 
 static void ir_preallocate_call_stack(ir_ctx *ctx, ir_backend_data *data)
@@ -5844,27 +5917,37 @@ static void ir_calc_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
 				if (!IR_REGSET_IN(data->used_preserved_regs, ival->reg)
 				 && IR_REGSET_IN(IR_REGSET_PRESERVED, ival->reg)) {
 					IR_REGSET_INCL(data->used_preserved_regs, ival->reg);
-					additional_size += 8;
+					additional_size += sizeof(void*);
 				}
 			}
 		}
 	}
-	data->stack_frame_size = IR_ALIGNED_SIZE(data->stack_frame_size, 8);
+
+#ifndef IR_REG_FP_RET1
+	ir_type ret_type = ir_get_return_type(ctx);
+	if (ret_type == IR_FLOAT) {
+		additional_size += sizeof(float);
+	} else if (ret_type == IR_DOUBLE) {
+		additional_size += sizeof(double);
+	}
+#endif
+
+	data->stack_frame_size = IR_ALIGNED_SIZE(data->stack_frame_size, sizeof(void*));
 	data->stack_frame_size += additional_size;
 
 	if (ctx->flags & IR_HAS_CALLS) {
 		/* Stack must be 16 byte aligned */
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
 			while (IR_ALIGNED_SIZE(data->stack_frame_size + sizeof(void*) * 2, 16) != data->stack_frame_size + sizeof(void*) * 2) {
-				data->stack_frame_size += 8;
-				data->stack_frame_alignment += 8;
+				data->stack_frame_size += sizeof(void*);
+				data->stack_frame_alignment += sizeof(void*);
 			}
 		} else {
 			ir_preallocate_call_stack(ctx, data);
 			while (IR_ALIGNED_SIZE(data->stack_frame_size + data->call_stack_size + sizeof(void*), 16) !=
 					data->stack_frame_size + data->call_stack_size + sizeof(void*)) {
-				data->stack_frame_size += 8;
-				data->stack_frame_alignment += 8;
+				data->stack_frame_size += sizeof(void*);
+				data->stack_frame_alignment += sizeof(void*);
 			}
 		}
 	}

@@ -31,6 +31,8 @@
 ?  code generation
 	-  COND
 	-  32-bit x86 back-end
+		- ABS_INT
+		- RETURN_FP
 	-  binary code emission without DynAsm ???
 
 ?  disassembler

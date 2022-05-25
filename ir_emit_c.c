@@ -659,17 +659,11 @@ static void ir_emit_store(ir_ctx *ctx, FILE *f, ir_insn *insn)
 	fprintf(f, ";\n");
 }
 
-static int ir_emit_func(ir_ctx *ctx, FILE *f)
+static uint8_t ir_get_return_type(ir_ctx *ctx)
 {
-	ir_ref ref, i, n, *p;
+	ir_ref ref;
 	ir_insn *insn;
-	ir_use_list *use_list;
 	uint8_t ret_type = 255;
-	bool has_params = 0;
-	ir_bitset vars;
-	int b, target;
-	ir_block *bb;
-	uint32_t flags;
 
 	/* Check all RETURN nodes */
 	ref = ctx->ir_base[1].op1;
@@ -697,6 +691,26 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 		ref = ctx->ir_base[ref].op3;
 	}
 
+	if (ret_type == 255) {
+		ret_type = IR_VOID;
+	}
+	return ret_type;
+}
+
+static int ir_emit_func(ir_ctx *ctx, FILE *f)
+{
+	ir_ref i, n, *p;
+	ir_insn *insn;
+	ir_use_list *use_list;
+	uint8_t ret_type;
+	bool has_params = 0;
+	ir_bitset vars;
+	int b, target;
+	ir_block *bb;
+	uint32_t flags;
+
+	ret_type = ir_get_return_type(ctx);
+
 	use_list = &ctx->use_lists[1];
 	n = use_list->count;
 	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
@@ -708,29 +722,24 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 	}
 
 	/* Emit function prototype */
-	if (ret_type != 255 || has_params) {
-		if (ret_type == 255) {
-			ret_type = IR_VOID;
-		}
-		fprintf(f, "%s", ir_type_cname[ret_type]);
-		fprintf(f, " test(");
-		if (has_params) {
-			use_list = &ctx->use_lists[1];
-			n = use_list->count;
-			for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
-				insn = &ctx->ir_base[*p];
-				if (insn->op == IR_PARAM) {
-					if (has_params) {
-						has_params = 0;
-					} else {
-						fprintf(f, ", ");
-					}
-					fprintf(f, "%s %s", ir_type_cname[insn->type], ir_get_str(ctx, insn->op2));
+	fprintf(f, "%s", ir_type_cname[ret_type]);
+	fprintf(f, " test(");
+	if (has_params) {
+		use_list = &ctx->use_lists[1];
+		n = use_list->count;
+		for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
+			insn = &ctx->ir_base[*p];
+			if (insn->op == IR_PARAM) {
+				if (has_params) {
+					has_params = 0;
+				} else {
+					fprintf(f, ", ");
 				}
+				fprintf(f, "%s %s", ir_type_cname[insn->type], ir_get_str(ctx, insn->op2));
 			}
 		}
-		fprintf(f, ")\n");
 	}
+	fprintf(f, ")\n");
 
 	fprintf(f, "{\n");
 
