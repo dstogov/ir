@@ -589,29 +589,29 @@ typedef int8_t ir_regs[4];
 typedef struct _ir_ctx {
 	ir_insn           *ir_base;           /* two directional array - instructions grow down, constants grow up */
 	ir_ref             insns_count;
-    ir_ref             insns_limit;
-    ir_ref             consts_count;
-    ir_ref             consts_limit;
+	ir_ref             insns_limit;
+	ir_ref             consts_count;
+	ir_ref             consts_limit;
 	uint32_t           flags;
-    ir_ref             fold_cse_limit;
+	ir_ref             fold_cse_limit;
 	ir_insn            fold_insn;
-    ir_use_list       *use_lists;         /* def->use lists for each instruction */
-    ir_ref            *use_edges;
-    uint32_t           cfg_blocks_count;
-    uint32_t           cfg_edges_count;
-    ir_block          *cfg_blocks;        /* list of Basic Blocks (starts from 1) */
-    uint32_t          *cfg_edges;
-    uint32_t          *cfg_map;           /* map of instructions to Basic Block number */
-    uint32_t          *rules;
-    uint32_t           vregs_count;
-    uint32_t          *vregs;
-    ir_live_interval **live_intervals;
-    ir_regs           *regs;
-    uint32_t          *prev_insn_len;
-    void              *data;
-    ir_strtab          strtab;
-    ir_ref             prev_insn_chain[IR_LAST_FOLDABLE + 1];
-    ir_ref             prev_const_chain[IR_LAST_TYPE];
+	ir_use_list       *use_lists;         /* def->use lists for each instruction */
+	ir_ref            *use_edges;
+	uint32_t           cfg_blocks_count;
+	uint32_t           cfg_edges_count;
+	ir_block          *cfg_blocks;        /* list of Basic Blocks (starts from 1) */
+	uint32_t          *cfg_edges;
+	uint32_t          *cfg_map;           /* map of instructions to Basic Block number */
+	uint32_t          *rules;
+	uint32_t           vregs_count;
+	uint32_t          *vregs;
+	ir_live_interval **live_intervals;
+	ir_regs           *regs;
+	uint32_t          *prev_insn_len;
+	void              *data;
+	ir_strtab          strtab;
+	ir_ref             prev_insn_chain[IR_LAST_FOLDABLE + 1];
+	ir_ref             prev_const_chain[IR_LAST_TYPE];
 } ir_ctx;
 
 extern const uint8_t ir_type_flags[IR_LAST_TYPE];
