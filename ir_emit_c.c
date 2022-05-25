@@ -483,21 +483,21 @@ static bool ir_needs_block_label(ir_ctx *ctx, int b)
 
 static void ir_emit_if(ir_ctx *ctx, FILE *f, int b, ir_ref def, ir_insn *insn)
 {
-	ir_use_list *use_list;
+	ir_block *bb;
+	uint32_t n, *p, use_block;
 	ir_insn *use_insn;
-	ir_ref i, *p, use, n;
 	int true_block = 0, false_block = 0, next_block;
 	bool short_true = 0, short_false = 0;
 
-	use_list = &ctx->use_lists[def];
-	n = use_list->count;
-	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
-		use = *p;
-		use_insn = &ctx->ir_base[use];
+	bb = &ctx->cfg_blocks[b];
+	p = &ctx->cfg_edges[bb->successors];
+	for (n = bb->successors_count; n != 0; p++, n--) {
+		use_block = *p;
+		use_insn = &ctx->ir_base[ctx->cfg_blocks[use_block].start];
 		if (use_insn->op == IR_IF_TRUE) {
-			true_block = ir_skip_empty_blocks(ctx, ctx->bb_num[use]);
+			true_block = ir_skip_empty_blocks(ctx, use_block);
 		} else if (use_insn->op == IR_IF_FALSE) {
-			false_block = ir_skip_empty_blocks(ctx, ctx->bb_num[use]);
+			false_block = ir_skip_empty_blocks(ctx, use_block);
 		} else {
 			IR_ASSERT(0);
 		}
@@ -527,32 +527,31 @@ static void ir_emit_if(ir_ctx *ctx, FILE *f, int b, ir_ref def, ir_insn *insn)
 	}
 }
 
-static void ir_emit_switch(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
+static void ir_emit_switch(ir_ctx *ctx, FILE *f, int b, ir_ref def, ir_insn *insn)
 {
-	ir_use_list *use_list;
+	ir_block *bb;
+	uint32_t n, *p, use_block;
 	ir_insn *use_insn;
-	ir_ref i, *p, use, n;
 
 	fprintf(f, "\tswitch (");
 	ir_emit_ref(ctx, f, insn->op2);
 	fprintf(f, ") {\n");
 
-	use_list = &ctx->use_lists[def];
-	n = use_list->count;
-	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
-		use = *p;
-		use_insn = &ctx->ir_base[use];
+	bb = &ctx->cfg_blocks[b];
+	p = &ctx->cfg_edges[bb->successors];
+	for (n = bb->successors_count; n != 0; p++, n--) {
+		use_block = *p;
+		use_insn = &ctx->ir_base[ctx->cfg_blocks[use_block].start];
 		if (use_insn->op == IR_CASE_VAL) {
 			fprintf(f, "\t\tcase ");
 			ir_emit_ref(ctx, f, use_insn->op2);
-			fprintf(f, ": goto bb%d;\n", ir_skip_empty_blocks(ctx, ctx->bb_num[use]));
+			fprintf(f, ": goto bb%d;\n", ir_skip_empty_blocks(ctx, use_block));
 		} else if (use_insn->op == IR_CASE_DEFAULT) {
-			fprintf(f, "\t\tdefault: goto bb%d;\n", ir_skip_empty_blocks(ctx, ctx->bb_num[use]));
+			fprintf(f, "\t\tdefault: goto bb%d;\n", ir_skip_empty_blocks(ctx, use_block));
 		} else {
 			IR_ASSERT(0);
 		}
 	}
-
 	fprintf(f, "\t}\n");
 }
 
@@ -964,7 +963,7 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 					ir_emit_if(ctx, f, b, i, insn);
 					break;
 				case IR_SWITCH:
-					ir_emit_switch(ctx, f, i, insn);
+					ir_emit_switch(ctx, f, b, i, insn);
 					break;
 				case IR_CALL:
 					ir_emit_call(ctx, f, i, insn);

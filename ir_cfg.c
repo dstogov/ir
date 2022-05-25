@@ -556,7 +556,6 @@ int ir_schedule_blocks(ir_ctx *ctx)
 			if (bb->loop_header > 0) {
 				bb->loop_header = map[bb->loop_header];
 			}
-			ctx->bb_num[bb->start] = b;
 		}
 		for (j = 0; j < ctx->cfg_edges_count; j++) {
 			if (ctx->cfg_edges[j] > 0) {

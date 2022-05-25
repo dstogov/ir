@@ -1633,10 +1633,10 @@ int ir_match(ir_ctx *ctx)
 
 	if (!ctx->prev_insn_len) {
 		ctx->prev_insn_len = ir_mem_malloc(ctx->insns_count * sizeof(uint32_t));
+		n = 1;
 		for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
-			n = b; /* The first insn of BB keeps BB number in prev_insn_len[] */
 			for (i = bb->start, insn = ctx->ir_base + i; i <= bb->end;) {
-				ctx->prev_insn_len[i] = n; /* The first insn of BB keeps BB number in prev_insn_len[] */
+				ctx->prev_insn_len[i] = n;
 				n = ir_operands_count(ctx, insn);
 				n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
 				i += n;
@@ -2068,21 +2068,21 @@ static void ir_emit_overflow_and_branch(ir_ctx *ctx, int b, ir_ref def, ir_insn 
 	dasm_State **Dst = &data->dasm_state;
 	ir_insn *overflow_insn = &ctx->ir_base[insn->op2];
 	ir_type type = ctx->ir_base[overflow_insn->op1].type;
-	ir_use_list *use_list;
+	ir_block *bb;
+	uint32_t n, *p, use_block;
 	ir_insn *use_insn;
-	ir_ref i, *p, use, n;
 	int true_block = 0, false_block = 0, next_block;
 	bool reverse = 0;
 
-	use_list = &ctx->use_lists[def];
-	n = use_list->count;
-	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
-		use = *p;
-		use_insn = &ctx->ir_base[use];
+	bb = &ctx->cfg_blocks[b];
+	p = &ctx->cfg_edges[bb->successors];
+	for (n = bb->successors_count; n != 0; p++, n--) {
+		use_block = *p;
+		use_insn = &ctx->ir_base[ctx->cfg_blocks[use_block].start];
 		if (use_insn->op == IR_IF_TRUE) {
-			true_block = ir_skip_empty_blocks(ctx, ctx->bb_num[use]);
+			true_block = ir_skip_empty_blocks(ctx, use_block);
 		} else if (use_insn->op == IR_IF_FALSE) {
-			false_block = ir_skip_empty_blocks(ctx, ctx->bb_num[use]);
+			false_block = ir_skip_empty_blocks(ctx, use_block);
 		} else {
 			IR_ASSERT(0);
 		}
@@ -3209,22 +3209,22 @@ static void ir_emit_cmp_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 static void ir_emit_jmp_true(ir_ctx *ctx, int b, ir_ref def)
 {
-	ir_use_list *use_list;
+	ir_block *bb;
 	ir_insn *use_insn;
-	ir_ref i, *p, use, n;
+	uint32_t n, *p, use_block;
 	int true_block = 0, false_block = 0;
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
-	use_list = &ctx->use_lists[def];
-	n = use_list->count;
-	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
-		use = *p;
-		use_insn = &ctx->ir_base[use];
+	bb = &ctx->cfg_blocks[b];
+	p = &ctx->cfg_edges[bb->successors];
+	for (n = bb->successors_count; n != 0; p++, n--) {
+		use_block = *p;
+		use_insn = &ctx->ir_base[ctx->cfg_blocks[use_block].start];
 		if (use_insn->op == IR_IF_TRUE) {
-			true_block = ir_skip_empty_blocks(ctx, ctx->bb_num[use]);
+			true_block = ir_skip_empty_blocks(ctx, use_block);
 		} else if (use_insn->op == IR_IF_FALSE) {
-			false_block = ir_skip_empty_blocks(ctx, ctx->bb_num[use]);
+			false_block = ir_skip_empty_blocks(ctx, use_block);
 		} else {
 			IR_ASSERT(0);
 		}
@@ -3238,22 +3238,22 @@ static void ir_emit_jmp_true(ir_ctx *ctx, int b, ir_ref def)
 
 static void ir_emit_jmp_false(ir_ctx *ctx, int b, ir_ref def)
 {
-	ir_use_list *use_list;
+	ir_block *bb;
 	ir_insn *use_insn;
-	ir_ref i, *p, use, n;
+	uint32_t n, *p, use_block;
 	int true_block = 0, false_block = 0;
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
-	use_list = &ctx->use_lists[def];
-	n = use_list->count;
-	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
-		use = *p;
-		use_insn = &ctx->ir_base[use];
+	bb = &ctx->cfg_blocks[b];
+	p = &ctx->cfg_edges[bb->successors];
+	for (n = bb->successors_count; n != 0; p++, n--) {
+		use_block = *p;
+		use_insn = &ctx->ir_base[ctx->cfg_blocks[use_block].start];
 		if (use_insn->op == IR_IF_TRUE) {
-			true_block = ir_skip_empty_blocks(ctx, ctx->bb_num[use]);
+			true_block = ir_skip_empty_blocks(ctx, use_block);
 		} else if (use_insn->op == IR_IF_FALSE) {
-			false_block = ir_skip_empty_blocks(ctx, ctx->bb_num[use]);
+			false_block = ir_skip_empty_blocks(ctx, use_block);
 		} else {
 			IR_ASSERT(0);
 		}
@@ -3267,22 +3267,22 @@ static void ir_emit_jmp_false(ir_ctx *ctx, int b, ir_ref def)
 
 static void ir_emit_jcc(ir_ctx *ctx, uint8_t op, int b, ir_ref def, ir_insn *insn, bool int_cmp)
 {
-	ir_use_list *use_list;
+	ir_block *bb;
 	ir_insn *use_insn;
-	ir_ref i, *p, use, n;
+	uint32_t n, *p, use_block;
 	int true_block = 0, false_block = 0, next_block;
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
-	use_list = &ctx->use_lists[def];
-	n = use_list->count;
-	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
-		use = *p;
-		use_insn = &ctx->ir_base[use];
+	bb = &ctx->cfg_blocks[b];
+	p = &ctx->cfg_edges[bb->successors];
+	for (n = bb->successors_count; n != 0; p++, n--) {
+		use_block = *p;
+		use_insn = &ctx->ir_base[ctx->cfg_blocks[use_block].start];
 		if (use_insn->op == IR_IF_TRUE) {
-			true_block = ir_skip_empty_blocks(ctx, ctx->bb_num[use]);
+			true_block = ir_skip_empty_blocks(ctx, use_block);
 		} else if (use_insn->op == IR_IF_FALSE) {
-			false_block = ir_skip_empty_blocks(ctx, ctx->bb_num[use]);
+			false_block = ir_skip_empty_blocks(ctx, use_block);
 		} else {
 			IR_ASSERT(0);
 		}
@@ -4474,14 +4474,15 @@ static void ir_emit_alloca(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
-static void ir_emit_switch(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+static void ir_emit_switch(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	ir_type type;
-	ir_use_list *use_list;
+	ir_block *bb;
 	ir_insn *use_insn, *val;
-	ir_ref i, *p, use, n;
+	uint32_t n, *p, use_block;
+	int i;
 	int label, default_label = 0;
 	int count = 0;
 	ir_val min, max;
@@ -4497,11 +4498,11 @@ static void ir_emit_switch(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		max.u64 = 0x0;
 	}
 
-	use_list = &ctx->use_lists[def];
-	n = use_list->count;
-	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
-		use = *p;
-		use_insn = &ctx->ir_base[use];
+	bb = &ctx->cfg_blocks[b];
+	p = &ctx->cfg_edges[bb->successors];
+	for (n = bb->successors_count; n != 0; p++, n--) {
+		use_block = *p;
+		use_insn = &ctx->ir_base[ctx->cfg_blocks[use_block].start];
 		if (use_insn->op == IR_CASE_VAL) {
 			val = &ctx->ir_base[use_insn->op2];
 			if (IR_IS_TYPE_SIGNED(type)) {
@@ -4515,7 +4516,7 @@ static void ir_emit_switch(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 			count++;
 		} else if (use_insn->op == IR_CASE_DEFAULT) {
-			default_label = ir_skip_empty_blocks(ctx, ctx->bb_num[use]);
+			default_label = ir_skip_empty_blocks(ctx, use_block);
 		} else {
 			IR_ASSERT(0);
 		}
@@ -4540,12 +4541,13 @@ static void ir_emit_switch(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		for (i = 0; i <= (max.i64 - min.i64 + 1); i++) {
 			labels[i] = default_label;
 		}
-		for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
-			use = *p;
-			use_insn = &ctx->ir_base[use];
+		p = &ctx->cfg_edges[bb->successors];
+		for (n = bb->successors_count; n != 0; p++, n--) {
+			use_block = *p;
+			use_insn = &ctx->ir_base[ctx->cfg_blocks[use_block].start];
 			if (use_insn->op == IR_CASE_VAL) {
 				val = &ctx->ir_base[use_insn->op2];
-				label = ir_skip_empty_blocks(ctx, ctx->bb_num[use]);
+				label = ir_skip_empty_blocks(ctx, use_block);
 				labels[val->val.i64 - min.i64] = label;
 			}
 		}
@@ -4650,12 +4652,13 @@ static void ir_emit_switch(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		|.code
 		ir_mem_free(labels);
 	} else {
-		for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
-			use = *p;
-			use_insn = &ctx->ir_base[use];
+		p = &ctx->cfg_edges[bb->successors];
+		for (n = bb->successors_count; n != 0; p++, n--) {
+			use_block = *p;
+			use_insn = &ctx->ir_base[ctx->cfg_blocks[use_block].start];
 			if (use_insn->op == IR_CASE_VAL) {
 				val = &ctx->ir_base[use_insn->op2];
-				label = ir_skip_empty_blocks(ctx, ctx->bb_num[use]);
+				label = ir_skip_empty_blocks(ctx, use_block);
 				if (IR_IS_32BIT(type, val->val)) {
 					|	ASM_REG_IMM_OP cmp, type, op2_reg, val->val.i32
 				} else {
@@ -6381,7 +6384,7 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 					ir_emit_if_int(ctx, b, i, insn);
 					break;
 				case IR_SWITCH:
-					ir_emit_switch(ctx, i, insn);
+					ir_emit_switch(ctx, b, i, insn);
 					break;
 				case IR_MIN_MAX_INT:
 					ir_emit_min_max_int(ctx, i, insn);

@@ -607,10 +607,7 @@ typedef struct _ir_ctx {
     uint32_t          *vregs;
     ir_live_interval **live_intervals;
     ir_regs           *regs;
-    union {
-	    uint32_t      *prev_insn_len;
-	    uint32_t	  *bb_num;
-	};
+    uint32_t          *prev_insn_len;
     void              *data;
     ir_strtab          strtab;
     ir_ref             prev_insn_chain[IR_LAST_FOLDABLE + 1];

@@ -26,10 +26,10 @@ int ir_assign_virtual_registers(ir_ctx *ctx)
 		ctx->prev_insn_len = ir_mem_malloc(ctx->insns_count * sizeof(uint32_t));
 	}
 	vregs = ir_mem_calloc(ctx->insns_count, sizeof(ir_ref));
+	n = 1;
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
-		n = b; /* The first insn of BB keeps BB number in prev_insn_len[] */
 		for (i = bb->start, insn = ctx->ir_base + i; i <= bb->end;) {
-			ctx->prev_insn_len[i] = n; /* The first insn of BB keeps BB number in prev_insn_len[] */
+			ctx->prev_insn_len[i] = n;
 			flags = ir_op_flags[insn->op];
 			if ((flags & IR_OP_FLAG_DATA) || ((flags & IR_OP_FLAG_MEM) && insn->type != IR_VOID)) {
 				if ((insn->op == IR_PARAM || insn->op == IR_VAR) && ctx->use_lists[i].count == 0) {
