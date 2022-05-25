@@ -1,5 +1,7 @@
 --TEST--
 004: Register Allocation (DIV + MUL)
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

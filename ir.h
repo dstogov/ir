@@ -9,6 +9,14 @@
 
 #define IR_VERSION "0.0.1"
 
+#if defined(IR_TARGET_X86)
+# define IR_TARGET "x86"
+#elif defined(IR_TARGET_X64)
+# define IR_TARGET "x86_64"
+#else
+# error "Unknown IR target"
+#endif
+
 typedef uint8_t bool;
 
 #ifdef IR_DEBUG

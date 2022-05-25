@@ -1,5 +1,7 @@
 --TEST--
 SWITCH 003
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

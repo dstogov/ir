@@ -1,5 +1,7 @@
 --TEST--
 010: type conversion BITCAST
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

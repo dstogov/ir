@@ -1,5 +1,7 @@
 --TEST--
 007: type conversion FP2INT
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

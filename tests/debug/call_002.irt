@@ -1,5 +1,7 @@
 --TEST--
 Indirect CALL
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

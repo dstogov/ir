@@ -1,5 +1,7 @@
 --TEST--
 015: Register Allocation (SHL + SHL + reuse/vreg hint)
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

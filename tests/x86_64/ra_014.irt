@@ -1,5 +1,7 @@
 --TEST--
 014: Register Allocation (SHL + SHL)
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

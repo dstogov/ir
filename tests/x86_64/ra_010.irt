@@ -1,5 +1,7 @@
 --TEST--
 010: Register Allocation (ADD + MUL)
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

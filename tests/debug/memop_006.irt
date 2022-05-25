@@ -1,5 +1,7 @@
 --TEST--
 006: Memory update (shift)
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

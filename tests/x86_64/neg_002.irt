@@ -1,5 +1,7 @@
 --TEST--
 002: neg function
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

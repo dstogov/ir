@@ -1,5 +1,7 @@
 --TEST--
 005: add function
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

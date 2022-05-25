@@ -1,5 +1,7 @@
 --TEST--
 Mandelbrot Test (mem)
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

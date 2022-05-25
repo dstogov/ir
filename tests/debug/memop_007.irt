@@ -1,5 +1,7 @@
 --TEST--
 007: Memory update (shift const)
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

@@ -1,5 +1,7 @@
 --TEST--
 001: shl function
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

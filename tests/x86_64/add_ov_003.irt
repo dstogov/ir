@@ -1,5 +1,7 @@
 --TEST--
 003: add_ov function
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

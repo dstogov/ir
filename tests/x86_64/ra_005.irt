@@ -1,5 +1,7 @@
 --TEST--
 005: Register Allocation (DIV + DIV)
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

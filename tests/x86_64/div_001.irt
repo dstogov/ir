@@ -1,5 +1,7 @@
 --TEST--
 001: div function
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

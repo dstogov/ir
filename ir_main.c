@@ -31,6 +31,7 @@ static void help(const char *cmd)
 		"  --debug-ra                 - debug register allocator\n"
 		"  --debug-regset <bit-mask>  - restrict available register set\n"
 #endif
+		"  --target                   - print JIT target\n"
 		"  --version\n"
 		"  --help\n",
 		cmd);
@@ -245,6 +246,9 @@ int main(int argc, char **argv)
 			return 0;
 		} else if (strcmp(argv[i], "--version") == 0) {
 			printf("IR %s\n", IR_VERSION);
+			return 0;
+		} else if (strcmp(argv[i], "--target") == 0) {
+			printf("%s\n", IR_TARGET);
 			return 0;
 		} else if (argv[i][0] == '-' && argv[i][1] == 'O' && strlen(argv[i]) == 3) {
 			if (argv[i][2] == '0') {

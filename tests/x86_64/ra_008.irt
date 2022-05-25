@@ -1,5 +1,7 @@
 --TEST--
 008: Register Allocation (MOD + DIV)
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

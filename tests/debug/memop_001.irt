@@ -1,5 +1,7 @@
 --TEST--
 001: Memory update (binary op with const)
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

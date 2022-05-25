@@ -1,5 +1,7 @@
 --TEST--
 004: add_ov function (jmp probability)
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

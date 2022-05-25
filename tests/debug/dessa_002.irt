@@ -1,5 +1,7 @@
 --TEST--
 DESSA 002
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

@@ -1,5 +1,7 @@
 --TEST--
 007: Register Allocation (MOD + MUL)
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

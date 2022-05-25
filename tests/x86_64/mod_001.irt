@@ -1,5 +1,7 @@
 --TEST--
 001: mod function
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

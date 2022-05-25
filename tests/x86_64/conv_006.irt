@@ -1,5 +1,7 @@
 --TEST--
 006: type conversion INT2FP
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

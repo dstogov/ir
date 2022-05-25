@@ -1,5 +1,7 @@
 --TEST--
 011: type conversion TRUNC
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--

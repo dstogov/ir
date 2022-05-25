@@ -1,5 +1,7 @@
 --TEST--
 Indirect Tail CALL
+--TARGET--
+x86_64
 --ARGS--
 -S
 --CODE--
