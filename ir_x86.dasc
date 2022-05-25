@@ -6763,12 +6763,17 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 
 	ret = dasm_encode(&data.dasm_state, entry);
 
+	if (data.jmp_table_label) {
+		uint32_t offset = dasm_getpclabel(&data.dasm_state, data.jmp_table_label);
+		ctx->jmp_table_offset = offset;
+	} else {
+		ctx->jmp_table_offset = 0;
+	}
 	if (data.rodata_label) {
-		int rodata = dasm_getpclabel(&data.dasm_state, data.rodata_label);
-		*size = rodata;
-	} else if (data.jmp_table_label) {
-		int rodata = dasm_getpclabel(&data.dasm_state, data.jmp_table_label);
-		*size = rodata;
+		uint32_t offset = dasm_getpclabel(&data.dasm_state, data.rodata_label);
+		ctx->rodata_offset = offset;
+	} else {
+		ctx->rodata_offset = 0;
 	}
 
 	if (ret != DASM_S_OK) {

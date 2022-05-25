@@ -35,19 +35,29 @@ x86_64
 --EXPECT--
 test:
 	cmpl $3, %edi
-	jg .L2
+	jg .L5
 	cmpl $1, %edi
-	jl .L2
+	jl .L5
 	movslq %edi, %rdi
-	leaq 0x24(%rip), %rax
+	leaq .L6(%rip), %rax
 	jmpq *-8(%rax, %rdi, 8)
-	movl $1, %eax
 .L1:
-	retq
-	movl $2, %eax
-	jmp .L1
-	movl $3, %eax
-	jmp .L1
+	movl $1, %eax
 .L2:
+	retq
+.L3:
+	movl $2, %eax
+	jmp .L2
+.L4:
+	movl $3, %eax
+	jmp .L2
+.L5:
 	movl $4, %eax
-	jmp .L1
+	jmp .L2
+.rodata
+.align 8
+.L6:
+	.qword .L1
+	.qword .L3
+	.qword .L4
+	.qword .L5

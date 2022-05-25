@@ -415,7 +415,7 @@ int main(int argc, char **argv)
 		if (entry) {
 			if (dump_asm) {
 				ir_disasm_add_symbol("test", (uintptr_t)entry, size);
-				ir_disasm("test", entry, size);
+				ir_disasm("test", entry, size, ctx.rodata_offset, ctx.jmp_table_offset);
 			}
 			if (run) {
 				int (*func)(void) = entry;

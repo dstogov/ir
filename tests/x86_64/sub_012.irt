@@ -14,6 +14,10 @@ x86_64
 }
 --EXPECT--
 test:
-	vmovsd 8(%rip), %xmm1
+	vmovsd .L1(%rip), %xmm1
 	vsubsd %xmm0, %xmm1, %xmm0
 	retq
+.rodata
+	.db 0x90, 0x90, 0x90
+.L1:
+	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f

@@ -83,7 +83,7 @@ test:
 	pushq %rbp
 	movq %rsp, %rbp
 	subq $0x38, %rsp
-	subsd 0xb0(%rip), %xmm1
+	subsd .L3(%rip), %xmm1
 	movsd %xmm1, -0x38(%rbp)
 	movsd %xmm0, -0x30(%rbp)
 	xorpd %xmm0, %xmm0
@@ -116,7 +116,7 @@ test:
 	movsd %xmm0, -0x28(%rbp)
 	movsd -0x10(%rbp), %xmm0
 	addsd -8(%rbp), %xmm0
-	ucomisd 0x26(%rip), %xmm0
+	ucomisd .L4(%rip), %xmm0
 	ja .L2
 	movl (%rax), %ecx
 	cmpl $0x3e8, %ecx
@@ -130,3 +130,9 @@ test:
 	movq %rbp, %rsp
 	popq %rbp
 	retq
+.rodata
+	.db 0x90, 0x90, 0x90, 0x90
+.L3:
+	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f
+.L4:
+	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x40

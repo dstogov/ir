@@ -79,7 +79,7 @@ test:
 	movsd %xmm0, (%rsp)
 	movsd %xmm1, 8(%rsp)
 	movsd 8(%rsp), %xmm0
-	subsd 0xf3(%rip), %xmm0
+	subsd .L5(%rip), %xmm0
 	movsd %xmm0, 0x10(%rsp)
 	movsd (%rsp), %xmm0
 	movsd %xmm0, 0x18(%rsp)
@@ -117,7 +117,7 @@ test:
 	addsd 0x40(%rsp), %xmm0
 	movsd %xmm0, 0x60(%rsp)
 	movsd 0x60(%rsp), %xmm0
-	ucomisd 0x2b(%rip), %xmm0
+	ucomisd .L6(%rip), %xmm0
 	ja .L2
 	jmp .L3
 .L2:
@@ -132,3 +132,8 @@ test:
 	retq
 .L4:
 	jmp .L1
+.rodata
+.L5:
+	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f
+.L6:
+	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x40

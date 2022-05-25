@@ -617,6 +617,8 @@ typedef struct _ir_ctx {
 	ir_regs           *regs;
 	uint32_t          *prev_insn_len;
 	void              *data;
+	uint32_t           rodata_offset;
+	uint32_t           jmp_table_offset;
 	ir_strtab          strtab;
 	ir_ref             prev_insn_chain[IR_LAST_FOLDABLE + 1];
 	ir_ref             prev_const_chain[IR_LAST_TYPE];
@@ -773,7 +775,7 @@ const char *ir_reg_name(int8_t reg, ir_type type);
 int ir_disasm_init(void);
 void ir_disasm_free(void);
 void ir_disasm_add_symbol(const char *name, uint64_t addr, uint64_t size);
-int ir_disasm(const char *name, const void *start, size_t size);
+int ir_disasm(const char *name, const void *start, size_t size, uint32_t rodata_offset, uint32_t jmp_table_offset);
 
 /* Linux perf interface (implementation in ir_perf.c) */
 void ir_perf_jitdump_open(void);

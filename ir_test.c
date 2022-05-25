@@ -218,7 +218,7 @@ int main(int argc, char **argv)
 	void *entry = ir_emit(&ctx, &size);
 
 	if (entry) {
-		ir_disasm("test", entry, size);
+		ir_disasm("test", entry, size, ctx.rodata_offset, ctx.jmp_table_offset);
 
 		ir_perf_map_register("test", entry, size);
 		ir_perf_jitdump_open();

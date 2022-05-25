@@ -55,7 +55,7 @@ x86_64
 }
 --EXPECT--
 test:
-	subsd 0x70(%rip), %xmm1
+	subsd .L4(%rip), %xmm1
 	xorpd %xmm3, %xmm3
 	xorpd %xmm2, %xmm2
 	movabsq $0x200000000, %rax
@@ -67,7 +67,7 @@ test:
 	mulsd %xmm3, %xmm5
 	movapd %xmm5, %xmm6
 	addsd %xmm4, %xmm6
-	ucomisd 0x42(%rip), %xmm6
+	ucomisd .L5(%rip), %xmm6
 	ja .L2
 	movabsq $0x2000003e8, %rcx
 	cmpq %rcx, %rax
@@ -84,3 +84,9 @@ test:
 .L3:
 	movabsq $0x200000000, %rax
 	retq
+.rodata
+	.db 0x90, 0x90, 0x90
+.L4:
+	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f
+.L5:
+	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x40

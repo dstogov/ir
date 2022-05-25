@@ -14,8 +14,12 @@ x86_64
 }
 --EXPECT--
 test:
-	vucomisd 0x10(%rip), %xmm0
+	vucomisd .L1(%rip), %xmm0
 	setnp %al
 	movl $0, %ecx
 	cmovnel %ecx, %eax
 	retq
+.rodata
+	.db 0x90, 0x90, 0x90
+.L1:
+	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00

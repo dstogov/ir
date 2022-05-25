@@ -35,9 +35,6 @@
 		- RETURN_FP
 	-  binary code emission without DynAsm ???
 
-?  disassembler
-    -  .rodata section and relative data labels
-
 -  modules (functions, data objecs, import, export, prototypes, forward declarations, memory segments, ref data, expr data) 
 -  C front-end
 -  interpreter
