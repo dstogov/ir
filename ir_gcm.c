@@ -5,7 +5,7 @@
  *
  * C. Click. "Global code motion, global value numbering" Submitted to PLDI ‘95.
  */
-static void ir_gcm_schedule_early(ir_ctx *ctx, int *_blocks, ir_ref ref)
+static void ir_gcm_schedule_early(ir_ctx *ctx, uint32_t *_blocks, ir_ref ref)
 {
 	ir_ref j, n, *p;
 	ir_insn *insn;
@@ -38,7 +38,7 @@ static void ir_gcm_schedule_early(ir_ctx *ctx, int *_blocks, ir_ref ref)
 }
 
 /* Last Common Ancestor */
-static int ir_gcm_find_lca(ir_ctx *ctx, int b1, int b2)
+static uint32_t ir_gcm_find_lca(ir_ctx *ctx, uint32_t b1, uint32_t b2)
 {
 	while (ctx->cfg_blocks[b1].dom_depth > ctx->cfg_blocks[b2].dom_depth) {
 		b1 = ctx->cfg_blocks[b1].dom_parent;
@@ -53,7 +53,7 @@ static int ir_gcm_find_lca(ir_ctx *ctx, int b1, int b2)
 	return b2;
 }
 
-static void ir_gcm_schedule_late(ir_ctx *ctx, int *_blocks, ir_bitset visited, ir_ref ref)
+static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visited, ir_ref ref)
 {
 	ir_ref i, n, *p, use;
 	ir_insn *insn;
@@ -62,7 +62,7 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, int *_blocks, ir_bitset visited, i
 	ir_bitset_incl(visited, ref);
 	n = ctx->use_lists[ref].count;
 	if (n) {
-		int lca, b;
+		uint32_t lca, b;
 
 		for (i = 0, p = &ctx->use_edges[ctx->use_lists[ref].refs]; i < n; i++, p++) {
 			use = *p;
@@ -112,12 +112,11 @@ int ir_gcm(ir_ctx *ctx)
 	ir_bitset visited;
 	ir_block *bb;
 	ir_list queue;
-	int *_blocks;
+	uint32_t *_blocks;
 	ir_insn *insn;
 	uint32_t flags;
 
-	_blocks = ir_mem_malloc(ctx->insns_count * sizeof(int));
-	memset(_blocks, 0, ctx->insns_count * sizeof(int));
+	_blocks = ir_mem_calloc(ctx->insns_count, sizeof(uint32_t));
 	ir_list_init(&queue, ctx->insns_count);
 
 	/* pin control instructions and collect their direct inputs */
@@ -206,7 +205,7 @@ int ir_gcm(ir_ctx *ctx)
 	}
 #endif
 
-	ctx->gcm_blocks = _blocks;
+	ctx->cfg_map = _blocks;
 
 	return 1;
 }
@@ -306,7 +305,7 @@ static int ir_copy(ir_ctx *new_ctx, ir_ctx *ctx, ir_ref *_next, bool preserve_co
 	}
 
 	if (ctx->cfg_blocks) {
-		int b;
+		uint32_t b;
 		ir_block *bb;
 
 		new_ctx->cfg_blocks_count = ctx->cfg_blocks_count;
@@ -336,7 +335,7 @@ int ir_schedule(ir_ctx *ctx)
 	ir_ctx new_ctx;
 	ir_ref i, j, k;
 	ir_ref b;
-	ir_ref *_blocks = ctx->gcm_blocks;
+	uint32_t *_blocks = ctx->cfg_map;
 	ir_ref *_next = ir_mem_calloc(ctx->insns_count, sizeof(ir_ref));
 	ir_ref *_prev = ir_mem_calloc(ctx->insns_count, sizeof(ir_ref));
 	ir_ref _rest = 0;

@@ -1,7 +1,7 @@
 --TEST--
 013: SCCP+GVN (Figure 3.11 from "Combining Analyses, Combining Optimization" by C.Click)
 --ARGS--
---dump-use-lists --dump-gcm --save --dump-after-gcm
+--dump-use-lists --dump-cfg-map --save --dump-after-gcm
 --CODE--
 {
 	uintptr_t c_1 = 0;
@@ -93,7 +93,7 @@
 00028(1): [00029]
 00029(1): [00030]
 }
-{ # GCM
+{ # CFG map (insn -> bb)
 1 -> 1
 2 -> 1
 3 -> 1

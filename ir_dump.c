@@ -243,13 +243,13 @@ void ir_dump_cfg(ir_ctx *ctx, FILE *f)
 	}
 }
 
-void ir_dump_gcm(ir_ctx *ctx, FILE *f)
+void ir_dump_cfg_map(ir_ctx *ctx, FILE *f)
 {
 	ir_ref i;
-    ir_ref *_blocks = ctx->gcm_blocks;
+    uint32_t *_blocks = ctx->cfg_map;
 
     if (_blocks) {
-		fprintf(f, "{ # GCM\n");
+		fprintf(f, "{ # CFG map (insn -> bb)\n");
 		for (i = IR_UNUSED + 1; i < ctx->insns_count; i++) {
 			fprintf(f, "%d -> %d\n", i, _blocks[i]);
 		}

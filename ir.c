@@ -254,7 +254,7 @@ void ir_init(ir_ctx *ctx, ir_ref consts_limit, ir_ref insns_limit)
 	ctx->cfg_edges_count = 0;
 	ctx->cfg_blocks = NULL;
 	ctx->cfg_edges = NULL;
-	ctx->gcm_blocks = NULL;
+	ctx->cfg_map = NULL;
 	ctx->rules = NULL;
 	ctx->vregs_count = 0;
 	ctx->vregs = NULL;
@@ -298,8 +298,8 @@ void ir_free(ir_ctx *ctx)
 	if (ctx->cfg_edges) {
 		ir_mem_free(ctx->cfg_edges);
 	}
-	if (ctx->gcm_blocks) {
-		ir_mem_free(ctx->gcm_blocks);
+	if (ctx->cfg_map) {
+		ir_mem_free(ctx->cfg_map);
 	}
 	if (ctx->rules) {
 		ir_mem_free(ctx->rules);

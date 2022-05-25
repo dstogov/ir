@@ -587,7 +587,7 @@ struct _ir_live_interval {
 typedef int8_t ir_regs[4];
 
 typedef struct _ir_ctx {
-	ir_insn           *ir_base;
+	ir_insn           *ir_base;           /* two directional array - instructions grow down, constants grow up */
 	ir_ref             insns_count;
     ir_ref             insns_limit;
     ir_ref             consts_count;
@@ -595,13 +595,13 @@ typedef struct _ir_ctx {
 	uint32_t           flags;
     ir_ref             fold_cse_limit;
 	ir_insn            fold_insn;
-    ir_use_list       *use_lists;
+    ir_use_list       *use_lists;         /* def->use lists for each instruction */
     ir_ref            *use_edges;
     uint32_t           cfg_blocks_count;
     uint32_t           cfg_edges_count;
-    ir_block          *cfg_blocks;
+    ir_block          *cfg_blocks;        /* list of Basic Blocks (starts from 1) */
     uint32_t          *cfg_edges;
-    int               *gcm_blocks;
+    uint32_t          *cfg_map;           /* map of instructions to Basic Block number */
     uint32_t          *rules;
     uint32_t           vregs_count;
     uint32_t          *vregs;
@@ -799,7 +799,7 @@ void ir_dump(ir_ctx *ctx, FILE *f);
 void ir_dump_dot(ir_ctx *ctx, FILE *f);
 void ir_dump_use_lists(ir_ctx *ctx, FILE *f);
 void ir_dump_cfg(ir_ctx *ctx, FILE *f);
-void ir_dump_gcm(ir_ctx *ctx, FILE *f);
+void ir_dump_cfg_map(ir_ctx *ctx, FILE *f);
 void ir_dump_live_ranges(ir_ctx *ctx, FILE *f);
 
 /* IR to C conversion (implementation in ir_emit_c.c) */

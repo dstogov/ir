@@ -23,7 +23,7 @@ static void help(const char *cmd)
 		"  --dump-after-all           - dump IR after each pass\n"
 		"  --dump-use-lists           - dump def->use lists\n"
 		"  --dump-cfg                 - dump CFG (Control Flow Graph)\n"
-		"  --dump-gcm                 - dump GCM schedule (Global Code Motion)\n"
+		"  --dump-cfg-map             - dump CFG map (instruction to BB number)\n"
 #ifdef IR_DEBUG
 		"  --debug-sccp               - debug SCCP optimization pass\n"
 		"  --debug-gcm                - debug GCM optimization pass\n"
@@ -41,7 +41,7 @@ static void help(const char *cmd)
 #define IR_DUMP_DOT                 (1<<2)
 #define IR_DUMP_USE_LISTS           (1<<3)
 #define IR_DUMP_CFG                 (1<<4)
-#define IR_DUMP_GCM                 (1<<5)
+#define IR_DUMP_CFG_MAP             (1<<5)
 #define IR_DUMP_LIVE_RANGES         (1<<6)
 
 #define IR_DUMP_AFTER_LOAD          (1<<16)
@@ -107,8 +107,8 @@ static int _save(ir_ctx *ctx, uint32_t dump, uint32_t pass, const char *dump_fil
 	if (dump & IR_DUMP_CFG) {
 		ir_dump_cfg(ctx, f);
 	}
-	if (dump & IR_DUMP_GCM) {
-		ir_dump_gcm(ctx, f);
+	if (dump & IR_DUMP_CFG_MAP) {
+		ir_dump_cfg_map(ctx, f);
 	}
 	if (dump & IR_DUMP_LIVE_RANGES) {
 		ir_dump_live_ranges(ctx, f);
@@ -286,8 +286,8 @@ int main(int argc, char **argv)
 			dump |= IR_DUMP_USE_LISTS;
 		} else if (strcmp(argv[i], "--dump-cfg") == 0) {
 			dump |= IR_DUMP_CFG;
-		} else if (strcmp(argv[i], "--dump-gcm") == 0) {
-			dump |= IR_DUMP_GCM;
+		} else if (strcmp(argv[i], "--dump-cfg-map") == 0) {
+			dump |= IR_DUMP_CFG_MAP;
 		} else if (strcmp(argv[i], "--dump-live-ranges") == 0) {
 			dump |= IR_DUMP_LIVE_RANGES;
 		} else if (strcmp(argv[i], "--dump-after-load") == 0) {

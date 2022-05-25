@@ -1,7 +1,7 @@
 --TEST--
 007: GCM for simple loop (Figure 7 from "Global Code Motion Global Value Numbering" by Cliff Click)
 --ARGS--
---dump-gcm --save --dump-after-gcm
+--dump-cfg-map --save --dump-after-gcm
 --CODE--
 {
 	uintptr_t c_1 = 0;
@@ -54,7 +54,7 @@
 	l_15 = BEGIN(l_14);
 	l_16 = RETURN(l_15, d_8);
 }
-{ # GCM
+{ # CFG map (insn -> bb)
 1 -> 1
 2 -> 1
 3 -> 1
