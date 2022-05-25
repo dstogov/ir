@@ -401,11 +401,18 @@ int ir_schedule(ir_ctx *ctx)
 #endif
 
 	/* Topological sort according dependencies inside each basic block */
-	uint32_t len = ir_bitset_len(ctx->insns_count);
 	ir_bitset scheduled = ir_bitset_malloc(ctx->insns_count);
 	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; b++, bb++) {
-		ir_bitset_clear(scheduled, len);
-		for (i = bb->start; i <= bb->end && i > 0; i = _next[i]) {
+		i = bb->start;
+		ir_bitset_incl(scheduled, i);
+		i = _next[i];
+		insn = &ctx->ir_base[i];
+		while (insn->op == IR_PARAM || insn->op == IR_VAR || insn->op == IR_PI || insn->op == IR_PHI) {
+			ir_bitset_incl(scheduled, i);
+			i = _next[i];
+			insn = &ctx->ir_base[i];
+		}
+		for (; i != bb->end; i = _next[i]) {
 			ir_ref n, j, *p, def;
 
 restart:
