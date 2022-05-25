@@ -260,7 +260,6 @@ void ir_init(ir_ctx *ctx, ir_ref consts_limit, ir_ref insns_limit)
 	ctx->vregs = NULL;
 	ctx->live_intervals = NULL;
 	ctx->regs = NULL;
-	ctx->unused_live_ranges = NULL;
 	ctx->prev_insn_len = NULL;
 	ctx->data = NULL;
 
@@ -309,9 +308,6 @@ void ir_free(ir_ctx *ctx)
 	}
 	if (ctx->live_intervals) {
 		ir_free_live_intervals(ctx->live_intervals, ctx->vregs_count);
-	}
-	if (ctx->unused_live_ranges) {
-		ir_free_live_ranges(ctx->unused_live_ranges);
 	}
 	if (ctx->regs) {
 		ir_mem_free(ctx->regs);

@@ -606,7 +606,6 @@ typedef struct _ir_ctx {
     uint32_t           vregs_count;
     uint32_t          *vregs;
     ir_live_interval **live_intervals;
-    ir_live_range     *unused_live_ranges;
     ir_regs           *regs;
     union {
 	    uint32_t      *prev_insn_len;
