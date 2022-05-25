@@ -414,7 +414,8 @@ restart:
 			n = ir_input_edges_count(ctx, insn);
 			for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
 				def = *p;
-				if (def && _blocks[def] == b
+				if (def > 0
+						&& _blocks[def] == b
 						&& !ir_bitset_in(scheduled, def)
 						&& insn->op != IR_PHI
 						&& insn->op != IR_PI) {
