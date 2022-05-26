@@ -5118,7 +5118,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 					|	ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [Ra(IR_REG_RSP)+stack_offset], tmp_fp_reg
 				}
 			}
-			stack_offset += sizeof(void*);
+			stack_offset += IR_MAX(sizeof(void*), ir_type_size[type]);
 		}
 	}
 
