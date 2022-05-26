@@ -5600,10 +5600,10 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
 		/* skip old frame pointer and return address */
-		stack_offset = sizeof(void*) + (data->stack_frame_size - data->stack_frame_alignment);
+		stack_offset = sizeof(void*) * 2 + (data->stack_frame_size - data->stack_frame_alignment);
 	} else {
 		 /* skip return address */
-		stack_offset = data->stack_frame_size;
+		stack_offset = sizeof(void*) + data->stack_frame_size;
 	}
 	n = use_list->count;
 	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
@@ -5615,7 +5615,6 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 					src_reg = int_reg_params[int_param_num];
 				} else {
 					src_reg = IR_REG_NONE;
-					stack_offset += sizeof(void*);
 				}
 				int_param_num++;
 			} else {
@@ -5623,12 +5622,11 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 					src_reg = fp_reg_params[fp_param_num];
 				} else {
 					src_reg = IR_REG_NONE;
-					stack_offset += sizeof(void*);
 				}
 				fp_param_num++;
 			}
-			if (ctx->vregs[use]) {
-				if (src_reg == IR_REG_NONE) {
+			if (src_reg == IR_REG_NONE) {
+				if (ctx->vregs[use]) {
 					ir_live_interval *ival = ctx->live_intervals[ctx->vregs[use]];
 					if ((ival->flags & IR_LIVE_INTERVAL_MEM_PARAM)
 					 && ival->stack_spill_pos == -1
@@ -5636,6 +5634,11 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 						ival->stack_spill_pos = stack_offset;
 						ctx->regs[use][0] = IR_REG_NONE;
 					}
+				}
+				if (sizeof(void*) == 8) {
+					stack_offset += sizeof(void*);
+				} else {
+					stack_offset += IR_MAX(sizeof(void*), ir_type_size[insn->type]);
 				}
 			}
 		}
