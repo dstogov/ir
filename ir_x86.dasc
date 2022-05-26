@@ -814,6 +814,8 @@ static bool ir_call_needs_tmp_int_reg(ir_ctx *ctx, ir_ref ref)
 				if (int_param > 0) {
 					return 1; /* for swap */
 				}
+			} else if (IR_IS_CONST_REF(arg) && arg_insn->op == IR_STR) {
+				return 1;
 			} else {
 				return 0;
 			}
@@ -5048,21 +5050,29 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 			/* Pass argument through stack (REG->MEM, IMM->MEM, MEM->MEM moves) */
 			if (IR_IS_TYPE_INT(type)) {
 				if (IR_IS_CONST_REF(arg)) {
-					ir_val *val = &ctx->ir_base[arg].val;
-					if (IR_IS_SIGNED_32BIT(val->i64)) {
+					ir_insn *val_insn = &ctx->ir_base[arg];
+
+					if (val_insn->op == IR_STR) {
+						int label = ctx->cfg_blocks_count - arg;
+
+						IR_ASSERT(tmp_reg != IR_REG_NONE);
+						|	lea Ra(tmp_reg), aword [=>label]
+						|	mov [Ra(IR_REG_RSP)+stack_offset], Ra(tmp_reg)
+						val_insn->emit_const = 1;
+					} else if (IR_IS_SIGNED_32BIT(val_insn->val.i64)) {
 						if (ir_type_size[type] <= 4) {
-							|	mov dword [Ra(IR_REG_RSP)+stack_offset], val->i32
+							|	mov dword [Ra(IR_REG_RSP)+stack_offset], val_insn->val.i32
 						} else {
 							IR_ASSERT(sizeof(void*) == 8);
 |.if X64
-							|	mov qword [rsp+stack_offset], val->i32
+							|	mov qword [rsp+stack_offset], val_insn->val.i32
 |.endif
 						}
 					} else {
 						IR_ASSERT(sizeof(void*) == 8);
 |.if X64
 						IR_ASSERT(tmp_reg != IR_REG_NONE);
-						|	mov64 Ra(tmp_reg), val->i64
+						|	mov64 Ra(tmp_reg), val_insn->val.i64
 						|	mov [rsp+stack_offset], Ra(tmp_reg)
 |.endif
 					}
