@@ -6002,6 +6002,18 @@ static void ir_calc_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
 		}
 	}
 
+	ival = ctx->live_intervals[0];
+	while (ival) {
+		if (ival->reg >= 0) {
+			if (!IR_REGSET_IN(data->used_preserved_regs, ival->reg)
+			 && IR_REGSET_IN(IR_REGSET_PRESERVED, ival->reg)) {
+				IR_REGSET_INCL(data->used_preserved_regs, ival->reg);
+				additional_size += sizeof(void*);
+			}
+		}
+		ival = ival->next;
+	}
+
 #ifndef IR_REG_FP_RET1
 	ir_type ret_type = ir_get_return_type(ctx);
 	if (ret_type == IR_FLOAT) {

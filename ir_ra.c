@@ -1933,6 +1933,8 @@ static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 			IR_ASSERT(0);
 			return 0;
 		}
+	} else {
+		return 1;
 	}
 	if (!ir_has_tmp(ctx, bb->end, tmp_reg.num)) {
 		ir_add_tmp(ctx, bb->end, tmp_reg);
