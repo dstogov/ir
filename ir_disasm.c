@@ -228,6 +228,14 @@ static uint64_t ir_disasm_rodata_reference(csh cs, const cs_insn *insn)
 			return (uint32_t)insn->detail->x86.operands[i].mem.disp;
 		}
 	}
+	if (cs_insn_group(cs, insn, X86_GRP_JUMP)) {
+		for (i = 0; i < insn->detail->x86.op_count; i++) {
+			if (insn->detail->x86.operands[i].type == X86_OP_MEM
+			 && insn->detail->x86.operands[i].mem.disp) {
+				return (uint32_t)insn->detail->x86.operands[i].mem.disp;
+			}
+		}
+	}
 #elif defined(IR_TARGET_X64)
 	for (i = 0; i < insn->detail->x86.op_count; i++) {
 		if (insn->detail->x86.operands[i].type == X86_OP_MEM
@@ -616,6 +624,10 @@ int ir_disasm(const char    *name,
 						break;
 					}
 					r++;
+				}
+				if (p - 1 != q && *(q-2) == '-') {
+					q--;
+					addr = (uint32_t)(-addr);
 				}
 				if (addr >= (uint64_t)(uintptr_t)start && addr < (uint64_t)(uintptr_t)orig_end) {
 					l = ir_addrtab_find(&labels, (uint32_t)((uintptr_t)addr - (uintptr_t)start));

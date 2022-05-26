@@ -4717,7 +4717,7 @@ static void ir_emit_switch(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 		}
 
 		if (IR_IS_32BIT(type, min)) {
-			offset = -min.i64 * 8;
+			offset = -min.i64 * sizeof(void*);
 			if (IR_IS_SIGNED_32BIT(offset)) {
 				|	ASM_REG_IMM_OP cmp, type, op2_reg, min.i32
 			} else {
