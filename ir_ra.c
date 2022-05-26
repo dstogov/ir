@@ -1784,7 +1784,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 		ir_live_pos split_pos;
 
 		if (next_use_pos == ival->range.start) {
-			IR_ASSERT(use_pos && use_pos->op_num == 0);
+			IR_ASSERT(ival->use_pos && ival->use_pos->op_num == 0);
 			/* split right after definition */
 			split_pos = next_use_pos + 1;
 		} else {
