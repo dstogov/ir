@@ -448,6 +448,10 @@ typedef struct _ir_backend_data {
 	int32_t     unused_slot_1;
 	int32_t     stack_frame_alignment;
 	int32_t     call_stack_size;
+#ifndef IR_REG_FP_RET1
+	int32_t     float_ret_slot;
+	int32_t     double_ret_slot;
+#endif
 	ir_regset   used_preserved_regs;
 	uint32_t    dessa_from_block;
 	dasm_State *dasm_state;
@@ -3633,8 +3637,17 @@ static void ir_emit_return_fp(ir_ctx *ctx, ir_reg ref, ir_insn *insn)
 			IR_ASSERT(0);
 		}
 	} else {
-		int32_t offset = 0; // TODO: ???
-		ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_RBP : IR_REG_RSP;
+		int32_t offset = (type == IR_FLOAT) ? data->float_ret_slot : data->double_ret_slot;
+		ir_reg fp;
+
+		IR_ASSERT(offset != -1);
+		if (ctx->flags & IR_USE_FRAME_POINTER) {
+			offset = offset - (data->stack_frame_size - data->stack_frame_alignment);
+			fp = IR_REG_RBP;
+		} else {
+			offset = offset + data->call_stack_size;
+			fp = IR_REG_RSP;
+		}
 		|	ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [Ra(fp)+offset], op2_reg
 		if (type == IR_FLOAT) {
 			|	fld dword [Ra(fp)+offset]
@@ -5499,59 +5512,74 @@ static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 	return 1;
 }
 
-static void ir_allocate_spill_slot(ir_ctx *ctx, ir_live_interval *ival, ir_backend_data *data)
+static int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type, ir_backend_data *data)
 {
-	uint8_t size = ir_type_size[ival->type];
+	int32_t ret;
+	uint8_t size = ir_type_size[type];
 
 	if (size == 8) {
-		ival->stack_spill_pos = data->stack_frame_size;
+		ret = data->stack_frame_size;
 		data->stack_frame_size += 8;
 	} else if (size == 4) {
 		if (data->unused_slot_4) {
-			ival->stack_spill_pos = data->unused_slot_4;
+			ret = data->unused_slot_4;
 			data->unused_slot_4 = 0;
 		} else {
-			ival->stack_spill_pos = data->stack_frame_size;
-			data->unused_slot_4 = data->stack_frame_size + 4;
-			data->stack_frame_size += 8;
+			ret = data->stack_frame_size;
+			if (sizeof(void*) == 8) {
+				data->unused_slot_4 = data->stack_frame_size + 4;
+				data->stack_frame_size += 8;
+			} else {
+				data->stack_frame_size += 4;
+			}
 		}
 	} else if (size == 2) {
 		if (data->unused_slot_2) {
-			ival->stack_spill_pos = data->unused_slot_2;
+			ret = data->unused_slot_2;
 			data->unused_slot_2 = 0;
 		} else if (data->unused_slot_4) {
-			ival->stack_spill_pos = data->unused_slot_4;
+			ret = data->unused_slot_4;
 			data->unused_slot_2 = data->unused_slot_4 + 2;
 			data->unused_slot_4 = 0;
 		} else {
-			ival->stack_spill_pos = data->stack_frame_size;
+			ret = data->stack_frame_size;
 			data->unused_slot_2 = data->stack_frame_size + 2;
-			data->unused_slot_4 = data->stack_frame_size + 4;
-			data->stack_frame_size += 8;
+			if (sizeof(void*) == 8) {
+				data->unused_slot_4 = data->stack_frame_size + 4;
+				data->stack_frame_size += 8;
+			} else {
+				data->stack_frame_size += 4;
+			}
 		}
 	} else if (size == 1) {
 		if (data->unused_slot_1) {
-			ival->stack_spill_pos = data->unused_slot_1;
+			ret = data->unused_slot_1;
 			data->unused_slot_1 = 0;
 		} else if (data->unused_slot_2) {
-			ival->stack_spill_pos = data->unused_slot_2;
+			ret = data->unused_slot_2;
 			data->unused_slot_1 = data->unused_slot_2 + 1;
 			data->unused_slot_2 = 0;
 		} else if (data->unused_slot_4) {
-			ival->stack_spill_pos = data->unused_slot_4;
+			ret = data->unused_slot_4;
 			data->unused_slot_1 = data->unused_slot_4 + 1;
 			data->unused_slot_2 = data->unused_slot_4 + 2;
 			data->unused_slot_4 = 0;
 		} else {
-			ival->stack_spill_pos = data->stack_frame_size;
+			ret = data->stack_frame_size;
 			data->unused_slot_1 = data->stack_frame_size + 1;
 			data->unused_slot_2 = data->stack_frame_size + 2;
-			data->unused_slot_4 = data->stack_frame_size + 4;
-			data->stack_frame_size += 8;
+			if (sizeof(void*) == 8) {
+				data->unused_slot_4 = data->stack_frame_size + 4;
+				data->stack_frame_size += 8;
+			} else {
+				data->stack_frame_size += 4;
+			}
 		}
 	} else {
 		IR_ASSERT(0);
+		ret = -1;
 	}
+	return ret;
 }
 
 static void ir_fix_param_spills(ir_ctx *ctx)
@@ -5614,6 +5642,44 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 	}
 }
 
+static uint8_t ir_get_return_type(ir_ctx *ctx)
+{
+	ir_ref ref;
+	ir_insn *insn;
+	uint8_t ret_type = 255;
+
+	/* Check all RETURN nodes */
+	ref = ctx->ir_base[1].op1;
+	while (ref) {
+		insn = &ctx->ir_base[ref];
+		if (insn->op == IR_RETURN) {
+			if (ret_type == 255) {
+				if (insn->op2) {
+					ret_type = ctx->ir_base[insn->op2].type;
+				} else {
+					ret_type = IR_VOID;
+				}
+			} else if (insn->op2) {
+				if (ret_type != ctx->ir_base[insn->op2].type) {
+					IR_ASSERT(0 && "conflicting return types");
+					return 0;
+				}
+			} else {
+				if (ret_type != IR_VOID) {
+					IR_ASSERT(0 && "conflicting return types");
+					return 0;
+				}
+			}
+		}
+		ref = ctx->ir_base[ref].op3;
+	}
+
+	if (ret_type == 255) {
+		ret_type = IR_VOID;
+	}
+	return ret_type;
+}
+
 static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 {
 	int b;
@@ -5624,6 +5690,19 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 	ir_backend_data *data = ctx->data;
 	ir_regset available = 0;
 	ir_tmp_reg tmp_regs[4];
+
+#ifndef IR_REG_FP_RET1
+	ir_type ret_type = ir_get_return_type(ctx);
+	if (ret_type == IR_FLOAT) {
+		if (data->float_ret_slot == -1) {
+			data->float_ret_slot = ir_allocate_spill_slot(ctx, ret_type, data);
+		}
+	} else if (ret_type == IR_DOUBLE) {
+		if (data->double_ret_slot == -1) {
+			data->double_ret_slot = ir_allocate_spill_slot(ctx, ret_type, data);
+		}
+	}
+#endif
 
 	ctx->regs = ir_mem_malloc(sizeof(ir_regs) * ctx->insns_count);
 	memset(ctx->regs, IR_REG_NONE, sizeof(ir_regs) * ctx->insns_count);
@@ -5687,7 +5766,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 							if (insn->op == IR_PARAM && reg == IR_REG_NONE) {
 								ival->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
 							} else {
-								ir_allocate_spill_slot(ctx, ival, data);
+								ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type, data);
 							}
 							ival->top = ival;
 							if (insn->op == IR_VAR) {
@@ -5839,44 +5918,6 @@ static void ir_mark_empty_blocks(ir_ctx *ctx)
 	}
 }
 
-static uint8_t ir_get_return_type(ir_ctx *ctx)
-{
-	ir_ref ref;
-	ir_insn *insn;
-	uint8_t ret_type = 255;
-
-	/* Check all RETURN nodes */
-	ref = ctx->ir_base[1].op1;
-	while (ref) {
-		insn = &ctx->ir_base[ref];
-		if (insn->op == IR_RETURN) {
-			if (ret_type == 255) {
-				if (insn->op2) {
-					ret_type = ctx->ir_base[insn->op2].type;
-				} else {
-					ret_type = IR_VOID;
-				}
-			} else if (insn->op2) {
-				if (ret_type != ctx->ir_base[insn->op2].type) {
-					IR_ASSERT(0 && "conflicting return types");
-					return 0;
-				}
-			} else {
-				if (ret_type != IR_VOID) {
-					IR_ASSERT(0 && "conflicting return types");
-					return 0;
-				}
-			}
-		}
-		ref = ctx->ir_base[ref].op3;
-	}
-
-	if (ret_type == 255) {
-		ret_type = IR_VOID;
-	}
-	return ret_type;
-}
-
 static void ir_preallocate_call_stack(ir_ctx *ctx, ir_backend_data *data)
 {
 	int call_stack_size, peak_call_stack_size = 0;
@@ -5926,9 +5967,13 @@ static void ir_calc_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
 #ifndef IR_REG_FP_RET1
 	ir_type ret_type = ir_get_return_type(ctx);
 	if (ret_type == IR_FLOAT) {
-		additional_size += sizeof(float);
+		if (data->float_ret_slot == -1) {
+			data->float_ret_slot = ir_allocate_spill_slot(ctx, ret_type, data);
+		}
 	} else if (ret_type == IR_DOUBLE) {
-		additional_size += sizeof(double);
+		if (data->double_ret_slot == -1) {
+			data->double_ret_slot = ir_allocate_spill_slot(ctx, ret_type, data);
+		}
 	}
 #endif
 
@@ -5976,6 +6021,10 @@ void *ir_emit(ir_ctx *ctx, size_t *size)
 	data.unused_slot_1 = 0;
 	data.stack_frame_alignment = 0;
 	data.call_stack_size = 0;
+#ifndef IR_REG_FP_RET1
+	data.float_ret_slot = -1;
+	data.double_ret_slot = -1;
+#endif
 	data.used_preserved_regs = 0;
 	data.rodata_label = 0;
 	data.jmp_table_label = 0;
