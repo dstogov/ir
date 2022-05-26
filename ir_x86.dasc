@@ -2346,6 +2346,10 @@ static void ir_emit_shift(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_emit_load(ctx, type, op2_reg, insn->op2);
 	}
 	if (op2_reg != IR_REG_RCX) {
+		if (op1_reg == IR_REG_RCX) {
+			ir_emit_mov(ctx, type, def_reg, op1_reg);
+			op1_reg = def_reg;
+		}
 		if (op2_reg >= 0) {
 			ir_emit_mov(ctx, type, IR_REG_RCX, op2_reg);
 		} else {
