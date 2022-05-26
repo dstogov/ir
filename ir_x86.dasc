@@ -829,11 +829,11 @@ static bool ir_call_needs_tmp_int_reg(ir_ctx *ctx, ir_ref ref)
 	return 0;
 }
 
-bool ir_result_reuses_op1_reg(ir_ctx *ctx, ir_ref ref)
+uint8_t ir_get_def_flags(ir_ctx *ctx, ir_ref ref)
 {
-	ir_ref rule;
+	ir_ref rule = ctx->rules[ref];
+	ir_insn *insn;
 
-	rule = ctx->rules[ref];
 	switch (rule) {
 		case IR_BINOP_INT:
 		case IR_BINOP_SSE2:
@@ -852,17 +852,28 @@ bool ir_result_reuses_op1_reg(ir_ctx *ctx, ir_ref ref)
 		case IR_OP_INT:
 		case IR_OP_FP:
 		case IR_MIN_MAX_INT:
-			return 1;
+			return IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG;
+		case IR_ABS_INT:
+			return IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_USE_MUST_BE_IN_REG;
+		case IR_SKIP_REG: /* PARAM PHI PI */
+			insn = &ctx->ir_base[ref];
+			if (insn->op == IR_PARAM) {
+				if (ir_get_param_reg(ctx, ref) == IR_REG_NONE) {
+					return IR_USE_MUST_BE_IN_REG;
+				}
+			}
+			return IR_USE_SHOULD_BE_IN_REG;
 	}
-	return 0;
+
+	return IR_USE_MUST_BE_IN_REG;
 }
 
 uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num)
 {
-	ir_ref rule;
+	ir_ref rule = ctx->rules[ref];
 	ir_insn *insn;
 
-	rule = ctx->rules[ref];
+	IR_ASSERT(op_num > 0);
 	switch (rule) {
 		case IR_MUL_INT:
 		case IR_DIV_INT:
@@ -904,14 +915,7 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num)
 		case IR_RETURN_INT:
 		case IR_RETURN_FP:
 		case IR_IJMP:
-			return IR_USE_SHOULD_BE_IN_REG;
 		case IR_SKIP_REG: /* PARAM PHI PI */
-			insn = &ctx->ir_base[ref];
-			if (insn->op == IR_PARAM && op_num == 0) {
-				if (ir_get_param_reg(ctx, ref) == IR_REG_NONE) {
-					return IR_USE_MUST_BE_IN_REG;
-				}
-			}
 			return IR_USE_SHOULD_BE_IN_REG;
 //		case IR_VLOAD_INT:
 //		case IR_VLOAD_FP:
@@ -5728,6 +5732,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 	ir_backend_data *data = ctx->data;
 	ir_regset available = 0;
 	ir_tmp_reg tmp_regs[4];
+	uint8_t def_flags;
 
 #ifndef IR_REG_FP_RET1
 	ir_type ret_type = ir_get_return_type(ctx);
@@ -5774,6 +5779,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 				case IR_SKIP:
 				case IR_SKIP_REG: /* PARAM PHI PI */
 					/* skip */
+					def_flags = ir_get_def_flags(ctx, i);
 					if (ctx->rules && *rule != IR_CMP_AND_BRANCH_INT && *rule != IR_CMP_AND_BRANCH_FP) {
 						available = IR_REGSET_SCRATCH;
 					}
@@ -5783,7 +5789,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 						if (reg != IR_REG_NONE && IR_REGSET_IN(available, reg)) {
 							IR_REGSET_EXCL(available, reg);
 							ctx->regs[i][0] = reg | IR_REG_SPILL_STORE;
-						} else if (ir_get_use_flags(ctx, i, 0) & IR_USE_MUST_BE_IN_REG) {
+						} else if (def_flags & IR_USE_MUST_BE_IN_REG) {
 							if (insn->op == IR_VLOAD
 							 && ctx->live_intervals[ctx->vregs[i]]
 							 && ctx->live_intervals[ctx->vregs[i]]->stack_spill_pos != -1) {
@@ -5862,7 +5868,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 					for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
 						ir_ref input = *p;
 						if (IR_OPND_KIND(insn_flags, j) == IR_OPND_DATA && input > 0 && ctx->vregs[input]) {
-							if (j == 1 && ir_result_reuses_op1_reg(ctx, i)) {
+							if ((def_flags & IR_DEF_REUSES_OP1_REG) && j == 1) {
 								ir_reg reg = ctx->regs[i][0] & ~IR_REG_SPILL_STORE;
 								ctx->regs[i][1] = reg | IR_REG_SPILL_LOAD;
 							} else {

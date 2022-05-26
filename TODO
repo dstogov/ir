@@ -22,15 +22,13 @@
 
 ?  register allocation
 	-  hints and low priority registers (prevent allocating registers that are used as hints
-	   tests/x86/ra_015.irt, tests/x86/combo_004.irt tests/x86/min_005.ir, tests/x86/min_006.irt)
+	   tests/x86/ra_015.irt, tests/x86/combo_004.irt tests/x86/min_005.ir, tests/x86/min_006.irt, tests/x86/abs_001.irt)
 	-  spill slot coalescing
 	-  optimisation of spill code placement (BB local or through resolution)
 	-  separate INT and FP allocation phases (for performance)
 
 ?  code generation
 	-  COND
-	?  32-bit x86 back-end
-	-  ABS_INT incorrect register allocation (tests/x86/abs_001.irt)
 	-  TAILCALL with stack arguments (tests/x86/tailcall_001.itr)
 	-  32-bit x86 back-end 64-bit integers support
 		(add_009.irt, conv_001.irt, conv_002.irt, conv_004.irt, conv_010.irt, sub_009.irt)

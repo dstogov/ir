@@ -274,16 +274,16 @@ static void ir_add_use_pos(ir_ctx *ctx, int v, ir_use_pos *use_pos)
 	}
 }
 
-static void ir_add_use(ir_ctx *ctx, int v, int op_num, ir_live_pos pos, ir_reg hint, ir_ref hint_ref)
+static void ir_add_use(ir_ctx *ctx, int v, int op_num, ir_live_pos pos, ir_reg hint, uint8_t use_flags, ir_ref hint_ref)
 {
 	ir_use_pos *use_pos;
 
 	use_pos = ir_mem_malloc(sizeof(ir_use_pos));
 	use_pos->op_num = op_num;
 	use_pos->hint = hint;
+	use_pos->flags = use_flags;
 	use_pos->hint_ref = hint_ref;
 	use_pos->pos = pos;
-	use_pos->flags = ctx->rules ? ir_get_use_flags(ctx, IR_LIVE_POS_TO_REF(pos), op_num) : 0;
 
 	ir_add_use_pos(ctx, v, use_pos);
 }
@@ -295,10 +295,9 @@ static void ir_add_phi_use(ir_ctx *ctx, int v, int op_num, ir_live_pos pos, ir_r
 	use_pos = ir_mem_malloc(sizeof(ir_use_pos));
 	use_pos->op_num = op_num;
 	use_pos->hint = IR_REG_NONE;
+	use_pos->flags = IR_PHI_USE | IR_USE_SHOULD_BE_IN_REG; // TODO: ???
 	use_pos->hint_ref = phi_ref;
 	use_pos->pos = pos;
-	use_pos->flags = ctx->rules ? ir_get_use_flags(ctx, phi_ref, op_num) : 0;
-	use_pos->flags |= IR_PHI_USE;
 
 	ir_add_use_pos(ctx, v, use_pos);
 }
@@ -379,6 +378,8 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 
 		/* for each operation op of b in reverse order */
 		for (i = bb->end; i > bb->start; i -= ctx->prev_insn_len[i]) {
+			uint8_t def_flags = 0;
+
 			insn = &ctx->ir_base[i];
 			flags = ir_op_flags[insn->op];
 			if (ctx->rules) {
@@ -397,7 +398,12 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							ir_live_pos def_pos;
 							ir_ref hint_ref = 0;
 
-							reg = ctx->rules ? ir_uses_fixed_reg(ctx, i, 0) : IR_REG_NONE;
+							if (ctx->rules) {
+								def_flags = ir_get_def_flags(ctx, i);
+								reg = ir_uses_fixed_reg(ctx, i, 0);
+							} else {
+								reg = IR_REG_NONE;
+							}
 							if (reg != IR_REG_NONE) {
 								def_pos = IR_SAVE_LIVE_POS_FROM_REF(i);
 								if (insn->op == IR_PARAM) {
@@ -408,11 +414,13 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 									ir_add_fixed_live_range(ctx, &unused, reg,
 										IR_DEF_LIVE_POS_FROM_REF(i), def_pos);
 								}
-							} else if (ctx->rules && ir_result_reuses_op1_reg(ctx, i)) {
+							} else if (def_flags & IR_DEF_REUSES_OP1_REG) {
 								/* We add two uses to emulate move from op1 to res */
-								ir_add_use(ctx, ctx->vregs[i], 0, IR_DEF_LIVE_POS_FROM_REF(i), reg, hint_ref);
+								ir_add_use(ctx, ctx->vregs[i], 0, IR_DEF_LIVE_POS_FROM_REF(i), reg, def_flags, hint_ref);
 								def_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
 								hint_ref = IR_IS_CONST_REF(insn->op1) ? 0 : insn->op1;
+							} else if (def_flags & IR_DEF_CONFLICTS_WITH_INPUT_REGS) {
+								def_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
 							} else {
 								if (insn->op == IR_PARAM) {
 									/* We may reuse parameter stack slot for spilling */
@@ -426,9 +434,9 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							/* intervals[opd].setFrom(op.id) */
 							ir_fix_live_range(ctx, ctx->vregs[i],
 								IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
-							ir_add_use(ctx, ctx->vregs[i], 0, def_pos, reg, hint_ref);
+							ir_add_use(ctx, ctx->vregs[i], 0, def_pos, reg, def_flags, hint_ref);
 						} else {
-							ir_add_use(ctx, ctx->vregs[i], 0, IR_DEF_LIVE_POS_FROM_REF(i), IR_REG_NONE, 0);
+							ir_add_use(ctx, ctx->vregs[i], 0, IR_DEF_LIVE_POS_FROM_REF(i), IR_REG_NONE, IR_USE_SHOULD_BE_IN_REG, 0);
 						}
 						/* live.remove(opd) */
 						ir_bitset_excl(live, ctx->vregs[i]);
@@ -444,23 +452,30 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 				for (j = 1; j <= n; j++) {
 					if (IR_OPND_KIND(flags, j) == IR_OPND_DATA) {
 						ir_ref input = insn->ops[j];
+						uint8_t use_flags;
+
+						if (ctx->rules) {
+							use_flags = ir_get_use_flags(ctx, i, j);
+							reg = ir_uses_fixed_reg(ctx, i, j);
+						} else {
+							use_flags = 0;
+							reg = IR_REG_NONE;
+						}
 						if (input > 0 && ctx->vregs[input]) {
 							ir_live_pos use_pos;
 
-							if (ctx->rules && j == 1 && ir_result_reuses_op1_reg(ctx, i)) {
+							if ((def_flags & IR_DEF_REUSES_OP1_REG) && j == 1) {
 								use_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
-								reg = ctx->rules ? ir_uses_fixed_reg(ctx, i, j) : IR_REG_NONE;
 								if (reg != IR_REG_NONE) {
 									ir_add_fixed_live_range(ctx, &unused, reg,
 										use_pos, IR_USE_LIVE_POS_FROM_REF(i));
 								}
 							} else {
-								reg = ctx->rules ? ir_uses_fixed_reg(ctx, i, j) : IR_REG_NONE;
 								if (reg != IR_REG_NONE) {
 									use_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
 									ir_add_fixed_live_range(ctx, &unused, reg,
 										use_pos, IR_USE_LIVE_POS_FROM_REF(i));
-								} else if (j > 1 && input == insn->op1 && ctx->rules && ir_result_reuses_op1_reg(ctx, i)) {
+								} else if ((def_flags & IR_DEF_REUSES_OP1_REG) && input == insn->op1) {
 									/* Input is the same as "op1" */
 									use_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
 								} else {
@@ -470,11 +485,10 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							/* intervals[opd].addRange(b.from, op.id) */
 							ir_add_live_range(ctx, &unused, ctx->vregs[input], ctx->ir_base[input].type,
 								IR_START_LIVE_POS_FROM_REF(bb->start), use_pos);
-							ir_add_use(ctx, ctx->vregs[input], j, use_pos, reg, 0);
+							ir_add_use(ctx, ctx->vregs[input], j, use_pos, reg, use_flags, 0);
 							/* live.add(opd) */
 							ir_bitset_incl(live, ctx->vregs[input]);
-						} else if (ctx->rules) {
-							reg = ir_uses_fixed_reg(ctx, i, j);
+						} else {
 							if (reg != IR_REG_NONE) {
 								ir_add_fixed_live_range(ctx, &unused, reg,
 									IR_LOAD_LIVE_POS_FROM_REF(i), IR_USE_LIVE_POS_FROM_REF(i));
@@ -928,7 +942,7 @@ int ir_coalesce(ir_ctx *ctx)
 		/* try to swap operands of commutative instructions for better register allocation */
 		for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
 			for (i = bb->start, insn = ctx->ir_base + i; i <= bb->end;) {
-				if (ir_result_reuses_op1_reg(ctx, i)) {
+				if (ir_get_def_flags(ctx, i) & IR_DEF_REUSES_OP1_REG) {
 					if (insn->op2 > 0 && insn->op1 != insn->op2
 					 && (ir_op_flags[insn->op] & IR_OP_FLAG_COMMUTATIVE)) {
 						ir_try_swap_operands(ctx, i, insn);
