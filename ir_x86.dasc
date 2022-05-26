@@ -901,6 +901,7 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num)
 			return IR_USE_SHOULD_BE_IN_REG;
 		case IR_RETURN_INT:
 		case IR_RETURN_FP:
+		case IR_IJMP:
 			return IR_USE_SHOULD_BE_IN_REG;
 		case IR_SKIP_REG: /* PARAM PHI PI */
 			insn = &ctx->ir_base[ref];
