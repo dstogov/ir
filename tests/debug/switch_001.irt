@@ -60,4 +60,3 @@ test:
 	.qword .L1
 	.qword .L3
 	.qword .L4
-	.qword .L5
