@@ -3,9 +3,7 @@
 
 #include <inttypes.h>
 #include <stdint.h>
-#include <string.h>
 #include <stdio.h>
-#include <malloc.h>
 
 #define IR_VERSION "0.0.1"
 
@@ -17,48 +15,14 @@
 # error "Unknown IR target"
 #endif
 
-typedef uint8_t bool;
-
-#ifdef IR_DEBUG
-# include <assert.h>
-# define IR_ASSERT(x) assert(x)
-# ifndef IR_DEBUG_REGSET
-#  define IR_DEBUG_REGSET
+#if defined(__SIZEOF_SIZE_T__)
+# if __SIZEOF_SIZE_T__ == 8
+#  define IR_64 1
+# elif __SIZEOF_SIZE_T__ != 4
+#  error "Unknown addr size"
 # endif
 #else
-# define IR_ASSERT(x)
-#endif
-
-#ifdef __has_builtin
-# if __has_builtin(__builtin_expect)
-#   define EXPECTED(condition)   __builtin_expect(!!(condition), 1)
-#   define UNEXPECTED(condition) __builtin_expect(!!(condition), 0)
-# endif
-#endif
-#ifndef EXPECTED
-# define EXPECTED(condition)   (condition)
-# define UNEXPECTED(condition) (condition)
-#endif
-
-#ifdef __has_attribute
-# if __has_attribute(always_inline)
-#  define IR_ALWAYS_INLINE static inline __attribute__((always_inline))
-# endif
-# if __has_attribute(noinline)
-#  define IR_NEVER_INLINE __attribute__((noinline))
-# endif
-# if __has_attribute(unused)
-#  define IR_UNUSED_LABEL __attribute__((unused));
-# endif
-#endif
-#ifndef IR_ALWAYS_INLINE
-# define IR_ALWAYS_INLINE static inline
-#endif
-#ifndef IR_NEVER_INLINE
-# define IR_NEVER_INLINE
-#endif
-#ifndef IR_UNUSED_LABEL
-# define IR_UNUSED_LABEL
+# error "Unknown addr size"
 #endif
 
 #if defined(__BYTE_ORDER__)
@@ -77,28 +41,9 @@ typedef uint8_t bool;
 # error "Unknown byte order"
 #endif
 
-#if defined(__SIZEOF_SIZE_T__)
-# if __SIZEOF_SIZE_T__ == 8
-#  define IR_64 1
-# elif __SIZEOF_SIZE_T__ != 4
-#  error "Unknown addr size"
-# endif
-#else
-# error "Unknown addr size"
-#endif
+typedef uint8_t bool;
 
-#define ir_mem_malloc(size)       malloc(size)
-#define ir_mem_calloc(n, size)    calloc(n, size)
-#define ir_mem_realloc(ptr, size) realloc(ptr, size)
-#define ir_mem_free(ptr)          free(ptr)
-
-void *ir_mem_mmap(size_t size);
-int ir_mem_unmap(void *ptr, size_t size);
-int ir_mem_protect(void *ptr, size_t size);
-int ir_mem_unprotect(void *ptr, size_t size);
-int ir_mem_flush(void *ptr, size_t size);
-
-/* IR_TYPE flags (low 4 bits are used for type size) */
+/* IR Type flags (low 4 bits are used for type size) */
 #define IR_TYPE_SIGNED     (1<<4)
 #define IR_TYPE_UNSIGNED   (1<<5)
 #define IR_TYPE_FP         (1<<6)
@@ -107,6 +52,7 @@ int ir_mem_flush(void *ptr, size_t size);
 #define IR_TYPE_ADDR       (IR_TYPE_SPECIAL|IR_TYPE_UNSIGNED)
 #define IR_TYPE_CHAR       (IR_TYPE_SPECIAL|IR_TYPE_SIGNED)
 
+/* List of IR types */
 #define IR_TYPES(_) \
 	_(BOOL,   bool,      b,    IR_TYPE_BOOL)     \
 	_(U8,     uint8_t,   u8,   IR_TYPE_UNSIGNED) \
@@ -126,6 +72,14 @@ int ir_mem_flush(void *ptr, size_t size);
 #define IR_IS_TYPE_SIGNED(t)   ((t) >= IR_CHAR && (t) < IR_DOUBLE)
 #define IR_IS_TYPE_INT(t)      ((t) < IR_DOUBLE)
 #define IR_IS_TYPE_FP(t)       ((t) >= IR_DOUBLE)
+
+#define IR_TYPE_ENUM(name, type, field, flags) IR_ ## name,
+
+typedef enum _ir_type {
+	IR_VOID,
+	IR_TYPES(IR_TYPE_ENUM)
+	IR_LAST_TYPE
+} ir_type;
 
 /* List of IR opcodes
  * ==================
@@ -223,7 +177,7 @@ int ir_mem_flush(void *ptr, size_t size);
 	_(FP2INT,       d1,   def, ___, ___) /* float to int conversion     */ \
 	_(FP2FP,        d1,   def, ___, ___) /* float to float conversion   */ \
 	\
-	/* overflow-check ???                                               */ \
+	/* overflow-check                                                   */ \
 	_(ADD_OV,       d2C,  def, def, ___) /* addition                    */ \
 	_(SUB_OV,       d2,   def, def, ___) /* subtraction                 */ \
 	_(MUL_OV,       d2C,  def, def, ___) /* multiplication              */ \
@@ -293,55 +247,22 @@ int ir_mem_flush(void *ptr, size_t size);
 	_(GUARD_TRUE,   c2,   src, def, ___) /* IF without second successor */ \
 	_(GUARD_FALSE,  c2,   src, def, ___) /* IF without second successor */ \
 
-#define IR_OP_FLAG_OPERANDS_SHIFT 3
-
-#define IR_OP_FLAG_EDGES_MSK      0x07
-#define IR_OP_FLAG_OPERANDS_MSK   0x38
-#define IR_OP_FLAG_MEM_MASK       ((1<<6)|(1<<7))
-
-#define IR_OP_FLAG_DATA           (1<<8)
-#define IR_OP_FLAG_CONTROL        (1<<9)
-#define IR_OP_FLAG_MEM            (1<<10)
-#define IR_OP_FLAG_COMMUTATIVE    (1<<11)
-
-#define IR_OP_FLAG_MEM_LOAD       ((0<<6)|(0<<7))
-#define IR_OP_FLAG_MEM_STORE      ((0<<6)|(1<<7))
-#define IR_OP_FLAG_MEM_CALL       ((1<<6)|(0<<7))
-#define IR_OP_FLAG_MEM_ALLOC      ((1<<6)|(1<<7))
-
-#define IR_OPND_UNUSED      0x0
-#define IR_OPND_DATA        0x1
-#define IR_OPND_CONTROL     0x2
-#define IR_OPND_CONTROL_DEP 0x3
-#define IR_OPND_CONTROL_REF 0x4
-#define IR_OPND_STR         0x5
-#define IR_OPND_NUM         0x6
-#define IR_OPND_VAR         0x7
-#define IR_OPND_PROB        0x8
-
-#define IR_OP_FLAGS(op_flags, op1_flags, op2_flags, op3_flags) \
-	((op_flags) | ((op1_flags) << 20) | ((op2_flags) << 24) | ((op3_flags) << 28))
-
-#define IR_INPUT_EDGES_COUNT(flags) (flags & IR_OP_FLAG_EDGES_MSK)
-#define IR_OPERANDS_COUNT(flags)    ((flags & IR_OP_FLAG_OPERANDS_MSK) >> IR_OP_FLAG_OPERANDS_SHIFT)
-
-#define IR_OPND_KIND(flags, i) \
-	(((flags) >> (16 + (4 * (((i) > 3) ? 3 : (i))))) & 0xf)
-
-#define IR_TYPE_ENUM(name, type, field, flags) IR_ ## name,
 #define IR_OP_ENUM(name, flags, op1, op2, op3) IR_ ## name,
-
-typedef enum _ir_type {
-	IR_VOID,
-	IR_TYPES(IR_TYPE_ENUM)
-	IR_LAST_TYPE
-} ir_type;
 
 typedef enum _ir_op {
 	IR_OPS(IR_OP_ENUM)
 	IR_LAST_OP
 } ir_op;
 
+/* IR Opcode and Type Union */
+#define IR_OPT_OP_MASK       0x00ff
+#define IR_OPT_TYPE_MASK     0xff00
+#define IR_OPT_TYPE_SHIFT    8
+
+#define IR_OPT(op, type)     ((uint16_t)(op) | ((uint16_t)(type) << IR_OPT_TYPE_SHIFT))
+#define IR_OPT_TYPE(opt)     (((opt) & IR_OPT_TYPE_MASK) >> IR_OPT_TYPE_SHIFT)
+
+/* IR References */
 typedef int32_t ir_ref;
 
 #define IR_IS_CONST_REF(ref) ((ref) < 0)
@@ -350,19 +271,9 @@ typedef int32_t ir_ref;
 #define IR_NULL              (-1)
 #define IR_FALSE             (-2)
 #define IR_TRUE              (-3)
-#define IR_LAST_FOLDABLE     IR_COPY
+#define IR_LAST_FOLDABLE_OP  IR_COPY
 
-#define IR_IS_CONST(op)      ((op) > IR_NOP && (op) <= IR_C_FLOAT)
-#define IR_IS_FOLDABLE(op)   ((op) <= IR_LAST_FOLDABLE)
-
-#define IR_OPT_OP_MASK       0x00ff
-#define IR_OPT_TYPE_MASK     0xff00
-#define IR_OPT_TYPE_SHIFT    8
-
-#define IR_OPT(op, type)     ((uint16_t)(op) | ((uint16_t)(type) << IR_OPT_TYPE_SHIFT))
-
-#define IR_OPT_TYPE(opt)     (((opt) & IR_OPT_TYPE_MASK) >> IR_OPT_TYPE_SHIFT)
-
+/* IR Constant Value */
 typedef union _ir_val {
 	double                             d;
 	uint64_t                           u64;
@@ -399,6 +310,7 @@ typedef union _ir_val {
 	);
 } ir_val;
 
+/* IR Instruction */
 typedef struct _ir_insn {
 	IR_STRUCT_LOHI(
 		union {
@@ -433,6 +345,7 @@ typedef struct _ir_insn {
 	};
 } ir_insn;
 
+/* IT String Tables API (implementation in ir_strtab.c) */
 typedef struct _ir_strtab {
 	void       *data;
 	uint32_t    mask;
@@ -444,50 +357,19 @@ typedef struct _ir_strtab {
 	uint32_t    buf_top;
 } ir_strtab;
 
-#define IR_IS_BB_START(op) \
-	((op) == IR_START || (op) == IR_BEGIN || (op) == IR_MERGE || (op) == IR_LOOP_BEGIN || \
-	 (op) == IR_IF_TRUE || (op) == IR_IF_FALSE || (op) == IR_CASE_VAL || (op) == IR_CASE_DEFAULT)
+#define ir_strtab_count(strtab) (strtab)->count
 
-#define IR_IS_BB_MERGE(op) \
-	((op) == IR_MERGE || (op) == IR_LOOP_BEGIN)
+typedef void (*ir_strtab_apply_t)(const char *str, uint32_t len, ir_ref val);
 
-#define IR_IS_BB_END(op) \
-	((op) == IR_RETURN || (op) == IR_END || (op) == IR_LOOP_END || (op) == IR_IF || \
-	 (op) == IR_SWITCH || (op) == IR_IJMP || (op) == IR_UNREACHABLE)
+void ir_strtab_init(ir_strtab *strtab, uint32_t count, uint32_t buf_size);
+ir_ref ir_strtab_lookup(ir_strtab *strtab, const char *str, uint32_t len, ir_ref val);
+ir_ref ir_strtab_find(ir_strtab *strtab, const char *str, uint32_t len);
+ir_ref ir_strtab_update(ir_strtab *strtab, const char *str, uint32_t len, ir_ref val);
+const char *ir_strtab_str(ir_strtab *strtab, ir_ref idx);
+void ir_strtab_apply(ir_strtab *strtab, ir_strtab_apply_t func);
+void ir_strtab_free(ir_strtab *strtab);
 
-#define IR_BB_UNREACHABLE      (1<<0)
-#define IR_BB_LOOP_HEADER      (1<<1)
-#define IR_BB_IRREDUCIBLE_LOOP (1<<2)
-#define IR_BB_DESSA_MOVES      (1<<3) /* translation out of SSA requires MOVEs      */
-#define IR_BB_MAY_SKIP         (1<<4) /* empty BB                                   */
-
-typedef struct _ir_block {
-	uint32_t flags;
-	ir_ref   start;              /* index of first instruction                 */
-	ir_ref   end;                /* index of last instruction                  */
-	uint32_t successors;         /* index in ir_ctx->cfg_edges[] array         */
-	uint32_t successors_count;
-	uint32_t predecessors;       /* index in ir_ctx->cfg_edges[] array         */
-	uint32_t predecessors_count;
-	union {
-		int  dom_parent;         /* immediate dominator block                  */
-		int  idom;               /* immediate dominator block                  */
-	};
-	union {
-		int  dom_depth;          /* depth from the root of the dominators tree */
-		int  postnum;            /* used temporary during tree constructon     */
-	};
-	int      dom_child;          /* first dominated blocks                     */
-	int      dom_next_child;     /* next dominated block (linked list)         */
-	int      loop_header;
-	int      loop_depth;
-} ir_block;
-
-typedef struct _ir_use_list {
-	ir_ref        refs;          /* index in ir_cts->use_edges[] array         */
-	ir_ref        count;
-} ir_use_list;
-
+/* IR Context Flags */
 #define IR_FUNCTION           (1<<0)
 #define IR_USE_FRAME_POINTER  (1<<1)
 #define IR_PREALLOCATED_STACK (1<<2)
@@ -512,89 +394,9 @@ typedef struct _ir_use_list {
 # define IR_DEBUG_RA          (1<<30)
 #endif
 
-typedef enum _ir_fold_action {
-	IR_FOLD_DO_RESTART,
-	IR_FOLD_DO_CSE,
-	IR_FOLD_DO_EMIT,
-	IR_FOLD_DO_COPY,
-	IR_FOLD_DO_CONST
-} ir_fold_action;
-
-typedef ir_ref                   ir_live_pos;
-typedef struct _ir_use_pos       ir_use_pos;
-typedef struct _ir_live_range    ir_live_range;
+typedef struct _ir_use_list      ir_use_list;
+typedef struct _ir_block         ir_block;
 typedef struct _ir_live_interval ir_live_interval;
-
-#define IR_SUB_REFS_COUNT                4
-
-#define IR_LOAD_SUB_REF                  0
-#define IR_USE_SUB_REF                   1
-#define IR_DEF_SUB_REF                   2
-#define IR_SAVE_SUB_REF                  3
-
-#define IR_LIVE_POS_TO_REF(pos)          ((pos) / IR_SUB_REFS_COUNT)
-#define IR_LIVE_POS_TO_SUB_REF(pos)      ((pos) % IR_SUB_REFS_COUNT)
-
-#define IR_LIVE_POS_FROM_REF(ref)        ((ref) * IR_SUB_REFS_COUNT)
-
-#define IR_START_LIVE_POS_FROM_REF(ref)  ((ref) * IR_SUB_REFS_COUNT)
-#define IR_LOAD_LIVE_POS_FROM_REF(ref)   ((ref) * IR_SUB_REFS_COUNT + IR_LOAD_SUB_REF)
-#define IR_USE_LIVE_POS_FROM_REF(ref)    ((ref) * IR_SUB_REFS_COUNT + IR_USE_SUB_REF)
-#define IR_DEF_LIVE_POS_FROM_REF(ref)    ((ref) * IR_SUB_REFS_COUNT + IR_DEF_SUB_REF)
-#define IR_SAVE_LIVE_POS_FROM_REF(ref)   ((ref) * IR_SUB_REFS_COUNT + IR_SAVE_SUB_REF)
-#define IR_END_LIVE_POS_FROM_REF(ref)    ((ref) * IR_SUB_REFS_COUNT + IR_SUB_REFS_COUNT)
-
-/* ir_use_pos.flags bits */
-#define IR_USE_MUST_BE_IN_REG            (1<<0)
-#define IR_USE_SHOULD_BE_IN_REG          (1<<1)
-#define IR_DEF_REUSES_OP1_REG            (1<<2)
-#define IR_DEF_CONFLICTS_WITH_INPUT_REGS (1<<3)
-
-#define IR_PHI_USE                       (1<<7)
-
-struct _ir_use_pos {
-	uint16_t       op_num; /* 0 - means result */
-	int8_t         hint;
-	uint8_t        flags;
-	ir_ref         hint_ref;
-	ir_live_pos    pos;
-	ir_use_pos    *next;
-};
-
-struct _ir_live_range {
-	ir_live_pos    start; /* inclusive */
-	ir_live_pos    end;   /* exclusive */
-	ir_live_range *next;
-};
-
-/* ir_live_interval.flags bits (two low bits are reserved for temporary register number) */
-#define IR_LIVE_INTERVAL_TEMP_NUM_MASK   0x3
-#define IR_LIVE_INTERVAL_FIXED           (1<<2)
-#define IR_LIVE_INTERVAL_TEMP            (1<<3)
-#define IR_LIVE_INTERVAL_VAR             (1<<4)
-#define IR_LIVE_INTERVAL_COALESCED       (1<<5)
-#define IR_LIVE_INTERVAL_HAS_HINTS       (1<<6)
-#define IR_LIVE_INTERVAL_MEM_PARAM       (1<<7)
-#define IR_LIVE_INTERVAL_MEM_LOAD        (1<<8)
-
-struct _ir_live_interval {
-	uint8_t           type;
-	int8_t            reg;
-	uint16_t          flags;
-	int32_t           vreg;
-	int32_t           stack_spill_pos;
-	ir_live_range     range;
-	ir_use_pos       *use_pos;
-	ir_live_interval *top;
-	ir_live_interval *next;
-	ir_live_interval *list_next; /* linked list of active, inactive or unhandled intervals */
-};
-
-#define IR_REG_SPILL_LOAD  (1<<6)
-#define IR_REG_SPILL_STORE (1<<5)
-#define IR_REG_NUM(r) \
-	((r) == IR_REG_NONE ? IR_REG_NONE : ((r) & ~(IR_REG_SPILL_LOAD|IR_REG_SPILL_STORE)))
-
 typedef int8_t ir_regs[4];
 
 typedef struct _ir_ctx {
@@ -623,59 +425,14 @@ typedef struct _ir_ctx {
 	uint32_t           rodata_offset;
 	uint32_t           jmp_table_offset;
 	ir_strtab          strtab;
-	ir_ref             prev_insn_chain[IR_LAST_FOLDABLE + 1];
+	ir_ref             prev_insn_chain[IR_LAST_FOLDABLE_OP + 1];
 	ir_ref             prev_const_chain[IR_LAST_TYPE];
 } ir_ctx;
 
-extern const uint8_t ir_type_flags[IR_LAST_TYPE];
-extern const char *ir_type_name[IR_LAST_TYPE];
-extern const char *ir_type_cname[IR_LAST_TYPE];
-extern const uint8_t ir_type_size[IR_LAST_TYPE];
-extern const uint32_t ir_op_flags[IR_LAST_OP];
-extern const char *ir_op_name[IR_LAST_OP];
-
-IR_ALWAYS_INLINE ir_ref ir_variable_inputs_count(ir_insn *insn)
-{
-	uint32_t n = insn->inputs_count;
-	if (n == 0) {
-		n = 2;
-	}
-	return n;
-}
-
-IR_ALWAYS_INLINE ir_ref ir_operands_count(ir_ctx *ctx, ir_insn *insn)
-{
-	uint32_t flags = ir_op_flags[insn->op];
-	uint32_t n = IR_OPERANDS_COUNT(flags);
-	if (n == 4) {
-		/* MERGE or CALL */
-		n = ir_variable_inputs_count(insn);
-		if (n == 0) {
-			n = 2;
-		}
-	} else if (n == 5) {
-		/* PHI */
-		n = ir_variable_inputs_count(&ctx->ir_base[insn->op1]) + 1;
-	}
-	return n;
-}
-
-IR_ALWAYS_INLINE ir_ref ir_input_edges_count(ir_ctx *ctx, ir_insn *insn)
-{
-	uint32_t flags = ir_op_flags[insn->op];
-	uint32_t n = IR_INPUT_EDGES_COUNT(flags);
-	if (n == 4) {
-		/* MERGE or CALL */
-		n = ir_variable_inputs_count(insn);
-	} else if (n == 5) {
-		/* PHI */
-		n = ir_variable_inputs_count(&ctx->ir_base[insn->op1]) + 1;
-	}
-	return n;
-}
-
 /* Basic IR Construction API (implementation in ir.c) */
 void ir_init(ir_ctx *ctx, ir_ref consts_limit, ir_ref insns_limit);
+void ir_free(ir_ctx *ctx);
+void ir_truncate(ir_ctx *ctx);
 
 ir_ref ir_const(ir_ctx *ctx, ir_val val, uint8_t type);
 ir_ref ir_const_i8(ir_ctx *ctx, int8_t c);
@@ -695,26 +452,37 @@ ir_ref ir_const_addr(ir_ctx *ctx, uintptr_t c);
 ir_ref ir_const_func(ir_ctx *ctx, ir_ref str);
 ir_ref ir_const_str(ir_ctx *ctx, ir_ref str);
 
+void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f);
+
 ir_ref ir_str(ir_ctx *ctx, const char *s);
 ir_ref ir_strl(ir_ctx *ctx, const char *s, size_t len);
 const char *ir_get_str(ir_ctx *ctx, ir_ref idx);
 
-ir_ref ir_emit0(ir_ctx *ctx, uint32_t opt);
-ir_ref ir_emit1(ir_ctx *ctx, uint32_t opt, ir_ref op1);
-ir_ref ir_emit2(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2);
-ir_ref ir_emit3(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
+ir_ref ir_emit(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
+ir_ref ir_fold(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
 
 ir_ref ir_emit_N(ir_ctx *ctx, uint32_t opt, uint32_t count);
 void   ir_set_op(ir_ctx *ctx, ir_ref ref, uint32_t n, ir_ref val);
 
-ir_ref ir_fold(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3, ir_insn *op1_insn, ir_insn *op2_insn, ir_insn *op3_insn);
-
-ir_ref ir_fold0(ir_ctx *ctx, uint32_t opt);
-ir_ref ir_fold1(ir_ctx *ctx, uint32_t opt, ir_ref op1);
-ir_ref ir_fold2(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2);
-ir_ref ir_fold3(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
-
 void ir_bind(ir_ctx *ctx, ir_ref var, ir_ref def);
+
+#define ir_emit0(ctx, opt) \
+	ir_emit(ctx, opt, IR_UNUSED, IR_UNUSED, IR_UNUSED)
+#define ir_emit1(ctx, opt, op1) \
+	ir_emit(ctx, opt, op1, IR_UNUSED, IR_UNUSED)
+#define ir_emit2(ctx, opt, op1, op2) \
+	ir_emit(ctx, opt, op1, op2, IR_UNUSED)
+#define ir_emit3(ctx, opt, op1, op2, op3) \
+	ir_emit(ctx, opt, op1, op2, op3)
+
+#define ir_fold0(ctx, opt) \
+	ir_fold(ctx, opt, IR_UNUSED, IR_UNUSED, IR_UNUSED)
+#define ir_fold1(ctx, opt, op1) \
+	ir_fold(ctx, opt, op1, IR_UNUSED, IR_UNUSED)
+#define ir_fold2(ctx, opt, op1, op2) \
+	ir_fold(ctx, opt, op1, op2, IR_UNUSED)
+#define ir_fold3(ctx, opt, op1, op2, op3) \
+	ir_fold(ctx, opt, op1, op2, op3)
 
 #define ir_param(ctx, type, region, name, pos) \
 	ir_emit3((ctx), IR_OPT(IR_PARAM, (type)), (region), ir_str((ctx), (name)), (pos))
@@ -731,11 +499,6 @@ void ir_bind(ir_ctx *ctx, ir_ref var, ir_ref def);
 		(ctx)->ir_base[(ins)].op3 = (val); \
 	} while (0)
 
-void ir_truncate(ir_ctx *ctx);
-void ir_free(ir_ctx *ctx);
-
-void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f);
-
 /* Def -> Use lists */
 void ir_build_def_use_lists(ir_ctx *ctx);
 
@@ -748,37 +511,31 @@ int ir_schedule_blocks(ir_ctx *ctx);
 /* SCCP - Sparse Conditional Constant Propagation (implementation in ir_sccp.c) */
 int ir_sccp(ir_ctx *ctx);
 
-/* GCM - Global Code Motion (implementation in ir_gcm.c) */
+/* GCM - Global Code Motion and scheduling (implementation in ir_gcm.c) */
 int ir_gcm(ir_ctx *ctx);
 int ir_schedule(ir_ctx *ctx);
 
 /* Liveness & Register Allocation (implementation in ir_ra.c) */
-typedef int (*emit_copy_t)(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to);
-
-#ifdef IR_DEBUG_REGSET
-extern uint32_t debug_regset;
-#endif
-
 int ir_assign_virtual_registers(ir_ctx *ctx);
 int ir_compute_live_ranges(ir_ctx *ctx);
 int ir_coalesce(ir_ctx *ctx);
-int ir_reg_alloc(ir_ctx *ctx);
 int ir_compute_dessa_moves(ir_ctx *ctx);
-int ir_gen_dessa_moves(ir_ctx *ctx, int b, emit_copy_t emit_copy);
-void ir_free_live_ranges(ir_live_range *live_range);
-void ir_free_live_intervals(ir_live_interval **live_intervals, int count);
+int ir_reg_alloc(ir_ctx *ctx);
 
 /* Target CPU instruction selection and code geneartion (see ir_x86.c) */
 int ir_match(ir_ctx *ctx);
-void *ir_emit(ir_ctx *ctx, size_t *size);
-
-const char *ir_reg_name(int8_t reg, ir_type type);
+void *ir_emit_code(ir_ctx *ctx, size_t *size);
 
 /* Target CPU disassembler (implementation in ir_disasm.c) */
-int ir_disasm_init(void);
+int  ir_disasm_init(void);
 void ir_disasm_free(void);
 void ir_disasm_add_symbol(const char *name, uint64_t addr, uint64_t size);
-int ir_disasm(const char *name, const void *start, size_t size, uint32_t rodata_offset, uint32_t jmp_table_offset);
+int  ir_disasm(const char *name,
+               const void *start,
+               size_t      size,
+               uint32_t    rodata_offset,
+               uint32_t    jmp_table_offset,
+               FILE       *f);
 
 /* Linux perf interface (implementation in ir_perf.c) */
 void ir_perf_jitdump_open(void);
@@ -816,18 +573,29 @@ int ir_emit_c(ir_ctx *ctx, FILE *f);
 
 /* IR verification API (implementation in ir_check.c) */
 void ir_check(ir_ctx *ctx);
+void ir_consistency_check(void);
 
-/* String Tables API (implementation in ir_strtab.c) */
-#define ir_strtab_count(strtab) (strtab)->count
+/* IR Memmory Allocation */
+#define ir_mem_malloc(size)       malloc(size)
+#define ir_mem_calloc(n, size)    calloc(n, size)
+#define ir_mem_realloc(ptr, size) realloc(ptr, size)
+#define ir_mem_free(ptr)          free(ptr)
 
-typedef void (*ir_strtab_apply_t)(const char *str, uint32_t len, ir_ref val);
+void *ir_mem_mmap(size_t size);
+int ir_mem_unmap(void *ptr, size_t size);
+int ir_mem_protect(void *ptr, size_t size);
+int ir_mem_unprotect(void *ptr, size_t size);
+int ir_mem_flush(void *ptr, size_t size);
 
-void ir_strtab_init(ir_strtab *strtab, uint32_t count, uint32_t buf_size);
-ir_ref ir_strtab_lookup(ir_strtab *strtab, const char *str, uint32_t len, ir_ref val);
-ir_ref ir_strtab_find(ir_strtab *strtab, const char *str, uint32_t len);
-ir_ref ir_strtab_update(ir_strtab *strtab, const char *str, uint32_t len, ir_ref val);
-const char *ir_strtab_str(ir_strtab *strtab, ir_ref idx);
-void ir_strtab_apply(ir_strtab *strtab, ir_strtab_apply_t func);
-void ir_strtab_free(ir_strtab *strtab);
+/* IR Debug API */
+#ifdef IR_DEBUG
+# ifndef IR_DEBUG_REGSET
+#  define IR_DEBUG_REGSET
+# endif
+#endif
+
+#ifdef IR_DEBUG_REGSET
+extern uint32_t debug_regset;
+#endif
 
 #endif /* IR_H */

@@ -1,4 +1,5 @@
 #include "ir.h"
+#include "ir_private.h"
 
 void ir_save(ir_ctx *ctx, FILE *f)
 {

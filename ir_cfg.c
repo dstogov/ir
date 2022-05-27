@@ -64,19 +64,6 @@ int ir_build_cfg(ir_ctx *ctx)
 		insn = &ctx->ir_base[ref];
 		if (IR_IS_BB_START(insn->op)) {
 			bb->start = ref;
-#if 0
-			flags = ir_op_flags[insn->op];
-			n = ir_input_edges_count(ctx, insn);
-			for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
-				ir_ref pred_ref = *p;
-				if (pred_ref) {
-					if (IR_OPND_KIND(flags, j) == IR_OPND_CONTROL) {
-						blocks[_blocks[pred_ref] - 1].successors_count++;
-						edges_count++;
-					 }
-				}
-			}
-#endif
 		} else {
 			bb->end = ref;
 		}

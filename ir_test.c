@@ -1,6 +1,7 @@
 #include "ir.h"
 #include <sys/time.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define BAILOUT 16
 #define MAX_ITERATIONS 1000
@@ -124,6 +125,8 @@ int main(int argc, char **argv)
 	int opt_level = 2;
 	uint32_t mflags = 0;
 
+	ir_consistency_check();
+
 	for (i = 1; i < argc; i++) {
 		if (argv[i][0] == '-' && argv[i][1] == 'O' && strlen(argv[i]) == 3) {
 			if (argv[i][2] == '0') {
@@ -162,19 +165,6 @@ int main(int argc, char **argv)
 			/* pass*/
 		}
 	}
-
-	IR_ASSERT(IR_UNUSED == 0);
-	IR_ASSERT(IR_NOP == 0);
-
-	IR_ASSERT((IR_EQ ^ 1) == IR_NE);
-	IR_ASSERT((IR_LT ^ 3) == IR_GT);
-	IR_ASSERT((IR_GT ^ 3) == IR_LT);
-	IR_ASSERT((IR_LE ^ 3) == IR_GE);
-	IR_ASSERT((IR_GE ^ 3) == IR_LE);
-	IR_ASSERT((IR_ULT ^ 3) == IR_UGT);
-	IR_ASSERT((IR_UGT ^ 3) == IR_ULT);
-	IR_ASSERT((IR_ULE ^ 3) == IR_UGE);
-	IR_ASSERT((IR_UGE ^ 3) == IR_ULE);
 
     ir_init(&ctx, 256, 1024);
 	ctx.flags |= IR_FUNCTION;
@@ -215,10 +205,10 @@ int main(int argc, char **argv)
     fclose(f);
 
 	size_t size;
-	void *entry = ir_emit(&ctx, &size);
+	void *entry = ir_emit_code(&ctx, &size);
 
 	if (entry) {
-		ir_disasm("test", entry, size, ctx.rodata_offset, ctx.jmp_table_offset);
+		ir_disasm("test", entry, size, ctx.rodata_offset, ctx.jmp_table_offset, stderr);
 
 		ir_perf_map_register("test", entry, size);
 		ir_perf_jitdump_open();

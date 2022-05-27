@@ -43,11 +43,11 @@ restart:
 	op2 = ir_sccp_identity(_values, op2);
 	op3 = ir_sccp_identity(_values, op3);
 #endif
-	op1_insn = (op1 > 0 && IR_IS_CONST(_values[op1].op)) ? _values + op1 : ctx->ir_base + op1;
-	op2_insn = (op2 > 0 && IR_IS_CONST(_values[op2].op)) ? _values + op2 : ctx->ir_base + op2;
-	op3_insn = (op3 > 0 && IR_IS_CONST(_values[op3].op)) ? _values + op3 : ctx->ir_base + op3;
+	op1_insn = (op1 > 0 && IR_IS_CONST_OP(_values[op1].op)) ? _values + op1 : ctx->ir_base + op1;
+	op2_insn = (op2 > 0 && IR_IS_CONST_OP(_values[op2].op)) ? _values + op2 : ctx->ir_base + op2;
+	op3_insn = (op3 > 0 && IR_IS_CONST_OP(_values[op3].op)) ? _values + op3 : ctx->ir_base + op3;
 
-	switch (ir_fold(ctx, opt, op1, op2, op3, op1_insn, op2_insn, op3_insn)) {
+	switch (ir_folding(ctx, opt, op1, op2, op3, op1_insn, op2_insn, op3_insn)) {
 		case IR_FOLD_DO_RESTART:
 #if IR_COMBO_RESTART
 			opt = ctx->fold_insn.optx;
@@ -65,8 +65,8 @@ restart:
 #if IR_COMBO_COPY_PROPAGATION
 			op1 = ir_sccp_identity(_values, op1);
 #endif
-			insn = (op1 > 0 && IR_IS_CONST(_values[op1].op)) ? _values + op1 : ctx->ir_base + op1;
-			if (IR_IS_CONST(insn->op)) {
+			insn = (op1 > 0 && IR_IS_CONST_OP(_values[op1].op)) ? _values + op1 : ctx->ir_base + op1;
+			if (IR_IS_CONST_OP(insn->op)) {
 				/* pass */
 #if IR_COMBO_COPY_PROPAGATION
 			} else if (IR_IS_TOP(res)) {
@@ -421,7 +421,7 @@ int ir_sccp(ir_ctx *ctx)
 				if (!changed) {
 					continue;
 				}
-			} else if (IR_IS_FOLDABLE(insn->op)) {
+			} else if (IR_IS_FOLDABLE_OP(insn->op)) {
 //				bool has_bottom = 0;
 				bool has_top = 0;
 				n = ir_input_edges_count(ctx, insn);
@@ -590,7 +590,7 @@ int ir_sccp(ir_ctx *ctx)
 #ifdef IR_DEBUG
 	if (ctx->flags & IR_DEBUG_SCCP) {
 		for (i = 1; i < ctx->insns_count; i++) {
-			if (IR_IS_CONST(_values[i].op)) {
+			if (IR_IS_CONST_OP(_values[i].op)) {
 				fprintf(stderr, "%d. CONST(", i);
 				ir_print_const(ctx, &_values[i], stderr);
 				fprintf(stderr, ")\n");
@@ -612,7 +612,7 @@ int ir_sccp(ir_ctx *ctx)
 #endif
 
 	for (i = 1; i < ctx->insns_count; i++) {
-		if (IR_IS_CONST(_values[i].op)) {
+		if (IR_IS_CONST_OP(_values[i].op)) {
 			/* replace instruction by constant */
 			j = ir_const(ctx, _values[i].val, _values[i].type);
 			ir_sccp_replace_insn(ctx, _values, i, j);

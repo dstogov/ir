@@ -8,6 +8,7 @@
 #include <fcntl.h>
 
 #include "ir.h"
+#include "ir_private.h"
 #include "ir_elf.h"
 
 #if defined(HAVE_ATTRIBUTE_ALIGNED)

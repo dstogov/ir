@@ -45,7 +45,7 @@ void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 		fprintf(f, "\"%s\"", ir_get_str(ctx, insn->val.addr));
 		return;
 	}
-	IR_ASSERT(IR_IS_CONST(insn->op));
+	IR_ASSERT(IR_IS_CONST_OP(insn->op));
 	switch (insn->type) {
 		case IR_BOOL:
 			fprintf(f, "%u", insn->val.b);
@@ -342,7 +342,7 @@ ir_ref ir_const(ir_ctx *ctx, ir_val val, uint8_t type)
 	insn->prev_const = ctx->prev_const_chain[type];
 	ctx->prev_const_chain[type] = ref;
 
-	insn->optx = IR_OPT(type, type); // IR_C_ ...
+	insn->optx = IR_OPT(type, type);
 	insn->val.u64 = val.u64;
 
 	return ref;
@@ -478,7 +478,8 @@ const char *ir_get_str(ir_ctx *ctx, ir_ref idx)
 	return ir_strtab_str(&ctx->strtab, idx - 1);
 }
 
-static ir_ref _ir_emit(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
+/* IR construction */
+ir_ref ir_emit(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
 {
 	ir_ref   ref = ir_next_insn(ctx);
 	ir_insn *insn = &ctx->ir_base[ref];
@@ -489,59 +490,6 @@ static ir_ref _ir_emit(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref
 	insn->op3 = op3;
 
 	return ref;
-}
-
-ir_ref ir_emit_N(ir_ctx *ctx, uint32_t opt, uint32_t count)
-{
-	int i;
-	ir_ref ref = ctx->insns_count;
-	ir_insn *insn;
-
-	while (UNEXPECTED(ref + count/4 >= ctx->insns_limit)) {
-		ir_grow_top(ctx);
-	}
-	ctx->insns_count = ref + 1 + count/4;
-
-	insn = &ctx->ir_base[ref];
-	insn->optx = opt;
-	if ((opt & IR_OPT_OP_MASK) != IR_PHI) {
-		insn->inputs_count = count;
-	}
-	for (i = 1; i <= (count|3); i++) {
-		insn->ops[i] = IR_UNUSED;
-	}
-
-	return ref;
-}
-
-void ir_set_op(ir_ctx *ctx, ir_ref ref, uint32_t n, ir_ref val)
-{
-	ir_insn *insn = &ctx->ir_base[ref];
-
-	if (n > 3) {
-		uint32_t count = 3;
-
-		if (insn->op == IR_MERGE) {
-			count = insn->inputs_count;
-			if (count == 0) {
-				count = 2;
-			}
-		} else if (insn->op == IR_CALL || insn->op == IR_TAILCALL) {
-			count = insn->inputs_count;
-			if (count == 0) {
-				count = 2;
-			}
-		} else if (insn->op == IR_PHI) {
-			count = ctx->ir_base[insn->op1].inputs_count + 1;
-			if (count == 1) {
-				count = 3;
-			}
-		} else {
-			IR_ASSERT(0);
-		}
-		IR_ASSERT(n <= count);
-	}
-	insn->ops[n] = val;
 }
 
 static ir_ref _ir_fold_cse(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
@@ -631,7 +579,7 @@ static ir_ref _ir_fold_cse(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir
  * ANY and UNUSED ops are represented by 0
  */
 
-IR_ALWAYS_INLINE ir_ref __ir_fold(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3, ir_insn *op1_insn, ir_insn *op2_insn, ir_insn *op3_insn)
+ir_ref ir_folding(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3, ir_insn *op1_insn, ir_insn *op2_insn, ir_insn *op3_insn)
 {
 	uint8_t op;
 	ir_ref ref;
@@ -691,7 +639,7 @@ ir_fold_cse:
 			return ref;
 		}
 
-		ref = _ir_emit(ctx, opt, op1, op2, op3);
+		ref = ir_emit(ctx, opt, op1, op2, op3);
 
 		/* Update local CSE chain */
 		op = opt & IR_OPT_OP_MASK;
@@ -711,7 +659,7 @@ ir_fold_cse:
 	}
 ir_fold_emit:
 	if (!(ctx->flags & IR_OPT_IN_SCCP)) {
-		return _ir_emit(ctx, opt, op1, op2, op3);
+		return ir_emit(ctx, opt, op1, op2, op3);
 	} else {
 		return IR_FOLD_DO_EMIT;
 	}
@@ -732,70 +680,70 @@ ir_fold_const:
 	}
 }
 
-ir_ref ir_fold(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3, ir_insn *op1_insn, ir_insn *op2_insn, ir_insn *op3_insn)
-{
-	return __ir_fold(ctx, opt, op1, op2, op3, op1_insn, op2_insn, op3_insn);
-}
-
-static ir_ref _ir_fold(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
+ir_ref ir_fold(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
 {
 	if (UNEXPECTED(!(ctx->flags & IR_OPT_FOLDING))) {
-		return _ir_emit(ctx, opt, op1, op2, op3);
+		return ir_emit(ctx, opt, op1, op2, op3);
+	}
+	return ir_folding(ctx, opt, op1, op2, op3, ctx->ir_base + op1, ctx->ir_base + op2, ctx->ir_base + op3);
+}
+
+ir_ref ir_emit_N(ir_ctx *ctx, uint32_t opt, uint32_t count)
+{
+	int i;
+	ir_ref ref = ctx->insns_count;
+	ir_insn *insn;
+
+	while (UNEXPECTED(ref + count/4 >= ctx->insns_limit)) {
+		ir_grow_top(ctx);
+	}
+	ctx->insns_count = ref + 1 + count/4;
+
+	insn = &ctx->ir_base[ref];
+	insn->optx = opt;
+	if ((opt & IR_OPT_OP_MASK) != IR_PHI) {
+		insn->inputs_count = count;
+	}
+	for (i = 1; i <= (count|3); i++) {
+		insn->ops[i] = IR_UNUSED;
 	}
 
-	return ir_fold(ctx, opt, op1, op2, op3, ctx->ir_base + op1, ctx->ir_base + op2, ctx->ir_base + op3);
+	return ref;
 }
 
-ir_ref ir_emit0(ir_ctx *ctx, uint32_t opt)
+void ir_set_op(ir_ctx *ctx, ir_ref ref, uint32_t n, ir_ref val)
 {
-	return _ir_emit(ctx, opt, IR_UNUSED, IR_UNUSED, IR_UNUSED);
-}
+	ir_insn *insn = &ctx->ir_base[ref];
 
-ir_ref ir_emit1(ir_ctx *ctx, uint32_t opt, ir_ref op1)
-{
-	return _ir_emit(ctx, opt, op1, IR_UNUSED, IR_UNUSED);
-}
+	if (n > 3) {
+		uint32_t count = 3;
 
-ir_ref ir_emit2(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2)
-{
-	return _ir_emit(ctx, opt, op1, op2, IR_UNUSED);
-}
-
-ir_ref ir_emit3(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
-{
-	return _ir_emit(ctx, opt, op1, op2, op3);
-}
-
-ir_ref ir_fold0(ir_ctx *ctx, uint32_t opt)
-{
-	return _ir_fold(ctx, opt, IR_UNUSED, IR_UNUSED, IR_UNUSED);
-}
-
-ir_ref ir_fold1(ir_ctx *ctx, uint32_t opt, ir_ref op1)
-{
-	return _ir_fold(ctx, opt, op1, IR_UNUSED, IR_UNUSED);
-}
-
-ir_ref ir_fold2(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2)
-{
-	return _ir_fold(ctx, opt, op1, op2, IR_UNUSED);
-}
-
-ir_ref ir_fold3(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
-{
-	return _ir_fold(ctx, opt, op1, op2, op3);
+		if (insn->op == IR_MERGE) {
+			count = insn->inputs_count;
+			if (count == 0) {
+				count = 2;
+			}
+		} else if (insn->op == IR_CALL || insn->op == IR_TAILCALL) {
+			count = insn->inputs_count;
+			if (count == 0) {
+				count = 2;
+			}
+		} else if (insn->op == IR_PHI) {
+			count = ctx->ir_base[insn->op1].inputs_count + 1;
+			if (count == 1) {
+				count = 3;
+			}
+		} else {
+			IR_ASSERT(0);
+		}
+		IR_ASSERT(n <= count);
+	}
+	insn->ops[n] = val;
 }
 
 void ir_bind(ir_ctx *ctx, ir_ref var, ir_ref def)
 {
-#if 0
-	_(START,        c0X2, ret, inf, ___) /* function start              */ \
-
-	_(BIND,	        v0X3, inf, inf, inf) /* local variable              */ \
-
-	ir_insn *insn = &ctx->ir_base[1];
-	insn->op2 = ir_emit3(ctx, IR_BIND, insn->op2, var, def);
-#endif
+	// TODO: node to VAR binding is not implemented yet
 }
 
 /* Batch construction of def->use edges */

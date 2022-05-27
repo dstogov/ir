@@ -1,4 +1,5 @@
 #include "ir.h"
+#include "ir_private.h"
 
 #define INVALID_IDX 0xffffffff
 

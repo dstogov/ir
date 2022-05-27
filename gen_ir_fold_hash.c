@@ -1,4 +1,5 @@
 #include "ir.h"
+#include <string.h>
 
 #define MAX_RULES 2048
 #define MAX_SLOTS (MAX_RULES * 4)

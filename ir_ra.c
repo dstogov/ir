@@ -1,14 +1,21 @@
 #define _GNU_SOURCE
 
+#include <stdlib.h>
 #include "ir.h"
 #include "ir_private.h"
-#include <stdlib.h>
 
-#include "ir_x86.h"
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
+# include "ir_x86.h"
+#endif
 
 #ifdef IR_DEBUG_REGSET
 uint32_t debug_regset = 0xffffffff; /* all 32 regisers */
 #endif
+
+int ir_regs_number(void)
+{
+	return IR_REG_NUM;
+}
 
 /* RA - Register Allocation, Liveness, Coalescing and SSA Resolution */
 
@@ -1120,13 +1127,6 @@ int ir_gen_dessa_moves(ir_ctx *ctx, int b, emit_copy_t emit_copy)
  * See "Optimized Interval Splitting in a Linear Scan Register Allocator",
  * Christian Wimmer VEE'10 (2005), Figure 2.
  */
-typedef struct _ir_lsra_data {
-	int32_t stack_frame_size;
-	int32_t unused_slot_4;
-	int32_t unused_slot_2;
-	int32_t unused_slot_1;
-} ir_lsra_data;
-
 #ifdef IR_DEBUG
 # define IR_LOG_LSRA(action, ival, comment) do { \
 		if (ctx->flags & IR_DEBUG_RA) { \
@@ -1390,7 +1390,7 @@ static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, ir_live_interval *iva
 	return child;
 }
 
-static int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type, ir_lsra_data *data)
+int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type, ir_reg_alloc_data *data)
 {
 	int32_t ret;
 	uint8_t size = ir_type_size[type];
@@ -1956,7 +1956,7 @@ static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 	return 1;
 }
 
-static bool ir_ival_spill_for_fuse_load(ir_ctx *ctx, ir_live_interval *ival, ir_lsra_data *data)
+static bool ir_ival_spill_for_fuse_load(ir_ctx *ctx, ir_live_interval *ival, ir_reg_alloc_data *data)
 {
 	ir_use_pos *use_pos = ival->use_pos;
 	ir_insn *insn;
@@ -2019,7 +2019,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 	int j;
 	ir_live_pos position;
 	ir_reg reg;
-	ir_lsra_data data;
+	ir_reg_alloc_data data;
 
 	if (!ctx->live_intervals) {
 		return 0;

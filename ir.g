@@ -12,6 +12,7 @@ php llk.php ir.g
 
 %{
 #include "ir.h"
+#include "ir_private.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -186,13 +187,13 @@ ir_insn(ir_parser_ctx *p):
 				")"
 			)?
 			{
-				if (IR_IS_FOLDABLE(op)
+				if (IR_IS_FOLDABLE_OP(op)
 				 && !IR_IS_UNRESOLVED(op1)
 				 && !IR_IS_UNRESOLVED(op2)
 				 && !IR_IS_UNRESOLVED(op3)) {
-					ref = ir_fold3(p->ctx, IR_OPT(op, t), op1, op2, op3);
+					ref = ir_fold(p->ctx, IR_OPT(op, t), op1, op2, op3);
 				} else {
-					ref = ir_emit3(p->ctx, IR_OPT(op, t), op1, op2, op3);
+					ref = ir_emit(p->ctx, IR_OPT(op, t), op1, op2, op3);
 				}
 			}
 		)
