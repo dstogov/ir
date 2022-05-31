@@ -817,7 +817,7 @@ typedef uint32_t ir_regset;
 /*** IR Register Allocation ***/
 /* Flags for ctx->regs[][] (low bits are used for register number itself) */
 #define IR_REG_SPILL_LOAD  (1<<6)
-#define IR_REG_SPILL_STORE (1<<5)
+#define IR_REG_SPILL_STORE (1<<6)
 #define IR_REG_NUM(r) \
 	((r) == IR_REG_NONE ? IR_REG_NONE : ((r) & ~(IR_REG_SPILL_LOAD|IR_REG_SPILL_STORE)))
 

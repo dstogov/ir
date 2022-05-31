@@ -308,7 +308,7 @@ int main(int argc, char **argv)
 				fprintf(stderr, "ERROR: Invalid usage' (use --help)\n");
 				return 1;
 			}
-			debug_regset = strtoul(argv[i + 1], NULL, 0);
+			debug_regset = strtoull(argv[i + 1], NULL, 0);
 			i++;
 #endif
 		} else if (argv[i][0] == '-') {

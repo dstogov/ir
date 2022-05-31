@@ -12,7 +12,7 @@
 #include "ir_private.h"
 
 #ifdef IR_DEBUG_REGSET
-uint32_t debug_regset = 0xffffffff; /* all 32 regisers */
+uint64_t debug_regset = 0xffffffffffffffff;
 #endif
 
 int ir_regs_number(void)

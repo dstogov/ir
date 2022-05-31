@@ -597,7 +597,7 @@ int ir_mem_flush(void *ptr, size_t size);
 #endif
 
 #ifdef IR_DEBUG_REGSET
-extern uint32_t debug_regset;
+extern uint64_t debug_regset;
 #endif
 
 #endif /* IR_H */
