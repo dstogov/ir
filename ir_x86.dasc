@@ -304,9 +304,9 @@
 
 |.macro ASM_SSE2_REG_REG_OP, fop, dop, type, dst, src
 ||	if (type == IR_FLOAT) {
-|		fop xmm(dst-IR_REG_XMM0), xmm(src-IR_REG_XMM0)
+|		fop xmm(dst-IR_REG_FP_FIRST), xmm(src-IR_REG_FP_FIRST)
 ||	} else if (type == IR_DOUBLE) {
-|		dop xmm(dst-IR_REG_XMM0), xmm(src-IR_REG_XMM0)
+|		dop xmm(dst-IR_REG_FP_FIRST), xmm(src-IR_REG_FP_FIRST)
 ||	} else {
 ||		IR_ASSERT(0);
 ||	}
@@ -314,9 +314,9 @@
 
 |.macro ASM_SSE2_REG_MEM_OP, fop, dop, type, dst, src
 ||	if (type == IR_FLOAT) {
-|		fop xmm(dst-IR_REG_XMM0), dword src
+|		fop xmm(dst-IR_REG_FP_FIRST), dword src
 ||	} else if (type == IR_DOUBLE) {
-|		dop xmm(dst-IR_REG_XMM0), qword src
+|		dop xmm(dst-IR_REG_FP_FIRST), qword src
 ||	} else {
 ||		IR_ASSERT(0);
 ||	}
@@ -337,9 +337,9 @@
 
 |.macro ASM_AVX_REG_REG_REG_OP, fop, dop, type, dst, op1, op2
 ||	if (type == IR_FLOAT) {
-|		fop xmm(dst-IR_REG_XMM0), xmm(op1-IR_REG_XMM0), xmm(op2-IR_REG_XMM0)
+|		fop xmm(dst-IR_REG_FP_FIRST), xmm(op1-IR_REG_FP_FIRST), xmm(op2-IR_REG_FP_FIRST)
 ||	} else if (type == IR_DOUBLE) {
-|		dop xmm(dst-IR_REG_XMM0), xmm(op1-IR_REG_XMM0), xmm(op2-IR_REG_XMM0)
+|		dop xmm(dst-IR_REG_FP_FIRST), xmm(op1-IR_REG_FP_FIRST), xmm(op2-IR_REG_FP_FIRST)
 ||	} else {
 ||		IR_ASSERT(0);
 ||	}
@@ -347,9 +347,9 @@
 
 |.macro ASM_AVX_REG_REG_MEM_OP, fop, dop, type, dst, op1, op2
 ||	if (type == IR_FLOAT) {
-|		fop xmm(dst-IR_REG_XMM0), xmm(op1-IR_REG_XMM0), dword op2
+|		fop xmm(dst-IR_REG_FP_FIRST), xmm(op1-IR_REG_FP_FIRST), dword op2
 ||	} else if (type == IR_DOUBLE) {
-|		dop xmm(dst-IR_REG_XMM0), xmm(op1-IR_REG_XMM0), qword op2
+|		dop xmm(dst-IR_REG_FP_FIRST), xmm(op1-IR_REG_FP_FIRST), qword op2
 ||	} else {
 ||		IR_ASSERT(0);
 ||	}
@@ -379,15 +379,15 @@
 |.macro ASM_FP_MEM_REG_OP, fop, dop, avx_fop, avx_dop, type, dst, src
 ||	if (type == IR_FLOAT) {
 ||		if (ctx->flags & IR_AVX) {
-|			avx_fop dword dst, xmm(src-IR_REG_XMM0)
+|			avx_fop dword dst, xmm(src-IR_REG_FP_FIRST)
 ||		} else {
-|			fop dword dst, xmm(src-IR_REG_XMM0)
+|			fop dword dst, xmm(src-IR_REG_FP_FIRST)
 ||		}
 ||	} else if (type == IR_DOUBLE) {
 ||		if (ctx->flags & IR_AVX) {
-|			avx_dop qword dst, xmm(src-IR_REG_XMM0)
+|			avx_dop qword dst, xmm(src-IR_REG_FP_FIRST)
 ||		} else {
-|			dop qword dst, xmm(src-IR_REG_XMM0)
+|			dop qword dst, xmm(src-IR_REG_FP_FIRST)
 ||		}
 ||	} else {
 ||		IR_ASSERT(0);
@@ -1749,16 +1749,16 @@ static void ir_emit_load(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref src)
 
 			if (insn->type == IR_FLOAT && insn->val.f == 0) {
 				if (ctx->flags & IR_AVX) {
-					|	vxorps xmm(reg-IR_REG_XMM0), xmm(reg-IR_REG_XMM0), xmm(reg-IR_REG_XMM0)
+					|	vxorps xmm(reg-IR_REG_FP_FIRST), xmm(reg-IR_REG_FP_FIRST), xmm(reg-IR_REG_FP_FIRST)
 				} else {
-					|	xorps xmm(reg-IR_REG_XMM0), xmm(reg-IR_REG_XMM0)
+					|	xorps xmm(reg-IR_REG_FP_FIRST), xmm(reg-IR_REG_FP_FIRST)
 				}
 				return;
 			} else if (insn->type == IR_DOUBLE && insn->val.d == 0) {
 				if (ctx->flags & IR_AVX) {
-					|	vxorpd xmm(reg-IR_REG_XMM0), xmm(reg-IR_REG_XMM0), xmm(reg-IR_REG_XMM0)
+					|	vxorpd xmm(reg-IR_REG_FP_FIRST), xmm(reg-IR_REG_FP_FIRST), xmm(reg-IR_REG_FP_FIRST)
 				} else {
-					|	xorpd xmm(reg-IR_REG_XMM0), xmm(reg-IR_REG_XMM0)
+					|	xorpd xmm(reg-IR_REG_FP_FIRST), xmm(reg-IR_REG_FP_FIRST)
 				}
 				return;
 			}
@@ -2825,9 +2825,9 @@ static void ir_emit_op_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|.code
 			}
 			if (ctx->flags & IR_AVX) {
-				|	vxorpd xmm(def_reg-IR_REG_XMM0), xmm(def_reg-IR_REG_XMM0), [->double_neg_const]
+				|	vxorpd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), [->double_neg_const]
 			} else {
-				|	xorpd xmm(def_reg-IR_REG_XMM0), [->double_neg_const]
+				|	xorpd xmm(def_reg-IR_REG_FP_FIRST), [->double_neg_const]
 			}
 		} else {
 			IR_ASSERT(insn->type == IR_FLOAT);
@@ -2840,9 +2840,9 @@ static void ir_emit_op_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|.code
 			}
 			if (ctx->flags & IR_AVX) {
-				|	vxorps xmm(def_reg-IR_REG_XMM0), xmm(def_reg-IR_REG_XMM0), [->float_neg_const]
+				|	vxorps xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), [->float_neg_const]
 			} else {
-				|	xorps xmm(def_reg-IR_REG_XMM0), [->float_neg_const]
+				|	xorps xmm(def_reg-IR_REG_FP_FIRST), [->float_neg_const]
 			}
 		}
 	} else if (insn->op == IR_ABS) {
@@ -2856,9 +2856,9 @@ static void ir_emit_op_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|.code
 			}
 			if (ctx->flags & IR_AVX) {
-				|	vandpd xmm(def_reg-IR_REG_XMM0), xmm(def_reg-IR_REG_XMM0), [->double_abs_const]
+				|	vandpd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), [->double_abs_const]
 			} else {
-				|	andpd xmm(def_reg-IR_REG_XMM0), [->double_abs_const]
+				|	andpd xmm(def_reg-IR_REG_FP_FIRST), [->double_abs_const]
 			}
 		} else {
 			IR_ASSERT(insn->type == IR_FLOAT);
@@ -2871,9 +2871,9 @@ static void ir_emit_op_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|.code
 			}
 			if (ctx->flags & IR_AVX) {
-				|	vandps xmm(def_reg-IR_REG_XMM0), xmm(def_reg-IR_REG_XMM0), [->float_abs_const]
+				|	vandps xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), [->float_abs_const]
 			} else {
-				|	andps xmm(def_reg-IR_REG_XMM0), [->float_abs_const]
+				|	andps xmm(def_reg-IR_REG_FP_FIRST), [->float_abs_const]
 			}
 		}
 	} else {
@@ -3859,17 +3859,17 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				IR_ASSERT(sizeof(void*) == 8);
 |.if X64
 				if (ctx->flags & IR_AVX) {
-					|	vmovd Rq(def_reg), xmm(op1_reg-IR_REG_XMM0)
+					|	vmovd Rq(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
 				} else {
-					|	movd Rq(def_reg), xmm(op1_reg-IR_REG_XMM0)
+					|	movd Rq(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
 				}
 |.endif
 			} else {
 				IR_ASSERT(src_type == IR_FLOAT);
 				if (ctx->flags & IR_AVX) {
-					|	vmovd Rd(def_reg), xmm(op1_reg-IR_REG_XMM0)
+					|	vmovd Rd(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
 				} else {
-					|	movd Rd(def_reg), xmm(op1_reg-IR_REG_XMM0)
+					|	movd Rd(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
 				}
 			}
 		} else if (IR_IS_CONST_REF(insn->op1)) {
@@ -3903,17 +3903,17 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				IR_ASSERT(sizeof(void*) == 8);
 |.if X64
 				if (ctx->flags & IR_AVX) {
-					|	vmovd xmm(def_reg-IR_REG_XMM0), Rq(op1_reg)
+					|	vmovd xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
 				} else {
-					|	movd xmm(def_reg-IR_REG_XMM0), Rq(op1_reg)
+					|	movd xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
 				}
 |.endif
 			} else {
 				IR_ASSERT(dst_type == IR_FLOAT);
 				if (ctx->flags & IR_AVX) {
-					|	vmovd xmm(def_reg-IR_REG_XMM0), Rd(op1_reg)
+					|	vmovd xmm(def_reg-IR_REG_FP_FIRST), Rd(op1_reg)
 				} else {
-					|	movd xmm(def_reg-IR_REG_XMM0), Rd(op1_reg)
+					|	movd xmm(def_reg-IR_REG_FP_FIRST), Rd(op1_reg)
 				}
 			}
 		} else {
@@ -3954,16 +3954,16 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		if (!src64) {
 			if (dst_type == IR_DOUBLE) {
 				if (ctx->flags & IR_AVX) {
-					|	vcvtsi2sd xmm(def_reg-IR_REG_XMM0), xmm(def_reg-IR_REG_XMM0), Rd(op1_reg)
+					|	vcvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), Rd(op1_reg)
 				} else {
-					|	cvtsi2sd xmm(def_reg-IR_REG_XMM0), Rd(op1_reg)
+					|	cvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), Rd(op1_reg)
 				}
 			} else {
 				IR_ASSERT(dst_type == IR_FLOAT);
 				if (ctx->flags & IR_AVX) {
-					|	vcvtsi2ss xmm(def_reg-IR_REG_XMM0), xmm(def_reg-IR_REG_XMM0), Rd(op1_reg)
+					|	vcvtsi2ss xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), Rd(op1_reg)
 				} else {
-					|	cvtsi2ss xmm(def_reg-IR_REG_XMM0), Rd(op1_reg)
+					|	cvtsi2ss xmm(def_reg-IR_REG_FP_FIRST), Rd(op1_reg)
 				}
 			}
 		} else {
@@ -3971,16 +3971,16 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |.if X64
 			if (dst_type == IR_DOUBLE) {
 				if (ctx->flags & IR_AVX) {
-					|	vcvtsi2sd xmm(def_reg-IR_REG_XMM0), xmm(def_reg-IR_REG_XMM0), Rq(op1_reg)
+					|	vcvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
 				} else {
-					|	cvtsi2sd xmm(def_reg-IR_REG_XMM0), Rq(op1_reg)
+					|	cvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
 				}
 			} else {
 				IR_ASSERT(dst_type == IR_FLOAT);
 				if (ctx->flags & IR_AVX) {
-					|	vcvtsi2ss xmm(def_reg-IR_REG_XMM0), xmm(def_reg-IR_REG_XMM0), Rq(op1_reg)
+					|	vcvtsi2ss xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
 				} else {
-					|	cvtsi2ss xmm(def_reg-IR_REG_XMM0), Rq(op1_reg)
+					|	cvtsi2ss xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
 				}
 			}
 |.endif
@@ -3992,16 +3992,16 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		if (!src64) {
 			if (dst_type == IR_DOUBLE) {
 				if (ctx->flags & IR_AVX) {
-					|	vcvtsi2sd xmm(def_reg-IR_REG_XMM0), xmm(def_reg-IR_REG_XMM0), dword [Ra(fp)+offset]
+					|	vcvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), dword [Ra(fp)+offset]
 				} else {
-					|	cvtsi2sd xmm(def_reg-IR_REG_XMM0), dword [Ra(fp)+offset]
+					|	cvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), dword [Ra(fp)+offset]
 				}
 			} else {
 				IR_ASSERT(dst_type == IR_FLOAT);
 				if (ctx->flags & IR_AVX) {
-					|	vcvtsi2ss xmm(def_reg-IR_REG_XMM0), xmm(def_reg-IR_REG_XMM0), dword [Ra(fp)+offset]
+					|	vcvtsi2ss xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), dword [Ra(fp)+offset]
 				} else {
-					|	cvtsi2ss xmm(def_reg-IR_REG_XMM0), dword [Ra(fp)+offset]
+					|	cvtsi2ss xmm(def_reg-IR_REG_FP_FIRST), dword [Ra(fp)+offset]
 				}
 			}
 		} else {
@@ -4009,16 +4009,16 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |.if X64
 			if (dst_type == IR_DOUBLE) {
 				if (ctx->flags & IR_AVX) {
-					|	vcvtsi2sd xmm(def_reg-IR_REG_XMM0), xmm(def_reg-IR_REG_XMM0), qword [Ra(fp)+offset]
+					|	vcvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), qword [Ra(fp)+offset]
 				} else {
-					|	cvtsi2sd xmm(def_reg-IR_REG_XMM0), qword [Ra(fp)+offset]
+					|	cvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), qword [Ra(fp)+offset]
 				}
 			} else {
 				IR_ASSERT(dst_type == IR_FLOAT);
 				if (ctx->flags & IR_AVX) {
-					|	vcvtsi2ss xmm(def_reg-IR_REG_XMM0), xmm(def_reg-IR_REG_XMM0), qword [Ra(fp)+offset]
+					|	vcvtsi2ss xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), qword [Ra(fp)+offset]
 				} else {
-					|	cvtsi2ss xmm(def_reg-IR_REG_XMM0), qword [Ra(fp)+offset]
+					|	cvtsi2ss xmm(def_reg-IR_REG_FP_FIRST), qword [Ra(fp)+offset]
 				}
 			}
 |.endif
@@ -4054,16 +4054,16 @@ static void ir_emit_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		if (!dst64) {
 			if (src_type == IR_DOUBLE) {
 				if (ctx->flags & IR_AVX) {
-					|	vcvtsd2si Rd(def_reg), xmm(op1_reg-IR_REG_XMM0)
+					|	vcvtsd2si Rd(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
 				} else {
-					|	cvtsd2si Rd(def_reg), xmm(op1_reg-IR_REG_XMM0)
+					|	cvtsd2si Rd(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
 				}
 			} else {
 				IR_ASSERT(src_type == IR_FLOAT);
 				if (ctx->flags & IR_AVX) {
-					|	vcvtss2si Rd(def_reg), xmm(op1_reg-IR_REG_XMM0)
+					|	vcvtss2si Rd(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
 				} else {
-					|	cvtss2si Rd(def_reg), xmm(op1_reg-IR_REG_XMM0)
+					|	cvtss2si Rd(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
 				}
 			}
 		} else {
@@ -4071,16 +4071,16 @@ static void ir_emit_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |.if X64
 			if (src_type == IR_DOUBLE) {
 				if (ctx->flags & IR_AVX) {
-					|	vcvtsd2si Rq(def_reg), xmm(op1_reg-IR_REG_XMM0)
+					|	vcvtsd2si Rq(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
 				} else {
-					|	cvtsd2si Rq(def_reg), xmm(op1_reg-IR_REG_XMM0)
+					|	cvtsd2si Rq(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
 				}
 			} else {
 				IR_ASSERT(src_type == IR_FLOAT);
 				if (ctx->flags & IR_AVX) {
-					|	vcvtss2si Rq(def_reg), xmm(op1_reg-IR_REG_XMM0)
+					|	vcvtss2si Rq(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
 				} else {
-					|	cvtss2si Rq(def_reg), xmm(op1_reg-IR_REG_XMM0)
+					|	cvtss2si Rq(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
 				}
 			}
 |.endif
@@ -4191,16 +4191,16 @@ static void ir_emit_fp2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 		} else if (src_type == IR_DOUBLE) {
 			if (ctx->flags & IR_AVX) {
-				|	vcvtsd2ss xmm(def_reg-IR_REG_XMM0), xmm(def_reg-IR_REG_XMM0), xmm(op1_reg-IR_REG_XMM0)
+				|	vcvtsd2ss xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 			} else {
-				|	cvtsd2ss xmm(def_reg-IR_REG_XMM0), xmm(op1_reg-IR_REG_XMM0)
+				|	cvtsd2ss xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 			}
 		} else {
 			IR_ASSERT(src_type == IR_FLOAT);
 			if (ctx->flags & IR_AVX) {
-				|	vcvtss2sd xmm(def_reg-IR_REG_XMM0), xmm(def_reg-IR_REG_XMM0), xmm(op1_reg-IR_REG_XMM0)
+				|	vcvtss2sd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 			} else {
-				|	cvtss2sd xmm(def_reg-IR_REG_XMM0), xmm(op1_reg-IR_REG_XMM0)
+				|	cvtss2sd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 			}
 		}
 	} else if (IR_IS_CONST_REF(insn->op1)) {
@@ -4210,16 +4210,16 @@ static void ir_emit_fp2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		_insn->emit_const = 1;
 		if (src_type == IR_DOUBLE) {
 			if (ctx->flags & IR_AVX) {
-				|	vcvtsd2ss xmm(def_reg-IR_REG_XMM0), xmm(def_reg-IR_REG_XMM0), qword [=>label]
+				|	vcvtsd2ss xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), qword [=>label]
 			} else {
-				|	cvtsd2ss xmm(def_reg-IR_REG_XMM0), qword [=>label]
+				|	cvtsd2ss xmm(def_reg-IR_REG_FP_FIRST), qword [=>label]
 			}
 		} else {
 			IR_ASSERT(src_type == IR_FLOAT);
 			if (ctx->flags & IR_AVX) {
-				|	vcvtss2sd xmm(def_reg-IR_REG_XMM0), xmm(def_reg-IR_REG_XMM0), dword [=>label]
+				|	vcvtss2sd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), dword [=>label]
 			} else {
-				|	cvtss2sd xmm(def_reg-IR_REG_XMM0), dword [=>label]
+				|	cvtss2sd xmm(def_reg-IR_REG_FP_FIRST), dword [=>label]
 			}
 		}
 	} else {
@@ -4228,16 +4228,16 @@ static void ir_emit_fp2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 		if (src_type == IR_DOUBLE) {
 			if (ctx->flags & IR_AVX) {
-				|	vcvtsd2ss xmm(def_reg-IR_REG_XMM0), xmm(def_reg-IR_REG_XMM0), qword [Ra(fp)+offset]
+				|	vcvtsd2ss xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), qword [Ra(fp)+offset]
 			} else {
-				|	cvtsd2ss xmm(def_reg-IR_REG_XMM0), qword [Ra(fp)+offset]
+				|	cvtsd2ss xmm(def_reg-IR_REG_FP_FIRST), qword [Ra(fp)+offset]
 			}
 		} else {
 			IR_ASSERT(src_type == IR_FLOAT);
 			if (ctx->flags & IR_AVX) {
-				|	vcvtss2sd xmm(def_reg-IR_REG_XMM0), xmm(def_reg-IR_REG_XMM0), dword [Ra(fp)+offset]
+				|	vcvtss2sd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), dword [Ra(fp)+offset]
 			} else {
-				|	cvtss2sd xmm(def_reg-IR_REG_XMM0), dword [Ra(fp)+offset]
+				|	cvtss2sd xmm(def_reg-IR_REG_FP_FIRST), dword [Ra(fp)+offset]
 			}
 		}
 	}
