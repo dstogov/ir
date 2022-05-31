@@ -62,10 +62,25 @@
 
 #endif
 
+#define IR_GP_REG_ENUM(code, name64, name32, name16, name8, name8h) \
+	IR_REG_ ## code,
+
+#define IR_FP_REG_ENUM(code, name) \
+	IR_REG_ ## code,
+
+enum _ir_reg {
+	IR_REG_NONE = -1,
+	IR_GP_REGS(IR_GP_REG_ENUM)
+	IR_FP_REGS(IR_FP_REG_ENUM)
+	IR_REG_NUM,
+};
+
 #define IR_REG_GP_FIRST IR_REG_R0
 #define IR_REG_FP_FIRST IR_REG_XMM0
 #define IR_REG_GP_LAST  (IR_REG_FP_FIRST - 1)
 #define IR_REG_FP_LAST  (IR_REG_NUM - 1)
+
+#define IR_REGSET_64BIT 0
 
 #define IR_REG_STACK_POINTER \
 	IR_REG_RSP
@@ -86,19 +101,6 @@
 #define IR_REG_RBP IR_REG_R5
 #define IR_REG_RSI IR_REG_R6
 #define IR_REG_RDI IR_REG_R7
-
-#define IR_GP_REG_ENUM(code, name64, name32, name16, name8, name8h) \
-	IR_REG_ ## code,
-
-#define IR_FP_REG_ENUM(code, name) \
-	IR_REG_ ## code,
-
-enum _ir_reg {
-	IR_REG_NONE = -1,
-	IR_GP_REGS(IR_GP_REG_ENUM)
-	IR_FP_REGS(IR_FP_REG_ENUM)
-	IR_REG_NUM,
-};
 
 /* Calling Convention */
 #ifdef _WIN64

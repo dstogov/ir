@@ -1,7 +1,7 @@
 #ifndef IR_ELF
 #define IR_ELF
 
-#if defined(IR_TARGET_X64) || defined(IR_TARGET_ARM64)
+#if defined(IR_TARGET_X64) || defined(IR_TARGET_AARCH64)
 # define ELF64
 #else
 # undef ELF64

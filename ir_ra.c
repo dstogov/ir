@@ -2,11 +2,14 @@
 
 #include <stdlib.h>
 #include "ir.h"
-#include "ir_private.h"
 
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 # include "ir_x86.h"
+#elif defined(IR_TARGET_AARCH64)
+# include "ir_aarch64.h"
 #endif
+
+#include "ir_private.h"
 
 #ifdef IR_DEBUG_REGSET
 uint32_t debug_regset = 0xffffffff; /* all 32 regisers */

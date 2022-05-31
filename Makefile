@@ -55,10 +55,8 @@ ir_load.c: ir.g
 
 ir_fold_hash.h: gen_ir_fold_hash ir_fold.h ir.h
 	./gen_ir_fold_hash > ir_fold_hash.h
-gen_ir_fold_hash: gen_ir_fold_hash.o ir_strtab.o
+gen_ir_fold_hash: gen_ir_fold_hash.c ir_strtab.c
 	$(CC) $(CFLAGS) $(LDFALGS) -o $@ $^
-gen_ir_fold_hash.o: gen_ir_fold_hash.c ir.h
-	$(CC) $(CFLAGS) -o $@ -c $<
 
 minilua: dynasm/minilua.c
 	$(CC) dynasm/minilua.c -lm -o $@

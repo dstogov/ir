@@ -1,8 +1,8 @@
 #define IR_X64 1
 
 #include "ir.h"
-#include "ir_private.h"
 #include "ir_x86.h"
+#include "ir_private.h"
 
 #ifdef _WIN32
 # define IR_SET_ALIGNED(alignment, decl) __declspec(align(alignment)) decl

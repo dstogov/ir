@@ -743,13 +743,9 @@ int ir_gen_dessa_moves(ir_ctx *ctx, int b, emit_copy_t emit_copy);
 void ir_free_live_ranges(ir_live_range *live_range);
 void ir_free_live_intervals(ir_live_interval **live_intervals, int count);
 
-/*** Register Sets ***/
-#if (IR_REG_NUM <= 32)
-# define IR_REGSET_64BIT 0
-#else
-# define IR_REGSET_64BIT 1
-#endif
+#if defined(IR_REGSET_64BIT)
 
+/*** Register Sets ***/
 #if IR_REGSET_64BIT
 typedef uint64_t ir_regset;
 #else
@@ -764,20 +760,20 @@ typedef uint32_t ir_regset;
 #define IR_REGSET_IS_SINGLETON(regset) \
 	(regset && !(regset & (regset - 1)))
 
-#if (!IR_REGSET_64BIT)
-#define IR_REGSET(reg) \
-	(1u << (reg))
-#else
-#define IR_REGSET(reg) \
+#if IR_REGSET_64BIT
+# define IR_REGSET(reg) \
 	(1ull << (reg))
+#else
+# define IR_REGSET(reg) \
+	(1u << (reg))
 #endif
 
-#if (!IR_REGSET_64BIT)
-#define IR_REGSET_INTERVAL(reg1, reg2) \
-	(((1u << ((reg2) - (reg1) + 1)) - 1) << (reg1))
-#else
-#define IR_REGSET_INTERVAL(reg1, reg2) \
+#if IR_REGSET_64BIT
+# define IR_REGSET_INTERVAL(reg1, reg2) \
 	(((1ull << ((reg2) - (reg1) + 1)) - 1) << (reg1))
+#else
+# define IR_REGSET_INTERVAL(reg1, reg2) \
+	(((1u << ((reg2) - (reg1) + 1)) - 1) << (reg1))
 #endif
 
 #define IR_REGSET_IN(regset, reg) \
@@ -798,12 +794,12 @@ typedef uint32_t ir_regset;
 #define IR_REGSET_DIFFERENCE(set1, set2) \
 	((set1) & ~(set2))
 
-#if (!IR_REGSET_64BIT)
-# define IR_REGSET_FIRST(set) ((ir_reg)ir_ntz(set))
-# define IR_REGSET_LAST(set)  ((ir_reg)(ir_nlz(set)^31))
-#else
+#if IR_REGSET_64BIT
 # define IR_REGSET_FIRST(set) ((ir_reg)ir_ntzl(set))
 # define ir_REGSET_LAST(set)  ((ir_reg)(ir_nlzl(set)(set)^63))
+#else
+# define IR_REGSET_FIRST(set) ((ir_reg)ir_ntz(set))
+# define IR_REGSET_LAST(set)  ((ir_reg)(ir_nlz(set)^31))
 #endif
 
 #define IR_REGSET_FOREACH(set, reg) \
@@ -852,6 +848,9 @@ ir_reg ir_uses_fixed_reg(ir_ctx *ctx, ir_ref ref, int op_num);
 uint8_t ir_get_def_flags(ir_ctx *ctx, ir_ref ref);
 uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num);
 int ir_get_temporary_regs(ir_ctx *ctx, ir_ref ref, ir_tmp_reg *tmp_regs);
+
+#endif /* defined(IR_REGSET_64BIT) */
+
 
 int ir_regs_number(void);
 const char *ir_reg_name(int8_t reg, ir_type type);

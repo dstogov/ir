@@ -200,7 +200,7 @@ static uint64_t ir_disasm_branch_target(csh cs, const cs_insn *insn)
 			}
 		}
 	}
-#elif defined(IR_TARGET_ARM64)
+#elif defined(IR_TARGET_AARCH64)
 	if (cs_insn_group(cs, insn, ARM64_GRP_JUMP)
 	 || insn->id == ARM64_INS_BL
 	 || insn->id == ARM64_INS_ADR) {
@@ -216,9 +216,9 @@ static uint64_t ir_disasm_branch_target(csh cs, const cs_insn *insn)
 
 static uint64_t ir_disasm_rodata_reference(csh cs, const cs_insn *insn)
 {
+#if defined(IR_TARGET_X86)
 	unsigned int i;
 
-#if defined(IR_TARGET_X86)
 	for (i = 0; i < insn->detail->x86.op_count; i++) {
 		if (insn->detail->x86.operands[i].type == X86_OP_MEM
 		 && insn->detail->x86.operands[i].mem.base == X86_REG_INVALID
@@ -237,6 +237,8 @@ static uint64_t ir_disasm_rodata_reference(csh cs, const cs_insn *insn)
 		}
 	}
 #elif defined(IR_TARGET_X64)
+	unsigned int i;
+
 	for (i = 0; i < insn->detail->x86.op_count; i++) {
 		if (insn->detail->x86.operands[i].type == X86_OP_MEM
 		 && insn->detail->x86.operands[i].mem.base == X86_REG_RIP
@@ -247,7 +249,7 @@ static uint64_t ir_disasm_rodata_reference(csh cs, const cs_insn *insn)
 			return insn->detail->x86.operands[i].mem.disp + insn->address + insn->size;
 		}
 	}
-#elif defined(IR_TARGET_ARM64)
+#elif defined(IR_TARGET_AARCH64)
 	return 0; // TODO:
 #endif
 
@@ -476,7 +478,7 @@ int ir_disasm(const char    *name,
 #  else
 	cs_option(cs, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
 #  endif
-# elif defined(IR_TARGET_ARM64)
+# elif defined(IR_TARGET_AARCH64)
 	if (cs_open(CS_ARCH_ARM64, CS_MODE_ARM, &cs) != CS_ERR_OK)
 		return 0;
 	cs_option(cs, CS_OPT_DETAIL, CS_OPT_ON);

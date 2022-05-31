@@ -11,6 +11,8 @@
 # define IR_TARGET "x86"
 #elif defined(IR_TARGET_X64)
 # define IR_TARGET "x86_64"
+#elif defined(IR_TARGET_AARCH64)
+# define IR_TARGET "aarch64"
 #else
 # error "Unknown IR target"
 #endif
