@@ -112,15 +112,30 @@ function run_tests() {
 	$tests = find_tests("tests");
 	$bad = array();
 	$failed = array();
+	$total = count($tests);
+	$count = 0;
 	foreach($tests as $test) {
+		$count++;
 		if (parse_test($test, $name, $code, $expect, $opt, $test_target)) {
 			if ($test_target !== null && $target != $test_target) {
+				echo "\r\e[1;33mSKIP\e[0m: $name [$test]\n";
 				$skiped++;
 				continue;
-			} else if (!run_test($test, $name, $code, $expect, $opt)) {
+			}
+			$str = "TEST: $count/$total $name [$test]\r";
+			$len = strlen($str);
+			echo $str;
+			flush();
+			$ret = run_test($test, $name, $code, $expect, $opt);
+	        echo str_repeat(" ", $len);
+			if ($ret) {
+				echo "\r\e[1;32mPASS\e[0m: $name [$test]\n";
+			} else {
+				echo "\r\e[1;31mFAIL\e[0m: $name [$test]\n";
 				$failed[$test] = $name;
 			}
 		} else {
+			echo "\r\e[1;31mBROK\e[0m: $name [$test]\n";
 			$bad[] = $test;
 		}
 	}

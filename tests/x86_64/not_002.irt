@@ -14,5 +14,5 @@ x86_64
 --EXPECT--
 test:
 	testb %dil, %dil
-	setne %al
+	sete %al
 	retq

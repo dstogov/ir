@@ -546,7 +546,6 @@ typedef enum _ir_rule {
 	IR_LEA_SI_B,
 	IR_INC,
 	IR_DEC,
-	IR_MUL_2,
 	IR_MUL_PWR2,
 	IR_DIV_PWR2,
 	IR_MOD_PWR2,
@@ -816,7 +815,6 @@ uint8_t ir_get_def_flags(ir_ctx *ctx, ir_ref ref)
 		case IR_COPY_FP:
 		case IR_INC:
 		case IR_DEC:
-		case IR_MUL_2:
 		case IR_MUL_PWR2:
 		case IR_DIV_PWR2:
 		case IR_MOD_PWR2:
@@ -1265,8 +1263,6 @@ binop_fp:
 					} else if (ir_type_size[insn->type] >= 4 &&
 							(op2_insn->val.u64 == 3 || op2_insn->val.u64 == 5 || op2_insn->val.u64 == 9)) {
 						return IR_LEA_SIB; // lea ret, [op1.reg+op1.reg*op2.scale]
-					} else if (op2_insn->val.u64 == 2) {
-						return IR_MUL_2; // add op1, op1
 					} else if (IR_IS_POWER_OF_TWO(op2_insn->val.u64)) {
 						return IR_MUL_PWR2; // shl op1, IR_LOG2(op2_insn->val.u64)
 					}
@@ -1508,7 +1504,7 @@ store_int:
 								return IR_MEM_DEC;
 							}
 						}
-					} else if (ctx->rules[insn->op3] == IR_MUL_2 || ctx->rules[insn->op3] == IR_MUL_PWR2) {
+					} else if (ctx->rules[insn->op3] == IR_MUL_PWR2) {
 						if (ctx->ir_base[op_insn->op1].op == load_op
 						 && ctx->ir_base[op_insn->op1].op2 == insn->op2) {
 							if (op_insn->op1 > bb->start
@@ -2676,7 +2672,7 @@ static void ir_emit_bool_not_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	} else {
 		|	ASM_MREF_IMM_OP cmp, type, op1, 0
 	}
-	|	setne Rb(def_reg)
+	|	sete Rb(def_reg)
 
 	if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
 		ir_emit_store(ctx, type, def, def_reg);
@@ -6359,7 +6355,6 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 						ir_emit_lea(ctx, i, insn->type, op2_reg, op1_reg, scale, 0);
 					}
 					break;
-				case IR_MUL_2:
 				case IR_MUL_PWR2:
 				case IR_DIV_PWR2:
 				case IR_MOD_PWR2:

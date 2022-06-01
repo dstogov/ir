@@ -250,7 +250,23 @@ static uint64_t ir_disasm_rodata_reference(csh cs, const cs_insn *insn)
 		}
 	}
 #elif defined(IR_TARGET_AARCH64)
-	return 0; // TODO:
+	unsigned int i;
+
+	if (insn->id == ARM64_INS_LDRB
+	 || insn->id == ARM64_INS_LDR
+	 || insn->id == ARM64_INS_LDRH
+	 || insn->id == ARM64_INS_LDRSB
+	 || insn->id == ARM64_INS_LDRSH
+	 || insn->id == ARM64_INS_LDRSW
+	 || insn->id == ARM64_INS_STRB
+	 || insn->id == ARM64_INS_STR
+	 || insn->id == ARM64_INS_STRH) {
+		for (i = 0; i < insn->detail->arm64.op_count; i++) {
+			if (insn->detail->arm64.operands[i].type == ARM64_OP_IMM)
+				return insn->detail->arm64.operands[i].imm;
+		}
+	}
+	return 0;
 #endif
 
 	return 0;
