@@ -375,7 +375,10 @@ void ir_strtab_free(ir_strtab *strtab);
 #define IR_FUNCTION           (1<<0)
 #define IR_USE_FRAME_POINTER  (1<<1)
 #define IR_PREALLOCATED_STACK (1<<2)
-#define IR_IRREDUCIBLE_CFG    (1<<3)
+#define IR_HAS_ALLOCA         (1<<3)
+#define IR_HAS_CALLS          (1<<4)
+
+#define IR_IRREDUCIBLE_CFG    (1<<8)
 
 #define IR_OPT_FOLDING        (1<<16)
 #define IR_OPT_CODEGEN        (1<<17)
@@ -386,7 +389,6 @@ void ir_strtab_free(ir_strtab *strtab);
 
 /* x86 related */
 #define IR_AVX                (1<<24)
-#define IR_HAS_CALLS          (1<<25)
 
 /* debug relted */
 #ifdef IR_DEBUG
