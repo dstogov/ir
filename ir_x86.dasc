@@ -10,6 +10,10 @@
 # define IR_SET_ALIGNED(alignment, decl) decl
 #endif
 
+#if IR_DEBUG
+# define DASM_CHECKS
+#endif
+
 #include "dynasm/dasm_proto.h"
 #include "dynasm/dasm_x86.h"
 
