@@ -248,7 +248,7 @@ local map_cond = {
 
 local parse_reg_type
 
-local function parse_reg(expr, shift, skip_vreg)
+local function parse_reg(expr, shift, no_vreg)
   if not expr then werror("expected register name") end
   local tname, ovreg = match(expr, "^([%w_]+):(@?%l%d+)$")
   if not tname then
@@ -281,7 +281,7 @@ local function parse_reg(expr, shift, skip_vreg)
     elseif parse_reg_type ~= vrt then
       werror("register size mismatch")
     end
-    if not skip_vreg then waction("VREG", shift, vreg) end
+    if not no_vreg then waction("VREG", shift, vreg) end
     return 0
   end
   werror("bad register name `"..expr.."'")
@@ -638,7 +638,7 @@ local function alias_bfx(p)
 end
 
 local function alias_bfiz(p)
-  parse_reg(p[1], 0)
+  parse_reg(p[1], 0, true)
   if parse_reg_type == "w" then
     p[3] = "#(32-("..p[3]:sub(2).."))%32"
     p[4] = "#("..p[4]:sub(2)..")-1"
