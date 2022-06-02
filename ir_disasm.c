@@ -252,7 +252,8 @@ static uint64_t ir_disasm_rodata_reference(csh cs, const cs_insn *insn)
 #elif defined(IR_TARGET_AARCH64)
 	unsigned int i;
 
-	if (insn->id == ARM64_INS_LDRB
+	if (insn->id == ARM64_INS_ADR
+	 || insn->id == ARM64_INS_LDRB
 	 || insn->id == ARM64_INS_LDR
 	 || insn->id == ARM64_INS_LDRH
 	 || insn->id == ARM64_INS_LDRSB
@@ -542,15 +543,14 @@ int ir_disasm(const char    *name,
 	cs_addr = (uint64_t)(uintptr_t)cs_code;
 	insn = cs_malloc(cs);
 	while (cs_disasm_iter(cs, &cs_code, &cs_size, &cs_addr, insn)) {
-		if ((addr = ir_disasm_branch_target(cs, insn))) {
+		if ((addr = ir_disasm_branch_target(cs, insn))
 # else
 	count = cs_disasm(cs, start, (uint8_t*)end - (uint8_t*)start, (uintptr_t)start, 0, &insn);
 	for (i = 0; i < count; i++) {
-		if ((addr = ir_disasm_branch_target(cs, &(insn[i])))) {
+		if ((addr = ir_disasm_branch_target(cs, &(insn[i])))
 # endif
-			if (addr >= (uint64_t)(uintptr_t)start && addr < (uint64_t)(uintptr_t)end) {
-				ir_addrtab_add(&labels, (uint32_t)((uintptr_t)addr - (uintptr_t)start));
-			}
+		 && (addr >= (uint64_t)(uintptr_t)start && addr < (uint64_t)(uintptr_t)end)) {
+			ir_addrtab_add(&labels, (uint32_t)((uintptr_t)addr - (uintptr_t)start));
 # ifdef HAVE_CAPSTONE_ITER
 		} else if ((addr = ir_disasm_rodata_reference(cs, insn))) {
 # else
@@ -628,51 +628,52 @@ int ir_disasm(const char    *name,
 			}
 		}
 #endif
-		while ((q = strchr(p, 'x')) != NULL) {
-			if (p != q && *(q-1) == '0') {
-				r = q + 1;
-				addr = 0;
-				while (1) {
-					if (*r >= '0' && *r <= '9') {
-						addr = addr * 16 + (*r - '0');
-					} else if (*r >= 'A' && *r <= 'F') {
-						addr = addr * 16 + (*r - 'A' + 10);
-					} else if (*r >= 'a' && *r <= 'f') {
-						addr = addr * 16 + (*r - 'a' + 10);
-					} else {
-						break;
-					}
-					r++;
+#if defined(IR_TARGET_AARCH64)
+		while ((q = strstr(p, "#0x")) != NULL) {
+				r = q + 3;
+#else
+		while ((q = strstr(p, "0x")) != NULL) {
+				r = q + 2;
+#endif
+			addr = 0;
+			while (1) {
+				if (*r >= '0' && *r <= '9') {
+					addr = addr * 16 + (*r - '0');
+				} else if (*r >= 'A' && *r <= 'F') {
+					addr = addr * 16 + (*r - 'A' + 10);
+				} else if (*r >= 'a' && *r <= 'f') {
+					addr = addr * 16 + (*r - 'a' + 10);
+				} else {
+					break;
 				}
-				if (p - 1 != q && *(q-2) == '-') {
-					q--;
-					addr = (uint32_t)(-addr);
-				}
-				if (addr >= (uint64_t)(uintptr_t)start && addr < (uint64_t)(uintptr_t)orig_end) {
-					l = ir_addrtab_find(&labels, (uint32_t)((uintptr_t)addr - (uintptr_t)start));
-					if (l >= 0) {
-						fprintf(f, ".L%d", l + 1);
-					} else {
-						fwrite(p, 1, r - p, f);
-					}
-				} else if ((sym = ir_disasm_resolver(addr, &offset))) {
-					fwrite(p, 1, q - p - 1, f);
-					fputs(sym, f);
-					if (offset != 0) {
-						if (offset > 0) {
-							fprintf(f, "+%" PRIx64, offset);
-						} else {
-							fprintf(f, "-%" PRIx64, offset);
-						}
-					}
+				r++;
+			}
+			if (p != q && *(q-1) == '-') {
+				q--;
+				addr = (uint32_t)(-addr);
+			}
+			if (addr >= (uint64_t)(uintptr_t)start && addr < (uint64_t)(uintptr_t)orig_end) {
+				l = ir_addrtab_find(&labels, (uint32_t)((uintptr_t)addr - (uintptr_t)start));
+				if (l >= 0) {
+					fwrite(p, 1, q - p, f);
+					fprintf(f, ".L%d", l + 1);
 				} else {
 					fwrite(p, 1, r - p, f);
 				}
-				p = r;
+			} else if ((sym = ir_disasm_resolver(addr, &offset))) {
+				fwrite(p, 1, q - p, f);
+				fputs(sym, f);
+				if (offset != 0) {
+					if (offset > 0) {
+						fprintf(f, "+%" PRIx64, offset);
+					} else {
+						fprintf(f, "-%" PRIx64, offset);
+					}
+				}
 			} else {
-				fwrite(p, 1, q - p + 1, f);
-				p = q + 1;
+				fwrite(p, 1, r - p, f);
 			}
+			p = r;
 		}
 		fprintf(f, "%s\n", p);
 	}

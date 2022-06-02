@@ -25,8 +25,8 @@
 
 #define IR_SPILL_POS_TO_OFFSET(offset) \
 	((ctx->flags & IR_USE_FRAME_POINTER) ? \
-		(offset) - (data->ra_data.stack_frame_size - data->stack_frame_alignment) : \
-		(offset) + data->call_stack_size)
+		((offset) + sizeof(void*) * 2) : \
+		((offset) + data->call_stack_size))
 
 /* Determine whether "val" falls into two allowed ranges:
  *   Range 1: [0, 0xfff]
@@ -1373,7 +1373,7 @@ static void ir_emit_load_mem_int(ir_ctx *ctx, ir_type type, ir_reg reg, ir_reg b
 				IR_ASSERT(0);
 		}
 	} else {
-		ir_emit_load_imm_int(ctx, IR_TYPE_ADDR, reg, offset);
+		ir_emit_load_imm_int(ctx, IR_ADDR, reg, offset);
 		switch (ir_type_size[type]) {
 			case 8:
 				|	ldr Rx(reg), [Rx(base_reg), Rx(reg)]
@@ -1441,9 +1441,9 @@ static void ir_emit_load_mem_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_reg ba
 			|	ldr Rs(reg-IR_REG_FP_FIRST), [Rx(base_reg), #offset]
 		}
 	} else {
-		ir_reg tmp_reg = IR_REG_X16; //??? TODO: TMP1
+		ir_reg tmp_reg = IR_REG_INT_TMP; /* reserved temporary register */
 
-		ir_emit_load_imm_int(ctx, IR_TYPE_ADDR, tmp_reg, offset);
+		ir_emit_load_imm_int(ctx, IR_ADDR, tmp_reg, offset);
 		if (type == IR_DOUBLE) {
 			|	ldr Rd(reg-IR_REG_FP_FIRST), [Rx(base_reg), Rx(tmp_reg)]
 		} else {
@@ -1505,7 +1505,7 @@ static void ir_emit_store_mem_int(ir_ctx *ctx, ir_type type, ir_reg base_reg, in
 				IR_ASSERT(0);
 		}
 	} else {
-		ir_emit_load_imm_int(ctx, IR_TYPE_ADDR, reg, offset);
+		ir_emit_load_imm_int(ctx, IR_ADDR, reg, offset);
 		switch (ir_type_size[type]) {
 			case 8:
 				|	str Rx(reg), [Rx(base_reg), Rx(reg)]
@@ -1538,9 +1538,9 @@ static void ir_emit_store_mem_fp(ir_ctx *ctx, ir_type type, ir_reg base_reg, int
 			|	str Rs(reg-IR_REG_FP_FIRST), [Rx(base_reg), #offset]
 		}
 	} else {
-		ir_reg tmp_reg = IR_REG_X16; //??? TODO: TMP1
+		ir_reg tmp_reg = IR_REG_INT_TMP; /* reserved temporary register */
 
-		ir_emit_load_imm_int(ctx, IR_TYPE_ADDR, tmp_reg, offset);
+		ir_emit_load_imm_int(ctx, IR_ADDR, tmp_reg, offset);
 		if (type == IR_DOUBLE) {
 			|	str Rd(reg-IR_REG_FP_FIRST), [Rx(base_reg), Rx(tmp_reg)]
 		} else {
@@ -1618,11 +1618,13 @@ static void ir_emit_prologue(ir_ctx *ctx)
 	dasm_State **Dst = &data->dasm_state;
 
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
-//???		|	push Ra(IR_REG_RBP)
-//???		|	mov Ra(IR_REG_RBP), Ra(IR_REG_RSP)
-	}
-	if (data->ra_data.stack_frame_size + data->call_stack_size) {
-//???		|	sub Ra(IR_REG_RSP), (data->ra_data.stack_frame_size + data->call_stack_size)
+		|	stp x29, x30, [sp, # (-(data->ra_data.stack_frame_size+16))]!
+		|	mov x29, sp
+		if (data->call_stack_size) {
+			| sub sp, sp, #(data->call_stack_size)
+		}
+	} else if (data->ra_data.stack_frame_size + data->call_stack_size) {
+		| sub sp, sp, #(data->ra_data.stack_frame_size + data->call_stack_size)
 	}
 	if (data->used_preserved_regs) {
 		int offset;
@@ -1677,10 +1679,12 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 	}
 
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
-//???		|	mov Ra(IR_REG_RSP), Ra(IR_REG_RBP)
-//???		|	pop Ra(IR_REG_RBP)
+		if (data->call_stack_size) {
+			| add sp, sp, #(data->call_stack_size)
+		}
+		|	ldp x29, x30, [sp], # (data->ra_data.stack_frame_size+16)
 	} else if (data->ra_data.stack_frame_size + data->call_stack_size) {
-//???		|	add Ra(IR_REG_RSP), (data->ra_data.stack_frame_size + data->call_stack_size)
+		| add sp, sp, #(data->ra_data.stack_frame_size + data->call_stack_size)
 	}
 }
 
@@ -3698,7 +3702,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 		used_stack = ir_call_used_stack(ctx, insn, 1);
 		data->call_stack_size += used_stack;
 		if (used_stack) {
-//???			|	sub Ra(IR_REG_RSP), used_stack
+			|	sub sp, sp, #used_stack
 		}
 	}
 
@@ -3856,7 +3860,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 								int label = ctx->cfg_blocks_count - arg;
 
 								val_insn->emit_const = 1;
-//???								|	lea Ra(dst_reg), aword [=>label]
+								|	adr Rx(dst_reg), =>label
 								continue;
 							}
 						} else if (ir_type_size[type] == 1) {
@@ -3884,12 +3888,13 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		const char *name = ir_get_str(ctx, ctx->ir_base[insn->op2].val.addr);
 		void *addr = ir_resolve_sym_name(name);
 
-		if (sizeof(void*) == 4 /*|| IR_IS_SIGNED_32BIT(addr)*/) { // TODO: 32-bit IP relative or 64-bit absolute address
+//???		if (sizeof(void*) == 4 /*|| IR_IS_SIGNED_32BIT(addr)*/) { // TODO: 32-bit IP relative or 64-bit absolute address
+			|	bl &addr
 //???			|	call aword &addr
-		} else {
+//???		} else {
 //???			|	mov64 rax, ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
 //???			|	call rax
-		}
+//???		}
     } else {
 		ir_reg op2_reg = ctx->regs[def][2];
 
@@ -3907,7 +3912,7 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
     }
 
 	if (used_stack) {
-//???		|	add Ra(IR_REG_RSP), used_stack
+		|	add sp, sp, #used_stack
 		data->call_stack_size -= used_stack;
 	}
 
@@ -4484,6 +4489,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 	}
 
 	if (ctx->flags & IR_HAS_CALLS) {
+		ctx->flags |= IR_USE_FRAME_POINTER;
 		/* Stack must be 16 byte aligned */
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
 			while (IR_ALIGNED_SIZE(data->ra_data.stack_frame_size + sizeof(void*) * 2, 16) != data->ra_data.stack_frame_size + sizeof(void*) * 2) {
@@ -4593,6 +4599,7 @@ static void ir_calc_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
 	data->ra_data.stack_frame_size += additional_size;
 
 	if (ctx->flags & IR_HAS_CALLS) {
+		ctx->flags |= IR_USE_FRAME_POINTER;
 		/* Stack must be 16 byte aligned */
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
 			while (IR_ALIGNED_SIZE(data->ra_data.stack_frame_size + sizeof(void*) * 2, 16) != data->ra_data.stack_frame_size + sizeof(void*) * 2) {
@@ -4858,29 +4865,38 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 				}
 				|.align 8
 				|=>label:
-				while (str[i]) {
-					char c = str[i];
+				while (1) {
+					char c;
+					uint32_t w = 0;
+					int j;
 
-					if (c == '\\') {
-						if (str[i+1] == '\\') {
-							i++;
-							c = '\\';
-						} else if (str[i+1] == 'n') {
-							i++;
-							c = '\n';
-						} else if (str[i+1] == 'r') {
-							i++;
-							c = '\r';
-						} else if (str[i+1] == 't') {
-							i++;
-							c = '\t';
+					for (j = 0; j < 4; j++) {
+						c = str[i];
+						if (!c) {
+							break;
+						} else if (c == '\\') {
+							if (str[i+1] == '\\') {
+								i++;
+								c = '\\';
+							} else if (str[i+1] == 'n') {
+								i++;
+								c = '\n';
+							} else if (str[i+1] == 'r') {
+								i++;
+								c = '\r';
+							} else if (str[i+1] == 't') {
+								i++;
+								c = '\t';
+							}
 						}
-
+						w |= c << (8 * j);
+						i++;
 					}
-//???					|.db c
-					i++;
+					|	.long w
+					if (!c) {
+						break;
+					}
 				}
-//???				|.db 0
 
 			} else {
 				IR_ASSERT(0);

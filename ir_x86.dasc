@@ -33,8 +33,8 @@
 
 #define IR_SPILL_POS_TO_OFFSET(offset) \
 	((ctx->flags & IR_USE_FRAME_POINTER) ? \
-		(offset) - (data->ra_data.stack_frame_size - data->stack_frame_alignment) : \
-		(offset) + data->call_stack_size)
+		((offset) - (data->ra_data.stack_frame_size - data->stack_frame_alignment)) : \
+		((offset) + data->call_stack_size))
 
 |.macro ASM_REG_OP, op, type, reg
 ||	switch (ir_type_size[type]) {
