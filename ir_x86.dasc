@@ -6606,7 +6606,8 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 
 	ret = dasm_link(&data.dasm_state, size);
 	if (ret != DASM_S_OK) {
-		return 0;
+		IR_ASSERT(0);
+		return NULL;
 	}
 
 	entry = ir_mem_mmap(4096);
