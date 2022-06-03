@@ -555,9 +555,9 @@ extern const char *ir_op_name[IR_LAST_OP];
 #define IR_OPND_CONTROL           0x2
 #define IR_OPND_CONTROL_DEP       0x3
 #define IR_OPND_CONTROL_REF       0x4
-#define IR_OPND_STR               0x5
-#define IR_OPND_NUM               0x6
-#define IR_OPND_VAR               0x7
+#define IR_OPND_VAR               0x5
+#define IR_OPND_STR               0x6
+#define IR_OPND_NUM               0x7
 #define IR_OPND_PROB              0x8
 
 #define IR_OP_FLAGS(op_flags, op1_flags, op2_flags, op3_flags) \

@@ -161,12 +161,12 @@ ir_insn(ir_parser_ctx *p):
 			{if (count.i32 < 0 || count.i32 > 255) yy_error("bad bumber of operands");}
 			{ref = ir_emit_N(p->ctx, IR_OPT(op, t), count.i32);}
 			(	"("
-				(	val(p, 1, &op1)
+				(	val(p, op, 1, &op1)
 					{n = 1;}
 					{if (n > count.i32) yy_error("too many operands");}
 					{ir_set_op(p->ctx, ref, n, op1);}
 					(	","
-						val(p, n,  &op1)
+						val(p, op, n,  &op1)
 						{n++;}
 						{if (n > count.i32) yy_error("too many operands");}
 						{ir_set_op(p->ctx, ref, n, op1);}
@@ -176,11 +176,11 @@ ir_insn(ir_parser_ctx *p):
 			)?
 		|
 			(	"("
-				(	val(p, 1, &op1)
+				(	val(p, op, 1, &op1)
 					(	","
-						val(p, 2,  &op2)
+						val(p, op, 2, &op2)
 						(	","
-							val(p, 3, &op3)
+							val(p, op, 3, &op3)
 						)?
 					)?
 				)?
@@ -222,15 +222,19 @@ func(uint8_t *op):
 	{*op = ref - 1;}
 ;
 
-val(ir_parser_ctx *p, uint32_t n, ir_ref *ref):
+val(ir_parser_ctx *p, uint8_t op, uint32_t n, ir_ref *ref):
 	{const char *str;}
 	{size_t len;}
 	{ir_val val;}
+	{uint32_t kind = IR_OPND_KIND(ir_op_flags[op], n);}
 	(	ID(&str, &len)
+		{if (kind < IR_OPND_DATA || kind > IR_OPND_VAR) yy_error("unexpected reference");}
 		{*ref = ir_use_var(p, n, str, len);}
 	|   STRING(&str, &len)
+		{if (kind != IR_OPND_STR) yy_error("unexpected string");}
 		{*ref = ir_strl(p->ctx, str, len);}
 	|	DECNUMBER(IR_I32, &val)
+		{if (kind != IR_OPND_NUM && kind != IR_OPND_PROB) yy_error("unexpected number");}
 		{if (val.u64 < 0 && val.u64 >= 0x7ffffff) yy_error("number out of range");}
 		{*ref = val.u64;}
 	)

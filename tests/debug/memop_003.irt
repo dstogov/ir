@@ -12,7 +12,7 @@ x86_64
 	int32_t v = VAR(l_1, "_spill_");
 	l_2 = VSTORE(l_1, v, y);
 	int32_t z, l_3 = VLOAD(l_2, v);
-	int32_t y2 = ADD(y, 2);
+	int32_t y2 = ADD(y, y);
 	int32_t ret = AND(y2, z);
 	l_4 = VSTORE(l_3, v, ret);
 	l_5 = RETURN(l_4);
