@@ -1,6 +1,6 @@
 CC         = gcc
-CFLAGS     = -O2 -g -Wall -Wno-array-bounds -DIR_TARGET_X64 -DIR_DEBUG_REGSET
-#CFLAGS     = -O0 -g -Wall -DIR_DEBUG -DIR_TARGET_X64
+#CFLAGS     = -O2 -g -Wall -Wno-array-bounds -DIR_TARGET_X64 -DIR_DEBUG_REGSET
+CFLAGS     = -O0 -g -Wall -DIR_DEBUG -DIR_TARGET_X64
 LDFLAGS    = -lm
 PHP        = php
 LLK        = /home/dmitry/php/llk/llk.php
