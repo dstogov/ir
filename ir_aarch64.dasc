@@ -969,14 +969,6 @@ int ir_match(ir_ctx *ctx)
 }
 
 /* code genertion */
-static int ir_skip_empty_blocks(ir_ctx *ctx, int b)
-{
-	while (ctx->cfg_blocks[b].flags & IR_BB_MAY_SKIP) {
-		b++;
-	}
-	return b;
-}
-
 static ir_reg ir_ref_spill_slot(ir_ctx *ctx, ir_ref ref)
 {
 	ir_backend_data *data = ctx->data;
@@ -1658,28 +1650,10 @@ static void ir_emit_overflow_and_branch(ir_ctx *ctx, int b, ir_ref def, ir_insn 
 	ir_insn *overflow_insn = &ctx->ir_base[insn->op2];
 	ir_insn *math_insn = &ctx->ir_base[overflow_insn->op1];
 	ir_type type = math_insn->type;
-	ir_block *bb;
-	uint32_t n, *p, use_block;
-	ir_insn *use_insn;
-	int true_block = 0, false_block = 0, next_block;
+	int true_block, false_block, next_block;
 	bool reverse = 0;
 
-	bb = &ctx->cfg_blocks[b];
-	p = &ctx->cfg_edges[bb->successors];
-	for (n = bb->successors_count; n != 0; p++, n--) {
-		use_block = *p;
-		use_insn = &ctx->ir_base[ctx->cfg_blocks[use_block].start];
-		if (use_insn->op == IR_IF_TRUE) {
-			true_block = ir_skip_empty_blocks(ctx, use_block);
-		} else if (use_insn->op == IR_IF_FALSE) {
-			false_block = ir_skip_empty_blocks(ctx, use_block);
-		} else {
-			IR_ASSERT(0);
-		}
-	}
-	IR_ASSERT(true_block && false_block);
-
-	next_block = b == ctx->cfg_blocks_count ? 0 : ir_skip_empty_blocks(ctx, b + 1);
+	ir_get_true_false_blocks(ctx, b, &true_block, &false_block, &next_block);
 	if (true_block == next_block) {
 		reverse = 1;
 		true_block = false_block;
@@ -2170,87 +2144,35 @@ static void ir_emit_cmp_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 static void ir_emit_jmp_true(ir_ctx *ctx, int b, ir_ref def)
 {
-	ir_block *bb;
-	ir_insn *use_insn;
-	uint32_t n, *p, use_block;
-	int true_block = 0, false_block = 0;
+	int true_block, false_block, next_block;
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
-	bb = &ctx->cfg_blocks[b];
-	p = &ctx->cfg_edges[bb->successors];
-	for (n = bb->successors_count; n != 0; p++, n--) {
-		use_block = *p;
-		use_insn = &ctx->ir_base[ctx->cfg_blocks[use_block].start];
-		if (use_insn->op == IR_IF_TRUE) {
-			true_block = ir_skip_empty_blocks(ctx, use_block);
-		} else if (use_insn->op == IR_IF_FALSE) {
-			false_block = ir_skip_empty_blocks(ctx, use_block);
-		} else {
-			IR_ASSERT(0);
-		}
-	}
-	IR_ASSERT(true_block && false_block);
-
-	if (b == ctx->cfg_blocks_count || true_block != ir_skip_empty_blocks(ctx, b + 1)) {
+	ir_get_true_false_blocks(ctx, b, &true_block, &false_block, &next_block);
+	if (true_block != next_block) {
 		|	b =>true_block
 	}
 }
 
 static void ir_emit_jmp_false(ir_ctx *ctx, int b, ir_ref def)
 {
-	ir_block *bb;
-	ir_insn *use_insn;
-	uint32_t n, *p, use_block;
-	int true_block = 0, false_block = 0;
+	int true_block, false_block, next_block;
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
-	bb = &ctx->cfg_blocks[b];
-	p = &ctx->cfg_edges[bb->successors];
-	for (n = bb->successors_count; n != 0; p++, n--) {
-		use_block = *p;
-		use_insn = &ctx->ir_base[ctx->cfg_blocks[use_block].start];
-		if (use_insn->op == IR_IF_TRUE) {
-			true_block = ir_skip_empty_blocks(ctx, use_block);
-		} else if (use_insn->op == IR_IF_FALSE) {
-			false_block = ir_skip_empty_blocks(ctx, use_block);
-		} else {
-			IR_ASSERT(0);
-		}
-	}
-	IR_ASSERT(true_block && false_block);
-
-	if (b == ctx->cfg_blocks_count || true_block != ir_skip_empty_blocks(ctx, b + 1)) {
+	ir_get_true_false_blocks(ctx, b, &true_block, &false_block, &next_block);
+	if (false_block != next_block) {
 		|	b =>false_block
 	}
 }
 
 static void ir_emit_jcc(ir_ctx *ctx, uint8_t op, int b, ir_ref def, ir_insn *insn, bool int_cmp)
 {
-	ir_block *bb;
-	ir_insn *use_insn;
-	uint32_t n, *p, use_block;
-	int true_block = 0, false_block = 0, next_block;
+	int true_block, false_block, next_block;
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
-	bb = &ctx->cfg_blocks[b];
-	p = &ctx->cfg_edges[bb->successors];
-	for (n = bb->successors_count; n != 0; p++, n--) {
-		use_block = *p;
-		use_insn = &ctx->ir_base[ctx->cfg_blocks[use_block].start];
-		if (use_insn->op == IR_IF_TRUE) {
-			true_block = ir_skip_empty_blocks(ctx, use_block);
-		} else if (use_insn->op == IR_IF_FALSE) {
-			false_block = ir_skip_empty_blocks(ctx, use_block);
-		} else {
-			IR_ASSERT(0);
-		}
-	}
-	IR_ASSERT(true_block && false_block);
-
-	next_block = b == ctx->cfg_blocks_count ? 0 : ir_skip_empty_blocks(ctx, b + 1);
+	ir_get_true_false_blocks(ctx, b, &true_block, &false_block, &next_block);
 	if (true_block == next_block) {
 		if (int_cmp || (op != IR_GT && op != IR_GE)) {
 			/* swap to avoid unconditional JMP if this doesn't introduce additional JP instruction */

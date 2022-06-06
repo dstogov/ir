@@ -454,14 +454,6 @@ static void ir_emit_abs(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 	}
 }
 
-static int ir_skip_empty_blocks(ir_ctx *ctx, int b)
-{
-	while (ctx->cfg_blocks[b].flags & IR_BB_MAY_SKIP) {
-		b++;
-	}
-	return b;
-}
-
 static bool ir_needs_block_label(ir_ctx *ctx, int b)
 {
 	while (1) {
@@ -483,28 +475,10 @@ static bool ir_needs_block_label(ir_ctx *ctx, int b)
 
 static void ir_emit_if(ir_ctx *ctx, FILE *f, int b, ir_ref def, ir_insn *insn)
 {
-	ir_block *bb;
-	uint32_t n, *p, use_block;
-	ir_insn *use_insn;
 	int true_block = 0, false_block = 0, next_block;
 	bool short_true = 0, short_false = 0;
 
-	bb = &ctx->cfg_blocks[b];
-	p = &ctx->cfg_edges[bb->successors];
-	for (n = bb->successors_count; n != 0; p++, n--) {
-		use_block = *p;
-		use_insn = &ctx->ir_base[ctx->cfg_blocks[use_block].start];
-		if (use_insn->op == IR_IF_TRUE) {
-			true_block = ir_skip_empty_blocks(ctx, use_block);
-		} else if (use_insn->op == IR_IF_FALSE) {
-			false_block = ir_skip_empty_blocks(ctx, use_block);
-		} else {
-			IR_ASSERT(0);
-		}
-	}
-	IR_ASSERT(true_block && false_block);
-
-	next_block = ir_skip_empty_blocks(ctx, b + 1);
+	ir_get_true_false_blocks(ctx, b, &true_block, &false_block, &next_block);
 	if (true_block == next_block) {
 		short_false = 1;
 	} else if (false_block == next_block) {

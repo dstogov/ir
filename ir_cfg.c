@@ -558,3 +558,39 @@ int ir_schedule_blocks(ir_ctx *ctx)
 
 	return 1;
 }
+
+/* JMP target optimisation */
+int ir_skip_empty_blocks(ir_ctx *ctx, int b)
+{
+	while (ctx->cfg_blocks[b].flags & IR_BB_MAY_SKIP) {
+		b++;
+	}
+	return b;
+}
+
+void ir_get_true_false_blocks(ir_ctx *ctx, int b, int *true_block, int *false_block, int *next_block)
+{
+	ir_block *bb;
+	uint32_t n, *p, use_block;
+	ir_insn *use_insn;
+
+	*true_block = 0;
+	*false_block = 0;
+	bb = &ctx->cfg_blocks[b];
+	IR_ASSERT(ctx->ir_base[bb->end].op == IR_IF);
+	IR_ASSERT(bb->successors_count == 2);
+	p = &ctx->cfg_edges[bb->successors];
+	for (n = 2; n != 0; p++, n--) {
+		use_block = *p;
+		use_insn = &ctx->ir_base[ctx->cfg_blocks[use_block].start];
+		if (use_insn->op == IR_IF_TRUE) {
+			*true_block = ir_skip_empty_blocks(ctx, use_block);
+		} else if (use_insn->op == IR_IF_FALSE) {
+			*false_block = ir_skip_empty_blocks(ctx, use_block);
+		} else {
+			IR_ASSERT(0);
+		}
+	}
+	IR_ASSERT(*true_block && *false_block);
+	*next_block = b == ctx->cfg_blocks_count ? 0 : ir_skip_empty_blocks(ctx, b + 1);
+}
