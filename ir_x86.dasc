@@ -5284,8 +5284,6 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 			ir_emit_store(ctx, type, to, from_reg);
 		} else if (IR_IS_CONST_REF(from) && (ir_type_size[type] != 8 || IR_IS_SIGNED_32BIT(ctx->ir_base[from].val.i64))) {
 			|	ASM_MREF_IMM_OP mov, type, to, ctx->ir_base[from].val.i32
-		} else if (IR_IS_CONST_REF(from) && ir_type_size[type] == 8 && IR_IS_UNSIGNED_32BIT(ctx->ir_base[from].val.u64)) {
-			|	mov Rd(to), ctx->ir_base[from].val.u32
 		} else if (IR_IS_CONST_REF(from) || !ir_is_same_mem(ctx, from, to)) {
 			from_reg = ctx->regs[ref][1]; /* temporary register for int mem->mem (see ir_fix_dessa_tmps) */
 			IR_ASSERT(from_reg != IR_REG_NONE);
