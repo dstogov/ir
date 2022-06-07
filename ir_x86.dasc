@@ -28,7 +28,7 @@
 |.section code, cold_code, rodata, jmp_table
 
 #define IR_IS_SIGNED_32BIT(val)   ((((intptr_t)(val)) <= 0x7fffffff) && (((intptr_t)(val)) >= (-2147483647 - 1)))
-#define IR_IS_UNSIGNED_32BIT(val) ((((uintptr_t)(val)) <= 0xffffffff) && (((uintptr_t)(val)) >= 0))
+#define IR_IS_UNSIGNED_32BIT(val) (((uintptr_t)(val)) <= 0xffffffff)
 #define IR_IS_32BIT(type, val)    (IR_IS_TYPE_SIGNED(type) ? IR_IS_SIGNED_32BIT((val).i64) : IR_IS_UNSIGNED_32BIT((val).u64))
 
 #define IR_SPILL_POS_TO_OFFSET(offset) \
