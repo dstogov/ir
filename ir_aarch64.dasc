@@ -4366,12 +4366,11 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 					|.align 8
 					|=>label:
 					|.long insn->val.u32, insn->val.u32_hi
-				} else if (insn->type == IR_FLOAT) {
+				} else {
+					IR_ASSERT(insn->type == IR_FLOAT);
 					|.align 4
 					|=>label:
 					|.long insn->val.u32
-				} else {
-					IR_ASSERT(0);
 				}
 			} else if (insn->op == IR_STR) {
 				int label = ctx->cfg_blocks_count + i;
