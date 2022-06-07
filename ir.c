@@ -1,4 +1,7 @@
-#define _GNU_SOURCE
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+
 #include <sys/mman.h>
 
 #include "ir.h"
