@@ -6,6 +6,10 @@
 
 #include <math.h>
 
+#ifdef HAVE_VALGRIND
+# include <valgrind/valgrind.h>
+#endif
+
 #define IR_TYPE_FLAGS(name, type, field, flags) ((flags)|sizeof(type)),
 #define IR_TYPE_NAME(name, type, field, flags)  #name,
 #define IR_TYPE_CNAME(name, type, field, flags) #type,
@@ -880,5 +884,11 @@ int ir_mem_unprotect(void *ptr, size_t size)
 
 int ir_mem_flush(void *ptr, size_t size)
 {
+#if ((defined(__GNUC__) && ZEND_GCC_VERSION >= 4003) || __has_builtin(__builtin___clear_cache))
+	__builtin___clear_cache((char*)(ptr), (char*)(ptr) + size);
+#endif
+#ifdef HAVE_VALGRIND
+	VALGRIND_DISCARD_TRANSLATIONS(ptr, size);
+#endif
 	return 1;
 }
