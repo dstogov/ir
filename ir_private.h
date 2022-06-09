@@ -544,6 +544,8 @@ extern const char *ir_op_name[IR_LAST_OP];
 #define IR_OP_FLAG_CONTROL        (1<<9)
 #define IR_OP_FLAG_MEM            (1<<10)
 #define IR_OP_FLAG_COMMUTATIVE    (1<<11)
+#define IR_OP_FLAG_BB_BEGIN       (1<<12)
+#define IR_OP_FLAG_BB_END         (1<<13)
 
 #define IR_OP_FLAG_MEM_LOAD       ((0<<6)|(0<<7))
 #define IR_OP_FLAG_MEM_STORE      ((0<<6)|(1<<7))
@@ -616,16 +618,14 @@ struct _ir_use_list {
 };
 
 /*** IR Basic Blocks info ***/
-#define IR_IS_BB_START(op) \
-	((op) == IR_START || (op) == IR_BEGIN || (op) == IR_MERGE || (op) == IR_LOOP_BEGIN || \
-	 (op) == IR_IF_TRUE || (op) == IR_IF_FALSE || (op) == IR_CASE_VAL || (op) == IR_CASE_DEFAULT)
+#define IR_IS_BB_BEGIN(op) \
+	((ir_op_flags[op] & IR_OP_FLAG_BB_BEGIN) != 0)
 
 #define IR_IS_BB_MERGE(op) \
 	((op) == IR_MERGE || (op) == IR_LOOP_BEGIN)
 
 #define IR_IS_BB_END(op) \
-	((op) == IR_RETURN || (op) == IR_END || (op) == IR_LOOP_END || (op) == IR_IF || \
-	 (op) == IR_SWITCH || (op) == IR_IJMP || (op) == IR_UNREACHABLE)
+	((ir_op_flags[op] & IR_OP_FLAG_BB_END) != 0)
 
 #define IR_BB_UNREACHABLE      (1<<0)
 #define IR_BB_LOOP_HEADER      (1<<1)
@@ -723,6 +723,7 @@ struct _ir_live_range {
 #define IR_LIVE_INTERVAL_HAS_HINTS       (1<<6)
 #define IR_LIVE_INTERVAL_MEM_PARAM       (1<<7)
 #define IR_LIVE_INTERVAL_MEM_LOAD        (1<<8)
+#define IR_LIVE_INTERVAL_REG_LOAD        (1<<9)
 
 struct _ir_live_interval {
 	uint8_t           type;

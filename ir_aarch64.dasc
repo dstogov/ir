@@ -405,6 +405,7 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num)
 		case IR_BITCAST:
 		case IR_RETURN_INT:
 		case IR_RETURN_FP:
+		case IR_RSTORE:
 		case IR_SKIP_REG: /* PARAM PHI PI */
 			return IR_USE_SHOULD_BE_IN_REG;
 	}
@@ -856,6 +857,7 @@ binop_fp:
 		case IR_PHI:
 		case IR_PI:
 		case IR_PARAM:
+		case IR_RLOAD:
 			return IR_SKIP_REG;
 
 		case IR_CALL:
@@ -2934,6 +2936,28 @@ static void ir_emit_store_fp(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 	ir_emit_store_mem_fp(ctx, type, op2_reg, 0, op3_reg);
 }
 
+static void ir_emit_rstore(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
+{
+	ir_ref type = ctx->ir_base[insn->op2].type;
+	ir_reg op2_reg = ctx->regs[ref][2];
+	ir_reg dst_reg = insn->op3;
+
+	if (op2_reg != IR_REG_NONE) {
+		if (op2_reg & IR_REG_SPILL_LOAD) {
+			op2_reg &= ~IR_REG_SPILL_LOAD;
+			ir_emit_load(ctx, type, op2_reg, insn->op2);
+		}
+		if (IR_IS_TYPE_INT(type)) {
+			ir_emit_mov(ctx, type, dst_reg, op2_reg);
+		} else {
+			IR_ASSERT(IR_IS_TYPE_FP(type));
+			ir_emit_fp_mov(ctx, type, dst_reg, op2_reg);
+		}
+	} else {
+		ir_emit_load(ctx, type, dst_reg, insn->op2);
+	}
+}
+
 static void ir_emit_alloca(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
@@ -3445,8 +3469,15 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	int32_t used_stack = ir_emit_arguments(ctx, def, insn, ctx->regs[def][1]);
 
 	if (IR_IS_CONST_REF(insn->op2)) {
-		const char *name = ir_get_str(ctx, ctx->ir_base[insn->op2].val.addr);
-		void *addr = ir_resolve_sym_name(name);
+		ir_insn *addr_insn = &ctx->ir_base[insn->op2];
+		void *addr;
+
+		IR_ASSERT(addr_insn->type == IR_ADDR);
+		if (addr_insn->op == IR_FUNC) {
+			addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
+		} else {
+			addr = (void*)addr_insn->val.addr;
+		}
 
 		|	bl &addr
     } else {
@@ -3507,8 +3538,15 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_emit_epilogue(ctx);
 
 	if (IR_IS_CONST_REF(insn->op2)) {
-		const char *name = ir_get_str(ctx, ctx->ir_base[insn->op2].val.addr);
-		void *addr = ir_resolve_sym_name(name);
+		ir_insn *addr_insn = &ctx->ir_base[insn->op2];
+		void *addr;
+
+		IR_ASSERT(addr_insn->type == IR_ADDR);
+		if (addr_insn->op == IR_FUNC) {
+			addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
+		} else {
+			addr = (void*)addr_insn->val.addr;
+		}
 
 		|	b &addr
     } else {
@@ -4320,6 +4358,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 					break;
 				case IR_VSTORE:
 					ir_emit_vstore(ctx, i, insn);
+					break;
+				case IR_RSTORE:
+					ir_emit_rstore(ctx, i, insn);
 					break;
 				case IR_LOAD_INT:
 					ir_emit_load_int(ctx, i, insn);

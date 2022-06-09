@@ -41,6 +41,9 @@ const char *ir_type_cname[IR_LAST_TYPE] = {
 
 const char *ir_op_name[IR_LAST_OP] = {
 	IR_OPS(IR_OP_NAME)
+#ifdef IR_PHP
+	IR_PHP_OPS(IR_OP_NAME)
+#endif
 };
 
 void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
@@ -70,7 +73,11 @@ void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 			fprintf(f, "%" PRIu64, insn->val.u64);
 			break;
 		case IR_ADDR:
-			fprintf(f, "%" PRIxPTR, insn->val.addr);
+			if (insn->val.addr) {
+				fprintf(f, "0x%" PRIxPTR, insn->val.addr);
+			} else {
+				fprintf(f, "0");
+			}
 			break;
 		case IR_CHAR:
 			if (insn->val.c == '\\') {
@@ -136,14 +143,39 @@ void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 #define ir_op_flag_c0X2    (ir_op_flag_c | 0 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_c1      (ir_op_flag_c | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_c1X1    (ir_op_flag_c | 1 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_c1X2    (ir_op_flag_c | 1 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_c2      (ir_op_flag_c | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_c2X1    (ir_op_flag_c | 2 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_c3      (ir_op_flag_c | 3 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_cN      (ir_op_flag_c | 4 | (4 << IR_OP_FLAG_OPERANDS_SHIFT)) // MERGE (number of operands encoded in op1)
+#define ir_op_flag_B       (IR_OP_FLAG_CONTROL|IR_OP_FLAG_BB_BEGIN)
+#define ir_op_flag_B0      ir_op_flag_B
+#define ir_op_flag_B0X1    (ir_op_flag_B | 0 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_B0X2    (ir_op_flag_B | 0 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_B1      (ir_op_flag_B | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_B1X1    (ir_op_flag_B | 1 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_B1X2    (ir_op_flag_B | 1 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_B2      (ir_op_flag_B | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_B2X1    (ir_op_flag_B | 2 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_B3      (ir_op_flag_B | 3 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_BN      (ir_op_flag_B | 4 | (4 << IR_OP_FLAG_OPERANDS_SHIFT)) // MERGE (number of operands encoded in op1)
+#define ir_op_flag_E       (IR_OP_FLAG_CONTROL|IR_OP_FLAG_BB_END)
+#define ir_op_flag_E0      ir_op_flag_B
+#define ir_op_flag_E0X1    (ir_op_flag_E | 0 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_E0X2    (ir_op_flag_E | 0 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_E1      (ir_op_flag_E | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_E1X1    (ir_op_flag_E | 1 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_E1X2    (ir_op_flag_E | 1 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_E2      (ir_op_flag_E | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_E2X1    (ir_op_flag_E | 2 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_E3      (ir_op_flag_E | 3 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_EN      (ir_op_flag_E | 4 | (4 << IR_OP_FLAG_OPERANDS_SHIFT)) // MERGE (number of operands encoded in op1)
 #define ir_op_flag_l       (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_LOAD)
 #define ir_op_flag_l0      ir_op_flag_l
 #define ir_op_flag_l1      (ir_op_flag_l | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_l1X1    (ir_op_flag_l | 1 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_l2      (ir_op_flag_l | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_l2X1    (ir_op_flag_l | 2 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_l3      (ir_op_flag_l | 3 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_s       (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_STORE)
 #define ir_op_flag_s0      ir_op_flag_s
@@ -160,6 +192,7 @@ void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 #define ir_op_kind_reg     IR_OPND_CONTROL_DEP
 #define ir_op_kind_beg     IR_OPND_CONTROL_REF
 #define ir_op_kind_ret     IR_OPND_CONTROL_REF
+#define ir_op_kind_ent     IR_OPND_CONTROL_REF
 #define ir_op_kind_str     IR_OPND_STR
 #define ir_op_kind_num     IR_OPND_NUM
 #define ir_op_kind_fld     IR_OPND_STR
@@ -171,6 +204,9 @@ void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 
 const uint32_t ir_op_flags[IR_LAST_OP] = {
 	IR_OPS(_IR_OP_FLAGS)
+#ifdef IR_PHP
+	IR_PHP_OPS(_IR_OP_FLAGS)
+#endif
 };
 
 static void ir_grow_bottom(ir_ctx *ctx)

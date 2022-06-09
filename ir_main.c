@@ -397,7 +397,7 @@ int main(int argc, char **argv)
 
 				ir_perf_map_register("test", entry, size);
 				ir_perf_jitdump_open();
-				ir_perf_jitdump_register("test", entry,	size);
+				ir_perf_jitdump_register("test", entry, size);
 
 				ir_mem_unprotect(entry, 4096);
 				ir_gdb_register("test", entry, size, 0, 0);

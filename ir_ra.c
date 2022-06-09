@@ -406,7 +406,12 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 			if ((flags & IR_OP_FLAG_DATA) || ((flags & IR_OP_FLAG_MEM) && insn->type != IR_VOID)) {
 				if (ctx->vregs[i]) {
 					if (ir_bitset_in(live, ctx->vregs[i])) {
-						if (insn->op != IR_PHI) {
+						if (insn->op == IR_RLOAD) {
+							ir_fix_live_range(ctx, ctx->vregs[i],
+								IR_START_LIVE_POS_FROM_REF(bb->start), IR_DEF_LIVE_POS_FROM_REF(i));
+							ctx->live_intervals[ctx->vregs[i]]->flags = IR_LIVE_INTERVAL_REG_LOAD;
+							ctx->live_intervals[ctx->vregs[i]]->reg = insn->op2;
+						} else if (insn->op != IR_PHI) {
 							ir_live_pos def_pos;
 							ir_ref hint_ref = 0;
 
@@ -2051,6 +2056,8 @@ static int ir_linear_scan(ir_ctx *ctx)
 				if (ival->stack_spill_pos == -1) {
 					ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type, &data);
 				}
+			} else if (ival->flags & IR_LIVE_INTERVAL_REG_LOAD) {
+				/* pre-allocated fixed register */
 			} else if (!(ival->flags & (IR_LIVE_INTERVAL_MEM_PARAM|IR_LIVE_INTERVAL_MEM_LOAD))
 					|| !ir_ival_spill_for_fuse_load(ctx, ival, &data)) {
 				ir_add_to_unhandled(&unhandled, ival);

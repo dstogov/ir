@@ -3,6 +3,7 @@
 
 #include <inttypes.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <stdio.h>
 
 #define IR_VERSION "0.0.1"
@@ -43,7 +44,9 @@
 # error "Unknown byte order"
 #endif
 
-typedef uint8_t bool;
+#ifdef IR_PHP
+# include "ir_php.h"
+#endif
 
 /* IR Type flags (low 4 bits are used for type size) */
 #define IR_TYPE_SIGNED     (1<<4)
@@ -94,6 +97,8 @@ typedef enum _ir_type {
  * d     - data      IR_OP_FLAG_DATA
  * r     - ref       IR_OP_FLAG_DATA alias
  * c     - control   IR_OP_FLAG_CONTROL
+ * B     - control   IR_OP_FLAG_CONTROL + IR_OP_FLAG_BB_BEGIN
+ * E     - control   IR_OP_FLAG_CONTROL + IR_OP_FLAG_BB_END
  * l     - load      IR_OP_FLAG_MEM + IR_OP_FLAG_MEM_LOAD
  * s     - store     IR_OP_FLAG_MEM + IR_OP_FLAG_STORE
  * x     - call      IR_OP_FLAG_MEM + IR_OP_FLAG_CALL
@@ -115,6 +120,7 @@ typedef enum _ir_type {
  * reg - data-control dependency on region (PHI, VAR, PARAM)
  * beg - reference to a LOOP_BEGIN region (LOOP_END, LOOP_EXIT)
  * ret - reference to a previous RETURN instruction (RETURN)
+ * ent - reference to a previous ENTRY instruction (ENTRY)
  * str - string: variable/argument name (VAR, PARAM, CALL, TAILCALL)
  * num - number: argument number (PARAM)
  * prb - branch probability 1-99 (0 - unspecified): (IF_TRUE, IF_FALSE, CASE_VAL, CASE_DEFAULT)
@@ -223,27 +229,29 @@ typedef enum _ir_type {
 	_(VADDR,        d1,   var, ___, ___) /* load address of local var   */ \
 	_(VLOAD,        l2,   src, var, ___) /* load value of local var     */ \
 	_(VSTORE,       s3,   src, var, def) /* store value to local var    */ \
+	_(RLOAD,        l1X1, src, num, ___) /* load value from register    */ \
+	_(RSTORE,       l2X1, src, def, num) /* store value into register   */ \
 	_(LOAD,         l2,   src, ref, ___) /* load from memory            */ \
 	_(STORE,        s3,   src, ref, def) /* store to memory             */ \
 	/* memory reference ops (A, H, U, S, TMP, STR, NEW, X, V) ???       */ \
 	\
 	/* control-flow nodes                                               */ \
-	_(START,        c0X1, ret, ___, ___) /* function start              */ \
-	_(RETURN,       c2X1, src, def, ret) /* function return             */ \
-	_(UNREACHABLE,  c2X1, src, def, ret) /* unreachable (tailcall, etc) */ \
-	_(BEGIN,        c1,   src, ___, ___) /* block start                 */ \
-	_(END,          c1,   src, ___, ___) /* block end                   */ \
-	_(IF,           c2,   src, def, ___) /* conditional control split   */ \
-	_(IF_TRUE,      c1X1, src, prb, ___) /* IF TRUE proj.               */ \
-	_(IF_FALSE,     c1X1, src, prb, ___) /* IF FALSE proj.              */ \
-	_(SWITCH,       c2,   src, def, ___) /* multi-way control split     */ \
-	_(CASE_VAL,     c2X1, src, def, prb) /* switch proj.                */ \
-	_(CASE_DEFAULT, c1X1, src, prb, ___) /* switch proj.                */ \
-	_(MERGE,        cN,   src, src, src) /* control merge               */ \
-	_(LOOP_BEGIN,   c2,   src, src, ___) /* loop start                  */ \
-	_(LOOP_END,     c1X1, src, beg, ___) /* loop end                    */ \
+	_(START,        B0X2, ret, ent, ___) /* function start              */ \
+	_(RETURN,       E2X1, src, def, ret) /* function return             */ \
+	_(UNREACHABLE,  E2X1, src, def, ret) /* unreachable (tailcall, etc) */ \
+	_(BEGIN,        B1,   src, ___, ___) /* block start                 */ \
+	_(END,          E1,   src, ___, ___) /* block end                   */ \
+	_(IF,           E2,   src, def, ___) /* conditional control split   */ \
+	_(IF_TRUE,      B1X1, src, prb, ___) /* IF TRUE proj.               */ \
+	_(IF_FALSE,     B1X1, src, prb, ___) /* IF FALSE proj.              */ \
+	_(SWITCH,       E2,   src, def, ___) /* multi-way control split     */ \
+	_(CASE_VAL,     B2X1, src, def, prb) /* switch proj.                */ \
+	_(CASE_DEFAULT, B1X1, src, prb, ___) /* switch proj.                */ \
+	_(MERGE,        BN,   src, src, src) /* control merge               */ \
+	_(LOOP_BEGIN,   B2,   src, src, ___) /* loop start                  */ \
+	_(LOOP_END,     E1X1, src, beg, ___) /* loop end                    */ \
 	_(LOOP_EXIT,    c1X1, src, beg, ___) /* loop exit                   */ \
-	_(IJMP,         c2X1, src, def, ret) /* computed goto               */ \
+	_(IJMP,         E2X1, src, def, ret) /* computed goto               */ \
 	\
 	/* guards (floating or not) ???                                     */ \
 	_(GUARD_TRUE,   c2,   src, def, ___) /* IF without second successor */ \
@@ -253,6 +261,9 @@ typedef enum _ir_type {
 
 typedef enum _ir_op {
 	IR_OPS(IR_OP_ENUM)
+#ifdef IR_PHP
+	IR_PHP_OPS(IR_OP_ENUM)
+#endif
 	IR_LAST_OP
 } ir_op;
 
