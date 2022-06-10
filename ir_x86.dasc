@@ -213,7 +213,7 @@
 |.macro ASM_REG_MREF_OP, _op, type, dst, src
 ||	if (IR_IS_CONST_REF(src)) {
 ||		ir_insn *_insn = &ctx->ir_base[src];
-||		IR_ASSERT(IR_IS_SIGNED_32BIT(_insn->val.i64));
+||		IR_ASSERT(IR_IS_32BIT(_insn->type, _insn->val));
 |		ASM_REG_IMM_OP _op, type, dst, _insn->val.i32
 ||	} else {
 ||		int32_t offset = ir_ref_spill_slot(ctx, src);
@@ -295,7 +295,7 @@
 |.macro ASM_REG_MREF_IMUL, type, dst, src
 ||	if (IR_IS_CONST_REF(src)) {
 ||		ir_insn *_insn = &ctx->ir_base[src];
-||		IR_ASSERT(IR_IS_SIGNED_32BIT(_insn->val.i64));
+||		IR_ASSERT(IR_IS_32BIT(_insn->type, _insn->val));
 |		ASM_REG_IMM_IMUL type, dst, _insn->val.i32
 ||	} else {
 ||		int32_t offset = ir_ref_spill_slot(ctx, src);
@@ -4976,11 +4976,16 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		} else {
 			addr = (void*)addr_insn->val.addr;
 		}
-		if (sizeof(void*) == 4 /*|| IR_IS_SIGNED_32BIT(addr)*/) { // TODO: 32-bit IP relative or 64-bit absolute address
+		if (sizeof(void*) == 4 || (ctx->code_buffer_size
+				&& IR_IS_SIGNED_32BIT((char*)addr - (char*)ctx->code_buffer_size))) {
 			|	call aword &addr
 		} else {
 |.if X64
-			|	mov64 rax, ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
+			if (IR_IS_SIGNED_32BIT(addr)) {
+				|	mov rax, ((ptrdiff_t)addr)    // 0x48 0xc7 0xc0 <imm-32-bit>
+			} else {
+				|	mov64 rax, ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
+			}
 			|	call rax
 |.endif
 		}
@@ -5062,11 +5067,16 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		} else {
 			addr = (void*)addr_insn->val.addr;
 		}
-		if (sizeof(void*) == 4 /*|| IR_IS_SIGNED_32BIT(addr)*/) { // TODO: 32-bit IP relative or 64-bit absolute address
+		if (sizeof(void*) == 4 || (ctx->code_buffer_size
+				&& IR_IS_SIGNED_32BIT((char*)addr - (char*)ctx->code_buffer_size))) {
 			|	jmp aword &addr
 		} else {
 |.if X64
-			|	mov64 rax, ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
+			if (IR_IS_SIGNED_32BIT(addr)) {
+				|	mov rax, ((ptrdiff_t)addr)    // 0x48 0xc7 0xc0 <imm-32-bit>
+			} else {
+				|	mov64 rax, ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
+			}
 			|	jmp rax
 |.endif
 		}
@@ -5938,7 +5948,7 @@ static void ir_calc_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
 
 static void* dasm_labels[ir_lb_MAX];
 
-void *ir_emit_code(ir_ctx *ctx, size_t *size)
+void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 {
 	int b, n, target;
 	ir_block *bb;
@@ -5949,6 +5959,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 	dasm_State **Dst;
 	int ret;
 	void *entry;
+	size_t size;
 
 	ctx->data = &data;
 	data.ra_data.stack_frame_size = 0;
@@ -6503,14 +6514,23 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 		|.code
 	}
 
-	ret = dasm_link(&data.dasm_state, size);
+	ret = dasm_link(&data.dasm_state, size_ptr);
 	if (ret != DASM_S_OK) {
 		IR_ASSERT(0);
 		return NULL;
 	}
+	size = *size_ptr;
 
-	entry = ir_mem_mmap(4096);
-	ir_mem_unprotect(entry, 4096);
+	if (ctx->code_buffer != NULL) {
+		if (IR_ALIGNED_SIZE(size, 16) > ctx->code_buffer_size) {
+			return NULL;
+		}
+		entry = ctx->code_buffer;
+		IR_ASSERT((uintptr_t)entry % 16 == 0);
+	} else {
+		entry = ir_mem_mmap(size);
+	}
+	ir_mem_unprotect(entry, size);
 
 	ret = dasm_encode(&data.dasm_state, entry);
 
@@ -6529,13 +6549,15 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 
 	if (ret != DASM_S_OK) {
 		IR_ASSERT(0);
-		ir_mem_unmap(entry, 4096);
+		if (ctx->code_buffer == NULL) {
+			ir_mem_unmap(entry, size);
+		}
 		return NULL;
 	}
 	dasm_free(&data.dasm_state);
 
-	ir_mem_flush(entry, 4096);
-	ir_mem_protect(entry, 4096);
+	ir_mem_flush(entry, size);
+	ir_mem_protect(entry, size);
 
 	return entry;
 }

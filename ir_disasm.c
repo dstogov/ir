@@ -458,6 +458,7 @@ static void ir_addrtab_sort(ir_addrtab *addrtab)
 int ir_disasm(const char    *name,
               const void    *start,
               size_t         size,
+              bool           asm_addr,
               uint32_t       rodata_offset,
               uint32_t       jmp_table_offset,
               FILE          *f)
@@ -579,7 +580,7 @@ int ir_disasm(const char    *name,
 		}
 
 # ifdef HAVE_CAPSTONE_ITER
-		if (0) {
+		if (asm_addr) {
 			fprintf(f, "    %" PRIx64 ":", insn->address);
 		}
 		p = insn->op_str;
@@ -590,7 +591,7 @@ int ir_disasm(const char    *name,
 			fprintf(f, "\t%s ", insn->mnemonic);
 		}
 # else
-		if (0) {
+		if (asm_addr) {
 			fprintf(f, "    %" PRIx64 ":", insn[i].address);
 		}
 		p = insn[i].op_str;

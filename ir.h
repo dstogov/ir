@@ -439,6 +439,8 @@ typedef struct _ir_ctx {
 	void              *data;
 	uint32_t           rodata_offset;
 	uint32_t           jmp_table_offset;
+	void              *code_buffer;
+	size_t             code_buffer_size;
 	ir_strtab          strtab;
 	ir_ref             prev_insn_chain[IR_LAST_FOLDABLE_OP + 1];
 	ir_ref             prev_const_chain[IR_LAST_TYPE];
@@ -550,6 +552,7 @@ void ir_disasm_add_symbol(const char *name, uint64_t addr, uint64_t size);
 int  ir_disasm(const char *name,
                const void *start,
                size_t      size,
+               bool        asm_addr,
                uint32_t    rodata_offset,
                uint32_t    jmp_table_offset,
                FILE       *f);

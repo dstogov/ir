@@ -620,12 +620,6 @@ int ir_gdb_register(const char    *name,
 	return ir_gdb_register_code(&ctx.obj, ctx.objsize);
 }
 
-int ir_gdb_unregister(void)
-{
-	ir_gdb_unregister_all();
-	return 1;
-}
-
 void ir_gdb_init(void)
 {
 	/* This might enable registration of all JIT-ed code, but unfortunately,

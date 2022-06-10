@@ -306,6 +306,9 @@ void ir_init(ir_ctx *ctx, ir_ref consts_limit, ir_ref insns_limit)
 	ctx->prev_insn_len = NULL;
 	ctx->data = NULL;
 
+	ctx->code_buffer = NULL;
+	ctx->code_buffer_size = 0;
+
 	ir_strtab_init(&ctx->strtab, 64, 4096);
 
 	buf = ir_mem_malloc((consts_limit + insns_limit) * sizeof(ir_insn));
