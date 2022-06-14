@@ -30,6 +30,10 @@
 #define IR_IS_SIGNED_32BIT(val)   ((((intptr_t)(val)) <= 0x7fffffff) && (((intptr_t)(val)) >= (-2147483647 - 1)))
 #define IR_IS_UNSIGNED_32BIT(val) (((uintptr_t)(val)) <= 0xffffffff)
 #define IR_IS_32BIT(type, val)    (IR_IS_TYPE_SIGNED(type) ? IR_IS_SIGNED_32BIT((val).i64) : IR_IS_UNSIGNED_32BIT((val).u64))
+#define IR_MAY_USE_32BIT_ADDR(a) \
+	(ctx->code_buffer && \
+	IR_IS_SIGNED_32BIT((char*)addr - (char*)ctx->code_buffer) && \
+	IR_IS_SIGNED_32BIT((char*)addr - ((char*)ctx->code_buffer + ctx->code_buffer_size)))
 
 #define IR_SPILL_POS_TO_OFFSET(offset) \
 	((ctx->flags & IR_USE_FRAME_POINTER) ? \
@@ -4976,8 +4980,7 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		} else {
 			addr = (void*)addr_insn->val.addr;
 		}
-		if (sizeof(void*) == 4 || (ctx->code_buffer_size
-				&& IR_IS_SIGNED_32BIT((char*)addr - (char*)ctx->code_buffer_size))) {
+		if (sizeof(void*) == 4 || IR_MAY_USE_32BIT_ADDR(addr)) {
 			|	call aword &addr
 		} else {
 |.if X64
@@ -5067,8 +5070,7 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		} else {
 			addr = (void*)addr_insn->val.addr;
 		}
-		if (sizeof(void*) == 4 || (ctx->code_buffer_size
-				&& IR_IS_SIGNED_32BIT((char*)addr - (char*)ctx->code_buffer_size))) {
+		if (sizeof(void*) == 4 || IR_MAY_USE_32BIT_ADDR(addr)) {
 			|	jmp aword &addr
 		} else {
 |.if X64
@@ -5113,6 +5115,49 @@ static void ir_emit_ijmp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		int32_t offset = ir_ref_spill_slot(ctx, insn->op2);
 		ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
 		|	jmp aword [Ra(fp)+offset]
+	}
+}
+
+static void ir_emit_guard(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_reg op2_reg = ctx->regs[def][2];
+	ir_type type = ctx->ir_base[insn->op2].type;
+
+	IR_ASSERT(op2_reg != IR_REG_NONE);
+	if (op2_reg & IR_REG_SPILL_LOAD) {
+		op2_reg &= ~IR_REG_SPILL_LOAD;
+		ir_emit_load(ctx, type, op2_reg, insn->op2);
+	}
+
+	if (IR_IS_CONST_REF(insn->op3)) {
+		ir_insn *addr_insn = &ctx->ir_base[insn->op3];
+		void *addr;
+
+		IR_ASSERT(addr_insn->type == IR_ADDR);
+		if (addr_insn->op == IR_FUNC) {
+			addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
+		} else {
+			addr = (void*)addr_insn->val.addr;
+		}
+		|	ASM_REG_REG_OP test, type, op2_reg, op2_reg
+		if (sizeof(void*) == 4 || IR_MAY_USE_32BIT_ADDR(addr)) {
+			|	je aword &addr
+		} else {
+|.if X64
+			|	jne >1
+			if (IR_IS_SIGNED_32BIT(addr)) {
+				|	mov rax, ((ptrdiff_t)addr)    // 0x48 0xc7 0xc0 <imm-32-bit>
+			} else {
+				|	mov64 rax, ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
+			}
+			|	jmp aword [rax]
+			|1:
+|.endif
+		}
+	} else {
+		IR_ASSERT(0);
 	}
 }
 
@@ -6431,6 +6476,10 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					break;
 				case IR_ALLOCA:
 					ir_emit_alloca(ctx, i, insn);
+					break;
+				case IR_GUARD_TRUE:
+				case IR_GUARD_FALSE:
+					ir_emit_guard(ctx, i, insn);
 					break;
 				default:
 					IR_ASSERT(0 && "NIY rule/insruction");

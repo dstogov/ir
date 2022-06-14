@@ -254,8 +254,8 @@ typedef enum _ir_type {
 	_(IJMP,         E2X1, src, def, ret) /* computed goto               */ \
 	\
 	/* guards (floating or not) ???                                     */ \
-	_(GUARD_TRUE,   c2,   src, def, ___) /* IF without second successor */ \
-	_(GUARD_FALSE,  c2,   src, def, ___) /* IF without second successor */ \
+	_(GUARD_TRUE,   c3,   src, def, def) /* IF without second successor */ \
+	_(GUARD_FALSE,  c3,   src, def, def) /* IF without second successor */ \
 
 #define IR_OP_ENUM(name, flags, op1, op2, op3) IR_ ## name,
 
