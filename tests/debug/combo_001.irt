@@ -13,7 +13,7 @@ x86_64
 	bool c_3 = 1;
 	int32_t i_1 = 1;
 	int32_t i_2 = 2;
-	ll_1 = START(ll_16);                     
+	ll_1 = START(ll_14);
 	bool cond = PARAM(ll_1, "cond", 0);
 	int32_t x_0 = COPY(i_1);
 	ll_2 = END(ll_1);
@@ -32,8 +32,7 @@ x86_64
 	ll_11 = IF_TRUE(ll_10);
 	ll_12 = LOOP_END(ll_11, ll_3);
 	ll_13 = IF_FALSE(ll_10);
-	ll_14 = LOOP_EXIT(ll_13, ll_3);
-	ll_16 = RETURN(ll_14, x_3);
+	ll_14 = RETURN(ll_13, x_3);
 }
 --EXPECT--
 test:

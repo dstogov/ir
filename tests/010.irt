@@ -9,7 +9,7 @@
 	bool c_3 = 1;
 	int32_t c_4 = 1;
 	int32_t c_5 = 2;
-	l_1 = START(l_21);
+	l_1 = START(l_20);
 	bool d_2 = PARAM(l_1, "cond", 0);
 	bool d_3 = COPY(c_4);
 	l_4 = END(l_1);
@@ -28,8 +28,7 @@
 	l_17 = IF_TRUE(l_16);
 	l_18 = LOOP_END(l_17, l_5);
 	l_19 = IF_FALSE(l_16);
-	l_20 = LOOP_EXIT(l_19, l_5);
-	l_21 = RETURN(l_20, d_15);
+	l_20 = RETURN(l_19, d_15);
 }
 --EXPECT--
 {
@@ -38,7 +37,7 @@
 	bool c_3 = 1;
 	int32_t c_4 = 1;
 	int32_t c_5 = 2;
-	l_1 = START(l_19);
+	l_1 = START(l_18);
 	bool d_2 = PARAM(l_1, "cond", 0);
 	l_3 = END(l_1);
 	l_4 = LOOP_BEGIN(l_3, l_16);
@@ -55,8 +54,7 @@
 	l_15 = IF_TRUE(l_14);
 	l_16 = LOOP_END(l_15, l_4);
 	l_17 = IF_FALSE(l_14);
-	l_18 = LOOP_EXIT(l_17, l_4);
-	l_19 = RETURN(l_18, c_4);
+	l_18 = RETURN(l_17, c_4);
 }
 { # Use Lists
 00001(2): [00002, 00003]
@@ -67,7 +65,6 @@
 00015(1): [00016]
 00016(1): [00004]
 00017(1): [00018]
-00018(1): [00019]
 }
 { # CFG map (insn -> bb)
 1 -> 1
@@ -88,5 +85,4 @@
 16 -> 3
 17 -> 4
 18 -> 4
-19 -> 4
 }

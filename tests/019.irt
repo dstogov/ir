@@ -7,7 +7,7 @@
 	bool c_3 = 1;
 	int32_t c_4 = 1;
 	int32_t c_5 = 2;
-	l_1 = START(l_34);
+	l_1 = START(l_33);
 	bool d_2 = PARAM(l_1, "cond", 0);
 	bool d_3 = PARAM(l_1, "z", 1);
 	bool d_4 = COPY(c_4);
@@ -39,8 +39,7 @@
 	l_30 = IF_TRUE(l_29);
 	l_31 = LOOP_END(l_30, l_7);
 	l_32 = IF_FALSE(l_29);
-	l_33 = LOOP_EXIT(l_32, l_7);
-	l_34 = RETURN(l_33, d_19);
+	l_33 = RETURN(l_32, d_19);
 }
 --EXPECT--
 {
@@ -48,7 +47,7 @@
 	bool c_2 = 0;
 	bool c_3 = 1;
 	int32_t c_4 = 1;
-	l_1 = START(l_11);
+	l_1 = START(l_10);
 	bool d_2 = PARAM(l_1, "cond", 0);
 	bool d_3 = PARAM(l_1, "z", 1);
 	l_4 = END(l_1);
@@ -57,6 +56,5 @@
 	l_7 = IF_TRUE(l_6);
 	l_8 = LOOP_END(l_7, l_5);
 	l_9 = IF_FALSE(l_6);
-	l_10 = LOOP_EXIT(l_9, l_5);
-	l_11 = RETURN(l_10, c_4);
+	l_10 = RETURN(l_9, c_4);
 }

@@ -37,9 +37,8 @@
 	l_24 = IF_TRUE(l_23);
 	l_25 = LOOP_END(l_24, l_13);
 	l_26 = IF_FALSE(l_23);
-	l_27 = LOOP_EXIT(l_26, l_13);
 	bool d_28 = EQ(d_22, c_4);
-	l_29 = IF(l_27, d_28);
+	l_29 = IF(l_26, d_28);
 	l_30 = IF_TRUE(l_29);
 	l_31 = RETURN(l_30, d_22);
 	l_32 = IF_FALSE(l_29);
@@ -57,7 +56,7 @@
 	int32_t c_5 = 2;
 	int32_t c_6 = 3;
 	int32_t c_7 = 4;
-	l_1 = START(l_38);
+	l_1 = START(l_37);
 	int32_t d_2 = PARAM(l_1, "z", 0);
 	bool d_3 = PARAM(l_1, "cond", 1);
 	l_4 = SWITCH(l_1, d_2);
@@ -83,15 +82,14 @@
 	l_24 = IF_TRUE(l_23);
 	l_25 = LOOP_END(l_24, l_13);
 	l_26 = IF_FALSE(l_23);
-	l_27 = LOOP_EXIT(l_26, l_13);
 	NOP;
 	NOP;
 	NOP;
-	l_31 = RETURN(l_27, c_4);
+	l_30 = RETURN(l_26, c_4);
 	NOP;
 	NOP;
-	l_34 = MERGE/3(l_6, l_8, l_10);
+	l_33 = MERGE/3(l_6, l_8, l_10);
 	NOP;
-	int32_t d_36 = PHI/3(l_34, c_4, c_5, c_6);
-	l_38 = RETURN(l_34, d_36, l_31);
+	int32_t d_35 = PHI/3(l_33, c_4, c_5, c_6);
+	l_37 = RETURN(l_33, d_35, l_30);
 }

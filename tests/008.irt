@@ -52,17 +52,15 @@
 	l_41 = IF_TRUE(l_40);
 	l_42 = LOOP_END(l_41, l_13);
 	l_43 = IF_FALSE(l_40);
-	l_44 = LOOP_EXIT(l_43, l_13);
-	l_45 = BEGIN(l_44);
-	int32_t d_46 = ADD(d_32, d_3);
-	int32_t d_47 = ADD(d_46, d_4);
-	int32_t d_48 = ADD(d_47, d_33);
-	int32_t d_49 = ADD(d_48, d_34);
-	int32_t d_50 = ADD(d_49, d_35);
-	int32_t d_51 = ADD(d_50, d_36);
-	int32_t d_52 = ADD(d_51, d_37);
-	int32_t d_53 = ADD(d_52, d_39);
-	l_54 = RETURN(l_45, d_53);
+	int32_t d_44 = ADD(d_32, d_3);
+	int32_t d_45 = ADD(d_44, d_4);
+	int32_t d_46 = ADD(d_45, d_33);
+	int32_t d_47 = ADD(d_46, d_34);
+	int32_t d_48 = ADD(d_47, d_35);
+	int32_t d_49 = ADD(d_48, d_36);
+	int32_t d_50 = ADD(d_49, d_37);
+	int32_t d_51 = ADD(d_50, d_39);
+	l_54 = RETURN(l_43, d_51);
 }
 --EXPECT--
 { # CFG
@@ -121,16 +119,8 @@ BB6:
 	loop_depth=1
 BB7:
 	start=39
-	end=40
-	successors(1) [BB8]
+	end=48
 	predecessors(1) [BB5]
 	dom_parent=BB5
 	dom_depth=3
-	dom_children [BB8]
-BB8:
-	start=41
-	end=50
-	predecessors(1) [BB7]
-	dom_parent=BB7
-	dom_depth=4
 }

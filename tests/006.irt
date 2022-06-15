@@ -11,7 +11,7 @@
 	int32_t c_5 = 2;
 	int32_t c_6 = 1;
 	int32_t c_7 = 0;
-	l_1 = START(l_16);
+	l_1 = START(l_14);
 	int32_t d_2 = PARAM(l_1, "x", 0);
 	l_3 = END(l_1);
 	l_4 = LOOP_BEGIN(l_3, l_12);
@@ -24,9 +24,7 @@
 	l_11 = IF_TRUE(l_10);
 	l_12 = LOOP_END(l_11, l_4);
 	l_13 = IF_FALSE(l_10);
-	l_14 = LOOP_EXIT(l_13, l_4);
-	l_15 = BEGIN(l_14);
-	l_16 = RETURN(l_15, d_8);
+	l_14 = RETURN(l_13, d_8);
 }
 --EXPECT--
 { # CFG
@@ -58,15 +56,7 @@ BB3:
 BB4:
 	start=13
 	end=14
-	successors(1) [BB5]
 	predecessors(1) [BB2]
 	dom_parent=BB2
 	dom_depth=2
-	dom_children [BB5]
-BB5:
-	start=15
-	end=16
-	predecessors(1) [BB4]
-	dom_parent=BB4
-	dom_depth=3
 }

@@ -739,7 +739,6 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 				case IR_MERGE:
 				case IR_LOOP_BEGIN:
 				case IR_LOOP_END:
-				case IR_LOOP_EXIT:
 				case IR_PARAM:
 				case IR_VAR:
 				case IR_PHI:
@@ -802,7 +801,6 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 				case IR_CASE_DEFAULT:
 				case IR_MERGE:
 				case IR_LOOP_BEGIN:
-				case IR_LOOP_EXIT:
 				case IR_UNREACHABLE:
 				case IR_PARAM:
 				case IR_VAR:

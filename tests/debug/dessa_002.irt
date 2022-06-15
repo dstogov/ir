@@ -10,7 +10,7 @@ x86_64
 	bool c_2 = 0;
 	bool c_3 = 1;
 	int32_t c_4 = 1;
-	l_1 = START(l_13);
+	l_1 = START(l_11);
 	int32_t d_2 = PARAM(l_1, "x", 0);
 	l_3 = END(l_1);
 	l_4 = LOOP_BEGIN(l_3, l_9);
@@ -20,9 +20,7 @@ x86_64
 	l_8 = IF_TRUE(l_7);
 	l_9 = LOOP_END(l_8, l_4);
 	l_10 = IF_FALSE(l_7);
-	l_11 = LOOP_EXIT(l_10, l_4);
-	l_12 = BEGIN(l_11);
-	l_13 = RETURN(l_12, d_5);
+	l_11 = RETURN(l_10, d_5);
 }
 --EXPECT--
 test:

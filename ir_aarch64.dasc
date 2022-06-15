@@ -929,7 +929,6 @@ binop_fp:
 		case IR_MERGE:
 		case IR_LOOP_BEGIN:
 //		case IR_LOOP_END:
-		case IR_LOOP_EXIT:
 		case IR_UNREACHABLE:
 			return IR_SKIP;
 		case IR_RETURN:
@@ -3952,7 +3951,6 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 				case IR_MERGE:
 				case IR_LOOP_BEGIN:
 				case IR_LOOP_END:
-				case IR_LOOP_EXIT:
 					break;
 				default:
 					flags = 0;

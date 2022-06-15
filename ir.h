@@ -118,7 +118,7 @@ typedef enum _ir_type {
  * arg - argument referene CALL/TAILCALL/CARG->CARG
  * src - reference to a previous control region (IF, IF_TRUE, IF_FALSE, LOOP_BEGIN, LOOP_END, RETURN)
  * reg - data-control dependency on region (PHI, VAR, PARAM)
- * beg - reference to a LOOP_BEGIN region (LOOP_END, LOOP_EXIT)
+ * beg - reference to a LOOP_BEGIN region (LOOP_END)
  * ret - reference to a previous RETURN instruction (RETURN)
  * ent - reference to a previous ENTRY instruction (ENTRY)
  * str - string: variable/argument name (VAR, PARAM, CALL, TAILCALL)
@@ -250,7 +250,6 @@ typedef enum _ir_type {
 	_(MERGE,        BN,   src, src, src) /* control merge               */ \
 	_(LOOP_BEGIN,   B2,   src, src, ___) /* loop start                  */ \
 	_(LOOP_END,     E1X1, src, beg, ___) /* loop end                    */ \
-	_(LOOP_EXIT,    c1X1, src, beg, ___) /* loop exit                   */ \
 	_(IJMP,         E2X1, src, def, ret) /* computed goto               */ \
 	\
 	/* guards (floating or not) ???                                     */ \

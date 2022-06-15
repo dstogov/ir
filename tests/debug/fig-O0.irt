@@ -54,8 +54,6 @@ x86_64
 	ll_11 = IF_TRUE(ll_10);
 	ll_12 = LOOP_END(ll_11, ll_3);
 	ll_13 = IF_FALSE(ll_10);
-	ll_14 = LOOP_EXIT(ll_13, ll_3);
-	ll_15 = BEGIN(ll_14);
 	int32_t ret1 = ADD(a_3, b_0);
 	int32_t ret2 = ADD(ret1, c_0);
 	int32_t ret3 = ADD(ret2, d_3);
@@ -64,7 +62,7 @@ x86_64
 	int32_t ret6 = ADD(ret5, s_3);
 	int32_t ret7 = ADD(ret6, t_3);
 	int32_t ret8 = ADD(ret7, y_0);
-	ll_16 = RETURN(ll_15, ret8);
+	ll_16 = RETURN(ll_13, ret8);
 }
 --EXPECT--
 test:

@@ -9,7 +9,7 @@
 	bool c_3 = 1;
 	int32_t c_4 = 1;
 	int32_t c_5 = 4;
-	l_1 = START(l_54);
+	l_1 = START(l_52);
 	int32_t d_2 = PARAM(l_1, "a", 0);
 	int32_t d_3 = PARAM(l_1, "b", 1);
 	int32_t d_4 = PARAM(l_1, "c", 2);
@@ -52,17 +52,15 @@
 	l_41 = IF_TRUE(l_40);
 	l_42 = LOOP_END(l_41, l_13);
 	l_43 = IF_FALSE(l_40);
-	l_44 = LOOP_EXIT(l_43, l_13);
-	l_45 = BEGIN(l_44);
-	int32_t d_46 = ADD(d_32, d_3);
-	int32_t d_47 = ADD(d_46, d_4);
-	int32_t d_48 = ADD(d_47, d_33);
-	int32_t d_49 = ADD(d_48, d_34);
-	int32_t d_50 = ADD(d_49, d_35);
-	int32_t d_51 = ADD(d_50, d_36);
-	int32_t d_52 = ADD(d_51, d_37);
-	int32_t d_53 = ADD(d_52, d_39);
-	l_54 = RETURN(l_45, d_53);
+	int32_t d_44 = ADD(d_32, d_3);
+	int32_t d_45 = ADD(d_44, d_4);
+	int32_t d_46 = ADD(d_45, d_33);
+	int32_t d_47 = ADD(d_46, d_34);
+	int32_t d_48 = ADD(d_47, d_35);
+	int32_t d_49 = ADD(d_48, d_36);
+	int32_t d_50 = ADD(d_49, d_37);
+	int32_t d_51 = ADD(d_50, d_39);
+	l_52 = RETURN(l_43, d_51);
 }
 --EXPECT--
 {
@@ -71,7 +69,7 @@
 	bool c_3 = 1;
 	int32_t c_4 = 1;
 	int32_t c_5 = 4;
-	l_1 = START(l_50);
+	l_1 = START(l_48);
 	int32_t d_2 = PARAM(l_1, "a", 0);
 	int32_t d_3 = PARAM(l_1, "b", 1);
 	int32_t d_4 = PARAM(l_1, "c", 2);
@@ -108,19 +106,17 @@
 	l_35 = IF_TRUE(l_34);
 	l_36 = LOOP_END(l_35, l_15);
 	l_37 = IF_FALSE(l_34);
-	l_38 = LOOP_EXIT(l_37, l_15);
-	l_39 = BEGIN(l_38);
-	int32_t d_40 = MUL(d_29, d_3);
-	int32_t d_41 = ADD(d_40, c_4);
-	int32_t d_42 = ADD(d_29, d_3);
-	int32_t d_43 = ADD(d_42, d_4);
-	int32_t d_44 = ADD(d_43, d_30);
-	int32_t d_45 = ADD(d_44, d_12);
-	int32_t d_46 = ADD(d_45, d_31);
-	int32_t d_47 = ADD(d_46, d_32);
-	int32_t d_48 = ADD(d_47, d_33);
-	int32_t d_49 = ADD(d_48, d_41);
-	l_50 = RETURN(l_39, d_49);
+	int32_t d_38 = MUL(d_29, d_3);
+	int32_t d_39 = ADD(d_38, c_4);
+	int32_t d_40 = ADD(d_29, d_3);
+	int32_t d_41 = ADD(d_40, d_4);
+	int32_t d_42 = ADD(d_41, d_30);
+	int32_t d_43 = ADD(d_42, d_12);
+	int32_t d_44 = ADD(d_43, d_31);
+	int32_t d_45 = ADD(d_44, d_32);
+	int32_t d_46 = ADD(d_45, d_33);
+	int32_t d_47 = ADD(d_46, d_39);
+	l_48 = RETURN(l_37, d_47);
 }
 { # CFG
 BB1:
@@ -178,16 +174,8 @@ BB6:
 	loop_depth=1
 BB7:
 	start=37
-	end=38
-	successors(1) [BB8]
+	end=48
 	predecessors(1) [BB5]
 	dom_parent=BB5
 	dom_depth=3
-	dom_children [BB8]
-BB8:
-	start=39
-	end=50
-	predecessors(1) [BB7]
-	dom_parent=BB7
-	dom_depth=4
 }

@@ -8,7 +8,7 @@
 	bool c_2 = 0;
 	bool c_3 = 1;
 	int32_t c_4 = 1;
-	l_1 = START(l_13);
+	l_1 = START(l_11);
 	int32_t d_2 = PARAM(l_1, "x", 0);
 	l_3 = END(l_1);
 	l_4 = LOOP_BEGIN(l_3, l_9);
@@ -18,9 +18,7 @@
 	l_8 = IF_TRUE(l_7);
 	l_9 = LOOP_END(l_8, l_4);
 	l_10 = IF_FALSE(l_7);
-	l_11 = LOOP_EXIT(l_10, l_4);
-	l_12 = BEGIN(l_11);
-	l_13 = RETURN(l_12, d_5);
+	l_11 = RETURN(l_10, d_5);
 }
 --EXPECT--
 {
@@ -28,7 +26,7 @@
 	bool c_2 = 0;
 	bool c_3 = 1;
 	int32_t c_4 = 1;
-	l_1 = START(l_13);
+	l_1 = START(l_11);
 	int32_t d_2 = PARAM(l_1, "x", 0);
 	l_3 = END(l_1);
 	l_4 = LOOP_BEGIN(l_3, l_9);
@@ -38,9 +36,7 @@
 	l_8 = IF_TRUE(l_7);
 	l_9 = LOOP_END(l_8, l_4);
 	l_10 = IF_FALSE(l_7);
-	l_11 = LOOP_EXIT(l_10, l_4);
-	l_12 = BEGIN(l_11);
-	l_13 = RETURN(l_12, d_5);
+	l_11 = RETURN(l_10, d_5);
 }
 { # CFG
 BB1:
@@ -72,19 +68,11 @@ BB3:
 BB4:
 	start=10
 	end=11
-	successors(1) [BB5]
 	predecessors(1) [BB2]
 	dom_parent=BB2
 	dom_depth=2
-	dom_children [BB5]
-BB5:
-	start=12
-	end=13
-	predecessors(1) [BB4]
-	dom_parent=BB4
-	dom_depth=3
 }
 { # LIVE-RANGES (vregs_count=2)
-R1 (d_2, d_5): [2.2-8.0), [10.0-13.1), DEF(2.2), PHI_USE(3.2, phi=d_5/2), DEF(5.2), USE(6.1/1), USE(13.1/2)
+R1 (d_2, d_5): [2.2-8.0), [10.0-11.1), DEF(2.2), PHI_USE(3.2, phi=d_5/2), DEF(5.2), USE(6.1/1), USE(11.1/2)
 R2 (d_6): [6.2-10.0), DEF(6.2), USE(7.1/2), PHI_USE(9.2, phi=d_5/3)
 }

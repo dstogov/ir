@@ -39,14 +39,10 @@ x86_64
 	int32_t d_25 = ADD(d_11, c_5);
 	l_26 = LOOP_END(l_23, l_10);
 	l_27 = IF_FALSE(l_14);
-	l_28 = LOOP_EXIT(l_27, l_10);
 	int32_t d_29 = ADD(d_4, c_5);
-	l_30 = LOOP_END(l_28, l_3);
+	l_30 = LOOP_END(l_27, l_3);
 	l_31 = IF_FALSE(l_7);
-	l_32 = LOOP_EXIT(l_31, l_3);
-	l_33 = END(l_32);
-	l_34 = BEGIN(l_33);
-	l_35 = RETURN(l_34, d_5);
+	l_35 = RETURN(l_31, d_5);
 }
 --EXPECT--
 test:
