@@ -544,8 +544,9 @@ extern const char *ir_op_name[IR_LAST_OP];
 #define IR_OP_FLAG_CONTROL        (1<<9)
 #define IR_OP_FLAG_MEM            (1<<10)
 #define IR_OP_FLAG_COMMUTATIVE    (1<<11)
-#define IR_OP_FLAG_BB_BEGIN       (1<<12)
+#define IR_OP_FLAG_BB_START       (1<<12)
 #define IR_OP_FLAG_BB_END         (1<<13)
+#define IR_OP_FLAG_TERMINATOR     (1<<14)
 
 #define IR_OP_FLAG_MEM_LOAD       ((0<<6)|(0<<7))
 #define IR_OP_FLAG_MEM_STORE      ((0<<6)|(1<<7))
@@ -618,8 +619,8 @@ struct _ir_use_list {
 };
 
 /*** IR Basic Blocks info ***/
-#define IR_IS_BB_BEGIN(op) \
-	((ir_op_flags[op] & IR_OP_FLAG_BB_BEGIN) != 0)
+#define IR_IS_BB_START(op) \
+	((ir_op_flags[op] & IR_OP_FLAG_BB_START) != 0)
 
 #define IR_IS_BB_MERGE(op) \
 	((op) == IR_MERGE || (op) == IR_LOOP_BEGIN)

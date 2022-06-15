@@ -2,7 +2,7 @@
 #define IR_PHP_H
 
 #define IR_PHP_OPS(_) \
-	_(PHP_ENTRY,    B0X2, num, ent, ___) /* PHP Code Entry              */ \
+	_(PHP_ENTRY,    S0X2, num, ent, ___) /* PHP Code Entry              */ \
 
 #if defined(IR_TARGET_X86)
 # define IR_REG_PHP_FP IR_REG_RSI

@@ -628,7 +628,7 @@ int ir_sccp(ir_ctx *ctx)
 					ir_sccp_replace_insn(ctx, _values, i, IR_UNUSED);
 				}
 			} else {
-				if (insn->op == IR_RETURN || insn->op == IR_UNREACHABLE || insn->op == IR_IJMP) {
+				if (ir_op_flags[insn->op] & IR_OP_FLAG_TERMINATOR) {
 					ir_ref ref = ctx->ir_base[1].op1;
 					if (ref == i) {
 						ctx->ir_base[1].op1 = insn->op3;

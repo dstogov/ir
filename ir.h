@@ -97,8 +97,9 @@ typedef enum _ir_type {
  * d     - data      IR_OP_FLAG_DATA
  * r     - ref       IR_OP_FLAG_DATA alias
  * c     - control   IR_OP_FLAG_CONTROL
- * B     - control   IR_OP_FLAG_CONTROL + IR_OP_FLAG_BB_BEGIN
+ * S     - control   IR_OP_FLAG_CONTROL + IR_OP_FLAG_BB_START
  * E     - control   IR_OP_FLAG_CONTROL + IR_OP_FLAG_BB_END
+ * T     - control   IR_OP_FLAG_CONTROL + IR_OP_FLAG_BB_END + IR_OP_FLAG_TERMINATOR
  * l     - load      IR_OP_FLAG_MEM + IR_OP_FLAG_MEM_LOAD
  * s     - store     IR_OP_FLAG_MEM + IR_OP_FLAG_STORE
  * x     - call      IR_OP_FLAG_MEM + IR_OP_FLAG_CALL
@@ -236,21 +237,21 @@ typedef enum _ir_type {
 	/* memory reference ops (A, H, U, S, TMP, STR, NEW, X, V) ???       */ \
 	\
 	/* control-flow nodes                                               */ \
-	_(START,        B0X2, ret, ent, ___) /* function start              */ \
-	_(RETURN,       E2X1, src, def, ret) /* function return             */ \
-	_(UNREACHABLE,  E2X1, src, def, ret) /* unreachable (tailcall, etc) */ \
-	_(BEGIN,        B1,   src, ___, ___) /* block start                 */ \
+	_(START,        S0X2, ret, ent, ___) /* function start              */ \
+	_(RETURN,       T2X1, src, def, ret) /* function return             */ \
+	_(UNREACHABLE,  T2X1, src, def, ret) /* unreachable (tailcall, etc) */ \
+	_(BEGIN,        S1,   src, ___, ___) /* block start                 */ \
 	_(END,          E1,   src, ___, ___) /* block end                   */ \
 	_(IF,           E2,   src, def, ___) /* conditional control split   */ \
-	_(IF_TRUE,      B1X1, src, prb, ___) /* IF TRUE proj.               */ \
-	_(IF_FALSE,     B1X1, src, prb, ___) /* IF FALSE proj.              */ \
+	_(IF_TRUE,      S1X1, src, prb, ___) /* IF TRUE proj.               */ \
+	_(IF_FALSE,     S1X1, src, prb, ___) /* IF FALSE proj.              */ \
 	_(SWITCH,       E2,   src, def, ___) /* multi-way control split     */ \
-	_(CASE_VAL,     B2X1, src, def, prb) /* switch proj.                */ \
-	_(CASE_DEFAULT, B1X1, src, prb, ___) /* switch proj.                */ \
-	_(MERGE,        BN,   src, src, src) /* control merge               */ \
-	_(LOOP_BEGIN,   B2,   src, src, ___) /* loop start                  */ \
+	_(CASE_VAL,     S2X1, src, def, prb) /* switch proj.                */ \
+	_(CASE_DEFAULT, S1X1, src, prb, ___) /* switch proj.                */ \
+	_(MERGE,        SN,   src, src, src) /* control merge               */ \
+	_(LOOP_BEGIN,   S2,   src, src, ___) /* loop start                  */ \
 	_(LOOP_END,     E1X1, src, beg, ___) /* loop end                    */ \
-	_(IJMP,         E2X1, src, def, ret) /* computed goto               */ \
+	_(IJMP,         T2X1, src, def, ret) /* computed goto               */ \
 	\
 	/* guards (floating or not) ???                                     */ \
 	_(GUARD_TRUE,   c3,   src, def, def) /* IF without second successor */ \

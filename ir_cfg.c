@@ -29,7 +29,7 @@ int ir_build_cfg(ir_ctx *ctx)
 		while (1) {
 			insn = &ctx->ir_base[ref];
 			_blocks[ref] = bb_count;
-			if (IR_IS_BB_BEGIN(insn->op)) {
+			if (IR_IS_BB_START(insn->op)) {
 				ir_bitset_incl(worklist.visited, ref);
 				break;
 			}
@@ -62,7 +62,7 @@ int ir_build_cfg(ir_ctx *ctx)
 		_blocks[ref] = n;
 		bb = &blocks[n];
 		insn = &ctx->ir_base[ref];
-		if (IR_IS_BB_BEGIN(insn->op)) {
+		if (IR_IS_BB_START(insn->op)) {
 			bb->start = ref;
 		} else {
 			bb->end = ref;
