@@ -4534,11 +4534,13 @@ static void ir_emit_rstore(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 			op2_reg &= ~IR_REG_SPILL_LOAD;
 			ir_emit_load(ctx, type, op2_reg, insn->op2);
 		}
-		if (IR_IS_TYPE_INT(type)) {
-			ir_emit_mov(ctx, type, dst_reg, op2_reg);
-		} else {
-			IR_ASSERT(IR_IS_TYPE_FP(type));
-			ir_emit_fp_mov(ctx, type, dst_reg, op2_reg);
+		if (op2_reg != dst_reg) {
+			if (IR_IS_TYPE_INT(type)) {
+				ir_emit_mov(ctx, type, dst_reg, op2_reg);
+			} else {
+				IR_ASSERT(IR_IS_TYPE_FP(type));
+				ir_emit_fp_mov(ctx, type, dst_reg, op2_reg);
+			}
 		}
 	} else {
 		ir_emit_load(ctx, type, dst_reg, insn->op2);
