@@ -4238,6 +4238,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	int ret;
 	void *entry;
 	size_t size;
+	uint32_t entries_count;
 
 	ctx->data = &data;
 	data.ra_data.stack_frame_size = 0;
@@ -4257,12 +4258,22 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		ir_calc_stack_frame_size(ctx, &data);
 	}
 
+	/* For all entries */
+	entries_count = 0;
+	i = ctx->ir_base[1].op2;
+	while (i != IR_UNUSED) {
+		entries_count++;
+		ctx->ir_base[i].op3 = entries_count;
+		i = ctx->ir_base[i].op2;
+	}
+
 	Dst = &data.dasm_state;
 	data.dasm_state = NULL;
 	dasm_init(&data.dasm_state, DASM_MAXSECTION);
 	dasm_setupglobal(&data.dasm_state, dasm_labels, ir_lb_MAX);
 	dasm_setup(&data.dasm_state, dasm_actions);
-	dasm_growpc(&data.dasm_state, ctx->cfg_blocks_count + 1 + ctx->consts_count + 1 + 1 + 1);
+	/* labels for each block + for each constant + rodata label + jmp_table label + for each entry */
+	dasm_growpc(&data.dasm_state, ctx->cfg_blocks_count + 1 + ctx->consts_count + 1 + 1 + 1 + entries_count);
 
 	if (ctx->flags & IR_FUNCTION) {
 		ir_emit_prologue(ctx);
@@ -4281,6 +4292,12 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_SKIP:
 				case IR_SKIP_REG:
 				case IR_VAR:
+					break;
+				case IR_ENTRY:
+					{
+						uint32_t label = ctx->cfg_blocks_count + ctx->consts_count + 3 + insn->op3;
+						|=>label:
+					}
 					break;
 				case IR_MUL_PWR2:
 				case IR_DIV_PWR2:
@@ -4538,6 +4555,14 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		ctx->rodata_offset = offset;
 	} else {
 		ctx->rodata_offset = 0;
+	}
+
+	/* For all entries */
+	i = ctx->ir_base[1].op2;
+	while (i != IR_UNUSED) {
+		uint32_t offset = dasm_getpclabel(&data.dasm_state, ctx->cfg_blocks_count + ctx->consts_count + 3 + ctx->ir_base[i].op3);
+		ctx->ir_base[i].op3 = offset;
+		i = ctx->ir_base[i].op2;
 	}
 
 	if (ret != DASM_S_OK) {

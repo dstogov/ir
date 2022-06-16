@@ -459,8 +459,7 @@ int ir_disasm(const char    *name,
               const void    *start,
               size_t         size,
               bool           asm_addr,
-              uint32_t       rodata_offset,
-              uint32_t       jmp_table_offset,
+              ir_ctx        *ctx,
               FILE          *f)
 {
 	size_t orig_size = size;
@@ -481,6 +480,8 @@ int ir_disasm(const char    *name,
 	const char *sym;
 	int64_t offset = 0;
 	char *p, *q, *r;
+	uint32_t rodata_offset = 0;
+	uint32_t jmp_table_offset = 0;
 
 # if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 #  if defined(__x86_64__) || defined(_WIN64)
@@ -509,31 +510,43 @@ int ir_disasm(const char    *name,
 
 	ir_addrtab_init(&labels, 32);
 
-	if (rodata_offset) {
-		if (size > rodata_offset) {
-			size = rodata_offset;
-		}
-	}
-	if (jmp_table_offset) {
-		uint32_t n = orig_size - jmp_table_offset;
-		uintptr_t *p;
+	if (ctx) {
+		ir_ref entry;
 
-		if (size > jmp_table_offset) {
-			size = jmp_table_offset;
+		entry = ctx->ir_base[1].op2;
+		while (entry != IR_UNUSED) {
+			ir_addrtab_add(&labels, ctx->ir_base[entry].op3/*, ctx->ir_base[entry].op1*/);
+			entry = ctx->ir_base[entry].op2;
 		}
-		while (n > 0 && IR_ALIGNED_SIZE(n, sizeof(void*)) != n) {
-			jmp_table_offset++;
-			n--;
-		}
-		IR_ASSERT(n > 0 && n % sizeof(void*) == 0 && jmp_table_offset % sizeof(void*) == 0);
-		p = (uintptr_t*)((char*)start + jmp_table_offset);
-		while (n > 0) {
-			if (*p) {
-				IR_ASSERT((uintptr_t)*p >= (uintptr_t)start && (uintptr_t)*p < (uintptr_t)orig_end);
-				ir_addrtab_add(&labels, (uint32_t)((uintptr_t)*p - (uintptr_t)start));
+
+		rodata_offset = ctx->rodata_offset;
+		if (rodata_offset) {
+			if (size > rodata_offset) {
+				size = rodata_offset;
 			}
-			p++;
-			n -= sizeof(void*);
+		}
+		jmp_table_offset = ctx->jmp_table_offset;
+		if (jmp_table_offset) {
+			uint32_t n = orig_size - jmp_table_offset;
+			uintptr_t *p;
+
+			if (size > jmp_table_offset) {
+				size = jmp_table_offset;
+			}
+			while (n > 0 && IR_ALIGNED_SIZE(n, sizeof(void*)) != n) {
+				jmp_table_offset++;
+				n--;
+			}
+			IR_ASSERT(n > 0 && n % sizeof(void*) == 0 && jmp_table_offset % sizeof(void*) == 0);
+			p = (uintptr_t*)((char*)start + jmp_table_offset);
+			while (n > 0) {
+				if (*p) {
+					IR_ASSERT((uintptr_t)*p >= (uintptr_t)start && (uintptr_t)*p < (uintptr_t)orig_end);
+					ir_addrtab_add(&labels, (uint32_t)((uintptr_t)*p - (uintptr_t)start));
+				}
+				p++;
+				n -= sizeof(void*);
+			}
 		}
 	}
 	end = (void *)((char *)start + size);

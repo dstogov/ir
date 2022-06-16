@@ -252,6 +252,7 @@ typedef enum _ir_type {
 	_(LOOP_BEGIN,   SN,   src, src, src) /* loop start                  */ \
 	_(LOOP_END,     E1X1, src, beg, ___) /* loop end                    */ \
 	_(IJMP,         T2X1, src, def, ret) /* computed goto               */ \
+	_(ENTRY,        S0X2, num, ent, ___) /* code entry (op3 keeps addr) */ \
 	\
 	/* guards (floating or not) ???                                     */ \
 	_(GUARD_TRUE,   c3,   src, def, def) /* IF without second successor */ \
@@ -553,8 +554,7 @@ int  ir_disasm(const char *name,
                const void *start,
                size_t      size,
                bool        asm_addr,
-               uint32_t    rodata_offset,
-               uint32_t    jmp_table_offset,
+               ir_ctx     *ctx,
                FILE       *f);
 
 /* Linux perf interface (implementation in ir_perf.c) */
