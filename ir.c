@@ -746,7 +746,7 @@ void ir_set_op(ir_ctx *ctx, ir_ref ref, uint32_t n, ir_ref val)
 	if (n > 3) {
 		uint32_t count = 3;
 
-		if (insn->op == IR_MERGE) {
+		if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
 			count = insn->inputs_count;
 			if (count == 0) {
 				count = 2;

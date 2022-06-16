@@ -35,7 +35,7 @@ void ir_save(ir_ctx *ctx, FILE *f)
 		}
 		fprintf(f, "%s", ir_op_name[insn->op]);
 		n = ir_operands_count(ctx, insn);
-		if (insn->op == IR_MERGE && n != 2) {
+		if ((insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) && n != 2) {
 			fprintf(f, "/%d", n);
 		} else if ((insn->op == IR_CALL || insn->op == IR_TAILCALL) && n != 2) {
 			fprintf(f, "/%d", n - 2);

@@ -324,7 +324,7 @@ static void ir_sccp_remove_unreachable_merge_inputs(ir_ctx *ctx, ir_insn *_value
 			}
 		}
 	} else {
-		IR_ASSERT(insn->op == IR_MERGE);
+		IR_ASSERT(insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN);
 		n = insn->inputs_count;
 		if (n == 0) {
 			n = 3;

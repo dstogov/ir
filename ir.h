@@ -117,7 +117,7 @@ typedef enum _ir_type {
  * ref - memory reference (data-flow use-def dependency edge)
  * var - variable reference (data-flow use-def dependency edge)
  * arg - argument referene CALL/TAILCALL/CARG->CARG
- * src - reference to a previous control region (IF, IF_TRUE, IF_FALSE, LOOP_BEGIN, LOOP_END, RETURN)
+ * src - reference to a previous control region (IF, IF_TRUE, IF_FALSE, MERGE, LOOP_BEGIN, LOOP_END, RETURN)
  * reg - data-control dependency on region (PHI, VAR, PARAM)
  * beg - reference to a LOOP_BEGIN region (LOOP_END)
  * ret - reference to a previous RETURN instruction (RETURN)
@@ -249,7 +249,7 @@ typedef enum _ir_type {
 	_(CASE_VAL,     S2X1, src, def, prb) /* switch proj.                */ \
 	_(CASE_DEFAULT, S1X1, src, prb, ___) /* switch proj.                */ \
 	_(MERGE,        SN,   src, src, src) /* control merge               */ \
-	_(LOOP_BEGIN,   S2,   src, src, ___) /* loop start                  */ \
+	_(LOOP_BEGIN,   SN,   src, src, src) /* loop start                  */ \
 	_(LOOP_END,     E1X1, src, beg, ___) /* loop end                    */ \
 	_(IJMP,         T2X1, src, def, ret) /* computed goto               */ \
 	\
