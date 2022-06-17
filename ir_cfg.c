@@ -46,6 +46,60 @@ int ir_build_cfg(ir_ctx *ctx)
 		}
 	}
 
+	/* Backward search may miss some blocks, perform addional forward search */
+	if (!ir_bitset_in(worklist.visited, 1)) {
+		ir_worklist_push(&worklist, 1);
+	}
+
+	/* Check entries */
+	ref = ctx->ir_base[1].op2;
+	while (ref) {
+		if (!ir_bitset_in(worklist.visited, ref)) {
+			ir_worklist_push(&worklist, ref);
+		}
+		ref = ctx->ir_base[ref].op2;
+	}
+
+	while (ir_worklist_len(&worklist)) {
+		ref = ir_worklist_pop(&worklist);
+		insn = &ctx->ir_base[ref];
+		IR_ASSERT(IR_IS_BB_START(insn->op));
+		bb_count++;
+		_blocks[ref] = bb_count;
+		ir_bitset_incl(worklist.visited, ref);
+
+		/* Skip control nodes untill BB end */
+		while (1) {
+			ir_use_list *use_list = &ctx->use_lists[ref];
+
+			n = use_list->count;
+			ref = IR_UNUSED;
+			for (j = 0, p = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
+				ref = *p;
+				insn = &ctx->ir_base[ref];
+				if (ir_op_flags[insn->op] & IR_OP_FLAG_CONTROL) {
+					break;
+				}
+			}
+			IR_ASSERT(ref != IR_UNUSED);
+			_blocks[ref] = bb_count;
+			if (IR_IS_BB_END(insn->op)) {
+				ir_bitset_incl(worklist.visited, ref);
+				use_list = &ctx->use_lists[ref];
+				n = use_list->count;
+				for (j = 0, p = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
+					ref = *p;
+					insn = &ctx->ir_base[ref];
+					if ((ir_op_flags[insn->op] & IR_OP_FLAG_CONTROL)
+					 && !ir_bitset_in(worklist.visited, ref)) {
+						ir_worklist_push(&worklist, ref);
+					}
+				}
+				break;
+			}
+		}
+	}
+
 	if (bb_count == 0) {
 		IR_ASSERT(bb_count > 0);
 		return 0;
