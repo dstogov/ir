@@ -402,7 +402,7 @@ IR_ALWAYS_INLINE ir_ref ir_array_at(ir_array *a, uint32_t i)
 IR_ALWAYS_INLINE void ir_array_set(ir_array *a, uint32_t i, ir_ref val)
 {
 	if (i >= a->size) {
-		ir_array_grow(a, i);
+		ir_array_grow(a, i + 1);
 	}
 	a->refs[i] = val;
 }
