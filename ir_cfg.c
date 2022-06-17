@@ -46,6 +46,11 @@ int ir_build_cfg(ir_ctx *ctx)
 		}
 	}
 
+	if (bb_count == 0) {
+		IR_ASSERT(bb_count > 0);
+		return 0;
+	}
+
 	/* Create array of basic blocks and count succcessor edges for each BB */
 	blocks = ir_mem_malloc((bb_count + 1) * sizeof(ir_block));
 	memset(blocks, 0, (bb_count + 1) * sizeof(ir_block));
