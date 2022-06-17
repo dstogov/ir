@@ -6960,8 +6960,8 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		IR_ASSERT((uintptr_t)entry % 16 == 0);
 	} else {
 		entry = ir_mem_mmap(size);
+		ir_mem_unprotect(entry, size);
 	}
-	ir_mem_unprotect(entry, size);
 
 	ret = dasm_encode(&data.dasm_state, entry);
 
@@ -6996,7 +6996,10 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	dasm_free(&data.dasm_state);
 
 	ir_mem_flush(entry, size);
-	ir_mem_protect(entry, size);
+
+	if (ctx->code_buffer == NULL) {
+		ir_mem_protect(entry, size);
+	}
 
 	return entry;
 }
