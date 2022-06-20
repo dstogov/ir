@@ -629,10 +629,12 @@ struct _ir_use_list {
 	((ir_op_flags[op] & IR_OP_FLAG_BB_END) != 0)
 
 #define IR_BB_UNREACHABLE      (1<<0)
-#define IR_BB_LOOP_HEADER      (1<<1)
-#define IR_BB_IRREDUCIBLE_LOOP (1<<2)
-#define IR_BB_DESSA_MOVES      (1<<3) /* translation out of SSA requires MOVEs      */
-#define IR_BB_MAY_SKIP         (1<<4) /* empty BB                                   */
+#define IR_BB_START            (1<<1)
+#define IR_BB_ENTRY            (1<<2)
+#define IR_BB_LOOP_HEADER      (1<<3)
+#define IR_BB_IRREDUCIBLE_LOOP (1<<4)
+#define IR_BB_DESSA_MOVES      (1<<5) /* translation out of SSA requires MOVEs      */
+#define IR_BB_MAY_SKIP         (1<<6) /* empty BB                                   */
 
 struct _ir_block {
 	uint32_t flags;

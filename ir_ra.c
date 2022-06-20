@@ -40,6 +40,9 @@ int ir_assign_virtual_registers(ir_ctx *ctx)
 	vregs = ir_mem_calloc(ctx->insns_count, sizeof(ir_ref));
 	n = 1;
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
+		if (bb->flags & IR_BB_UNREACHABLE) {
+			continue;
+		}
 		for (i = bb->start, insn = ctx->ir_base + i; i <= bb->end;) {
 			ctx->prev_insn_len[i] = n;
 			flags = ir_op_flags[insn->op];
@@ -338,6 +341,9 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 	ctx->live_intervals = ir_mem_calloc(ctx->vregs_count + 1 + IR_REG_NUM, sizeof(ir_live_interval*));
 	for (b = ctx->cfg_blocks_count; b > 0; b--) {
 		bb = &ctx->cfg_blocks[b];
+		if (bb->flags & IR_BB_UNREACHABLE) {
+			continue;
+		}
 		/* for each successor of b */
 		ir_bitset_incl(visited, b);
 		ir_bitset_clear(live, len);
@@ -896,6 +902,9 @@ int ir_coalesce(ir_ctx *ctx)
 	/* Collect a list of blocks which are predecossors to block with phi finctions */
 	ir_worklist_init(&blocks, ctx->cfg_blocks_count + 1);
 	for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
+		if (bb->flags & IR_BB_UNREACHABLE) {
+			continue;
+		}
 		if (bb->predecessors_count > 1) {
 			use_list = &ctx->use_lists[bb->start];
 			n = use_list->count;
@@ -1028,6 +1037,9 @@ int ir_compute_dessa_moves(ir_ctx *ctx)
 	ir_insn *insn;
 
 	for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
+		if (bb->flags & IR_BB_UNREACHABLE) {
+			continue;
+		}
 		if (bb->predecessors_count > 1) {
 			use_list = &ctx->use_lists[bb->start];
 			n = use_list->count;
@@ -2037,6 +2049,9 @@ static int ir_linear_scan(ir_ctx *ctx)
 
 	/* Add fixed intervals for temporary registers used for DESSA moves */
 	for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
+		if (bb->flags & IR_BB_UNREACHABLE) {
+			continue;
+		}
 		if (bb->flags & IR_BB_DESSA_MOVES) {
 			ctx->data = bb;
 			ir_gen_dessa_moves(ctx, b, ir_fix_dessa_tmps);

@@ -720,6 +720,9 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 	/* Emit declarations for local variables */
 	vars = ir_bitset_malloc(ctx->vregs_count + 1);
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
+		if (bb->flags & IR_BB_UNREACHABLE) {
+			continue;
+		}
 		bb->flags &= ~IR_BB_MAY_SKIP;
 		flags = IR_BB_MAY_SKIP;
 		if (bb->successors_count != 1
@@ -785,7 +788,7 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 	ir_mem_free(vars);
 
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
-		if (bb->flags & IR_BB_MAY_SKIP) {
+		if (bb->flags & (IR_BB_MAY_SKIP|IR_BB_UNREACHABLE)) {
 			continue;
 		}
 		if (ir_needs_block_label(ctx, b)) {

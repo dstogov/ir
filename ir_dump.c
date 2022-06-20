@@ -221,6 +221,12 @@ void ir_dump_cfg(ir_ctx *ctx, FILE *f)
 				}
 				fprintf(f, "]\n");
 			}
+			if (bb->flags & IR_BB_ENTRY) {
+				fprintf(f, "\tENTRY\n");
+			}
+			if (bb->flags & IR_BB_UNREACHABLE) {
+				fprintf(f, "\tUNREACHABLE\n");
+			}
 			if (bb->flags & IR_BB_LOOP_HEADER) {
 				fprintf(f, "\tLOOP_HEADER\n");
 			}

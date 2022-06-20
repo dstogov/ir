@@ -108,11 +108,11 @@ int ir_build_cfg(ir_ctx *ctx)
 	/* Create array of basic blocks and count succcessor edges for each BB */
 	blocks = ir_mem_malloc((bb_count + 1) * sizeof(ir_block));
 	memset(blocks, 0, (bb_count + 1) * sizeof(ir_block));
-	uint32_t *_xlat = ir_mem_malloc(bb_count * sizeof(uint32_t));
-	memset(_xlat, 0, bb_count * sizeof(uint32_t));
+	uint32_t *_xlat = ir_mem_malloc((bb_count + 1) * sizeof(uint32_t));
+	memset(_xlat, 0, (bb_count + 1) * sizeof(uint32_t));
 	b = 0;
 	IR_BITSET_FOREACH(worklist.visited, ir_bitset_len(ctx->insns_count), ref) {
-		/* reorder blocks to reflect the original control flow (START - 0) */
+		/* reorder blocks to reflect the original control flow (START - 1) */
 		j = _blocks[ref];
 		n = _xlat[j];
 		if (n == 0) {
@@ -130,8 +130,18 @@ int ir_build_cfg(ir_ctx *ctx)
 	ir_mem_free(_xlat);
 	ir_worklist_free(&worklist);
 
+	ir_worklist_init(&worklist, bb_count + 1);
 	for (b = 1, bb = blocks + 1; b <= bb_count; b++, bb++) {
 		insn = &ctx->ir_base[bb->start];
+		if (insn->op == IR_START) {
+			bb->flags |= IR_BB_START;
+			ir_worklist_push(&worklist, b);
+		} else if (insn->op == IR_ENTRY) {
+			bb->flags |= IR_BB_ENTRY;
+			ir_worklist_push(&worklist, b);
+		} else {
+			bb->flags |= IR_BB_UNREACHABLE; /* all blocks are marked as UNREACHABLE first */
+		}
 		flags = ir_op_flags[insn->op];
 		n = ir_input_edges_count(ctx, insn);
 		for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
@@ -187,6 +197,25 @@ int ir_build_cfg(ir_ctx *ctx)
     ctx->cfg_blocks = blocks;
     ctx->cfg_edges = edges;
 
+	/* Mark reachable blocks */
+	while (ir_worklist_len(&worklist) != 0) {
+		uint32_t *p, succ_b;
+		ir_block *succ_bb;
+
+		b = ir_worklist_pop(&worklist);
+		bb = &blocks[b];
+		n = bb->successors_count;
+		for (p = ctx->cfg_edges + bb->successors; n > 0; p++, n--) {
+			succ_b = *p;
+			succ_bb = &blocks[succ_b];
+			if (succ_bb->flags & IR_BB_UNREACHABLE) {
+				succ_bb->flags &= ~IR_BB_UNREACHABLE;
+				ir_worklist_push(&worklist, succ_b);
+			}
+		}
+	}
+	ir_worklist_free(&worklist);
+
 	return 1;
 }
 
@@ -232,9 +261,9 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 		changed = 0;
 		/* Iterating in Reverse Post Oorder */
 		for (b = 2, bb = &blocks[2]; b <= blocks_count; b++, bb++) {
-//			if (bb->flags & IR_BB_UNREACHABLE) {
-//				continue;
-//			}
+			if (bb->flags & IR_BB_UNREACHABLE) {
+				continue;
+			}
 			if (bb->predecessors_count) {
 				int idom = 0;
 				uint32_t k = bb->predecessors_count;
@@ -276,9 +305,9 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 
 	/* Construct dominators tree */
 	for (b = 2, bb = &blocks[2]; b <= blocks_count; b++, bb++) {
-//		if (bb->flags & IR_BB_UNREACHABLE) {
-//			continue;
-//		}
+		if (bb->flags & IR_BB_UNREACHABLE) {
+			continue;
+		}
 		if (bb->idom > 0) {
 			ir_block *idom_bb = &blocks[bb->idom];
 

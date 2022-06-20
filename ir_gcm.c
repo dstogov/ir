@@ -121,6 +121,9 @@ int ir_gcm(ir_ctx *ctx)
 
 	/* pin control instructions and collect their direct inputs */
 	for (i = 1, bb = ctx->cfg_blocks + 1; i <= ctx->cfg_blocks_count; i++, bb++) {
+		if (bb->flags & IR_BB_UNREACHABLE) {
+			continue;
+		}
 		j = bb->end;
 		while (1) {
 			insn = &ctx->ir_base[j];
@@ -163,6 +166,9 @@ int ir_gcm(ir_ctx *ctx)
 	visited = ir_bitset_malloc(ctx->insns_count);
 	ir_list_clear(&queue);
 	for (i = 1, bb = ctx->cfg_blocks + 1; i <= ctx->cfg_blocks_count; i++, bb++) {
+		if (bb->flags & IR_BB_UNREACHABLE) {
+			continue;
+		}
 		j = bb->end;
 		while (1) {
 			ir_bitset_incl(visited, j);
@@ -403,6 +409,9 @@ int ir_schedule(ir_ctx *ctx)
 	/* Topological sort according dependencies inside each basic block */
 	ir_bitset scheduled = ir_bitset_malloc(ctx->insns_count);
 	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; b++, bb++) {
+		if (bb->flags & IR_BB_UNREACHABLE) {
+			continue;
+		}
 		i = bb->start;
 		ir_bitset_incl(scheduled, i);
 		i = _next[i];
