@@ -401,6 +401,11 @@ int ir_sccp(ir_ctx *ctx)
 
 	/* A bit modified SCCP algorith of M. N. Wegman and F. K. Zadeck */
 	ir_bitset_incl(worklist, 1);
+	i = ctx->ir_base[1].op2;
+	while (i) {
+		ir_bitset_incl(worklist, i);
+		i = ctx->ir_base[i].op2;
+	}
 	while ((i = ir_bitset_pop_first(worklist, len)) >= 0) {
 		insn = &ctx->ir_base[i];
 		flags = ir_op_flags[insn->op];
