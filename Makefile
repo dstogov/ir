@@ -54,7 +54,7 @@ ir_load.c: ir.g
 	$(PHP) $(LLK) ir.g
 
 ir_fold_hash.h: gen_ir_fold_hash ir_fold.h ir.h
-	./gen_ir_fold_hash > ir_fold_hash.h
+	./gen_ir_fold_hash < ir_fold.h > ir_fold_hash.h
 gen_ir_fold_hash: gen_ir_fold_hash.c ir_strtab.c
 	$(CC) $(CFLAGS) $(LDFALGS) -o $@ $^
 

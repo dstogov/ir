@@ -187,17 +187,12 @@ static int parse_rule(const char *buf)
 int main()
 {
 	char buf[4096];
-	FILE *f = fopen("ir_fold.h", "r");
+	FILE *f = stdin;
 	int line = 0;
 	int rules = 0;
 	int i;
 	uint32_t mask[MAX_RULES];
 	uint32_t rule[MAX_RULES];
-
-	if (!f) {
-		fprintf(stderr, "ERROR: Cannot open \"ir_fold.h\"\n");
-		return 1;
-	}
 
 	ir_strtab_init(&strtab, IR_LAST_OP, 0);
 
