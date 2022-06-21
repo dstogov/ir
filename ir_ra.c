@@ -13,6 +13,10 @@
 
 #include "ir_private.h"
 
+#if defined(__GNUC__)
+# pragma GCC diagnostic ignored "-Warray-bounds"
+#endif
+
 #ifdef IR_DEBUG_REGSET
 uint64_t debug_regset = 0xffffffffffffffff;
 #endif

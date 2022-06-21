@@ -17,6 +17,10 @@
 #include "dynasm/dasm_proto.h"
 #include "dynasm/dasm_arm64.h"
 
+#if defined(__GNUC__)
+# pragma GCC diagnostic ignored "-Warray-bounds"
+#endif
+
 |.arch arm64
 
 |.actionlist dasm_actions

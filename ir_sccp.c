@@ -1,6 +1,10 @@
 #include "ir.h"
 #include "ir_private.h"
 
+#if defined(__GNUC__)
+# pragma GCC diagnostic ignored "-Warray-bounds"
+#endif
+
 /* SCCP - Sparse Conditional Constant Propagation + Copy Propagation
  *
  * M. N. Wegman and F. K. Zadeck. "Constant propagation with conditional branches"

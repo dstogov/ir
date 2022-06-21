@@ -17,6 +17,10 @@
 #include "dynasm/dasm_proto.h"
 #include "dynasm/dasm_x86.h"
 
+#if defined(__GNUC__)
+# pragma GCC diagnostic ignored "-Warray-bounds"
+#endif
+
 |.if X64
 |.arch x64
 |.else
@@ -5251,6 +5255,7 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	int32_t used_stack = ir_emit_arguments(ctx, def, insn, ctx->regs[def][1]);
+	(void) used_stack;
 
 	IR_ASSERT(used_stack == 0);
 

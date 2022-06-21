@@ -13,6 +13,10 @@
 # include <valgrind/valgrind.h>
 #endif
 
+#if defined(__GNUC__)
+# pragma GCC diagnostic ignored "-Warray-bounds"
+#endif
+
 #define IR_TYPE_FLAGS(name, type, field, flags) ((flags)|sizeof(type)),
 #define IR_TYPE_NAME(name, type, field, flags)  #name,
 #define IR_TYPE_CNAME(name, type, field, flags) #type,
@@ -648,6 +652,7 @@ ir_ref ir_folding(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3,
 	ir_ref ref;
 	ir_val val;
 	uint32_t key, any;
+	(void) op3_insn;
 
 restart:
 	key = (opt & IR_OPT_OP_MASK) + ((uint32_t)op1_insn->op << 7) + ((uint32_t)op2_insn->op << 14);

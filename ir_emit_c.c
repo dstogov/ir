@@ -1,6 +1,10 @@
 #include "ir.h"
 #include "ir_private.h"
 
+#if defined(__GNUC__)
+# pragma GCC diagnostic ignored "-Warray-bounds"
+#endif
+
 static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 {
 	FILE *f = ctx->data;
