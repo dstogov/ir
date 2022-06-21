@@ -582,6 +582,7 @@ typedef enum _ir_rule {
 	IR_MEM_BINOP_INT,
 	IR_MEM_SHIFT,
 	IR_MEM_SHIFT_CONST,
+	IR_REG_BINOP_INT,
 	IR_SKIP_BINOP_INT,
 	IR_SKIP_SHIFT,
 	IR_VSTORE_INT,
@@ -1521,7 +1522,9 @@ store_int:
 					if (!ctx->rules[insn->op3]) {
 						ctx->rules[insn->op3] = ir_match_insn(ctx, insn->op3, bb);
 					}
-					if (ctx->rules[insn->op3] == IR_BINOP_INT && op_insn->op != IR_MUL) {
+					if ((ctx->rules[insn->op3] == IR_BINOP_INT && op_insn->op != IR_MUL) ||
+							ctx->rules[insn->op3] == IR_LEA_OB ||
+							ctx->rules[insn->op3] == IR_LEA_IB) {
 						if (ctx->ir_base[op_insn->op1].op == load_op
 						 && ctx->ir_base[op_insn->op1].op2 == insn->op2) {
 							if (op_insn->op1 > bb->start
@@ -1656,6 +1659,36 @@ store_int:
 				return IR_STORE_FP;
 			}
 			break;
+		case IR_RSTORE:
+			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
+				if ((ctx->flags & IR_OPT_CODEGEN) && insn->op2 > bb->start && insn->op2 < ref && ctx->use_lists[insn->op2].count == 1) {
+					ir_insn *op_insn = &ctx->ir_base[insn->op2];
+
+					if (!ctx->rules[insn->op2]) {
+						ctx->rules[insn->op2] = ir_match_insn(ctx, insn->op2, bb);
+					}
+					if ((ctx->rules[insn->op2] == IR_BINOP_INT && op_insn->op != IR_MUL) ||
+							ctx->rules[insn->op2] == IR_LEA_OB ||
+							ctx->rules[insn->op2] == IR_LEA_IB) {
+						if (ctx->ir_base[op_insn->op1].op == IR_RLOAD
+						 && ctx->ir_base[op_insn->op1].op2 == insn->op3) {
+							ctx->rules[insn->op2] = IR_SKIP_BINOP_INT;
+							ctx->rules[op_insn->op1] = IR_SKIP;
+							return IR_REG_BINOP_INT;
+						} else if ((ir_op_flags[op_insn->op] & IR_OP_FLAG_COMMUTATIVE)
+						 && ctx->ir_base[op_insn->op2].op == IR_RLOAD
+						 && ctx->ir_base[op_insn->op2].op2 == insn->op3) {
+							ir_ref tmp = op_insn->op1;
+							op_insn->op1 = op_insn->op2;
+							op_insn->op2 = tmp;
+							ctx->rules[insn->op2] = IR_SKIP_BINOP_INT;
+							ctx->rules[op_insn->op1] = IR_SKIP;
+							return IR_REG_BINOP_INT;
+						}
+					}
+				}
+			}
+			return IR_RSTORE;
 		case IR_START:
 		case IR_BEGIN:
 //		case IR_END:
@@ -2318,6 +2351,71 @@ static void ir_emit_mem_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 			case IR_XOR:
 				|	ASM_MEM_REG_OP xor, type, [Ra(reg)+offset], op2_reg
+				break;
+			default:
+				IR_ASSERT(0 && "NIY binary op");
+				break;
+		}
+	}
+}
+
+static void ir_emit_reg_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_insn *op_insn = &ctx->ir_base[insn->op2];
+	ir_type type = op_insn->type;
+	ir_ref op2 = op_insn->op2;
+	ir_reg op2_reg = ctx->regs[insn->op2][2];
+	ir_reg reg;
+
+	IR_ASSERT(insn->op == IR_RSTORE);
+	reg = insn->op3;
+
+	if (op2_reg == IR_REG_NONE) {
+		ir_val *val = &ctx->ir_base[op2].val;
+
+		IR_ASSERT(IR_IS_CONST_REF(op2) && (ir_type_size[type] != 8 || IR_IS_32BIT(type, ctx->ir_base[op2].val)));
+		switch (op_insn->op) {
+			case IR_ADD:
+				|	ASM_REG_IMM_OP add, type, reg, val->i32
+				break;
+			case IR_SUB:
+				|	ASM_REG_IMM_OP sub, type, reg, val->i32
+				break;
+			case IR_OR:
+				|	ASM_REG_IMM_OP or, type, reg, val->i32
+				break;
+			case IR_AND:
+				|	ASM_REG_IMM_OP and, type, reg, val->i32
+				break;
+			case IR_XOR:
+				|	ASM_REG_IMM_OP xor, type, reg, val->i32
+				break;
+			default:
+				IR_ASSERT(0 && "NIY binary op");
+				break;
+		}
+	} else {
+		if ((op2_reg & IR_REG_SPILL_LOAD) || IR_IS_CONST_REF(op2)) {
+			op2_reg &= ~IR_REG_SPILL_LOAD;
+			ir_emit_load(ctx, type, op2_reg, op2);
+		}
+		switch (op_insn->op) {
+			case IR_ADD:
+				|	ASM_REG_REG_OP add, type, reg, op2_reg
+				break;
+			case IR_SUB:
+				|	ASM_REG_REG_OP sub, type, reg, op2_reg
+				break;
+			case IR_OR:
+				|	ASM_REG_REG_OP or, type, reg, op2_reg
+				break;
+			case IR_AND:
+				|	ASM_REG_REG_OP and, type, reg, op2_reg
+				break;
+			case IR_XOR:
+				|	ASM_REG_REG_OP xor, type, reg, op2_reg
 				break;
 			default:
 				IR_ASSERT(0 && "NIY binary op");
@@ -6852,6 +6950,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					break;
 				case IR_MEM_SHIFT_CONST:
 					ir_emit_mem_shift_const(ctx, i, insn);
+					break;
+				case IR_REG_BINOP_INT:
+					ir_emit_reg_binop_int(ctx, i, insn);
 					break;
 				case IR_VADDR:
 					ir_emit_vaddr(ctx, i, insn);

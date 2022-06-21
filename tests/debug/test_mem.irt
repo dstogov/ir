@@ -94,9 +94,7 @@ test:
 	movq %rsp, %rax
 	movl $0, (%rax)
 .L1:
-	movl (%rax), %ecx
-	leal 1(%rcx), %ecx
-	movl %ecx, (%rax)
+	addl $1, (%rax)
 	movsd -0x20(%rbp), %xmm0
 	movsd -0x28(%rbp), %xmm1
 	movapd %xmm1, %xmm2
@@ -131,7 +129,6 @@ test:
 	popq %rbp
 	retq
 .rodata
-	.db 0x90, 0x90, 0x90, 0x90
 .L3:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f
 .L4:
