@@ -6,9 +6,6 @@
 #ifdef IR_DEBUG
 # include <assert.h>
 # define IR_ASSERT(x) assert(x)
-# ifndef IR_DEBUG_REGSET
-#  define IR_DEBUG_REGSET
-# endif
 #else
 # define IR_ASSERT(x)
 #endif

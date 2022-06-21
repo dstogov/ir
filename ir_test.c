@@ -124,6 +124,7 @@ int main(int argc, char **argv)
     int i;
 	int opt_level = 2;
 	uint32_t mflags = 0;
+	uint64_t debug_regset = 0xffffffffffffffff;
 
 	ir_consistency_check();
 
@@ -152,7 +153,6 @@ int main(int argc, char **argv)
 		} else if (strcmp(argv[i], "--debug-ra") == 0) {
 			mflags |= IR_DEBUG_RA;
 #endif
-#ifdef IR_DEBUG_REGSET
 		} else if (strcmp(argv[i], "--debug-regset") == 0) {
 			if (i + 1 == argc || argv[i + 1][0] == '-') {
 				fprintf(stderr, "ERROR: Invalid usage' (use --help)\n");
@@ -160,7 +160,6 @@ int main(int argc, char **argv)
 			}
 			debug_regset = strtoull(argv[i + 1], NULL, 0);
 			i++;
-#endif
 		} else {
 			/* pass*/
 		}
@@ -172,6 +171,7 @@ int main(int argc, char **argv)
 	if (opt_level > 0) {
 		ctx.flags |= IR_OPT_FOLDING | IR_OPT_CODEGEN;
 	}
+	ctx.fixed_regset = ~debug_regset;
     gen_mandelbrot(&ctx);
 
 	ir_build_def_use_lists(&ctx);

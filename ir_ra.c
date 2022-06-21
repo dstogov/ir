@@ -17,10 +17,6 @@
 # pragma GCC diagnostic ignored "-Warray-bounds"
 #endif
 
-#ifdef IR_DEBUG_REGSET
-uint64_t debug_regset = 0xffffffffffffffff;
-#endif
-
 int ir_regs_number(void)
 {
 	return IR_REG_NUM;
@@ -1599,9 +1595,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 		}
 	}
 
-#ifdef IR_DEBUG_REGSET
-	available &= debug_regset;
-#endif
+	available = IR_REGSET_DIFFERENCE(available, (ir_regset)ctx->fixed_regset);
 
 	/* for each interval it in active */
 	other = *active;
@@ -1741,9 +1735,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 		}
 	}
 
-#ifdef IR_DEBUG_REGSET
-	available &= debug_regset;
-#endif
+	available = IR_REGSET_DIFFERENCE(available, (ir_regset)ctx->fixed_regset);
 
 	if (IR_REGSET_IS_EMPTY(available)) {
 		fprintf(stderr, "LSRA Internal Error: No registers available. Allocation is not possible\n");

@@ -210,6 +210,7 @@ int main(int argc, char **argv)
 	uint32_t dump = 0;
 	int opt_level = 2;
 	uint32_t mflags = 0;
+	uint64_t debug_regset = 0xffffffffffffffff;
 
 	ir_consistency_check();
 
@@ -302,7 +303,6 @@ int main(int argc, char **argv)
 		} else if (strcmp(argv[i], "--debug-ra") == 0) {
 			mflags |= IR_DEBUG_RA;
 #endif
-#ifdef IR_DEBUG_REGSET
 		} else if (strcmp(argv[i], "--debug-regset") == 0) {
 			if (i + 1 == argc || argv[i + 1][0] == '-') {
 				fprintf(stderr, "ERROR: Invalid usage' (use --help)\n");
@@ -310,7 +310,6 @@ int main(int argc, char **argv)
 			}
 			debug_regset = strtoull(argv[i + 1], NULL, 0);
 			i++;
-#endif
 		} else if (argv[i][0] == '-') {
 			fprintf(stderr, "ERROR: Unknown option '%s' (use --help)\n", argv[i]);
 			return 1;
@@ -355,6 +354,7 @@ int main(int argc, char **argv)
 	if (dump_asm || run) {
 		ctx.flags |= IR_GEN_NATIVE;
 	}
+	ctx.fixed_regset = ~debug_regset;
 
 	if (!ir_load(&ctx, f)) {
 		fprintf(stderr, "ERROR: Cannot load input file '%s'\n", input);

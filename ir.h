@@ -434,6 +434,7 @@ typedef struct _ir_ctx {
 	uint32_t          *rules;
 	uint32_t           vregs_count;
 	uint32_t          *vregs;
+	uint64_t           fixed_regset;
 	ir_live_interval **live_intervals;
 	ir_regs           *regs;
 	uint32_t          *prev_insn_len;
@@ -590,16 +591,5 @@ int ir_mem_unmap(void *ptr, size_t size);
 int ir_mem_protect(void *ptr, size_t size);
 int ir_mem_unprotect(void *ptr, size_t size);
 int ir_mem_flush(void *ptr, size_t size);
-
-/* IR Debug API */
-#ifdef IR_DEBUG
-# ifndef IR_DEBUG_REGSET
-#  define IR_DEBUG_REGSET
-# endif
-#endif
-
-#ifdef IR_DEBUG_REGSET
-extern uint64_t debug_regset;
-#endif
 
 #endif /* IR_H */
