@@ -477,45 +477,29 @@ ir_ref ir_strl(ir_ctx *ctx, const char *s, size_t len);
 const char *ir_get_str(ir_ctx *ctx, ir_ref idx);
 
 ir_ref ir_emit(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
-ir_ref ir_fold(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
+
+ir_ref ir_emit0(ir_ctx *ctx, uint32_t opt);
+ir_ref ir_emit1(ir_ctx *ctx, uint32_t opt, ir_ref op1);
+ir_ref ir_emit2(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2);
+ir_ref ir_emit3(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
+
+void   ir_set_op1(ir_ctx *ctx, ir_ref ref, ir_ref val);
+void   ir_set_op2(ir_ctx *ctx, ir_ref ref, ir_ref val);
+void   ir_set_op3(ir_ctx *ctx, ir_ref ref, ir_ref val);
 
 ir_ref ir_emit_N(ir_ctx *ctx, uint32_t opt, uint32_t count);
 void   ir_set_op(ir_ctx *ctx, ir_ref ref, uint32_t n, ir_ref val);
 
-void ir_bind(ir_ctx *ctx, ir_ref var, ir_ref def);
+ir_ref ir_fold(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
 
-#define ir_emit0(ctx, opt) \
-	ir_emit(ctx, opt, IR_UNUSED, IR_UNUSED, IR_UNUSED)
-#define ir_emit1(ctx, opt, op1) \
-	ir_emit(ctx, opt, op1, IR_UNUSED, IR_UNUSED)
-#define ir_emit2(ctx, opt, op1, op2) \
-	ir_emit(ctx, opt, op1, op2, IR_UNUSED)
-#define ir_emit3(ctx, opt, op1, op2, op3) \
-	ir_emit(ctx, opt, op1, op2, op3)
+ir_ref ir_fold0(ir_ctx *ctx, uint32_t opt);
+ir_ref ir_fold1(ir_ctx *ctx, uint32_t opt, ir_ref op1);
+ir_ref ir_fold2(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2);
+ir_ref ir_fold3(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
 
-#define ir_fold0(ctx, opt) \
-	ir_fold(ctx, opt, IR_UNUSED, IR_UNUSED, IR_UNUSED)
-#define ir_fold1(ctx, opt, op1) \
-	ir_fold(ctx, opt, op1, IR_UNUSED, IR_UNUSED)
-#define ir_fold2(ctx, opt, op1, op2) \
-	ir_fold(ctx, opt, op1, op2, IR_UNUSED)
-#define ir_fold3(ctx, opt, op1, op2, op3) \
-	ir_fold(ctx, opt, op1, op2, op3)
-
-#define ir_param(ctx, type, region, name, pos) \
-	ir_emit3((ctx), IR_OPT(IR_PARAM, (type)), (region), ir_str((ctx), (name)), (pos))
-#define ir_var(ctx, type, region, name) \
-	ir_emit2((ctx), IR_OPT(IR_VAR, (type)), (region), ir_str((ctx), (name)))
-
-#define ir_set_op1(ctx, ins, val) do { \
-		(ctx)->ir_base[(ins)].op1 = (val); \
-	} while (0)
-#define ir_set_op2(ctx, ins, val) do { \
-		(ctx)->ir_base[(ins)].op2 = (val); \
-	} while (0)
-#define ir_set_op3(ctx, ins, val) do { \
-		(ctx)->ir_base[(ins)].op3 = (val); \
-	} while (0)
+ir_ref ir_param(ir_ctx *ctx, ir_type type, ir_ref region, const char *name, int pos);
+ir_ref ir_var(ir_ctx *ctx, ir_type type, ir_ref region, const char *name);
+void   ir_bind(ir_ctx *ctx, ir_ref var, ir_ref def);
 
 /* Def -> Use lists */
 void ir_build_def_use_lists(ir_ctx *ctx);

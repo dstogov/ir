@@ -520,6 +520,41 @@ ir_ref ir_emit(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
 	return ref;
 }
 
+ir_ref ir_emit0(ir_ctx *ctx, uint32_t opt)
+{
+	return ir_emit(ctx, opt, IR_UNUSED, IR_UNUSED, IR_UNUSED);
+}
+
+ir_ref ir_emit1(ir_ctx *ctx, uint32_t opt, ir_ref op1)
+{
+	return ir_emit(ctx, opt, op1, IR_UNUSED, IR_UNUSED);
+}
+
+ir_ref ir_emit2(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2)
+{
+	return ir_emit(ctx, opt, op1, op2, IR_UNUSED);
+}
+
+ir_ref ir_emit3(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
+{
+	return ir_emit(ctx, opt, op1, op2, op3);
+}
+
+void ir_set_op1(ir_ctx *ctx, ir_ref ref, ir_ref val)
+{
+	ctx->ir_base[ref].op1 = val;
+}
+
+void ir_set_op2(ir_ctx *ctx, ir_ref ref, ir_ref val)
+{
+	ctx->ir_base[ref].op2 = val;
+}
+
+void ir_set_op3(ir_ctx *ctx, ir_ref ref, ir_ref val)
+{
+	ctx->ir_base[ref].op3 = val;
+}
+
 static ir_ref _ir_fold_cse(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
 {
 	ir_ref ref = ctx->prev_insn_chain[opt & IR_OPT_OP_MASK];
@@ -716,6 +751,26 @@ ir_ref ir_fold(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
 	return ir_folding(ctx, opt, op1, op2, op3, ctx->ir_base + op1, ctx->ir_base + op2, ctx->ir_base + op3);
 }
 
+ir_ref ir_fold0(ir_ctx *ctx, uint32_t opt)
+{
+	return ir_fold(ctx, opt, IR_UNUSED, IR_UNUSED, IR_UNUSED);
+}
+
+ir_ref ir_fold1(ir_ctx *ctx, uint32_t opt, ir_ref op1)
+{
+	return ir_fold(ctx, opt, op1, IR_UNUSED, IR_UNUSED);
+}
+
+ir_ref ir_fold2(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2)
+{
+	return ir_fold(ctx, opt, op1, op2, IR_UNUSED);
+}
+
+ir_ref ir_fold3(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
+{
+	return ir_fold(ctx, opt, op1, op2, op3);
+}
+
 ir_ref ir_emit_N(ir_ctx *ctx, uint32_t opt, uint32_t count)
 {
 	int i;
@@ -767,6 +822,16 @@ void ir_set_op(ir_ctx *ctx, ir_ref ref, uint32_t n, ir_ref val)
 		IR_ASSERT(n <= count);
 	}
 	insn->ops[n] = val;
+}
+
+ir_ref ir_param(ir_ctx *ctx, ir_type type, ir_ref region, const char *name, int pos)
+{
+	return ir_emit(ctx, IR_OPT(IR_PARAM, type), region, ir_str(ctx, name), pos);
+}
+
+ir_ref ir_var(ir_ctx *ctx, ir_type type, ir_ref region, const char *name)
+{
+	return ir_emit(ctx, IR_OPT(IR_VAR, type), region, ir_str(ctx, name), IR_UNUSED);
 }
 
 void ir_bind(ir_ctx *ctx, ir_ref var, ir_ref def)
