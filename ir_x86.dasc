@@ -5406,7 +5406,14 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	int32_t used_stack = ir_emit_arguments(ctx, def, insn, ctx->regs[def][1]);
 	(void) used_stack;
 
-	IR_ASSERT(used_stack == 0);
+	if (used_stack != 0) {
+		ir_emit_call(ctx, def, insn);
+		if (ctx->flags & IR_FUNCTION) {
+			ir_emit_epilogue(ctx);
+		}
+		ir_emit_return_void(ctx);
+		return;
+	}
 
 	if (ctx->flags & IR_FUNCTION) {
 		ir_emit_epilogue(ctx);

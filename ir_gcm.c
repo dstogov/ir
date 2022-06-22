@@ -269,7 +269,7 @@ static int ir_copy(ir_ctx *new_ctx, ir_ctx *ctx, ir_ref *_next, bool preserve_co
 		insn = &ctx->ir_base[i];
 		flags = ir_op_flags[insn->op];
 		n = ir_operands_count(ctx, insn);
-		if ((insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) && n != 2) {
+		if ((insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN || insn->op == IR_CALL || insn->op == IR_TAILCALL) && n != 2) {
 			new_ref = ir_emit_N(new_ctx, insn->opt, n);
 		} else if (n <= 3) {
 			new_ref = ir_emit0(new_ctx, insn->opt);
