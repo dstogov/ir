@@ -610,12 +610,20 @@ void ir_free_live_intervals(ir_live_interval **live_intervals, int count)
 {
 	uint32_t i;
 	ir_live_interval *ival;
+	ir_use_pos *use_pos;
 
-	for (i = 1; i <= count; i++) {
+	count += IR_REG_NUM;
+	for (i = 0; i <= count; i++) {
 		ival = live_intervals[i];
 		if (ival) {
 			if (ival->range.next) {
 				ir_free_live_ranges(ival->range.next);
+			}
+			use_pos = ival->use_pos;
+			while (use_pos) {
+				ir_use_pos *p = use_pos;
+				use_pos = p->next;
+				ir_mem_free(p);
 			}
 			ir_mem_free(ival);
 		}

@@ -293,6 +293,8 @@ int main(int argc, char **argv)
 			mflags |= IR_AVX;
 		} else if (strcmp(argv[i], "-muse-fp") == 0) {
 			mflags |= IR_USE_FRAME_POINTER;
+		} else if (strcmp(argv[i], "-mfastcall") == 0) {
+			mflags |= IR_FASTCALL_FUNC;
 #ifdef IR_DEBUG
 		} else if (strcmp(argv[i], "--debug-sccp") == 0) {
 			mflags |= IR_DEBUG_SCCP;

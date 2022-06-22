@@ -424,6 +424,7 @@ typedef struct _ir_backend_data {
     ir_reg_alloc_data  ra_data;
 	int32_t            stack_frame_alignment;
 	int32_t            call_stack_size;
+	int32_t            param_stack_size;
 #ifndef IR_REG_FP_RET1
 	int32_t            float_ret_slot;
 	int32_t            double_ret_slot;
@@ -509,6 +510,11 @@ static const int8_t _ir_fp_reg_params[IR_REG_FP_ARGS] = {
 
 static const int8_t *_ir_int_reg_params = NULL;
 static const int8_t *_ir_fp_reg_params = NULL;
+static const int8_t _ir_int_fc_reg_params[IR_REG_INT_FCARGS] = {
+	IR_REG_INT_FCARG1,
+	IR_REG_INT_FCARG2,
+};
+static const int8_t *_ir_fp_fc_reg_params = NULL;
 
 #endif
 
@@ -529,6 +535,12 @@ const char *ir_reg_name(int8_t reg, ir_type type)
 	}
 	IR_ASSERT(0);
 	return NULL;
+}
+
+static bool ir_is_fastcall(ir_ctx *ctx, ir_insn *insn)
+{
+	// TODO: ???
+	return 0;
 }
 
 typedef enum _ir_rule {
@@ -650,6 +662,15 @@ static ir_reg ir_get_param_reg(ir_ctx *ctx, ir_ref ref)
 	const int8_t *int_reg_params = _ir_int_reg_params;
 	const int8_t *fp_reg_params = _ir_fp_reg_params;
 
+#if !defined(_WIN64) && !defined(__x86_64__)
+	if (sizeof(void*) == 4 && (ctx->flags & IR_FASTCALL_FUNC)) {
+		int_reg_params_count = IR_REG_INT_FCARGS;
+		fp_reg_params_count = IR_REG_FP_FCARGS;
+		int_reg_params = _ir_int_fc_reg_params;
+		fp_reg_params = _ir_fp_fc_reg_params;
+	}
+#endif
+
 	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < use_list->count; i++, p++) {
 		use = *p;
 		insn = &ctx->ir_base[use];
@@ -690,6 +711,15 @@ static ir_reg ir_get_arg_reg(ir_ctx *ctx, ir_insn *insn, int op_num)
 	int fp_reg_params_count = IR_REG_FP_ARGS;
 	const int8_t *int_reg_params = _ir_int_reg_params;
 	const int8_t *fp_reg_params = _ir_fp_reg_params;
+
+#if !defined(_WIN64) && !defined(__x86_64__)
+	if (sizeof(void*) == 4 && ir_is_fastcall(ctx, insn)) {
+		int_reg_params_count = IR_REG_INT_FCARGS;
+		fp_reg_params_count = IR_REG_FP_FCARGS;
+		int_reg_params = _ir_int_fc_reg_params;
+		fp_reg_params = _ir_fp_fc_reg_params;
+	}
+#endif
 
 	n = ir_input_edges_count(ctx, insn);
 	for (j = 3; j <= n; j++) {
@@ -778,6 +808,12 @@ static bool ir_call_needs_tmp_int_reg(ir_ctx *ctx, ir_ref ref)
 	ir_type type;
 	int int_param = 0;
 	int int_reg_params_count = IR_REG_INT_ARGS;
+
+#if !defined(_WIN64) && !defined(__x86_64__)
+	if (sizeof(void*) == 4 && ir_is_fastcall(ctx, insn)) {
+		int_reg_params_count = IR_REG_INT_FCARGS;
+	}
+#endif
 
 	n = ir_input_edges_count(ctx, insn);
 	for (j = 3; j <= n; j++) {
@@ -2049,6 +2085,9 @@ static void ir_emit_prologue(ir_ctx *ctx)
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
+	if (!(ctx->flags & IR_FUNCTION)) {
+		return;
+	}
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
 		|	push Ra(IR_REG_RBP)
 		|	mov Ra(IR_REG_RBP), Ra(IR_REG_RSP)
@@ -2085,6 +2124,9 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
+	if (!(ctx->flags & IR_FUNCTION)) {
+		return;
+	}
 	if (data->used_preserved_regs) {
 		int offset;
 		uint32_t i;
@@ -3728,9 +3770,15 @@ static void ir_emit_return_void(ir_ctx *ctx)
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
-	if (ctx->flags & IR_FUNCTION) {
-		ir_emit_epilogue(ctx);
+	ir_emit_epilogue(ctx);
+
+#if !defined(_WIN64) && !defined(__x86_64__)
+	if (sizeof(void*) == 4 && (ctx->flags & IR_FASTCALL_FUNC) && data->param_stack_size) {
+		|	ret data->param_stack_size
+		return;
 	}
+#endif
+
 	|	ret
 }
 
@@ -5073,6 +5121,13 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn, bool align)
 	int fp_reg_params_count = IR_REG_FP_ARGS;
 	int32_t used_stack = 0;
 
+#if !defined(_WIN64) && !defined(__x86_64__)
+	if (sizeof(void*) == 4 && ir_is_fastcall(ctx, insn)) {
+		int_reg_params_count = IR_REG_INT_FCARGS;
+		fp_reg_params_count = IR_REG_FP_FCARGS;
+	}
+#endif
+
 	n = ir_input_edges_count(ctx, insn);
 	for (j = 3; j <= n; j++) {
 		type = ctx->ir_base[insn->ops[j]].type;
@@ -5124,6 +5179,15 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 	if (n < 3) {
 		return 0;
 	}
+
+#if !defined(_WIN64) && !defined(__x86_64__)
+	if (sizeof(void*) == 4 && ir_is_fastcall(ctx, insn)) {
+		int_reg_params_count = IR_REG_INT_FCARGS;
+		fp_reg_params_count = IR_REG_FP_FCARGS;
+		int_reg_params = _ir_int_fc_reg_params;
+		fp_reg_params = _ir_fp_fc_reg_params;
+	}
+#endif
 
 	if (insn->op == IR_CALL && (ctx->flags & IR_PREALLOCATED_STACK)) {
 		// TODO: support for preallocated stack
@@ -5408,16 +5472,11 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	if (used_stack != 0) {
 		ir_emit_call(ctx, def, insn);
-		if (ctx->flags & IR_FUNCTION) {
-			ir_emit_epilogue(ctx);
-		}
 		ir_emit_return_void(ctx);
 		return;
 	}
 
-	if (ctx->flags & IR_FUNCTION) {
-		ir_emit_epilogue(ctx);
-	}
+	ir_emit_epilogue(ctx);
 
 	if (IR_IS_CONST_REF(insn->op2)) {
 		ir_insn *addr_insn = &ctx->ir_base[insn->op2];
@@ -6013,6 +6072,15 @@ static void ir_emit_load_params(ir_ctx *ctx)
 	const int8_t *fp_reg_params = _ir_fp_reg_params;
 	int32_t stack_offset = 0;
 
+#if !defined(_WIN64) && !defined(__x86_64__)
+	if (sizeof(void*) == 4 && (ctx->flags & IR_FASTCALL_FUNC)) {
+		int_reg_params_count = IR_REG_INT_FCARGS;
+		fp_reg_params_count = IR_REG_FP_FCARGS;
+		int_reg_params = _ir_int_fc_reg_params;
+		fp_reg_params = _ir_fp_fc_reg_params;
+	}
+#endif
+
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
 		stack_offset = sizeof(void*) * 2; /* skip old frame pointer and return address */
 	} else {
@@ -6122,14 +6190,24 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 	int fp_reg_params_count = IR_REG_FP_ARGS;
 	const int8_t *int_reg_params = _ir_int_reg_params;
 	const int8_t *fp_reg_params = _ir_fp_reg_params;
+	int32_t stack_start = 0;
 	int32_t stack_offset = 0;
+
+#if !defined(_WIN64) && !defined(__x86_64__)
+	if (sizeof(void*) == 4 && (ctx->flags & IR_FASTCALL_FUNC)) {
+		int_reg_params_count = IR_REG_INT_FCARGS;
+		fp_reg_params_count = IR_REG_FP_FCARGS;
+		int_reg_params = _ir_int_fc_reg_params;
+		fp_reg_params = _ir_fp_fc_reg_params;
+	}
+#endif
 
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
 		/* skip old frame pointer and return address */
-		stack_offset = sizeof(void*) * 2 + (data->ra_data.stack_frame_size - data->stack_frame_alignment);
+		stack_start = sizeof(void*) * 2 + (data->ra_data.stack_frame_size - data->stack_frame_alignment);
 	} else {
 		 /* skip return address */
-		stack_offset = sizeof(void*) + data->ra_data.stack_frame_size;
+		stack_start = sizeof(void*) + data->ra_data.stack_frame_size;
 	}
 	n = use_list->count;
 	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
@@ -6157,7 +6235,7 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 					if ((ival->flags & IR_LIVE_INTERVAL_MEM_PARAM)
 					 && ival->stack_spill_pos == -1
 					 && (ival->next || ival->reg == IR_REG_NONE)) {
-						ival->stack_spill_pos = stack_offset;
+						ival->stack_spill_pos = stack_start + stack_offset;
 						ctx->regs[use][0] = IR_REG_NONE;
 					}
 				}
@@ -6169,6 +6247,7 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 			}
 		}
 	}
+	data->param_stack_size = stack_offset;
 }
 
 #ifndef IR_REG_FP_RET1

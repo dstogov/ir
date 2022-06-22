@@ -386,10 +386,11 @@ void ir_strtab_free(ir_strtab *strtab);
 
 /* IR Context Flags */
 #define IR_FUNCTION           (1<<0)
-#define IR_USE_FRAME_POINTER  (1<<1)
-#define IR_PREALLOCATED_STACK (1<<2)
-#define IR_HAS_ALLOCA         (1<<3)
-#define IR_HAS_CALLS          (1<<4)
+#define IR_FASTCALL_FUNC      (1<<1)
+#define IR_USE_FRAME_POINTER  (1<<2)
+#define IR_PREALLOCATED_STACK (1<<3)
+#define IR_HAS_ALLOCA         (1<<4)
+#define IR_HAS_CALLS          (1<<5)
 
 #define IR_IRREDUCIBLE_CFG    (1<<8)
 
