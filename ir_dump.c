@@ -362,7 +362,7 @@ void ir_dump_live_ranges(ir_ctx *ctx, FILE *f)
 		if (ival) {
 			ir_live_range *p = &ival->range;
 			fprintf(f, "[%%%s] : [%d.%d-%d.%d)",
-				ir_reg_name(ival->reg, IR_ADDR),
+				ir_reg_name(ival->reg, ival->type),
 				IR_LIVE_POS_TO_REF(p->start), IR_LIVE_POS_TO_SUB_REF(p->start),
 				IR_LIVE_POS_TO_REF(p->end), IR_LIVE_POS_TO_SUB_REF(p->end));
 			p = p->next;

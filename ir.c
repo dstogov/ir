@@ -136,6 +136,7 @@ void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 #define ir_op_flag_r       IR_OP_FLAG_DATA                                      // "d" and "r" are the same now
 #define ir_op_flag_r0      ir_op_flag_r
 #define ir_op_flag_r0X1    (ir_op_flag_r | 0 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_r0X3    (ir_op_flag_r | 0 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_r1      (ir_op_flag_r | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_r1X1    (ir_op_flag_r | 1 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_r1X2    (ir_op_flag_r | 1 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))

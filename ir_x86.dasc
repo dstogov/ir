@@ -515,6 +515,9 @@ static const int8_t *_ir_fp_reg_params = NULL;
 const char *ir_reg_name(int8_t reg, ir_type type)
 {
 	IR_ASSERT(reg >= 0 && reg < IR_REG_NUM);
+	if (type == IR_VOID) {
+		type = (reg < IR_REG_FP_FIRST) ? IR_ADDR : IR_DOUBLE;
+	}
 	if (IR_IS_TYPE_FP(type) || ir_type_size[type] == 8) {
 		return _ir_reg_name[reg];
 	} else if (ir_type_size[type] == 4) {
@@ -1193,12 +1196,21 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 				 && insn->op1 < ref
 				 && !ctx->rules[insn->op1]
 				 && ctx->ir_base[insn->op1].op == IR_LOAD) {
-					ir_insn *addr_insn = &ctx->ir_base[ctx->ir_base[insn->op1].op2];
+					ir_ref addr_ref = ctx->ir_base[insn->op1].op2;
+					ir_insn *addr_insn = &ctx->ir_base[addr_ref];
 
 					if (addr_insn->op == IR_RLOAD ||
 						(addr_insn->op == IR_C_ADDR &&
 							(sizeof(void*) == 4 || IR_IS_SIGNED_32BIT(addr_insn->val.i64)))) {
 						ctx->rules[insn->op1] = IR_SKIP_MEM;
+					} else {
+						if (!ctx->rules[addr_ref]) {
+							ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
+						}
+						if (ctx->rules[addr_ref] == IR_LEA_OB || ctx->rules[addr_ref] == IR_SKIP_MEM) {
+							ctx->rules[insn->op1] = IR_SKIP_MEM;
+							ctx->rules[addr_ref] = IR_SKIP_MEM;
+						}
 					}
 				}
 				return IR_CMP_INT;
@@ -1719,12 +1731,21 @@ store_int:
 						 && insn->op1 < ref
 						 && !ctx->rules[insn->op1]
 						 && ctx->ir_base[insn->op1].op == IR_LOAD) {
-							ir_insn *addr_insn = &ctx->ir_base[ctx->ir_base[insn->op1].op2];
+							ir_ref addr_ref = ctx->ir_base[insn->op1].op2;
+							ir_insn *addr_insn = &ctx->ir_base[addr_ref];
 
 							if (addr_insn->op == IR_RLOAD ||
 								(addr_insn->op == IR_C_ADDR &&
 									(sizeof(void*) == 4 || IR_IS_SIGNED_32BIT(addr_insn->val.i64)))) {
 								ctx->rules[insn->op1] = IR_SKIP_MEM;
+							} else {
+								if (!ctx->rules[addr_ref]) {
+									ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
+								}
+								if (ctx->rules[addr_ref] == IR_LEA_OB || ctx->rules[addr_ref] == IR_SKIP_MEM) {
+									ctx->rules[insn->op1] = IR_SKIP_MEM;
+									ctx->rules[addr_ref] = IR_SKIP_MEM;
+								}
 							}
 						}
 						return IR_CMP_AND_BRANCH_INT;
@@ -1752,12 +1773,21 @@ store_int:
 						 && insn->op1 < ref
 						 && !ctx->rules[insn->op1]
 						 && ctx->ir_base[insn->op1].op == IR_LOAD) {
-							ir_insn *addr_insn = &ctx->ir_base[ctx->ir_base[insn->op1].op2];
+							ir_ref addr_ref = ctx->ir_base[insn->op1].op2;
+							ir_insn *addr_insn = &ctx->ir_base[addr_ref];
 
 							if (addr_insn->op == IR_RLOAD ||
 								(addr_insn->op == IR_C_ADDR &&
 									(sizeof(void*) == 4 || IR_IS_SIGNED_32BIT(addr_insn->val.i64)))) {
 								ctx->rules[insn->op1] = IR_SKIP_MEM;
+							} else {
+								if (!ctx->rules[addr_ref]) {
+									ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
+								}
+								if (ctx->rules[addr_ref] == IR_LEA_OB || ctx->rules[addr_ref] == IR_SKIP_MEM) {
+									ctx->rules[insn->op1] = IR_SKIP_MEM;
+									ctx->rules[addr_ref] = IR_SKIP_MEM;
+								}
 							}
 						}
 						return IR_GUARD_CMP_INT;
@@ -1775,12 +1805,21 @@ store_int:
 			 && insn->op2 < ref
 			 && !ctx->rules[insn->op2]
 			 && ctx->ir_base[insn->op2].op == IR_LOAD) {
-				ir_insn *addr_insn = &ctx->ir_base[ctx->ir_base[insn->op2].op2];
+				ir_ref addr_ref = ctx->ir_base[insn->op2].op2;
+				ir_insn *addr_insn = &ctx->ir_base[addr_ref];
 
 				if (addr_insn->op == IR_RLOAD ||
 					(addr_insn->op == IR_C_ADDR &&
 						(sizeof(void*) == 4 || IR_IS_SIGNED_32BIT(addr_insn->val.i64)))) {
 					ctx->rules[insn->op2] = IR_SKIP_MEM;
+				} else {
+					if (!ctx->rules[addr_ref]) {
+						ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
+					}
+					if (ctx->rules[addr_ref] == IR_LEA_OB || ctx->rules[addr_ref] == IR_SKIP_MEM) {
+						ctx->rules[insn->op2] = IR_SKIP_MEM;
+						ctx->rules[addr_ref] = IR_SKIP_MEM;
+					}
 				}
 			}
 			return insn->op;
@@ -3252,6 +3291,10 @@ static void ir_emit_cmp_int_common(ir_ctx *ctx, ir_type type, ir_insn *insn, ir_
 				op1_reg = ctx->regs[insn->op1][2];
 				IR_ASSERT(op1_reg != IR_REG_NONE);
 				|	ASM_MEM_REG_OP cmp, type, [Ra(op1_reg)], op2_reg
+			} else if (addr_insn->op == IR_ADD) {
+				op1_reg = ctx->regs[load_insn->op2][1];
+				IR_ASSERT(op1_reg != IR_REG_NONE && IR_IS_CONST_REF(addr_insn->op2));
+				|	ASM_MEM_REG_OP cmp, type, [Ra(op1_reg)+ctx->ir_base[addr_insn->op2].val.i32], op2_reg
 			} else {
 				IR_ASSERT(0);
 			}
@@ -3266,6 +3309,10 @@ static void ir_emit_cmp_int_common(ir_ctx *ctx, ir_type type, ir_insn *insn, ir_
 				op1_reg = ctx->regs[insn->op1][2];
 				IR_ASSERT(op1_reg != IR_REG_NONE);
 				|	ASM_MEM_IMM_OP cmp, type, [Ra(op1_reg)], ctx->ir_base[op2].val.i32
+			} else if (addr_insn->op == IR_ADD) {
+				op1_reg = ctx->regs[load_insn->op2][1];
+				IR_ASSERT(op1_reg != IR_REG_NONE && IR_IS_CONST_REF(addr_insn->op2));
+				|	ASM_MEM_IMM_OP cmp, type, [Ra(op1_reg)+ctx->ir_base[addr_insn->op2].val.i32], ctx->ir_base[op2].val.i32
 			} else {
 				IR_ASSERT(0);
 			}
@@ -5783,6 +5830,36 @@ static void ir_emit_lea(ir_ctx *ctx, ir_ref def, ir_type type, ir_reg base_reg, 
 	}
 }
 
+static void ir_emit_tls(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_reg reg = IR_REG_NUM(ctx->regs[def][0]);
+
+|.if X64
+|	fs
+||	if (insn->op1) {
+|		mov Ra(reg), aword [insn->op1]
+||	} else {
+|		mov Ra(reg), [0x8]
+|		mov Ra(reg), aword [Ra(reg)+insn->op2]
+|		mov Ra(reg), aword [Ra(reg)+insn->op3]
+||	}
+|.else
+|	gs
+||	if (insn->op1) {
+|		mov Ra(reg), aword [insn->op1]
+||	} else {
+|		mov Ra(reg), [0x4]
+|		mov Ra(reg), aword [Ra(reg)+insn->op2]
+|		mov Ra(reg), aword [Ra(reg)+insn->op3]
+||	}
+|	.endif
+	if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
+		ir_emit_store(ctx, IR_ADDR, def, reg);
+	}
+}
+
 static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 {
 	ir_backend_data *data = ctx->data;
@@ -6987,6 +7064,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_GUARD_TRUE:
 				case IR_GUARD_FALSE:
 					ir_emit_guard(ctx, i, insn);
+					break;
+				case IR_TLS:
+					ir_emit_tls(ctx, i, insn);
 					break;
 				default:
 					IR_ASSERT(0 && "NIY rule/insruction");

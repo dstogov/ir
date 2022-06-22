@@ -220,6 +220,7 @@ typedef enum _ir_type {
 	_(VAR,	        r1X1, reg, str, ___) /* local variable              */ \
 	_(FUNC,         r0,   ___, ___, ___) /* constant func ref           */ \
 	_(STR,          r0,   ___, ___, ___) /* constant str ref            */ \
+	_(TLS,          r0X3, num, num, num) /* thread local variable       */ \
 	\
 	/* call ops                                                         */ \
 	_(CALL,         xN,   src, def, def) /* CALL(src, func, args...)    */ \
