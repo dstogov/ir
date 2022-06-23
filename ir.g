@@ -134,6 +134,7 @@ ir_insn(ir_parser_ctx *p):
 	{ir_ref ref;}
 	{ir_val val;}
 	{ir_val count;}
+	{ir_val flags;}
 	{uint32_t n;}
 	(
 		type(&t)
@@ -148,8 +149,23 @@ ir_insn(ir_parser_ctx *p):
 	"="
 	(	const(t, &val)
 		{ref = ir_const(p->ctx, val, t);}
-	|	"func" "(" ID(&func, &func_len) ")"
-		{ref = ir_const_func(p->ctx, ir_strl(p->ctx, func, func_len));}
+	|	"func" "(" ID(&func, &func_len)
+		{flags.u64 = 0;}
+		(	","
+			DECNUMBER(IR_U16, &flags)
+		)?
+		")"
+		{ref = ir_const_func(p->ctx, ir_strl(p->ctx, func, func_len), flags.u16);}
+	|	"func_addr" "("
+		(	DECNUMBER(IR_ADDR, &val)
+		|	HEXNUMBER(IR_ADDR, &val)
+		)
+		{flags.u64 = 0;}
+		(	","
+			DECNUMBER(IR_U16, &flags)
+		)?
+		")"
+		{ref = ir_const_func_addr(p->ctx, val.addr, flags.u16);}
 	|   STRING(&func, &func_len)
 		{ref = ir_const_str(p->ctx, ir_strl(p->ctx, func, func_len));}
 	|	func(&op)

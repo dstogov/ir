@@ -218,6 +218,7 @@ typedef enum _ir_type {
 	/* data ops                                                         */ \
 	_(PARAM,        r1X2, reg, str, num) /* incoming parameter proj.    */ \
 	_(VAR,	        r1X1, reg, str, ___) /* local variable              */ \
+	_(FUNC_ADDR,    r0,   ___, ___, ___) /* constant func ref           */ \
 	_(FUNC,         r0,   ___, ___, ___) /* constant func ref           */ \
 	_(STR,          r0,   ___, ___, ___) /* constant str ref            */ \
 	_(TLS,          r0X3, num, num, num) /* thread local variable       */ \
@@ -327,6 +328,7 @@ typedef union _ir_val {
 
 /* IR constant flags */
 #define IR_CONST_EMIT          (1<<0)
+#define IR_CONST_FASTCALL_FUNC (1<<1)
 
 /* IR Instruction */
 typedef struct _ir_insn {
@@ -472,8 +474,9 @@ ir_ref ir_const_char(ir_ctx *ctx, char c);
 ir_ref ir_const_float(ir_ctx *ctx, float c);
 ir_ref ir_const_double(ir_ctx *ctx, double c);
 ir_ref ir_const_addr(ir_ctx *ctx, uintptr_t c);
+ir_ref ir_const_func_addr(ir_ctx *ctx, uintptr_t c, uint16_t flags);
 
-ir_ref ir_const_func(ir_ctx *ctx, ir_ref str);
+ir_ref ir_const_func(ir_ctx *ctx, ir_ref str, uint16_t flags);
 ir_ref ir_const_str(ir_ctx *ctx, ir_ref str);
 
 void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f);

@@ -475,12 +475,35 @@ ir_ref ir_const_addr(ir_ctx *ctx, uintptr_t c)
 	return ir_const(ctx, val, IR_ADDR);
 }
 
-ir_ref ir_const_func(ir_ctx *ctx, ir_ref str)
+ir_ref ir_const_func_addr(ir_ctx *ctx, uintptr_t c, uint16_t flags)
+{
+	ir_ref top = -ctx->consts_count;
+	ir_ref ref;
+	ir_insn *insn;
+
+	if (c == 0) {
+		return IR_NULL;
+	}
+	ir_val val;
+	val.u64 = c;
+	ref = ir_const(ctx, val, IR_ADDR);
+	insn = &ctx->ir_base[ref];
+	if (ref == top) {
+		insn->optx = IR_OPT(IR_FUNC_ADDR, IR_ADDR);
+		insn->const_flags = flags;
+	} else {
+		IR_ASSERT(insn->opt == IR_OPT(IR_FUNC_ADDR, IR_ADDR) && insn->const_flags == flags);
+	}
+	return ref;
+}
+
+ir_ref ir_const_func(ir_ctx *ctx, ir_ref str, uint16_t flags)
 {
 	ir_ref ref = ir_next_const(ctx);
 	ir_insn *insn = &ctx->ir_base[ref];
 
 	insn->optx = IR_OPT(IR_FUNC, IR_ADDR);
+	insn->const_flags = flags;
 	insn->val.addr = str;
 
 	return ref;

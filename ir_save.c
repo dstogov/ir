@@ -12,7 +12,18 @@ void ir_save(ir_ctx *ctx, FILE *f)
 	for (i = IR_UNUSED + 1, insn = ctx->ir_base - i; i < ctx->consts_count; i++, insn--) {
 		fprintf(f, "\t%s c_%d = ", ir_type_cname[insn->type], i);
 		if (insn->op == IR_FUNC) {
-			fprintf(f, "func(%s)", ir_get_str(ctx, insn->val.addr));
+			if (!insn->const_flags) {
+				fprintf(f, "func(%s)", ir_get_str(ctx, insn->val.addr));
+			} else {
+				fprintf(f, "func(%s, %d)", ir_get_str(ctx, insn->val.addr), insn->const_flags);
+			}
+		} else if (insn->op == IR_FUNC_ADDR) {
+			fprintf(f, "func_addr(");
+			ir_print_const(ctx, insn, f);
+			if (insn->const_flags) {
+				fprintf(f, ", %d", insn->const_flags);
+			}
+			fprintf(f, ")");
 		} else {
 			ir_print_const(ctx, insn, f);
 		}

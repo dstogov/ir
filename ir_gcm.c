@@ -246,7 +246,10 @@ static int ir_copy(ir_ctx *new_ctx, ir_ctx *ctx, ir_ref *_next, bool preserve_co
 
 		IR_BITSET_FOREACH(used, ir_bitset_len(ctx->consts_count + 1), ref) {
 			if (ctx->ir_base[-ref].op == IR_FUNC) {
-				_xlat[-ref] = ir_const_func(new_ctx, ir_str(new_ctx, ir_get_str(ctx, ctx->ir_base[-ref].val.addr)));
+				_xlat[-ref] = ir_const_func(new_ctx, ir_str(new_ctx, ir_get_str(ctx, ctx->ir_base[-ref].val.addr)),
+					ctx->ir_base[-ref].const_flags);
+			} else if (ctx->ir_base[-ref].op == IR_FUNC_ADDR) {
+				_xlat[-ref] = ir_const_func_addr(new_ctx, ctx->ir_base[-ref].val.addr, ctx->ir_base[-ref].const_flags);
 			} else if (ctx->ir_base[-ref].op == IR_STR) {
 				_xlat[-ref] = ir_const_str(new_ctx, ir_str(new_ctx, ir_get_str(ctx, ctx->ir_base[-ref].val.addr)));
 			} else {
@@ -283,7 +286,10 @@ static int ir_copy(ir_ctx *new_ctx, ir_ctx *ctx, ir_ref *_next, bool preserve_co
 				case IR_OPND_VAR:
 					if (IR_IS_CONST_REF(ref) && !preserve_constants_order) {
 						if (ctx->ir_base[-ref].op == IR_FUNC) {
-							ref = ir_const_func(new_ctx, ir_str(new_ctx, ir_get_str(ctx, ctx->ir_base[ref].val.addr)));
+							ref = ir_const_func(new_ctx, ir_str(new_ctx, ir_get_str(ctx, ctx->ir_base[ref].val.addr)),
+								ctx->ir_base[-ref].const_flags);
+						} else if (ctx->ir_base[-ref].op == IR_FUNC_ADDR) {
+							ref = ir_const_func_addr(new_ctx, ctx->ir_base[ref].val.addr, ctx->ir_base[-ref].const_flags);
 						} else if (ctx->ir_base[-ref].op == IR_STR) {
 							ref = ir_const_str(new_ctx, ir_str(new_ctx, ir_get_str(ctx, ctx->ir_base[ref].val.addr)));
 						} else {

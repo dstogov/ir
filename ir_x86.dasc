@@ -537,11 +537,15 @@ const char *ir_reg_name(int8_t reg, ir_type type)
 	return NULL;
 }
 
+#if !defined(_WIN64) && !defined(__x86_64__)
 static bool ir_is_fastcall(ir_ctx *ctx, ir_insn *insn)
 {
-	// TODO: ???
+	if (IR_IS_CONST_REF(insn->op2) && (ctx->ir_base[insn->op2].const_flags & IR_CONST_FASTCALL_FUNC)) {
+		return 1;
+	}
 	return 0;
 }
+#endif
 
 typedef enum _ir_rule {
 	IR_SKIP = IR_LAST_OP,
