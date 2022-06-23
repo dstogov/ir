@@ -1155,7 +1155,7 @@ static void ir_emit_load_imm_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref sr
 		|	fmov Rd(reg-IR_REG_FP_FIRST), xzr
 	} else {
 		label = ctx->cfg_blocks_count - src;
-		insn->emit_const = 1;
+		insn->const_flags |= IR_CONST_EMIT;
 		if (type == IR_DOUBLE) {
 			|	ldr Rd(reg-IR_REG_FP_FIRST), =>label
 		} else {
@@ -3424,7 +3424,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 					if (val_insn->op == IR_STR) {
 						int label = ctx->cfg_blocks_count - arg;
 
-						val_insn->emit_const = 1;
+						val_insn->const_flags |= IR_CONST_EMIT;
 						IR_ASSERT(tmp_reg != IR_REG_NONE);
 						|	adr Rx(tmp_reg), =>label
 						|	str Rx(tmp_reg), [sp, #stack_offset]
@@ -3505,7 +3505,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 							if (val_insn->op == IR_STR) {
 								int label = ctx->cfg_blocks_count - arg;
 
-								val_insn->emit_const = 1;
+								val_insn->const_flags |= IR_CONST_EMIT;
 								|	adr Rx(dst_reg), =>label
 								continue;
 							}
@@ -4485,7 +4485,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		|.rodata
 	}
 	for (i = IR_UNUSED + 1, insn = ctx->ir_base - i; i < ctx->consts_count; i++, insn--) {
-		if (insn->emit_const) {
+		if (insn->const_flags & IR_CONST_EMIT) {
 			if (IR_IS_TYPE_FP(insn->type)) {
 				int label = ctx->cfg_blocks_count + i;
 

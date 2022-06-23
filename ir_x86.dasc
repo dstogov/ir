@@ -334,7 +334,7 @@
 ||	if (IR_IS_CONST_REF(src)) {
 ||		ir_insn *_insn = &ctx->ir_base[src];
 ||		int label = ctx->cfg_blocks_count - src;
-||		_insn->emit_const = 1;
+||		_insn->const_flags |= IR_CONST_EMIT;
 |		ASM_SSE2_REG_MEM_OP fop, dop, type, dst, [=>label]
 ||	} else {
 ||		int32_t offset = ir_ref_spill_slot(ctx, src);
@@ -365,7 +365,7 @@
 ||	if (IR_IS_CONST_REF(op2)) {
 ||		ir_insn *_insn = &ctx->ir_base[op2];
 ||		int label = ctx->cfg_blocks_count - op2;
-||		_insn->emit_const = 1;
+||		_insn->const_flags |= IR_CONST_EMIT;
 |		ASM_AVX_REG_REG_MEM_OP fop, dop, type, dst, op1, [=>label]
 ||	} else {
 ||		int32_t offset = ir_ref_spill_slot(ctx, op2);
@@ -411,7 +411,7 @@
 ||	if (IR_IS_CONST_REF(src)) {
 ||		ir_insn *_insn = &ctx->ir_base[src];
 ||		int label = ctx->cfg_blocks_count - src;
-||		_insn->emit_const = 1;
+||		_insn->const_flags |= IR_CONST_EMIT;
 |		ASM_FP_REG_MEM_OP fop, dop, avx_fop, avx_dop, type, dst, [=>label]
 ||	} else {
 ||		int32_t offset = ir_ref_spill_slot(ctx, src);
@@ -1969,7 +1969,7 @@ static void ir_emit_load_imm_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref sr
 		}
 	} else {
 		label = ctx->cfg_blocks_count - src;
-		insn->emit_const = 1;
+		insn->const_flags |= IR_CONST_EMIT;
 		|	ASM_FP_REG_MEM_OP movss, movsd, vmovss, vmovsd, type, reg, [=>label]
 	}
 }
@@ -4319,7 +4319,7 @@ static void ir_emit_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_insn *_insn = &ctx->ir_base[insn->op1];
 		int label = ctx->cfg_blocks_count - insn->op1;
 
-		_insn->emit_const = 1;
+		_insn->const_flags |= IR_CONST_EMIT;
 		if (!dst64) {
 			if (src_type == IR_DOUBLE) {
 				if (ctx->flags & IR_AVX) {
@@ -4437,7 +4437,7 @@ static void ir_emit_fp2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_insn *_insn = &ctx->ir_base[insn->op1];
 		int label = ctx->cfg_blocks_count - insn->op1;
 
-		_insn->emit_const = 1;
+		_insn->const_flags |= IR_CONST_EMIT;
 		if (src_type == IR_DOUBLE) {
 			if (ctx->flags & IR_AVX) {
 				|	vcvtsd2ss xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), qword [=>label]
@@ -5252,7 +5252,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 					if (val_insn->op == IR_STR) {
 						int label = ctx->cfg_blocks_count - arg;
 
-						val_insn->emit_const = 1;
+						val_insn->const_flags |= IR_CONST_EMIT;
 						IR_ASSERT(tmp_reg != IR_REG_NONE);
 						|	lea Ra(tmp_reg), aword [=>label]
 						|	mov [Ra(IR_REG_RSP)+stack_offset], Ra(tmp_reg)
@@ -5360,7 +5360,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 							if (val_insn->op == IR_STR) {
 								int label = ctx->cfg_blocks_count - arg;
 
-								val_insn->emit_const = 1;
+								val_insn->const_flags |= IR_CONST_EMIT;
 								|	lea Ra(dst_reg), aword [=>label]
 								continue;
 							}
@@ -7170,7 +7170,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		|.rodata
 	}
 	for (i = IR_UNUSED + 1, insn = ctx->ir_base - i; i < ctx->consts_count; i++, insn--) {
-		if (insn->emit_const) {
+		if (insn->const_flags & IR_CONST_EMIT) {
 			if (IR_IS_TYPE_FP(insn->type)) {
 				int label = ctx->cfg_blocks_count + i;
 

@@ -325,6 +325,9 @@ typedef union _ir_val {
 	);
 } ir_val;
 
+/* IR constant flags */
+#define IR_CONST_EMIT          (1<<0)
+
 /* IR Instruction */
 typedef struct _ir_insn {
 	IR_STRUCT_LOHI(
@@ -340,7 +343,7 @@ typedef struct _ir_insn {
 				union {
 					uint16_t           inputs_count;       /* number of input control edges for MERGE, CALL, TAILCALL */
 					uint16_t           prev_insn_offset;   /* 16-bit backward offset from current instruction for CSE */
-					uint16_t           emit_const;         /* flag to emit constant in rodat section */
+					uint16_t           const_flags;        /* flag to emit constant in rodat section */
 				}
 			);
 			uint32_t                   optx;
