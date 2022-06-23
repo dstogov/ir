@@ -367,6 +367,7 @@ static void ir_sccp_remove_unreachable_merge_inputs(ir_ctx *ctx, ir_insn *_value
 				}
 			}
 		}
+		ir_mem_free(life_inputs);
 	}
 }
 
