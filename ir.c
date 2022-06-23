@@ -59,7 +59,7 @@ void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 		fprintf(f, "\"%s\"", ir_get_str(ctx, insn->val.addr));
 		return;
 	}
-	IR_ASSERT(IR_IS_CONST_OP(insn->op));
+	IR_ASSERT(IR_IS_CONST_OP(insn->op) || insn->op == IR_FUNC_ADDR);
 	switch (insn->type) {
 		case IR_BOOL:
 			fprintf(f, "%u", insn->val.b);
