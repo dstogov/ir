@@ -2089,7 +2089,7 @@ static void ir_emit_prologue(ir_ctx *ctx)
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
-	if (!(ctx->flags & IR_FUNCTION)) {
+	if (ctx->flags & IR_STUB) {
 		return;
 	}
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
@@ -2128,9 +2128,6 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
-	if (!(ctx->flags & IR_FUNCTION)) {
-		return;
-	}
 	if (data->used_preserved_regs) {
 		int offset;
 		uint32_t i;
@@ -6493,9 +6490,24 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 		}
 	}
 
+	if (ctx->fixed_save_regset) {
+		ir_reg reg;
+		(void) reg;
+
+		data->used_preserved_regs = (ir_regset)ctx->fixed_save_regset;
+		IR_REGSET_FOREACH(data->used_preserved_regs, reg) {
+			data->ra_data.stack_frame_size += sizeof(void*);
+		} IR_REGSET_FOREACH_END();
+	}
+
 	if (ctx->flags & IR_HAS_CALLS) {
 		/* Stack must be 16 byte aligned */
-		if (ctx->flags & IR_USE_FRAME_POINTER) {
+		if (!(ctx->flags & IR_FUNCTION)) {
+			while (IR_ALIGNED_SIZE(data->ra_data.stack_frame_size, 16) != data->ra_data.stack_frame_size) {
+				data->ra_data.stack_frame_size += sizeof(void*);
+				data->stack_frame_alignment += sizeof(void*);
+			}
+		} else if (ctx->flags & IR_USE_FRAME_POINTER) {
 			while (IR_ALIGNED_SIZE(data->ra_data.stack_frame_size + sizeof(void*) * 2, 16) != data->ra_data.stack_frame_size + sizeof(void*) * 2) {
 				data->ra_data.stack_frame_size += sizeof(void*);
 				data->stack_frame_alignment += sizeof(void*);
@@ -6571,6 +6583,17 @@ static void ir_calc_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
 	int i;
 	ir_live_interval **p, *ival;
 	uint32_t additional_size = 0;
+	ir_regset fixed_regset = (ir_regset)ctx->fixed_regset;
+
+	if (ctx->fixed_save_regset) {
+		ir_reg reg;
+		(void) reg;
+
+		data->used_preserved_regs = (ir_regset)ctx->fixed_save_regset;
+		IR_REGSET_FOREACH(data->used_preserved_regs, reg) {
+			additional_size += sizeof(void*);
+		} IR_REGSET_FOREACH_END();
+	}
 
 	for (i = 1, p = ctx->live_intervals + i; i <= ctx->vregs_count; i++, p++) {
 		ival = *p;
@@ -6582,6 +6605,7 @@ static void ir_calc_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
 			}
 			if (ival->reg != IR_REG_NONE) {
 				if (!IR_REGSET_IN(data->used_preserved_regs, ival->reg)
+				 && !IR_REGSET_IN(fixed_regset, ival->reg)
 				 && IR_REGSET_IN(IR_REGSET_PRESERVED, ival->reg)) {
 					IR_REGSET_INCL(data->used_preserved_regs, ival->reg);
 					additional_size += sizeof(void*);
@@ -6594,6 +6618,7 @@ static void ir_calc_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
 	while (ival) {
 		if (ival->reg != IR_REG_NONE) {
 			if (!IR_REGSET_IN(data->used_preserved_regs, ival->reg)
+			 && !IR_REGSET_IN(fixed_regset, ival->reg)
 			 && IR_REGSET_IN(IR_REGSET_PRESERVED, ival->reg)) {
 				IR_REGSET_INCL(data->used_preserved_regs, ival->reg);
 				additional_size += sizeof(void*);
@@ -6620,13 +6645,20 @@ static void ir_calc_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
 
 	if (ctx->flags & IR_HAS_CALLS) {
 		/* Stack must be 16 byte aligned */
-		if (ctx->flags & IR_USE_FRAME_POINTER) {
+		if (!(ctx->flags & IR_FUNCTION)) {
+			while (IR_ALIGNED_SIZE(data->ra_data.stack_frame_size, 16) != data->ra_data.stack_frame_size) {
+				data->ra_data.stack_frame_size += sizeof(void*);
+				data->stack_frame_alignment += sizeof(void*);
+			}
+		} else if (ctx->flags & IR_USE_FRAME_POINTER) {
 			while (IR_ALIGNED_SIZE(data->ra_data.stack_frame_size + sizeof(void*) * 2, 16) != data->ra_data.stack_frame_size + sizeof(void*) * 2) {
 				data->ra_data.stack_frame_size += sizeof(void*);
 				data->stack_frame_alignment += sizeof(void*);
 			}
 		} else {
-			ir_preallocate_call_stack(ctx, data);
+			if (!(ctx->flags & IR_NO_STACK_COMBINE)) {
+				ir_preallocate_call_stack(ctx, data);
+			}
 			while (IR_ALIGNED_SIZE(data->ra_data.stack_frame_size + data->call_stack_size + sizeof(void*), 16) !=
 					data->ra_data.stack_frame_size + data->call_stack_size + sizeof(void*)) {
 				data->ra_data.stack_frame_size += sizeof(void*);
@@ -6697,8 +6729,8 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	/* labels for each block + for each constant + rodata label + jmp_table label + for each entry */
 	dasm_growpc(&data.dasm_state, ctx->cfg_blocks_count + 1 + ctx->consts_count + 1 + 1 + 1 + entries_count);
 
+	ir_emit_prologue(ctx);
 	if (ctx->flags & IR_FUNCTION) {
-		ir_emit_prologue(ctx);
 		ir_emit_load_params(ctx);
 	}
 
@@ -6725,6 +6757,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					{
 						uint32_t label = ctx->cfg_blocks_count + ctx->consts_count + 3 + insn->op3;
 						|=>label:
+						ir_emit_prologue(ctx);
 					}
 					break;
 				case IR_LEA_OB:

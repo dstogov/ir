@@ -289,6 +289,7 @@ void ir_init(ir_ctx *ctx, ir_ref consts_limit, ir_ref insns_limit)
 	ctx->vregs_count = 0;
 	ctx->vregs = NULL;
 	ctx->fixed_regset = 0;
+	ctx->fixed_save_regset = 0;
 	ctx->live_intervals = NULL;
 	ctx->regs = NULL;
 	ctx->prev_insn_len = NULL;

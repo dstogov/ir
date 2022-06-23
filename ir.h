@@ -397,6 +397,7 @@ void ir_strtab_free(ir_strtab *strtab);
 #define IR_PREALLOCATED_STACK (1<<4)
 #define IR_HAS_ALLOCA         (1<<5)
 #define IR_HAS_CALLS          (1<<6)
+#define IR_NO_STACK_COMBINE   (1<<7)
 
 #define IR_IRREDUCIBLE_CFG    (1<<8)
 
@@ -443,6 +444,7 @@ typedef struct _ir_ctx {
 	uint32_t           vregs_count;
 	uint32_t          *vregs;
 	uint64_t           fixed_regset;
+	uint64_t           fixed_save_regset;
 	ir_live_interval **live_intervals;
 	ir_regs           *regs;
 	uint32_t          *prev_insn_len;

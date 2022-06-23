@@ -481,6 +481,7 @@ restart:
 	ir_init(&new_ctx, ctx->consts_count, ctx->insns_count);
 	new_ctx.flags = ctx->flags;
 	new_ctx.fixed_regset = ctx->fixed_regset;
+	new_ctx.fixed_save_regset = ctx->fixed_save_regset;
 	/* TODO: linearize without reallocation and reconstruction ??? */
 	if (!ir_copy(&new_ctx, ctx, _next, 1)) {
 		ir_free(&new_ctx);
