@@ -5905,8 +5905,8 @@ static void ir_emit_tls(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 |.if X64
 |	fs
-||	if (insn->op1) {
-|		mov Ra(reg), aword [insn->op1]
+||	if (!insn->op3) {
+|		mov Ra(reg), aword [insn->op2]
 ||	} else {
 |		mov Ra(reg), [0x8]
 |		mov Ra(reg), aword [Ra(reg)+insn->op2]
@@ -5914,8 +5914,8 @@ static void ir_emit_tls(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 ||	}
 |.else
 |	gs
-||	if (insn->op1) {
-|		mov Ra(reg), aword [insn->op1]
+||	if (!insn->op3) {
+|		mov Ra(reg), aword [insn->op2]
 ||	} else {
 |		mov Ra(reg), [0x4]
 |		mov Ra(reg), aword [Ra(reg)+insn->op2]

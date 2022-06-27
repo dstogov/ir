@@ -221,7 +221,6 @@ typedef enum _ir_type {
 	_(FUNC_ADDR,    r0,   ___, ___, ___) /* constant func ref           */ \
 	_(FUNC,         r0,   ___, ___, ___) /* constant func ref           */ \
 	_(STR,          r0,   ___, ___, ___) /* constant str ref            */ \
-	_(TLS,          r0X3, num, num, num) /* thread local variable       */ \
 	\
 	/* call ops                                                         */ \
 	_(CALL,         xN,   src, def, def) /* CALL(src, func, args...)    */ \
@@ -236,6 +235,7 @@ typedef enum _ir_type {
 	_(RSTORE,       l2X1, src, def, num) /* store value into register   */ \
 	_(LOAD,         l2,   src, ref, ___) /* load from memory            */ \
 	_(STORE,        s3,   src, ref, def) /* store to memory             */ \
+	_(TLS,          l1X2, src, num, num) /* thread local variable       */ \
 	/* memory reference ops (A, H, U, S, TMP, STR, NEW, X, V) ???       */ \
 	\
 	/* control-flow nodes                                               */ \
