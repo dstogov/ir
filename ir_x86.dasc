@@ -7292,6 +7292,13 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	}
 
 	ret = dasm_encode(&data.dasm_state, entry);
+	if (ret != DASM_S_OK) {
+		IR_ASSERT(0);
+		if (ctx->code_buffer == NULL) {
+			ir_mem_unmap(entry, size);
+		}
+		return NULL;
+	}
 
 	if (data.jmp_table_label) {
 		uint32_t offset = dasm_getpclabel(&data.dasm_state, data.jmp_table_label);
@@ -7314,13 +7321,6 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		i = ctx->ir_base[i].op2;
 	}
 
-	if (ret != DASM_S_OK) {
-		IR_ASSERT(0);
-		if (ctx->code_buffer == NULL) {
-			ir_mem_unmap(entry, size);
-		}
-		return NULL;
-	}
 	dasm_free(&data.dasm_state);
 
 	ir_mem_flush(entry, size);

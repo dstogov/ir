@@ -32,6 +32,52 @@
 		((offset) + sizeof(void*) * 2) : \
 		((offset) + data->call_stack_size))
 
+#define B_IMM           (1<<27)        // signed imm26 * 4
+#define ADR_IMM         (1<<20)        // signed imm21
+#define ADRP_IMM        (1LL<<32)      // signed imm21 * 4096
+
+static bool aarch64_may_use_b(ir_ctx *ctx, const void *addr)
+{
+	if (ctx->code_buffer) {
+		if (addr >= ctx->code_buffer && (char*)addr < (char*)ctx->code_buffer + ctx->code_buffer_size) {
+			return (ctx->code_buffer_size < B_IMM);
+		} else if ((char*)addr >= (char*)ctx->code_buffer + ctx->code_buffer_size) {
+			return (((char*)addr - (char*)ctx->code_buffer) < B_IMM);
+		} else if (addr < ctx->code_buffer) {
+			return (((char*)(ctx->code_buffer + ctx->code_buffer_size) - (char*)addr) < B_IMM);
+		}
+	}
+	return 1; //???
+}
+
+static bool aarch64_may_use_adr(ir_ctx *ctx, const void *addr)
+{
+	if (ctx->code_buffer) {
+		if (addr >= ctx->code_buffer && (char*)addr < (char*)ctx->code_buffer + ctx->code_buffer_size) {
+			return ( ctx->code_buffer_size < ADR_IMM);
+		} else if ((char*)addr >= (char*)ctx->code_buffer + ctx->code_buffer_size) {
+			return (((char*)addr - (char*)ctx->code_buffer) < ADR_IMM);
+		} else if (addr < ctx->code_buffer) {
+			return (((char*)(ctx->code_buffer + ctx->code_buffer_size) - (char*)addr) < ADR_IMM);
+		}
+	}
+	return 0;
+}
+
+static bool aarch64_may_use_adrp(ir_ctx *ctx, const void *addr)
+{
+	if (ctx->code_buffer) {
+		if (addr >= ctx->code_buffer && (char*)addr < (char*)ctx->code_buffer + ctx->code_buffer_size) {
+			return ( ctx->code_buffer_size < ADRP_IMM);
+		} else if ((char*)addr >= (char*)ctx->code_buffer + ctx->code_buffer_size) {
+			return (((char*)addr - (char*)ctx->code_buffer) < ADRP_IMM);
+		} else if (addr < ctx->code_buffer) {
+			return (((char*)(ctx->code_buffer + ctx->code_buffer_size) - (char*)addr) < ADRP_IMM);
+		}
+	}
+	return 0;
+}
+
 /* Determine whether "val" falls into two allowed ranges:
  *   Range 1: [0, 0xfff]
  *   Range 2: LSL #12 to Range 1
@@ -3537,8 +3583,12 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		} else {
 			addr = (void*)addr_insn->val.addr;
 		}
-
-		|	bl &addr
+		if (aarch64_may_use_b(ctx, addr)) {
+			|	bl &addr
+		} else {
+			ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, (intptr_t)addr);
+			|	blr Rx(IR_REG_INT_TMP)
+		}
     } else {
 		ir_reg op2_reg = ctx->regs[def][2];
 
@@ -3611,7 +3661,12 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			addr = (void*)addr_insn->val.addr;
 		}
 
-		|	b &addr
+		if (aarch64_may_use_b(ctx, addr)) {
+			|	b &addr
+		} else {
+			ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, (intptr_t)addr);
+			|	br Rx(IR_REG_INT_TMP)
+		}
     } else {
 		ir_reg op2_reg = ctx->regs[def][2];
 
@@ -3636,6 +3691,59 @@ static void ir_emit_ijmp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_emit_load(ctx, IR_ADDR, op2_reg, insn->op2);
 	}
 	|	br Rx(op2_reg)
+}
+
+static void ir_emit_guard(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_reg op2_reg = ctx->regs[def][2];
+	ir_type type = ctx->ir_base[insn->op2].type;
+
+	IR_ASSERT(op2_reg != IR_REG_NONE);
+	if (op2_reg & IR_REG_SPILL_LOAD) {
+		op2_reg &= ~IR_REG_SPILL_LOAD;
+		ir_emit_load(ctx, type, op2_reg, insn->op2);
+	}
+
+	if (IR_IS_CONST_REF(insn->op3)) {
+		ir_insn *addr_insn = &ctx->ir_base[insn->op3];
+		void *addr;
+
+		IR_ASSERT(addr_insn->type == IR_ADDR);
+		if (addr_insn->op == IR_FUNC) {
+			addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
+		} else {
+			addr = (void*)addr_insn->val.addr;
+		}
+		|	cbz Rw(op2_reg), &addr
+	} else {
+		IR_ASSERT(0);
+	}
+}
+
+static void ir_emit_tls(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	uint32_t code;
+	ir_reg reg = IR_REG_NUM(ctx->regs[def][0]);
+
+||#ifdef __APPLE__
+||	code = 0xd53bd060 | reg; // TODO: hard-coded: mrs reg, tpidrro_el0
+|	.long code
+|	and Rx(reg), Rx(reg), #0xfffffffffffffff8
+|//???	MEM_ACCESS_64_WITH_UOFFSET_64 ldr, Rx(reg), Rx(reg), #insn->op2, TMP1
+|//???	MEM_ACCESS_64_WITH_UOFFSET_64 ldr, Rx(reg), Rx(reg), #insn->op3, TMP1
+||#else
+||	code = 0xd53bd040 | reg; // TODO: hard-coded: mrs reg, tpidr_el0
+|	.long code
+||//???	ZEND_ASSERT(insn->op2 <= LDR_STR_PIMM64);
+|	ldr Rx(reg), [Rx(reg), #insn->op2]
+||#endif
+	if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
+		ir_emit_store(ctx, IR_ADDR, def, reg);
+	}
 }
 
 static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
@@ -4503,6 +4611,13 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_ALLOCA:
 					ir_emit_alloca(ctx, i, insn);
 					break;
+				case IR_GUARD_TRUE:
+				case IR_GUARD_FALSE:
+					ir_emit_guard(ctx, i, insn);
+					break;
+				case IR_TLS:
+					ir_emit_tls(ctx, i, insn);
+					break;
 				default:
 					IR_ASSERT(0 && "NIY rule/insruction");
 					break;
@@ -4613,6 +4728,13 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	}
 
 	ret = dasm_encode(&data.dasm_state, entry);
+	if (ret != DASM_S_OK) {
+		IR_ASSERT(0);
+		if (ctx->code_buffer == NULL) {
+			ir_mem_unmap(entry, size);
+		}
+		return NULL;
+	}
 
 	if (data.jmp_table_label) {
 		uint32_t offset = dasm_getpclabel(&data.dasm_state, data.jmp_table_label);
@@ -4635,13 +4757,6 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		i = ctx->ir_base[i].op2;
 	}
 
-	if (ret != DASM_S_OK) {
-		IR_ASSERT(0);
-		if (ctx->code_buffer == NULL) {
-			ir_mem_unmap(entry, size);
-		}
-		return NULL;
-	}
 	dasm_free(&data.dasm_state);
 
 	ir_mem_flush(entry, size);
