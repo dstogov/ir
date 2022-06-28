@@ -250,6 +250,8 @@ typedef enum _ir_rule {
 	IR_GUARD_CMP_FP,
 	IR_OVERFLOW_AND_BRANCH,
 	IR_MIN_MAX_INT,
+	IR_REG_BINOP_INT,
+	IR_SKIP_BINOP_INT,
 	IR_LOAD_INT,
 	IR_LOAD_FP,
 	IR_STORE_INT,
@@ -478,6 +480,7 @@ int ir_get_temporary_regs(ir_ctx *ctx, ir_ref ref, ir_tmp_reg *tmp_regs)
 	rule = ctx->rules[ref];
 	switch (rule) {
 		case IR_BINOP_INT:
+		case IR_SKIP_BINOP_INT:
 			insn = &ctx->ir_base[ref];
 			n = 0;
 			if (IR_IS_CONST_REF(insn->op1)) {
@@ -997,6 +1000,34 @@ binop_fp:
 				return IR_STORE_FP;
 			}
 			break;
+		case IR_RSTORE:
+			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
+				if ((ctx->flags & IR_OPT_CODEGEN) && insn->op2 > bb->start && insn->op2 < ref && ctx->use_lists[insn->op2].count == 1) {
+					ir_insn *op_insn = &ctx->ir_base[insn->op2];
+
+					if (!ctx->rules[insn->op2]) {
+						ctx->rules[insn->op2] = ir_match_insn(ctx, insn->op2, bb);
+					}
+					if (ctx->rules[insn->op2] == IR_BINOP_INT) {
+						if (ctx->ir_base[op_insn->op1].op == IR_RLOAD
+						 && ctx->ir_base[op_insn->op1].op2 == insn->op3) {
+							ctx->rules[insn->op2] = IR_SKIP_BINOP_INT;
+							ctx->rules[op_insn->op1] = IR_SKIP;
+							return IR_REG_BINOP_INT;
+						} else if ((ir_op_flags[op_insn->op] & IR_OP_FLAG_COMMUTATIVE)
+						 && ctx->ir_base[op_insn->op2].op == IR_RLOAD
+						 && ctx->ir_base[op_insn->op2].op2 == insn->op3) {
+							ir_ref tmp = op_insn->op1;
+							op_insn->op1 = op_insn->op2;
+							op_insn->op2 = tmp;
+							ctx->rules[insn->op2] = IR_SKIP_BINOP_INT;
+							ctx->rules[op_insn->op1] = IR_SKIP;
+							return IR_REG_BINOP_INT;
+						}
+					}
+				}
+			}
+			return IR_RSTORE;
 		case IR_START:
 		case IR_BEGIN:
 //		case IR_END:
@@ -1838,6 +1869,74 @@ static void ir_emit_overflow_and_branch(ir_ctx *ctx, int b, ir_ref def, ir_insn 
 	}
 	if (false_block) {
 		|	b =>false_block
+	}
+}
+
+static void ir_emit_reg_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_insn *op_insn = &ctx->ir_base[insn->op2];
+	ir_type type = op_insn->type;
+	ir_ref op2 = op_insn->op2;
+	ir_reg op2_reg = ctx->regs[insn->op2][2];
+	ir_reg reg;
+
+	IR_ASSERT(insn->op == IR_RSTORE);
+	reg = insn->op3;
+
+	if (op2_reg == IR_REG_NONE) {
+		ir_val *val = &ctx->ir_base[op2].val;
+
+		IR_ASSERT(IR_IS_CONST_REF(op2));
+		switch (op_insn->op) {
+			case IR_ADD:
+				|	ASM_REG_REG_IMM_OP add, type, reg, reg, val->i32
+				break;
+			case IR_SUB:
+				|	ASM_REG_REG_IMM_OP sub, type, reg, reg, val->i32
+				break;
+			case IR_OR:
+				|	ASM_REG_REG_IMM_OP orr, type, reg, reg, val->i32
+				break;
+			case IR_AND:
+				|	ASM_REG_REG_IMM_OP and, type, reg, reg, val->i32
+				break;
+			case IR_XOR:
+				|	ASM_REG_REG_IMM_OP eor, type, reg, reg, val->i32
+				break;
+			default:
+				IR_ASSERT(0 && "NIY binary op");
+				break;
+		}
+	} else {
+		if ((op2_reg & IR_REG_SPILL_LOAD) || IR_IS_CONST_REF(op2)) {
+			op2_reg &= ~IR_REG_SPILL_LOAD;
+			ir_emit_load(ctx, type, op2_reg, op2);
+		}
+		switch (op_insn->op) {
+			case IR_ADD:
+				|	ASM_REG_REG_REG_OP add, type, reg, reg, op2_reg
+				break;
+			case IR_SUB:
+				|	ASM_REG_REG_REG_OP sub, type, reg, reg, op2_reg
+				break;
+			case IR_MUL:
+				|	ASM_REG_REG_REG_OP mul, type, reg, reg, op2_reg
+				break;
+			case IR_OR:
+				|	ASM_REG_REG_REG_OP orr, type, reg, reg, op2_reg
+				break;
+			case IR_AND:
+				|	ASM_REG_REG_REG_OP and, type, reg, reg, op2_reg
+				break;
+			case IR_XOR:
+				|	ASM_REG_REG_REG_OP eor, type, reg, reg, op2_reg
+				break;
+			default:
+				IR_ASSERT(0 && "NIY binary op");
+				break;
+		}
 	}
 }
 
@@ -4846,6 +4945,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_SKIP:
 				case IR_SKIP_REG:
 				case IR_SKIP_MEM:
+				case IR_SKIP_BINOP_INT:
 				case IR_VAR:
 					break;
 				case IR_ENTRY:
@@ -4964,6 +5064,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					break;
 				case IR_IJMP:
 					ir_emit_ijmp(ctx, i, insn);
+					break;
+				case IR_REG_BINOP_INT:
+					ir_emit_reg_binop_int(ctx, i, insn);
 					break;
 				case IR_VADDR:
 					ir_emit_vaddr(ctx, i, insn);
