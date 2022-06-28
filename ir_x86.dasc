@@ -1696,7 +1696,7 @@ store_int:
 			}
 			break;
 		case IR_LOAD:
-			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op3].type)) {
+			if (IR_IS_TYPE_INT(insn->type)) {
 				return IR_LOAD_INT;
 			} else {
 				return IR_LOAD_FP;
