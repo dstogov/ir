@@ -246,6 +246,8 @@ typedef enum _ir_rule {
 	IR_COPY_FP,
 	IR_CMP_AND_BRANCH_INT,
 	IR_CMP_AND_BRANCH_FP,
+	IR_GUARD_CMP_INT,
+	IR_GUARD_CMP_FP,
 	IR_OVERFLOW_AND_BRANCH,
 	IR_MIN_MAX_INT,
 	IR_LOAD_INT,
@@ -1035,6 +1037,34 @@ binop_fp:
 			} else {
 				IR_ASSERT(0 && "NIY IR_IF_FP");
 			}
+		case IR_GUARD_TRUE:
+		case IR_GUARD_FALSE:
+			if (insn->op2 > bb->start && insn->op2 < ref && ctx->use_lists[insn->op2].count == 1) {
+				op2_insn = &ctx->ir_base[insn->op2];
+				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT) {
+					ctx->rules[insn->op2] = IR_SKIP;
+					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
+						if (insn->op1 > bb->start
+						 && insn->op1 < ref
+						 && !ctx->rules[insn->op1]
+						 && ctx->ir_base[insn->op1].op == IR_LOAD) {
+							ir_ref addr_ref = ctx->ir_base[insn->op1].op2;
+							ir_insn *addr_insn = &ctx->ir_base[addr_ref];
+
+							if (addr_insn->op == IR_RLOAD) {
+								ctx->rules[insn->op1] = IR_SKIP_MEM;
+							}
+						}
+						return IR_GUARD_CMP_INT;
+//???					} else {
+//???						return IR_GUARD_CMP_FP;
+					}
+//???				} else if (op2_insn->op == IR_OVERFLOW) {
+//???					ctx->rules[insn->op2] = IR_SKIP;
+//???					return IR_GUARD_OVERFLOW;
+				}
+			}
+			return insn->op;
 		default:
 			break;
 	}
@@ -2291,6 +2321,41 @@ static void ir_emit_jmp_false(ir_ctx *ctx, int b, ir_ref def)
 	}
 }
 
+static void ir_emit_jz(ir_ctx *ctx, uint8_t op, int b, ir_type type, ir_reg reg)
+{
+	int true_block, false_block, next_block;
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+
+	ir_get_true_false_blocks(ctx, b, &true_block, &false_block, &next_block);
+	if (true_block == next_block) {
+		IR_ASSERT(op < IR_LT);
+		op ^= 1; // reverse
+		true_block = false_block;
+		false_block = 0;
+	} else if (false_block == next_block) {
+		false_block = 0;
+	}
+
+	if (op == IR_EQ) {
+		if (ir_type_size[type] == 8) {
+			|	cbz Rx(reg), =>true_block
+		} else {
+			|	cbz Rw(reg), =>true_block
+		}
+	} else {
+		IR_ASSERT(op == IR_NE);
+		if (ir_type_size[type] == 8) {
+			|	cbnz Rx(reg), =>true_block
+		} else {
+			|	cbnz Rw(reg), =>true_block
+		}
+	}
+	if (false_block) {
+		|	b =>false_block
+	}
+}
+
 static void ir_emit_jcc(ir_ctx *ctx, uint8_t op, int b, ir_ref def, ir_insn *insn, bool int_cmp)
 {
 	int true_block, false_block, next_block;
@@ -2433,7 +2498,7 @@ static void ir_emit_cmp_and_branch_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *
 			ir_emit_load(ctx, type, op2_reg, op2);
 		}
 	}
-	if (IR_IS_CONST_REF(insn->op2) && ctx->ir_base[insn->op2].val.u64 == 0) {
+	if (IR_IS_CONST_REF(op2) && ctx->ir_base[op2].val.u64 == 0) {
 		if (op == IR_ULT) {
 			/* always false */
 			ir_emit_jmp_false(ctx, b, def);
@@ -2446,6 +2511,10 @@ static void ir_emit_cmp_and_branch_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *
 			op = IR_EQ;
 		} else if (op == IR_UGT) {
 			op = IR_NE;
+		}
+		if (op1_reg != IR_REG_NONE && (op == IR_EQ || op == IR_NE)) {
+			ir_emit_jz(ctx, op, b, type, op1_reg);
+			return;
 		}
 	}
 	ir_emit_cmp_int_common(ctx, type, op1_reg, op1, op2_reg, op2);
@@ -3848,6 +3917,174 @@ static void ir_emit_guard(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
+static void ir_emit_guard_jz(ir_ctx *ctx, uint8_t op, void *addr, ir_type type, ir_reg reg)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+
+	if (op == IR_EQ) {
+		if (ir_type_size[type] == 8) {
+			|	cbnz Rx(reg), &addr
+		} else {
+			|	cbnz Rw(reg), &addr
+		}
+	} else {
+		IR_ASSERT(op == IR_NE);
+		if (ir_type_size[type] == 8) {
+			|	cbz Rx(reg), &addr
+		} else {
+			|	cbz Rw(reg), &addr
+		}
+	}
+}
+
+static void ir_emit_guard_jcc(ir_ctx *ctx, uint8_t op, void *addr, bool int_cmp)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+
+	if (int_cmp) {
+		switch (op) {
+			case IR_EQ:
+				|	beq &addr
+				break;
+			case IR_NE:
+				|	bne &addr
+				break;
+			case IR_LT:
+				|	blt &addr
+				break;
+			case IR_GE:
+				|	bge &addr
+				break;
+			case IR_LE:
+				|	ble &addr
+				break;
+			case IR_GT:
+				|	bgt &addr
+				break;
+			case IR_ULT:
+				|	blo &addr
+				break;
+			case IR_UGE:
+				|	bhs &addr
+				break;
+			case IR_ULE:
+				|	bls &addr
+				break;
+			case IR_UGT:
+				|	bhi &addr
+				break;
+			default:
+				IR_ASSERT(0 && "NIY binary op");
+				break;
+		}
+	} else {
+		switch (op) {
+			case IR_EQ:
+				|	bvs >1
+				|	beq &addr
+				|1:
+				break;
+			case IR_NE:
+				|	bne &addr
+				|	bvs &addr
+				break;
+			case IR_LT:
+				|	bvs >1
+				|	blo &addr
+				|1:
+				break;
+			case IR_GE:
+				|	bhs &addr
+				break;
+			case IR_LE:
+				|	bvs >1
+				|	bls &addr
+				|1:
+				break;
+			case IR_GT:
+				|	bhi &addr
+				break;
+//			case IR_ULT: fprintf(stderr, "\tjb .LL%d\n", true_block); break;
+//			case IR_UGE: fprintf(stderr, "\tjae .LL%d\n", true_block); break;
+//			case IR_ULE: fprintf(stderr, "\tjbe .LL%d\n", true_block); break;
+//			case IR_UGT: fprintf(stderr, "\tja .LL%d\n", true_block); break;
+			default:
+				IR_ASSERT(0 && "NIY binary op");
+				break;
+		}
+	}
+}
+
+static void ir_emit_guard_cmp_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_insn *cmp_insn = &ctx->ir_base[insn->op2];
+	ir_op op = cmp_insn->op;
+	ir_type type = ctx->ir_base[cmp_insn->op1].type;
+	ir_ref op1 = cmp_insn->op1;
+	ir_ref op2 = cmp_insn->op2;
+	ir_reg op1_reg = ctx->regs[insn->op2][1];
+	ir_reg op2_reg = ctx->regs[insn->op2][2];
+	ir_insn *addr_insn;
+	void *addr;
+
+	if (op1_reg != IR_REG_NONE && ((op1_reg & IR_REG_SPILL_LOAD) || IR_IS_CONST_REF(op1))) {
+		op1_reg &= ~IR_REG_SPILL_LOAD;
+		ir_emit_load(ctx, type, op1_reg, op1);
+	}
+	if (op2_reg != IR_REG_NONE && ((op2_reg & IR_REG_SPILL_LOAD) || IR_IS_CONST_REF(op2))) {
+		op2_reg &= ~IR_REG_SPILL_LOAD;
+		if (op1 != op2) {
+			ir_emit_load(ctx, type, op2_reg, op2);
+		}
+	}
+
+	IR_ASSERT(IR_IS_CONST_REF(insn->op3));
+	addr_insn = &ctx->ir_base[insn->op3];
+	IR_ASSERT(addr_insn->type == IR_ADDR);
+	if (addr_insn->op == IR_FUNC) {
+		addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
+	} else {
+		addr = (void*)addr_insn->val.addr;
+	}
+
+	if (IR_IS_CONST_REF(op2) && ctx->ir_base[op2].val.u64 == 0) {
+		if (op == IR_ULT) {
+			/* always false */
+			if (aarch64_may_use_b(ctx, addr)) {
+				|	b &addr
+			} else {
+				ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, (intptr_t)addr);
+				|	br Rx(IR_REG_INT_TMP)
+			}
+			return;
+		} else if (op == IR_UGE) {
+			/* always true */
+			return;
+		} else if (op == IR_ULE) {
+			op = IR_EQ;
+		} else if (op == IR_UGT) {
+			op = IR_NE;
+		}
+		if (op1_reg != IR_REG_NONE && (op == IR_EQ || op == IR_NE)) {
+			ir_emit_guard_jz(ctx, op, addr, type, op1_reg);
+			return;
+		}
+	}
+	ir_emit_cmp_int_common(ctx, type, op1_reg, op1, op2_reg, op2);
+
+	if (op < IR_LT) {
+		op ^= 1; // reverse
+	} else {
+		op ^= 3; // reverse
+	}
+
+	ir_emit_guard_jcc(ctx, op, addr, 1);
+}
+
 static void ir_emit_tls(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
@@ -4220,7 +4457,11 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 				case IR_SKIP_REG: /* PARAM PHI PI */
 					/* skip */
 					def_flags = ir_get_def_flags(ctx, i);
-					if (ctx->rules && *rule != IR_CMP_AND_BRANCH_INT && *rule != IR_CMP_AND_BRANCH_FP) {
+					if (ctx->rules
+					 && *rule != IR_CMP_AND_BRANCH_INT
+					 && *rule != IR_CMP_AND_BRANCH_FP
+					 && *rule != IR_GUARD_CMP_INT
+					 && *rule != IR_GUARD_CMP_FP) {
 						available = IR_REGSET_SCRATCH;
 					}
 					if (ctx->vregs[i]) {
@@ -4675,6 +4916,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					break;
 				case IR_CMP_AND_BRANCH_FP:
 					ir_emit_cmp_and_branch_fp(ctx, b, i, insn);
+					break;
+				case IR_GUARD_CMP_INT:
+					ir_emit_guard_cmp_int(ctx, b, i, insn);
 					break;
 				case IR_IF_INT:
 					ir_emit_if_int(ctx, b, i, insn);
