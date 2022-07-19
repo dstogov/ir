@@ -1584,6 +1584,14 @@ store_int:
 							 && insn->op1 == op_insn->op1) {
 								ctx->rules[insn->op3] = IR_SKIP_BINOP_INT;
 								ctx->rules[op_insn->op1] = IR_SKIP;
+
+								ir_ref addr_ref = insn->op2;
+								if (!ctx->rules[addr_ref]) {
+									ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
+								}
+								if (ctx->rules[addr_ref] == IR_LEA_OB) {
+									ctx->rules[addr_ref] = IR_SKIP_MEM;
+								}
 								return IR_MEM_BINOP_INT;
 							}
 						} else if ((ir_op_flags[op_insn->op] & IR_OP_FLAG_COMMUTATIVE)
@@ -2378,12 +2386,27 @@ static void ir_emit_mem_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		reg = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
 	} else if (insn->op == IR_STORE) {
 		reg = ctx->regs[def][2];
-		IR_ASSERT(reg != IR_REG_NONE);
-		if (reg != IR_REG_NONE && (reg & IR_REG_SPILL_LOAD)) {
-			reg &= ~IR_REG_SPILL_LOAD;
-			ir_emit_load(ctx, type, reg, insn->op2);
+		if (reg != IR_REG_NONE) {
+			if (reg != IR_REG_NONE && (reg & IR_REG_SPILL_LOAD)) {
+				reg &= ~IR_REG_SPILL_LOAD;
+				ir_emit_load(ctx, type, reg, insn->op2);
+			}
+			offset = 0;
+		} else {
+			ir_insn *addr_insn = &ctx->ir_base[insn->op2];
+
+			if (addr_insn->op == IR_ADD) {
+				reg = ctx->regs[insn->op2][1];
+				IR_ASSERT(reg != IR_REG_NONE);
+				if (reg != IR_REG_NONE && (reg & IR_REG_SPILL_LOAD)) {
+					reg &= ~IR_REG_SPILL_LOAD;
+					ir_emit_load(ctx, type, reg, addr_insn->op1);
+				}
+				offset = ctx->ir_base[addr_insn->op2].val.i32;
+			} else {
+				IR_ASSERT(0);
+			}
 		}
-		offset = 0;
 	} else {
 		IR_ASSERT(0);
 		return;
