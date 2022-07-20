@@ -2418,9 +2418,11 @@ static void ir_emit_mem_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		IR_ASSERT(IR_IS_CONST_REF(op2) && (ir_type_size[type] != 8 || IR_IS_32BIT(type, ctx->ir_base[op2].val)));
 		switch (op_insn->op) {
 			case IR_ADD:
+			case IR_ADD_OV:
 				|	ASM_MEM_IMM_OP add, type, [Ra(reg)+offset], val->i32
 				break;
 			case IR_SUB:
+			case IR_SUB_OV:
 				|	ASM_MEM_IMM_OP sub, type, [Ra(reg)+offset], val->i32
 				break;
 			case IR_OR:
@@ -2443,9 +2445,11 @@ static void ir_emit_mem_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 		switch (op_insn->op) {
 			case IR_ADD:
+			case IR_ADD_OV:
 				|	ASM_MEM_REG_OP add, type, [Ra(reg)+offset], op2_reg
 				break;
 			case IR_SUB:
+			case IR_SUB_OV:
 				|	ASM_MEM_REG_OP sub, type, [Ra(reg)+offset], op2_reg
 				break;
 			case IR_OR:
