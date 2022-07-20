@@ -236,6 +236,7 @@ typedef enum _ir_type {
 	_(LOAD,         l2,   src, ref, ___) /* load from memory            */ \
 	_(STORE,        s3,   src, ref, def) /* store to memory             */ \
 	_(TLS,          l1X2, src, num, num) /* thread local variable       */ \
+	_(TRAP,         x1,   src, ___, ___) /* DebugBreak                  */ \
 	/* memory reference ops (A, H, U, S, TMP, STR, NEW, X, V) ???       */ \
 	\
 	/* control-flow nodes                                               */ \
