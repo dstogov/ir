@@ -95,8 +95,7 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 			lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
 		}
 		b = lca;
-
-		while (lca != ctx->cfg_blocks[_blocks[ref]].dom_parent) {
+		while (ctx->cfg_blocks[b].loop_depth && lca != ctx->cfg_blocks[_blocks[ref]].dom_parent) {
 			if (ctx->cfg_blocks[lca].loop_depth < ctx->cfg_blocks[b].loop_depth) {
 				b = lca;
 			}
