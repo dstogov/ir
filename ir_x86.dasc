@@ -3038,7 +3038,13 @@ static void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 	} else {
 		if (IR_IS_TYPE_SIGNED(type)) {
-			|	cdq
+			if (ir_type_size[type] == 8) {
+				|	cqo
+			} else if (ir_type_size[type] == 4) {
+				|	cdq
+			} else if (ir_type_size[type] == 2) {
+				|	cwd
+			}
 			if (op2_reg != IR_REG_NONE) {
 				|	ASM_REG_OP idiv, type, op2_reg
 			} else {
