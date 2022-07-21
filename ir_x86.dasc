@@ -1235,7 +1235,8 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 				if (insn->op1 > bb->start
 				 && insn->op1 < ref
 				 && !ctx->rules[insn->op1]
-				 && ctx->ir_base[insn->op1].op == IR_LOAD) {
+				 && ctx->ir_base[insn->op1].op == IR_LOAD
+				 && ctx->use_lists[insn->op1].count == 2) {
 					ir_ref addr_ref = ctx->ir_base[insn->op1].op2;
 					ir_insn *addr_insn = &ctx->ir_base[addr_ref];
 
@@ -1584,7 +1585,6 @@ store_int:
 							 && insn->op1 == op_insn->op1) {
 								ctx->rules[insn->op3] = IR_SKIP_BINOP_INT;
 								ctx->rules[op_insn->op1] = IR_SKIP;
-
 								ir_ref addr_ref = insn->op2;
 								if (!ctx->rules[addr_ref]) {
 									ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
@@ -1605,6 +1605,13 @@ store_int:
 								op_insn->op2 = tmp;
 								ctx->rules[insn->op3] = IR_SKIP_BINOP_INT;
 								ctx->rules[op_insn->op1] = IR_SKIP;
+								ir_ref addr_ref = insn->op2;
+								if (!ctx->rules[addr_ref]) {
+									ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
+								}
+								if (ctx->rules[addr_ref] == IR_LEA_OB) {
+									ctx->rules[addr_ref] = IR_SKIP_MEM;
+								}
 								return IR_MEM_BINOP_INT;
 							}
 						}
@@ -1778,7 +1785,8 @@ store_int:
 						if (insn->op1 > bb->start
 						 && insn->op1 < ref
 						 && !ctx->rules[insn->op1]
-						 && ctx->ir_base[insn->op1].op == IR_LOAD) {
+						 && ctx->ir_base[insn->op1].op == IR_LOAD
+						 && ctx->use_lists[insn->op1].count == 2) {
 							ir_ref addr_ref = ctx->ir_base[insn->op1].op2;
 							ir_insn *addr_insn = &ctx->ir_base[addr_ref];
 
@@ -1820,7 +1828,8 @@ store_int:
 						if (insn->op1 > bb->start
 						 && insn->op1 < ref
 						 && !ctx->rules[insn->op1]
-						 && ctx->ir_base[insn->op1].op == IR_LOAD) {
+						 && ctx->ir_base[insn->op1].op == IR_LOAD
+						 && ctx->use_lists[insn->op1].count == 2) {
 							ir_ref addr_ref = ctx->ir_base[insn->op1].op2;
 							ir_insn *addr_insn = &ctx->ir_base[addr_ref];
 
@@ -1852,7 +1861,8 @@ store_int:
 			if (insn->op2 > bb->start
 			 && insn->op2 < ref
 			 && !ctx->rules[insn->op2]
-			 && ctx->ir_base[insn->op2].op == IR_LOAD) {
+			 && ctx->ir_base[insn->op2].op == IR_LOAD
+			 && ctx->use_lists[insn->op1].count == 2) {
 				ir_ref addr_ref = ctx->ir_base[insn->op2].op2;
 				ir_insn *addr_insn = &ctx->ir_base[addr_ref];
 
@@ -5582,7 +5592,29 @@ static void ir_emit_ijmp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg op2_reg = ctx->regs[def][2];
 
-	if (ctx->rules[insn->op2] == IR_SKIP_MEM) {
+	if (IR_IS_CONST_REF(insn->op2)) {
+		ir_insn *addr_insn = &ctx->ir_base[insn->op2];
+		void *addr;
+
+		IR_ASSERT(addr_insn->type == IR_ADDR);
+		if (addr_insn->op == IR_FUNC) {
+			addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
+		} else {
+			addr = (void*)addr_insn->val.addr;
+		}
+		if (sizeof(void*) == 4 || IR_MAY_USE_32BIT_ADDR(addr)) {
+			|	jmp aword &addr
+		} else {
+|.if X64
+			if (IR_IS_SIGNED_32BIT(addr)) {
+				|	mov rax, ((ptrdiff_t)addr)    // 0x48 0xc7 0xc0 <imm-32-bit>
+			} else {
+				|	mov64 rax, ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
+			}
+			|	jmp aword [rax]
+|.endif
+		}
+	} else if (ctx->rules[insn->op2] == IR_SKIP_MEM) {
 		ir_insn *load_insn = &ctx->ir_base[insn->op2];
 		ir_insn *addr_insn;
 
