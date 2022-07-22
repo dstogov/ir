@@ -5658,6 +5658,37 @@ static void ir_emit_guard(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg op2_reg = ctx->regs[def][2];
 	ir_type type = ctx->ir_base[insn->op2].type;
 
+	if (IR_IS_CONST_REF(insn->op2)) {
+		if (insn->op2 == IR_FALSE) {
+			if (IR_IS_CONST_REF(insn->op3)) {
+				ir_insn *addr_insn = &ctx->ir_base[insn->op3];
+				void *addr;
+
+				IR_ASSERT(addr_insn->type == IR_ADDR);
+				if (addr_insn->op == IR_FUNC) {
+					addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
+				} else {
+					addr = (void*)addr_insn->val.addr;
+				}
+				if (sizeof(void*) == 4 || IR_MAY_USE_32BIT_ADDR(addr)) {
+					|	jmp aword &addr
+				} else {
+|.if X64
+					if (IR_IS_SIGNED_32BIT(addr)) {
+						|	mov rax, ((ptrdiff_t)addr)    // 0x48 0xc7 0xc0 <imm-32-bit>
+					} else {
+						|	mov64 rax, ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
+					}
+					|	jmp aword [rax]
+|.endif
+				}
+			} else {
+				IR_ASSERT(0);
+			}
+		}
+		return;
+	}
+
 	IR_ASSERT(op2_reg != IR_REG_NONE);
 	if (op2_reg & IR_REG_SPILL_LOAD) {
 		op2_reg &= ~IR_REG_SPILL_LOAD;
