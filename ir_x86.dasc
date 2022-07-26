@@ -1268,7 +1268,8 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 						// const
 					} else if (op2_insn->val.i64 == 0) {
 						return IR_COPY_INT;
-					} else if (ir_type_size[insn->type] >= 4 && IR_IS_SIGNED_32BIT(op2_insn->val.i64)) {
+					} else if ((ir_type_size[insn->type] >= 4 && insn->op == IR_ADD && IR_IS_SIGNED_32BIT(op2_insn->val.i64)) ||
+							(ir_type_size[insn->type] >= 4 && insn->op == IR_SUB && IR_IS_SIGNED_32BIT(-op2_insn->val.i64))) {
 						if (insn->op1 > bb->start && insn->op1 < ref && ctx->use_lists[insn->op1].count == 1) {
 							if (!ctx->rules[insn->op1]) {
 								ctx->rules[insn->op1] = ir_match_insn(ctx, insn->op1, bb);
