@@ -50,11 +50,11 @@ test:
 	xorl %eax, %eax
 .L1:
 	cmpl $0xa, %ecx
-	jg .L5
+	jge .L5
 	xorl %edx, %edx
 .L2:
 	cmpl $0xa, %edx
-	jg .L4
+	jge .L4
 	cmpl %ecx, %edx
 	je .L3
 	leal 1(%rax), %eax

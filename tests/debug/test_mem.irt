@@ -118,7 +118,7 @@ test:
 	ja .L2
 	movl (%rax), %ecx
 	cmpl $0x3e8, %ecx
-	jl .L1
+	jle .L1
 	xorl %eax, %eax
 	movq %rbp, %rsp
 	popq %rbp

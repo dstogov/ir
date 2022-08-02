@@ -2465,11 +2465,7 @@ static void ir_emit_jcc(ir_ctx *ctx, uint8_t op, int b, ir_ref def, ir_insn *ins
 	if (true_block == next_block) {
 		if (int_cmp || (op != IR_GT && op != IR_GE)) {
 			/* swap to avoid unconditional JMP if this doesn't introduce additional JP instruction */
-			if (op < IR_LT) {
-				op ^= 1; // reverse
-			} else {
-				op ^= 3; // reverse
-			}
+			op ^= 1; // reverse
 			true_block = false_block;
 			false_block = 0;
 		}
@@ -4175,11 +4171,7 @@ static void ir_emit_guard_cmp_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 	}
 	ir_emit_cmp_int_common(ctx, type, op1_reg, op1, op2_reg, op2);
 
-	if (op < IR_LT) {
-		op ^= 1; // reverse
-	} else {
-		op ^= 3; // reverse
-	}
+	op ^= 1; // reverse
 
 	ir_emit_guard_jcc(ctx, op, addr, 1);
 }

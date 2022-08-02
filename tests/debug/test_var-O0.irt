@@ -126,7 +126,7 @@ test:
 	retq
 .L3:
 	cmpl $0x3e8, 0x30(%rsp)
-	jl .L4
+	jle .L4
 	xorl %eax, %eax
 	addq $0x68, %rsp
 	retq

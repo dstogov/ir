@@ -104,7 +104,7 @@ test:
 	retq
 .L3:
 	cmpl $0x3e8, 0x2c(%rsp)
-	jl .L4
+	jle .L4
 	xorl %eax, %eax
 	addq $0x70, %rsp
 	retq
