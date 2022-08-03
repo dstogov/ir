@@ -1980,13 +1980,13 @@ static void ir_emit_load_imm_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref sr
 	ir_insn *insn = &ctx->ir_base[src];
 	int label;
 
-	if (type == IR_FLOAT && insn->val.f == 0) {
+	if (type == IR_FLOAT && insn->val.u32 == 0) {
 		if (ctx->flags & IR_AVX) {
 			|	vxorps xmm(reg-IR_REG_FP_FIRST), xmm(reg-IR_REG_FP_FIRST), xmm(reg-IR_REG_FP_FIRST)
 		} else {
 			|	xorps xmm(reg-IR_REG_FP_FIRST), xmm(reg-IR_REG_FP_FIRST)
 		}
-	} else if (type == IR_DOUBLE && insn->val.d == 0) {
+	} else if (type == IR_DOUBLE && insn->val.u64 == 0) {
 		if (ctx->flags & IR_AVX) {
 			|	vxorpd xmm(reg-IR_REG_FP_FIRST), xmm(reg-IR_REG_FP_FIRST), xmm(reg-IR_REG_FP_FIRST)
 		} else {
@@ -5568,7 +5568,7 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
 					ir_emit_store(ctx, insn->type, def, def_reg);
 				}
-			} else {
+			} else if (ctx->use_lists[def].count > 1) {
 				ir_emit_store(ctx, insn->type, def, IR_REG_INT_RET1);
 			}
 		} else if (IR_IS_TYPE_FP(insn->type)) {
@@ -5581,7 +5581,7 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
 					ir_emit_store(ctx, insn->type, def, def_reg);
 				}
-			} else {
+			} else if (ctx->use_lists[def].count > 1) {
 				ir_emit_store(ctx, insn->type, def, IR_REG_FP_RET1);
 			}
 #else
