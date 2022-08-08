@@ -3400,6 +3400,10 @@ static void ir_emit_cmp_int_common(ir_ctx *ctx, ir_type type, ir_insn *insn, ir_
 				|	ASM_MEM_IMM_OP cmp, type, [Ra(op1_reg)], ctx->ir_base[op2].val.i32
 			} else if (addr_insn->op == IR_ADD) {
 				op1_reg = ctx->regs[load_insn->op2][1];
+				if (op1_reg & IR_REG_SPILL_LOAD) {
+					op1_reg &= ~IR_REG_SPILL_LOAD;
+					ir_emit_load(ctx, type, op1_reg, addr_insn->op1);
+				}
 				IR_ASSERT(op1_reg != IR_REG_NONE && IR_IS_CONST_REF(addr_insn->op2));
 				|	ASM_MEM_IMM_OP cmp, type, [Ra(op1_reg)+ctx->ir_base[addr_insn->op2].val.i32], ctx->ir_base[op2].val.i32
 			} else {
