@@ -1785,24 +1785,24 @@ store_int:
 				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT) {
 					ctx->rules[insn->op2] = IR_SKIP;
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
-						if (insn->op1 > bb->start
-						 && insn->op1 < ref
-						 && !ctx->rules[insn->op1]
-						 && ctx->ir_base[insn->op1].op == IR_LOAD
-						 && ctx->use_lists[insn->op1].count == 2) {
-							ir_ref addr_ref = ctx->ir_base[insn->op1].op2;
+						if (op2_insn->op1 > bb->start
+						 && op2_insn->op1 < ref
+						 && !ctx->rules[op2_insn->op1]
+						 && ctx->ir_base[op2_insn->op1].op == IR_LOAD
+						 && ctx->use_lists[op2_insn->op1].count == 2) {
+							ir_ref addr_ref = ctx->ir_base[op2_insn->op1].op2;
 							ir_insn *addr_insn = &ctx->ir_base[addr_ref];
 
 							if (addr_insn->op == IR_RLOAD ||
 								(addr_insn->op == IR_C_ADDR &&
 									(sizeof(void*) == 4 || IR_IS_SIGNED_32BIT(addr_insn->val.i64)))) {
-								ctx->rules[insn->op1] = IR_SKIP_MEM;
+								ctx->rules[op2_insn->op1] = IR_SKIP_MEM;
 							} else {
 								if (!ctx->rules[addr_ref]) {
 									ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
 								}
 								if (ctx->rules[addr_ref] == IR_LEA_OB || ctx->rules[addr_ref] == IR_SKIP_MEM) {
-									ctx->rules[insn->op1] = IR_SKIP_MEM;
+									ctx->rules[op2_insn->op1] = IR_SKIP_MEM;
 									ctx->rules[addr_ref] = IR_SKIP_MEM;
 								}
 							}
