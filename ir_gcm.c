@@ -386,12 +386,21 @@ int ir_schedule(ir_ctx *ctx)
 		_rest = _next[i];
 		b = _blocks[i];
 		bb = &ctx->cfg_blocks[b];
-		/* insert after start of the block and all PARAM, VAR, PI, PHI */
-		k = _next[bb->start];
-		insn = &ctx->ir_base[k];
-		while (insn->op == IR_PARAM || insn->op == IR_VAR || insn->op == IR_PI || insn->op == IR_PHI) {
-			k = _next[k];
+		if (i == bb->end) {
+			// TODO: When removing MERGE, SCCP may move END of the block below other blocks ???
+			/* insert at the end of the block */
+			k = _next[bb->start];
+			while (_blocks[k] == b) {
+				k = _next[k];
+			}
+		} else {
+			/* insert after start of the block and all PARAM, VAR, PI, PHI */
+			k = _next[bb->start];
 			insn = &ctx->ir_base[k];
+			while (insn->op == IR_PARAM || insn->op == IR_VAR || insn->op == IR_PI || insn->op == IR_PHI) {
+				k = _next[k];
+				insn = &ctx->ir_base[k];
+			}
 		}
 		/* insert before "k" */
 		_prev[i] = _prev[k];
