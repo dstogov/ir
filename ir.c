@@ -299,7 +299,7 @@ void ir_init(ir_ctx *ctx, ir_ref consts_limit, ir_ref insns_limit)
 	ctx->code_buffer = NULL;
 	ctx->code_buffer_size = 0;
 
-	ir_strtab_init(&ctx->strtab, 64, 4096);
+	ctx->strtab.data = NULL;
 
 	buf = ir_mem_malloc((consts_limit + insns_limit) * sizeof(ir_insn));
 	ctx->ir_base = buf + consts_limit;
@@ -320,7 +320,9 @@ void ir_free(ir_ctx *ctx)
 {
 	ir_insn *buf = ctx->ir_base - ctx->consts_limit;
 	ir_mem_free(buf);
-	ir_strtab_free(&ctx->strtab);
+	if (ctx->strtab.data) {
+		ir_strtab_free(&ctx->strtab);
+	}
 	if (ctx->use_lists) {
 		ir_mem_free(ctx->use_lists);
 	}
@@ -524,16 +526,23 @@ ir_ref ir_const_str(ir_ctx *ctx, ir_ref str)
 
 ir_ref ir_str(ir_ctx *ctx, const char *s)
 {
+	if (!ctx->strtab.data) {
+		ir_strtab_init(&ctx->strtab, 64, 4096);
+	}
 	return ir_strtab_lookup(&ctx->strtab, s, strlen(s), ir_strtab_count(&ctx->strtab) + 1);
 }
 
 ir_ref ir_strl(ir_ctx *ctx, const char *s, size_t len)
 {
+	if (!ctx->strtab.data) {
+		ir_strtab_init(&ctx->strtab, 64, 4096);
+	}
 	return ir_strtab_lookup(&ctx->strtab, s, len, ir_strtab_count(&ctx->strtab) + 1);
 }
 
 const char *ir_get_str(ir_ctx *ctx, ir_ref idx)
 {
+	IR_ASSERT(ctx->strtab.data);
 	return ir_strtab_str(&ctx->strtab, idx - 1);
 }
 
