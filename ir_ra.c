@@ -2086,13 +2086,22 @@ static int ir_linear_scan(ir_ctx *ctx)
 	data.unused_slot_2 = 0;
 	data.unused_slot_1 = 0;
 
-	for (j = 1; j <= ctx->vregs_count; j++) {
+	for (j = 0; j <= ctx->vregs_count; j++) {
 		ival = ctx->live_intervals[j];
 		if (ival) {
 			if (ival->flags & IR_LIVE_INTERVAL_VAR) {
 				if (ival->stack_spill_pos == -1) {
 					ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type, &data);
 				}
+			}
+		}
+	}
+
+	for (j = ctx->vregs_count; j != 0; j--) {
+		ival = ctx->live_intervals[j];
+		if (ival) {
+			if (ival->flags & IR_LIVE_INTERVAL_VAR) {
+				/* pass */
 			} else if (ival->flags & IR_LIVE_INTERVAL_REG_LOAD) {
 				/* pre-allocated fixed register */
 			} else if (!(ival->flags & (IR_LIVE_INTERVAL_MEM_PARAM|IR_LIVE_INTERVAL_MEM_LOAD))
