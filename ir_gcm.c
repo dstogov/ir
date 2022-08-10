@@ -215,143 +215,23 @@ int ir_gcm(ir_ctx *ctx)
 	return 1;
 }
 
-static int ir_copy(ir_ctx *new_ctx, ir_ctx *ctx, ir_ref *_next, bool preserve_constants_order)
-{
-	ir_ref i, j, k, n, *p, ref, new_ref;
-	ir_ref *_xlat;
-	ir_insn *insn;
-	uint32_t flags;
-
-	if (preserve_constants_order) {
-		ir_bitset used = ir_bitset_malloc(ctx->consts_count + 1);
-
-		_xlat = ir_mem_calloc(ctx->consts_count + ctx->insns_count, sizeof(ir_ref));
-		_xlat += ctx->consts_count;
-
-		for (j = 1, i = 1; i != 0; i = _next[i]) {
-			_xlat[i] = j;
-			insn = &ctx->ir_base[i];
-			flags = ir_op_flags[insn->op];
-			n = ir_operands_count(ctx, insn);
-			for (k = 1, p = insn->ops + 1; k <= n; k++, p++) {
-				ref = *p;
-				if (IR_OPND_KIND(flags, k) == IR_OPND_DATA && IR_IS_CONST_REF(ref)) {
-					ir_bitset_incl(used, -ref);
-				}
-			}
-			n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
-			j += n;
-		}
-
-		IR_BITSET_FOREACH(used, ir_bitset_len(ctx->consts_count + 1), ref) {
-			if (ctx->ir_base[-ref].op == IR_FUNC) {
-				_xlat[-ref] = ir_const_func(new_ctx, ir_str(new_ctx, ir_get_str(ctx, ctx->ir_base[-ref].val.addr)),
-					ctx->ir_base[-ref].const_flags);
-			} else if (ctx->ir_base[-ref].op == IR_FUNC_ADDR) {
-				_xlat[-ref] = ir_const_func_addr(new_ctx, ctx->ir_base[-ref].val.addr, ctx->ir_base[-ref].const_flags);
-			} else if (ctx->ir_base[-ref].op == IR_STR) {
-				_xlat[-ref] = ir_const_str(new_ctx, ir_str(new_ctx, ir_get_str(ctx, ctx->ir_base[-ref].val.addr)));
-			} else {
-				_xlat[-ref] = ir_const(new_ctx, ctx->ir_base[-ref].val, ctx->ir_base[-ref].type);
-			}
-		} IR_BITSET_FOREACH_END();
-		ir_mem_free(used);
-	} else {
-		_xlat = ir_mem_calloc(ctx->insns_count, sizeof(ir_ref));
-		for (j = 1, i = 1; i != 0; i = _next[i]) {
-			_xlat[i] = j;
-			insn = &ctx->ir_base[i];
-			n = ir_operands_count(ctx, insn);
-			n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
-			j += n;
-		}
-	}
-
-	for (i = 1; i != 0; i = _next[i]) {
-		insn = &ctx->ir_base[i];
-		flags = ir_op_flags[insn->op];
-		n = ir_operands_count(ctx, insn);
-		if ((insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN || insn->op == IR_CALL || insn->op == IR_TAILCALL) && n != 2) {
-			new_ref = ir_emit_N(new_ctx, insn->opt, n);
-		} else if (n <= 3) {
-			new_ref = ir_emit0(new_ctx, insn->opt);
-		} else {
-			new_ref = ir_emit_N(new_ctx, insn->opt, n);
-		}
-		for (k = 1, p = insn->ops + 1; k <= n; k++, p++) {
-			ref = *p;
-			switch (IR_OPND_KIND(flags, k)) {
-				case IR_OPND_DATA:
-				case IR_OPND_VAR:
-					if (IR_IS_CONST_REF(ref) && !preserve_constants_order) {
-						if (ctx->ir_base[-ref].op == IR_FUNC) {
-							ref = ir_const_func(new_ctx, ir_str(new_ctx, ir_get_str(ctx, ctx->ir_base[ref].val.addr)),
-								ctx->ir_base[-ref].const_flags);
-						} else if (ctx->ir_base[-ref].op == IR_FUNC_ADDR) {
-							ref = ir_const_func_addr(new_ctx, ctx->ir_base[ref].val.addr, ctx->ir_base[-ref].const_flags);
-						} else if (ctx->ir_base[-ref].op == IR_STR) {
-							ref = ir_const_str(new_ctx, ir_str(new_ctx, ir_get_str(ctx, ctx->ir_base[ref].val.addr)));
-						} else {
-							ref = ir_const(new_ctx, ctx->ir_base[ref].val, ctx->ir_base[ref].type);
-						}
-						break;
-					}
-				case IR_OPND_CONTROL:
-				case IR_OPND_CONTROL_DEP:
-				case IR_OPND_CONTROL_REF:
-					ref = _xlat[ref];
-					break;
-				case IR_OPND_STR:
-					ref = ir_str(new_ctx, ir_get_str(ctx, ref));
-					break;
-				case IR_OPND_NUM:
-				case IR_OPND_PROB:
-					break;
-				default:
-					IR_ASSERT(0);
-					break;
-			}
-			ir_set_op(new_ctx, new_ref, k, ref);
-		}
-	}
-
-	if (ctx->cfg_blocks) {
-		uint32_t b;
-		ir_block *bb;
-
-		new_ctx->cfg_blocks_count = ctx->cfg_blocks_count;
-		if (ctx->cfg_edges_count) {
-			new_ctx->cfg_edges_count = ctx->cfg_edges_count;
-			new_ctx->cfg_edges = ir_mem_malloc(ctx->cfg_edges_count * sizeof(uint32_t));
-			memcpy(new_ctx->cfg_edges, ctx->cfg_edges, ctx->cfg_edges_count * sizeof(uint32_t));
-		}
-		new_ctx->cfg_blocks = ir_mem_malloc((ctx->cfg_blocks_count + 1) * sizeof(ir_block));
-		memcpy(new_ctx->cfg_blocks, ctx->cfg_blocks, (ctx->cfg_blocks_count + 1) * sizeof(ir_block));
-		for (b = 1, bb = new_ctx->cfg_blocks + 1; b <= new_ctx->cfg_blocks_count; b++, bb++) {
-			bb->start = _xlat[bb->start];
-			bb->end = _xlat[bb->end];
-		}
-	}
-
-	if (preserve_constants_order) {
-		_xlat -= ctx->consts_count;
-	}
-	ir_mem_free(_xlat);
-
-	return 1;
-}
-
 int ir_schedule(ir_ctx *ctx)
 {
 	ir_ctx new_ctx;
-	ir_ref i, j, k;
+	ir_ref i, j, k, n, *p, ref, new_ref, insns_count, consts_count;
+	ir_ref *_xlat;
+	uint32_t flags;
+	uint32_t edges_count;
+	ir_use_list *lists;
+	ir_ref *edges;
+	ir_bitset used;
 	ir_ref b;
 	uint32_t *_blocks = ctx->cfg_map;
 	ir_ref *_next = ir_mem_calloc(ctx->insns_count, sizeof(ir_ref));
 	ir_ref *_prev = ir_mem_calloc(ctx->insns_count, sizeof(ir_ref));
 	ir_ref _rest = 0;
 	ir_block *bb;
-	ir_insn *insn;
+	ir_insn *insn, *new_insn;
 
     /* Create double-linked list of nodes ordered by BB, respecting BB->start and BB->end */
 	IR_ASSERT(_blocks[1]);
@@ -485,21 +365,157 @@ restart:
 
 	ir_mem_free(_prev);
 
-	/* Linearization */
-	ir_init(&new_ctx, ctx->consts_count, ctx->insns_count);
+	/* TODO: linearize without reallocation and reconstruction ??? */
+
+	_xlat = ir_mem_calloc(ctx->consts_count + ctx->insns_count, sizeof(ir_ref));
+	_xlat += ctx->consts_count;
+	_xlat[IR_TRUE] = IR_TRUE;
+	_xlat[IR_FALSE] = IR_FALSE;
+	_xlat[IR_NULL] = IR_NULL;
+	used = ir_bitset_malloc(ctx->consts_count + 1);
+	insns_count = 1;
+	consts_count = -(IR_TRUE - 1);
+
+	for (i = 1; i != 0; i = _next[i]) {
+		_xlat[i] = insns_count;
+		insn = &ctx->ir_base[i];
+		flags = ir_op_flags[insn->op];
+		n = ir_input_edges_count(ctx, insn);
+		for (k = 1, p = insn->ops + 1; k <= n; k++, p++) {
+			ref = *p;
+			if (ref < IR_TRUE) {
+				if (!ir_bitset_in(used, -ref)) {
+					ir_bitset_incl(used, -ref);
+					consts_count++;
+				}
+			}
+		}
+		n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
+		insns_count += n;
+	}
+
+	lists = ir_mem_calloc(insns_count, sizeof(ir_use_list));
+	ir_init(&new_ctx, consts_count, insns_count);
 	new_ctx.flags = ctx->flags;
 	new_ctx.fixed_regset = ctx->fixed_regset;
 	new_ctx.fixed_save_regset = ctx->fixed_save_regset;
-	/* TODO: linearize without reallocation and reconstruction ??? */
-	if (!ir_copy(&new_ctx, ctx, _next, 1)) {
-		ir_free(&new_ctx);
-		return 0;
+
+	IR_BITSET_FOREACH(used, ir_bitset_len(ctx->consts_count + 1), ref) {
+		new_ref = new_ctx.consts_count;
+		IR_ASSERT(new_ref < ctx->consts_limit);
+		new_ctx.consts_count = new_ref + 1;
+		_xlat[-ref] = new_ref = -new_ref;
+		insn = &ctx->ir_base[-ref];
+		new_insn = &new_ctx.ir_base[new_ref];
+		new_insn->optx = insn->optx;
+		new_insn->prev_const = 0;
+		if (insn->op == IR_FUNC || insn->op == IR_STR) {
+			new_insn->val.addr = ir_str(&new_ctx, ir_get_str(ctx, insn->val.addr));
+		} else {
+			new_insn->val.u64 = insn->val.u64;
+		}
+	} IR_BITSET_FOREACH_END();
+
+	ir_mem_free(used);
+	edges_count = 0;
+
+	for (i = 1; i != 0; i = _next[i]) {
+		insn = &ctx->ir_base[i];
+		flags = ir_op_flags[insn->op];
+		n = ir_operands_count(ctx, insn);
+
+		new_ref = new_ctx.insns_count;
+		new_ctx.insns_count = new_ref + 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI;
+		IR_ASSERT(new_ctx.insns_count <= new_ctx.insns_limit);
+		new_insn = &new_ctx.ir_base[new_ref];
+
+		new_insn->optx = insn->optx;
+		new_insn->op1 = IR_UNUSED;
+		new_insn->op2 = IR_UNUSED;
+		new_insn->op3 = IR_UNUSED;
+		for (k = 1, p = insn->ops + 1; k <= n; k++, p++) {
+			ref = *p;
+			switch (IR_OPND_KIND(flags, k)) {
+				case IR_OPND_DATA:
+				case IR_OPND_VAR:
+				case IR_OPND_CONTROL:
+				case IR_OPND_CONTROL_DEP:
+					ref = _xlat[ref];
+					if (ref > 0) {
+						lists[ref].refs = -1;
+						lists[ref].count++;
+						edges_count++;
+					}
+					break;
+				case IR_OPND_CONTROL_REF:
+					ref = _xlat[ref];
+					break;
+				case IR_OPND_STR:
+					ref = ir_str(&new_ctx, ir_get_str(ctx, ref));
+					break;
+				case IR_OPND_NUM:
+				case IR_OPND_PROB:
+					break;
+				default:
+					IR_ASSERT(0);
+					break;
+			}
+			new_insn->ops[k] = ref;
+		}
 	}
+
+	edges = ir_mem_malloc(edges_count * sizeof(ir_ref));
+	edges_count = 0;
+	for (i = IR_UNUSED + 1, insn = new_ctx.ir_base + i; i < new_ctx.insns_count;) {
+		n = ir_input_edges_count(&new_ctx, insn);
+		for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
+			ref = *p;
+			if (ref > 0) {
+				ir_use_list *use_list = &lists[ref];
+
+				if (use_list->refs == -1) {
+					use_list->refs = edges_count;
+					edges_count += use_list->count;
+					use_list->count = 0;
+				}
+				edges[use_list->refs + use_list->count++] = i;
+			}
+		}
+		n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
+		i += n;
+		insn += n;
+	}
+
+	new_ctx.use_edges = edges;
+	new_ctx.use_lists = lists;
+
+	if (ctx->cfg_blocks) {
+		uint32_t b;
+		ir_block *bb;
+
+		new_ctx.cfg_blocks_count = ctx->cfg_blocks_count;
+		if (ctx->cfg_edges_count) {
+			new_ctx.cfg_edges_count = ctx->cfg_edges_count;
+			new_ctx.cfg_edges = ir_mem_malloc(ctx->cfg_edges_count * sizeof(uint32_t));
+			memcpy(new_ctx.cfg_edges, ctx->cfg_edges, ctx->cfg_edges_count * sizeof(uint32_t));
+		}
+		new_ctx.cfg_blocks = ir_mem_malloc((ctx->cfg_blocks_count + 1) * sizeof(ir_block));
+		memcpy(new_ctx.cfg_blocks, ctx->cfg_blocks, (ctx->cfg_blocks_count + 1) * sizeof(ir_block));
+		for (b = 1, bb = new_ctx.cfg_blocks + 1; b <= new_ctx.cfg_blocks_count; b++, bb++) {
+			bb->start = _xlat[bb->start];
+			bb->end = _xlat[bb->end];
+		}
+	}
+
+	_xlat -= ctx->consts_count;
+	ir_mem_free(_xlat);
+
 	ir_free(ctx);
-	ir_build_def_use_lists(&new_ctx);
-	ir_truncate(&new_ctx);
+	IR_ASSERT(new_ctx.consts_count == new_ctx.consts_limit);
+	IR_ASSERT(new_ctx.insns_count == new_ctx.insns_limit);
 	memcpy(ctx, &new_ctx, sizeof(ir_ctx));
 	ctx->flags |= IR_LINEAR;
+
 	ir_mem_free(_next);
 
 	return 1;
