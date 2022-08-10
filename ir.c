@@ -883,10 +883,8 @@ void ir_bind(ir_ctx *ctx, ir_ref var, ir_ref def)
 /* Batch construction of def->use edges */
 void ir_build_def_use_lists(ir_ctx *ctx)
 {
-	ir_ref n, i, j, *p, ref, def;
+	ir_ref n, i, j, *p, def;
 	ir_insn *insn;
-	ir_bitset worklist1 = ir_bitset_malloc(ctx->insns_count);
-	ir_bitset worklist2 = ir_bitset_malloc(ctx->insns_count);
 	uint32_t edges_count = 0;
 	ir_use_list *lists = ir_mem_calloc(ctx->insns_count, sizeof(ir_use_list));
 	ir_ref *edges;
@@ -894,11 +892,10 @@ void ir_build_def_use_lists(ir_ctx *ctx)
 	for (i = IR_UNUSED + 1, insn = ctx->ir_base + i; i < ctx->insns_count;) {
 		n = ir_input_edges_count(ctx, insn);
 		for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
-			ref = *p;
-			if (ref > 0) {
-				ir_bitset_incl(worklist2, i);
-				ir_bitset_incl(worklist1, ref);
-				lists[ref].count++;
+			def = *p;
+			if (def > 0) {
+				lists[def].refs = -1;
+				lists[def].count++;
 				edges_count++;
 			}
 		}
@@ -907,28 +904,28 @@ void ir_build_def_use_lists(ir_ctx *ctx)
 		insn += n;
 	}
 
-	n = 0;
-	IR_BITSET_FOREACH(worklist1, ir_bitset_len(ctx->insns_count), ref) {
-		lists[ref].refs = n;
-		n += lists[ref].count;
-		lists[ref].count = 0;
-	} IR_BITSET_FOREACH_END();
-	IR_ASSERT(n == edges_count);
-
 	edges = ir_mem_malloc(edges_count * sizeof(ir_ref));
-	IR_BITSET_FOREACH(worklist2, ir_bitset_len(ctx->insns_count), ref) {
-		insn = &ctx->ir_base[ref];
+	edges_count = 0;
+	for (i = IR_UNUSED + 1, insn = ctx->ir_base + i; i < ctx->insns_count;) {
 		n = ir_input_edges_count(ctx, insn);
 		for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
 			def = *p;
 			if (def > 0) {
-				edges[lists[def].refs + lists[def].count++] = ref;
+				ir_use_list *use_list = &lists[def];
+
+				if (use_list->refs == -1) {
+					use_list->refs = edges_count;
+					edges_count += use_list->count;
+					use_list->count = 0;
+				}
+				edges[use_list->refs + use_list->count++] = i;
 			}
 		}
-	} IR_BITSET_FOREACH_END();
+		n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
+		i += n;
+		insn += n;
+	}
 
-	ir_mem_free(worklist2);
-	ir_mem_free(worklist1);
 	ctx->use_edges = edges;
 	ctx->use_lists = lists;
 }
