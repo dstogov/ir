@@ -2148,10 +2148,10 @@ static int ir_linear_scan(ir_ctx *ctx)
 		while (other) {
 			ir_live_range *r = other->current_range;
 
-			if (r) {
-				while (r && r->end <= position) {
+			if (r && r->end <= position) {
+				do {
 					r = r->next;
-				}
+				} while (r && r->end <= position);
 				other->current_range = r;
 			}
 			/* if (ir_ival_end(other) <= position) {*/
@@ -2183,14 +2183,11 @@ static int ir_linear_scan(ir_ctx *ctx)
 		while (other) {
 			ir_live_range *r = other->current_range;
 
-			if (r) {
-				while (r && r->end <= position) {
+			if (r  && r->end <= position) {
+				do {
 					r = r->next;
-				}
+				} while (r && r->end <= position);
 				other->current_range = r;
-			}
-			while (r && r->end <= position) {
-				r = r->next;
 			}
 			/* if (ir_ival_end(other) <= position) {*/
 			if (!r) {
