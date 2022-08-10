@@ -643,18 +643,18 @@ void ir_free_live_intervals(ir_live_interval **live_intervals, int count)
 static ir_live_pos ir_ivals_overlap(ir_live_range *lrg1, ir_live_range *lrg2)
 {
 	while (1) {
-		if (lrg1->start < lrg2->end) {
-			if (lrg2->start < lrg1->end) {
+		if (lrg2->start < lrg1->end) {
+			if (lrg1->start < lrg2->end) {
 				return IR_MAX(lrg1->start, lrg2->start);
 			} else {
-				lrg1 = lrg1->next;
-				if (!lrg1) {
+				lrg2 = lrg2->next;
+				if (!lrg2) {
 					return 0;
 				}
 			}
 		} else {
-			lrg2 = lrg2->next;
-			if (!lrg2) {
+			lrg1 = lrg1->next;
+			if (!lrg1) {
 				return 0;
 			}
 		}
