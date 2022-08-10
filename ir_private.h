@@ -205,41 +205,41 @@ IR_ALWAYS_INLINE int ir_nlzl(uint64_t num)
 /*** Helper data types ***/
 
 /* Bitsets */
-typedef uint32_t *ir_bitset;
+typedef uintptr_t *ir_bitset;
 
 IR_ALWAYS_INLINE uint32_t ir_bitset_len(uint32_t n)
 {
-	return (n + 31) / 32;
+	return (n + (sizeof(uintptr_t) * 8 - 1)) / (sizeof(uintptr_t) * 8);
 }
 
 IR_ALWAYS_INLINE ir_bitset ir_bitset_malloc(uint32_t n)
 {
-	return ir_mem_calloc(ir_bitset_len(n), sizeof(uint32_t));
+	return ir_mem_calloc(ir_bitset_len(n), sizeof(uintptr_t));
 }
 
 IR_ALWAYS_INLINE void ir_bitset_incl(ir_bitset set, uint32_t n)
 {
-	set[n / 32] |= 1 << (n % 32);
+	set[n / (sizeof(uintptr_t) * 8)] |= 1UL << (n % (sizeof(uintptr_t) * 8));
 }
 
 IR_ALWAYS_INLINE void ir_bitset_excl(ir_bitset set, uint32_t n)
 {
-	set[n / 32] &= ~(1 << (n % 32));
+	set[n / (sizeof(uintptr_t) * 8)] &= ~(1UL << (n % (sizeof(uintptr_t) * 8)));
 }
 
 IR_ALWAYS_INLINE bool ir_bitset_in(ir_bitset set, uint32_t n)
 {
-	return (set[(n / 32)] & (1 << (n % 32))) != 0;
+	return (set[(n / (sizeof(uintptr_t) * 8))] & (1UL << (n % (sizeof(uintptr_t) * 8)))) != 0;
 }
 
 IR_ALWAYS_INLINE void ir_bitset_clear(ir_bitset set, uint32_t len)
 {
-	memset(set, 0, len * sizeof(uint32_t));
+	memset(set, 0, len * sizeof(uintptr_t));
 }
 
 IR_ALWAYS_INLINE void ir_bitset_fill(ir_bitset set, uint32_t len)
 {
-	memset(set, 0xff, len * sizeof(uint32_t));
+	memset(set, 0xff, len * sizeof(uintptr_t));
 }
 
 IR_ALWAYS_INLINE bool ir_bitset_empty(ir_bitset set, uint32_t len)
@@ -255,12 +255,12 @@ IR_ALWAYS_INLINE bool ir_bitset_empty(ir_bitset set, uint32_t len)
 
 IR_ALWAYS_INLINE bool ir_bitset_equal(ir_bitset set1, ir_bitset set2, uint32_t len)
 {
-    return memcmp(set1, set2, len * sizeof(uint32_t)) == 0;
+    return memcmp(set1, set2, len * sizeof(uintptr_t)) == 0;
 }
 
 IR_ALWAYS_INLINE void ir_bitset_copy(ir_bitset set1, ir_bitset set2, uint32_t len)
 {
-    memcpy(set1, set2, len * sizeof(uint32_t));
+    memcpy(set1, set2, len * sizeof(uintptr_t));
 }
 
 IR_ALWAYS_INLINE void ir_bitset_intersection(ir_bitset set1, ir_bitset set2, uint32_t len)
@@ -308,7 +308,11 @@ IR_ALWAYS_INLINE int ir_bitset_first(ir_bitset set, uint32_t len)
 
 	for (i = 0; i < len; i++) {
 		if (set[i]) {
-			return 32 * i + ir_ntz(set[i]);
+			if (sizeof(uintptr_t) == 4) {
+				return 32 * i + ir_ntz(set[i]);
+			} else {
+				return 64 * i + ir_ntzl(set[i]);
+			}
 		}
 	}
 	return -1; /* empty set */
@@ -321,8 +325,8 @@ IR_ALWAYS_INLINE int ir_bitset_last(ir_bitset set, uint32_t len)
 	while (i > 0) {
 		i--;
 		if (set[i]) {
-			uint32_t j = 32 * i - 1;
-			uint32_t x = set[i];
+			uint32_t j = (sizeof(uintptr_t) * 8) * i - 1;
+			uintptr_t x = set[i];
 			do {
 				x = x >> 1;
 				j++;
@@ -345,9 +349,9 @@ IR_ALWAYS_INLINE int ir_bitset_pop_first(ir_bitset set, uint32_t len) {
 	ir_bitset _set = (set); \
 	uint32_t _i, _len = (len); \
 	for (_i = 0; _i < _len; _i++) { \
-		uint32_t _x = _set[_i]; \
+		uintptr_t _x = _set[_i]; \
 		if (_x) { \
-			(bit) = 32 * _i; \
+			(bit) = (sizeof(uintptr_t) * 8) * _i; \
 			for (; _x != 0; _x >>= 1, (bit)++) { \
 				if (!(_x & 1)) continue;
 
