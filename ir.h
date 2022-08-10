@@ -593,10 +593,31 @@ void ir_check(ir_ctx *ctx);
 void ir_consistency_check(void);
 
 /* IR Memmory Allocation */
-#define ir_mem_malloc(size)       malloc(size)
-#define ir_mem_calloc(n, size)    calloc(n, size)
-#define ir_mem_realloc(ptr, size) realloc(ptr, size)
-#define ir_mem_free(ptr)          free(ptr)
+#ifndef ir_mem_malloc
+# define ir_mem_malloc   malloc
+#endif
+#ifndef ir_mem_calloc
+# define ir_mem_calloc   calloc
+#endif
+#ifndef ir_mem_realloc
+# define ir_mem_realloc  realloc
+#endif
+#ifndef ir_mem_free
+# define ir_mem_free     free
+#endif
+
+#ifndef ir_mem_pmalloc
+# define ir_mem_pmalloc  malloc
+#endif
+#ifndef ir_mem_pcalloc
+# define ir_mem_pcalloc  calloc
+#endif
+#ifndef ir_mem_prealloc
+# define ir_mem_prealloc realloc
+#endif
+#ifndef ir_mem_pfree
+# define ir_mem_pfree    free
+#endif
 
 void *ir_mem_mmap(size_t size);
 int ir_mem_unmap(void *ptr, size_t size);

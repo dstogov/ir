@@ -10,6 +10,19 @@
 # define IR_SET_ALIGNED(alignment, decl) decl
 #endif
 
+#define DASM_M_GROW(ctx, t, p, sz, need) \
+  do { \
+    size_t _sz = (sz), _need = (need); \
+    if (_sz < _need) { \
+      if (_sz < 16) _sz = 16; \
+      while (_sz < _need) _sz += _sz; \
+      (p) = (t *)ir_mem_realloc((p), _sz); \
+      (sz) = _sz; \
+    } \
+  } while(0)
+
+#define DASM_M_FREE(ctx, p, sz) ir_mem_free(p)
+
 #if IR_DEBUG
 # define DASM_CHECKS
 #endif

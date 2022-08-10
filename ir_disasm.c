@@ -74,7 +74,7 @@ void ir_disasm_add_symbol(const char *name,
 	ir_sym_node *sym;
 	size_t len = strlen(name);
 
-	sym = ir_mem_malloc(sizeof(ir_sym_node) + len + 1);
+	sym = ir_mem_pmalloc(sizeof(ir_sym_node) + len + 1);
 	if (!sym) {
 		return;
 	}
@@ -111,7 +111,7 @@ void ir_disasm_add_symbol(const char *name,
 					/* reduce size of the existing symbol */
 					node->end = sym->end;
 				}
-				free(sym);
+				ir_mem_pfree(sym);
 				return;
 			}
 		} while (1);
@@ -167,7 +167,7 @@ static void ir_disasm_destroy_symbols(ir_sym_node *n)
 		if (n->child[1]) {
 			ir_disasm_destroy_symbols(n->child[1]);
 		}
-		free(n);
+		ir_mem_pfree(n);
 	}
 }
 

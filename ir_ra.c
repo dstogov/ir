@@ -615,13 +615,13 @@ void ir_free_live_ranges(ir_live_range *live_range)
 void ir_free_live_intervals(ir_live_interval **live_intervals, int count)
 {
 	uint32_t i;
-	ir_live_interval *ival;
+	ir_live_interval *ival, *next;
 	ir_use_pos *use_pos;
 
 	count += IR_REG_NUM;
 	for (i = 0; i <= count; i++) {
 		ival = live_intervals[i];
-		if (ival) {
+		while (ival) {
 			if (ival->range.next) {
 				ir_free_live_ranges(ival->range.next);
 			}
@@ -631,7 +631,9 @@ void ir_free_live_intervals(ir_live_interval **live_intervals, int count)
 				use_pos = p->next;
 				ir_mem_free(p);
 			}
+			next = ival->next;
 			ir_mem_free(ival);
+			ival = next;
 		}
 	}
 	ir_mem_free(live_intervals);
