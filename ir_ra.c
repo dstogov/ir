@@ -1249,8 +1249,8 @@ static bool ir_ival_covers(ir_live_interval *ival, ir_live_pos position)
 	ir_live_range *live_range = &ival->range;
 
 	do {
-		if (position >= live_range->start && position < live_range->end) {
-			return 1;
+		if (position < live_range->end) {
+			return position >= live_range->start;
 		}
 		live_range = live_range->next;
 	} while (live_range);
