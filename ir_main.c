@@ -20,11 +20,12 @@ static void help(const char *cmd)
 		"  --dump-after-gcm           - dump IR after GCM optimization pass\n"
 		"  --dump-after-schedule      - dump IR after SCHEDULE pass\n"
 		"  --dump-after-live-ranges   - dump IR after live ranges identification\n"
-		"  --dump-after-coalescing    - dump IR after live ranges identification\n"
+		"  --dump-after-coalescing    - dump IR after live ranges coalescing\n"
 		"  --dump-after-all           - dump IR after each pass\n"
 		"  --dump-use-lists           - dump def->use lists\n"
 		"  --dump-cfg                 - dump CFG (Control Flow Graph)\n"
 		"  --dump-cfg-map             - dump CFG map (instruction to BB number)\n"
+		"  --dump-live-ranges         - dump live ranges\n"
 #ifdef IR_DEBUG
 		"  --debug-sccp               - debug SCCP optimization pass\n"
 		"  --debug-gcm                - debug GCM optimization pass\n"
