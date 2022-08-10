@@ -732,6 +732,7 @@ struct _ir_live_interval {
 	int32_t           vreg;
 	int32_t           stack_spill_pos;
 	ir_live_range     range;
+	ir_live_pos       end;       /* end of the last live range (cahce of ival.range.{next->}end) */
 	ir_use_pos       *use_pos;
 	ir_live_interval *top;
 	ir_live_interval *next;

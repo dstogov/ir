@@ -86,7 +86,7 @@ static void ir_add_local_var(ir_ctx *ctx, int v, uint8_t type)
 	ival->vreg = v;
 	ival->stack_spill_pos = -1; // not allocated
 	ival->range.start = IR_START_LIVE_POS_FROM_REF(1);
-	ival->range.end = IR_END_LIVE_POS_FROM_REF(ctx->insns_count - 1);
+	ival->range.end = ival->end = IR_END_LIVE_POS_FROM_REF(ctx->insns_count - 1);
 	ival->range.next = NULL;
 	ival->use_pos = NULL;
 
@@ -110,7 +110,7 @@ static void ir_add_live_range(ir_ctx *ctx, ir_live_range **unused, int v, uint8_
 		ival->vreg = v;
 		ival->stack_spill_pos = -1; // not allocated
 		ival->range.start = start;
-		ival->range.end = end;
+		ival->range.end = ival->end = end;
 		ival->range.next = NULL;
 		ival->use_pos = NULL;
 
@@ -143,6 +143,9 @@ static void ir_add_live_range(ir_ctx *ctx, ir_live_range **unused, int v, uint8_
 					*unused = next;
 					next = p->next;
 				}
+				if (!p->next) {
+					ival->end = p->end;
+				}
 			}
 			return;
 		}
@@ -168,6 +171,9 @@ static void ir_add_live_range(ir_ctx *ctx, ir_live_range **unused, int v, uint8_
 	q->start = start;
 	q->end = end;
 	q->next = p;
+	if (!p) {
+		ival->end = end;
+	}
 }
 
 static void ir_add_fixed_live_range(ir_ctx *ctx, ir_live_range **unused, ir_reg reg, ir_live_pos start, ir_live_pos end)
@@ -182,7 +188,7 @@ static void ir_add_fixed_live_range(ir_ctx *ctx, ir_live_range **unused, ir_reg 
 		ival->vreg = v;
 		ival->stack_spill_pos = -1; // not allocated
 		ival->range.start = start;
-		ival->range.end = end;
+		ival->range.end = ival->end = end;
 		ival->range.next = NULL;
 		ival->use_pos = NULL;
 
@@ -205,7 +211,7 @@ static void ir_add_tmp(ir_ctx *ctx, ir_ref ref, ir_tmp_reg tmp_reg)
 	ival->vreg = 0;
 	ival->stack_spill_pos = -1; // not allocated
 	ival->range.start = IR_START_LIVE_POS_FROM_REF(ref) + tmp_reg.start;
-	ival->range.end = IR_START_LIVE_POS_FROM_REF(ref) + tmp_reg.end;
+	ival->range.end = ival->end = IR_START_LIVE_POS_FROM_REF(ref) + tmp_reg.end;
 	ival->range.next = NULL;
 	ival->use_pos = NULL;
 
@@ -809,6 +815,9 @@ static void ir_swap_operands(ir_ctx *ctx, ir_ref i, ir_insn *insn)
 		while (r) {
 			if (r->end == load_pos) {
 				r->end = pos;
+				if (!r->next) {
+					ival->end = pos;
+				}
 				break;
 			}
 			r = r->next;
@@ -879,12 +888,18 @@ static int ir_try_swap_operands(ir_ctx *ctx, ir_ref i, ir_insn *insn)
 			while (r) {
 				if (r->end == pos) {
 					r->end = load_pos;
+					if (!r->next) {
+						ival->end = load_pos;
+					}
 					if (!ir_vregs_overlap(ctx, ctx->vregs[insn->op2], ctx->vregs[i])
 					 && !ir_hint_conflict(ctx, i, ctx->vregs[insn->op2], ctx->vregs[i])) {
 						ir_swap_operands(ctx, i, insn);
 						return 1;
 					} else {
 						r->end = pos;
+						if (!r->next) {
+							ival->end = pos;
+						}
 					}
 					break;
 				}
@@ -1215,14 +1230,18 @@ int ir_gen_dessa_moves(ir_ctx *ctx, int b, emit_copy_t emit_copy)
 # define IR_LOG_LSRA_CONFLICT(action, ival, pos);
 #endif
 
-static ir_live_pos ir_ival_end(ir_live_interval *ival)
+IR_ALWAYS_INLINE ir_live_pos ir_ival_end(ir_live_interval *ival)
 {
+#if 1
+	return ival->end;
+#else
 	ir_live_range *live_range = &ival->range;
 
 	while (live_range->next) {
 		live_range = live_range->next;
 	}
 	return live_range->end;
+#endif
 }
 
 static bool ir_ival_covers(ir_live_interval *ival, ir_live_pos position)
@@ -1391,6 +1410,7 @@ static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, ir_live_interval *iva
 	child->range.start = pos;
 	child->range.end = p->end;
 	child->range.next = p->next;
+	child->end = ival->end;
 	child->use_pos = prev_use_pos ? prev_use_pos->next : use_pos;
 
 	child->top = ival->top;
@@ -1399,8 +1419,9 @@ static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, ir_live_interval *iva
 
 	if (pos == p->start) {
 		prev->next = NULL;
+		ival->end = prev->end;
 	} else {
-		p->end = pos;
+		p->end = ival->end = pos;
 		p->next = NULL;
 	}
 	if (prev_use_pos) {
