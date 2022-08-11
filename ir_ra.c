@@ -561,9 +561,8 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 				ir_bitset_clear(queue, bb_set_len);
 			}
 			ir_bitset_incl(loops, b);
-			ir_bitset_incl(queue, b);
+			child = b;
 			do {
-				child = ir_bitset_pop_first(queue, bb_set_len);
 				child_bb = &ctx->cfg_blocks[child];
 
 				IR_BITSET_FOREACH(live, len, i) {
@@ -583,7 +582,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					}
 					child = child_bb->dom_next_child;
 				}
-			} while (!ir_bitset_empty(queue, bb_set_len));
+			} while ((child = ir_bitset_pop_first(queue, bb_set_len)) >= 0);
 		}
 
 		/* b.liveIn = live */
@@ -1142,11 +1141,10 @@ int ir_gen_dessa_moves(ir_ctx *ctx, int b, emit_copy_t emit_copy)
 		}
 	} IR_BITSET_FOREACH_END();
 
-	while (!ir_bitset_empty(todo, len)) {
+	while ((j = ir_bitset_pop_first(todo, len)) >= 0) {
 		uint32_t a, b, c;
 
-		while (!ir_bitset_empty(ready, len)) {
-			b = ir_bitset_pop_first(ready, len);
+		while ((b = ir_bitset_pop_first(ready, len)) != (uint32_t)-1) {
 			a = pred[b];
 			c = loc[a];
 			emit_copy(ctx, ctx->ir_base[b].type, c, b);
@@ -1155,7 +1153,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, int b, emit_copy_t emit_copy)
 				ir_bitset_incl(ready, a);
 			}
 		}
-		b = ir_bitset_pop_first(todo, len);
+		b = j;
 		if (b != loc[pred[b]]) {
 			emit_copy(ctx, ctx->ir_base[b].type, b, 0);
 			loc[b] = 0;

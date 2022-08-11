@@ -542,8 +542,7 @@ int ir_schedule_blocks(ir_ctx *ctx)
 		ir_bitset_incl(blocks, b);
 	}
 
-	while (!ir_bitset_empty(blocks, len)) {
-		b = ir_bitset_pop_first(blocks, len);
+	while ((b = ir_bitset_pop_first(blocks, len)) != (uint32_t)-1) {
 		bb = &ctx->cfg_blocks[b];
 		do {
 			if (bb->predecessors_count == 2) {
