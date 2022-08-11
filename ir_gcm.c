@@ -394,6 +394,30 @@ restart:
 		insns_count += n;
 	}
 
+#if 1
+	if (consts_count == ctx->consts_count && insns_count == ctx->insns_count) {
+		bool changed = 0;
+
+		for (i = 1; i != 0; i = _next[i]) {
+			if (_xlat[i] != i) {
+				changed = 1;
+				break;
+			}
+		}
+		if (!changed) {
+			ir_mem_free(used);
+			_xlat -= ctx->consts_count;
+			ir_mem_free(_xlat);
+			ir_mem_free(_next);
+
+			ctx->flags |= IR_LINEAR;
+			ir_truncate(ctx);
+
+			return 1;
+		}
+	}
+#endif
+
 	lists = ir_mem_calloc(insns_count, sizeof(ir_use_list));
 	ir_init(&new_ctx, consts_count, insns_count);
 	new_ctx.flags = ctx->flags;
