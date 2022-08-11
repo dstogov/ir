@@ -355,7 +355,7 @@ void ir_dump_live_ranges(ir_ctx *ctx, FILE *f)
 		}
 	}
 #if 1
-	n = ctx->vregs_count + ir_regs_number();
+	n = ctx->vregs_count + ir_regs_number() + 1;
 	for (i = ctx->vregs_count + 1; i <= n; i++) {
 		ir_live_interval *ival = ctx->live_intervals[i];
 

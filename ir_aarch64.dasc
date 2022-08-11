@@ -229,6 +229,9 @@ static const int8_t _ir_fp_reg_params[IR_REG_FP_ARGS] = {
 
 const char *ir_reg_name(int8_t reg, ir_type type)
 {
+	if (reg == IR_REG_NUM) {
+		return "SCRATCH";
+	}
 	IR_ASSERT(reg >= 0 && reg < IR_REG_NUM);
 	if (type == IR_VOID) {
 		type = (reg < IR_REG_FP_FIRST) ? IR_ADDR : IR_DOUBLE;

@@ -344,7 +344,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 	visited = ir_bitset_malloc(ctx->cfg_blocks_count + 1);
 	len = ir_bitset_len(ctx->vregs_count + 1);
 	live = ir_bitset_malloc((ctx->cfg_blocks_count + 1) * len * 8 * sizeof(*live));
-	ctx->live_intervals = ir_mem_calloc(ctx->vregs_count + 1 + IR_REG_NUM, sizeof(ir_live_interval*));
+	ctx->live_intervals = ir_mem_calloc(ctx->vregs_count + 1 + IR_REG_NUM + 1, sizeof(ir_live_interval*));
 	for (b = ctx->cfg_blocks_count; b > 0; b--) {
 		bb = &ctx->cfg_blocks[b];
 		if (bb->flags & IR_BB_UNREACHABLE) {
@@ -526,7 +526,11 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					}
 				}
 				/* CPU specific constraints */
-				if (ctx->rules) {
+				if (insn->op == IR_CALL) {
+					ir_add_fixed_live_range(ctx, &unused, IR_REG_NUM,
+						IR_START_LIVE_POS_FROM_REF(i) + IR_USE_SUB_REF,
+						IR_START_LIVE_POS_FROM_REF(i) + IR_DEF_SUB_REF);
+				} else if (ctx->rules) {
 					ir_live_pos start, end;
 					ir_regset regset = ir_get_scratch_regset(ctx, i, &start, &end);
 
@@ -618,7 +622,7 @@ void ir_free_live_intervals(ir_live_interval **live_intervals, int count)
 	ir_live_interval *ival, *next;
 	ir_use_pos *use_pos;
 
-	count += IR_REG_NUM;
+	count += IR_REG_NUM + 1;
 	for (i = 0; i <= count; i++) {
 		ival = live_intervals[i];
 		while (ival) {
@@ -1028,7 +1032,7 @@ int ir_coalesce(ir_ctx *ctx)
 		n--;
 		if (n != ctx->vregs_count) {
 			j = ctx->vregs_count - n;
-			for (i = n + 1; i <= n + IR_REG_NUM; i++) {
+			for (i = n + 1; i <= n + IR_REG_NUM + 1; i++) {
 				ctx->live_intervals[i] = ctx->live_intervals[i + j];
 				if (ctx->live_intervals[i]) {
 					ctx->live_intervals[i]->vreg = i;
@@ -1631,7 +1635,13 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 		/* freeUntilPos[it.reg] = 0 */
 		reg = other->reg;
 		IR_ASSERT(reg >= 0);
-		if (IR_REGSET_IN(available, reg)) {
+		if (reg == IR_REG_NUM) {
+			ir_regset regset = IR_REGSET_INTERSECTION(available, IR_REGSET_SCRATCH);
+
+			IR_REGSET_FOREACH(regset, reg) {
+				freeUntilPos[reg] = 0;
+			} IR_REGSET_FOREACH_END();
+		} else if (IR_REGSET_IN(available, reg)) {
 			freeUntilPos[reg] = 0;
 		}
 		other = other->list_next;
@@ -1647,7 +1657,18 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 		/* freeUntilPos[it.reg] = next intersection of it with current */
 		reg = other->reg;
 		IR_ASSERT(reg >= 0);
-		if (IR_REGSET_IN(available, reg)) {
+		if (reg == IR_REG_NUM) {
+			next = ir_ivals_overlap(&ival->range, other->current_range);
+			if (next) {
+				ir_regset regset = IR_REGSET_INTERSECTION(available, IR_REGSET_SCRATCH);
+
+				IR_REGSET_FOREACH(regset, reg) {
+					if (next < freeUntilPos[reg]) {
+						freeUntilPos[reg] = next;
+					}
+				} IR_REGSET_FOREACH_END();
+			}
+		} else if (IR_REGSET_IN(available, reg)) {
 			next = ir_ivals_overlap(&ival->range, other->current_range);
 			if (next && next < freeUntilPos[reg]) {
 				freeUntilPos[reg] = next;
@@ -1777,7 +1798,13 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 		/* nextUsePos[it.reg] = next use of it after start of current */
 		reg = other->reg;
 		IR_ASSERT(reg >= 0);
-		if (IR_REGSET_IN(available, reg)) {
+		if (reg == IR_REG_NUM) {
+			ir_regset regset = IR_REGSET_INTERSECTION(available, IR_REGSET_SCRATCH);
+
+			IR_REGSET_FOREACH(regset, reg) {
+				blockPos[reg] = nextUsePos[reg] = 0;
+			} IR_REGSET_FOREACH_END();
+		} else if (IR_REGSET_IN(available, reg)) {
 			if (other->flags & (IR_LIVE_INTERVAL_FIXED|IR_LIVE_INTERVAL_TEMP)) {
 				blockPos[reg] = nextUsePos[reg] = 0;
 			} else {
@@ -1797,7 +1824,22 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 		/* freeUntilPos[it.reg] = next intersection of it with current */
 		reg = other->reg;
 		IR_ASSERT(reg >= 0);
-		if (IR_REGSET_IN(available, reg)) {
+		if (reg == IR_REG_NUM) {
+			ir_live_pos overlap = ir_ivals_overlap(&ival->range, other->current_range);
+
+			if (overlap) {
+				ir_regset regset = IR_REGSET_INTERSECTION(available, IR_REGSET_SCRATCH);
+
+				IR_REGSET_FOREACH(regset, reg) {
+					if (overlap < nextUsePos[reg]) {
+						nextUsePos[reg] = overlap;
+					}
+					if (overlap < blockPos[reg]) {
+						blockPos[reg] = overlap;
+					}
+				} IR_REGSET_FOREACH_END();
+			}
+		} else if (IR_REGSET_IN(available, reg)) {
 			ir_live_pos overlap = ir_ivals_overlap(&ival->range, other->current_range);
 
 			if (overlap) {
@@ -2119,7 +2161,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 		ival = ival->next;
 	}
 
-	for (j = ctx->vregs_count + 1; j <= ctx->vregs_count + IR_REG_NUM; j++) {
+	for (j = ctx->vregs_count + 1; j <= ctx->vregs_count + IR_REG_NUM + 1; j++) {
 		ival = ctx->live_intervals[j];
 		if (ival) {
 			ival->current_range = &ival->range;
