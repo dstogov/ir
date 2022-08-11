@@ -397,6 +397,7 @@ restart:
 	lists = ir_mem_calloc(insns_count, sizeof(ir_use_list));
 	ir_init(&new_ctx, consts_count, insns_count);
 	new_ctx.flags = ctx->flags;
+	new_ctx.fixed_stack_frame_size = ctx->fixed_stack_frame_size;
 	new_ctx.fixed_regset = ctx->fixed_regset;
 	new_ctx.fixed_save_regset = ctx->fixed_save_regset;
 
