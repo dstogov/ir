@@ -367,11 +367,12 @@ restart:
 
 	/* TODO: linearize without reallocation and reconstruction ??? */
 
-	_xlat = ir_mem_calloc(ctx->consts_count + ctx->insns_count, sizeof(ir_ref));
+	_xlat = ir_mem_malloc((ctx->consts_count + ctx->insns_count) * sizeof(ir_ref));
 	_xlat += ctx->consts_count;
 	_xlat[IR_TRUE] = IR_TRUE;
 	_xlat[IR_FALSE] = IR_FALSE;
 	_xlat[IR_NULL] = IR_NULL;
+	_xlat[IR_UNUSED] = IR_UNUSED;
 	used = ir_bitset_malloc(ctx->consts_count + 1);
 	insns_count = 1;
 	consts_count = -(IR_TRUE - 1);
