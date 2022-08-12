@@ -352,13 +352,16 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 		}
 		/* for each successor of b */
 		ir_bitset_incl(visited, b);
-		ir_bitset_clear(live, len);
 		for (i = 0; i < bb->successors_count; i++) {
 			succ = ctx->cfg_edges[bb->successors + i];
 			/* blocks must be ordered where all dominators of a block are before this block */
             IR_ASSERT(ir_bitset_in(visited, succ) || bb->loop_header == succ);
 			/* live = union of successors.liveIn */
-			ir_bitset_union(live, live + (len * succ), len);
+			if (i == 0) {
+				ir_bitset_copy(live, live + (len * succ), len);
+			} else {
+				ir_bitset_union(live, live + (len * succ), len);
+			}
 			/* for each phi function phi of successor */
 			succ_bb = &ctx->cfg_blocks[succ];
 			if (succ_bb->predecessors_count > 1) {
