@@ -352,6 +352,9 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 		}
 		/* for each successor of b */
 		ir_bitset_incl(visited, b);
+		if (bb->successors_count == 0) {
+			ir_bitset_clear(live, len);
+		}
 		for (i = 0; i < bb->successors_count; i++) {
 			succ = ctx->cfg_edges[bb->successors + i];
 			/* blocks must be ordered where all dominators of a block are before this block */
