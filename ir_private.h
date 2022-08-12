@@ -345,12 +345,20 @@ IR_ALWAYS_INLINE int ir_bitset_last(ir_bitset set, uint32_t len)
 	return -1; /* empty set */
 }
 
-IR_ALWAYS_INLINE int ir_bitset_pop_first(ir_bitset set, uint32_t len) {
-	int i = ir_bitset_first(set, len);
-	if (i >= 0) {
-		ir_bitset_excl(set, i);
+IR_ALWAYS_INLINE int ir_bitset_pop_first(ir_bitset set, uint32_t len)
+{
+	uint32_t i;
+
+	for (i = 0; i < len; i++) {
+		ir_bitset_base_t x = set[i];
+
+		if (x) {
+			int bit = IR_BITSET_BITS * i + ir_bitset_ntz(x);
+			set[i] = x & (x - 1);
+			return bit;
+		}
 	}
-	return i;
+	return -1; /* empty set */
 }
 
 #define IR_BITSET_FOREACH(set, len, bit) do { \
