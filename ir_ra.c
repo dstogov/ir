@@ -434,8 +434,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							ir_ref hint_ref = 0;
 
 							if (ctx->rules) {
-								def_flags = ir_get_def_flags(ctx, i);
-								reg = ir_uses_fixed_reg(ctx, i, 0);
+								def_flags = ir_get_def_flags(ctx, i, &reg);
 							} else {
 								reg = IR_REG_NONE;
 							}
@@ -490,8 +489,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						uint8_t use_flags;
 
 						if (ctx->rules) {
-							use_flags = ir_get_use_flags(ctx, i, j);
-							reg = ir_uses_fixed_reg(ctx, i, j);
+							use_flags = ir_get_use_flags(ctx, i, j, &reg);
 						} else {
 							use_flags = 0;
 							reg = IR_REG_NONE;
@@ -929,6 +927,7 @@ int ir_coalesce(ir_ctx *ctx)
 	ir_worklist blocks;
 	bool compact = 0;
 	ir_live_range *unused = NULL;
+	ir_reg reg;
 
 	/* Collect a list of blocks which are predecossors to block with phi finctions */
 	ir_worklist_init(&blocks, ctx->cfg_blocks_count + 1);
@@ -999,7 +998,7 @@ int ir_coalesce(ir_ctx *ctx)
 		/* try to swap operands of commutative instructions for better register allocation */
 		for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
 			for (i = bb->start, insn = ctx->ir_base + i; i <= bb->end;) {
-				if (ir_get_def_flags(ctx, i) & IR_DEF_REUSES_OP1_REG) {
+				if (ir_get_def_flags(ctx, i, &reg) & IR_DEF_REUSES_OP1_REG) {
 					if (insn->op2 > 0 && insn->op1 != insn->op2
 					 && (ir_op_flags[insn->op] & IR_OP_FLAG_COMMUTATIVE)) {
 						ir_try_swap_operands(ctx, i, insn);

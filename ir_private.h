@@ -209,7 +209,7 @@ IR_ALWAYS_INLINE int ir_nlzl(uint64_t num)
 # define IR_BITSET_BITS 32
 # define IR_BITSET_ONE  1U
 # define ir_bitset_base_t uint32_t
-# define IR_bitset_ntz  ir_ntz
+# define ir_bitset_ntz  ir_ntz
 #else
 # define IR_BITSET_BITS   64
 # define IR_BITSET_ONE    1UL
@@ -927,9 +927,8 @@ bool ir_needs_vreg(ir_ctx *ctx, ir_ref ref);
 
 /* Registers modified by the given instruction */
 ir_regset ir_get_scratch_regset(ir_ctx *ctx, ir_ref ref, ir_live_pos *start, ir_live_pos *end);
-ir_reg ir_uses_fixed_reg(ir_ctx *ctx, ir_ref ref, int op_num);
-uint8_t ir_get_def_flags(ir_ctx *ctx, ir_ref ref);
-uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num);
+uint8_t ir_get_def_flags(ir_ctx *ctx, ir_ref ref, ir_reg *reg);
+uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num, ir_reg *reg);
 int ir_get_temporary_regs(ir_ctx *ctx, ir_ref ref, ir_tmp_reg *tmp_regs);
 
 #endif /* defined(IR_REGSET_64BIT) */

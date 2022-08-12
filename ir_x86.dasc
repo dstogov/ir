@@ -769,56 +769,6 @@ static ir_reg ir_get_arg_reg(ir_ctx *ctx, ir_insn *insn, int op_num)
 	return IR_REG_NONE;
 }
 
-ir_reg ir_uses_fixed_reg(ir_ctx *ctx, ir_ref ref, int op_num)
-{
-	ir_ref rule;
-
-	rule = ctx->rules[ref];
-	if (rule == IR_SHIFT || rule == IR_SKIP_SHIFT) {
-		if (op_num == 2) {
-			return IR_REG_RCX;
-		}
-	} else if (rule == IR_MUL_INT || rule == IR_DIV_INT) {
-		if (op_num == 0 || op_num == 1) {
-			return IR_REG_RAX;
-		}
-	} else if (rule == IR_MOD_INT) {
-		if (op_num == 0) {
-			return IR_REG_RDX;
-		} else if (op_num == 1) {
-			return IR_REG_RAX;
-		}
-	} else if (rule == IR_RETURN_INT) {
-		if (op_num == 2) {
-			return IR_REG_INT_RET1;
-		}
-#ifdef IR_REG_FP_RET1
-	} else if (rule == IR_RETURN_FP) {
-		if (op_num == 2) {
-			return IR_REG_FP_RET1;
-		}
-#endif
-	} else if (rule == IR_SKIP_REG) {
-		if (ctx->ir_base[ref].op == IR_PARAM && op_num == 0) {
-			return ir_get_param_reg(ctx, ref);
-		}
-	} else if (rule == IR_CALL || (rule == IR_TAILCALL && op_num > 0)) {
-		ir_insn *insn = &ctx->ir_base[ref];
-		if (op_num == 0) {
-			if (IR_IS_TYPE_INT(insn->type)) {
-				return IR_REG_INT_RET1;
-#ifdef IR_REG_FP_RET1
-			} else {
-				return IR_REG_FP_RET1;
-#endif
-			}
-		} else {
-			return ir_get_arg_reg(ctx, insn, op_num);
-		}
-	}
-	return IR_REG_NONE;
-}
-
 static bool ir_call_needs_tmp_int_reg(ir_ctx *ctx, ir_ref ref)
 {
 	ir_insn *insn = &ctx->ir_base[ref];
@@ -862,18 +812,17 @@ static bool ir_call_needs_tmp_int_reg(ir_ctx *ctx, ir_ref ref)
 	return 0;
 }
 
-uint8_t ir_get_def_flags(ir_ctx *ctx, ir_ref ref)
+uint8_t ir_get_def_flags(ir_ctx *ctx, ir_ref ref, ir_reg *reg)
 {
 	ir_ref rule = ctx->rules[ref];
 	ir_insn *insn;
 
+	*reg = IR_REG_NONE;
 	switch (rule) {
 		case IR_BINOP_INT:
 		case IR_BINOP_SSE2:
 		case IR_SHIFT:
 		case IR_SHIFT_CONST:
-		case IR_MUL_INT:
-		case IR_DIV_INT:
 		case IR_COPY_INT:
 		case IR_COPY_FP:
 		case IR_INC:
@@ -890,29 +839,42 @@ uint8_t ir_get_def_flags(ir_ctx *ctx, ir_ref ref)
 		case IR_SKIP_REG: /* PARAM PHI PI */
 			insn = &ctx->ir_base[ref];
 			if (insn->op == IR_PARAM) {
-				if (ir_get_param_reg(ctx, ref) == IR_REG_NONE) {
+				*reg = ir_get_param_reg(ctx, ref);
+				if (*reg == IR_REG_NONE) {
 					return IR_USE_MUST_BE_IN_REG;
 				}
 			}
 			return IR_USE_SHOULD_BE_IN_REG;
+		case IR_MUL_INT:
+		case IR_DIV_INT:
+			*reg = IR_REG_RAX;
+			return IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG;
+		case IR_MOD_INT :
+			*reg = IR_REG_RDX;
+			break;
+		case IR_CALL:
+			insn = &ctx->ir_base[ref];
+			if (IR_IS_TYPE_INT(insn->type)) {
+				*reg = IR_REG_INT_RET1;
+#ifdef IR_REG_FP_RET1
+			} else {
+				*reg = IR_REG_FP_RET1;
+#endif
+			}
+			break;
 	}
 
 	return IR_USE_MUST_BE_IN_REG;
 }
 
-uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num)
+uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num, ir_reg *reg)
 {
 	ir_ref rule = ctx->rules[ref];
 	ir_insn *insn;
 
 	IR_ASSERT(op_num > 0);
+	*reg = IR_REG_NONE;
 	switch (rule) {
-		case IR_MUL_INT:
-		case IR_DIV_INT:
-		case IR_MOD_INT:
-			if (op_num == 1) {
-				return IR_USE_SHOULD_BE_IN_REG;
-			}
 		case IR_BINOP_INT:
 		case IR_SKIP_BINOP_INT:
 		case IR_BINOP_SSE2:
@@ -941,11 +903,11 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num)
 		case IR_CALL:
 		case IR_TAILCALL:
 			if (op_num > 2) {
+				insn = &ctx->ir_base[ref];
+				*reg = ir_get_arg_reg(ctx, insn, op_num);
 				return IR_USE_SHOULD_BE_IN_REG;
 			}
 			return IR_USE_SHOULD_BE_IN_REG;
-		case IR_RETURN_INT:
-		case IR_RETURN_FP:
 		case IR_IJMP:
 		case IR_RSTORE:
 		case IR_SKIP_REG: /* PARAM PHI PI */
@@ -981,8 +943,35 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num)
 					break;
 			}
 			break;
-	}
 
+		case IR_SHIFT:
+		case IR_SKIP_SHIFT:
+			if (op_num == 2) {
+				*reg = IR_REG_RCX;
+			}
+			break;
+		case IR_MUL_INT:
+		case IR_DIV_INT:
+			if (op_num == 1) {
+				*reg = IR_REG_RAX;
+			}
+			return IR_USE_SHOULD_BE_IN_REG;
+		case IR_MOD_INT:
+			if (op_num == 1) {
+				*reg = IR_REG_RAX;
+			}
+			return IR_USE_SHOULD_BE_IN_REG;
+		case IR_RETURN_INT:
+			IR_ASSERT(op_num == 2);
+			*reg = IR_REG_INT_RET1;
+			return IR_USE_SHOULD_BE_IN_REG;
+		case IR_RETURN_FP:
+#ifdef IR_REG_FP_RET1
+			IR_ASSERT(op_num == 2);
+			*reg = IR_REG_FP_RET1;
+#endif
+			return IR_USE_SHOULD_BE_IN_REG;
+	}
 	return IR_USE_MUST_BE_IN_REG;
 }
 
@@ -6502,6 +6491,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 	ir_regset available = 0;
 	ir_tmp_reg tmp_regs[4];
 	uint8_t def_flags;
+	ir_reg reg;
 
 #ifndef IR_REG_FP_RET1
 	ir_type ret_type = ir_get_return_type(ctx);
@@ -6551,7 +6541,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 				case IR_SKIP_MEM:
 				case IR_SKIP_REG: /* PARAM PHI PI */
 					/* skip */
-					def_flags = ir_get_def_flags(ctx, i);
+					def_flags = ir_get_def_flags(ctx, i, &reg);
 					if (ctx->rules
 					 && *rule != IR_CMP_AND_BRANCH_INT
 					 && *rule != IR_CMP_AND_BRANCH_FP
@@ -6560,8 +6550,6 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 						available = IR_REGSET_SCRATCH;
 					}
 					if (ctx->vregs[i]) {
-						ir_reg reg = ir_uses_fixed_reg(ctx, i, 0);
-
 						if (reg != IR_REG_NONE && IR_REGSET_IN(available, reg)) {
 							IR_REGSET_EXCL(available, reg);
 							ctx->regs[i][0] = reg | IR_REG_SPILL_STORE;
@@ -6648,14 +6636,15 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 								ir_reg reg = ctx->regs[i][0] & ~IR_REG_SPILL_STORE;
 								ctx->regs[i][1] = reg | IR_REG_SPILL_LOAD;
 							} else {
-								ir_reg reg = ir_uses_fixed_reg(ctx, i, j);
+								ir_reg reg;
+								uint8_t use_flags = ir_get_use_flags(ctx, i, j, &reg);
 
 								if (reg != IR_REG_NONE && IR_REGSET_IN(available, reg)) {
 									IR_REGSET_EXCL(available, reg);
 									ctx->regs[i][j] = reg | IR_REG_SPILL_LOAD;
 								} else if (j > 1 && input == insn->op1 && ctx->regs[i][1] != IR_REG_NONE) {
 									ctx->regs[i][j] = ctx->regs[i][1];
-								} else if (ir_get_use_flags(ctx, i, j) & IR_USE_MUST_BE_IN_REG) {
+								} else if (use_flags & IR_USE_MUST_BE_IN_REG) {
 									reg = ir_get_free_reg(ctx->ir_base[input].type, available);
 									IR_REGSET_EXCL(available, reg);
 									ctx->regs[i][j] = reg | IR_REG_SPILL_LOAD;
