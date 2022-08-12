@@ -526,40 +526,40 @@ next:
  */
 int ir_schedule_blocks(ir_ctx *ctx)
 {
-	uint32_t len = ir_bitset_len(ctx->cfg_blocks_count + 1);
-	ir_bitset blocks = ir_bitset_malloc(ctx->cfg_blocks_count + 1);
+	ir_bitqueue blocks;
 	uint32_t b, *p, successor, best_successor, j;
 	ir_block *bb, *successor_bb, *best_successor_bb;
 	ir_insn *insn;
-	uint32_t *list, *map, pos;
+	uint32_t *list, *map;
 	uint32_t prob, best_successor_prob;
 	uint32_t count = 0;
 	bool reorder = 0;
 
+	ir_bitqueue_init(&blocks, ctx->cfg_blocks_count + 1);
+	blocks.pos = 0;
 	list = ir_mem_malloc(sizeof(uint32_t) * (ctx->cfg_blocks_count + 1) * 2);
 	map = list + (ctx->cfg_blocks_count + 1);
 	for (b = 1; b <= ctx->cfg_blocks_count; b++) {
-		ir_bitset_incl(blocks, b);
+		ir_bitset_incl(blocks.set, b);
 	}
 
-	pos = 0;
-	while ((b = ir_bitset_pop_first_ex(blocks, len, &pos)) != (uint32_t)-1) {
+	while ((b = ir_bitqueue_pop(&blocks)) != (uint32_t)-1) {
 		bb = &ctx->cfg_blocks[b];
 		do {
 			if (bb->predecessors_count == 2) {
 				uint32_t predecessor = ctx->cfg_edges[bb->predecessors];
 
-				if (!ir_bitset_in(blocks, predecessor)) {
+				if (!ir_bitqueue_in(&blocks, predecessor)) {
 					predecessor = ctx->cfg_edges[bb->predecessors + 1];
 				}
-				if (ir_bitset_in(blocks, predecessor)) {
+				if (ir_bitqueue_in(&blocks, predecessor)) {
 					ir_block *predecessor_bb = &ctx->cfg_blocks[predecessor];
 
 					if (predecessor_bb->successors_count == 1
 					 && predecessor_bb->predecessors_count == 1
 					 && predecessor_bb->end == predecessor_bb->start + 1
 					 && !(predecessor_bb->flags & IR_BB_DESSA_MOVES)) {
-						ir_bitset_excl(blocks, predecessor);
+						ir_bitqueue_del(&blocks, predecessor);
 						count++;
 						list[count] = predecessor;
 						map[predecessor] = count;
@@ -581,7 +581,7 @@ int ir_schedule_blocks(ir_ctx *ctx)
 			best_successor_bb = NULL;
 			for (b = 0, p = &ctx->cfg_edges[bb->successors]; b < bb->successors_count; b++, p++) {
 				successor = *p;
-				if (ir_bitset_in(blocks, successor)) {
+				if (ir_bitqueue_in(&blocks, successor)) {
 					successor_bb = &ctx->cfg_blocks[successor];
 					insn = &ctx->ir_base[successor_bb->start];
 					if (insn->op == IR_IF_TRUE || insn->op == IR_IF_FALSE || insn->op == IR_CASE_DEFAULT) {
@@ -617,12 +617,12 @@ int ir_schedule_blocks(ir_ctx *ctx)
 					if (predecessor_bb->successors_count == 2) {
 						b = ctx->cfg_edges[predecessor_bb->successors];
 
-						if (!ir_bitset_in(blocks, b)) {
+						if (!ir_bitqueue_in(&blocks, b)) {
 							b = ctx->cfg_edges[predecessor_bb->successors + 1];
 						}
-						if (ir_bitset_in(blocks, b)) {
+						if (ir_bitqueue_in(&blocks, b)) {
 							bb = &ctx->cfg_blocks[b];
-							ir_bitset_excl(blocks, b);
+							ir_bitqueue_del(&blocks, b);
 							continue;
 						}
 					}
@@ -631,7 +631,7 @@ int ir_schedule_blocks(ir_ctx *ctx)
 			}
 			b = best_successor;
 			bb = best_successor_bb;
-			ir_bitset_excl(blocks, b);
+			ir_bitqueue_del(&blocks, b);
 		} while (1);
 	}
 
@@ -663,7 +663,7 @@ int ir_schedule_blocks(ir_ctx *ctx)
 	}
 
 	ir_mem_free(list);
-	ir_mem_free(blocks);
+	ir_bitqueue_free(&blocks);
 
 	return 1;
 }

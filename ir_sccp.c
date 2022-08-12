@@ -371,7 +371,7 @@ static void ir_sccp_remove_unreachable_merge_inputs(ir_ctx *ctx, ir_insn *_value
 	}
 }
 
-static uint32_t ir_sccp_mark_reachable_data(ir_ctx *ctx, ir_bitset worklist, ir_insn *_values, ir_insn *insn, uint32_t pos)
+static void ir_sccp_mark_reachable_data(ir_ctx *ctx, ir_bitqueue *worklist, ir_insn *_values, ir_insn *insn)
 {
 	int j, n, use;
 	uint32_t flags = ir_op_flags[insn->op];
@@ -380,13 +380,12 @@ static uint32_t ir_sccp_mark_reachable_data(ir_ctx *ctx, ir_bitset worklist, ir_
 	for (j = 1; j <= n; j++) {
 		if (IR_OPND_KIND(flags, j) == IR_OPND_DATA || IR_OPND_KIND(flags, j) == IR_OPND_VAR) {
 			use = insn->ops[j];
-			if (use > 0 && IR_IS_TOP(use) && !ir_bitset_in(worklist, use)) {
-				ir_bitset_incl_ex(worklist, use, &pos);
-				pos = ir_sccp_mark_reachable_data(ctx, worklist, _values, &ctx->ir_base[use], pos);
+			if (use > 0 && IR_IS_TOP(use) && !ir_bitqueue_in(worklist, use)) {
+				ir_bitqueue_add(worklist, use);
+				ir_sccp_mark_reachable_data(ctx, worklist, _values, &ctx->ir_base[use]);
 			}
 		}
 	}
-	return pos;
 }
 
 int ir_sccp(ir_ctx *ctx)
@@ -394,22 +393,22 @@ int ir_sccp(ir_ctx *ctx)
 	ir_ref i, j, n, *p, use;
 	ir_use_list *use_list;
 	ir_insn *insn, *use_insn;
-	uint32_t flags, pos;
-	uint32_t len = ir_bitset_len(ctx->insns_count);
-	ir_bitset worklist = ir_bitset_malloc(ctx->insns_count);
+	uint32_t flags;
+	ir_bitqueue worklist;
 	ir_insn *_values = ir_mem_calloc(ctx->insns_count, sizeof(ir_insn));
 
 	ctx->flags |= IR_OPT_IN_SCCP;
 
 	/* A bit modified SCCP algorith of M. N. Wegman and F. K. Zadeck */
-	ir_bitset_incl(worklist, 1);
+	ir_bitqueue_init(&worklist, ctx->insns_count);
+	worklist.pos = 0;
+	ir_bitset_incl(worklist.set, 1);
 	i = ctx->ir_base[1].op2;
 	while (i) {
-		ir_bitset_incl(worklist, i);
+		ir_bitset_incl(worklist.set, i);
 		i = ctx->ir_base[i].op2;
 	}
-	pos = 0;
-	while ((i = ir_bitset_pop_first_ex(worklist, len, &pos)) >= 0) {
+	while ((i = ir_bitqueue_pop(&worklist)) >= 0) {
 		insn = &ctx->ir_base[i];
 		flags = ir_op_flags[insn->op];
 		if (flags & IR_OP_FLAG_DATA) {
@@ -476,7 +475,7 @@ int ir_sccp(ir_ctx *ctx)
 								IR_MAKE_BOTTOM(i);
 							}
 							if (!IR_IS_BOTTOM(use)) {
-								ir_bitset_incl_ex(worklist, use, &pos);
+								ir_bitqueue_add(&worklist, use);
 							}
 							break;
 						}
@@ -506,7 +505,7 @@ int ir_sccp(ir_ctx *ctx)
 									IR_MAKE_BOTTOM(i);
 								}
 								if (!IR_IS_BOTTOM(use)) {
-									ir_bitset_incl_ex(worklist, use, &pos);
+									ir_bitqueue_add(&worklist, use);
 								}
 								default_case = IR_UNUSED;
 								break;
@@ -524,7 +523,7 @@ int ir_sccp(ir_ctx *ctx)
 							IR_MAKE_BOTTOM(i);
 						}
 						if (!IR_IS_BOTTOM(default_case)) {
-							ir_bitset_incl_ex(worklist, default_case, &pos);
+							ir_bitqueue_add(&worklist, default_case);
 						}
 					}
 					if (!IR_IS_BOTTOM(i)) {
@@ -571,13 +570,13 @@ int ir_sccp(ir_ctx *ctx)
 				for (j = 1; j <= n; j++) {
 					if (IR_OPND_KIND(flags, j) == IR_OPND_DATA || IR_OPND_KIND(flags, j) == IR_OPND_VAR) {
 						use = insn->ops[j];
-						if (use > 0 && IR_IS_TOP(use) && !ir_bitset_in(worklist, use)) {
-							ir_bitset_incl_ex(worklist, use, &pos);
-							pos = ir_sccp_mark_reachable_data(ctx, worklist, _values, &ctx->ir_base[use], pos);
+						if (use > 0 && IR_IS_TOP(use) && !ir_bitqueue_in(&worklist, use)) {
+							ir_bitqueue_add(&worklist, use);
+							ir_sccp_mark_reachable_data(ctx, &worklist, _values, &ctx->ir_base[use]);
 						}
 					}
 				}
-//				pos = ir_sccp_mark_reachable_data(ctx, worklist, _values, insn, pos);
+//				ir_sccp_mark_reachable_data(ctx, &worklist, _values, insn);
 			}
 		}
 		use_list = &ctx->use_lists[i];
@@ -588,12 +587,12 @@ int ir_sccp(ir_ctx *ctx)
 			if ((ir_op_flags[insn->op] & IR_OP_FLAG_DATA)) {
 				if (insn->op != IR_PHI || IR_IS_REACHABLE(insn->op1)) {
 					if (!IR_IS_BOTTOM(use)) {
-						ir_bitset_incl_ex(worklist, use, &pos);
+						ir_bitqueue_add(&worklist, use);
 					}
 				}
 			} else if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN || IR_IS_REACHABLE(insn->op1)) {
 				if (!IR_IS_BOTTOM(use)) {
-					ir_bitset_incl_ex(worklist, use, &pos);
+					ir_bitqueue_add(&worklist, use);
 				}
 			}
 		}
@@ -661,17 +660,17 @@ int ir_sccp(ir_ctx *ctx)
 			ir_sccp_remove_if(ctx, _values, i, _values[i].op1);
 		} else if (_values[i].op == IR_MERGE || _values[i].op == IR_LOOP_BEGIN) {
 			/* schedule merge to remove unreachable MERGE inputs */
-			ir_bitset_incl_ex(worklist, i, &pos);
+			ir_bitqueue_add(&worklist, i);
 		}
 	}
 
-	while ((i = ir_bitset_pop_first_ex(worklist, len, &pos)) >= 0) {
+	while ((i = ir_bitqueue_pop(&worklist)) >= 0) {
 		/* remove unreachable MERGE inputs */
 		ir_sccp_remove_unreachable_merge_inputs(ctx, _values, i, _values[i].op1);
 	}
 
 	ir_mem_free(_values);
-	ir_mem_free(worklist);
+	ir_bitqueue_free(&worklist);
 
 	ctx->flags &= ~IR_OPT_IN_SCCP;
 

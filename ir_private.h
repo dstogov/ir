@@ -361,33 +361,6 @@ IR_ALWAYS_INLINE int ir_bitset_pop_first(ir_bitset set, uint32_t len)
 	return -1; /* empty set */
 }
 
-IR_ALWAYS_INLINE int ir_bitset_pop_first_ex(ir_bitset set, uint32_t len, uint32_t *pos)
-{
-	uint32_t i = *pos;
-	ir_bitset_base_t x;
-	do {
-		x = set[i];
-		if (x) {
-			int bit = IR_BITSET_BITS * i + ir_bitset_ntz(x);
-			set[i] = x & (x - 1);
-			*pos = i;
-			return bit;
-		}
-		i++;
-	} while (i < len);
-	*pos = len - 1;
-	return -1; /* empty set */
-}
-
-IR_ALWAYS_INLINE void ir_bitset_incl_ex(ir_bitset set, uint32_t n, uint32_t *pos)
-{
-	uint32_t i = n / IR_BITSET_BITS;
-	set[i] |= IR_BITSET_ONE << (n % IR_BITSET_BITS);
-	if (i < *pos) {
-		*pos = i;
-	}
-}
-
 #define IR_BITSET_FOREACH(set, len, bit) do { \
 	ir_bitset _set = (set); \
 	uint32_t _i, _len = (len); \
@@ -401,6 +374,68 @@ IR_ALWAYS_INLINE void ir_bitset_incl_ex(ir_bitset set, uint32_t n, uint32_t *pos
 		} \
 	} \
 } while (0)
+
+/* Bit Queue */
+typedef struct _ir_bitqueue {
+	uint32_t  len;
+	uint32_t  pos;
+	ir_bitset set;
+} ir_bitqueue;
+
+IR_ALWAYS_INLINE void ir_bitqueue_init(ir_bitqueue *q, uint32_t n)
+{
+	q->len = ir_bitset_len(n);
+	q->pos = q->len - 1;
+	q->set = ir_bitset_malloc(n);
+}
+
+IR_ALWAYS_INLINE void ir_bitqueue_free(ir_bitqueue *q)
+{
+	ir_mem_free(q->set);
+}
+
+IR_ALWAYS_INLINE void ir_bitqueue_clear(ir_bitqueue *q)
+{
+	q->pos = q->len - 1;
+	ir_bitset_clear(q->set, q->len);
+}
+
+IR_ALWAYS_INLINE int ir_bitqueue_pop(ir_bitqueue *q)
+{
+	uint32_t i = q->pos;
+	ir_bitset_base_t x;
+	do {
+		x = q->set[i];
+		if (x) {
+			int bit = IR_BITSET_BITS * i + ir_bitset_ntz(x);
+			q->set[i] = x & (x - 1);
+			q->pos = i;
+			return bit;
+		}
+		i++;
+	} while (i < q->len);
+	q->pos = q->len - 1;
+	return -1; /* empty set */
+}
+
+IR_ALWAYS_INLINE void ir_bitqueue_add(ir_bitqueue *q, uint32_t n)
+{
+	uint32_t i = n / IR_BITSET_BITS;
+	q->set[i] |= IR_BITSET_ONE << (n % IR_BITSET_BITS);
+	if (i < q->pos) {
+		q->pos = i;
+	}
+}
+
+IR_ALWAYS_INLINE void ir_bitqueue_del(ir_bitqueue *q, uint32_t n)
+{
+	ir_bitset_excl(q->set, n);
+}
+
+IR_ALWAYS_INLINE bool ir_bitqueue_in(ir_bitqueue *q, uint32_t n)
+{
+	return ir_bitset_in(q->set, n);
+}
 
 /* Dynamic array of numeric references */
 typedef struct _ir_array {
