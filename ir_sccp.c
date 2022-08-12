@@ -371,7 +371,7 @@ static void ir_sccp_remove_unreachable_merge_inputs(ir_ctx *ctx, ir_insn *_value
 	}
 }
 
-static void ir_sccp_mark_reachable_data(ir_ctx *ctx, ir_bitset worklist, ir_insn *_values, ir_insn *insn)
+static uint32_t ir_sccp_mark_reachable_data(ir_ctx *ctx, ir_bitset worklist, ir_insn *_values, ir_insn *insn, uint32_t pos)
 {
 	int j, n, use;
 	uint32_t flags = ir_op_flags[insn->op];
@@ -381,11 +381,12 @@ static void ir_sccp_mark_reachable_data(ir_ctx *ctx, ir_bitset worklist, ir_insn
 		if (IR_OPND_KIND(flags, j) == IR_OPND_DATA || IR_OPND_KIND(flags, j) == IR_OPND_VAR) {
 			use = insn->ops[j];
 			if (use > 0 && IR_IS_TOP(use) && !ir_bitset_in(worklist, use)) {
-				ir_bitset_incl(worklist, use);
-				ir_sccp_mark_reachable_data(ctx, worklist, _values, &ctx->ir_base[use]);
+				ir_bitset_incl_ex(worklist, use, &pos);
+				pos = ir_sccp_mark_reachable_data(ctx, worklist, _values, &ctx->ir_base[use], pos);
 			}
 		}
 	}
+	return pos;
 }
 
 int ir_sccp(ir_ctx *ctx)
@@ -393,7 +394,7 @@ int ir_sccp(ir_ctx *ctx)
 	ir_ref i, j, n, *p, use;
 	ir_use_list *use_list;
 	ir_insn *insn, *use_insn;
-	uint32_t flags;
+	uint32_t flags, pos;
 	uint32_t len = ir_bitset_len(ctx->insns_count);
 	ir_bitset worklist = ir_bitset_malloc(ctx->insns_count);
 	ir_insn *_values = ir_mem_calloc(ctx->insns_count, sizeof(ir_insn));
@@ -407,7 +408,8 @@ int ir_sccp(ir_ctx *ctx)
 		ir_bitset_incl(worklist, i);
 		i = ctx->ir_base[i].op2;
 	}
-	while ((i = ir_bitset_pop_first(worklist, len)) >= 0) {
+	pos = 0;
+	while ((i = ir_bitset_pop_first_ex(worklist, len, &pos)) >= 0) {
 		insn = &ctx->ir_base[i];
 		flags = ir_op_flags[insn->op];
 		if (flags & IR_OP_FLAG_DATA) {
@@ -474,7 +476,7 @@ int ir_sccp(ir_ctx *ctx)
 								IR_MAKE_BOTTOM(i);
 							}
 							if (!IR_IS_BOTTOM(use)) {
-								ir_bitset_incl(worklist, use);
+								ir_bitset_incl_ex(worklist, use, &pos);
 							}
 							break;
 						}
@@ -504,7 +506,7 @@ int ir_sccp(ir_ctx *ctx)
 									IR_MAKE_BOTTOM(i);
 								}
 								if (!IR_IS_BOTTOM(use)) {
-									ir_bitset_incl(worklist, use);
+									ir_bitset_incl_ex(worklist, use, &pos);
 								}
 								default_case = IR_UNUSED;
 								break;
@@ -522,7 +524,7 @@ int ir_sccp(ir_ctx *ctx)
 							IR_MAKE_BOTTOM(i);
 						}
 						if (!IR_IS_BOTTOM(default_case)) {
-							ir_bitset_incl(worklist, default_case);
+							ir_bitset_incl_ex(worklist, default_case, &pos);
 						}
 					}
 					if (!IR_IS_BOTTOM(i)) {
@@ -570,12 +572,12 @@ int ir_sccp(ir_ctx *ctx)
 					if (IR_OPND_KIND(flags, j) == IR_OPND_DATA || IR_OPND_KIND(flags, j) == IR_OPND_VAR) {
 						use = insn->ops[j];
 						if (use > 0 && IR_IS_TOP(use) && !ir_bitset_in(worklist, use)) {
-							ir_bitset_incl(worklist, use);
-							ir_sccp_mark_reachable_data(ctx, worklist, _values, &ctx->ir_base[use]);
+							ir_bitset_incl_ex(worklist, use, &pos);
+							pos = ir_sccp_mark_reachable_data(ctx, worklist, _values, &ctx->ir_base[use], pos);
 						}
 					}
 				}
-//				ir_sccp_mark_reachable_data(ctx, worklist, _values, insn);
+//				pos = ir_sccp_mark_reachable_data(ctx, worklist, _values, insn, pos);
 			}
 		}
 		use_list = &ctx->use_lists[i];
@@ -586,12 +588,12 @@ int ir_sccp(ir_ctx *ctx)
 			if ((ir_op_flags[insn->op] & IR_OP_FLAG_DATA)) {
 				if (insn->op != IR_PHI || IR_IS_REACHABLE(insn->op1)) {
 					if (!IR_IS_BOTTOM(use)) {
-						ir_bitset_incl(worklist, use);
+						ir_bitset_incl_ex(worklist, use, &pos);
 					}
 				}
 			} else if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN || IR_IS_REACHABLE(insn->op1)) {
 				if (!IR_IS_BOTTOM(use)) {
-					ir_bitset_incl(worklist, use);
+					ir_bitset_incl_ex(worklist, use, &pos);
 				}
 			}
 		}
@@ -659,11 +661,11 @@ int ir_sccp(ir_ctx *ctx)
 			ir_sccp_remove_if(ctx, _values, i, _values[i].op1);
 		} else if (_values[i].op == IR_MERGE || _values[i].op == IR_LOOP_BEGIN) {
 			/* schedule merge to remove unreachable MERGE inputs */
-			ir_bitset_incl(worklist, i);
+			ir_bitset_incl_ex(worklist, i, &pos);
 		}
 	}
 
-	while ((i = ir_bitset_pop_first(worklist, len)) >= 0) {
+	while ((i = ir_bitset_pop_first_ex(worklist, len, &pos)) >= 0) {
 		/* remove unreachable MERGE inputs */
 		ir_sccp_remove_unreachable_merge_inputs(ctx, _values, i, _values[i].op1);
 	}

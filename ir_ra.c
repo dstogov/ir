@@ -552,6 +552,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 			uint32_t bb_set_len = ir_bitset_len(ctx->cfg_blocks_count + 1);
 			int child;
 			ir_block *child_bb;
+			uint32_t pos;
 
 			if (!loops) {
 				loops = ir_bitset_malloc(ctx->cfg_blocks_count + 1);
@@ -560,6 +561,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 				ir_bitset_clear(loops, bb_set_len);
 				ir_bitset_clear(queue, bb_set_len);
 			}
+			pos = bb_set_len - 1;
 			ir_bitset_incl(loops, b);
 			child = b;
 			do {
@@ -575,14 +577,14 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 				while (child) {
 					child_bb = &ctx->cfg_blocks[child];
 					if (child_bb->loop_header && ir_bitset_in(loops, child_bb->loop_header)) {
-						ir_bitset_incl(queue, child);
+						ir_bitset_incl_ex(queue, child, &pos);
 						if (child_bb->flags & IR_BB_LOOP_HEADER) {
 							ir_bitset_incl(loops, child);
 						}
 					}
 					child = child_bb->dom_next_child;
 				}
-			} while ((child = ir_bitset_pop_first(queue, bb_set_len)) >= 0);
+			} while ((child = ir_bitset_pop_first_ex(queue, bb_set_len, &pos)) >= 0);
 		}
 
 		/* b.liveIn = live */

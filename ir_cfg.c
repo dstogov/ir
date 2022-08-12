@@ -531,7 +531,7 @@ int ir_schedule_blocks(ir_ctx *ctx)
 	uint32_t b, *p, successor, best_successor, j;
 	ir_block *bb, *successor_bb, *best_successor_bb;
 	ir_insn *insn;
-	uint32_t *list, *map;
+	uint32_t *list, *map, pos;
 	uint32_t prob, best_successor_prob;
 	uint32_t count = 0;
 	bool reorder = 0;
@@ -542,7 +542,8 @@ int ir_schedule_blocks(ir_ctx *ctx)
 		ir_bitset_incl(blocks, b);
 	}
 
-	while ((b = ir_bitset_pop_first(blocks, len)) != (uint32_t)-1) {
+	pos = 0;
+	while ((b = ir_bitset_pop_first_ex(blocks, len, &pos)) != (uint32_t)-1) {
 		bb = &ctx->cfg_blocks[b];
 		do {
 			if (bb->predecessors_count == 2) {

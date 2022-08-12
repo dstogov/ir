@@ -361,6 +361,33 @@ IR_ALWAYS_INLINE int ir_bitset_pop_first(ir_bitset set, uint32_t len)
 	return -1; /* empty set */
 }
 
+IR_ALWAYS_INLINE int ir_bitset_pop_first_ex(ir_bitset set, uint32_t len, uint32_t *pos)
+{
+	uint32_t i = *pos;
+	ir_bitset_base_t x;
+	do {
+		x = set[i];
+		if (x) {
+			int bit = IR_BITSET_BITS * i + ir_bitset_ntz(x);
+			set[i] = x & (x - 1);
+			*pos = i;
+			return bit;
+		}
+		i++;
+	} while (i < len);
+	*pos = len - 1;
+	return -1; /* empty set */
+}
+
+IR_ALWAYS_INLINE void ir_bitset_incl_ex(ir_bitset set, uint32_t n, uint32_t *pos)
+{
+	uint32_t i = n / IR_BITSET_BITS;
+	set[i] |= IR_BITSET_ONE << (n % IR_BITSET_BITS);
+	if (i < *pos) {
+		*pos = i;
+	}
+}
+
 #define IR_BITSET_FOREACH(set, len, bit) do { \
 	ir_bitset _set = (set); \
 	uint32_t _i, _len = (len); \
