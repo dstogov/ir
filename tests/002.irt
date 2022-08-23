@@ -1,5 +1,5 @@
 --TEST--
-002: Idetical constant merging
+002: Identical constant merging
 --CODE--
 {
 	int32_t c_4 = 1;
