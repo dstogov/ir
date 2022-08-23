@@ -821,6 +821,7 @@ IR_FOLD(MAX(C_FLOAT, C_FLOAT))
 
 IR_FOLD(SEXT(C_I8))
 IR_FOLD(SEXT(C_U8))
+IR_FOLD(SEXT(C_BOOL))
 {
 	IR_ASSERT(IR_IS_TYPE_INT(IR_OPT_TYPE(opt)));
 	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] > ir_type_size[IR_OPT_TYPE(op1_insn->type)]);
@@ -845,6 +846,7 @@ IR_FOLD(SEXT(C_U32))
 
 IR_FOLD(ZEXT(C_I8))
 IR_FOLD(ZEXT(C_U8))
+IR_FOLD(ZEXT(C_BOOL))
 {
 	IR_ASSERT(IR_IS_TYPE_INT(IR_OPT_TYPE(opt)));
 	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] > ir_type_size[IR_OPT_TYPE(op1_insn->type)]);
