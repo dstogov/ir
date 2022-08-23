@@ -3155,6 +3155,10 @@ static void ir_emit_load_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg op2_reg = ctx->regs[def][2];
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 
+	if (ctx->use_lists[def].count == 1) {
+		/* dead load */
+		return;
+	}
 	IR_ASSERT(def_reg != IR_REG_NONE);
 	if (op2_reg == IR_REG_NONE) {
 		op2_reg = def_reg;
@@ -3220,6 +3224,10 @@ static void ir_emit_load_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg op2_reg = ctx->regs[def][2];
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 
+	if (ctx->use_lists[def].count == 1) {
+		/* dead load */
+		return;
+	}
 	IR_ASSERT(def_reg != IR_REG_NONE);
 	if (op2_reg != IR_REG_NONE && (op2_reg & IR_REG_SPILL_LOAD)) {
 		op2_reg &= ~IR_REG_SPILL_LOAD;

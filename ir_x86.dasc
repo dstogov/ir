@@ -4672,6 +4672,10 @@ static void ir_emit_load_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 	int32_t offset = 0;
 
+	if (ctx->use_lists[def].count == 1) {
+		/* dead load */
+		return;
+	}
 	IR_ASSERT(def_reg != IR_REG_NONE);
 	if (IR_IS_CONST_REF(insn->op2)) {
 		void *addr = (void*)ctx->ir_base[insn->op2].val.addr;
@@ -4719,6 +4723,10 @@ static void ir_emit_load_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 	int32_t offset = 0;
 
+	if (ctx->use_lists[def].count == 1) {
+		/* dead load */
+		return;
+	}
 	IR_ASSERT(def_reg != IR_REG_NONE);
 	if (IR_IS_CONST_REF(insn->op2)) {
 		void *addr = (void*)ctx->ir_base[insn->op2].val.addr;
