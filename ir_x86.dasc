@@ -313,18 +313,6 @@
 ||	}
 |.endmacro
 
-|.macro ASM_REG_MREF_IMUL, type, dst, src
-||	if (IR_IS_CONST_REF(src)) {
-||		ir_insn *_insn = &ctx->ir_base[src];
-||		IR_ASSERT(IR_IS_32BIT(_insn->type, _insn->val));
-|		ASM_REG_IMM_IMUL type, dst, _insn->val.i32
-||	} else {
-||		int32_t offset = ir_ref_spill_slot(ctx, src);
-||		ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
-|		ASM_REG_MEM_IMUL type, dst, [Ra(fp)+offset]
-||	}
-|.endmacro
-
 |.macro ASM_SSE2_REG_REG_OP, fop, dop, type, dst, src
 ||	if (type == IR_DOUBLE) {
 |		dop xmm(dst-IR_REG_FP_FIRST), xmm(src-IR_REG_FP_FIRST)
@@ -343,19 +331,6 @@
 ||	}
 |.endmacro
 
-|.macro ASM_SSE2_REG_MREF_OP, fop, dop, type, dst, src
-||	if (IR_IS_CONST_REF(src)) {
-||		ir_insn *_insn = &ctx->ir_base[src];
-||		int label = ctx->cfg_blocks_count - src;
-||		_insn->const_flags |= IR_CONST_EMIT;
-|		ASM_SSE2_REG_MEM_OP fop, dop, type, dst, [=>label]
-||	} else {
-||		int32_t offset = ir_ref_spill_slot(ctx, src);
-||		ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
-|		ASM_SSE2_REG_MEM_OP fop, dop, type, dst, [Ra(fp)+offset]
-||	}
-|.endmacro
-
 |.macro ASM_AVX_REG_REG_REG_OP, fop, dop, type, dst, op1, op2
 ||	if (type == IR_DOUBLE) {
 |		dop xmm(dst-IR_REG_FP_FIRST), xmm(op1-IR_REG_FP_FIRST), xmm(op2-IR_REG_FP_FIRST)
@@ -371,19 +346,6 @@
 ||	} else {
 ||		IR_ASSERT(type == IR_FLOAT);
 |		fop xmm(dst-IR_REG_FP_FIRST), xmm(op1-IR_REG_FP_FIRST), dword op2
-||	}
-|.endmacro
-
-|.macro ASM_AVX_REG_REG_MREF_OP, fop, dop, type, dst, op1, op2
-||	if (IR_IS_CONST_REF(op2)) {
-||		ir_insn *_insn = &ctx->ir_base[op2];
-||		int label = ctx->cfg_blocks_count - op2;
-||		_insn->const_flags |= IR_CONST_EMIT;
-|		ASM_AVX_REG_REG_MEM_OP fop, dop, type, dst, op1, [=>label]
-||	} else {
-||		int32_t offset = ir_ref_spill_slot(ctx, op2);
-||		ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
-|		ASM_AVX_REG_REG_MEM_OP fop, dop, type, dst, op1, [Ra(fp)+offset]
 ||	}
 |.endmacro
 
@@ -1337,37 +1299,63 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 				}
 binop_int:
 				if ((ctx->flags & IR_OPT_CODEGEN)
-				 && (ir_op_flags[insn->op] & IR_OP_FLAG_COMMUTATIVE)
 				 && !IR_IS_CONST_REF(insn->op2)
 				 && !IR_IS_CONST_REF(insn->op1)) {
-					ir_insn *op1_insn = &ctx->ir_base[insn->op1];
-					ir_insn *op2_insn = &ctx->ir_base[insn->op2];
+					if (ir_op_flags[insn->op] & IR_OP_FLAG_COMMUTATIVE) {
+						ir_insn *op1_insn = &ctx->ir_base[insn->op1];
+						ir_insn *op2_insn = &ctx->ir_base[insn->op2];
 
-					if ((op1_insn->op == IR_VLOAD || op1_insn->op == IR_LOAD)
-					 && (op2_insn->op != IR_VLOAD && op2_insn->op != IR_LOAD)) {
-						/* swap for better load fusion */
-						ir_ref tmp = insn->op1;
-						insn->op1 = insn->op2;
-						insn->op2 = tmp;
-				    }
+						if ((op1_insn->op == IR_VLOAD || op1_insn->op == IR_LOAD)
+						 && (op2_insn->op != IR_VLOAD && op2_insn->op != IR_LOAD)) {
+							/* swap for better load fusion */
+							ir_ref tmp = insn->op1;
+							insn->op1 = insn->op2;
+							insn->op2 = tmp;
+					    }
+					}
+					if (ctx->ir_base[insn->op2].op == IR_LOAD
+					 && ctx->use_lists[insn->op2].count == 2) {
+						ir_ref addr_ref = ctx->ir_base[insn->op2].op2;
+
+						if (!ctx->rules[addr_ref]) {
+							ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
+						}
+						if (ctx->rules[addr_ref] == IR_LEA_OB || ctx->rules[addr_ref] == IR_SKIP_MEM) {
+							ctx->rules[insn->op2] = IR_SKIP_MEM;
+							ctx->rules[addr_ref] = IR_SKIP_MEM;
+						}
+					}
 				}
 				return IR_BINOP_INT;
 			} else {
 binop_fp:
 				if ((ctx->flags & IR_OPT_CODEGEN)
-				 && (ir_op_flags[insn->op] & IR_OP_FLAG_COMMUTATIVE)
 				 && !IR_IS_CONST_REF(insn->op2)
 				 && !IR_IS_CONST_REF(insn->op1)) {
-					ir_insn *op1_insn = &ctx->ir_base[insn->op1];
-					ir_insn *op2_insn = &ctx->ir_base[insn->op2];
+					if (ir_op_flags[insn->op] & IR_OP_FLAG_COMMUTATIVE) {
+						ir_insn *op1_insn = &ctx->ir_base[insn->op1];
+						ir_insn *op2_insn = &ctx->ir_base[insn->op2];
 
-					if ((op1_insn->op == IR_VLOAD || op1_insn->op == IR_LOAD)
-					 && (op2_insn->op != IR_VLOAD && op2_insn->op != IR_LOAD)) {
-						/* swap for better load fusion */
-						ir_ref tmp = insn->op1;
-						insn->op1 = insn->op2;
-						insn->op2 = tmp;
-				    }
+						if ((op1_insn->op == IR_VLOAD || op1_insn->op == IR_LOAD)
+						 && (op2_insn->op != IR_VLOAD && op2_insn->op != IR_LOAD)) {
+							/* swap for better load fusion */
+							ir_ref tmp = insn->op1;
+							insn->op1 = insn->op2;
+							insn->op2 = tmp;
+					    }
+					}
+					if (ctx->ir_base[insn->op2].op == IR_LOAD
+					 && ctx->use_lists[insn->op2].count == 2) {
+						ir_ref addr_ref = ctx->ir_base[insn->op2].op2;
+
+						if (!ctx->rules[addr_ref]) {
+							ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
+						}
+						if (ctx->rules[addr_ref] == IR_LEA_OB || ctx->rules[addr_ref] == IR_SKIP_MEM) {
+							ctx->rules[insn->op2] = IR_SKIP_MEM;
+							ctx->rules[addr_ref] = IR_SKIP_MEM;
+						}
+					}
 				}
 				if (ctx->flags & IR_AVX) {
 					return IR_BINOP_AVX;
@@ -2265,28 +2253,85 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				IR_ASSERT(0 && "NIY binary op");
 				break;
 		}
-	} else {
+	} else if (IR_IS_CONST_REF(op2)) {
+		ir_insn *val_insn = &ctx->ir_base[op2];
+		int32_t val;
+
+		IR_ASSERT(IR_IS_32BIT(val_insn->type, val_insn->val));
+		val = val_insn->val.i32;
 		switch (insn->op) {
 			case IR_ADD:
 			case IR_ADD_OV:
-				|	ASM_REG_MREF_OP add, type, def_reg, op2
+				|	ASM_REG_IMM_OP add, type, def_reg, val
 				break;
 			case IR_SUB:
 			case IR_SUB_OV:
-				|	ASM_REG_MREF_OP sub, type, def_reg, op2
+				|	ASM_REG_IMM_OP sub, type, def_reg, val
 				break;
 			case IR_MUL:
 			case IR_MUL_OV:
-				|	ASM_REG_MREF_IMUL type, def_reg, op2
+				|	ASM_REG_IMM_IMUL type, def_reg, val
 				break;
 			case IR_OR:
-				|	ASM_REG_MREF_OP or, type, def_reg, op2
+				|	ASM_REG_IMM_OP or, type, def_reg, val
 				break;
 			case IR_AND:
-				|	ASM_REG_MREF_OP and, type, def_reg, op2
+				|	ASM_REG_IMM_OP and, type, def_reg, val
 				break;
 			case IR_XOR:
-				|	ASM_REG_MREF_OP xor, type, def_reg, op2
+				|	ASM_REG_IMM_OP xor, type, def_reg, val
+				break;
+			default:
+				IR_ASSERT(0 && "NIY binary op");
+				break;
+		}
+	} else {
+		ir_reg reg = IR_REG_NONE;
+		int32_t offset = 0;
+
+		if (ctx->rules[op2] == IR_SKIP_MEM) {
+			ir_insn *load_insn = &ctx->ir_base[op2];
+			ir_insn *addr_insn;
+
+			IR_ASSERT(load_insn->op == IR_LOAD);
+			addr_insn = &ctx->ir_base[load_insn->op2];
+
+			if (addr_insn->op == IR_ADD) {
+				reg = ctx->regs[load_insn->op2][1];
+				IR_ASSERT(reg != IR_REG_NONE);
+				if (reg != IR_REG_NONE && (reg & IR_REG_SPILL_LOAD)) {
+					reg &= ~IR_REG_SPILL_LOAD;
+					ir_emit_load(ctx, type, reg, addr_insn->op1);
+				}
+				offset = ctx->ir_base[addr_insn->op2].val.i32;
+			} else {
+				IR_ASSERT(0);
+			}
+		} else {
+			reg = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
+			offset = ir_ref_spill_slot(ctx, op2);
+		}
+		switch (insn->op) {
+			case IR_ADD:
+			case IR_ADD_OV:
+				|	ASM_REG_MEM_OP add, type, def_reg, [Ra(reg)+offset]
+				break;
+			case IR_SUB:
+			case IR_SUB_OV:
+				|	ASM_REG_MEM_OP sub, type, def_reg, [Ra(reg)+offset]
+				break;
+			case IR_MUL:
+			case IR_MUL_OV:
+				|	ASM_REG_MEM_IMUL type, def_reg, [Ra(reg)+offset]
+				break;
+			case IR_OR:
+				|	ASM_REG_MEM_OP or, type, def_reg, [Ra(reg)+offset]
+				break;
+			case IR_AND:
+				|	ASM_REG_MEM_OP and, type, def_reg, [Ra(reg)+offset]
+				break;
+			case IR_XOR:
+				|	ASM_REG_MEM_OP xor, type, def_reg, [Ra(reg)+offset]
 				break;
 			default:
 				IR_ASSERT(0 && "NIY binary op");
@@ -2419,7 +2464,7 @@ static void ir_emit_mem_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_ref op2 = op_insn->op2;
 	ir_reg op2_reg = ctx->regs[insn->op3][2];
 	ir_reg reg;
-	int32_t offset;
+	int32_t offset = 0;
 
 	if (insn->op == IR_VSTORE) {
 		offset = ir_ref_spill_slot(ctx, insn->op2);
@@ -2431,7 +2476,6 @@ static void ir_emit_mem_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				reg &= ~IR_REG_SPILL_LOAD;
 				ir_emit_load(ctx, type, reg, insn->op2);
 			}
-			offset = 0;
 		} else {
 			ir_insn *addr_insn = &ctx->ir_base[insn->op2];
 
@@ -3281,25 +3325,78 @@ static void ir_emit_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				IR_ASSERT(0 && "NIY binary op");
 				break;
 		}
-	} else {
+	} else if (IR_IS_CONST_REF(op2)) {
+		ir_insn *val_insn = &ctx->ir_base[op2];
+		int label = ctx->cfg_blocks_count - op2;
+
+		val_insn->const_flags |= IR_CONST_EMIT;
 		switch (insn->op) {
 			case IR_ADD:
-				|	ASM_SSE2_REG_MREF_OP addss, addsd, type, def_reg, op2
+				|	ASM_SSE2_REG_MEM_OP addss, addsd, type, def_reg, [=>label]
 				break;
 			case IR_SUB:
-				|	ASM_SSE2_REG_MREF_OP subss, subsd, type, def_reg, op2
+				|	ASM_SSE2_REG_MEM_OP subss, subsd, type, def_reg, [=>label]
 				break;
 			case IR_MUL:
-				|	ASM_SSE2_REG_MREF_OP mulss, mulsd, type, def_reg, op2
+				|	ASM_SSE2_REG_MEM_OP mulss, mulsd, type, def_reg, [=>label]
 				break;
 			case IR_DIV:
-				|	ASM_SSE2_REG_MREF_OP divss, divsd, type, def_reg, op2
+				|	ASM_SSE2_REG_MEM_OP divss, divsd, type, def_reg, [=>label]
 				break;
 			case IR_MIN:
-				|	ASM_SSE2_REG_MREF_OP minss, minsd, type, def_reg, op2
+				|	ASM_SSE2_REG_MEM_OP minss, minsd, type, def_reg, [=>label]
 				break;
 			case IR_MAX:
-				|	ASM_SSE2_REG_MREF_OP maxss, maxsd, type, def_reg, op2
+				|	ASM_SSE2_REG_MEM_OP maxss, maxsd, type, def_reg, [=>label]
+				break;
+			default:
+				IR_ASSERT(0 && "NIY binary op");
+				break;
+		}
+	} else {
+		ir_reg reg = IR_REG_NONE;
+		int32_t offset = 0;
+
+		if (ctx->rules[op2] == IR_SKIP_MEM) {
+			ir_insn *load_insn = &ctx->ir_base[op2];
+			ir_insn *addr_insn;
+
+			IR_ASSERT(load_insn->op == IR_LOAD);
+			addr_insn = &ctx->ir_base[load_insn->op2];
+
+			if (addr_insn->op == IR_ADD) {
+				reg = ctx->regs[load_insn->op2][1];
+				IR_ASSERT(reg != IR_REG_NONE);
+				if (reg != IR_REG_NONE && (reg & IR_REG_SPILL_LOAD)) {
+					reg &= ~IR_REG_SPILL_LOAD;
+					ir_emit_load(ctx, type, reg, addr_insn->op1);
+				}
+				offset = ctx->ir_base[addr_insn->op2].val.i32;
+			} else {
+				IR_ASSERT(0);
+			}
+		} else {
+			reg = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
+			offset = ir_ref_spill_slot(ctx, op2);
+		}
+		switch (insn->op) {
+			case IR_ADD:
+				|	ASM_SSE2_REG_MEM_OP addss, addsd, type, def_reg, [Ra(reg)+offset]
+				break;
+			case IR_SUB:
+				|	ASM_SSE2_REG_MEM_OP subss, subsd, type, def_reg, [Ra(reg)+offset]
+				break;
+			case IR_MUL:
+				|	ASM_SSE2_REG_MEM_OP mulss, mulsd, type, def_reg, [Ra(reg)+offset]
+				break;
+			case IR_DIV:
+				|	ASM_SSE2_REG_MEM_OP divss, divsd, type, def_reg, [Ra(reg)+offset]
+				break;
+			case IR_MIN:
+				|	ASM_SSE2_REG_MEM_OP minss, minsd, type, def_reg, [Ra(reg)+offset]
+				break;
+			case IR_MAX:
+				|	ASM_SSE2_REG_MEM_OP maxss, maxsd, type, def_reg, [Ra(reg)+offset]
 				break;
 			default:
 				IR_ASSERT(0 && "NIY binary op");
@@ -3358,25 +3455,78 @@ static void ir_emit_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				IR_ASSERT(0 && "NIY binary op");
 				break;
 		}
-	} else {
+	} else if (IR_IS_CONST_REF(op2)) {
+		ir_insn *val_insn = &ctx->ir_base[op2];
+		int label = ctx->cfg_blocks_count - op2;
+
+		val_insn->const_flags |= IR_CONST_EMIT;
 		switch (insn->op) {
 			case IR_ADD:
-				|	ASM_AVX_REG_REG_MREF_OP vaddss, vaddsd, type, def_reg, op1_reg, op2
+				|	ASM_AVX_REG_REG_MEM_OP vaddss, vaddsd, type, def_reg, op1_reg, [=>label]
 				break;
 			case IR_SUB:
-				|	ASM_AVX_REG_REG_MREF_OP vsubss, vsubsd, type, def_reg, op1_reg, op2
+				|	ASM_AVX_REG_REG_MEM_OP vsubss, vsubsd, type, def_reg, op1_reg, [=>label]
 				break;
 			case IR_MUL:
-				|	ASM_AVX_REG_REG_MREF_OP vmulss, vmulsd, type, def_reg, op1_reg, op2
+				|	ASM_AVX_REG_REG_MEM_OP vmulss, vmulsd, type, def_reg, op1_reg, [=>label]
 				break;
 			case IR_DIV:
-				|	ASM_AVX_REG_REG_MREF_OP vdivss, vdivsd, type, def_reg, op1_reg, op2
+				|	ASM_AVX_REG_REG_MEM_OP vdivss, vdivsd, type, def_reg, op1_reg, [=>label]
 				break;
 			case IR_MIN:
-				|	ASM_AVX_REG_REG_MREF_OP vminss, vminsd, type, def_reg, op1_reg, op2
+				|	ASM_AVX_REG_REG_MEM_OP vminss, vminsd, type, def_reg, op1_reg, [=>label]
 				break;
 			case IR_MAX:
-				|	ASM_AVX_REG_REG_MREF_OP vmaxss, vmaxsd, type, def_reg, op1_reg, op2
+				|	ASM_AVX_REG_REG_MEM_OP vmaxss, vmaxsd, type, def_reg, op1_reg, [=>label]
+				break;
+			default:
+				IR_ASSERT(0 && "NIY binary op");
+				break;
+		}
+	} else {
+		ir_reg reg = IR_REG_NONE;
+		int32_t offset = 0;
+
+		if (ctx->rules[op2] == IR_SKIP_MEM) {
+			ir_insn *load_insn = &ctx->ir_base[op2];
+			ir_insn *addr_insn;
+
+			IR_ASSERT(load_insn->op == IR_LOAD);
+			addr_insn = &ctx->ir_base[load_insn->op2];
+
+			if (addr_insn->op == IR_ADD) {
+				reg = ctx->regs[load_insn->op2][1];
+				IR_ASSERT(reg != IR_REG_NONE);
+				if (reg != IR_REG_NONE && (reg & IR_REG_SPILL_LOAD)) {
+					reg &= ~IR_REG_SPILL_LOAD;
+					ir_emit_load(ctx, type, reg, addr_insn->op1);
+				}
+				offset = ctx->ir_base[addr_insn->op2].val.i32;
+			} else {
+				IR_ASSERT(0);
+			}
+		} else {
+			reg = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
+			offset = ir_ref_spill_slot(ctx, op2);
+		}
+		switch (insn->op) {
+			case IR_ADD:
+				|	ASM_AVX_REG_REG_MEM_OP vaddss, vaddsd, type, def_reg, op1_reg, [Ra(reg)+offset]
+				break;
+			case IR_SUB:
+				|	ASM_AVX_REG_REG_MEM_OP vsubss, vsubsd, type, def_reg, op1_reg, [Ra(reg)+offset]
+				break;
+			case IR_MUL:
+				|	ASM_AVX_REG_REG_MEM_OP vmulss, vmulsd, type, def_reg, op1_reg, [Ra(reg)+offset]
+				break;
+			case IR_DIV:
+				|	ASM_AVX_REG_REG_MEM_OP vdivss, vdivsd, type, def_reg, op1_reg, [Ra(reg)+offset]
+				break;
+			case IR_MIN:
+				|	ASM_AVX_REG_REG_MEM_OP vminss, vminsd, type, def_reg, op1_reg, [Ra(reg)+offset]
+				break;
+			case IR_MAX:
+				|	ASM_AVX_REG_REG_MEM_OP vmaxss, vmaxsd, type, def_reg, op1_reg, [Ra(reg)+offset]
 				break;
 			default:
 				IR_ASSERT(0 && "NIY binary op");
@@ -4792,7 +4942,7 @@ static void ir_emit_store_int(ir_ctx *ctx, ir_reg ref, ir_insn *insn)
 	ir_ref type = val_insn->type;
 	ir_reg op2_reg = ctx->regs[ref][2];
 	ir_reg op3_reg = ctx->regs[ref][3];
-	int32_t offset;
+	int32_t offset = 0;
 
 	if (IR_IS_CONST_REF(insn->op2)) {
 		void *addr = (void*)ctx->ir_base[insn->op2].val.addr;
@@ -4811,16 +4961,7 @@ static void ir_emit_store_int(ir_ctx *ctx, ir_reg ref, ir_insn *insn)
 			}
 			return;
 		}
-	}
-
-	if (op2_reg != IR_REG_NONE) {
-		if ((op2_reg & IR_REG_SPILL_LOAD) || IR_IS_CONST_REF(insn->op2)) {
-			op2_reg &= ~IR_REG_SPILL_LOAD;
-			IR_ASSERT(ctx->ir_base[insn->op2].type == IR_ADDR);
-			ir_emit_load(ctx, IR_ADDR, op2_reg, insn->op2);
-		}
-		offset = 0;
-	} else {
+	} else if (ctx->rules[insn->op2] == IR_SKIP_MEM) {
 		ir_insn *addr_insn = &ctx->ir_base[insn->op2];
 
 		if (addr_insn->op == IR_ADD) {
@@ -4833,6 +4974,13 @@ static void ir_emit_store_int(ir_ctx *ctx, ir_reg ref, ir_insn *insn)
 			offset = ctx->ir_base[addr_insn->op2].val.i32;
 		} else {
 			IR_ASSERT(0);
+		}
+	} else {
+		IR_ASSERT(op2_reg != IR_REG_NONE);
+		if ((op2_reg & IR_REG_SPILL_LOAD) || IR_IS_CONST_REF(insn->op2)) {
+			op2_reg &= ~IR_REG_SPILL_LOAD;
+			IR_ASSERT(ctx->ir_base[insn->op2].type == IR_ADDR);
+			ir_emit_load(ctx, IR_ADDR, op2_reg, insn->op2);
 		}
 	}
 	if (IR_IS_CONST_REF(insn->op3) && IR_IS_32BIT(type, val_insn->val)) {
