@@ -1721,6 +1721,16 @@ store_int:
 			}
 			break;
 		case IR_LOAD:
+			if (ctx->use_lists[insn->op2].count == 1) {
+				ir_ref addr_ref = insn->op2;
+
+				if (!ctx->rules[addr_ref]) {
+					ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
+				}
+				if (ctx->rules[addr_ref] == IR_LEA_OB) {
+					ctx->rules[addr_ref] = IR_SKIP_MEM;
+				}
+			}
 			if (IR_IS_TYPE_INT(insn->type)) {
 				return IR_LOAD_INT;
 			} else {
@@ -1728,6 +1738,16 @@ store_int:
 			}
 			break;
 		case IR_STORE:
+			if (ctx->use_lists[insn->op2].count == 1) {
+				ir_ref addr_ref = insn->op2;
+
+				if (!ctx->rules[addr_ref]) {
+					ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
+				}
+				if (ctx->rules[addr_ref] == IR_LEA_OB) {
+					ctx->rules[addr_ref] = IR_SKIP_MEM;
+				}
+			}
 			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op3].type)) {
 				store_rule = IR_STORE_INT;
 				load_op = IR_LOAD;

@@ -45,18 +45,12 @@ test:
 	subq $0x10, %rsp
 	movq %rsp, %rdi
 	movb $0x68, (%rdi)
-	leaq 1(%rdi), %rax
-	movb $0x69, (%rax)
-	leaq 2(%rdi), %rax
-	movb $0x20, (%rax)
-	leaq 3(%rdi), %rax
-	movb $0x25, (%rax)
-	leaq 4(%rdi), %rax
-	movb $0x64, (%rax)
-	leaq 5(%rdi), %rax
-	movb $0xa, (%rax)
-	leaq 6(%rdi), %rax
-	movb $0, (%rax)
+	movb $0x69, 1(%rdi)
+	movb $0x20, 2(%rdi)
+	movb $0x25, 3(%rdi)
+	movb $0x64, 4(%rdi)
+	movb $0xa, 5(%rdi)
+	movb $0, 6(%rdi)
 	movl $0x2a, %esi
 	movabsq $_IO_printf, %rax
 	callq *%rax
