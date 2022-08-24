@@ -133,6 +133,8 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, const char *dump_
 		return 0;
 	}
 
+	ir_check(ctx);
+
 	/* Global Optimization */
 	if (opt_level > 1) {
 		ir_sccp(ctx);
@@ -196,6 +198,8 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, const char *dump_
 	 && !_save(ctx, dump, IR_DUMP_FINAL, dump_file)) {
 		return 0;
 	}
+
+	ir_check(ctx);
 
 	return 1;
 }
