@@ -223,14 +223,6 @@
 ||	}
 |.endmacro
 
-|.macro ASM_MREF_REG_OP, op, type, dst, src
-||	do {
-||		int32_t offset = ir_ref_spill_slot(ctx, dst);
-||		ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
-|		ASM_MEM_REG_OP op, type, [Ra(fp)+offset], src
-||	} while (0);
-|.endmacro
-
 |.macro ASM_MREF_IMM_OP, op, type, dst, src
 ||	do {
 ||		int32_t offset = ir_ref_spill_slot(ctx, dst);
@@ -3469,30 +3461,10 @@ static void ir_emit_cmp_int_common(ir_ctx *ctx, ir_type type, ir_insn *insn, ir_
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
-	if (ctx->rules[insn->op1] == IR_SKIP_MEM) {
-		int32_t offset = 0;
-
-		op1_reg = ir_fuse_load(ctx, insn->op1, &offset);
+	if (op1_reg != IR_REG_NONE) {
 		if (op2_reg != IR_REG_NONE) {
-			if (op1_reg == IR_REG_NONE) {
-				|	ASM_MEM_REG_OP cmp, type, [offset], op2_reg
-			} else {
-				|	ASM_MEM_REG_OP cmp, type, [Ra(op1_reg)+offset], op2_reg
-			}
-		} else {
-			IR_ASSERT(!IR_IS_CONST_REF(op1));
-			IR_ASSERT(IR_IS_CONST_REF(op2));
-			IR_ASSERT(IR_IS_32BIT(ctx->ir_base[op2].type, ctx->ir_base[op2].val));
-			if (op1_reg == IR_REG_NONE) {
-				|	ASM_MEM_IMM_OP cmp, type, [offset], ctx->ir_base[op2].val.i32
-			} else {
-				|	ASM_MEM_IMM_OP cmp, type, [Ra(op1_reg)+offset], ctx->ir_base[op2].val.i32
-			}
-		}
-	} else if (op1_reg != IR_REG_NONE && op2_reg != IR_REG_NONE) {
-		|	ASM_REG_REG_OP cmp, type, op1_reg, op2_reg
-	} else if (op1_reg != IR_REG_NONE) {
-		if (IR_IS_CONST_REF(op2) && ctx->ir_base[op2].val.u64 == 0) {
+			|	ASM_REG_REG_OP cmp, type, op1_reg, op2_reg
+		} else if (IR_IS_CONST_REF(op2) && ctx->ir_base[op2].val.u64 == 0) {
 			|	ASM_REG_REG_OP test, type, op1_reg, op1_reg
 		} else if (IR_IS_CONST_REF(op2)) {
 			ir_insn *val_insn = &ctx->ir_base[op2];
@@ -3511,13 +3483,33 @@ static void ir_emit_cmp_int_common(ir_ctx *ctx, ir_type type, ir_insn *insn, ir_
 			}
 			|	ASM_REG_MEM_OP cmp, type, op1_reg, [Ra(op2_reg)+offset]
 		}
-	} else if (op2_reg != IR_REG_NONE) {
-		|	ASM_MREF_REG_OP cmp, type, op1, op2_reg
+	} else if (IR_IS_CONST_REF(insn->op1)) {
+		IR_ASSERT(0);
 	} else {
-		IR_ASSERT(!IR_IS_CONST_REF(op1));
-		IR_ASSERT(IR_IS_CONST_REF(op2));
-		IR_ASSERT(IR_IS_32BIT(ctx->ir_base[op2].type, ctx->ir_base[op2].val));
-		|	ASM_MREF_IMM_OP cmp, type, op1, ctx->ir_base[op2].val.i32
+		int32_t offset = 0;
+
+		if (ctx->rules[insn->op1] == IR_SKIP_MEM) {
+			op1_reg = ir_fuse_load(ctx, insn->op1, &offset);
+		} else {
+			op1_reg = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
+			offset = ir_ref_spill_slot(ctx, insn->op1);
+		}
+		if (op2_reg != IR_REG_NONE) {
+			if (op1_reg == IR_REG_NONE) {
+				|	ASM_MEM_REG_OP cmp, type, [offset], op2_reg
+			} else {
+				|	ASM_MEM_REG_OP cmp, type, [Ra(op1_reg)+offset], op2_reg
+			}
+		} else {
+			IR_ASSERT(!IR_IS_CONST_REF(op1));
+			IR_ASSERT(IR_IS_CONST_REF(op2));
+			IR_ASSERT(IR_IS_32BIT(ctx->ir_base[op2].type, ctx->ir_base[op2].val));
+			if (op1_reg == IR_REG_NONE) {
+				|	ASM_MEM_IMM_OP cmp, type, [offset], ctx->ir_base[op2].val.i32
+			} else {
+				|	ASM_MEM_IMM_OP cmp, type, [Ra(op1_reg)+offset], ctx->ir_base[op2].val.i32
+			}
+		}
 	}
 }
 
