@@ -1805,6 +1805,7 @@ store_int:
 				}
 			}
 			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
+				ir_match_fuse_load(ctx, insn->op2, bb);
 				return IR_IF_INT;
 			} else {
 				IR_ASSERT(0 && "NIY IR_IF_FP");
@@ -3933,7 +3934,16 @@ static void ir_emit_if_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 	} else if (IR_IS_CONST_REF(insn->op2)) {
 		IR_ASSERT(0);
 	} else {
-		|	ASM_MREF_IMM_OP cmp, type, insn->op2, 0
+		int32_t offset = 0;
+
+		if (ctx->rules[insn->op2] == IR_SKIP_MEM) {
+			op2_reg = ir_fuse_load(ctx, insn->op2, &offset);
+			IR_ASSERT(op2_reg != IR_REG_NONE);
+		} else {
+			op2_reg = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
+			offset = ir_ref_spill_slot(ctx, insn->op2);
+		}
+		|	ASM_MEM_IMM_OP cmp, type, [Ra(op2_reg)+offset], 0
 	}
 	ir_emit_jcc(ctx, IR_NE, b, def, insn, 1);
 }
