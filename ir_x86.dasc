@@ -3072,18 +3072,11 @@ static void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_emit_load(ctx, type, op2_reg, op2);
 	}
 	if (insn->op == IR_MUL || insn->op == IR_MUL_OV) {
-		if (IR_IS_TYPE_SIGNED(insn->type)) {
-			if (op2_reg != IR_REG_NONE) {
-				|	ASM_REG_OP imul, type, op2_reg
-			} else {
-				|	ASM_MREF_OP imul, type, op2
-			}
+		IR_ASSERT(!IR_IS_TYPE_SIGNED(insn->type));
+		if (op2_reg != IR_REG_NONE) {
+			|	ASM_REG_OP mul, type, op2_reg
 		} else {
-			if (op2_reg != IR_REG_NONE) {
-				|	ASM_REG_OP mul, type, op2_reg
-			} else {
-				|	ASM_MREF_OP mul, type, op2
-			}
+			|	ASM_MREF_OP mul, type, op2
 		}
 	} else {
 		if (IR_IS_TYPE_SIGNED(type)) {
