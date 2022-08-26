@@ -3631,7 +3631,7 @@ static void ir_emit_cmp_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
-static void ir_emit_test_int_common(ir_ctx *ctx, ir_ref ref)
+static void ir_emit_test_int_common(ir_ctx *ctx, ir_ref ref, ir_op op)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
@@ -3663,7 +3663,27 @@ static void ir_emit_test_int_common(ir_ctx *ctx, ir_ref ref)
 
 			IR_ASSERT(IR_IS_32BIT(val_insn->type, val_insn->val));
 			val = val_insn->val.i32;
-			|	ASM_REG_IMM_OP test, type, op1_reg, val
+			if ((op == IR_EQ || op == IR_NE) && val == 0xff && (sizeof(void*) == 8 || op1_reg <= IR_REG_R3)) {
+				|	test Rb(op1_reg), Rb(op1_reg)
+			} else if ((op == IR_EQ || op == IR_NE) && val == 0xff00 && op1_reg <= IR_REG_R3) {
+				if (op1_reg == IR_REG_RAX) {
+					|	test ah, ah
+				} else if (op1_reg == IR_REG_RBX) {
+					|	test bh, bh
+				} else if (op1_reg == IR_REG_RCX) {
+					|	test ch, ch
+				} else if (op1_reg == IR_REG_RDX) {
+					|	test dh, dh
+				} else {
+					IR_ASSERT(0);
+				}
+			} else if ((op == IR_EQ || op == IR_NE) && val == 0xffff) {
+				|	test Rw(op1_reg), Rw(op1_reg)
+			} else if ((op == IR_EQ || op == IR_NE) && val == 0xffffffff) {
+				|	test Rd(op1_reg), Rd(op1_reg)
+			} else {
+				|	ASM_REG_IMM_OP test, type, op1_reg, val
+			}
 		} else {
 			int32_t offset = 0;
 
@@ -3717,7 +3737,7 @@ static void ir_emit_test_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 
 	IR_ASSERT(def_reg != IR_REG_NONE);
-	ir_emit_test_int_common(ctx, insn->op1);
+	ir_emit_test_int_common(ctx, insn->op1, insn->op);
 	ir_emit_setcc_int(ctx, insn->op, def_reg);
 	if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
 		ir_emit_store(ctx, insn->type, def, def_reg);
@@ -4024,7 +4044,7 @@ static void ir_emit_cmp_and_branch_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *
 
 static void ir_emit_test_and_branch_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 {
-	ir_emit_test_int_common(ctx, insn->op2);
+	ir_emit_test_int_common(ctx, insn->op2, IR_NE);
 	ir_emit_jcc(ctx, IR_NE, b, def, insn, 1);
 }
 
