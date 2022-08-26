@@ -3956,7 +3956,7 @@ static void ir_emit_jcc(ir_ctx *ctx, uint8_t op, int b, ir_ref def, ir_insn *ins
 			case IR_LT:
 				if (swap) {
 					|	jb =>true_block
-				} if (!false_block) {
+				} else if (!false_block) {
 					|	jp >1
 					|	jb =>true_block
 					|1:
