@@ -477,11 +477,13 @@ const char *ir_reg_name(int8_t reg, ir_type type)
 #if !defined(_WIN64) && !defined(__x86_64__)
 static bool ir_is_fastcall(ir_ctx *ctx, ir_insn *insn)
 {
-	if (IR_IS_CONST_REF(insn->op2) && (ctx->ir_base[insn->op2].const_flags & IR_CONST_FASTCALL_FUNC)) {
+	if (sizeof(void*) == 4 && IR_IS_CONST_REF(insn->op2) && (ctx->ir_base[insn->op2].const_flags & IR_CONST_FASTCALL_FUNC)) {
 		return 1;
 	}
 	return 0;
 }
+#else
+# define ir_is_fastcall(ctx, insn) 0
 #endif
 
 typedef enum _ir_rule {
@@ -5639,7 +5641,7 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 	return 1;
 }
 
-static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn, bool align)
+static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn)
 {
 	int j, n;
 	ir_type type;
@@ -5672,11 +5674,6 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn, bool align)
 		} else {
 			IR_ASSERT(0);
 		}
-	}
-
-	if (align && used_stack % 16 != 0) {
-		/* Stack must be 16 byte aligned */
-		used_stack += sizeof(void*);
 	}
 
 	return used_stack;
@@ -5721,10 +5718,12 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 		// TODO: support for preallocated stack
 		used_stack = 0;
 	} else {
-		used_stack = ir_call_used_stack(ctx, insn, 1);
-		data->call_stack_size += used_stack;
-		if (used_stack) {
-			|	sub Ra(IR_REG_RSP), used_stack
+		used_stack = ir_call_used_stack(ctx, insn);
+		/* Stack must be 16 byte aligned */
+		int32_t aligned_stack = IR_ALIGNED_SIZE(used_stack, 16);
+		data->call_stack_size += aligned_stack;
+		if (aligned_stack) {
+			|	sub Ra(IR_REG_RSP), aligned_stack
 		}
 	}
 
@@ -5952,8 +5951,17 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
     }
 
 	if (used_stack) {
-		|	add Ra(IR_REG_RSP), used_stack
-		data->call_stack_size -= used_stack;
+		int32_t aligned_stack = IR_ALIGNED_SIZE(used_stack, 16);
+
+		data->call_stack_size -= aligned_stack;
+		if (ir_is_fastcall(ctx, insn)) {
+			aligned_stack -= used_stack;
+			if (aligned_stack) {
+				|	add Ra(IR_REG_RSP), aligned_stack
+			}
+		} else {
+			|	add Ra(IR_REG_RSP), aligned_stack
+		}
 	}
 
 	if (insn->type != IR_VOID) {
@@ -7134,7 +7142,7 @@ static void ir_preallocate_call_stack(ir_ctx *ctx, ir_backend_data *data)
 
 	for (i = 1, insn = ctx->ir_base + 1; i < ctx->insns_count;) {
 		if (insn->op == IR_CALL) {
-			call_stack_size = ir_call_used_stack(ctx, insn, 0);
+			call_stack_size = ir_call_used_stack(ctx, insn);
 			if (call_stack_size > peak_call_stack_size) {
 				peak_call_stack_size = call_stack_size;
 			}
