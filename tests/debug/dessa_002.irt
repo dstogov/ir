@@ -25,8 +25,8 @@ x86_64
 --EXPECT--
 test:
 .L1:
-	leal 1(%rdi), %eax
-	testl %eax, %eax
+	movl %edi, %eax
+	addl $1, %eax
 	je .L2
 	movl %eax, %edi
 	jmp .L1
