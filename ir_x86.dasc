@@ -1600,7 +1600,10 @@ store_int:
 				if ((ctx->flags & IR_OPT_CODEGEN)
 				 && insn->op3 > bb->start
 				 && insn->op3 < ref
-				 && ctx->use_lists[insn->op3].count == 1
+				 && (ctx->use_lists[insn->op3].count == 1 ||
+				     (ctx->use_lists[insn->op3].count == 2
+				   && (ctx->ir_base[insn->op3].op == IR_ADD_OV ||
+				       ctx->ir_base[insn->op3].op == IR_SUB_OV)))
 				 && IR_IS_TYPE_INT(ctx->ir_base[insn->op3].type)) {
 					ir_insn *op_insn = &ctx->ir_base[insn->op3];
 
