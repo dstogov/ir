@@ -1255,36 +1255,33 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 			}
 			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)) {
 				if (IR_IS_CONST_REF(insn->op2)
+				 && ctx->ir_base[insn->op2].val.i64 == 0
+				 && insn->op1 == ref - 1) { /* prevoius instruction */
+					ir_insn *op1_insn = &ctx->ir_base[insn->op1];
+
+					if (op1_insn->op == IR_ADD ||
+				        op1_insn->op == IR_SUB ||
+//				        op1_insn->op == IR_MUL ||
+				        op1_insn->op == IR_OR  ||
+				        op1_insn->op == IR_AND ||
+				        op1_insn->op == IR_XOR) {
+
+						ir_match_swap_commutative(ctx, op1_insn);
+						ir_match_fuse_load(ctx, op1_insn->op2, bb);
+						if (op1_insn->op == IR_AND && ctx->use_lists[insn->op1].count == 1) {
+							ctx->rules[insn->op1] = IR_SKIP_TEST_INT;
+							return IR_TEST_INT;
+						} else {
+							ctx->rules[insn->op1] = IR_BINOP_INT;
+							return IR_SETCC_INT;
+						}
+					}
+				}
+				if (IR_IS_CONST_REF(insn->op2)
 				 && insn->op1 > bb->start
 				 && insn->op1 < ref
 				 && !ctx->rules[insn->op1]) {
 					ir_match_fuse_load(ctx, insn->op1, bb);
-				}
-				if (IR_IS_CONST_REF(insn->op2)
-				 && ctx->ir_base[insn->op2].val.i64 == 0
-				 && ctx->ir_base[insn->op1].op == IR_AND // TODO: OR, XOR. etc
-				 && ctx->use_lists[insn->op1].count == 1) {
-					if (!ctx->rules[insn->op1]) {
-						ctx->rules[insn->op1] = ir_match_insn(ctx, insn->op1, bb);
-					}
-					ctx->rules[insn->op1] = IR_SKIP_TEST_INT;
-					return IR_TEST_INT;
-				} else if (IR_IS_CONST_REF(insn->op2)
-				 && ctx->ir_base[insn->op2].val.i64 == 0
-				 && insn->op1 == ref - 1 /* prevoius instruction */
-				 && (ctx->ir_base[insn->op1].op == IR_ADD ||
-				     ctx->ir_base[insn->op1].op == IR_SUB ||
-//				     ctx->ir_base[insn->op1].op == IR_MUL ||
-				     ctx->ir_base[insn->op1].op == IR_OR  ||
-				     ctx->ir_base[insn->op1].op == IR_AND ||
-				     ctx->ir_base[insn->op1].op == IR_XOR)) {
-
-					ir_insn *op1_insn = &ctx->ir_base[insn->op1];
-
-					ir_match_swap_commutative(ctx, op1_insn);
-					ir_match_fuse_load(ctx, op1_insn->op2, bb);
-					ctx->rules[insn->op1] = IR_BINOP_INT;
-					return IR_SETCC_INT;
 				}
 				return IR_CMP_INT;
 			} else {
@@ -1586,7 +1583,11 @@ binop_fp:
 				store_rule = IR_VSTORE_INT;
 				load_op = IR_VLOAD;
 store_int:
-				if ((ctx->flags & IR_OPT_CODEGEN) && insn->op3 > bb->start && insn->op3 < ref && ctx->use_lists[insn->op3].count == 1) {
+				if ((ctx->flags & IR_OPT_CODEGEN)
+				 && insn->op3 > bb->start
+				 && insn->op3 < ref
+				 && ctx->use_lists[insn->op3].count == 1
+				 && IR_IS_TYPE_INT(ctx->ir_base[insn->op3].type)) {
 					ir_insn *op_insn = &ctx->ir_base[insn->op3];
 
 					if (!ctx->rules[insn->op3]) {
@@ -1747,15 +1748,19 @@ store_int:
 			break;
 		case IR_RSTORE:
 			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
-				if ((ctx->flags & IR_OPT_CODEGEN) && insn->op2 > bb->start && insn->op2 < ref && ctx->use_lists[insn->op2].count == 1) {
+				if ((ctx->flags & IR_OPT_CODEGEN)
+				 && insn->op2 > bb->start
+				 && insn->op2 < ref
+				 && ctx->use_lists[insn->op2].count == 1
+				 && IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
 					ir_insn *op_insn = &ctx->ir_base[insn->op2];
 
-					if (!ctx->rules[insn->op2]) {
-						ctx->rules[insn->op2] = ir_match_insn(ctx, insn->op2, bb);
-					}
-					if ((ctx->rules[insn->op2] == IR_BINOP_INT && op_insn->op != IR_MUL) ||
-							ctx->rules[insn->op2] == IR_LEA_OB ||
-							ctx->rules[insn->op2] == IR_LEA_IB) {
+					if (op_insn->op == IR_ADD ||
+				        op_insn->op == IR_SUB ||
+//				        op_insn->op == IR_MUL ||
+				        op_insn->op == IR_OR  ||
+				        op_insn->op == IR_AND ||
+				        op_insn->op == IR_XOR) {
 						if (ctx->ir_base[op_insn->op1].op == IR_RLOAD
 						 && ctx->ir_base[op_insn->op1].op2 == insn->op3) {
 							ctx->rules[insn->op2] = IR_SKIP_BINOP_INT;
@@ -1818,9 +1823,8 @@ store_int:
 						return IR_CMP_AND_BRANCH_FP;
 					}
 				} else if (op2_insn->op == IR_AND) { // TODO: OR, XOR. etc
-					if (!ctx->rules[insn->op2]) {
-						ctx->rules[insn->op2] = ir_match_insn(ctx, op2_insn->op1, bb);
-					}
+					ir_match_swap_commutative(ctx, op2_insn);
+					ir_match_fuse_load(ctx, op2_insn->op2, bb);
 					ctx->rules[insn->op2] = IR_SKIP_TEST_INT;
 					return IR_TEST_AND_BRANCH_INT;
 				} else if (op2_insn->op == IR_OVERFLOW) {
@@ -1833,11 +1837,11 @@ store_int:
 				 && insn->op2 > bb->start) {
 					op2_insn = &ctx->ir_base[insn->op2];
 					if (op2_insn->op == IR_ADD ||
-					     op2_insn->op == IR_SUB ||
-//					     op2_insn->op == IR_MUL ||
-					     op2_insn->op == IR_OR  ||
-					     op2_insn->op == IR_AND ||
-					     op2_insn->op == IR_XOR) {
+					    op2_insn->op == IR_SUB ||
+//					    op2_insn->op == IR_MUL ||
+					    op2_insn->op == IR_OR  ||
+					    op2_insn->op == IR_AND ||
+					    op2_insn->op == IR_XOR) {
 
 						ir_match_swap_commutative(ctx, op2_insn);
 						ir_match_fuse_load(ctx, op2_insn->op2, bb);
@@ -1848,18 +1852,19 @@ store_int:
 				 && insn->op1 == ref - 1 /* prevoius instruction */
 				 && insn->op2 == ref - 2 /* prevoius instruction */
 				 && insn->op2 > bb->start
-				 && ctx->use_lists[insn->op2].count == 2) {
+				 && ctx->use_lists[insn->op2].count == 2
+				 && IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
 					ir_insn *store_insn = &ctx->ir_base[insn->op1];
-					ir_insn *op_insn = &ctx->ir_base[insn->op2];
 
-					if (store_insn->op == IR_STORE
-					 && store_insn->op3 == insn->op2) {
-						if (!ctx->rules[insn->op2]) {
-							ctx->rules[insn->op2] = ir_match_insn(ctx, insn->op2, bb);
-						}
-						if ((ctx->rules[insn->op2] == IR_BINOP_INT && op_insn->op != IR_MUL) ||
-								ctx->rules[insn->op2] == IR_LEA_OB ||
-								ctx->rules[insn->op2] == IR_LEA_IB) {
+					if (store_insn->op == IR_STORE && store_insn->op3 == insn->op2) {
+						ir_insn *op_insn = &ctx->ir_base[insn->op2];
+
+						if (op_insn->op == IR_ADD ||
+						    op_insn->op == IR_SUB ||
+//						    op_insn->op == IR_MUL ||
+						    op_insn->op == IR_OR  ||
+						    op_insn->op == IR_AND ||
+						    op_insn->op == IR_XOR) {
 							if (ctx->ir_base[op_insn->op1].op == IR_LOAD
 							 && ctx->ir_base[op_insn->op1].op2 == store_insn->op2) {
 								if (op_insn->op1 > bb->start
