@@ -15,6 +15,6 @@ x86_64
 }
 --EXPECT--
 test:
-	imull $2, %edi, %edi
+	imull $2, %edi, %eax
 	seto %al
 	retq
