@@ -223,14 +223,6 @@
 ||	}
 |.endmacro
 
-|.macro ASM_MREF_IMM_OP, op, type, dst, src
-||	do {
-||		int32_t offset = ir_ref_spill_slot(ctx, dst);
-||		ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
-|		ASM_MEM_IMM_OP op, type, [Ra(fp)+offset], src
-||	} while (0);
-|.endmacro
-
 |.macro ASM_REG_REG_IMUL, type, dst, src
 ||	switch (ir_type_size[type]) {
 ||		case 2:
@@ -3196,7 +3188,10 @@ static void ir_emit_bool_not_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (op1_reg != IR_REG_NONE) {
 		|	ASM_REG_REG_OP test, type, op1_reg, op1_reg
 	} else {
-		|	ASM_MREF_IMM_OP cmp, type, op1, 0
+		int32_t offset = ir_ref_spill_slot(ctx, op1);
+		ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
+
+		|	ASM_MEM_IMM_OP cmp, type, [Ra(fp)+offset], 0
 	}
 	|	sete Rb(def_reg)
 
@@ -6636,7 +6631,10 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 		} else if (from_reg != IR_REG_NONE) {
 			ir_emit_store(ctx, type, to, from_reg);
 		} else if (IR_IS_CONST_REF(from) && (ir_type_size[type] != 8 || IR_IS_SIGNED_32BIT(ctx->ir_base[from].val.i64))) {
-			|	ASM_MREF_IMM_OP mov, type, to, ctx->ir_base[from].val.i32
+			int32_t offset = ir_ref_spill_slot(ctx, to);
+			ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
+
+			|	ASM_MEM_IMM_OP mov, type, [Ra(fp)+offset], ctx->ir_base[from].val.i32
 		} else if (IR_IS_CONST_REF(from) || !ir_is_same_mem(ctx, from, to)) {
 			from_reg = ctx->regs[ref][1]; /* temporary register for int mem->mem (see ir_fix_dessa_tmps) */
 			IR_ASSERT(from_reg != IR_REG_NONE);
