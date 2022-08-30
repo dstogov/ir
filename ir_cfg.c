@@ -546,29 +546,6 @@ int ir_schedule_blocks(ir_ctx *ctx)
 	while ((b = ir_bitqueue_pop(&blocks)) != (uint32_t)-1) {
 		bb = &ctx->cfg_blocks[b];
 		do {
-			if (bb->predecessors_count == 2) {
-				uint32_t predecessor = ctx->cfg_edges[bb->predecessors];
-
-				if (!ir_bitqueue_in(&blocks, predecessor)) {
-					predecessor = ctx->cfg_edges[bb->predecessors + 1];
-				}
-				if (ir_bitqueue_in(&blocks, predecessor)) {
-					ir_block *predecessor_bb = &ctx->cfg_blocks[predecessor];
-
-					if (predecessor_bb->successors_count == 1
-					 && predecessor_bb->predecessors_count == 1
-					 && predecessor_bb->end == predecessor_bb->start + 1
-					 && !(predecessor_bb->flags & IR_BB_DESSA_MOVES)) {
-						ir_bitqueue_del(&blocks, predecessor);
-						count++;
-						list[count] = predecessor;
-						map[predecessor] = count;
-						if (predecessor != count) {
-							reorder = 1;
-						}
-					}
-				}
-			}
 			count++;
 			list[count] = b;
 			map[b] = count;
@@ -669,10 +646,38 @@ int ir_schedule_blocks(ir_ctx *ctx)
 }
 
 /* JMP target optimisation */
-int ir_skip_empty_blocks(ir_ctx *ctx, int b)
+int ir_skip_empty_target_blocks(ir_ctx *ctx, int b)
 {
-	while (ctx->cfg_blocks[b].flags & IR_BB_MAY_SKIP) {
-		b++;
+	ir_block *bb;
+
+	while (1) {
+		bb = &ctx->cfg_blocks[b];
+
+		if (bb->end == bb->start + 1
+		 && bb->successors_count == 1
+		 && !(bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_DESSA_MOVES))) {
+			b = ctx->cfg_edges[bb->successors];
+		} else {
+			break;
+		}
+	}
+	return b;
+}
+
+int ir_skip_empty_next_blocks(ir_ctx *ctx, int b)
+{
+	ir_block *bb;
+
+	while (1) {
+		bb = &ctx->cfg_blocks[b];
+
+		if (bb->end == bb->start + 1
+		 && bb->successors_count == 1
+		 && !(bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_DESSA_MOVES))) {
+			b++;
+		} else {
+			break;
+		}
 	}
 	return b;
 }
@@ -693,13 +698,13 @@ void ir_get_true_false_blocks(ir_ctx *ctx, int b, int *true_block, int *false_bl
 		use_block = *p;
 		use_insn = &ctx->ir_base[ctx->cfg_blocks[use_block].start];
 		if (use_insn->op == IR_IF_TRUE) {
-			*true_block = ir_skip_empty_blocks(ctx, use_block);
+			*true_block = ir_skip_empty_target_blocks(ctx, use_block);
 		} else if (use_insn->op == IR_IF_FALSE) {
-			*false_block = ir_skip_empty_blocks(ctx, use_block);
+			*false_block = ir_skip_empty_target_blocks(ctx, use_block);
 		} else {
 			IR_ASSERT(0);
 		}
 	}
 	IR_ASSERT(*true_block && *false_block);
-	*next_block = b == ctx->cfg_blocks_count ? 0 : ir_skip_empty_blocks(ctx, b + 1);
+	*next_block = b == ctx->cfg_blocks_count ? 0 : ir_skip_empty_next_blocks(ctx, b + 1);
 }

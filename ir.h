@@ -523,8 +523,6 @@ int ir_build_cfg(ir_ctx *ctx);
 int ir_build_dominators_tree(ir_ctx *ctx);
 int ir_find_loops(ir_ctx *ctx);
 int ir_schedule_blocks(ir_ctx *ctx);
-int ir_skip_empty_blocks(ir_ctx *ctx, int b);
-void ir_get_true_false_blocks(ir_ctx *ctx, int b, int *true_block, int *false_block, int *next_block);
 
 /* SCCP - Sparse Conditional Constant Propagation (implementation in ir_sccp.c) */
 int ir_sccp(ir_ctx *ctx);

@@ -711,7 +711,6 @@ struct _ir_use_list {
 #define IR_BB_LOOP_HEADER      (1<<3)
 #define IR_BB_IRREDUCIBLE_LOOP (1<<4)
 #define IR_BB_DESSA_MOVES      (1<<5) /* translation out of SSA requires MOVEs      */
-#define IR_BB_MAY_SKIP         (1<<6) /* empty BB                                   */
 
 struct _ir_block {
 	uint32_t flags;
@@ -734,6 +733,10 @@ struct _ir_block {
 	int      loop_header;
 	int      loop_depth;
 };
+
+int ir_skip_empty_target_blocks(ir_ctx *ctx, int b);
+int ir_skip_empty_next_blocks(ir_ctx *ctx, int b);
+void ir_get_true_false_blocks(ir_ctx *ctx, int b, int *true_block, int *false_block, int *next_block);
 
 /*** Folding Engine (see ir.c and ir_fold.h) ***/
 typedef enum _ir_fold_action {

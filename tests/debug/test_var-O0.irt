@@ -79,7 +79,7 @@ test:
 	movsd %xmm0, (%rsp)
 	movsd %xmm1, 8(%rsp)
 	movsd 8(%rsp), %xmm0
-	subsd .L4(%rip), %xmm0
+	subsd .L3(%rip), %xmm0
 	movsd %xmm0, 0x10(%rsp)
 	movsd (%rsp), %xmm0
 	movsd %xmm0, 0x18(%rsp)
@@ -117,22 +117,20 @@ test:
 	addsd 0x40(%rsp), %xmm0
 	movsd %xmm0, 0x60(%rsp)
 	movsd 0x60(%rsp), %xmm0
-	ucomisd .L5(%rip), %xmm0
+	ucomisd .L4(%rip), %xmm0
 	jbe .L2
 	movl 0x30(%rsp), %eax
 	addq $0x68, %rsp
 	retq
 .L2:
 	cmpl $0x3e8, 0x30(%rsp)
-	jle .L3
+	jle .L1
 	xorl %eax, %eax
 	addq $0x68, %rsp
 	retq
-.L3:
-	jmp .L1
 .rodata
-	.db 0x90, 0x90
-.L4:
+	.db 0x90, 0x90, 0x90
+.L3:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f
-.L5:
+.L4:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x40

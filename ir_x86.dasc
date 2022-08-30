@@ -5443,7 +5443,7 @@ static void ir_emit_switch(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 			}
 			count++;
 		} else if (use_insn->op == IR_CASE_DEFAULT) {
-			default_label = ir_skip_empty_blocks(ctx, use_block);
+			default_label = ir_skip_empty_target_blocks(ctx, use_block);
 		} else {
 			IR_ASSERT(0);
 		}
@@ -5474,7 +5474,7 @@ static void ir_emit_switch(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 			use_insn = &ctx->ir_base[ctx->cfg_blocks[use_block].start];
 			if (use_insn->op == IR_CASE_VAL) {
 				val = &ctx->ir_base[use_insn->op2];
-				label = ir_skip_empty_blocks(ctx, use_block);
+				label = ir_skip_empty_target_blocks(ctx, use_block);
 				labels[val->val.i64 - min.i64] = label;
 			}
 		}
@@ -5594,7 +5594,7 @@ static void ir_emit_switch(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 			use_insn = &ctx->ir_base[ctx->cfg_blocks[use_block].start];
 			if (use_insn->op == IR_CASE_VAL) {
 				val = &ctx->ir_base[use_insn->op2];
-				label = ir_skip_empty_blocks(ctx, use_block);
+				label = ir_skip_empty_target_blocks(ctx, use_block);
 				if (IR_IS_32BIT(type, val->val)) {
 					|	ASM_REG_IMM_OP cmp, type, op2_reg, val->val.i32
 				} else {
@@ -6946,7 +6946,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 	ir_block *bb;
 	ir_insn *insn;
 	ir_ref i, n, j, *p;
-	uint32_t flags, *rule, insn_flags;
+	uint32_t *rule, insn_flags;
 	ir_backend_data *data = ctx->data;
 	ir_regset available = 0;
 	ir_tmp_reg tmp_regs[4];
@@ -6974,13 +6974,6 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 		if (bb->flags & IR_BB_UNREACHABLE) {
 			continue;
 		}
-		bb->flags &= ~IR_BB_MAY_SKIP;
-		flags = IR_BB_MAY_SKIP;
-		if (bb->successors_count != 1 ||
-		    ctx->cfg_edges[bb->successors] != b + 1 ||
-		    (bb->flags & IR_BB_DESSA_MOVES)) {
-			flags = 0;
-		}
 		for (i = bb->start, insn = ctx->ir_base + i, rule = ctx->rules + i; i <= bb->end;) {
 			switch (ctx->rules ? *rule : insn->op) {
 				case IR_START:
@@ -6995,12 +6988,6 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 				case IR_LOOP_END:
 					break;
 				default:
-					flags = 0;
-				case IR_VAR:
-				case IR_SKIP:
-				case IR_SKIP_MEM:
-				case IR_SKIP_REG: /* PARAM PHI PI */
-					/* skip */
 					def_flags = ir_get_def_flags(ctx, i, &reg);
 					if (ctx->rules
 					 && *rule != IR_CMP_AND_BRANCH_INT
@@ -7133,7 +7120,6 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 			insn += n;
 			rule += n;
 		}
-		bb->flags |= flags;
 		if (bb->flags & IR_BB_DESSA_MOVES) {
 			data->dessa_from_block = b;
 			ir_gen_dessa_moves(ctx, b, ir_fix_dessa_tmps);
@@ -7171,39 +7157,6 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 	}
 
 	ir_fix_param_spills(ctx);
-}
-
-static void ir_mark_empty_blocks(ir_ctx *ctx)
-{
-	int b;
-	ir_block *bb;
-	ir_insn *insn;
-	ir_ref i, n;
-	uint32_t flags, *rule;
-
-	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
-		if (bb->flags & IR_BB_UNREACHABLE) {
-			continue;
-		}
-		bb->flags &= ~IR_BB_MAY_SKIP;
-		if (bb->successors_count == 1
-		 && ctx->cfg_edges[bb->successors] == b + 1
-		 && !(bb->flags & IR_BB_DESSA_MOVES)) {
-			flags = IR_BB_MAY_SKIP;
-			for (i = bb->start, insn = ctx->ir_base + i, rule = ctx->rules + i; i < bb->end;) {
-				if (*rule != IR_SKIP && *rule != IR_SKIP_REG && *rule != IR_SKIP_MEM) {
-					flags = 0;
-					break;
-				}
-				n = ir_operands_count(ctx, insn);
-				n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
-				i += n;
-				insn += n;
-				rule += n;
-			}
-			bb->flags |= flags;
-		}
-	}
 }
 
 static void ir_preallocate_call_stack(ir_ctx *ctx, ir_backend_data *data)
@@ -7358,7 +7311,6 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	if (!ctx->live_intervals) {
 		ir_allocate_unique_spill_slots(ctx);
 	} else {
-		ir_mark_empty_blocks(ctx);
 		ir_calc_stack_frame_size(ctx, &data);
 	}
 
@@ -7394,12 +7346,12 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		if (bb->flags & IR_BB_UNREACHABLE) {
 			continue;
 		}
-//		if (bb->flags & IR_BB_MAY_SKIP) {
-//			continue;
-//		}
-//		if (ir_needs_block_label(ctx, b)) {
-			|=>b:
-//		}
+		if (bb->end == bb->start + 1
+		 && bb->successors_count == 1
+		 && !(bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_DESSA_MOVES))) {
+			continue;
+		}
+		|=>b:
 		for (i = bb->start, insn = ctx->ir_base + i, rule = ctx->rules + i; i <= bb->end;) {
 			switch (*rule) {
 				case IR_SKIP:
@@ -7781,8 +7733,8 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 						ir_gen_dessa_moves(ctx, b, ir_emit_dessa_move);
 					}
 					IR_ASSERT(bb->successors_count == 1);
-					target = ir_skip_empty_blocks(ctx, ctx->cfg_edges[bb->successors]);
-					if (b == ctx->cfg_blocks_count || target != ir_skip_empty_blocks(ctx, b + 1)) {
+					target = ir_skip_empty_target_blocks(ctx, ctx->cfg_edges[bb->successors]);
+					if (b == ctx->cfg_blocks_count || target != ir_skip_empty_next_blocks(ctx, b + 1)) {
 						|	jmp =>target
 					}
 					break;

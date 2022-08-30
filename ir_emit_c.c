@@ -458,25 +458,6 @@ static void ir_emit_abs(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 	}
 }
 
-static bool ir_needs_block_label(ir_ctx *ctx, int b)
-{
-	while (1) {
-		if (ctx->cfg_blocks[b].predecessors_count == 0) {
-			return 0;
-		} else if (ctx->cfg_blocks[b].predecessors_count == 1
-		 && ctx->cfg_edges[ctx->cfg_blocks[b].predecessors] == b - 1
-		 && ctx->ir_base[ctx->cfg_blocks[b - 1].end].op != IR_SWITCH) {
-			b--;
-			if (!(ctx->cfg_blocks[b].flags & IR_BB_MAY_SKIP)) {
-				return 0;
-			}
-		} else {
-			return 1;
-		}
-	}
-	return 1;
-}
-
 static void ir_emit_if(ir_ctx *ctx, FILE *f, int b, ir_ref def, ir_insn *insn)
 {
 	int true_block = 0, false_block = 0, next_block;
@@ -523,9 +504,9 @@ static void ir_emit_switch(ir_ctx *ctx, FILE *f, int b, ir_ref def, ir_insn *ins
 		if (use_insn->op == IR_CASE_VAL) {
 			fprintf(f, "\t\tcase ");
 			ir_emit_ref(ctx, f, use_insn->op2);
-			fprintf(f, ": goto bb%d;\n", ir_skip_empty_blocks(ctx, use_block));
+			fprintf(f, ": goto bb%d;\n", ir_skip_empty_target_blocks(ctx, use_block));
 		} else if (use_insn->op == IR_CASE_DEFAULT) {
-			fprintf(f, "\t\tdefault: goto bb%d;\n", ir_skip_empty_blocks(ctx, use_block));
+			fprintf(f, "\t\tdefault: goto bb%d;\n", ir_skip_empty_target_blocks(ctx, use_block));
 		} else {
 			IR_ASSERT(0);
 		}
@@ -683,9 +664,8 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 	uint8_t ret_type;
 	bool has_params = 0;
 	ir_bitset vars;
-	int b, target;
+	int b, target, prev = 0;
 	ir_block *bb;
-	uint32_t flags;
 
 	ret_type = ir_get_return_type(ctx);
 
@@ -727,34 +707,7 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 		if (bb->flags & IR_BB_UNREACHABLE) {
 			continue;
 		}
-		bb->flags &= ~IR_BB_MAY_SKIP;
-		flags = IR_BB_MAY_SKIP;
-		if (bb->successors_count != 1
-		 || ctx->cfg_edges[bb->successors] != b + 1
-		 || (bb->flags & IR_BB_DESSA_MOVES)) {
-			flags = 0;
-		}
 		for (i = bb->start, insn = ctx->ir_base + i; i <= bb->end;) {
-			switch (insn->op) {
-				case IR_START:
-				case IR_BEGIN:
-				case IR_END:
-				case IR_IF_TRUE:
-				case IR_IF_FALSE:
-				case IR_CASE_VAL:
-				case IR_CASE_DEFAULT:
-				case IR_MERGE:
-				case IR_LOOP_BEGIN:
-				case IR_LOOP_END:
-				case IR_PARAM:
-				case IR_VAR:
-				case IR_PHI:
-				case IR_PI:
-					/* skip */
-					break;
-				default:
-					flags = 0;
-			}
 			if (ctx->vregs[i]) {
 				if (!ir_bitset_in(vars, ctx->vregs[i])) {
 					ir_bitset_incl(vars, ctx->vregs[i]);
@@ -787,17 +740,22 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 			i += n;
 			insn += n;
 		}
-		bb->flags |= flags;
 	}
 	ir_mem_free(vars);
 
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
-		if (bb->flags & (IR_BB_MAY_SKIP|IR_BB_UNREACHABLE)) {
+		if (bb->flags & IR_BB_UNREACHABLE) {
 			continue;
 		}
-		if (ir_needs_block_label(ctx, b)) {
+		if (bb->end == bb->start + 1
+		 && bb->successors_count == 1
+		 && !(bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_DESSA_MOVES))) {
+			continue;
+		}
+		if (bb->predecessors_count > 1 || (bb->predecessors_count == 1 && ctx->cfg_edges[bb->predecessors] != prev)) {
 			fprintf(f, "bb%d:\n", b);
 		}
+		prev = b;
 		for (i = bb->start, insn = ctx->ir_base + i; i <= bb->end;) {
 			switch (insn->op) {
 				case IR_START:
@@ -942,8 +900,8 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 						ctx->data = f;
 						ir_gen_dessa_moves(ctx, b, ir_emit_dessa_move);
 					}
-					target = ir_skip_empty_blocks(ctx, ctx->cfg_edges[bb->successors]);
-					if (b == ctx->cfg_blocks_count || target != ir_skip_empty_blocks(ctx, b + 1)) {
+					target = ir_skip_empty_target_blocks(ctx, ctx->cfg_edges[bb->successors]);
+					if (b == ctx->cfg_blocks_count || target != ir_skip_empty_next_blocks(ctx, b + 1)) {
 						fprintf(f, "\tgoto bb%d;\n", target);
 					}
 					break;

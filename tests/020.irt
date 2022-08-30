@@ -42,28 +42,28 @@
 BB1:
 	start=1
 	end=5
-	successors(2) [BB2, BB3]
+	successors(2) [BB2, BB4]
 	dom_depth=0
-	dom_children [BB2, BB3, BB4]
+	dom_children [BB2, BB4, BB3]
 BB2:
 	start=6
 	end=7
-	successors(1) [BB4]
+	successors(1) [BB3]
 	predecessors(1) [BB1]
 	dom_parent=BB1
 	dom_depth=1
 	mov R2 -> R1
 BB3:
-	start=8
-	end=9
-	successors(1) [BB4]
-	predecessors(1) [BB1]
+	start=10
+	end=12
+	predecessors(2) [BB2, BB4]
 	dom_parent=BB1
 	dom_depth=1
 BB4:
-	start=10
-	end=12
-	predecessors(2) [BB2, BB3]
+	start=8
+	end=9
+	successors(1) [BB3]
+	predecessors(1) [BB1]
 	dom_parent=BB1
 	dom_depth=1
 }

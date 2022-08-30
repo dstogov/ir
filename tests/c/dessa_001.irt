@@ -27,8 +27,8 @@ int32_t test(int32_t a, int32_t b, bool cond)
 	int32_t d_1 = a;
 	int32_t d_2 = b;
 	bool d_3 = cond;
-	if (!d_3) goto bb4;
+	if (!d_3) goto bb3;
 	d_1 = d_2;
-bb4:
+bb3:
 	return d_1;
 }
