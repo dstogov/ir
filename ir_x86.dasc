@@ -813,6 +813,7 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num, ir_reg *reg)
 		case IR_BINOP_SSE2:
 		case IR_BINOP_AVX:
 		case IR_IF_INT:
+		case IR_CMP_FP:
 			return (op_num == 2) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
 		case IR_CMP_INT:
 		case IR_SKIP_TEST_INT:
@@ -827,13 +828,6 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num, ir_reg *reg)
 			return IR_USE_MUST_BE_IN_REG;
 		case IR_MIN_MAX_INT:
 			return (op_num == 1) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
-		case IR_CMP_FP:
-			insn = &ctx->ir_base[ref];
-			if (insn->op == IR_LT || insn->op == IR_LE) {
-				return (op_num == 1) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
-			} else {
-				return (op_num == 2) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
-			}
 		case IR_CALL:
 		case IR_TAILCALL:
 			if (op_num > 2) {
@@ -869,11 +863,7 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num, ir_reg *reg)
 							return IR_USE_SHOULD_BE_IN_REG;
 					    }
 					} else {
-						if (insn->op == IR_LT || insn->op == IR_LE) {
-							return (op_num == 1) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
-						} else {
-							return (op_num == 2) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
-						}
+						return (op_num == 2) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
 					}
 					break;
 			}
@@ -986,24 +976,13 @@ cmp_int:
 			tmp_regs[0].end = IR_SAVE_SUB_REF;
 			n = 1;
 cmp_fp:
-			if (insn->op == IR_LT || insn->op == IR_LE) {
-				if (IR_IS_CONST_REF(insn->op2)) {
-					ir_insn *val_insn = &ctx->ir_base[insn->op2];
-					tmp_regs[n].num = 2;
-					tmp_regs[n].type = val_insn->type;
-					tmp_regs[n].start = IR_LOAD_SUB_REF;
-					tmp_regs[n].end = IR_DEF_SUB_REF;
-					n++;
-				}
-			} else {
-				if (IR_IS_CONST_REF(insn->op1)) {
-					ir_insn *val_insn = &ctx->ir_base[insn->op1];
-					tmp_regs[n].num = 1;
-					tmp_regs[n].type = val_insn->type;
-					tmp_regs[n].start = IR_LOAD_SUB_REF;
-					tmp_regs[n].end = IR_DEF_SUB_REF;
-					n++;
-				}
+			if (IR_IS_CONST_REF(insn->op1)) {
+				ir_insn *val_insn = &ctx->ir_base[insn->op1];
+				tmp_regs[n].num = 1;
+				tmp_regs[n].type = val_insn->type;
+				tmp_regs[n].start = IR_LOAD_SUB_REF;
+				tmp_regs[n].end = IR_DEF_SUB_REF;
+				n++;
 			}
 			return n;
 		case IR_BINOP_AVX:
@@ -1193,20 +1172,33 @@ static void ir_match_fuse_load(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 
 static void ir_match_swap_cmp(ir_ctx *ctx, ir_insn *insn)
 {
-	if ((ctx->flags & IR_OPT_CODEGEN)
-	 && !IR_IS_CONST_REF(insn->op2)
-	 && !IR_IS_CONST_REF(insn->op1)) {
-		ir_insn *op1_insn = &ctx->ir_base[insn->op1];
-		ir_insn *op2_insn = &ctx->ir_base[insn->op2];
+	if (ctx->flags & IR_OPT_CODEGEN) {
+		if (insn->op == IR_LT || insn->op == IR_LE) {
+			ir_insn *op1_insn = &ctx->ir_base[insn->op1];
 
-		if ((op1_insn->op == IR_VLOAD || op1_insn->op == IR_LOAD)
-		 && (op2_insn->op != IR_VLOAD && op2_insn->op != IR_LOAD)) {
-			/* swap for better load fusion */
-			ir_ref tmp = insn->op1;
-			insn->op1 = insn->op2;
-			insn->op2 = tmp;
-			if (insn->op != IR_EQ && insn->op != IR_NE) {
+			if (IR_IS_TYPE_FP(op1_insn->type)) {
+				/* swap operands to avoid P flag check */
+				ir_ref tmp = insn->op1;
+				insn->op1 = insn->op2;
+				insn->op2 = tmp;
 				insn->op ^= 3;
+				return;
+			}
+		}
+		if (!IR_IS_CONST_REF(insn->op2)
+		 && !IR_IS_CONST_REF(insn->op1)) {
+			ir_insn *op1_insn = &ctx->ir_base[insn->op1];
+			ir_insn *op2_insn = &ctx->ir_base[insn->op2];
+
+			if ((op1_insn->op == IR_VLOAD || op1_insn->op == IR_LOAD)
+			 && (op2_insn->op != IR_VLOAD && op2_insn->op != IR_LOAD)) {
+				/* swap for better load fusion */
+				ir_ref tmp = insn->op1;
+				insn->op1 = insn->op2;
+				insn->op2 = tmp;
+				if (insn->op != IR_EQ && insn->op != IR_NE) {
+					insn->op ^= 3;
+				}
 			}
 		}
 	}
@@ -3948,19 +3940,10 @@ static ir_op ir_emit_cmp_fp_common(ir_ctx *ctx, ir_ref cmp_ref, ir_insn *cmp_ins
 	ir_ref op1, op2;
 	ir_reg op1_reg, op2_reg;
 
-	if ((ctx->regs[cmp_ref][2] != IR_REG_NONE) && (op == IR_LT || op == IR_LE)) {
-		/* swap operands to avoid P flag check */
-		op ^= 3;
-		op1 = cmp_insn->op2;
-		op2 = cmp_insn->op1;
-		op1_reg = ctx->regs[cmp_ref][2];
-		op2_reg = ctx->regs[cmp_ref][1];
-	} else {
-		op1 = cmp_insn->op1;
-		op2 = cmp_insn->op2;
-		op1_reg = ctx->regs[cmp_ref][1];
-		op2_reg = ctx->regs[cmp_ref][2];
-	}
+	op1 = cmp_insn->op1;
+	op2 = cmp_insn->op2;
+	op1_reg = ctx->regs[cmp_ref][1];
+	op2_reg = ctx->regs[cmp_ref][2];
 
 	if (op1_reg == IR_REG_NONE && op2_reg != IR_REG_NONE && (op == IR_EQ || op == IR_NE)) {
 		ir_ref tmp;
