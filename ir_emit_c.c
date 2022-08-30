@@ -747,7 +747,7 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 		if (bb->flags & IR_BB_UNREACHABLE) {
 			continue;
 		}
-		if (bb->end == bb->start + 1
+		if (bb->end - ctx->prev_insn_len[bb->end] == bb->start
 		 && bb->successors_count == 1
 		 && !(bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_DESSA_MOVES))) {
 			continue;

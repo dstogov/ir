@@ -586,7 +586,7 @@ int ir_schedule_blocks(ir_ctx *ctx)
 			if (!best_successor_bb) {
 				if (bb->successors_count == 1
 				 && bb->predecessors_count == 1
-				 && bb->end == bb->start + 1
+				 && bb->end - ctx->prev_insn_len[bb->end] == bb->start
 				 && !(bb->flags & IR_BB_DESSA_MOVES)) {
 					uint32_t predecessor = ctx->cfg_edges[bb->predecessors];
 					ir_block *predecessor_bb = &ctx->cfg_blocks[predecessor];
@@ -653,7 +653,7 @@ int ir_skip_empty_target_blocks(ir_ctx *ctx, int b)
 	while (1) {
 		bb = &ctx->cfg_blocks[b];
 
-		if (bb->end == bb->start + 1
+		if (bb->end - ctx->prev_insn_len[bb->end] == bb->start
 		 && bb->successors_count == 1
 		 && !(bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_DESSA_MOVES))) {
 			b = ctx->cfg_edges[bb->successors];
@@ -669,9 +669,13 @@ int ir_skip_empty_next_blocks(ir_ctx *ctx, int b)
 	ir_block *bb;
 
 	while (1) {
+		if (b > ctx->cfg_blocks_count) {
+			return 0;
+		}
+
 		bb = &ctx->cfg_blocks[b];
 
-		if (bb->end == bb->start + 1
+		if (bb->end - ctx->prev_insn_len[bb->end] == bb->start
 		 && bb->successors_count == 1
 		 && !(bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_DESSA_MOVES))) {
 			b++;
