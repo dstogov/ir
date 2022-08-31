@@ -527,7 +527,7 @@ next:
 int ir_schedule_blocks(ir_ctx *ctx)
 {
 	ir_bitqueue blocks;
-	uint32_t b, *p, successor, best_successor, j;
+	uint32_t b, *p, successor, best_successor, j, last_non_empty = 0;
 	ir_block *bb, *successor_bb, *best_successor_bb;
 	ir_insn *insn;
 	uint32_t *list, *map;
@@ -539,21 +539,48 @@ int ir_schedule_blocks(ir_ctx *ctx)
 	blocks.pos = 0;
 	list = ir_mem_malloc(sizeof(uint32_t) * (ctx->cfg_blocks_count + 1) * 2);
 	map = list + (ctx->cfg_blocks_count + 1);
-	for (b = 1; b <= ctx->cfg_blocks_count; b++) {
+	for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
+		if (bb->end - ctx->prev_insn_len[bb->end] == bb->start
+		 && bb->successors_count == 1
+		 && !(bb->flags & IR_BB_DESSA_MOVES)) {
+			bb->flags |= IR_BB_EMPTY;
+		}
 		ir_bitset_incl(blocks.set, b);
 	}
 
 	while ((b = ir_bitqueue_pop(&blocks)) != (uint32_t)-1) {
 		bb = &ctx->cfg_blocks[b];
+		/* Start trace */
 		do {
+			if (bb->predecessors_count > 1) {
+				/* Insert empty ENTRY blocks */
+				for (j = 0, p = &ctx->cfg_edges[bb->predecessors]; j < bb->predecessors_count; j++, p++) {
+					ir_ref predecessor = *p;
+
+					if (ir_bitqueue_in(&blocks, predecessor)
+					 && (ctx->cfg_blocks[predecessor].flags & IR_BB_ENTRY)
+					 && ctx->cfg_blocks[predecessor].end == ctx->cfg_blocks[predecessor].start + 1) {
+						ir_bitqueue_del(&blocks, predecessor);
+						count++;
+						list[count] = predecessor;
+						map[predecessor] = count;
+						if (predecessor != count) {
+							reorder = 1;
+						}
+						if (!(bb->flags & IR_BB_EMPTY)) {
+							last_non_empty = b;
+						}
+					}
+				}
+			}
 			count++;
 			list[count] = b;
 			map[b] = count;
 			if (b != count) {
 				reorder = 1;
 			}
-			if (!bb->successors_count) {
-				break;
+			if (!(bb->flags & IR_BB_EMPTY)) {
+				last_non_empty = b;
 			}
 			best_successor_bb = NULL;
 			for (b = 0, p = &ctx->cfg_edges[bb->successors]; b < bb->successors_count; b++, p++) {
@@ -574,9 +601,15 @@ int ir_schedule_blocks(ir_ctx *ctx)
 						best_successor = successor;
 						best_successor_bb = successor_bb;
 						best_successor_prob = prob;
-					} else if ((best_successor_prob && prob && prob > best_successor_prob)
-							|| (!best_successor_prob && prob && prob > 100 / bb->successors_count)
-							|| (best_successor_prob && !prob && best_successor_prob < 100 / bb->successors_count)) {
+					} else if ((best_successor_prob && prob
+								&& prob > best_successor_prob)
+							|| (!best_successor_prob && prob
+								&& prob > 100 / bb->successors_count)
+							|| (best_successor_prob && !prob
+								&& best_successor_prob < 100 / bb->successors_count)
+							|| (!best_successor_prob && !prob
+								&& (best_successor_bb->flags & IR_BB_EMPTY)
+								&& !(successor_bb->flags & IR_BB_EMPTY))) {
 						best_successor = successor;
 						best_successor_bb = successor_bb;
 						best_successor_prob = prob;
@@ -584,18 +617,14 @@ int ir_schedule_blocks(ir_ctx *ctx)
 				}
 			}
 			if (!best_successor_bb) {
-				if (bb->successors_count == 1
-				 && bb->predecessors_count == 1
-				 && bb->end - ctx->prev_insn_len[bb->end] == bb->start
-				 && !(bb->flags & IR_BB_DESSA_MOVES)) {
-					uint32_t predecessor = ctx->cfg_edges[bb->predecessors];
-					ir_block *predecessor_bb = &ctx->cfg_blocks[predecessor];
-
-					if (predecessor_bb->successors_count == 2) {
-						b = ctx->cfg_edges[predecessor_bb->successors];
+				/* Try to continue trace using the other successor of the last IF */
+				if ((bb->flags & IR_BB_EMPTY) && last_non_empty) {
+					bb = &ctx->cfg_blocks[last_non_empty];
+					if (bb->successors_count == 2) {
+						b = ctx->cfg_edges[bb->successors];
 
 						if (!ir_bitqueue_in(&blocks, b)) {
-							b = ctx->cfg_edges[predecessor_bb->successors + 1];
+							b = ctx->cfg_edges[bb->successors + 1];
 						}
 						if (ir_bitqueue_in(&blocks, b)) {
 							bb = &ctx->cfg_blocks[b];
@@ -604,6 +633,7 @@ int ir_schedule_blocks(ir_ctx *ctx)
 						}
 					}
 				}
+				/* End trace */
 				break;
 			}
 			b = best_successor;
@@ -677,7 +707,7 @@ int ir_skip_empty_next_blocks(ir_ctx *ctx, int b)
 
 		if (bb->end - ctx->prev_insn_len[bb->end] == bb->start
 		 && bb->successors_count == 1
-		 && !(bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_DESSA_MOVES))) {
+		 && !(bb->flags & (IR_BB_START|/*IR_BB_ENTRY|*/IR_BB_DESSA_MOVES))) {
 			b++;
 		} else {
 			break;

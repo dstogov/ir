@@ -711,6 +711,7 @@ struct _ir_use_list {
 #define IR_BB_LOOP_HEADER      (1<<3)
 #define IR_BB_IRREDUCIBLE_LOOP (1<<4)
 #define IR_BB_DESSA_MOVES      (1<<5) /* translation out of SSA requires MOVEs      */
+#define IR_BB_EMPTY            (1<<6)
 
 struct _ir_block {
 	uint32_t flags;
