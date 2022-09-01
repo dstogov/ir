@@ -1284,6 +1284,12 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 						ir_match_swap_commutative(ctx, op1_insn);
 						ir_match_fuse_load(ctx, op1_insn->op2, bb);
 						if (op1_insn->op == IR_AND && ctx->use_lists[insn->op1].count == 1) {
+							if (IR_IS_CONST_REF(op1_insn->op2)
+							 && op1_insn->op1 > bb->start
+							 && op1_insn->op1 < ref
+							 && !ctx->rules[op1_insn->op1]) {
+								ir_match_fuse_load(ctx, op1_insn->op1, bb);
+							}
 							ctx->rules[insn->op1] = IR_SKIP_TEST_INT;
 							return IR_TEST_INT;
 						} else {
@@ -1855,6 +1861,12 @@ store_int:
 				} else if (op2_insn->op == IR_AND) { // TODO: OR, XOR. etc
 					ir_match_swap_commutative(ctx, op2_insn);
 					ir_match_fuse_load(ctx, op2_insn->op2, bb);
+					if (IR_IS_CONST_REF(op2_insn->op2)
+					 && op2_insn->op1 > bb->start
+					 && op2_insn->op1 < ref
+					 && !ctx->rules[op2_insn->op1]) {
+						ir_match_fuse_load(ctx, op2_insn->op1, bb);
+					}
 					ctx->rules[insn->op2] = IR_SKIP_TEST_INT;
 					return IR_TEST_AND_BRANCH_INT;
 				} else if (op2_insn->op == IR_OVERFLOW) {
@@ -3858,7 +3870,7 @@ static void ir_emit_test_int_common(ir_ctx *ctx, ir_ref ref, ir_op op)
 			op1_reg &= ~IR_REG_SPILL_LOAD;
 			ir_emit_load(ctx, type, op1_reg, op1);
 		}
-		if (op2_reg != IR_REG_NONE) {
+		if (op2_reg != IR_REG_NONE && ctx->rules[op2] != IR_SKIP_MEM) {
 			if ((op2_reg & IR_REG_SPILL_LOAD) || IR_IS_CONST_REF(op2)) {
 				op2_reg &= ~IR_REG_SPILL_LOAD;
 				if (op1 != op2) {
