@@ -380,7 +380,6 @@ restart:
 	for (i = 1; i != 0; i = _next[i]) {
 		_xlat[i] = insns_count;
 		insn = &ctx->ir_base[i];
-		flags = ir_op_flags[insn->op];
 		n = ir_input_edges_count(ctx, insn);
 		for (k = 1, p = insn->ops + 1; k <= n; k++, p++) {
 			ref = *p;
