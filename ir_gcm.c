@@ -455,38 +455,105 @@ restart:
 		IR_ASSERT(new_ctx.insns_count <= new_ctx.insns_limit);
 		new_insn = &new_ctx.ir_base[new_ref];
 
-		new_insn->optx = insn->optx;
-		new_insn->op1 = IR_UNUSED;
-		new_insn->op2 = IR_UNUSED;
-		new_insn->op3 = IR_UNUSED;
-		for (k = 1, p = insn->ops + 1; k <= n; k++, p++) {
-			ref = *p;
-			switch (IR_OPND_KIND(flags, k)) {
-				case IR_OPND_DATA:
-				case IR_OPND_VAR:
-				case IR_OPND_CONTROL:
-				case IR_OPND_CONTROL_DEP:
-					ref = _xlat[ref];
-					if (ref > 0) {
-						lists[ref].refs = -1;
-						lists[ref].count++;
-						edges_count++;
+		*new_insn = *insn;
+		switch (IR_OPND_KIND(flags, 1)) {
+			case IR_OPND_UNUSED:
+				continue;
+			case IR_OPND_DATA:
+			case IR_OPND_CONTROL:
+			case IR_OPND_CONTROL_DEP:
+			case IR_OPND_VAR:
+				ref = _xlat[insn->op1];
+				if (ref > 0) {
+					lists[ref].refs = -1;
+					lists[ref].count++;
+					edges_count++;
+				}
+				new_insn->op1 = ref;
+				break;
+			case IR_OPND_CONTROL_REF:
+				new_insn->op1 = _xlat[insn->op1];
+				break;
+			case IR_OPND_STR:
+				new_insn->op1 = ir_str(&new_ctx, ir_get_str(ctx, insn->op1));
+				break;
+			case IR_OPND_NUM:
+			case IR_OPND_PROB:
+				break;
+			default:
+				IR_ASSERT(0);
+		}
+		if (n < 2) {
+			continue;
+		}
+		switch (IR_OPND_KIND(flags, 2)) {
+			case IR_OPND_UNUSED:
+				continue;
+			case IR_OPND_DATA:
+			case IR_OPND_CONTROL:
+			case IR_OPND_CONTROL_DEP:
+			case IR_OPND_VAR:
+				ref = _xlat[insn->op2];
+				if (ref > 0) {
+					lists[ref].refs = -1;
+					lists[ref].count++;
+					edges_count++;
+				}
+				new_insn->op2 = ref;
+				break;
+			case IR_OPND_CONTROL_REF:
+				new_insn->op2 = _xlat[insn->op2];
+				break;
+			case IR_OPND_STR:
+				new_insn->op2 = ir_str(&new_ctx, ir_get_str(ctx, insn->op2));
+				break;
+			case IR_OPND_NUM:
+			case IR_OPND_PROB:
+				break;
+			default:
+				IR_ASSERT(0);
+		}
+		if (n < 3) {
+			continue;
+		}
+		switch (IR_OPND_KIND(flags, 3)) {
+			case IR_OPND_UNUSED:
+				break;
+			case IR_OPND_DATA:
+			case IR_OPND_CONTROL:
+			case IR_OPND_CONTROL_DEP:
+			case IR_OPND_VAR:
+				ref = _xlat[insn->op3];
+				if (ref > 0) {
+					lists[ref].refs = -1;
+					lists[ref].count++;
+					edges_count++;
+				}
+				new_insn->op3 = ref;
+				if (n > 3) {
+					for (k = 3, p = insn->ops + 3; k <= n; k++, p++) {
+						ref = *p;
+						ref = _xlat[ref];
+						if (ref > 0) {
+							lists[ref].refs = -1;
+							lists[ref].count++;
+							edges_count++;
+						}
+						new_insn->ops[k] = ref;
 					}
-					break;
-				case IR_OPND_CONTROL_REF:
-					ref = _xlat[ref];
-					break;
-				case IR_OPND_STR:
-					ref = ir_str(&new_ctx, ir_get_str(ctx, ref));
-					break;
-				case IR_OPND_NUM:
-				case IR_OPND_PROB:
-					break;
-				default:
-					IR_ASSERT(0);
-					break;
-			}
-			new_insn->ops[k] = ref;
+				}
+				break;
+			case IR_OPND_CONTROL_REF:
+				new_insn->op3 = _xlat[insn->op3];
+				break;
+			case IR_OPND_STR:
+				new_insn->op3 = ir_str(&new_ctx, ir_get_str(ctx, insn->op3));
+				break;
+			case IR_OPND_NUM:
+			case IR_OPND_PROB:
+				break;
+			default:
+				IR_ASSERT(0);
 		}
 	}
 
