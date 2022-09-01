@@ -17,6 +17,10 @@
 # pragma GCC diagnostic ignored "-Warray-bounds"
 #endif
 
+#define IR_SKIP      IR_LAST_OP
+#define IR_SKIP_REG  (IR_LAST_OP+1)
+#define IR_SKIP_MEM  (IR_LAST_OP+2)
+
 int ir_regs_number(void)
 {
 	return IR_REG_NUM;
@@ -481,7 +485,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					}
 				}
 			}
-			if (insn->op != IR_PHI) {
+			if (insn->op != IR_PHI && (!ctx->rules || ctx->rules[i] != IR_SKIP_MEM)) {
 				n = ir_input_edges_count(ctx, insn);
 				for (j = 1; j <= n; j++) {
 					if (IR_OPND_KIND(flags, j) == IR_OPND_DATA) {
@@ -493,6 +497,25 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						} else {
 							use_flags = 0;
 							reg = IR_REG_NONE;
+						}
+						if (input > 0 && ctx->rules && ctx->rules[input] == IR_SKIP_MEM) {
+							do {
+								if (ctx->ir_base[input].op == IR_LOAD) {
+									input = ctx->ir_base[input].op2;
+									if (input < 0 || ctx->rules[input] != IR_SKIP_MEM) {
+										break;
+									}
+								}
+								if (ctx->ir_base[input].op == IR_RLOAD) {
+									/* pass */
+								} else if (ctx->ir_base[input].op == IR_ADD) {
+									IR_ASSERT(!IR_IS_CONST_REF(ctx->ir_base[input].op1));
+									IR_ASSERT(IR_IS_CONST_REF(ctx->ir_base[input].op2));
+									input = ctx->ir_base[input].op1;
+								} else {
+									input = 0;
+								}
+							} while (0);
 						}
 						if (input > 0 && ctx->vregs[input]) {
 							ir_live_pos use_pos;
