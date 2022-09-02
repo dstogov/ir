@@ -258,8 +258,8 @@ typedef enum _ir_type {
 	_(ENTRY,        S0X2, num, ent, ___) /* code entry (op3 keeps addr) */ \
 	\
 	/* guards (floating or not) ???                                     */ \
-	_(GUARD_TRUE,   c3,   src, def, def) /* IF without second successor */ \
-	_(GUARD_FALSE,  c3,   src, def, def) /* IF without second successor */ \
+	_(GUARD,        c3,   src, def, def) /* IF without second successor */ \
+	_(GUARD_NOT  ,  c3,   src, def, def) /* IF without second successor */ \
 
 #define IR_OP_ENUM(name, flags, op1, op2, op3) IR_ ## name,
 

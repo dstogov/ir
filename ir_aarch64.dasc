@@ -1073,8 +1073,8 @@ binop_fp:
 			} else {
 				IR_ASSERT(0 && "NIY IR_IF_FP");
 			}
-		case IR_GUARD_TRUE:
-		case IR_GUARD_FALSE:
+		case IR_GUARD:
+		case IR_GUARD_NOT:
 			if (insn->op2 > bb->start && insn->op2 < ref && ctx->use_lists[insn->op2].count == 1) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT) {
@@ -4088,7 +4088,11 @@ static void ir_emit_guard(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		} else {
 			addr = (void*)addr_insn->val.addr;
 		}
-		|	cbz Rw(op2_reg), &addr
+		if (insn->op == IR_GUARD) {
+			|	cbz Rw(op2_reg), &addr
+		} else {
+			|	cbnz Rw(op2_reg), &addr
+		}
 	} else {
 		IR_ASSERT(0);
 	}
@@ -4247,13 +4251,18 @@ static void ir_emit_guard_cmp_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 			op = IR_NE;
 		}
 		if (op1_reg != IR_REG_NONE && (op == IR_EQ || op == IR_NE)) {
+			if (insn->op == IR_GUARD_NOT) {
+				op ^= 1; // reverse
+			}
 			ir_emit_guard_jz(ctx, op, addr, type, op1_reg);
 			return;
 		}
 	}
 	ir_emit_cmp_int_common(ctx, type, op1_reg, op1, op2_reg, op2);
 
-	op ^= 1; // reverse
+	if (insn->op == IR_GUARD) {
+		op ^= 1; // reverse
+	}
 
 	ir_emit_guard_jcc(ctx, op, addr, 1);
 }
@@ -5128,8 +5137,8 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_ALLOCA:
 					ir_emit_alloca(ctx, i, insn);
 					break;
-				case IR_GUARD_TRUE:
-				case IR_GUARD_FALSE:
+				case IR_GUARD:
+				case IR_GUARD_NOT:
 					ir_emit_guard(ctx, i, insn);
 					break;
 				case IR_TLS:
