@@ -4296,13 +4296,16 @@ static void ir_emit_if_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 		int32_t offset = 0;
 
 		if (ctx->rules[insn->op2] == IR_SKIP_MEM) {
-			IR_ASSERT(op2_reg != IR_REG_NONE);
 			offset = ir_fuse_load(ctx, insn->op2, op2_reg);
 		} else {
 			op2_reg = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
 			offset = ir_ref_spill_slot(ctx, insn->op2);
 		}
-		|	ASM_MEM_IMM_OP cmp, type, [Ra(op2_reg)+offset], 0
+		if (op2_reg == IR_REG_NONE) {
+			|	ASM_MEM_IMM_OP cmp, type, [offset], 0
+		} else {
+			|	ASM_MEM_IMM_OP cmp, type, [Ra(op2_reg)+offset], 0
+		}
 	}
 	ir_emit_jcc(ctx, IR_NE, b, def, insn, 1);
 }
