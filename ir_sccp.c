@@ -461,24 +461,24 @@ int ir_sccp(ir_ctx *ctx)
 				if (!IR_IS_BOTTOM(insn->op2)) {
 					bool b = ir_sccp_is_true(ctx, _values, insn->op2);
 					use_list = &ctx->use_lists[i];
-					n = use_list->count;
-					for (j = 0, p = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
-						use = *p;
-						IR_ASSERT(use > 0);
+					IR_ASSERT(use_list->count == 2);
+					p = &ctx->use_edges[use_list->refs];
+					use = *p;
+					use_insn = &ctx->ir_base[use];
+					IR_ASSERT(use_insn->op == IR_IF_TRUE || use_insn->op == IR_IF_FALSE);
+					if ((use_insn->op == IR_IF_TRUE) != b) {
+						use = *(p+1);
 						use_insn = &ctx->ir_base[use];
 						IR_ASSERT(use_insn->op == IR_IF_TRUE || use_insn->op == IR_IF_FALSE);
-						if ((use_insn->op == IR_IF_TRUE) == b) {
-							if (IR_IS_TOP(i)) {
-								_values[i].optx = IR_IF;
-								_values[i].op1 = use;
-							} else if (_values[i].optx != IR_IF || _values[i].op1 != use) {
-								IR_MAKE_BOTTOM(i);
-							}
-							if (!IR_IS_BOTTOM(use)) {
-								ir_bitqueue_add(&worklist, use);
-							}
-							break;
-						}
+					}
+					if (IR_IS_TOP(i)) {
+						_values[i].optx = IR_IF;
+						_values[i].op1 = use;
+					} else if (_values[i].optx != IR_IF || _values[i].op1 != use) {
+						IR_MAKE_BOTTOM(i);
+					}
+					if (!IR_IS_BOTTOM(use)) {
+						ir_bitqueue_add(&worklist, use);
 					}
 					continue;
 				}

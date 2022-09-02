@@ -719,8 +719,7 @@ int ir_skip_empty_next_blocks(ir_ctx *ctx, int b)
 void ir_get_true_false_blocks(ir_ctx *ctx, int b, int *true_block, int *false_block, int *next_block)
 {
 	ir_block *bb;
-	uint32_t n, *p, use_block;
-	ir_insn *use_insn;
+	uint32_t *p, use_block;
 
 	*true_block = 0;
 	*false_block = 0;
@@ -728,16 +727,18 @@ void ir_get_true_false_blocks(ir_ctx *ctx, int b, int *true_block, int *false_bl
 	IR_ASSERT(ctx->ir_base[bb->end].op == IR_IF);
 	IR_ASSERT(bb->successors_count == 2);
 	p = &ctx->cfg_edges[bb->successors];
-	for (n = 2; n != 0; p++, n--) {
-		use_block = *p;
-		use_insn = &ctx->ir_base[ctx->cfg_blocks[use_block].start];
-		if (use_insn->op == IR_IF_TRUE) {
-			*true_block = ir_skip_empty_target_blocks(ctx, use_block);
-		} else if (use_insn->op == IR_IF_FALSE) {
-			*false_block = ir_skip_empty_target_blocks(ctx, use_block);
-		} else {
-			IR_ASSERT(0);
-		}
+	use_block = *p;
+	if (ctx->ir_base[ctx->cfg_blocks[use_block].start].op == IR_IF_TRUE) {
+		*true_block = ir_skip_empty_target_blocks(ctx, use_block);
+		use_block = *(p+1);
+		IR_ASSERT(ctx->ir_base[ctx->cfg_blocks[use_block].start].op == IR_IF_FALSE);
+		*false_block = ir_skip_empty_target_blocks(ctx, use_block);
+	} else {
+		IR_ASSERT(ctx->ir_base[ctx->cfg_blocks[use_block].start].op == IR_IF_FALSE);
+		*false_block = ir_skip_empty_target_blocks(ctx, use_block);
+		use_block = *(p+1);
+		IR_ASSERT(ctx->ir_base[ctx->cfg_blocks[use_block].start].op == IR_IF_TRUE);
+		*true_block = ir_skip_empty_target_blocks(ctx, use_block);
 	}
 	IR_ASSERT(*true_block && *false_block);
 	*next_block = b == ctx->cfg_blocks_count ? 0 : ir_skip_empty_next_blocks(ctx, b + 1);
