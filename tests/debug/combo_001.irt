@@ -22,12 +22,12 @@ x86_64
 	bool b = NE(x_1, i_1);
 	ll_4 = IF(ll_3, b);
 	ll_5 = IF_TRUE(ll_4);
-	uint32_t x_2 = COPY(i_2);
+	int32_t x_2 = COPY(i_2);
 	ll_6 = END(ll_5);
 	ll_7 = IF_FALSE(ll_4);
 	ll_72 = END(ll_7);
 	ll_8 = MERGE(ll_6, ll_72);
-	uint32_t x_3 = PHI(ll_8, x_2, x_1);
+	int32_t x_3 = PHI(ll_8, x_2, x_1);
 	ll_10 = IF(ll_8, cond);
 	ll_11 = IF_TRUE(ll_10);
 	ll_12 = LOOP_END(ll_11, ll_3);

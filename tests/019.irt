@@ -9,7 +9,7 @@
 	int32_t c_5 = 2;
 	l_1 = START(l_33);
 	bool d_2 = PARAM(l_1, "cond", 0);
-	bool d_3 = PARAM(l_1, "z", 1);
+	int32_t d_3 = PARAM(l_1, "z", 1);
 	bool d_4 = COPY(c_4);
 	bool d_5 = COPY(d_3);
 	l_6 = END(l_1);
@@ -49,7 +49,7 @@
 	int32_t c_4 = 1;
 	l_1 = START(l_10);
 	bool d_2 = PARAM(l_1, "cond", 0);
-	bool d_3 = PARAM(l_1, "z", 1);
+	int32_t d_3 = PARAM(l_1, "z", 1);
 	l_4 = END(l_1);
 	l_5 = LOOP_BEGIN(l_4, l_8);
 	l_6 = IF(l_5, d_2);

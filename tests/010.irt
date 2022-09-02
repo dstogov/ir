@@ -18,12 +18,12 @@
 	bool d_7 = NE(d_6, c_4);
 	l_8 = IF(l_5, d_7);
 	l_9 = IF_TRUE(l_8);
-	uint32_t d_10 = COPY(c_5);
+	int32_t d_10 = COPY(c_5);
 	l_11 = END(l_9);
 	l_12 = IF_FALSE(l_8);
 	l_13 = END(l_12);
 	l_14 = MERGE(l_11, l_13);
-	uint32_t d_15 = PHI(l_14, d_10, d_6);
+	int32_t d_15 = PHI(l_14, d_10, d_6);
 	l_16 = IF(l_14, d_2);
 	l_17 = IF_TRUE(l_16);
 	l_18 = LOOP_END(l_17, l_5);

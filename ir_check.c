@@ -37,7 +37,7 @@ void ir_check(ir_ctx *ctx)
 {
 	//TODO:
 	ir_ref i, j, n, *p, use;
-	ir_insn *insn;
+	ir_insn *insn, *use_insn;
 	uint32_t flags;
 	bool ok = 1;
 
@@ -57,12 +57,13 @@ void ir_check(ir_ctx *ctx)
 						fprintf(stderr, "ir_base[%d].ops[%d] insn reference (%d) is out of range\n", i, j, use);
 						ok = 0;
 					}
+					use_insn = &ctx->ir_base[use];
 					switch (IR_OPND_KIND(flags, j)) {
 						case IR_OPND_DATA:
-							if (ctx->ir_base[use].op == IR_VAR
-							 || !(ir_op_flags[ctx->ir_base[use].op] & IR_OP_FLAG_DATA)) {
-								if (!(ir_op_flags[ctx->ir_base[use].op] & IR_OP_FLAG_MEM)
-								 || ctx->ir_base[use].type == IR_VOID) {
+							if (use_insn->op == IR_VAR
+							 || !(ir_op_flags[use_insn->op] & IR_OP_FLAG_DATA)) {
+								if (!(ir_op_flags[use_insn->op] & IR_OP_FLAG_MEM)
+								 || use_insn->type == IR_VOID) {
 									fprintf(stderr, "ir_base[%d].ops[%d] reference (%d) must be DATA\n", i, j, use);
 									ok = 0;
 								}
@@ -72,15 +73,64 @@ void ir_check(ir_ctx *ctx)
 								fprintf(stderr, "ir_base[%d].ops[%d] invalid forward reference (%d)\n", i, j, use);
 								ok = 0;
 							}
+							if (flags & IR_OP_FLAG_DATA) {
+								switch (insn->op) {
+									case IR_COND:
+										if (j == 1) {
+											break;
+										}
+									case IR_ADD:
+									case IR_SUB:
+									case IR_MUL:
+									case IR_DIV:
+									case IR_MOD:
+									case IR_NEG:
+									case IR_ABS:
+									case IR_ADD_OV:
+									case IR_SUB_OV:
+									case IR_MUL_OV:
+									case IR_NOT:
+									case IR_OR:
+									case IR_AND:
+									case IR_XOR:
+									case IR_SHL:
+									case IR_SHR:
+									case IR_SAR:
+									case IR_ROL:
+									case IR_ROR:
+									case IR_BSWAP:
+									case IR_MIN:
+									case IR_MAX:
+									case IR_PHI:
+									case IR_COPY:
+									case IR_PI:
+										if (insn->type != use_insn->type) {
+											if (j == 2
+											 && (insn->op == IR_SHL
+											  || insn->op == IR_SHR
+											  || insn->op == IR_SAR
+											  || insn->op == IR_ROL
+											  || insn->op == IR_ROR)
+											 && ir_type_size[use_insn->type] < ir_type_size[insn->type]) {
+												/* second argument of SHIFT may be incompatible with result */
+												break;
+											}
+											fprintf(stderr, "ir_base[%d].ops[%d] (%d) type is incompatible with result type (%d != %d)\n",
+												i, j, use, use_insn->type, insn->type);
+											ok = 0;
+										}
+										break;
+								}
+							}
 							break;
 						case IR_OPND_CONTROL:
 							if (flags & IR_OP_FLAG_BB_START) {
-								if (!(ir_op_flags[ctx->ir_base[use].op] & IR_OP_FLAG_BB_END)) {
+								if (!(ir_op_flags[use_insn->op] & IR_OP_FLAG_BB_END)) {
 									fprintf(stderr, "ir_base[%d].ops[%d] reference (%d) must be BB_END\n", i, j, use);
 									ok = 0;
 								}
 							} else {
-								if (ir_op_flags[ctx->ir_base[use].op] & IR_OP_FLAG_BB_END) {
+								if (ir_op_flags[use_insn->op] & IR_OP_FLAG_BB_END) {
 									fprintf(stderr, "ir_base[%d].ops[%d] reference (%d) must not be BB_END\n", i, j, use);
 									ok = 0;
 								}
@@ -92,7 +142,7 @@ void ir_check(ir_ctx *ctx)
 								ok = 0;
 							}
 						case IR_OPND_CONTROL_REF:
-							if (!(ir_op_flags[ctx->ir_base[use].op] & IR_OP_FLAG_CONTROL)) {
+							if (!(ir_op_flags[use_insn->op] & IR_OP_FLAG_CONTROL)) {
 								fprintf(stderr, "ir_base[%d].ops[%d] reference (%d) must be CONTROL\n", i, j, use);
 								ok = 0;
 							}
