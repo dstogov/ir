@@ -356,9 +356,9 @@ void ir_free(ir_ctx *ctx)
 	}
 }
 
-ir_ref ir_const(ir_ctx *ctx, ir_val val, uint8_t type)
+IR_NEVER_INLINE ir_ref ir_const(ir_ctx *ctx, ir_val val, uint8_t type)
 {
-	ir_insn *insn;
+	ir_insn *insn, *prev_insn;
 	ir_ref ref;
 
 	if (type == IR_BOOL) {
@@ -366,20 +366,31 @@ ir_ref ir_const(ir_ctx *ctx, ir_val val, uint8_t type)
 	} else if (type == IR_ADDR && val.u64 == 0) {
 		return IR_NULL;
 	}
+	prev_insn = NULL;
 	ref = ctx->prev_const_chain[type];
 	while (ref) {
 		insn = &ctx->ir_base[ref];
-		if (insn->val.u64 == val.u64) {
-			return ref;
+		if (UNEXPECTED(insn->val.u64 >= val.u64)) {
+			if (insn->val.u64 == val.u64) {
+				return ref;
+			} else {
+				break;
+			}
 		}
+		prev_insn = insn;
 		ref = insn->prev_const;
 	}
 
 	ref = ir_next_const(ctx);
 	insn = &ctx->ir_base[ref];
 
-	insn->prev_const = ctx->prev_const_chain[type];
-	ctx->prev_const_chain[type] = ref;
+	if (prev_insn) {
+		insn->prev_const = prev_insn->prev_const;
+		prev_insn->prev_const = ref;
+	} else {
+		insn->prev_const = ctx->prev_const_chain[type];
+		ctx->prev_const_chain[type] = ref;
+	}
 
 	insn->optx = IR_OPT(type, type);
 	insn->val.u64 = val.u64;
