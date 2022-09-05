@@ -33,7 +33,7 @@ void ir_consistency_check(void)
 	IR_ASSERT(IR_ADD + 1 == IR_SUB);
 }
 
-void ir_check(ir_ctx *ctx)
+bool ir_check(ir_ctx *ctx)
 {
 	//TODO:
 	ir_ref i, j, n, *p, use;
@@ -179,4 +179,5 @@ void ir_check(ir_ctx *ctx)
 	}
 
 	IR_ASSERT(ok);
+	return ok;
 }

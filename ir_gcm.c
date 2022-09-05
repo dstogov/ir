@@ -548,6 +548,7 @@ restart:
 				}
 				new_insn->op3 = ref;
 				if (n > 3) {
+					ir_ref *ops = new_insn->ops;
 					for (k = 3, p = insn->ops + 3; k <= n; k++, p++) {
 						ref = *p;
 						ref = _xlat[ref];
@@ -556,7 +557,7 @@ restart:
 							lists[ref].count++;
 							edges_count++;
 						}
-						new_insn->ops[k] = ref;
+						ops[k] = ref;
 					}
 				}
 				break;

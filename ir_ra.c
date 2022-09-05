@@ -1273,6 +1273,7 @@ IR_ALWAYS_INLINE ir_live_pos ir_ival_end(ir_live_interval *ival)
 #endif
 }
 
+#ifdef IR_DEBUG
 static bool ir_ival_covers(ir_live_interval *ival, ir_live_pos position)
 {
 	ir_live_range *live_range = &ival->range;
@@ -1286,6 +1287,7 @@ static bool ir_ival_covers(ir_live_interval *ival, ir_live_pos position)
 
 	return 0;
 }
+#endif
 
 static bool ir_ival_has_hole_between(ir_live_interval *ival, ir_live_pos from, ir_live_pos to)
 {

@@ -588,7 +588,7 @@ void ir_dump_live_ranges(ir_ctx *ctx, FILE *f);
 int ir_emit_c(ir_ctx *ctx, FILE *f);
 
 /* IR verification API (implementation in ir_check.c) */
-void ir_check(ir_ctx *ctx);
+bool ir_check(ir_ctx *ctx);
 void ir_consistency_check(void);
 
 /* IR Memmory Allocation */

@@ -125,7 +125,7 @@ ir_func_prototype(ir_parser_ctx *p):
 
 ir_insn(ir_parser_ctx *p):
 	{const char *str, *str2 = NULL, *func;}
-	{size_t len, len2, func_len;}
+	{size_t len, len2 = 0, func_len;}
 	{uint8_t op;}
 	{uint8_t t = 0;}
 	{ir_ref op1 = IR_UNUSED;}
@@ -147,7 +147,8 @@ ir_insn(ir_parser_ctx *p):
 		ID(&str, &len)
 	)
 	"="
-	(	const(t, &val)
+	(	{val.u64 = 0;}
+		const(t, &val)
 		{ref = ir_const(p->ctx, val, t);}
 	|	"func" "(" ID(&func, &func_len)
 		{flags.u64 = 0;}
