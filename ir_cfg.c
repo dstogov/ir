@@ -66,13 +66,20 @@ int ir_build_cfg(ir_ctx *ctx)
 			ir_bitset_incl(worklist.visited, ref);
 			_blocks[ref] = bb_count;
 			/* Add predecessors */
-			flags = ir_op_flags[insn->op];
-			n = ir_input_edges_count(ctx, insn);
-			for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
-				ir_ref ref = *p;
-				if (ref && IR_OPND_KIND(flags, j) == IR_OPND_CONTROL) {
-					ir_worklist_push(&worklist, ref);
+			if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
+				flags = ir_op_flags[insn->op];
+				n = ir_input_edges_count(ctx, insn);
+				for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
+					ir_ref ref = *p;
+					if (ref) {
+						IR_ASSERT(IR_OPND_KIND(flags, j) == IR_OPND_CONTROL);
+						ir_worklist_push(&worklist, ref);
+					}
 				}
+			} else if (insn->op != IR_START && insn->op != IR_ENTRY) {
+				IR_ASSERT(insn->op1);
+				IR_ASSERT(IR_OPND_KIND(ir_op_flags[insn->op], 1) == IR_OPND_CONTROL);
+				ir_worklist_push(&worklist, insn->op1);
 			}
 		} else {
 			IR_ASSERT(IR_IS_BB_START(insn->op));
@@ -163,17 +170,25 @@ int ir_build_cfg(ir_ctx *ctx)
 		} else {
 			bb->flags |= IR_BB_UNREACHABLE; /* all blocks are marked as UNREACHABLE first */
 		}
-		flags = ir_op_flags[insn->op];
-		n = ir_input_edges_count(ctx, insn);
-		for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
-			ir_ref pred_ref = *p;
-			if (pred_ref) {
-				if (IR_OPND_KIND(flags, j) == IR_OPND_CONTROL) {
+		if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
+			flags = ir_op_flags[insn->op];
+			n = ir_input_edges_count(ctx, insn);
+			for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
+				ir_ref pred_ref = *p;
+				if (pred_ref) {
+					IR_ASSERT(IR_OPND_KIND(flags, j) == IR_OPND_CONTROL);
 					bb->predecessors_count++;
 					blocks[_blocks[pred_ref]].successors_count++;
 					edges_count++;
-				 }
+				}
 			}
+		} else if (insn->op != IR_START && insn->op != IR_ENTRY) {
+			ir_ref pred_ref = insn->op1;
+			IR_ASSERT(pred_ref);
+			IR_ASSERT(IR_OPND_KIND(ir_op_flags[insn->op], 1) == IR_OPND_CONTROL);
+			bb->predecessors_count++;
+			blocks[_blocks[pred_ref]].successors_count++;
+			edges_count++;
 		}
 	}
 
@@ -194,12 +209,13 @@ int ir_build_cfg(ir_ctx *ctx)
 	bb = blocks + 1;
 	for (b = 1; b <= bb_count; b++, bb++) {
 		insn = &ctx->ir_base[bb->start];
-		flags = ir_op_flags[insn->op];
-		n = ir_input_edges_count(ctx, insn);
-		for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
-			ref = *p;
-			if (ref) {
-				if (IR_OPND_KIND(flags, j) == IR_OPND_CONTROL) {
+		if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
+			flags = ir_op_flags[insn->op];
+			n = ir_input_edges_count(ctx, insn);
+			for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
+				ref = *p;
+				if (ref) {
+					IR_ASSERT(IR_OPND_KIND(flags, j) == IR_OPND_CONTROL);
 					ir_ref pred_b = _blocks[ref];
 					ir_block *pred_bb = &blocks[pred_b];
 					edges[bb->predecessors + bb->predecessors_count] = pred_b;
@@ -209,6 +225,17 @@ int ir_build_cfg(ir_ctx *ctx)
 					pred_bb->successors_count++;
 				}
 			}
+		} else if (insn->op != IR_START && insn->op != IR_ENTRY) {
+			ref = insn->op1;
+			IR_ASSERT(ref);
+			IR_ASSERT(IR_OPND_KIND(ir_op_flags[insn->op], 1) == IR_OPND_CONTROL);
+			ir_ref pred_b = _blocks[ref];
+			ir_block *pred_bb = &blocks[pred_b];
+			edges[bb->predecessors + bb->predecessors_count] = pred_b;
+			bb->predecessors_count++;
+			pred_bb->end = ref;
+			edges[pred_bb->successors + pred_bb->successors_count] = b;
+			pred_bb->successors_count++;
 		}
 	}
 	ir_mem_free(_blocks);
