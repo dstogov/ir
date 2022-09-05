@@ -567,7 +567,9 @@ int ir_sccp(ir_ctx *ctx)
 
 				flags = ir_op_flags[insn->op];
 				n = ir_input_edges_count(ctx, insn);
-				for (j = 1; j <= n; j++) {
+				/* first input is source control (we may skip it) */
+				IR_ASSERT(n == 0 || IR_OPND_KIND(flags, 1) == IR_OPND_CONTROL);
+				for (j = 2; j <= n; j++) {
 					if (IR_OPND_KIND(flags, j) == IR_OPND_DATA || IR_OPND_KIND(flags, j) == IR_OPND_VAR) {
 						use = insn->ops[j];
 						if (use > 0 && IR_IS_TOP(use) && !ir_bitqueue_in(&worklist, use)) {
