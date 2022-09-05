@@ -586,7 +586,7 @@ int ir_sccp(ir_ctx *ctx)
 		for (j = 0, p = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
 			use = *p;
 			insn = &ctx->ir_base[use];
-			if ((ir_op_flags[insn->op] & IR_OP_FLAG_DATA)) {
+			if (ir_op_flags[insn->op] & IR_OP_FLAG_DATA) {
 				if (insn->op != IR_PHI || IR_IS_REACHABLE(insn->op1)) {
 					if (!IR_IS_BOTTOM(use)) {
 						ir_bitqueue_add(&worklist, use);
