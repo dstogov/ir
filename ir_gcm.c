@@ -11,16 +11,23 @@ static void ir_gcm_schedule_early(ir_ctx *ctx, uint32_t *_blocks, ir_ref ref)
 	ir_insn *insn;
 	uint32_t flags;
 
-	if (_blocks[ref] > 0) {
-		return;
-	}
 	_blocks[ref] = 1;
 
 	insn = &ctx->ir_base[ref];
 	flags = ir_op_flags[insn->op];
-	if (IR_OPND_KIND(flags, 1) == IR_OPND_CONTROL_DEP) {
+	if (IR_OPND_KIND(flags, 1) == IR_OPND_CONTROL_DEP) { // PARAM, VAR, PHI, PI
 		IR_ASSERT(_blocks[insn->op1] > 0);
 		_blocks[ref] = _blocks[insn->op1];
+		n = ir_input_edges_count(ctx, insn);
+		for (j = 2, p = insn->ops + j; j <= n; j++, p++) {
+			ir_ref input = *p;
+			if (input > 0) {
+				if (_blocks[input] == 0) {
+					ir_gcm_schedule_early(ctx, _blocks, input);
+				}
+			}
+		}
+		return;
 	}
 	n = ir_input_edges_count(ctx, insn);
 	for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
@@ -29,8 +36,7 @@ static void ir_gcm_schedule_early(ir_ctx *ctx, uint32_t *_blocks, ir_ref ref)
 			if (_blocks[input] == 0) {
 				ir_gcm_schedule_early(ctx, _blocks, input);
 			}
-			if (IR_OPND_KIND(flags, 1) != IR_OPND_CONTROL_DEP
-			 && ctx->cfg_blocks[_blocks[ref]].dom_depth < ctx->cfg_blocks[_blocks[input]].dom_depth) {
+			if (ctx->cfg_blocks[_blocks[ref]].dom_depth < ctx->cfg_blocks[_blocks[input]].dom_depth) {
 				_blocks[ref] = _blocks[input];
 			}
 		}
@@ -64,20 +70,23 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 	if (n) {
 		uint32_t lca, b;
 
+		insn = &ctx->ir_base[ref];
+		flags = ir_op_flags[insn->op];
+		if (IR_OPND_KIND(flags, 1) == IR_OPND_CONTROL_DEP) {
+			for (i = 0, p = &ctx->use_edges[ctx->use_lists[ref].refs]; i < n; i++, p++) {
+				use = *p;
+				if (!ir_bitset_in(visited, use) && _blocks[use]) {
+					ir_gcm_schedule_late(ctx, _blocks, visited, use);
+				}
+			}
+			return;
+		}
+		lca = 0;
 		for (i = 0, p = &ctx->use_edges[ctx->use_lists[ref].refs]; i < n; i++, p++) {
 			use = *p;
 			if (!ir_bitset_in(visited, use) && _blocks[use]) {
 				ir_gcm_schedule_late(ctx, _blocks, visited, use);
 			}
-		}
-		insn = &ctx->ir_base[ref];
-		flags = ir_op_flags[insn->op];
-		if (IR_OPND_KIND(flags, 1) == IR_OPND_CONTROL_DEP) {
-			return;
-		}
-		lca = 0;
-		for (i = 0, p -= n; i < n; i++, p++) {
-			use = *p;
 			b = _blocks[use];
 			if (!b) {
 				continue;
@@ -112,7 +121,7 @@ int ir_gcm(ir_ctx *ctx)
 	ir_block *bb;
 	ir_list queue;
 	uint32_t *_blocks;
-	ir_insn *insn;
+	ir_insn *insn, *use_insn;
 	uint32_t flags;
 
 	_blocks = ir_mem_calloc(ctx->insns_count, sizeof(uint32_t));
@@ -128,11 +137,19 @@ int ir_gcm(ir_ctx *ctx)
 			insn = &ctx->ir_base[j];
 			_blocks[j] = i; /* pin to block */
 			flags = ir_op_flags[insn->op];
-			n = ir_input_edges_count(ctx, insn);
-			for (k = 1, p = insn->ops + 1; k <= n; k++, p++) {
-				ref = *p;
-				if (ref > 0) {
-					if (IR_OPND_KIND(flags, k) == IR_OPND_DATA || IR_OPND_KIND(flags, k) == IR_OPND_VAR) {
+			if (IR_OPND_KIND(flags, 2) == IR_OPND_DATA) {
+				if (insn->op2 > 0) {
+					ir_list_push(&queue, insn->op2);
+				}
+			}
+			if (IR_OPND_KIND(flags, 3) == IR_OPND_DATA) {
+				if (insn->op3 > 0) {
+					ir_list_push(&queue, insn->op3);
+				}
+				n = ir_input_edges_count(ctx, insn);
+				for (k = 4, p = insn->ops + 4; k <= n; k++, p++) {
+					ref = *p;
+					if (ref > 0) {
 						ir_list_push(&queue, ref);
 					}
 				}
@@ -176,9 +193,10 @@ int ir_gcm(ir_ctx *ctx)
 			if (n > 0) {
 				for (k = 0, p = &ctx->use_edges[ctx->use_lists[j].refs]; k < n; k++, p++) {
 					ref = *p;
-					if (ctx->ir_base[ref].op == IR_PARAM || ctx->ir_base[ref].op == IR_VAR) {
+					use_insn = &ctx->ir_base[ref];
+					if (use_insn->op == IR_PARAM || use_insn->op == IR_VAR) {
 						_blocks[ref] = _blocks[j];
-					} else if (ir_op_flags[ctx->ir_base[ref].op] & IR_OP_FLAG_DATA) {
+					} else if (ir_op_flags[use_insn->op] & IR_OP_FLAG_DATA) {
 						ir_list_push(&queue, ref);
 					}
 				}
