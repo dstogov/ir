@@ -998,6 +998,146 @@ bool ir_list_contains(ir_list *l, ir_ref val)
 	return 0;
 }
 
+static uint32_t ir_hashtab_hash_size(uint32_t size)
+{
+	size -= 1;
+	size |= (size >> 1);
+	size |= (size >> 2);
+	size |= (size >> 4);
+	size |= (size >> 8);
+	size |= (size >> 16);
+	return size + 1;
+}
+
+static void ir_hashtab_resize(ir_hashtab *tab)
+{
+	uint32_t old_hash_size = (uint32_t)(-(int32_t)tab->mask);
+	char *old_data = tab->data;
+	uint32_t size = tab->size * 2;
+	uint32_t hash_size = ir_hashtab_hash_size(size);
+	char *data = ir_mem_malloc(hash_size * sizeof(uint32_t) + size * sizeof(ir_hashtab_bucket));
+	ir_hashtab_bucket *p;
+	uint32_t pos, i;
+
+	memset(data, -1, hash_size * sizeof(uint32_t));
+	tab->data = data + (hash_size * sizeof(uint32_t));
+	tab->mask = (uint32_t)(-(int32_t)hash_size);
+	tab->size = size;
+
+	memcpy(tab->data, old_data, tab->count * sizeof(ir_hashtab_bucket));
+	ir_mem_free(old_data - (old_hash_size * sizeof(uint32_t)));
+
+	i = tab->count;
+	pos = 0;
+	p = (ir_hashtab_bucket*)tab->data;
+	do {
+		uint32_t key = p->key | tab->mask;
+		p->next = ((uint32_t*)tab->data)[(int32_t)key];
+		((uint32_t*)tab->data)[(int32_t)key] = pos;
+		pos += sizeof(ir_hashtab_bucket);
+		p++;
+	} while (--i);
+}
+
+void ir_hashtab_init(ir_hashtab *tab, uint32_t size)
+{
+	IR_ASSERT(size > 0);
+	uint32_t hash_size = ir_hashtab_hash_size(size);
+	char *data = ir_mem_malloc(hash_size * sizeof(uint32_t) + size * sizeof(ir_hashtab_bucket));
+	memset(data, -1, hash_size * sizeof(uint32_t));
+	tab->data = (data + (hash_size * sizeof(uint32_t)));
+	tab->mask = (uint32_t)(-(int32_t)hash_size);
+	tab->size = size;
+	tab->count = 0;
+	tab->pos = 0;
+}
+
+void ir_hashtab_free(ir_hashtab *tab)
+{
+	uint32_t hash_size = (uint32_t)(-(int32_t)tab->mask);
+	char *data = tab->data - (hash_size * sizeof(uint32_t));
+	ir_mem_free(data);
+	tab->data = NULL;
+}
+
+ir_ref ir_hashtab_find(ir_hashtab *tab, uint32_t key)
+{
+	char *data = (char*)tab->data;
+	uint32_t pos = ((uint32_t*)data)[(int32_t)(key | tab->mask)];
+	ir_hashtab_bucket *p;
+
+	while (pos != IR_INVALID_IDX) {
+		p = (ir_hashtab_bucket*)(data + pos);
+		if (p->key == key) {
+			return p->val;
+		}
+		pos = p->next;
+	}
+	return IR_INVALID_VAL;
+}
+
+void ir_hashtab_add(ir_hashtab *tab, uint32_t key, ir_ref val)
+{
+	char *data = (char*)tab->data;
+	uint32_t pos = ((uint32_t*)data)[(int32_t)(key | tab->mask)];
+	ir_hashtab_bucket *p;
+
+	while (pos != IR_INVALID_IDX) {
+		p = (ir_hashtab_bucket*)(data + pos);
+		if (p->key == key) {
+			return;
+		}
+		pos = p->next;
+	}
+
+	if (UNEXPECTED(tab->count >= tab->size)) {
+		ir_hashtab_resize(tab);
+		data = tab->data;
+	}
+
+	pos = tab->pos;
+	tab->pos += sizeof(ir_hashtab_bucket);
+	tab->count++;
+	p = (ir_hashtab_bucket*)(data + pos);
+	p->key = key;
+	p->val = val;
+	key |= tab->mask;
+	p->next = ((uint32_t*)data)[(int32_t)key];
+	((uint32_t*)data)[(int32_t)key] = pos;
+}
+
+static int ir_hashtab_key_cmp(const void *b1, const void *b2)
+{
+	return ((ir_hashtab_bucket*)b1)->key - ((ir_hashtab_bucket*)b2)->key;
+}
+
+void ir_hashtab_key_sort(ir_hashtab *tab)
+{
+	ir_hashtab_bucket *p;
+	uint32_t hash_size, pos, i;
+
+	if (!tab->count) {
+		return;
+	}
+
+	qsort(tab->data, tab->count, sizeof(ir_hashtab_bucket), ir_hashtab_key_cmp);
+
+	hash_size = ir_hashtab_hash_size(tab->size);
+	memset((char*)tab->data - (hash_size * sizeof(uint32_t)), -1, hash_size * sizeof(uint32_t));
+
+	i = tab->count;
+	pos = 0;
+	p = (ir_hashtab_bucket*)tab->data;
+	do {
+		uint32_t key = p->key | tab->mask;
+		p->next = ((uint32_t*)tab->data)[(int32_t)key];
+		((uint32_t*)tab->data)[(int32_t)key] = pos;
+		pos += sizeof(ir_hashtab_bucket);
+		p++;
+	} while (--i);
+}
+
+/* Memory API */
 void *ir_mem_mmap(size_t size)
 {
 	return mmap(NULL, size, PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);

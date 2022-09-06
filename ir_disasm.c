@@ -302,161 +302,6 @@ static const char* ir_disasm_resolver(uint64_t   addr,
 	return NULL;
 }
 
-#define INVALID_IDX 0xffffffff
-
-typedef struct _ir_addrtab_bucket {
-	uint32_t    addr;
-	int32_t     entry;
-	uint32_t    next;
-} ir_addrtab_bucket;
-
-typedef struct _ir_addrtab {
-	void       *data;
-	uint32_t    mask;
-	uint32_t    size;
-	uint32_t    count;
-	uint32_t    pos;
-} ir_addrtab;
-
-static uint32_t ir_addrtab_hash_size(uint32_t size)
-{
-	size -= 1;
-	size |= (size >> 1);
-	size |= (size >> 2);
-	size |= (size >> 4);
-	size |= (size >> 8);
-	size |= (size >> 16);
-	return size + 1;
-}
-
-static void ir_addrtab_resize(ir_addrtab *addrtab)
-{
-	uint32_t old_hash_size = (uint32_t)(-(int32_t)addrtab->mask);
-	char *old_data = addrtab->data;
-	uint32_t size = addrtab->size * 2;
-	uint32_t hash_size = ir_addrtab_hash_size(size);
-	char *data = ir_mem_malloc(hash_size * sizeof(uint32_t) + size * sizeof(ir_addrtab_bucket));
-	ir_addrtab_bucket *p;
-	uint32_t pos, i;
-
-	memset(data, -1, hash_size * sizeof(uint32_t));
-	addrtab->data = data + (hash_size * sizeof(uint32_t));
-	addrtab->mask = (uint32_t)(-(int32_t)hash_size);
-	addrtab->size = size;
-
-	memcpy(addrtab->data, old_data, addrtab->count * sizeof(ir_addrtab_bucket));
-	ir_mem_free(old_data - (old_hash_size * sizeof(uint32_t)));
-
-	i = addrtab->count;
-	pos = 0;
-	p = (ir_addrtab_bucket*)addrtab->data;
-	do {
-		uint32_t addr = p->addr | addrtab->mask;
-		p->next = ((uint32_t*)addrtab->data)[(int32_t)addr];
-		((uint32_t*)addrtab->data)[(int32_t)addr] = pos;
-		pos += sizeof(ir_addrtab_bucket);
-		p++;
-	} while (--i);
-}
-
-static void ir_addrtab_init(ir_addrtab *addrtab, uint32_t size)
-{
-	IR_ASSERT(size > 0);
-	uint32_t hash_size = ir_addrtab_hash_size(size);
-	char *data = ir_mem_malloc(hash_size * sizeof(uint32_t) + size * sizeof(ir_addrtab_bucket));
-	memset(data, -1, hash_size * sizeof(uint32_t));
-	addrtab->data = (data + (hash_size * sizeof(uint32_t)));
-	addrtab->mask = (uint32_t)(-(int32_t)hash_size);
-	addrtab->size = size;
-	addrtab->count = 0;
-	addrtab->pos = 0;
-}
-
-void ir_addrtab_free(ir_addrtab *addrtab)
-{
-	uint32_t hash_size = (uint32_t)(-(int32_t)addrtab->mask);
-	char *data = addrtab->data - (hash_size * sizeof(uint32_t));
-	ir_mem_free(data);
-	addrtab->data = NULL;
-}
-
-static ir_addrtab_bucket *ir_addrtab_find(ir_addrtab *addrtab, uintptr_t addr)
-{
-	char *data = (char*)addrtab->data;
-	uint32_t pos = ((uint32_t*)data)[(int32_t)(addr | addrtab->mask)];
-	ir_addrtab_bucket *p;
-
-	while (pos != INVALID_IDX) {
-		p = (ir_addrtab_bucket*)(data + pos);
-		if (p->addr == addr) {
-			return p;
-		}
-		pos = p->next;
-	}
-	return NULL;
-}
-
-static void ir_addrtab_add(ir_addrtab *addrtab, uintptr_t addr, int32_t entry)
-{
-	char *data = (char*)addrtab->data;
-	uint32_t pos = ((uint32_t*)data)[(int32_t)(addr | addrtab->mask)];
-	ir_addrtab_bucket *p;
-
-	while (pos != INVALID_IDX) {
-		p = (ir_addrtab_bucket*)(data + pos);
-		if (p->addr == addr) {
-			return;
-		}
-		pos = p->next;
-	}
-
-	if (UNEXPECTED(addrtab->count >= addrtab->size)) {
-		ir_addrtab_resize(addrtab);
-		data = addrtab->data;
-	}
-
-	pos = addrtab->pos;
-	addrtab->pos += sizeof(ir_addrtab_bucket);
-	addrtab->count++;
-	p = (ir_addrtab_bucket*)(data + pos);
-	p->addr = addr;
-	p->entry = entry;
-	addr |= addrtab->mask;
-	p->next = ((uint32_t*)data)[(int32_t)addr];
-	((uint32_t*)data)[(int32_t)addr] = pos;
-}
-
-static int ir_addrab_cmp(const void *b1, const void *b2)
-{
-	return ((ir_addrtab_bucket*)b1)->addr - ((ir_addrtab_bucket*)b2)->addr;
-}
-
-static void ir_addrtab_sort(ir_addrtab *addrtab)
-{
-	ir_addrtab_bucket *p;
-	uint32_t hash_size, pos, i;
-
-	if (!addrtab->count) {
-		return;
-	}
-
-	qsort(addrtab->data, addrtab->count, sizeof(ir_addrtab_bucket), ir_addrab_cmp);
-
-	hash_size = ir_addrtab_hash_size(addrtab->size);
-	memset((char*)addrtab->data - (hash_size * sizeof(uint32_t)), -1, hash_size * sizeof(uint32_t));
-
-	i = addrtab->count;
-	pos = 0;
-	p = (ir_addrtab_bucket*)addrtab->data;
-	do {
-		uint32_t addr = p->addr | addrtab->mask;
-		p->next = ((uint32_t*)addrtab->data)[(int32_t)addr];
-		((uint32_t*)addrtab->data)[(int32_t)addr] = pos;
-		pos += sizeof(ir_addrtab_bucket);
-		p++;
-	} while (--i);
-}
-
 int ir_disasm(const char    *name,
               const void    *start,
               size_t         size,
@@ -467,7 +312,7 @@ int ir_disasm(const char    *name,
 	size_t orig_size = size;
 	const void *orig_end = (void *)((char *)start + size);
 	const void *end;
-	ir_addrtab labels;
+	ir_hashtab labels;
 	int32_t l, n;
 	uint64_t addr;
 	csh cs;
@@ -484,7 +329,8 @@ int ir_disasm(const char    *name,
 	char *p, *q, *r;
 	uint32_t rodata_offset = 0;
 	uint32_t jmp_table_offset = 0;
-	ir_addrtab_bucket *b;
+	ir_hashtab_bucket *b;
+	int32_t entry;
 
 # if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 #  if defined(__x86_64__) || defined(_WIN64)
@@ -511,14 +357,14 @@ int ir_disasm(const char    *name,
 		fprintf(f, "%s:\n", name);
 	}
 
-	ir_addrtab_init(&labels, 32);
+	ir_hashtab_init(&labels, 32);
 
 	if (ctx) {
 		ir_ref entry;
 
 		entry = ctx->ir_base[1].op2;
 		while (entry != IR_UNUSED) {
-			ir_addrtab_add(&labels, ctx->ir_base[entry].op3, ctx->ir_base[entry].op1);
+			ir_hashtab_add(&labels, ctx->ir_base[entry].op3, ctx->ir_base[entry].op1);
 			entry = ctx->ir_base[entry].op2;
 		}
 
@@ -545,7 +391,7 @@ int ir_disasm(const char    *name,
 			while (n > 0) {
 				if (*p) {
 					IR_ASSERT((uintptr_t)*p >= (uintptr_t)start && (uintptr_t)*p < (uintptr_t)orig_end);
-					ir_addrtab_add(&labels, (uint32_t)((uintptr_t)*p - (uintptr_t)start), -1);
+					ir_hashtab_add(&labels, (uint32_t)((uintptr_t)*p - (uintptr_t)start), -1);
 				}
 				p++;
 				n -= sizeof(void*);
@@ -567,27 +413,27 @@ int ir_disasm(const char    *name,
 		if ((addr = ir_disasm_branch_target(cs, &(insn[i])))
 # endif
 		 && (addr >= (uint64_t)(uintptr_t)start && addr < (uint64_t)(uintptr_t)end)) {
-			ir_addrtab_add(&labels, (uint32_t)((uintptr_t)addr - (uintptr_t)start), -1);
+			ir_hashtab_add(&labels, (uint32_t)((uintptr_t)addr - (uintptr_t)start), -1);
 # ifdef HAVE_CAPSTONE_ITER
 		} else if ((addr = ir_disasm_rodata_reference(cs, insn))) {
 # else
 		} else if ((addr = ir_disasm_rodata_reference(cs, &(insn[i])))) {
 # endif
 			if (addr >= (uint64_t)(uintptr_t)end && addr < (uint64_t)(uintptr_t)orig_end) {
-				ir_addrtab_add(&labels, (uint32_t)((uintptr_t)addr - (uintptr_t)start), -1);
+				ir_hashtab_add(&labels, (uint32_t)((uintptr_t)addr - (uintptr_t)start), -1);
 			}
 		}
 	}
 
-	ir_addrtab_sort(&labels);
+	ir_hashtab_key_sort(&labels);
 
 	/* renumber labels */
 	l = 0;
 	n = labels.count;
 	b = labels.data;
 	while (n > 0) {
-		if (b->entry < 0) {
-			b->entry = --l; 
+		if (b->val < 0) {
+			b->val = --l;
 		}	
 		b++;
 		n--;
@@ -598,16 +444,16 @@ int ir_disasm(const char    *name,
 	cs_size = (uint8_t*)end - (uint8_t*)start;
 	cs_addr = (uint64_t)(uintptr_t)cs_code;
 	while (cs_disasm_iter(cs, &cs_code, &cs_size, &cs_addr, insn)) {
-		b = ir_addrtab_find(&labels, (uint32_t)((uintptr_t)insn->address - (uintptr_t)start));
+		entry = ir_hashtab_find(&labels, (uint32_t)((uintptr_t)insn->address - (uintptr_t)start));
 # else
 	for (i = 0; i < count; i++) {
-		b = ir_addrtab_find(&labels, (uint32_t)((uintptr_t)insn->address - (uintptr_t)start));
+		entry = ir_hashtab_find(&labels, (uint32_t)((uintptr_t)insn->address - (uintptr_t)start));
 # endif
-		if (b) {
-			if (b->entry >= 0) {
-				fprintf(f, ".ENTRY_%d:\n", b->entry);
+		if (entry != IR_INVALID_VAL) {
+			if (entry >= 0) {
+				fprintf(f, ".ENTRY_%d:\n", entry);
 			} else {
-				fprintf(f, ".L%d:\n", -b->entry);
+				fprintf(f, ".L%d:\n", -entry);
 			}
 		}
 
@@ -642,8 +488,8 @@ int ir_disasm(const char    *name,
 		if ((addr = ir_disasm_rodata_reference(cs, &(insn[i])))) {
 # endif
 			if (addr >= (uint64_t)(uintptr_t)end && addr < (uint64_t)(uintptr_t)orig_end) {
-				b = ir_addrtab_find(&labels, (uint32_t)((uintptr_t)addr - (uintptr_t)start));
-				if (b) {
+				entry = ir_hashtab_find(&labels, (uint32_t)((uintptr_t)addr - (uintptr_t)start));
+				if (entry != IR_INVALID_VAL) {
 					r = q = strstr(p, "(%rip)");
 					if (r && r > p) {
 						r--;
@@ -654,10 +500,10 @@ int ir_disasm(const char    *name,
 							r -= 2;
 						}
 						fwrite(p, 1, r - p, f);
-						if (b->entry >= 0) {
-							fprintf(f, ".ENTRY_%d%s\n", b->entry, q);
+						if (entry >= 0) {
+							fprintf(f, ".ENTRY_%d%s\n", entry, q);
 						} else {
-							fprintf(f, ".L%d%s\n", -b->entry, q);
+							fprintf(f, ".L%d%s\n", -entry, q);
 						}
 						continue;
 					}
@@ -690,13 +536,13 @@ int ir_disasm(const char    *name,
 				addr = (uint32_t)(-addr);
 			}
 			if (addr >= (uint64_t)(uintptr_t)start && addr < (uint64_t)(uintptr_t)orig_end) {
-				b = ir_addrtab_find(&labels, (uint32_t)((uintptr_t)addr - (uintptr_t)start));
-				if (b) {
+				entry = ir_hashtab_find(&labels, (uint32_t)((uintptr_t)addr - (uintptr_t)start));
+				if (entry != IR_INVALID_VAL) {
 					fwrite(p, 1, q - p, f);
-					if (b->entry >= 0) {
-						fprintf(f, ".ENTRY_%d", b->entry);
+					if (entry >= 0) {
+						fprintf(f, ".ENTRY_%d", entry);
 					} else {
-						fprintf(f, ".L%d", -b->entry);
+						fprintf(f, ".L%d", -entry);
 					}
 				} else {
 					fwrite(p, 1, r - p, f);
@@ -733,12 +579,12 @@ int ir_disasm(const char    *name,
 		uint32_t j;
 
 		while (n > 0) {
-			b = ir_addrtab_find(&labels, (uint32_t)((uintptr_t)p - (uintptr_t)start));
-			if (b) {
-				if (b->entry >= 0) {
-					fprintf(f, ".ENTRY_%d:\n", b->entry);
+			entry = ir_hashtab_find(&labels, (uint32_t)((uintptr_t)p - (uintptr_t)start));
+			if (entry != IR_INVALID_VAL) {
+				if (entry >= 0) {
+					fprintf(f, ".ENTRY_%d:\n", entry);
 				} else {
-					fprintf(f, ".L%d:\n", -b->entry);
+					fprintf(f, ".L%d:\n", -entry);
 				}
 			}
 			fprintf(f, "\t.db 0x%02x", (int)*p);
@@ -746,8 +592,8 @@ int ir_disasm(const char    *name,
 			n--;
 			j = 15;
 			while (n > 0 && j > 0) {
-				b = ir_addrtab_find(&labels, (uint32_t)((uintptr_t)p - (uintptr_t)start));
-				if (b) {
+				entry = ir_hashtab_find(&labels, (uint32_t)((uintptr_t)p - (uintptr_t)start));
+				if (entry != IR_INVALID_VAL) {
 					break;
 				}
 				fprintf(f, ", 0x%02x", (int)*p);
@@ -766,22 +612,22 @@ int ir_disasm(const char    *name,
 
 		p = (uintptr_t*)((char*)start + jmp_table_offset);
 		while (n > 0) {
-			b = ir_addrtab_find(&labels, (uint32_t)((uintptr_t)p - (uintptr_t)start));
-			if (b) {
-				if (b->entry >= 0) {
-					fprintf(f, ".ENTRY_%d:\n", b->entry);
+			entry = ir_hashtab_find(&labels, (uint32_t)((uintptr_t)p - (uintptr_t)start));
+			if (entry != IR_INVALID_VAL) {
+				if (entry >= 0) {
+					fprintf(f, ".ENTRY_%d:\n", entry);
 				} else {
-					fprintf(f, ".L%d:\n", -b->entry);
+					fprintf(f, ".L%d:\n", -entry);
 				}
 			}
 			if (*p) {
 				IR_ASSERT((uintptr_t)*p >= (uintptr_t)start && (uintptr_t)*p < (uintptr_t)orig_end);
-				b = ir_addrtab_find(&labels, (uint32_t)(*p - (uintptr_t)start));
-				IR_ASSERT(b && b->entry < 0);
+				entry = ir_hashtab_find(&labels, (uint32_t)(*p - (uintptr_t)start));
+				IR_ASSERT(entry != IR_INVALID_VAL && entry < 0);
 				if (sizeof(void*) == 8) {
-					fprintf(f, "\t.qword .L%d\n", -b->entry);
+					fprintf(f, "\t.qword .L%d\n", -entry);
 				} else {
-					fprintf(f, "\t.dword .L%d\n", -b->entry);
+					fprintf(f, "\t.dword .L%d\n", -entry);
 				}
 			} else {
 				if (sizeof(void*) == 8) {
@@ -797,7 +643,7 @@ int ir_disasm(const char    *name,
 
 	fprintf(f, "\n");
 
-	ir_addrtab_free(&labels);
+	ir_hashtab_free(&labels);
 
 	cs_close(&cs);
 

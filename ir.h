@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define IR_VERSION "0.0.1"
 
@@ -366,7 +367,10 @@ typedef struct _ir_insn {
 	};
 } ir_insn;
 
-/* IT String Tables API (implementation in ir_strtab.c) */
+/* IR Hash Tables API (private) */
+typedef struct _ir_hashtab ir_hashtab;
+
+/* IR String Tables API (implementation in ir_strtab.c) */
 typedef struct _ir_strtab {
 	void       *data;
 	uint32_t    mask;

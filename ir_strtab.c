@@ -1,8 +1,6 @@
 #include "ir.h"
 #include "ir_private.h"
 
-#define INVALID_IDX 0xffffffff
-
 typedef struct _ir_strtab_bucket {
 	uint32_t    h;
 	uint32_t    len;
@@ -112,7 +110,7 @@ ir_ref ir_strtab_find(ir_strtab *strtab, const char *str, uint32_t len)
 	uint32_t pos = ((uint32_t*)data)[(int32_t)(h | strtab->mask)];
 	ir_strtab_bucket *p;
 
-	while (pos != INVALID_IDX) {
+	while (pos != IR_INVALID_IDX) {
 		p = (ir_strtab_bucket*)(data + pos);
 		if (p->h == h
 		 && p->len == len
@@ -131,7 +129,7 @@ ir_ref ir_strtab_lookup(ir_strtab *strtab, const char *str, uint32_t len, ir_ref
 	uint32_t pos = ((uint32_t*)data)[(int32_t)(h | strtab->mask)];
 	ir_strtab_bucket *p;
 
-	while (pos != INVALID_IDX) {
+	while (pos != IR_INVALID_IDX) {
 		p = (ir_strtab_bucket*)(data + pos);
 		if (p->h == h
 		 && p->len == len
@@ -180,7 +178,7 @@ ir_ref ir_strtab_update(ir_strtab *strtab, const char *str, uint32_t len, ir_ref
 	uint32_t pos = ((uint32_t*)data)[(int32_t)(h | strtab->mask)];
 	ir_strtab_bucket *p;
 
-	while (pos != INVALID_IDX) {
+	while (pos != IR_INVALID_IDX) {
 		p = (ir_strtab_bucket*)(data + pos);
 		if (p->h == h
 		 && p->len == len

@@ -599,6 +599,30 @@ IR_ALWAYS_INLINE ir_ref ir_worklist_peek(ir_worklist *w)
 	return ir_list_peek(&w->l);
 }
 
+/* IR Hash Table */
+#define IR_INVALID_IDX 0xffffffff
+#define IR_INVALID_VAL 0x80000000
+
+typedef struct _ir_hashtab_bucket {
+	uint32_t    key;
+	ir_ref      val;
+	uint32_t    next;
+} ir_hashtab_bucket;
+
+typedef struct _ir_hashtab {
+	void       *data;
+	uint32_t    mask;
+	uint32_t    size;
+	uint32_t    count;
+	uint32_t    pos;
+} ir_hashtab;
+
+void ir_hashtab_init(ir_hashtab *tab, uint32_t size);
+void ir_hashtab_free(ir_hashtab *tab);
+ir_ref ir_hashtab_find(ir_hashtab *tab, uint32_t key);
+void ir_hashtab_add(ir_hashtab *tab, uint32_t key, ir_ref val);
+void ir_hashtab_key_sort(ir_hashtab *tab);
+
 /*** IR OP info ***/
 extern const uint8_t ir_type_flags[IR_LAST_TYPE];
 extern const char *ir_type_name[IR_LAST_TYPE];
