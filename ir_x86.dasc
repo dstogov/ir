@@ -2043,7 +2043,7 @@ int ir_match(ir_ctx *ctx)
 }
 
 /* code genertion */
-static ir_reg ir_ref_spill_slot(ir_ctx *ctx, ir_ref ref)
+static int32_t ir_ref_spill_slot(ir_ctx *ctx, ir_ref ref)
 {
 	ir_backend_data *data = ctx->data;
 	int32_t offset;
