@@ -309,7 +309,7 @@ test:
 
 1. C. Click, M. Paleczny. “A Simple Graph-Based Intermediate Representation” In ACM SIGPLAN Workshop on Intermediate Representations (IR '95), pages 35-49, Jan. 1995.
 2. C. Click. “Global Code Motion Global Value Numbering” In ACM SIGPLAN Notices, Volume 30, Issue 6, pp 246–257, June 1995
-3. M. Pall. “LuaJIT 2.0 intellectual property disclosure and research opportunities” November 2009 http://mad.web.cern.ch/mad/releases/madng/madng-git/lib/patches/LuaJIT%202.0%20notes%20from%20M.Pall.pdf
+3. M. Pall. “LuaJIT 2.0 intellectual property disclosure and research opportunities” November 2009 http://lua-users.org/lists/lua-l/2009-11/msg00089.html
 4.  M. N. Wegman and F. K. Zadeck. "Constant propagation with conditional branches" ACM Transactions on Programming Languages and Systems, 13(2):181-210, April 1991
 5. C. Wimmer. “Optimized Interval Splitting in a Linear Scan Register Allocator” In VEE '05: Proceedings of the 1st ACM/USENIX international conference on Virtual execution environments, pages 132–141, June 2005
 6. C. Wimmer and M. Franz. “Linear Scan Register Allocation on SSA Form” In CGO '10: Proceedings of the 8-th annual IEEE/ACM international symposium on Code generation and optimization, pages 170–179,  April 2010
