@@ -9,26 +9,14 @@ static void ir_gcm_schedule_early(ir_ctx *ctx, uint32_t *_blocks, ir_ref ref)
 {
 	ir_ref j, n, *p;
 	ir_insn *insn;
-	uint32_t flags;
+
+	insn = &ctx->ir_base[ref];
+
+	IR_ASSERT(insn->op != IR_PARAM && insn->op != IR_VAR);
+	IR_ASSERT(insn->op != IR_PHI && insn->op != IR_PI);
 
 	_blocks[ref] = 1;
 
-	insn = &ctx->ir_base[ref];
-	flags = ir_op_flags[insn->op];
-	if (IR_OPND_KIND(flags, 1) == IR_OPND_CONTROL_DEP) { // PARAM, VAR, PHI, PI
-		IR_ASSERT(_blocks[insn->op1] > 0);
-		_blocks[ref] = _blocks[insn->op1];
-		n = ir_input_edges_count(ctx, insn);
-		for (j = 2, p = insn->ops + j; j <= n; j++, p++) {
-			ir_ref input = *p;
-			if (input > 0) {
-				if (_blocks[input] == 0) {
-					ir_gcm_schedule_early(ctx, _blocks, input);
-				}
-			}
-		}
-		return;
-	}
 	n = ir_input_edges_count(ctx, insn);
 	for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
 		ir_ref input = *p;
@@ -63,7 +51,6 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 {
 	ir_ref i, n, *p, use;
 	ir_insn *insn;
-	uint32_t flags;
 
 	ir_bitset_incl(visited, ref);
 	n = ctx->use_lists[ref].count;
@@ -71,16 +58,9 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 		uint32_t lca, b;
 
 		insn = &ctx->ir_base[ref];
-		flags = ir_op_flags[insn->op];
-		if (IR_OPND_KIND(flags, 1) == IR_OPND_CONTROL_DEP) {
-			for (i = 0, p = &ctx->use_edges[ctx->use_lists[ref].refs]; i < n; i++, p++) {
-				use = *p;
-				if (!ir_bitset_in(visited, use) && _blocks[use]) {
-					ir_gcm_schedule_late(ctx, _blocks, visited, use);
-				}
-			}
-			return;
-		}
+		IR_ASSERT(insn->op != IR_PARAM && insn->op != IR_VAR);
+		IR_ASSERT(insn->op != IR_PHI && insn->op != IR_PI);
+
 		lca = 0;
 		for (i = 0, p = &ctx->use_edges[ctx->use_lists[ref].refs]; i < n; i++, p++) {
 			use = *p;
@@ -122,12 +102,14 @@ int ir_gcm(ir_ctx *ctx)
 	ir_list queue;
 	uint32_t *_blocks;
 	ir_insn *insn, *use_insn;
+	ir_use_list *use_list;
 	uint32_t flags;
 
 	_blocks = ir_mem_calloc(ctx->insns_count, sizeof(uint32_t));
 	ir_list_init(&queue, ctx->insns_count);
+	visited = ir_bitset_malloc(ctx->insns_count);
 
-	/* pin control instructions and collect their direct inputs */
+	/* pin and collect control and control depended (PARAM, VAR, PHI, PI) instructions */
 	for (i = 1, bb = ctx->cfg_blocks + 1; i <= ctx->cfg_blocks_count; i++, bb++) {
 		if (bb->flags & IR_BB_UNREACHABLE) {
 			continue;
@@ -135,26 +117,34 @@ int ir_gcm(ir_ctx *ctx)
 		j = bb->end;
 		while (1) {
 			insn = &ctx->ir_base[j];
+			ir_bitset_incl(visited, j);
 			_blocks[j] = i; /* pin to block */
 			flags = ir_op_flags[insn->op];
-			if (IR_OPND_KIND(flags, 2) == IR_OPND_DATA) {
-				if (insn->op2 > 0) {
-					ir_list_push(&queue, insn->op2);
-				}
-			}
-			if (IR_OPND_KIND(flags, 3) == IR_OPND_DATA) {
-				if (insn->op3 > 0) {
-					ir_list_push(&queue, insn->op3);
-				}
-				n = ir_input_edges_count(ctx, insn);
-				for (k = 4, p = insn->ops + 4; k <= n; k++, p++) {
-					ref = *p;
-					if (ref > 0) {
-						ir_list_push(&queue, ref);
-					}
-				}
+			if (IR_OPND_KIND(flags, 2) == IR_OPND_DATA
+			 || IR_OPND_KIND(flags, 3) == IR_OPND_DATA
+			 || ((flags & IR_OP_FLAG_MEM) && insn->type != IR_VOID)) {
+				ir_list_push(&queue, j);
 			}
 			if (j == bb->start) {
+				use_list = &ctx->use_lists[j];
+				n = use_list->count;
+				for (p = &ctx->use_edges[use_list->refs]; n > 0; n--, p++) {
+					ref = *p;
+					use_insn = &ctx->ir_base[ref];
+					if (use_insn->op == IR_PARAM || use_insn->op == IR_VAR) {
+						_blocks[ref] = i; /* pin to block */
+						ir_bitset_incl(visited, ref);
+					} else
+					if (use_insn->op == IR_PHI || use_insn->op == IR_PI) {
+						ir_bitset_incl(visited, ref);
+						if (UNEXPECTED(ctx->use_lists[ref].count == 0)) {
+							// TODO: Unused PHI ???
+						} else {
+							_blocks[ref] = i; /* pin to block */
+							ir_list_push(&queue, ref);
+						}
+					}
+				}
 				break;
 			}
 			j = insn->op1; /* control predecessor */
@@ -164,8 +154,24 @@ int ir_gcm(ir_ctx *ctx)
 	n = ir_list_len(&queue);
 	for (i = 0; i < n; i++) {
 		ref = ir_list_at(&queue, i);
-		if (_blocks[ref] == 0) {
-			ir_gcm_schedule_early(ctx, _blocks, ref);
+		insn = &ctx->ir_base[ref];
+		flags = ir_op_flags[insn->op];
+		if (IR_OPND_KIND(flags, 2) == IR_OPND_DATA) {
+			if (insn->op2 > 0 && _blocks[insn->op2] == 0) {
+				ir_gcm_schedule_early(ctx, _blocks, insn->op2);
+			}
+		}
+		if (IR_OPND_KIND(flags, 3) == IR_OPND_DATA) {
+			if (insn->op3 > 0 && _blocks[insn->op3] == 0) {
+				ir_gcm_schedule_early(ctx, _blocks, insn->op3);
+			}
+			ir_ref n = ir_input_edges_count(ctx, insn);
+			for (k = 4, p = insn->ops + 4; k <= n; k++, p++) {
+				ref = *p;
+				if (ref > 0 && _blocks[ref] == 0) {
+					ir_gcm_schedule_early(ctx, _blocks, ref);
+				}
+			}
 		}
 	}
 
@@ -178,41 +184,18 @@ int ir_gcm(ir_ctx *ctx)
 	}
 #endif
 
-	/* collect uses of control instructions */
-	visited = ir_bitset_malloc(ctx->insns_count);
-	ir_list_clear(&queue);
-	for (i = 1, bb = ctx->cfg_blocks + 1; i <= ctx->cfg_blocks_count; i++, bb++) {
-		if (bb->flags & IR_BB_UNREACHABLE) {
-			continue;
-		}
-		j = bb->end;
-		while (1) {
-			ir_bitset_incl(visited, j);
-			insn = &ctx->ir_base[j];
-			n = ctx->use_lists[j].count;
-			if (n > 0) {
-				for (k = 0, p = &ctx->use_edges[ctx->use_lists[j].refs]; k < n; k++, p++) {
-					ref = *p;
-					use_insn = &ctx->ir_base[ref];
-					if (use_insn->op == IR_PARAM || use_insn->op == IR_VAR) {
-						_blocks[ref] = _blocks[j];
-					} else if (ir_op_flags[use_insn->op] & IR_OP_FLAG_DATA) {
-						ir_list_push(&queue, ref);
-					}
-				}
-			}
-			if (j == bb->start) {
-				break;
-			}
-			j = insn->op1; /* control predecessor */
-		}
-	}
-
 	n = ir_list_len(&queue);
 	for (i = 0; i < n; i++) {
 		ref = ir_list_at(&queue, i);
-		if (!ir_bitset_in(visited, ref)) {
-			ir_gcm_schedule_late(ctx, _blocks, visited, ref);
+		use_list = &ctx->use_lists[ref];
+		ir_ref n = use_list->count;
+		if (n > 0) {
+			for (p = &ctx->use_edges[use_list->refs]; n > 0; n--, p++) {
+				ref = *p;
+				if (!ir_bitset_in(visited, ref)) {
+					ir_gcm_schedule_late(ctx, _blocks, visited, ref);
+				}
+			}
 		}
 	}
 
