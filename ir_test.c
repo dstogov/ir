@@ -35,13 +35,13 @@ void gen_mandelbrot(ir_ctx *ctx)
 	ir_bind(ctx, zi, zi_1);                                                    // cr=cr_1, ci=x_1, zi=zi_1, zr=0.0, i=0
 	ir_ref zr_1 = ir_emit2(ctx, IR_OPT(IR_PHI, IR_DOUBLE), l_1,
 		ir_const_double(ctx, 0.0));
-	ir_bind(ctx, zi, zi_1);                                                    // cr=cr_1, ci=x_1, zi=zi_1, zr=zr_1, i=0
+	ir_bind(ctx, zr, zr_1);                                                    // cr=cr_1, ci=x_1, zi=zi_1, zr=zr_1, i=0
 	ir_ref i_1 = ir_emit2(ctx, IR_OPT(IR_PHI, IR_I32), l_1,
 		ir_const_i32(ctx, 0));
 	ir_bind(ctx, i, i_1);                                                      // cr=cr_1, ci=x_1, zi=zi_1, zr=zr_1, i=i_1
 	ir_ref i_2 = ir_emit2(ctx, IR_OPT(IR_ADD, IR_I32), i_1,
 		ir_const_i32(ctx, 1));
-	ir_bind(ctx, i, i_1);                                                      // cr=cr_1, ci=x_1, zi=zi_1, zr=zr_1, i=i_2
+	ir_bind(ctx, i, i_2);                                                      // cr=cr_1, ci=x_1, zi=zi_1, zr=zr_1, i=i_2
 	ir_ref temp = ir_var(ctx, IR_DOUBLE, l_1, "temp");
 	ir_ref temp_1 = ir_fold2(ctx, IR_OPT(IR_MUL, IR_DOUBLE), zr_1, zi_1);
 	ir_bind(ctx, temp, temp_1);                                                // ... temp=temp_1
@@ -172,7 +172,8 @@ int main(int argc, char **argv)
 		ctx.flags |= IR_OPT_FOLDING | IR_OPT_CODEGEN;
 	}
 	ctx.fixed_regset = ~debug_regset;
-    gen_mandelbrot(&ctx);
+	gen_mandelbrot(&ctx);
+//	ir_save(&ctx, stderr);
 
 	ir_build_def_use_lists(&ctx);
 	if (opt_level > 1) {
@@ -196,13 +197,13 @@ int main(int argc, char **argv)
 		ir_compute_dessa_moves(&ctx);
 	}
 
-    ir_truncate(&ctx);
-//    ir_dump(&ctx, stderr);
-    ir_save(&ctx, stderr);
-    ir_dump_live_ranges(&ctx, stderr);
-    f = fopen("ir.dot", "w+");
-    ir_dump_dot(&ctx, f);
-    fclose(f);
+	ir_truncate(&ctx);
+//	ir_dump(&ctx, stderr);
+	ir_save(&ctx, stderr);
+	ir_dump_live_ranges(&ctx, stderr);
+	f = fopen("ir.dot", "w+");
+	ir_dump_dot(&ctx, f);
+	fclose(f);
 
 	size_t size;
 	void *entry = ir_emit_code(&ctx, &size);
