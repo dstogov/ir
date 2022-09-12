@@ -173,6 +173,56 @@ bool ir_check(ir_ctx *ctx)
 				ok = 0;
 			}
 		}
+		if (ctx->use_lists) {
+			if ((flags & IR_OP_FLAG_CONTROL) && !(flags & IR_OP_FLAG_MEM)) {
+				ir_use_list *use_list = &ctx->use_lists[i];
+				ir_ref count;
+
+				switch (insn->op) {
+					case IR_SWITCH:
+						/* may have many successors */
+						break;
+					case IR_IF:
+						if (use_list->count != 2) {
+							fprintf(stderr, "ir_base[%d].op (IF) must have 2 succesors (%d)\n", i, use_list->count);
+							ok = 0;
+						}
+						break;
+					case IR_UNREACHABLE:
+					case IR_IJMP:
+						if (use_list->count == 1) {
+							/* UNREACHABLE and IJMP may be used in MERGE with the following ENTRY */
+							break;
+						}
+					case IR_RETURN:
+						if (use_list->count != 0) {
+							fprintf(stderr, "ir_base[%d].op (%s) must not have successors (%d)\n",
+								i, ir_op_name[insn->op], use_list->count);
+							ok = 0;
+						}
+						break;
+					default:
+						/* skip data references */
+						count = use_list->count;
+						for (j = 0, p = &ctx->use_edges[use_list->refs]; j < use_list->count; j++, p++) {
+							use = *p;
+							if (!(ir_op_flags[ctx->ir_base[use].op] & IR_OP_FLAG_CONTROL)) {
+								count--;
+							}
+						}
+						if (count != 1) {
+							if (insn->op == IR_CALL && count == 2) {
+								/* result of CALL may be used as data in control instruction */
+								break;
+							}
+							fprintf(stderr, "ir_base[%d].op (%s) must have 1 succesor (%d)\n",
+								i, ir_op_name[insn->op], count);
+							ok = 0;
+						}
+						break;
+				}
+			}
+		}
 		n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
 		i += n;
 		insn += n;
