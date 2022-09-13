@@ -214,6 +214,20 @@ static void ir_sccp_replace_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_r
 	IR_ASSERT(ref != new_ref);
 
 	insn = &ctx->ir_base[ref];
+	if (ir_op_flags[insn->op] & IR_OP_FLAG_TERMINATOR) {
+		ir_ref prev = ctx->ir_base[1].op1;
+		if (prev == ref) {
+			ctx->ir_base[1].op1 = insn->op3;
+		} else {
+			while (prev) {
+				if (ctx->ir_base[prev].op3 == ref) {
+					ctx->ir_base[prev].op3 = insn->op3;
+					break;
+				}
+				prev = ctx->ir_base[prev].op3;
+			}
+		}
+	}
 	n = ir_input_edges_count(ctx, insn);
 	for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
 		ir_ref input = *p;
@@ -647,20 +661,6 @@ int ir_sccp(ir_ctx *ctx)
 					ir_sccp_replace_insn(ctx, _values, i, IR_UNUSED);
 				}
 			} else {
-				if (ir_op_flags[insn->op] & IR_OP_FLAG_TERMINATOR) {
-					ir_ref ref = ctx->ir_base[1].op1;
-					if (ref == i) {
-						ctx->ir_base[1].op1 = insn->op3;
-					} else {
-						do {
-							if (ctx->ir_base[ref].op3 == i) {
-								ctx->ir_base[ref].op3 = insn->op3;
-								break;
-							}
-							ref = ctx->ir_base[ref].op3;
-						} while (ref);
-					}
-				}
 				ir_sccp_replace_insn(ctx, _values, i, IR_UNUSED);
 			}
 		} else if (_values[i].op == IR_IF) {
