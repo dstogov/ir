@@ -324,7 +324,7 @@ static void ir_sccp_remove_unreachable_merge_inputs(ir_ctx *ctx, ir_insn *_value
 				ir_ref prev, next = IR_UNUSED, input = insn->ops[j];
 				ir_insn *next_insn = NULL, *input_insn = &ctx->ir_base[input];
 
-				IR_ASSERT(input_insn->op == IR_END);
+				IR_ASSERT(input_insn->op == IR_END || input_insn->op == IR_IJMP || input_insn->op == IR_UNREACHABLE);
 				prev = input_insn->op1;
 				use_list = &ctx->use_lists[ref];
 				for (k = 0, p = &ctx->use_edges[use_list->refs]; k < use_list->count; k++, p++) {
