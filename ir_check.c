@@ -166,8 +166,8 @@ bool ir_check(ir_ctx *ctx)
 				/* pass (function returns void) */
 			} else if (insn->op == IR_BEGIN && j == 1) {
 				/* pass (start of unreachable basic block) */
-			} else if (insn->op == IR_LOOP_BEGIN || insn->op == IR_MERGE) {
-				/* TODO: something wrong ??? */
+//			} else if (insn->op == IR_LOOP_BEGIN || insn->op == IR_MERGE) {
+//				/* TODO: something wrong ??? */
 			} else if (IR_OPND_KIND(flags, j) != IR_OPND_CONTROL_REF) {
 				fprintf(stderr, "ir_base[%d].ops[%d] missing reference (%d)\n", i, j, use);
 				ok = 0;
