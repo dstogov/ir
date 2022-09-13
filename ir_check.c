@@ -69,7 +69,7 @@ bool ir_check(ir_ctx *ctx)
 								}
 							}
 							if (use >= i
-							 && !(insn->op == IR_PHI && j > 2 && ctx->ir_base[insn->op1].op == IR_LOOP_BEGIN)) {
+							 && !(insn->op == IR_PHI && j > 1 && ctx->ir_base[insn->op1].op == IR_LOOP_BEGIN)) {
 								fprintf(stderr, "ir_base[%d].ops[%d] invalid forward reference (%d)\n", i, j, use);
 								ok = 0;
 							}
@@ -140,6 +140,12 @@ bool ir_check(ir_ctx *ctx)
 							 && !(insn->op == IR_LOOP_BEGIN)) {
 								fprintf(stderr, "ir_base[%d].ops[%d] invalid forward reference (%d)\n", i, j, use);
 								ok = 0;
+							} else if (insn->op == IR_PHI) {
+								ir_insn *merge_insn = &ctx->ir_base[insn->op1];
+								if (merge_insn->op != IR_MERGE && merge_insn->op != IR_LOOP_BEGIN) {
+									fprintf(stderr, "ir_base[%d].ops[%d] reference (%d) must be MERGE or LOOP_BEGIN\n", i, j, use);
+									ok = 0;
+								}
 							}
 						case IR_OPND_CONTROL_REF:
 							if (!(ir_op_flags[use_insn->op] & IR_OP_FLAG_CONTROL)) {
