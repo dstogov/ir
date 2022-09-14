@@ -83,6 +83,7 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 			}
 			lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
 		}
+		IR_ASSERT(lca != 0 && "No Common Antecessor");
 		b = lca;
 		while (ctx->cfg_blocks[b].loop_depth && lca != ctx->cfg_blocks[_blocks[ref]].dom_parent) {
 			if (ctx->cfg_blocks[lca].loop_depth < ctx->cfg_blocks[b].loop_depth) {
@@ -192,7 +193,7 @@ int ir_gcm(ir_ctx *ctx)
 		if (n > 0) {
 			for (p = &ctx->use_edges[use_list->refs]; n > 0; n--, p++) {
 				ref = *p;
-				if (!ir_bitset_in(visited, ref)) {
+				if (!ir_bitset_in(visited, ref) && _blocks[ref]) {
 					ir_gcm_schedule_late(ctx, _blocks, visited, ref);
 				}
 			}
