@@ -360,7 +360,7 @@ void ir_free(ir_ctx *ctx)
 IR_NEVER_INLINE ir_ref ir_const(ir_ctx *ctx, ir_val val, uint8_t type)
 {
 	ir_insn *insn, *prev_insn;
-	ir_ref ref;
+	ir_ref ref, prev;
 
 	if (type == IR_BOOL) {
 		return val.u64 ? IR_TRUE : IR_FALSE;
@@ -382,16 +382,17 @@ IR_NEVER_INLINE ir_ref ir_const(ir_ctx *ctx, ir_val val, uint8_t type)
 		ref = insn->prev_const;
 	}
 
+	if (prev_insn) {
+		prev = prev_insn->prev_const;
+		prev_insn->prev_const = -ctx->consts_count;
+	} else {
+		prev = ctx->prev_const_chain[type];
+		ctx->prev_const_chain[type] = -ctx->consts_count;
+	}
+
 	ref = ir_next_const(ctx);
 	insn = &ctx->ir_base[ref];
-
-	if (prev_insn) {
-		insn->prev_const = prev_insn->prev_const;
-		prev_insn->prev_const = ref;
-	} else {
-		insn->prev_const = ctx->prev_const_chain[type];
-		ctx->prev_const_chain[type] = ref;
-	}
+	insn->prev_const = prev;
 
 	insn->optx = IR_OPT(type, type);
 	insn->val.u64 = val.u64;
