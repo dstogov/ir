@@ -468,9 +468,7 @@ int ir_sccp(ir_ctx *ctx)
 //					} else
 					if (IR_IS_TOP(insn->ops[j])) {
 						has_top = 1;
-						if (!ir_bitqueue_in(&worklist, insn->ops[j])) {
-							ir_bitqueue_add(&worklist, insn->ops[j]);
-						}
+						ir_bitqueue_add(&worklist, insn->ops[j]);
 					}
 				}
 				if (has_top) {
@@ -485,6 +483,7 @@ int ir_sccp(ir_ctx *ctx)
 		} else {
 			if (insn->op == IR_IF) {
 				if (IR_IS_TOP(insn->op2)) {
+					ir_bitqueue_add(&worklist, insn->op2);
 					continue;
 				}
 				if (!IR_IS_BOTTOM(insn->op2)) {
@@ -514,6 +513,7 @@ int ir_sccp(ir_ctx *ctx)
 				IR_MAKE_BOTTOM(i);
 			} else if (insn->op == IR_SWITCH) {
 				if (IR_IS_TOP(insn->op2)) {
+					ir_bitqueue_add(&worklist, insn->op2);
 					continue;
 				}
 				if (!IR_IS_BOTTOM(insn->op2)) {
