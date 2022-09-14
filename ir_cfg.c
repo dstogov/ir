@@ -292,13 +292,23 @@ static void compute_postnum(const ir_ctx *ctx, uint32_t *cur, uint32_t b)
  * Cooper, Harvey and Kennedy. */
 int ir_build_dominators_tree(ir_ctx *ctx)
 {
-	uint32_t blocks_count, b;
+	uint32_t blocks_count, b, postnum;
 	ir_block *blocks, *bb;
 	uint32_t *edges;
 	bool changed;
 
-	b = 1;
-	compute_postnum(ctx, &b, 1);
+	postnum = 1;
+	compute_postnum(ctx, &postnum, 1);
+
+	if (ctx->ir_base[1].op2) {
+		for (b = 2, bb = &ctx->cfg_blocks[2]; b <= ctx->cfg_blocks_count; b++, bb++) {
+			if (bb->flags & IR_BB_ENTRY) {
+				compute_postnum(ctx, &postnum, b);
+				bb->idom = 1;
+			}
+		}
+		ctx->cfg_blocks[1].postnum = postnum;
+	}
 
 	/* Find immediate dominators */
 	blocks = ctx->cfg_blocks;
@@ -312,7 +322,19 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 			if (bb->flags & IR_BB_UNREACHABLE) {
 				continue;
 			}
-			if (bb->predecessors_count) {
+			if (bb->predecessors_count == 1) {
+				int idom = 0;
+				uint32_t pred_b = edges[bb->predecessors];
+				ir_block *pred_bb = &blocks[pred_b];
+
+				if (pred_bb->idom > 0) {
+					idom = pred_b;
+				}
+				if (idom > 0 && bb->idom != idom) {
+					bb->idom = idom;
+					changed = 1;
+				}
+			} else if (bb->predecessors_count) {
 				int idom = 0;
 				uint32_t k = bb->predecessors_count;
 				uint32_t *p = edges + bb->predecessors;
@@ -320,7 +342,7 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 					uint32_t pred_b = *p;
 					ir_block *pred_bb = &blocks[pred_b];
 
-					if (pred_bb->idom > 0) {
+					if (pred_bb->idom > 0 && !(pred_bb->flags & IR_BB_ENTRY)) {
 						if (idom == 0) {
 							idom = pred_b;
 						} else if (idom != pred_b) {
@@ -356,7 +378,10 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 		if (bb->flags & IR_BB_UNREACHABLE) {
 			continue;
 		}
-		if (bb->idom > 0) {
+		if (bb->flags & IR_BB_ENTRY) {
+			bb->idom = 0;
+			bb->dom_depth = 0;
+		} else if (bb->idom > 0) {
 			ir_block *idom_bb = &blocks[bb->idom];
 
 			bb->dom_depth = idom_bb->dom_depth + 1;
