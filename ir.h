@@ -440,6 +440,7 @@ typedef struct _ir_ctx {
 	ir_insn            fold_insn;
 	ir_use_list       *use_lists;         /* def->use lists for each instruction */
 	ir_ref            *use_edges;
+	uint32_t           use_edges_count;
 	uint32_t           cfg_blocks_count;
 	uint32_t           cfg_edges_count;
 	ir_block          *cfg_blocks;        /* list of Basic Blocks (starts from 1) */

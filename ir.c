@@ -280,6 +280,7 @@ void ir_init(ir_ctx *ctx, ir_ref consts_limit, ir_ref insns_limit)
 
 	ctx->use_lists = NULL;
 	ctx->use_edges = NULL;
+	ctx->use_edges_count = 0;
 
 	ctx->cfg_blocks_count = 0;
 	ctx->cfg_edges_count = 0;
@@ -939,6 +940,7 @@ void ir_build_def_use_lists(ir_ctx *ctx)
 	}
 
 	ctx->use_edges = edges;
+	ctx->use_edges_count = edges_count;
 	ctx->use_lists = lists;
 }
 

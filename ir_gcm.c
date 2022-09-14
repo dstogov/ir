@@ -581,6 +581,7 @@ restart:
 	}
 
 	new_ctx.use_edges = edges;
+	new_ctx.use_edges_count = edges_count;
 	new_ctx.use_lists = lists;
 
 	if (ctx->cfg_blocks) {

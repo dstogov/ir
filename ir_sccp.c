@@ -196,11 +196,17 @@ static void ir_sccp_add_to_use_list(ir_ctx *ctx, ir_ref to, ir_ref ref)
 	ir_use_list *use_list = &ctx->use_lists[to];
 	ir_ref n = use_list->refs + use_list->count;
 
-	if (ctx->use_edges[n] == IR_UNUSED) {
+	if (n < ctx->use_edges_count && ctx->use_edges[n] == IR_UNUSED) {
 		ctx->use_edges[n] = ref;
 		use_list->count++;
 	} else {
-		IR_ASSERT(0 && "NIY: insert def->use edges"); // TODO:
+		/* Reallocate the whole edges buffer (this is inefficient) */
+		ctx->use_edges = ir_mem_realloc(ctx->use_edges, (ctx->use_edges_count + use_list->count + 1) * sizeof(ir_ref));
+		memcpy(ctx->use_edges + ctx->use_edges_count, ctx->use_edges + use_list->refs, use_list->count * sizeof(ir_ref));
+		use_list->refs = ctx->use_edges_count;
+		ctx->use_edges[use_list->refs + use_list->count] = ref;
+		use_list->count++;
+		ctx->use_edges_count += use_list->count;
 	}
 }
 #endif
