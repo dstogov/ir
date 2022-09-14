@@ -906,7 +906,7 @@ static int ir_try_swap_operands(ir_ctx *ctx, ir_ref i, ir_insn *insn)
 	 && !ir_vregs_overlap(ctx, ctx->vregs[insn->op1], ctx->vregs[i])
 	 && !ir_hint_conflict(ctx, i, ctx->vregs[insn->op1], ctx->vregs[i])) {
 		/* pass */
-	} else if (insn->op2 > 0 && insn->op1 != insn->op2
+	} else if (insn->op1 > 0 && insn->op2 > 0 && insn->op1 != insn->op2
 		&& (ir_op_flags[insn->op] & IR_OP_FLAG_COMMUTATIVE)) {
 		if (ctx->vregs[insn->op2] != ctx->vregs[i]) {
 			ir_live_pos pos = IR_USE_LIVE_POS_FROM_REF(i);
