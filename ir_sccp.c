@@ -442,7 +442,7 @@ int ir_sccp(ir_ctx *ctx)
 						_values[i+j+1].optx = IR_BOTTOM; /* keep the tail of a long multislot instruction */
 					}
 				}
-				for (j = 1; j <= n; j++) {
+				for (j = 1; j < n; j++) {
 					if (merge_insn->ops[j] && IR_IS_REACHABLE(merge_insn->ops[j])) {
 						if (ir_sccp_join_values(ctx, _values, i, insn->ops[j + 1])) {
 							changed = 1;
@@ -462,6 +462,9 @@ int ir_sccp(ir_ctx *ctx)
 //					} else
 					if (IR_IS_TOP(insn->ops[j])) {
 						has_top = 1;
+						if (!ir_bitqueue_in(&worklist, insn->ops[j])) {
+							ir_bitqueue_add(&worklist, insn->ops[j]);
+						}
 					}
 				}
 				if (has_top) {
