@@ -1937,6 +1937,14 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 		/* split current at optimal position before block_pos[reg] */
 		ir_live_pos split_pos = ir_last_use_pos_before(ival,  blockPos[reg] + 1,
 			IR_USE_MUST_BE_IN_REG | IR_USE_SHOULD_BE_IN_REG);
+		if (split_pos == 0) {
+			split_pos = ir_first_use_pos_after(ival, blockPos[reg],
+				IR_USE_MUST_BE_IN_REG | IR_USE_SHOULD_BE_IN_REG) - 1;
+			other = ir_split_interval_at(ctx, ival, split_pos);
+			ir_add_to_unhandled(unhandled, other);
+			IR_LOG_LSRA("      ---- Queue", other, "");
+			return IR_REG_NONE;
+		}
 		split_pos = ir_find_optimal_split_position(ctx, ival, split_pos, blockPos[reg], 1);
 		other = ir_split_interval_at(ctx, ival, split_pos);
 		ir_add_to_unhandled(unhandled, other);
