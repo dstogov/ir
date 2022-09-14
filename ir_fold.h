@@ -824,7 +824,7 @@ IR_FOLD(SEXT(C_U8))
 IR_FOLD(SEXT(C_BOOL))
 {
 	IR_ASSERT(IR_IS_TYPE_INT(IR_OPT_TYPE(opt)));
-	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] > ir_type_size[IR_OPT_TYPE(op1_insn->type)]);
+	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] > ir_type_size[op1_insn->type]);
 	IR_FOLD_CONST_I((int64_t)op1_insn->val.i8);
 }
 
@@ -832,7 +832,7 @@ IR_FOLD(SEXT(C_I16))
 IR_FOLD(SEXT(C_U16))
 {
 	IR_ASSERT(IR_IS_TYPE_INT(IR_OPT_TYPE(opt)));
-	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] > ir_type_size[IR_OPT_TYPE(op1_insn->type)]);
+	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] > ir_type_size[op1_insn->type]);
 	IR_FOLD_CONST_I((int64_t)op1_insn->val.i16);
 }
 
@@ -840,7 +840,7 @@ IR_FOLD(SEXT(C_I32))
 IR_FOLD(SEXT(C_U32))
 {
 	IR_ASSERT(IR_IS_TYPE_INT(IR_OPT_TYPE(opt)));
-	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] > ir_type_size[IR_OPT_TYPE(op1_insn->type)]);
+	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] > ir_type_size[op1_insn->type]);
 	IR_FOLD_CONST_I((int64_t)op1_insn->val.i32);
 }
 
@@ -849,7 +849,7 @@ IR_FOLD(ZEXT(C_U8))
 IR_FOLD(ZEXT(C_BOOL))
 {
 	IR_ASSERT(IR_IS_TYPE_INT(IR_OPT_TYPE(opt)));
-	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] > ir_type_size[IR_OPT_TYPE(op1_insn->type)]);
+	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] > ir_type_size[op1_insn->type]);
 	IR_FOLD_CONST_U((uint64_t)op1_insn->val.u8);
 }
 
@@ -857,7 +857,7 @@ IR_FOLD(ZEXT(C_I16))
 IR_FOLD(ZEXT(C_U16))
 {
 	IR_ASSERT(IR_IS_TYPE_INT(IR_OPT_TYPE(opt)));
-	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] > ir_type_size[IR_OPT_TYPE(op1_insn->type)]);
+	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] > ir_type_size[op1_insn->type]);
 	IR_FOLD_CONST_U((uint64_t)op1_insn->val.u16);
 }
 
@@ -865,7 +865,7 @@ IR_FOLD(ZEXT(C_I32))
 IR_FOLD(ZEXT(C_U32))
 {
 	IR_ASSERT(IR_IS_TYPE_INT(IR_OPT_TYPE(opt)));
-	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] > ir_type_size[IR_OPT_TYPE(op1_insn->type)]);
+	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] > ir_type_size[op1_insn->type]);
 	IR_FOLD_CONST_U((uint64_t)op1_insn->val.u32);
 }
 
@@ -877,7 +877,7 @@ IR_FOLD(TRUNC(C_U32))
 IR_FOLD(TRUNC(C_U64))
 {
 	IR_ASSERT(IR_IS_TYPE_INT(IR_OPT_TYPE(opt)));
-	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] < ir_type_size[IR_OPT_TYPE(op1_insn->type)]);
+	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] < ir_type_size[op1_insn->type]);
 	switch (IR_OPT_TYPE(opt)) {
 		case IR_I8:
 			IR_FOLD_CONST_I(op1_insn->val.i8);
@@ -908,7 +908,7 @@ IR_FOLD(BITCAST(C_U64))
 IR_FOLD(BITCAST(C_FLOAT))
 IR_FOLD(BITCAST(C_DOUBLE))
 {
-	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] == ir_type_size[IR_OPT_TYPE(op1_insn->type)]);
+	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] == ir_type_size[op1_insn->type]);
 	switch (IR_OPT_TYPE(opt)) {
 		case IR_I8:
 			IR_FOLD_CONST_I(op1_insn->val.i8);
