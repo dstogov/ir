@@ -1451,6 +1451,7 @@ static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, ir_live_interval *iva
 	if (pos == p->start) {
 		prev->next = NULL;
 		ival->end = prev->end;
+		ir_mem_free(p);
 	} else {
 		p->end = ival->end = pos;
 		p->next = NULL;
