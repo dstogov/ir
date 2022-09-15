@@ -430,9 +430,11 @@ int ir_find_loops(ir_ctx *ctx)
 	/* We don't materialize the DJ spanning tree explicitly, as we are only interested in ancestor
 	 * queries. These are implemented by checking entry/exit times of the DFS search. */
 	ir_worklist_init(&work, ctx->cfg_blocks_count + 1);
-	entry_times = ir_mem_calloc((ctx->cfg_blocks_count + 1) * 3, sizeof(uint32_t));
+	entry_times = ir_mem_malloc((ctx->cfg_blocks_count + 1) * 3 * sizeof(uint32_t));
 	exit_times = entry_times + ctx->cfg_blocks_count + 1;
 	sorted_blocks = exit_times + ctx->cfg_blocks_count + 1;
+
+	memset(entry_times, 0, (ctx->cfg_blocks_count + 1) * sizeof(uint32_t));
 
 	ir_worklist_push(&work, 1);
 	while (ir_worklist_len(&work)) {
@@ -694,8 +696,9 @@ int ir_schedule_blocks(ir_ctx *ctx)
 	}
 
 	if (reorder) {
-		ir_block *cfg_blocks = ir_mem_calloc(sizeof(ir_block), ctx->cfg_blocks_count + 1);
+		ir_block *cfg_blocks = ir_mem_malloc(sizeof(ir_block) * (ctx->cfg_blocks_count + 1));
 
+		memset(ctx->cfg_blocks, 0, sizeof(ir_block));
 		for (b = 1, bb = cfg_blocks + 1; b <= count; b++, bb++) {
 			*bb = ctx->cfg_blocks[list[b]];
 			if (bb->dom_parent > 0) {

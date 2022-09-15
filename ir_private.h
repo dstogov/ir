@@ -449,7 +449,7 @@ void ir_array_remove(ir_array *a, uint32_t i);
 
 IR_ALWAYS_INLINE void ir_array_init(ir_array *a, uint32_t size)
 {
-	a->refs = ir_mem_calloc(size, sizeof(ir_ref));
+	a->refs = ir_mem_malloc(size * sizeof(ir_ref));
 	a->size = size;
 }
 
