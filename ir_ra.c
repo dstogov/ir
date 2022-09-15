@@ -2399,14 +2399,32 @@ static void assign_regs(ir_ctx *ctx)
 				if (ival->reg >= 0) {
 					use_pos = ival->use_pos;
 					while (use_pos) {
+						ref = IR_LIVE_POS_TO_REF(use_pos->pos);
 						reg = ival->reg;
+						if (use_pos->op_num == 0
+						 && (use_pos->flags & IR_DEF_REUSES_OP1_REG)
+						 && ctx->regs[ref][1] != IR_REG_NONE
+						 && (ctx->regs[ref][1] & IR_REG_SPILL_LOAD)) {
+							/* load op1 directly into result (valid only when op1 register is not reused) */
+							ctx->regs[ref][1] = reg | IR_REG_SPILL_LOAD;
+						}
 						if (ival->top->stack_spill_pos != -1) {
 							// TODO: Insert spill loads and stotres in optimal positons (resolution)
 
 							if (use_pos->op_num == 0) {
 								reg |= IR_REG_SPILL_STORE;
 							} else {
-								reg |= IR_REG_SPILL_LOAD;
+								if ((use_pos->flags & IR_USE_MUST_BE_IN_REG)
+								 || ctx->ir_base[ref].op == IR_CALL
+								 || ctx->ir_base[ref].op == IR_TAILCALL
+								 || (use_pos->op_num == 2
+								  && ctx->ir_base[ref].op1 == ctx->ir_base[ref].op2
+								  && IR_REG_NUM(ctx->regs[ref][1]) == reg)) {
+									reg |= IR_REG_SPILL_LOAD;
+								} else {
+									/* fuse spill load (valid only when register is not reused) */
+									reg = IR_REG_NONE;
+								}
 							}
 						}
 						if (use_pos->flags & IR_PHI_USE) {
@@ -2415,7 +2433,6 @@ static void assign_regs(ir_ctx *ctx)
 							IR_ASSERT(use_pos->op_num <= IR_MAX(3, ir_input_edges_count(ctx, &ctx->ir_base[ref])));
 							ctx->regs[ref][use_pos->op_num] = reg;
 						} else {
-							ref = IR_LIVE_POS_TO_REF(use_pos->pos);
 							IR_ASSERT(use_pos->op_num <= IR_MAX(3, ir_input_edges_count(ctx, &ctx->ir_base[ref])));
 							ctx->regs[ref][use_pos->op_num] = reg;
 						}

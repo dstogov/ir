@@ -294,7 +294,12 @@ void ir_dump_live_ranges(ir_ctx *ctx, FILE *f)
 				}
 				fprintf(f, ")");
 				if (ival->stack_spill_pos != -1) {
-					fprintf(f, " [SPILL=0x%x]", ival->stack_spill_pos);
+					if (ival->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL) {
+						IR_ASSERT(ctx->spill_base >= 0);
+						fprintf(f, " [SPILL=0x%x(%%%s)]", ival->stack_spill_pos, ir_reg_name(ctx->spill_base, IR_ADDR));
+					} else {
+						fprintf(f, " [SPILL=0x%x]", ival->stack_spill_pos);
+					}
 				}
 			}
 			if (ival->next) {
