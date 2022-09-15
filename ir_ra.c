@@ -512,6 +512,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 									IR_ASSERT(!IR_IS_CONST_REF(ctx->ir_base[input].op1));
 									IR_ASSERT(IR_IS_CONST_REF(ctx->ir_base[input].op2));
 									input = ctx->ir_base[input].op1;
+									use_flags = IR_USE_MUST_BE_IN_REG;
 								} else {
 									input = 0;
 								}
