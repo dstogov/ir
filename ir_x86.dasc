@@ -538,7 +538,8 @@ typedef enum _ir_rule {
 	IR_MEM_SHIFT,
 	IR_MEM_SHIFT_CONST,
 	IR_REG_BINOP_INT,
-	IR_SKIP_BINOP_INT,
+	IR_SKIP_MEM_BINOP_INT,
+	IR_SKIP_REG_BINOP_INT,
 	IR_SKIP_TEST_INT,
 	IR_SKIP_SHIFT,
 	IR_VSTORE_INT,
@@ -560,7 +561,8 @@ bool ir_needs_vreg(ir_ctx *ctx, ir_ref ref)
 	IR_ASSERT(ctx->rules);
 	return ctx->rules[ref] != IR_SKIP
 	 && ctx->rules[ref] != IR_SKIP_MEM
-	 && ctx->rules[ref] != IR_SKIP_BINOP_INT
+	 && ctx->rules[ref] != IR_SKIP_MEM_BINOP_INT
+	 && ctx->rules[ref] != IR_SKIP_REG_BINOP_INT
 	 && ctx->rules[ref] != IR_SKIP_TEST_INT
 	 && ctx->rules[ref] != IR_SKIP_SHIFT;
 }
@@ -801,7 +803,7 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num, ir_reg *reg)
 	*reg = IR_REG_NONE;
 	switch (rule) {
 		case IR_BINOP_INT:
-		case IR_SKIP_BINOP_INT:
+		case IR_SKIP_REG_BINOP_INT:
 		case IR_BINOP_SSE2:
 		case IR_BINOP_AVX:
 		case IR_IF_INT:
@@ -903,7 +905,8 @@ int ir_get_temporary_regs(ir_ctx *ctx, ir_ref ref, ir_tmp_reg *tmp_regs)
 	rule = ctx->rules[ref];
 	switch (rule) {
 		case IR_BINOP_INT:
-		case IR_SKIP_BINOP_INT:
+		case IR_SKIP_MEM_BINOP_INT:
+		case IR_SKIP_REG_BINOP_INT:
 		case IR_SKIP_TEST_INT:
 			insn = &ctx->ir_base[ref];
 			if (IR_IS_CONST_REF(insn->op2) && insn->op1 != insn->op2) {
@@ -1640,7 +1643,7 @@ store_int:
 							if (op_insn->op1 > bb->start
 							 && ctx->use_lists[op_insn->op1].count == 2
 							 && insn->op1 == op_insn->op1) {
-								ctx->rules[insn->op3] = IR_SKIP_BINOP_INT;
+								ctx->rules[insn->op3] = IR_SKIP_MEM_BINOP_INT;
 								ctx->rules[op_insn->op1] = IR_SKIP;
 								ir_ref addr_ref = insn->op2;
 								if (!ctx->rules[addr_ref]) {
@@ -1660,7 +1663,7 @@ store_int:
 								ir_ref tmp = op_insn->op1;
 								op_insn->op1 = op_insn->op2;
 								op_insn->op2 = tmp;
-								ctx->rules[insn->op3] = IR_SKIP_BINOP_INT;
+								ctx->rules[insn->op3] = IR_SKIP_MEM_BINOP_INT;
 								ctx->rules[op_insn->op1] = IR_SKIP;
 								ir_ref addr_ref = insn->op2;
 								if (!ctx->rules[addr_ref]) {
@@ -1802,7 +1805,7 @@ store_int:
 				        op_insn->op == IR_XOR) {
 						if (ctx->ir_base[op_insn->op1].op == IR_RLOAD
 						 && ctx->ir_base[op_insn->op1].op2 == insn->op3) {
-							ctx->rules[insn->op2] = IR_SKIP_BINOP_INT;
+							ctx->rules[insn->op2] = IR_SKIP_REG_BINOP_INT;
 							ctx->rules[op_insn->op1] = IR_SKIP;
 							return IR_REG_BINOP_INT;
 						} else if ((ir_op_flags[op_insn->op] & IR_OP_FLAG_COMMUTATIVE)
@@ -1811,7 +1814,7 @@ store_int:
 							ir_ref tmp = op_insn->op1;
 							op_insn->op1 = op_insn->op2;
 							op_insn->op2 = tmp;
-							ctx->rules[insn->op2] = IR_SKIP_BINOP_INT;
+							ctx->rules[insn->op2] = IR_SKIP_REG_BINOP_INT;
 							ctx->rules[op_insn->op1] = IR_SKIP;
 							return IR_REG_BINOP_INT;
 						}
@@ -1915,7 +1918,7 @@ store_int:
 								if (op_insn->op1 > bb->start
 								 && ctx->use_lists[op_insn->op1].count == 2
 								 && store_insn->op1 == op_insn->op1) {
-									ctx->rules[insn->op2] = IR_SKIP_BINOP_INT;
+									ctx->rules[insn->op2] = IR_SKIP_MEM_BINOP_INT;
 									ctx->rules[op_insn->op1] = IR_SKIP;
 									ir_ref addr_ref = store_insn->op2;
 									if (!ctx->rules[addr_ref]) {
@@ -1936,7 +1939,7 @@ store_int:
 									ir_ref tmp = op_insn->op1;
 									op_insn->op1 = op_insn->op2;
 									op_insn->op2 = tmp;
-									ctx->rules[insn->op2] = IR_SKIP_BINOP_INT;
+									ctx->rules[insn->op2] = IR_SKIP_MEM_BINOP_INT;
 									ctx->rules[op_insn->op1] = IR_SKIP;
 									ir_ref addr_ref = store_insn->op2;
 									if (!ctx->rules[addr_ref]) {
@@ -7435,7 +7438,8 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_SKIP:
 				case IR_SKIP_REG:
 				case IR_SKIP_MEM:
-				case IR_SKIP_BINOP_INT:
+				case IR_SKIP_MEM_BINOP_INT:
+				case IR_SKIP_REG_BINOP_INT:
 				case IR_SKIP_TEST_INT:
 				case IR_SKIP_SHIFT:
 				case IR_VAR:
