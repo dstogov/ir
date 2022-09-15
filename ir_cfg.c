@@ -14,7 +14,6 @@ int ir_build_cfg(ir_ctx *ctx)
 	ir_use_list *use_list;
 
 	_blocks = ir_mem_calloc(ctx->insns_count, sizeof(uint32_t));
-	memset(_blocks, 0, ctx->insns_count * sizeof(uint32_t));
 	ir_worklist_init(&worklist, ctx->insns_count);
 
 	/* Add START node */
