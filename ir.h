@@ -438,6 +438,7 @@ typedef struct _ir_ctx {
 	uint32_t           flags;
 	ir_ref             fold_cse_limit;
 	ir_insn            fold_insn;
+	ir_hashtab        *binding;
 	ir_use_list       *use_lists;         /* def->use lists for each instruction */
 	ir_ref            *use_edges;
 	uint32_t           use_edges_count;
@@ -449,6 +450,7 @@ typedef struct _ir_ctx {
 	uint32_t          *rules;
 	uint32_t          *vregs;
 	uint32_t           vregs_count;
+	int32_t            spill_base;        /* base register for special spill area (e.g. PHP VM frame pointer) */
 	int32_t            fixed_stack_frame_size;
 	uint64_t           fixed_regset;
 	uint64_t           fixed_save_regset;

@@ -713,6 +713,13 @@ IR_ALWAYS_INLINE ir_ref ir_input_edges_count(ir_ctx *ctx, ir_insn *insn)
 	return n;
 }
 
+/*** IR Binding ***/
+IR_ALWAYS_INLINE ir_ref ir_binding_find(ir_ctx *ctx, ir_ref ref)
+{
+	ir_ref var = ir_hashtab_find(ctx->binding, ref);
+	return (var != IR_INVALID_VAL) ? var : 0;
+}
+
 /*** IR Use Lists ***/
 struct _ir_use_list {
 	ir_ref        refs; /* index in ir_ctx->use_edges[] array */
@@ -832,6 +839,7 @@ struct _ir_live_range {
 #define IR_LIVE_INTERVAL_MEM_PARAM       (1<<7)
 #define IR_LIVE_INTERVAL_MEM_LOAD        (1<<8)
 #define IR_LIVE_INTERVAL_REG_LOAD        (1<<9)
+#define IR_LIVE_INTERVAL_SPILL_SPECIAL   (1<<10) /* spill slot is pre-allocated in a special area (see ir_ctx.spill_reserved_base) */
 
 struct _ir_live_interval {
 	uint8_t           type;

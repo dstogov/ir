@@ -93,10 +93,26 @@ void ir_save(ir_ctx *ctx, FILE *f)
 				first = 0;
 			}
 		}
+		if (first) {
+			fprintf(f, ";");
+		} else {
+			fprintf(f, ");");
+		}
+		if (ctx->binding) {
+			ir_ref var = ir_binding_find(ctx, i);
+			if (var) {
+				if (var >= 0) {
+					fprintf(f, " # BIND(d_%d);", var);
+				} else {
+					// TODO: use callback ???
+					fprintf(f, " # BIND(%d);", var);
+				}
+			}
+		}
+		fprintf(f, "\n");
 		n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
 		i += n;
 		insn += n;
-		fprintf(f, "%s;\n", first ? "" : ")");
 	}
 	fprintf(f, "}\n");
 }

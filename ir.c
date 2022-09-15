@@ -278,6 +278,8 @@ void ir_init(ir_ctx *ctx, ir_ref consts_limit, ir_ref insns_limit)
 	ctx->fold_cse_limit = IR_UNUSED + 1;
 	ctx->flags = 0;
 
+	ctx->binding = NULL;
+
 	ctx->use_lists = NULL;
 	ctx->use_edges = NULL;
 	ctx->use_edges_count = 0;
@@ -290,6 +292,7 @@ void ir_init(ir_ctx *ctx, ir_ref consts_limit, ir_ref insns_limit)
 	ctx->rules = NULL;
 	ctx->vregs = NULL;
 	ctx->vregs_count = 0;
+	ctx->spill_base = -1;
 	ctx->fixed_stack_frame_size = -1;
 	ctx->fixed_regset = 0;
 	ctx->fixed_save_regset = 0;
@@ -324,6 +327,10 @@ void ir_free(ir_ctx *ctx)
 	ir_mem_free(buf);
 	if (ctx->strtab.data) {
 		ir_strtab_free(&ctx->strtab);
+	}
+	if (ctx->binding) {
+		ir_hashtab_free(ctx->binding);
+		ir_mem_free(ctx->binding);
 	}
 	if (ctx->use_lists) {
 		ir_mem_free(ctx->use_lists);
@@ -891,7 +898,14 @@ ir_ref ir_var(ir_ctx *ctx, ir_type type, ir_ref region, const char *name)
 
 void ir_bind(ir_ctx *ctx, ir_ref var, ir_ref def)
 {
-	// TODO: node to VAR binding is not implemented yet
+	if (IR_IS_CONST_REF(def)) {
+		return;
+	}
+	if (!ctx->binding) {
+		ctx->binding = ir_mem_malloc(sizeof(ir_hashtab));;
+		ir_hashtab_init(ctx->binding, 16);
+	}
+	ir_hashtab_add(ctx->binding, def, var);
 }
 
 /* Batch construction of def->use edges */

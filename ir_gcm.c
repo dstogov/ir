@@ -217,6 +217,44 @@ int ir_gcm(ir_ctx *ctx)
 	return 1;
 }
 
+static void ir_xlat_binding(ir_ctx *ctx, ir_ref *_xlat)
+{
+	uint32_t n1, n2, pos, key;
+	ir_hashtab_bucket *b1, *b2;
+	ir_hashtab *binding = ctx->binding;
+	uint32_t hash_size = (uint32_t)(-(int32_t)binding->mask);
+
+	memset(binding->data - (hash_size * sizeof(uint32_t)), -1, hash_size * sizeof(uint32_t));
+	n1 = binding->count;
+	n2 = 0;
+	pos = 0;
+	b1 = binding->data;
+	b2 = binding->data;
+	while (n1 > 0) {
+		key = b1->key;
+		IR_ASSERT(key < ctx->insns_count);
+		if (_xlat[key]) {
+			key = _xlat[key];
+			b2->key = key;
+			if (b1->val > 0) {
+				IR_ASSERT(_xlat[b1->val]);
+				b2->val = _xlat[b1->val];
+			} else {
+				b2->val = b1->val;
+			}
+			key |= binding->mask;
+			b2->next = ((uint32_t*)binding->data)[(int32_t)key];
+			((uint32_t*)binding->data)[(int32_t)key] = pos;
+			pos += sizeof(ir_hashtab_bucket);
+			b2++;
+			n2++;
+		}
+		b1++;
+		n1--;
+	}
+	binding->count = n2;
+}
+
 int ir_schedule(ir_ctx *ctx)
 {
 	ir_ctx new_ctx;
@@ -370,6 +408,9 @@ restart:
 	/* TODO: linearize without reallocation and reconstruction ??? */
 
 	_xlat = ir_mem_malloc((ctx->consts_count + ctx->insns_count) * sizeof(ir_ref));
+	if (ctx->binding) {
+		memset(_xlat, 0, (ctx->consts_count + ctx->insns_count) * sizeof(ir_ref));
+	}
 	_xlat += ctx->consts_count;
 	_xlat[IR_TRUE] = IR_TRUE;
 	_xlat[IR_FALSE] = IR_FALSE;
@@ -423,6 +464,7 @@ restart:
 	lists = ir_mem_calloc(insns_count, sizeof(ir_use_list));
 	ir_init(&new_ctx, consts_count, insns_count);
 	new_ctx.flags = ctx->flags;
+	new_ctx.spill_base = ctx->spill_base;
 	new_ctx.fixed_stack_frame_size = ctx->fixed_stack_frame_size;
 	new_ctx.fixed_regset = ctx->fixed_regset;
 	new_ctx.fixed_save_regset = ctx->fixed_save_regset;
@@ -557,6 +599,12 @@ restart:
 			default:
 				IR_ASSERT(0);
 		}
+	}
+
+	if (ctx->binding) {
+		ir_xlat_binding(ctx, _xlat);
+		new_ctx.binding = ctx->binding;
+		ctx->binding = NULL;
 	}
 
 	edges = ir_mem_malloc(edges_count * sizeof(ir_ref));

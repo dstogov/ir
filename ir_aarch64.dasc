@@ -1157,6 +1157,11 @@ IR_ALWAYS_INLINE int32_t ir_ref_spill_slot(ir_ctx *ctx, ir_ref ref, ir_reg *reg)
 	IR_ASSERT(ref >= 0);
 	offset = ctx->live_intervals[ctx->vregs[ref]]->stack_spill_pos;
 	IR_ASSERT(offset != -1);
+	if (ctx->live_intervals[ctx->vregs[ref]]->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL) {
+		IR_ASSERT(ctx->spill_base != IR_REG_NONE);
+		*reg = ctx->spill_base;
+		return offset;
+	}
 	*reg = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
 	return IR_SPILL_POS_TO_OFFSET(offset);
 }
@@ -4839,7 +4844,7 @@ static void ir_calc_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
 	for (i = 1, p = ctx->live_intervals + i; i <= ctx->vregs_count; i++, p++) {
 		ival = *p;
 		if (ival) {
-			if (ival->stack_spill_pos != -1) {
+			if (ival->stack_spill_pos != -1 && !(ival->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL)) {
 				if (ival->stack_spill_pos + ir_type_size[ival->type] > data->ra_data.stack_frame_size) {
 					data->ra_data.stack_frame_size = ival->stack_spill_pos + ir_type_size[ival->type];
 				}

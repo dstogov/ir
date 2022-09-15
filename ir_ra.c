@@ -2103,6 +2103,8 @@ static bool ir_ival_spill_for_fuse_load(ir_ctx *ctx, ir_live_interval *ival, ir_
 
 		return 1;
 	} else if (ival->flags & IR_LIVE_INTERVAL_MEM_LOAD) {
+		ir_live_interval *var_ival;
+
 		insn = &ctx->ir_base[IR_LIVE_POS_TO_REF(use_pos->pos)];
 		IR_ASSERT(insn->op == IR_VLOAD);
 		use_pos =use_pos->next;
@@ -2118,18 +2120,40 @@ static bool ir_ival_spill_for_fuse_load(ir_ctx *ctx, ir_live_interval *ival, ir_
 		}
 
 		IR_ASSERT(ctx->ir_base[insn->op2].op == IR_VAR);
-		if (ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos != -1) {
-			ival->stack_spill_pos =
-				ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos;
-		} else {
-			ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type, data);
-			ctx->live_intervals[ctx->vregs[insn->op2]]->stack_spill_pos =
-				ival->stack_spill_pos;
+		var_ival = ctx->live_intervals[ctx->vregs[insn->op2]];
+		if (var_ival->stack_spill_pos == -1) {
+			var_ival->stack_spill_pos = ir_allocate_spill_slot(ctx, var_ival->type, data);
 		}
+		ival->stack_spill_pos = var_ival->stack_spill_pos;
 
 		return 1;
 	}
 	return 0;
+}
+
+static void ir_assign_special_spill_slots(ir_ctx *ctx)
+{
+	ir_hashtab_bucket *b = ctx->binding->data;
+	uint32_t n = ctx->binding->count;
+	uint32_t v;
+	ir_live_interval *ival;
+
+	while (n > 0) {
+		if (b->val < 0) {
+			v = ctx->vregs[b->key];
+			if (v) {
+				ival = ctx->live_intervals[v];
+				if (ival
+				 && ival->stack_spill_pos == -1
+				 && (ival->next || ival->reg == IR_REG_NONE)) {
+					ival->stack_spill_pos = -b->val;
+					ival->flags |= IR_LIVE_INTERVAL_SPILL_SPECIAL;
+				}
+			}
+		}
+		b++;
+		n--;
+	}
 }
 
 static int ir_linear_scan(ir_ctx *ctx)
@@ -2313,10 +2337,34 @@ static int ir_linear_scan(ir_ctx *ctx)
 	}
 #endif
 
+	if (ctx->binding) {
+		ir_assign_special_spill_slots(ctx);
+	}
+
 	for (j = 1; j <= ctx->vregs_count; j++) {
 		ival = ctx->live_intervals[j];
 		if (ival && ival->stack_spill_pos == -1 && !(ival->flags & IR_LIVE_INTERVAL_MEM_PARAM)) {
 			if (ival->next || ival->reg == IR_REG_NONE) {
+#if 0
+				if (ctx->binding) {
+					ir_ref ref;
+
+					// TODO: avoid naive loop ???
+					for (ref = 1; ref < ctx->insns_count; ref++) {
+						if (ctx->vregs[ref] == j) {
+							ir_ref var = ir_binding_find(ctx, ref);
+							if (var < 0) {
+								ival->stack_spill_pos = -var;
+								ival->flags |= IR_LIVE_INTERVAL_SPILL_SPECIAL;
+								break;
+							}
+						}
+					}
+					if (ival->stack_spill_pos != -1) {
+						continue;
+					}
+				}
+#endif
 				ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type, &data);
 			}
 		}
