@@ -233,6 +233,7 @@ int main()
 	}
 #endif
 
+	printf("/* This file is generated from \"ir_fold.h\". Do not edit! */\n\n");
 	printf("typedef enum _ir_fold_rule_id {\n");
 	for (i = 0; i < rules; i++) {
 		printf("\tIR_RULE_%d,\n", rule[i]);

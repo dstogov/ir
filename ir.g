@@ -11,6 +11,8 @@ php llk.php ir.g
 %indent         "\t"
 
 %{
+/* This file is generated from "ir.g". Do not edit! */
+
 #include "ir.h"
 #include "ir_private.h"
 
