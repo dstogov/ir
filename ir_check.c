@@ -115,6 +115,15 @@ bool ir_check(ir_ctx *ctx)
 												/* second argument of SHIFT may be incompatible with result */
 												break;
 											}
+											if (sizeof(void*) == 8) {
+												if (insn->type == IR_ADDR && use_insn->type == IR_U64) {
+													break;
+												}
+											} else {
+												if (insn->type == IR_ADDR && use_insn->type == IR_U32) {
+													break;
+												}
+											}
 											fprintf(stderr, "ir_base[%d].ops[%d] (%d) type is incompatible with result type (%d != %d)\n",
 												i, j, use, use_insn->type, insn->type);
 											ok = 0;
