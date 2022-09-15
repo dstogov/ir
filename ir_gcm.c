@@ -465,6 +465,7 @@ restart:
 	ir_init(&new_ctx, consts_count, insns_count);
 	new_ctx.flags = ctx->flags;
 	new_ctx.spill_base = ctx->spill_base;
+	new_ctx.fixed_stack_red_zone = ctx->fixed_stack_red_zone;
 	new_ctx.fixed_stack_frame_size = ctx->fixed_stack_frame_size;
 	new_ctx.fixed_regset = ctx->fixed_regset;
 	new_ctx.fixed_save_regset = ctx->fixed_save_regset;

@@ -293,6 +293,7 @@ void ir_init(ir_ctx *ctx, ir_ref consts_limit, ir_ref insns_limit)
 	ctx->vregs = NULL;
 	ctx->vregs_count = 0;
 	ctx->spill_base = -1;
+	ctx->fixed_stack_red_zone = 0;
 	ctx->fixed_stack_frame_size = -1;
 	ctx->fixed_regset = 0;
 	ctx->fixed_save_regset = 0;

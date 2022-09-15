@@ -451,6 +451,7 @@ typedef struct _ir_ctx {
 	uint32_t          *vregs;
 	uint32_t           vregs_count;
 	int32_t            spill_base;        /* base register for special spill area (e.g. PHP VM frame pointer) */
+	int32_t            fixed_stack_red_zone;
 	int32_t            fixed_stack_frame_size;
 	uint64_t           fixed_regset;
 	uint64_t           fixed_save_regset;

@@ -4943,7 +4943,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	}
 
 	if (ctx->fixed_stack_frame_size != -1) {
-		IR_ASSERT(data.ra_data.stack_frame_size <= ctx->fixed_stack_frame_size);
+		IR_ASSERT(data.ra_data.stack_frame_size <= ctx->fixed_stack_frame_size + ctx->fixed_stack_red_zone);
 		data.ra_data.stack_frame_size = ctx->fixed_stack_frame_size;
 		data.stack_frame_alignment = 0;
 	}
