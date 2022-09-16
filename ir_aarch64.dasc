@@ -751,6 +751,35 @@ cmp_fp:
 	return 0;
 }
 
+static void ir_match_fuse_addr(ir_ctx *ctx, ir_ref addr_ref, ir_type type)
+{
+	if (!IR_IS_CONST_REF(addr_ref)) {
+		ir_insn *addr_insn = &ctx->ir_base[addr_ref];
+
+		if (addr_insn->op == IR_ADD
+		 && !IR_IS_CONST_REF(addr_insn->op1)
+		 && IR_IS_CONST_REF(addr_insn->op2)  // TODO: temporary workaround
+		 && aarch64_may_encode_addr_offset(ctx->ir_base[addr_insn->op2].val.i64, ir_type_size[type])) {
+			ir_use_list *use_list = &ctx->use_lists[addr_ref];
+			ir_ref j = use_list->count;
+
+			if (j > 1) {
+				/* check if address is used only in LOAD and STORE */
+				ir_ref *p = &ctx->use_edges[use_list->refs];
+
+				do {
+					ir_insn *insn = &ctx->ir_base[*p];
+					if (insn->op != IR_LOAD && (insn->op != IR_STORE || insn->op3 == addr_ref)) {
+						return;
+					}
+					p++;
+				} while (--j);
+			}
+			ctx->rules[addr_ref] = IR_SKIP_MEM;
+		}
+	}
+}
+
 static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 {
 	ir_insn *op2_insn;
@@ -966,19 +995,7 @@ binop_fp:
 			ctx->flags |= IR_USE_FRAME_POINTER | IR_HAS_ALLOCA;
 			return IR_ALLOCA;
 		case IR_LOAD:
-			{
-				ir_ref addr_ref = insn->op2;
-				ir_insn *addr_insn = &ctx->ir_base[addr_ref];
-
-				if (addr_insn->op == IR_RLOAD) {
-					ctx->rules[addr_ref] = IR_SKIP_REG;
-				} else if (addr_insn->op == IR_ADD &&
-						!IR_IS_CONST_REF(addr_insn->op1) &&
-						IR_IS_CONST_REF(addr_insn->op2) // TODO: temporary workaround
-						) {
-					ctx->rules[addr_ref] = IR_SKIP_MEM;
-				}
-			}
+			ir_match_fuse_addr(ctx, insn->op2, insn->type);
 			if (IR_IS_TYPE_INT(insn->type)) {
 				return IR_LOAD_INT;
 			} else {
@@ -986,19 +1003,7 @@ binop_fp:
 			}
 			break;
 		case IR_STORE:
-			{
-				ir_ref addr_ref = insn->op2;
-				ir_insn *addr_insn = &ctx->ir_base[addr_ref];
-
-				if (addr_insn->op == IR_RLOAD) {
-					ctx->rules[addr_ref] = IR_SKIP_REG;
-				} else if (addr_insn->op == IR_ADD &&
-						!IR_IS_CONST_REF(addr_insn->op1) &&
-						IR_IS_CONST_REF(addr_insn->op2) // TODO: temporary workaround
-						) {
-					ctx->rules[addr_ref] = IR_SKIP_MEM;
-				}
-			}
+			ir_match_fuse_addr(ctx, insn->op2, ctx->ir_base[insn->op3].type);
 			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op3].type)) {
 				return IR_STORE_INT;
 			} else {

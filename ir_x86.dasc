@@ -1135,24 +1135,25 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb);
 static void ir_match_fuse_addr(ir_ctx *ctx, ir_ref addr_ref, ir_block *bb)
 {
 	if (!IR_IS_CONST_REF(addr_ref)) {
-		ir_use_list *use_list = &ctx->use_lists[addr_ref];
-		ir_ref j = use_list->count;
-
-		if (j > 1) {
-			ir_ref *p = &ctx->use_edges[use_list->refs];
-
-			do {
-				ir_insn *insn = &ctx->ir_base[*p];
-				if (insn->op != IR_LOAD && (insn->op != IR_STORE || insn->op3 == addr_ref)) {
-					return;
-				}
-				p++;
-			} while (--j);
-		}
 		if (!ctx->rules[addr_ref]) {
 			ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
 		}
 		if (ctx->rules[addr_ref] == IR_LEA_OB) {
+			ir_use_list *use_list = &ctx->use_lists[addr_ref];
+			ir_ref j = use_list->count;
+
+			if (j > 1) {
+				/* check if address is used only in LOAD and STORE */
+				ir_ref *p = &ctx->use_edges[use_list->refs];
+
+				do {
+					ir_insn *insn = &ctx->ir_base[*p];
+					if (insn->op != IR_LOAD && (insn->op != IR_STORE || insn->op3 == addr_ref)) {
+						return;
+					}
+					p++;
+				} while (--j);
+			}
 			ctx->rules[addr_ref] = IR_SKIP_MEM;
 		}
 	}
