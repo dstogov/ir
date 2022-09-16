@@ -4628,12 +4628,16 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 	ir_reg op1_reg = ctx->regs[def][1];
+	int32_t offset;
 
 	IR_ASSERT(ir_type_size[dst_type] == ir_type_size[src_type]);
 	IR_ASSERT(def_reg != IR_REG_NONE);
 	if (IR_IS_TYPE_INT(src_type) && IR_IS_TYPE_INT(dst_type)) {
-		IR_ASSERT(ctx->rules[insn->op1] != IR_SKIP_MEM); // NIY
-		if (op1_reg != IR_REG_NONE) {
+		if (ctx->rules[insn->op1] == IR_SKIP_MEM) {
+			IR_ASSERT(op1_reg != IR_REG_NONE);
+			offset = ir_fuse_load(ctx, insn->op1, &op1_reg);
+			ir_emit_load_mem_int(ctx, dst_type, def_reg, op1_reg, offset);
+		} else if (op1_reg != IR_REG_NONE) {
 			if (op1_reg != def_reg) {
 				ir_emit_mov(ctx, dst_type, def_reg, op1_reg);
 			}
@@ -4641,8 +4645,11 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			ir_emit_load(ctx, dst_type, def_reg, insn->op1);
 		}
 	} else if (IR_IS_TYPE_FP(src_type) && IR_IS_TYPE_FP(dst_type)) {
-		IR_ASSERT(ctx->rules[insn->op1] != IR_SKIP_MEM); // NIY
-		if (op1_reg != IR_REG_NONE) {
+		if (ctx->rules[insn->op1] == IR_SKIP_MEM) {
+			IR_ASSERT(op1_reg != IR_REG_NONE);
+			offset = ir_fuse_load(ctx, insn->op1, &op1_reg);
+			ir_emit_load_mem_fp(ctx, dst_type, def_reg, op1_reg, offset);
+		} else if (op1_reg != IR_REG_NONE) {
 			if (op1_reg != def_reg) {
 				ir_emit_fp_mov(ctx, dst_type, def_reg, op1_reg);
 			}
