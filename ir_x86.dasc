@@ -1603,7 +1603,14 @@ binop_fp:
 
 		case IR_CALL:
 			ctx->flags |= IR_HAS_CALLS;
-			return IR_CALL;
+		case IR_TAILCALL:
+			if (ir_input_edges_count(ctx, insn) == 2 /* no arguments */
+			 && insn->op2 > bb->start
+			 && insn->op2 < ref
+			 && !ctx->rules[insn->op2]) {
+				ir_match_fuse_load(ctx, insn->op2, bb);
+			}
+			return insn->op;
 
 		case IR_VAR:
 			if (ctx->use_lists[ref].count > 0) {
@@ -6062,17 +6069,26 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
     } else {
 		ir_reg op2_reg = ctx->regs[def][2];
 
-		if (op2_reg != IR_REG_NONE) {
+		if (op2_reg != IR_REG_NONE && ctx->rules[insn->op2] != IR_SKIP_MEM) {
 			if (op2_reg & IR_REG_SPILL_LOAD) {
 				op2_reg &= ~IR_REG_SPILL_LOAD;
 				ir_emit_load(ctx, IR_ADDR, op2_reg, insn->op2);
 			}
 			|	call Ra(op2_reg)
 		} else {
-			ir_reg fp;
-			int32_t offset = ir_ref_spill_slot(ctx, insn->op2, &fp);
+			int32_t offset;
 
-			|	call aword [Ra(fp)+offset]
+			if (ctx->rules[insn->op2] == IR_SKIP_MEM) {
+				offset = ir_fuse_load(ctx, insn->op2, &op2_reg);
+			} else {
+				offset = ir_ref_spill_slot(ctx, insn->op2, &op2_reg);
+			}
+
+			if (op2_reg != IR_REG_NONE) {
+				|	call aword [Ra(op2_reg)+offset]
+			} else {
+				|	call aword [offset]
+			}
 		}
     }
 
@@ -6165,17 +6181,26 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
     } else {
 		ir_reg op2_reg = ctx->regs[def][2];
 
-		if (op2_reg != IR_REG_NONE) {
+		if (op2_reg != IR_REG_NONE && ctx->rules[insn->op2] != IR_SKIP_MEM) {
 			if (op2_reg & IR_REG_SPILL_LOAD) {
 				op2_reg &= ~IR_REG_SPILL_LOAD;
 				ir_emit_load(ctx, IR_ADDR, op2_reg, insn->op2);
 			}
 			|	jmp Ra(op2_reg)
 		} else {
-			ir_reg fp;
-			int32_t offset = ir_ref_spill_slot(ctx, insn->op2, &fp);
+			int32_t offset;
 
-			|	jmp aword [Ra(fp)+offset]
+			if (ctx->rules[insn->op2] == IR_SKIP_MEM) {
+				offset = ir_fuse_load(ctx, insn->op2, &op2_reg);
+			} else {
+				offset = ir_ref_spill_slot(ctx, insn->op2, &op2_reg);
+			}
+
+			if (op2_reg != IR_REG_NONE) {
+				|	jmp aword [Ra(op2_reg)+offset]
+			} else {
+				|	jmp aword [offset]
+			}
 		}
     }
 }
