@@ -868,7 +868,7 @@ binop_fp:
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (IR_IS_CONST_REF(insn->op1)) {
 					// const
-				} else if (IR_IS_POWER_OF_TWO(op2_insn->val.u64)) {
+				} else if (IR_IS_TYPE_UNSIGNED(insn->type) && IR_IS_POWER_OF_TWO(op2_insn->val.u64)) {
 					return IR_MOD_PWR2;
 				}
 			}
