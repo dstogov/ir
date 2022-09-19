@@ -507,7 +507,7 @@ int ir_get_temporary_regs(ir_ctx *ctx, ir_ref ref, ir_tmp_reg *tmp_regs)
 						tmp_regs[n].num = 2;
 						tmp_regs[n].type = insn->type;
 						tmp_regs[n].start = IR_LOAD_SUB_REF;
-						tmp_regs[n].end = IR_DEF_SUB_REF;
+						tmp_regs[n].end = IR_SAVE_SUB_REF;
 						n++;
 						break;
 					case IR_AND:
