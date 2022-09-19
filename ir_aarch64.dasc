@@ -2383,16 +2383,16 @@ static void ir_emit_cmp_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			|	cset Rw(def_reg), ne
 			break;
 		case IR_LT:
-			|	cset Rw(def_reg), lo
+			|	cset Rw(def_reg), mi
 			break;
 		case IR_GE:
-			|	cset Rw(def_reg), hs
+			|	cset Rw(def_reg), ge
 			break;
 		case IR_LE:
 			|	cset Rw(def_reg), ls
 			break;
 		case IR_GT:
-			|	cset Rw(def_reg), hi
+			|	cset Rw(def_reg), gt
 			break;
 		default:
 			IR_ASSERT(0 && "NIY binary op");
@@ -2467,7 +2467,6 @@ static void ir_emit_jcc(ir_ctx *ctx, uint8_t op, int b, ir_ref def, ir_insn *ins
 	int true_block, false_block, next_block;
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-	bool swap = 0;
 
 	ir_get_true_false_blocks(ctx, b, &true_block, &false_block, &next_block);
 	if (true_block == next_block) {
@@ -2475,7 +2474,6 @@ static void ir_emit_jcc(ir_ctx *ctx, uint8_t op, int b, ir_ref def, ir_insn *ins
 		op ^= 1; // reverse
 		true_block = false_block;
 		false_block = 0;
-		swap = 1;
 	} else if (false_block == next_block) {
 		false_block = 0;
 	}
@@ -2519,54 +2517,22 @@ static void ir_emit_jcc(ir_ctx *ctx, uint8_t op, int b, ir_ref def, ir_insn *ins
 	} else {
 		switch (op) {
 			case IR_EQ:
-				if (!false_block) {
-					|	bvs >1
-					|	beq =>true_block
-					|1:
-				} else {
-					|	bvs =>false_block
-					|	beq =>true_block
-				}
+				|	beq =>true_block
 				break;
 			case IR_NE:
 				|	bne =>true_block
-				|	bvs =>true_block
 				break;
 			case IR_LT:
-				if (swap) {
-					|	blo =>true_block
-				} else if (!false_block) {
-					|	bvs >1
-					|	blo =>true_block
-					|1:
-				} else {
-					|	bvs =>false_block
-					|	blo =>true_block
-				}
+				|	bmi =>true_block
 				break;
 			case IR_GE:
-				if (swap) {
-					|	bvs =>true_block
-				}
-				|	bhs =>true_block
+				|	bge =>true_block
 				break;
 			case IR_LE:
-				if (swap) {
-					|	bls =>true_block
-				} else if (!false_block) {
-					|	bvs >1
-					|	bls =>true_block
-					|1:
-				} else {
-					|	bvs =>false_block
-					|	bls =>true_block
-				}
+				|	bls =>true_block
 				break;
 			case IR_GT:
-				if (swap) {
-					|	bvs =>true_block
-				}
-				|	bhi =>true_block
+				|	bgt =>true_block
 				break;
 //			case IR_ULT: fprintf(stderr, "\tjb .LL%d\n", true_block); break;
 //			case IR_UGE: fprintf(stderr, "\tjae .LL%d\n", true_block); break;
@@ -4187,29 +4153,22 @@ static void ir_emit_guard_jcc(ir_ctx *ctx, uint8_t op, void *addr, bool int_cmp)
 	} else {
 		switch (op) {
 			case IR_EQ:
-				|	bvs >1
 				|	beq &addr
-				|1:
 				break;
 			case IR_NE:
 				|	bne &addr
-				|	bvs &addr
 				break;
 			case IR_LT:
-				|	bvs >1
-				|	blo &addr
-				|1:
+				|	bmi &addr
 				break;
 			case IR_GE:
-				|	bhs &addr
+				|	bge &addr
 				break;
 			case IR_LE:
-				|	bvs >1
 				|	bls &addr
-				|1:
 				break;
 			case IR_GT:
-				|	bhi &addr
+				|	bgt &addr
 				break;
 //			case IR_ULT: fprintf(stderr, "\tjb .LL%d\n", true_block); break;
 //			case IR_UGE: fprintf(stderr, "\tjae .LL%d\n", true_block); break;
