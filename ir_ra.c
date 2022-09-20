@@ -2133,7 +2133,7 @@ static bool ir_ival_spill_for_fuse_load(ir_ctx *ctx, ir_live_interval *ival, ir_
 	return 0;
 }
 
-static void ir_assign_special_spill_slots(ir_ctx *ctx)
+static void ir_assign_bound_spill_slots(ir_ctx *ctx)
 {
 	ir_hashtab_bucket *b = ctx->binding->data;
 	uint32_t n = ctx->binding->count;
@@ -2141,15 +2141,26 @@ static void ir_assign_special_spill_slots(ir_ctx *ctx)
 	ir_live_interval *ival;
 
 	while (n > 0) {
-		if (b->val < 0) {
-			v = ctx->vregs[b->key];
-			if (v) {
-				ival = ctx->live_intervals[v];
-				if (ival
-				 && ival->stack_spill_pos == -1
-				 && (ival->next || ival->reg == IR_REG_NONE)) {
+		v = ctx->vregs[b->key];
+		if (v) {
+			ival = ctx->live_intervals[v];
+			if (ival
+			 && ival->stack_spill_pos == -1
+			 && (ival->next || ival->reg == IR_REG_NONE)) {
+				if (b->val < 0) {
+					/* special spill slot */
 					ival->stack_spill_pos = -b->val;
 					ival->flags |= IR_LIVE_INTERVAL_SPILL_SPECIAL;
+				} else {
+					/* node is bound to VAR node */
+					ir_live_interval *var_ival;
+
+					IR_ASSERT(ctx->ir_base[b->val].op == IR_VAR);
+					var_ival = ctx->live_intervals[ctx->vregs[b->val]];
+					if (var_ival->stack_spill_pos == -1) {
+						var_ival->stack_spill_pos = ir_allocate_spill_slot(ctx, var_ival->type, ctx->data);
+					}
+					ival->stack_spill_pos = var_ival->stack_spill_pos;
 				}
 			}
 		}
@@ -2340,7 +2351,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 #endif
 
 	if (ctx->binding) {
-		ir_assign_special_spill_slots(ctx);
+		ir_assign_bound_spill_slots(ctx);
 	}
 
 	for (j = 1; j <= ctx->vregs_count; j++) {

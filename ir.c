@@ -906,6 +906,8 @@ void ir_bind(ir_ctx *ctx, ir_ref var, ir_ref def)
 		ctx->binding = ir_mem_malloc(sizeof(ir_hashtab));;
 		ir_hashtab_init(ctx->binding, 16);
 	}
+	/* Node may be bound some VAR node or to some special spill slot (using negative "var") */
+	IR_ASSERT(var < 0 || (var < ctx->insns_count && ctx->ir_base[var].op == IR_VAR));
 	ir_hashtab_add(ctx->binding, def, var);
 }
 
