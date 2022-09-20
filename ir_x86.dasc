@@ -6513,6 +6513,41 @@ static void ir_emit_guard_cmp_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 	ir_emit_guard_jcc(ctx, op, addr, 1);
 }
 
+static void ir_emit_guard_overflow(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_type type;
+	ir_insn *addr_insn;
+	void *addr;
+
+	IR_ASSERT(IR_IS_CONST_REF(insn->op3));
+	addr_insn = &ctx->ir_base[insn->op3];
+	IR_ASSERT(addr_insn->type == IR_ADDR);
+	if (addr_insn->op == IR_FUNC) {
+		addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
+	} else {
+		addr = (void*)addr_insn->val.addr;
+	}
+
+	type = ctx->ir_base[ctx->ir_base[insn->op2].op1].type;
+
+	IR_ASSERT(IR_IS_TYPE_INT(type));
+	if (IR_IS_TYPE_SIGNED(type)) {
+		if (insn->op == IR_GUARD) {
+			|	jno &addr
+		} else {
+			|	jo &addr
+		}
+	} else {
+		if (insn->op == IR_GUARD) {
+			|	jnc &addr
+		} else {
+			|	jc &addr
+		}
+	}
+}
+
 static void ir_emit_lea(ir_ctx *ctx, ir_ref def, ir_type type, ir_reg base_reg, ir_reg index_reg, uint8_t scale, int32_t offset)
 {
 	ir_backend_data *data = ctx->data;
@@ -7944,6 +7979,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_GUARD:
 				case IR_GUARD_NOT:
 					ir_emit_guard(ctx, i, insn);
+					break;
+				case IR_GUARD_OVERFLOW:
+					ir_emit_guard_overflow(ctx, i, insn);
 					break;
 				case IR_TLS:
 					ir_emit_tls(ctx, i, insn);
