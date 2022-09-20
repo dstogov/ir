@@ -576,7 +576,7 @@ restart:
 				new_insn->op3 = ref;
 				if (n > 3) {
 					ir_ref *ops = new_insn->ops;
-					for (k = 3, p = insn->ops + 3; k <= n; k++, p++) {
+					for (k = 4, p = insn->ops + 4; k <= n; k++, p++) {
 						ref = *p;
 						ref = _xlat[ref];
 						if (ref > 0) {
