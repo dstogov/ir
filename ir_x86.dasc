@@ -1041,6 +1041,7 @@ cmp_fp:
 			}
 			break;
 		case IR_LOAD_FP:
+		case IR_MEM_BINOP_INT:
 			insn = &ctx->ir_base[ref];
 			n = 0;
 			if (IR_IS_CONST_REF(insn->op2)) {
@@ -2659,12 +2660,16 @@ static void ir_emit_mem_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	} else if (insn->op == IR_STORE) {
 		reg = ctx->regs[def][2];
 		IR_ASSERT(reg != IR_REG_NONE);
-		if (reg & IR_REG_SPILL_LOAD) {
-			reg &= ~IR_REG_SPILL_LOAD;
+		if (IR_IS_CONST_REF(insn->op2)) {
 			ir_emit_load(ctx, IR_ADDR, reg, insn->op2);
-		}
-		if (ctx->rules[insn->op2] == IR_SKIP_MEM) {
-			offset = ir_fuse_addr(ctx, insn->op2, &reg);
+		} else {
+			if (reg & IR_REG_SPILL_LOAD) {
+				reg &= ~IR_REG_SPILL_LOAD;
+				ir_emit_load(ctx, IR_ADDR, reg, insn->op2);
+			}
+			if (ctx->rules[insn->op2] == IR_SKIP_MEM) {
+				offset = ir_fuse_addr(ctx, insn->op2, &reg);
+			}
 		}
 	} else {
 		IR_ASSERT(0);
