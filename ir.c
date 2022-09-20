@@ -920,7 +920,7 @@ void ir_build_def_use_lists(ir_ctx *ctx)
 
 	for (i = IR_UNUSED + 1, insn = ctx->ir_base + i; i < ctx->insns_count;) {
 		n = ir_input_edges_count(ctx, insn);
-		for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
+		for (j = n, p = insn->ops + 1; j > 0; j--, p++) {
 			def = *p;
 			if (def > 0) {
 				lists[def].refs = -1;
@@ -937,7 +937,7 @@ void ir_build_def_use_lists(ir_ctx *ctx)
 	edges_count = 0;
 	for (i = IR_UNUSED + 1, insn = ctx->ir_base + i; i < ctx->insns_count;) {
 		n = ir_input_edges_count(ctx, insn);
-		for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
+		for (j = n, p = insn->ops + 1; j > 0; j--, p++) {
 			def = *p;
 			if (def > 0) {
 				ir_use_list *use_list = &lists[def];
