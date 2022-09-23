@@ -5487,6 +5487,98 @@ static void ir_emit_alloca(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
+static void ir_emit_saveregs(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
+
+	IR_ASSERT(def_reg != IR_REG_NONE);
+
+	|.if X64
+
+	|	sub rsp, 16*8+16*8 /* CPU regs + SSE regs */
+	|	mov aword [rsp+0*8], rax
+	|	mov aword [rsp+1*8], rcx
+	|	mov aword [rsp+2*8], rdx
+	|	mov aword [rsp+3*8], rbx
+	|	mov aword [rsp+5*8], rbp
+	|	mov aword [rsp+6*8], rsi
+	|	mov aword [rsp+7*8], rdi
+	|	mov aword [rsp+8*8], r8
+	|	mov aword [rsp+9*8], r9
+	|	mov aword [rsp+10*8], r10
+	|	mov aword [rsp+11*8], r11
+	|	mov aword [rsp+12*8], r12
+	|	mov aword [rsp+13*8], r13
+	|	mov aword [rsp+14*8], r14
+	|	mov aword [rsp+15*8], r15
+	|	movsd qword [rsp+16*8+0*8], xmm0
+	|	movsd qword [rsp+16*8+1*8], xmm1
+	|	movsd qword [rsp+16*8+2*8], xmm2
+	|	movsd qword [rsp+16*8+3*8], xmm3
+	|	movsd qword [rsp+16*8+4*8], xmm4
+	|	movsd qword [rsp+16*8+5*8], xmm5
+	|	movsd qword [rsp+16*8+6*8], xmm6
+	|	movsd qword [rsp+16*8+7*8], xmm7
+	|	movsd qword [rsp+16*8+8*8], xmm8
+	|	movsd qword [rsp+16*8+9*8], xmm9
+	|	movsd qword [rsp+16*8+10*8], xmm10
+	|	movsd qword [rsp+16*8+11*8], xmm11
+	|	movsd qword [rsp+16*8+12*8], xmm12
+	|	movsd qword [rsp+16*8+13*8], xmm13
+	|	movsd qword [rsp+16*8+14*8], xmm14
+	|	movsd qword [rsp+16*8+15*8], xmm15
+
+	|	lea Ra(def_reg), [rsp+16*8+16*8]
+	|	mov aword [rsp+4*8], Ra(def_reg)
+
+	|.else
+
+	|	sub rsp, 8*4+8*8 /* CPU regs + SSE regs */
+	|	mov aword [esp+0*4], eax
+	|	mov aword [esp+1*4], ecx
+	|	mov aword [esp+2*4], edx
+	|	mov aword [esp+3*4], ebx
+	|	mov aword [esp+5*4], ebp
+	|	mov aword [esp+6*4], esi
+	|	mov aword [esp+7*4], edi
+	|	movsd qword [esp+8*4+0*8], xmm0
+	|	movsd qword [esp+8*4+1*8], xmm1
+	|	movsd qword [esp+8*4+2*8], xmm2
+	|	movsd qword [esp+8*4+3*8], xmm3
+	|	movsd qword [esp+8*4+4*8], xmm4
+	|	movsd qword [esp+8*4+5*8], xmm5
+	|	movsd qword [esp+8*4+6*8], xmm6
+	|	movsd qword [esp+8*4+7*8], xmm7
+
+	|	lea Ra(def_reg), [esp+8*4+8*8]
+	|	mov aword [esp+4*8], Ra(def_reg)
+
+	|.endif
+
+	if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
+		ir_emit_store(ctx, insn->type, def, def_reg);
+	}
+}
+
+static void ir_emit_exitgroup(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	uint32_t i;
+	uint32_t first_exit_point = insn->op2;
+	uint32_t exit_points_per_group = insn->op3;
+
+	for (i = 0; i < exit_points_per_group - 1; i++) {
+		|	push byte i
+		|	.byte 0xeb, (4*(exit_points_per_group-i)-6) // jmp >1
+	}
+	|	push byte i
+	|// 1:
+	|	add aword [r4], first_exit_point
+}
+
 static void ir_emit_switch(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
@@ -7985,6 +8077,12 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					break;
 				case IR_ALLOCA:
 					ir_emit_alloca(ctx, i, insn);
+					break;
+				case IR_SAVEREGS:
+					ir_emit_saveregs(ctx, i, insn);
+					break;
+				case IR_EXITGROUP:
+					ir_emit_exitgroup(ctx, i, insn);
 					break;
 				case IR_GUARD:
 				case IR_GUARD_NOT:

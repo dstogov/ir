@@ -261,6 +261,11 @@ typedef enum _ir_type {
 	/* guards (floating or not) ???                                     */ \
 	_(GUARD,        c3,   src, def, def) /* IF without second successor */ \
 	_(GUARD_NOT  ,  c3,   src, def, def) /* IF without second successor */ \
+	\
+	/* tracing JIT support                                              */ \
+	_(SAVEREGS,     a1,   src, ___, ___) /* save all CPU registers      */ \
+	_(EXITGROUP,    c1X2, src, num, num) /* code to push exit number    */ \
+
 
 #define IR_OP_ENUM(name, flags, op1, op2, op3) IR_ ## name,
 
