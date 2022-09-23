@@ -1638,11 +1638,13 @@ store_int:
 								ctx->rules[insn->op3] = IR_SKIP_MEM_BINOP_INT;
 								ctx->rules[op_insn->op1] = IR_SKIP;
 								ir_ref addr_ref = insn->op2;
-								if (!ctx->rules[addr_ref]) {
-									ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
-								}
-								if (ctx->rules[addr_ref] == IR_LEA_OB) {
-									ctx->rules[addr_ref] = IR_SKIP_MEM;
+								if (!IR_IS_CONST_REF(addr_ref)) {
+									if (!ctx->rules[addr_ref]) {
+										ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
+									}
+									if (ctx->rules[addr_ref] == IR_LEA_OB) {
+										ctx->rules[addr_ref] = IR_SKIP_MEM;
+									}
 								}
 								return IR_MEM_BINOP_INT;
 							}
@@ -1658,11 +1660,13 @@ store_int:
 								ctx->rules[insn->op3] = IR_SKIP_MEM_BINOP_INT;
 								ctx->rules[op_insn->op1] = IR_SKIP;
 								ir_ref addr_ref = insn->op2;
-								if (!ctx->rules[addr_ref]) {
-									ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
-								}
-								if (ctx->rules[addr_ref] == IR_LEA_OB) {
-									ctx->rules[addr_ref] = IR_SKIP_MEM;
+								if (!IR_IS_CONST_REF(addr_ref)) {
+									if (!ctx->rules[addr_ref]) {
+										ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
+									}
+									if (ctx->rules[addr_ref] == IR_LEA_OB) {
+										ctx->rules[addr_ref] = IR_SKIP_MEM;
+									}
 								}
 								return IR_MEM_BINOP_INT;
 							}
@@ -1918,11 +1922,13 @@ store_int:
 									ctx->rules[insn->op2] = IR_SKIP_MEM_BINOP_INT;
 									ctx->rules[op_insn->op1] = IR_SKIP;
 									ir_ref addr_ref = store_insn->op2;
-									if (!ctx->rules[addr_ref]) {
-										ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
-									}
-									if (ctx->rules[addr_ref] == IR_LEA_OB) {
-										ctx->rules[addr_ref] = IR_SKIP_MEM;
+									if (!IR_IS_CONST_REF(addr_ref)) {
+										if (!ctx->rules[addr_ref]) {
+											ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
+										}
+										if (ctx->rules[addr_ref] == IR_LEA_OB) {
+											ctx->rules[addr_ref] = IR_SKIP_MEM;
+										}
 									}
 									ctx->rules[insn->op1] = IR_MEM_BINOP_INT;
 									return IR_JCC_INT;
@@ -1939,11 +1945,13 @@ store_int:
 									ctx->rules[insn->op2] = IR_SKIP_MEM_BINOP_INT;
 									ctx->rules[op_insn->op1] = IR_SKIP;
 									ir_ref addr_ref = store_insn->op2;
-									if (!ctx->rules[addr_ref]) {
-										ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
-									}
-									if (ctx->rules[addr_ref] == IR_LEA_OB) {
-										ctx->rules[addr_ref] = IR_SKIP_MEM;
+									if (!IR_IS_CONST_REF(addr_ref)) {
+										if (!ctx->rules[addr_ref]) {
+											ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
+										}
+										if (ctx->rules[addr_ref] == IR_LEA_OB) {
+											ctx->rules[addr_ref] = IR_SKIP_MEM;
+										}
 									}
 									ctx->rules[insn->op1] = IR_MEM_BINOP_INT;
 									return IR_JCC_INT;
