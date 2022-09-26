@@ -6353,7 +6353,7 @@ static void ir_emit_ijmp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			} else {
 				|	mov64 rax, ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
 			}
-			|	jmp aword [rax]
+			|	jmp rax
 |.endif
 		}
 	} else if (ctx->rules[insn->op2] == IR_SKIP_MEM) {
