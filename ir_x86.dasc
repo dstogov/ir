@@ -3425,7 +3425,7 @@ static void ir_emit_op_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			if (!data->double_neg_const) {
 				data->double_neg_const = 1;
 				ir_rodata(ctx);
-				|.align 8
+				|.align 16
 				|->double_neg_const:
 				|.dword 0, 0x80000000, 0, 0
 				|.code
@@ -3440,7 +3440,7 @@ static void ir_emit_op_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			if (!data->float_neg_const) {
 				data->float_neg_const = 1;
 				ir_rodata(ctx);
-				|.align 8
+				|.align 16
 				|->float_neg_const:
 				|.dword 0x80000000, 0, 0, 0
 				|.code
@@ -3456,7 +3456,7 @@ static void ir_emit_op_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			if (!data->double_abs_const) {
 				data->double_abs_const = 1;
 				ir_rodata(ctx);
-				|.align 8
+				|.align 16
 				|->double_abs_const:
 				|.dword 0xffffffff, 0x7fffffff, 0, 0
 				|.code
@@ -3471,7 +3471,7 @@ static void ir_emit_op_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			if (!data->float_abs_const) {
 				data->float_abs_const = 1;
 				ir_rodata(ctx);
-				|.align 8
+				|.align 16
 				|->float_abs_const:
 				|.dword 0x7fffffff, 0, 0, 0
 				|.code
@@ -4820,6 +4820,7 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				if (ctx->flags & IR_AVX) {
 					|	vcvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
 				} else {
+					|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	cvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
 				}
 			} else {
@@ -5543,7 +5544,7 @@ static void ir_emit_saveregs(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	|.else
 
-	|	sub rsp, 8*4+8*8 /* CPU regs + SSE regs */
+	|	sub esp, 8*4+8*8 /* CPU regs + SSE regs */
 	|	mov aword [esp+0*4], eax
 	|	mov aword [esp+1*4], ecx
 	|	mov aword [esp+2*4], edx
@@ -5561,7 +5562,7 @@ static void ir_emit_saveregs(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	|	movsd qword [esp+8*4+7*8], xmm7
 
 	|	lea Ra(def_reg), [esp+8*4+8*8]
-	|	mov aword [esp+4*8], Ra(def_reg)
+	|	mov aword [esp+4*4], Ra(def_reg)
 
 	|.endif
 
