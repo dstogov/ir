@@ -4265,6 +4265,9 @@ static void ir_emit_guard_cmp_fp(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 	} else {
 		addr = (void*)addr_insn->val.addr;
 	}
+	if (insn->op == IR_GUARD) {
+		op ^= 1; // reverse
+	}
 	ir_emit_guard_jcc(ctx, op, addr, 0);
 }
 
