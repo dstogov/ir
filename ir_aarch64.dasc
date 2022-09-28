@@ -4313,6 +4313,11 @@ static void ir_emit_tls(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	uint32_t code;
 	ir_reg reg = IR_REG_NUM(ctx->regs[def][0]);
 
+	if (ctx->use_lists[def].count == 1) {
+		/* dead load */
+		return;
+	}
+
 ||#ifdef __APPLE__
 ||	code = 0xd53bd060 | reg; // TODO: hard-coded: mrs reg, tpidrro_el0
 |	.long code

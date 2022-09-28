@@ -6842,6 +6842,11 @@ static void ir_emit_tls(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg reg = IR_REG_NUM(ctx->regs[def][0]);
 
+	if (ctx->use_lists[def].count == 1) {
+		/* dead load */
+		return;
+	}
+
 |.if X64
 |	fs
 ||	if (!insn->op3) {
