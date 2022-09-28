@@ -498,7 +498,7 @@ ir_gdbjit_descriptor __jit_debug_descriptor = {
 	1, IR_GDBJIT_NOACTION, NULL, NULL
 };
 
-#if 1
+#ifdef IR_EXTERNAL_GDB_ENTRY
 __jit_debug_register_code(void);
 #else
 IR_NEVER_INLINE void __jit_debug_register_code(void)

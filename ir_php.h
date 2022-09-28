@@ -16,4 +16,6 @@
 # define ir_mem_free    efree
 #endif
 
+#define IR_EXTERNAL_GDB_ENTRY
+
 #endif /* IR_PHP_H */
