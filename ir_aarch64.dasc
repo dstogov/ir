@@ -431,6 +431,9 @@ uint8_t ir_get_def_flags(ir_ctx *ctx, ir_ref ref, ir_reg *reg)
 			insn = &ctx->ir_base[ref];
 			*reg = (IR_IS_TYPE_INT(insn->type)) ? IR_REG_INT_RET1 : IR_REG_FP_RET1;
 			break;
+		case IR_EXITCALL:
+			*reg = IR_REG_INT_RET1;
+			break;
 	}
 
 	return IR_USE_MUST_BE_IN_REG;
@@ -4029,7 +4032,12 @@ static void ir_emit_ijmp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		} else {
 			addr = (void*)addr_insn->val.addr;
 		}
-		|	b &addr
+		if (aarch64_may_use_b(ctx, addr)) {
+			|	b &addr
+		} else {
+			ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, (intptr_t)addr);
+			|	br Rx(IR_REG_INT_TMP)
+		}
 	} else {
 		IR_ASSERT(0);
 	}
@@ -4055,7 +4063,12 @@ static void ir_emit_guard(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				} else {
 					addr = (void*)addr_insn->val.addr;
 				}
-				|	b &addr
+				if (aarch64_may_use_b(ctx, addr)) {
+					|	b &addr
+				} else {
+					ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, (intptr_t)addr);
+					|	br Rx(IR_REG_INT_TMP)
+				}
 			} else {
 				IR_ASSERT(0);
 			}
@@ -4332,6 +4345,105 @@ static void ir_emit_tls(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 ||#endif
 	if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
 		ir_emit_store(ctx, IR_ADDR, def, reg);
+	}
+}
+
+static void ir_emit_exitcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
+
+	IR_ASSERT(def_reg != IR_REG_NONE);
+
+	|	stp d30, d31, [sp, #-16]!
+	|	stp d28, d29, [sp, #-16]!
+	|	stp d26, d27, [sp, #-16]!
+	|	stp d24, d25, [sp, #-16]!
+	|	stp d22, d23, [sp, #-16]!
+	|	stp d20, d21, [sp, #-16]!
+	|	stp d18, d19, [sp, #-16]!
+	|	stp d16, d17, [sp, #-16]!
+	|	stp d14, d15, [sp, #-16]!
+	|	stp d12, d13, [sp, #-16]!
+	|	stp d10, d11, [sp, #-16]!
+	|	stp d8, d9, [sp, #-16]!
+	|	stp d6, d7, [sp, #-16]!
+	|	stp d4, d5, [sp, #-16]!
+	|	stp d2, d3, [sp, #-16]!
+	|	stp d0, d1, [sp, #-16]!
+
+	|	str x30, [sp, #-16]!
+	|	stp x28, x29, [sp, #-16]!
+	|	stp x26, x27, [sp, #-16]!
+	|	stp x24, x25, [sp, #-16]!
+	|	stp x22, x23, [sp, #-16]!
+	|	stp x20, x21, [sp, #-16]!
+	|	stp x18, x19, [sp, #-16]!
+	|	stp x16, x17, [sp, #-16]!
+	|	stp x14, x15, [sp, #-16]!
+	|	stp x12, x13, [sp, #-16]!
+	|	stp x10, x11, [sp, #-16]!
+	|	stp x8, x9, [sp, #-16]!
+	|	stp x6, x7, [sp, #-16]!
+	|	stp x4, x5, [sp, #-16]!
+	|	stp x2, x3, [sp, #-16]!
+	|	stp x0, x1, [sp, #-16]!
+
+	|	add Rx(IR_REG_INT_ARG2), sp, #(32*8+32*8)
+	|	str Rx(IR_REG_INT_ARG2), [sp, #(31*8)]
+	|	mov Rx(IR_REG_INT_ARG1), Rx(IR_REG_INT_TMP)
+
+	if (IR_IS_CONST_REF(insn->op2)) {
+		ir_insn *addr_insn = &ctx->ir_base[insn->op2];
+		void *addr;
+
+		IR_ASSERT(addr_insn->type == IR_ADDR);
+		if (addr_insn->op == IR_FUNC) {
+			addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
+		} else {
+			addr = (void*)addr_insn->val.addr;
+		}
+
+		if (aarch64_may_use_b(ctx, addr)) {
+			|	b &addr
+		} else {
+			ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, (intptr_t)addr);
+			|	br Rx(IR_REG_INT_TMP)
+		}
+	} else {
+		IR_ASSERT(0);
+	}
+
+	|	add sp, sp, #(32*8+32*8)
+
+	if (def_reg != IR_REG_INT_RET1) {
+		ir_emit_mov(ctx, insn->type, def_reg, IR_REG_INT_RET1);
+	}
+	if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
+		ir_emit_store(ctx, insn->type, def, def_reg);
+	}
+}
+
+static void ir_emit_exitgroup(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	uint32_t i;
+	uint32_t first_exit_point = insn->op2;
+	uint32_t exit_points_per_group = insn->op3;
+
+	|	bl >2
+	|1:
+	for (i = 1; i < exit_points_per_group; i++) {
+		|	bl >2
+	}
+	|2:
+	|	adr Rx(IR_REG_INT_TMP), <1
+	|	sub Rx(IR_REG_INT_TMP), lr, Rx(IR_REG_INT_TMP)
+	|	lsr Rx(IR_REG_INT_TMP), Rx(IR_REG_INT_TMP), #2
+	if (first_exit_point) {
+		|	add Rx(IR_REG_INT_TMP), Rx(IR_REG_INT_TMP), #first_exit_point
 	}
 }
 
@@ -5193,6 +5305,12 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					break;
 				case IR_ALLOCA:
 					ir_emit_alloca(ctx, i, insn);
+					break;
+				case IR_EXITCALL:
+					ir_emit_exitcall(ctx, i, insn);
+					break;
+				case IR_EXITGROUP:
+					ir_emit_exitgroup(ctx, i, insn);
 					break;
 				case IR_GUARD:
 				case IR_GUARD_NOT:

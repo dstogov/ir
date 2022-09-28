@@ -262,8 +262,8 @@ typedef enum _ir_type {
 	_(GUARD,        c3,   src, def, def) /* IF without second successor */ \
 	_(GUARD_NOT  ,  c3,   src, def, def) /* IF without second successor */ \
 	\
-	/* tracing JIT support                                              */ \
-	_(SAVEREGS,     a1,   src, ___, ___) /* save all CPU registers      */ \
+	/* tracing JIT helpers                                              */ \
+	_(EXITCALL,     x2,   src, def, ___) /* save all CPU registers      */ \
 	_(EXITGROUP,    c1X2, src, num, num) /* code to push exit number    */ \
 
 

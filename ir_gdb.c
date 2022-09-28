@@ -498,10 +498,14 @@ ir_gdbjit_descriptor __jit_debug_descriptor = {
 	1, IR_GDBJIT_NOACTION, NULL, NULL
 };
 
+#if 1
+__jit_debug_register_code(void);
+#else
 IR_NEVER_INLINE void __jit_debug_register_code(void)
 {
 	__asm__ __volatile__("");
 }
+#endif
 
 static bool ir_gdb_register_code(const void *object, size_t size)
 {
