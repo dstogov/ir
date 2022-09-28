@@ -4072,8 +4072,8 @@ static void ir_emit_guard(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			} else {
 				IR_ASSERT(0);
 			}
-			return;
 		}
+		return;
 	}
 
 	IR_ASSERT(op2_reg != IR_REG_NONE);
@@ -4406,10 +4406,10 @@ static void ir_emit_exitcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 
 		if (aarch64_may_use_b(ctx, addr)) {
-			|	b &addr
+			|	bl &addr
 		} else {
 			ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, (intptr_t)addr);
-			|	br Rx(IR_REG_INT_TMP)
+			|	blr Rx(IR_REG_INT_TMP)
 		}
 	} else {
 		IR_ASSERT(0);
