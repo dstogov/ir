@@ -24,6 +24,7 @@
 	-  spill slot coalescing
 	-  optimisation of spill code placement (BB local or through resolution)
 	-  separate INT and FP allocation phases (for performance)
+	-  respect multi-ENTRY code (Zend/tests/bug72598.phpt)
 
 ?  code generation
 	-  COND
