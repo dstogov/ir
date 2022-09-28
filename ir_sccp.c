@@ -191,7 +191,7 @@ static void ir_sccp_remove_from_use_list(ir_ctx *ctx, ir_ref from, ir_ref ref)
 }
 
 #if IR_COMBO_COPY_PROPAGATION
-static void ir_sccp_add_to_use_list(ir_ctx *ctx, ir_ref to, ir_ref ref)
+static int ir_sccp_add_to_use_list(ir_ctx *ctx, ir_ref to, ir_ref ref)
 {
 	ir_use_list *use_list = &ctx->use_lists[to];
 	ir_ref n = use_list->refs + use_list->count;
@@ -199,6 +199,7 @@ static void ir_sccp_add_to_use_list(ir_ctx *ctx, ir_ref to, ir_ref ref)
 	if (n < ctx->use_edges_count && ctx->use_edges[n] == IR_UNUSED) {
 		ctx->use_edges[n] = ref;
 		use_list->count++;
+		return 0;
 	} else {
 		/* Reallocate the whole edges buffer (this is inefficient) */
 		ctx->use_edges = ir_mem_realloc(ctx->use_edges, (ctx->use_edges_count + use_list->count + 1) * sizeof(ir_ref));
@@ -207,6 +208,7 @@ static void ir_sccp_add_to_use_list(ir_ctx *ctx, ir_ref to, ir_ref ref)
 		ctx->use_edges[use_list->refs + use_list->count] = ref;
 		use_list->count++;
 		ctx->use_edges_count += use_list->count;
+		return 1;
 	}
 }
 #endif
@@ -256,7 +258,12 @@ static void ir_sccp_replace_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_r
 			}
 #if IR_COMBO_COPY_PROPAGATION
 			if (new_ref > 0 && IR_IS_BOTTOM(use)) {
-				ir_sccp_add_to_use_list(ctx, new_ref, use);
+				if (ir_sccp_add_to_use_list(ctx, new_ref, use)) {
+					/* restore after reallocation */
+					use_list = &ctx->use_lists[ref];
+					n = use_list->count;
+					p = &ctx->use_edges[use_list->refs + j];
+				}
 			}
 #endif
 			// TODO: Folding ???
