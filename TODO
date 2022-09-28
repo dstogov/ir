@@ -27,6 +27,7 @@
 	-  optimisation of spill code placement (BB local or through resolution)
 	-  separate INT and FP allocation phases (for performance)
 	-  respect multi-ENTRY code (Zend/tests/bug72598.phpt)
+	-  proper live ranges for complex codegen rules (Zend/tests/match/042.phpt [jit=1254/ZTS/32])
 
 ?  code generation
 	-  COND
