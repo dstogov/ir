@@ -469,8 +469,13 @@ const char *ir_reg_name(int8_t reg, ir_type type)
 #if !defined(_WIN64) && !defined(__x86_64__)
 static bool ir_is_fastcall(ir_ctx *ctx, ir_insn *insn)
 {
-	if (sizeof(void*) == 4 && IR_IS_CONST_REF(insn->op2) && (ctx->ir_base[insn->op2].const_flags & IR_CONST_FASTCALL_FUNC)) {
-		return 1;
+	if (sizeof(void*) == 4) {
+		if (IR_IS_CONST_REF(insn->op2)) {
+			return (ctx->ir_base[insn->op2].const_flags & IR_CONST_FASTCALL_FUNC) != 0;
+		} else if (ctx->ir_base[insn->op2].op == IR_BITCAST) {
+			return (ctx->ir_base[insn->op2].op2 & IR_CONST_FASTCALL_FUNC) != 0;
+		}
+		return 0;
 	}
 	return 0;
 }
