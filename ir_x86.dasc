@@ -6303,6 +6303,7 @@ static void ir_emit_guard(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg op2_reg = ctx->regs[def][2];
 	ir_type type = ctx->ir_base[insn->op2].type;
 
+	IR_ASSERT(IR_IS_TYPE_INT(type));
 	if (IR_IS_CONST_REF(insn->op2)) {
 		if ((insn->op == IR_GUARD && insn->op2 == IR_FALSE) ||
 				(insn->op == IR_GUARD_NOT && insn->op2 == IR_TRUE)) {
