@@ -4828,7 +4828,6 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				if (ctx->flags & IR_AVX) {
 					|	vcvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
 				} else {
-					|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	cvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
 				}
 			} else {
