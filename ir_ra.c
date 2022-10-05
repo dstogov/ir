@@ -454,7 +454,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 								}
 							} else if (def_flags & IR_DEF_REUSES_OP1_REG) {
 								/* We add two uses to emulate move from op1 to res */
-								ir_add_use(ctx, ctx->vregs[i], 0, IR_DEF_LIVE_POS_FROM_REF(i), reg, def_flags, hint_ref);
+								ir_add_use(ctx, ctx->vregs[i], 0, IR_DEF_LIVE_POS_FROM_REF(i), reg, def_flags, 0);
 								def_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
 								hint_ref = IR_IS_CONST_REF(insn->op1) ? 0 : insn->op1;
 							} else if (def_flags & IR_DEF_CONFLICTS_WITH_INPUT_REGS) {
@@ -520,9 +520,11 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						}
 						if (input > 0 && ctx->vregs[input]) {
 							ir_live_pos use_pos;
+							ir_ref hint_ref = 0;
 
 							if ((def_flags & IR_DEF_REUSES_OP1_REG) && j == 1) {
 								use_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
+								hint_ref = i;
 								if (reg != IR_REG_NONE) {
 									ir_add_fixed_live_range(ctx, &unused, reg,
 										use_pos, IR_USE_LIVE_POS_FROM_REF(i));
@@ -542,7 +544,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							/* intervals[opd].addRange(b.from, op.id) */
 							ir_add_live_range(ctx, &unused, ctx->vregs[input], ctx->ir_base[input].type,
 								IR_START_LIVE_POS_FROM_REF(bb->start), use_pos);
-							ir_add_use(ctx, ctx->vregs[input], j, use_pos, reg, use_flags, 0);
+							ir_add_use(ctx, ctx->vregs[input], j, use_pos, reg, use_flags, hint_ref);
 							/* live.add(opd) */
 							ir_bitset_incl(live, ctx->vregs[input]);
 						} else {
