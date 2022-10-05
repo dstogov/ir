@@ -720,7 +720,15 @@ static void ir_vregs_join(ir_ctx *ctx, ir_live_range **unused, uint32_t r1, uint
 		*unused = live_range;
 		ir_add_live_range(ctx, unused, r1, ival->type, live_range->start, live_range->end);
 		live_range = next;
-	} while (live_range);
+	}
+
+	use_pos = ctx->live_intervals[r1]->use_pos;
+	while (use_pos) {
+		if (!(use_pos->flags & IR_PHI_USE) && ctx->vregs[use_pos->hint_ref] == r2) {
+			use_pos->hint_ref = 0;
+		}
+		use_pos = use_pos->next;
+	}
 
 	use_pos = ival->use_pos;
 	while (use_pos) {
