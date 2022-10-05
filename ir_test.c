@@ -169,7 +169,7 @@ int main(int argc, char **argv)
 	ctx.flags |= IR_FUNCTION;
 	ctx.flags |= mflags;
 	if (opt_level > 0) {
-		ctx.flags |= IR_OPT_FOLDING | IR_OPT_CODEGEN;
+		ctx.flags |= IR_OPT_FOLDING | IR_OPT_CFG | IR_OPT_CODEGEN;
 	}
 	ctx.fixed_regset = ~debug_regset;
 	gen_mandelbrot(&ctx);

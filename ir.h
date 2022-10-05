@@ -412,10 +412,11 @@ void ir_strtab_free(ir_strtab *strtab);
 #define IR_IRREDUCIBLE_CFG    (1<<8)
 
 #define IR_OPT_FOLDING        (1<<16)
-#define IR_OPT_CODEGEN        (1<<17)
-#define IR_OPT_IN_SCCP        (1<<18)
-#define IR_LINEAR             (1<<19)
-#define IR_GEN_NATIVE         (1<<20)
+#define IR_OPT_CFG            (1<<17) /* merge BBs, by remove END->BEGIN nodes during CFG construction */
+#define IR_OPT_CODEGEN        (1<<18)
+#define IR_OPT_IN_SCCP        (1<<19)
+#define IR_LINEAR             (1<<20)
+#define IR_GEN_NATIVE         (1<<21)
 #define IR_GEN_C              (1<<22)
 
 /* x86 related */

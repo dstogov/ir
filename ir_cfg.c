@@ -1,6 +1,44 @@
 #include "ir.h"
 #include "ir_private.h"
 
+static ir_ref ir_merge_blocks(ir_ctx *ctx, ir_ref end, ir_ref begin)
+{
+	ir_ref prev, next;
+	ir_use_list *use_list;
+	ir_ref j, n, *p;
+
+	IR_ASSERT(ctx->ir_base[begin].op == IR_BEGIN);
+	IR_ASSERT(ctx->ir_base[end].op == IR_END);
+	IR_ASSERT(ctx->ir_base[begin].op1 == end);
+	IR_ASSERT(ctx->use_lists[end].count == 1);
+
+	prev = ctx->ir_base[end].op1;
+
+	use_list = &ctx->use_lists[begin];
+	IR_ASSERT(use_list->count == 1);
+	next = ctx->use_edges[use_list->refs];
+
+	/* remove BEGIN and END */
+	ctx->ir_base[begin].op = IR_NOP;
+	ctx->ir_base[begin].op1 = IR_UNUSED;
+	ctx->use_lists[begin].count = 0;
+	ctx->ir_base[end].op = IR_NOP;
+	ctx->ir_base[end].op1 = IR_UNUSED;
+	ctx->use_lists[end].count = 0;
+
+	/* connect their predecessor and successor */
+	ctx->ir_base[next].op1 = prev;
+	use_list = &ctx->use_lists[prev];
+	n = use_list->count;
+	for (j = 0, p = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
+		if (*p == end) {
+			*p = next;
+		}
+	}
+
+	return next;
+}
+
 int ir_build_cfg(ir_ctx *ctx)
 {
 	ir_ref n, j, *p, ref, b;
@@ -57,6 +95,14 @@ int ir_build_cfg(ir_ctx *ctx)
 			while (1) {
 				insn = &ctx->ir_base[ref];
 				if (IR_IS_BB_START(insn->op)) {
+					if (insn->op == IR_BEGIN
+					 && (ctx->flags & IR_OPT_CFG)
+					 && ctx->ir_base[insn->op1].op == IR_END
+					 && ctx->use_lists[ref].count == 1) {
+						ref = ir_merge_blocks(ctx, insn->op1, ref);
+						ref = ctx->ir_base[ref].op1;
+						continue;
+					}
 					break;
 				}
 				ref = insn->op1; // follow connected control blocks untill BB start
@@ -106,8 +152,23 @@ int ir_build_cfg(ir_ctx *ctx)
 						break;
 					}
 				}
+next_successor:
 				IR_ASSERT(ref != IR_UNUSED);
 				if (IR_IS_BB_END(insn->op)) {
+					if (insn->op == IR_END && (ctx->flags & IR_OPT_CFG)) {
+						ir_ref next;
+
+						use_list = &ctx->use_lists[ref];
+						IR_ASSERT(use_list->count == 1);
+						next = ctx->use_edges[use_list->refs];
+
+						if (ctx->ir_base[next].op == IR_BEGIN
+						 && ctx->use_lists[next].count == 1) {
+							ref = ir_merge_blocks(ctx, ref, next);
+							insn = &ctx->ir_base[ref];
+							goto next_successor;
+						}
+					}
 					break;
 				}
 			}
