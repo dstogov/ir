@@ -457,7 +457,9 @@ int ir_sccp(ir_ctx *ctx)
 				}
 				for (j = 1; j < n; j++) {
 					if (merge_insn->ops[j] && IR_IS_REACHABLE(merge_insn->ops[j])) {
-						if (ir_sccp_join_values(ctx, _values, i, insn->ops[j + 1])) {
+						if (IR_IS_TOP(insn->ops[j + 1])) {
+							ir_bitqueue_add(&worklist, insn->ops[j +1]);
+						} else if (ir_sccp_join_values(ctx, _values, i, insn->ops[j + 1])) {
 							changed = 1;
 						}
 					}
