@@ -82,7 +82,7 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 
 					b = 0;
 					n = ir_input_edges_count(ctx, insn);
-					for (j = 4, p = insn->ops + 4; j <= n; j++, p++) {
+					for (j = 3, p = insn->ops + 4; j < n; j++, p++) {
 						if (*p == ref) {
 							b = _blocks[ctx->ir_base[insn->op1].ops[j]];
 							break;
