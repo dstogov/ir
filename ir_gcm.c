@@ -78,7 +78,17 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 				} else if (insn->op3 == ref) {
 					b = _blocks[ctx->ir_base[insn->op1].op2];
 				} else {
-					IR_ASSERT(0);
+					ir_ref j, n, *p;
+
+					b = 0;
+					n = ir_input_edges_count(ctx, insn);
+					for (j = 4, p = insn->ops + 4; j <= n; j++, p++) {
+						if (*p == ref) {
+							b = _blocks[ctx->ir_base[insn->op1].ops[j]];
+							break;
+						}
+					}
+					IR_ASSERT(b != 0);
 				}
 			}
 			lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
