@@ -5160,7 +5160,7 @@ static void ir_emit_copy_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (def_reg == op1_reg) {
 		/* same reg */
 	} else if (def_reg != IR_REG_NONE && op1_reg != IR_REG_NONE) {
-		ir_emit_mov(ctx, type, def_reg, op1_reg);
+		ir_emit_fp_mov(ctx, type, def_reg, op1_reg);
 	} else if (def_reg != IR_REG_NONE) {
 		ir_emit_load(ctx, type, def_reg, insn->op1);
 	} else if (op1_reg != IR_REG_NONE) {
