@@ -3169,6 +3169,12 @@ static void ir_emit_load_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 			IR_ASSERT(op1_reg != IR_REG_NONE);
 			if (IR_IS_CONST_REF(addr_insn->op2)) {
+				if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
+					ir_reg fp;
+					if (ir_ref_spill_slot(ctx, def, &fp) == ctx->ir_base[addr_insn->op2].val.i32 && op1_reg == fp) {
+						return;
+					}
+				}
 				ir_emit_load_mem_int(ctx, type, def_reg, op1_reg, ctx->ir_base[addr_insn->op2].val.i32);
 			} else {
 				op2_reg = ctx->regs[insn->op2][2]; // TODO: ???
@@ -3241,6 +3247,12 @@ static void ir_emit_load_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 			IR_ASSERT(op1_reg != IR_REG_NONE);
 			if (IR_IS_CONST_REF(addr_insn->op2)) {
+				if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
+					ir_reg fp;
+					if (ir_ref_spill_slot(ctx, def, &fp) == ctx->ir_base[addr_insn->op2].val.i32 && op1_reg == fp) {
+						return;
+					}
+				}
 				ir_emit_load_mem_fp(ctx, type, def_reg, op1_reg, ctx->ir_base[addr_insn->op2].val.i32);
 			} else {
 				op2_reg = ctx->regs[insn->op2][2]; // TODO: ???

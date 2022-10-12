@@ -5285,6 +5285,12 @@ static void ir_emit_load_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		offset = ir_fuse_addr(ctx, insn->op2, &op2_reg);
 	}
 
+	if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
+		ir_reg fp;
+		if (ir_ref_spill_slot(ctx, def, &fp) == offset && op2_reg == fp) {
+			return;
+		}
+	}
 	ir_emit_load_mem_int(ctx, type, def_reg, op2_reg, offset);
 	if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
 		ir_emit_store(ctx, type, def, def_reg);
@@ -5325,6 +5331,12 @@ static void ir_emit_load_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		offset = ir_fuse_addr(ctx, insn->op2, &op2_reg);
 	}
 
+	if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
+		ir_reg fp;
+		if (ir_ref_spill_slot(ctx, def, &fp) == offset && op2_reg == fp) {
+			return;
+		}
+	}
 	ir_emit_load_mem_fp(ctx, type, def_reg, op2_reg, offset);
 	if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
 		ir_emit_store(ctx, type, def, def_reg);
