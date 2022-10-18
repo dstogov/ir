@@ -1980,10 +1980,10 @@ store_int:
 				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT) {
 					ctx->rules[insn->op2] = IR_SKIP;
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
-						if (insn->op1 > bb->start
-						 && insn->op1 < ref
-						 && !ctx->rules[insn->op1]) {
-							ir_match_fuse_load(ctx, insn->op1, bb);
+						if (op2_insn->op1 > bb->start
+						 && op2_insn->op1 < ref
+						 && !ctx->rules[op2_insn->op1]) {
+							ir_match_fuse_load(ctx, op2_insn->op1, bb);
 						}
 						return IR_GUARD_CMP_INT;
 					} else {
