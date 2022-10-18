@@ -913,13 +913,14 @@ static int ir_hint_conflict(ir_ctx *ctx, ir_ref ref, int use, int def)
 static int ir_try_swap_operands(ir_ctx *ctx, ir_ref i, ir_insn *insn)
 {
 	if (insn->op1 > 0
+	 && ctx->vregs[insn->op1]
 	 && ctx->vregs[insn->op1] != ctx->vregs[i]
 	 && !ir_vregs_overlap(ctx, ctx->vregs[insn->op1], ctx->vregs[i])
 	 && !ir_hint_conflict(ctx, i, ctx->vregs[insn->op1], ctx->vregs[i])) {
 		/* pass */
 	} else if (insn->op1 > 0 && insn->op2 > 0 && insn->op1 != insn->op2
 		&& (ir_op_flags[insn->op] & IR_OP_FLAG_COMMUTATIVE)) {
-		if (ctx->vregs[insn->op2] != ctx->vregs[i]) {
+		if (ctx->vregs[insn->op2] && ctx->vregs[insn->op2] != ctx->vregs[i]) {
 			ir_live_pos pos = IR_USE_LIVE_POS_FROM_REF(i);
 			ir_live_pos load_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
 			ir_live_interval *ival = ctx->live_intervals[ctx->vregs[insn->op2]];
