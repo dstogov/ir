@@ -673,6 +673,9 @@ extern const char *ir_op_name[IR_LAST_OP];
 #define IR_OPND_KIND(flags, i) \
 	(((flags) >> (16 + (4 * (((i) > 3) ? 3 : (i))))) & 0xf)
 
+#define IR_IS_REF_OPND_KIND(kind) \
+	((kind) >= IR_OPND_DATA && (kind) <= IR_OPND_VAR)
+
 IR_ALWAYS_INLINE ir_ref ir_variable_inputs_count(ir_insn *insn)
 {
 	uint32_t n = insn->inputs_count;

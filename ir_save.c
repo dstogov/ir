@@ -91,6 +91,9 @@ void ir_save(ir_ctx *ctx, FILE *f)
 			} else if (opnd_kind == IR_OPND_NUM) {
 				fprintf(f, "%s%d", first ? "(" : ", ", ref);
 				first = 0;
+			} else if (IR_IS_REF_OPND_KIND(opnd_kind) && j != n) {
+				fprintf(f, "%snull", first ? "(" : ", ");
+				first = 0;
 			}
 		}
 		if (first) {

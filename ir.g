@@ -247,7 +247,7 @@ val(ir_parser_ctx *p, uint8_t op, uint32_t n, ir_ref *ref):
 	{ir_val val;}
 	{uint32_t kind = IR_OPND_KIND(ir_op_flags[op], n);}
 	(	ID(&str, &len)
-		{if (kind < IR_OPND_DATA || kind > IR_OPND_VAR) yy_error("unexpected reference");}
+		{if (!IR_IS_REF_OPND_KIND(kind)) yy_error("unexpected reference");}
 		{*ref = ir_use_var(p, n, str, len);}
 	|   STRING(&str, &len)
 		{if (kind != IR_OPND_STR) yy_error("unexpected string");}
@@ -256,6 +256,8 @@ val(ir_parser_ctx *p, uint8_t op, uint32_t n, ir_ref *ref):
 		{if (kind != IR_OPND_NUM && kind != IR_OPND_PROB) yy_error("unexpected number");}
 		{if (val.u64 < 0 && val.u64 >= 0x7ffffff) yy_error("number out of range");}
 		{*ref = val.u64;}
+	|	"null"
+		{*ref = IR_UNUSED;}
 	)
 ;
 
