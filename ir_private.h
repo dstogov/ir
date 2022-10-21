@@ -620,7 +620,7 @@ typedef struct _ir_hashtab {
 void ir_hashtab_init(ir_hashtab *tab, uint32_t size);
 void ir_hashtab_free(ir_hashtab *tab);
 ir_ref ir_hashtab_find(ir_hashtab *tab, uint32_t key);
-void ir_hashtab_add(ir_hashtab *tab, uint32_t key, ir_ref val);
+bool ir_hashtab_add(ir_hashtab *tab, uint32_t key, ir_ref val);
 void ir_hashtab_key_sort(ir_hashtab *tab);
 
 /*** IR OP info ***/
@@ -971,9 +971,5 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num, ir_reg *reg);
 int ir_get_temporary_regs(ir_ctx *ctx, ir_ref ref, ir_tmp_reg *tmp_regs);
 
 #endif /* defined(IR_REGSET_64BIT) */
-
-
-int ir_regs_number(void);
-const char *ir_reg_name(int8_t reg, ir_type type);
 
 #endif /* IR_PRIVATE_H */

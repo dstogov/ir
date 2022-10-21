@@ -212,7 +212,7 @@ typedef enum _ir_type {
 	\
 	/* data-flow and miscellaneous ops                                  */ \
 	_(PHI,          dP,   reg, def, def) /* SSA Phi function            */ \
-	_(COPY,         d1,   def, ___, ___) /* COPY (last foldable op)     */ \
+	_(COPY,         d1X1, def, opt, ___) /* COPY (last foldable op)     */ \
 	_(PI,           d2,   reg, def, ___) /* e-SSA Pi constraint ???     */ \
 	/* (USE, RENAME)                                                    */ \
 	\
@@ -265,6 +265,7 @@ typedef enum _ir_type {
 	/* tracing JIT helpers                                              */ \
 	_(EXITCALL,     x2,   src, def, ___) /* save all CPU registers      */ \
 	_(EXITGROUP,    c1X2, src, num, num) /* code to push exit number    */ \
+	_(SNAPSHOT,     xN,   src, def, def) /* CALL(src, args...)          */ \
 
 
 #define IR_OP_ENUM(name, flags, op1, op2, op3) IR_ ## name,
@@ -527,7 +528,7 @@ ir_ref ir_fold3(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
 
 ir_ref ir_param(ir_ctx *ctx, ir_type type, ir_ref region, const char *name, int pos);
 ir_ref ir_var(ir_ctx *ctx, ir_type type, ir_ref region, const char *name);
-void   ir_bind(ir_ctx *ctx, ir_ref var, ir_ref def);
+ir_ref ir_bind(ir_ctx *ctx, ir_ref var, ir_ref def);
 
 /* Def -> Use lists */
 void ir_build_def_use_lists(ir_ctx *ctx);
@@ -551,6 +552,10 @@ int ir_compute_live_ranges(ir_ctx *ctx);
 int ir_coalesce(ir_ctx *ctx);
 int ir_compute_dessa_moves(ir_ctx *ctx);
 int ir_reg_alloc(ir_ctx *ctx);
+
+int ir_regs_number(void);
+bool ir_reg_is_int(int32_t reg);
+const char *ir_reg_name(int8_t reg, ir_type type);
 
 /* Target CPU instruction selection and code geneartion (see ir_x86.c) */
 int ir_match(ir_ctx *ctx);

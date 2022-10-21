@@ -3,6 +3,13 @@
 
 #define IR_PHP_OPS(_)
 
+
+#define IR_SNAPSHOT_HANDLER_DCL() \
+	void *zend_jit_snapshot_handler(ir_ctx *ctx, ir_ref snapshot_ref, ir_insn *snapshot, void *addr)
+
+#define IR_SNAPSHOT_HANDLER(ctx, ref, insn, adr) \
+	zend_jit_snapshot_handler(ctx, ref, insn, addr)
+
 #ifndef IR_PHP_MM
 # define IR_PHP_MM 1
 #endif

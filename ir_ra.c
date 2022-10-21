@@ -26,6 +26,12 @@ int ir_regs_number(void)
 	return IR_REG_NUM;
 }
 
+bool ir_reg_is_int(int32_t reg)
+{
+	IR_ASSERT(reg >= 0 && reg < IR_REG_NUM);
+	return reg >= IR_REG_GP_FIRST && reg <= IR_REG_GP_LAST;
+}
+
 /* RA - Register Allocation, Liveness, Coalescing and SSA Resolution */
 
 int ir_assign_virtual_registers(ir_ctx *ctx)
@@ -456,7 +462,10 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 								/* We add two uses to emulate move from op1 to res */
 								ir_add_use(ctx, ctx->vregs[i], 0, IR_DEF_LIVE_POS_FROM_REF(i), reg, def_flags, 0);
 								def_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
-								hint_ref = IR_IS_CONST_REF(insn->op1) ? 0 : insn->op1;
+								if (!IR_IS_CONST_REF(insn->op1)) {
+									IR_ASSERT(ctx->vregs[insn->op1]);
+									hint_ref = insn->op1;
+								}
 							} else if (def_flags & IR_DEF_CONFLICTS_WITH_INPUT_REGS) {
 								def_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
 							} else {
@@ -524,6 +533,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 
 							if ((def_flags & IR_DEF_REUSES_OP1_REG) && j == 1) {
 								use_pos = IR_LOAD_LIVE_POS_FROM_REF(i);
+								IR_ASSERT(ctx->vregs[i]);
 								hint_ref = i;
 								if (reg != IR_REG_NONE) {
 									ir_add_fixed_live_range(ctx, &unused, reg,
@@ -2007,6 +2017,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 				split_pos = ir_first_use_pos_after(child, ival->range.start, IR_USE_MUST_BE_IN_REG | IR_USE_SHOULD_BE_IN_REG) - 1; // TODO: ???
 				if (split_pos > child->range.start && split_pos < ir_ival_end(child)) {
 					split_pos = ir_find_optimal_split_position(ctx, child, ival->range.start, split_pos, 1);
+					// TODO: split_pos may be equal to child->range.start
 					child2 = ir_split_interval_at(ctx, child, split_pos);
 					IR_LOG_LSRA("      ---- Spill", child, "");
 					ir_add_to_unhandled(unhandled, child2);

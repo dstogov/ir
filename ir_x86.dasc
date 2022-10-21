@@ -765,6 +765,7 @@ uint8_t ir_get_def_flags(ir_ctx *ctx, ir_ref ref, ir_reg *reg)
 		case IR_OP_INT:
 		case IR_OP_FP:
 		case IR_MIN_MAX_INT:
+		case IR_COPY:
 			return IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG;
 		case IR_ABS_INT:
 			return IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_USE_MUST_BE_IN_REG;
@@ -895,6 +896,8 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num, ir_reg *reg)
 						return (op_num == 2) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
 					}
 					break;
+				case IR_SNAPSHOT:
+					return IR_USE_SHOULD_BE_IN_REG;
 			}
 			break;
 
@@ -1867,6 +1870,7 @@ store_int:
 		case IR_LOOP_BEGIN:
 //		case IR_LOOP_END:
 		case IR_UNREACHABLE:
+		case IR_SNAPSHOT:
 			return IR_SKIP;
 		case IR_RETURN:
 			if (!insn->op2) {
@@ -6281,6 +6285,29 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
     }
 }
 
+#ifdef IR_SNAPSHOT_HANDLER_DCL
+	IR_SNAPSHOT_HANDLER_DCL();
+#endif
+
+static void *ir_jmp_addr(ir_ctx *ctx, ir_insn *insn, ir_insn *addr_insn)
+{
+	void *addr;
+
+	IR_ASSERT(addr_insn->type == IR_ADDR);
+	if (addr_insn->op == IR_FUNC) {
+		addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
+	} else {
+		IR_ASSERT(addr_insn->op == IR_ADDR || addr_insn->op == IR_FUNC_ADDR);
+		addr = (void*)addr_insn->val.addr;
+	}
+#ifdef IR_SNAPSHOT_HANDLER
+	if (ctx->ir_base[insn->op1].op == IR_SNAPSHOT) {
+		addr = IR_SNAPSHOT_HANDLER(ctx, insn->op1, &ctx->ir_base[insn->op1], addr);
+	}
+#endif
+	return addr;
+}
+
 static void ir_emit_ijmp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
@@ -6288,15 +6315,8 @@ static void ir_emit_ijmp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg op2_reg = ctx->regs[def][2];
 
 	if (IR_IS_CONST_REF(insn->op2)) {
-		ir_insn *addr_insn = &ctx->ir_base[insn->op2];
-		void *addr;
+		void *addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op2]);
 
-		IR_ASSERT(addr_insn->type == IR_ADDR);
-		if (addr_insn->op == IR_FUNC) {
-			addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
-		} else {
-			addr = (void*)addr_insn->val.addr;
-		}
 		if (sizeof(void*) == 4 || IR_MAY_USE_32BIT_ADDR(addr)) {
 			|	jmp aword &addr
 		} else {
@@ -6338,35 +6358,24 @@ static void ir_emit_guard(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg op2_reg = ctx->regs[def][2];
 	ir_type type = ctx->ir_base[insn->op2].type;
+	void *addr;
 
 	IR_ASSERT(IR_IS_TYPE_INT(type));
 	if (IR_IS_CONST_REF(insn->op2)) {
 		if ((insn->op == IR_GUARD && insn->op2 == IR_FALSE) ||
 				(insn->op == IR_GUARD_NOT && insn->op2 == IR_TRUE)) {
-			if (IR_IS_CONST_REF(insn->op3)) {
-				ir_insn *addr_insn = &ctx->ir_base[insn->op3];
-				void *addr;
-
-				IR_ASSERT(addr_insn->type == IR_ADDR);
-				if (addr_insn->op == IR_FUNC) {
-					addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
-				} else {
-					addr = (void*)addr_insn->val.addr;
-				}
-				if (sizeof(void*) == 4 || IR_MAY_USE_32BIT_ADDR(addr)) {
-					|	jmp aword &addr
-				} else {
-|.if X64
-					if (IR_IS_SIGNED_32BIT(addr)) {
-						|	mov rax, ((ptrdiff_t)addr)    // 0x48 0xc7 0xc0 <imm-32-bit>
-					} else {
-						|	mov64 rax, ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
-					}
-					|	jmp aword [rax]
-|.endif
-				}
+			addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op3]);
+			if (sizeof(void*) == 4 || IR_MAY_USE_32BIT_ADDR(addr)) {
+				|	jmp aword &addr
 			} else {
-				IR_ASSERT(0);
+|.if X64
+				if (IR_IS_SIGNED_32BIT(addr)) {
+					|	mov rax, ((ptrdiff_t)addr)    // 0x48 0xc7 0xc0 <imm-32-bit>
+				} else {
+					|	mov64 rax, ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
+				}
+				|	jmp aword [rax]
+|.endif
 			}
 		}
 		return;
@@ -6393,40 +6402,28 @@ static void ir_emit_guard(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 	}
 
-	if (IR_IS_CONST_REF(insn->op3)) {
-		ir_insn *addr_insn = &ctx->ir_base[insn->op3];
-		void *addr;
-
-		IR_ASSERT(addr_insn->type == IR_ADDR);
-		if (addr_insn->op == IR_FUNC) {
-			addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
+	addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op3]);
+	if (sizeof(void*) == 4 || IR_MAY_USE_32BIT_ADDR(addr)) {
+		if (insn->op == IR_GUARD) {
+			|	je aword &addr
 		} else {
-			addr = (void*)addr_insn->val.addr;
-		}
-		if (sizeof(void*) == 4 || IR_MAY_USE_32BIT_ADDR(addr)) {
-			if (insn->op == IR_GUARD) {
-				|	je aword &addr
-			} else {
-				|	jne aword &addr
-			}
-		} else {
-|.if X64
-			if (insn->op == IR_GUARD) {
-				|	jne >1
-			} else {
-				|	je >1
-			}
-			if (IR_IS_SIGNED_32BIT(addr)) {
-				|	mov rax, ((ptrdiff_t)addr)    // 0x48 0xc7 0xc0 <imm-32-bit>
-			} else {
-				|	mov64 rax, ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
-			}
-			|	jmp aword [rax]
-			|1:
-|.endif
+			|	jne aword &addr
 		}
 	} else {
-		IR_ASSERT(0);
+|.if X64
+		if (insn->op == IR_GUARD) {
+			|	jne >1
+		} else {
+			|	je >1
+		}
+		if (IR_IS_SIGNED_32BIT(addr)) {
+			|	mov rax, ((ptrdiff_t)addr)    // 0x48 0xc7 0xc0 <imm-32-bit>
+		} else {
+			|	mov64 rax, ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
+		}
+		|	jmp aword [rax]
+		|1:
+|.endif
 	}
 }
 
@@ -6520,7 +6517,6 @@ static void ir_emit_guard_cmp_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 	ir_ref op2 = cmp_insn->op2;
 	ir_reg op1_reg = ctx->regs[insn->op2][1];
 	ir_reg op2_reg = ctx->regs[insn->op2][2];
-	ir_insn *addr_insn;
 	void *addr;
 
 	if (op1_reg != IR_REG_NONE && ((op1_reg & IR_REG_SPILL_LOAD) || IR_IS_CONST_REF(op1))) {
@@ -6534,15 +6530,7 @@ static void ir_emit_guard_cmp_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 		}
 	}
 
-	IR_ASSERT(IR_IS_CONST_REF(insn->op3));
-	addr_insn = &ctx->ir_base[insn->op3];
-	IR_ASSERT(addr_insn->type == IR_ADDR);
-	if (addr_insn->op == IR_FUNC) {
-		addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
-	} else {
-		addr = (void*)addr_insn->val.addr;
-	}
-
+	addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op3]);
 	if (IR_IS_CONST_REF(op2) && ctx->ir_base[op2].val.u64 == 0) {
 		if (op == IR_ULT) {
 			/* always false */
@@ -6580,17 +6568,8 @@ static void ir_emit_guard_cmp_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 static void ir_emit_guard_cmp_fp(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 {
 	ir_op op = ir_emit_cmp_fp_common(ctx, insn->op2, &ctx->ir_base[insn->op2]);
-	ir_insn *addr_insn;
-	void *addr;
+	void *addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op3]);
 
-	IR_ASSERT(IR_IS_CONST_REF(insn->op3));
-	addr_insn = &ctx->ir_base[insn->op3];
-	IR_ASSERT(addr_insn->type == IR_ADDR);
-	if (addr_insn->op == IR_FUNC) {
-		addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
-	} else {
-		addr = (void*)addr_insn->val.addr;
-	}
 	if (insn->op == IR_GUARD) {
 		op ^= 1; // reverse
 	}
@@ -6602,17 +6581,7 @@ static void ir_emit_guard_overflow(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	ir_type type;
-	ir_insn *addr_insn;
-	void *addr;
-
-	IR_ASSERT(IR_IS_CONST_REF(insn->op3));
-	addr_insn = &ctx->ir_base[insn->op3];
-	IR_ASSERT(addr_insn->type == IR_ADDR);
-	if (addr_insn->op == IR_FUNC) {
-		addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
-	} else {
-		addr = (void*)addr_insn->val.addr;
-	}
+	void *addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op3]);
 
 	type = ctx->ir_base[ctx->ir_base[insn->op2].op1].type;
 
@@ -6888,15 +6857,8 @@ static void ir_emit_exitcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	|.endif
 
 	if (IR_IS_CONST_REF(insn->op2)) {
-		ir_insn *addr_insn = &ctx->ir_base[insn->op2];
-		void *addr;
+		void *addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op2]);
 
-		IR_ASSERT(addr_insn->type == IR_ADDR);
-		if (addr_insn->op == IR_FUNC) {
-			addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
-		} else {
-			addr = (void*)addr_insn->val.addr;
-		}
 		if (sizeof(void*) == 4 || IR_MAY_USE_32BIT_ADDR(addr)) {
 			|	call aword &addr
 		} else {

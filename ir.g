@@ -175,7 +175,7 @@ ir_insn(ir_parser_ctx *p):
 		(
 			"/"
 			DECNUMBER(IR_I32, &count)
-			{if (op == IR_PHI) count.i32++;}
+			{if (op == IR_PHI || op == IR_SNAPSHOT) count.i32++;}
 			{if (op == IR_CALL || op == IR_TAILCALL) count.i32+=2;}
 			{if (count.i32 < 0 || count.i32 > 255) yy_error("bad bumber of operands");}
 			{ref = ir_emit_N(p->ctx, IR_OPT(op, t), count.i32);}

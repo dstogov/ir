@@ -1036,7 +1036,11 @@ IR_FOLD(FP2FP(C_DOUBLE))
 /* Copy Propagation */
 IR_FOLD(COPY(_))
 {
-	IR_FOLD_COPY(op1);
+	if (!op2) {
+		IR_FOLD_COPY(op1);
+	}
+	/* skip CSE */
+	IR_FOLD_EMIT;
 }
 
 IR_FOLD(PHI(_, _)) // TODO: PHI(_, _, _)

@@ -52,6 +52,8 @@ void ir_save(ir_ctx *ctx, FILE *f)
 			fprintf(f, "/%d", n - 2);
 		} else if (insn->op == IR_PHI && n != 3) {
 			fprintf(f, "/%d", n - 1);
+		} else if (insn->op == IR_SNAPSHOT) {
+			fprintf(f, "/%d", n - 1);
 		}
 		first = 1;
 		for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {

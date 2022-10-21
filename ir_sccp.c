@@ -596,7 +596,7 @@ int ir_sccp(ir_ctx *ctx)
 			} else {
 				IR_MAKE_BOTTOM(i);
 
-				if (insn->op == IR_CALL || insn->op == IR_TAILCALL) {
+				if (insn->op == IR_CALL || insn->op == IR_TAILCALL || insn->op == IR_SNAPSHOT) {
 					n = ir_input_edges_count(ctx, insn);
 					for (j = 0; j < (n>>2); j++) {
 						_values[i+j+1].optx = IR_BOTTOM; /* keep the tail of a long multislot instruction */

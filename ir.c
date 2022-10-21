@@ -129,6 +129,7 @@ void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 #define ir_op_flag_d       IR_OP_FLAG_DATA
 #define ir_op_flag_d0      ir_op_flag_d
 #define ir_op_flag_d1      (ir_op_flag_d | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_d1X1    (ir_op_flag_d | 1 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_d2      (ir_op_flag_d | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_d2C     (ir_op_flag_d | IR_OP_FLAG_COMMUTATIVE | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_d3      (ir_op_flag_d | 3 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
@@ -188,6 +189,7 @@ void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 #define ir_op_kind_fld     IR_OPND_STR
 #define ir_op_kind_var     IR_OPND_VAR
 #define ir_op_kind_prb     IR_OPND_PROB
+#define ir_op_kind_opt     IR_OPND_PROB
 
 #define _IR_OP_FLAGS(name, flags, op1, op2, op3) \
 	IR_OP_FLAGS(ir_op_flag_ ## flags, ir_op_kind_ ## op1, ir_op_kind_ ## op2, ir_op_kind_ ## op3),
@@ -871,7 +873,7 @@ void ir_set_op(ir_ctx *ctx, ir_ref ref, uint32_t n, ir_ref val)
 			if (count == 0) {
 				count = 2;
 			}
-		} else if (insn->op == IR_CALL || insn->op == IR_TAILCALL) {
+		} else if (insn->op == IR_CALL || insn->op == IR_TAILCALL || insn->op == IR_SNAPSHOT) {
 			count = insn->inputs_count;
 			if (count == 0) {
 				count = 2;
@@ -899,10 +901,10 @@ ir_ref ir_var(ir_ctx *ctx, ir_type type, ir_ref region, const char *name)
 	return ir_emit(ctx, IR_OPT(IR_VAR, type), region, ir_str(ctx, name), IR_UNUSED);
 }
 
-void ir_bind(ir_ctx *ctx, ir_ref var, ir_ref def)
+ir_ref ir_bind(ir_ctx *ctx, ir_ref var, ir_ref def)
 {
 	if (IR_IS_CONST_REF(def)) {
-		return;
+		return def;
 	}
 	if (!ctx->binding) {
 		ctx->binding = ir_mem_malloc(sizeof(ir_hashtab));;
@@ -910,7 +912,11 @@ void ir_bind(ir_ctx *ctx, ir_ref var, ir_ref def)
 	}
 	/* Node may be bound some VAR node or to some special spill slot (using negative "var") */
 	IR_ASSERT(var < 0 || (var < ctx->insns_count && ctx->ir_base[var].op == IR_VAR));
-	ir_hashtab_add(ctx->binding, def, var);
+	if (!ir_hashtab_add(ctx->binding, def, var)) {
+		def = ir_emit2(ctx, IR_OPT(IR_COPY, ctx->ir_base[def].type), def, 1);
+		ir_hashtab_add(ctx->binding, def, var);
+	}
+	return def;
 }
 
 /* Batch construction of def->use edges */
@@ -1098,7 +1104,7 @@ ir_ref ir_hashtab_find(ir_hashtab *tab, uint32_t key)
 	return IR_INVALID_VAL;
 }
 
-void ir_hashtab_add(ir_hashtab *tab, uint32_t key, ir_ref val)
+bool ir_hashtab_add(ir_hashtab *tab, uint32_t key, ir_ref val)
 {
 	char *data = (char*)tab->data;
 	uint32_t pos = ((uint32_t*)data)[(int32_t)(key | tab->mask)];
@@ -1107,7 +1113,7 @@ void ir_hashtab_add(ir_hashtab *tab, uint32_t key, ir_ref val)
 	while (pos != IR_INVALID_IDX) {
 		p = (ir_hashtab_bucket*)(data + pos);
 		if (p->key == key) {
-			return;
+			return p->val == val;
 		}
 		pos = p->next;
 	}
@@ -1126,6 +1132,7 @@ void ir_hashtab_add(ir_hashtab *tab, uint32_t key, ir_ref val)
 	key |= tab->mask;
 	p->next = ((uint32_t*)data)[(int32_t)key];
 	((uint32_t*)data)[(int32_t)key] = pos;
+	return 1;
 }
 
 static int ir_hashtab_key_cmp(const void *b1, const void *b2)
