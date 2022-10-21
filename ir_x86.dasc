@@ -822,11 +822,22 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num, ir_reg *reg)
 		case IR_CMP_INT:
 		case IR_SKIP_TEST_INT:
 			if (op_num == 2) {
-				return IR_USE_SHOULD_BE_IN_REG;
+				insn = &ctx->ir_base[ref];
+				if (IR_IS_CONST_REF(insn->op1)) {
+					ir_insn *val_insn = &ctx->ir_base[insn->op1];
+					if (ir_type_size[val_insn->type] != 8 || IR_IS_32BIT(val_insn->type, val_insn->val)) {
+						return IR_USE_SHOULD_BE_IN_REG;
+					}
+				} else if (ctx->rules[insn->op1] != IR_SKIP_MEM) {
+					return IR_USE_SHOULD_BE_IN_REG;
+				}
 			} else if (op_num == 1) {
 				insn = &ctx->ir_base[ref];
 				if (IR_IS_CONST_REF(insn->op2)) {
-					return IR_USE_SHOULD_BE_IN_REG;
+					ir_insn *val_insn = &ctx->ir_base[insn->op2];
+					if (ir_type_size[val_insn->type] != 8 || IR_IS_32BIT(val_insn->type, val_insn->val)) {
+						return IR_USE_SHOULD_BE_IN_REG;
+					}
 				}
 			}
 			return IR_USE_MUST_BE_IN_REG;
@@ -863,9 +874,23 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num, ir_reg *reg)
 				case IR_ULE:
 				case IR_UGT:
 					if (IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)) {
-						if (op_num == 2 || (op_num == 1 && IR_IS_CONST_REF(insn->op2))) {
-							return IR_USE_SHOULD_BE_IN_REG;
-					    }
+						if (op_num == 2) {
+							if (IR_IS_CONST_REF(insn->op1)) {
+								ir_insn *val_insn = &ctx->ir_base[insn->op1];
+								if (ir_type_size[val_insn->type] != 8 || IR_IS_32BIT(val_insn->type, val_insn->val)) {
+									return IR_USE_SHOULD_BE_IN_REG;
+								}
+							} else if (ctx->rules[insn->op1] != IR_SKIP_MEM) {
+								return IR_USE_SHOULD_BE_IN_REG;
+							}
+						} else if (op_num == 1) {
+							if (IR_IS_CONST_REF(insn->op2)) {
+								ir_insn *val_insn = &ctx->ir_base[insn->op2];
+								if (ir_type_size[val_insn->type] != 8 || IR_IS_32BIT(val_insn->type, val_insn->val)) {
+									return IR_USE_SHOULD_BE_IN_REG;
+								}
+							}
+						}
 					} else {
 						return (op_num == 2) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
 					}
