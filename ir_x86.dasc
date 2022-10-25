@@ -897,7 +897,7 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num, ir_reg *reg)
 					}
 					break;
 				case IR_SNAPSHOT:
-					return IR_USE_SHOULD_BE_IN_REG;
+					return 0;
 			}
 			break;
 

@@ -471,7 +471,7 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num, ir_reg *reg)
 			*reg = IR_REG_FP_RET1;
 			return IR_USE_SHOULD_BE_IN_REG;
 		case IR_SNAPSHOT:
-			return IR_USE_SHOULD_BE_IN_REG;
+			return 0;
 	}
 
 	return IR_USE_MUST_BE_IN_REG;
