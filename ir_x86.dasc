@@ -5310,7 +5310,7 @@ static void ir_emit_load_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		IR_ASSERT(ctx->ir_base[insn->op2].type == IR_ADDR);
 		ir_emit_load(ctx, IR_ADDR, op2_reg, insn->op2);
 	}
-	if (ctx->rules[insn->op2] == IR_SKIP_MEM) {
+	if (!IR_IS_CONST_REF(insn->op2) && ctx->rules[insn->op2] == IR_SKIP_MEM) {
 		offset = ir_fuse_addr(ctx, insn->op2, &op2_reg);
 	}
 
@@ -5356,7 +5356,7 @@ static void ir_emit_load_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		IR_ASSERT(ctx->ir_base[insn->op2].type == IR_ADDR);
 		ir_emit_load(ctx, IR_ADDR, op2_reg, insn->op2);
 	}
-	if (ctx->rules[insn->op2] == IR_SKIP_MEM) {
+	if (!IR_IS_CONST_REF(insn->op2) && ctx->rules[insn->op2] == IR_SKIP_MEM) {
 		offset = ir_fuse_addr(ctx, insn->op2, &op2_reg);
 	}
 
