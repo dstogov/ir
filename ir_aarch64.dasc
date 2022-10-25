@@ -1091,7 +1091,11 @@ binop_fp:
 		case IR_GUARD_NOT:
 			if (insn->op2 > bb->start && insn->op2 < ref && ctx->use_lists[insn->op2].count == 1) {
 				op2_insn = &ctx->ir_base[insn->op2];
-				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT) {
+				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT
+					// TODO: register allocator may clobber operands of CMP before they are used in the GUARD_CMP
+				 && (insn->op2 == ref - 1 ||
+				     (insn->op2 == ref - ctx->prev_insn_len[ref] - 1
+				   && ctx->ir_base[ref - ctx->prev_insn_len[ref]].op == IR_SNAPSHOT))) {
 					ctx->rules[insn->op2] = IR_SKIP;
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
 						if (insn->op1 > bb->start
