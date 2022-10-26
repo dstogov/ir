@@ -6893,23 +6893,6 @@ static void ir_emit_exitcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
-static void ir_emit_exitgroup(ir_ctx *ctx, ir_ref def, ir_insn *insn)
-{
-	ir_backend_data *data = ctx->data;
-	dasm_State **Dst = &data->dasm_state;
-	uint32_t i;
-	uint32_t first_exit_point = insn->op2;
-	uint32_t exit_points_per_group = insn->op3;
-
-	for (i = 0; i < exit_points_per_group - 1; i++) {
-		|	push byte i
-		|	.byte 0xeb, (4*(exit_points_per_group-i)-6) // jmp >1
-	}
-	|	push byte i
-	|// 1:
-	|	add aword [r4], first_exit_point
-}
-
 static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 {
 	ir_backend_data *data = ctx->data;
@@ -8162,9 +8145,6 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_EXITCALL:
 					ir_emit_exitcall(ctx, i, insn);
 					break;
-				case IR_EXITGROUP:
-					ir_emit_exitgroup(ctx, i, insn);
-					break;
 				case IR_GUARD:
 				case IR_GUARD_NOT:
 					ir_emit_guard(ctx, i, insn);
@@ -8316,5 +8296,70 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		ir_mem_protect(entry, size);
 	}
 
+	return entry;
+}
+
+const void *ir_emit_exitgroup(uint32_t first_exit_point, uint32_t exit_points_per_group, const void *exit_addr, void *code_buffer, size_t code_buffer_size, size_t *size_ptr)
+{
+	void *entry;
+	size_t size;
+	uint32_t i;
+	dasm_State **Dst, *dasm_state;
+	int ret;
+
+	IR_ASSERT(code_buffer);
+	IR_ASSERT(IR_IS_SIGNED_32BIT((char*)exit_addr - (char*)code_buffer));
+	IR_ASSERT(IR_IS_SIGNED_32BIT((char*)exit_addr - ((char*)code_buffer + code_buffer_size)));
+
+	Dst = &dasm_state;
+	dasm_state = NULL;
+	dasm_init(&dasm_state, DASM_MAXSECTION);
+	dasm_setupglobal(&dasm_state, dasm_labels, ir_lb_MAX);
+	dasm_setup(&dasm_state, dasm_actions);
+
+	for (i = 0; i < exit_points_per_group - 1; i++) {
+		|	push byte i
+		|	.byte 0xeb, (4*(exit_points_per_group-i)-6) // jmp >1
+	}
+	|	push byte i
+	|// 1:
+	|	add aword [r4], first_exit_point
+	|	jmp aword &exit_addr
+
+	ret = dasm_link(&dasm_state, &size);
+	if (ret != DASM_S_OK) {
+		IR_ASSERT(0);
+		return NULL;
+	}
+
+	if (code_buffer != NULL) {
+		if (IR_ALIGNED_SIZE(size, 16) > code_buffer_size) {
+			return NULL;
+		}
+		entry = code_buffer;
+		IR_ASSERT((uintptr_t)entry % 16 == 0);
+	} else {
+		entry = ir_mem_mmap(size);
+		ir_mem_unprotect(entry, size);
+	}
+
+	ret = dasm_encode(&dasm_state, entry);
+	if (ret != DASM_S_OK) {
+		IR_ASSERT(0);
+		if (code_buffer == NULL) {
+			ir_mem_unmap(entry, size);
+		}
+		return NULL;
+	}
+
+	dasm_free(&dasm_state);
+
+	ir_mem_flush(entry, size);
+
+	if (code_buffer == NULL) {
+		ir_mem_protect(entry, size);
+	}
+
+	*size_ptr = size;
 	return entry;
 }

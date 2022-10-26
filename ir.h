@@ -264,7 +264,6 @@ typedef enum _ir_type {
 	\
 	/* tracing JIT helpers                                              */ \
 	_(EXITCALL,     x2,   src, def, ___) /* save all CPU registers      */ \
-	_(EXITGROUP,    c1X2, src, num, num) /* code to push exit number    */ \
 	_(SNAPSHOT,     xN,   src, def, def) /* CALL(src, args...)          */ \
 
 
@@ -613,6 +612,8 @@ void ir_consistency_check(void);
 /* Code patching (implementation in ir_patch.c) */
 int ir_patch(const void *code, size_t size, uint32_t jmp_table_size, const void *from_addr, const void *to_addr);
 
+/* Deoptimization helpers */
+const void *ir_emit_exitgroup(uint32_t first_exit_point, uint32_t exit_points_per_group, const void *exit_addr, void *code_buffer, size_t code_buffer_size, size_t *size_ptr);
 
 /* IR Memmory Allocation */
 #ifndef ir_mem_malloc
