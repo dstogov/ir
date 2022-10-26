@@ -41,13 +41,13 @@ endif
 all: $(BUILD_DIR)/ir $(BUILD_DIR)/ir_test
 
 $(BUILD_DIR)/ir: $(BUILD_DIR)/ir_main.o $(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_strtab.o $(BUILD_DIR)/ir_cfg.o \
-	$(BUILD_DIR)/ir_sccp.o $(BUILD_DIR)/ir_gcm.o $(BUILD_DIR)/ir_ra.o $(BUILD_DIR)/ir_$(DASM_ARCH).o \
+	$(BUILD_DIR)/ir_sccp.o $(BUILD_DIR)/ir_gcm.o $(BUILD_DIR)/ir_ra.o $(BUILD_DIR)/ir_emit.o \
 	$(BUILD_DIR)/ir_load.o $(BUILD_DIR)/ir_save.o $(BUILD_DIR)/ir_emit_c.o $(BUILD_DIR)/ir_dump.o \
 	$(BUILD_DIR)/ir_disasm.o $(BUILD_DIR)/ir_gdb.o $(BUILD_DIR)/ir_perf.o $(BUILD_DIR)/ir_check.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ -lcapstone $^
 
 $(BUILD_DIR)/ir_test: $(BUILD_DIR)/ir_test.o $(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_strtab.o $(BUILD_DIR)/ir_cfg.o \
-	$(BUILD_DIR)/ir_sccp.o $(BUILD_DIR)/ir_gcm.o $(BUILD_DIR)/ir_ra.o $(BUILD_DIR)/ir_$(DASM_ARCH).o \
+	$(BUILD_DIR)/ir_sccp.o $(BUILD_DIR)/ir_gcm.o $(BUILD_DIR)/ir_ra.o $(BUILD_DIR)/ir_emit.o \
 	$(BUILD_DIR)/ir_save.o $(BUILD_DIR)/ir_dump.o $(BUILD_DIR)/ir_disasm.o $(BUILD_DIR)/ir_gdb.o \
 	$(BUILD_DIR)/ir_perf.o $(BUILD_DIR)/ir_check.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ -lcapstone $^
@@ -96,11 +96,11 @@ $(BUILD_DIR)/gen_ir_fold_hash: $(SRC_DIR)/gen_ir_fold_hash.c $(SRC_DIR)/ir_strta
 
 $(BUILD_DIR)/minilua: $(SRC_DIR)/dynasm/minilua.c
 	$(BUILD_CC) $(SRC_DIR)/dynasm/minilua.c -lm -o $@
-$(BUILD_DIR)/ir_$(DASM_ARCH).c: $(SRC_DIR)/ir_$(DASM_ARCH).dasc $(SRC_DIR)/dynasm/*.lua $(BUILD_DIR)/minilua
+$(BUILD_DIR)/ir_emit_$(DASM_ARCH).h: $(SRC_DIR)/ir_$(DASM_ARCH).dasc $(SRC_DIR)/dynasm/*.lua $(BUILD_DIR)/minilua
 	$(BUILD_DIR)/minilua $(SRC_DIR)/dynasm/dynasm.lua $(DASM_FLAGS) -o $@ $(SRC_DIR)/ir_$(DASM_ARCH).dasc
-$(BUILD_DIR)/ir_$(DASM_ARCH).o: $(BUILD_DIR)/ir_$(DASM_ARCH).c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h \
+$(BUILD_DIR)/ir_emit.o: $(SRC_DIR)/ir_emit.c $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h \
 	$(SRC_DIR)/ir_$(DASM_ARCH).h
-	$(CC) $(CFLAGS) -I$(SRC_DIR) -o $@ -c $<
+	$(CC) $(CFLAGS) -I$(BUILD_DIR) -o $@ -c $<
 
 test: $(BUILD_DIR)/ir
 	$(BUILD_DIR)/ir $(SRC_DIR)/test.ir --dump --save 2>$(BUILD_DIR)/test.log
@@ -110,7 +110,7 @@ test: $(BUILD_DIR)/ir
 
 clean:
 	rm -rf $(BUILD_DIR)/ir $(BUILD_DIR)/ir_test $(BUILD_DIR)/*.o \
-	$(BUILD_DIR)/minilua $(BUILD_DIR)/ir_$(DASM_ARCH).c \
+	$(BUILD_DIR)/minilua $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h \
 	$(BUILD_DIR)/ir_fold_hash.h $(BUILD_DIR)/gen_ir_fold_hash \
 	$(BUILD_DIR)/ir.dot $(BUILD_DIR)/ir.pdf $(BUILD_DIR)/test.log
 	find $(SRC_DIR)/tests -type f -name '*.diff' -delete

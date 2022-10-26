@@ -3,8 +3,8 @@
 *.dot
 *.pdf
 ir_fold_hash.h
-ir_x86.c
-ir_aarch64.c
+ir_emit_x86.h
+ir_emit_aarch64.h
 minilua
 gen_ir_fold_hash
 ir_test
