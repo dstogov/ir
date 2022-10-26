@@ -10,7 +10,8 @@ BUILD_CC   = gcc
 CFLAGS     = -Wall
 LDFLAGS    = -lm
 PHP        = php
-LLK        = /home/dmitry/php/llk/llk.php
+LLK        = llk
+#LLK        = $(PHP) $(HOME)/php/llk/llk.php
 
 ifeq (debug, $(BUILD))
  CFLAGS += -O0 -g -DIR_DEBUG=1
@@ -31,7 +32,7 @@ ifeq (x86, $(TARGET))
   DASM_FLAGS =
 endif
 ifeq (aarch64, $(TARGET))
-  CC= aarch64-linux-gnu-gcc --sysroot=/home/dmitry/php/ARM64
+  CC= aarch64-linux-gnu-gcc --sysroot=$(HOME)/php/ARM64
   CFLAGS += -DIR_TARGET_AARCH64
   DASM_ARCH  = aarch64
   DASM_FLAGS =
@@ -86,7 +87,7 @@ $(BUILD_DIR)/ir_test.o: $(SRC_DIR)/ir_test.c $(SRC_DIR)/ir.h
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 $(SRC_DIR)/ir_load.c: $(SRC_DIR)/ir.g
-	$(PHP) $(LLK) ir.g
+	$(LLK) ir.g
 
 $(BUILD_DIR)/ir_fold_hash.h: $(BUILD_DIR)/gen_ir_fold_hash $(SRC_DIR)/ir_fold.h $(SRC_DIR)/ir.h
 	$(BUILD_DIR)/gen_ir_fold_hash < $(SRC_DIR)/ir_fold.h > $(BUILD_DIR)/ir_fold_hash.h
