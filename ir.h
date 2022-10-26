@@ -258,13 +258,15 @@ typedef enum _ir_type {
 	_(IJMP,         T2X1, src, def, ret) /* computed goto               */ \
 	_(ENTRY,        S0X2, num, ent, ___) /* code entry (op3 keeps addr) */ \
 	\
-	/* guards (floating or not) ???                                     */ \
+	/* guards                                                           */ \
 	_(GUARD,        c3,   src, def, def) /* IF without second successor */ \
 	_(GUARD_NOT  ,  c3,   src, def, def) /* IF without second successor */ \
 	\
-	/* tracing JIT helpers                                              */ \
-	_(EXITCALL,     x2,   src, def, ___) /* save all CPU registers      */ \
-	_(SNAPSHOT,     xN,   src, def, def) /* CALL(src, args...)          */ \
+	/* deoptimization                                                   */ \
+	_(SNAPSHOT,     xN,   src, def, def) /* SNAPSHOT(src, args...)      */ \
+	\
+	/* deoptimization helper                                            */ \
+	_(EXITCALL,     x2,   src, def, ___) /* save CPU regs and call op2  */ \
 
 
 #define IR_OP_ENUM(name, flags, op1, op2, op3) IR_ ## name,
