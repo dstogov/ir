@@ -2,14 +2,6 @@
 #include "ir_aarch64.h"
 #include "ir_private.h"
 
-#ifdef _WIN32
-# define IR_SET_ALIGNED(alignment, decl) __declspec(align(alignment)) decl
-#elif defined(HAVE_ATTRIBUTE_ALIGNED)
-# define IR_SET_ALIGNED(alignment, decl) decl __attribute__ ((__aligned__ (alignment)))
-#else
-# define IR_SET_ALIGNED(alignment, decl) decl
-#endif
-
 #define DASM_M_GROW(ctx, t, p, sz, need) \
   do { \
     size_t _sz = (sz), _need = (need); \

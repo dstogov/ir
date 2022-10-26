@@ -1,84 +1,118 @@
+# TRAGET may be "x86_64" or "x86" or "aarch64"
+TARGET     = x86_64
+# BUILD can be "debug" or "release"
+BUILD      = debug
+BUILD_DIR  = .
+SRC_DIR    = .
+
 CC         = gcc
-#CFLAGS     = -O2 -g -Wall -DIR_TARGET_X64
-CFLAGS     = -O0 -g -Wall -DIR_DEBUG -DIR_TARGET_X64
+BUILD_CC   = gcc
+CFLAGS     = -Wall
 LDFLAGS    = -lm
 PHP        = php
 LLK        = /home/dmitry/php/llk/llk.php
-DASM_ARCH  = x86
-DASM_FLAGS = -D X64=1
 
-all: ir ir_test
+ifeq (debug, $(BUILD))
+ CFLAGS += -O0 -g -DIR_DEBUG=1
+endif
+ifeq (release, $(BUILD))
+ CFLAGS += -O2 -g
+endif
 
-ir: ir_main.o ir.o ir_strtab.o ir_cfg.o ir_sccp.o ir_gcm.o ir_ra.o ir_$(DASM_ARCH).o \
-	ir_load.o ir_save.o ir_emit_c.o ir_dump.o ir_disasm.o ir_gdb.o ir_perf.o ir_check.o
+ifeq (x86_64, $(TARGET))
+  CFLAGS += -DIR_TARGET_X64
+  DASM_ARCH  = x86
+  DASM_FLAGS = -D X64=1
+endif
+ifeq (x86, $(TARGET))
+  CC= gcc -m32
+  CFLAGS += -DIR_TARGET_X86
+  DASM_ARCH  = x86
+  DASM_FLAGS =
+endif
+ifeq (aarch64, $(TARGET))
+  CC= aarch64-linux-gnu-gcc --sysroot=/home/dmitry/php/ARM64
+  CFLAGS += -DIR_TARGET_AARCH64
+  DASM_ARCH  = aarch64
+  DASM_FLAGS =
+endif
+
+all: $(BUILD_DIR)/ir $(BUILD_DIR)/ir_test
+
+$(BUILD_DIR)/ir: $(BUILD_DIR)/ir_main.o $(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_strtab.o $(BUILD_DIR)/ir_cfg.o \
+	$(BUILD_DIR)/ir_sccp.o $(BUILD_DIR)/ir_gcm.o $(BUILD_DIR)/ir_ra.o $(BUILD_DIR)/ir_$(DASM_ARCH).o \
+	$(BUILD_DIR)/ir_load.o $(BUILD_DIR)/ir_save.o $(BUILD_DIR)/ir_emit_c.o $(BUILD_DIR)/ir_dump.o \
+	$(BUILD_DIR)/ir_disasm.o $(BUILD_DIR)/ir_gdb.o $(BUILD_DIR)/ir_perf.o $(BUILD_DIR)/ir_check.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ -lcapstone $^
 
-ir_test: ir_test.o ir.o ir_strtab.o ir_cfg.o ir_sccp.o ir_gcm.o ir_ra.o ir_$(DASM_ARCH).o \
-	ir_save.o ir_dump.o ir_disasm.o ir_gdb.o ir_perf.o ir_check.o
+$(BUILD_DIR)/ir_test: $(BUILD_DIR)/ir_test.o $(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_strtab.o $(BUILD_DIR)/ir_cfg.o \
+	$(BUILD_DIR)/ir_sccp.o $(BUILD_DIR)/ir_gcm.o $(BUILD_DIR)/ir_ra.o $(BUILD_DIR)/ir_$(DASM_ARCH).o \
+	$(BUILD_DIR)/ir_save.o $(BUILD_DIR)/ir_dump.o $(BUILD_DIR)/ir_disasm.o $(BUILD_DIR)/ir_gdb.o \
+	$(BUILD_DIR)/ir_perf.o $(BUILD_DIR)/ir_check.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ -lcapstone $^
 
-ir.o: ir.c ir.h ir_private.h ir_fold.h ir_fold_hash.h
+$(BUILD_DIR)/ir.o: $(SRC_DIR)/ir.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h $(SRC_DIR)/ir_fold.h \
+	$(BUILD_DIR)/ir_fold_hash.h
+	$(CC) $(CFLAGS) -I$(BUILD_DIR) -o $@ -c $<
+$(BUILD_DIR)/ir_cfg.o: $(SRC_DIR)/ir_cfg.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h
 	$(CC) $(CFLAGS) -o $@ -c $<
-ir_cfg.o: ir_cfg.c ir.h ir_private.h
+$(BUILD_DIR)/ir_sccp.o: $(SRC_DIR)/ir_sccp.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h
 	$(CC) $(CFLAGS) -o $@ -c $<
-ir_sccp.o: ir_sccp.c ir.h ir_private.h
+$(BUILD_DIR)/ir_gcm.o: $(SRC_DIR)/ir_gcm.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h
 	$(CC) $(CFLAGS) -o $@ -c $<
-ir_gcm.o: ir_gcm.c ir.h ir_private.h
+$(BUILD_DIR)/ir_ra.o: $(SRC_DIR)/ir_ra.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h $(SRC_DIR)/ir_$(DASM_ARCH).h
 	$(CC) $(CFLAGS) -o $@ -c $<
-ir_ra.o: ir_ra.c ir.h ir_private.h ir_$(DASM_ARCH).h
+$(BUILD_DIR)/ir_strtab.o: $(SRC_DIR)/ir_strtab.c $(SRC_DIR)/ir.h
 	$(CC) $(CFLAGS) -o $@ -c $<
-ir_strtab.o: ir_strtab.c ir.h
+$(BUILD_DIR)/ir_save.o: $(SRC_DIR)/ir_save.c $(SRC_DIR)/ir.h
 	$(CC) $(CFLAGS) -o $@ -c $<
-ir_save.o: ir_save.c ir.h
+$(BUILD_DIR)/ir_load.o: $(SRC_DIR)/ir_load.c $(SRC_DIR)/ir.h
 	$(CC) $(CFLAGS) -o $@ -c $<
-ir_load.o: ir_load.c ir.h
+$(BUILD_DIR)/ir_emit_c.o: $(SRC_DIR)/ir_emit_c.c $(SRC_DIR)/ir.h
 	$(CC) $(CFLAGS) -o $@ -c $<
-ir_emit_c.o: ir_emit_c.c ir.h
+$(BUILD_DIR)/ir_dump.o: $(SRC_DIR)/ir_dump.c $(SRC_DIR)/ir.h
 	$(CC) $(CFLAGS) -o $@ -c $<
-ir_dump.o: ir_dump.c ir.h
+$(BUILD_DIR)/ir_disasm.o: $(SRC_DIR)/ir_disasm.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h
 	$(CC) $(CFLAGS) -o $@ -c $<
-ir_disasm.o: ir_disasm.c ir.h ir_private.h
+$(BUILD_DIR)/ir_gdb.o: $(SRC_DIR)/ir_gdb.c $(SRC_DIR)/ir.h
 	$(CC) $(CFLAGS) -o $@ -c $<
-ir_gdb.o: ir_gdb.c ir.h
+$(BUILD_DIR)/ir_perf.o: $(SRC_DIR)/ir_perf.c $(SRC_DIR)/ir.h
 	$(CC) $(CFLAGS) -o $@ -c $<
-ir_perf.o: ir_perf.c ir.h
+$(BUILD_DIR)/ir_check.o: $(SRC_DIR)/ir_check.c $(SRC_DIR)/ir.h
 	$(CC) $(CFLAGS) -o $@ -c $<
-ir_check.o: ir_check.c ir.h
+$(BUILD_DIR)/ir_main.o: $(SRC_DIR)/ir_main.c $(SRC_DIR)/ir.h
 	$(CC) $(CFLAGS) -o $@ -c $<
-ir_main.o: ir_main.c ir.h
-	$(CC) $(CFLAGS) -o $@ -c $<
-ir_test.o: ir_test.c ir.h
+$(BUILD_DIR)/ir_test.o: $(SRC_DIR)/ir_test.c $(SRC_DIR)/ir.h
 	$(CC) $(CFLAGS) -o $@ -c $<
 
-ir_load.c: ir.g
+$(SRC_DIR)/ir_load.c: $(SRC_DIR)/ir.g
 	$(PHP) $(LLK) ir.g
 
-ir_fold_hash.h: gen_ir_fold_hash ir_fold.h ir.h
-	./gen_ir_fold_hash < ir_fold.h > ir_fold_hash.h
-gen_ir_fold_hash: gen_ir_fold_hash.c ir_strtab.c
-	$(CC) $(CFLAGS) $(LDFALGS) -o $@ $^
+$(BUILD_DIR)/ir_fold_hash.h: $(BUILD_DIR)/gen_ir_fold_hash $(SRC_DIR)/ir_fold.h $(SRC_DIR)/ir.h
+	$(BUILD_DIR)/gen_ir_fold_hash < $(SRC_DIR)/ir_fold.h > $(BUILD_DIR)/ir_fold_hash.h
+$(BUILD_DIR)/gen_ir_fold_hash: $(SRC_DIR)/gen_ir_fold_hash.c $(SRC_DIR)/ir_strtab.c
+	$(BUILD_CC) $(CFLAGS) $(LDFALGS) -o $@ $^
 
-minilua: dynasm/minilua.c
-	$(CC) dynasm/minilua.c -lm -o $@
-ir_$(DASM_ARCH).c: ir_$(DASM_ARCH).dasc minilua dynasm/*.lua
-	./minilua dynasm/dynasm.lua $(DASM_FLAGS) -o $@ ir_$(DASM_ARCH).dasc
-ir_$(DASM_ARCH).o: ir_$(DASM_ARCH).c ir.h ir_private.h ir_$(DASM_ARCH).h
-	$(CC) $(CFLAGS) -o $@ -c $<
+$(BUILD_DIR)/minilua: $(SRC_DIR)/dynasm/minilua.c
+	$(BUILD_CC) $(SRC_DIR)/dynasm/minilua.c -lm -o $@
+$(BUILD_DIR)/ir_$(DASM_ARCH).c: $(SRC_DIR)/ir_$(DASM_ARCH).dasc $(SRC_DIR)/dynasm/*.lua $(BUILD_DIR)/minilua
+	$(BUILD_DIR)/minilua $(SRC_DIR)/dynasm/dynasm.lua $(DASM_FLAGS) -o $@ $(SRC_DIR)/ir_$(DASM_ARCH).dasc
+$(BUILD_DIR)/ir_$(DASM_ARCH).o: $(BUILD_DIR)/ir_$(DASM_ARCH).c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h \
+	$(SRC_DIR)/ir_$(DASM_ARCH).h
+	$(CC) $(CFLAGS) -I$(SRC_DIR) -o $@ -c $<
 
-test: ir
-	./ir test.ir --dump --save 2>2.log
-	./ir test.ir --dot ir.dot
-	dot -Tpdf ir.dot -o ir.pdf
-	php ir-test.php
+test: $(BUILD_DIR)/ir
+	$(BUILD_DIR)/ir $(SRC_DIR)/test.ir --dump --save 2>$(BUILD_DIR)/test.log
+	$(BUILD_DIR)/ir $(SRC_DIR)/test.ir --dot $(BUILD_DIR)/ir.dot
+	dot -Tpdf $(BUILD_DIR)/ir.dot -o $(BUILD_DIR)/ir.pdf
+	BUILD_DIR=$(BUILD_DIR) SRC_DIR=$(SRC_DIR) $(PHP) $(SRC_DIR)/ir-test.php
 
 clean:
-	rm -rf ir ir_test *.o \
-	ir_load.c \
-	minilua ir_$(DASM_ARCH).c \
-	ir_fold_hash.h gen_ir_fold_hash \
-	ir.dot ir.pdf 2.log \
-	b perf.data perf.data.old perf.data.jitted \
-	tests/*.diff tests/*.out tests/*.exp tests/*.ir \
-	tests/x86_64/*.diff tests/x86_64/*.out tests/x86_64/*.exp tests/x86_64/*.ir \
-	tests/c/*.diff tests/c/*.out tests/c/*.exp tests/c/*.ir \
-	tests/debug/*.diff tests/debug/*.out tests/debug/*.exp tests/debug/*.ir
+	rm -rf $(BUILD_DIR)/ir $(BUILD_DIR)/ir_test $(BUILD_DIR)/*.o \
+	$(BUILD_DIR)/minilua $(BUILD_DIR)/ir_$(DASM_ARCH).c \
+	$(BUILD_DIR)/ir_fold_hash.h $(BUILD_DIR)/gen_ir_fold_hash \
+	$(BUILD_DIR)/ir.dot $(BUILD_DIR)/ir.pdf $(BUILD_DIR)/test.log
+	find $(SRC_DIR)/tests -type f -name '*.diff' -delete
+	find $(SRC_DIR)/tests -type f -name '*.out' -delete
+	find $(SRC_DIR)/tests -type f -name '*.exp' -delete
+	find $(SRC_DIR)/tests -type f -name '*.ir' -delete

@@ -48,7 +48,7 @@ function parse_test($test, &$name, &$code, &$expect, &$args, &$target) {
 	return true;
 }
 
-function run_test($test, $name, $code, $expect, $args) {
+function run_test($build_dir, $test, $name, $code, $expect, $args) {
 	$base   = substr($test, 0, -4);
 	$input = $base . ".ir";
 	$output = $base . ".out";
@@ -59,8 +59,8 @@ function run_test($test, $name, $code, $expect, $args) {
 	if (!@file_put_contents($input, $code)) {
 		return false;
 	}
-	@system("./ir $input $args >$output 2>&1");
-//	if (@system("./ir $input $args 2>&1 >$output") != 0) {
+	@system("$build_dir/ir $input $args >$output 2>&1");
+//	if (@system("$build_dir/ir $input $args 2>&1 >$output") != 0) {
 //		return false;
 //	}
 	$out = @file_get_contents($output);
@@ -107,9 +107,11 @@ function find_tests($dir) {
 }
 
 function run_tests() {
+	$build_dir = getenv("BUILD_DIR") ?? ".";
+	$src_dir = getenv("SRC_DIR") ?? ".";
 	$skiped = 0;
-    $target = @system("./ir --target");
-	$tests = find_tests("tests");
+    $target = @system("$build_dir/ir --target");
+	$tests = find_tests("$src_dir/tests");
 	$bad = array();
 	$failed = array();
 	$total = count($tests);
@@ -126,7 +128,7 @@ function run_tests() {
 			$len = strlen($str);
 			echo $str;
 			flush();
-			$ret = run_test($test, $name, $code, $expect, $opt);
+			$ret = run_test($build_dir, $test, $name, $code, $expect, $opt);
 	        echo str_repeat(" ", $len);
 			if ($ret) {
 				echo "\r\e[1;32mPASS\e[0m: $name [$test]\n";
