@@ -11,12 +11,6 @@
 #include "ir_private.h"
 #include "ir_elf.h"
 
-#if defined(HAVE_ATTRIBUTE_ALIGNED)
-# define IR_SET_ALIGNED(alignment, decl) decl __attribute__ ((__aligned__ (alignment)))
-#else
-# define IR_SET_ALIGNED(alignment, decl) decl
-#endif
-
 /* DWARF definitions. */
 #define DW_CIE_VERSION  1
 

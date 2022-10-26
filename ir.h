@@ -610,6 +610,10 @@ int ir_emit_c(ir_ctx *ctx, FILE *f);
 bool ir_check(ir_ctx *ctx);
 void ir_consistency_check(void);
 
+/* Code patching (implementation in ir_patch.c) */
+int ir_patch(const void *code, size_t size, uint32_t jmp_table_size, const void *from_addr, const void *to_addr);
+
+
 /* IR Memmory Allocation */
 #ifndef ir_mem_malloc
 # define ir_mem_malloc   malloc

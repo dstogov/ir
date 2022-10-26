@@ -21,6 +21,11 @@
 # if __has_attribute(noinline)
 #  define IR_NEVER_INLINE __attribute__((noinline))
 # endif
+# if __has_attribute(__aligned__)
+#  define IR_SET_ALIGNED(alignment, decl) decl __attribute__ ((__aligned__ (alignment)))
+# endif
+#elif defined(_WIN32)
+# define IR_SET_ALIGNED(alignment, decl) __declspec(align(alignment)) decl
 #endif
 #ifndef EXPECTED
 # define EXPECTED(condition)   (condition)
@@ -31,6 +36,9 @@
 #endif
 #ifndef IR_NEVER_INLINE
 # define IR_NEVER_INLINE
+#endif
+#ifndef IR_SET_ALIGNED
+#  define IR_SET_ALIGNED(alignment, decl) decl
 #endif
 
 /*** Helper routines ***/
