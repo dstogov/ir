@@ -9,6 +9,8 @@
 # include "ir_x86.h"
 #elif defined(IR_TARGET_AARCH64)
 # include "ir_aarch64.h"
+#else
+# error "Unknown IR target"
 #endif
 
 #include "ir_private.h"
