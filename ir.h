@@ -410,8 +410,11 @@ void ir_strtab_free(ir_strtab *strtab);
 #define IR_HAS_ALLOCA         (1<<5)
 #define IR_HAS_CALLS          (1<<6)
 #define IR_NO_STACK_COMBINE   (1<<7)
+#define IR_START_BR_TARGET    (1<<8)
+#define IR_ENTRY_BR_TARGET    (1<<9)
+#define IR_GEN_ENDBR          (1<<10)
 
-#define IR_IRREDUCIBLE_CFG    (1<<8)
+#define IR_IRREDUCIBLE_CFG    (1<<15)
 
 #define IR_OPT_FOLDING        (1<<16)
 #define IR_OPT_CFG            (1<<17) /* merge BBs, by remove END->BEGIN nodes during CFG construction */
