@@ -910,9 +910,10 @@ ir_ref ir_bind(ir_ctx *ctx, ir_ref var, ir_ref def)
 		ctx->binding = ir_mem_malloc(sizeof(ir_hashtab));;
 		ir_hashtab_init(ctx->binding, 16);
 	}
-	/* Node may be bound some VAR node or to some special spill slot (using negative "var") */
+	/* Node may be bound to some VAR node or to some special spill slot (using negative "var") */
 	IR_ASSERT(var < 0 || (var < ctx->insns_count && ctx->ir_base[var].op == IR_VAR));
 	if (!ir_hashtab_add(ctx->binding, def, var)) {
+		/* Add a copy with different binding */
 		def = ir_emit2(ctx, IR_OPT(IR_COPY, ctx->ir_base[def].type), def, 1);
 		ir_hashtab_add(ctx->binding, def, var);
 	}
