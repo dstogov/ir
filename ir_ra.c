@@ -773,7 +773,7 @@ static bool ir_try_coalesce(ir_ctx *ctx, ir_live_range **unused, ir_ref from, ir
 		} else if ((f2 & IR_LIVE_INTERVAL_COALESCED) && !(f1 & IR_LIVE_INTERVAL_COALESCED)) {
 			ir_vregs_join(ctx, unused, v2, v1);
 			ctx->vregs[from] = v2;
-		} else if (v1 < v2) {
+		} else if (from < to) {
 			ir_vregs_join(ctx, unused, v1, v2);
 			if (f2 & IR_LIVE_INTERVAL_COALESCED) {
 				for (i = 0; i < ctx->insns_count; i++) {
