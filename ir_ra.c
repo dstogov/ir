@@ -1655,6 +1655,28 @@ static void ir_add_to_unhandled(ir_live_interval **unhandled, ir_live_interval *
 	}
 }
 
+static void ir_add_to_unhandled_spill(ir_live_interval **unhandled, ir_live_interval *ival)
+{
+	ir_live_pos pos = ival->range.start;
+
+	if (*unhandled == NULL
+	 || pos <= (*unhandled)->range.start) {
+		ival->list_next = *unhandled;
+		*unhandled = ival;
+	} else {
+		ir_live_interval *prev = *unhandled;
+
+		while (prev->list_next) {
+			if (pos <= prev->list_next->range.start) {
+				break;
+			}
+			prev = prev->list_next;
+		}
+		ival->list_next = prev->list_next;
+		prev->list_next = ival;
+	}
+}
+
 static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_live_interval **active, ir_live_interval *inactive, ir_live_interval **unhandled)
 {
 	ir_live_pos freeUntilPos[IR_REG_NUM];
@@ -2389,13 +2411,71 @@ static int ir_linear_scan(ir_ctx *ctx)
 		ir_assign_bound_spill_slots(ctx);
 	}
 
-	for (j = 1; j <= ctx->vregs_count; j++) {
+	/* Use simple linear-scan (without holes) to allocate and reuse spill slots */
+	unhandled = NULL;
+	for (j = ctx->vregs_count; j != 0; j--) {
 		ival = ctx->live_intervals[j];
 		if (ival
 		 && (ival->next || ival->reg == IR_REG_NONE)
 		 && ival->stack_spill_pos == -1
 		 && !(ival->flags & IR_LIVE_INTERVAL_MEM_PARAM)) {
-			ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type, &data);
+			ir_live_range *r;
+
+			other = ival;
+			while (other->next) {
+				other = other->next;
+			}
+			r = &other->range;
+			while (r->next) {
+				r = r->next;
+			}
+			ival->end = r->end;
+			ir_add_to_unhandled_spill(&unhandled, ival);
+		}
+	}
+
+	if (unhandled) {
+		uint8_t size;
+		ir_live_interval *handled[9] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+
+		active = NULL;
+		while (unhandled) {
+			ival = unhandled;
+			ival->current_range = &ival->range;
+			unhandled = ival->list_next;
+			position = ival->range.start;
+
+			/* for each interval i in active */
+			other = active;
+			prev = NULL;
+			while (other) {
+				if (other->end <= position) {
+					/* move i from active to handled */
+					if (prev) {
+						prev->list_next = other->list_next;
+					} else {
+						active = other->list_next;
+					}
+					size = ir_type_size[other->type];
+					IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8);
+					other->list_next = handled[size];
+					handled[size] = other;
+				} else {
+					prev = other;
+				}
+				other = prev ? prev->list_next : active;
+			}
+
+			size = ir_type_size[ival->type];
+			IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8);
+			if (handled[size] != NULL) {
+				ival->stack_spill_pos = handled[size]->stack_spill_pos;
+				handled[size] = handled[size]->list_next;
+			} else {
+				ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type, &data);
+			}
+			ival->list_next = active;
+			active = ival;
 		}
 	}
 
