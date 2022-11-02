@@ -2391,30 +2391,11 @@ static int ir_linear_scan(ir_ctx *ctx)
 
 	for (j = 1; j <= ctx->vregs_count; j++) {
 		ival = ctx->live_intervals[j];
-		if (ival && ival->stack_spill_pos == -1 && !(ival->flags & IR_LIVE_INTERVAL_MEM_PARAM)) {
-			if (ival->next || ival->reg == IR_REG_NONE) {
-#if 0
-				if (ctx->binding) {
-					ir_ref ref;
-
-					// TODO: avoid naive loop ???
-					for (ref = 1; ref < ctx->insns_count; ref++) {
-						if (ctx->vregs[ref] == j) {
-							ir_ref var = ir_binding_find(ctx, ref);
-							if (var < 0) {
-								ival->stack_spill_pos = -var;
-								ival->flags |= IR_LIVE_INTERVAL_SPILL_SPECIAL;
-								break;
-							}
-						}
-					}
-					if (ival->stack_spill_pos != -1) {
-						continue;
-					}
-				}
-#endif
-				ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type, &data);
-			}
+		if (ival
+		 && (ival->next || ival->reg == IR_REG_NONE)
+		 && ival->stack_spill_pos == -1
+		 && !(ival->flags & IR_LIVE_INTERVAL_MEM_PARAM)) {
+			ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type, &data);
 		}
 	}
 
