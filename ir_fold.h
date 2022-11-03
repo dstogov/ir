@@ -1829,8 +1829,6 @@ IR_FOLD(XOR(XOR, C_I64))
 /* Swap operands (move lower ref to op2) for better CSE */
 IR_FOLD(ADD(_, _))
 IR_FOLD(MUL(_, _))
-IR_FOLD(ADD_OV(_, _))
-IR_FOLD(MUL_OV(_, _))
 IR_FOLD_NAMED(swap_ops)
 {
 	if (op1 < op2) {  /* move lower ref to op2 */
@@ -1840,6 +1838,25 @@ IR_FOLD_NAMED(swap_ops)
 		IR_FOLD_RESTART;
 	}
     IR_FOLD_NEXT;
+}
+
+IR_FOLD(ADD_OV(_, _))
+IR_FOLD(MUL_OV(_, _))
+{
+	if (op1 < op2) {  /* move lower ref to op2 */
+		ir_ref tmp = op1;
+		op1 = op2;
+		op2 = tmp;
+		IR_FOLD_RESTART;
+	}
+	/* skip CSE ??? */
+	IR_FOLD_EMIT;
+}
+
+IR_FOLD(SUB_OV(_, _))
+{
+	/* skip CSE ??? */
+	IR_FOLD_EMIT;
 }
 
 /* Binary operations with op1 == op2 */
