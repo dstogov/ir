@@ -468,10 +468,74 @@ IR_FOLD(ABS(C_FLOAT))
 
 //IR_FOLD(CAST(CONST))
 //TODO: type casting
-//IR_FOLD(ADD_OV(CONST, CONST))
-//IR_FOLD(SUB_OV(CONST, CONST))
+
+IR_FOLD(ADD_OV(C_U8, C_U8))
+IR_FOLD(ADD_OV(C_U16, C_U16))
+IR_FOLD(ADD_OV(C_U32, C_U32))
+IR_FOLD(ADD_OV(C_U64, C_U64))
+{
+	ir_type type = IR_OPT_TYPE(opt);
+	uint64_t max = ((uint64_t)0xffffffffffffffff) >> (64 - ir_type_size[type] * 8);
+	IR_ASSERT(type == op1_insn->type);
+	if (op1_insn->val.u64 > max - op2_insn->val.u64) {
+		IR_FOLD_NEXT;
+	}
+	IR_FOLD_CONST_U(op1_insn->val.u64 + op2_insn->val.u64);
+}
+
+IR_FOLD(ADD_OV(C_I8, C_I8))
+IR_FOLD(ADD_OV(C_I16, C_I16))
+IR_FOLD(ADD_OV(C_I32, C_I32))
+IR_FOLD(ADD_OV(C_I64, C_I64))
+{
+	ir_type type = IR_OPT_TYPE(opt);
+	int64_t max = ((uint64_t)0x7fffffffffffffff) >> (64 - ir_type_size[type] * 8);
+	int64_t min = - max - 1;
+	IR_ASSERT(type == op1_insn->type);
+	if ((op2_insn->val.i64 > 0 && op1_insn->val.i64 > max - op2_insn->val.i64)
+	 || (op2_insn->val.i64 < 0 && op1_insn->val.i64 < min - op2_insn->val.i64)) {
+		IR_FOLD_NEXT;
+	}
+	IR_FOLD_CONST_I(op1_insn->val.i64 + op2_insn->val.i64);
+}
+
+IR_FOLD(SUB_OV(C_U8, C_U8))
+IR_FOLD(SUB_OV(C_U16, C_U16))
+IR_FOLD(SUB_OV(C_U32, C_U32))
+IR_FOLD(SUB_OV(C_U64, C_U64))
+{
+	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
+	if (op2_insn->val.u64 > op1_insn->val.u64) {
+		IR_FOLD_NEXT;
+	}
+	IR_FOLD_CONST_U(op1_insn->val.u64 - op2_insn->val.u64);
+}
+
+IR_FOLD(SUB_OV(C_I8, C_I8))
+IR_FOLD(SUB_OV(C_I16, C_I16))
+IR_FOLD(SUB_OV(C_I32, C_I32))
+IR_FOLD(SUB_OV(C_I64, C_I64))
+{
+	ir_type type = IR_OPT_TYPE(opt);
+	int64_t max = ((uint64_t)0x7fffffffffffffff) >> (64 - ir_type_size[type] * 8);
+	int64_t min = - max - 1;
+	IR_ASSERT(type == op1_insn->type);
+	if ((op2_insn->val.i64 > 0 && op1_insn->val.i64 < min + op2_insn->val.i64)
+	 || (op2_insn->val.i64 < 0 && op1_insn->val.i64 > max + op2_insn->val.i64)) {
+		IR_FOLD_NEXT;
+	}
+	IR_FOLD_CONST_I(op1_insn->val.i64 - op2_insn->val.i64);
+}
+
 //IR_FOLD(MUL_OV(CONST, CONST))
-//TODO: overflow check
+
+IR_FOLD(OVERFLOW(_))
+{
+	if (op1_insn->op != IR_ADD_OV && op1_insn->op != IR_SUB_OV && op1_insn->op != IR_MUL_OV) {
+		IR_FOLD_COPY(IR_FALSE);
+	}
+	IR_FOLD_NEXT;
+}
 
 IR_FOLD(NOT(C_BOOL))
 {
