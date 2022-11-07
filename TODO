@@ -11,7 +11,6 @@
 -  irreducable loops detection/support
 
 -  range inference and PI node
--  SCCP edge cases (remove MERGE with PHIs)
 -  Folding after SCCP (see combo4.ir)
 -  Extend SCCP to remove dead LOADs
 
