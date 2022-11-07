@@ -38,8 +38,7 @@ x86_64
 }
 --EXPECT--
 test:
-	movl $2, %eax
-	imull %esi, %eax
+	leal (%rsi, %rsi), %eax
 .L1:
 	testb %dil, %dil
 	jne .L1

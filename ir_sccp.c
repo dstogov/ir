@@ -56,7 +56,6 @@ restart:
 			op2 = ctx->fold_insn.op2;
 			op3 = ctx->fold_insn.op3;
 			goto restart;
-		case IR_FOLD_DO_CSE:
 		case IR_FOLD_DO_EMIT:
 			IR_MAKE_BOTTOM(res);
 			return 1;
@@ -74,7 +73,7 @@ restart:
 				_values[res].op1 = op1;
 				return 1;
 			} else if (_values[res].op == IR_COPY && _values[res].op1 == op1) {
-				return 0;
+				return 0; /* not changed */
 #endif
 			} else {
 				IR_MAKE_BOTTOM(res);
@@ -97,7 +96,7 @@ restart:
 		IR_MAKE_BOTTOM(res);
 		return 1;
 	}
-	return 0;
+	return 0; /* not changed */
 }
 
 static bool ir_sccp_join_values(ir_ctx *ctx, ir_insn *_values, ir_ref a, ir_ref b)
@@ -226,7 +225,7 @@ static void ir_sccp_make_nop(ir_ctx *ctx, ir_ref ref)
 	}
 }
 
-static void ir_sccp_replace_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_ref new_ref)
+static void ir_sccp_replace_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_ref new_ref, ir_bitqueue *worklist)
 {
 	ir_ref j, n, *p, use, k, l;
 	ir_insn *insn;
@@ -265,11 +264,79 @@ static void ir_sccp_replace_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_r
 				}
 			}
 #endif
-			// TODO: Folding ???
+			/* schedule folding & DCE */
+			if (worklist && _values[use].op == IR_BOTTOM) {
+				ir_bitqueue_add(worklist, use);
+			}
 		}
 	}
 
 	ir_sccp_make_nop(ctx, ref);
+}
+
+static void ir_sccp_fold2(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_bitqueue *worklist)
+{
+	uint32_t opt;
+	ir_ref op1, op2, op3;
+	ir_insn *op1_insn, *op2_insn, *op3_insn, *insn;
+
+	insn = &ctx->ir_base[ref];
+	opt = insn->opt;
+	op1 = insn->op1;
+	op2 = insn->op2;
+	op3 = insn->op3;
+
+restart:
+	op1_insn = ctx->ir_base + op1;
+	op2_insn = ctx->ir_base + op2;
+	op3_insn = ctx->ir_base + op3;
+
+	switch (ir_folding(ctx, opt, op1, op2, op3, op1_insn, op2_insn, op3_insn)) {
+		case IR_FOLD_DO_RESTART:
+			opt = ctx->fold_insn.optx;
+			op1 = ctx->fold_insn.op1;
+			op2 = ctx->fold_insn.op2;
+			op3 = ctx->fold_insn.op3;
+			goto restart;
+		case IR_FOLD_DO_EMIT:
+			insn = &ctx->ir_base[ref];
+			if (insn->opt != ctx->fold_insn.opt
+			 || insn->op1 != ctx->fold_insn.op1
+			 || insn->op2 != ctx->fold_insn.op2
+			 || insn->op3 != ctx->fold_insn.op3) {
+
+				ir_use_list *use_list;
+				ir_ref n, j, *p, use;
+
+				insn->optx = ctx->fold_insn.opt;
+				insn->op1 = ctx->fold_insn.op1;
+				insn->op2 = ctx->fold_insn.op2;
+				insn->op3 = ctx->fold_insn.op3;
+
+				use_list = &ctx->use_lists[ref];
+				n = use_list->count;
+				for (j = 0, p = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
+					use = *p;
+					if (IR_IS_REACHABLE(use)) {
+						if (worklist && _values[use].op == IR_BOTTOM) {
+							ir_bitqueue_add(worklist, use);
+						}
+					}
+				}
+			}
+			break;
+		case IR_FOLD_DO_COPY:
+			op1 = ctx->fold_insn.op1;
+			ir_sccp_replace_insn(ctx, _values, ref, op1, worklist);
+			break;
+		case IR_FOLD_DO_CONST:
+			op1 = ir_const(ctx, ctx->fold_insn.val, ctx->fold_insn.type);
+			ir_sccp_replace_insn(ctx, _values, ref, op1, worklist);
+			break;
+		default:
+			IR_ASSERT(0);
+			break;
+	}
 }
 
 static void ir_sccp_replace_use(ir_ctx *ctx, ir_ref ref, ir_ref use, ir_ref new_use)
@@ -462,22 +529,32 @@ int ir_sccp(ir_ctx *ctx)
 					continue;
 				}
 			} else if (IR_IS_FOLDABLE_OP(insn->op)) {
-//				bool has_bottom = 0;
+				bool may_benefit = 0;
 				bool has_top = 0;
 				n = ir_input_edges_count(ctx, insn);
 				for (j = 1; j <= n; j++) {
-//					if (IR_IS_BOTTOM(insn->ops[j])) {
-//						has_bottom = 1;
-//					} else
-					if (IR_IS_TOP(insn->ops[j])) {
-						has_top = 1;
-						ir_bitqueue_add(&worklist, insn->ops[j]);
+					ir_ref input = insn->ops[j];
+					if (!IR_IS_CONST_REF(input)) {
+						if (_values[input].optx == IR_TOP) {
+							has_top = 1;
+							ir_bitqueue_add(&worklist, insn->ops[j]);
+						} else if (_values[input].optx != IR_BOTTOM) {
+							/* Perform folding only if some of direct inputs
+							 * is going to be replaced by a constant or copy.
+							 * This approach may miss some folding optimizations
+							 * dependent on indirect inputs. e.g reassociation.
+							 */
+							may_benefit = 1;
+						}
 					}
 				}
 				if (has_top) {
 					continue;
 				}
-				if (!ir_sccp_fold(ctx, _values, i, insn->opt, insn->op1, insn->op2, insn->op3)) {
+				if (!may_benefit) {
+					IR_MAKE_BOTTOM(i);
+				} else if (!ir_sccp_fold(ctx, _values, i, insn->opt, insn->op1, insn->op2, insn->op3)) {
+					/* not changed */
 					continue;
 				}
 			} else {
@@ -662,10 +739,10 @@ int ir_sccp(ir_ctx *ctx)
 		} else if (IR_IS_CONST_OP(_values[i].op)) {
 			/* replace instruction by constant */
 			j = ir_const(ctx, _values[i].val, _values[i].type);
-			ir_sccp_replace_insn(ctx, _values, i, j);
+			ir_sccp_replace_insn(ctx, _values, i, j, &worklist);
 #if IR_COMBO_COPY_PROPAGATION
 		} else if (_values[i].op == IR_COPY) {
-			ir_sccp_replace_insn(ctx, _values, i, _values[i].op1);
+			ir_sccp_replace_insn(ctx, _values, i, _values[i].op1, &worklist);
 #endif
 		} else if (_values[i].op == IR_TOP) {
 			/* remove unreachable instruction */
@@ -690,7 +767,7 @@ int ir_sccp(ir_ctx *ctx)
 						}
 					}
 				}
-				ir_sccp_replace_insn(ctx, _values, i, IR_UNUSED);
+				ir_sccp_replace_insn(ctx, _values, i, IR_UNUSED, NULL);
 			}
 		} else if (_values[i].op == IR_IF) {
 			/* remove one way IF/SWITCH */
@@ -702,8 +779,19 @@ int ir_sccp(ir_ctx *ctx)
 	}
 
 	while ((i = ir_bitqueue_pop(&worklist)) >= 0) {
-		/* remove unreachable MERGE inputs */
-		ir_sccp_remove_unreachable_merge_inputs(ctx, _values, i, _values[i].op1);
+		if (_values[i].op == IR_MERGE || _values[i].op == IR_LOOP_BEGIN) {
+			/* remove unreachable MERGE inputs */
+			ir_sccp_remove_unreachable_merge_inputs(ctx, _values, i, _values[i].op1);
+		} else {
+			insn = &ctx->ir_base[i];
+			if (IR_IS_FOLDABLE_OP(insn->op)) {
+				if (ctx->use_lists[i].count == 0) {
+					ir_sccp_replace_insn(ctx, _values, i, IR_UNUSED, &worklist);
+				} else {
+					ir_sccp_fold2(ctx, _values, i, &worklist);
+				}
+			}
+		}
 	}
 
 	ir_mem_free(_values);
