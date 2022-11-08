@@ -1,0 +1,32 @@
+--TEST--
+004: add_ov function (jmp probability)
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	int32_t c_1 = 0;
+	int32_t c = 2;
+	l_1 = START(l_8);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t ret1 = ADD_OV(x, c);
+	bool ov = OVERFLOW(ret1);
+	l_2 = IF(l_1, ov);
+	l_3 = IF_TRUE(l_2, 1);
+	l_4 = END(l_3);
+	l_5 = IF_FALSE(l_2);
+	l_6 = END(l_5);
+	l_7 = MERGE(l_4, l_6);
+	int32_t ret = PHI(l_7, c_1, ret1);
+	l_8 = RETURN(l_7, ret);
+}
+--EXPECT--
+test:
+	adds w0, w0, #2
+	b.vs .L2
+.L1:
+	ret
+.L2:
+	mov w0, wzr
+	b .L1

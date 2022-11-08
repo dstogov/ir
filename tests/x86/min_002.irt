@@ -1,0 +1,23 @@
+--TEST--
+002: min function
+--TARGET--
+x86
+--ARGS--
+-S -mavx
+--CODE--
+{
+	l_1 = START(l_4);
+	float x = PARAM(l_1, "x", 1);
+	float y = PARAM(l_1, "y", 2);
+	float ret = MIN(x, y);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	subl $4, %esp
+	vmovss 0xc(%esp), %xmm0
+	vminss 8(%esp), %xmm0, %xmm0
+	vmovss %xmm0, (%esp)
+	flds (%esp)
+	addl $4, %esp
+	retl

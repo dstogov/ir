@@ -1,0 +1,18 @@
+--TEST--
+002: not function
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	bool x = PARAM(l_1, "x", 1);
+	bool ret = NOT(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	cmp w2, #0
+	cset w0, eq
+	ret

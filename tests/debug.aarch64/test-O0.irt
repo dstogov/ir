@@ -1,0 +1,131 @@
+--TEST--
+Mandelbrot Test (-O0)
+--TARGET--
+aarch64
+--ARGS--
+-S -O0
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	double c_4 = 0.5;
+	double c_5 = 0;
+	int32_t c_6 = 0;
+	int32_t c_7 = 1;
+	double c_8 = 16;
+	int32_t c_9 = 1000;
+	l_1 = START(l_35);
+	double d_2 = PARAM(l_1, "x", 0);
+	double d_3 = PARAM(l_1, "y", 1);
+	double d_4 = VAR(l_1, "cr");
+	double d_5 = SUB(d_3, c_4);
+	double d_6 = VAR(l_1, "ci");
+	double d_7 = VAR(l_1, "zi");
+	double d_8 = VAR(l_1, "zr");
+	int32_t d_9 = VAR(l_1, "i");
+	l_10 = END(l_1);
+	l_11 = LOOP_BEGIN(l_10, l_37);
+	double d_12 = PHI(l_11, c_5, d_25);
+	double d_13 = PHI(l_11, c_5, d_23);
+	int32_t d_14 = PHI(l_11, c_6, d_15);
+	int32_t d_15 = ADD(d_14, c_7);
+	double d_16 = VAR(l_11, "temp");
+	double d_17 = MUL(d_13, d_12);
+	double d_18 = VAR(l_11, "zr2");
+	double d_19 = MUL(d_13, d_13);
+	double d_20 = VAR(l_11, "zi2");
+	double d_21 = MUL(d_12, d_12);
+	double d_22 = SUB(d_19, d_21);
+	double d_23 = ADD(d_22, d_5);
+	double d_24 = ADD(d_17, d_17);
+	double d_25 = ADD(d_24, d_2);
+	double d_26 = ADD(d_21, d_19);
+	bool d_27 = GT(d_26, c_8);
+	l_28 = IF(l_11, d_27);
+	l_29 = IF_TRUE(l_28);
+	l_30 = RETURN(l_29, d_15);
+	l_31 = IF_FALSE(l_28);
+	bool d_32 = GT(d_15, c_9);
+	l_33 = IF(l_31, d_32);
+	l_34 = IF_TRUE(l_33);
+	l_35 = RETURN(l_34, c_6, l_30);
+	l_36 = IF_FALSE(l_33);
+	l_37 = LOOP_END(l_36, l_11);
+}
+--EXPECT--
+test:
+	sub sp, sp, #0x70
+	str d0, [sp]
+	str d1, [sp, #8]
+	ldr d1, [sp, #8]
+	ldr d2, .L4
+	fsub d0, d1, d2
+	str d0, [sp, #0x10]
+	fmov d0, xzr
+	str d0, [sp, #0x18]
+	fmov d0, xzr
+	str d0, [sp, #0x20]
+	mov w0, wzr
+	str w0, [sp, #0x28]
+.L1:
+	ldr w1, [sp, #0x28]
+	add w0, w1, #1
+	str w0, [sp, #0x2c]
+	ldr d1, [sp, #0x20]
+	ldr d2, [sp, #0x18]
+	fmul d0, d1, d2
+	str d0, [sp, #0x30]
+	ldr d1, [sp, #0x20]
+	fmul d0, d1, d1
+	str d0, [sp, #0x38]
+	ldr d1, [sp, #0x18]
+	fmul d0, d1, d1
+	str d0, [sp, #0x40]
+	ldr d1, [sp, #0x38]
+	ldr d2, [sp, #0x40]
+	fsub d0, d1, d2
+	str d0, [sp, #0x48]
+	ldr d1, [sp, #0x48]
+	ldr d2, [sp, #0x10]
+	fadd d0, d1, d2
+	str d0, [sp, #0x50]
+	ldr d1, [sp, #0x30]
+	fadd d0, d1, d1
+	str d0, [sp, #0x58]
+	ldr d1, [sp, #0x58]
+	ldr d2, [sp]
+	fadd d0, d1, d2
+	str d0, [sp, #0x60]
+	ldr d1, [sp, #0x40]
+	ldr d2, [sp, #0x38]
+	fadd d0, d1, d2
+	str d0, [sp, #0x68]
+	ldr d0, [sp, #0x68]
+	ldr d1, .L5
+	fcmp d0, d1
+	b.ls .L2
+	ldr w0, [sp, #0x2c]
+	add sp, sp, #0x70
+	ret
+.L2:
+	ldr w0, [sp, #0x2c]
+	cmp w0, #0x3e8
+	b.le .L3
+	mov w0, wzr
+	add sp, sp, #0x70
+	ret
+.L3:
+	ldr d0, [sp, #0x60]
+	str d0, [sp, #0x18]
+	ldr d0, [sp, #0x50]
+	str d0, [sp, #0x20]
+	ldr w0, [sp, #0x2c]
+	str w0, [sp, #0x28]
+	b .L1
+.rodata
+	.db 0x1f, 0x20, 0x03, 0xd5
+.L4:
+	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f
+.L5:
+	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x40

@@ -1,0 +1,19 @@
+--TEST--
+010: add function
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	uint16_t c = 1;
+	l_1 = START(l_4);
+	uint16_t x = PARAM(l_1, "x", 1);
+	uint16_t ret = ADD(x, c);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	movw 4(%esp), %ax
+	incw %ax
+	retl

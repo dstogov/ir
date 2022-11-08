@@ -1,0 +1,144 @@
+--TEST--
+Mandelbrot Test (var)
+--TARGET--
+aarch64
+--ARGS--
+-S -O0
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	double c_4 = 0.5;
+	double c_5 = 0;
+	int32_t c_6 = 0;
+	int32_t c_7 = 1;
+	double c_8 = 16;
+	int32_t c_9 = 1000;
+	l_1 = START(l_35);
+	double d_2 = PARAM(l_1, "x", 0);
+	double d_3 = PARAM(l_1, "y", 1);
+	double cr = VAR(l_1, "cr");
+	double d_5 = SUB(d_3, c_4);
+	l_1_1 = VSTORE(l_1, cr, d_5);
+	double ci = VAR(l_1, "ci");
+	l_1_2 = VSTORE(l_1_1, ci, d_2);
+	double zi = VAR(l_1, "zi");
+	l_1_3 = VSTORE(l_1_2, zi, c_5);
+	double zr = VAR(l_1, "zr");
+	l_1_4 = VSTORE(l_1_3, zr, c_5);
+	int32_t i = VAR(l_1, "i");
+	l_1_5 = VSTORE(l_1_4, i, c_6);
+	l_10 = END(l_1_5);
+	l_11 = LOOP_BEGIN(l_10, l_37);
+	int32_t d_14, l_11_1 = VLOAD(l_11, i);
+	int32_t d_15 = ADD(d_14, c_7);
+	l_11_2 = VSTORE(l_11_1, i, d_15);
+	double temp = VAR(l_11, "temp");
+	double zr_1, l_11_3 = VLOAD(l_11_2, zr);
+	double zi_1, l_11_4 = VLOAD(l_11_3, zi);
+	double d_17 = MUL(zr_1, zi_1);
+	l_11_5 = VSTORE(l_11_4, temp, d_17);
+	double zr2 = VAR(l_11, "zr2");
+	double d_19 = MUL(zr_1, zr_1);
+	l_11_6 = VSTORE(l_11_5, zr2, d_19);
+	double zi2 = VAR(l_11, "zi2");
+	double d_21 = MUL(zi_1, zi_1);
+	l_11_7 = VSTORE(l_11_6, zi2, d_21);
+	double zr2_1, l_11_8 = VLOAD(l_11_7, zr2);
+	double zi2_1, l_11_9 = VLOAD(l_11_8, zi2);
+	double d_22 = SUB(zr2_1, zi2_1);
+	double cr2_1, l_11_10 = VLOAD(l_11_9, cr);
+	double d_23 = ADD(d_22, cr2_1);
+	l_11_11 = VSTORE(l_11_10, zr, d_23);
+	double temp_1, l_11_12 = VLOAD(l_11_11, temp);
+	double d_24 = ADD(temp_1, temp_1);
+	double ci_1, l_11_13 = VLOAD(l_11_12, ci);
+	double d_25 = ADD(d_24, ci_1);
+	l_11_14 = VSTORE(l_11_13, zi, d_25);
+	double zi2_2, l_11_15 = VLOAD(l_11_14, zi2);
+	double zr2_2, l_11_16 = VLOAD(l_11_15, zr2);
+	double d_26 = ADD(zi2_2, zr2_2);
+	bool d_27 = GT(d_26, c_8);
+	l_28 = IF(l_11_16, d_27);
+	l_29 = IF_TRUE(l_28);
+	int32_t d_15_1, l_29_1 = VLOAD(l_29, i);
+	l_30 = RETURN(l_29_1, d_15_1);
+	l_31 = IF_FALSE(l_28);
+	int32_t d_15_2, l_31_1 = VLOAD(l_31, i);
+	bool d_32 = GT(d_15_2, c_9);
+	l_33 = IF(l_31_1, d_32);
+	l_34 = IF_TRUE(l_33);
+	l_35 = RETURN(l_34, c_6, l_30);
+	l_36 = IF_FALSE(l_33);
+	l_37 = LOOP_END(l_36, l_11);
+}
+--EXPECT--
+test:
+	sub sp, sp, #0x68
+	str d0, [sp]
+	str d1, [sp, #8]
+	ldr d1, [sp, #8]
+	ldr d2, .L3
+	fsub d0, d1, d2
+	str d0, [sp, #0x10]
+	ldr d0, [sp]
+	str d0, [sp, #0x18]
+	fmov d0, xzr
+	str d0, [sp, #0x20]
+	fmov d0, xzr
+	str d0, [sp, #0x28]
+	mov w0, wzr
+	str w0, [sp, #0x30]
+.L1:
+	ldr w1, [sp, #0x30]
+	add w0, w1, #1
+	str w0, [sp, #0x30]
+	ldr d1, [sp, #0x28]
+	ldr d2, [sp, #0x20]
+	fmul d0, d1, d2
+	str d0, [sp, #0x38]
+	ldr d1, [sp, #0x28]
+	fmul d0, d1, d1
+	str d0, [sp, #0x40]
+	ldr d1, [sp, #0x20]
+	fmul d0, d1, d1
+	str d0, [sp, #0x48]
+	ldr d1, [sp, #0x40]
+	ldr d2, [sp, #0x48]
+	fsub d0, d1, d2
+	str d0, [sp, #0x50]
+	ldr d1, [sp, #0x50]
+	ldr d2, [sp, #0x10]
+	fadd d0, d1, d2
+	str d0, [sp, #0x28]
+	ldr d1, [sp, #0x38]
+	fadd d0, d1, d1
+	str d0, [sp, #0x58]
+	ldr d1, [sp, #0x58]
+	ldr d2, [sp, #0x18]
+	fadd d0, d1, d2
+	str d0, [sp, #0x20]
+	ldr d1, [sp, #0x48]
+	ldr d2, [sp, #0x40]
+	fadd d0, d1, d2
+	str d0, [sp, #0x60]
+	ldr d0, [sp, #0x60]
+	ldr d1, .L4
+	fcmp d0, d1
+	b.ls .L2
+	ldr w0, [sp, #0x30]
+	add sp, sp, #0x68
+	ret
+.L2:
+	ldr w0, [sp, #0x30]
+	cmp w0, #0x3e8
+	b.le .L1
+	mov w0, wzr
+	add sp, sp, #0x68
+	ret
+.rodata
+.L3:
+	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f
+.L4:
+	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x40

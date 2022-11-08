@@ -1,0 +1,119 @@
+--TEST--
+FibI
+--TARGET--
+x86_64
+--ARGS--
+--save --dump-live-ranges -S --run
+--CODE--
+{
+	int32_t c_0 = 0;
+	int32_t c_1 = 1;
+	int32_t c_10000 = 10000;
+	uintptr_t f = func(printf);
+	uintptr_t format = "%d\n";
+	l_1 = START(l_6);
+	int32_t lo_1 = COPY(c_0);
+	int32_t hi_1 = COPY(c_1);
+	l_2 = END(l_1);
+	l_3 = LOOP_BEGIN(l_2, l_9);
+	int32_t lo_2 = PHI(l_3, lo_1, lo_3);
+	int32_t hi_2 = PHI(l_3, hi_1, hi_3);
+	bool b = LT(hi_2, c_10000);
+	l_4 = IF(l_3, b);
+	l_7 = IF_TRUE(l_4);
+	int32_t hi_3 = ADD(hi_2, lo_2);
+	int32_t lo_3 = SUB(hi_3, lo_2);
+	l_8 = CALL/2(l_7, f, format, lo_3);
+	l_9 = LOOP_END(l_8, l_3);
+	l_5 = IF_FALSE(l_4);
+	l_6 = RETURN(l_5, c_0);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 0;
+	int32_t c_5 = 1;
+	int32_t c_6 = 10000;
+	uintptr_t c_7 = func(printf);
+	uintptr_t c_8 = "%d\n";
+	l_1 = START(l_15);
+	l_2 = END(l_1);
+	l_3 = LOOP_BEGIN(l_2, l_13);
+	int32_t d_4 = PHI(l_3, c_4, d_10);
+	int32_t d_5 = PHI(l_3, c_5, d_9);
+	bool d_6 = LT(d_5, c_6);
+	l_7 = IF(l_3, d_6);
+	l_8 = IF_TRUE(l_7);
+	int32_t d_9 = ADD(d_5, d_4);
+	int32_t d_10 = SUB(d_9, d_4);
+	l_11 = CALL/2(l_8, c_7, c_8, d_10);
+	l_13 = LOOP_END(l_11, l_3);
+	l_14 = IF_FALSE(l_7);
+	l_15 = RETURN(l_14, c_4);
+}
+{ # LIVE-RANGES (vregs_count=3)
+TMP
+	[%eax]: [2.2-2.3)
+	[%rax]: [11.0-11.1)
+	[%eax]: [13.2-13.3)
+R1 (d_4) [%eax]: [3.0-10.1), DEF(4.2), USE(9.1/2)!, USE(10.1/2)
+R2 (d_5, d_9) [%ebx]: [3.0-9.1), [9.2-14.0), DEF(5.2), USE(6.1/1), USE(9.1/1)!, DEF(9.2)!, USE(10.0/1, hint=%esi, hint=R3)!, PHI_USE(13.2, phi=d_5/3)
+R3 (d_10) [%ebp]: [10.0-14.0), DEF(10.0, hint=R2)!, DEF(10.2)!, USE(11.0/4, hint=%esi), PHI_USE(13.2, phi=d_4/3)
+[%rax] : [15.0-15.1)
+[%rsi] : [11.0-11.1)
+[%rdi] : [11.0-11.1)
+[%SCRATCH] : [11.1-11.2)
+}
+test:
+	subq $0x18, %rsp
+	movq %rbx, 0x10(%rsp)
+	movq %rbp, 8(%rsp)
+	xorl %eax, %eax
+	movl $1, %ebx
+.L1:
+	cmpl $0x2710, %ebx
+	jge .L2
+	leal (%rbx, %rax), %ebx
+	movl %ebx, %ebp
+	subl %eax, %ebp
+	movl %ebp, %esi
+	leaq .L3(%rip), %rdi
+	movabsq $_IO_printf, %rax
+	callq *%rax
+	movl %ebp, %eax
+	jmp .L1
+.L2:
+	xorl %eax, %eax
+	movq 0x10(%rsp), %rbx
+	movq 8(%rsp), %rbp
+	addq $0x18, %rsp
+	retq
+.rodata
+	.db 0x90, 0x90
+.L3:
+	.db 0x25, 0x64, 0x0a, 0x00
+
+1
+1
+2
+3
+5
+8
+13
+21
+34
+55
+89
+144
+233
+377
+610
+987
+1597
+2584
+4181
+6765
+
+exit code = 0

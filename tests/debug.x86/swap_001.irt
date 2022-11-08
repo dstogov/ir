@@ -1,0 +1,28 @@
+--TEST--
+001: Swap operands of commutative instruction
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_5);
+	double x = PARAM(l_1, "x", 1);
+	double y = PARAM(l_1, "y", 2);
+	double v = VAR(l_1, "_spill_");
+	l_2 = VSTORE(l_1, v, y);
+	double z, l_3 = VLOAD(l_2, v);
+	double ret = ADD(z, x);
+	l_4 = VSTORE(l_3, v, ret);
+	l_5 = RETURN(l_4);
+}
+--EXPECT--
+test:
+	subl $8, %esp
+	movsd 0xc(%esp), %xmm0
+	movsd 0x14(%esp), %xmm1
+	movsd %xmm1, (%esp)
+	addsd (%esp), %xmm0
+	movsd %xmm0, (%esp)
+	addl $8, %esp
+	retl

@@ -1,0 +1,17 @@
+--TEST--
+001: type conversion SEXT
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	int32_t x = PARAM(l_1, "x", 1);
+	int64_t ret = SEXT(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	movslq %edi, %rax
+	retq

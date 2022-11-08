@@ -1,0 +1,18 @@
+--TEST--
+001: abs function
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t ret = ABS(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	cmp w0, #0
+	cneg w0, w0, lt
+	ret

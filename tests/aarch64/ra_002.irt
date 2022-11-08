@@ -1,0 +1,21 @@
+--TEST--
+002: Register Allocation (MUL + DIV)
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	uint32_t x_1 = PARAM(l_1, "x", 1);
+	uint32_t y_1 = PARAM(l_1, "y", 2);
+	uint32_t z_1 = PARAM(l_1, "z", 3);
+	uint32_t x_2 = MUL(x_1, y_1);
+	uint32_t x_3 = DIV(x_2, z_1);
+	l_4 = RETURN(l_1, x_3);
+}
+--EXPECT--
+test:
+	mul w0, w1, w0
+	udiv w0, w0, w2
+	ret

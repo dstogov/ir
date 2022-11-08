@@ -1,0 +1,26 @@
+--TEST--
+003: neg function
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	float x = PARAM(l_1, "x", 1);
+	float ret = NEG(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	subl $4, %esp
+	movss 8(%esp), %xmm0
+	xorps .L1, %xmm0
+	movss %xmm0, (%esp)
+	flds (%esp)
+	addl $4, %esp
+	retl
+.rodata
+	.db 0x90, 0x90, 0x90, 0x90
+.L1:
+	.db 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00

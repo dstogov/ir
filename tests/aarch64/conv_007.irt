@@ -1,0 +1,17 @@
+--TEST--
+007: type conversion FP2INT
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	float x = PARAM(l_1, "x", 1);
+	uint32_t ret = FP2INT(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	fcvtzu w0, s0
+	ret

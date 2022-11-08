@@ -1,0 +1,45 @@
+--TEST--
+CALL with parallel argument passing
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 42;
+	uintptr_t c_5 = func(printf);
+	uintptr_t c_6 = "hello %d!\n";
+	l_1 = START(l_4);
+	int32_t p_1 = PARAM(l_1, "p1", 1);
+	int32_t p_2 = PARAM(l_1, "p2", 1);
+	int32_t p_3 = PARAM(l_1, "p3", 1);
+	int32_t p_4 = PARAM(l_1, "p4", 1);
+	int32_t d_2, l_2 = CALL/4(l_1, c_5, c_6, p_3, p_4, p_2);
+	int32_t d_3 = ADD(d_2, p_1);
+	l_4 = RETURN(l_2, d_3);
+}
+--EXPECT--
+test:
+	subl $0x1c, %esp
+	movl %ebx, 0x18(%esp)
+	movl 0x20(%esp), %ebx
+	leal .L1, %eax
+	movl %eax, (%esp)
+	movl 0x28(%esp), %eax
+	movl %eax, 4(%esp)
+	movl 0x2c(%esp), %eax
+	movl %eax, 8(%esp)
+	movl 0x24(%esp), %eax
+	movl %eax, 0xc(%esp)
+	calll printf
+	leal (%eax, %ebx), %eax
+	movl 0x18(%esp), %ebx
+	addl $0x1c, %esp
+	retl
+.rodata
+	.db 0x90, 0x90, 0x90, 0x90
+.L1:
+	.db 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x25, 0x64, 0x21, 0x0a, 0x00

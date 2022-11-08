@@ -1,0 +1,26 @@
+--TEST--
+004: ne function
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	double c = 0;
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	bool ret = NE(x, c);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	movsd 4(%esp), %xmm0
+	ucomisd .L1, %xmm0
+	setp %al
+	movl $1, %ecx
+	cmovnel %ecx, %eax
+	retl
+.rodata
+	.db 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
+.L1:
+	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00

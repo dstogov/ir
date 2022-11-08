@@ -1,0 +1,22 @@
+--TEST--
+001: alloca function
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	int32_t size = 10;
+	l_1 = START(l_4);
+	uintptr_t ret, l_2 = ALLOCA(l_1, size);
+	l_4 = RETURN(l_2, ret);
+}
+--EXPECT--
+test:
+	stp x29, x30, [sp, #-0x10]!
+	mov x29, sp
+	sub sp, sp, #0x10
+	mov x0, sp
+	mov sp, x29
+	ldp x29, x30, [sp], #0x10
+	ret

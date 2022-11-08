@@ -1,0 +1,24 @@
+--TEST--
+LEA 001
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	int32_t i_1 = 10;
+	int32_t i_4 = 4;
+	l_1 = START(l_2);
+	int32_t x = PARAM(l_1, "x", 0);
+	int32_t y = PARAM(l_1, "y", 0);
+	int32_t z1 = ADD(x, i_1);
+	int32_t z2 = MUL(y, i_4);
+	int32_t z3 = ADD(z1, z2);
+	l_2 = RETURN(l_1, z3);
+}
+--EXPECT--
+test:
+	movl 4(%esp), %eax
+	movl 8(%esp), %ecx
+	leal 0xa(%eax, %ecx, 4), %eax
+	retl

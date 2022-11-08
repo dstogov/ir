@@ -1,0 +1,15 @@
+--TEST--
+001: IJMP - computed goto
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_2);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	l_2 = IJMP(l_1, p);
+}
+--EXPECT--
+test:
+	jmpl *4(%esp)

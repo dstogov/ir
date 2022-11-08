@@ -1,0 +1,22 @@
+--TEST--
+008: Memory update (LOAD/STORE)
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	int32_t c = 0x80;
+	l_1 = START(l_4);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	int32_t z, l_2 = LOAD(l_1, p);
+	int32_t ret = AND(z, c);
+	l_3 = STORE(l_2, p, ret);
+	l_4 = RETURN(l_3);
+}
+--EXPECT--
+test:
+	ldr w1, [x0]
+	and w1, w1, #0x80
+	str w1, [x0]
+	ret

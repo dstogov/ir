@@ -1,0 +1,31 @@
+--TEST--
+Simple CALL
+--TARGET--
+x86
+--ARGS--
+-S --run
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 42;
+	uintptr_t c_5 = func(printf);
+	uintptr_t c_6 = "hello %d!\n";
+	l_1 = START(l_4);
+	char d_2, l_2 = TAILCALL/2(l_1, c_5, c_6, c_4);
+	l_4 = UNREACHABLE(l_2, d_2);
+}
+--EXPECT--
+test:
+	leaq .L1(%rip), %rdi
+	movl $0x2a, %esi
+	movabsq $_IO_printf, %rax
+	jmpq *%rax
+.rodata
+.L1:
+	.db 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x25, 0x64, 0x21, 0x0a, 0x00
+
+hello 42!
+
+exit code = 10

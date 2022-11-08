@@ -1,0 +1,19 @@
+--TEST--
+003: ule function
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	uint32_t c = 0;
+	l_1 = START(l_4);
+	uint32_t x = PARAM(l_1, "x", 2);
+	bool ret = ULE(x, c);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	cmpl $0, 4(%esp)
+	sete %al
+	retl

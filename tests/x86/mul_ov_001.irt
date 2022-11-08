@@ -1,0 +1,20 @@
+--TEST--
+001: mul_ov function
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	int32_t c = 2;
+	l_1 = START(l_2);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t ret = MUL_OV(x, c);
+	bool ov = OVERFLOW(ret);
+	l_2 = RETURN(l_1, ov);
+}
+--EXPECT--
+test:
+	imull $2, 4(%esp), %eax
+	seto %al
+	retl

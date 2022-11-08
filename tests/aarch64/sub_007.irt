@@ -1,0 +1,18 @@
+--TEST--
+007: sub function
+--TARGET--
+aarch64
+--ARGS--
+-S -mavx
+--CODE--
+{
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	double y = PARAM(l_1, "y", 2);
+	double ret = SUB(x, y);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	fsub d0, d0, d1
+	ret

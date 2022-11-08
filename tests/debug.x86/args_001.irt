@@ -1,0 +1,51 @@
+--TEST--
+001: Argument Passing
+--TARGET--
+x86
+--ARGS--
+-S --run
+--CODE--
+{
+	int8_t c_1 = 1;
+	int16_t c_2 = 2;
+	int32_t c_3 = 3;
+	int32_t c_4 = 4;
+	int32_t c_5 = 5;
+	uint8_t c_6 = 6;
+	uint16_t c_7 = 7;
+	uint32_t c_8 = 8;
+	int32_t c_9 = 9;
+	int32_t c_10 = 10;
+	uintptr_t f = func(printf);
+	uintptr_t fmt = "%d %d %d %d %d %d %d %d %d %d\n";
+	l_1 = START(l_3);
+	int32_t d_2, l_2 = CALL/11(l_1, f, fmt, c_1, c_2, c_3, c_4, c_5, c_6, c_7, c_8, c_9, c_10);
+	l_3 = RETURN(l_2, d_2);
+}
+--EXPECT--
+test:
+	subl $0x2c, %esp
+	leal .L1, %eax
+	movl %eax, (%esp)
+	movl $1, 4(%esp)
+	movl $2, 8(%esp)
+	movl $3, 0xc(%esp)
+	movl $4, 0x10(%esp)
+	movl $5, 0x14(%esp)
+	movl $6, 0x18(%esp)
+	movl $7, 0x1c(%esp)
+	movl $8, 0x20(%esp)
+	movl $9, 0x24(%esp)
+	movl $0xa, 0x28(%esp)
+	calll printf
+	addl $0x2c, %esp
+	retl
+.rodata
+	.db 0x90, 0x90, 0x90
+.L1:
+	.db 0x25, 0x64, 0x20, 0x25, 0x64, 0x20, 0x25, 0x64, 0x20, 0x25, 0x64, 0x20, 0x25, 0x64, 0x20, 0x25
+	.db 0x64, 0x20, 0x25, 0x64, 0x20, 0x25, 0x64, 0x20, 0x25, 0x64, 0x20, 0x25, 0x64, 0x0a, 0x00
+
+1 2 3 4 5 6 7 8 9 10
+
+exit code = 21

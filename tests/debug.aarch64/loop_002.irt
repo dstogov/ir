@@ -1,0 +1,68 @@
+--TEST--
+LOOP 002
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 0;
+	int32_t c_5 = 1;
+	int32_t c_6 = 10;
+	l_1 = START(l_35);
+	l_2 = END(l_1);
+	l_3 = LOOP_BEGIN(l_2, l_30);
+	int32_t d_4 = PHI(l_3, c_4, d_29);
+	int32_t d_5 = PHI(l_3, c_4, d_12);
+	bool d_6 = LT(d_4, c_6);
+	l_7 = IF(l_3, d_6);
+	l_8 = IF_TRUE(l_7);
+	l_9 = END(l_8);
+	l_10 = LOOP_BEGIN(l_9, l_26);
+	int32_t d_11 = PHI(l_10, c_4, d_25);
+	int32_t d_12 = PHI(l_10, d_5, d_24);
+	bool d_13 = LT(d_11, c_6);
+	l_14 = IF(l_10, d_13);
+	l_15 = IF_TRUE(l_14);
+	bool d_16 = NE(d_11, d_4);
+	l_17 = IF(l_15, d_16);
+	l_18 = IF_TRUE(l_17);
+	int32_t d_19 = ADD(d_12, c_5);
+	l_20 = END(l_18);
+	l_21 = IF_FALSE(l_17);
+	l_22 = END(l_21);
+	l_23 = MERGE(l_20, l_22);
+	int32_t d_24 = PHI(l_23, d_19, d_12);
+	int32_t d_25 = ADD(d_11, c_5);
+	l_26 = LOOP_END(l_23, l_10);
+	l_27 = IF_FALSE(l_14);
+	int32_t d_29 = ADD(d_4, c_5);
+	l_30 = LOOP_END(l_27, l_3);
+	l_31 = IF_FALSE(l_7);
+	l_35 = RETURN(l_31, d_5);
+}
+--EXPECT--
+test:
+	mov w1, wzr
+	mov w0, wzr
+.L1:
+	cmp w1, #0xa
+	b.ge .L5
+	mov w2, wzr
+.L2:
+	cmp w2, #0xa
+	b.ge .L4
+	cmp w2, w1
+	b.eq .L3
+	add w0, w0, #1
+.L3:
+	add w2, w2, #1
+	b .L2
+.L4:
+	add w1, w1, #1
+	b .L1
+.L5:
+	ret

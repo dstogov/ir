@@ -1,0 +1,198 @@
+--TEST--
+Fig -O0
+--TARGET--
+aarch64
+--ARGS--
+-S -O0
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t i_1 = 1;
+	int32_t i_4 = 4;
+	ll_1 = START(ll_16);                # <-
+	int32_t a_0 = PARAM(ll_1, "a", 0);
+	int32_t b_0 = PARAM(ll_1, "b", 1);
+	int32_t c_0 = PARAM(ll_1, "c", 2);
+	int32_t d_0 = PARAM(ll_1, "d", 3);
+	int32_t l_0 = PARAM(ll_1, "l", 4);
+	int32_t m_0 = PARAM(ll_1, "m", 5);
+	int32_t s_0 = PARAM(ll_1, "s", 6);
+	int32_t t_0 = PARAM(ll_1, "t", 7);	
+	int32_t cond1 = PARAM(ll_1, "cond1", 8);	
+	int32_t cond2 = PARAM(ll_1, "cond2", 9);	
+	ll_2 = END(ll_1);
+	ll_3 = LOOP_BEGIN(ll_2, ll_12);     # <-
+	int32_t a_1 = PHI(ll_3, a_0, a_3);
+	int32_t d_1 = PHI(ll_3, d_0, d_3);
+	int32_t m_1 = PHI(ll_3, m_0, m_3);
+	int32_t s_1 = PHI(ll_3, s_0, s_3);
+	int32_t t_1 = PHI(ll_3, t_0, t_3);
+	ll_4 = IF(ll_3, cond1);
+	ll_5 = IF_TRUE(ll_4);
+	int32_t l_1 = MUL(c_0, b_0);
+	int32_t m_2 = ADD(l_1, i_4);
+	int32_t a_2 = COPY(c_0);
+	ll_6 = END(ll_5);
+	ll_7 = IF_FALSE(ll_4);
+	int32_t d_2 = COPY(c_0);
+	int32_t l_2 = MUL(d_2, b_0);
+	int32_t s_2 = MUL(a_1, b_0);
+	int32_t t_2 = ADD(s_2, i_1);
+	ll_8 = END(ll_7);
+	ll_9 = MERGE(ll_6, ll_8);
+	int32_t a_3 = PHI(ll_9, a_2, a_1);
+	int32_t d_3 = PHI(ll_9, d_1, d_2);
+	int32_t l_3 = PHI(ll_9, l_1, l_2);
+	int32_t m_3 = PHI(ll_9, m_2, m_1);
+	int32_t s_3 = PHI(ll_9, s_1, s_2);
+	int32_t t_3 = PHI(ll_9, t_1, t_2);
+	int32_t x_0 = MUL(a_3, b_0);
+	int32_t y_0 = ADD(x_0, i_1);
+	ll_10 = IF(ll_9, cond2);
+	ll_11 = IF_TRUE(ll_10);
+	ll_12 = LOOP_END(ll_11, ll_3);
+	ll_13 = IF_FALSE(ll_10);
+	int32_t ret1 = ADD(a_3, b_0);
+	int32_t ret2 = ADD(ret1, c_0);
+	int32_t ret3 = ADD(ret2, d_3);
+	int32_t ret4 = ADD(ret3, l_3);
+	int32_t ret5 = ADD(ret4, m_3);
+	int32_t ret6 = ADD(ret5, s_3);
+	int32_t ret7 = ADD(ret6, t_3);
+	int32_t ret8 = ADD(ret7, y_0);
+	ll_16 = RETURN(ll_13, ret8);
+}
+--EXPECT--
+test:
+	sub sp, sp, #0x90
+	str w0, [sp]
+	str w1, [sp, #4]
+	str w2, [sp, #8]
+	str w3, [sp, #0xc]
+	str w5, [sp, #0x10]
+	str w6, [sp, #0x14]
+	str w7, [sp, #0x18]
+	ldr w0, [sp]
+	str w0, [sp, #0x1c]
+	ldr w0, [sp, #0xc]
+	str w0, [sp, #0x20]
+	ldr w0, [sp, #0x10]
+	str w0, [sp, #0x24]
+	ldr w0, [sp, #0x14]
+	str w0, [sp, #0x28]
+	ldr w0, [sp, #0x18]
+	str w0, [sp, #0x2c]
+.L1:
+	ldr w0, [sp, #0x98]
+	cmp w0, #0
+	b.eq .L2
+	ldr w1, [sp, #8]
+	ldr w2, [sp, #4]
+	mul w0, w1, w2
+	str w0, [sp, #0x30]
+	ldr w1, [sp, #0x30]
+	add w0, w1, #4
+	str w0, [sp, #0x34]
+	ldr w1, [sp, #8]
+	mov w0, w1
+	str w0, [sp, #0x38]
+	ldr w0, [sp, #0x38]
+	str w0, [sp, #0x4c]
+	ldr w0, [sp, #0x20]
+	str w0, [sp, #0x50]
+	ldr w0, [sp, #0x30]
+	str w0, [sp, #0x54]
+	ldr w0, [sp, #0x34]
+	str w0, [sp, #0x58]
+	ldr w0, [sp, #0x28]
+	str w0, [sp, #0x5c]
+	ldr w0, [sp, #0x2c]
+	str w0, [sp, #0x60]
+	b .L3
+.L2:
+	ldr w1, [sp, #8]
+	mov w0, w1
+	str w0, [sp, #0x3c]
+	ldr w1, [sp, #0x3c]
+	ldr w2, [sp, #4]
+	mul w0, w1, w2
+	str w0, [sp, #0x40]
+	ldr w1, [sp, #0x1c]
+	ldr w2, [sp, #4]
+	mul w0, w1, w2
+	str w0, [sp, #0x44]
+	ldr w1, [sp, #0x44]
+	add w0, w1, #1
+	str w0, [sp, #0x48]
+	ldr w0, [sp, #0x1c]
+	str w0, [sp, #0x4c]
+	ldr w0, [sp, #0x3c]
+	str w0, [sp, #0x50]
+	ldr w0, [sp, #0x40]
+	str w0, [sp, #0x54]
+	ldr w0, [sp, #0x24]
+	str w0, [sp, #0x58]
+	ldr w0, [sp, #0x44]
+	str w0, [sp, #0x5c]
+	ldr w0, [sp, #0x48]
+	str w0, [sp, #0x60]
+.L3:
+	ldr w1, [sp, #0x4c]
+	ldr w2, [sp, #4]
+	mul w0, w1, w2
+	str w0, [sp, #0x64]
+	ldr w1, [sp, #0x64]
+	add w0, w1, #1
+	str w0, [sp, #0x68]
+	ldr w0, [sp, #0xa0]
+	cmp w0, #0
+	b.eq .L4
+	ldr w0, [sp, #0x4c]
+	str w0, [sp, #0x1c]
+	ldr w0, [sp, #0x50]
+	str w0, [sp, #0x20]
+	ldr w0, [sp, #0x58]
+	str w0, [sp, #0x24]
+	ldr w0, [sp, #0x5c]
+	str w0, [sp, #0x28]
+	ldr w0, [sp, #0x60]
+	str w0, [sp, #0x2c]
+	b .L1
+.L4:
+	ldr w1, [sp, #0x4c]
+	ldr w2, [sp, #4]
+	add w0, w1, w2
+	str w0, [sp, #0x6c]
+	ldr w1, [sp, #0x6c]
+	ldr w2, [sp, #8]
+	add w0, w1, w2
+	str w0, [sp, #0x70]
+	ldr w1, [sp, #0x70]
+	ldr w2, [sp, #0x50]
+	add w0, w1, w2
+	str w0, [sp, #0x74]
+	ldr w1, [sp, #0x74]
+	ldr w2, [sp, #0x54]
+	add w0, w1, w2
+	str w0, [sp, #0x78]
+	ldr w1, [sp, #0x78]
+	ldr w2, [sp, #0x58]
+	add w0, w1, w2
+	str w0, [sp, #0x7c]
+	ldr w1, [sp, #0x7c]
+	ldr w2, [sp, #0x5c]
+	add w0, w1, w2
+	str w0, [sp, #0x80]
+	ldr w1, [sp, #0x80]
+	ldr w2, [sp, #0x60]
+	add w0, w1, w2
+	str w0, [sp, #0x84]
+	ldr w1, [sp, #0x84]
+	ldr w2, [sp, #0x68]
+	add w0, w1, w2
+	str w0, [sp, #0x88]
+	ldr w0, [sp, #0x88]
+	add sp, sp, #0x90
+	ret

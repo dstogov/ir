@@ -1,0 +1,59 @@
+--TEST--
+001: Parameter Loading
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_2);
+	int32_t p_1 = PARAM(l_1, "p_1", 1);
+	int32_t p_2 = PARAM(l_1, "p_2", 1);
+	int32_t p_3 = PARAM(l_1, "p_3", 1);
+	int32_t p_4 = PARAM(l_1, "p_4", 1);
+	int32_t p_5 = PARAM(l_1, "p_5", 1);
+	int32_t p_6 = PARAM(l_1, "p_6", 1);
+	int32_t p_7 = PARAM(l_1, "p_7", 1);
+	int32_t p_8 = PARAM(l_1, "p_8", 1);
+	int32_t p_9 = PARAM(l_1, "p_9", 1);
+	int32_t p_10 = PARAM(l_1, "p_10", 1);
+	int32_t r1 = ADD(p_1, p_2);
+	int32_t r2 = ADD(r1, p_3);
+	int32_t r3 = ADD(r2, p_4);
+	int32_t r4 = ADD(r3, p_5);
+	int32_t r5 = ADD(r4, p_6);
+	int32_t r6 = ADD(r5, p_7);
+	int32_t r7 = ADD(r6, p_8);
+	int32_t r8 = ADD(r7, p_9);
+	int32_t ret = SUB(r8, p_10);
+	l_2 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	subl $0x10, %esp
+	movl %ebx, 0xc(%esp)
+	movl %ebp, 8(%esp)
+	movl %esi, 4(%esp)
+	movl %edi, (%esp)
+	movl 0x14(%esp), %eax
+	movl 0x18(%esp), %ecx
+	movl 0x1c(%esp), %edx
+	movl 0x20(%esp), %ebx
+	movl 0x24(%esp), %ebp
+	movl 0x28(%esp), %esi
+	movl 0x34(%esp), %edi
+	leal (%ecx, %eax), %eax
+	leal (%eax, %edx), %eax
+	leal (%eax, %ebx), %eax
+	leal (%eax, %ebp), %eax
+	leal (%eax, %esi), %eax
+	leal (%eax, %ecx), %eax
+	leal (%eax, %ecx), %eax
+	leal (%eax, %edi), %eax
+	subl 0x38(%esp), %eax
+	movl 0xc(%esp), %ebx
+	movl 8(%esp), %ebp
+	movl 4(%esp), %esi
+	movl (%esp), %edi
+	addl $0x10, %esp
+	retl

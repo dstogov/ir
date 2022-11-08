@@ -1,0 +1,22 @@
+--TEST--
+006: type conversion INT2FP
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	int32_t x = PARAM(l_1, "x", 1);
+	double ret = INT2FP(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	subl $8, %esp
+	movl 0xc(%esp), %eax
+	cvtsi2sdl %eax, %xmm0
+	movsd %xmm0, (%esp)
+	fldl (%esp)
+	addl $8, %esp
+	retl

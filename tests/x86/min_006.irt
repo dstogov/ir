@@ -1,0 +1,22 @@
+--TEST--
+006: min function
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	uint8_t x = PARAM(l_1, "x", 1);
+	uint8_t y = PARAM(l_1, "y", 2);
+	uint8_t ret = MIN(x, y);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	movb 4(%esp), %al
+	movb 8(%esp), %cl
+	cmpb %al, %cl
+	cmovbw %ax, %cx
+	movb %cl, %al
+	retl

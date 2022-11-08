@@ -1,0 +1,22 @@
+--TEST--
+009: type conversion FP2FP
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	float ret = FP2FP(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	subl $4, %esp
+	movsd 8(%esp), %xmm0
+	cvtsd2ss %xmm0, %xmm0
+	movss %xmm0, (%esp)
+	flds (%esp)
+	addl $4, %esp
+	retl

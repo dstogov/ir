@@ -1,0 +1,60 @@
+--TEST--
+Simple CALL with VADDR
+--TARGET--
+x86
+--ARGS--
+-S --run
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 42;
+	char h = 'h';
+	char i = 'i';
+	char sp = ' ';
+	char pc = '%';
+	char d = 'd';
+	char nl = '\n';
+	char zero = 0;
+	uintptr_t one = 1;
+	uintptr_t c_5 = func(printf);
+	l_1 = START(l_4);
+	uint64_t var = VAR(l_1, "str");
+	uintptr_t a_0 = VADDR(var);
+	s_1 = STORE(l_1, a_0, h);
+	uintptr_t a_1 = ADD(a_0, one);
+	s_2 = STORE(s_1, a_1, i);
+	uintptr_t a_2 = ADD(a_1, one);
+	s_3 = STORE(s_2, a_2, sp);
+	uintptr_t a_3 = ADD(a_2, one);
+	s_4 = STORE(s_3, a_3, pc);
+	uintptr_t a_4 = ADD(a_3, one);
+	s_5 = STORE(s_4, a_4, d);
+	uintptr_t a_5 = ADD(a_4, one);
+	s_6 = STORE(s_5, a_5, nl);
+	uintptr_t a_6 = ADD(a_5, one);
+	s_7 = STORE(s_6, a_6, zero);
+	int32_t d_2, l_2 = CALL/2(s_7, c_5, a_0, c_4);
+	l_4 = RETURN(l_2, d_2);
+}
+--EXPECT--
+test:
+	subl $0x1c, %esp
+	leal 8(%esp), %eax
+	movb $0x68, (%eax)
+	movb $0x69, 1(%eax)
+	movb $0x20, 2(%eax)
+	movb $0x25, 3(%eax)
+	movb $0x64, 4(%eax)
+	movb $0xa, 5(%eax)
+	movb $0, 6(%eax)
+	movl %eax, (%esp)
+	movl $0x2a, 4(%esp)
+	calll printf
+	addl $0x1c, %esp
+	retl
+
+hi 42
+
+exit code = 6

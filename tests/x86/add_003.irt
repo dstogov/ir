@@ -1,0 +1,20 @@
+--TEST--
+003: add function
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t y = PARAM(l_1, "y", 2);
+	int32_t ret = ADD(y, x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	movl 4(%esp), %eax
+	movl 8(%esp), %ecx
+	leal (%ecx, %eax), %eax
+	retl

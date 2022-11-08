@@ -1,0 +1,32 @@
+--TEST--
+DESSA 001
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+# Figure 1 from "Translating Out of Static Single Assignment Form" by Sreedhar
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	l_1 = START(l_13);
+	int32_t d_2 = PARAM(l_1, "a", 0);
+	int32_t d_3 = PARAM(l_1, "b", 1);
+	bool d_4 = PARAM(l_1, "cond", 2);
+	l_6 = IF(l_1, d_4);
+	l_7 = IF_TRUE(l_6);
+	l_8 = END(l_7);
+	l_9 = IF_FALSE(l_6);
+	l_10 = END(l_9);
+	l_11 = MERGE(l_8, l_10);
+	int32_t d_12 = PHI(l_11, d_3, d_2);
+	l_13 = RETURN(l_11, d_12);
+}
+--EXPECT--
+test:
+	cmp w2, #0
+	b.eq .L1
+	mov w0, w1
+.L1:
+	ret

@@ -1,0 +1,19 @@
+--TEST--
+003: gt function
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	int32_t c = 0;
+	l_1 = START(l_4);
+	int32_t x = PARAM(l_1, "x", 1);
+	bool ret = GT(x, c);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	cmp w0, #0
+	cset w0, gt
+	ret

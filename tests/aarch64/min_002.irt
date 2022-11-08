@@ -1,0 +1,18 @@
+--TEST--
+002: min function
+--TARGET--
+aarch64
+--ARGS--
+-S -mavx
+--CODE--
+{
+	l_1 = START(l_4);
+	float x = PARAM(l_1, "x", 1);
+	float y = PARAM(l_1, "y", 2);
+	float ret = MIN(x, y);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	fmin s0, s1, s0
+	ret

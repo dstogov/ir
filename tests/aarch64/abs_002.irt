@@ -1,0 +1,17 @@
+--TEST--
+002: abs function
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	double ret = ABS(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	fabs d0, d0
+	ret

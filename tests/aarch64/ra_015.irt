@@ -1,0 +1,20 @@
+--TEST--
+015: Register Allocation (SHL + SHL + reuse/vreg hint)
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	uint32_t x = PARAM(l_1, "x", 1);
+	uint32_t y = PARAM(l_1, "y", 2);
+	uint32_t ret = SHL(x, y);
+	uint32_t ret2 = SHL(y, ret);
+	l_4 = RETURN(l_1, ret2);
+}
+--EXPECT--
+test:
+	lsl w0, w0, w1
+	lsl w0, w1, w0
+	ret

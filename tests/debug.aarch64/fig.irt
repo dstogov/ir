@@ -1,0 +1,96 @@
+--TEST--
+Fig
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t i_1 = 1;
+	int32_t i_4 = 4;
+	ll_1 = START(ll_16);                # <-
+	int32_t a_0 = PARAM(ll_1, "a", 0);
+	int32_t b_0 = PARAM(ll_1, "b", 1);
+	int32_t c_0 = PARAM(ll_1, "c", 2);
+	int32_t d_0 = PARAM(ll_1, "d", 3);
+	int32_t l_0 = PARAM(ll_1, "l", 4);
+	int32_t m_0 = PARAM(ll_1, "m", 5);
+	int32_t s_0 = PARAM(ll_1, "s", 6);
+	int32_t t_0 = PARAM(ll_1, "t", 7);	
+	int32_t cond1 = PARAM(ll_1, "cond1", 8);	
+	int32_t cond2 = PARAM(ll_1, "cond2", 9);	
+	ll_2 = END(ll_1);
+	ll_3 = LOOP_BEGIN(ll_2, ll_12);     # <-
+	int32_t a_1 = PHI(ll_3, a_0, a_3);
+	int32_t d_1 = PHI(ll_3, d_0, d_3);
+	int32_t m_1 = PHI(ll_3, m_0, m_3);
+	int32_t s_1 = PHI(ll_3, s_0, s_3);
+	int32_t t_1 = PHI(ll_3, t_0, t_3);
+	ll_4 = IF(ll_3, cond1);
+	ll_5 = IF_TRUE(ll_4);
+	int32_t l_1 = MUL(c_0, b_0);
+	int32_t m_2 = ADD(l_1, i_4);
+	int32_t a_2 = COPY(c_0);
+	ll_6 = END(ll_5);
+	ll_7 = IF_FALSE(ll_4);
+	int32_t d_2 = COPY(c_0);
+	int32_t l_2 = MUL(d_2, b_0);
+	int32_t s_2 = MUL(a_1, b_0);
+	int32_t t_2 = ADD(s_2, i_1);
+	ll_8 = END(ll_7);
+	ll_9 = MERGE(ll_6, ll_8);
+	int32_t a_3 = PHI(ll_9, a_2, a_1);
+	int32_t d_3 = PHI(ll_9, d_1, d_2);
+	int32_t l_3 = PHI(ll_9, l_1, l_2);
+	int32_t m_3 = PHI(ll_9, m_2, m_1);
+	int32_t s_3 = PHI(ll_9, s_1, s_2);
+	int32_t t_3 = PHI(ll_9, t_1, t_2);
+	int32_t x_0 = MUL(a_3, b_0);
+	int32_t y_0 = ADD(x_0, i_1);
+	ll_10 = IF(ll_9, cond2);
+	ll_11 = IF_TRUE(ll_10);
+	ll_12 = LOOP_END(ll_11, ll_3);
+	ll_13 = IF_FALSE(ll_10);
+	int32_t ret1 = ADD(a_3, b_0);
+	int32_t ret2 = ADD(ret1, c_0);
+	int32_t ret3 = ADD(ret2, d_3);
+	int32_t ret4 = ADD(ret3, l_3);
+	int32_t ret5 = ADD(ret4, m_3);
+	int32_t ret6 = ADD(ret5, s_3);
+	int32_t ret7 = ADD(ret6, t_3);
+	int32_t ret8 = ADD(ret7, y_0);
+	ll_16 = RETURN(ll_13, ret8);
+}
+--EXPECT--
+test:
+	ldr w4, [sp, #8]
+	ldr w8, [sp, #0x10]
+	mul w9, w2, w1
+	add w10, w9, #4
+.L1:
+	cmp w4, #0
+	b.eq .L3
+	mov w0, w2
+	mov w5, w10
+.L2:
+	cmp w8, #0
+	b.ne .L1
+	mul w4, w0, w1
+	add w4, w4, #1
+	add w0, w0, w1
+	add w0, w0, w2
+	add w0, w0, w3
+	add w0, w0, w9
+	add w0, w0, w5
+	add w0, w0, w6
+	add w0, w0, w7
+	add w0, w0, w4
+	ret
+.L3:
+	mul w6, w0, w1
+	add w7, w6, #1
+	mov w3, w2
+	b .L2

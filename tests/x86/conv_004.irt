@@ -1,0 +1,17 @@
+--TEST--
+004: type conversion BITCAST
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	uint64_t ret = BITCAST(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	movd %xmm0, %rax
+	retq

@@ -1,0 +1,20 @@
+--TEST--
+006: div function
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	uint32_t x = PARAM(l_1, "x", 1);
+	uint32_t y = PARAM(l_1, "y", 2);
+	uint32_t ret = DIV(x, y);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	movl 4(%esp), %eax
+	xorl %edx, %edx
+	divl 8(%esp)
+	retl

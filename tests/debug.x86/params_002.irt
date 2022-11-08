@@ -1,0 +1,47 @@
+--TEST--
+002: Parameter Loading
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_2);
+	double p_1 = PARAM(l_1, "p_1", 1);
+	double p_2 = PARAM(l_1, "p_2", 1);
+	double p_3 = PARAM(l_1, "p_3", 1);
+	double p_4 = PARAM(l_1, "p_4", 1);
+	double p_5 = PARAM(l_1, "p_5", 1);
+	double p_6 = PARAM(l_1, "p_6", 1);
+	double p_7 = PARAM(l_1, "p_7", 1);
+	double p_8 = PARAM(l_1, "p_8", 1);
+	double p_9 = PARAM(l_1, "p_9", 1);
+	double p_10 = PARAM(l_1, "p_10", 1);
+	double r1 = ADD(p_1, p_2);
+	double r2 = ADD(r1, p_3);
+	double r3 = ADD(r2, p_4);
+	double r4 = ADD(r3, p_5);
+	double r5 = ADD(r4, p_6);
+	double r6 = ADD(r5, p_7);
+	double r7 = ADD(r6, p_8);
+	double r8 = ADD(r7, p_9);
+	double ret = SUB(r8, p_10);
+	l_2 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	subl $8, %esp
+	movsd 0x14(%esp), %xmm0
+	addsd 0xc(%esp), %xmm0
+	addsd 0x1c(%esp), %xmm0
+	addsd 0x24(%esp), %xmm0
+	addsd 0x2c(%esp), %xmm0
+	addsd 0x34(%esp), %xmm0
+	addsd 0x3c(%esp), %xmm0
+	addsd 0x44(%esp), %xmm0
+	addsd 0x4c(%esp), %xmm0
+	subsd 0x54(%esp), %xmm0
+	movsd %xmm0, (%esp)
+	fldl (%esp)
+	addl $8, %esp
+	retl

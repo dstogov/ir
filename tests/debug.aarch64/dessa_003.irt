@@ -1,0 +1,45 @@
+--TEST--
+DESSA 003
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+# Figure 8 (swap problem) from "Translating Out of Static Single Assignment Form" by Sreedhar
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 1;
+	int32_t c_12 = 12;
+	l_1 = START(l_13);
+	int32_t x0 = PARAM(l_1, "x", 0);
+	int32_t y1 = PARAM(l_1, "y", 1);
+	int32_t cond = PARAM(l_1, "z", 2);
+	int32_t x1 = DIV(x0, c_12);
+	l_3 = END(l_1);
+	l_4 = LOOP_BEGIN(l_3, l_9);
+	int32_t x2 = PHI(l_4, x1, x3);
+	int32_t y2 = PHI(l_4, y1, y3);
+	int32_t z = COPY(x2);
+	int32_t x3 = COPY(y2);
+	int32_t y3 = COPY(z);
+	l_7 = IF(l_4, cond);
+	l_8 = IF_TRUE(l_7);
+	l_9 = LOOP_END(l_8, l_4);
+	l_10 = IF_FALSE(l_7);
+	l_13 = RETURN(l_10, z);
+}
+--EXPECT--
+test:
+	movz w3, #0xc
+	sdiv w0, w0, w3
+.L1:
+	cmp w2, #0
+	b.eq .L2
+	mov w3, w0
+	mov w0, w1
+	mov w1, w3
+	b .L1
+.L2:
+	ret

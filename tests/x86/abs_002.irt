@@ -1,0 +1,26 @@
+--TEST--
+002: abs function
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	double ret = ABS(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	subl $8, %esp
+	movsd 0xc(%esp), %xmm0
+	andpd .L1, %xmm0
+	movsd %xmm0, (%esp)
+	fldl (%esp)
+	addl $8, %esp
+	retl
+.rodata
+	.db 0x90, 0x90, 0x90
+.L1:
+	.db 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00

@@ -1,0 +1,20 @@
+--TEST--
+004: ge function
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	double c = 0;
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	bool ret = GE(x, c);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	fmov d1, xzr
+	fcmp d0, d1
+	cset w0, ge
+	ret

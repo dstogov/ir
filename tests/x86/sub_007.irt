@@ -1,0 +1,23 @@
+--TEST--
+007: sub function
+--TARGET--
+x86
+--ARGS--
+-S -mavx
+--CODE--
+{
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	double y = PARAM(l_1, "y", 2);
+	double ret = SUB(x, y);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	subl $8, %esp
+	vmovsd 0xc(%esp), %xmm0
+	vsubsd 0x14(%esp), %xmm0, %xmm0
+	vmovsd %xmm0, (%esp)
+	fldl (%esp)
+	addl $8, %esp
+	retl
