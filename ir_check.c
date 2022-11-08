@@ -40,6 +40,34 @@ void ir_consistency_check(void)
 	IR_ASSERT(IR_ADD + 1 == IR_SUB);
 }
 
+static bool ir_check_use_list(ir_ctx *ctx, ir_ref from, ir_ref to)
+{
+	ir_ref n, j, *p;
+	ir_use_list *use_list = &ctx->use_lists[from];
+
+	n = use_list->count;
+	for (j = 0, p = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
+		if (*p == to) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static bool ir_check_input_list(ir_ctx *ctx, ir_ref from, ir_ref to)
+{
+	ir_insn *insn = &ctx->ir_base[to];
+	ir_ref n, j, *p;
+
+	n = ir_input_edges_count(ctx, insn);
+	for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
+		if (*p == from) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
 bool ir_check(ir_ctx *ctx)
 {
 	ir_ref i, j, n, *p, use;
@@ -194,12 +222,26 @@ bool ir_check(ir_ctx *ctx)
 				fprintf(stderr, "ir_base[%d].ops[%d] missing reference (%d)\n", i, j, use);
 				ok = 0;
 			}
+			if (ctx->use_lists
+			 && use > 0
+			 && !ir_check_use_list(ctx, use, i)) {
+				fprintf(stderr, "ir_base[%d].ops[%d] is not in use list (%d)\n", i, j, use);
+				ok = 0;
+			}
 		}
 		if (ctx->use_lists) {
-			if ((flags & IR_OP_FLAG_CONTROL) && !(flags & IR_OP_FLAG_MEM)) {
-				ir_use_list *use_list = &ctx->use_lists[i];
-				ir_ref count;
+			ir_use_list *use_list = &ctx->use_lists[i];
+			ir_ref count;
 
+			for (j = 0, p = &ctx->use_edges[use_list->refs]; j < use_list->count; j++, p++) {
+				use = *p;
+				if (!ir_check_input_list(ctx, i, use)) {
+					fprintf(stderr, "ir_base[%d] is in use list of ir_base[%d]\n", use, i);
+					ok = 0;
+				}
+			}
+
+			if ((flags & IR_OP_FLAG_CONTROL) && !(flags & IR_OP_FLAG_MEM)) {
 				switch (insn->op) {
 					case IR_SWITCH:
 						/* may have many successors */
