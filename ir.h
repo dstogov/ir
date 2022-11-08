@@ -1,3 +1,10 @@
+/*
+ * IR - Lightweight JIT Compilation Framework
+ * (Public API)
+ * Copyright (C) 2022 Zend by Perforce.
+ * Authors: Dmitry Stogov <dmitry@php.net>
+ */
+
 #ifndef IR_H
 #define IR_H
 

@@ -1,3 +1,10 @@
+/*
+ * IR - Lightweight JIT Compilation Framework
+ * (C code generator)
+ * Copyright (C) 2022 Zend by Perforce.
+ * Authors: Dmitry Stogov <dmitry@php.net>
+ */
+
 #include "ir.h"
 #include "ir_private.h"
 

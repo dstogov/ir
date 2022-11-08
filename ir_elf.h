@@ -1,3 +1,10 @@
+/*
+ * IR - Lightweight JIT Compilation Framework
+ * (ELF header definitions)
+ * Copyright (C) 2022 Zend by Perforce.
+ * Authors: Dmitry Stogov <dmitry@php.net>
+ */
+
 #ifndef IR_ELF
 #define IR_ELF
 

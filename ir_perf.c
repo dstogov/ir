@@ -1,3 +1,19 @@
+/*
+ * IR - Lightweight JIT Compilation Framework
+ * (Linux perf interface)
+ * Copyright (C) 2022 Zend by Perforce.
+ * Authors: Dmitry Stogov <dmitry@php.net>
+ *
+ * 1) Profile using perf-<pid>.map
+ * perf record ./prog
+ * perf report
+ *
+ * 2) Profile using jit-<pid>.dump
+ * perf record -k 1 ./prog
+ * perf inject -j -i perf.data -o perf.data.jitted
+ * perf report -i perf.data.jitted
+ */
+
 #include <stdio.h>
 #include <unistd.h>
 #include <time.h>
@@ -28,20 +44,6 @@ extern unsigned int thr_self(void);
 
 #include "ir.h"
 #include "ir_elf.h"
-
-/*
- * 1) Profile using perf-<pid>.map
- *
- * perf record ./prog
- * perf report
- *
- * 2) Profile using jit-<pid>.dump
- *
- * perf record -k 1 ./prog
- * perf inject -j -i perf.data -o perf.data.jitted
- * perf report -i perf.data.jitted
- *
- */
 
 #define IR_PERF_JITDUMP_HEADER_MAGIC   0x4A695444
 #define IR_PERF_JITDUMP_HEADER_VERSION 1

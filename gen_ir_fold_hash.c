@@ -1,3 +1,12 @@
+/*
+ * IR - Lightweight JIT Compilation Framework
+ * (Folding engine generator)
+ * Copyright (C) 2022 Zend by Perforce.
+ * Authors: Dmitry Stogov <dmitry@php.net>
+ *
+ * Based on Mike Pall's implementation for LuaJIT.
+ */
+
 #include "ir.h"
 #include <string.h>
 

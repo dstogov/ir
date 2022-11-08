@@ -1,3 +1,15 @@
+/*
+ * IR - Lightweight JIT Compilation Framework
+ * (RA - Register Allocation, Liveness, Coalescing, SSA Deconstruction)
+ * Copyright (C) 2022 Zend by Perforce.
+ * Authors: Dmitry Stogov <dmitry@php.net>
+ *
+ * See: "Linear Scan Register Allocation on SSA Form", Christian Wimmer and
+ * Michael Franz, CGO'10 (2010)
+ * See: "Optimized Interval Splitting in a Linear Scan Register Allocator",
+ * Christian Wimmer VEE'10 (2005)
+ */
+
 #ifndef _GNU_SOURCE
 # define _GNU_SOURCE
 #endif
@@ -33,8 +45,6 @@ bool ir_reg_is_int(int32_t reg)
 	IR_ASSERT(reg >= 0 && reg < IR_REG_NUM);
 	return reg >= IR_REG_GP_FIRST && reg <= IR_REG_GP_LAST;
 }
-
-/* RA - Register Allocation, Liveness, Coalescing and SSA Resolution */
 
 int ir_assign_virtual_registers(ir_ctx *ctx)
 {
@@ -79,11 +89,8 @@ int ir_assign_virtual_registers(ir_ctx *ctx)
 	return 1;
 }
 
-/* Lifetime intervals construction
- *
- * See "Linear Scan Register Allocation on SSA Form", Christian Wimmer and
- * Michael Franz, CGO'10 (2010), Figure 4.
- */
+/* Lifetime intervals construction */
+
 static void ir_add_local_var(ir_ctx *ctx, int v, uint8_t type)
 {
 	ir_live_interval *ival = ctx->live_intervals[v];
@@ -1220,11 +1227,8 @@ int ir_gen_dessa_moves(ir_ctx *ctx, int b, emit_copy_t emit_copy)
 	return 1;
 }
 
-/* Linear Scan Register Allocation
- *
- * See "Optimized Interval Splitting in a Linear Scan Register Allocator",
- * Christian Wimmer VEE'10 (2005), Figure 2.
- */
+/* Linear Scan Register Allocation */
+
 #ifdef IR_DEBUG
 # define IR_LOG_LSRA(action, ival, comment) do { \
 		if (ctx->flags & IR_DEBUG_RA) { \

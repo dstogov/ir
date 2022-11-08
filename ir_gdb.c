@@ -1,6 +1,10 @@
 /*
- *  Based on Mike Pall's implementation of GDB interface for LuaJIT.
- *  LuaJIT -- a Just-In-Time Compiler for Lua. http://luajit.org/
+ * IR - Lightweight JIT Compilation Framework
+ * (GDB interface)
+ * Copyright (C) 2022 Zend by Perforce.
+ * Authors: Dmitry Stogov <dmitry@php.net>
+ *
+ * Based on Mike Pall's implementation of GDB interface for LuaJIT.
  */
 
 #include <stdlib.h>

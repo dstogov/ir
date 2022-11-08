@@ -1,3 +1,12 @@
+/*
+ * IR - Lightweight JIT Compilation Framework
+ * (Folding engine rules)
+ * Copyright (C) 2022 Zend by Perforce.
+ * Authors: Dmitry Stogov <dmitry@php.net>
+ *
+ * Based on Mike Pall's implementation for LuaJIT.
+ */
+
 /* Constant Folding */
 IR_FOLD(EQ(C_BOOL, C_BOOL))
 IR_FOLD(EQ(C_U8, C_U8))

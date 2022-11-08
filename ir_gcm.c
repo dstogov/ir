@@ -1,10 +1,16 @@
+/*
+ * IR - Lightweight JIT Compilation Framework
+ * (GCM - Global Code Motion and Scheduler)
+ * Copyright (C) 2022 Zend by Perforce.
+ * Authors: Dmitry Stogov <dmitry@php.net>
+ *
+ * The GCM algorithm is based on Cliff Click's publication
+ * See: C. Click. "Global code motion, global value numbering" Submitted to PLDI‘95.
+ */
+
 #include "ir.h"
 #include "ir_private.h"
 
-/* GCM - Global Code Motion
- *
- * C. Click. "Global code motion, global value numbering" Submitted to PLDI ‘95.
- */
 static void ir_gcm_schedule_early(ir_ctx *ctx, uint32_t *_blocks, ir_ref ref)
 {
 	ir_ref j, n, *p;

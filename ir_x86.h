@@ -1,3 +1,10 @@
+/*
+ * IR - Lightweight JIT Compilation Framework
+ * (x86/x86_64 CPU soecific definitions)
+ * Copyright (C) 2022 Zend by Perforce.
+ * Authors: Dmitry Stogov <dmitry@php.net>
+ */
+
 #ifndef IR_X86_H
 #define IR_X86_H
 

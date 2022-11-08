@@ -1,3 +1,10 @@
+/*
+ * IR - Lightweight JIT Compilation Framework
+ * (IR verification)
+ * Copyright (C) 2022 Zend by Perforce.
+ * Authors: Dmitry Stogov <dmitry@php.net>
+ */
+
 #include "ir.h"
 #include "ir_private.h"
 
@@ -35,7 +42,6 @@ void ir_consistency_check(void)
 
 bool ir_check(ir_ctx *ctx)
 {
-	//TODO:
 	ir_ref i, j, n, *p, use;
 	ir_insn *insn, *use_insn;
 	uint32_t flags;

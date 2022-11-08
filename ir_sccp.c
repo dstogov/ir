@@ -1,15 +1,20 @@
+/*
+ * IR - Lightweight JIT Compilation Framework
+ * (SCCP - Sparse Conditional Constant Propagation)
+ * Copyright (C) 2022 Zend by Perforce.
+ * Authors: Dmitry Stogov <dmitry@php.net>
+ *
+ * The SCCP algorithm is based on M. N. Wegman and F. K. Zadeck publication
+ * See:  M. N. Wegman and F. K. Zadeck. "Constant propagation with conditional branches"
+ * ACM Transactions on Programming Languages and Systems, 13(2):181-210, April 1991
+ */
+
 #include "ir.h"
 #include "ir_private.h"
 
 #if defined(__GNUC__)
 # pragma GCC diagnostic ignored "-Warray-bounds"
 #endif
-
-/* SCCP - Sparse Conditional Constant Propagation + Copy Propagation
- *
- * M. N. Wegman and F. K. Zadeck. "Constant propagation with conditional branches"
- * ACM Transactions on Programming Languages and Systems, 13(2):181-210, April 1991
- */
 
 #define IR_TOP                  IR_UNUSED
 #define IR_BOTTOM               IR_LAST_OP

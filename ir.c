@@ -1,3 +1,19 @@
+/*
+ * IR - Lightweight JIT Compilation Framework
+ * (IR construction, folding, utilities)
+ * Copyright (C) 2022 Zend by Perforce.
+ * Authors: Dmitry Stogov <dmitry@php.net>
+ *
+ * The logical IR representation is based on Cliff Click's Sea of Nodes.
+ * See: C. Click, M. Paleczny. “A Simple Graph-Based Intermediate
+ * Representation” In ACM SIGPLAN Workshop on Intermediate Representations
+ * (IR '95), pages 35-49, Jan. 1995.
+ *
+ * The phisical IR representation is based on Mike Pall's LuaJIT IR.
+ * See: M. Pall. “LuaJIT 2.0 intellectual property disclosure and research
+ * opportunities” November 2009 http://lua-users.org/lists/lua-l/2009-11/msg00089.html
+ */
+
 #ifndef _GNU_SOURCE
 # define _GNU_SOURCE
 #endif

@@ -1,8 +1,16 @@
+/*
+ * IR - Lightweight JIT Compilation Framework
+ * (Native code patcher)
+ * Copyright (C) 2022 Zend by Perforce.
+ * Authors: Dmitry Stogov <dmitry@php.net>
+ *
+ * Based on Mike Pall's implementation for LuaJIT.
+ */
+
 #include "ir.h"
 #include "ir_private.h"
 
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
-/* This taken from LuaJIT. Thanks to Mike Pall. */
 static uint32_t _asm_x86_inslen(const uint8_t* p)
 {
 	static const uint8_t map_op1[256] = {

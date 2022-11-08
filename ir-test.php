@@ -1,4 +1,10 @@
 <?php
+/*
+ * IR - Lightweight JIT Compilation Framework
+ * (Test driver)
+ * Copyright (C) 2022 Zend by Perforce.
+ * Authors: Dmitry Stogov <dmitry@php.net>
+ */
 
 function parse_test($test, &$name, &$code, &$expect, &$args, &$target) {
 	$text = @file_get_contents($test);

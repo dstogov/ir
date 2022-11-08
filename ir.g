@@ -1,7 +1,12 @@
 /*
-To generate ir_load.c use llk <https://github.com/dstogov/llk>:
-php llk.php ir.g
-*/
+ * IR - Lightweight JIT Compilation Framework
+ * (IR loader)
+ * Copyright (C) 2022 Zend by Perforce.
+ * Authors: Dmitry Stogov <dmitry@php.net>
+ *
+ * To generate ir_load.c use llk <https://github.com/dstogov/llk>:
+ * php llk.php ir.g
+ */
 
 %start          ir
 %case-sensetive true
@@ -11,7 +16,17 @@ php llk.php ir.g
 %indent         "\t"
 
 %{
-/* This file is generated from "ir.g". Do not edit! */
+/*
+ * IR - Lightweight JIT Compilation Framework
+ * (IR loader)
+ * Copyright (C) 2005-2022 Zend by Perforce.
+ * Authors: Dmitry Stogov <dmitry@php.net>
+ *
+ * This file is generated from "ir.g". Do not edit!
+ *
+ * To generate ir_load.c use llk <https://github.com/dstogov/llk>:
+ * php llk.php ir.g
+ */
 
 #include "ir.h"
 #include "ir_private.h"

@@ -1,3 +1,10 @@
+/*
+ * IR - Lightweight JIT Compilation Framework
+ * (Native code generator based on DynAsm)
+ * Copyright (C) 2022 Zend by Perforce.
+ * Authors: Dmitry Stogov <dmitry@php.net>
+ */
+
 #include "ir.h"
 
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
