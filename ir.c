@@ -29,10 +29,6 @@
 # include <valgrind/valgrind.h>
 #endif
 
-#if defined(__GNUC__)
-# pragma GCC diagnostic ignored "-Warray-bounds"
-#endif
-
 #define IR_TYPE_FLAGS(name, type, field, flags) ((flags)|sizeof(type)),
 #define IR_TYPE_NAME(name, type, field, flags)  #name,
 #define IR_TYPE_CNAME(name, type, field, flags) #type,
@@ -622,21 +618,6 @@ ir_ref ir_emit3(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
 	return ir_emit(ctx, opt, op1, op2, op3);
 }
 
-void ir_set_op1(ir_ctx *ctx, ir_ref ref, ir_ref val)
-{
-	ctx->ir_base[ref].op1 = val;
-}
-
-void ir_set_op2(ir_ctx *ctx, ir_ref ref, ir_ref val)
-{
-	ctx->ir_base[ref].op2 = val;
-}
-
-void ir_set_op3(ir_ctx *ctx, ir_ref ref, ir_ref val)
-{
-	ctx->ir_base[ref].op3 = val;
-}
-
 static ir_ref _ir_fold_cse(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
 {
 	ir_ref ref = ctx->prev_insn_chain[opt & IR_OPT_OP_MASK];
@@ -859,7 +840,7 @@ ir_ref ir_fold3(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
 ir_ref ir_emit_N(ir_ctx *ctx, uint32_t opt, uint32_t count)
 {
 	int i;
-	ir_ref ref = ctx->insns_count;
+	ir_ref *p, ref = ctx->insns_count;
 	ir_insn *insn;
 
 	while (UNEXPECTED(ref + count/4 >= ctx->insns_limit)) {
@@ -872,8 +853,8 @@ ir_ref ir_emit_N(ir_ctx *ctx, uint32_t opt, uint32_t count)
 	if ((opt & IR_OPT_OP_MASK) != IR_PHI) {
 		insn->inputs_count = count;
 	}
-	for (i = 1; i <= (count|3); i++) {
-		insn->ops[i] = IR_UNUSED;
+	for (i = 1, p = insn->ops + i; i <= (count|3); i++, p++) {
+		*p = IR_UNUSED;
 	}
 
 	return ref;
@@ -906,7 +887,7 @@ void ir_set_op(ir_ctx *ctx, ir_ref ref, uint32_t n, ir_ref val)
 		}
 		IR_ASSERT(n <= count);
 	}
-	insn->ops[n] = val;
+	ir_insn_set_op(insn, n, val);
 }
 
 ir_ref ir_param(ir_ctx *ctx, ir_type type, ir_ref region, const char *name, int pos)

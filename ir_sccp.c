@@ -12,10 +12,6 @@
 #include "ir.h"
 #include "ir_private.h"
 
-#if defined(__GNUC__)
-# pragma GCC diagnostic ignored "-Warray-bounds"
-#endif
-
 #define IR_TOP                  IR_UNUSED
 #define IR_BOTTOM               IR_LAST_OP
 
@@ -262,8 +258,8 @@ static void ir_sccp_replace_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_r
 			insn = &ctx->ir_base[use];
 			l = ir_input_edges_count(ctx, insn);
 			for (k = 1; k <= l; k++) {
-				if (insn->ops[k] == ref) {
-					insn->ops[k] = new_ref;
+				if (ir_insn_op(insn, k) == ref) {
+					ir_insn_set_op(insn, k, new_ref);
 				}
 			}
 #if IR_COMBO_COPY_PROPAGATION
@@ -405,8 +401,8 @@ static void ir_sccp_remove_unreachable_merge_inputs(ir_ctx *ctx, ir_insn *_value
 	if (n - unreachable_inputs == 1) {
 		/* remove MERGE completely */
 		for (j = 1; j <= n; j++) {
-			if (insn->ops[j] && IR_IS_REACHABLE(insn->ops[j])) {
-				ir_ref prev, next = IR_UNUSED, input = insn->ops[j];
+			if (ir_insn_op(insn, j) && IR_IS_REACHABLE(ir_insn_op(insn, j))) {
+				ir_ref prev, next = IR_UNUSED, input = ir_insn_op(insn, j);
 				ir_insn *next_insn = NULL, *input_insn = &ctx->ir_base[input];
 
 				IR_ASSERT(input_insn->op == IR_END || input_insn->op == IR_IJMP || input_insn->op == IR_UNREACHABLE);
@@ -440,9 +436,9 @@ static void ir_sccp_remove_unreachable_merge_inputs(ir_ctx *ctx, ir_insn *_value
 		i = 1;
 		life_inputs = ir_bitset_malloc(n + 1);
 		for (j = 1; j <= n; j++) {
-			if (insn->ops[j]) {
+			if (ir_insn_op(insn, j)) {
 				if (i != j) {
-					insn->ops[i] = insn->ops[j];
+					ir_insn_set_op(insn, i, ir_insn_op(insn, j));
 				}
 				ir_bitset_incl(life_inputs, j);
 				i++;
@@ -463,13 +459,13 @@ static void ir_sccp_remove_unreachable_merge_inputs(ir_ctx *ctx, ir_insn *_value
 			    i = 2;
 				for (j = 2; j <= n; j++) {
 					if (ir_bitset_in(life_inputs, j - 1)) {
-						IR_ASSERT(use_insn->ops[j]);
+						IR_ASSERT(ir_insn_op(use_insn, j));
 						if (i != j) {
-							use_insn->ops[i] = use_insn->ops[j];
+							ir_insn_set_op(use_insn, i, ir_insn_op(use_insn, j));
 						}
 						i++;
 					} else {
-						IR_ASSERT(use_insn->ops[j] <= 0);
+						IR_ASSERT(ir_insn_op(use_insn, j) <= 0);
 					}
 				}
 			}
@@ -486,7 +482,7 @@ static void ir_sccp_mark_reachable_data(ir_ctx *ctx, ir_bitqueue *worklist, ir_i
 	n = ir_input_edges_count(ctx, insn);
 	for (j = 1; j <= n; j++) {
 		if (IR_OPND_KIND(flags, j) == IR_OPND_DATA || IR_OPND_KIND(flags, j) == IR_OPND_VAR) {
-			use = insn->ops[j];
+			use = ir_insn_op(insn, j);
 			if (use > 0 && IR_IS_TOP(use) && !ir_bitqueue_in(worklist, use)) {
 				ir_bitqueue_add(worklist, use);
 				ir_sccp_mark_reachable_data(ctx, worklist, _values, &ctx->ir_base[use]);
@@ -530,10 +526,10 @@ int ir_sccp(ir_ctx *ctx)
 					}
 				}
 				for (j = 1; j < n; j++) {
-					if (merge_insn->ops[j] && IR_IS_REACHABLE(merge_insn->ops[j])) {
-						if (IR_IS_TOP(insn->ops[j + 1])) {
-							ir_bitqueue_add(&worklist, insn->ops[j +1]);
-						} else if (ir_sccp_join_values(ctx, _values, i, insn->ops[j + 1])) {
+					if (ir_insn_op(merge_insn, j) && IR_IS_REACHABLE(ir_insn_op(merge_insn, j))) {
+						if (IR_IS_TOP(ir_insn_op(insn, j + 1))) {
+							ir_bitqueue_add(&worklist, ir_insn_op(insn, j +1));
+						} else if (ir_sccp_join_values(ctx, _values, i, ir_insn_op(insn, j + 1))) {
 							changed = 1;
 						}
 					}
@@ -546,11 +542,11 @@ int ir_sccp(ir_ctx *ctx)
 				bool has_top = 0;
 				n = ir_input_edges_count(ctx, insn);
 				for (j = 1; j <= n; j++) {
-					ir_ref input = insn->ops[j];
+					ir_ref input = ir_insn_op(insn, j);
 					if (!IR_IS_CONST_REF(input)) {
 						if (_values[input].optx == IR_TOP) {
 							has_top = 1;
-							ir_bitqueue_add(&worklist, insn->ops[j]);
+							ir_bitqueue_add(&worklist, ir_insn_op(insn, j));
 						} else if (_values[input].optx != IR_BOTTOM) {
 							/* Perform folding only if some of direct inputs
 							 * is going to be replaced by a constant or copy.
@@ -663,8 +659,8 @@ int ir_sccp(ir_ctx *ctx)
 					}
 				}
 				for (j = 1; j <= n; j++) {
-					if (insn->ops[j]) {
-						if (!IR_IS_REACHABLE(insn->ops[j])) {
+					if (ir_insn_op(insn, j)) {
+						if (!IR_IS_REACHABLE(ir_insn_op(insn, j))) {
 							unreachable_inputs++;
 						}
 					}
@@ -697,7 +693,7 @@ int ir_sccp(ir_ctx *ctx)
 				IR_ASSERT(n == 0 || IR_OPND_KIND(flags, 1) == IR_OPND_CONTROL);
 				for (j = 2; j <= n; j++) {
 					if (IR_OPND_KIND(flags, j) == IR_OPND_DATA || IR_OPND_KIND(flags, j) == IR_OPND_VAR) {
-						use = insn->ops[j];
+						use = ir_insn_op(insn, j);
 						if (use > 0 && IR_IS_TOP(use) && !ir_bitqueue_in(&worklist, use)) {
 							ir_bitqueue_add(&worklist, use);
 							ir_sccp_mark_reachable_data(ctx, &worklist, _values, &ctx->ir_base[use]);

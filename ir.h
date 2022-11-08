@@ -523,12 +523,35 @@ ir_ref ir_emit1(ir_ctx *ctx, uint32_t opt, ir_ref op1);
 ir_ref ir_emit2(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2);
 ir_ref ir_emit3(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
 
-void   ir_set_op1(ir_ctx *ctx, ir_ref ref, ir_ref val);
-void   ir_set_op2(ir_ctx *ctx, ir_ref ref, ir_ref val);
-void   ir_set_op3(ir_ctx *ctx, ir_ref ref, ir_ref val);
-
 ir_ref ir_emit_N(ir_ctx *ctx, uint32_t opt, uint32_t count);
 void   ir_set_op(ir_ctx *ctx, ir_ref ref, uint32_t n, ir_ref val);
+
+static inline void ir_set_op1(ir_ctx *ctx, ir_ref ref, ir_ref val)
+{
+	ctx->ir_base[ref].op1 = val;
+}
+
+static inline void ir_set_op2(ir_ctx *ctx, ir_ref ref, ir_ref val)
+{
+	ctx->ir_base[ref].op2 = val;
+}
+
+static inline void ir_set_op3(ir_ctx *ctx, ir_ref ref, ir_ref val)
+{
+	ctx->ir_base[ref].op3 = val;
+}
+
+static inline ir_ref ir_insn_op(ir_insn *insn, uint32_t n)
+{
+	ir_ref *p = insn->ops + n;
+	return *p;
+}
+
+static inline void ir_insn_set_op(ir_insn *insn, uint32_t n, ir_ref val)
+{
+	ir_ref *p = insn->ops + n;
+	*p = val;
+}
 
 ir_ref ir_fold(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
 

@@ -8,10 +8,6 @@
 #include "ir.h"
 #include "ir_private.h"
 
-#if defined(__GNUC__)
-# pragma GCC diagnostic ignored "-Warray-bounds"
-#endif
-
 static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 {
 	FILE *f = ctx->data;
@@ -539,7 +535,7 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 		if (j != 3) {
 			fprintf(f, ", ");
 		}
-		ir_emit_ref(ctx, f, insn->ops[j]);
+		ir_emit_ref(ctx, f, ir_insn_op(insn, j));
 	}
 	fprintf(f, ");\n");
 }
@@ -562,7 +558,7 @@ static void ir_emit_tailcall(ir_ctx *ctx, FILE *f, ir_insn *insn)
 		if (j != 3) {
 			fprintf(f, ", ");
 		}
-		ir_emit_ref(ctx, f, insn->ops[j]);
+		ir_emit_ref(ctx, f, ir_insn_op(insn, j));
 	}
 	fprintf(f, ");\n");
 	if (insn->type == IR_VOID) {

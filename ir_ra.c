@@ -27,10 +27,6 @@
 
 #include "ir_private.h"
 
-#if defined(__GNUC__)
-# pragma GCC diagnostic ignored "-Warray-bounds"
-#endif
-
 #define IR_SKIP      IR_LAST_OP
 #define IR_SKIP_REG  (IR_LAST_OP+1)
 #define IR_SKIP_MEM  (IR_LAST_OP+2)
@@ -401,16 +397,16 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					ir_ref use = ctx->use_edges[use_list->refs + j];
 					insn = &ctx->ir_base[use];
 					if (insn->op == IR_PHI) {
-						if (insn->ops[k] > 0) {
+						if (ir_insn_op(insn, k) > 0) {
 							/* live.add(phi.inputOf(b)) */
-							IR_ASSERT(ctx->vregs[insn->ops[k]]);
-							ir_bitset_incl(live, ctx->vregs[insn->ops[k]]);
+							IR_ASSERT(ctx->vregs[ir_insn_op(insn, k)]);
+							ir_bitset_incl(live, ctx->vregs[ir_insn_op(insn, k)]);
 							// TODO: ir_add_live_range() is used just to set ival->type
 							/* intervals[phi.inputOf(b)].addRange(b.from, b.to) */
-							ir_add_live_range(ctx, &unused, ctx->vregs[insn->ops[k]], insn->type,
+							ir_add_live_range(ctx, &unused, ctx->vregs[ir_insn_op(insn, k)], insn->type,
 								IR_START_LIVE_POS_FROM_REF(bb->start),
 								IR_END_LIVE_POS_FROM_REF(bb->end));
-							ir_add_phi_use(ctx, ctx->vregs[insn->ops[k]], k, IR_DEF_LIVE_POS_FROM_REF(bb->end), use);
+							ir_add_phi_use(ctx, ctx->vregs[ir_insn_op(insn, k)], k, IR_DEF_LIVE_POS_FROM_REF(bb->end), use);
 						}
 					}
 				}
@@ -507,7 +503,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 				n = ir_input_edges_count(ctx, insn);
 				for (j = 1; j <= n; j++) {
 					if (IR_OPND_KIND(flags, j) == IR_OPND_DATA) {
-						ir_ref input = insn->ops[j];
+						ir_ref input = ir_insn_op(insn, j);
 						uint8_t use_flags;
 
 						if (ctx->rules) {
@@ -1028,7 +1024,7 @@ int ir_coalesce(ir_ctx *ctx)
 			use = *p;
 			insn = &ctx->ir_base[use];
 			if (insn->op == IR_PHI) {
-				input = insn->ops[k];
+				input = ir_insn_op(insn, k);
 				if (input > 0) {
 					if (!ir_try_coalesce(ctx, &unused, input, use)) {
 						ir_add_phi_move(ctx, b, input, use);
@@ -1133,7 +1129,7 @@ int ir_compute_dessa_moves(ir_ctx *ctx)
 				if (insn->op == IR_PHI) {
 					k = ir_input_edges_count(ctx, insn);
 					for (j = 2; j <= k; j++) {
-						if (IR_IS_CONST_REF(insn->ops[j]) || ctx->vregs[insn->ops[j]] != ctx->vregs[use]) {
+						if (IR_IS_CONST_REF(ir_insn_op(insn, j)) || ctx->vregs[ir_insn_op(insn, j)] != ctx->vregs[use]) {
 							int pred = ctx->cfg_edges[bb->predecessors + (j-2)];
 							ctx->cfg_blocks[pred].flags |= IR_BB_DESSA_MOVES;
 						}
@@ -1182,7 +1178,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, int b, emit_copy_t emit_copy)
 		ir_ref ref = ctx->use_edges[use_list->refs + j];
 		ir_insn *insn = &ctx->ir_base[ref];
 		if (insn->op == IR_PHI) {
-			ir_ref input = insn->ops[k];
+			ir_ref input = ir_insn_op(insn, k);
 			if (IR_IS_CONST_REF(input)) {
 				emit_copy(ctx, insn->type, input, ref);
 			} else if (ctx->vregs[input] != ctx->vregs[ref]) {

@@ -328,7 +328,7 @@ static ir_reg ir_get_arg_reg(ir_ctx *ctx, ir_insn *insn, int op_num)
 
 	n = ir_input_edges_count(ctx, insn);
 	for (j = 3; j <= n; j++) {
-		type = ctx->ir_base[insn->ops[j]].type;
+		type = ctx->ir_base[ir_insn_op(insn, j)].type;
 		if (IR_IS_TYPE_INT(type)) {
 			if (j == op_num) {
 				if (int_param < int_reg_params_count) {
@@ -366,7 +366,7 @@ static bool ir_call_needs_tmp_int_reg(ir_ctx *ctx, ir_ref ref)
 
 	n = ir_input_edges_count(ctx, insn);
 	for (j = 3; j <= n; j++) {
-		arg = insn->ops[j];
+		arg = ir_insn_op(insn, j);
 		arg_insn = &ctx->ir_base[arg];
 		type = arg_insn->type;
 		if (IR_IS_TYPE_INT(type)) {
@@ -3598,7 +3598,7 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn)
 
 	n = ir_input_edges_count(ctx, insn);
 	for (j = 3; j <= n; j++) {
-		type = ctx->ir_base[insn->ops[j]].type;
+		type = ctx->ir_base[ir_insn_op(insn, j)].type;
 		if (IR_IS_TYPE_INT(type)) {
 			if (int_param >= int_reg_params_count) {
 				used_stack += IR_MAX(sizeof(void*), ir_type_size[type]);
@@ -3660,7 +3660,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 	 *    and collect arguments that should be passed through registers */
 	copies = ir_mem_malloc((n - 2) * sizeof(ir_copy));
 	for (j = 3; j <= n; j++) {
-		arg = insn->ops[j];
+		arg = ir_insn_op(insn, j);
 		src_reg = ctx->regs[def][j];
 		arg_insn = &ctx->ir_base[arg];
 		type = arg_insn->type;
@@ -3759,7 +3759,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 		int_param = 0;
 		fp_param = 0;
 		for (j = 3; j <= n; j++) {
-			arg = insn->ops[j];
+			arg = ir_insn_op(insn, j);
 			src_reg = ctx->regs[def][j];
 			arg_insn = &ctx->ir_base[arg];
 			type = arg_insn->type;
@@ -4323,7 +4323,7 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 		for (j = 0; j < use_list->count; j++) {
 			ir_ref use = ctx->use_edges[use_list->refs + j];
 			ir_insn *insn = &ctx->ir_base[use];
-			if (insn->op == IR_PHI && insn->ops[k] == from && insn->op1 == to_bb->start) {
+			if (insn->op == IR_PHI && ir_insn_op(insn, k) == from && insn->op1 == to_bb->start) {
 				phi = use;
 				break;
 			}
