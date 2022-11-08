@@ -240,7 +240,7 @@ typedef enum _ir_type {
 	_(VLOAD,        l2,   src, var, ___) /* load value of local var     */ \
 	_(VSTORE,       s3,   src, var, def) /* store value to local var    */ \
 	_(RLOAD,        l1X1, src, num, ___) /* load value from register    */ \
-	_(RSTORE,       l2X1, src, def, num) /* store value into register   */ \
+	_(RSTORE,       s2X1, src, def, num) /* store value into register   */ \
 	_(LOAD,         l2,   src, ref, ___) /* load from memory            */ \
 	_(STORE,        s3,   src, ref, def) /* store to memory             */ \
 	_(TLS,          l1X2, src, num, num) /* thread local variable       */ \
