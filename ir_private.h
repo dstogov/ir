@@ -668,6 +668,7 @@ extern const char *ir_op_name[IR_LAST_OP];
 #define IR_OP_FLAG_MEM_STORE      ((0<<6)|(1<<7))
 #define IR_OP_FLAG_MEM_CALL       ((1<<6)|(0<<7))
 #define IR_OP_FLAG_MEM_ALLOC      ((1<<6)|(1<<7))
+#define IR_OP_FLAG_MEM_MASK       ((1<<6)|(1<<7))
 
 #define IR_OPND_UNUSED            0x0
 #define IR_OPND_DATA              0x1

@@ -244,6 +244,13 @@ static void ir_sccp_replace_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_r
 		ir_ref input = *p;
 		if (input > 0) {
 			ir_sccp_remove_from_use_list(ctx, input, ref);
+			/* schedule DCE */
+			if (worklist
+			 && ((IR_IS_FOLDABLE_OP(ctx->ir_base[input].op) && ctx->use_lists[input].count == 0)
+			  || ((ir_op_flags[ctx->ir_base[input].op] & (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_MASK)) == (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_LOAD)
+					&& ctx->use_lists[input].count == 1))) {
+				ir_bitqueue_add(worklist, input);
+			}
 		}
 	}
 
@@ -269,7 +276,7 @@ static void ir_sccp_replace_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_r
 				}
 			}
 #endif
-			/* schedule folding & DCE */
+			/* schedule folding */
 			if (worklist && _values[use].op == IR_BOTTOM) {
 				ir_bitqueue_add(worklist, use);
 			}
@@ -353,6 +360,7 @@ static void ir_sccp_replace_use(ir_ctx *ctx, ir_ref ref, ir_ref use, ir_ref new_
 	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
 		if (*p == use) {
 			*p = new_use;
+			break;
 		}
 	}
 }
@@ -669,6 +677,10 @@ int ir_sccp(ir_ctx *ctx)
 				} else {
 					continue;
 				}
+			} else if ((flags & (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_MASK)) == (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_LOAD)
+					&& ctx->use_lists[i].count == 1) {
+				/* dead load */
+				_values[i].optx = IR_LOAD;
 			} else {
 				IR_MAKE_BOTTOM(i);
 
@@ -780,6 +792,9 @@ int ir_sccp(ir_ctx *ctx)
 		} else if (_values[i].op == IR_MERGE || _values[i].op == IR_LOOP_BEGIN) {
 			/* schedule merge to remove unreachable MERGE inputs */
 			ir_bitqueue_add(&worklist, i);
+		} else if (_values[i].op == IR_LOAD) {
+			/* schedule dead load elimination */
+			ir_bitqueue_add(&worklist, i);
 		}
 	}
 
@@ -795,6 +810,16 @@ int ir_sccp(ir_ctx *ctx)
 				} else {
 					ir_sccp_fold2(ctx, _values, i, &worklist);
 				}
+			} else if ((ir_op_flags[insn->op] & (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_MASK)) == (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_LOAD)
+					&& ctx->use_lists[i].count == 1) {
+				/* dead load */
+				ir_ref next = ctx->use_edges[ctx->use_lists[i].refs];
+
+				/* remove LOAD from double linked control list */
+				ctx->ir_base[next].op1 = insn->op1;
+				ir_sccp_replace_use(ctx, insn->op1, i, next);
+				insn->op1 = IR_UNUSED;
+				ir_sccp_replace_insn(ctx, _values, i, IR_UNUSED, &worklist);
 			}
 		}
 	}

@@ -10,8 +10,7 @@
 
 -  irreducable loops detection/support
 
--  range inference and PI node
--  Extend SCCP to remove dead LOADs
+-  Extend SCCP to support range inference and PI node
 
 ?  instruction selection
 	- xor, btsl=INCL, btrl=EXCL, btl=IN, bsr

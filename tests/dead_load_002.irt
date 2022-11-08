@@ -1,0 +1,19 @@
+--TEST--
+002: dead loads
+--CODE--
+{
+	l_1 = START(l_5);
+	uintptr_t d_2 = PARAM(l_1, "a", 0);
+	uintptr_t d_3, l_3 = LOAD(l_1, d_2);
+	int32_t d_4, l_4 = LOAD(l_3, d_3);
+	l_5 = RETURN(l_4);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	l_1 = START(l_3);
+	uintptr_t d_2 = PARAM(l_1, "a", 0);
+	l_3 = RETURN(l_1, null);
+}
