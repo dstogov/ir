@@ -92,6 +92,7 @@ void ir_save(ir_ctx *ctx, FILE *f)
 						if (ref == 0) {
 							break;
 						}
+						IR_FALLTHROUGH;
 					case IR_OPND_NUM:
 						fprintf(f, "%s%d", first ? "(" : ", ", ref);
 						first = 0;

@@ -7,7 +7,7 @@ SRC_DIR    = .
 
 CC         = gcc
 BUILD_CC   = gcc
-CFLAGS     = -Wall
+CFLAGS     = -Wall -Wextra -Wno-unused-parameter
 LDFLAGS    = -lm
 PHP        = php
 LLK        = llk

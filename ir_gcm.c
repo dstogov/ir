@@ -117,7 +117,7 @@ int ir_gcm(ir_ctx *ctx)
 	ir_bitset visited;
 	ir_block *bb;
 	ir_list queue;
-	uint32_t *_blocks;
+	uint32_t *_blocks, b;
 	ir_insn *insn, *use_insn;
 	ir_use_list *use_list;
 	uint32_t flags;
@@ -127,7 +127,7 @@ int ir_gcm(ir_ctx *ctx)
 	visited = ir_bitset_malloc(ctx->insns_count);
 
 	/* pin and collect control and control depended (PARAM, VAR, PHI, PI) instructions */
-	for (i = 1, bb = ctx->cfg_blocks + 1; i <= ctx->cfg_blocks_count; i++, bb++) {
+	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; b++, bb++) {
 		if (bb->flags & IR_BB_UNREACHABLE) {
 			continue;
 		}
@@ -135,7 +135,7 @@ int ir_gcm(ir_ctx *ctx)
 		while (1) {
 			insn = &ctx->ir_base[j];
 			ir_bitset_incl(visited, j);
-			_blocks[j] = i; /* pin to block */
+			_blocks[j] = b; /* pin to block */
 			flags = ir_op_flags[insn->op];
 			if (IR_OPND_KIND(flags, 2) == IR_OPND_DATA
 			 || IR_OPND_KIND(flags, 3) == IR_OPND_DATA
@@ -149,7 +149,7 @@ int ir_gcm(ir_ctx *ctx)
 					ref = *p;
 					use_insn = &ctx->ir_base[ref];
 					if (use_insn->op == IR_PARAM || use_insn->op == IR_VAR) {
-						_blocks[ref] = i; /* pin to block */
+						_blocks[ref] = b; /* pin to block */
 						ir_bitset_incl(visited, ref);
 					} else
 					if (use_insn->op == IR_PHI || use_insn->op == IR_PI) {
@@ -157,7 +157,7 @@ int ir_gcm(ir_ctx *ctx)
 						if (UNEXPECTED(ctx->use_lists[ref].count == 0)) {
 							// TODO: Unused PHI ???
 						} else {
-							_blocks[ref] = i; /* pin to block */
+							_blocks[ref] = b; /* pin to block */
 							ir_list_push(&queue, ref);
 						}
 					}
@@ -235,7 +235,8 @@ int ir_gcm(ir_ctx *ctx)
 
 static void ir_xlat_binding(ir_ctx *ctx, ir_ref *_xlat)
 {
-	uint32_t n1, n2, pos, key;
+	uint32_t n1, n2, pos;
+	ir_ref key;
 	ir_hashtab_bucket *b1, *b2;
 	ir_hashtab *binding = ctx->binding;
 	uint32_t hash_size = (uint32_t)(-(int32_t)binding->mask);
@@ -259,8 +260,8 @@ static void ir_xlat_binding(ir_ctx *ctx, ir_ref *_xlat)
 				b2->val = b1->val;
 			}
 			key |= binding->mask;
-			b2->next = ((uint32_t*)binding->data)[(int32_t)key];
-			((uint32_t*)binding->data)[(int32_t)key] = pos;
+			b2->next = ((uint32_t*)binding->data)[key];
+			((uint32_t*)binding->data)[key] = pos;
 			pos += sizeof(ir_hashtab_bucket);
 			b2++;
 			n2++;
@@ -281,7 +282,7 @@ int ir_schedule(ir_ctx *ctx)
 	ir_use_list *lists;
 	ir_ref *edges;
 	ir_bitset used;
-	ir_ref b;
+	uint32_t b;
 	uint32_t *_blocks = ctx->cfg_map;
 	ir_ref *_next = ir_mem_calloc(ctx->insns_count, sizeof(ir_ref));
 	ir_ref *_prev = ir_mem_calloc(ctx->insns_count, sizeof(ir_ref));

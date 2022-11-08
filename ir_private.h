@@ -31,6 +31,9 @@
 # if __has_attribute(__aligned__)
 #  define IR_SET_ALIGNED(alignment, decl) decl __attribute__ ((__aligned__ (alignment)))
 # endif
+# if __has_attribute(__fallthrough__)
+#  define IR_FALLTHROUGH __attribute__((__fallthrough__))
+# endif
 #elif defined(_WIN32)
 # define IR_SET_ALIGNED(alignment, decl) __declspec(align(alignment)) decl
 #endif
@@ -46,6 +49,9 @@
 #endif
 #ifndef IR_SET_ALIGNED
 #  define IR_SET_ALIGNED(alignment, decl) decl
+#endif
+#ifndef IR_FALLTHROUGH
+#  define IR_FALLTHROUGH ((void)0)
 #endif
 
 /*** Helper routines ***/
@@ -595,7 +601,7 @@ IR_ALWAYS_INLINE void ir_worklist_clear(ir_worklist *w)
 
 IR_ALWAYS_INLINE bool ir_worklist_push(ir_worklist *w, ir_ref val)
 {
-	IR_ASSERT(val >= 0 && val < ir_worklist_capasity(w));
+	IR_ASSERT(val >= 0 && (uint32_t)val < ir_worklist_capasity(w));
 	if (ir_bitset_in(w->visited, val)) {
 		return 0;
 	}
@@ -736,7 +742,7 @@ IR_ALWAYS_INLINE ir_ref ir_input_edges_count(ir_ctx *ctx, ir_insn *insn)
 IR_ALWAYS_INLINE ir_ref ir_binding_find(ir_ctx *ctx, ir_ref ref)
 {
 	ir_ref var = ir_hashtab_find(ctx->binding, ref);
-	return (var != IR_INVALID_VAL) ? var : 0;
+	return (var != (ir_ref)IR_INVALID_VAL) ? var : 0;
 }
 
 /*** IR Use Lists ***/
@@ -772,22 +778,22 @@ struct _ir_block {
 	uint32_t predecessors;       /* index in ir_ctx->cfg_edges[] array         */
 	uint32_t predecessors_count;
 	union {
-		int  dom_parent;         /* immediate dominator block                  */
-		int  idom;               /* immediate dominator block                  */
+		uint32_t dom_parent;     /* immediate dominator block                  */
+		uint32_t idom;           /* immediate dominator block                  */
 	};
 	union {
-		int  dom_depth;          /* depth from the root of the dominators tree */
-		int  postnum;            /* used temporary during tree constructon     */
+		uint32_t dom_depth;      /* depth from the root of the dominators tree */
+		uint32_t postnum;        /* used temporary during tree constructon     */
 	};
-	int      dom_child;          /* first dominated blocks                     */
-	int      dom_next_child;     /* next dominated block (linked list)         */
-	int      loop_header;
-	int      loop_depth;
+	uint32_t     dom_child;      /* first dominated blocks                     */
+	uint32_t     dom_next_child; /* next dominated block (linked list)         */
+	uint32_t     loop_header;
+	uint32_t     loop_depth;
 };
 
-int ir_skip_empty_target_blocks(ir_ctx *ctx, int b);
-int ir_skip_empty_next_blocks(ir_ctx *ctx, int b);
-void ir_get_true_false_blocks(ir_ctx *ctx, int b, int *true_block, int *false_block, int *next_block);
+uint32_t ir_skip_empty_target_blocks(ir_ctx *ctx, uint32_t b);
+uint32_t ir_skip_empty_next_blocks(ir_ctx *ctx, uint32_t b);
+void ir_get_true_false_blocks(ir_ctx *ctx, uint32_t b, uint32_t *true_block, uint32_t *false_block, uint32_t *next_block);
 
 /*** Folding Engine (see ir.c and ir_fold.h) ***/
 typedef enum _ir_fold_action {
@@ -877,7 +883,7 @@ struct _ir_live_interval {
 
 typedef int (*emit_copy_t)(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to);
 
-int ir_gen_dessa_moves(ir_ctx *ctx, int b, emit_copy_t emit_copy);
+int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy);
 void ir_free_live_ranges(ir_live_range *live_range);
 void ir_free_live_intervals(ir_live_interval **live_intervals, int count);
 

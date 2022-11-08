@@ -113,6 +113,7 @@ bool ir_check(ir_ctx *ctx)
 										if (j == 1) {
 											break;
 										}
+										IR_FALLTHROUGH;
 									case IR_ADD:
 									case IR_SUB:
 									case IR_MUL:
@@ -178,6 +179,7 @@ bool ir_check(ir_ctx *ctx)
 									ok = 0;
 								}
 							}
+							break;
 						case IR_OPND_CONTROL_DEP:
 							if (use >= i
 							 && !(insn->op == IR_LOOP_BEGIN)) {
@@ -190,6 +192,7 @@ bool ir_check(ir_ctx *ctx)
 									ok = 0;
 								}
 							}
+							break;
 						case IR_OPND_CONTROL_REF:
 							if (!(ir_op_flags[use_insn->op] & IR_OP_FLAG_CONTROL)) {
 								fprintf(stderr, "ir_base[%d].ops[%d] reference (%d) must be CONTROL\n", i, j, use);
@@ -258,6 +261,7 @@ bool ir_check(ir_ctx *ctx)
 							/* UNREACHABLE and IJMP may be used in MERGE with the following ENTRY */
 							break;
 						}
+						IR_FALLTHROUGH;
 					case IR_RETURN:
 						if (use_list->count != 0) {
 							fprintf(stderr, "ir_base[%d].op (%s) must not have successors (%d)\n",

@@ -837,12 +837,13 @@ ir_ref ir_fold3(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
 	return ir_fold(ctx, opt, op1, op2, op3);
 }
 
-ir_ref ir_emit_N(ir_ctx *ctx, uint32_t opt, uint32_t count)
+ir_ref ir_emit_N(ir_ctx *ctx, uint32_t opt, int32_t count)
 {
 	int i;
 	ir_ref *p, ref = ctx->insns_count;
 	ir_insn *insn;
 
+	IR_ASSERT(count >= 0);
 	while (UNEXPECTED(ref + count/4 >= ctx->insns_limit)) {
 		ir_grow_top(ctx);
 	}
@@ -860,12 +861,12 @@ ir_ref ir_emit_N(ir_ctx *ctx, uint32_t opt, uint32_t count)
 	return ref;
 }
 
-void ir_set_op(ir_ctx *ctx, ir_ref ref, uint32_t n, ir_ref val)
+void ir_set_op(ir_ctx *ctx, ir_ref ref, int32_t n, ir_ref val)
 {
 	ir_insn *insn = &ctx->ir_base[ref];
 
 	if (n > 3) {
-		uint32_t count = 3;
+		int32_t count = 3;
 
 		if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
 			count = insn->inputs_count;

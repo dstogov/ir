@@ -456,7 +456,7 @@ int ir_disasm(const char    *name,
 	for (i = 0; i < count; i++) {
 		entry = ir_hashtab_find(&labels, (uint32_t)((uintptr_t)insn->address - (uintptr_t)start));
 # endif
-		if (entry != IR_INVALID_VAL) {
+		if (entry != (ir_ref)IR_INVALID_VAL) {
 			if (entry >= 0) {
 				fprintf(f, ".ENTRY_%d:\n", entry);
 			} else {
@@ -496,7 +496,7 @@ int ir_disasm(const char    *name,
 # endif
 			if (addr >= (uint64_t)(uintptr_t)end && addr < (uint64_t)(uintptr_t)orig_end) {
 				entry = ir_hashtab_find(&labels, (uint32_t)((uintptr_t)addr - (uintptr_t)start));
-				if (entry != IR_INVALID_VAL) {
+				if (entry != (ir_ref)IR_INVALID_VAL) {
 					r = q = strstr(p, "(%rip)");
 					if (r && r > p) {
 						r--;
@@ -544,7 +544,7 @@ int ir_disasm(const char    *name,
 			}
 			if (addr >= (uint64_t)(uintptr_t)start && addr < (uint64_t)(uintptr_t)orig_end) {
 				entry = ir_hashtab_find(&labels, (uint32_t)((uintptr_t)addr - (uintptr_t)start));
-				if (entry != IR_INVALID_VAL) {
+				if (entry != (ir_ref)IR_INVALID_VAL) {
 					fwrite(p, 1, q - p, f);
 					if (entry >= 0) {
 						fprintf(f, ".ENTRY_%d", entry);
@@ -587,7 +587,7 @@ int ir_disasm(const char    *name,
 
 		while (n > 0) {
 			entry = ir_hashtab_find(&labels, (uint32_t)((uintptr_t)p - (uintptr_t)start));
-			if (entry != IR_INVALID_VAL) {
+			if (entry != (ir_ref)IR_INVALID_VAL) {
 				if (entry >= 0) {
 					fprintf(f, ".ENTRY_%d:\n", entry);
 				} else {
@@ -600,7 +600,7 @@ int ir_disasm(const char    *name,
 			j = 15;
 			while (n > 0 && j > 0) {
 				entry = ir_hashtab_find(&labels, (uint32_t)((uintptr_t)p - (uintptr_t)start));
-				if (entry != IR_INVALID_VAL) {
+				if (entry != (ir_ref)IR_INVALID_VAL) {
 					break;
 				}
 				fprintf(f, ", 0x%02x", (int)*p);
@@ -620,7 +620,7 @@ int ir_disasm(const char    *name,
 		p = (uintptr_t*)((char*)start + jmp_table_offset);
 		while (n > 0) {
 			entry = ir_hashtab_find(&labels, (uint32_t)((uintptr_t)p - (uintptr_t)start));
-			if (entry != IR_INVALID_VAL) {
+			if (entry != (ir_ref)IR_INVALID_VAL) {
 				if (entry >= 0) {
 					fprintf(f, ".ENTRY_%d:\n", entry);
 				} else {
@@ -630,7 +630,7 @@ int ir_disasm(const char    *name,
 			if (*p) {
 				IR_ASSERT((uintptr_t)*p >= (uintptr_t)start && (uintptr_t)*p < (uintptr_t)orig_end);
 				entry = ir_hashtab_find(&labels, (uint32_t)(*p - (uintptr_t)start));
-				IR_ASSERT(entry != IR_INVALID_VAL && entry < 0);
+				IR_ASSERT(entry != (ir_ref)IR_INVALID_VAL && entry < 0);
 				if (sizeof(void*) == 8) {
 					fprintf(f, "\t.qword .L%d\n", -entry);
 				} else {

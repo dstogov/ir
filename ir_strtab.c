@@ -199,7 +199,7 @@ ir_ref ir_strtab_update(ir_strtab *strtab, const char *str, uint32_t len, ir_ref
 
 const char *ir_strtab_str(ir_strtab *strtab, ir_ref idx)
 {
-	IR_ASSERT(idx >= 0 && idx < strtab->count);
+	IR_ASSERT(idx >= 0 && (uint32_t)idx < strtab->count);
 	return ((ir_strtab_bucket*)strtab->data)[idx].str;
 }
 
@@ -217,7 +217,8 @@ void ir_strtab_free(ir_strtab *strtab)
 
 void ir_strtab_apply(ir_strtab *strtab, ir_strtab_apply_t func)
 {
-	ir_ref i;
+	uint32_t i;
+
 	for (i = 0; i < strtab->count; i++) {
 		ir_strtab_bucket *b = &((ir_strtab_bucket*)strtab->data)[i];
 		func(b->str, b->len, b->val);

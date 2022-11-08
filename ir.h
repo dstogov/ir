@@ -459,7 +459,7 @@ typedef struct _ir_ctx {
 	ir_hashtab        *binding;
 	ir_use_list       *use_lists;         /* def->use lists for each instruction */
 	ir_ref            *use_edges;
-	uint32_t           use_edges_count;
+	ir_ref             use_edges_count;
 	uint32_t           cfg_blocks_count;
 	uint32_t           cfg_edges_count;
 	ir_block          *cfg_blocks;        /* list of Basic Blocks (starts from 1) */
@@ -467,7 +467,7 @@ typedef struct _ir_ctx {
 	uint32_t          *cfg_map;           /* map of instructions to Basic Block number */
 	uint32_t          *rules;
 	uint32_t          *vregs;
-	uint32_t           vregs_count;
+	ir_ref             vregs_count;
 	int32_t            spill_base;        /* base register for special spill area (e.g. PHP VM frame pointer) */
 	int32_t            fixed_stack_red_zone;
 	int32_t            fixed_stack_frame_size;
@@ -475,7 +475,7 @@ typedef struct _ir_ctx {
 	uint64_t           fixed_save_regset;
 	ir_live_interval **live_intervals;
 	ir_regs           *regs;
-	uint32_t          *prev_insn_len;
+	ir_ref            *prev_insn_len;
 	void              *data;
 	uint32_t           rodata_offset;
 	uint32_t           jmp_table_offset;
@@ -523,8 +523,8 @@ ir_ref ir_emit1(ir_ctx *ctx, uint32_t opt, ir_ref op1);
 ir_ref ir_emit2(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2);
 ir_ref ir_emit3(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
 
-ir_ref ir_emit_N(ir_ctx *ctx, uint32_t opt, uint32_t count);
-void   ir_set_op(ir_ctx *ctx, ir_ref ref, uint32_t n, ir_ref val);
+ir_ref ir_emit_N(ir_ctx *ctx, uint32_t opt, int32_t count);
+void   ir_set_op(ir_ctx *ctx, ir_ref ref, int32_t n, ir_ref val);
 
 static inline void ir_set_op1(ir_ctx *ctx, ir_ref ref, ir_ref val)
 {
@@ -541,13 +541,13 @@ static inline void ir_set_op3(ir_ctx *ctx, ir_ref ref, ir_ref val)
 	ctx->ir_base[ref].op3 = val;
 }
 
-static inline ir_ref ir_insn_op(ir_insn *insn, uint32_t n)
+static inline ir_ref ir_insn_op(ir_insn *insn, int32_t n)
 {
 	ir_ref *p = insn->ops + n;
 	return *p;
 }
 
-static inline void ir_insn_set_op(ir_insn *insn, uint32_t n, ir_ref val)
+static inline void ir_insn_set_op(ir_insn *insn, int32_t n, ir_ref val)
 {
 	ir_ref *p = insn->ops + n;
 	*p = val;

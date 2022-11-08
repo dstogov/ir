@@ -48,11 +48,12 @@ static ir_ref ir_merge_blocks(ir_ctx *ctx, ir_ref end, ir_ref begin)
 
 int ir_build_cfg(ir_ctx *ctx)
 {
-	ir_ref n, j, *p, ref, b;
+	ir_ref n, j, *p, ref;
+	uint32_t b;
 	ir_insn *insn;
 	uint32_t flags;
 	ir_worklist worklist;
-	uint32_t bb_count = 0;
+	uint32_t count, bb_count = 0;
 	uint32_t edges_count = 0;
 	ir_block *blocks, *bb;
 	uint32_t *_blocks, *edges;
@@ -260,16 +261,16 @@ next_successor:
 	}
 
 	bb = blocks + 1;
-	n = 0;
+	count = 0;
 	for (b = 1; b <= bb_count; b++, bb++) {
-		bb->successors = n;
-		n += bb->successors_count;
+		bb->successors = count;
+		count += bb->successors_count;
 		bb->successors_count = 0;
-		bb->predecessors = n;
-		n += bb->predecessors_count;
+		bb->predecessors = count;
+		count += bb->predecessors_count;
 		bb->predecessors_count = 0;
 	}
-	IR_ASSERT(n == edges_count * 2);
+	IR_ASSERT(count == edges_count * 2);
 
 	/* Create an array of successor control edges */
 	edges = ir_mem_malloc(edges_count * 2 * sizeof(uint32_t));
@@ -390,7 +391,7 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 				continue;
 			}
 			if (bb->predecessors_count == 1) {
-				int idom = 0;
+				uint32_t idom = 0;
 				uint32_t pred_b = edges[bb->predecessors];
 				ir_block *pred_bb = &blocks[pred_b];
 
@@ -402,7 +403,7 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 					changed = 1;
 				}
 			} else if (bb->predecessors_count) {
-				int idom = 0;
+				uint32_t idom = 0;
 				uint32_t k = bb->predecessors_count;
 				uint32_t *p = edges + bb->predecessors;
 				do {
@@ -604,7 +605,7 @@ next:
 					}
 					if (j != i) {
 						ir_block *bb = &blocks[j];
-						if (bb->idom < 0 && j != 1) {
+						if (bb->idom == 0 && j != 1) {
 							/* Ignore blocks that are unreachable or only abnormally reachable. */
 							continue;
 						}
@@ -676,7 +677,7 @@ int ir_schedule_blocks(ir_ctx *ctx)
 			if (bb->predecessors_count > 1) {
 				/* Insert empty ENTRY blocks */
 				for (j = 0, p = &ctx->cfg_edges[bb->predecessors]; j < bb->predecessors_count; j++, p++) {
-					ir_ref predecessor = *p;
+					uint32_t predecessor = *p;
 
 					if (ir_bitqueue_in(&blocks, predecessor)
 					 && (ctx->cfg_blocks[predecessor].flags & IR_BB_ENTRY)
@@ -798,7 +799,7 @@ int ir_schedule_blocks(ir_ctx *ctx)
 }
 
 /* JMP target optimisation */
-int ir_skip_empty_target_blocks(ir_ctx *ctx, int b)
+uint32_t ir_skip_empty_target_blocks(ir_ctx *ctx, uint32_t b)
 {
 	ir_block *bb;
 
@@ -816,7 +817,7 @@ int ir_skip_empty_target_blocks(ir_ctx *ctx, int b)
 	return b;
 }
 
-int ir_skip_empty_next_blocks(ir_ctx *ctx, int b)
+uint32_t ir_skip_empty_next_blocks(ir_ctx *ctx, uint32_t b)
 {
 	ir_block *bb;
 
@@ -838,7 +839,7 @@ int ir_skip_empty_next_blocks(ir_ctx *ctx, int b)
 	return b;
 }
 
-void ir_get_true_false_blocks(ir_ctx *ctx, int b, int *true_block, int *false_block, int *next_block)
+void ir_get_true_false_blocks(ir_ctx *ctx, uint32_t b, uint32_t *true_block, uint32_t *false_block, uint32_t *next_block)
 {
 	ir_block *bb;
 	uint32_t *p, use_block;

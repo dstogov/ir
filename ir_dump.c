@@ -271,8 +271,7 @@ void ir_dump_cfg_map(ir_ctx *ctx, FILE *f)
 
 void ir_dump_live_ranges(ir_ctx *ctx, FILE *f)
 {
-    uint32_t i, n;
-    ir_ref j;
+    ir_ref i, j, n;
 
 	if (!ctx->live_intervals) {
 		return;
@@ -289,13 +288,13 @@ void ir_dump_live_ranges(ir_ctx *ctx, FILE *f)
 				fprintf(f, "TMP");
 			} else {
 				for (j = 1; j < ctx->insns_count; j++) {
-					if (ctx->vregs[j] == i) {
+					if (ctx->vregs[j] == (uint32_t)i) {
 						break;
 					}
 				}
 				fprintf(f, "R%d (d_%d", i, j);
 				for (j++; j < ctx->insns_count; j++) {
-					if (ctx->vregs[j] == i) {
+					if (ctx->vregs[j] == (uint32_t)i) {
 						fprintf(f, ", d_%d", j);
 					}
 				}

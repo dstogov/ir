@@ -35,10 +35,6 @@
 # define DASM_CHECKS
 #endif
 
-#if defined(__GNUC__)
-# pragma GCC diagnostic ignored "-Warray-bounds"
-#endif
-
 typedef struct _ir_copy {
 	ir_type type;
 	ir_reg  from;
@@ -106,13 +102,29 @@ static void *ir_jmp_addr(ir_ctx *ctx, ir_insn *insn, ir_insn *addr_insn)
 	return addr;
 }
 
+#if defined(__GNUC__)
+# pragma GCC push_options
+# pragma GCC diagnostic ignored "-Warray-bounds"
+# pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
+#endif
+
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 # include "dynasm/dasm_proto.h"
 # include "dynasm/dasm_x86.h"
-# include "ir_emit_x86.h"
 #elif defined(IR_TARGET_AARCH64)
 # include "dynasm/dasm_proto.h"
 # include "dynasm/dasm_arm64.h"
+#else
+# error "Unknown IR target"
+#endif
+
+#if defined(__GNUC__)
+# pragma GCC pop_options
+#endif
+
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
+# include "ir_emit_x86.h"
+#elif defined(IR_TARGET_AARCH64)
 # include "ir_emit_aarch64.h"
 #else
 # error "Unknown IR target"
@@ -120,8 +132,8 @@ static void *ir_jmp_addr(ir_ctx *ctx, ir_insn *insn, ir_insn *addr_insn)
 
 int ir_match(ir_ctx *ctx)
 {
-	int b, n;
-	ir_ref i;
+	uint32_t b;
+	ir_ref i, n;
 	ir_block *bb;
 	ir_insn *insn;
 

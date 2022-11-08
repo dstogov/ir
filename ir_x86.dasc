@@ -1596,6 +1596,7 @@ binop_fp:
 
 		case IR_CALL:
 			ctx->flags |= IR_HAS_CALLS;
+			IR_FALLTHROUGH;
 		case IR_TAILCALL:
 			if (ir_input_edges_count(ctx, insn) == 2 /* no arguments */
 			 && insn->op2 > bb->start
@@ -2570,13 +2571,13 @@ static void ir_emit_overflow(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
-static void ir_emit_overflow_and_branch(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
+static void ir_emit_overflow_and_branch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	ir_insn *overflow_insn = &ctx->ir_base[insn->op2];
 	ir_type type = ctx->ir_base[overflow_insn->op1].type;
-	int true_block, false_block, next_block;
+	uint32_t true_block, false_block, next_block;
 	bool reverse = 0;
 
 	ir_get_true_false_blocks(ctx, b, &true_block, &false_block, &next_block);
@@ -3869,7 +3870,7 @@ static void ir_emit_test_int_common(ir_ctx *ctx, ir_ref ref, ir_op op)
 				}
 			} else if ((op == IR_EQ || op == IR_NE) && val == 0xffff) {
 				|	test Rw(op1_reg), Rw(op1_reg)
-			} else if ((op == IR_EQ || op == IR_NE) && val == 0xffffffff) {
+			} else if ((op == IR_EQ || op == IR_NE) && val == -1) {
 				|	test Rd(op1_reg), Rd(op1_reg)
 			} else {
 				|	ASM_REG_IMM_OP test, type, op1_reg, val
@@ -4048,9 +4049,9 @@ static void ir_emit_cmp_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
-static void ir_emit_jmp_true(ir_ctx *ctx, int b, ir_ref def)
+static void ir_emit_jmp_true(ir_ctx *ctx, uint32_t b, ir_ref def)
 {
-	int true_block, false_block, next_block;
+	uint32_t true_block, false_block, next_block;
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
@@ -4060,9 +4061,9 @@ static void ir_emit_jmp_true(ir_ctx *ctx, int b, ir_ref def)
 	}
 }
 
-static void ir_emit_jmp_false(ir_ctx *ctx, int b, ir_ref def)
+static void ir_emit_jmp_false(ir_ctx *ctx, uint32_t b, ir_ref def)
 {
-	int true_block, false_block, next_block;
+	uint32_t true_block, false_block, next_block;
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
@@ -4072,9 +4073,9 @@ static void ir_emit_jmp_false(ir_ctx *ctx, int b, ir_ref def)
 	}
 }
 
-static void ir_emit_jcc(ir_ctx *ctx, uint8_t op, int b, ir_ref def, ir_insn *insn, bool int_cmp)
+static void ir_emit_jcc(ir_ctx *ctx, uint8_t op, uint32_t b, ir_ref def, ir_insn *insn, bool int_cmp)
 {
-	int true_block, false_block, next_block;
+	uint32_t true_block, false_block, next_block;
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	bool swap = 0;
@@ -4192,7 +4193,7 @@ static void ir_emit_jcc(ir_ctx *ctx, uint8_t op, int b, ir_ref def, ir_insn *ins
 	}
 }
 
-static void ir_emit_cmp_and_branch_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
+static void ir_emit_cmp_and_branch_int(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 {
 	ir_insn *cmp_insn = &ctx->ir_base[insn->op2];
 	ir_op op = cmp_insn->op;
@@ -4245,19 +4246,19 @@ static void ir_emit_cmp_and_branch_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *
 	ir_emit_jcc(ctx, op, b, def, insn, 1);
 }
 
-static void ir_emit_test_and_branch_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
+static void ir_emit_test_and_branch_int(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 {
 	ir_emit_test_int_common(ctx, insn->op2, IR_NE);
 	ir_emit_jcc(ctx, IR_NE, b, def, insn, 1);
 }
 
-static void ir_emit_cmp_and_branch_fp(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
+static void ir_emit_cmp_and_branch_fp(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 {
 	ir_op op = ir_emit_cmp_fp_common(ctx, insn->op2, &ctx->ir_base[insn->op2]);
 	ir_emit_jcc(ctx, op, b, def, insn, 0);
 }
 
-static void ir_emit_if_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
+static void ir_emit_if_int(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 {
 	ir_type type = ctx->ir_base[insn->op2].type;
 	ir_reg op2_reg = ctx->regs[def][2];
@@ -5458,7 +5459,7 @@ static void ir_emit_alloca(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
-static void ir_emit_switch(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
+static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
@@ -5471,7 +5472,10 @@ static void ir_emit_switch(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 	int count = 0;
 	ir_val min, max;
 	int64_t offset;
-	ir_reg op2_reg, tmp_reg;
+	ir_reg op2_reg = ctx->regs[def][2];
+|.if X64
+||	ir_reg tmp_reg = ctx->regs[def][3];
+|.endif
 
 	type = ctx->ir_base[insn->op2].type;
 	if (IR_IS_TYPE_SIGNED(type)) {
@@ -5506,11 +5510,10 @@ static void ir_emit_switch(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 		}
 	}
 
-	op2_reg = ctx->regs[def][2];
-	tmp_reg = ctx->regs[def][3];
-
 	IR_ASSERT(op2_reg != IR_REG_NONE);
-	IR_ASSERT(tmp_reg != IR_REG_NONE || sizeof(void*) != 8);
+|.if X64
+||	IR_ASSERT(tmp_reg != IR_REG_NONE || sizeof(void*) != 8);
+|.endif
 	if (op2_reg & IR_REG_SPILL_LOAD) {
 		op2_reg &= ~IR_REG_SPILL_LOAD;
 		ir_emit_load(ctx, type, op2_reg, insn->op2);
@@ -6376,7 +6379,7 @@ static void ir_emit_guard_jcc(ir_ctx *ctx, uint8_t op, void *addr, bool int_cmp)
 	}
 }
 
-static void ir_emit_guard_cmp_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
+static void ir_emit_guard_cmp_int(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
@@ -6435,7 +6438,7 @@ static void ir_emit_guard_cmp_int(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
 	ir_emit_guard_jcc(ctx, op, addr, 1);
 }
 
-static void ir_emit_guard_cmp_fp(ir_ctx *ctx, int b, ir_ref def, ir_insn *insn)
+static void ir_emit_guard_cmp_fp(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 {
 	ir_op op = ir_emit_cmp_fp_common(ctx, insn->op2, &ctx->ir_base[insn->op2]);
 	void *addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op3]);
@@ -6770,14 +6773,15 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 	int8_t to_reg, from_reg;
 	ir_block *to_bb;
 	int j, k = 0;
+	uint32_t b;
 	ir_ref phi = 0;
 	bool spill_store = 0;
 
 	IR_ASSERT(from_bb->successors_count == 1);
 	to_bb = &ctx->cfg_blocks[ctx->cfg_edges[from_bb->successors]];
-	for (j = 0; j < to_bb->predecessors_count; j++) {
-		if (ctx->cfg_edges[to_bb->predecessors + j] == from_block) {
-			k = j + 2;
+	for (b = 0; b < to_bb->predecessors_count; b++) {
+		if (ctx->cfg_edges[to_bb->predecessors + b] == from_block) {
+			k = b + 2;
 			break;
 		}
 	}
@@ -7139,7 +7143,7 @@ static uint8_t ir_get_return_type(ir_ctx *ctx)
 
 static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 {
-	int b;
+	uint32_t b;
 	ir_block *bb;
 	ir_insn *insn;
 	ir_ref i, n, j, *p;
@@ -7474,7 +7478,7 @@ static void* dasm_labels[ir_lb_MAX];
 
 void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 {
-	int b, n, target;
+	uint32_t b, n, target;
 	ir_block *bb;
 	ir_ref i;
 	ir_insn *insn;

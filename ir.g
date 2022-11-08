@@ -152,7 +152,7 @@ ir_insn(ir_parser_ctx *p):
 	{ir_val val;}
 	{ir_val count;}
 	{ir_val flags;}
-	{uint32_t n;}
+	{int32_t n;}
 	(
 		type(&t)
 		ID(&str, &len)
@@ -269,7 +269,7 @@ val(ir_parser_ctx *p, uint8_t op, uint32_t n, ir_ref *ref):
 		{*ref = ir_strl(p->ctx, str, len);}
 	|	DECNUMBER(IR_I32, &val)
 		{if (kind != IR_OPND_NUM && kind != IR_OPND_PROB) yy_error("unexpected number");}
-		{if (val.u64 < 0 && val.u64 >= 0x7ffffff) yy_error("number out of range");}
+		{if (val.i64 < 0 && val.i64 >= 0x7ffffff) yy_error("number out of range");}
 		{*ref = val.u64;}
 	|	"null"
 		{*ref = IR_UNUSED;}

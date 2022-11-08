@@ -690,7 +690,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 	ir_val val;
 	ir_val count;
 	ir_val flags;
-	uint32_t n;
+	int32_t n;
 	save_pos  = yy_pos;
 	save_text = yy_text;
 	save_line = yy_line;
@@ -893,7 +893,7 @@ static int parse_val(int sym, ir_parser_ctx *p, uint8_t op, uint32_t n, ir_ref *
 	} else if (sym == YY_DECNUMBER) {
 		sym = parse_DECNUMBER(sym, IR_I32, &val);
 		if (kind != IR_OPND_NUM && kind != IR_OPND_PROB) yy_error("unexpected number");
-		if (val.u64 < 0 && val.u64 >= 0x7ffffff) yy_error("number out of range");
+		if (val.i64 < 0 && val.i64 >= 0x7ffffff) yy_error("number out of range");
 		*ref = val.u64;
 	} else if (sym == YY_NULL) {
 		sym = get_sym();

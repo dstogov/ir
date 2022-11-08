@@ -461,9 +461,9 @@ static void ir_emit_abs(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 	}
 }
 
-static void ir_emit_if(ir_ctx *ctx, FILE *f, int b, ir_ref def, ir_insn *insn)
+static void ir_emit_if(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn *insn)
 {
-	int true_block = 0, false_block = 0, next_block;
+	uint32_t true_block = 0, false_block = 0, next_block;
 	bool short_true = 0, short_false = 0;
 
 	ir_get_true_false_blocks(ctx, b, &true_block, &false_block, &next_block);
@@ -489,7 +489,7 @@ static void ir_emit_if(ir_ctx *ctx, FILE *f, int b, ir_ref def, ir_insn *insn)
 	}
 }
 
-static void ir_emit_switch(ir_ctx *ctx, FILE *f, int b, ir_ref def, ir_insn *insn)
+static void ir_emit_switch(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn *insn)
 {
 	ir_block *bb;
 	uint32_t n, *p, use_block;
@@ -667,7 +667,7 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 	uint8_t ret_type;
 	bool has_params = 0;
 	ir_bitset vars;
-	int b, target, prev = 0;
+	uint32_t b, target, prev = 0;
 	ir_block *bb;
 
 	ret_type = ir_get_return_type(ctx);
