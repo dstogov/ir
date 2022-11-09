@@ -249,21 +249,21 @@ typedef enum _ir_type {
 	\
 	/* control-flow nodes                                               */ \
 	_(START,        S0X2, ret, ent, ___) /* function start              */ \
-	_(RETURN,       T2X1, src, def, ret) /* function return             */ \
-	_(UNREACHABLE,  T2X1, src, def, ret) /* unreachable (tailcall, etc) */ \
+	_(ENTRY,        S0X2, num, ent, ___) /* code entry (op3 keeps addr) */ \
 	_(BEGIN,        S1,   src, ___, ___) /* block start                 */ \
-	_(END,          E1,   src, ___, ___) /* block end                   */ \
-	_(IF,           E2,   src, def, ___) /* conditional control split   */ \
 	_(IF_TRUE,      S1X1, src, prb, ___) /* IF TRUE proj.               */ \
 	_(IF_FALSE,     S1X1, src, prb, ___) /* IF FALSE proj.              */ \
-	_(SWITCH,       E2,   src, def, ___) /* multi-way control split     */ \
 	_(CASE_VAL,     S2X1, src, def, prb) /* switch proj.                */ \
 	_(CASE_DEFAULT, S1X1, src, prb, ___) /* switch proj.                */ \
 	_(MERGE,        SN,   src, src, src) /* control merge               */ \
 	_(LOOP_BEGIN,   SN,   src, src, src) /* loop start                  */ \
+	_(END,          E1,   src, ___, ___) /* block end                   */ \
 	_(LOOP_END,     E1X1, src, beg, ___) /* loop end                    */ \
+	_(IF,           E2,   src, def, ___) /* conditional control split   */ \
+	_(SWITCH,       E2,   src, def, ___) /* multi-way control split     */ \
+	_(RETURN,       T2X1, src, def, ret) /* function return             */ \
 	_(IJMP,         T2X1, src, def, ret) /* computed goto               */ \
-	_(ENTRY,        S0X2, num, ent, ___) /* code entry (op3 keeps addr) */ \
+	_(UNREACHABLE,  T2X1, src, def, ret) /* unreachable (tailcall, etc) */ \
 	\
 	/* guards                                                           */ \
 	_(GUARD,        c3,   src, def, def) /* IF without second successor */ \
