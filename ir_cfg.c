@@ -46,12 +46,58 @@ static ir_ref ir_merge_blocks(ir_ctx *ctx, ir_ref end, ir_ref begin)
 	return next;
 }
 
+IR_ALWAYS_INLINE void _ir_add_successors(ir_ctx *ctx, ir_ref ref, ir_worklist *worklist)
+{
+	ir_use_list *use_list = &ctx->use_lists[ref];
+	ir_ref *p, use, n = use_list->count;
+
+	if (n < 2) {
+		if (n == 1) {
+			use = ctx->use_edges[use_list->refs];
+			IR_ASSERT(ir_op_flags[ctx->ir_base[use].op] & IR_OP_FLAG_CONTROL);
+			ir_worklist_push(worklist, use);
+		}
+	} else {
+		p = &ctx->use_edges[use_list->refs];
+		if (n == 2) {
+			use = *p;
+			IR_ASSERT(ir_op_flags[ctx->ir_base[use].op] & IR_OP_FLAG_CONTROL);
+			ir_worklist_push(worklist, use);
+			use = *(p + 1);
+			IR_ASSERT(ir_op_flags[ctx->ir_base[use].op] & IR_OP_FLAG_CONTROL);
+			ir_worklist_push(worklist, use);
+		} else {
+			for (; n > 0; p++, n--) {
+				use = *p;
+				IR_ASSERT(ir_op_flags[ctx->ir_base[use].op] & IR_OP_FLAG_CONTROL);
+				ir_worklist_push(worklist, use);
+			}
+		}
+	}
+}
+
+IR_ALWAYS_INLINE void _ir_add_predecessors(ir_insn *insn, ir_worklist *worklist)
+{
+	ir_ref n, j, *p, ref;
+
+	if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
+		n = ir_variable_inputs_count(insn);
+		for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
+			ref = *p;
+			IR_ASSERT(ref);
+			ir_worklist_push(worklist, ref);
+		}
+	} else if (insn->op != IR_START && insn->op != IR_ENTRY) {
+		IR_ASSERT(insn->op1);
+		ir_worklist_push(worklist, insn->op1);
+	}
+}
+
 int ir_build_cfg(ir_ctx *ctx)
 {
 	ir_ref n, j, *p, ref;
 	uint32_t b;
 	ir_insn *insn;
-	uint32_t flags;
 	ir_worklist worklist;
 	uint32_t count, bb_count = 0;
 	uint32_t edges_count = 0;
@@ -90,15 +136,7 @@ int ir_build_cfg(ir_ctx *ctx)
 			bb_count++;
 			_blocks[ref] = bb_count;
 			/* Add successors */
-			use_list = &ctx->use_lists[ref];
-			n = use_list->count;
-			for (j = 0, p = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
-				ir_ref ref = *p;
-				insn = &ctx->ir_base[ref];
-				if (ir_op_flags[insn->op] & IR_OP_FLAG_CONTROL) {
-					ir_worklist_push(&worklist, ref);
-				}
-			}
+			_ir_add_successors(ctx, ref, &worklist);
 			/* Skip control nodes untill BB start */
 			while (1) {
 				insn = &ctx->ir_base[ref];
@@ -119,35 +157,14 @@ int ir_build_cfg(ir_ctx *ctx)
 			ir_bitset_incl(worklist.visited, ref);
 			_blocks[ref] = bb_count;
 			/* Add predecessors */
-			if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
-				flags = ir_op_flags[insn->op];
-				n = ir_input_edges_count(ctx, insn);
-				for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
-					ir_ref ref = *p;
-					if (ref) {
-						IR_ASSERT(IR_OPND_KIND(flags, j) == IR_OPND_CONTROL);
-						ir_worklist_push(&worklist, ref);
-					}
-				}
-			} else if (insn->op != IR_START && insn->op != IR_ENTRY) {
-				IR_ASSERT(insn->op1);
-				IR_ASSERT(IR_OPND_KIND(ir_op_flags[insn->op], 1) == IR_OPND_CONTROL);
-				ir_worklist_push(&worklist, insn->op1);
-			}
+			_ir_add_predecessors(insn, &worklist);
 		} else {
 			IR_ASSERT(IR_IS_BB_START(insn->op));
 			/* Mark BB start */
 			bb_count++;
 			_blocks[ref] = bb_count;
 			/* Add predecessors */
-			flags = ir_op_flags[insn->op];
-			n = ir_input_edges_count(ctx, insn);
-			for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
-				ir_ref ref = *p;
-				if (ref && IR_OPND_KIND(flags, j) == IR_OPND_CONTROL) {
-					ir_worklist_push(&worklist, ref);
-				}
-			}
+			_ir_add_predecessors(insn, &worklist);
 			/* Skip control nodes untill BB end */
 			while (1) {
 				use_list = &ctx->use_lists[ref];
@@ -184,15 +201,7 @@ next_successor:
 			_blocks[ref] = bb_count;
 			ir_bitset_incl(worklist.visited, ref);
 			/* Add successors */
-			use_list = &ctx->use_lists[ref];
-			n = use_list->count;
-			for (j = 0, p = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
-				ir_ref ref = *p;
-				insn = &ctx->ir_base[ref];
-				if (ir_op_flags[insn->op] & IR_OP_FLAG_CONTROL) {
-					ir_worklist_push(&worklist, ref);
-				}
-			}
+			_ir_add_successors(ctx, ref, &worklist);
 		}
 	}
 
@@ -239,16 +248,13 @@ next_successor:
 			bb->flags |= IR_BB_UNREACHABLE; /* all blocks are marked as UNREACHABLE first */
 		}
 		if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
-			flags = ir_op_flags[insn->op];
-			n = ir_input_edges_count(ctx, insn);
+			n = ir_variable_inputs_count(insn);
 			for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
 				ir_ref pred_ref = *p;
-				if (pred_ref) {
-					IR_ASSERT(IR_OPND_KIND(flags, j) == IR_OPND_CONTROL);
-					bb->predecessors_count++;
-					blocks[_blocks[pred_ref]].successors_count++;
-					edges_count++;
-				}
+				IR_ASSERT(pred_ref);
+				bb->predecessors_count++;
+				blocks[_blocks[pred_ref]].successors_count++;
+				edges_count++;
 			}
 		} else if (insn->op != IR_START && insn->op != IR_ENTRY) {
 			ir_ref pred_ref = insn->op1;
@@ -278,20 +284,17 @@ next_successor:
 	for (b = 1; b <= bb_count; b++, bb++) {
 		insn = &ctx->ir_base[bb->start];
 		if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
-			flags = ir_op_flags[insn->op];
-			n = ir_input_edges_count(ctx, insn);
+			n = ir_variable_inputs_count(insn);
 			for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
 				ref = *p;
-				if (ref) {
-					IR_ASSERT(IR_OPND_KIND(flags, j) == IR_OPND_CONTROL);
-					ir_ref pred_b = _blocks[ref];
-					ir_block *pred_bb = &blocks[pred_b];
-					edges[bb->predecessors + bb->predecessors_count] = pred_b;
-					bb->predecessors_count++;
-					pred_bb->end = ref;
-					edges[pred_bb->successors + pred_bb->successors_count] = b;
-					pred_bb->successors_count++;
-				}
+				IR_ASSERT(ref);
+				ir_ref pred_b = _blocks[ref];
+				ir_block *pred_bb = &blocks[pred_b];
+				edges[bb->predecessors + bb->predecessors_count] = pred_b;
+				bb->predecessors_count++;
+				pred_bb->end = ref;
+				edges[pred_bb->successors + pred_bb->successors_count] = b;
+				pred_bb->successors_count++;
 			}
 		} else if (insn->op != IR_START && insn->op != IR_ENTRY) {
 			ref = insn->op1;
