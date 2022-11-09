@@ -711,13 +711,16 @@ IR_ALWAYS_INLINE ir_ref ir_operands_count(ir_ctx *ctx, ir_insn *insn)
 {
 	uint32_t flags = ir_op_flags[insn->op];
 	uint32_t n = IR_OPERANDS_COUNT(flags);
-	if (n == 4) {
+	if (EXPECTED(n < 4)) {
+		/* pass */
+	} else if (n == 4) {
 		/* MERGE or CALL */
 		n = ir_variable_inputs_count(insn);
 		if (n == 0) {
 			n = 2;
 		}
-	} else if (n == 5) {
+	} else {
+		IR_ASSERT(n == 5);
 		/* PHI */
 		n = ir_variable_inputs_count(&ctx->ir_base[insn->op1]) + 1;
 	}
@@ -728,10 +731,13 @@ IR_ALWAYS_INLINE ir_ref ir_input_edges_count(ir_ctx *ctx, ir_insn *insn)
 {
 	uint32_t flags = ir_op_flags[insn->op];
 	uint32_t n = IR_INPUT_EDGES_COUNT(flags);
-	if (n == 4) {
+	if (EXPECTED(n < 4)) {
+		/* pass */
+	} else if (n == 4) {
 		/* MERGE or CALL */
 		n = ir_variable_inputs_count(insn);
-	} else if (n == 5) {
+	} else {
+		IR_ASSERT(n == 5);
 		/* PHI */
 		n = ir_variable_inputs_count(&ctx->ir_base[insn->op1]) + 1;
 	}
