@@ -991,13 +991,15 @@ int ir_coalesce(ir_ctx *ctx)
 
 			use_list = &ctx->use_lists[bb->start];
 			n = use_list->count;
-			for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
-				use = *p;
-				insn = &ctx->ir_base[use];
-				if (insn->op == IR_PHI) {
-					k = ir_input_edges_count(ctx, insn);
-					for (j = 2; j <= k; j++) {
-						ir_worklist_push(&blocks, ctx->cfg_edges[bb->predecessors + (j-2)]);
+			if (n > 1) {
+				k = ir_variable_inputs_count(&ctx->ir_base[bb->start]) + 1;
+				for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
+					use = *p;
+					insn = &ctx->ir_base[use];
+					if (insn->op == IR_PHI) {
+						for (j = 2; j <= k; j++) {
+							ir_worklist_push(&blocks, ctx->cfg_edges[bb->predecessors + (j-2)]);
+						}
 					}
 				}
 			}
@@ -1132,15 +1134,17 @@ int ir_compute_dessa_moves(ir_ctx *ctx)
 		if (bb->predecessors_count > 1) {
 			use_list = &ctx->use_lists[bb->start];
 			n = use_list->count;
-			for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
-				use = *p;
-				insn = &ctx->ir_base[use];
-				if (insn->op == IR_PHI) {
-					k = ir_input_edges_count(ctx, insn);
-					for (j = 2; j <= k; j++) {
-						if (IR_IS_CONST_REF(ir_insn_op(insn, j)) || ctx->vregs[ir_insn_op(insn, j)] != ctx->vregs[use]) {
-							int pred = ctx->cfg_edges[bb->predecessors + (j-2)];
-							ctx->cfg_blocks[pred].flags |= IR_BB_DESSA_MOVES;
+			if (n > 1) {
+				k = ir_variable_inputs_count(&ctx->ir_base[bb->start]) + 1;
+				for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
+					use = *p;
+					insn = &ctx->ir_base[use];
+					if (insn->op == IR_PHI) {
+						for (j = 2; j <= k; j++) {
+							if (IR_IS_CONST_REF(ir_insn_op(insn, j)) || ctx->vregs[ir_insn_op(insn, j)] != ctx->vregs[use]) {
+								int pred = ctx->cfg_edges[bb->predecessors + (j-2)];
+								ctx->cfg_blocks[pred].flags |= IR_BB_DESSA_MOVES;
+							}
 						}
 					}
 				}
