@@ -424,15 +424,16 @@ IR_ALWAYS_INLINE void ir_bitqueue_clear(ir_bitqueue *q)
 IR_ALWAYS_INLINE int ir_bitqueue_pop(ir_bitqueue *q)
 {
 	uint32_t i = q->pos;
-	ir_bitset_base_t x;
+	ir_bitset_base_t x, *p = q->set + i;
 	do {
-		x = q->set[i];
+		x = *p;
 		if (x) {
 			int bit = IR_BITSET_BITS * i + ir_bitset_ntz(x);
-			q->set[i] = x & (x - 1);
+			*p = x & (x - 1);
 			q->pos = i;
 			return bit;
 		}
+		p++;
 		i++;
 	} while (i < q->len);
 	q->pos = q->len - 1;
