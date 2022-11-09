@@ -510,6 +510,8 @@ ir_ref ir_const_func_addr(ir_ctx *ctx, uintptr_t c, uint16_t flags);
 ir_ref ir_const_func(ir_ctx *ctx, ir_ref str, uint16_t flags);
 ir_ref ir_const_str(ir_ctx *ctx, ir_ref str);
 
+ir_ref ir_unique_const_addr(ir_ctx *ctx, uintptr_t c);
+
 void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f);
 
 ir_ref ir_str(ir_ctx *ctx, const char *s);

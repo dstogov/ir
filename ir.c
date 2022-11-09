@@ -381,6 +381,46 @@ void ir_free(ir_ctx *ctx)
 	}
 }
 
+ir_ref ir_unique_const_addr(ir_ctx *ctx, uintptr_t addr)
+{
+	ir_ref ref = ir_next_const(ctx);
+	ir_insn *insn = &ctx->ir_base[ref];
+
+	insn->optx = IR_OPT(IR_ADDR, IR_ADDR);
+	insn->val.u64 = addr;
+	/* don't insert into constants chain */
+	insn->prev_const = IR_UNUSED;
+#if 0
+	insn->prev_const = ctx->prev_const_chain[IR_ADDR];
+	ctx->prev_const_chain[IR_ADDR] = ref;
+#endif
+#if 0
+	ir_insn *prev_insn, *next_insn;
+	ir_ref next;
+
+	prev_insn = NULL;
+	next = ctx->prev_const_chain[IR_ADDR];
+	while (next) {
+		next_insn = &ctx->ir_base[next];
+		if (UNEXPECTED(next_insn->val.u64 >= addr)) {
+			break;
+		}
+		prev_insn = next_insn;
+		next = next_insn->prev_const;
+	}
+
+	if (prev_insn) {
+		insn->prev_const = prev_insn->prev_const;
+		prev_insn->prev_const = ref;
+	} else {
+		insn->prev_const = ctx->prev_const_chain[IR_ADDR];
+		ctx->prev_const_chain[IR_ADDR] = ref;
+	}
+#endif
+
+	return ref;
+}
+
 IR_NEVER_INLINE ir_ref ir_const(ir_ctx *ctx, ir_val val, uint8_t type)
 {
 	ir_insn *insn, *prev_insn;
@@ -529,12 +569,12 @@ ir_ref ir_const_func_addr(ir_ctx *ctx, uintptr_t c, uint16_t flags)
 	ir_val val;
 	val.u64 = c;
 	ref = ir_const(ctx, val, IR_ADDR);
-	insn = &ctx->ir_base[ref];
 	if (ref == top) {
+		insn = &ctx->ir_base[ref];
 		insn->optx = IR_OPT(IR_FUNC_ADDR, IR_ADDR);
 		insn->const_flags = flags;
 	} else {
-		IR_ASSERT(insn->opt == IR_OPT(IR_FUNC_ADDR, IR_ADDR) && insn->const_flags == flags);
+		IR_ASSERT(ctx->ir_base[ref].opt == IR_OPT(IR_FUNC_ADDR, IR_ADDR) && ctx->ir_base[ref].const_flags == flags);
 	}
 	return ref;
 }
