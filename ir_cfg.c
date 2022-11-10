@@ -95,7 +95,7 @@ IR_ALWAYS_INLINE void _ir_add_predecessors(ir_insn *insn, ir_worklist *worklist)
 
 int ir_build_cfg(ir_ctx *ctx)
 {
-	ir_ref n, j, *p, ref;
+	ir_ref n, j, *p, ref, start, end;
 	uint32_t b;
 	ir_insn *insn;
 	ir_worklist worklist;
@@ -104,6 +104,7 @@ int ir_build_cfg(ir_ctx *ctx)
 	ir_block *blocks, *bb;
 	uint32_t *_blocks, *edges;
 	ir_use_list *use_list;
+	ir_bitset bb_starts = ir_bitset_malloc(ctx->insns_count);
 
 	_blocks = ir_mem_calloc(ctx->insns_count, sizeof(uint32_t));
 	ir_worklist_init(&worklist, ctx->insns_count);
@@ -134,7 +135,7 @@ int ir_build_cfg(ir_ctx *ctx)
 		} else if (IR_IS_BB_END(insn->op)) {
 			/* Mark BB end */
 			bb_count++;
-			_blocks[ref] = bb_count;
+			end = ref;
 			/* Add successors */
 			_ir_add_successors(ctx, ref, &worklist);
 			/* Skip control nodes untill BB start */
@@ -154,15 +155,18 @@ int ir_build_cfg(ir_ctx *ctx)
 				ref = insn->op1; // follow connected control blocks untill BB start
 			}
 			/* Mark BB start */
+			_blocks[ref] = end;
+			_blocks[end] = end;
+			ir_bitset_incl(bb_starts, ref);
 			ir_bitset_incl(worklist.visited, ref);
-			_blocks[ref] = bb_count;
 			/* Add predecessors */
 			_ir_add_predecessors(insn, &worklist);
 		} else {
 			IR_ASSERT(IR_IS_BB_START(insn->op));
 			/* Mark BB start */
 			bb_count++;
-			_blocks[ref] = bb_count;
+			start = ref;
+			ir_bitset_incl(bb_starts, ref);
 			/* Add predecessors */
 			_ir_add_predecessors(insn, &worklist);
 			/* Skip control nodes untill BB end */
@@ -198,44 +202,33 @@ next_successor:
 				}
 			}
 			/* Mark BB end */
-			_blocks[ref] = bb_count;
+			_blocks[start] = ref;
+			_blocks[ref] = ref;
 			ir_bitset_incl(worklist.visited, ref);
 			/* Add successors */
 			_ir_add_successors(ctx, ref, &worklist);
 		}
 	}
+	ir_worklist_clear(&worklist);
 
-	if (bb_count == 0) {
-		IR_ASSERT(bb_count > 0);
-		return 0;
-	}
+	IR_ASSERT(bb_count > 0);
 
 	/* Create array of basic blocks and count succcessor edges for each BB */
-	blocks = ir_mem_malloc((bb_count + 1) * sizeof(ir_block));
-	memset(blocks, 0, (bb_count + 1) * sizeof(ir_block));
-	uint32_t *_xlat = ir_mem_malloc((bb_count + 1) * sizeof(uint32_t));
-	memset(_xlat, 0, (bb_count + 1) * sizeof(uint32_t));
-	b = 0;
-	IR_BITSET_FOREACH(worklist.visited, ir_bitset_len(ctx->insns_count), ref) {
-		/* reorder blocks to reflect the original control flow (START - 1) */
-		j = _blocks[ref];
-		n = _xlat[j];
-		if (n == 0) {
-			_xlat[j] = n = ++b;
-		}
-		_blocks[ref] = n;
-		bb = &blocks[n];
-		insn = &ctx->ir_base[ref];
-		if (IR_IS_BB_START(insn->op)) {
-			bb->start = ref;
-		} else {
-			bb->end = ref;
-		}
+	blocks = ir_mem_calloc(bb_count + 1, sizeof(ir_block));
+	b = 1;
+	bb = blocks + 1;
+	IR_BITSET_FOREACH(bb_starts, ir_bitset_len(ctx->insns_count), start) {
+		IR_ASSERT(IR_IS_BB_START(ctx->ir_base[start].op));
+		end = _blocks[start];
+		_blocks[start] = b;
+		_blocks[end] = b;
+		bb->start = start;
+		bb->end = end;
+		bb++;
+		b++;
 	} IR_BITSET_FOREACH_END();
-	ir_mem_free(_xlat);
-	ir_worklist_free(&worklist);
+	ir_mem_free(bb_starts);
 
-	ir_worklist_init(&worklist, bb_count + 1);
 	for (b = 1, bb = blocks + 1; b <= bb_count; b++, bb++) {
 		insn = &ctx->ir_base[bb->start];
 		if (insn->op == IR_START) {
@@ -249,12 +242,12 @@ next_successor:
 		}
 		if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
 			n = ir_variable_inputs_count(insn);
+			bb->predecessors_count += n;
+			edges_count += n;
 			for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
 				ir_ref pred_ref = *p;
 				IR_ASSERT(pred_ref);
-				bb->predecessors_count++;
 				blocks[_blocks[pred_ref]].successors_count++;
-				edges_count++;
 			}
 		} else if (insn->op != IR_START && insn->op != IR_ENTRY) {
 			ir_ref pred_ref = insn->op1;
@@ -309,12 +302,12 @@ next_successor:
 			pred_bb->successors_count++;
 		}
 	}
-	ir_mem_free(_blocks);
 
     ctx->cfg_blocks_count = bb_count;
     ctx->cfg_edges_count = edges_count * 2;
     ctx->cfg_blocks = blocks;
     ctx->cfg_edges = edges;
+    ctx->cfg_map = _blocks;
 
 	/* Mark reachable blocks */
 	while (ir_worklist_len(&worklist) != 0) {

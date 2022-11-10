@@ -122,7 +122,8 @@ int ir_gcm(ir_ctx *ctx)
 	ir_use_list *use_list;
 	uint32_t flags;
 
-	_blocks = ir_mem_calloc(ctx->insns_count, sizeof(uint32_t));
+	IR_ASSERT(ctx->cfg_map);
+	_blocks = ctx->cfg_map;
 	ir_list_init(&queue, ctx->insns_count);
 	visited = ir_bitset_malloc(ctx->insns_count);
 
