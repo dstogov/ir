@@ -305,6 +305,11 @@ test:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x40
 ```
 
+## PHP JIT based on IR
+
+A new experimental JIT for PHP based on IR is developed at [php-ir](https://github.com/dstogov/php-src/tree/php-ir/ext/opcache/jit) branch.
+See [README-IR.md](https://github.com/dstogov/php-src/blob/php-ir/ext/opcache/jit/README-IR.md).
+
 ## References
 
 1. C. Click, M. Paleczny. “A Simple Graph-Based Intermediate Representation” In ACM SIGPLAN Workshop on Intermediate Representations (IR '95), pages 35-49, Jan. 1995.
