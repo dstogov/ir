@@ -248,7 +248,6 @@ next_successor:
 		} else {
 			bb->flags = IR_BB_UNREACHABLE; /* all blocks are marked as UNREACHABLE first */
 			if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
-				bb->flags |= IR_BB_MERGE;
 				n = ir_variable_inputs_count(insn);
 				bb->predecessors_count = n;
 				edges_count += n;
@@ -270,7 +269,7 @@ next_successor:
 	bb = blocks + 1;
 	for (b = 1; b <= bb_count; b++, bb++) {
 		insn = &ctx->ir_base[bb->start];
-		if (bb->flags & IR_BB_MERGE) {
+		if (bb->predecessors_count > 1) {
 			uint32_t *q = edges + bb->predecessors;
 			n = ir_variable_inputs_count(insn);
 			for (p = insn->ops + 1; n > 0; p++, q++, n--) {
@@ -281,7 +280,7 @@ next_successor:
 				*q = pred_b;
 				edges[pred_bb->successors + pred_bb->successors_count++] = b;
 			}
-		} else if (!(bb->flags & (IR_BB_START|IR_BB_ENTRY))) {
+		} else if (bb->predecessors_count == 1) {
 			ref = insn->op1;
 			IR_ASSERT(ref);
 			IR_ASSERT(IR_OPND_KIND(ir_op_flags[insn->op], 1) == IR_OPND_CONTROL);
