@@ -596,7 +596,7 @@ IR_ALWAYS_INLINE uint32_t ir_worklist_capasity(ir_worklist *w)
 
 IR_ALWAYS_INLINE void ir_worklist_clear(ir_worklist *w)
 {
-	ir_list_free(&w->l);
+	ir_list_clear(&w->l);
 	ir_bitset_clear(w->visited, ir_bitset_len(ir_worklist_capasity(w)));
 }
 
