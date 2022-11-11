@@ -132,7 +132,59 @@ int ir_gcm(ir_ctx *ctx)
 
 	IR_ASSERT(ctx->cfg_map);
 	_blocks = ctx->cfg_map;
+
 	ir_list_init(&queue_early, ctx->insns_count);
+
+	if (ctx->cfg_blocks_count == 1) {
+		ref = ctx->cfg_blocks[1].end;
+		do {
+			insn = &ctx->ir_base[ref];
+			_blocks[ref] = 1; /* pin to block */
+			flags = ir_op_flags[insn->op];
+#if 1
+			n = IR_INPUT_EDGES_COUNT(flags);
+			if (!IR_IS_FIXED_INPUTS_COUNT(n) || n > 1) {
+				ir_list_push(&queue_early, ref);
+			}
+#else
+			if (IR_OPND_KIND(flags, 2) == IR_OPND_DATA
+			 || IR_OPND_KIND(flags, 3) == IR_OPND_DATA) {
+				ir_list_push(&queue_early, ref);
+			}
+#endif
+			ref = insn->op1; /* control predecessor */
+		} while (ref != 1); /* IR_START */
+		_blocks[1] = 1; /* pin to block */
+
+		use_list = &ctx->use_lists[1];
+		n = use_list->count;
+		for (p = &ctx->use_edges[use_list->refs]; n > 0; n--, p++) {
+			ref = *p;
+			use_insn = &ctx->ir_base[ref];
+			if (use_insn->op == IR_PARAM || use_insn->op == IR_VAR) {
+				_blocks[ref] = 1; /* pin to block */
+			}
+		}
+
+		/* Place all live nodes to the first block */
+		while (ir_list_len(&queue_early)) {
+			ref = ir_list_pop(&queue_early);
+			insn = &ctx->ir_base[ref];
+			n = ir_input_edges_count(ctx, insn);
+			for (p = insn->ops + 1; n > 0; p++, n--) {
+				ref = *p;
+				if (ref > 0 && _blocks[ref] == 0) {
+					_blocks[ref] = 1;
+					ir_list_push(&queue_early, ref);
+				}
+			}
+		}
+
+		ir_list_free(&queue_early);
+
+		return 1;
+	}
+
 	ir_list_init(&queue_late, ctx->insns_count);
 	visited = ir_bitset_malloc(ctx->insns_count);
 
@@ -236,8 +288,6 @@ int ir_gcm(ir_ctx *ctx)
 		}
 	}
 #endif
-
-	ctx->cfg_map = _blocks;
 
 	return 1;
 }
