@@ -8,11 +8,11 @@
 #include "ir.h"
 #include "ir_private.h"
 
-static ir_ref ir_merge_blocks(ir_ctx *ctx, ir_ref end, ir_ref begin)
+static ir_ref _ir_merge_blocks(ir_ctx *ctx, ir_ref end, ir_ref begin)
 {
 	ir_ref prev, next;
 	ir_use_list *use_list;
-	ir_ref j, n, *p;
+	ir_ref n, *p;
 
 	IR_ASSERT(ctx->ir_base[begin].op == IR_BEGIN);
 	IR_ASSERT(ctx->ir_base[end].op == IR_END);
@@ -37,7 +37,7 @@ static ir_ref ir_merge_blocks(ir_ctx *ctx, ir_ref end, ir_ref begin)
 	ctx->ir_base[next].op1 = prev;
 	use_list = &ctx->use_lists[prev];
 	n = use_list->count;
-	for (j = 0, p = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
+	for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
 		if (*p == end) {
 			*p = next;
 		}
@@ -78,11 +78,11 @@ IR_ALWAYS_INLINE void _ir_add_successors(ir_ctx *ctx, ir_ref ref, ir_worklist *w
 
 IR_ALWAYS_INLINE void _ir_add_predecessors(ir_insn *insn, ir_worklist *worklist)
 {
-	ir_ref n, j, *p, ref;
+	ir_ref n, *p, ref;
 
 	if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
 		n = ir_variable_inputs_count(insn);
-		for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
+		for (p = insn->ops + 1; n > 0; p++, n--) {
 			ref = *p;
 			IR_ASSERT(ref);
 			ir_worklist_push(worklist, ref);
@@ -95,7 +95,7 @@ IR_ALWAYS_INLINE void _ir_add_predecessors(ir_insn *insn, ir_worklist *worklist)
 
 int ir_build_cfg(ir_ctx *ctx)
 {
-	ir_ref n, j, *p, ref, start, end;
+	ir_ref n, *p, ref, start, end, next;
 	uint32_t b;
 	ir_insn *insn;
 	ir_worklist worklist;
@@ -104,20 +104,13 @@ int ir_build_cfg(ir_ctx *ctx)
 	ir_block *blocks, *bb;
 	uint32_t *_blocks, *edges;
 	ir_use_list *use_list;
-	ir_bitset bb_starts = ir_bitset_malloc(ctx->insns_count);
-
+	uint32_t len = ir_bitset_len(ctx->insns_count);
+	ir_bitset bb_starts = ir_mem_calloc(len * 2, IR_BITSET_BITS / 8);
+	ir_bitset bb_leaks = bb_starts + len;
 	_blocks = ir_mem_calloc(ctx->insns_count, sizeof(uint32_t));
 	ir_worklist_init(&worklist, ctx->insns_count);
 
-	/* Add START node */
-	ir_worklist_push(&worklist, 1);
-
-	/* Add all ENTRY nodes */
-	ref = ctx->ir_base[1].op2;
-	while (ref) {
-		ir_worklist_push(&worklist, ref);
-		ref = ctx->ir_base[ref].op2;
-	}
+	/* First try to perform backward DFS search starting from "stop" nodes */
 
 	/* Add all "stop" nodes */
 	ref = ctx->ir_base[1].op1;
@@ -130,70 +123,94 @@ int ir_build_cfg(ir_ctx *ctx)
 		ref = ir_worklist_pop(&worklist);
 		insn = &ctx->ir_base[ref];
 
-		if (_blocks[ref]) {
-			/* alredy processed */
-		} else if (IR_IS_BB_END(insn->op)) {
-			/* Mark BB end */
-			bb_count++;
-			end = ref;
-			/* Add successors */
-			_ir_add_successors(ctx, ref, &worklist);
-			/* Skip control nodes untill BB start */
-			while (1) {
-				insn = &ctx->ir_base[ref];
-				if (IR_IS_BB_START(insn->op)) {
-					if (insn->op == IR_BEGIN
-					 && (ctx->flags & IR_OPT_CFG)
-					 && ctx->ir_base[insn->op1].op == IR_END
-					 && ctx->use_lists[ref].count == 1) {
-						ref = ir_merge_blocks(ctx, insn->op1, ref);
-						ref = ctx->ir_base[ref].op1;
-						continue;
-					}
-					break;
-				}
-				ref = insn->op1; // follow connected control blocks untill BB start
+		IR_ASSERT(IR_IS_BB_END(insn->op));
+		/* Remember BB end */
+		end = ref;
+		/* Some successors of IF and SWITCH nodes may be inaccessible by backward DFS */
+		use_list = &ctx->use_lists[end];
+		n = use_list->count;
+		if (n > 1) {
+			for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
+				/* Remember possible inaccessible succcessors */
+				ir_bitset_incl(bb_leaks, *p);
 			}
-			/* Mark BB start */
-			_blocks[ref] = end;
-			_blocks[end] = end;
-			ir_bitset_incl(bb_starts, ref);
-			ir_bitset_incl(worklist.visited, ref);
-			/* Add predecessors */
-			_ir_add_predecessors(insn, &worklist);
-		} else {
+		}
+		/* Skip control nodes untill BB start */
+		ref = insn->op1;
+		while (1) {
+			insn = &ctx->ir_base[ref];
+			if (IR_IS_BB_START(insn->op)) {
+				if (insn->op == IR_BEGIN
+				 && (ctx->flags & IR_OPT_CFG)
+				 && ctx->ir_base[insn->op1].op == IR_END
+				 && ctx->use_lists[ref].count == 1) {
+					ref = _ir_merge_blocks(ctx, insn->op1, ref);
+					ref = ctx->ir_base[ref].op1;
+					continue;
+				}
+				break;
+			}
+			ref = insn->op1; // follow connected control blocks untill BB start
+		}
+		/* Mark BB Start */
+		bb_count++;
+		_blocks[ref] = end;
+		ir_bitset_incl(bb_starts, ref);
+		/* Add predecessors */
+		_ir_add_predecessors(insn, &worklist);
+	}
+
+	/* Backward DFS way miss some branches ending by infinite loops.  */
+	/* Try forward DFS. (in most cases all nodes are already proceed. */
+
+	/* START node my be inaccessible from "stop" nodes */
+	ir_bitset_incl(bb_leaks, 1);
+
+	/* ENTRY nodes may be  inaccessible from "stop" nodes */
+	ref = ctx->ir_base[1].op2;
+	while (ref) {
+		ir_bitset_incl(bb_leaks, ref);
+		ref = ctx->ir_base[ref].op2;
+	}
+
+	/* Add all not processed START, ENTRY and succcessor of IF and SWITCH */
+	IR_BITSET_FOREACH_DIFFERENCE(bb_leaks, bb_starts, len, start) {
+		ir_worklist_push(&worklist, start);
+	} IR_BITSET_FOREACH_END();
+
+	if (ir_worklist_len(&worklist)) {
+		ir_bitset_union(worklist.visited, bb_starts, len);
+		do {
+			ref = ir_worklist_pop(&worklist);
+			insn = &ctx->ir_base[ref];
+
 			IR_ASSERT(IR_IS_BB_START(insn->op));
-			/* Mark BB start */
-			bb_count++;
+			/* Remember BB start */
 			start = ref;
-			ir_bitset_incl(bb_starts, ref);
-			/* Add predecessors */
-			_ir_add_predecessors(insn, &worklist);
 			/* Skip control nodes untill BB end */
 			while (1) {
 				use_list = &ctx->use_lists[ref];
 				n = use_list->count;
-				ref = IR_UNUSED;
-				for (j = 0, p = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
-					ref = *p;
-					insn = &ctx->ir_base[ref];
-					if (ir_op_flags[insn->op] & IR_OP_FLAG_CONTROL) {
+				next = IR_UNUSED;
+				for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
+					next = *p;
+					insn = &ctx->ir_base[next];
+					if ((ir_op_flags[insn->op] & IR_OP_FLAG_CONTROL) && insn->op1 == ref) {
 						break;
 					}
 				}
+				IR_ASSERT(next != IR_UNUSED);
+				ref = next;
 next_successor:
-				IR_ASSERT(ref != IR_UNUSED);
 				if (IR_IS_BB_END(insn->op)) {
 					if (insn->op == IR_END && (ctx->flags & IR_OPT_CFG)) {
-						ir_ref next;
-
 						use_list = &ctx->use_lists[ref];
 						IR_ASSERT(use_list->count == 1);
 						next = ctx->use_edges[use_list->refs];
 
 						if (ctx->ir_base[next].op == IR_BEGIN
 						 && ctx->use_lists[next].count == 1) {
-							ref = ir_merge_blocks(ctx, ref, next);
+							ref = _ir_merge_blocks(ctx, ref, next);
 							insn = &ctx->ir_base[ref];
 							goto next_successor;
 						}
@@ -201,13 +218,13 @@ next_successor:
 					break;
 				}
 			}
-			/* Mark BB end */
+			/* Mark BB Start */
+			bb_count++;
 			_blocks[start] = ref;
-			_blocks[ref] = ref;
-			ir_bitset_incl(worklist.visited, ref);
+			ir_bitset_incl(bb_starts, start);
 			/* Add successors */
 			_ir_add_successors(ctx, ref, &worklist);
-		}
+		} while (ir_worklist_len(&worklist));
 	}
 	ir_worklist_clear(&worklist);
 
@@ -218,7 +235,7 @@ next_successor:
 	b = 1;
 	bb = blocks + 1;
 	count = 0;
-	IR_BITSET_FOREACH(bb_starts, ir_bitset_len(ctx->insns_count), start) {
+	IR_BITSET_FOREACH(bb_starts, len, start) {
 		end = _blocks[start];
 		_blocks[start] = b;
 		_blocks[end] = b;

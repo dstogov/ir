@@ -391,6 +391,16 @@ IR_ALWAYS_INLINE int ir_bitset_pop_first(ir_bitset set, uint32_t len)
 			(bit) = IR_BITSET_BITS * _i + ir_bitset_ntz(_x); \
 			_x &= _x - 1;
 
+#define IR_BITSET_FOREACH_DIFFERENCE(set1, set2, len, bit) do { \
+	ir_bitset _set1 = (set1); \
+	ir_bitset _set2 = (set2); \
+	uint32_t _i, _len = (len); \
+	for (_i = 0; _i < _len; _i++) { \
+		ir_bitset_base_t _x = _set1[_i] & ~_set2[_i]; \
+		while (_x) { \
+			(bit) = IR_BITSET_BITS * _i + ir_bitset_ntz(_x); \
+			_x &= _x - 1;
+
 #define IR_BITSET_FOREACH_END() \
 		} \
 	} \
