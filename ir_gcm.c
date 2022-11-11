@@ -13,8 +13,9 @@
 
 static void ir_gcm_schedule_early(ir_ctx *ctx, uint32_t *_blocks, ir_ref ref)
 {
-	ir_ref j, n, *p;
+	ir_ref n, *p, input;
 	ir_insn *insn;
+	uint32_t dom_depth, b;
 
 	insn = &ctx->ir_base[ref];
 
@@ -22,16 +23,19 @@ static void ir_gcm_schedule_early(ir_ctx *ctx, uint32_t *_blocks, ir_ref ref)
 	IR_ASSERT(insn->op != IR_PHI && insn->op != IR_PI);
 
 	_blocks[ref] = 1;
+	dom_depth = 0;
 
 	n = ir_input_edges_count(ctx, insn);
-	for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
-		ir_ref input = *p;
+	for (p = insn->ops + 1; n > 0; p++, n--) {
+		input = *p;
 		if (input > 0) {
 			if (_blocks[input] == 0) {
 				ir_gcm_schedule_early(ctx, _blocks, input);
 			}
-			if (ctx->cfg_blocks[_blocks[ref]].dom_depth < ctx->cfg_blocks[_blocks[input]].dom_depth) {
-				_blocks[ref] = _blocks[input];
+			b = _blocks[input];
+			if (dom_depth < ctx->cfg_blocks[b].dom_depth) {
+				dom_depth = ctx->cfg_blocks[b].dom_depth;
+				_blocks[ref] = b;
 			}
 		}
 	}
@@ -40,10 +44,14 @@ static void ir_gcm_schedule_early(ir_ctx *ctx, uint32_t *_blocks, ir_ref ref)
 /* Last Common Ancestor */
 static uint32_t ir_gcm_find_lca(ir_ctx *ctx, uint32_t b1, uint32_t b2)
 {
-	while (ctx->cfg_blocks[b1].dom_depth > ctx->cfg_blocks[b2].dom_depth) {
+	uint32_t dom_depth;
+
+	dom_depth = ctx->cfg_blocks[b2].dom_depth;
+	while (ctx->cfg_blocks[b1].dom_depth > dom_depth) {
 		b1 = ctx->cfg_blocks[b1].dom_parent;
 	}
-	while (ctx->cfg_blocks[b2].dom_depth > ctx->cfg_blocks[b1].dom_depth) {
+	dom_depth = ctx->cfg_blocks[b1].dom_depth;
+	while (ctx->cfg_blocks[b2].dom_depth > dom_depth) {
 		b2 = ctx->cfg_blocks[b2].dom_parent;
 	}
 	while (b1 != b2) {
@@ -55,7 +63,7 @@ static uint32_t ir_gcm_find_lca(ir_ctx *ctx, uint32_t b1, uint32_t b2)
 
 static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visited, ir_ref ref)
 {
-	ir_ref i, n, *p, use;
+	ir_ref n, *p, use;
 	ir_insn *insn;
 
 	ir_bitset_incl(visited, ref);
@@ -68,44 +76,43 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 		IR_ASSERT(insn->op != IR_PHI && insn->op != IR_PI);
 
 		lca = 0;
-		for (i = 0, p = &ctx->use_edges[ctx->use_lists[ref].refs]; i < n; i++, p++) {
+		for (p = &ctx->use_edges[ctx->use_lists[ref].refs]; n > 0; p++, n--) {
 			use = *p;
-			if (!ir_bitset_in(visited, use) && _blocks[use]) {
-				ir_gcm_schedule_late(ctx, _blocks, visited, use);
-			}
 			b = _blocks[use];
 			if (!b) {
 				continue;
+			} else if (!ir_bitset_in(visited, use)) {
+				ir_gcm_schedule_late(ctx, _blocks, visited, use);
+				b = _blocks[use];
+				IR_ASSERT(b != 0);
 			}
 			insn = &ctx->ir_base[use];
 			if (insn->op == IR_PHI) {
-				if (insn->op2 == ref) {
-					b = _blocks[ctx->ir_base[insn->op1].op1];
-				} else if (insn->op3 == ref) {
-					b = _blocks[ctx->ir_base[insn->op1].op2];
-				} else {
-					ir_ref j, n, *p;
+				ir_ref *p = insn->ops + 2; /* PHI data inputs */
+				ir_ref *q = ctx->ir_base[insn->op1].ops + 1; /* MERGE inputs */
 
-					b = 0;
-					n = ir_input_edges_count(ctx, insn);
-					for (j = 3, p = insn->ops + 4; j < n; j++, p++) {
-						if (*p == ref) {
-							b = _blocks[ir_insn_op(&ctx->ir_base[insn->op1], j)];
-							break;
-						}
-					}
-					IR_ASSERT(b != 0);
+				while (*p != ref) {
+					p++;
+					q++;
 				}
+				b = _blocks[*q];
 			}
 			lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
 		}
 		IR_ASSERT(lca != 0 && "No Common Antecessor");
 		b = lca;
-		while (ctx->cfg_blocks[b].loop_depth && lca != ctx->cfg_blocks[_blocks[ref]].dom_parent) {
-			if (ctx->cfg_blocks[lca].loop_depth < ctx->cfg_blocks[b].loop_depth) {
-				b = lca;
+		uint32_t loop_depth = ctx->cfg_blocks[b].loop_depth;
+		if (loop_depth) {
+			while (lca != ctx->cfg_blocks[_blocks[ref]].dom_parent) {
+				if (ctx->cfg_blocks[lca].loop_depth < loop_depth) {
+					loop_depth = ctx->cfg_blocks[lca].loop_depth;
+					b = lca;
+					if (!loop_depth) {
+						break;
+					}
+				}
+				lca = ctx->cfg_blocks[lca].dom_parent;
 			}
-			lca = ctx->cfg_blocks[lca].dom_parent;
 		}
 		_blocks[ref] = b;
 	}
@@ -113,10 +120,11 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 
 int ir_gcm(ir_ctx *ctx)
 {
-	ir_ref i, j, k, n, *p, ref;
+	ir_ref k, n, *p, ref;
 	ir_bitset visited;
 	ir_block *bb;
-	ir_list queue;
+	ir_list queue_early;
+	ir_list queue_late;
 	uint32_t *_blocks, b;
 	ir_insn *insn, *use_insn;
 	ir_use_list *use_list;
@@ -124,71 +132,71 @@ int ir_gcm(ir_ctx *ctx)
 
 	IR_ASSERT(ctx->cfg_map);
 	_blocks = ctx->cfg_map;
-	ir_list_init(&queue, ctx->insns_count);
+	ir_list_init(&queue_early, ctx->insns_count);
+	ir_list_init(&queue_late, ctx->insns_count);
 	visited = ir_bitset_malloc(ctx->insns_count);
 
 	/* pin and collect control and control depended (PARAM, VAR, PHI, PI) instructions */
-	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; b++, bb++) {
+	b = ctx->cfg_blocks_count;
+	for (bb = ctx->cfg_blocks + b; b > 0; bb--, b--) {
 		if (bb->flags & IR_BB_UNREACHABLE) {
 			continue;
 		}
-		j = bb->end;
-		while (1) {
-			insn = &ctx->ir_base[j];
-			ir_bitset_incl(visited, j);
-			_blocks[j] = b; /* pin to block */
+		ref = bb->end;
+		do {
+			insn = &ctx->ir_base[ref];
+			ir_bitset_incl(visited, ref);
+			_blocks[ref] = b; /* pin to block */
 			flags = ir_op_flags[insn->op];
+#if 1
+			n = IR_INPUT_EDGES_COUNT(flags);
+			if (!IR_IS_FIXED_INPUTS_COUNT(n) || n > 1) {
+				ir_list_push(&queue_early, ref);
+			}
+#else
 			if (IR_OPND_KIND(flags, 2) == IR_OPND_DATA
-			 || IR_OPND_KIND(flags, 3) == IR_OPND_DATA
-			 || ((flags & IR_OP_FLAG_MEM) && insn->type != IR_VOID)) {
-				ir_list_push(&queue, j);
+			 || IR_OPND_KIND(flags, 3) == IR_OPND_DATA) {
+				ir_list_push(&queue_early, ref);
 			}
-			if (j == bb->start) {
-				use_list = &ctx->use_lists[j];
-				n = use_list->count;
-				for (p = &ctx->use_edges[use_list->refs]; n > 0; n--, p++) {
-					ref = *p;
-					use_insn = &ctx->ir_base[ref];
-					if (use_insn->op == IR_PARAM || use_insn->op == IR_VAR) {
-						_blocks[ref] = b; /* pin to block */
-						ir_bitset_incl(visited, ref);
-					} else
-					if (use_insn->op == IR_PHI || use_insn->op == IR_PI) {
-						ir_bitset_incl(visited, ref);
-						if (UNEXPECTED(ctx->use_lists[ref].count == 0)) {
-							// TODO: Unused PHI ???
-						} else {
-							_blocks[ref] = b; /* pin to block */
-							ir_list_push(&queue, ref);
-						}
-					}
+#endif
+			if (insn->type != IR_VOID) {
+				IR_ASSERT(flags & IR_OP_FLAG_MEM);
+				ir_list_push(&queue_late, ref);
+			}
+			ref = insn->op1; /* control predecessor */
+		} while (ref != bb->start);
+		ir_bitset_incl(visited, ref);
+		_blocks[ref] = b; /* pin to block */
+
+		use_list = &ctx->use_lists[ref];
+		n = use_list->count;
+		for (p = &ctx->use_edges[use_list->refs]; n > 0; n--, p++) {
+			ref = *p;
+			use_insn = &ctx->ir_base[ref];
+			if (use_insn->op == IR_PARAM || use_insn->op == IR_VAR) {
+				_blocks[ref] = b; /* pin to block */
+				ir_bitset_incl(visited, ref);
+			} else if (use_insn->op == IR_PHI || use_insn->op == IR_PI) {
+				ir_bitset_incl(visited, ref);
+				if (EXPECTED(ctx->use_lists[ref].count != 0)) {
+					_blocks[ref] = b; /* pin to block */
+					ir_list_push(&queue_early, ref);
+					ir_list_push(&queue_late, ref);
 				}
-				break;
 			}
-			j = insn->op1; /* control predecessor */
 		}
 	}
 
-	n = ir_list_len(&queue);
-	for (i = 0; i < n; i++) {
-		ref = ir_list_at(&queue, i);
+	n = ir_list_len(&queue_early);
+	while (n > 0) {
+		n--;
+		ref = ir_list_at(&queue_early, n);
 		insn = &ctx->ir_base[ref];
-		flags = ir_op_flags[insn->op];
-		if (IR_OPND_KIND(flags, 2) == IR_OPND_DATA) {
-			if (insn->op2 > 0 && _blocks[insn->op2] == 0) {
-				ir_gcm_schedule_early(ctx, _blocks, insn->op2);
-			}
-		}
-		if (IR_OPND_KIND(flags, 3) == IR_OPND_DATA) {
-			if (insn->op3 > 0 && _blocks[insn->op3] == 0) {
-				ir_gcm_schedule_early(ctx, _blocks, insn->op3);
-			}
-			ir_ref n = ir_input_edges_count(ctx, insn);
-			for (k = 4, p = insn->ops + 4; k <= n; k++, p++) {
-				ref = *p;
-				if (ref > 0 && _blocks[ref] == 0) {
-					ir_gcm_schedule_early(ctx, _blocks, ref);
-				}
+		k = ir_input_edges_count(ctx, insn) - 1;
+		for (p = insn->ops + 2; k > 0; p++, k--) {
+			ref = *p;
+			if (ref > 0 && _blocks[ref] == 0) {
+				ir_gcm_schedule_early(ctx, _blocks, ref);
 			}
 		}
 	}
@@ -196,35 +204,35 @@ int ir_gcm(ir_ctx *ctx)
 #ifdef IR_DEBUG
 	if (ctx->flags & IR_DEBUG_GCM) {
 		fprintf(stderr, "GCM Schedule Early\n");
-		for (i = 1; i < ctx->insns_count; i++) {
-			fprintf(stderr, "%d -> %d\n", i, _blocks[i]);
+		for (n = 1; n < ctx->insns_count; n++) {
+			fprintf(stderr, "%d -> %d\n", n, _blocks[n]);
 		}
 	}
 #endif
 
-	n = ir_list_len(&queue);
-	for (i = 0; i < n; i++) {
-		ref = ir_list_at(&queue, i);
+	n = ir_list_len(&queue_late);
+	while (n > 0) {
+		n--;
+		ref = ir_list_at(&queue_late, n);
 		use_list = &ctx->use_lists[ref];
-		ir_ref n = use_list->count;
-		if (n > 0) {
-			for (p = &ctx->use_edges[use_list->refs]; n > 0; n--, p++) {
-				ref = *p;
-				if (!ir_bitset_in(visited, ref) && _blocks[ref]) {
-					ir_gcm_schedule_late(ctx, _blocks, visited, ref);
-				}
+		k = use_list->count;
+		for (p = &ctx->use_edges[use_list->refs]; k > 0; p++, k--) {
+			ref = *p;
+			if (!ir_bitset_in(visited, ref) && _blocks[ref]) {
+				ir_gcm_schedule_late(ctx, _blocks, visited, ref);
 			}
 		}
 	}
 
 	ir_mem_free(visited);
-	ir_list_free(&queue);
+	ir_list_free(&queue_early);
+	ir_list_free(&queue_late);
 
 #ifdef IR_DEBUG
 	if (ctx->flags & IR_DEBUG_GCM) {
 		fprintf(stderr, "GCM Schedule Late\n");
-		for (i = 1; i < ctx->insns_count; i++) {
-			fprintf(stderr, "%d -> %d\n", i, _blocks[i]);
+		for (n = 1; n < ctx->insns_count; n++) {
+			fprintf(stderr, "%d -> %d\n", n, _blocks[n]);
 		}
 	}
 #endif
