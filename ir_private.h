@@ -8,7 +8,7 @@
 #ifndef IR_PRIVATE_H
 #define IR_PRIVATE_H
 #include <string.h>
-#include <malloc.h>
+#include <stdlib.h>
 
 #ifdef IR_DEBUG
 # include <assert.h>
