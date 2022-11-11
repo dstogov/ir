@@ -36,6 +36,8 @@
 # endif
 #elif defined(_WIN32)
 # define IR_SET_ALIGNED(alignment, decl) __declspec(align(alignment)) decl
+#else /* GCC prior to 10 or non-clang/msvc compilers */
+#define __has_builtin(x) 0
 #endif
 #ifndef EXPECTED
 # define EXPECTED(condition)   (condition)
@@ -210,7 +212,7 @@ IR_ALWAYS_INLINE int ir_nlzl(uint64_t num)
 	return (int) (64 - 1) - index;
 #else
 	uint64_t x;
-	uint65_t n;
+	uint64_t n;
 
 	n = 64;
 	x = num >> 32; if (x != 0) {n -= 32; num = x;}
