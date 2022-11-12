@@ -7,6 +7,7 @@
  * Based on Mike Pall's implementation of GDB interface for LuaJIT.
  */
 
+#include <stddef.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
