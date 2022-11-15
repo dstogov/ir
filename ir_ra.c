@@ -1157,7 +1157,8 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy)
 	uint32_t succ, j, k = 0, n = 0;
 	ir_block *bb, *succ_bb;
 	ir_use_list *use_list;
-	ir_ref *loc, *pred, i;
+	ir_ref *loc, *pred, i, *p, ref, input;
+	ir_insn *insn;
 	uint32_t len;
 	ir_bitset todo, ready;
 
@@ -1179,27 +1180,40 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy)
 	}
 	IR_ASSERT(k != 0);
 
-	loc = ir_mem_calloc(ctx->insns_count * 2, sizeof(ir_ref));
+	loc = ir_mem_malloc(ctx->insns_count * 2 * sizeof(ir_ref));
 	pred = loc + ctx->insns_count;
 	len = ir_bitset_len(ctx->insns_count);
 	todo = ir_bitset_malloc(ctx->insns_count);
-	ready = ir_bitset_malloc(ctx->insns_count);
 
-	for (i = 0; i < use_list->count; i++) {
-		ir_ref ref = ctx->use_edges[use_list->refs + i];
-		ir_insn *insn = &ctx->ir_base[ref];
+	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < use_list->count; i++, p++) {
+		ref = *p;
+		insn = &ctx->ir_base[ref];
 		if (insn->op == IR_PHI) {
-			ir_ref input = ir_insn_op(insn, k);
+			input = ir_insn_op(insn, k);
 			if (IR_IS_CONST_REF(input)) {
 				emit_copy(ctx, insn->type, input, ref);
 			} else if (ctx->vregs[input] != ctx->vregs[ref]) {
-				loc[input] = input;
-				pred[ref] = input;
+				loc[ref] = pred[input] = 0;
 				ir_bitset_incl(todo, ref);
 				n++;
 			}
 		}
 	}
+
+	if (n == 0) {
+		ir_mem_free(todo);
+		ir_mem_free(loc);
+		return 1;
+	}
+
+	ready = ir_bitset_malloc(ctx->insns_count);
+	IR_BITSET_FOREACH(todo, len, ref) {
+		insn = &ctx->ir_base[ref];
+		IR_ASSERT(insn->op == IR_PHI);
+		input = ir_insn_op(insn, k);
+		loc[input] = input;
+		pred[ref] = input;
+	} IR_BITSET_FOREACH_END();
 
 	IR_BITSET_FOREACH(todo, len, i) {
 		if (!loc[i]) {
