@@ -346,7 +346,10 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 	uint32_t flags, len;
 	ir_insn *insn;
 	ir_block *bb, *succ_bb;
-	ir_bitset visited, live;
+#ifdef IR_DEBUG
+	ir_bitset visited;
+#endif
+	ir_bitset live;
 	ir_bitset loops = NULL;
 	ir_bitqueue queue;
 	ir_reg reg;
@@ -357,7 +360,9 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 	}
 
 	/* Compute Live Ranges */
+#ifdef IR_DEBUG
 	visited = ir_bitset_malloc(ctx->cfg_blocks_count + 1);
+#endif
 	len = ir_bitset_len(ctx->vregs_count + 1);
 	live = ir_bitset_malloc((ctx->cfg_blocks_count + 1) * len * 8 * sizeof(*live));
 	ctx->live_intervals = ir_mem_calloc(ctx->vregs_count + 1 + IR_REG_NUM + 1, sizeof(ir_live_interval*));
@@ -367,14 +372,18 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 			continue;
 		}
 		/* for each successor of b */
+#ifdef IR_DEBUG
 		ir_bitset_incl(visited, b);
+#endif
 		if (bb->successors_count == 0) {
 			ir_bitset_clear(live, len);
 		}
 		for (i = 0; i < bb->successors_count; i++) {
 			succ = ctx->cfg_edges[bb->successors + i];
 			/* blocks must be ordered where all dominators of a block are before this block */
+#ifdef IR_DEBUG
             IR_ASSERT(ir_bitset_in(visited, succ) || bb->loop_header == succ);
+#endif
 			/* live = union of successors.liveIn */
 			if (i == 0) {
 				ir_bitset_copy(live, live + (len * succ), len);
@@ -437,66 +446,64 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					ir_add_tmp(ctx, ref, tmp_regs[n]);
 				}
 			}
-			if ((flags & IR_OP_FLAG_DATA) || ((flags & IR_OP_FLAG_MEM) && insn->type != IR_VOID)) {
-				if (ctx->vregs[ref]) {
-					if (ir_bitset_in(live, ctx->vregs[ref])) {
-						if (insn->op == IR_RLOAD) {
-							ir_fix_live_range(ctx, ctx->vregs[ref],
-								IR_START_LIVE_POS_FROM_REF(bb->start), IR_DEF_LIVE_POS_FROM_REF(ref));
-							ctx->live_intervals[ctx->vregs[ref]]->flags = IR_LIVE_INTERVAL_REG_LOAD;
-							ctx->live_intervals[ctx->vregs[ref]]->reg = insn->op2;
-						} else if (insn->op != IR_PHI) {
-							ir_live_pos def_pos;
-							ir_ref hint_ref = 0;
+			if (ctx->vregs[ref]) {
+				if (ir_bitset_in(live, ctx->vregs[ref])) {
+					if (insn->op == IR_RLOAD) {
+						ir_fix_live_range(ctx, ctx->vregs[ref],
+							IR_START_LIVE_POS_FROM_REF(bb->start), IR_DEF_LIVE_POS_FROM_REF(ref));
+						ctx->live_intervals[ctx->vregs[ref]]->flags = IR_LIVE_INTERVAL_REG_LOAD;
+						ctx->live_intervals[ctx->vregs[ref]]->reg = insn->op2;
+					} else if (insn->op != IR_PHI) {
+						ir_live_pos def_pos;
+						ir_ref hint_ref = 0;
 
-							if (ctx->rules) {
-								def_flags = ir_get_def_flags(ctx, ref, &reg);
-							} else {
-								reg = IR_REG_NONE;
-							}
-							if (reg != IR_REG_NONE) {
-								def_pos = IR_SAVE_LIVE_POS_FROM_REF(ref);
-								if (insn->op == IR_PARAM) {
-									/* parameter register must be kept before it's copied */
-									ir_add_fixed_live_range(ctx, &unused, reg,
-										IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
-								} else {
-									ir_add_fixed_live_range(ctx, &unused, reg,
-										IR_DEF_LIVE_POS_FROM_REF(ref), def_pos);
-								}
-							} else if (def_flags & IR_DEF_REUSES_OP1_REG) {
-								/* We add two uses to emulate move from op1 to res */
-								ir_add_use(ctx, ctx->vregs[ref], 0, IR_DEF_LIVE_POS_FROM_REF(ref), reg, def_flags, 0);
-								def_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
-								if (!IR_IS_CONST_REF(insn->op1)) {
-									IR_ASSERT(ctx->vregs[insn->op1]);
-									hint_ref = insn->op1;
-								}
-							} else if (def_flags & IR_DEF_CONFLICTS_WITH_INPUT_REGS) {
-								def_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
-							} else {
-								if (insn->op == IR_PARAM) {
-									/* We may reuse parameter stack slot for spilling */
-									ctx->live_intervals[ctx->vregs[ref]]->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
-								} else if (insn->op == IR_VLOAD) {
-									/* Load may be fused into the useage instruction */
-									ctx->live_intervals[ctx->vregs[ref]]->flags |= IR_LIVE_INTERVAL_MEM_LOAD;
-								}
-								def_pos = IR_DEF_LIVE_POS_FROM_REF(ref);
-							}
-							/* intervals[opd].setFrom(op.id) */
-							ir_fix_live_range(ctx, ctx->vregs[ref],
-								IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
-							ir_add_use(ctx, ctx->vregs[ref], 0, def_pos, reg, def_flags, hint_ref);
+						if (ctx->rules) {
+							def_flags = ir_get_def_flags(ctx, ref, &reg);
 						} else {
-							ir_add_use(ctx, ctx->vregs[ref], 0, IR_DEF_LIVE_POS_FROM_REF(ref), IR_REG_NONE, IR_USE_SHOULD_BE_IN_REG, 0);
+							reg = IR_REG_NONE;
 						}
-						/* live.remove(opd) */
-						ir_bitset_excl(live, ctx->vregs[ref]);
-					} else if (insn->op == IR_VAR) {
-						if (ctx->use_lists[ref].count > 0) {
-							ir_add_local_var(ctx, ctx->vregs[ref], insn->type);
+						if (reg != IR_REG_NONE) {
+							def_pos = IR_SAVE_LIVE_POS_FROM_REF(ref);
+							if (insn->op == IR_PARAM) {
+								/* parameter register must be kept before it's copied */
+								ir_add_fixed_live_range(ctx, &unused, reg,
+									IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
+							} else {
+								ir_add_fixed_live_range(ctx, &unused, reg,
+									IR_DEF_LIVE_POS_FROM_REF(ref), def_pos);
+							}
+						} else if (def_flags & IR_DEF_REUSES_OP1_REG) {
+							/* We add two uses to emulate move from op1 to res */
+							ir_add_use(ctx, ctx->vregs[ref], 0, IR_DEF_LIVE_POS_FROM_REF(ref), reg, def_flags, 0);
+							def_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
+							if (!IR_IS_CONST_REF(insn->op1)) {
+								IR_ASSERT(ctx->vregs[insn->op1]);
+								hint_ref = insn->op1;
+							}
+						} else if (def_flags & IR_DEF_CONFLICTS_WITH_INPUT_REGS) {
+							def_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
+						} else {
+							if (insn->op == IR_PARAM) {
+								/* We may reuse parameter stack slot for spilling */
+								ctx->live_intervals[ctx->vregs[ref]]->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
+							} else if (insn->op == IR_VLOAD) {
+								/* Load may be fused into the useage instruction */
+								ctx->live_intervals[ctx->vregs[ref]]->flags |= IR_LIVE_INTERVAL_MEM_LOAD;
+							}
+							def_pos = IR_DEF_LIVE_POS_FROM_REF(ref);
 						}
+						/* intervals[opd].setFrom(op.id) */
+						ir_fix_live_range(ctx, ctx->vregs[ref],
+							IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
+						ir_add_use(ctx, ctx->vregs[ref], 0, def_pos, reg, def_flags, hint_ref);
+					} else {
+						ir_add_use(ctx, ctx->vregs[ref], 0, IR_DEF_LIVE_POS_FROM_REF(ref), IR_REG_NONE, IR_USE_SHOULD_BE_IN_REG, 0);
+					}
+					/* live.remove(opd) */
+					ir_bitset_excl(live, ctx->vregs[ref]);
+				} else if (insn->op == IR_VAR) {
+					if (ctx->use_lists[ref].count > 0) {
+						ir_add_local_var(ctx, ctx->vregs[ref], insn->type);
 					}
 				}
 			}
@@ -645,7 +652,9 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 	}
 
 	ir_mem_free(live);
+#ifdef IR_DEBUG
 	ir_mem_free(visited);
+#endif
 
 	return 1;
 }
