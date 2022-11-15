@@ -974,7 +974,6 @@ int ir_coalesce(ir_ctx *ctx)
 	ir_block *bb, *succ_bb;
 	ir_use_list *use_list;
 	ir_insn *insn;
-	uint32_t *offsets;
 	ir_worklist blocks;
 	bool compact = 0;
 	ir_live_range *unused = NULL;
@@ -1050,25 +1049,27 @@ int ir_coalesce(ir_ctx *ctx)
 	}
 	ir_worklist_free(&blocks);
 
-#if 1
 	if (ctx->rules) {
 		/* try to swap operands of commutative instructions for better register allocation */
 		for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
 			ir_ref i;
 
-			for (i = bb->start, insn = ctx->ir_base + i; i <= bb->end;) {
-				if (ir_get_def_flags(ctx, i, &reg) & IR_DEF_REUSES_OP1_REG) {
-					if (insn->op2 > 0 && insn->op1 != insn->op2
-					 && (ir_op_flags[insn->op] & IR_OP_FLAG_COMMUTATIVE)) {
-						ir_try_swap_operands(ctx, i, insn);
+			i = bb->start;
+
+			/* skip first instruction */
+			insn = ctx->ir_base + i;
+			n = ir_operands_count(ctx, insn);
+			n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
+			i += n;
+			insn += n;
+
+			while (i < bb->end) {
+				if ((ir_op_flags[insn->op] & IR_OP_FLAG_COMMUTATIVE) && ctx->vregs[i]) {
+					if (ir_get_def_flags(ctx, i, &reg) & IR_DEF_REUSES_OP1_REG) {
+						if (insn->op2 > 0 && insn->op1 != insn->op2) {
+							ir_try_swap_operands(ctx, i, insn);
+						}
 					}
-//					if (insn->op1 > 0) {
-//						ir_try_coalesce(ctx, insn->op1, i);
-//					}
-//				} else if (insn->op == IR_COPY) {
-//					if (insn->op1 > 0) {
-//						ir_try_coalesce(ctx, insn->op1, i);
-//					}
 				}
 				n = ir_operands_count(ctx, insn);
 				n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
@@ -1077,19 +1078,17 @@ int ir_coalesce(ir_ctx *ctx)
 			}
 		}
 	}
-#endif
 
 	if (compact) {
-#if 1
 		ir_ref i, n;
+		uint32_t *xlat = ir_mem_malloc((ctx->vregs_count + 1) * sizeof(uint32_t));
 
-		offsets = ir_mem_calloc(ctx->vregs_count + 1, sizeof(uint32_t));
 		for (i = 1, n = 1; i <= ctx->vregs_count; i++) {
 			if (ctx->live_intervals[i]) {
+				xlat[i] = n;
 				if (i != n) {
 					ctx->live_intervals[n] = ctx->live_intervals[i];
 					ctx->live_intervals[n]->vreg = n;
-					offsets[i] = i - n;
 				}
 				n++;
 			}
@@ -1105,13 +1104,12 @@ int ir_coalesce(ir_ctx *ctx)
 			}
 			for (j = 1; j < ctx->insns_count; j++) {
 				if (ctx->vregs[j]) {
-					ctx->vregs[j] -= offsets[ctx->vregs[j]];
+					ctx->vregs[j] = xlat[ctx->vregs[j]];
 				}
 			}
 			ctx->vregs_count = n;
 		}
-		ir_mem_free(offsets);
-#endif
+		ir_mem_free(xlat);
 	}
 
 	return 1;
