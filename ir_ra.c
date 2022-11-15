@@ -349,7 +349,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 #ifdef IR_DEBUG
 	ir_bitset visited;
 #endif
-	ir_bitset live;
+	ir_bitset live, bb_live;
 	ir_bitset loops = NULL;
 	ir_bitqueue queue;
 	ir_reg reg;
@@ -364,7 +364,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 	visited = ir_bitset_malloc(ctx->cfg_blocks_count + 1);
 #endif
 	len = ir_bitset_len(ctx->vregs_count + 1);
-	live = ir_bitset_malloc((ctx->cfg_blocks_count + 1) * len * 8 * sizeof(*live));
+	bb_live = ir_mem_malloc((ctx->cfg_blocks_count + 1) * len * sizeof(ir_bitset_base_t));
 	ctx->live_intervals = ir_mem_calloc(ctx->vregs_count + 1 + IR_REG_NUM + 1, sizeof(ir_live_interval*));
 	for (b = ctx->cfg_blocks_count; b > 0; b--) {
 		bb = &ctx->cfg_blocks[b];
@@ -375,6 +375,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 #ifdef IR_DEBUG
 		ir_bitset_incl(visited, b);
 #endif
+		live = bb_live + (len * b);
 		if (bb->successors_count == 0) {
 			ir_bitset_clear(live, len);
 		}
@@ -386,9 +387,15 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 #endif
 			/* live = union of successors.liveIn */
 			if (i == 0) {
-				ir_bitset_copy(live, live + (len * succ), len);
+				if (EXPECTED(succ > b)) {
+					ir_bitset_copy(live, bb_live + (len * succ), len);
+				} else {
+					IR_ASSERT(ctx->cfg_blocks[succ].flags & IR_BB_LOOP_HEADER);
+					ir_bitset_clear(live, len);
+				}
 			} else {
-				ir_bitset_union(live, live + (len * succ), len);
+				IR_ASSERT(succ > b);
+				ir_bitset_union(live, bb_live + (len * succ), len);
 			}
 			/* for each phi function phi of successor */
 			succ_bb = &ctx->cfg_blocks[succ];
@@ -637,9 +644,6 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 				}
 			} while ((child = ir_bitqueue_pop(&queue)) >= 0);
 		}
-
-		/* b.liveIn = live */
-		ir_bitset_copy(live + (len * b), live, len);
 	}
 
 	if (unused) {
@@ -651,7 +655,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 		ir_bitqueue_free(&queue);
 	}
 
-	ir_mem_free(live);
+	ir_mem_free(bb_live);
 #ifdef IR_DEBUG
 	ir_mem_free(visited);
 #endif
