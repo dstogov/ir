@@ -341,9 +341,9 @@ static void ir_add_phi_use(ir_ctx *ctx, int v, int op_num, ir_live_pos pos, ir_r
 
 int ir_compute_live_ranges(ir_ctx *ctx)
 {
-	uint32_t b, i, j, k, n, succ;
+	uint32_t b, i, j, k, n, succ, *p;
 	ir_ref ref;
-	uint32_t flags, len;
+	uint32_t len;
 	ir_insn *insn;
 	ir_block *bb, *succ_bb;
 #ifdef IR_DEBUG
@@ -379,8 +379,8 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 		if (bb->successors_count == 0) {
 			ir_bitset_clear(live, len);
 		}
-		for (i = 0; i < bb->successors_count; i++) {
-			succ = ctx->cfg_edges[bb->successors + i];
+		for (i = 0, p = &ctx->cfg_edges[bb->successors + i]; i < bb->successors_count; i++, p++) {
+			succ = *p;
 			/* blocks must be ordered where all dominators of a block are before this block */
 #ifdef IR_DEBUG
             IR_ASSERT(ir_bitset_in(visited, succ) || bb->loop_header == succ);
@@ -402,28 +402,31 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 			if (succ_bb->predecessors_count > 1) {
 				ir_use_list *use_list = &ctx->use_lists[succ_bb->start];
 
-				k = 0;
-				for (j = 0; j < succ_bb->predecessors_count; j++) {
-					if (ctx->cfg_edges[succ_bb->predecessors + j] == b) {
-						k = j + 2;
-						break;
+				if (use_list->count > 1) {
+					k = 0;
+					for (j = 0; j < succ_bb->predecessors_count; j++) {
+						if (ctx->cfg_edges[succ_bb->predecessors + j] == b) {
+							k = j + 2;
+							break;
+						}
 					}
-				}
-				IR_ASSERT(k != 0);
-				for (ref = 0; ref < use_list->count; ref++) {
-					ir_ref use = ctx->use_edges[use_list->refs + ref];
-					insn = &ctx->ir_base[use];
-					if (insn->op == IR_PHI) {
-						if (ir_insn_op(insn, k) > 0) {
-							/* live.add(phi.inputOf(b)) */
-							IR_ASSERT(ctx->vregs[ir_insn_op(insn, k)]);
-							ir_bitset_incl(live, ctx->vregs[ir_insn_op(insn, k)]);
-							// TODO: ir_add_live_range() is used just to set ival->type
-							/* intervals[phi.inputOf(b)].addRange(b.from, b.to) */
-							ir_add_live_range(ctx, &unused, ctx->vregs[ir_insn_op(insn, k)], insn->type,
-								IR_START_LIVE_POS_FROM_REF(bb->start),
-								IR_END_LIVE_POS_FROM_REF(bb->end));
-							ir_add_phi_use(ctx, ctx->vregs[ir_insn_op(insn, k)], k, IR_DEF_LIVE_POS_FROM_REF(bb->end), use);
+					IR_ASSERT(k != 0);
+					for (ref = 0; ref < use_list->count; ref++) {
+						ir_ref use = ctx->use_edges[use_list->refs + ref];
+						insn = &ctx->ir_base[use];
+						if (insn->op == IR_PHI) {
+							ir_ref input = ir_insn_op(insn, k);
+							if (input > 0) {
+								/* live.add(phi.inputOf(b)) */
+								IR_ASSERT(ctx->vregs[input]);
+								ir_bitset_incl(live, ctx->vregs[input]);
+								// TODO: ir_add_live_range() is used just to set ival->type
+								/* intervals[phi.inputOf(b)].addRange(b.from, b.to) */
+								ir_add_live_range(ctx, &unused, ctx->vregs[input], insn->type,
+									IR_START_LIVE_POS_FROM_REF(bb->start),
+									IR_END_LIVE_POS_FROM_REF(bb->end));
+								ir_add_phi_use(ctx, ctx->vregs[input], k, IR_DEF_LIVE_POS_FROM_REF(bb->end), use);
+							}
 						}
 					}
 				}
@@ -443,7 +446,6 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 			uint8_t def_flags = 0;
 
 			insn = &ctx->ir_base[ref];
-			flags = ir_op_flags[insn->op];
 			if (ctx->rules) {
 				ir_tmp_reg tmp_regs[4];
 				int n = ir_get_temporary_regs(ctx, ref, tmp_regs);
@@ -515,10 +517,14 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 				}
 			}
 			if (insn->op != IR_PHI && (!ctx->rules || ctx->rules[ref] != IR_SKIP_MEM)) {
+				uint32_t flags = ir_op_flags[insn->op];
+				ir_ref *p;
+
 				n = ir_input_edges_count(ctx, insn);
-				for (j = 1; j <= n; j++) {
+				j = (flags & IR_OP_FLAG_CONTROL) ? 2 : 1;
+				for (p = insn->ops + j; j <= n; j++, p++) {
 					if (IR_OPND_KIND(flags, j) == IR_OPND_DATA) {
-						ir_ref input = ir_insn_op(insn, j);
+						ir_ref input = *p;
 						uint8_t use_flags;
 
 						if (ctx->rules) {
