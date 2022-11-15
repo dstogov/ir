@@ -62,15 +62,20 @@ int ir_assign_virtual_registers(ir_ctx *ctx)
 		if (bb->flags & IR_BB_UNREACHABLE) {
 			continue;
 		}
-		for (i = bb->start, insn = ctx->ir_base + i; i <= bb->end;) {
+		i = bb->start;
+
+		/* skip first instruction */
+		insn = ctx->ir_base + i;
+		n = ir_operands_count(ctx, insn);
+		n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
+		i += n;
+		insn += n;
+		while (i < bb->end) {
 			ctx->prev_insn_len[i] = n;
 			flags = ir_op_flags[insn->op];
-			if ((flags & IR_OP_FLAG_DATA) || ((flags & IR_OP_FLAG_MEM) && insn->type != IR_VOID)) {
-				if ((insn->op == IR_PARAM || insn->op == IR_VAR) && ctx->use_lists[i].count == 0) {
-					/* pass */
-				} else if (insn->op == IR_VAR && ctx->use_lists[i].count > 0) {
-					vregs[i] = ++vregs_count; /* for spill slot */
-				} else if (!ctx->rules || ir_needs_vreg(ctx, i)) {
+			if (((flags & IR_OP_FLAG_DATA) && ctx->use_lists[i].count > 0)
+			 || ((flags & IR_OP_FLAG_MEM) && ctx->use_lists[i].count > 1)) {
+				if (!ctx->rules || ir_needs_vreg(ctx, i)) {
 					vregs[i] = ++vregs_count;
 				}
 			}
@@ -79,6 +84,7 @@ int ir_assign_virtual_registers(ir_ctx *ctx)
 			i += n;
 			insn += n;
 		}
+		ctx->prev_insn_len[i] = n;
 	}
 	ctx->vregs_count = vregs_count;
 	ctx->vregs = vregs;
