@@ -457,7 +457,12 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 		} IR_BITSET_FOREACH_END();
 
 		/* for each operation op of b in reverse order */
-		for (ref = bb->end; ref > bb->start; ref -= ctx->prev_insn_len[ref]) {
+		ref = bb->end;
+		insn = &ctx->ir_base[ref];
+		if (insn->op == IR_END || insn->op == IR_LOOP_END) {
+			ref -= ctx->prev_insn_len[ref];
+		}
+		for (; ref > bb->start; ref -= ctx->prev_insn_len[ref]) {
 			uint8_t def_flags = 0;
 			uint32_t flags;
 			ir_ref *p;
