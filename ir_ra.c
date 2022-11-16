@@ -382,56 +382,65 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 		ir_bitset_incl(visited, b);
 #endif
 		live = bb_live + (len * b);
-		if (bb->successors_count == 0) {
+		n = bb->successors_count;
+		if (n == 0) {
 			ir_bitset_clear(live, len);
-		}
-		for (i = 0, p = &ctx->cfg_edges[bb->successors + i]; i < bb->successors_count; i++, p++) {
+		} else {
+			p = &ctx->cfg_edges[bb->successors];
 			succ = *p;
 			/* blocks must be ordered where all dominators of a block are before this block */
 #ifdef IR_DEBUG
             IR_ASSERT(ir_bitset_in(visited, succ) || bb->loop_header == succ);
 #endif
-			/* live = union of successors.liveIn */
-			if (i == 0) {
+
+			if (n > 1) {
+				IR_ASSERT(succ > b);
+				/* live = union of successors.liveIn */
+				ir_bitset_copy(live, bb_live + (len * succ), len);
+				for (p++, n--; n > 0; p++, n--) {
+					succ = *p;
+					IR_ASSERT(succ > b);
+					ir_bitset_union(live, bb_live + (len * succ), len);
+				}
+			} else {
+				/* live = successor.liveIn */
 				if (EXPECTED(succ > b)) {
 					ir_bitset_copy(live, bb_live + (len * succ), len);
 				} else {
 					IR_ASSERT(ctx->cfg_blocks[succ].flags & IR_BB_LOOP_HEADER);
 					ir_bitset_clear(live, len);
 				}
-			} else {
-				IR_ASSERT(succ > b);
-				ir_bitset_union(live, bb_live + (len * succ), len);
-			}
-			/* for each phi function phi of successor */
-			succ_bb = &ctx->cfg_blocks[succ];
-			if (succ_bb->predecessors_count > 1) {
-				ir_use_list *use_list = &ctx->use_lists[succ_bb->start];
 
-				if (use_list->count > 1) {
-					k = 0;
-					for (j = 0; j < succ_bb->predecessors_count; j++) {
-						if (ctx->cfg_edges[succ_bb->predecessors + j] == b) {
-							k = j + 2;
-							break;
+				/* for each phi function phi of successor */
+				succ_bb = &ctx->cfg_blocks[succ];
+				if (succ_bb->predecessors_count > 1) {
+					ir_use_list *use_list = &ctx->use_lists[succ_bb->start];
+
+					if (use_list->count > 1) {
+						k = 0;
+						for (j = 0; j < succ_bb->predecessors_count; j++) {
+							if (ctx->cfg_edges[succ_bb->predecessors + j] == b) {
+								k = j + 2;
+								break;
+							}
 						}
-					}
-					IR_ASSERT(k != 0);
-					for (ref = 0; ref < use_list->count; ref++) {
-						ir_ref use = ctx->use_edges[use_list->refs + ref];
-						insn = &ctx->ir_base[use];
-						if (insn->op == IR_PHI) {
-							ir_ref input = ir_insn_op(insn, k);
-							if (input > 0) {
-								/* live.add(phi.inputOf(b)) */
-								IR_ASSERT(ctx->vregs[input]);
-								ir_bitset_incl(live, ctx->vregs[input]);
-								// TODO: ir_add_live_range() is used just to set ival->type
-								/* intervals[phi.inputOf(b)].addRange(b.from, b.to) */
-								ir_add_live_range(ctx, &unused, ctx->vregs[input], insn->type,
-									IR_START_LIVE_POS_FROM_REF(bb->start),
-									IR_END_LIVE_POS_FROM_REF(bb->end));
-								ir_add_phi_use(ctx, ctx->vregs[input], k, IR_DEF_LIVE_POS_FROM_REF(bb->end), use);
+						IR_ASSERT(k != 0);
+						for (ref = 0; ref < use_list->count; ref++) {
+							ir_ref use = ctx->use_edges[use_list->refs + ref];
+							insn = &ctx->ir_base[use];
+							if (insn->op == IR_PHI) {
+								ir_ref input = ir_insn_op(insn, k);
+								if (input > 0) {
+									/* live.add(phi.inputOf(b)) */
+									IR_ASSERT(ctx->vregs[input]);
+									ir_bitset_incl(live, ctx->vregs[input]);
+									// TODO: ir_add_live_range() is used just to set ival->type
+									/* intervals[phi.inputOf(b)].addRange(b.from, b.to) */
+									ir_add_live_range(ctx, &unused, ctx->vregs[input], insn->type,
+										IR_START_LIVE_POS_FROM_REF(bb->start),
+										IR_END_LIVE_POS_FROM_REF(bb->end));
+									ir_add_phi_use(ctx, ctx->vregs[input], k, IR_DEF_LIVE_POS_FROM_REF(bb->end), use);
+								}
 							}
 						}
 					}
