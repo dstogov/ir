@@ -95,8 +95,7 @@ test:
 	ldr w1, [sp, #0x30]
 	add w0, w1, #4
 	str w0, [sp, #0x34]
-	ldr w1, [sp, #8]
-	mov w0, w1
+	ldr w0, [sp, #8]
 	str w0, [sp, #0x38]
 	ldr w0, [sp, #0x38]
 	str w0, [sp, #0x4c]
@@ -112,8 +111,7 @@ test:
 	str w0, [sp, #0x60]
 	b .L3
 .L2:
-	ldr w1, [sp, #8]
-	mov w0, w1
+	ldr w0, [sp, #8]
 	str w0, [sp, #0x3c]
 	ldr w1, [sp, #0x3c]
 	ldr w2, [sp, #4]

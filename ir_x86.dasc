@@ -737,7 +737,6 @@ uint8_t ir_get_def_flags(ir_ctx *ctx, ir_ref ref, ir_reg *reg)
 		case IR_OP_INT:
 		case IR_OP_FP:
 		case IR_MIN_MAX_INT:
-		case IR_COPY:
 			return IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG;
 		case IR_ABS_INT:
 			return IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_USE_MUST_BE_IN_REG;
