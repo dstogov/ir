@@ -838,6 +838,12 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num, ir_reg *reg)
 //		case IR_VSTORE_INT:
 //		case IR_VSTORE_FP:
 //			return (op_num == 2) ? 0 : IR_USE_MUST_BE_IN_REG;
+		case IR_SKIP:
+			insn = &ctx->ir_base[ref];
+			if (insn->op == IR_SNAPSHOT) {
+				return 0;
+			}
+			break;
 		case IR_SHIFT:
 		case IR_SKIP_SHIFT:
 			if (op_num == 2) {
