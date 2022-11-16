@@ -876,14 +876,11 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num, ir_reg *reg)
 		case IR_SKIP_SHIFT:
 			if (op_num == 2) {
 				*reg = IR_REG_RCX;
+				return IR_USE_SHOULD_BE_IN_REG;
 			}
 			break;
 		case IR_MUL_INT:
 		case IR_DIV_INT:
-			if (op_num == 1) {
-				*reg = IR_REG_RAX;
-			}
-			return IR_USE_SHOULD_BE_IN_REG;
 		case IR_MOD_INT:
 			if (op_num == 1) {
 				*reg = IR_REG_RAX;
