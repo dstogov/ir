@@ -450,17 +450,25 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 		/* for each operation op of b in reverse order */
 		for (ref = bb->end; ref > bb->start; ref -= ctx->prev_insn_len[ref]) {
 			uint8_t def_flags = 0;
+			uint32_t flags;
+			ir_ref *p;
 
-			insn = &ctx->ir_base[ref];
 			if (ctx->rules) {
 				ir_tmp_reg tmp_regs[4];
-				int n = ir_get_temporary_regs(ctx, ref, tmp_regs);
+				int n;
 
+				if (ctx->rules[ref] == IR_SKIP_MEM) {
+					continue;
+				}
+
+				n = ir_get_temporary_regs(ctx, ref, tmp_regs);
 				while (n > 0) {
 					n--;
 					ir_add_tmp(ctx, ref, tmp_regs[n]);
 				}
 			}
+
+			insn = &ctx->ir_base[ref];
 			if (ctx->vregs[ref]) {
 				if (ir_bitset_in(live, ctx->vregs[ref])) {
 					if (insn->op == IR_RLOAD) {
@@ -513,106 +521,109 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						ir_add_use(ctx, ctx->vregs[ref], 0, def_pos, reg, def_flags, hint_ref);
 					} else {
 						ir_add_use(ctx, ctx->vregs[ref], 0, IR_DEF_LIVE_POS_FROM_REF(ref), IR_REG_NONE, IR_USE_SHOULD_BE_IN_REG, 0);
+						/* live.remove(opd) */
+						ir_bitset_excl(live, ctx->vregs[ref]);
+						/* PHIs inputs must not be processed */
+						continue;
 					}
 					/* live.remove(opd) */
 					ir_bitset_excl(live, ctx->vregs[ref]);
-				} else if (insn->op == IR_VAR) {
-					if (ctx->use_lists[ref].count > 0) {
-						ir_add_local_var(ctx, ctx->vregs[ref], insn->type);
+				} else {
+					IR_ASSERT(insn->op == IR_VAR);
+					IR_ASSERT(ctx->use_lists[ref].count > 0);
+					ir_add_local_var(ctx, ctx->vregs[ref], insn->type);
+				}
+			}
+
+			IR_ASSERT(insn->op != IR_PHI && (!ctx->rules || ctx->rules[ref] != IR_SKIP_MEM));
+			flags = ir_op_flags[insn->op];
+			n = ir_input_edges_count(ctx, insn);
+			j = (flags & IR_OP_FLAG_CONTROL) ? 2 : 1;
+			for (p = insn->ops + j; j <= n; j++, p++) {
+				if (IR_OPND_KIND(flags, j) == IR_OPND_DATA) {
+					ir_ref input = *p;
+					uint8_t use_flags;
+
+					if (ctx->rules) {
+						use_flags = ir_get_use_flags(ctx, ref, j, &reg);
+					} else {
+						use_flags = 0;
+						reg = IR_REG_NONE;
+					}
+					if (input > 0 && ctx->rules && ctx->rules[input] == IR_SKIP_MEM) {
+						do {
+							if (ctx->ir_base[input].op == IR_LOAD) {
+								input = ctx->ir_base[input].op2;
+								if (input < 0 || ctx->rules[input] != IR_SKIP_MEM) {
+									break;
+								}
+							}
+							if (ctx->ir_base[input].op == IR_RLOAD) {
+								/* pass */
+							} else if (ctx->ir_base[input].op == IR_ADD) {
+								IR_ASSERT(!IR_IS_CONST_REF(ctx->ir_base[input].op1));
+								IR_ASSERT(IR_IS_CONST_REF(ctx->ir_base[input].op2));
+								input = ctx->ir_base[input].op1;
+								use_flags = IR_USE_MUST_BE_IN_REG;
+							} else {
+								input = 0;
+							}
+						} while (0);
+					}
+					if (input > 0 && ctx->vregs[input]) {
+						ir_live_pos use_pos;
+						ir_ref hint_ref = 0;
+
+						if ((def_flags & IR_DEF_REUSES_OP1_REG) && j == 1) {
+							use_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
+							IR_ASSERT(ctx->vregs[ref]);
+							hint_ref = ref;
+							if (reg != IR_REG_NONE) {
+								ir_add_fixed_live_range(ctx, &unused, reg,
+									use_pos, IR_USE_LIVE_POS_FROM_REF(ref));
+							}
+						} else {
+							if (reg != IR_REG_NONE) {
+								use_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
+								ir_add_fixed_live_range(ctx, &unused, reg,
+									use_pos, IR_USE_LIVE_POS_FROM_REF(ref));
+							} else if ((def_flags & IR_DEF_REUSES_OP1_REG) && input == insn->op1) {
+								/* Input is the same as "op1" */
+								use_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
+							} else {
+								use_pos = IR_USE_LIVE_POS_FROM_REF(ref);
+							}
+						}
+						/* intervals[opd].addRange(b.from, op.id) */
+						ir_add_live_range(ctx, &unused, ctx->vregs[input], ctx->ir_base[input].type,
+							IR_START_LIVE_POS_FROM_REF(bb->start), use_pos);
+						ir_add_use(ctx, ctx->vregs[input], j, use_pos, reg, use_flags, hint_ref);
+						/* live.add(opd) */
+						ir_bitset_incl(live, ctx->vregs[input]);
+					} else {
+						if (reg != IR_REG_NONE) {
+							ir_add_fixed_live_range(ctx, &unused, reg,
+								IR_LOAD_LIVE_POS_FROM_REF(ref), IR_USE_LIVE_POS_FROM_REF(ref));
+						}
 					}
 				}
 			}
-			if (insn->op != IR_PHI && (!ctx->rules || ctx->rules[ref] != IR_SKIP_MEM)) {
-				uint32_t flags = ir_op_flags[insn->op];
-				ir_ref *p;
 
-				n = ir_input_edges_count(ctx, insn);
-				j = (flags & IR_OP_FLAG_CONTROL) ? 2 : 1;
-				for (p = insn->ops + j; j <= n; j++, p++) {
-					if (IR_OPND_KIND(flags, j) == IR_OPND_DATA) {
-						ir_ref input = *p;
-						uint8_t use_flags;
+			/* CPU specific constraints */
+			if (insn->op == IR_CALL) {
+				ir_add_fixed_live_range(ctx, &unused, IR_REG_NUM,
+					IR_START_LIVE_POS_FROM_REF(ref) + IR_USE_SUB_REF,
+					IR_START_LIVE_POS_FROM_REF(ref) + IR_DEF_SUB_REF);
+			} else if (ctx->rules) {
+				ir_live_pos start, end;
+				ir_regset regset = ir_get_scratch_regset(ctx, ref, &start, &end);
 
-						if (ctx->rules) {
-							use_flags = ir_get_use_flags(ctx, ref, j, &reg);
-						} else {
-							use_flags = 0;
-							reg = IR_REG_NONE;
-						}
-						if (input > 0 && ctx->rules && ctx->rules[input] == IR_SKIP_MEM) {
-							do {
-								if (ctx->ir_base[input].op == IR_LOAD) {
-									input = ctx->ir_base[input].op2;
-									if (input < 0 || ctx->rules[input] != IR_SKIP_MEM) {
-										break;
-									}
-								}
-								if (ctx->ir_base[input].op == IR_RLOAD) {
-									/* pass */
-								} else if (ctx->ir_base[input].op == IR_ADD) {
-									IR_ASSERT(!IR_IS_CONST_REF(ctx->ir_base[input].op1));
-									IR_ASSERT(IR_IS_CONST_REF(ctx->ir_base[input].op2));
-									input = ctx->ir_base[input].op1;
-									use_flags = IR_USE_MUST_BE_IN_REG;
-								} else {
-									input = 0;
-								}
-							} while (0);
-						}
-						if (input > 0 && ctx->vregs[input]) {
-							ir_live_pos use_pos;
-							ir_ref hint_ref = 0;
-
-							if ((def_flags & IR_DEF_REUSES_OP1_REG) && j == 1) {
-								use_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
-								IR_ASSERT(ctx->vregs[ref]);
-								hint_ref = ref;
-								if (reg != IR_REG_NONE) {
-									ir_add_fixed_live_range(ctx, &unused, reg,
-										use_pos, IR_USE_LIVE_POS_FROM_REF(ref));
-								}
-							} else {
-								if (reg != IR_REG_NONE) {
-									use_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
-									ir_add_fixed_live_range(ctx, &unused, reg,
-										use_pos, IR_USE_LIVE_POS_FROM_REF(ref));
-								} else if ((def_flags & IR_DEF_REUSES_OP1_REG) && input == insn->op1) {
-									/* Input is the same as "op1" */
-									use_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
-								} else {
-									use_pos = IR_USE_LIVE_POS_FROM_REF(ref);
-								}
-							}
-							/* intervals[opd].addRange(b.from, op.id) */
-							ir_add_live_range(ctx, &unused, ctx->vregs[input], ctx->ir_base[input].type,
-								IR_START_LIVE_POS_FROM_REF(bb->start), use_pos);
-							ir_add_use(ctx, ctx->vregs[input], j, use_pos, reg, use_flags, hint_ref);
-							/* live.add(opd) */
-							ir_bitset_incl(live, ctx->vregs[input]);
-						} else {
-							if (reg != IR_REG_NONE) {
-								ir_add_fixed_live_range(ctx, &unused, reg,
-									IR_LOAD_LIVE_POS_FROM_REF(ref), IR_USE_LIVE_POS_FROM_REF(ref));
-							}
-						}
-					}
-				}
-				/* CPU specific constraints */
-				if (insn->op == IR_CALL) {
-					ir_add_fixed_live_range(ctx, &unused, IR_REG_NUM,
-						IR_START_LIVE_POS_FROM_REF(ref) + IR_USE_SUB_REF,
-						IR_START_LIVE_POS_FROM_REF(ref) + IR_DEF_SUB_REF);
-				} else if (ctx->rules) {
-					ir_live_pos start, end;
-					ir_regset regset = ir_get_scratch_regset(ctx, ref, &start, &end);
-
-					if (regset != IR_REGSET_EMPTY) {
-						IR_REGSET_FOREACH(regset, reg) {
-							ir_add_fixed_live_range(ctx, &unused, reg,
-								IR_START_LIVE_POS_FROM_REF(ref) + start,
-								IR_START_LIVE_POS_FROM_REF(ref) + end);
-						}  IR_REGSET_FOREACH_END();
-					}
+				if (regset != IR_REGSET_EMPTY) {
+					IR_REGSET_FOREACH(regset, reg) {
+						ir_add_fixed_live_range(ctx, &unused, reg,
+							IR_START_LIVE_POS_FROM_REF(ref) + start,
+							IR_START_LIVE_POS_FROM_REF(ref) + end);
+					}  IR_REGSET_FOREACH_END();
 				}
 			}
 		}
