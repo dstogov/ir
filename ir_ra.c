@@ -490,6 +490,9 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							IR_START_LIVE_POS_FROM_REF(bb->start), IR_DEF_LIVE_POS_FROM_REF(ref));
 						ctx->live_intervals[ctx->vregs[ref]]->flags = IR_LIVE_INTERVAL_REG_LOAD;
 						ctx->live_intervals[ctx->vregs[ref]]->reg = insn->op2;
+						/* live.remove(opd) */
+						ir_bitset_excl(live, ctx->vregs[ref]);
+						continue;
 					} else if (insn->op != IR_PHI) {
 						ir_live_pos def_pos;
 						ir_ref hint_ref = 0;
@@ -533,6 +536,8 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						ir_fix_live_range(ctx, ctx->vregs[ref],
 							IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
 						ir_add_use(ctx, ctx->vregs[ref], 0, def_pos, reg, def_flags, hint_ref);
+						/* live.remove(opd) */
+						ir_bitset_excl(live, ctx->vregs[ref]);
 					} else {
 						ir_add_use(ctx, ctx->vregs[ref], 0, IR_DEF_LIVE_POS_FROM_REF(ref), IR_REG_NONE, IR_USE_SHOULD_BE_IN_REG, 0);
 						/* live.remove(opd) */
@@ -540,12 +545,11 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						/* PHIs inputs must not be processed */
 						continue;
 					}
-					/* live.remove(opd) */
-					ir_bitset_excl(live, ctx->vregs[ref]);
 				} else {
 					IR_ASSERT(insn->op == IR_VAR);
 					IR_ASSERT(ctx->use_lists[ref].count > 0);
 					ir_add_local_var(ctx, ctx->vregs[ref], insn->type);
+					continue;
 				}
 			}
 
