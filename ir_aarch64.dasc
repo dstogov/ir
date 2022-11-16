@@ -240,6 +240,8 @@ enum _ir_rule {
 	IR_MIN_MAX_INT,
 	IR_REG_BINOP_INT,
 	IR_SKIP_BINOP_INT,
+	IR_SKIP_CMP_INT,
+	IR_SKIP_CMP_FP,
 	IR_LOAD_INT,
 	IR_LOAD_FP,
 	IR_STORE_INT,
@@ -257,7 +259,11 @@ bool ir_needs_vreg(ir_ctx *ctx, ir_ref ref)
 
 	IR_ASSERT(ctx->rules);
 	rule = ir_rule(ctx, ref);
-	return rule != IR_SKIP && rule != IR_SKIP_MEM;
+	return rule != IR_SKIP
+	 && rule != IR_SKIP_MEM
+	 && rule != IR_SKIP_BINOP_INT
+	 && rule != IR_SKIP_CMP_INT
+	 && rule != IR_SKIP_CMP_FP;
 }
 
 ir_regset ir_get_scratch_regset(ir_ctx *ctx, ir_ref ref, ir_live_pos *start, ir_live_pos *end)
@@ -575,9 +581,9 @@ int ir_get_temporary_regs(ir_ctx *ctx, ir_ref ref, ir_tmp_reg *tmp_regs)
 			}
 			return n;
 		case IR_CMP_INT:
+		case IR_SKIP_CMP_INT:
 			insn = &ctx->ir_base[ref];
 			n = 0;
-cmp_int:
 			if (IR_IS_CONST_REF(insn->op1)) {
 				tmp_regs[n].num = 1;
 				tmp_regs[n].type = insn->type;
@@ -597,14 +603,9 @@ cmp_int:
 			}
 			return n;
 		case IR_CMP_FP:
+		case IR_SKIP_CMP_FP:
 			insn = &ctx->ir_base[ref];
 			n = 0;
-//???			tmp_regs[0].num = 3;
-//???			tmp_regs[0].type = IR_BOOL;
-//???			tmp_regs[0].start = IR_DEF_SUB_REF;
-//???			tmp_regs[0].end = IR_SAVE_SUB_REF;
-//???			n = 1;
-cmp_fp:
 			if (IR_IS_CONST_REF(insn->op1)) {
 				ir_insn *val_insn = &ctx->ir_base[insn->op1];
 				tmp_regs[n].num = 1;
@@ -700,31 +701,6 @@ cmp_fp:
 				tmp_regs[0].start = IR_LOAD_SUB_REF;
 				tmp_regs[0].end = IR_USE_SUB_REF;
 				return 1;
-			}
-			break;
-		case IR_SKIP:
-			insn = &ctx->ir_base[ref];
-			switch (insn->op) {
-				case IR_EQ:
-				case IR_NE:
-				case IR_LT:
-				case IR_GE:
-				case IR_LE:
-				case IR_GT:
-				case IR_ULT:
-				case IR_UGE:
-				case IR_ULE:
-				case IR_UGT:
-					if (IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)) {
-						/* part of IR_CMP_AND_BRANCH_INT */
-						n = 0;
-						goto cmp_int;
-					} else {
-						/* part of IR_CMP_AND_BRANCH_FP */
-						n = 0;
-						goto cmp_fp;
-					}
-					break;
 			}
 			break;
 	}
@@ -1044,10 +1020,11 @@ binop_fp:
 			if (insn->op2 > bb->start && insn->op2 < ref && ctx->use_lists[insn->op2].count == 1) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT) {
-					ctx->rules[insn->op2] = IR_SKIP;
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
+						ctx->rules[insn->op2] = IR_SKIP_CMP_INT;
 						return IR_CMP_AND_BRANCH_INT;
 					} else {
+						ctx->rules[insn->op2] = IR_SKIP_CMP_FP;
 						return IR_CMP_AND_BRANCH_FP;
 					}
 				} else if (op2_insn->op == IR_OVERFLOW) {
@@ -1069,7 +1046,6 @@ binop_fp:
 				 && (insn->op2 == ref - 1 ||
 				     (insn->op2 == ref - ctx->prev_insn_len[ref] - 1
 				   && ctx->ir_base[ref - ctx->prev_insn_len[ref]].op == IR_SNAPSHOT))) {
-					ctx->rules[insn->op2] = IR_SKIP;
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
 						if (insn->op1 > bb->start
 						 && insn->op1 < ref
@@ -1082,8 +1058,10 @@ binop_fp:
 								ctx->rules[insn->op1] = IR_SKIP_MEM;
 							}
 						}
+						ctx->rules[insn->op2] = IR_SKIP_CMP_INT;
 						return IR_GUARD_CMP_INT;
 					} else {
+						ctx->rules[insn->op2] = IR_SKIP_CMP_FP;
 						return IR_GUARD_CMP_FP;
 					}
 				} else if (op2_insn->op == IR_OVERFLOW) {
@@ -5005,6 +4983,8 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_SKIP_REG:
 				case IR_SKIP_MEM:
 				case IR_SKIP_BINOP_INT:
+				case IR_SKIP_CMP_INT:
+				case IR_SKIP_CMP_FP:
 				case IR_VAR:
 					break;
 				case IR_ENTRY:

@@ -516,6 +516,8 @@ enum _ir_rule {
 	IR_REG_BINOP_INT,
 	IR_SKIP_MEM_BINOP_INT,
 	IR_SKIP_REG_BINOP_INT,
+	IR_SKIP_CMP_INT,
+	IR_SKIP_CMP_FP,
 	IR_SKIP_TEST_INT,
 	IR_SKIP_SHIFT,
 	IR_VSTORE_INT,
@@ -542,6 +544,8 @@ bool ir_needs_vreg(ir_ctx *ctx, ir_ref ref)
 	 && rule != IR_SKIP_MEM_BINOP_INT
 	 && rule != IR_SKIP_REG_BINOP_INT
 	 && rule != IR_SKIP_TEST_INT
+	 && rule != IR_SKIP_CMP_INT
+	 && rule != IR_SKIP_CMP_FP
 	 && rule != IR_SKIP_SHIFT;
 }
 
@@ -788,10 +792,12 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num, ir_reg *reg)
 		case IR_BINOP_AVX:
 		case IR_IF_INT:
 		case IR_CMP_FP:
+		case IR_SKIP_CMP_FP:
 		case IR_GUARD:
 		case IR_GUARD_NOT:
 			return (op_num == 2) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
 		case IR_CMP_INT:
+		case IR_SKIP_CMP_INT:
 		case IR_SKIP_TEST_INT:
 			if (op_num == 2) {
 				insn = &ctx->ir_base[ref];
@@ -832,46 +838,6 @@ uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num, ir_reg *reg)
 //		case IR_VSTORE_INT:
 //		case IR_VSTORE_FP:
 //			return (op_num == 2) ? 0 : IR_USE_MUST_BE_IN_REG;
-		case IR_SKIP:
-			insn = &ctx->ir_base[ref];
-			switch (insn->op) {
-				case IR_EQ:
-				case IR_NE:
-				case IR_LT:
-				case IR_GE:
-				case IR_LE:
-				case IR_GT:
-				case IR_ULT:
-				case IR_UGE:
-				case IR_ULE:
-				case IR_UGT:
-					if (IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)) {
-						if (op_num == 2) {
-							if (IR_IS_CONST_REF(insn->op1)) {
-								ir_insn *val_insn = &ctx->ir_base[insn->op1];
-								if (ir_type_size[val_insn->type] != 8 || IR_IS_32BIT(val_insn->type, val_insn->val)) {
-									return IR_USE_SHOULD_BE_IN_REG;
-								}
-							} else if (ir_rule(ctx, insn->op1) != IR_SKIP_MEM) {
-								return IR_USE_SHOULD_BE_IN_REG;
-							}
-						} else if (op_num == 1) {
-							if (IR_IS_CONST_REF(insn->op2)) {
-								ir_insn *val_insn = &ctx->ir_base[insn->op2];
-								if (ir_type_size[val_insn->type] != 8 || IR_IS_32BIT(val_insn->type, val_insn->val)) {
-									return IR_USE_SHOULD_BE_IN_REG;
-								}
-							}
-						}
-					} else {
-						return (op_num == 2) ? IR_USE_SHOULD_BE_IN_REG : IR_USE_MUST_BE_IN_REG;
-					}
-					break;
-				case IR_SNAPSHOT:
-					return 0;
-			}
-			break;
-
 		case IR_SHIFT:
 		case IR_SKIP_SHIFT:
 			if (op_num == 2) {
@@ -936,9 +902,9 @@ int ir_get_temporary_regs(ir_ctx *ctx, ir_ref ref, ir_tmp_reg *tmp_regs)
 			}
 			break;
 		case IR_CMP_INT:
+		case IR_SKIP_CMP_INT:
 			insn = &ctx->ir_base[ref];
 			n = 0;
-cmp_int:
 			if (IR_IS_CONST_REF(insn->op1)) {
 				ir_insn *val_insn = &ctx->ir_base[insn->op1];
 				if (ir_type_size[val_insn->type] == 8 && !IR_IS_32BIT(val_insn->type, val_insn->val)) {
@@ -968,6 +934,10 @@ cmp_int:
 				n++;
 			}
 			return n;
+		case IR_SKIP_CMP_FP:
+			insn = &ctx->ir_base[ref];
+			n = 0;
+			goto cmp_fp;
 		case IR_CMP_FP:
 			insn = &ctx->ir_base[ref];
 			tmp_regs[0].num = 3;
@@ -1103,31 +1073,6 @@ cmp_fp:
 				tmp_regs[0].start = IR_LOAD_SUB_REF;
 				tmp_regs[0].end = IR_USE_SUB_REF;
 				return 1;
-			}
-			break;
-		case IR_SKIP:
-			insn = &ctx->ir_base[ref];
-			switch (insn->op) {
-				case IR_EQ:
-				case IR_NE:
-				case IR_LT:
-				case IR_GE:
-				case IR_LE:
-				case IR_GT:
-				case IR_ULT:
-				case IR_UGE:
-				case IR_ULE:
-				case IR_UGT:
-					if (IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)) {
-						/* part of IR_CMP_AND_BRANCH_INT or IR_GUARD_CMP_INT */
-						n = 0;
-						goto cmp_int;
-					} else {
-						/* part of IR_CMP_AND_BRANCH_FP or IR_GUARD_CMP_IFP */
-						n = 0;
-						goto cmp_fp;
-					}
-					break;
 			}
 			break;
 	}
@@ -1859,7 +1804,6 @@ store_int:
 					 && !ctx->rules[op2_insn->op2]) {
 						ir_match_fuse_load(ctx, op2_insn->op2, bb);
 					}
-					ctx->rules[insn->op2] = IR_SKIP;
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
 						if (IR_IS_CONST_REF(op2_insn->op2)
 						 && op2_insn->op1 > bb->start
@@ -1867,8 +1811,10 @@ store_int:
 						 && !ctx->rules[op2_insn->op1]) {
 							ir_match_fuse_load(ctx, op2_insn->op1, bb);
 						}
+						ctx->rules[insn->op2] = IR_SKIP_CMP_INT;
 						return IR_CMP_AND_BRANCH_INT;
 					} else {
+						ctx->rules[insn->op2] = IR_SKIP_CMP_FP;
 						return IR_CMP_AND_BRANCH_FP;
 					}
 				} else if (op2_insn->op == IR_AND) { // TODO: OR, XOR. etc
@@ -1980,15 +1926,16 @@ store_int:
 				 && (insn->op2 == ref - 1 ||
 				     (insn->op2 == ref - ctx->prev_insn_len[ref] - 1
 				   && ctx->ir_base[ref - ctx->prev_insn_len[ref]].op == IR_SNAPSHOT))) {
-					ctx->rules[insn->op2] = IR_SKIP;
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
 						if (op2_insn->op1 > bb->start
 						 && op2_insn->op1 < ref
 						 && !ctx->rules[op2_insn->op1]) {
 							ir_match_fuse_load(ctx, op2_insn->op1, bb);
 						}
+						ctx->rules[insn->op2] = IR_SKIP_CMP_INT;
 						return IR_GUARD_CMP_INT;
 					} else {
+						ctx->rules[insn->op2] = IR_SKIP_CMP_FP;
 						return IR_GUARD_CMP_FP;
 					}
 				} else if (op2_insn->op == IR_OVERFLOW) {
@@ -7567,6 +7514,8 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_SKIP_MEM_BINOP_INT:
 				case IR_SKIP_REG_BINOP_INT:
 				case IR_SKIP_TEST_INT:
+				case IR_SKIP_CMP_INT:
+				case IR_SKIP_CMP_FP:
 				case IR_SKIP_SHIFT:
 				case IR_VAR:
 					break;
