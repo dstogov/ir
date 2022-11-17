@@ -860,6 +860,15 @@ typedef struct _ir_live_interval ir_live_interval;
 
 #define IR_PHI_USE                       (1<<7)
 
+#define IR_OP1_MUST_BE_IN_REG            (1<<8)
+#define IR_OP1_SHOULD_BE_IN_REG          (1<<9)
+#define IR_OP2_MUST_BE_IN_REG            (1<<10)
+#define IR_OP2_SHOULD_BE_IN_REG          (1<<11)
+#define IR_OP3_MUST_BE_IN_REG            (1<<12)
+#define IR_OP3_SHOULD_BE_IN_REG          (1<<13)
+
+#define IR_USE_FLAGS(def_flags, op_num)  (((def_flags) >> (6 + (IR_MIN((op_num), 3) * 2))) & 3)
+
 struct _ir_use_pos {
 	uint16_t       op_num; /* 0 - means result */
 	int8_t         hint;
@@ -986,13 +995,6 @@ typedef uint32_t ir_regset;
 #define IR_REG_NUM(r) \
 	((r) == IR_REG_NONE ? IR_REG_NONE : ((r) & ~(IR_REG_SPILL_LOAD|IR_REG_SPILL_STORE)))
 
-typedef struct _ir_tmp_reg {
-	uint8_t num;
-	uint8_t type;
-	uint8_t start;
-	uint8_t end;
-} ir_tmp_reg;
-
 typedef struct _ir_reg_alloc_data {
 	int32_t stack_frame_size;
 	int32_t unused_slot_4;
@@ -1004,14 +1006,15 @@ int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type, ir_reg_alloc_data *dat
 
 /*** IR Target Interface ***/
 typedef enum _ir_reg ir_reg;
+typedef struct _ir_target_constraints ir_target_constraints;
+
+#define IR_TMP_REG(_num, _type, _start, _end) \
+	(ir_tmp_reg){.num=(_num), .type=(_type), .start=(_start), .end=(_end)}
+#define IR_SCRATCH_REG(_reg, _start, _end) \
+	(ir_tmp_reg){.reg=(_reg), .type=IR_VOID, .start=(_start), .end=(_end)}
 
 bool ir_needs_vreg(ir_ctx *ctx, ir_ref ref);
-
-/* Registers modified by the given instruction */
-ir_regset ir_get_scratch_regset(ir_ctx *ctx, ir_ref ref, ir_live_pos *start, ir_live_pos *end);
-uint8_t ir_get_def_flags(ir_ctx *ctx, ir_ref ref, ir_reg *reg);
-uint8_t ir_get_use_flags(ir_ctx *ctx, ir_ref ref, int op_num, ir_reg *reg);
-int ir_get_temporary_regs(ir_ctx *ctx, ir_ref ref, ir_tmp_reg *tmp_regs);
+int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *constraints);
 
 #endif /* defined(IR_REGSET_64BIT) */
 

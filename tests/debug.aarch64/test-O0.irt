@@ -58,9 +58,9 @@ test:
 	sub sp, sp, #0x70
 	str d0, [sp]
 	str d1, [sp, #8]
-	ldr d1, [sp, #8]
-	ldr d2, .L4
-	fsub d0, d1, d2
+	ldr d2, [sp, #8]
+	ldr d1, .L4
+	fsub d0, d2, d1
 	str d0, [sp, #0x10]
 	fmov d0, xzr
 	str d0, [sp, #0x18]
@@ -101,9 +101,9 @@ test:
 	ldr d2, [sp, #0x38]
 	fadd d0, d1, d2
 	str d0, [sp, #0x68]
-	ldr d0, [sp, #0x68]
-	ldr d1, .L5
-	fcmp d0, d1
+	ldr d1, [sp, #0x68]
+	ldr d0, .L5
+	fcmp d1, d0
 	b.ls .L2
 	ldr w0, [sp, #0x2c]
 	add sp, sp, #0x70

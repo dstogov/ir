@@ -124,6 +124,7 @@ enum _ir_reg {
 # define IR_REG_FP_ARG2  IR_REG_XMM1
 # define IR_REG_FP_ARG3  IR_REG_XMM2
 # define IR_REG_FP_ARG4  IR_REG_XMM3
+# define IR_MAX_REG_ARGS 8
 
 # define IR_REGSET_SCRATCH \
 	(IR_REGSET_INTERVAL(IR_REG_RAX, IR_REG_RDX) \
@@ -155,6 +156,7 @@ enum _ir_reg {
 # define IR_REG_FP_ARG6  IR_REG_XMM5
 # define IR_REG_FP_ARG7  IR_REG_XMM6
 # define IR_REG_FP_ARG8  IR_REG_XMM7
+# define IR_MAX_REG_ARGS 14
 
 # define IR_REGSET_SCRATCH \
 	(IR_REGSET_INTERVAL(IR_REG_RAX, IR_REG_RDX) \
@@ -174,10 +176,12 @@ enum _ir_reg {
 # define IR_REG_INT_ARGS   0
 # define IR_REG_FP_ARGS    0
 
+# define IR_HAVE_FASTCALL  1
 # define IR_REG_INT_FCARGS 2
 # define IR_REG_FP_FCARGS  0
 # define IR_REG_INT_FCARG1 IR_REG_RCX
 # define IR_REG_INT_FCARG2 IR_REG_RDX
+# define IR_MAX_REG_ARGS   2
 
 # define IR_REGSET_SCRATCH \
 	(IR_REGSET_INTERVAL(IR_REG_RAX, IR_REG_RDX) | IR_REGSET_FP)
@@ -188,5 +192,23 @@ enum _ir_reg {
 	| IR_REGSET_INTERVAL(IR_REG_RSI, IR_REG_RDI))
 
 #endif
+
+typedef struct _ir_tmp_reg {
+	union {
+		uint8_t num;
+		int8_t  reg;
+	};
+	uint8_t     type;
+	uint8_t     start;
+	uint8_t     end;
+} ir_tmp_reg;
+
+struct _ir_target_constraints {
+	int8_t      def_reg;
+	uint8_t     tmps_count;
+	uint8_t     hints_count;
+	ir_tmp_reg  tmp_regs[3];
+	int8_t      hints[IR_MAX_REG_ARGS + 3];
+};
 
 #endif /* IR_X86_H */

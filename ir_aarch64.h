@@ -138,6 +138,7 @@ enum _ir_reg {
 #define IR_REG_FP_ARG6  IR_REG_V5
 #define IR_REG_FP_ARG7  IR_REG_V6
 #define IR_REG_FP_ARG8  IR_REG_V7
+#define IR_MAX_REG_ARGS 16
 
 # define IR_REGSET_SCRATCH \
 	(IR_REGSET_INTERVAL(IR_REG_X0, IR_REG_X18) \
@@ -147,5 +148,23 @@ enum _ir_reg {
 # define IR_REGSET_PRESERVED \
 	(IR_REGSET_INTERVAL(IR_REG_X19, IR_REG_X30) \
 	| IR_REGSET_INTERVAL(IR_REG_V8, IR_REG_V15))
+
+typedef struct _ir_tmp_reg {
+	union {
+		uint8_t num;
+		int8_t  reg;
+	};
+	uint8_t     type;
+	uint8_t     start;
+	uint8_t     end;
+} ir_tmp_reg;
+
+struct _ir_target_constraints {
+	int8_t      def_reg;
+	uint8_t     tmps_count;
+	uint8_t     hints_count;
+	ir_tmp_reg  tmp_regs[3];
+	int8_t      hints[IR_MAX_REG_ARGS + 3];
+};
 
 #endif /* IR_AARCH64_H */
