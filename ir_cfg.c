@@ -662,7 +662,7 @@ int ir_schedule_blocks(ir_ctx *ctx)
 	list = ir_mem_malloc(sizeof(uint32_t) * (ctx->cfg_blocks_count + 1) * 2);
 	map = list + (ctx->cfg_blocks_count + 1);
 	for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
-		if (bb->end - ctx->prev_insn_len[bb->end] == bb->start
+		if (ctx->prev_ref[bb->end] == bb->start
 		 && bb->successors_count == 1
 		 && !(bb->flags & IR_BB_DESSA_MOVES)) {
 			bb->flags |= IR_BB_EMPTY;
@@ -806,7 +806,7 @@ uint32_t ir_skip_empty_target_blocks(ir_ctx *ctx, uint32_t b)
 	while (1) {
 		bb = &ctx->cfg_blocks[b];
 
-		if (bb->end - ctx->prev_insn_len[bb->end] == bb->start
+		if (ctx->prev_ref[bb->end] == bb->start
 		 && bb->successors_count == 1
 		 && !(bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_DESSA_MOVES))) {
 			b = ctx->cfg_edges[bb->successors];
@@ -828,7 +828,7 @@ uint32_t ir_skip_empty_next_blocks(ir_ctx *ctx, uint32_t b)
 
 		bb = &ctx->cfg_blocks[b];
 
-		if (bb->end - ctx->prev_insn_len[bb->end] == bb->start
+		if (ctx->prev_ref[bb->end] == bb->start
 		 && bb->successors_count == 1
 		 && !(bb->flags & (IR_BB_START|/*IR_BB_ENTRY|*/IR_BB_DESSA_MOVES))) {
 			b++;

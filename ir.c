@@ -315,7 +315,7 @@ void ir_init(ir_ctx *ctx, ir_ref consts_limit, ir_ref insns_limit)
 	ctx->fixed_save_regset = 0;
 	ctx->live_intervals = NULL;
 	ctx->regs = NULL;
-	ctx->prev_insn_len = NULL;
+	ctx->prev_ref = NULL;
 	ctx->data = NULL;
 
 	ctx->code_buffer = NULL;
@@ -376,8 +376,8 @@ void ir_free(ir_ctx *ctx)
 	if (ctx->regs) {
 		ir_mem_free(ctx->regs);
 	}
-	if (ctx->prev_insn_len) {
-		ir_mem_free(ctx->prev_insn_len);
+	if (ctx->prev_ref) {
+		ir_mem_free(ctx->prev_ref);
 	}
 }
 

@@ -483,7 +483,7 @@ typedef struct _ir_ctx {
 	uint64_t           fixed_save_regset;
 	ir_live_interval **live_intervals;
 	ir_regs           *regs;
-	ir_ref            *prev_insn_len;
+	ir_ref            *prev_ref;
 	void              *data;
 	uint32_t           rodata_offset;
 	uint32_t           jmp_table_offset;

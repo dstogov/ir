@@ -1701,8 +1701,8 @@ store_int:
 				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT
 					// TODO: register allocator may clobber operands of CMP before they are used in the GUARD_CMP
 				 && (insn->op2 == ref - 1 ||
-				     (insn->op2 == ref - ctx->prev_insn_len[ref] - 1
-				   && ctx->ir_base[ref - ctx->prev_insn_len[ref]].op == IR_SNAPSHOT))) {
+				     (insn->op2 == ctx->prev_ref[ref] - 1
+				   && ctx->ir_base[ctx->prev_ref[ref]].op == IR_SNAPSHOT))) {
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
 						if (op2_insn->op1 > bb->start
 						 && op2_insn->op1 < ref
@@ -7266,7 +7266,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		if (bb->flags & IR_BB_UNREACHABLE) {
 			continue;
 		}
-		if (bb->end - ctx->prev_insn_len[bb->end] == bb->start
+		if (ctx->prev_ref[bb->end] == bb->start
 		 && bb->successors_count == 1
 		 && !(bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_DESSA_MOVES))) {
 			continue;
