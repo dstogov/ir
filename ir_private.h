@@ -816,6 +816,19 @@ uint32_t ir_skip_empty_target_blocks(ir_ctx *ctx, uint32_t b);
 uint32_t ir_skip_empty_next_blocks(ir_ctx *ctx, uint32_t b);
 void ir_get_true_false_blocks(ir_ctx *ctx, uint32_t b, uint32_t *true_block, uint32_t *false_block, uint32_t *next_block);
 
+IR_ALWAYS_INLINE uint32_t ir_phi_input_number(ir_ctx *ctx, ir_block *bb, uint32_t from)
+{
+	uint32_t n, *p;
+
+	for (n = 0, p = &ctx->cfg_edges[bb->predecessors]; n < bb->predecessors_count; p++, n++) {
+		if (*p == from) {
+			return n + 2; /* first input is a reference to MERGE */
+		}
+	}
+	IR_ASSERT(0);
+	return 0;
+}
+
 /*** Folding Engine (see ir.c and ir_fold.h) ***/
 typedef enum _ir_fold_action {
 	IR_FOLD_DO_RESTART,

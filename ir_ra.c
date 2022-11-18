@@ -415,13 +415,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					ir_use_list *use_list = &ctx->use_lists[succ_bb->start];
 
 					if (use_list->count > 1) {
-						k = 0;
-						for (j = 0; j < succ_bb->predecessors_count; j++) {
-							if (ctx->cfg_edges[succ_bb->predecessors + j] == b) {
-								k = j + 2;
-								break;
-							}
-						}
+						k = ir_phi_input_number(ctx, succ_bb, b);
 						IR_ASSERT(k != 0);
 						for (ref = 0; ref < use_list->count; ref++) {
 							ir_ref use = ctx->use_edges[use_list->refs + ref];
@@ -1050,14 +1044,7 @@ int ir_coalesce(ir_ctx *ctx)
 		succ = ctx->cfg_edges[bb->successors];
 		succ_bb = &ctx->cfg_blocks[succ];
 		IR_ASSERT(succ_bb->predecessors_count > 1);
-		k = 0;
-		for (i = 0; i < succ_bb->predecessors_count; i++) {
-			if (ctx->cfg_edges[succ_bb->predecessors + i] == b) {
-				k = i + 2;
-				break;
-			}
-		}
-		IR_ASSERT(k != 0);
+		k = ir_phi_input_number(ctx, succ_bb, b);
 		use_list = &ctx->use_lists[succ_bb->start];
 		n = use_list->count;
 		for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
@@ -1190,7 +1177,7 @@ int ir_compute_dessa_moves(ir_ctx *ctx)
 
 int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy)
 {
-	uint32_t succ, j, k = 0, n = 0;
+	uint32_t succ, k, n = 0;
 	ir_block *bb, *succ_bb;
 	ir_use_list *use_list;
 	ir_ref *loc, *pred, i, *p, ref, input;
@@ -1208,13 +1195,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy)
 	IR_ASSERT(succ_bb->predecessors_count > 1);
 	use_list = &ctx->use_lists[succ_bb->start];
 
-	for (j = 0; j < succ_bb->predecessors_count; j++) {
-		if (ctx->cfg_edges[succ_bb->predecessors + j] == b) {
-			k = j + 2;
-			break;
-		}
-	}
-	IR_ASSERT(k != 0);
+	k = ir_phi_input_number(ctx, succ_bb, b);
 
 	loc = ir_mem_malloc(ctx->insns_count * 2 * sizeof(ir_ref));
 	pred = loc + ctx->insns_count;

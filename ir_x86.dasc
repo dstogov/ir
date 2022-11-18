@@ -6492,20 +6492,13 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 	ir_ref ref = from_bb->end;
 	int8_t to_reg, from_reg;
 	ir_block *to_bb;
-	int j, k = 0;
-	uint32_t b;
+	int j, k;
 	ir_ref phi = 0;
 	bool spill_store = 0;
 
 	IR_ASSERT(from_bb->successors_count == 1);
 	to_bb = &ctx->cfg_blocks[ctx->cfg_edges[from_bb->successors]];
-	for (b = 0; b < to_bb->predecessors_count; b++) {
-		if (ctx->cfg_edges[to_bb->predecessors + b] == from_block) {
-			k = b + 2;
-			break;
-		}
-	}
-	IR_ASSERT(k != 0);
+	k = ir_phi_input_number(ctx, to_bb, from_block);
 	if (to) {
 		phi = to;
 	} else {
