@@ -7272,7 +7272,31 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 			continue;
 		}
 		|=>b:
-		for (i = bb->start, insn = ctx->ir_base + i, rule = ctx->rules + i; i <= bb->end;) {
+
+		i = bb->start;
+		insn = ctx->ir_base + i;
+		if (bb->flags & IR_BB_ENTRY) {
+			uint32_t label = ctx->cfg_blocks_count + ctx->consts_count + 3 + insn->op3;
+
+			|=>label:
+			if ((ctx->flags & IR_GEN_ENDBR) && (ctx->flags & IR_ENTRY_BR_TARGET)) {
+				|.if X64
+				|	endbr64
+				|.else
+				|	endbr32
+				|.endif
+			}
+			ir_emit_prologue(ctx);
+		}
+
+		/* skip first instruction */
+		n = ir_operands_count(ctx, insn);
+		n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
+		i += n;
+		insn += n;
+		rule = ctx->rules + i;
+
+		while (i <= bb->end) {
 			switch (*rule) {
 				case IR_SKIP:
 				case IR_SKIP_MEM:
@@ -7288,20 +7312,6 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_PHI:
 				case IR_RLOAD:
 				case IR_SNAPSHOT:
-					break;
-				case IR_ENTRY:
-					{
-						uint32_t label = ctx->cfg_blocks_count + ctx->consts_count + 3 + insn->op3;
-						|=>label:
-						if ((ctx->flags & IR_GEN_ENDBR) && (ctx->flags & IR_ENTRY_BR_TARGET)) {
-							|.if X64
-							|	endbr64
-							|.else
-							|	endbr32
-							|.endif
-						}
-						ir_emit_prologue(ctx);
-					}
 					break;
 				case IR_LEA_OB:
 					{

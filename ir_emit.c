@@ -292,12 +292,13 @@ int ir_match(ir_ctx *ctx)
 		if (bb->flags & IR_BB_UNREACHABLE) {
 			continue;
 		}
-		for (i = bb->end; i >= bb->start; i = ctx->prev_ref[i]) {
+		for (i = bb->end; i > bb->start; i = ctx->prev_ref[i]) {
 			insn = &ctx->ir_base[i];
 			if (!ctx->rules[i]) {
 				ctx->rules[i] = ir_match_insn(ctx, i, bb);
 			}
 		}
+		ctx->rules[i] = IR_SKIP;
 	}
 
 	return 1;
