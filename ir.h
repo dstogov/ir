@@ -434,6 +434,14 @@ void ir_strtab_free(ir_strtab *strtab);
 /* x86 related */
 #define IR_AVX                (1<<24)
 
+/* Temporary: Live Ranges */
+#define IR_LR_HAVE_VARS        (1<<25)
+#define IR_LR_HAVE_DESSA_MOVES (1<<26)
+
+/* Temporary: Register Allocator */
+#define IR_RA_HAVE_SPLITS      (1<<25)
+#define IR_RA_HAVE_SPILLS      (1<<26)
+
 /* debug relted */
 #ifdef IR_DEBUG
 # define IR_DEBUG_SCCP        (1<<27)

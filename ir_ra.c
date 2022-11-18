@@ -115,6 +115,7 @@ static void ir_add_local_var(ir_ctx *ctx, int v, uint8_t type)
 	ival->next = NULL;
 
 	ctx->live_intervals[v] = ival;
+	ctx->flags |= IR_LR_HAVE_VARS;
 }
 
 static void ir_add_live_range(ir_ctx *ctx, ir_live_range **unused, int v, uint8_t type, ir_live_pos start, ir_live_pos end)
@@ -364,6 +365,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 	}
 
 	/* Compute Live Ranges */
+	ctx->flags &= ~(IR_LR_HAVE_VARS|IR_LR_HAVE_DESSA_MOVES);
 #ifdef IR_DEBUG
 	visited = ir_bitset_malloc(ctx->cfg_blocks_count + 1);
 #endif
@@ -840,6 +842,7 @@ static void ir_add_phi_move(ir_ctx *ctx, uint32_t b, ir_ref from, ir_ref to)
 {
 	if (IR_IS_CONST_REF(from) || ctx->vregs[from] != ctx->vregs[to]) {
 		ctx->cfg_blocks[b].flags |= IR_BB_DESSA_MOVES;
+		ctx->flags |= IR_LR_HAVE_DESSA_MOVES;
 #if 0
 		fprintf(stderr, "BB%d: MOV %d -> %d\n", b, from, to);
 #endif
@@ -1165,6 +1168,7 @@ int ir_compute_dessa_moves(ir_ctx *ctx)
 							if (IR_IS_CONST_REF(ir_insn_op(insn, j)) || ctx->vregs[ir_insn_op(insn, j)] != ctx->vregs[use]) {
 								int pred = ctx->cfg_edges[bb->predecessors + (j-2)];
 								ctx->cfg_blocks[pred].flags |= IR_BB_DESSA_MOVES;
+								ctx->flags |= IR_LR_HAVE_DESSA_MOVES;
 							}
 						}
 					}
@@ -1462,6 +1466,7 @@ static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, ir_live_interval *iva
 
 	IR_LOG_LSRA_SPLIT(ival, pos);
 	IR_ASSERT(pos > ival->range.start);
+	ctx->flags |= IR_RA_HAVE_SPLITS;
 
 	p = &ival->range;
 	prev = NULL;
@@ -1875,6 +1880,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 		if (!use_pos) {
 			/* spill */
 			IR_LOG_LSRA("    ---- Spill", ival, " (no use pos that must be in reg)");
+			ctx->flags |= IR_RA_HAVE_SPILLS;
 			return IR_REG_NONE;
 		}
 		next_use_pos = use_pos->pos;
@@ -2280,14 +2286,16 @@ static int ir_linear_scan(ir_ctx *ctx)
 		return 0;
 	}
 
-	/* Add fixed intervals for temporary registers used for DESSA moves */
-	for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
-		if (bb->flags & IR_BB_UNREACHABLE) {
-			continue;
-		}
-		if (bb->flags & IR_BB_DESSA_MOVES) {
-			ctx->data = bb;
-			ir_gen_dessa_moves(ctx, b, ir_fix_dessa_tmps);
+	if (ctx->flags & IR_LR_HAVE_DESSA_MOVES) {
+		/* Add fixed intervals for temporary registers used for DESSA moves */
+		for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
+			if (bb->flags & IR_BB_UNREACHABLE) {
+				continue;
+			}
+			if (bb->flags & IR_BB_DESSA_MOVES) {
+				ctx->data = bb;
+				ir_gen_dessa_moves(ctx, b, ir_fix_dessa_tmps);
+			}
 		}
 	}
 
@@ -2297,12 +2305,14 @@ static int ir_linear_scan(ir_ctx *ctx)
 	data.unused_slot_2 = 0;
 	data.unused_slot_1 = 0;
 
-	for (j = 0; j <= ctx->vregs_count; j++) {
-		ival = ctx->live_intervals[j];
-		if (ival) {
-			if (ival->flags & IR_LIVE_INTERVAL_VAR) {
-				if (ival->stack_spill_pos == -1) {
-					ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type, &data);
+	if (ctx->flags & IR_LR_HAVE_VARS) {
+		for (j = 0; j <= ctx->vregs_count; j++) {
+			ival = ctx->live_intervals[j];
+			if (ival) {
+				if (ival->flags & IR_LIVE_INTERVAL_VAR) {
+					if (ival->stack_spill_pos == -1) {
+						ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type, &data);
+					}
 				}
 			}
 		}
@@ -2341,6 +2351,8 @@ static int ir_linear_scan(ir_ctx *ctx)
 			inactive = ival;
 		}
 	}
+
+	ctx->flags &= ~(IR_RA_HAVE_SPLITS|IR_RA_HAVE_SPILLS);
 
 #ifdef IR_DEBUG
 	if (ctx->flags & IR_DEBUG_RA) {
@@ -2449,75 +2461,78 @@ static int ir_linear_scan(ir_ctx *ctx)
 	}
 #endif
 
-	if (ctx->binding) {
-		ir_assign_bound_spill_slots(ctx);
-	}
+	if (ctx->flags & (IR_RA_HAVE_SPLITS|IR_RA_HAVE_SPILLS)) {
 
-	/* Use simple linear-scan (without holes) to allocate and reuse spill slots */
-	unhandled = NULL;
-	for (j = ctx->vregs_count; j != 0; j--) {
-		ival = ctx->live_intervals[j];
-		if (ival
-		 && (ival->next || ival->reg == IR_REG_NONE)
-		 && ival->stack_spill_pos == -1
-		 && !(ival->flags & IR_LIVE_INTERVAL_MEM_PARAM)) {
-			ir_live_range *r;
-
-			other = ival;
-			while (other->next) {
-				other = other->next;
-			}
-			r = &other->range;
-			while (r->next) {
-				r = r->next;
-			}
-			ival->end = r->end;
-			ir_add_to_unhandled_spill(&unhandled, ival);
+		if (ctx->binding) {
+			ir_assign_bound_spill_slots(ctx);
 		}
-	}
 
-	if (unhandled) {
-		uint8_t size;
-		ir_live_interval *handled[9] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+		/* Use simple linear-scan (without holes) to allocate and reuse spill slots */
+		unhandled = NULL;
+		for (j = ctx->vregs_count; j != 0; j--) {
+			ival = ctx->live_intervals[j];
+			if (ival
+			 && (ival->next || ival->reg == IR_REG_NONE)
+			 && ival->stack_spill_pos == -1
+			 && !(ival->flags & IR_LIVE_INTERVAL_MEM_PARAM)) {
+				ir_live_range *r;
 
-		active = NULL;
-		while (unhandled) {
-			ival = unhandled;
-			ival->current_range = &ival->range;
-			unhandled = ival->list_next;
-			position = ival->range.start;
-
-			/* for each interval i in active */
-			other = active;
-			prev = NULL;
-			while (other) {
-				if (other->end <= position) {
-					/* move i from active to handled */
-					if (prev) {
-						prev->list_next = other->list_next;
-					} else {
-						active = other->list_next;
-					}
-					size = ir_type_size[other->type];
-					IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8);
-					other->list_next = handled[size];
-					handled[size] = other;
-				} else {
-					prev = other;
+				other = ival;
+				while (other->next) {
+					other = other->next;
 				}
-				other = prev ? prev->list_next : active;
+				r = &other->range;
+				while (r->next) {
+					r = r->next;
+				}
+				ival->end = r->end;
+				ir_add_to_unhandled_spill(&unhandled, ival);
 			}
+		}
 
-			size = ir_type_size[ival->type];
-			IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8);
-			if (handled[size] != NULL) {
-				ival->stack_spill_pos = handled[size]->stack_spill_pos;
-				handled[size] = handled[size]->list_next;
-			} else {
-				ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type, &data);
+		if (unhandled) {
+			uint8_t size;
+			ir_live_interval *handled[9] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+
+			active = NULL;
+			while (unhandled) {
+				ival = unhandled;
+				ival->current_range = &ival->range;
+				unhandled = ival->list_next;
+				position = ival->range.start;
+
+				/* for each interval i in active */
+				other = active;
+				prev = NULL;
+				while (other) {
+					if (other->end <= position) {
+						/* move i from active to handled */
+						if (prev) {
+							prev->list_next = other->list_next;
+						} else {
+							active = other->list_next;
+						}
+						size = ir_type_size[other->type];
+						IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8);
+						other->list_next = handled[size];
+						handled[size] = other;
+					} else {
+						prev = other;
+					}
+					other = prev ? prev->list_next : active;
+				}
+
+				size = ir_type_size[ival->type];
+				IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8);
+				if (handled[size] != NULL) {
+					ival->stack_spill_pos = handled[size]->stack_spill_pos;
+					handled[size] = handled[size]->list_next;
+				} else {
+					ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type, &data);
+				}
+				ival->list_next = active;
+				active = ival;
 			}
-			ival->list_next = active;
-			active = ival;
 		}
 	}
 
