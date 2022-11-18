@@ -387,8 +387,8 @@ IR_ALWAYS_INLINE int ir_bitset_pop_first(ir_bitset set, uint32_t len)
 #define IR_BITSET_FOREACH(set, len, bit) do { \
 	ir_bitset _set = (set); \
 	uint32_t _i, _len = (len); \
-	for (_i = 0; _i < _len; _i++) { \
-		ir_bitset_base_t _x = _set[_i]; \
+	for (_i = 0; _i < _len; _set++, _i++) { \
+		ir_bitset_base_t _x = *_set; \
 		while (_x) { \
 			(bit) = IR_BITSET_BITS * _i + ir_bitset_ntz(_x); \
 			_x &= _x - 1;
