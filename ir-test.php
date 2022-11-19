@@ -141,6 +141,11 @@ function run_tests() {
 			} else {
 				echo "\r\e[1;31mFAIL\e[0m: $name [$test]\n";
 				$failed[$test] = $name;
+				global $show_diff;
+				if ($show_diff) {
+					$base   = substr($test, 0, -4);
+					echo file_get_contents("$base.diff");
+				}
 			}
 		} else {
 			echo "\r\e[1;31mBROK\e[0m: $name [$test]\n";
@@ -169,6 +174,9 @@ function run_tests() {
 		}
 	}
 	echo "-------------------------------\n";
+
+	return count($failed) > 0 ? 1 : 0;
 }
 
-run_tests();
+$show_diff = in_array('--show-diff', $argv, true);
+exit(run_tests());

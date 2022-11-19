@@ -44,13 +44,13 @@ $(BUILD_DIR)/ir: $(BUILD_DIR)/ir_main.o $(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_strtab
 	$(BUILD_DIR)/ir_sccp.o $(BUILD_DIR)/ir_gcm.o $(BUILD_DIR)/ir_ra.o $(BUILD_DIR)/ir_emit.o \
 	$(BUILD_DIR)/ir_load.o $(BUILD_DIR)/ir_save.o $(BUILD_DIR)/ir_emit_c.o $(BUILD_DIR)/ir_dump.o \
 	$(BUILD_DIR)/ir_disasm.o $(BUILD_DIR)/ir_gdb.o $(BUILD_DIR)/ir_perf.o $(BUILD_DIR)/ir_check.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ -lcapstone $^
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lcapstone
 
 $(BUILD_DIR)/ir_test: $(BUILD_DIR)/ir_test.o $(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_strtab.o $(BUILD_DIR)/ir_cfg.o \
 	$(BUILD_DIR)/ir_sccp.o $(BUILD_DIR)/ir_gcm.o $(BUILD_DIR)/ir_ra.o $(BUILD_DIR)/ir_emit.o \
 	$(BUILD_DIR)/ir_save.o $(BUILD_DIR)/ir_dump.o $(BUILD_DIR)/ir_disasm.o $(BUILD_DIR)/ir_gdb.o \
 	$(BUILD_DIR)/ir_perf.o $(BUILD_DIR)/ir_check.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ -lcapstone $^
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lcapstone
 
 $(BUILD_DIR)/ir.o: $(SRC_DIR)/ir.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h $(SRC_DIR)/ir_fold.h \
 	$(BUILD_DIR)/ir_fold_hash.h
@@ -107,6 +107,9 @@ test: $(BUILD_DIR)/ir
 	$(BUILD_DIR)/ir $(SRC_DIR)/test.ir --dot $(BUILD_DIR)/ir.dot
 	dot -Tpdf $(BUILD_DIR)/ir.dot -o $(BUILD_DIR)/ir.pdf
 	BUILD_DIR=$(BUILD_DIR) SRC_DIR=$(SRC_DIR) $(PHP) $(SRC_DIR)/ir-test.php
+
+test-ci: $(BUILD_DIR)/ir
+	BUILD_DIR=$(BUILD_DIR) SRC_DIR=$(SRC_DIR) $(PHP) $(SRC_DIR)/ir-test.php --show-diff
 
 clean:
 	rm -rf $(BUILD_DIR)/ir $(BUILD_DIR)/ir_test $(BUILD_DIR)/*.o \
