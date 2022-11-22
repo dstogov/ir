@@ -6883,7 +6883,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 	ctx->regs = ir_mem_malloc(sizeof(ir_regs) * ctx->insns_count);
 	memset(ctx->regs, IR_REG_NONE, sizeof(ir_regs) * ctx->insns_count);
 
-	ctx->live_intervals = ir_mem_calloc(ctx->vregs_count + 1 + IR_REG_NUM, sizeof(ir_live_interval*));
+	ctx->live_intervals = ir_mem_calloc(ctx->vregs_count + 1 + IR_REG_NUM + 1, sizeof(ir_live_interval*));
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
 		if (bb->flags & IR_BB_UNREACHABLE) {
 			continue;
