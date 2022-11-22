@@ -1,0 +1,88 @@
+name: Push
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - "**"
+permissions:
+  contents: read
+jobs:
+  x86_64:
+    name: x86_64
+    runs-on: ubuntu-22.04
+    container:
+      image: ubuntu:22.04
+    steps:
+      - uses: actions/checkout@v3
+      - name: apt
+        run: |
+          apt update -y
+          DEBIAN_FRONTEND=noninteractive apt install -y \
+            gcc \
+            libcapstone-dev \
+            libcapstone4 \
+            make \
+            php-cli
+      - name: make
+        run: make TARGET=x86_64 all
+      - name: test
+        run: make TARGET=x86_64 test-ci
+  x86:
+    name: x86
+    runs-on: ubuntu-22.04
+    container:
+      image: ubuntu:22.04
+    steps:
+      - uses: actions/checkout@v3
+      - name: apt
+        run: |
+          dpkg --add-architecture i386
+          apt update -y
+          DEBIAN_FRONTEND=noninteractive apt install -y \
+            gcc \
+            gcc-multilib \
+            libc6:i386 \
+            make \
+            php-cli \
+            wget
+      - name: Build capstone
+        run: |
+          # capstone isn't distributed for 32-bit so we need to build it manually
+          wget https://github.com/capstone-engine/capstone/archive/4.0.2.tar.gz -O capstone.tar.gz
+          tar zxvf capstone.tar.gz
+          cd capstone-4.0.2
+          ./make.sh nix32
+          ./make.sh install
+          cd ..
+          rm -rf capstone-4.0.2 capstone.tar.gz
+      - name: make
+        run: make TARGET=x86 all
+      - name: test
+        run: make TARGET=x86 test-ci
+  aarch64:
+    name: aarch64
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: uraimo/run-on-arch-action@v2
+        name: QEMU
+        id: runcmd
+        with:
+          arch: aarch64
+          distro: ubuntu22.04
+          githubToken: ${{ github.token }}
+          install: |
+            apt update -y
+            DEBIAN_FRONTEND=noninteractive apt install -y \
+              gcc \
+              libc6 \
+              libcapstone-dev \
+              libcapstone4 \
+              make \
+              php-cli
+          run: |
+            make CC=gcc TARGET=aarch64 all
+            # FIXME: For some reason some of the object files are rebuilt
+            make CC=gcc TARGET=aarch64 test-ci
