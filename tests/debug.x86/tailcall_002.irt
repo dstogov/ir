@@ -2,6 +2,8 @@
 Indirect Tail CALL
 --TARGET--
 x86
+--XFAIL--
+TAILCALL for functions with stack argumnts is not implemented
 --ARGS--
 -S
 --CODE--

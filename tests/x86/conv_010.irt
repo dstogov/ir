@@ -2,6 +2,8 @@
 010: type conversion BITCAST
 --TARGET--
 x86
+--XFAIL--
+64-bit integers are not implemented on 32-bit systems
 --ARGS--
 -S
 --CODE--

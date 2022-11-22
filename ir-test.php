@@ -6,51 +6,31 @@
  * Authors: Dmitry Stogov <dmitry@php.net>
  */
 
-function parse_test($test, &$name, &$code, &$expect, &$args, &$target) {
+function parse_test($test, &$name, &$code, &$expect, &$args, &$target, &$xfail) {
+	$sections = array();
 	$text = @file_get_contents($test);
-	if (!$text) {
+	if (!$text || !preg_match_all("/^--[A-Z]+--$/m", $text, $r, PREG_SET_ORDER | PREG_OFFSET_CAPTURE)) {
 		return false;
 	}
-	$p1 = strpos($text, '--TEST--');
-	$p_args = strpos($text, '--ARGS--');
-	$p_target = strpos($text, '--TARGET--');
-	$p3 = strpos($text, '--CODE--');
-	$p4 = strpos($text, '--EXPECT--');
-	if ($p1 === false || $p3 === false || $p4 === false || $p1 > $p3 || $p3 > $p4) {
+	foreach($r as $sect) {
+		if (isset($sect_name)) {
+			$sections[$sect_name] = trim(substr($text, $sect_offset, $sect[0][1] - $sect_offset));
+		}
+		$sect_name = $sect[0][0];
+		$sect_offset = $sect[0][1] + strlen($sect_name);
+	}
+	if (isset($sect_name)) {
+		$sections[$sect_name] = trim(substr($text, $sect_offset));
+	}
+	if (!isset($sections['--TEST--']) || !isset($sections['--CODE--']) || !isset($sections['--EXPECT--'])) {
 		return false;
 	}
-	$code = trim(substr($text, $p3 + strlen('--CODE--'), $p4 - $p3 - strlen('--CODE--')));
-	$expect = trim(substr($text, $p4 + strlen('--EXPECT--')));
-	$expect = str_replace("\r", "", $expect);
-
-	$end_name = $p3;
-	$args = "--save";
-	$target = null;
-
-	if ($p_args !== false ) {
-		$end = ($p_target !== false && $p_target > $p_args) ? $p_target : $p3;
-		if ($p_args < $p1 || $p_args > $end) {
-			return false;
-		}
-		if ($p_args < $end_name) {
-			$end_name = $p_args;
-		}
-		$args = trim(substr($text, $p_args + strlen('--ARGS--'), $end - $p_args - strlen('--ARGS--')));
-	}
-
-	if ($p_target !== false ) {
-		$end = ($p_args !== false && $p_args > $p_target) ? $p_args : $p3;
-		if ($p_target < $p1 || $p_target > $end) {
-			return false;
-		}
-		if ($p_target < $end_name) {
-			$end_name = $p_target;
-		}
-		$target = trim(substr($text, $p_target + strlen('--TARGET--'), $end - $p_target - strlen('--TARGET--')));
-	}
-
-	$name = trim(substr($text, $p1 + strlen('--TEST--'), $end_name - $p1 - strlen('--TEST--')));
-
+	$name = $sections['--TEST--'];
+	$code = $sections['--CODE--'];
+	$expect = $sections['--EXPECT--'];
+	$args = isset($sections['--ARGS--']) ? $sections['--ARGS--'] : "--save";
+	$target = isset($sections['--TARGET--']) ? $sections['--TARGET--'] : null;
+	$xfail = isset($sections['--XFAIL--']) ? $sections['--XFAIL--'] : null;
 	return true;
 }
 
@@ -120,11 +100,12 @@ function run_tests() {
 	$tests = find_tests("$src_dir/tests");
 	$bad = array();
 	$failed = array();
+	$xfailed = array();
 	$total = count($tests);
 	$count = 0;
 	foreach($tests as $test) {
 		$count++;
-		if (parse_test($test, $name, $code, $expect, $opt, $test_target)) {
+		if (parse_test($test, $name, $code, $expect, $opt, $test_target, $xfail)) {
 			if ($test_target !== null && $target != $test_target) {
 				echo "\r\e[1;33mSKIP\e[0m: $name [$test]\n";
 				$skiped++;
@@ -138,6 +119,9 @@ function run_tests() {
 	        echo str_repeat(" ", $len);
 			if ($ret) {
 				echo "\r\e[1;32mPASS\e[0m: $name [$test]\n";
+			} else if (isset($xfail)) {
+				echo "\r\e[1;31mXFAIL\e[0m: $name [$test]  XFAIL REASON: $xfail\n";
+				$xfailed[$test] = array($name, $xfail);
 			} else {
 				echo "\r\e[1;31mFAIL\e[0m: $name [$test]\n";
 				$failed[$test] = $name;
@@ -165,9 +149,20 @@ function run_tests() {
 	}
 	echo "Total: " . count($tests) . "\n";
 	echo "Passed: " . (count($tests) - count($failed) - $skiped) . "\n";
+	echo "Expected fail: " . count($xfailed) . "\n";
 	echo "Failed: " . count($failed) . "\n";
 	echo "Skiped: " . $skiped . "\n";
+	if (count($xfailed) > 0) {
+		echo "-------------------------------\n";
+		echo "EXPECTED FAILED TESTS\n";
+		echo "-------------------------------\n";
+		foreach ($xfailed as $test => list($name, $xfail)) {
+			echo "$name [$test]  XFAIL REASON: $xfail\n";
+		}
+	}
 	if (count($failed) > 0) {
+		echo "-------------------------------\n";
+		echo "FAILED TESTS\n";
 		echo "-------------------------------\n";
 		foreach ($failed as $test => $name) {
 			echo "$name [$test]\n";
