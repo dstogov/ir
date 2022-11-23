@@ -270,11 +270,11 @@ int ir_match(ir_ctx *ctx)
 
 	if (!ctx->prev_ref) {
 		ctx->prev_ref = ir_mem_malloc(ctx->insns_count * sizeof(ir_ref));
+		prev = 0;
 		for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
 			if (bb->flags & IR_BB_UNREACHABLE) {
 				continue;
 			}
-			prev = 0;
 			for (i = bb->start, insn = ctx->ir_base + i; i < bb->end;) {
 				ctx->prev_ref[i] = prev;
 				n = ir_operands_count(ctx, insn);

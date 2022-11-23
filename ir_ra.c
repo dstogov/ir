@@ -57,6 +57,7 @@ int ir_assign_virtual_registers(ir_ctx *ctx)
 	}
 	vregs = ir_mem_calloc(ctx->insns_count, sizeof(ir_ref));
 	n = 1;
+	prev = 0;
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
 		if (bb->flags & IR_BB_UNREACHABLE) {
 			continue;
@@ -65,7 +66,7 @@ int ir_assign_virtual_registers(ir_ctx *ctx)
 
 		/* skip first instruction */
 		insn = ctx->ir_base + i;
-		ctx->prev_ref[i] = 0;
+		ctx->prev_ref[i] = prev;
 		prev = i;
 		n = ir_operands_count(ctx, insn);
 		n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
