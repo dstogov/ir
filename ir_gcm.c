@@ -343,7 +343,7 @@ IR_ALWAYS_INLINE ir_ref ir_count_constant(ir_bitset used, ir_ref ref)
 int ir_schedule(ir_ctx *ctx)
 {
 	ir_ctx new_ctx;
-	ir_ref i, j, k, n, *p, *q, ref, new_ref, insns_count, consts_count, edges_count;
+	ir_ref i, j, k, n, *p, *q, ref, new_ref, prev_ref, insns_count, consts_count, edges_count;
 	ir_ref *_xlat;
 	uint32_t flags;
 	ir_ref *edges;
@@ -692,10 +692,14 @@ restart:
 	new_ctx.use_lists = lists = ir_mem_malloc(insns_count * sizeof(ir_use_list));
 	new_ctx.use_edges = edges = ir_mem_malloc(edges_count * sizeof(ir_ref));
 	new_ctx.use_edges_count = edges_count;
+	new_ctx.prev_ref = _prev = ir_mem_malloc(insns_count * sizeof(ir_ref));
+	prev_ref = 0;
 	edges_count = 0;
 	for (i = 1; i != 0; i = _next[i]) {
 		use_list = &ctx->use_lists[i];
 		new_ref = _xlat[i];
+		_prev[new_ref] = prev_ref;
+		prev_ref = new_ref;
 		new_list = &lists[new_ref];
 		new_list->refs = edges_count;
 		n = use_list->count;
