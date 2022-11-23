@@ -965,18 +965,17 @@ void ir_build_def_use_lists(ir_ctx *ctx)
 {
 	ir_ref n, i, j, *p, def;
 	ir_insn *insn;
-	uint32_t edges_count = 0;
+	uint32_t edges_count;
 	ir_use_list *lists = ir_mem_calloc(ctx->insns_count, sizeof(ir_use_list));
 	ir_ref *edges;
+	ir_use_list *use_list;
 
 	for (i = IR_UNUSED + 1, insn = ctx->ir_base + i; i < ctx->insns_count;) {
 		n = ir_input_edges_count(ctx, insn);
 		for (j = n, p = insn->ops + 1; j > 0; j--, p++) {
 			def = *p;
 			if (def > 0) {
-				lists[def].refs = -1;
 				lists[def].count++;
-				edges_count++;
 			}
 		}
 		n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
@@ -984,20 +983,20 @@ void ir_build_def_use_lists(ir_ctx *ctx)
 		insn += n;
 	}
 
-	edges = ir_mem_malloc(edges_count * sizeof(ir_ref));
 	edges_count = 0;
+	for (i = IR_UNUSED + 1, use_list = &lists[i]; i < ctx->insns_count; i++, use_list++) {
+		use_list->refs = edges_count;
+		edges_count += use_list->count;
+		use_list->count = 0;
+	}
+
+	edges = ir_mem_malloc(edges_count * sizeof(ir_ref));
 	for (i = IR_UNUSED + 1, insn = ctx->ir_base + i; i < ctx->insns_count;) {
 		n = ir_input_edges_count(ctx, insn);
 		for (j = n, p = insn->ops + 1; j > 0; j--, p++) {
 			def = *p;
 			if (def > 0) {
-				ir_use_list *use_list = &lists[def];
-
-				if (use_list->refs == -1) {
-					use_list->refs = edges_count;
-					edges_count += use_list->count;
-					use_list->count = 0;
-				}
+				use_list = &lists[def];
 				edges[use_list->refs + use_list->count++] = i;
 			}
 		}
