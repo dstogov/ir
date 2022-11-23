@@ -1081,16 +1081,13 @@ int ir_coalesce(ir_ctx *ctx)
 		for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
 			ir_ref i;
 
-			i = bb->start;
+			i = bb->end;
 
-			/* skip first instruction */
-			insn = ctx->ir_base + i;
-			n = ir_operands_count(ctx, insn);
-			n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
-			i += n;
-			insn += n;
+			/* skip last instruction */
+			i = ctx->prev_ref[i];
 
-			while (i < bb->end) {
+			while (i != bb->start) {
+				insn = &ctx->ir_base[i];
 				if ((ir_op_flags[insn->op] & IR_OP_FLAG_COMMUTATIVE)
 				 && ctx->vregs[i]
 				 && ctx->live_intervals[ctx->vregs[i]]->use_pos
@@ -1100,10 +1097,7 @@ int ir_coalesce(ir_ctx *ctx)
 				 && insn->op1 != insn->op2) {
 					ir_try_swap_operands(ctx, i, insn);
 				}
-				n = ir_operands_count(ctx, insn);
-				n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
-				i += n;
-				insn += n;
+				i = ctx->prev_ref[i];
 			}
 		}
 	}
