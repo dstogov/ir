@@ -540,10 +540,6 @@ restart:
 	}
 #endif
 
-	ir_mem_free(_prev);
-
-	/* TODO: linearize without reallocation and reconstruction ??? */
-
 #if 1
 	if (consts_count == ctx->consts_count && insns_count == ctx->insns_count) {
 		bool changed = 0;
@@ -561,6 +557,7 @@ restart:
 			ir_mem_free(_xlat);
 			ir_mem_free(_next);
 
+			ctx->prev_ref = _prev;
 			ctx->flags |= IR_LINEAR;
 			ir_truncate(ctx);
 
@@ -568,6 +565,8 @@ restart:
 		}
 	}
 #endif
+
+	ir_mem_free(_prev);
 
 	ir_init(&new_ctx, consts_count, insns_count);
 	new_ctx.insns_count = insns_count;
