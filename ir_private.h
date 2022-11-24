@@ -518,6 +518,12 @@ IR_ALWAYS_INLINE void ir_array_set(ir_array *a, uint32_t i, ir_ref val)
 	a->refs[i] = val;
 }
 
+IR_ALWAYS_INLINE void ir_array_set_unchecked(ir_array *a, uint32_t i, ir_ref val)
+{
+	IR_ASSERT(i < a->size);
+	a->refs[i] = val;
+}
+
 /* List/Stack of numeric references */
 typedef struct _ir_list {
 	ir_array a;
@@ -558,6 +564,11 @@ IR_ALWAYS_INLINE uint32_t ir_list_capasity(ir_list *l)
 IR_ALWAYS_INLINE void ir_list_push(ir_list *l, ir_ref val)
 {
 	ir_array_set(&l->a, l->len++, val);
+}
+
+IR_ALWAYS_INLINE void ir_list_push_unchecked(ir_list *l, ir_ref val)
+{
+	ir_array_set_unchecked(&l->a, l->len++, val);
 }
 
 IR_ALWAYS_INLINE ir_ref ir_list_pop(ir_list *l)
@@ -619,7 +630,8 @@ IR_ALWAYS_INLINE bool ir_worklist_push(ir_worklist *w, ir_ref val)
 		return 0;
 	}
 	ir_bitset_incl(w->visited, val);
-	ir_list_push(&w->l, val);
+	IR_ASSERT(ir_list_len(&w->l) < ir_list_capasity(&w->l));
+	ir_list_push_unchecked(&w->l, val);
 	return 1;
 }
 

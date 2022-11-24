@@ -144,12 +144,12 @@ int ir_gcm(ir_ctx *ctx)
 #if 1
 			n = IR_INPUT_EDGES_COUNT(flags);
 			if (!IR_IS_FIXED_INPUTS_COUNT(n) || n > 1) {
-				ir_list_push(&queue_early, ref);
+				ir_list_push_unchecked(&queue_early, ref);
 			}
 #else
 			if (IR_OPND_KIND(flags, 2) == IR_OPND_DATA
 			 || IR_OPND_KIND(flags, 3) == IR_OPND_DATA) {
-				ir_list_push(&queue_early, ref);
+				ir_list_push_unchecked(&queue_early, ref);
 			}
 #endif
 			ref = insn->op1; /* control predecessor */
@@ -175,7 +175,7 @@ int ir_gcm(ir_ctx *ctx)
 				ref = *p;
 				if (ref > 0 && _blocks[ref] == 0) {
 					_blocks[ref] = 1;
-					ir_list_push(&queue_early, ref);
+					ir_list_push_unchecked(&queue_early, ref);
 				}
 			}
 		}
@@ -203,17 +203,17 @@ int ir_gcm(ir_ctx *ctx)
 #if 1
 			n = IR_INPUT_EDGES_COUNT(flags);
 			if (!IR_IS_FIXED_INPUTS_COUNT(n) || n > 1) {
-				ir_list_push(&queue_early, ref);
+				ir_list_push_unchecked(&queue_early, ref);
 			}
 #else
 			if (IR_OPND_KIND(flags, 2) == IR_OPND_DATA
 			 || IR_OPND_KIND(flags, 3) == IR_OPND_DATA) {
-				ir_list_push(&queue_early, ref);
+				ir_list_push_unchecked(&queue_early, ref);
 			}
 #endif
 			if (insn->type != IR_VOID) {
 				IR_ASSERT(flags & IR_OP_FLAG_MEM);
-				ir_list_push(&queue_late, ref);
+				ir_list_push_unchecked(&queue_late, ref);
 			}
 			ref = insn->op1; /* control predecessor */
 		} while (ref != bb->start);
@@ -232,8 +232,8 @@ int ir_gcm(ir_ctx *ctx)
 				ir_bitset_incl(visited, ref);
 				if (EXPECTED(ctx->use_lists[ref].count != 0)) {
 					_blocks[ref] = b; /* pin to block */
-					ir_list_push(&queue_early, ref);
-					ir_list_push(&queue_late, ref);
+					ir_list_push_unchecked(&queue_early, ref);
+					ir_list_push_unchecked(&queue_late, ref);
 				}
 			}
 		}
