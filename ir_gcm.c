@@ -351,8 +351,8 @@ int ir_schedule(ir_ctx *ctx)
 	uint32_t b, prev_b;
 	uint32_t *_blocks = ctx->cfg_map;
 	ir_ref *_next = ir_mem_malloc(ctx->insns_count * sizeof(ir_ref));
-	ir_ref *_prev = ir_mem_calloc(ctx->insns_count, sizeof(ir_ref));
-	ir_ref _rest = 0;
+	ir_ref *_prev = ir_mem_malloc(ctx->insns_count * sizeof(ir_ref));
+	ir_ref _move_down = 0;
 	ir_block *bb;
 	ir_insn *insn, *new_insn;
 	ir_use_list *lists, *use_list, *new_list;
@@ -361,6 +361,7 @@ int ir_schedule(ir_ctx *ctx)
 	prev_b = _blocks[1];
 	IR_ASSERT(prev_b);
 	_prev[1] = 0;
+	_prev[ctx->cfg_blocks[1].end] = 0;
 	for (i = 2, j = 1; i < ctx->insns_count; i++) {
 		b = _blocks[i];
 		if (b == prev_b) {
@@ -368,51 +369,55 @@ int ir_schedule(ir_ctx *ctx)
 			_next[j] = i;
 			_prev[i] = j;
 			j = i;
-		} else if (b) {
+		} else if (b > prev_b) {
 			bb = &ctx->cfg_blocks[b];
 			if (i == bb->start) {
+				IR_ASSERT(bb->end > bb->start);
 				prev_b = b;
+				_prev[bb->end] = 0;
 				/* add to the end of the list */
 				_next[j] = i;
 				_prev[i] = j;
 				j = i;
-			} else if (_prev[bb->end]) {
+			} else {
+				IR_ASSERT(i != bb->end);
+				/* move down late (see the following loop) */
+				_next[i] = _move_down;
+				_move_down = i;
+			}
+        } else if (b) {
+			bb = &ctx->cfg_blocks[b];
+			IR_ASSERT(i != bb->start);
+			if (_prev[bb->end]) {
 				/* move up, insert before the end of the alredy scheduled BB */
 				k = bb->end;
-				_prev[i] = _prev[k];
-				_next[i] = k;
-				_next[_prev[k]] = i;
-				_prev[k] = i;
 			} else {
-				/* move down late (see the following loop) */
-				_next[i] = _rest;
-				_rest = i;
+				/* move up, insert at the end of the block */
+				k = ctx->cfg_blocks[b + 1].start;
 			}
+			/* insert before "k" */
+			_prev[i] = _prev[k];
+			_next[i] = k;
+			_next[_prev[k]] = i;
+			_prev[k] = i;
 		}
 	}
 	_next[j] = 0;
 
-	while (_rest) {
-		i = _rest;
-		_rest = _next[i];
+	while (_move_down) {
+		i = _move_down;
+		_move_down = _next[i];
 		b = _blocks[i];
 		bb = &ctx->cfg_blocks[b];
-		if (i == bb->end) {
-			// TODO: When removing MERGE, SCCP may move END of the block below other blocks ???
-			/* insert at the end of the block */
-			k = _next[bb->start];
-			while (_blocks[k] == b) {
-				k = _next[k];
-			}
-		} else {
-			/* insert after the start of the block and all PARAM, VAR, PI, PHI */
-			k = _next[bb->start];
+
+		/* insert after the start of the block and all PARAM, VAR, PI, PHI */
+		k = _next[bb->start];
+		insn = &ctx->ir_base[k];
+		while (insn->op == IR_PARAM || insn->op == IR_VAR || insn->op == IR_PI || insn->op == IR_PHI) {
+			k = _next[k];
 			insn = &ctx->ir_base[k];
-			while (insn->op == IR_PARAM || insn->op == IR_VAR || insn->op == IR_PI || insn->op == IR_PHI) {
-				k = _next[k];
-				insn = &ctx->ir_base[k];
-			}
 		}
+
 		/* insert before "k" */
 		_prev[i] = _prev[k];
 		_next[i] = k;
