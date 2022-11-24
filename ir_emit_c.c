@@ -672,6 +672,10 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 
 	ret_type = ir_get_return_type(ctx);
 
+	if (!ctx->prev_ref) {
+		ir_build_prev_refs(ctx);
+	}
+
 	use_list = &ctx->use_lists[1];
 	n = use_list->count;
 	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {

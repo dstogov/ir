@@ -739,3 +739,28 @@ restart:
 
 	return 1;
 }
+
+void ir_build_prev_refs(ir_ctx *ctx)
+{
+	uint32_t b;
+	ir_block *bb;
+	ir_ref i, n, prev;
+	ir_insn *insn;
+
+	ctx->prev_ref = ir_mem_malloc(ctx->insns_count * sizeof(ir_ref));
+	prev = 0;
+	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
+		if (bb->flags & IR_BB_UNREACHABLE) {
+			continue;
+		}
+		for (i = bb->start, insn = ctx->ir_base + i; i < bb->end;) {
+			ctx->prev_ref[i] = prev;
+			n = ir_operands_count(ctx, insn);
+			n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
+			prev = i;
+			i += n;
+			insn += n;
+		}
+		ctx->prev_ref[i] = prev;
+	}
+}

@@ -46,18 +46,14 @@ int ir_assign_virtual_registers(ir_ctx *ctx)
 	uint32_t *vregs;
 	uint32_t vregs_count = 0;
 	uint32_t b;
-	ir_ref i, n, prev;
+	ir_ref i, n;
 	ir_block *bb;
 	ir_insn *insn;
 	uint32_t flags;
 
 	/* Assign unique virtual register to each data node */
-	if (!ctx->prev_ref) {
-		ctx->prev_ref = ir_mem_malloc(ctx->insns_count * sizeof(ir_ref));
-	}
 	vregs = ir_mem_calloc(ctx->insns_count, sizeof(ir_ref));
 	n = 1;
-	prev = 0;
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
 		if (bb->flags & IR_BB_UNREACHABLE) {
 			continue;
@@ -66,14 +62,11 @@ int ir_assign_virtual_registers(ir_ctx *ctx)
 
 		/* skip first instruction */
 		insn = ctx->ir_base + i;
-		ctx->prev_ref[i] = prev;
-		prev = i;
 		n = ir_operands_count(ctx, insn);
 		n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
 		i += n;
 		insn += n;
 		while (i < bb->end) {
-			ctx->prev_ref[i] = prev;
 			flags = ir_op_flags[insn->op];
 			if (((flags & IR_OP_FLAG_DATA) && ctx->use_lists[i].count > 0)
 			 || ((flags & IR_OP_FLAG_MEM) && ctx->use_lists[i].count > 1)) {
@@ -83,11 +76,9 @@ int ir_assign_virtual_registers(ir_ctx *ctx)
 			}
 			n = ir_operands_count(ctx, insn);
 			n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
-			prev = i;
 			i += n;
 			insn += n;
 		}
-		ctx->prev_ref[i] = prev;
 	}
 	ctx->vregs_count = vregs_count;
 	ctx->vregs = vregs;
