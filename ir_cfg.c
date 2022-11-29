@@ -88,8 +88,9 @@ IR_ALWAYS_INLINE void _ir_add_predecessors(ir_insn *insn, ir_worklist *worklist)
 			ir_worklist_push(worklist, ref);
 		}
 	} else if (insn->op != IR_START && insn->op != IR_ENTRY) {
-		IR_ASSERT(insn->op1);
-		ir_worklist_push(worklist, insn->op1);
+		if (EXPECTED(insn->op1)) {
+			ir_worklist_push(worklist, insn->op1);
+		}
 	}
 }
 
@@ -269,10 +270,12 @@ next_successor:
 				bb->predecessors_count = n;
 				edges_count += n;
 				count += n;
-			} else {
+			} else if (EXPECTED(insn->op1)) {
 				bb->predecessors_count = 1;
 				edges_count++;
 				count++;
+			} else {
+				bb->predecessors_count = 0;
 			}
 		}
 		b++;
@@ -335,6 +338,230 @@ next_successor:
 	return 1;
 }
 
+static void ir_remove_predecessor(ir_ctx *ctx, ir_block *bb, uint32_t from)
+{
+	uint32_t i, *p, *q, n = 0;
+
+	p = q = &ctx->cfg_edges[bb->predecessors];
+	for (i = 0; i < bb->predecessors_count; i++, p++) {
+		if (*p != from) {
+			if (p != q) {
+				*q = *p;
+			}
+			q++;
+			n++;
+		}
+	}
+	IR_ASSERT(n != bb->predecessors_count);
+	bb->predecessors_count = n;
+}
+
+static void ir_remove_from_use_list(ir_ctx *ctx, ir_ref from, ir_ref ref)
+{
+	ir_ref j, n, *p, *q, use;
+	ir_use_list *use_list = &ctx->use_lists[from];
+	ir_ref skip = 0;
+
+	n = use_list->count;
+	for (j = 0, p = q = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
+		use = *p;
+		if (use == ref) {
+			skip++;
+		} else {
+			if (p != q) {
+				*q = use;
+			}
+			q++;
+		}
+	}
+	use_list->count -= skip;
+}
+
+static void ir_remove_merge_input(ir_ctx *ctx, ir_ref merge, ir_ref from)
+{
+	ir_ref i, j, n, k, *p, use;
+	ir_insn *use_insn;
+	ir_use_list *use_list;
+	ir_bitset life_inputs;
+	ir_insn *insn = &ctx->ir_base[merge];
+
+	IR_ASSERT(insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN);
+	n = insn->inputs_count;
+	if (n == 0) {
+		n = 3;
+	}
+	i = 1;
+	life_inputs = ir_bitset_malloc(n + 1);
+	for (j = 1; j <= n; j++) {
+		ir_ref input = ir_insn_op(insn, j);
+
+		if (input != from) {
+			if (i != j) {
+				ir_insn_set_op(insn, i, input);
+			}
+			ir_bitset_incl(life_inputs, j);
+			i++;
+		}
+	}
+	i--;
+	if (i == 1) {
+	    insn->op = IR_BEGIN;
+		insn->inputs_count = 0;
+		use_list = &ctx->use_lists[merge];
+		for (k = 0, p = &ctx->use_edges[use_list->refs]; k < use_list->count; k++, p++) {
+			use = *p;
+			use_insn = &ctx->ir_base[use];
+			if (use_insn->op == IR_PHI) {
+				/* Convert PHI to COPY */
+			    i = 2;
+				for (j = 2; j <= n; j++) {
+					ir_ref input = ir_insn_op(use_insn, j);
+
+					if (ir_bitset_in(life_inputs, j - 1)) {
+						use_insn->op1 = ir_insn_op(use_insn, j);
+					} else if (input > 0) {
+						ir_remove_from_use_list(ctx, input, use);
+					}
+				}
+				use_insn->op = IR_COPY;
+				use_insn->op2 = IR_UNUSED;
+				use_insn->op3 = IR_UNUSED;
+				ir_remove_from_use_list(ctx, merge, use);
+			}
+		}
+	} else {
+		if (i == 2) {
+			i = 0;
+		}
+		insn->inputs_count = i;
+
+		n++;
+		use_list = &ctx->use_lists[merge];
+		for (k = 0, p = &ctx->use_edges[use_list->refs]; k < use_list->count; k++, p++) {
+			use = *p;
+			use_insn = &ctx->ir_base[use];
+			if (use_insn->op == IR_PHI) {
+			    i = 2;
+				for (j = 2; j <= n; j++) {
+					ir_ref input = ir_insn_op(use_insn, j);
+
+					if (ir_bitset_in(life_inputs, j - 1)) {
+						IR_ASSERT(input);
+						if (i != j) {
+							ir_insn_set_op(use_insn, i, input);
+						}
+						i++;
+					} else if (input > 0) {
+						ir_remove_from_use_list(ctx, input, use);
+					}
+				}
+			}
+		}
+	}
+	ir_mem_free(life_inputs);
+	ir_remove_from_use_list(ctx, from, merge);
+}
+
+/* CFG constructed after SCCP pass doesn't have unreachable BBs, otherwise they should be removed */
+int ir_remove_unreachable_blocks(ir_ctx *ctx)
+{
+	uint32_t b, *p, i;
+	uint32_t unreachable_count = 0;
+	uint32_t bb_count = ctx->cfg_blocks_count;
+	ir_block *bb = ctx->cfg_blocks + 1;
+
+	for (b = 1; b <= bb_count; b++, bb++) {
+		if (bb->flags & IR_BB_UNREACHABLE) {
+#if 0
+			do {if (!unreachable_count) ir_dump_cfg(ctx, stderr);} while(0);
+#endif
+			if (bb->successors_count) {
+				for (i = 0, p = &ctx->cfg_edges[bb->successors]; i < bb->successors_count; i++, p++) {
+					ir_block *succ_bb = &ctx->cfg_blocks[*p];
+
+					if (!(succ_bb->flags & IR_BB_UNREACHABLE)) {
+						ir_remove_predecessor(ctx, succ_bb, b);
+						ir_remove_merge_input(ctx, succ_bb->start, bb->end);
+					}
+				}
+			} else {
+				ir_ref prev, ref = bb->end;
+				ir_insn *insn = &ctx->ir_base[ref];
+
+				IR_ASSERT(ir_op_flags[insn->op] & IR_OP_FLAG_TERMINATOR);
+				/* remove from terminators list */
+				prev = ctx->ir_base[1].op1;
+				if (prev == ref) {
+					ctx->ir_base[1].op1 = insn->op3;
+				} else {
+					while (prev) {
+						if (ctx->ir_base[prev].op3 == ref) {
+							ctx->ir_base[prev].op3 = insn->op3;
+							break;
+						}
+						prev = ctx->ir_base[prev].op3;
+					}
+				}
+			}
+			ctx->cfg_map[bb->start] = 0;
+			ctx->cfg_map[bb->end] = 0;
+			unreachable_count++;
+		}
+	}
+
+	if (unreachable_count) {
+		ir_block *dst_bb;
+		uint32_t n = 1;
+		uint32_t *edges;
+
+		dst_bb = bb = ctx->cfg_blocks + 1;
+		for (b = 1; b <= bb_count; b++, bb++) {
+			if (!(bb->flags & IR_BB_UNREACHABLE)) {
+				if (dst_bb != bb) {
+					memcpy(dst_bb, bb, sizeof(ir_block));
+					ctx->cfg_map[dst_bb->start] = n;
+					ctx->cfg_map[dst_bb->end] = n;
+				}
+				dst_bb->successors_count = 0;
+				dst_bb++;
+				n++;
+			}
+		}
+		ctx->cfg_blocks_count = bb_count = n - 1;
+
+		/* Rebuild successor/predecessors control edges */
+		edges = ctx->cfg_edges;
+		bb = ctx->cfg_blocks + 1;
+		for (b = 1; b <= bb_count; b++, bb++) {
+			ir_insn *insn = &ctx->ir_base[bb->start];
+			ir_ref *p, ref;
+
+			if (bb->predecessors_count > 1) {
+				uint32_t *q = edges + bb->predecessors;
+				n = ir_variable_inputs_count(insn);
+				for (p = insn->ops + 1; n > 0; p++, q++, n--) {
+					ref = *p;
+					IR_ASSERT(ref);
+					ir_ref pred_b = ctx->cfg_map[ref];
+					ir_block *pred_bb = &ctx->cfg_blocks[pred_b];
+					*q = pred_b;
+					edges[pred_bb->successors + pred_bb->successors_count++] = b;
+				}
+			} else if (bb->predecessors_count == 1) {
+				ref = insn->op1;
+				IR_ASSERT(ref);
+				IR_ASSERT(IR_OPND_KIND(ir_op_flags[insn->op], 1) == IR_OPND_CONTROL);
+				ir_ref pred_b = ctx->cfg_map[ref];
+				ir_block *pred_bb = &ctx->cfg_blocks[pred_b];
+				edges[bb->predecessors] = pred_b;
+				edges[pred_bb->successors + pred_bb->successors_count++] = b;
+			}
+		}
+	}
+
+	return 1;
+}
+
 static void compute_postnum(const ir_ctx *ctx, uint32_t *cur, uint32_t b)
 {
 	uint32_t i, *p;
@@ -387,9 +614,7 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 		changed = 0;
 		/* Iterating in Reverse Post Oorder */
 		for (b = 2, bb = &blocks[2]; b <= blocks_count; b++, bb++) {
-			if (bb->flags & IR_BB_UNREACHABLE) {
-				continue;
-			}
+			IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 			if (bb->predecessors_count == 1) {
 				uint32_t idom = 0;
 				uint32_t pred_b = edges[bb->predecessors];
@@ -443,9 +668,7 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 
 	/* Construct dominators tree */
 	for (b = 2, bb = &blocks[2]; b <= blocks_count; b++, bb++) {
-		if (bb->flags & IR_BB_UNREACHABLE) {
-			continue;
-		}
+		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		if (bb->flags & IR_BB_ENTRY) {
 			bb->idom = 0;
 			bb->dom_depth = 0;

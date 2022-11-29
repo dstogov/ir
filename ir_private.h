@@ -680,6 +680,22 @@ extern const char *ir_op_name[IR_LAST_OP];
 #define IR_IS_CONST_OP(op)       ((op) > IR_NOP && (op) <= IR_C_FLOAT)
 #define IR_IS_FOLDABLE_OP(op)    ((op) <= IR_LAST_FOLDABLE_OP)
 
+IR_ALWAYS_INLINE bool ir_const_is_true(ir_insn *v)
+{
+
+	if (v->type == IR_BOOL) {
+		return v->val.b;
+	} else if (IR_IS_TYPE_INT(v->type)) {
+		return v->val.i64 != 0;
+	} else if (v->type == IR_DOUBLE) {
+		return v->val.d != 0.0;
+	} else if (v->type == IR_FLOAT) {
+		return v->val.f != 0.0;
+	}
+	IR_ASSERT(0 && "NYI");
+	return 0;
+}
+
 /* IR OP flags */
 #define IR_OP_FLAG_OPERANDS_SHIFT 3
 

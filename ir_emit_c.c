@@ -711,9 +711,7 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 	/* Emit declarations for local variables */
 	vars = ir_bitset_malloc(ctx->vregs_count + 1);
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
-		if (bb->flags & IR_BB_UNREACHABLE) {
-			continue;
-		}
+		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		for (i = bb->start, insn = ctx->ir_base + i; i <= bb->end;) {
 			if (ctx->vregs[i]) {
 				if (!ir_bitset_in(vars, ctx->vregs[i])) {
@@ -751,9 +749,7 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 	ir_mem_free(vars);
 
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
-		if (bb->flags & IR_BB_UNREACHABLE) {
-			continue;
-		}
+		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		if (ctx->prev_ref[bb->end] == bb->start
 		 && bb->successors_count == 1
 		 && !(bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_DESSA_MOVES))) {

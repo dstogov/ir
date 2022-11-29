@@ -2331,6 +2331,21 @@ static void ir_emit_if_int(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
+	if (IR_IS_CONST_REF(insn->op2)) {
+		uint32_t true_block, false_block, next_block;
+
+		ir_get_true_false_blocks(ctx, b, &true_block, &false_block, &next_block);
+		if (ir_const_is_true(&ctx->ir_base[insn->op2])) {
+			if (true_block != next_block) {
+				|	b =>true_block
+			}
+		} else {
+			if (false_block != next_block) {
+				|	b =>false_block
+			}
+		}
+		return;
+	}
 	IR_ASSERT(op2_reg != IR_REG_NONE);
 	if ((op2_reg & IR_REG_SPILL_LOAD) || IR_IS_CONST_REF(insn->op2)) {
 		op2_reg &= ~IR_REG_SPILL_LOAD;
@@ -4413,9 +4428,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 
 	ctx->live_intervals = ir_mem_calloc(ctx->vregs_count + 1 + IR_REG_NUM + 1, sizeof(ir_live_interval*));
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
-		if (bb->flags & IR_BB_UNREACHABLE) {
-			continue;
-		}
+		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		for (i = bb->start, insn = ctx->ir_base + i, rule = ctx->rules + i; i <= bb->end;) {
 			switch (ctx->rules ? *rule : insn->op) {
 				case IR_START:
@@ -4774,9 +4787,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	}
 
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
-		if (bb->flags & IR_BB_UNREACHABLE) {
-			continue;
-		}
+		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		if (ctx->prev_ref[bb->end] == bb->start
 		 && bb->successors_count == 1
 		 && !(bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_DESSA_MOVES))) {

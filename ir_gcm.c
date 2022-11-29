@@ -96,6 +96,7 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 					q++;
 				}
 				b = _blocks[*q];
+				IR_ASSERT(b);
 			}
 			lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
 		}
@@ -191,9 +192,7 @@ int ir_gcm(ir_ctx *ctx)
 	/* pin and collect control and control depended (PARAM, VAR, PHI, PI) instructions */
 	b = ctx->cfg_blocks_count;
 	for (bb = ctx->cfg_blocks + b; b > 0; bb--, b--) {
-		if (bb->flags & IR_BB_UNREACHABLE) {
-			continue;
-		}
+		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		ref = bb->end;
 		do {
 			insn = &ctx->ir_base[ref];
@@ -450,9 +449,7 @@ int ir_schedule(ir_ctx *ctx)
 	scheduled = ir_bitset_malloc(ctx->insns_count);
 	used = ir_bitset_malloc(ctx->consts_count + 1);
 	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; b++, bb++) {
-		if (bb->flags & IR_BB_UNREACHABLE) {
-			continue;
-		}
+		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		/* Schedule BB start */
 		i = bb->start;
 		ir_bitset_incl(scheduled, i);
@@ -755,9 +752,7 @@ void ir_build_prev_refs(ir_ctx *ctx)
 	ctx->prev_ref = ir_mem_malloc(ctx->insns_count * sizeof(ir_ref));
 	prev = 0;
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
-		if (bb->flags & IR_BB_UNREACHABLE) {
-			continue;
-		}
+		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		for (i = bb->start, insn = ctx->ir_base + i; i < bb->end;) {
 			ctx->prev_ref[i] = prev;
 			n = ir_operands_count(ctx, insn);

@@ -154,6 +154,9 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, const char *dump_
 	/* Schedule */
 	if (opt_level > 0) {
 		ir_build_cfg(ctx);
+		if (opt_level == 1) {
+			ir_remove_unreachable_blocks(ctx);
+		}
 		ir_build_dominators_tree(ctx);
 		ir_find_loops(ctx);
 		ir_gcm(ctx);

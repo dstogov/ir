@@ -136,17 +136,7 @@ static bool ir_sccp_is_true(ir_ctx *ctx, ir_insn *_values, ir_ref a)
 {
 	ir_insn *v = IR_IS_CONST_REF(a) ? &ctx->ir_base[a] : &_values[a];
 
-	if (v->type == IR_BOOL) {
-		return v->val.b;
-	} else if (IR_IS_TYPE_INT(v->type)) {
-		return v->val.i64 != 0;
-	} else if (v->type == IR_DOUBLE) {
-		return v->val.d != 0.0;
-	} else if (v->type == IR_FLOAT) {
-		return v->val.f != 0.0;
-	}
-	IR_ASSERT(0 && "NYI");
-	return 0;
+	return ir_const_is_true(v);
 }
 
 static bool ir_sccp_is_equal(ir_ctx *ctx, ir_insn *_values, ir_ref a, ir_ref b)

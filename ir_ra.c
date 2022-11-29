@@ -55,9 +55,7 @@ int ir_assign_virtual_registers(ir_ctx *ctx)
 	vregs = ir_mem_calloc(ctx->insns_count, sizeof(ir_ref));
 	n = 1;
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
-		if (bb->flags & IR_BB_UNREACHABLE) {
-			continue;
-		}
+		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		i = bb->start;
 
 		/* skip first instruction */
@@ -369,9 +367,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 	ctx->live_intervals = ir_mem_calloc(ctx->vregs_count + 1 + IR_REG_NUM + 1, sizeof(ir_live_interval*));
 	for (b = ctx->cfg_blocks_count; b > 0; b--) {
 		bb = &ctx->cfg_blocks[b];
-		if (bb->flags & IR_BB_UNREACHABLE) {
-			continue;
-		}
+		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		/* for each successor of b */
 #ifdef IR_DEBUG
 		ir_bitset_incl(visited, b);
@@ -1008,9 +1004,7 @@ int ir_coalesce(ir_ctx *ctx)
 	/* Collect a list of blocks which are predecossors to block with phi finctions */
 	ir_worklist_init(&blocks, ctx->cfg_blocks_count + 1);
 	for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
-		if (bb->flags & IR_BB_UNREACHABLE) {
-			continue;
-		}
+		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		if (bb->predecessors_count > 1) {
 			uint32_t i;
 
@@ -1073,6 +1067,7 @@ int ir_coalesce(ir_ctx *ctx)
 		for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
 			ir_ref i;
 
+			IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 			i = bb->end;
 
 			/* skip last instruction */
@@ -1141,9 +1136,7 @@ int ir_compute_dessa_moves(ir_ctx *ctx)
 	ir_insn *insn;
 
 	for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
-		if (bb->flags & IR_BB_UNREACHABLE) {
-			continue;
-		}
+		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		if (bb->predecessors_count > 1) {
 			use_list = &ctx->use_lists[bb->start];
 			n = use_list->count;
@@ -2278,9 +2271,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 	if (ctx->flags & IR_LR_HAVE_DESSA_MOVES) {
 		/* Add fixed intervals for temporary registers used for DESSA moves */
 		for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
-			if (bb->flags & IR_BB_UNREACHABLE) {
-				continue;
-			}
+			IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 			if (bb->flags & IR_BB_DESSA_MOVES) {
 				ctx->data = bb;
 				ir_gen_dessa_moves(ctx, b, ir_fix_dessa_tmps);

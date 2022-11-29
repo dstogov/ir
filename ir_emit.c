@@ -273,9 +273,7 @@ int ir_match(ir_ctx *ctx)
 
 	ctx->rules = ir_mem_calloc(ctx->insns_count, sizeof(uint32_t));
 	for (b = ctx->cfg_blocks_count, bb = ctx->cfg_blocks + b; b > 0; b--, bb--) {
-		if (bb->flags & IR_BB_UNREACHABLE) {
-			continue;
-		}
+		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		for (i = bb->end; i > bb->start; i = ctx->prev_ref[i]) {
 			if (!ctx->rules[i]) {
 				ctx->rules[i] = ir_match_insn(ctx, i, bb);

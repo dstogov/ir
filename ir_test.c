@@ -187,6 +187,9 @@ int main(int argc, char **argv)
 		ir_sccp(&ctx);
 	}
 	ir_build_cfg(&ctx);
+	if (opt_level <= 1) {
+		ir_remove_unreachable_blocks(&ctx);
+	}
 	if (opt_level > 0) {
 		ir_build_dominators_tree(&ctx);
 		ir_find_loops(&ctx);
