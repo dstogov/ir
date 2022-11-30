@@ -16,5 +16,5 @@ x86_64
 test:
 	movl %esi, %eax
 	cmpl %edi, %eax
-	cmovll %edi, %eax
+	cmovgl %edi, %eax
 	retq

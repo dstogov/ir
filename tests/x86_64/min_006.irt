@@ -16,5 +16,5 @@ x86_64
 test:
 	movb %sil, %al
 	cmpb %dil, %al
-	cmovbw %di, %ax
+	cmovaw %di, %ax
 	retq

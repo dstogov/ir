@@ -17,6 +17,6 @@ test:
 	movl 4(%esp), %eax
 	movl 8(%esp), %ecx
 	cmpl %eax, %ecx
-	cmovll %eax, %ecx
+	cmovgl %eax, %ecx
 	movl %ecx, %eax
 	retl

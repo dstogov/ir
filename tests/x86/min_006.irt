@@ -17,6 +17,6 @@ test:
 	movb 4(%esp), %al
 	movb 8(%esp), %cl
 	cmpb %al, %cl
-	cmovbw %ax, %cx
+	cmovaw %ax, %cx
 	movb %cl, %al
 	retl

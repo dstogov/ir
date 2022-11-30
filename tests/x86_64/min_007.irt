@@ -17,5 +17,5 @@ test:
 	movl %edi, %eax
 	movl $0x2f, %ecx
 	cmpl %ecx, %eax
-	cmovll %ecx, %eax
+	cmovgl %ecx, %eax
 	retq
