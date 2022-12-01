@@ -1053,13 +1053,16 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 								ctx->rules[insn->op1] = ir_match_insn(ctx, insn->op1, bb);
 							}
 						}
-						if (ctx->rules[insn->op1] == IR_LEA_SI) {
+						if (ctx->rules[insn->op1] == IR_LEA_SI
+						 && ctx->use_lists[insn->op1].count == 1) {
 							ctx->rules[insn->op1] = IR_SKIP;
 							return IR_LEA_SI_O; // lea ret, [op1.op1.reg*op1.op2.scale+op2.offset]
-						} else if (ctx->rules[insn->op1] == IR_LEA_SIB) {
+						} else if (ctx->rules[insn->op1] == IR_LEA_SIB
+								&& ctx->use_lists[insn->op1].count == 1) {
 							ctx->rules[insn->op1] = IR_SKIP;
 							return IR_LEA_SIB_O; // lea ret, [op1.op1.reg+op1.op1.reg*op1.op2.scale+op2.offset]
-						} else if (ctx->rules[insn->op1] == IR_LEA_IB) {
+						} else if (ctx->rules[insn->op1] == IR_LEA_IB
+								&& ctx->use_lists[insn->op1].count == 1) {
 							ctx->rules[insn->op1] = IR_SKIP;
 							return IR_LEA_IB_O; // lea ret, [op1.op1.reg+op1.op2.reg+op2.offset]
 						}
@@ -1090,17 +1093,21 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 							ctx->rules[insn->op2] = ir_match_insn(ctx, insn->op2, bb);
 						}
 					}
-					if (ctx->rules[insn->op1] == IR_LEA_OB) {
+					if (ctx->rules[insn->op1] == IR_LEA_OB
+					 && ctx->use_lists[insn->op1].count == 1) {
 						ctx->rules[insn->op1] = IR_SKIP;
-						if (ctx->rules[insn->op2] == IR_LEA_SI) {
+						if (ctx->rules[insn->op2] == IR_LEA_SI
+						 && ctx->use_lists[insn->op2].count == 1) {
 							ctx->rules[insn->op2] = IR_SKIP;
 							return IR_LEA_OB_SI; // lea ret, [op1.op1.reg+op1.op2.offset+op2.op1.reg*op2.op2.scale]
 						}
 						return IR_LEA_OB_I; // lea ret, [op1.op1.reg+op1.op2.offset+op2.reg]
 					}
-					if (ctx->rules[insn->op2] == IR_LEA_OB) {
+					if (ctx->rules[insn->op2] == IR_LEA_OB
+					 && ctx->use_lists[insn->op2].count == 1) {
 						ctx->rules[insn->op2] = IR_SKIP;
-						if (ctx->rules[insn->op1] == IR_LEA_SI) {
+						if (ctx->rules[insn->op1] == IR_LEA_SI
+						 && ctx->use_lists[insn->op1].count == 1) {
 							ctx->rules[insn->op1] = IR_SKIP;
 							return IR_LEA_SI_OB; // lea ret, [op1.op1.reg*op1.op2.scale+op2.op1.reg+op2.op2.offset]
 						}
