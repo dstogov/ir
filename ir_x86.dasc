@@ -2121,36 +2121,64 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		int32_t offset = 0;
 
 		if (ir_rule(ctx, op2) == IR_SKIP_MEM) {
-			IR_ASSERT(op2_reg != IR_REG_NONE);
 			offset = ir_fuse_load(ctx, op2, &op2_reg);
 		} else {
 			offset = ir_ref_spill_slot(ctx, op2, &op2_reg);
 		}
-		switch (insn->op) {
-			case IR_ADD:
-			case IR_ADD_OV:
-				|	ASM_REG_MEM_OP add, type, def_reg, [Ra(op2_reg)+offset]
-				break;
-			case IR_SUB:
-			case IR_SUB_OV:
-				|	ASM_REG_MEM_OP sub, type, def_reg, [Ra(op2_reg)+offset]
-				break;
-			case IR_MUL:
-			case IR_MUL_OV:
-				|	ASM_REG_MEM_IMUL type, def_reg, [Ra(op2_reg)+offset]
-				break;
-			case IR_OR:
-				|	ASM_REG_MEM_OP or, type, def_reg, [Ra(op2_reg)+offset]
-				break;
-			case IR_AND:
-				|	ASM_REG_MEM_OP and, type, def_reg, [Ra(op2_reg)+offset]
-				break;
-			case IR_XOR:
-				|	ASM_REG_MEM_OP xor, type, def_reg, [Ra(op2_reg)+offset]
-				break;
-			default:
-				IR_ASSERT(0 && "NIY binary op");
-				break;
+		if (op2_reg != IR_REG_NONE) {
+			switch (insn->op) {
+				case IR_ADD:
+				case IR_ADD_OV:
+					|	ASM_REG_MEM_OP add, type, def_reg, [Ra(op2_reg)+offset]
+					break;
+				case IR_SUB:
+				case IR_SUB_OV:
+					|	ASM_REG_MEM_OP sub, type, def_reg, [Ra(op2_reg)+offset]
+					break;
+				case IR_MUL:
+				case IR_MUL_OV:
+					|	ASM_REG_MEM_IMUL type, def_reg, [Ra(op2_reg)+offset]
+					break;
+				case IR_OR:
+					|	ASM_REG_MEM_OP or, type, def_reg, [Ra(op2_reg)+offset]
+					break;
+				case IR_AND:
+					|	ASM_REG_MEM_OP and, type, def_reg, [Ra(op2_reg)+offset]
+					break;
+				case IR_XOR:
+					|	ASM_REG_MEM_OP xor, type, def_reg, [Ra(op2_reg)+offset]
+					break;
+				default:
+					IR_ASSERT(0 && "NIY binary op");
+					break;
+			}
+		} else {
+			switch (insn->op) {
+				case IR_ADD:
+				case IR_ADD_OV:
+					|	ASM_REG_MEM_OP add, type, def_reg, [offset]
+					break;
+				case IR_SUB:
+				case IR_SUB_OV:
+					|	ASM_REG_MEM_OP sub, type, def_reg, [offset]
+					break;
+				case IR_MUL:
+				case IR_MUL_OV:
+					|	ASM_REG_MEM_IMUL type, def_reg, [offset]
+					break;
+				case IR_OR:
+					|	ASM_REG_MEM_OP or, type, def_reg, [offset]
+					break;
+				case IR_AND:
+					|	ASM_REG_MEM_OP and, type, def_reg, [offset]
+					break;
+				case IR_XOR:
+					|	ASM_REG_MEM_OP xor, type, def_reg, [offset]
+					break;
+				default:
+					IR_ASSERT(0 && "NIY binary op");
+					break;
+			}
 		}
 	}
 	if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
