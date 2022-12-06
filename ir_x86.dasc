@@ -5189,6 +5189,17 @@ static void ir_emit_store_fp(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 	ir_emit_store_mem_fp(ctx, type, op2_reg, offset, op3_reg);
 }
 
+static void ir_emit_rload(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_reg def_reg = insn->op2;
+
+	if (ctx->vregs[def]
+	 && ctx->live_intervals[ctx->vregs[def]]
+	 && ctx->live_intervals[ctx->vregs[def]]->top->stack_spill_pos != -1) {
+		ir_emit_store(ctx, insn->type, def, def_reg);
+	}
+}
+
 static void ir_emit_rstore(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 {
 	ir_ref type = ctx->ir_base[insn->op2].type;
@@ -7400,7 +7411,6 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_PARAM:
 				case IR_PI:
 				case IR_PHI:
-				case IR_RLOAD:
 				case IR_SNAPSHOT:
 					break;
 				case IR_LEA_OB:
@@ -7826,6 +7836,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					break;
 				case IR_VSTORE_FP:
 					ir_emit_vstore_fp(ctx, i, insn);
+					break;
+				case IR_RLOAD:
+					ir_emit_rload(ctx, i, insn);
 					break;
 				case IR_RSTORE:
 					ir_emit_rstore(ctx, i, insn);
