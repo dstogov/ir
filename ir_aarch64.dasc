@@ -2517,6 +2517,8 @@ static void ir_emit_zext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 static void ir_emit_trunc(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
 	ir_type dst_type = insn->type;
 	ir_type src_type = ctx->ir_base[insn->op1].type;
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
@@ -2531,7 +2533,11 @@ static void ir_emit_trunc(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_emit_load(ctx, src_type, op1_reg, insn->op1);
 	}
 	if (op1_reg != IR_REG_NONE) {
-		if (op1_reg != def_reg) {
+		if (ir_type_size[dst_type] == 1) {
+			|	and Rw(def_reg), Rw(op1_reg), #0xff
+		} else if (ir_type_size[dst_type] == 2) {
+			|	and Rw(def_reg), Rw(op1_reg), #0xffff
+		} else if (op1_reg != def_reg) {
 			ir_emit_mov(ctx, dst_type, def_reg, op1_reg);
 		}
 	} else {

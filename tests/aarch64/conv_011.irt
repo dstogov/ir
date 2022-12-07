@@ -13,4 +13,5 @@ aarch64
 }
 --EXPECT--
 test:
+	and w0, w0, #0xff
 	ret
