@@ -1,5 +1,5 @@
 -  va_arg nodes
--  BSTART, BEND nodes (to free data allocated by ALLOCA)
+?  BSTART, BEND nodes (to free data allocated by ALLOCA) (now it's possible to do this through AFREE)
 -  Full support for function prototypes ???
    (now we may only set "fastcall" calling convention for constants or for variables through BITCAST)
 

@@ -1344,8 +1344,9 @@ binop_fp:
 			break;
 		case IR_ALLOCA:
 			/* alloca() may be use only in functions */
-			IR_ASSERT(ctx->flags & IR_FUNCTION);
-			ctx->flags |= IR_USE_FRAME_POINTER | IR_HAS_ALLOCA;
+			if (ctx->flags & IR_FUNCTION) {
+				ctx->flags |= IR_USE_FRAME_POINTER | IR_HAS_ALLOCA;
+			}
 			return IR_ALLOCA;
 		case IR_VSTORE:
 			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op3].type)) {
@@ -5252,11 +5253,15 @@ static void ir_emit_alloca(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			size = IR_ALIGNED_SIZE(size, 8);
 		}
 		|	ASM_REG_IMM_OP sub, IR_ADDR, IR_REG_RSP, size
+		if (!(ctx->flags & IR_FUNCTION)) {
+			data->call_stack_size += size;
+		}
 	} else {
 		int32_t alignment = (ctx->flags & IR_HAS_CALLS) ? 16 : 8;
 		ir_reg op2_reg = ctx->regs[def][2];
 		ir_type type = ctx->ir_base[insn->op2].type;
 
+		IR_ASSERT(ctx->flags & IR_FUNCTION);
 		IR_ASSERT(def_reg != IR_REG_NONE);
 		if (op2_reg != IR_REG_NONE && (op2_reg & IR_REG_SPILL_LOAD)) {
 			op2_reg &= ~IR_REG_SPILL_LOAD;
@@ -5281,6 +5286,46 @@ static void ir_emit_alloca(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 	} else {
 		ir_emit_store(ctx, IR_ADDR, def, IR_REG_STACK_POINTER);
+	}
+}
+
+static void ir_emit_afree(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+
+	if (IR_IS_CONST_REF(insn->op2)) {
+		ir_insn *val = &ctx->ir_base[insn->op2];
+		int32_t size = val->val.i32;
+
+		IR_ASSERT(IR_IS_TYPE_INT(val->type));
+		IR_ASSERT(IR_IS_TYPE_UNSIGNED(val->type) || val->val.i64 > 0);
+		IR_ASSERT(IR_IS_SIGNED_32BIT(val->val.i64));
+
+		if (ctx->flags & IR_HAS_CALLS) {
+			/* Stack must be 16 byte aligned */
+			size = IR_ALIGNED_SIZE(size, 16);
+		} else {
+			size = IR_ALIGNED_SIZE(size, 8);
+		}
+		|	ASM_REG_IMM_OP add, IR_ADDR, IR_REG_RSP, size
+		if (!(ctx->flags & IR_FUNCTION)) {
+			data->call_stack_size -= size;
+		}
+	} else {
+//		int32_t alignment = (ctx->flags & IR_HAS_CALLS) ? 16 : 8;
+		ir_reg op2_reg = ctx->regs[def][2];
+		ir_type type = ctx->ir_base[insn->op2].type;
+
+		IR_ASSERT(ctx->flags & IR_FUNCTION);
+		if (op2_reg != IR_REG_NONE && (op2_reg & IR_REG_SPILL_LOAD)) {
+			op2_reg &= ~IR_REG_SPILL_LOAD;
+			ir_emit_load(ctx, type, op2_reg, insn->op2);
+		}
+
+		// TODO: alignment ???
+
+		|	ASM_REG_REG_OP add, IR_ADDR, IR_REG_RSP, op2_reg
 	}
 }
 
@@ -7857,6 +7902,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					break;
 				case IR_ALLOCA:
 					ir_emit_alloca(ctx, i, insn);
+					break;
+				case IR_AFREE:
+					ir_emit_afree(ctx, i, insn);
 					break;
 				case IR_EXITCALL:
 					ir_emit_exitcall(ctx, i, insn);

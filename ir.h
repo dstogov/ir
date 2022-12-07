@@ -236,6 +236,7 @@ typedef enum _ir_type {
 	\
 	/* memory reference and load/store ops                              */ \
 	_(ALLOCA,       a2,   src, def, ___) /* alloca(def)                 */ \
+	_(AFREE,        a2,   src, def, ___) /* revert alloca(def)          */ \
 	_(VADDR,        d1,   var, ___, ___) /* load address of local var   */ \
 	_(VLOAD,        l2,   src, var, ___) /* load value of local var     */ \
 	_(VSTORE,       s3,   src, var, def) /* store value to local var    */ \
