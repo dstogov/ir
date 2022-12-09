@@ -2102,10 +2102,14 @@ spill_current:
 			ir_live_pos overlap = ir_ivals_overlap(&ival->range, other->current_range);
 
 			if (overlap) {
+				ir_live_interval *child;
+
 				IR_ASSERT(other->type != IR_VOID);
 				IR_LOG_LSRA_CONFLICT("      ---- Conflict with inactive", other, overlap);
 				// TODO: optimal split position (this case is not tested)
-				ir_split_interval_at(ctx, other, overlap);
+				child = ir_split_interval_at(ctx, other, overlap);
+				ir_add_to_unhandled(unhandled, child);
+				IR_LOG_LSRA("      ---- Queue", child, "");
 			}
 		}
 		other = other->list_next;
