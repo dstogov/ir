@@ -286,6 +286,8 @@ static bool ir_call_needs_tmp_int_reg(ir_ctx *ctx, ir_insn *insn)
 				if (int_param > 0) {
 					return 1; /* for swap */
 				}
+			} else  {
+				return 1; /* for mem -> stack copy */
 			}
 			int_param++;
 		}
