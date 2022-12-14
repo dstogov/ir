@@ -4315,7 +4315,6 @@ static void ir_emit_zext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		int32_t offset = 0;
 
 		if (ir_rule(ctx, insn->op1) == IR_SKIP_MEM) {
-			IR_ASSERT(op1_reg != IR_REG_NONE);
 			offset = ir_fuse_load(ctx, insn->op1, &op1_reg);
 		} else {
 			offset = ir_ref_spill_slot(ctx, insn->op1, &op1_reg);
@@ -4323,31 +4322,55 @@ static void ir_emit_zext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 		if (ir_type_size[src_type] == 1) {
 			if (ir_type_size[dst_type] == 2) {
-				|	movzx Rw(def_reg), byte [Ra(op1_reg)+offset]
+				if (op1_reg != IR_REG_NONE) {
+					|	movzx Rw(def_reg), byte [Ra(op1_reg)+offset]
+				} else {
+					|	movzx Rw(def_reg), byte [offset]
+				}
 			} else if (ir_type_size[dst_type] == 4) {
-				|	movzx Rd(def_reg), byte [Ra(op1_reg)+offset]
+				if (op1_reg != IR_REG_NONE) {
+					|	movzx Rd(def_reg), byte [Ra(op1_reg)+offset]
+				} else {
+					|	movzx Rd(def_reg), byte [offset]
+				}
 			} else {
 				IR_ASSERT(ir_type_size[dst_type] == 8);
 				IR_ASSERT(sizeof(void*) == 8);
 |.if X64
-				|	movzx Rq(def_reg), byte [Ra(op1_reg)+offset]
+				if (op1_reg != IR_REG_NONE) {
+					|	movzx Rq(def_reg), byte [Ra(op1_reg)+offset]
+				} else {
+					|	movzx Rq(def_reg), byte [offset]
+				}
 |.endif
 			}
 		} else if (ir_type_size[src_type] == 2) {
 			if (ir_type_size[dst_type] == 4) {
-				|	movzx Rd(def_reg), word [Ra(op1_reg)+offset]
+				if (op1_reg != IR_REG_NONE) {
+					|	movzx Rd(def_reg), word [Ra(op1_reg)+offset]
+				} else {
+					|	movzx Rd(def_reg), word [offset]
+				}
 			} else {
 				IR_ASSERT(ir_type_size[dst_type] == 8);
 				IR_ASSERT(sizeof(void*) == 8);
 |.if X64
-				|	movzx Rq(def_reg), word [Ra(op1_reg)+offset]
+				if (op1_reg != IR_REG_NONE) {
+					|	movzx Rq(def_reg), word [Ra(op1_reg)+offset]
+				} else {
+					|	movzx Rq(def_reg), word [offset]
+				}
 |.endif
 			}
 		} else {
 			IR_ASSERT(ir_type_size[src_type] == 4);
 			IR_ASSERT(ir_type_size[dst_type] == 8);
 |.if X64
-			|	mov Rd(def_reg), dword [Ra(op1_reg)+offset]
+			if (op1_reg != IR_REG_NONE) {
+				|	mov Rd(def_reg), dword [Ra(op1_reg)+offset]
+			} else {
+				|	mov Rd(def_reg), dword [offset]
+			}
 |.endif
 		}
 	}
