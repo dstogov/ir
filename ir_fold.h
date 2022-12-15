@@ -985,6 +985,9 @@ IR_FOLD(BITCAST(C_U32))
 IR_FOLD(BITCAST(C_U64))
 IR_FOLD(BITCAST(C_FLOAT))
 IR_FOLD(BITCAST(C_DOUBLE))
+IR_FOLD(BITCAST(C_BOOL))
+IR_FOLD(BITCAST(C_CHAR))
+IR_FOLD(BITCAST(C_ADDR))
 {
 	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] == ir_type_size[op1_insn->type]);
 	switch (IR_OPT_TYPE(opt)) {
@@ -1008,6 +1011,10 @@ IR_FOLD(BITCAST(C_DOUBLE))
 			IR_FOLD_CONST_F(op1_insn->val.f);
 		case IR_DOUBLE:
 			IR_FOLD_CONST_D(op1_insn->val.d);
+		case IR_CHAR:
+			IR_FOLD_CONST_I(op1_insn->val.c);
+		case IR_ADDR:
+			IR_FOLD_CONST_U(op1_insn->val.addr);
 		default:
 			IR_ASSERT(0);
 	}
