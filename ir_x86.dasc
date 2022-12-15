@@ -4424,6 +4424,10 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			offset = ir_fuse_load(ctx, insn->op1, &op1_reg);
 			ir_emit_load_mem_int(ctx, dst_type, def_reg, op1_reg, offset);
 		} else if (op1_reg != IR_REG_NONE) {
+			if (op1_reg & IR_REG_SPILL_LOAD) {
+				op1_reg &= ~IR_REG_SPILL_LOAD;
+				ir_emit_load(ctx, src_type, op1_reg, insn->op1);
+			}
 			if (op1_reg != def_reg) {
 				ir_emit_mov(ctx, dst_type, def_reg, op1_reg);
 			}
@@ -4436,6 +4440,10 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			offset = ir_fuse_load(ctx, insn->op1, &op1_reg);
 			ir_emit_load_mem_fp(ctx, dst_type, def_reg, op1_reg, offset);
 		} else if (op1_reg != IR_REG_NONE) {
+			if (op1_reg & IR_REG_SPILL_LOAD) {
+				op1_reg &= ~IR_REG_SPILL_LOAD;
+				ir_emit_load(ctx, src_type, op1_reg, insn->op1);
+			}
 			if (op1_reg != def_reg) {
 				ir_emit_fp_mov(ctx, dst_type, def_reg, op1_reg);
 			}
