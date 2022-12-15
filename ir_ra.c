@@ -1425,10 +1425,12 @@ static ir_live_pos ir_find_optimal_split_position(ir_ctx *ctx, ir_live_interval 
 	if (min_bb->loop_depth < max_bb->loop_depth) {
 		/* Split at the end of the loop entry */
 		do {
-			if (max_bb->loop_header) {
+			if (max_bb->flags & IR_BB_LOOP_HEADER) {
+				max_bb = &ctx->cfg_blocks[ctx->cfg_edges[max_bb->predecessors]];
+			} else if (max_bb->loop_header) {
 				max_bb = &ctx->cfg_blocks[max_bb->loop_header];
+				max_bb = &ctx->cfg_blocks[ctx->cfg_edges[max_bb->predecessors]];
 			}
-			max_bb = &ctx->cfg_blocks[ctx->cfg_edges[max_bb->predecessors]];
 			IR_ASSERT(ir_ival_covers(ival, IR_DEF_LIVE_POS_FROM_REF(max_bb->end)));
 		} while (min_bb->loop_depth < max_bb->loop_depth);
 
