@@ -340,6 +340,7 @@ IR_FOLD(MUL(C_U8, C_U8))
 IR_FOLD(MUL(C_U16, C_U16))
 IR_FOLD(MUL(C_U32, C_U32))
 IR_FOLD(MUL(C_U64, C_U64))
+IR_FOLD(MUL(C_ADDR, C_ADDR))
 {
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
 	IR_FOLD_CONST_U(op1_insn->val.u64 * op2_insn->val.u64);
@@ -370,6 +371,7 @@ IR_FOLD(DIV(C_U8, C_U8))
 IR_FOLD(DIV(C_U16, C_U16))
 IR_FOLD(DIV(C_U32, C_U32))
 IR_FOLD(DIV(C_U64, C_U64))
+IR_FOLD(DIV(C_ADDR, C_ADDR))
 {
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
 	if (op2_insn->val.u64 == 0) {
@@ -408,6 +410,7 @@ IR_FOLD(MOD(C_U8, C_U8))
 IR_FOLD(MOD(C_U16, C_U16))
 IR_FOLD(MOD(C_U32, C_U32))
 IR_FOLD(MOD(C_U64, C_U64))
+IR_FOLD(MOD(C_ADDR, C_ADDR))
 {
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
 	if (op2_insn->val.u64 == 0) {
