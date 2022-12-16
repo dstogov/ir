@@ -20,5 +20,5 @@ test:
 	movl %edi, %eax
 	xorl %edx, %edx
 	divl %esi
-	mull %ecx
+	imull %ecx, %eax
 	retq

@@ -16,8 +16,7 @@ x86_64
 }
 --EXPECT--
 test:
-	movl %edx, %ecx
 	movl %esi, %eax
-	mull %edi
-	mull %ecx
+	imull %edi, %eax
+	imull %edx, %eax
 	retq

@@ -24,6 +24,7 @@
 	-  separate INT and FP allocation phases (for performance)
 	-  respect multi-ENTRY code (Zend/tests/bug72598.phpt)
 	-  proper live ranges for complex codegen rules (Zend/tests/match/042.phpt [jit=1254/ZTS/32])
+	-  tests/x86/ra_007.irt loads one of the parameters too early that leads to the following useless move
 
 ?  code generation
 	-  COND

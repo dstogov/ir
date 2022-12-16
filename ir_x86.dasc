@@ -1157,7 +1157,9 @@ binop_fp:
 						return IR_IMUL3;
 					}
 				}
-				if (IR_IS_TYPE_SIGNED(insn->type) && ir_type_size[insn->type] != 1) {
+				/* Prefer IMUL over MUL because it's more flexable and uses less registers ??? */
+//				if (IR_IS_TYPE_SIGNED(insn->type) && ir_type_size[insn->type] != 1) {
+				if (ir_type_size[insn->type] != 1) {
 					goto binop_int;
 				}
 				ir_match_fuse_load(ctx, insn->op2, bb);

@@ -19,5 +19,5 @@ test:
 	movl 4(%esp), %eax
 	xorl %edx, %edx
 	divl 8(%esp)
-	mull 0xc(%esp)
+	imull 0xc(%esp), %eax
 	retl

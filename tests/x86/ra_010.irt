@@ -19,5 +19,5 @@ test:
 	movl 4(%esp), %eax
 	movl 8(%esp), %ecx
 	leal (%ecx, %eax), %eax
-	mull 0xc(%esp)
+	imull 0xc(%esp), %eax
 	retl

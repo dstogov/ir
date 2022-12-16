@@ -17,5 +17,5 @@ x86_64
 --EXPECT--
 test:
 	leal (%rsi, %rdi), %eax
-	mull %edx
+	imull %edx, %eax
 	retq

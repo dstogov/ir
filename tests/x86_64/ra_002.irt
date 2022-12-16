@@ -18,7 +18,7 @@ x86_64
 test:
 	movl %edx, %ecx
 	movl %esi, %eax
-	mull %edi
+	imull %edi, %eax
 	xorl %edx, %edx
 	divl %ecx
 	retq

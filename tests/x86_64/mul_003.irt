@@ -15,5 +15,5 @@ x86_64
 --EXPECT--
 test:
 	movl %esi, %eax
-	mull %edi
+	imull %edi, %eax
 	retq
