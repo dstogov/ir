@@ -4308,7 +4308,10 @@ static void ir_emit_zext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			IR_ASSERT(ir_type_size[dst_type] == 8);
 			IR_ASSERT(sizeof(void*) == 8);
 |.if X64
-			|	mov Rd(def_reg), Rd(op1_reg)
+			/* Avoid zero extension to the same register. This may be not always safe ??? */
+			if (op1_reg != def_reg) {
+				|	mov Rd(def_reg), Rd(op1_reg)
+			}
 |.endif
 		}
 	} else if (IR_IS_CONST_REF(insn->op1)) {
