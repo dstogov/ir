@@ -483,6 +483,7 @@ enum _ir_rule {
 	IR_JCC_INT,
 	IR_GUARD_CMP_INT,
 	IR_GUARD_CMP_FP,
+	IR_GUARD_TEST_INT,
 	IR_GUARD_OVERFLOW,
 	IR_OVERFLOW_AND_BRANCH,
 	IR_MIN_MAX_INT,
@@ -1698,6 +1699,17 @@ store_int:
 						ctx->rules[insn->op2] = IR_SKIP_CMP_FP;
 						return IR_GUARD_CMP_FP;
 					}
+				} else if (op2_insn->op == IR_AND) { // TODO: OR, XOR. etc
+					ir_match_swap_commutative(ctx, op2_insn);
+					ir_match_fuse_load(ctx, op2_insn->op2, bb);
+					if (IR_IS_CONST_REF(op2_insn->op2)
+					 && op2_insn->op1 > bb->start
+					 && op2_insn->op1 < ref
+					 && !ctx->rules[op2_insn->op1]) {
+						ir_match_fuse_load(ctx, op2_insn->op1, bb);
+					}
+					ctx->rules[insn->op2] = IR_SKIP_TEST_INT;
+					return IR_GUARD_TEST_INT;
 				} else if (op2_insn->op == IR_OVERFLOW) {
 					ctx->rules[insn->op2] = IR_SKIP;
 					return IR_GUARD_OVERFLOW;
@@ -6333,6 +6345,15 @@ static void ir_emit_guard_cmp_fp(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *i
 	ir_emit_guard_jcc(ctx, op, addr, 0);
 }
 
+static void ir_emit_guard_test_int(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
+{
+	void *addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op3]);
+	ir_op op = (insn->op == IR_GUARD) ? IR_EQ : IR_NE;
+
+	ir_emit_test_int_common(ctx, insn->op2, op);
+	ir_emit_guard_jcc(ctx, op, addr, 1);
+}
+
 static void ir_emit_guard_overflow(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
@@ -7816,6 +7837,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					break;
 				case IR_GUARD_CMP_FP:
 					ir_emit_guard_cmp_fp(ctx, b, i, insn);
+					break;
+				case IR_GUARD_TEST_INT:
+					ir_emit_guard_test_int(ctx, b, i, insn);
 					break;
 				case IR_IF_INT:
 					ir_emit_if_int(ctx, b, i, insn);
