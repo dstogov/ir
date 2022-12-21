@@ -5107,13 +5107,12 @@ static void ir_emit_load_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 
 	IR_ASSERT(op2_reg != IR_REG_NONE);
-	if ((op2_reg & IR_REG_SPILL_LOAD) || IR_IS_CONST_REF(insn->op2)) {
+	if (!IR_IS_CONST_REF(insn->op2) && ir_rule(ctx, insn->op2) == IR_SKIP_MEM) {
+		offset = ir_fuse_addr(ctx, insn->op2, &op2_reg);
+	} else if ((op2_reg & IR_REG_SPILL_LOAD) || IR_IS_CONST_REF(insn->op2)) {
 		op2_reg &= ~IR_REG_SPILL_LOAD;
 		IR_ASSERT(ctx->ir_base[insn->op2].type == IR_ADDR);
 		ir_emit_load(ctx, IR_ADDR, op2_reg, insn->op2);
-	}
-	if (!IR_IS_CONST_REF(insn->op2) && ir_rule(ctx, insn->op2) == IR_SKIP_MEM) {
-		offset = ir_fuse_addr(ctx, insn->op2, &op2_reg);
 	}
 
 	if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
@@ -5158,13 +5157,12 @@ static void ir_emit_store_int(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 	}
 
 	IR_ASSERT(op2_reg != IR_REG_NONE);
-	if ((op2_reg & IR_REG_SPILL_LOAD) || IR_IS_CONST_REF(insn->op2)) {
+	if (!IR_IS_CONST_REF(insn->op2) && ir_rule(ctx, insn->op2) == IR_SKIP_MEM) {
+		offset = ir_fuse_addr(ctx, insn->op2, &op2_reg);
+	} else if ((op2_reg & IR_REG_SPILL_LOAD) || IR_IS_CONST_REF(insn->op2)) {
 		op2_reg &= ~IR_REG_SPILL_LOAD;
 		IR_ASSERT(ctx->ir_base[insn->op2].type == IR_ADDR);
 		ir_emit_load(ctx, IR_ADDR, op2_reg, insn->op2);
-	}
-	if (ir_rule(ctx, insn->op2) == IR_SKIP_MEM) {
-		offset = ir_fuse_addr(ctx, insn->op2, &op2_reg);
 	}
 
 	if (IR_IS_CONST_REF(insn->op3) && IR_IS_32BIT(type, val_insn->val)) {
@@ -5204,13 +5202,12 @@ static void ir_emit_store_fp(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 	}
 
 	IR_ASSERT(op2_reg != IR_REG_NONE);
-	if ((op2_reg & IR_REG_SPILL_LOAD) || IR_IS_CONST_REF(insn->op2)) {
+	if (!IR_IS_CONST_REF(insn->op2) && ir_rule(ctx, insn->op2) == IR_SKIP_MEM) {
+		offset = ir_fuse_addr(ctx, insn->op2, &op2_reg);
+	} else if ((op2_reg & IR_REG_SPILL_LOAD) || IR_IS_CONST_REF(insn->op2)) {
 		op2_reg &= ~IR_REG_SPILL_LOAD;
 		IR_ASSERT(ctx->ir_base[insn->op2].type == IR_ADDR);
 		ir_emit_load(ctx, IR_ADDR, op2_reg, insn->op2);
-	}
-	if (ir_rule(ctx, insn->op2) == IR_SKIP_MEM) {
-		offset = ir_fuse_addr(ctx, insn->op2, &op2_reg);
 	}
 
 	ir_emit_store_mem_fp(ctx, type, op2_reg, offset, op3_reg);
