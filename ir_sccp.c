@@ -459,6 +459,11 @@ static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values
 				i++;
 			}
 		}
+		j = i;
+		while (j < n) {
+			ir_insn_set_op(insn, j, IR_UNUSED);
+			j++;
+		}
 		i--;
 		if (i == 2) {
 			i = 0;
@@ -473,15 +478,21 @@ static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values
 			if (use_insn->op == IR_PHI) {
 			    i = 2;
 				for (j = 2; j <= n; j++) {
+					ir_ref input = ir_insn_op(use_insn, j);
+
 					if (ir_bitset_in(life_inputs, j - 1)) {
-						IR_ASSERT(ir_insn_op(use_insn, j));
+						IR_ASSERT(input);
 						if (i != j) {
-							ir_insn_set_op(use_insn, i, ir_insn_op(use_insn, j));
+							ir_insn_set_op(use_insn, i, input);
 						}
 						i++;
-					} else {
-						IR_ASSERT(ir_insn_op(use_insn, j) <= 0);
+					} else if (!IR_IS_CONST_REF(input)) {
+						ir_sccp_remove_from_use_list(ctx, input, use);
 					}
+				}
+				while (i <= n) {
+					ir_insn_set_op(use_insn, i, IR_UNUSED);
+					i++;
 				}
 			}
 		}
