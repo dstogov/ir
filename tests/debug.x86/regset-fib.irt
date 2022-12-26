@@ -92,10 +92,10 @@ test:
 	movsd 0x14(%esp), %xmm0
 	subsd 0xc(%esp), %xmm0
 	movsd %xmm0, 0x1c(%esp)
-	movsd 0x1c(%esp), %xmm0
-	movsd %xmm0, 4(%esp)
 	leal .L5, %eax
 	movl %eax, (%esp)
+	movsd 0x1c(%esp), %xmm0
+	movsd %xmm0, 4(%esp)
 	calll printf
 	movsd 0x1c(%esp), %xmm1
 	movsd %xmm1, 0xc(%esp)
