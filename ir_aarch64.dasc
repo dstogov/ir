@@ -5170,12 +5170,17 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	ret = dasm_link(&data.dasm_state, size_ptr);
 	if (ret != DASM_S_OK) {
 		IR_ASSERT(0);
+		dasm_free(&data.dasm_state);
+		if (ctx->code_buffer == NULL) {
+			ir_mem_unmap(entry, size);
+		}
 		return NULL;
 	}
 	size = *size_ptr;
 
 	if (ctx->code_buffer != NULL) {
 		if (IR_ALIGNED_SIZE(size, 16) > ctx->code_buffer_size) {
+			dasm_free(&data.dasm_state);
 			return NULL;
 		}
 		entry = ctx->code_buffer;
@@ -5188,6 +5193,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	ret = dasm_encode(&data.dasm_state, entry);
 	if (ret != DASM_S_OK) {
 		IR_ASSERT(0);
+		dasm_free(&data.dasm_state);
 		if (ctx->code_buffer == NULL) {
 			ir_mem_unmap(entry, size);
 		}
@@ -5270,9 +5276,6 @@ const void *ir_emit_exitgroup(uint32_t first_exit_point, uint32_t exit_points_pe
 	if (ret != DASM_S_OK) {
 		IR_ASSERT(0);
 		dasm_free(&dasm_state);
-		if (code_buffer == NULL) {
-			ir_mem_unmap(entry, size);
-		}
 		return NULL;
 	}
 
