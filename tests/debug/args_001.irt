@@ -25,18 +25,18 @@ x86_64
 --EXPECT--
 test:
 	subq $0x28, %rsp
-	movl $6, (%rsp)
-	movl $7, 8(%rsp)
-	movl $8, 0x10(%rsp)
-	movq $9, 0x18(%rsp)
-	movabsq $0x100000000, %rax
-	movq %rax, 0x20(%rsp)
 	leaq .L1(%rip), %rdi
 	movq $1, %rsi
 	movw $2, %dx
 	movl $3, %ecx
 	movq $4, %r8
 	movabsq $0x100000000, %r9
+	movl $6, (%rsp)
+	movl $7, 8(%rsp)
+	movl $8, 0x10(%rsp)
+	movq $9, 0x18(%rsp)
+	movabsq $0x100000000, %rax
+	movq %rax, 0x20(%rsp)
 	movabsq $_IO_printf, %rax
 	callq *%rax
 	addq $0x28, %rsp

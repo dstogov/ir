@@ -27,6 +27,12 @@ test:
 	subq $0x28, %rsp
 	movl %r9d, %eax
 	movl %eax, (%rsp)
+	movl %r8d, %r9d
+	movl %ecx, %r8d
+	movl %edx, %ecx
+	movl %esi, %edx
+	movl %edi, %esi
+	leaq .L1(%rip), %rdi
 	movl 0x30(%rsp), %r10d
 	movl %r10d, 8(%rsp)
 	movl 0x38(%rsp), %r10d
@@ -35,12 +41,6 @@ test:
 	movl %r10d, 0x18(%rsp)
 	movl 0x48(%rsp), %r10d
 	movl %r10d, 0x20(%rsp)
-	movl %r8d, %r9d
-	movl %ecx, %r8d
-	movl %edx, %ecx
-	movl %esi, %edx
-	movl %edi, %esi
-	leaq .L1(%rip), %rdi
 	movabsq $_IO_printf, %rax
 	callq *%rax
 	addq $0x28, %rsp

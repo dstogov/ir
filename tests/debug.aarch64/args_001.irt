@@ -27,12 +27,6 @@ test:
 	stp x29, x30, [sp, #-0x10]!
 	mov x29, sp
 	sub sp, sp, #0x20
-	movz w8, #0x8
-	str x8, [sp]
-	movz x8, #0x9
-	str x8, [sp, #8]
-	movz x8, #0x1, lsl #32
-	str x8, [sp, #0x10]
 	adr x0, .L1
 	movz x1, #0x1
 	movz w2, #0x2
@@ -41,6 +35,12 @@ test:
 	movz x5, #0x1, lsl #32
 	movz x6, #0x6
 	movz w7, #0x7
+	movz w8, #0x8
+	str x8, [sp]
+	movz x8, #0x9
+	str x8, [sp, #8]
+	movz x8, #0x1, lsl #32
+	str x8, [sp, #0x10]
 	bl _IO_printf
 	add sp, sp, #0x20
 	ldp x29, x30, [sp], #0x10

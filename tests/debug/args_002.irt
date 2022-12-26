@@ -25,9 +25,6 @@ x86_64
 --EXPECT--
 test:
 	subq $0x18, %rsp
-	movabsq $0x3feccccccccccccd, %rax
-	movq %rax, (%rsp)
-	movq $0, 8(%rsp)
 	leaq .L9(%rip), %rdi
 	movsd .L1(%rip), %xmm0
 	movsd .L2(%rip), %xmm1
@@ -37,6 +34,9 @@ test:
 	movsd .L6(%rip), %xmm5
 	movsd .L7(%rip), %xmm6
 	movsd .L8(%rip), %xmm7
+	movabsq $0x3feccccccccccccd, %rax
+	movq %rax, (%rsp)
+	movq $0, 8(%rsp)
 	movabsq $_IO_printf, %rax
 	callq *%rax
 	addq $0x18, %rsp

@@ -27,10 +27,6 @@ test:
 	stp x29, x30, [sp, #-0x10]!
 	mov x29, sp
 	sub sp, sp, #0x10
-	ldr d31, .L9
-	str d31, [sp]
-	fmov d31, xzr
-	str d31, [sp, #8]
 	adr x0, .L10
 	ldr d0, .L1
 	ldr d1, .L2
@@ -40,6 +36,10 @@ test:
 	ldr d5, .L6
 	ldr d6, .L7
 	ldr d7, .L8
+	ldr d31, .L9
+	str d31, [sp]
+	fmov d31, xzr
+	str d31, [sp, #8]
 	bl _IO_printf
 	add sp, sp, #0x10
 	ldp x29, x30, [sp], #0x10

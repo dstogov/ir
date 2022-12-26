@@ -76,9 +76,9 @@ test:
 	leal (%ebx, %eax), %ebx
 	movl %ebx, %ebp
 	subl %eax, %ebp
+	movl %ebp, 4(%esp)
 	leal .L3, %eax
 	movl %eax, (%esp)
-	movl %ebp, 4(%esp)
 	calll printf
 	movl %ebp, %eax
 	jmp .L1
