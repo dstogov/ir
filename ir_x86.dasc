@@ -4595,15 +4595,19 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		if (!src64) {
 			if (dst_type == IR_DOUBLE) {
 				if (ctx->flags & IR_AVX) {
+					|	vxorps xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	vcvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), Rd(op1_reg)
 				} else {
+					|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	cvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), Rd(op1_reg)
 				}
 			} else {
 				IR_ASSERT(dst_type == IR_FLOAT);
 				if (ctx->flags & IR_AVX) {
+					|	vxorps xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	vcvtsi2ss xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), Rd(op1_reg)
 				} else {
+					|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	cvtsi2ss xmm(def_reg-IR_REG_FP_FIRST), Rd(op1_reg)
 				}
 			}
@@ -4612,15 +4616,19 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |.if X64
 			if (dst_type == IR_DOUBLE) {
 				if (ctx->flags & IR_AVX) {
+					|	vxorps xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	vcvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
 				} else {
+					|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	cvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
 				}
 			} else {
 				IR_ASSERT(dst_type == IR_FLOAT);
 				if (ctx->flags & IR_AVX) {
+					|	vxorps xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	vcvtsi2ss xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
 				} else {
+					|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	cvtsi2ss xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
 				}
 			}
@@ -4639,15 +4647,19 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		if (!src64) {
 			if (dst_type == IR_DOUBLE) {
 				if (ctx->flags & IR_AVX) {
+					|	vxorps xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	vcvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), dword [Ra(op1_reg)+offset]
 				} else {
+					|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	cvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), dword [Ra(op1_reg)+offset]
 				}
 			} else {
 				IR_ASSERT(dst_type == IR_FLOAT);
 				if (ctx->flags & IR_AVX) {
+					|	vxorps xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	vcvtsi2ss xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), dword [Ra(op1_reg)+offset]
 				} else {
+					|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	cvtsi2ss xmm(def_reg-IR_REG_FP_FIRST), dword [Ra(op1_reg)+offset]
 				}
 			}
@@ -4656,15 +4668,19 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |.if X64
 			if (dst_type == IR_DOUBLE) {
 				if (ctx->flags & IR_AVX) {
+					|	vxorps xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	vcvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), qword [Ra(op1_reg)+offset]
 				} else {
+					|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	cvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), qword [Ra(op1_reg)+offset]
 				}
 			} else {
 				IR_ASSERT(dst_type == IR_FLOAT);
 				if (ctx->flags & IR_AVX) {
+					|	vxorps xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	vcvtsi2ss xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), qword [Ra(op1_reg)+offset]
 				} else {
+					|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	cvtsi2ss xmm(def_reg-IR_REG_FP_FIRST), qword [Ra(op1_reg)+offset]
 				}
 			}

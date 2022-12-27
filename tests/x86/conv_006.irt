@@ -15,6 +15,7 @@ x86
 test:
 	subl $8, %esp
 	movl 0xc(%esp), %eax
+	pxor %xmm0, %xmm0
 	cvtsi2sdl %eax, %xmm0
 	movsd %xmm0, (%esp)
 	fldl (%esp)

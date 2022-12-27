@@ -13,5 +13,6 @@ x86_64
 }
 --EXPECT--
 test:
+	pxor %xmm0, %xmm0
 	cvtsi2sdl %edi, %xmm0
 	retq
