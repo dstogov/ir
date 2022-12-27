@@ -485,8 +485,12 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					if (insn->op == IR_RLOAD) {
 						ir_fix_live_range(ctx, ctx->vregs[ref],
 							IR_START_LIVE_POS_FROM_REF(bb->start), IR_DEF_LIVE_POS_FROM_REF(ref));
-						ctx->live_intervals[ctx->vregs[ref]]->flags = IR_LIVE_INTERVAL_REG_LOAD;
-						ctx->live_intervals[ctx->vregs[ref]]->reg = insn->op2;
+						if (IR_REGSET_IN(IR_REGSET_UNION(ctx->fixed_regset, IR_REGSET_FIXED), insn->op2)) {
+							ctx->live_intervals[ctx->vregs[ref]]->flags = IR_LIVE_INTERVAL_REG_LOAD;
+							ctx->live_intervals[ctx->vregs[ref]]->reg = insn->op2;
+						} else {
+							ir_add_use(ctx, ctx->vregs[ref], 0, IR_DEF_LIVE_POS_FROM_REF(ref), insn->op2, IR_USE_SHOULD_BE_IN_REG, 0);
+						}
 						/* live.remove(opd) */
 						ir_bitset_excl(live, ctx->vregs[ref]);
 						continue;
@@ -2323,11 +2327,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 				/* pass */
 			} else if (ival->flags & IR_LIVE_INTERVAL_REG_LOAD) {
 				/* pre-allocated fixed register */
-				if (!IR_REGSET_IN(ctx->fixed_regset, ival->reg)) {
-					ival->current_range = &ival->range;
-					ival->list_next = inactive;
-					inactive = ival;
-				}
+				IR_ASSERT(IR_REGSET_IN(IR_REGSET_UNION(ctx->fixed_regset, IR_REGSET_FIXED), ival->reg));
 			} else if (!(ival->flags & (IR_LIVE_INTERVAL_MEM_PARAM|IR_LIVE_INTERVAL_MEM_LOAD))
 					|| !ir_ival_spill_for_fuse_load(ctx, ival, &data)) {
 				ir_add_to_unhandled(&unhandled, ival);

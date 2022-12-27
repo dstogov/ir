@@ -5215,12 +5215,33 @@ static void ir_emit_store_fp(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 
 static void ir_emit_rload(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
-	ir_reg def_reg = insn->op2;
+	ir_reg src_reg = insn->op2;
+	ir_type type = insn->type;
 
-	if (ctx->vregs[def]
-	 && ctx->live_intervals[ctx->vregs[def]]
-	 && ctx->live_intervals[ctx->vregs[def]]->top->stack_spill_pos != -1) {
-		ir_emit_store(ctx, insn->type, def, def_reg);
+	if (IR_REGSET_IN(IR_REGSET_UNION(ctx->fixed_regset, IR_REGSET_FIXED), src_reg)) {
+		if (ctx->vregs[def]
+		 && ctx->live_intervals[ctx->vregs[def]]
+		 && ctx->live_intervals[ctx->vregs[def]]->top->stack_spill_pos != -1) {
+			ir_emit_store(ctx, type, def, src_reg);
+		}
+	} else {
+		ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
+
+		if (def_reg == IR_REG_NONE) {
+			ir_emit_store(ctx, type, def, src_reg);
+		} else {
+			if (src_reg != def_reg) {
+				if (IR_IS_TYPE_INT(type)) {
+					ir_emit_mov(ctx, type, def_reg, src_reg);
+				} else {
+					IR_ASSERT(IR_IS_TYPE_FP(type));
+					ir_emit_fp_mov(ctx, type, def_reg, src_reg);
+				}
+			}
+			if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
+				ir_emit_store(ctx, type, def, def_reg);
+			}
+		}
 	}
 }
 
