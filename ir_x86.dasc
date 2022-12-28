@@ -3494,12 +3494,15 @@ static void ir_emit_cmp_int_common(ir_ctx *ctx, ir_type type, ir_insn *insn, ir_
 			int32_t offset = 0;
 
 			if (ir_rule(ctx, op2) == IR_SKIP_MEM) {
-				IR_ASSERT(op2_reg != IR_REG_NONE);
 				offset = ir_fuse_load(ctx, op2, &op2_reg);
 			} else {
 				offset = ir_ref_spill_slot(ctx, op2, &op2_reg);
 			}
-			|	ASM_REG_MEM_OP cmp, type, op1_reg, [Ra(op2_reg)+offset]
+			if (op2_reg != IR_REG_NONE) {
+				|	ASM_REG_MEM_OP cmp, type, op1_reg, [Ra(op2_reg)+offset]
+			} else {
+				|	ASM_REG_MEM_OP cmp, type, op1_reg, [offset]
+			}
 		}
 	} else if (IR_IS_CONST_REF(insn->op1)) {
 		IR_ASSERT(0);
