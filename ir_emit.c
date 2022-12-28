@@ -278,6 +278,7 @@ int ir_match(ir_ctx *ctx)
 			if (!ctx->rules[i]) {
 				ctx->rules[i] = ir_match_insn(ctx, i, bb);
 			}
+			ir_match_insn2(ctx, i, bb);
 		}
 		ctx->rules[i] = IR_SKIP;
 	}

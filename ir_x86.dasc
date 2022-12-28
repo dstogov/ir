@@ -1743,6 +1743,25 @@ store_int:
 	return insn->op;
 }
 
+static void ir_match_insn2(ir_ctx *ctx, ir_ref ref, ir_block *bb)
+{
+	if (ctx->rules[ref] == IR_LEA_IB) {
+		ir_insn *insn = &ctx->ir_base[ref];
+
+		if (ctx->ir_base[insn->op2].op == IR_LOAD) {
+			ir_match_fuse_load(ctx, insn->op2, bb);
+			ctx->rules[ref] = IR_BINOP_INT;
+		} else if (ctx->ir_base[insn->op1].op == IR_LOAD) {
+			/* swap for better load fusion */
+			ir_ref tmp = insn->op1;
+			insn->op1 = insn->op2;
+			insn->op2 = tmp;
+			ir_match_fuse_load(ctx, insn->op2, bb);
+			ctx->rules[ref] = IR_BINOP_INT;
+		}
+	}
+}
+
 /* code genertion */
 static int32_t ir_ref_spill_slot(ir_ctx *ctx, ir_ref ref, ir_reg *reg)
 {
