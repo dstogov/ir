@@ -1441,9 +1441,12 @@ static ir_live_pos ir_find_optimal_split_position(ir_ctx *ctx, ir_live_interval 
 		return IR_DEF_LIVE_POS_FROM_REF(max_bb->end);
 	}
 
-	IR_ASSERT(min_bb->loop_depth == max_bb->loop_depth); // TODO: Can "min_bb" be in a deeper loop than "max_bb" ???
-
-	return IR_LOAD_LIVE_POS_FROM_REF(max_bb->start);
+	if (min_bb->loop_depth == max_bb->loop_depth) {
+		return IR_LOAD_LIVE_POS_FROM_REF(max_bb->start);
+	} else {
+		// TODO: "min_bb" is in a deeper loop than "max_bb" ???
+		return max_pos;
+	}
 }
 
 static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, ir_live_interval *ival, ir_live_pos pos)
