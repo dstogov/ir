@@ -603,6 +603,9 @@ binop:
 				}
 			}
 			break;
+		case IR_IMUL3:
+			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
+			break;
 		case IR_SKIP_SHIFT:
 			flags = IR_OP2_MUST_BE_IN_REG;
 			goto shift;
@@ -842,7 +845,6 @@ cmp_fp:
 		case IR_GUARD_NOT:
 			flags = IR_OP2_SHOULD_BE_IN_REG;
 			break;
-		case IR_IMUL3:
 		case IR_IJMP:
 			flags = IR_OP2_SHOULD_BE_IN_REG;
 			break;
@@ -1153,7 +1155,8 @@ binop_fp:
 						return IR_MUL_PWR2; // shl op1, IR_LOG2(op2_insn->val.u64)
 					} else if (IR_IS_TYPE_SIGNED(insn->type)
 					 && ir_type_size[insn->type] != 1
-					 && IR_IS_SIGNED_32BIT(op2_insn->val.i64)) {
+					 && IR_IS_SIGNED_32BIT(op2_insn->val.i64)
+					 && !IR_IS_CONST_REF(insn->op1)) {
 						ir_match_fuse_load(ctx, insn->op1, bb);
 						return IR_IMUL3;
 					}
@@ -1178,7 +1181,8 @@ binop_fp:
 			if (IR_IS_TYPE_SIGNED(insn->type) && ir_type_size[insn->type] != 1) {
 				if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
 					op2_insn = &ctx->ir_base[insn->op2];
-					if (IR_IS_SIGNED_32BIT(op2_insn->val.i64)) {
+					if (IR_IS_SIGNED_32BIT(op2_insn->val.i64)
+					 && !IR_IS_CONST_REF(insn->op1)) {
 						ir_match_fuse_load(ctx, insn->op1, bb);
 						return IR_IMUL3;
 					}
