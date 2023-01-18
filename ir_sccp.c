@@ -308,32 +308,32 @@ restart:
 
 				insn->optx = ctx->fold_insn.opt;
 				if (insn->op1 != ctx->fold_insn.op1) {
-					if (!IR_IS_CONST_REF(insn->op1)) {
+					if (!IR_IS_CONST_REF(insn->op1) && insn->op1 != ctx->fold_insn.op2 && insn->op1 != ctx->fold_insn.op3) {
 						ir_sccp_remove_from_use_list(ctx, insn->op1, ref);
 					}
-					if (!IR_IS_CONST_REF(ctx->fold_insn.op1)) {
+					if (!IR_IS_CONST_REF(ctx->fold_insn.op1) && ctx->fold_insn.op1 != insn->op2 && ctx->fold_insn.op1 != insn->op3) {
 						ir_sccp_add_to_use_list(ctx, ctx->fold_insn.op1, ref);
 					}
-					insn->op1 = ctx->fold_insn.op1;
 				}
 				if (insn->op2 != ctx->fold_insn.op2) {
-					if (!IR_IS_CONST_REF(insn->op2)) {
+					if (!IR_IS_CONST_REF(insn->op2) && insn->op2 != ctx->fold_insn.op1 && insn->op2 != ctx->fold_insn.op3) {
 						ir_sccp_remove_from_use_list(ctx, insn->op2, ref);
 					}
-					if (!IR_IS_CONST_REF(ctx->fold_insn.op2)) {
+					if (!IR_IS_CONST_REF(ctx->fold_insn.op2) && ctx->fold_insn.op2 != insn->op1 && ctx->fold_insn.op2 != insn->op3) {
 						ir_sccp_add_to_use_list(ctx, ctx->fold_insn.op2, ref);
 					}
-					insn->op2 = ctx->fold_insn.op2;
 				}
 				if (insn->op3 != ctx->fold_insn.op3) {
-					if (!IR_IS_CONST_REF(insn->op3)) {
+					if (!IR_IS_CONST_REF(insn->op3) && insn->op3 != ctx->fold_insn.op2 && insn->op3 != ctx->fold_insn.op2) {
 						ir_sccp_remove_from_use_list(ctx, insn->op3, ref);
 					}
-					if (!IR_IS_CONST_REF(ctx->fold_insn.op3)) {
+					if (!IR_IS_CONST_REF(ctx->fold_insn.op3) && ctx->fold_insn.op3 != insn->op1 && ctx->fold_insn.op3 != insn->op2) {
 						ir_sccp_add_to_use_list(ctx, ctx->fold_insn.op3, ref);
 					}
-					insn->op3 = ctx->fold_insn.op3;
 				}
+				insn->op1 = ctx->fold_insn.op1;
+				insn->op2 = ctx->fold_insn.op2;
+				insn->op3 = ctx->fold_insn.op3;
 
 				use_list = &ctx->use_lists[ref];
 				n = use_list->count;
