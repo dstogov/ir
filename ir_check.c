@@ -248,6 +248,10 @@ bool ir_check(ir_ctx *ctx)
 				switch (insn->op) {
 					case IR_SWITCH:
 						/* may have many successors */
+						if (use_list->count < 1) {
+							fprintf(stderr, "ir_base[%d].op (SWITCH) must have at least 1 succesor (%d)\n", i, use_list->count);
+							ok = 0;
+						}
 						break;
 					case IR_IF:
 						if (use_list->count != 2) {
