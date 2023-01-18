@@ -455,6 +455,10 @@ int ir_schedule(ir_ctx *ctx)
 		ir_bitset_incl(scheduled, i);
 		_xlat[i] = bb->start = insns_count;
 		insn = &ctx->ir_base[i];
+		if (insn->op == IR_CASE_VAL) {
+			IR_ASSERT(insn->op2 < IR_TRUE);
+			consts_count += ir_count_constant(used, insn->op2);
+		}
 		n = ir_input_edges_count(ctx, insn);
 		insns_count += 1 + (n >> 2); // support for multi-word instructions like MERGE
 		i = _next[i];
