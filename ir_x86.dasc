@@ -1956,14 +1956,14 @@ static int32_t ir_fuse_load(ir_ctx *ctx, ir_ref ref, ir_reg *preg)
 	if (!IR_IS_CONST_REF(load_insn->op2)
 	 && ir_rule(ctx, load_insn->op2) != IR_SKIP_MEM) {
 		/* just fuse the LOAD itself */
-		if (*preg != IR_REG_NONE) {
+		if (*preg != IR_REG_NONE && *preg != ctx->regs[load_insn->op2][0]) {
 			IR_ASSERT(!((*preg) & IR_REG_SPILL_LOAD));
 		} else {
 			ir_reg reg = ctx->regs[load_insn->op2][0];
 			IR_ASSERT(reg != IR_REG_NONE);
 			if (reg & IR_REG_SPILL_LOAD) {
 				reg &= ~IR_REG_SPILL_LOAD;
-				ir_emit_load(ctx, load_insn->type, reg, load_insn->op2);
+				ir_emit_load(ctx, IR_ADDR, reg, load_insn->op2);
 			}
 			*preg = reg;
 		}

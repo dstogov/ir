@@ -564,6 +564,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						do {
 							if (ctx->ir_base[input].op == IR_LOAD) {
 								input = ctx->ir_base[input].op2;
+								use_flags = IR_USE_MUST_BE_IN_REG;
 								if (input < 0 || ctx->rules[input] != IR_SKIP_MEM) {
 									break;
 								}
