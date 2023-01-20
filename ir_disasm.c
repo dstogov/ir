@@ -630,11 +630,19 @@ int ir_disasm(const char    *name,
 			if (*p) {
 				IR_ASSERT((uintptr_t)*p >= (uintptr_t)start && (uintptr_t)*p < (uintptr_t)orig_end);
 				entry = ir_hashtab_find(&labels, (uint32_t)(*p - (uintptr_t)start));
-				IR_ASSERT(entry != (ir_ref)IR_INVALID_VAL && entry < 0);
-				if (sizeof(void*) == 8) {
-					fprintf(f, "\t.qword .L%d\n", -entry);
+				IR_ASSERT(entry != (ir_ref)IR_INVALID_VAL);
+				if (entry >= 0) {
+					if (sizeof(void*) == 8) {
+						fprintf(f, "\t.qword .ENTRY_%d\n", entry);
+					} else {
+						fprintf(f, "\t.dword .ENTRY_%d\n", entry);
+					}
 				} else {
-					fprintf(f, "\t.dword .L%d\n", -entry);
+					if (sizeof(void*) == 8) {
+						fprintf(f, "\t.qword .L%d\n", -entry);
+					} else {
+						fprintf(f, "\t.dword .L%d\n", -entry);
+					}
 				}
 			} else {
 				if (sizeof(void*) == 8) {
