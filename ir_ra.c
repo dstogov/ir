@@ -2602,13 +2602,7 @@ static void assign_regs(ir_ctx *ctx)
 							IR_ASSERT(use_pos->hint_ref > 0);
 							ref = use_pos->hint_ref;
 						}
-						IR_ASSERT(use_pos->op_num <= IR_MAX(3, ir_input_edges_count(ctx, &ctx->ir_base[ref])));
-
-						/* It's allowed to write above reg_ops[4] boundary */
-						/* (see the real boundaty check by the assertion above) */
-						/* ctx->regs[ref][use_pos->op_num] = reg; */
-						int8_t *reg_ops = ctx->regs[ref];
-						reg_ops[use_pos->op_num] = reg;
+						ir_set_alocated_reg(ctx, ref, use_pos->op_num, reg);
 
 						use_pos = use_pos->next;
 					}

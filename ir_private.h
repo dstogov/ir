@@ -1045,6 +1045,24 @@ typedef struct _ir_reg_alloc_data {
 
 int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type, ir_reg_alloc_data *data);
 
+IR_ALWAYS_INLINE void ir_set_alocated_reg(ir_ctx *ctx, ir_ref ref, int op_num, int8_t reg)
+{
+	int8_t *regs = ctx->regs[ref];
+
+	/* regs[] is not limited by the declared boundary 4, the real boundary checked below */
+	IR_ASSERT(op_num <= IR_MAX(3, ir_input_edges_count(ctx, &ctx->ir_base[ref])));
+	regs[op_num] = reg;
+}
+
+IR_ALWAYS_INLINE int8_t ir_get_alocated_reg(ir_ctx *ctx, ir_ref ref, int op_num)
+{
+	int8_t *regs = ctx->regs[ref];
+
+	/* regs[] is not limited by the declared boundary 4, the real boundary checked below */
+	IR_ASSERT(op_num <= IR_MAX(3, ir_input_edges_count(ctx, &ctx->ir_base[ref])));
+	return regs[op_num];
+}
+
 /*** IR Target Interface ***/
 typedef enum _ir_reg ir_reg;
 typedef struct _ir_target_constraints ir_target_constraints;
