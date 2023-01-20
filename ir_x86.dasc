@@ -7567,8 +7567,14 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 						ir_reg op1_reg = ctx->regs[i][1];
 						int32_t offset = ctx->ir_base[insn->op2].val.i32;
 
-						if (insn->op == IR_SUB) {
-							offset = -offset;
+						if (insn->op == IR_ADD) {
+							offset = ctx->ir_base[insn->op2].val.i32;
+						} else {
+							IR_ASSERT(insn->op == IR_SUB);
+							int64_t long_offset = ctx->ir_base[insn->op2].val.i64;
+							long_offset = -long_offset;
+							IR_ASSERT(IR_IS_SIGNED_32BIT(long_offset));
+							offset = long_offset;
 						}
 						if (op1_reg & IR_REG_SPILL_LOAD) {
 							op1_reg &= ~IR_REG_SPILL_LOAD;
