@@ -1809,8 +1809,9 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 			pos = freeUntilPos[i];
 			reg = i;
 		} else if (freeUntilPos[i] == pos
-				&& !IR_REGSET_IN(IR_REGSET_SCRATCH, reg)
-				&& IR_REGSET_IN(IR_REGSET_SCRATCH, i)) {
+				&& (reg == IR_REG_NONE
+					|| (!IR_REGSET_IN(IR_REGSET_SCRATCH, reg)
+						&& IR_REGSET_IN(IR_REGSET_SCRATCH, i)))) {
 			/* prefer caller-saved registers to avoid save/restore in prologue/epilogue */
 			pos = freeUntilPos[i];
 			reg = i;
@@ -2600,12 +2601,15 @@ static void assign_regs(ir_ctx *ctx)
 						if (use_pos->flags & IR_PHI_USE) {
 							IR_ASSERT(use_pos->hint_ref > 0);
 							ref = use_pos->hint_ref;
-							IR_ASSERT(use_pos->op_num <= IR_MAX(3, ir_input_edges_count(ctx, &ctx->ir_base[ref])));
-							ctx->regs[ref][use_pos->op_num] = reg;
-						} else {
-							IR_ASSERT(use_pos->op_num <= IR_MAX(3, ir_input_edges_count(ctx, &ctx->ir_base[ref])));
-							ctx->regs[ref][use_pos->op_num] = reg;
 						}
+						IR_ASSERT(use_pos->op_num <= IR_MAX(3, ir_input_edges_count(ctx, &ctx->ir_base[ref])));
+
+						/* It's allowed to write above reg_ops[4] boundary */
+						/* (see the real boundaty check by the assertion above) */
+						/* ctx->regs[ref][use_pos->op_num] = reg; */
+						int8_t *reg_ops = ctx->regs[ref];
+						reg_ops[use_pos->op_num] = reg;
+
 						use_pos = use_pos->next;
 					}
 				}
