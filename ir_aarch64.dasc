@@ -3216,7 +3216,7 @@ static void ir_emit_alloca(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			size = IR_ALIGNED_SIZE(size, 8);
 		}
 		|	sub sp, sp, #size
-		if (!(ctx->flags & IR_FUNCTION)) {
+		if (!(ctx->flags & IR_USE_FRAME_POINTER)) {
 			data->call_stack_size += size;
 		}
 	} else {
@@ -3263,7 +3263,7 @@ static void ir_emit_afree(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			size = IR_ALIGNED_SIZE(size, 8);
 		}
 		|	add sp, sp, #size
-		if (!(ctx->flags & IR_FUNCTION)) {
+		if (!(ctx->flags & IR_USE_FRAME_POINTER)) {
 			data->call_stack_size -= size;
 		}
 	} else {
