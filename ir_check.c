@@ -261,12 +261,11 @@ bool ir_check(ir_ctx *ctx)
 						break;
 					case IR_UNREACHABLE:
 					case IR_IJMP:
+					case IR_RETURN:
 						if (use_list->count == 1) {
-							/* UNREACHABLE and IJMP may be used in MERGE with the following ENTRY */
+							/* UNREACHABLE, IJMP and RETURN may be used in MERGE with the following ENTRY */
 							break;
 						}
-						IR_FALLTHROUGH;
-					case IR_RETURN:
 						if (use_list->count != 0) {
 							fprintf(stderr, "ir_base[%d].op (%s) must not have successors (%d)\n",
 								i, ir_op_name[insn->op], use_list->count);
