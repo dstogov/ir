@@ -1735,6 +1735,14 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
 			IR_REGSET_EXCL(available, IR_REG_FRAME_POINTER);
 		}
+#if defined(IR_TARGET_X86)
+		if (ir_type_size[ival->type] == 1) {
+			/* TODO: if no registers avialivle, we may use of one this register for already allocated interval ??? */
+			IR_REGSET_EXCL(available, IR_REG_RBP);
+			IR_REGSET_EXCL(available, IR_REG_RSI);
+			IR_REGSET_EXCL(available, IR_REG_RDI);
+		}
+#endif
 		/* set freeUntilPos of all physical registers to maxInt */
 		for (i = IR_REG_GP_FIRST; i <= IR_REG_GP_LAST; i++) {
 			freeUntilPos[i] = 0x7fffffff;
@@ -1893,6 +1901,14 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
 			IR_REGSET_EXCL(available, IR_REG_FRAME_POINTER);
 		}
+#if defined(IR_TARGET_X86)
+		if (ir_type_size[ival->type] == 1) {
+			/* TODO: if no registers avialivle, we may use of one this register for already allocated interval ??? */
+			IR_REGSET_EXCL(available, IR_REG_RBP);
+			IR_REGSET_EXCL(available, IR_REG_RSI);
+			IR_REGSET_EXCL(available, IR_REG_RDI);
+		}
+#endif
 		/* set nextUsePos of all physical registers to maxInt */
 		for (i = IR_REG_GP_FIRST; i <= IR_REG_GP_LAST; i++) {
 			nextUsePos[i] = 0x7fffffff;
