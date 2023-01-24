@@ -752,6 +752,7 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		if (ctx->prev_ref[bb->end] == bb->start
 		 && bb->successors_count == 1
+		 && (ctx->ir_base[bb->end].op == IR_END || ctx->ir_base[bb->end].op == IR_LOOP_END)
 		 && !(bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_DESSA_MOVES))) {
 			continue;
 		}
