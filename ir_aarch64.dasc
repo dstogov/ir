@@ -325,6 +325,7 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 						}
 						break;
 					case IR_MUL_OV:
+						flags |= IR_DEF_CONFLICTS_WITH_INPUT_REGS;
 						constraints->tmp_regs[n] = IR_TMP_REG(2, insn->type, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 						n++;
 						break;
@@ -4095,11 +4096,19 @@ static void ir_emit_guard_overflow(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-	ir_type type = ctx->ir_base[ctx->ir_base[insn->op2].op1].type;
+	ir_insn *overflow_insn = &ctx->ir_base[insn->op2];
+	ir_insn *math_insn = &ctx->ir_base[overflow_insn->op1];
+	ir_type type = math_insn->type;
 	void *addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op3]);
 
 	IR_ASSERT(IR_IS_TYPE_INT(type));
-	if (IR_IS_TYPE_SIGNED(type)) {
+	if (math_insn->op == IR_MUL_OV) {
+		if (insn->op == IR_GUARD) {
+			|	beq &addr
+		} else {
+			|	bne &addr
+		}
+	} else if (IR_IS_TYPE_SIGNED(type)) {
 		if (insn->op == IR_GUARD) {
 			|	bvc &addr
 		} else {
