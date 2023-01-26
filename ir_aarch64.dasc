@@ -868,17 +868,6 @@ binop_fp:
 				     (insn->op2 == ctx->prev_ref[ref] - 1
 				   && ctx->ir_base[ctx->prev_ref[ref]].op == IR_SNAPSHOT))) {
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
-						if (insn->op1 > bb->start
-						 && insn->op1 < ref
-						 && !ctx->rules[insn->op1]
-						 && ctx->ir_base[insn->op1].op == IR_LOAD) {
-							ir_ref addr_ref = ctx->ir_base[insn->op1].op2;
-							ir_insn *addr_insn = &ctx->ir_base[addr_ref];
-
-							if (addr_insn->op == IR_RLOAD) {
-								ctx->rules[insn->op1] = IR_SKIP_MEM;
-							}
-						}
 						ctx->rules[insn->op2] = IR_SKIP_CMP_INT;
 						return IR_GUARD_CMP_INT;
 					} else {
