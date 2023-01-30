@@ -133,6 +133,7 @@ typedef enum _ir_type {
  * str - string: variable/argument name (VAR, PARAM, CALL, TAILCALL)
  * num - number: argument number (PARAM)
  * prb - branch probability 1-99 (0 - unspecified): (IF_TRUE, IF_FALSE, CASE_VAL, CASE_DEFAULT)
+ * opt - optional number
  *
  * The order of IR opcodes is carefully selected for efficient folding.
  * - foldable instruction go first
@@ -240,7 +241,7 @@ typedef enum _ir_type {
 	_(VADDR,        d1,   var, ___, ___) /* load address of local var   */ \
 	_(VLOAD,        l2,   src, var, ___) /* load value of local var     */ \
 	_(VSTORE,       s3,   src, var, def) /* store value to local var    */ \
-	_(RLOAD,        l1X1, src, num, ___) /* load value from register    */ \
+	_(RLOAD,        l1X2, src, num, opt) /* load value from register    */ \
 	_(RSTORE,       s2X1, src, def, num) /* store value into register   */ \
 	_(LOAD,         l2,   src, ref, ___) /* load from memory            */ \
 	_(STORE,        s3,   src, ref, def) /* store to memory             */ \
@@ -594,6 +595,12 @@ int ir_gcm(ir_ctx *ctx);
 int ir_schedule(ir_ctx *ctx);
 
 /* Liveness & Register Allocation (implementation in ir_ra.c) */
+#define IR_REG_NONE        -1
+#define IR_REG_SPILL_LOAD  (1<<6)
+#define IR_REG_SPILL_STORE (1<<6)
+#define IR_REG_NUM(r) \
+	((r) == IR_REG_NONE ? IR_REG_NONE : ((r) & ~(IR_REG_SPILL_LOAD|IR_REG_SPILL_STORE)))
+
 int ir_assign_virtual_registers(ir_ctx *ctx);
 int ir_compute_live_ranges(ir_ctx *ctx);
 int ir_coalesce(ir_ctx *ctx);

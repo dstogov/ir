@@ -5270,7 +5270,9 @@ static void ir_emit_rload(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 
 		if (def_reg == IR_REG_NONE) {
-			ir_emit_store(ctx, type, def, src_reg);
+			if (!insn->op3) {
+				ir_emit_store(ctx, type, def, src_reg);
+			}
 		} else {
 			if (src_reg != def_reg) {
 				if (IR_IS_TYPE_INT(type)) {
@@ -5280,7 +5282,7 @@ static void ir_emit_rload(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					ir_emit_fp_mov(ctx, type, def_reg, src_reg);
 				}
 			}
-			if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
+			if ((ctx->regs[def][0] & IR_REG_SPILL_STORE) && !insn->op3) {
 				ir_emit_store(ctx, type, def, def_reg);
 			}
 		}

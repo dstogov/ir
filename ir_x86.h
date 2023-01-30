@@ -76,7 +76,7 @@
 	IR_REG_ ## code,
 
 enum _ir_reg {
-	IR_REG_NONE = -1,
+	_IR_REG_NONE = -1,
 	IR_GP_REGS(IR_GP_REG_ENUM)
 	IR_FP_REGS(IR_FP_REG_ENUM)
 	IR_REG_NUM,
