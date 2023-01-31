@@ -417,7 +417,7 @@ int main(int argc, char **argv)
 				ir_perf_jitdump_register("test", entry, size);
 
 				ir_mem_unprotect(entry, 4096);
-				ir_gdb_register("test", entry, size, 0, 0);
+				ir_gdb_register("test", entry, size, sizeof(void*), 0);
 				ir_mem_protect(entry, 4096);
 
 				ret = func();

@@ -73,7 +73,7 @@ void gen_mandelbrot(ir_ctx *ctx)
 			ir_const_double(ctx, 16.0)));
 
 	ir_ref r_1 = ir_emit1(ctx, IR_IF_TRUE, if_1);
-	ret = ir_emit2(ctx, IR_OPT(IR_RETURN, IR_I32), r_1, i_2);
+	ret = ir_emit2(ctx, IR_RETURN, r_1, i_2);
 
 	ir_ref r_2 = ir_emit1(ctx, IR_IF_FALSE, if_1);
 
@@ -82,7 +82,7 @@ void gen_mandelbrot(ir_ctx *ctx)
 
 	ir_ref r_3 = ir_emit1(ctx, IR_IF_TRUE, if_2);
 
-	ret = ir_emit3(ctx, IR_OPT(IR_RETURN, IR_I32), r_3, ir_const_i32(ctx, 0), ret);
+	ret = ir_emit3(ctx, IR_RETURN, r_3, ir_const_i32(ctx, 0), ret);
 
 	ir_ref r_4 = ir_emit1(ctx, IR_IF_FALSE, if_2);
 
@@ -226,7 +226,7 @@ int main(int argc, char **argv)
 		ir_perf_jitdump_register("test", entry,	size);
 
 		ir_mem_unprotect(entry, 4096);
-		ir_gdb_register("test", entry, size, 0, 0);
+		ir_gdb_register("test", entry, size, sizeof(void*), 0);
 		ir_mem_protect(entry, 4096);
 
 		run((mandelbrot_t)entry);
