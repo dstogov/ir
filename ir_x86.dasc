@@ -7339,7 +7339,7 @@ static void ir_preallocate_call_stack(ir_ctx *ctx, ir_backend_data *data)
 			call_stack_size = ir_call_used_stack(ctx, insn);
 			if (call_stack_size > peak_call_stack_size
 #ifdef IR_HAVE_FASTCALL
-			 && (!ir_is_fastcall(ctx, insn) || !call_stack_size) /* fast call functions restore stack pointer */
+			 && !ir_is_fastcall(ctx, insn) /* fast call functions restore stack pointer */
 #endif
 			) {
 				peak_call_stack_size = call_stack_size;
