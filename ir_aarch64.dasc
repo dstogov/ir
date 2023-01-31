@@ -4748,8 +4748,10 @@ static void ir_preallocate_call_stack(ir_ctx *ctx, ir_backend_data *data)
 		i += n;
 		insn += n;
 	}
-	data->call_stack_size = peak_call_stack_size;
-	ctx->flags |= IR_PREALLOCATED_STACK;
+	if (peak_call_stack_size) {
+		data->call_stack_size = peak_call_stack_size;
+		ctx->flags |= IR_PREALLOCATED_STACK;
+	}
 }
 
 static void ir_calc_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
