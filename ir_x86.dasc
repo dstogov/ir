@@ -1031,7 +1031,7 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 						}
 					}
 				}
-				if (IR_IS_CONST_REF(insn->op2)
+				if ((IR_IS_CONST_REF(insn->op2) || ctx->rules[insn->op2] != IR_SKIP_MEM)
 				 && insn->op1 > bb->start
 				 && insn->op1 < ref
 				 && !ctx->rules[insn->op1]) {
@@ -1586,7 +1586,7 @@ store_int:
 						ir_match_fuse_load(ctx, op2_insn->op2, bb);
 					}
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
-						if (IR_IS_CONST_REF(op2_insn->op2)
+						if ((IR_IS_CONST_REF(op2_insn->op2) || ctx->rules[op2_insn->op2] != IR_SKIP_MEM)
 						 && op2_insn->op1 > bb->start
 						 && op2_insn->op1 < ref
 						 && !ctx->rules[op2_insn->op1]) {
