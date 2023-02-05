@@ -904,7 +904,7 @@ static void ir_match_fuse_addr(ir_ctx *ctx, ir_ref addr_ref, ir_block *bb)
 	}
 }
 
-static void ir_match_fuse_load(ir_ctx *ctx, ir_ref ref, ir_block *bb)
+static bool ir_match_fuse_load(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 {
 	if (ref > bb->start
 	 && ctx->ir_base[ref].op == IR_LOAD
@@ -916,63 +916,88 @@ static void ir_match_fuse_load(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 			if (addr_insn->op == IR_C_ADDR &&
 				(sizeof(void*) == 4 || IR_IS_SIGNED_32BIT(addr_insn->val.i64))) {
 				ctx->rules[ref] = IR_SKIP_MEM;
+				return 1;
 			}
 		} else {
 			ir_match_fuse_addr(ctx, addr_ref, bb);
 			ctx->rules[ref] = IR_SKIP_MEM;
+			return 1;
+		}
+	} else if (ref > bb->start
+	 && ctx->ir_base[ref].op == IR_VLOAD) {
+		return 1;
+	}
+	return 0;
+}
+
+static void ir_swap_ops(ir_insn *insn)
+{
+	ir_ref tmp = insn->op1;
+	insn->op1 = insn->op2;
+	insn->op2 = tmp;
+}
+
+static void ir_match_fuse_load_commutative_int(ir_ctx *ctx, ir_insn *insn, ir_block *bb)
+{
+	if (IR_IS_CONST_REF(insn->op2)) {
+		if (ir_type_size[insn->type] > 4 && !IR_IS_32BIT(ctx->ir_base[insn->op2].type, ctx->ir_base[insn->op2].val)
+		 && !IR_IS_CONST_REF(insn->op1)
+		 && ir_match_fuse_load(ctx, insn->op1, bb)) {
+			ir_swap_ops(insn);
+		}
+	} else if (!ir_match_fuse_load(ctx, insn->op2, bb)) {
+		if (!IR_IS_CONST_REF(insn->op1)
+		 && ir_match_fuse_load(ctx, insn->op1, bb)) {
+			ir_swap_ops(insn);
 		}
 	}
 }
 
-static void ir_match_swap_cmp(ir_ctx *ctx, ir_insn *insn)
+static void ir_match_fuse_load_commutative_fp(ir_ctx *ctx, ir_insn *insn, ir_block *bb)
 {
-	if (ctx->flags & IR_OPT_CODEGEN) {
-		if (insn->op == IR_LT || insn->op == IR_LE) {
-			ir_insn *op1_insn = &ctx->ir_base[insn->op1];
+	if (!IR_IS_CONST_REF(insn->op2)
+	 && !ir_match_fuse_load(ctx, insn->op2, bb)
+	 && (IR_IS_CONST_REF(insn->op1) || ir_match_fuse_load(ctx, insn->op1, bb))) {
+		ir_swap_ops(insn);
+	}
+}
 
-			if (IR_IS_TYPE_FP(op1_insn->type)) {
-				/* swap operands to avoid P flag check */
-				ir_ref tmp = insn->op1;
-				insn->op1 = insn->op2;
-				insn->op2 = tmp;
+static void ir_match_fuse_load_cmp_int(ir_ctx *ctx, ir_insn *insn, ir_block *bb)
+{
+	if (IR_IS_CONST_REF(insn->op2)) {
+		if (!IR_IS_CONST_REF(insn->op1)
+		 && ir_match_fuse_load(ctx, insn->op1, bb)
+		 && ir_type_size[ctx->ir_base[insn->op2].type] > 4
+		 && !IR_IS_32BIT(ctx->ir_base[insn->op2].type, ctx->ir_base[insn->op2].val)) {
+			ir_swap_ops(insn);
+			if (insn->op != IR_EQ && insn->op != IR_NE) {
 				insn->op ^= 3;
-				return;
 			}
 		}
-		if (!IR_IS_CONST_REF(insn->op2)
-		 && !IR_IS_CONST_REF(insn->op1)) {
-			ir_insn *op1_insn = &ctx->ir_base[insn->op1];
-			ir_insn *op2_insn = &ctx->ir_base[insn->op2];
-
-			if ((op1_insn->op == IR_VLOAD || op1_insn->op == IR_LOAD)
-			 && (op2_insn->op != IR_VLOAD && op2_insn->op != IR_LOAD)) {
-				/* swap for better load fusion */
-				ir_ref tmp = insn->op1;
-				insn->op1 = insn->op2;
-				insn->op2 = tmp;
-				if (insn->op != IR_EQ && insn->op != IR_NE) {
-					insn->op ^= 3;
-				}
+	} else if (!ir_match_fuse_load(ctx, insn->op2, bb)) {
+		if (!IR_IS_CONST_REF(insn->op1)
+		 && ir_match_fuse_load(ctx, insn->op1, bb)) {
+			ir_swap_ops(insn);
+			if (insn->op != IR_EQ && insn->op != IR_NE) {
+				insn->op ^= 3;
 			}
 		}
 	}
 }
 
-static void ir_match_swap_commutative(ir_ctx *ctx, ir_insn *insn)
+static void ir_match_fuse_load_cmp_fp(ir_ctx *ctx, ir_insn *insn, ir_block *bb)
 {
-	if ((ctx->flags & IR_OPT_CODEGEN)
-	 && (ir_op_flags[insn->op] & IR_OP_FLAG_COMMUTATIVE)
-	 && !IR_IS_CONST_REF(insn->op2)
-	 && !IR_IS_CONST_REF(insn->op1)) {
-		ir_insn *op1_insn = &ctx->ir_base[insn->op1];
-		ir_insn *op2_insn = &ctx->ir_base[insn->op2];
-
-		if ((op1_insn->op == IR_VLOAD || op1_insn->op == IR_LOAD)
-		 && (op2_insn->op != IR_VLOAD && op2_insn->op != IR_LOAD)) {
-			/* swap for better load fusion */
-			ir_ref tmp = insn->op1;
-			insn->op1 = insn->op2;
-			insn->op2 = tmp;
+	if (insn->op == IR_LT || insn->op == IR_LE) {
+		/* swap operands to avoid P flag check */
+		ir_swap_ops(insn);
+		insn->op ^= 3;
+		ir_match_fuse_load(ctx, insn->op2, bb);
+	} else if (IR_IS_CONST_REF(insn->op2)) {
+	} else if (ir_match_fuse_load(ctx, insn->op2, bb)) {
+	} else if (IR_IS_CONST_REF(insn->op1) || ir_match_fuse_load(ctx, insn->op1, bb)) {
+		ir_swap_ops(insn);
+		if (insn->op != IR_EQ && insn->op != IR_NE) {
+			insn->op ^= 3;
 		}
 	}
 }
@@ -995,12 +1020,6 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 		case IR_UGE:
 		case IR_ULE:
 		case IR_UGT:
-			ir_match_swap_cmp(ctx, insn);
-			if (insn->op2 > bb->start
-			 && insn->op2 < ref
-			 && !ctx->rules[insn->op2]) {
-				ir_match_fuse_load(ctx, insn->op2, bb);
-			}
 			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)) {
 				if (IR_IS_CONST_REF(insn->op2)
 				 && ctx->ir_base[insn->op2].val.i64 == 0
@@ -1014,8 +1033,11 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 				        op1_insn->op == IR_AND ||
 				        op1_insn->op == IR_XOR) {
 
-						ir_match_swap_commutative(ctx, op1_insn);
-						ir_match_fuse_load(ctx, op1_insn->op2, bb);
+						if (ir_op_flags[op1_insn->op] & IR_OP_FLAG_COMMUTATIVE) {
+							ir_match_fuse_load_commutative_int(ctx, op1_insn, bb);
+						} else {
+							ir_match_fuse_load(ctx, op1_insn->op2, bb);
+						}
 						if (op1_insn->op == IR_AND && ctx->use_lists[insn->op1].count == 1) {
 							if (IR_IS_CONST_REF(op1_insn->op2)
 							 && op1_insn->op1 > bb->start
@@ -1031,14 +1053,10 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 						}
 					}
 				}
-				if ((IR_IS_CONST_REF(insn->op2) || ctx->rules[insn->op2] != IR_SKIP_MEM)
-				 && insn->op1 > bb->start
-				 && insn->op1 < ref
-				 && !ctx->rules[insn->op1]) {
-					ir_match_fuse_load(ctx, insn->op1, bb);
-				}
+				ir_match_fuse_load_cmp_int(ctx, insn, bb);
 				return IR_CMP_INT;
 			} else {
+				ir_match_fuse_load_cmp_fp(ctx, insn, bb);
 				return IR_CMP_FP;
 			}
 			break;
@@ -1121,13 +1139,19 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 					return IR_LEA_IB; // lea ret, [op1.reg+op2.reg]
 				}
 binop_int:
-				ir_match_swap_commutative(ctx, insn);
-				ir_match_fuse_load(ctx, insn->op2, bb);
+				if (ir_op_flags[insn->op] & IR_OP_FLAG_COMMUTATIVE) {
+					ir_match_fuse_load_commutative_int(ctx, insn, bb);
+				} else {
+					ir_match_fuse_load(ctx, insn->op2, bb);
+				}
 				return IR_BINOP_INT;
 			} else {
 binop_fp:
-				ir_match_swap_commutative(ctx, insn);
-				ir_match_fuse_load(ctx, insn->op2, bb);
+				if (ir_op_flags[insn->op] & IR_OP_FLAG_COMMUTATIVE) {
+					ir_match_fuse_load_commutative_fp(ctx, insn, bb);
+				} else {
+					ir_match_fuse_load(ctx, insn->op2, bb);
+				}
 				if (ctx->flags & IR_AVX) {
 					return IR_BINOP_AVX;
 				} else {
@@ -1579,28 +1603,17 @@ store_int:
 			if (insn->op2 > bb->start && insn->op2 < ref && ctx->use_lists[insn->op2].count == 1) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT) {
-					ir_match_swap_cmp(ctx, op2_insn);
-					if (op2_insn->op2 > bb->start
-					 && op2_insn->op2 < ref
-					 && !ctx->rules[op2_insn->op2]) {
-						ir_match_fuse_load(ctx, op2_insn->op2, bb);
-					}
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
-						if ((IR_IS_CONST_REF(op2_insn->op2) || ctx->rules[op2_insn->op2] != IR_SKIP_MEM)
-						 && op2_insn->op1 > bb->start
-						 && op2_insn->op1 < ref
-						 && !ctx->rules[op2_insn->op1]) {
-							ir_match_fuse_load(ctx, op2_insn->op1, bb);
-						}
+						ir_match_fuse_load_cmp_int(ctx, op2_insn, bb);
 						ctx->rules[insn->op2] = IR_SKIP_CMP_INT;
 						return IR_CMP_AND_BRANCH_INT;
 					} else {
+						ir_match_fuse_load_cmp_fp(ctx, op2_insn, bb);
 						ctx->rules[insn->op2] = IR_SKIP_CMP_FP;
 						return IR_CMP_AND_BRANCH_FP;
 					}
 				} else if (op2_insn->op == IR_AND) { // TODO: OR, XOR. etc
-					ir_match_swap_commutative(ctx, op2_insn);
-					ir_match_fuse_load(ctx, op2_insn->op2, bb);
+					ir_match_fuse_load_commutative_int(ctx, op2_insn, bb);
 					if (IR_IS_CONST_REF(op2_insn->op2)
 					 && op2_insn->op1 > bb->start
 					 && op2_insn->op1 < ref
@@ -1625,8 +1638,11 @@ store_int:
 					    op2_insn->op == IR_AND ||
 					    op2_insn->op == IR_XOR) {
 
-						ir_match_swap_commutative(ctx, op2_insn);
-						ir_match_fuse_load(ctx, op2_insn->op2, bb);
+						if (ir_op_flags[op2_insn->op] & IR_OP_FLAG_COMMUTATIVE) {
+							ir_match_fuse_load_commutative_int(ctx, op2_insn, bb);
+						} else {
+							ir_match_fuse_load(ctx, op2_insn->op2, bb);
+						}
 						ctx->rules[insn->op2] = IR_BINOP_INT;
 						return IR_JCC_INT;
 					}
@@ -1692,20 +1708,16 @@ store_int:
 				     (insn->op2 == ctx->prev_ref[ref] - 1
 				   && ctx->ir_base[ctx->prev_ref[ref]].op == IR_SNAPSHOT))) {
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
-						if (op2_insn->op1 > bb->start
-						 && op2_insn->op1 < ref
-						 && !ctx->rules[op2_insn->op1]) {
-							ir_match_fuse_load(ctx, op2_insn->op1, bb);
-						}
+						ir_match_fuse_load_cmp_int(ctx, op2_insn, bb);
 						ctx->rules[insn->op2] = IR_SKIP_CMP_INT;
 						return IR_GUARD_CMP_INT;
 					} else {
+						ir_match_fuse_load_cmp_fp(ctx, op2_insn, bb);
 						ctx->rules[insn->op2] = IR_SKIP_CMP_FP;
 						return IR_GUARD_CMP_FP;
 					}
 				} else if (op2_insn->op == IR_AND) { // TODO: OR, XOR. etc
-					ir_match_swap_commutative(ctx, op2_insn);
-					ir_match_fuse_load(ctx, op2_insn->op2, bb);
+					ir_match_fuse_load_commutative_int(ctx, op2_insn, bb);
 					if (IR_IS_CONST_REF(op2_insn->op2)
 					 && op2_insn->op1 > bb->start
 					 && op2_insn->op1 < ref
@@ -3499,7 +3511,7 @@ static void ir_emit_cmp_int_common(ir_ctx *ctx, ir_type type, ir_insn *insn, ir_
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
-	if (op1_reg != IR_REG_NONE && ir_rule(ctx, insn->op1) != IR_SKIP_MEM) {
+	if (op1_reg != IR_REG_NONE && (IR_IS_CONST_REF(insn->op1) || ir_rule(ctx, insn->op1) != IR_SKIP_MEM)) {
 		if (op2_reg != IR_REG_NONE && (IR_IS_CONST_REF(op2) || ir_rule(ctx, insn->op2) != IR_SKIP_MEM)) {
 			|	ASM_REG_REG_OP cmp, type, op1_reg, op2_reg
 		} else if (IR_IS_CONST_REF(op2) && ctx->ir_base[op2].val.u64 == 0) {
