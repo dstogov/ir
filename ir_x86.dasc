@@ -18,6 +18,7 @@
 #define IR_IS_SIGNED_32BIT(val)   ((((intptr_t)(val)) <= 0x7fffffff) && (((intptr_t)(val)) >= (-2147483647 - 1)))
 #define IR_IS_UNSIGNED_32BIT(val) (((uintptr_t)(val)) <= 0xffffffff)
 #define IR_IS_32BIT(type, val)    (IR_IS_TYPE_SIGNED(type) ? IR_IS_SIGNED_32BIT((val).i64) : IR_IS_UNSIGNED_32BIT((val).u64))
+#define IR_IS_FP_ZERO(insn)       ((insn.type == IR_DOUBLE) ? (insn.val.u64 == 0) : (insn.val.u32 == 0))
 #define IR_MAY_USE_32BIT_ADDR(a) \
 	(ctx->code_buffer && \
 	IR_IS_SIGNED_32BIT((char*)addr - (char*)ctx->code_buffer) && \
@@ -1002,7 +1003,7 @@ static void ir_match_fuse_load_cmp_fp(ir_ctx *ctx, ir_insn *insn, ir_block *bb, 
 	}
 	if (IR_IS_CONST_REF(insn->op2)) {
 	} else if (ir_match_fuse_load(ctx, insn->op2, bb)) {
-	} else if (IR_IS_CONST_REF(insn->op1) || ir_match_fuse_load(ctx, insn->op1, bb)) {
+	} else if ((IR_IS_CONST_REF(insn->op1) && !IR_IS_FP_ZERO(ctx->ir_base[insn->op1])) || ir_match_fuse_load(ctx, insn->op1, bb)) {
 		ir_swap_ops(insn);
 		if (insn->op != IR_EQ && insn->op != IR_NE) {
 			insn->op ^= 3;
@@ -1616,7 +1617,10 @@ store_int:
 						ctx->rules[insn->op2] = IR_SKIP_CMP_INT;
 						return IR_CMP_AND_BRANCH_INT;
 					} else {
-						ir_match_fuse_load_cmp_fp(ctx, op2_insn, bb, 1);
+						uint32_t true_block, false_block, next_block;
+
+						ir_get_true_false_blocks(ctx, bb - ctx->cfg_blocks, &true_block, &false_block, &next_block);
+						ir_match_fuse_load_cmp_fp(ctx, op2_insn, bb, true_block == next_block);
 						ctx->rules[insn->op2] = IR_SKIP_CMP_FP;
 						return IR_CMP_AND_BRANCH_FP;
 					}
