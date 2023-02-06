@@ -72,6 +72,7 @@ bool ir_check(ir_ctx *ctx)
 {
 	ir_ref i, j, n, *p, use;
 	ir_insn *insn, *use_insn;
+	ir_type type;
 	uint32_t flags;
 	bool ok = 1;
 
@@ -232,6 +233,28 @@ bool ir_check(ir_ctx *ctx)
 				ok = 0;
 			}
 		}
+
+		switch (insn->op) {
+			case IR_LOAD:
+			case IR_STORE:
+				type = ctx->ir_base[insn->op2].type;
+				if (type != IR_ADDR
+				 && (!IR_IS_TYPE_INT(type) || ir_type_size[type] != ir_type_size[IR_ADDR])) {
+					fprintf(stderr, "ir_base[%d].op2 must have ADDR type (%s)\n",
+						i, ir_type_name[type]);
+					ok = 0;
+				}
+				break;
+			case IR_VLOAD:
+			case IR_VSTORE:
+				if (ctx->ir_base[insn->op2].op != IR_VAR) {
+					fprintf(stderr, "ir_base[%d].op2 must be 'VAR' (%s)\n",
+						i, ir_op_name[ctx->ir_base[insn->op2].op]);
+					ok = 0;
+				}
+				break;
+		}
+
 		if (ctx->use_lists) {
 			ir_use_list *use_list = &ctx->use_lists[i];
 			ir_ref count;
