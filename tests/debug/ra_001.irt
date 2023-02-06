@@ -1,0 +1,40 @@
+--TEST--
+001: register allocation
+--TARGET--
+x86_64
+--XFAIL--
+Not implemented register allocation optimization pattern
+--ARGS--
+-S
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uintptr_t c_4 = 0x1;
+	uintptr_t c_5 = 0xbad;
+	l_1 = START(l_15);
+	uintptr_t d_2 = PARAM(l_1, "ptr", 0);
+	uintptr_t d_3, l_3 = LOAD(l_1, d_2);
+	uintptr_t d_4 = AND(d_3, c_4);
+	l_5 = IF(l_3, d_4);
+	l_6 = IF_TRUE(l_5);
+	uintptr_t d_7, l_7 = LOAD(l_6, c_5);
+	uintptr_t d_8 = ADD(d_7, d_3);
+	uintptr_t d_9, l_9 = LOAD(l_7, d_8);
+	l_10 = END(l_9);
+	l_11 = IF_FALSE(l_5);
+	l_12 = END(l_11);
+	l_13 = MERGE(l_10, l_12);
+	uintptr_t d_14 = PHI(l_13, d_9, d_3);
+	l_15 = RETURN(l_13, d_14);
+}
+--EXPECT--
+test:
+	movq (%rdi), %rax
+	testq $1, %rax
+	je .L1
+	addq 0xbad, %rax
+	movq (%rax), %rax
+.L1:
+	retq
