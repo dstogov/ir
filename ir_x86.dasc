@@ -1617,10 +1617,7 @@ store_int:
 						ctx->rules[insn->op2] = IR_SKIP_CMP_INT;
 						return IR_CMP_AND_BRANCH_INT;
 					} else {
-						uint32_t true_block, false_block, next_block;
-
-						ir_get_true_false_blocks(ctx, bb - ctx->cfg_blocks, &true_block, &false_block, &next_block);
-						ir_match_fuse_load_cmp_fp(ctx, op2_insn, bb, true_block == next_block);
+						ir_match_fuse_load_cmp_fp(ctx, op2_insn, bb, 1);
 						ctx->rules[insn->op2] = IR_SKIP_CMP_FP;
 						return IR_CMP_AND_BRANCH_FP;
 					}
