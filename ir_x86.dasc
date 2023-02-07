@@ -8249,7 +8249,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 			insn += n;
 			rule += n;
 		}
-next_block:
+next_block:;
 	}
 
 	if (data.rodata_label) {
