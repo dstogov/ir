@@ -52,6 +52,24 @@
 # error "Unknown byte order"
 #endif
 
+#ifdef __has_attribute
+# if __has_attribute(always_inline)
+#  define IR_ALWAYS_INLINE static inline __attribute__((always_inline))
+# endif
+# if __has_attribute(noinline)
+#  define IR_NEVER_INLINE __attribute__((noinline))
+# endif
+#else
+# define __has_attribute(x) 0
+#endif
+
+#ifndef IR_ALWAYS_INLINE
+# define IR_ALWAYS_INLINE static inline
+#endif
+#ifndef IR_NEVER_INLINE
+# define IR_NEVER_INLINE
+#endif
+
 #ifdef IR_PHP
 # include "ir_php.h"
 #endif
@@ -538,28 +556,28 @@ ir_ref ir_emit3(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
 ir_ref ir_emit_N(ir_ctx *ctx, uint32_t opt, int32_t count);
 void   ir_set_op(ir_ctx *ctx, ir_ref ref, int32_t n, ir_ref val);
 
-static inline void ir_set_op1(ir_ctx *ctx, ir_ref ref, ir_ref val)
+IR_ALWAYS_INLINE void ir_set_op1(ir_ctx *ctx, ir_ref ref, ir_ref val)
 {
 	ctx->ir_base[ref].op1 = val;
 }
 
-static inline void ir_set_op2(ir_ctx *ctx, ir_ref ref, ir_ref val)
+IR_ALWAYS_INLINE void ir_set_op2(ir_ctx *ctx, ir_ref ref, ir_ref val)
 {
 	ctx->ir_base[ref].op2 = val;
 }
 
-static inline void ir_set_op3(ir_ctx *ctx, ir_ref ref, ir_ref val)
+IR_ALWAYS_INLINE void ir_set_op3(ir_ctx *ctx, ir_ref ref, ir_ref val)
 {
 	ctx->ir_base[ref].op3 = val;
 }
 
-static inline ir_ref ir_insn_op(ir_insn *insn, int32_t n)
+IR_ALWAYS_INLINE ir_ref ir_insn_op(ir_insn *insn, int32_t n)
 {
 	ir_ref *p = insn->ops + n;
 	return *p;
 }
 
-static inline void ir_insn_set_op(ir_insn *insn, int32_t n, ir_ref val)
+IR_ALWAYS_INLINE void ir_insn_set_op(ir_insn *insn, int32_t n, ir_ref val)
 {
 	ir_ref *p = insn->ops + n;
 	*p = val;

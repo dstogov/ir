@@ -22,12 +22,6 @@
 #   define EXPECTED(condition)   __builtin_expect(!!(condition), 1)
 #   define UNEXPECTED(condition) __builtin_expect(!!(condition), 0)
 # endif
-# if __has_attribute(always_inline)
-#  define IR_ALWAYS_INLINE static inline __attribute__((always_inline))
-# endif
-# if __has_attribute(noinline)
-#  define IR_NEVER_INLINE __attribute__((noinline))
-# endif
 # if __has_attribute(__aligned__)
 #  define IR_SET_ALIGNED(alignment, decl) decl __attribute__ ((__aligned__ (alignment)))
 # endif
@@ -42,12 +36,6 @@
 #ifndef EXPECTED
 # define EXPECTED(condition)   (condition)
 # define UNEXPECTED(condition) (condition)
-#endif
-#ifndef IR_ALWAYS_INLINE
-# define IR_ALWAYS_INLINE static inline
-#endif
-#ifndef IR_NEVER_INLINE
-# define IR_NEVER_INLINE
 #endif
 #ifndef IR_SET_ALIGNED
 #  define IR_SET_ALIGNED(alignment, decl) decl
