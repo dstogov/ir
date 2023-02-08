@@ -38,53 +38,29 @@ ifeq (aarch64, $(TARGET))
   DASM_FLAGS =
 endif
 
-all: $(BUILD_DIR)/ir $(BUILD_DIR)/ir_test
-
-$(BUILD_DIR)/ir: $(BUILD_DIR)/ir_main.o $(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_strtab.o $(BUILD_DIR)/ir_cfg.o \
+OBJS_COMMON = $(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_strtab.o $(BUILD_DIR)/ir_cfg.o \
 	$(BUILD_DIR)/ir_sccp.o $(BUILD_DIR)/ir_gcm.o $(BUILD_DIR)/ir_ra.o $(BUILD_DIR)/ir_emit.o \
 	$(BUILD_DIR)/ir_load.o $(BUILD_DIR)/ir_save.o $(BUILD_DIR)/ir_emit_c.o $(BUILD_DIR)/ir_dump.o \
 	$(BUILD_DIR)/ir_disasm.o $(BUILD_DIR)/ir_gdb.o $(BUILD_DIR)/ir_perf.o $(BUILD_DIR)/ir_check.o
+OBJS_IR = $(BUILD_DIR)/ir_main.o
+OBJS_IR_TEST = $(BUILD_DIR)/ir_test.o
+
+all: $(BUILD_DIR) $(BUILD_DIR)/ir $(BUILD_DIR)/ir_test
+
+$(BUILD_DIR):
+	@mkdir -p $(BUILD_DIR)
+
+$(BUILD_DIR)/ir: $(OBJS_COMMON) $(OBJS_IR)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lcapstone
 
-$(BUILD_DIR)/ir_test: $(BUILD_DIR)/ir_test.o $(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_strtab.o $(BUILD_DIR)/ir_cfg.o \
-	$(BUILD_DIR)/ir_sccp.o $(BUILD_DIR)/ir_gcm.o $(BUILD_DIR)/ir_ra.o $(BUILD_DIR)/ir_emit.o \
-	$(BUILD_DIR)/ir_save.o $(BUILD_DIR)/ir_dump.o $(BUILD_DIR)/ir_disasm.o $(BUILD_DIR)/ir_gdb.o \
-	$(BUILD_DIR)/ir_perf.o $(BUILD_DIR)/ir_check.o
+$(BUILD_DIR)/ir_test: $(OBJS_COMMON) $(OBJS_IR_TEST)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lcapstone
 
-$(BUILD_DIR)/ir.o: $(SRC_DIR)/ir.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h $(SRC_DIR)/ir_fold.h \
-	$(BUILD_DIR)/ir_fold_hash.h
-	$(CC) $(CFLAGS) -I$(BUILD_DIR) -o $@ -c $<
-$(BUILD_DIR)/ir_cfg.o: $(SRC_DIR)/ir_cfg.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h
-	$(CC) $(CFLAGS) -o $@ -c $<
-$(BUILD_DIR)/ir_sccp.o: $(SRC_DIR)/ir_sccp.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h
-	$(CC) $(CFLAGS) -o $@ -c $<
-$(BUILD_DIR)/ir_gcm.o: $(SRC_DIR)/ir_gcm.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h
-	$(CC) $(CFLAGS) -o $@ -c $<
-$(BUILD_DIR)/ir_ra.o: $(SRC_DIR)/ir_ra.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h $(SRC_DIR)/ir_$(DASM_ARCH).h
-	$(CC) $(CFLAGS) -o $@ -c $<
-$(BUILD_DIR)/ir_strtab.o: $(SRC_DIR)/ir_strtab.c $(SRC_DIR)/ir.h
-	$(CC) $(CFLAGS) -o $@ -c $<
-$(BUILD_DIR)/ir_save.o: $(SRC_DIR)/ir_save.c $(SRC_DIR)/ir.h
-	$(CC) $(CFLAGS) -o $@ -c $<
-$(BUILD_DIR)/ir_load.o: $(SRC_DIR)/ir_load.c $(SRC_DIR)/ir.h
-	$(CC) $(CFLAGS) -o $@ -c $<
-$(BUILD_DIR)/ir_emit_c.o: $(SRC_DIR)/ir_emit_c.c $(SRC_DIR)/ir.h
-	$(CC) $(CFLAGS) -o $@ -c $<
-$(BUILD_DIR)/ir_dump.o: $(SRC_DIR)/ir_dump.c $(SRC_DIR)/ir.h
-	$(CC) $(CFLAGS) -o $@ -c $<
-$(BUILD_DIR)/ir_disasm.o: $(SRC_DIR)/ir_disasm.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h
-	$(CC) $(CFLAGS) -o $@ -c $<
-$(BUILD_DIR)/ir_gdb.o: $(SRC_DIR)/ir_gdb.c $(SRC_DIR)/ir.h
-	$(CC) $(CFLAGS) -o $@ -c $<
-$(BUILD_DIR)/ir_perf.o: $(SRC_DIR)/ir_perf.c $(SRC_DIR)/ir.h
-	$(CC) $(CFLAGS) -o $@ -c $<
-$(BUILD_DIR)/ir_check.o: $(SRC_DIR)/ir_check.c $(SRC_DIR)/ir.h
-	$(CC) $(CFLAGS) -o $@ -c $<
-$(BUILD_DIR)/ir_main.o: $(SRC_DIR)/ir_main.c $(SRC_DIR)/ir.h
-	$(CC) $(CFLAGS) -o $@ -c $<
-$(BUILD_DIR)/ir_test.o: $(SRC_DIR)/ir_test.c $(SRC_DIR)/ir.h
-	$(CC) $(CFLAGS) -o $@ -c $<
+$(OBJS_COMMON) $(OBJS_IR) $(OBJS_IR_TEST): $(SRC_DIR)/ir.h
+$(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_cfg.o $(BUILD_DIR)/ir_sccp.o $(BUILD_DIR)/ir_gcm.o $(BUILD_DIR)/ir_ra.o $(BUILD_DIR)/ir_disasm.o: $(SRC_DIR)/ir_private.h
+$(BUILD_DIR)/ir.o: $(SRC_DIR)/ir_fold.h $(BUILD_DIR)/ir_fold_hash.h
+$(BUILD_DIR)/ir_emit.o $(BUILD_DIR)/ir_ra.o: $(SRC_DIR)/ir_$(DASM_ARCH).h
+$(BUILD_DIR)/ir_emit.o:  $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h
 
 $(SRC_DIR)/ir_load.c: $(SRC_DIR)/ir.g
 	$(LLK) ir.g
@@ -98,8 +74,8 @@ $(BUILD_DIR)/minilua: $(SRC_DIR)/dynasm/minilua.c
 	$(BUILD_CC) $(SRC_DIR)/dynasm/minilua.c -lm -o $@
 $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h: $(SRC_DIR)/ir_$(DASM_ARCH).dasc $(SRC_DIR)/dynasm/*.lua $(BUILD_DIR)/minilua
 	$(BUILD_DIR)/minilua $(SRC_DIR)/dynasm/dynasm.lua $(DASM_FLAGS) -o $@ $(SRC_DIR)/ir_$(DASM_ARCH).dasc
-$(BUILD_DIR)/ir_emit.o: $(SRC_DIR)/ir_emit.c $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h \
-	$(SRC_DIR)/ir_$(DASM_ARCH).h
+
+$(OBJS_COMMON) $(OBJS_IR) $(OBJS_IR_TEST): $(BUILD_DIR)/$(notdir %.o): $(SRC_DIR)/$(notdir %.c)
 	$(CC) $(CFLAGS) -I$(BUILD_DIR) -o $@ -c $<
 
 test: $(BUILD_DIR)/ir
