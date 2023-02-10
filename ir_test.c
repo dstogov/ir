@@ -6,6 +6,7 @@
  */
 
 #include "ir.h"
+#include "ir_builder.h"
 #include <sys/time.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,87 +16,42 @@
 
 void gen_mandelbrot(ir_ctx *ctx)
 {
-	ir_ref start = ir_emit0(ctx, IR_START);
-	ir_ref ret;
+	ir_START();
+	ir_ref x = ir_PARAM(IR_DOUBLE, "x", 1);
+	ir_ref y = ir_PARAM(IR_DOUBLE, "y", 2);
+	ir_ref cr = ir_SUB_D(y, ir_CONST_DOUBLE(0.5));
+	ir_ref ci = ir_COPY_D(x);
+	ir_ref zi = ir_COPY_D(ir_CONST_DOUBLE(0.0));
+	ir_ref zr = ir_COPY_D(ir_CONST_DOUBLE(0.0));
+	ir_ref i = ir_COPY_D(ir_CONST_I32(0));
 
-	ir_ref x_1 = ir_param(ctx, IR_DOUBLE, start, "x", 0);
-	ir_ref y_1 = ir_param(ctx, IR_DOUBLE, start, "y", 1);
+	ir_ref loop = ir_LOOP_BEGIN(ir_END());
+		ir_ref zi_1 = ir_PHI_2(zi, IR_UNUSED);
+		ir_ref zr_1 = ir_PHI_2(zr, IR_UNUSED);
+		ir_ref i_1 = ir_PHI_2(i, IR_UNUSED);
 
-	ir_ref cr = ir_var(ctx, IR_DOUBLE, start, "cr");
-	ir_ref cr_1 = ir_fold2(ctx, IR_OPT(IR_SUB, IR_DOUBLE), y_1,
-		ir_const_double(ctx, 0.5));
-	ir_bind(ctx, cr, cr_1);                                                    // cr=cr_1
-	ir_ref ci = ir_var(ctx, IR_DOUBLE, start, "ci");
-	ir_bind(ctx, ci, x_1);                                                     // cr=cr_1, ci=x_1
-	ir_ref zi = ir_var(ctx, IR_DOUBLE, start, "zi");
-	ir_bind(ctx, zi, ir_const_double(ctx, 0.0));                               // cr=cr_1, ci=x_1, zi=0.0
-	ir_ref zr = ir_var(ctx, IR_DOUBLE, start, "zr");
-	ir_bind(ctx, zr, ir_const_double(ctx, 0.0));                               // cr=cr_1, ci=x_1, zi=0.0, zr=0.0
-	ir_ref i = ir_var(ctx, IR_I32, start, "i");
-	ir_bind(ctx, i, ir_const_i32(ctx, 0));                                     // cr=cr_1, ci=x_1, zi=0.0, zr=0.0, i=0
+		ir_ref i_2 = ir_ADD_I32(i_1, ir_CONST_I32(1));
+		ir_ref temp = ir_MUL_D(zr_1, zi_1);
+		ir_ref zr2 = ir_MUL_D(zr_1, zr_1);
+		ir_ref zi2 = ir_MUL_D(zi_1, zi_1);
+		ir_ref zr_2 = ir_ADD_D(ir_SUB_D(zr2, zi2), cr);
+		ir_ref zi_2 = ir_ADD_D(ir_ADD_D(temp, temp), ci);
+		ir_ref if_1 = ir_IF(ir_GT(ir_ADD_D(zi2, zr2), ir_CONST_DOUBLE(16.0)));
+			ir_IF_TRUE(if_1);
+				ir_RETURN(i_2);
+			ir_IF_FALSE(if_1);
+				ir_ref if_2 = ir_IF(ir_GT(i_2, ir_CONST_I32(1000)));
+				ir_IF_TRUE(if_2);
+					ir_RETURN(ir_CONST_I32(0));
+				ir_IF_FALSE(if_2);
+					ir_ref loop_end = ir_LOOP_END(loop);
 
-	ir_ref e_1 = ir_emit1(ctx, IR_END, start);
-	ir_ref l_1 = ir_emit1(ctx, IR_LOOP_BEGIN, e_1);
-
-	ir_ref zi_1 = ir_emit2(ctx, IR_OPT(IR_PHI, IR_DOUBLE), l_1,
-		ir_const_double(ctx, 0.0));
-	ir_bind(ctx, zi, zi_1);                                                    // cr=cr_1, ci=x_1, zi=zi_1, zr=0.0, i=0
-	ir_ref zr_1 = ir_emit2(ctx, IR_OPT(IR_PHI, IR_DOUBLE), l_1,
-		ir_const_double(ctx, 0.0));
-	ir_bind(ctx, zr, zr_1);                                                    // cr=cr_1, ci=x_1, zi=zi_1, zr=zr_1, i=0
-	ir_ref i_1 = ir_emit2(ctx, IR_OPT(IR_PHI, IR_I32), l_1,
-		ir_const_i32(ctx, 0));
-	ir_bind(ctx, i, i_1);                                                      // cr=cr_1, ci=x_1, zi=zi_1, zr=zr_1, i=i_1
-	ir_ref i_2 = ir_emit2(ctx, IR_OPT(IR_ADD, IR_I32), i_1,
-		ir_const_i32(ctx, 1));
-	ir_bind(ctx, i, i_2);                                                      // cr=cr_1, ci=x_1, zi=zi_1, zr=zr_1, i=i_2
-	ir_ref temp = ir_var(ctx, IR_DOUBLE, l_1, "temp");
-	ir_ref temp_1 = ir_fold2(ctx, IR_OPT(IR_MUL, IR_DOUBLE), zr_1, zi_1);
-	ir_bind(ctx, temp, temp_1);                                                // ... temp=temp_1
-	ir_ref zr2 = ir_var(ctx, IR_DOUBLE, l_1, "zr2");
-	ir_ref zr2_1 = ir_fold2(ctx, IR_OPT(IR_MUL, IR_DOUBLE), zr_1, zr_1);
-	ir_bind(ctx, zr2, zr2_1);                                                  // ... temp=temp_1, zr2=zr2_1
-	ir_ref zi2 = ir_var(ctx, IR_DOUBLE, l_1, "zi2");
-	ir_ref zi2_1 = ir_fold2(ctx, IR_OPT(IR_MUL, IR_DOUBLE), zi_1, zi_1);
-	ir_bind(ctx, zi2, zi2_1);                                                  // ... temp=temp_1, zr2=zr2_1, zi2=zi2_1
-	ir_ref zr_2 = ir_fold2(ctx, IR_OPT(IR_ADD, IR_DOUBLE),
-		ir_fold2(ctx, IR_OPT(IR_SUB, IR_DOUBLE), zr2_1, zi2_1),
-		cr_1);
-	ir_bind(ctx, zr, zr_2);                                                    // cr=cr_1, ci=x_1, zi=zi_1, zr=zr_2, i=i_2
-	ir_ref zi_2 = ir_fold2(ctx, IR_OPT(IR_ADD, IR_DOUBLE),
-		ir_fold2(ctx, IR_OPT(IR_ADD, IR_DOUBLE), temp_1, temp_1),
-		x_1);
-	ir_bind(ctx, zi, zi_2);                                                    // cr=cr_1, ci=x_1, zi=zi_2 zr=zr_2, i=i_2
-
-	ir_ref if_1 = ir_emit2(ctx, IR_IF, l_1,
-		ir_fold2(ctx, IR_OPT(IR_GT, IR_BOOL),
-			ir_fold2(ctx, IR_OPT(IR_ADD, IR_DOUBLE), zi2_1, zr2_1),
-			ir_const_double(ctx, 16.0)));
-
-	ir_ref r_1 = ir_emit1(ctx, IR_IF_TRUE, if_1);
-	ret = ir_emit2(ctx, IR_RETURN, r_1, i_2);
-
-	ir_ref r_2 = ir_emit1(ctx, IR_IF_FALSE, if_1);
-
-	ir_ref if_2 = ir_emit2(ctx, IR_IF, r_2,
-		ir_fold2(ctx, IR_OPT(IR_GT, IR_BOOL), i_2, ir_const_i32(ctx, 1000)));
-
-	ir_ref r_3 = ir_emit1(ctx, IR_IF_TRUE, if_2);
-
-	ret = ir_emit3(ctx, IR_RETURN, r_3, ir_const_i32(ctx, 0), ret);
-
-	ir_ref r_4 = ir_emit1(ctx, IR_IF_FALSE, if_2);
-
-	ir_ref l_2 = ir_emit2(ctx, IR_LOOP_END, r_4, l_1);
-
-	ir_set_op2(ctx, l_1, l_2);
+	/* close loop */
+	ir_set_op2(ctx, loop, loop_end);
 	ir_set_op3(ctx, zi_1, zi_2);
 	ir_set_op3(ctx, zr_1, zr_2);
 	ir_set_op3(ctx, i_1, i_2);
-
-	ir_set_op1(ctx, start, ret);
 }
-
 
 typedef int (*mandelbrot_t)(double, double);
 

@@ -470,12 +470,15 @@ void ir_strtab_free(ir_strtab *strtab);
 # define IR_DEBUG_RA          (1<<30)
 #endif
 
+typedef struct _ir_ctx           ir_ctx;
 typedef struct _ir_use_list      ir_use_list;
 typedef struct _ir_block         ir_block;
 typedef struct _ir_live_interval ir_live_interval;
 typedef int8_t ir_regs[4];
 
-typedef struct _ir_ctx {
+typedef void (*ir_snapshot_create_t)(ir_ctx *ctx, ir_ref addr);
+
+struct _ir_ctx {
 	ir_insn           *ir_base;           /* two directional array - instructions grow down, constants grow up */
 	ir_ref             insns_count;
 	ir_ref             insns_limit;
@@ -504,7 +507,11 @@ typedef struct _ir_ctx {
 	ir_live_interval **live_intervals;
 	ir_regs           *regs;
 	ir_ref            *prev_ref;
-	void              *data;
+	union {
+		void          *data;
+		ir_ref         control;           /* used by IR construction API (see ir_builder.h) */
+	};
+	ir_snapshot_create_t   snapshot_create;
 	uint32_t           rodata_offset;
 	uint32_t           jmp_table_offset;
 	void              *code_buffer;
@@ -512,7 +519,7 @@ typedef struct _ir_ctx {
 	ir_strtab          strtab;
 	ir_ref             prev_insn_chain[IR_LAST_FOLDABLE_OP + 1];
 	ir_ref             prev_const_chain[IR_LAST_TYPE];
-} ir_ctx;
+};
 
 /* Basic IR Construction API (implementation in ir.c) */
 void ir_init(ir_ctx *ctx, ir_ref consts_limit, ir_ref insns_limit);

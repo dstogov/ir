@@ -317,6 +317,7 @@ void ir_init(ir_ctx *ctx, ir_ref consts_limit, ir_ref insns_limit)
 	ctx->regs = NULL;
 	ctx->prev_ref = NULL;
 	ctx->data = NULL;
+	ctx->snapshot_create = NULL;
 
 	ctx->code_buffer = NULL;
 	ctx->code_buffer_size = 0;
@@ -1239,4 +1240,817 @@ int ir_mem_flush(void *ptr, size_t size)
 	VALGRIND_DISCARD_TRANSLATIONS(ptr, size);
 #endif
 	return 1;
+}
+
+/* Alias Analyses */
+typedef enum _ir_alias {
+	IR_MAY_ALIAS  = -1,
+	IR_NO_ALIAS   =  0,
+	IR_MUST_ALIAS =  1,
+} ir_alias;
+
+#if 0
+static ir_alias ir_check_aliasing(ir_ctx *ctx, ir_ref addr1, ir_ref addr2)
+{
+	ir_insn *insn1, *insn2;
+
+	if (addr1 == addr2) {
+		return IR_MUST_ALIAS;
+	}
+
+	insn1 = &ctx->ir_base[addr1];
+	insn2 = &ctx->ir_base[addr2];
+	if (insn1->op == IR_ADD && IR_IS_CONST_REF(insn1->op2)) {
+		if (insn1->op1 == addr2) {
+			uintptr_t offset1 = ctx->ir_base[insn1->op2].val.u64;
+			return (offset1 != 0) ? IR_MUST_ALIAS : IR_NO_ALIAS;
+		} else if (insn2->op == IR_ADD && IR_IS_CONST_REF(insn1->op2) && insn1->op1 == insn2->op1) {
+			if (insn1->op2 == insn2->op2) {
+				return IR_MUST_ALIAS;
+			} else if (IR_IS_CONST_REF(insn1->op2) && IR_IS_CONST_REF(insn2->op2)) {
+				uintptr_t offset1 = ctx->ir_base[insn1->op2].val.u64;
+				uintptr_t offset2 = ctx->ir_base[insn2->op2].val.u64;
+
+				return (offset1 == offset2) ? IR_MUST_ALIAS : IR_NO_ALIAS;
+			}
+		}
+	} else if (insn2->op == IR_ADD && IR_IS_CONST_REF(insn2->op2)) {
+		if (insn2->op1 == addr1) {
+			uintptr_t offset2 = ctx->ir_base[insn2->op2].val.u64;
+
+			return (offset2 != 0) ? IR_MUST_ALIAS : IR_NO_ALIAS;
+		}
+	}
+	return IR_MAY_ALIAS;
+}
+#endif
+
+static ir_alias ir_check_partial_aliasing(ir_ctx *ctx, ir_ref addr1, ir_ref addr2, ir_type type1, ir_type type2)
+{
+	ir_insn *insn1, *insn2;
+
+	/* this must be already check */
+	IR_ASSERT(addr1 != addr2);
+
+	insn1 = &ctx->ir_base[addr1];
+	insn2 = &ctx->ir_base[addr2];
+	if (insn1->op == IR_ADD && IR_IS_CONST_REF(insn1->op2)) {
+		if (insn1->op1 == addr2) {
+			uintptr_t offset1 = ctx->ir_base[insn1->op2].val.u64;
+			uintptr_t size2 = ir_type_size[type2];
+
+			return (offset1 < size2) ? IR_MUST_ALIAS : IR_NO_ALIAS;
+		} else if (insn2->op == IR_ADD && IR_IS_CONST_REF(insn1->op2) && insn1->op1 == insn2->op1) {
+			if (insn1->op2 == insn2->op2) {
+				return IR_MUST_ALIAS;
+			} else if (IR_IS_CONST_REF(insn1->op2) && IR_IS_CONST_REF(insn2->op2)) {
+				uintptr_t offset1 = ctx->ir_base[insn1->op2].val.u64;
+				uintptr_t offset2 = ctx->ir_base[insn2->op2].val.u64;
+
+				if (offset1 == offset2) {
+					return IR_MUST_ALIAS;
+				} else if (type1 == type2) {
+					return IR_NO_ALIAS;
+				} else {
+					/* check for partail intersection */
+					uintptr_t size1 = ir_type_size[type1];
+					uintptr_t size2 = ir_type_size[type2];
+
+					if (offset1	> offset2) {
+						return offset1 < offset2 + size2 ? IR_MUST_ALIAS : IR_NO_ALIAS;
+					} else {
+						return offset2 < offset1 + size1 ? IR_MUST_ALIAS : IR_NO_ALIAS;
+					}
+				}
+			}
+		}
+	} else if (insn2->op == IR_ADD && IR_IS_CONST_REF(insn2->op2)) {
+		if (insn2->op1 == addr1) {
+			uintptr_t offset2 = ctx->ir_base[insn2->op2].val.u64;
+			uintptr_t size1 = ir_type_size[type1];
+
+			return (offset2 < size1) ? IR_MUST_ALIAS : IR_NO_ALIAS;
+		}
+	}
+	return IR_MAY_ALIAS;
+}
+
+static ir_ref ir_find_aliasing_load(ir_ctx *ctx, ir_ref ref, ir_type type, ir_ref addr)
+{
+	ir_insn *insn;
+	uint32_t modified_regset = 0;
+
+	while (1) {
+		insn = &ctx->ir_base[ref];
+		if (insn->op == IR_LOAD) {
+			if (insn->type == type && insn->op2 == addr) {
+				return ref; /* load forwarding (L2L) */
+			}
+		} else if (insn->op == IR_STORE) {
+			ir_type type2 = ctx->ir_base[insn->op3].type;
+
+			if (insn->op2 == addr) {
+				if (type2 == type) {
+					ref = insn->op3;
+					insn = &ctx->ir_base[ref];
+					if (insn->op == IR_RLOAD && (modified_regset & (1 << insn->op2))) {
+						/* anti-dependency */
+						return IR_UNUSED;
+					}
+					return ref; /* store forwarding (S2L) */
+				} else if (IR_IS_TYPE_INT(type) && ir_type_size[type2] > ir_type_size[type]) {
+					return ir_fold1(ctx, IR_OPT(IR_TRUNC, type), insn->op3); /* partial store forwarding (S2L) */
+				} else {
+					return IR_UNUSED;
+				}
+			} else if (ir_check_partial_aliasing(ctx, addr, insn->op2, type, type2) != IR_NO_ALIAS) {
+				return IR_UNUSED;
+			}
+		} else if (insn->op == IR_RSTORE) {
+			modified_regset |= (1 << insn->op3);
+		} else if (insn->op == IR_START
+			 || insn->op == IR_BEGIN
+			 || insn->op == IR_IF_TRUE
+			 || insn->op == IR_IF_FALSE
+			 || insn->op == IR_CASE_VAL
+			 || insn->op == IR_CASE_DEFAULT
+			 || insn->op == IR_MERGE
+			 || insn->op == IR_LOOP_BEGIN
+			 || insn->op == IR_ENTRY
+			 || insn->op == IR_CALL) {
+			return IR_UNUSED;
+		}
+		ref = insn->op1;
+	}
+}
+
+/* IR Construction API */
+
+ir_ref _ir_PARAM(ir_ctx *ctx, ir_type type, const char* name, ir_ref num)
+{
+	IR_ASSERT(ctx->control);
+	IR_ASSERT(ctx->ir_base[ctx->control].op == IR_START);
+	IR_ASSERT(ctx->insns_count == num + 1);
+	return ir_param(ctx, type, ctx->control, name, num);
+}
+
+ir_ref _ir_VAR(ir_ctx *ctx, ir_type type, const char* name)
+{
+	IR_ASSERT(ctx->control);
+	IR_ASSERT(IR_IS_BB_START(ctx->ir_base[ctx->control].op));
+	return ir_var(ctx, type, ctx->control, name);
+}
+
+ir_ref _ir_PHI_2(ir_ctx *ctx, ir_ref src1, ir_ref src2)
+{
+	ir_type type = ctx->ir_base[src1].type;
+
+	IR_ASSERT(ctx->control);
+	IR_ASSERT(ctx->ir_base[ctx->control].op == IR_MERGE || ctx->ir_base[ctx->control].op == IR_LOOP_BEGIN);
+	return ir_emit3(ctx, IR_OPT(IR_PHI, type), ctx->control, src1, src2);
+}
+
+ir_ref _ir_PHI_N(ir_ctx *ctx, ir_ref n, ir_ref *inputs)
+{
+	IR_ASSERT(ctx->control);
+	IR_ASSERT(n > 0);
+	if (n == 1) {
+		return inputs[0];
+	} else {
+	    ir_ref i;
+		ir_ref ref = inputs[0];
+
+		IR_ASSERT(ctx->ir_base[ctx->control].op == IR_MERGE || ctx->ir_base[ctx->control].op == IR_LOOP_BEGIN);
+		for (i = 1; i < n; i++) {
+			if (inputs[i] != ref) {
+				break;
+			}
+		}
+		if (i == n) {
+			/* all the same */
+			return ref;
+		}
+
+		ref = ir_emit_N(ctx, IR_OPT(IR_PHI, ctx->ir_base[inputs[0]].type), n + 1);
+		ir_set_op(ctx, ref, 1, ctx->control);
+		for (i = 0; i < n; i++) {
+			ir_set_op(ctx, ref, i + 2, inputs[i]);
+		}
+		return ref;
+	}
+}
+
+void _ir_START(ir_ctx *ctx)
+{
+	IR_ASSERT(!ctx->control);
+	IR_ASSERT(ctx->insns_count == 1);
+	ctx->control = ir_emit0(ctx, IR_START);
+}
+
+void _ir_ENTRY(ir_ctx *ctx, ir_ref num)
+{
+	IR_ASSERT(!ctx->control);
+	ctx->control = ir_emit2(ctx, IR_ENTRY, num, ctx->ir_base[1].op2);
+	ctx->ir_base[1].op2 = ctx->control;
+}
+
+void _ir_BEGIN(ir_ctx *ctx, ir_ref src)
+{
+//	IR_ASSERT(!ctx->control);
+	if (src
+	 && src + 1 == ctx->insns_count
+	 && ctx->ir_base[src].op == IR_END) {
+		/* merge with the last END */
+		ctx->control = ctx->ir_base[src].op1;
+		ctx->insns_count--;
+	} else {
+		ctx->control = ir_emit1(ctx, IR_BEGIN, src);
+	}
+}
+
+ir_ref _ir_IF(ir_ctx *ctx, ir_ref condition)
+{
+	ir_ref if_ref;
+
+	IR_ASSERT(ctx->control);
+	if_ref = ir_emit2(ctx, IR_IF, ctx->control, condition);
+	ctx->control = IR_UNUSED;
+	return if_ref;
+}
+
+void _ir_IF_TRUE(ir_ctx *ctx, ir_ref if_ref)
+{
+//	IR_ASSERT(!ctx->control);
+	IR_ASSERT(if_ref);
+	IR_ASSERT(ctx->ir_base[if_ref].op == IR_IF);
+	ctx->control = ir_emit1(ctx, IR_IF_TRUE, if_ref);
+}
+
+void _ir_IF_TRUE_cold(ir_ctx *ctx, ir_ref if_ref)
+{
+//	IR_ASSERT(!ctx->control);
+	IR_ASSERT(if_ref);
+	IR_ASSERT(ctx->ir_base[if_ref].op == IR_IF);
+	/* op2 is used as an indicator of low-probability branch */
+	ctx->control = ir_emit2(ctx, IR_IF_TRUE, if_ref, 1);
+}
+
+void _ir_IF_FALSE(ir_ctx *ctx, ir_ref if_ref)
+{
+//	IR_ASSERT(!ctx->control);
+	IR_ASSERT(if_ref);
+	IR_ASSERT(ctx->ir_base[if_ref].op == IR_IF);
+	ctx->control = ir_emit1(ctx, IR_IF_FALSE, if_ref);
+}
+
+void _ir_IF_FALSE_cold(ir_ctx *ctx, ir_ref if_ref)
+{
+//	IR_ASSERT(!ctx->control);
+	IR_ASSERT(if_ref);
+	IR_ASSERT(ctx->ir_base[if_ref].op == IR_IF);
+	/* op2 is used as an indicator of low-probability branch */
+	ctx->control = ir_emit2(ctx, IR_IF_FALSE, if_ref, 1);
+}
+
+ir_ref _ir_END(ir_ctx *ctx)
+{
+	ir_ref ref;
+
+	IR_ASSERT(ctx->control);
+	ref = ir_emit1(ctx, IR_END, ctx->control);
+	ctx->control = IR_UNUSED;
+	return ref;
+}
+
+void _ir_MERGE_2(ir_ctx *ctx, ir_ref src1, ir_ref src2)
+{
+//	IR_ASSERT(!ctx->control);
+	ctx->control = ir_emit2(ctx, IR_MERGE, src1, src2);
+}
+
+void _ir_MERGE_N(ir_ctx *ctx, ir_ref n, ir_ref *inputs)
+{
+//	IR_ASSERT(!ctx->control);
+	IR_ASSERT(n > 0);
+	if (n == 1) {
+		_ir_BEGIN(ctx, inputs[0]);
+	} else {
+		ir_ref *ops;
+
+		ctx->control = ir_emit_N(ctx, IR_MERGE, n);
+		ops = ctx->ir_base[ctx->control].ops;
+		while (n) {
+			n--;
+			ops[n + 1] = inputs[n];
+		}
+	}
+}
+
+ir_ref _ir_END_LIST(ir_ctx *ctx, ir_ref list)
+{
+	ir_ref ref;
+
+	IR_ASSERT(ctx->control);
+	IR_ASSERT(!list || ctx->ir_base[list].op == IR_END);
+	/* create a liked list of END nodes with the same destination through END.op2 */
+	ref = ir_emit2(ctx, IR_END, ctx->control, list);
+	ctx->control = IR_UNUSED;
+	return ref;
+}
+
+void _ir_MERGE_LIST(ir_ctx *ctx, ir_ref list)
+{
+	ir_ref ref = list;
+
+	if (list != IR_UNUSED) {
+		uint32_t n = 0;
+
+//		IR_ASSERT(!ctx->control);
+
+		/* count inputs count */
+		do {
+			ir_insn *insn = &ctx->ir_base[ref];
+
+			IR_ASSERT(insn->op == IR_END);
+			ref = insn->op2;
+			n++;
+		} while (ref != IR_UNUSED);
+
+
+		/* create MERGE node */
+		IR_ASSERT(n > 0);
+		if (n == 1) {
+			ctx->ir_base[list].op2 = IR_UNUSED;
+			_ir_BEGIN(ctx, list);
+		} else {
+			ctx->control = ir_emit_N(ctx, IR_MERGE, n);
+			ref = list;
+			while (n) {
+				ir_insn *insn = &ctx->ir_base[ref];
+
+				ir_set_op(ctx, ctx->control, n, ref);
+				ref = insn->op2;
+				insn->op2 = IR_UNUSED;
+				n--;
+			}
+		}
+	}
+}
+
+ir_ref _ir_LOOP_BEGIN(ir_ctx *ctx, ir_ref src1)
+{
+//	IR_ASSERT(!ctx->control);
+	ctx->control = ir_emit2(ctx, IR_LOOP_BEGIN, src1, IR_UNUSED);
+	return ctx->control;
+}
+
+ir_ref _ir_LOOP_END(ir_ctx *ctx, ir_ref loop)
+{
+	ir_ref ref;
+
+	IR_ASSERT(ctx->control);
+	ref = ir_emit2(ctx, IR_LOOP_END, ctx->control, loop);
+	ctx->control = IR_UNUSED;
+	return ref;
+}
+
+ir_ref _ir_CALL(ir_ctx *ctx, ir_type type, ir_ref func)
+{
+	IR_ASSERT(ctx->control);
+	return ctx->control = ir_emit2(ctx, IR_OPT(IR_CALL, type), ctx->control, func);
+}
+
+ir_ref _ir_CALL_1(ir_ctx *ctx, ir_type type, ir_ref func, ir_ref arg1)
+{
+	ir_ref call;
+
+	IR_ASSERT(ctx->control);
+	call = ir_emit_N(ctx, IR_OPT(IR_CALL, type), 3);
+	ir_set_op(ctx, call, 1, ctx->control);
+	ir_set_op(ctx, call, 2, func);
+	ir_set_op(ctx, call, 3, arg1);
+	ctx->control = call;
+	return call;
+}
+
+ir_ref _ir_CALL_2(ir_ctx *ctx, ir_type type, ir_ref func, ir_ref arg1, ir_ref arg2)
+{
+	ir_ref call;
+
+	IR_ASSERT(ctx->control);
+	call = ir_emit_N(ctx, IR_OPT(IR_CALL, type), 4);
+	ir_set_op(ctx, call, 1, ctx->control);
+	ir_set_op(ctx, call, 2, func);
+	ir_set_op(ctx, call, 3, arg1);
+	ir_set_op(ctx, call, 4, arg2);
+	ctx->control = call;
+	return call;
+}
+
+ir_ref _ir_CALL_3(ir_ctx *ctx, ir_type type, ir_ref func, ir_ref arg1, ir_ref arg2, ir_ref arg3)
+{
+	ir_ref call;
+
+	IR_ASSERT(ctx->control);
+	call = ir_emit_N(ctx, IR_OPT(IR_CALL, type), 5);
+	ir_set_op(ctx, call, 1, ctx->control);
+	ir_set_op(ctx, call, 2, func);
+	ir_set_op(ctx, call, 3, arg1);
+	ir_set_op(ctx, call, 4, arg2);
+	ir_set_op(ctx, call, 5, arg3);
+	ctx->control = call;
+	return call;
+}
+
+ir_ref _ir_CALL_4(ir_ctx *ctx, ir_type type, ir_ref func, ir_ref arg1, ir_ref arg2, ir_ref arg3, ir_ref arg4)
+{
+	ir_ref call;
+
+	IR_ASSERT(ctx->control);
+	call = ir_emit_N(ctx, IR_OPT(IR_CALL, type), 6);
+	ir_set_op(ctx, call, 1, ctx->control);
+	ir_set_op(ctx, call, 2, func);
+	ir_set_op(ctx, call, 3, arg1);
+	ir_set_op(ctx, call, 4, arg2);
+	ir_set_op(ctx, call, 5, arg3);
+	ir_set_op(ctx, call, 6, arg4);
+	ctx->control = call;
+	return call;
+}
+
+ir_ref _ir_CALL_5(ir_ctx *ctx, ir_type type, ir_ref func, ir_ref arg1, ir_ref arg2, ir_ref arg3, ir_ref arg4, ir_ref arg5)
+{
+	ir_ref call;
+
+	IR_ASSERT(ctx->control);
+	call = ir_emit_N(ctx, IR_OPT(IR_CALL, type), 7);
+	ir_set_op(ctx, call, 1, ctx->control);
+	ir_set_op(ctx, call, 2, func);
+	ir_set_op(ctx, call, 3, arg1);
+	ir_set_op(ctx, call, 4, arg2);
+	ir_set_op(ctx, call, 5, arg3);
+	ir_set_op(ctx, call, 6, arg4);
+	ir_set_op(ctx, call, 7, arg5);
+	ctx->control = call;
+	return call;
+}
+
+void _ir_UNREACHABLE(ir_ctx *ctx)
+{
+	IR_ASSERT(ctx->control);
+	ctx->control = ir_emit3(ctx, IR_UNREACHABLE, ctx->control, IR_UNUSED, ctx->ir_base[1].op1);
+	ctx->ir_base[1].op1 = ctx->control;
+//	ctx->control = IE_UNUSED;
+}
+
+void _ir_TAILCALL(ir_ctx *ctx, ir_ref func)
+{
+	IR_ASSERT(ctx->control);
+	ctx->control = ir_emit2(ctx, IR_TAILCALL, ctx->control, func);
+	_ir_UNREACHABLE(ctx);
+}
+
+void _ir_TAILCALL_1(ir_ctx *ctx, ir_ref func, ir_ref arg1)
+{
+	ir_ref call;
+
+	IR_ASSERT(ctx->control);
+	call = ir_emit_N(ctx, IR_TAILCALL, 3);
+	ir_set_op(ctx, call, 1, ctx->control);
+	ir_set_op(ctx, call, 2, func);
+	ir_set_op(ctx, call, 3, arg1);
+	ctx->control = call;
+	_ir_UNREACHABLE(ctx);
+}
+
+void _ir_TAILCALL_2(ir_ctx *ctx, ir_ref func, ir_ref arg1, ir_ref arg2)
+{
+	ir_ref call;
+
+	IR_ASSERT(ctx->control);
+	call = ir_emit_N(ctx, IR_TAILCALL, 4);
+	ir_set_op(ctx, call, 1, ctx->control);
+	ir_set_op(ctx, call, 2, func);
+	ir_set_op(ctx, call, 3, arg1);
+	ir_set_op(ctx, call, 4, arg2);
+	ctx->control = call;
+	_ir_UNREACHABLE(ctx);
+}
+
+void _ir_TAILCALL_3(ir_ctx *ctx, ir_ref func, ir_ref arg1, ir_ref arg2, ir_ref arg3)
+{
+	ir_ref call;
+
+	IR_ASSERT(ctx->control);
+	call = ir_emit_N(ctx, IR_TAILCALL, 5);
+	ir_set_op(ctx, call, 1, ctx->control);
+	ir_set_op(ctx, call, 2, func);
+	ir_set_op(ctx, call, 3, arg1);
+	ir_set_op(ctx, call, 4, arg2);
+	ir_set_op(ctx, call, 5, arg3);
+	ctx->control = call;
+	_ir_UNREACHABLE(ctx);
+}
+
+void _ir_TAILCALL_4(ir_ctx *ctx, ir_ref func, ir_ref arg1, ir_ref arg2, ir_ref arg3, ir_ref arg4)
+{
+	ir_ref call;
+
+	IR_ASSERT(ctx->control);
+	call = ir_emit_N(ctx, IR_TAILCALL, 6);
+	ir_set_op(ctx, call, 1, ctx->control);
+	ir_set_op(ctx, call, 2, func);
+	ir_set_op(ctx, call, 3, arg1);
+	ir_set_op(ctx, call, 4, arg2);
+	ir_set_op(ctx, call, 5, arg3);
+	ir_set_op(ctx, call, 6, arg4);
+	ctx->control = call;
+	_ir_UNREACHABLE(ctx);
+}
+
+void _ir_TAILCALL_5(ir_ctx *ctx, ir_ref func, ir_ref arg1, ir_ref arg2, ir_ref arg3, ir_ref arg4, ir_ref arg5)
+{
+	ir_ref call;
+
+	IR_ASSERT(ctx->control);
+	call = ir_emit_N(ctx, IR_TAILCALL, 7);
+	ir_set_op(ctx, call, 1, ctx->control);
+	ir_set_op(ctx, call, 2, func);
+	ir_set_op(ctx, call, 3, arg1);
+	ir_set_op(ctx, call, 4, arg2);
+	ir_set_op(ctx, call, 5, arg3);
+	ir_set_op(ctx, call, 6, arg4);
+	ir_set_op(ctx, call, 7, arg5);
+	ctx->control = call;
+	_ir_UNREACHABLE(ctx);
+}
+
+ir_ref _ir_SWITCH(ir_ctx *ctx, ir_ref val)
+{
+	ir_ref ref;
+
+	IR_ASSERT(ctx->control);
+	ref = ir_emit2(ctx, IR_SWITCH, ctx->control, val);
+	ctx->control = IR_UNUSED;
+	return ref;
+}
+
+void _ir_CASE_VAL(ir_ctx *ctx, ir_ref switch_ref, ir_ref val)
+{
+//	IR_ASSERT(!ctx->control);
+	ctx->control = ir_emit2(ctx, IR_CASE_VAL, switch_ref, val);
+}
+
+void _ir_CASE_DEFAULT(ir_ctx *ctx, ir_ref switch_ref)
+{
+//	IR_ASSERT(!ctx->control);
+	ctx->control = ir_emit1(ctx, IR_CASE_DEFAULT, switch_ref);
+}
+
+void _ir_RETURN(ir_ctx *ctx, ir_ref val)
+{
+	IR_ASSERT(ctx->control);
+	ctx->control = ir_emit3(ctx, IR_RETURN, ctx->control, val, ctx->ir_base[1].op1);
+	ctx->ir_base[1].op1 = ctx->control;
+//	ctx-control = IR_UNUSED;
+}
+
+void _ir_IJMP(ir_ctx *ctx, ir_ref addr)
+{
+	IR_ASSERT(ctx->control);
+	ctx->control = ir_emit3(ctx, IR_IJMP, ctx->control, addr, ctx->ir_base[1].op1);
+	ctx->ir_base[1].op1 = ctx->control;
+	ctx->control = IR_UNUSED;
+}
+
+ir_ref _ir_ADD_OFFSET(ir_ctx *ctx, ir_ref addr, uintptr_t offset)
+{
+	if (offset) {
+		addr = ir_fold2(ctx, IR_OPT(IR_ADD, IR_ADDR), addr, ir_const_addr(ctx, offset));
+	}
+	return addr;
+}
+
+void _ir_GUARD(ir_ctx *ctx, ir_ref condition, ir_ref addr)
+{
+	IR_ASSERT(ctx->control);
+	if (condition == IR_TRUE) {
+		return;
+	} else {
+		ir_ref ref = ctx->control;
+		ir_insn *insn;
+
+		while (ref > condition) {
+			insn = &ctx->ir_base[ref];
+			if (insn->op == IR_GUARD) {
+				if (insn->op2 == condition) {
+					return;
+				}
+			} else if (insn->op == IR_GUARD_NOT) {
+				if (insn->op2 == condition) {
+					condition = IR_FALSE;
+					break;
+				}
+			} else if (insn->op == IR_START
+				 || insn->op == IR_BEGIN
+				 || insn->op == IR_IF_TRUE
+				 || insn->op == IR_IF_FALSE
+				 || insn->op == IR_CASE_VAL
+				 || insn->op == IR_CASE_DEFAULT
+				 || insn->op == IR_MERGE
+				 || insn->op == IR_LOOP_BEGIN
+				 || insn->op == IR_ENTRY) {
+				break;
+			}
+			ref = insn->op1;
+		}
+	}
+	if (ctx->snapshot_create) {
+		ctx->snapshot_create(ctx, addr);
+	}
+	ctx->control = ir_emit3(ctx, IR_GUARD, ctx->control, condition, addr);
+}
+
+void _ir_GUARD_NOT(ir_ctx *ctx, ir_ref condition, ir_ref addr)
+{
+	IR_ASSERT(ctx->control);
+	if (condition == IR_FALSE) {
+		return;
+	} else {
+		ir_ref ref = ctx->control;
+		ir_insn *insn;
+
+		while (ref > condition) {
+			insn = &ctx->ir_base[ref];
+			if (insn->op == IR_GUARD_NOT) {
+				if (insn->op2 == condition) {
+					return;
+				}
+			} else if (insn->op == IR_GUARD) {
+				if (insn->op2 == condition) {
+					condition = IR_TRUE;
+					break;
+				}
+			} else if (insn->op == IR_START
+				 || insn->op == IR_BEGIN
+				 || insn->op == IR_IF_TRUE
+				 || insn->op == IR_IF_FALSE
+				 || insn->op == IR_CASE_VAL
+				 || insn->op == IR_CASE_DEFAULT
+				 || insn->op == IR_MERGE
+				 || insn->op == IR_LOOP_BEGIN
+				 || insn->op == IR_ENTRY) {
+				break;
+			}
+			ref = insn->op1;
+		}
+	}
+	if (ctx->snapshot_create) {
+		ctx->snapshot_create(ctx, addr);
+	}
+	ctx->control = ir_emit3(ctx, IR_GUARD_NOT, ctx->control, condition, addr);
+}
+
+ir_ref _ir_SNAPSHOT(ir_ctx *ctx, ir_ref n)
+{
+	ir_ref snapshot;
+
+	IR_ASSERT(ctx->control);
+	snapshot = ir_emit_N(ctx, IR_SNAPSHOT, 1 + n); /* op1 is used for control */
+	ctx->ir_base[snapshot].op1 = ctx->control;
+	ctx->control = snapshot;
+	return snapshot;
+}
+
+void _ir_SNAPSHOT_ADD(ir_ctx *ctx, ir_ref snapshot, ir_ref pos, ir_ref val)
+{
+	ir_insn *insn = &ctx->ir_base[snapshot];
+	ir_ref *ops = insn->ops;
+
+	IR_ASSERT(val < snapshot);
+	IR_ASSERT(insn->op == IR_SNAPSHOT);
+	pos++; /* op1 is used for control */
+	IR_ASSERT(pos > 1 && pos <= insn->inputs_count);
+	ops[pos] = val;
+}
+
+ir_ref _ir_EXITCALL(ir_ctx *ctx, ir_ref func)
+{
+	IR_ASSERT(ctx->control);
+	return ctx->control = ir_emit2(ctx, IR_OPT(IR_EXITCALL, IR_I32), ctx->control, func);
+}
+
+ir_ref _ir_ALLOCA(ir_ctx *ctx, ir_ref size)
+{
+	IR_ASSERT(ctx->control);
+	return ctx->control = ir_emit2(ctx, IR_OPT(IR_ALLOCA, IR_ADDR), ctx->control, size);
+}
+
+void _ir_AFREE(ir_ctx *ctx, ir_ref size)
+{
+	IR_ASSERT(ctx->control);
+	ctx->control = ir_emit2(ctx, IR_AFREE, ctx->control, size);
+}
+
+ir_ref _ir_VLOAD(ir_ctx *ctx, ir_type type, ir_ref var)
+{
+	IR_ASSERT(ctx->control);
+	return ctx->control = ir_emit2(ctx, IR_OPT(IR_VLOAD, type), ctx->control, var);
+}
+
+void _ir_VSTORE(ir_ctx *ctx, ir_ref var, ir_ref val)
+{
+	IR_ASSERT(ctx->control);
+	ctx->control = ir_emit3(ctx, IR_VSTORE, ctx->control, var, val);
+}
+
+ir_ref _ir_TLS(ir_ctx *ctx, ir_ref index, ir_ref offset)
+{
+	IR_ASSERT(ctx->control);
+	return ctx->control = ir_emit3(ctx, IR_OPT(IR_TLS, IR_ADDR), ctx->control, index, offset);
+}
+
+ir_ref _ir_RLOAD(ir_ctx *ctx, ir_type type, ir_ref reg)
+{
+	IR_ASSERT(ctx->control);
+	return ctx->control = ir_emit2(ctx, IR_OPT(IR_RLOAD, type), ctx->control, reg);
+}
+
+void _ir_RSTORE(ir_ctx *ctx, ir_ref reg, ir_ref val)
+{
+	IR_ASSERT(ctx->control);
+	ctx->control = ir_emit3(ctx, IR_RSTORE, ctx->control, val, reg);
+}
+
+ir_ref _ir_LOAD(ir_ctx *ctx, ir_type type, ir_ref addr)
+{
+	ir_ref ref = ir_find_aliasing_load(ctx, ctx->control, type, addr);
+
+	IR_ASSERT(ctx->control);
+	if (!ref) {
+		ctx->control = ref = ir_emit2(ctx, IR_OPT(IR_LOAD, type), ctx->control, addr);
+	}
+	return ref;
+}
+
+void _ir_STORE(ir_ctx *ctx, ir_ref addr, ir_ref val)
+{
+	ir_ref ref = ctx->control;
+	ir_ref prev = IR_UNUSED;
+	ir_insn *insn;
+	ir_type type = ctx->ir_base[val].type;
+	ir_type type2;
+
+	IR_ASSERT(ctx->control);
+	while (1) {
+		insn = &ctx->ir_base[ref];
+		if (insn->op == IR_STORE) {
+			if (insn->op2 == addr) {
+				if (ctx->ir_base[insn->op3].type == type) {
+					if (insn->op3 == val) {
+						return;
+					} else {
+						if (prev) {
+							ctx->ir_base[prev].op1 = insn->op1;
+						} else {
+							ctx->control = insn->op1;
+						}
+						insn->optx = IR_NOP;
+						insn->op1 = IR_NOP;
+						insn->op2 = IR_NOP;
+						insn->op3 = IR_NOP;
+						break;
+					}
+				} else {
+					break;
+				}
+			} else {
+				type2 = ctx->ir_base[insn->op3].type;
+				goto check_aliasing;
+			}
+		} else if (insn->op == IR_LOAD) {
+			if (insn->op2 == addr) {
+				break;
+			}
+			type2 = insn->type;
+check_aliasing:
+			if (ir_check_partial_aliasing(ctx, addr, insn->op2, type, type2) != IR_NO_ALIAS) {
+				break;
+			}
+		} else if (insn->op == IR_START
+			 || insn->op == IR_BEGIN
+			 || insn->op == IR_IF_TRUE
+			 || insn->op == IR_IF_FALSE
+			 || insn->op == IR_CASE_VAL
+			 || insn->op == IR_CASE_DEFAULT
+			 || insn->op == IR_MERGE
+			 || insn->op == IR_LOOP_BEGIN
+			 || insn->op == IR_ENTRY
+			 || insn->op == IR_CALL) {
+			break;
+		}
+		prev = ref;
+		ref = insn->op1;
+	}
+	ctx->control = ir_emit3(ctx, IR_STORE, ctx->control, addr, val);
 }

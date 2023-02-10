@@ -123,7 +123,7 @@ int32_t mandelbrot(double x, double y)
 	int i = 0;
 
 	while(1) {
-		i ++;
+		i++;
 		double temp = zr * zi;
 		double zr2 = zr * zr;
 		double zi2 = zi * zi;
@@ -143,71 +143,41 @@ This may be done through IR construction API by the following code:
 ```c
 void gen_mandelbrot(ir_ctx *ctx)
 {
-	ir_ref start = ir_emit0(ctx, IR_START);
-	ir_ref ret;
+	ir_START();
+	ir_ref x = ir_PARAM(IR_DOUBLE, "x", 1);
+	ir_ref y = ir_PARAM(IR_DOUBLE, "y", 2);
+	ir_ref cr = ir_SUB_D(y, ir_CONST_DOUBLE(0.5));
+	ir_ref ci = ir_COPY_D(x);
+	ir_ref zi = ir_COPY_D(ir_CONST_DOUBLE(0.0));
+	ir_ref zr = ir_COPY_D(ir_CONST_DOUBLE(0.0));
+	ir_ref i = ir_COPY_D(ir_CONST_I32(0));
 
-	ir_ref x_1 = ir_param(ctx, IR_DOUBLE, start, "x", 0);
-	ir_ref y_1 = ir_param(ctx, IR_DOUBLE, start, "y", 1);
+	ir_ref loop = ir_LOOP_BEGIN(ir_END());
+		ir_ref zi_1 = ir_PHI_2(zi, IR_UNUSED);
+		ir_ref zr_1 = ir_PHI_2(zr, IR_UNUSED);
+		ir_ref i_1 = ir_PHI_2(i, IR_UNUSED);
 
-	ir_ref cr = ir_var(ctx, IR_DOUBLE, start, "cr");
-	ir_ref cr_1 = ir_fold2(ctx, IR_OPT(IR_SUB, IR_DOUBLE), y_1,
-		ir_const_double(ctx, 0.5));
-	ir_ref ci = ir_var(ctx, IR_DOUBLE, start, "ci");
-	ir_ref zi = ir_var(ctx, IR_DOUBLE, start, "zi");
-	ir_ref zr = ir_var(ctx, IR_DOUBLE, start, "zr");
-	ir_ref i = ir_var(ctx, IR_I32, start, "i");
+		ir_ref i_2 = ir_ADD_I32(i_1, ir_CONST_I32(1));
+		ir_ref temp = ir_MUL_D(zr_1, zi_1);
+		ir_ref zr2 = ir_MUL_D(zr_1, zr_1);
+		ir_ref zi2 = ir_MUL_D(zi_1, zi_1);
+		ir_ref zr_2 = ir_ADD_D(ir_SUB_D(zr2, zi2), cr);
+		ir_ref zi_2 = ir_ADD_D(ir_ADD_D(temp, temp), ci);
+		ir_ref if_1 = ir_IF(ir_GT(ir_ADD_D(zi2, zr2), ir_CONST_DOUBLE(16.0)));
+			ir_IF_TRUE(if_1);
+				ir_RETURN(i_2);
+			ir_IF_FALSE(if_1);
+				ir_ref if_2 = ir_IF(ir_GT(i_2, ir_CONST_I32(1000)));
+				ir_IF_TRUE(if_2);
+					ir_RETURN(ir_CONST_I32(0));
+				ir_IF_FALSE(if_2);
+					ir_ref loop_end = ir_LOOP_END(loop);
 
-	ir_ref e_1 = ir_emit1(ctx, IR_END, start);
-	ir_ref l_1 = ir_emit1(ctx, IR_LOOP_BEGIN, e_1);
-
-	ir_ref zi_1 = ir_emit2(ctx, IR_OPT(IR_PHI, IR_DOUBLE), l_1,
-		ir_const_double(ctx, 0.0));
-	ir_ref zr_1 = ir_emit2(ctx, IR_OPT(IR_PHI, IR_DOUBLE), l_1,
-		ir_const_double(ctx, 0.0));
-	ir_ref i_1 = ir_emit2(ctx, IR_OPT(IR_PHI, IR_I32), l_1,
-		ir_const_i32(ctx, 0));
-	ir_ref i_2 = ir_emit2(ctx, IR_OPT(IR_ADD, IR_I32), i_1,
-		ir_const_i32(ctx, 1));
-	ir_ref temp = ir_var(ctx, IR_DOUBLE, l_1, "temp");
-	ir_ref temp_1 = ir_fold2(ctx, IR_OPT(IR_MUL, IR_DOUBLE), zr_1, zi_1);
-	ir_ref zr2 = ir_var(ctx, IR_DOUBLE, l_1, "zr2");
-	ir_ref zr2_1 = ir_fold2(ctx, IR_OPT(IR_MUL, IR_DOUBLE), zr_1, zr_1);
-	ir_ref zi2 = ir_var(ctx, IR_DOUBLE, l_1, "zi2");
-	ir_ref zi2_1 = ir_fold2(ctx, IR_OPT(IR_MUL, IR_DOUBLE), zi_1, zi_1);
-	ir_ref zr_2 = ir_fold2(ctx, IR_OPT(IR_ADD, IR_DOUBLE),
-		ir_fold2(ctx, IR_OPT(IR_SUB, IR_DOUBLE), zr2_1, zi2_1),
-		cr_1);
-	ir_ref zi_2 = ir_fold2(ctx, IR_OPT(IR_ADD, IR_DOUBLE),
-		ir_fold2(ctx, IR_OPT(IR_ADD, IR_DOUBLE), temp_1, temp_1),
-		x_1);
-
-	ir_ref if_1 = ir_emit2(ctx, IR_IF, l_1,
-		ir_fold2(ctx, IR_OPT(IR_GT, IR_BOOL),
-			ir_fold2(ctx, IR_OPT(IR_ADD, IR_DOUBLE), zi2_1, zr2_1),
-			ir_const_double(ctx, 16.0)));
-
-	ir_ref r_1 = ir_emit1(ctx, IR_IF_TRUE, if_1);
-	ret = ir_emit2(ctx, IR_OPT(IR_RETURN, IR_I32), r_1, i_2);
-
-	ir_ref r_2 = ir_emit1(ctx, IR_IF_FALSE, if_1);
-
-	ir_ref if_2 = ir_emit2(ctx, IR_IF, r_2,
-		ir_fold2(ctx, IR_OPT(IR_GT, IR_BOOL), i_2, ir_const_i32(ctx, 1000)));
-
-	ir_ref r_3 = ir_emit1(ctx, IR_IF_TRUE, if_2);
-
-	ret = ir_emit3(ctx, IR_OPT(IR_RETURN, IR_I32), r_3, ir_const_i32(ctx, 0), ret);
-
-	ir_ref r_4 = ir_emit1(ctx, IR_IF_FALSE, if_2);
-
-	ir_ref l_2 = ir_emit2(ctx, IR_LOOP_END, r_4, l_1);
-
-	ir_set_op2(ctx, l_1, l_2);
+	/* close loop */
+	ir_set_op2(ctx, loop, loop_end);
 	ir_set_op3(ctx, zi_1, zi_2);
 	ir_set_op3(ctx, zr_1, zr_2);
 	ir_set_op3(ctx, i_1, i_2);
-
-	ir_set_op1(ctx, start, ret);
 }
 ```
 The textual representation of the IR after system independent optimizations:
@@ -223,43 +193,35 @@ The textual representation of the IR after system independent optimizations:
 	int32_t c_7 = 1;
 	double c_8 = 16;
 	int32_t c_9 = 1000;
-	l_1 = START(l_30);
-	double d_2 = PARAM(l_1, "x", 0);
-	double d_3 = PARAM(l_1, "y", 1);
-	double d_4 = VAR(l_1, "cr");
-	double d_5 = SUB(d_3, c_4);
-	double d_6 = VAR(l_1, "ci");
-	double d_7 = VAR(l_1, "zi");
-	double d_8 = VAR(l_1, "zr");
-	int32_t d_9 = VAR(l_1, "i");
-	l_10 = END(l_1);
-	l_11 = LOOP_BEGIN(l_10, l_37);
-	double d_12 = PHI(l_11, c_5, d_36);
-	double d_13 = PHI(l_11, c_5, d_34);
-	int32_t d_14 = PHI(l_11, c_6, d_15);
-	int32_t d_15 = ADD(d_14, c_7);
-	double d_16 = VAR(l_11, "temp");
-	double d_17 = VAR(l_11, "zr2");
-	double d_18 = MUL(d_13, d_13);
-	double d_19 = VAR(l_11, "zi2");
-	double d_20 = MUL(d_12, d_12);
-	double d_21 = ADD(d_20, d_18);
-	bool d_22 = GT(d_21, c_8);
-	l_23 = IF(l_11, d_22);
-	l_24 = IF_TRUE(l_23);
-	l_25 = RETURN(l_24, d_15);
-	l_26 = IF_FALSE(l_23);
-	bool d_27 = GT(d_15, c_9);
-	l_28 = IF(l_26, d_27);
-	l_29 = IF_TRUE(l_28);
-	l_30 = RETURN(l_29, c_6, l_25);
-	l_31 = IF_FALSE(l_28);
-	double d_32 = MUL(d_12, d_13);
-	double d_33 = SUB(d_18, d_20);
-	double d_34 = ADD(d_33, d_5);
-	double d_35 = ADD(d_32, d_32);
-	double d_36 = ADD(d_35, d_2);
-	l_37 = LOOP_END(l_31, l_11);
+	l_1 = START(l_22);
+	double d_2 = PARAM(l_1, "x", 1);
+	double d_3 = PARAM(l_1, "y", 2);
+	double d_4 = SUB(d_3, c_4);
+	l_5 = END(l_1);
+	l_6 = LOOP_BEGIN(l_5, l_29);
+	double d_7 = PHI(l_6, c_5, d_28);
+	double d_8 = PHI(l_6, c_5, d_26);
+	int32_t d_9 = PHI(l_6, c_6, d_10);
+	int32_t d_10 = ADD(d_9, c_7);
+	double d_11 = MUL(d_8, d_8);
+	double d_12 = MUL(d_7, d_7);
+	double d_13 = ADD(d_12, d_11);
+	bool d_14 = GT(d_13, c_8);
+	l_15 = IF(l_6, d_14);
+	l_16 = IF_TRUE(l_15);
+	l_17 = RETURN(l_16, d_10);
+	l_18 = IF_FALSE(l_15);
+	bool d_19 = GT(d_10, c_9);
+	l_20 = IF(l_18, d_19);
+	l_21 = IF_TRUE(l_20);
+	l_22 = RETURN(l_21, c_6, l_17);
+	l_23 = IF_FALSE(l_20);
+	double d_24 = MUL(d_7, d_8);
+	double d_25 = SUB(d_11, d_12);
+	double d_26 = ADD(d_25, d_4);
+	double d_27 = ADD(d_24, d_24);
+	double d_28 = ADD(d_27, d_2);
+	l_29 = LOOP_END(l_23, l_6);
 }
 ```
 The visualized graph:
