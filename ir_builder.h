@@ -422,6 +422,7 @@
 
 #define ir_PHI_2(_src1, _src2)            _ir_PHI_2(_ir_CTX, (_src1), (_src2))
 #define ir_PHI_N(_n, _inputs)             _ir_PHI_N(_ir_CTX, (_n), (_inputs))
+#define ir_PHI_SET_OP(_ref, _pos, _src)   _ir_PHI_SET_OP(_ir_CTX, (_ref), (_pos), (_src))
 
 #define ir_COPY(_op1)                     ir_UNARY_OP(IR_COPY, (_op1))
 #define ir_COPY_B(_op1)                   ir_UNARY_OP_B(IR_COPY, (_op1))
@@ -536,6 +537,7 @@
 #define ir_END()                          _ir_END(_ir_CTX)
 #define ir_MERGE_2(_src1, _src2)          _ir_MERGE_2(_ir_CTX, (_src1), (_src2))
 #define ir_MERGE_N(_n, _inputs)           _ir_MERGE_N(_ir_CTX, (_n), (_inputs))
+#define ir_MERGE_SET_OP(_ref, _pos, _src) _ir_MERGE_SET_OP(_ir_CTX, (_ref), (_pos), (_src))
 #define ir_LOOP_BEGIN(_src1)              _ir_LOOP_BEGIN(_ir_CTX, (_src1))
 #define ir_LOOP_END(_loop)                _ir_LOOP_END(_ir_CTX, (_loop))
 #define ir_SWITCH(_val)                   _ir_SWITCH(_ir_CTX, (_val))
@@ -549,7 +551,7 @@
 #define ir_GUARD_NOT(_condition, _addr)   _ir_GUARD_NOT(_ir_CTX, (_condition), (_addr))
 
 #define ir_SNAPSHOT(_n)                   _ir_SNAPSHOT(_ir_CTX, (_n))
-#define ir_SNAPSHOT_ADD(_ref, _pos, _val) _ir_SNAPSHOT_ADD(_ir_CTX, (_ref), (_pos), (_val))
+#define ir_SNAPSHOT_SET_OP(_s, _pos, _v)  _ir_SNAPSHOT_SET_OP(_ir_CTX, (_s), (_pos), (_v))
 
 #define ir_EXITCALL(_func)                _ir_EXITCALL(_ir_CTX,(_func))
 
@@ -563,6 +565,7 @@
 ir_ref _ir_ADD_OFFSET(ir_ctx *ctx, ir_ref addr, uintptr_t offset);
 ir_ref _ir_PHI_2(ir_ctx *ctx, ir_ref src1, ir_ref src2);
 ir_ref _ir_PHI_N(ir_ctx *ctx, ir_ref n, ir_ref *inputs);
+void   _ir_PHI_SET_OP(ir_ctx *ctx, ir_ref phi, ir_ref pos, ir_ref src);
 ir_ref _ir_PARAM(ir_ctx *ctx, ir_type type, const char* name, ir_ref num);
 ir_ref _ir_VAR(ir_ctx *ctx, ir_type type, const char* name);
 ir_ref _ir_CALL(ir_ctx *ctx, ir_type type, ir_ref func);
@@ -597,6 +600,7 @@ void   _ir_IF_FALSE(ir_ctx *ctx, ir_ref if_ref);
 void   _ir_IF_FALSE_cold(ir_ctx *ctx, ir_ref if_ref);
 void   _ir_MERGE_2(ir_ctx *ctx, ir_ref src1, ir_ref src2);
 void   _ir_MERGE_N(ir_ctx *ctx, ir_ref n, ir_ref *inputs);
+void   _ir_MERGE_SET_OP(ir_ctx *ctx, ir_ref merge, ir_ref pos, ir_ref src);
 void   _ir_MERGE_LIST(ir_ctx *ctx, ir_ref list);
 ir_ref _ir_LOOP_BEGIN(ir_ctx *ctx, ir_ref src1);
 ir_ref _ir_LOOP_END(ir_ctx *ctx, ir_ref loop);
@@ -610,7 +614,7 @@ void   _ir_IJMP(ir_ctx *ctx, ir_ref addr);
 void   _ir_GUARD(ir_ctx *ctx, ir_ref condition, ir_ref addr);
 void   _ir_GUARD_NOT(ir_ctx *ctx, ir_ref condition, ir_ref addr);
 ir_ref _ir_SNAPSHOT(ir_ctx *ctx, ir_ref n);
-void   _ir_SNAPSHOT_ADD(ir_ctx *ctx, ir_ref snapshot, ir_ref pos, ir_ref val);
+void   _ir_SNAPSHOT_SET_OP(ir_ctx *ctx, ir_ref snapshot, ir_ref pos, ir_ref val);
 ir_ref _ir_EXITCALL(ir_ctx *ctx, ir_ref func);
 
 #endif /* IR_BUILDER_H */

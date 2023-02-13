@@ -174,10 +174,10 @@ void gen_mandelbrot(ir_ctx *ctx)
 					ir_ref loop_end = ir_LOOP_END(loop);
 
 	/* close loop */
-	ir_set_op2(ctx, loop, loop_end);
-	ir_set_op3(ctx, zi_1, zi_2);
-	ir_set_op3(ctx, zr_1, zr_2);
-	ir_set_op3(ctx, i_1, i_2);
+	ir_MERGE_SET_OP(loop, 2, loop_end);
+	ir_PHI_SET_OP(zi_1, 2, zi_2);
+	ir_PHI_SET_OP(zr_1, 2, zr_2);
+	ir_PHI_SET_OP(i_1, 2, i_2);
 }
 ```
 The textual representation of the IR after system independent optimizations:

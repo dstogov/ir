@@ -1440,6 +1440,19 @@ ir_ref _ir_PHI_N(ir_ctx *ctx, ir_ref n, ir_ref *inputs)
 	}
 }
 
+void _ir_PHI_SET_OP(ir_ctx *ctx, ir_ref phi, ir_ref pos, ir_ref src)
+{
+	ir_insn *insn = &ctx->ir_base[phi];
+	ir_ref *ops = insn->ops;
+
+	IR_ASSERT(insn->op == IR_PHI);
+	insn = &ctx->ir_base[insn->op1];
+	IR_ASSERT(insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN);
+	IR_ASSERT(pos > 0 && pos <= (insn->inputs_count ? insn->inputs_count : 2));
+	pos++; /* op1 is used for control */
+	ops[pos] = src;
+}
+
 void _ir_START(ir_ctx *ctx)
 {
 	IR_ASSERT(!ctx->control);
@@ -1544,6 +1557,16 @@ void _ir_MERGE_N(ir_ctx *ctx, ir_ref n, ir_ref *inputs)
 			ops[n + 1] = inputs[n];
 		}
 	}
+}
+
+void _ir_MERGE_SET_OP(ir_ctx *ctx, ir_ref merge, ir_ref pos, ir_ref src)
+{
+	ir_insn *insn = &ctx->ir_base[merge];
+	ir_ref *ops = insn->ops;
+
+	IR_ASSERT(insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN);
+	IR_ASSERT(pos > 0 && pos <= (insn->inputs_count ? insn->inputs_count : 2));
+	ops[pos] = src;
 }
 
 ir_ref _ir_END_LIST(ir_ctx *ctx, ir_ref list)
@@ -1922,7 +1945,7 @@ ir_ref _ir_SNAPSHOT(ir_ctx *ctx, ir_ref n)
 	return snapshot;
 }
 
-void _ir_SNAPSHOT_ADD(ir_ctx *ctx, ir_ref snapshot, ir_ref pos, ir_ref val)
+void _ir_SNAPSHOT_SET_OP(ir_ctx *ctx, ir_ref snapshot, ir_ref pos, ir_ref val)
 {
 	ir_insn *insn = &ctx->ir_base[snapshot];
 	ir_ref *ops = insn->ops;
