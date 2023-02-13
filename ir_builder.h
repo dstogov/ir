@@ -522,7 +522,7 @@
 #define ir_LOAD_D(_addr)                  _ir_LOAD(_ir_CTX, IR_DOUBLE, (_addr))
 #define ir_LOAD_F(_addr)                  _ir_LOAD(_ir_CTX, IR_FLOAT, (_addr))
 #define ir_STORE(_addr, _val)             _ir_STORE(_ir_CTX, (_addr), (_val))
-#define ir_TLS(_index, _offset)           _ir_TLS(_irCTX, (_index), (_offset))
+#define ir_TLS(_index, _offset)           _ir_TLS(_ir_CTX, (_index), (_offset))
 #define ir_TRAP()                         do {_ir_CTX->control = ir_emit1(_ir_CTX, IR_TRAP, _ir_CTX->control);} while (0)
 
 #define ir_START()                        _ir_START(_ir_CTX)
