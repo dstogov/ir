@@ -324,7 +324,7 @@ restart:
 					}
 				}
 				if (insn->op3 != ctx->fold_insn.op3) {
-					if (!IR_IS_CONST_REF(insn->op3) && insn->op3 != ctx->fold_insn.op2 && insn->op3 != ctx->fold_insn.op2) {
+					if (!IR_IS_CONST_REF(insn->op3) && insn->op3 != ctx->fold_insn.op1 && insn->op3 != ctx->fold_insn.op2) {
 						ir_sccp_remove_from_use_list(ctx, insn->op3, ref);
 					}
 					if (!IR_IS_CONST_REF(ctx->fold_insn.op3) && ctx->fold_insn.op3 != insn->op1 && ctx->fold_insn.op3 != insn->op2) {
