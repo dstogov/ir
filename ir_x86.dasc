@@ -1613,6 +1613,40 @@ store_int:
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT) {
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
+						if (IR_IS_CONST_REF(op2_insn->op2)
+						 && ctx->ir_base[op2_insn->op2].val.i64 == 0
+						 && op2_insn->op1 == insn->op2 - 1) { /* prevoius instruction */
+							ir_insn *op1_insn = &ctx->ir_base[op2_insn->op1];
+
+							if (op1_insn->op == IR_ADD ||
+						        op1_insn->op == IR_SUB ||
+//						        op1_insn->op == IR_MUL ||
+						        op1_insn->op == IR_OR  ||
+						        op1_insn->op == IR_AND ||
+						        op1_insn->op == IR_XOR) {
+
+								if (ir_op_flags[op1_insn->op] & IR_OP_FLAG_COMMUTATIVE) {
+									ir_match_fuse_load_commutative_int(ctx, op1_insn, bb);
+								} else {
+									ir_match_fuse_load(ctx, op1_insn->op2, bb);
+								}
+								if (op1_insn->op == IR_AND && ctx->use_lists[insn->op1].count == 1) {
+									if (IR_IS_CONST_REF(op1_insn->op2)
+									 && op1_insn->op1 > bb->start
+									 && op1_insn->op1 < ref
+									 && !ctx->rules[op1_insn->op1]) {
+										ir_match_fuse_load(ctx, op1_insn->op1, bb);
+									}
+									ctx->rules[op2_insn->op1] = IR_TEST_INT;
+									ctx->rules[insn->op2] = IR_SKIP_CMP_INT;
+									return IR_TEST_AND_BRANCH_INT;
+								} else {
+									ctx->rules[op2_insn->op1] = IR_BINOP_INT;
+									ctx->rules[insn->op2] = IR_SKIP_CMP_INT;
+									return IR_JCC_INT;
+								}
+							}
+						}
 						ir_match_fuse_load_cmp_int(ctx, op2_insn, bb);
 						ctx->rules[insn->op2] = IR_SKIP_CMP_INT;
 						return IR_CMP_AND_BRANCH_INT;
@@ -4091,8 +4125,18 @@ static void ir_emit_cmp_and_branch_int(ir_ctx *ctx, uint32_t b, ir_ref def, ir_i
 
 static void ir_emit_test_and_branch_int(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 {
-	ir_emit_test_int_common(ctx, insn->op2, IR_NE);
-	ir_emit_jcc(ctx, IR_NE, b, def, insn, 1);
+	ir_ref op2 = insn->op2;
+	ir_op op = ctx->ir_base[op2].op;
+
+	if (op >= IR_EQ && op <= IR_UGT) {
+		op2 = ctx->ir_base[op2].op1;
+	} else {
+		IR_ASSERT(op == IR_AND);
+		op = IR_NE;
+	}
+
+	ir_emit_test_int_common(ctx, op2, op);
+	ir_emit_jcc(ctx, op, b, def, insn, 1);
 }
 
 static void ir_emit_cmp_and_branch_fp(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
@@ -8099,7 +8143,21 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					ir_emit_test_and_branch_int(ctx, b, i, insn);
 					break;
 				case IR_JCC_INT:
-					ir_emit_jcc(ctx, IR_NE, b, i, insn, 1);
+					{
+						ir_op op = ctx->ir_base[insn->op2].op;
+
+						if (op == IR_ADD ||
+						    op == IR_SUB ||
+//						    op == IR_MUL ||
+						    op == IR_OR  ||
+						    op == IR_AND ||
+						    op == IR_XOR) {
+							op = IR_NE;
+						} else {
+							IR_ASSERT(op >= IR_EQ && op <= IR_UGT);
+						}
+						ir_emit_jcc(ctx, op, b, i, insn, 1);
+					}
 					break;
 				case IR_GUARD_CMP_INT:
 					if (ir_emit_guard_cmp_int(ctx, b, i, insn)) {
