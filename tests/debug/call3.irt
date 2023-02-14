@@ -23,18 +23,16 @@ test:
 	subq $8, %rsp
 	movq %rbx, (%rsp)
 	movl %edi, %ebx
-	movq (%r8), %rax
-	movl %ecx, %r8d
+	movl %ecx, %eax
 	movl %esi, %ecx
 	movl %edx, %esi
-	movl %r8d, %edx
+	movl %eax, %edx
 	leaq .L1(%rip), %rdi
-	callq *%rax
+	callq *(%r8)
 	leal (%rax, %rbx), %eax
 	movq (%rsp), %rbx
 	addq $8, %rsp
 	retq
 .rodata
-	.db 0x90, 0x90, 0x90, 0x90
 .L1:
 	.db 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x25, 0x64, 0x21, 0x0a, 0x00

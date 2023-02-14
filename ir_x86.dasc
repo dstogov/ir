@@ -1370,8 +1370,7 @@ binop_fp:
 			ctx->flags |= IR_HAS_CALLS;
 			IR_FALLTHROUGH;
 		case IR_TAILCALL:
-			if (ir_input_edges_count(ctx, insn) == 2 /* no arguments */
-			 && insn->op2 > bb->start
+			if (insn->op2 > bb->start
 			 && insn->op2 < ref
 			 && !ctx->rules[insn->op2]) {
 				ir_match_fuse_load(ctx, insn->op2, bb);
