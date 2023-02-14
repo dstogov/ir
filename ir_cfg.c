@@ -899,10 +899,7 @@ int ir_schedule_blocks(ir_ctx *ctx)
 		/* Start trace */
 		do {
 			if (bb->predecessors_count > 1
-			 && ctx->fixed_stack_frame_size == -1
-			 && ctx->fixed_save_regset == 0
-			 && !(ctx->flags & IR_USE_FRAME_POINTER)
-			 && !((ctx->flags & IR_GEN_ENDBR) && (ctx->flags & IR_ENTRY_BR_TARGET))) {
+			 && (ctx->flags & IR_MERGE_EMPTY_ENTRIES)) {
 				/* Insert empty ENTRY blocks */
 				for (j = 0, p = &ctx->cfg_edges[bb->predecessors]; j < bb->predecessors_count; j++, p++) {
 					uint32_t predecessor = *p;

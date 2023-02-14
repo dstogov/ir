@@ -429,30 +429,31 @@ void ir_strtab_apply(ir_strtab *strtab, ir_strtab_apply_t func);
 void ir_strtab_free(ir_strtab *strtab);
 
 /* IR Context Flags */
-#define IR_FUNCTION           (1<<0)
-#define IR_FASTCALL_FUNC      (1<<1)
-#define IR_SKIP_PROLOGUE      (1<<2)
-#define IR_USE_FRAME_POINTER  (1<<3)
-#define IR_PREALLOCATED_STACK (1<<4)
-#define IR_HAS_ALLOCA         (1<<5)
-#define IR_HAS_CALLS          (1<<6)
-#define IR_NO_STACK_COMBINE   (1<<7)
-#define IR_START_BR_TARGET    (1<<8)
-#define IR_ENTRY_BR_TARGET    (1<<9)
-#define IR_GEN_ENDBR          (1<<10)
+#define IR_FUNCTION            (1<<0)
+#define IR_FASTCALL_FUNC       (1<<1)
+#define IR_SKIP_PROLOGUE       (1<<2)
+#define IR_USE_FRAME_POINTER   (1<<3)
+#define IR_PREALLOCATED_STACK  (1<<4)
+#define IR_HAS_ALLOCA          (1<<5)
+#define IR_HAS_CALLS           (1<<6)
+#define IR_NO_STACK_COMBINE    (1<<7)
+#define IR_START_BR_TARGET     (1<<8)
+#define IR_ENTRY_BR_TARGET     (1<<9)
+#define IR_GEN_ENDBR           (1<<10)
+#define IR_MERGE_EMPTY_ENTRIES (1<<11)
 
-#define IR_IRREDUCIBLE_CFG    (1<<15)
+#define IR_IRREDUCIBLE_CFG     (1<<15)
 
-#define IR_OPT_FOLDING        (1<<16)
-#define IR_OPT_CFG            (1<<17) /* merge BBs, by remove END->BEGIN nodes during CFG construction */
-#define IR_OPT_CODEGEN        (1<<18)
-#define IR_OPT_IN_SCCP        (1<<19)
-#define IR_LINEAR             (1<<20)
-#define IR_GEN_NATIVE         (1<<21)
-#define IR_GEN_C              (1<<22)
+#define IR_OPT_FOLDING         (1<<16)
+#define IR_OPT_CFG             (1<<17) /* merge BBs, by remove END->BEGIN nodes during CFG construction */
+#define IR_OPT_CODEGEN         (1<<18)
+#define IR_OPT_IN_SCCP         (1<<19)
+#define IR_LINEAR              (1<<20)
+#define IR_GEN_NATIVE          (1<<21)
+#define IR_GEN_C               (1<<22)
 
 /* x86 related */
-#define IR_AVX                (1<<24)
+#define IR_AVX                 (1<<24)
 
 /* Temporary: Live Ranges */
 #define IR_LR_HAVE_VARS        (1<<25)
