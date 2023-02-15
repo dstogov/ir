@@ -814,8 +814,6 @@ cmp_fp:
 			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 			break;
 		case IR_SHIFT_CONST:
-		case IR_COPY_INT:
-		case IR_COPY_FP:
 		case IR_INC:
 		case IR_DEC:
 		case IR_MUL_PWR2:
@@ -824,6 +822,12 @@ cmp_fp:
 		case IR_OP_INT:
 		case IR_OP_FP:
 			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;
+			break;
+		case IR_COPY_INT:
+		case IR_COPY_FP:
+		case IR_SEXT:
+		case IR_ZEXT:
+			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
 			break;
 		case IR_ABS_INT:
 			flags = IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;

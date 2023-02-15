@@ -513,8 +513,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							/* We add two uses to emulate move from op1 to res */
 							ir_add_use(ctx, ctx->vregs[ref], 0, IR_DEF_LIVE_POS_FROM_REF(ref), reg, def_flags, 0);
 							def_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
-							if (!IR_IS_CONST_REF(insn->op1)) {
-								IR_ASSERT(ctx->vregs[insn->op1]);
+							if (!IR_IS_CONST_REF(insn->op1) && ctx->vregs[insn->op1]) {
 								hint_ref = insn->op1;
 							}
 						} else if (def_flags & IR_DEF_CONFLICTS_WITH_INPUT_REGS) {
