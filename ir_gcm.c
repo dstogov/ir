@@ -11,11 +11,12 @@
 #include "ir.h"
 #include "ir_private.h"
 
-static void ir_gcm_schedule_early(ir_ctx *ctx, uint32_t *_blocks, ir_ref ref)
+static void ir_gcm_schedule_early(ir_ctx *ctx, uint32_t *_blocks, ir_ref ref, ir_list *queue_rest)
 {
 	ir_ref n, *p, input;
 	ir_insn *insn;
 	uint32_t dom_depth, b;
+	bool reschedule_late = 1;
 
 	insn = &ctx->ir_base[ref];
 
@@ -30,14 +31,28 @@ static void ir_gcm_schedule_early(ir_ctx *ctx, uint32_t *_blocks, ir_ref ref)
 		input = *p;
 		if (input > 0) {
 			if (_blocks[input] == 0) {
-				ir_gcm_schedule_early(ctx, _blocks, input);
+				ir_gcm_schedule_early(ctx, _blocks, input, queue_rest);
 			}
 			b = _blocks[input];
 			if (dom_depth < ctx->cfg_blocks[b].dom_depth) {
 				dom_depth = ctx->cfg_blocks[b].dom_depth;
 				_blocks[ref] = b;
 			}
+			reschedule_late = 0;
 		}
+	}
+	if (UNEXPECTED(reschedule_late)) {
+		/* Floating nodes that doesn't sepend on other nodes
+		 * (e.g. only on constants), has to be scheduled to the
+		 * last common ancestor. Otherwise they always goes to the
+		 * first block.
+		 *
+		 * TODO:
+		 * It's possible to reuse ir_gcm_schedule_late() and move
+		 * these nodes out of the loops, but then we mgiht need
+		 * to rematerialize them at proper place(s).
+		 */
+		ir_list_push_unchecked(queue_rest, ref);
 	}
 }
 
@@ -119,6 +134,51 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 	}
 }
 
+static void ir_gcm_schedule_rest(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visited, ir_ref ref)
+{
+	ir_ref n, *p, use;
+	ir_insn *insn;
+
+	ir_bitset_incl(visited, ref);
+	n = ctx->use_lists[ref].count;
+	if (n) {
+		uint32_t lca, b;
+
+		insn = &ctx->ir_base[ref];
+		IR_ASSERT(insn->op != IR_PARAM && insn->op != IR_VAR);
+		IR_ASSERT(insn->op != IR_PHI && insn->op != IR_PI);
+
+		lca = 0;
+		for (p = &ctx->use_edges[ctx->use_lists[ref].refs]; n > 0; p++, n--) {
+			use = *p;
+			b = _blocks[use];
+			if (!b) {
+				continue;
+			} else if (!ir_bitset_in(visited, use)) {
+				ir_gcm_schedule_late(ctx, _blocks, visited, use);
+				b = _blocks[use];
+				IR_ASSERT(b != 0);
+			}
+			insn = &ctx->ir_base[use];
+			if (insn->op == IR_PHI) {
+				ir_ref *p = insn->ops + 2; /* PHI data inputs */
+				ir_ref *q = ctx->ir_base[insn->op1].ops + 1; /* MERGE inputs */
+
+				while (*p != ref) {
+					p++;
+					q++;
+				}
+				b = _blocks[*q];
+				IR_ASSERT(b);
+			}
+			lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
+		}
+		IR_ASSERT(lca != 0 && "No Common Antecessor");
+		b = lca;
+		_blocks[ref] = b;
+	}
+}
+
 int ir_gcm(ir_ctx *ctx)
 {
 	ir_ref k, n, *p, ref;
@@ -126,6 +186,7 @@ int ir_gcm(ir_ctx *ctx)
 	ir_block *bb;
 	ir_list queue_early;
 	ir_list queue_late;
+	ir_list queue_rest;
 	uint32_t *_blocks, b;
 	ir_insn *insn, *use_insn;
 	ir_use_list *use_list;
@@ -238,6 +299,8 @@ int ir_gcm(ir_ctx *ctx)
 		}
 	}
 
+	ir_list_init(&queue_rest, ctx->insns_count);
+
 	n = ir_list_len(&queue_early);
 	while (n > 0) {
 		n--;
@@ -247,7 +310,7 @@ int ir_gcm(ir_ctx *ctx)
 		for (p = insn->ops + 2; k > 0; p++, k--) {
 			ref = *p;
 			if (ref > 0 && _blocks[ref] == 0) {
-				ir_gcm_schedule_early(ctx, _blocks, ref);
+				ir_gcm_schedule_early(ctx, _blocks, ref, &queue_rest);
 			}
 		}
 	}
@@ -275,9 +338,17 @@ int ir_gcm(ir_ctx *ctx)
 		}
 	}
 
+	n = ir_list_len(&queue_rest);
+	while (n > 0) {
+		n--;
+		ref = ir_list_at(&queue_rest, n);
+		ir_gcm_schedule_rest(ctx, _blocks, visited, ref);
+	}
+
 	ir_mem_free(visited);
 	ir_list_free(&queue_early);
 	ir_list_free(&queue_late);
+	ir_list_free(&queue_rest);
 
 #ifdef IR_DEBUG
 	if (ctx->flags & IR_DEBUG_GCM) {
