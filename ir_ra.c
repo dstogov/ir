@@ -547,6 +547,24 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					ir_add_local_var(ctx, ctx->vregs[ref], insn->type);
 					continue;
 				}
+#if 0
+			} else if (insn->op == IR_RSTORE
+			 && insn->op2 == ref - 1 /* previous istruction */
+			 && ctx->vregs[insn->op2]
+			 && (insn-1)->op != IR_RLOAD
+			 && ctx->use_lists[insn->op2].count == 1
+			 && IR_REGSET_IN(IR_REGSET_UNION(ctx->fixed_regset, IR_REGSET_FIXED), insn->op3)) {
+
+			    ir_live_pos use_pos = IR_USE_LIVE_POS_FROM_REF(ref);
+
+				ir_add_live_range(ctx, &unused, ctx->vregs[insn->op2], ctx->ir_base[insn->op2].type,
+					IR_START_LIVE_POS_FROM_REF(bb->start), use_pos);
+				ir_add_use(ctx, ctx->vregs[insn->op2], 2, use_pos, IR_REG_NONE, 0, IR_UNUSED);
+				ir_bitset_incl(live, ctx->vregs[insn->op2]);
+				ctx->live_intervals[ctx->vregs[insn->op2]]->flags = IR_LIVE_INTERVAL_REG_LOAD;
+				ctx->live_intervals[ctx->vregs[insn->op2]]->reg = insn->op3;
+				continue;
+#endif
 			}
 
 			IR_ASSERT(insn->op != IR_PHI && (!ctx->rules || ctx->rules[ref] != IR_SKIP_MEM));
