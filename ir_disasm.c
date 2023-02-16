@@ -397,8 +397,9 @@ int ir_disasm(const char    *name,
 			p = (uintptr_t*)((char*)start + jmp_table_offset);
 			while (n > 0) {
 				if (*p) {
-					IR_ASSERT((uintptr_t)*p >= (uintptr_t)start && (uintptr_t)*p < (uintptr_t)orig_end);
-					ir_hashtab_add(&labels, (uint32_t)((uintptr_t)*p - (uintptr_t)start), -1);
+					if ((uintptr_t)*p >= (uintptr_t)start && (uintptr_t)*p < (uintptr_t)orig_end) {
+						ir_hashtab_add(&labels, (uint32_t)((uintptr_t)*p - (uintptr_t)start), -1);
+					}
 				}
 				p++;
 				n -= sizeof(void*);
@@ -628,20 +629,38 @@ int ir_disasm(const char    *name,
 				}
 			}
 			if (*p) {
-				IR_ASSERT((uintptr_t)*p >= (uintptr_t)start && (uintptr_t)*p < (uintptr_t)orig_end);
-				entry = ir_hashtab_find(&labels, (uint32_t)(*p - (uintptr_t)start));
-				IR_ASSERT(entry != (ir_ref)IR_INVALID_VAL);
-				if (entry >= 0) {
-					if (sizeof(void*) == 8) {
-						fprintf(f, "\t.qword .ENTRY_%d\n", entry);
+				if ((uintptr_t)*p >= (uintptr_t)start && (uintptr_t)*p < (uintptr_t)orig_end) {
+					entry = ir_hashtab_find(&labels, (uint32_t)(*p - (uintptr_t)start));
+					IR_ASSERT(entry != (ir_ref)IR_INVALID_VAL);
+					if (entry >= 0) {
+						if (sizeof(void*) == 8) {
+							fprintf(f, "\t.qword .ENTRY_%d\n", entry);
+						} else {
+							fprintf(f, "\t.dword .ENTRY_%d\n", entry);
+						}
 					} else {
-						fprintf(f, "\t.dword .ENTRY_%d\n", entry);
+						if (sizeof(void*) == 8) {
+							fprintf(f, "\t.qword .L%d\n", -entry);
+						} else {
+							fprintf(f, "\t.dword .L%d\n", -entry);
+						}
 					}
 				} else {
-					if (sizeof(void*) == 8) {
-						fprintf(f, "\t.qword .L%d\n", -entry);
+					int64_t offset;
+					const char *name = ir_disasm_find_symbol(*p, &offset);
+
+					if (name && offset == 0) {
+						if (sizeof(void*) == 8) {
+							fprintf(f, "\t.qword %s\n", name);
+						} else {
+							fprintf(f, "\t.dword %s\n", name);
+						}
 					} else {
-						fprintf(f, "\t.dword .L%d\n", -entry);
+						if (sizeof(void*) == 8) {
+							fprintf(f, "\t.qword 0x%0llx\n", (long long)*p);
+						} else {
+							fprintf(f, "\t.dword 0x%0x\n", (int)*p);
+						}
 					}
 				}
 			} else {

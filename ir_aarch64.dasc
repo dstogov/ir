@@ -3389,7 +3389,24 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 		|.align 8
 		|1:
 		for (i = 0; i <= (max.i64 - min.i64); i++) {
-			|	.addr =>labels[i]
+			int b = labels[i];
+			ir_block *bb = &ctx->cfg_blocks[b];
+			ir_insn *insn = &ctx->ir_base[bb->end];
+
+			if (insn->op == IR_IJMP && IR_IS_CONST_REF(insn->op2)) {
+				ir_ref prev = ctx->prev_ref[bb->end];
+				if (prev != bb->start && ctx->ir_base[prev].op == IR_SNAPSHOT) {
+					prev = ctx->prev_ref[prev];
+				}
+				if (prev == bb->start) {
+					void *addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op2]);
+
+					|	.addr &addr
+					bb->flags |= IR_BB_SKIP;
+					continue;
+				}
+			}
+			|	.addr =>b
 		}
 		|.code
 		ir_mem_free(labels);
@@ -4905,7 +4922,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
-		if (ctx->prev_ref[bb->end] == bb->start
+		if (bb->flags & IR_BB_SKIP) {
+			continue;
+		} else if (ctx->prev_ref[bb->end] == bb->start
 		 && bb->successors_count == 1
 		 && (ctx->ir_base[bb->end].op == IR_END || ctx->ir_base[bb->end].op == IR_LOOP_END)
 		 && !(bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_DESSA_MOVES))) {
