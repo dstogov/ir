@@ -5,7 +5,7 @@
  * Authors: Dmitry Stogov <dmitry@php.net>
  *
  * The GCM algorithm is based on Cliff Click's publication
- * See: C. Click. "Global code motion, global value numbering" Submitted to PLDI‘95.
+ * See: C. Click. "Global code motion, global value numbering" Submitted to PLDI'95.
  */
 
 #include "ir.h"
