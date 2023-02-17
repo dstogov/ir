@@ -2045,7 +2045,11 @@ static void ir_emit_prologue(ir_ctx *ctx)
 		|	mov Ra(IR_REG_RBP), Ra(IR_REG_RSP)
 	}
 	if (data->ra_data.stack_frame_size + data->call_stack_size) {
-		|	sub Ra(IR_REG_RSP), (data->ra_data.stack_frame_size + data->call_stack_size)
+		if (ctx->fixed_stack_red_zone) {
+			IR_ASSERT(data->ra_data.stack_frame_size + data->call_stack_size <= ctx->fixed_stack_red_zone);
+		} else {
+			|	sub Ra(IR_REG_RSP), (data->ra_data.stack_frame_size + data->call_stack_size)
+		}
 	}
 	if (data->used_preserved_regs) {
 		int offset;
@@ -2103,7 +2107,11 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 		|	mov Ra(IR_REG_RSP), Ra(IR_REG_RBP)
 		|	pop Ra(IR_REG_RBP)
 	} else if (data->ra_data.stack_frame_size + data->call_stack_size) {
-		|	add Ra(IR_REG_RSP), (data->ra_data.stack_frame_size + data->call_stack_size)
+		if (ctx->fixed_stack_red_zone) {
+			IR_ASSERT(data->ra_data.stack_frame_size + data->call_stack_size <= ctx->fixed_stack_red_zone);
+		} else {
+			|	add Ra(IR_REG_RSP), (data->ra_data.stack_frame_size + data->call_stack_size)
+		}
 	}
 }
 
@@ -5880,11 +5888,20 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 		used_stack = 0;
 	} else {
 		used_stack = ir_call_used_stack(ctx, insn);
-		/* Stack must be 16 byte aligned */
-		int32_t aligned_stack = IR_ALIGNED_SIZE(used_stack, 16);
-		data->call_stack_size += aligned_stack;
-		if (aligned_stack) {
-			|	sub Ra(IR_REG_RSP), aligned_stack
+		if (ctx->fixed_call_stack_size
+		 && used_stack <= ctx->fixed_call_stack_size
+#ifdef IR_HAVE_FASTCALL
+		 && !ir_is_fastcall(ctx, insn) /* fast call functions restore stack pointer */
+#endif
+		) {
+			used_stack = 0;
+		} else {
+			/* Stack must be 16 byte aligned */
+			int32_t aligned_stack = IR_ALIGNED_SIZE(used_stack, 16);
+			data->call_stack_size += aligned_stack;
+			if (aligned_stack) {
+				|	sub Ra(IR_REG_RSP), aligned_stack
+			}
 		}
 	}
 
@@ -7739,8 +7756,12 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	}
 
 	if (ctx->fixed_stack_frame_size != -1) {
-		IR_ASSERT(data.ra_data.stack_frame_size <= ctx->fixed_stack_frame_size + ctx->fixed_stack_red_zone);
+		if (ctx->fixed_stack_red_zone) {
+			IR_ASSERT(ctx->fixed_stack_red_zone == ctx->fixed_stack_frame_size + ctx->fixed_call_stack_size);
+		}
+		IR_ASSERT(data.ra_data.stack_frame_size <= ctx->fixed_stack_frame_size);
 		data.ra_data.stack_frame_size = ctx->fixed_stack_frame_size;
+		data.call_stack_size = ctx->fixed_call_stack_size;
 		data.stack_frame_alignment = 0;
 	}
 

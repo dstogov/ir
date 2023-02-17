@@ -501,10 +501,11 @@ struct _ir_ctx {
 	uint32_t          *vregs;
 	ir_ref             vregs_count;
 	int32_t            spill_base;        /* base register for special spill area (e.g. PHP VM frame pointer) */
-	int32_t            fixed_stack_red_zone;
-	int32_t            fixed_stack_frame_size;
-	uint64_t           fixed_regset;
-	uint64_t           fixed_save_regset;
+	uint64_t           fixed_regset;      /* fixed registers, excluded for regular register allocation */
+	int32_t            fixed_stack_red_zone;    /* reusable stack allocated by caller (default 0) */
+	int32_t            fixed_stack_frame_size;  /* fixed stack allocated by generated code for spills and registers save/restore */
+	int32_t            fixed_call_stack_size;   /* fixed preallocated stack for parameter passing (default 0) */
+	uint64_t           fixed_save_regset;       /* registers that always saved/restored in prologue/epilugue */
 	ir_live_interval **live_intervals;
 	ir_regs           *regs;
 	ir_ref            *prev_ref;

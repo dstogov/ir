@@ -1223,7 +1223,11 @@ static void ir_emit_prologue(ir_ctx *ctx)
 			| sub sp, sp, #(data->call_stack_size)
 		}
 	} else if (data->ra_data.stack_frame_size + data->call_stack_size) {
-		| sub sp, sp, #(data->ra_data.stack_frame_size + data->call_stack_size)
+		if (ctx->fixed_stack_red_zone) {
+			IR_ASSERT(data->ra_data.stack_frame_size + data->call_stack_size <= ctx->fixed_stack_red_zone);
+		} else {
+			| sub sp, sp, #(data->ra_data.stack_frame_size + data->call_stack_size)
+		}
 	}
 	if (data->used_preserved_regs) {
 		int offset;
@@ -1325,7 +1329,11 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 		}
 		|	ldp x29, x30, [sp], # (data->ra_data.stack_frame_size+16)
 	} else if (data->ra_data.stack_frame_size + data->call_stack_size) {
-		| add sp, sp, #(data->ra_data.stack_frame_size + data->call_stack_size)
+		if (ctx->fixed_stack_red_zone) {
+			IR_ASSERT(data->ra_data.stack_frame_size + data->call_stack_size <= ctx->fixed_stack_red_zone);
+		} else {
+			| add sp, sp, #(data->ra_data.stack_frame_size + data->call_stack_size)
+		}
 	}
 }
 
@@ -3574,9 +3582,13 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 		used_stack = ir_call_used_stack(ctx, insn);
 		/* Stack must be 16 byte aligned */
 		used_stack = IR_ALIGNED_SIZE(used_stack, 16);
-		data->call_stack_size += used_stack;
-		if (used_stack) {
-			|	sub sp, sp, #used_stack
+		if (ctx->fixed_call_stack_size && used_stack <= ctx->fixed_call_stack_size) {
+			used_stack = 0;
+		} else {
+			data->call_stack_size += used_stack;
+			if (used_stack) {
+				|	sub sp, sp, #used_stack
+			}
 		}
 	}
 
@@ -4891,8 +4903,12 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	}
 
 	if (ctx->fixed_stack_frame_size != -1) {
-		IR_ASSERT(data.ra_data.stack_frame_size <= ctx->fixed_stack_frame_size + ctx->fixed_stack_red_zone);
+		if (ctx->fixed_stack_red_zone) {
+			IR_ASSERT(ctx->fixed_stack_red_zone == ctx->fixed_stack_frame_size + ctx->fixed_call_stack_size);
+		}
+		IR_ASSERT(data.ra_data.stack_frame_size <= ctx->fixed_stack_frame_size);
 		data.ra_data.stack_frame_size = ctx->fixed_stack_frame_size;
+		data.call_stack_size = ctx->fixed_call_stack_size;
 		data.stack_frame_alignment = 0;
 	}
 

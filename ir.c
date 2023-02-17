@@ -311,6 +311,7 @@ void ir_init(ir_ctx *ctx, ir_ref consts_limit, ir_ref insns_limit)
 	ctx->spill_base = -1;
 	ctx->fixed_stack_red_zone = 0;
 	ctx->fixed_stack_frame_size = -1;
+	ctx->fixed_call_stack_size = 0;
 	ctx->fixed_regset = 0;
 	ctx->fixed_save_regset = 0;
 	ctx->live_intervals = NULL;
