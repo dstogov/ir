@@ -14,6 +14,6 @@ x86_64
 }
 --EXPECT--
 test:
-	movq $0xa, %rax
+	movl $0xa, %eax
 	bswapq %rax
 	retq

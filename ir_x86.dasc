@@ -1844,17 +1844,19 @@ static void ir_emit_load_imm_int(ir_ctx *ctx, ir_type type, ir_reg reg, int64_t 
 	dasm_State **Dst = &data->dasm_state;
 
 	IR_ASSERT(IR_IS_TYPE_INT(type));
-	if (ir_type_size[type] == 8 && !IR_IS_SIGNED_32BIT(val)) {
+	if (val == 0) {
+		|	ASM_REG_REG_OP xor, type, reg, reg
+	} else if (ir_type_size[type] == 8) {
 		IR_ASSERT(sizeof(void*) == 8);
 |.if X64
 		if (IR_IS_UNSIGNED_32BIT(val)) {
 			|	mov Rd(reg), (uint32_t)val // zero extended load
+		} else if (IR_IS_SIGNED_32BIT(val)) {
+			|	mov Rq(reg), (int32_t)val // sign extended load
 		} else {
 			|	mov64 Ra(reg), val
 		}
 |.endif
-	} else if (val == 0) {
-		|	ASM_REG_REG_OP xor, type, reg, reg
 	} else {
 		|	ASM_REG_IMM_OP mov, type, reg, (int32_t)val // sign extended load
 	}
