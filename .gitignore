@@ -16,3 +16,6 @@ tests/**/*.exp
 tests/**/*.ir
 tests/**/*.out
 tests/**/*.log
+
+win32/vcpkg
+win32/build_*
