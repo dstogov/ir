@@ -86,3 +86,21 @@ jobs:
             make CC=gcc TARGET=aarch64 all
             # FIXME: For some reason some of the object files are rebuilt
             make CC=gcc TARGET=aarch64 test-ci
+
+  windows:
+    strategy:
+      matrix:
+        arch: [x86, amd64]
+        include:
+          - vcpkg_dir: .\win32\vcpkg
+          - vcpkg_triplet: x86-windows
+            arch: x86
+          - vcpkg_triplet: x64-windows
+            arch: amd64
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch }}
+      - run: nmake -nologo -f win32/Makefile VCPKG_DIR=${{ matrix.vcpkg_dir }} VCPKG_TRIPLET=${{ matrix.vcpkg_triplet }}
