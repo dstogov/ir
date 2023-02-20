@@ -103,4 +103,12 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: ${{ matrix.arch }}
-      - run: nmake -nologo -f win32/Makefile VCPKG_DIR=${{ matrix.vcpkg_dir }} VCPKG_TRIPLET=${{ matrix.vcpkg_triplet }}
+      - name: Build
+        shell: cmd
+        run: nmake -nologo -f win32/Makefile VCPKG_DIR=${{ matrix.vcpkg_dir }} VCPKG_TRIPLET=${{ matrix.vcpkg_triplet }}
+      - name: Test
+        shell: cmd
+        run: |
+          nmake -nologo -f win32/Makefile VCPKG_DIR=${{ matrix.vcpkg_dir }} VCPKG_TRIPLET=${{ matrix.vcpkg_triplet }} test
+          type win32\build_${{ matrix.vcpkg_triplet }}\test.log
+
