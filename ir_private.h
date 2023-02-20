@@ -17,6 +17,16 @@
 # define IR_ASSERT(x)
 #endif
 
+#ifdef _WIN32
+# include <intrin.h>
+# ifdef _M_X64
+#  pragma intrinsic(_BitScanForward64)
+#  pragma intrinsic(_BitScanReverse64)
+# endif
+# pragma intrinsic(_BitScanForward)
+# pragma intrinsic(_BitScanReverse)
+#endif
+
 #ifdef __has_builtin
 # if __has_builtin(__builtin_expect)
 #   define EXPECTED(condition)   __builtin_expect(!!(condition), 1)
@@ -104,7 +114,7 @@ IR_ALWAYS_INLINE uint32_t ir_ntz(uint32_t num)
 #elif defined(_WIN32)
 	uint32_t index;
 
-	if (!BitScanForward(&index, num)) {
+	if (!_BitScanForward(&index, num)) {
 		/* undefined behavior */
 		return 32;
 	}
@@ -133,9 +143,9 @@ IR_ALWAYS_INLINE uint32_t ir_ntzl(uint64_t num)
 	unsigned long index;
 
 #if defined(_WIN64)
-	if (!BitScanForward64(&index, num)) {
+	if (!_BitScanForward64(&index, num)) {
 #else
-	if (!BitScanForward(&index, num)) {
+	if (!_BitScanForward(&index, num)) {
 #endif
 		/* undefined behavior */
 		return 64;
@@ -165,7 +175,7 @@ IR_ALWAYS_INLINE int ir_nlz(uint32_t num)
 #elif defined(_WIN32)
 	uint32_t index;
 
-	if (!BitScanReverse(&index, num)) {
+	if (!_BitScanReverse(&index, num)) {
 		/* undefined behavior */
 		return 32;
 	}
@@ -192,7 +202,11 @@ IR_ALWAYS_INLINE int ir_nlzl(uint64_t num)
 #elif defined(_WIN32)
 	uint32_t index;
 
-	if (!BitScanReverse64(&index, num)) {
+#if defined(_WIN64)
+	if (!_BitScanReverse64(&index, num)) {
+#else
+	if (!_BitScanReverse(&index, num)) {
+#endif
 		/* undefined behavior */
 		return 64;
 	}
@@ -223,7 +237,11 @@ IR_ALWAYS_INLINE int ir_nlzl(uint64_t num)
 # define ir_bitset_ntz  ir_ntz
 #else
 # define IR_BITSET_BITS   64
-# define IR_BITSET_ONE    1UL
+# ifdef _M_X64 /* MSVC*/
+#  define IR_BITSET_ONE    1ui64
+# else
+#  define IR_BITSET_ONE    1UL
+# endif
 # define ir_bitset_base_t uint64_t
 # define ir_bitset_ntz    ir_ntzl
 #endif

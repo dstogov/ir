@@ -370,7 +370,7 @@ static void ir_xlat_binding(ir_ctx *ctx, ir_ref *_xlat)
 	ir_hashtab *binding = ctx->binding;
 	uint32_t hash_size = (uint32_t)(-(int32_t)binding->mask);
 
-	memset(binding->data - (hash_size * sizeof(uint32_t)), -1, hash_size * sizeof(uint32_t));
+	memset((char*)binding->data - (hash_size * sizeof(uint32_t)), -1, hash_size * sizeof(uint32_t));
 	n1 = binding->count;
 	n2 = 0;
 	pos = 0;

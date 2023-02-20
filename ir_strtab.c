@@ -206,7 +206,7 @@ const char *ir_strtab_str(ir_strtab *strtab, ir_ref idx)
 void ir_strtab_free(ir_strtab *strtab)
 {
 	uint32_t hash_size = (uint32_t)(-(int32_t)strtab->mask);
-	char *data = strtab->data - (hash_size * sizeof(uint32_t));
+	char *data = (char*)strtab->data - (hash_size * sizeof(uint32_t));
 	ir_mem_free(data);
 	strtab->data = NULL;
 	if (strtab->buf) {

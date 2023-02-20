@@ -355,7 +355,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	f = fopen(input, "r");
+	f = fopen(input, "rb");
 	if (!f) {
 		fprintf(stderr, "ERROR: Cannot open input file '%s'\n", input);
 		return 1;
@@ -420,6 +420,7 @@ int main(int argc, char **argv)
 				int (*func)(void) = entry;
 				int ret;
 
+#ifndef _WIN32
 				ir_perf_map_register("test", entry, size);
 				ir_perf_jitdump_open();
 				ir_perf_jitdump_register("test", entry, size);
@@ -427,6 +428,7 @@ int main(int argc, char **argv)
 				ir_mem_unprotect(entry, 4096);
 				ir_gdb_register("test", entry, size, sizeof(void*), 0);
 				ir_mem_protect(entry, 4096);
+#endif
 
 				ret = func();
 				fflush(stdout);
