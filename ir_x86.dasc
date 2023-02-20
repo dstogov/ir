@@ -721,16 +721,17 @@ cmp_fp:
 			flags = IR_OP2_MUST_BE_IN_REG | IR_OP3_MUST_BE_IN_REG;
 			insn = &ctx->ir_base[ref];
 			if (IR_IS_CONST_REF(insn->op2)) {
-				IR_ASSERT(ctx->ir_base[insn->op2].type == IR_ADDR);
-				if (ir_type_size[insn->type] == 8 && !IR_IS_SIGNED_32BIT(ctx->ir_base[insn->op2].val.i64)) {
+				ir_insn *val_insn = &ctx->ir_base[insn->op2];
+				IR_ASSERT(val_insn->type == IR_ADDR);
+				if (ir_type_size[val_insn->type] == 8 && !IR_IS_SIGNED_32BIT(val_insn->val.i64)) {
 					constraints->tmp_regs[0] = IR_TMP_REG(2, IR_ADDR, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n = 1;
 				}
 			}
 			if (IR_IS_CONST_REF(insn->op3)) {
-				insn = &ctx->ir_base[insn->op3];
-				if (ir_type_size[insn->type] == 8 && !IR_IS_32BIT(insn->type, insn->val)) {
-					constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				ir_insn *val_insn = &ctx->ir_base[insn->op3];
+				if (ir_type_size[val_insn->type] == 8 && !IR_IS_32BIT(val_insn->type, val_insn->val)) {
+					constraints->tmp_regs[n] = IR_TMP_REG(3, val_insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
 				}
 			}
