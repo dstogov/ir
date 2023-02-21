@@ -1193,7 +1193,13 @@ static void ir_emit_mov(ir_ctx *ctx, ir_type type, ir_reg dst, ir_reg src)
 	dasm_State **Dst = &data->dasm_state;
 
 	if (ir_type_size[type] == 8) {
-		|	mov Rx(dst), Rx(src)
+		if (dst == IR_REG_STACK_POINTER) {
+			|	mov sp, Rx(src)
+		} else if (src == IR_REG_STACK_POINTER) {
+			|	mov Rx(dst), sp
+		} else {
+			|	mov Rx(dst), Rx(src)
+		}
 	} else {
 		|	mov Rw(dst), Rw(src)
 	}
