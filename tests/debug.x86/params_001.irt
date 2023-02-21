@@ -42,14 +42,14 @@ test:
 	movl 0x24(%esp), %ebp
 	movl 0x28(%esp), %esi
 	movl 0x34(%esp), %edi
-	leal (%ecx, %eax), %eax
-	leal (%eax, %edx), %eax
-	leal (%eax, %ebx), %eax
-	leal (%eax, %ebp), %eax
-	leal (%eax, %esi), %eax
-	leal (%eax, %ecx), %eax
-	leal (%eax, %ecx), %eax
-	leal (%eax, %edi), %eax
+	addl %ecx, %eax
+	addl %edx, %eax
+	addl %ebx, %eax
+	addl %ebp, %eax
+	addl %esi, %eax
+	addl %ecx, %eax
+	addl %ecx, %eax
+	addl %edi, %eax
 	subl 0x38(%esp), %eax
 	movl 0xc(%esp), %ebx
 	movl 8(%esp), %ebp

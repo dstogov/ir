@@ -18,6 +18,6 @@ x86
 test:
 	movl 4(%esp), %eax
 	movl 8(%esp), %ecx
-	leal (%ecx, %eax), %eax
+	addl %ecx, %eax
 	imull 0xc(%esp), %eax
 	retl

@@ -22,7 +22,7 @@ test:
 	subl $4, %esp
 	movl 8(%esp), %eax
 	movl %eax, (%esp)
-	leal (%eax, %eax), %eax
+	addl %eax, %eax
 	andl %eax, (%esp)
 	addl $4, %esp
 	retl

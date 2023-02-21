@@ -35,7 +35,7 @@ test:
 	leal 1(%eax), %eax
 	xorl %ecx, %ecx
 .L1:
-	leal (%eax, %ecx), %ecx
+	addl %eax, %ecx
 	cmpl $0xa, %ecx
 	jl .L1
 	leal (%ecx, %ecx), %eax

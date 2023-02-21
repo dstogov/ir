@@ -2,8 +2,6 @@
 001: register allocation
 --TARGET--
 x86_64
---XFAIL--
-Not implemented register allocation optimization pattern
 --ARGS--
 -S
 --CODE--

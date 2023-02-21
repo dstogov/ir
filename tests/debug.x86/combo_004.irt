@@ -40,7 +40,7 @@ x86
 test:
 	movb 4(%esp), %al
 	movl 8(%esp), %ecx
-	leal (%ecx, %ecx), %ecx
+	addl %ecx, %ecx
 .L1:
 	testb %al, %al
 	jne .L1

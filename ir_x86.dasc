@@ -1431,9 +1431,7 @@ store_int:
 							if (op_insn->op2 > bb->start
 							 && ctx->use_lists[op_insn->op2].count == 2
 							 && insn->op1 == op_insn->op2) {
-								ir_ref tmp = op_insn->op1;
-								op_insn->op1 = op_insn->op2;
-								op_insn->op2 = tmp;
+								ir_swap_ops(op_insn);
 								ctx->rules[insn->op3] = IR_SKIP_MEM_BINOP_INT;
 								ctx->rules[op_insn->op1] = IR_SKIP;
 								ir_match_fuse_addr(ctx, insn->op2, bb);
@@ -1576,9 +1574,7 @@ store_int:
 						} else if ((ir_op_flags[op_insn->op] & IR_OP_FLAG_COMMUTATIVE)
 						 && ctx->ir_base[op_insn->op2].op == IR_RLOAD
 						 && ctx->ir_base[op_insn->op2].op2 == insn->op3) {
-							ir_ref tmp = op_insn->op1;
-							op_insn->op1 = op_insn->op2;
-							op_insn->op2 = tmp;
+							ir_swap_ops(op_insn);
 							ctx->rules[insn->op2] = IR_SKIP_REG_BINOP_INT;
 							ctx->rules[op_insn->op1] = IR_SKIP;
 							return IR_REG_BINOP_INT;
@@ -1727,9 +1723,7 @@ store_int:
 								if (op_insn->op2 > bb->start
 								 && ctx->use_lists[op_insn->op2].count == 2
 								 && store_insn->op1 == op_insn->op2) {
-									ir_ref tmp = op_insn->op1;
-									op_insn->op1 = op_insn->op2;
-									op_insn->op2 = tmp;
+									ir_swap_ops(op_insn);
 									ctx->rules[insn->op2] = IR_SKIP_MEM_BINOP_INT;
 									ctx->rules[op_insn->op1] = IR_SKIP;
 									ir_match_fuse_addr(ctx, store_insn->op2, bb);
@@ -1807,15 +1801,11 @@ static void ir_match_insn2(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 	if (ctx->rules[ref] == IR_LEA_IB) {
 		ir_insn *insn = &ctx->ir_base[ref];
 
-		if (ctx->ir_base[insn->op2].op == IR_LOAD) {
-			ir_match_fuse_load(ctx, insn->op2, bb);
+		if (ir_match_fuse_load(ctx, insn->op2, bb)) {
 			ctx->rules[ref] = IR_BINOP_INT;
-		} else if (ctx->ir_base[insn->op1].op == IR_LOAD) {
+		} else if (ir_match_fuse_load(ctx, insn->op1, bb)) {
 			/* swap for better load fusion */
-			ir_ref tmp = insn->op1;
-			insn->op1 = insn->op2;
-			insn->op2 = tmp;
-			ir_match_fuse_load(ctx, insn->op2, bb);
+			ir_swap_ops(insn);
 			ctx->rules[ref] = IR_BINOP_INT;
 		}
 	}
@@ -6807,10 +6797,23 @@ static void ir_emit_lea(ir_ctx *ctx, ir_ref def, ir_type type, ir_reg base_reg, 
 			if (!offset) {
 				switch (scale) {
 					case 1:
-						if (ir_type_size[type] == 4) {
-							|	lea Rd(def_reg), dword [Rd(base_reg)+Rd(index_reg)]
+						if (ir_type_size[type] == sizeof(void*)) {
+							if (def_reg == base_reg) {
+								|	add Ra(def_reg), Ra(index_reg)
+							} else if (def_reg == index_reg) {
+								|	add Ra(def_reg), Ra(base_reg)
+							} else {
+								|	lea Ra(def_reg), aword [Ra(base_reg)+Ra(index_reg)]
+							}
 						} else {
-							|	lea Ra(def_reg), aword [Ra(base_reg)+Ra(index_reg)]
+							IR_ASSERT(sizeof(void*) == 8 && ir_type_size[type] == 4);
+							if (def_reg == base_reg) {
+								|	add Rd(def_reg), Rd(index_reg)
+							} else if (def_reg == index_reg) {
+								|	add Rd(def_reg), Rd(base_reg)
+							} else {
+								|	lea Rd(def_reg), dword [Rd(base_reg)+Rd(index_reg)]
+							}
 						}
 						break;
 					case 2:

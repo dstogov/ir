@@ -33,13 +33,13 @@ test:
 	movl 8(%rsp), %eax
 	movl 0x10(%rsp), %r10d
 	movl 0x18(%rsp), %r11d
-	leal (%rsi, %rdi), %esi
-	leal (%rsi, %rdx), %edx
-	leal (%rdx, %rcx), %ecx
-	leal (%rcx, %r8), %ecx
-	leal (%rcx, %r9), %ecx
-	leal (%rcx, %rax), %eax
-	leal (%rax, %r10), %eax
-	leal (%rax, %r11), %eax
+	addl %edi, %esi
+	addl %esi, %edx
+	addl %edx, %ecx
+	addl %r8d, %ecx
+	addl %r9d, %ecx
+	addl %ecx, %eax
+	addl %r10d, %eax
+	addl %r11d, %eax
 	subl 0x20(%rsp), %eax
 	retq

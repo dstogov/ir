@@ -24,7 +24,7 @@ test:
 	movl 0xc(%esp), %ecx
 	movl %ecx, (%esp)
 	andl (%esp), %eax
-	leal (%eax, %eax), %eax
+	addl %eax, %eax
 	movl %eax, (%esp)
 	addl $4, %esp
 	retl

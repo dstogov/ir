@@ -73,7 +73,7 @@ test:
 .L1:
 	cmpl $0x2710, %ebx
 	jge .L2
-	leal (%ebx, %eax), %ebx
+	addl %eax, %ebx
 	movl %ebx, %ebp
 	subl %eax, %ebp
 	movl %ebp, 4(%esp)
@@ -89,7 +89,7 @@ test:
 	addl $0x1c, %esp
 	retl
 .rodata
-	.db 0x90, 0x90, 0x90
+	.db 0x90, 0x90, 0x90, 0x90
 .L3:
 	.db 0x25, 0x64, 0x0a, 0x00
 

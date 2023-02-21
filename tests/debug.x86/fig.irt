@@ -91,14 +91,14 @@ test:
 	jne .L1
 	movl %eax, %esi
 	imull %ecx, %esi
-	leal (%eax, %ecx), %eax
-	leal (%eax, %edx), %eax
-	leal (%eax, %ebx), %eax
+	addl %ecx, %eax
+	addl %edx, %eax
+	addl %ebx, %eax
 	movl (%esp), %edi
-	leal (%eax, %edi), %eax
-	leal (%eax, %ebp), %eax
-	leal (%eax, %ecx), %eax
-	leal (%eax, %ecx), %eax
+	addl %edi, %eax
+	addl %ebp, %eax
+	addl %ecx, %eax
+	addl %ecx, %eax
 	leal 1(%eax, %esi), %eax
 	movl 0x14(%esp), %ebx
 	movl 0x10(%esp), %ebp

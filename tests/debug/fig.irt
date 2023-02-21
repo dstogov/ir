@@ -86,13 +86,13 @@ test:
 	jne .L1
 	movl %edi, %r10d
 	imull %esi, %r10d
-	leal (%rdi, %rsi), %esi
-	leal (%rsi, %rdx), %edx
-	leal (%rdx, %rcx), %ecx
-	leal (%rcx, %rbx), %ecx
-	leal (%rcx, %r9), %ecx
-	leal (%rcx, %rax), %eax
-	leal (%rax, %r8), %eax
+	addl %edi, %esi
+	addl %esi, %edx
+	addl %edx, %ecx
+	addl %ebx, %ecx
+	addl %r9d, %ecx
+	addl %ecx, %eax
+	addl %r8d, %eax
 	leal 1(%rax, %r10), %eax
 	movq 8(%rsp), %rbx
 	movq (%rsp), %rbp
