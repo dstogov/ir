@@ -5354,6 +5354,9 @@ static void ir_emit_rload(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 
 		if (def_reg == IR_REG_NONE) {
+			/* op3 is used as a flag that the value is already stored in memory.
+			 * If op3 is set we don't have to store the value once again (in case of spilling)
+			 */
 			if (!insn->op3) {
 				ir_emit_store(ctx, type, def, src_reg);
 			}
