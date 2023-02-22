@@ -9,8 +9,8 @@ on:
 permissions:
   contents: read
 jobs:
-  x86_64:
-    name: x86_64
+  Linux_x86_64:
+    name: 'Linux x86_64'
     runs-on: ubuntu-22.04
     container:
       image: ubuntu:22.04
@@ -29,8 +29,8 @@ jobs:
         run: make TARGET=x86_64 all
       - name: test
         run: make TARGET=x86_64 test-ci
-  x86:
-    name: x86
+  Linux_i386:
+    name: 'Linux i386'
     runs-on: ubuntu-22.04
     container:
       image: ubuntu:22.04
@@ -61,8 +61,8 @@ jobs:
         run: make TARGET=x86 all
       - name: test
         run: make TARGET=x86 test-ci
-  aarch64:
-    name: aarch64
+  Linux_aarch64:
+    name: 'Linux aarch64'
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
@@ -87,7 +87,7 @@ jobs:
             # FIXME: For some reason some of the object files are rebuilt
             make CC=gcc TARGET=aarch64 test-ci
 
-  windows:
+  Windows:
     strategy:
       matrix:
         arch: [x86, amd64]
