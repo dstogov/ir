@@ -11,7 +11,7 @@
 /* _ir_CTX may be redefined by the user */
 #define _ir_CTX                           ctx
 
-#define ir_NOP()                          ir_emit0(_ir_CTX)
+#define ir_NOP()                          ir_emit0(_ir_CTX, IR_NOP)
 
 #define ir_CONST_BOOL(_val)               ir_const_bool(_ir_CTX, (_val))
 #define ir_CONST_U8(_val)                 ir_const_u8(_ir_CTX, (_val))
