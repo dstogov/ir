@@ -86,7 +86,7 @@ int find_hash(uint32_t *mask, uint32_t count)
 
 static int find_op(const char *s, size_t len)
 {
-	return ir_strtab_find(&strtab, s, len) - 1;
+	return ir_strtab_find(&strtab, s, (uint8_t)len) - 1;
 }
 
 static int parse_rule(const char *buf)

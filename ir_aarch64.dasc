@@ -3775,7 +3775,7 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 		IR_ASSERT(addr_insn->type == IR_ADDR);
 		if (addr_insn->op == IR_FUNC) {
-			addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
+			addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.i32));
 		} else {
 			addr = (void*)addr_insn->val.addr;
 		}
@@ -3852,7 +3852,7 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 		IR_ASSERT(addr_insn->type == IR_ADDR);
 		if (addr_insn->op == IR_FUNC) {
-			addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
+			addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.i32));
 		} else {
 			addr = (void*)addr_insn->val.addr;
 		}
@@ -4232,7 +4232,7 @@ static void ir_emit_exitcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 		IR_ASSERT(addr_insn->type == IR_ADDR);
 		if (addr_insn->op == IR_FUNC) {
-			addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
+			addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.i32));
 		} else {
 			addr = (void*)addr_insn->val.addr;
 		}
@@ -5186,7 +5186,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				}
 			} else if (insn->op == IR_STR) {
 				int label = ctx->cfg_blocks_count + i;
-				const char *str = ir_get_str(ctx, insn->val.addr);
+				const char *str = ir_get_str(ctx, insn->val.i32);
 				int i = 0;
 
 				if (!data.rodata_label) {

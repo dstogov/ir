@@ -70,10 +70,10 @@ const char *ir_op_name[IR_LAST_OP] = {
 void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 {
 	if (insn->op == IR_FUNC) {
-		fprintf(f, "%s", ir_get_str(ctx, insn->val.addr));
+		fprintf(f, "%s", ir_get_str(ctx, insn->val.i32));
 		return;
 	} else if (insn->op == IR_STR) {
-		fprintf(f, "\"%s\"", ir_get_str(ctx, insn->val.addr));
+		fprintf(f, "\"%s\"", ir_get_str(ctx, insn->val.i32));
 		return;
 	}
 	IR_ASSERT(IR_IS_CONST_OP(insn->op) || insn->op == IR_FUNC_ADDR);
@@ -611,10 +611,14 @@ ir_ref ir_const_str(ir_ctx *ctx, ir_ref str)
 
 ir_ref ir_str(ir_ctx *ctx, const char *s)
 {
+	size_t len;
+
 	if (!ctx->strtab.data) {
 		ir_strtab_init(&ctx->strtab, 64, 4096);
 	}
-	return ir_strtab_lookup(&ctx->strtab, s, strlen(s), ir_strtab_count(&ctx->strtab) + 1);
+	len = strlen(s);
+	IR_ASSERT(len <= 0xffffffff);
+	return ir_strtab_lookup(&ctx->strtab, s, (uint32_t)len, ir_strtab_count(&ctx->strtab) + 1);
 }
 
 ir_ref ir_strl(ir_ctx *ctx, const char *s, size_t len)
@@ -622,7 +626,8 @@ ir_ref ir_strl(ir_ctx *ctx, const char *s, size_t len)
 	if (!ctx->strtab.data) {
 		ir_strtab_init(&ctx->strtab, 64, 4096);
 	}
-	return ir_strtab_lookup(&ctx->strtab, s, len, ir_strtab_count(&ctx->strtab) + 1);
+	IR_ASSERT(len <= 0xffffffff);
+	return ir_strtab_lookup(&ctx->strtab, s, (uint32_t)len, ir_strtab_count(&ctx->strtab) + 1);
 }
 
 const char *ir_get_str(ir_ctx *ctx, ir_ref idx)
@@ -1346,7 +1351,7 @@ static ir_alias ir_check_partial_aliasing(ir_ctx *ctx, ir_ref addr1, ir_ref addr
 	insn2 = &ctx->ir_base[addr2];
 	if (insn1->op == IR_ADD && IR_IS_CONST_REF(insn1->op2)) {
 		if (insn1->op1 == addr2) {
-			uintptr_t offset1 = ctx->ir_base[insn1->op2].val.u64;
+			uintptr_t offset1 = ctx->ir_base[insn1->op2].val.addr;
 			uintptr_t size2 = ir_type_size[type2];
 
 			return (offset1 < size2) ? IR_MUST_ALIAS : IR_NO_ALIAS;
@@ -1354,8 +1359,8 @@ static ir_alias ir_check_partial_aliasing(ir_ctx *ctx, ir_ref addr1, ir_ref addr
 			if (insn1->op2 == insn2->op2) {
 				return IR_MUST_ALIAS;
 			} else if (IR_IS_CONST_REF(insn1->op2) && IR_IS_CONST_REF(insn2->op2)) {
-				uintptr_t offset1 = ctx->ir_base[insn1->op2].val.u64;
-				uintptr_t offset2 = ctx->ir_base[insn2->op2].val.u64;
+				uintptr_t offset1 = ctx->ir_base[insn1->op2].val.addr;
+				uintptr_t offset2 = ctx->ir_base[insn2->op2].val.addr;
 
 				if (offset1 == offset2) {
 					return IR_MUST_ALIAS;
@@ -1376,7 +1381,7 @@ static ir_alias ir_check_partial_aliasing(ir_ctx *ctx, ir_ref addr1, ir_ref addr
 		}
 	} else if (insn2->op == IR_ADD && IR_IS_CONST_REF(insn2->op2)) {
 		if (insn2->op1 == addr1) {
-			uintptr_t offset2 = ctx->ir_base[insn2->op2].val.u64;
+			uintptr_t offset2 = ctx->ir_base[insn2->op2].val.addr;
 			uintptr_t size1 = ir_type_size[type1];
 
 			return (offset2 < size1) ? IR_MUST_ALIAS : IR_NO_ALIAS;

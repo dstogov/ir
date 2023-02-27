@@ -525,7 +525,7 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 		ir_emit_def_ref(ctx, f, def);
 	}
 	if (IR_IS_CONST_REF(insn->op2)) {
-		fprintf(f, "%s", ir_get_str(ctx, ctx->ir_base[insn->op2].val.addr));
+		fprintf(f, "%s", ir_get_str(ctx, ctx->ir_base[insn->op2].val.i32));
 	} else {
 		ir_emit_ref(ctx, f, insn->op2);
 	}
@@ -548,7 +548,7 @@ static void ir_emit_tailcall(ir_ctx *ctx, FILE *f, ir_insn *insn)
 		fprintf(f, "\treturn ");
 	}
 	if (IR_IS_CONST_REF(insn->op2)) {
-		fprintf(f, "%s", ir_get_str(ctx, ctx->ir_base[insn->op2].val.addr));
+		fprintf(f, "%s", ir_get_str(ctx, ctx->ir_base[insn->op2].val.i32));
 	} else {
 		ir_emit_ref(ctx, f, insn->op2);
 	}

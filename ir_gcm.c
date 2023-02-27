@@ -666,7 +666,7 @@ restart:
 		while (ref != IR_TRUE) {
 			_xlat[ref] = ref;
 			if (new_insn->op == IR_FUNC || new_insn->op == IR_STR) {
-				new_insn->val.addr = ir_str(&new_ctx, ir_get_str(ctx, new_insn->val.addr));
+				new_insn->val.addr = ir_str(&new_ctx, ir_get_str(ctx, new_insn->val.i32));
 			}
 			new_insn++;
 			ref++;
@@ -682,7 +682,7 @@ restart:
 			new_insn->optx = insn->optx;
 			new_insn->prev_const = 0;
 			if (insn->op == IR_FUNC || insn->op == IR_STR) {
-				new_insn->val.addr = ir_str(&new_ctx, ir_get_str(ctx, insn->val.addr));
+				new_insn->val.addr = ir_str(&new_ctx, ir_get_str(ctx, insn->val.i32));
 			} else {
 				new_insn->val.u64 = insn->val.u64;
 			}

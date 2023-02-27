@@ -2852,12 +2852,14 @@ static void ir_emit_shift_const(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-	uint32_t shift = ctx->ir_base[insn->op2].val.u64;
+	int32_t shift;
 	ir_type type = insn->type;
 	ir_ref op1 = insn->op1;
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 	ir_reg op1_reg = ctx->regs[def][1];
 
+	IR_ASSERT(IR_IS_SIGNED_32BIT(ctx->ir_base[insn->op2].val.i64));
+	shift = ctx->ir_base[insn->op2].val.i32;
 	IR_ASSERT(def_reg != IR_REG_NONE);
 
 	if (op1_reg != IR_REG_NONE && (op1_reg & IR_REG_SPILL_LOAD)) {
@@ -2901,10 +2903,12 @@ static void ir_emit_mem_shift_const(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	dasm_State **Dst = &data->dasm_state;
 	ir_insn *op_insn = &ctx->ir_base[insn->op3];
 	ir_type type = op_insn->type;
-	uint32_t shift = ctx->ir_base[op_insn->op2].val.u64;
+	int32_t shift;
 	ir_reg reg;
 	int32_t offset = 0;
 
+	IR_ASSERT(IR_IS_SIGNED_32BIT(ctx->ir_base[insn->op2].val.i64));
+	shift = ctx->ir_base[insn->op2].val.i32;
 	if (insn->op == IR_VSTORE) {
 		offset = ir_ref_spill_slot(ctx, insn->op2, &reg);
 	} else if (insn->op == IR_STORE) {
@@ -5170,7 +5174,7 @@ static void ir_emit_load_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		void *addr = (void*)ctx->ir_base[insn->op2].val.addr;
 
 		if (sizeof(void*) == 4 || IR_IS_SIGNED_32BIT(addr)) {
-			int32_t addr32 = (intptr_t)addr;
+			int32_t addr32 = (int32_t)(intptr_t)addr;
 			|	ASM_REG_MEM_OP mov, type, def_reg, [addr32]
 			return;
 		}
@@ -5216,7 +5220,7 @@ static void ir_emit_load_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		void *addr = (void*)ctx->ir_base[insn->op2].val.addr;
 
 		if (sizeof(void*) == 4 || IR_IS_SIGNED_32BIT(addr)) {
-			int32_t addr32 = (intptr_t)addr;
+			int32_t addr32 = (int32_t)(intptr_t)addr;
 			|	ASM_FP_REG_MEM_OP movss, movsd, vmovss, vmovsd, type, def_reg, [addr32]
 			return;
 		}
@@ -5257,7 +5261,7 @@ static void ir_emit_store_int(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 		void *addr = (void*)ctx->ir_base[insn->op2].val.addr;
 
 		if (sizeof(void*) == 4 || IR_IS_SIGNED_32BIT(addr)) {
-			int32_t addr32 = (intptr_t)addr;
+			int32_t addr32 = (int32_t)(intptr_t)addr;
 			if (IR_IS_CONST_REF(insn->op3) && IR_IS_32BIT(type, val_insn->val)) {
 				|	ASM_MEM_IMM_OP mov, type, [addr32], val_insn->val.i32
 			} else {
@@ -5311,7 +5315,7 @@ static void ir_emit_store_fp(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 		void *addr = (void*)ctx->ir_base[insn->op2].val.addr;
 
 		if (sizeof(void*) == 4 || IR_IS_SIGNED_32BIT(addr)) {
-			int32_t addr32 = (intptr_t)addr;
+			int32_t addr32 = (int32_t)(intptr_t)addr;
 			|	ASM_FP_MEM_REG_OP movss, movsd, vmovss, vmovsd, type, [addr32], op2_reg
 			return;
 		}
@@ -5558,7 +5562,7 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 
 	/* Generate a table jmp or a seqence of calls */
 	if ((max.i64-min.i64) < count * 8) {
-		int *labels = ir_mem_malloc(sizeof(int) * (max.i64 - min.i64 + 1));
+		int *labels = ir_mem_malloc(sizeof(int) * (size_t)(max.i64 - min.i64 + 1));
 
 		for (i = 0; i <= (max.i64 - min.i64); i++) {
 			labels[i] = default_label;
@@ -6101,7 +6105,7 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 		IR_ASSERT(addr_insn->type == IR_ADDR);
 		if (addr_insn->op == IR_FUNC) {
-			addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
+			addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.i32));
 		} else {
 			addr = (void*)addr_insn->val.addr;
 		}
@@ -6213,7 +6217,7 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 		IR_ASSERT(addr_insn->type == IR_ADDR);
 		if (addr_insn->op == IR_FUNC) {
-			addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.addr));
+			addr = ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.i32));
 		} else {
 			addr = (void*)addr_insn->val.addr;
 		}
@@ -7869,7 +7873,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 							int64_t long_offset = ctx->ir_base[insn->op2].val.i64;
 							long_offset = -long_offset;
 							IR_ASSERT(IR_IS_SIGNED_32BIT(long_offset));
-							offset = long_offset;
+							offset = (int32_t)long_offset;
 						}
 						if (op1_reg & IR_REG_SPILL_LOAD) {
 							op1_reg &= ~IR_REG_SPILL_LOAD;
@@ -8393,7 +8397,7 @@ next_block:;
 				}
 			} else if (insn->op == IR_STR) {
 				int label = ctx->cfg_blocks_count + i;
-				const char *str = ir_get_str(ctx, insn->val.addr);
+				const char *str = ir_get_str(ctx, insn->val.i32);
 				int i = 0;
 
 				if (!data.rodata_label) {

@@ -814,8 +814,8 @@ static bool ir_try_coalesce(ir_ctx *ctx, ir_live_range **unused, ir_ref from, ir
 	uint32_t v2 = ctx->vregs[to];
 
 	if (v1 != v2 && !ir_vregs_overlap(ctx, v1, v2)) {
-		uint8_t f1 = ctx->live_intervals[v1]->flags;
-		uint8_t f2 = ctx->live_intervals[v2]->flags;
+		uint16_t f1 = ctx->live_intervals[v1]->flags;
+		uint16_t f2 = ctx->live_intervals[v2]->flags;
 
 		if ((f1 & IR_LIVE_INTERVAL_COALESCED) && !(f2 & IR_LIVE_INTERVAL_COALESCED)) {
 			ir_vregs_join(ctx, unused, v1, v2);

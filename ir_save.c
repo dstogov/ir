@@ -20,9 +20,9 @@ void ir_save(ir_ctx *ctx, FILE *f)
 		fprintf(f, "\t%s c_%d = ", ir_type_cname[insn->type], i);
 		if (insn->op == IR_FUNC) {
 			if (!insn->const_flags) {
-				fprintf(f, "func(%s)", ir_get_str(ctx, insn->val.addr));
+				fprintf(f, "func(%s)", ir_get_str(ctx, insn->val.i32));
 			} else {
-				fprintf(f, "func(%s, %d)", ir_get_str(ctx, insn->val.addr), insn->const_flags);
+				fprintf(f, "func(%s, %d)", ir_get_str(ctx, insn->val.i32), insn->const_flags);
 			}
 		} else if (insn->op == IR_FUNC_ADDR) {
 			fprintf(f, "func_addr(");

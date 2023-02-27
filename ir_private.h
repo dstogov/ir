@@ -139,14 +139,10 @@ IR_ALWAYS_INLINE uint32_t ir_ntzl(uint64_t num)
 {
 #if (defined(__GNUC__) || __has_builtin(__builtin_ctzl))
 	return __builtin_ctzl(num);
-#elif defined(_WIN32)
+#elif defined(_WIN64)
 	unsigned long index;
 
-#if defined(_WIN64)
 	if (!_BitScanForward64(&index, num)) {
-#else
-	if (!_BitScanForward(&index, num)) {
-#endif
 		/* undefined behavior */
 		return 64;
 	}
@@ -155,15 +151,15 @@ IR_ALWAYS_INLINE uint32_t ir_ntzl(uint64_t num)
 #else
 	uint32_t n;
 
-	if (num == Z_UL(0)) return 64;
+	if (num == 0) return 64;
 
 	n = 1;
-	if ((num & 0xffffffff) == 0) {n += 32; num = num >> Z_UL(32);}
+	if ((num & 0xffffffff) == 0) {n += 32; num = num >> 32;}
 	if ((num & 0x0000ffff) == 0) {n += 16; num = num >> 16;}
 	if ((num & 0x000000ff) == 0) {n +=  8; num = num >>  8;}
 	if ((num & 0x0000000f) == 0) {n +=  4; num = num >>  4;}
 	if ((num & 0x00000003) == 0) {n +=  2; num = num >>  2;}
-	return n - (num & 1);
+	return n - (uint32_t)(num & 1);
 #endif
 }
 
@@ -199,14 +195,10 @@ IR_ALWAYS_INLINE int ir_nlzl(uint64_t num)
 {
 #if (defined(__GNUC__) || __has_builtin(__builtin_clzll))
 	return __builtin_clzll(num);
-#elif defined(_WIN32)
-	uint32_t index;
+#elif defined(_WIN64)
+	unsigned long index;
 
-#if defined(_WIN64)
 	if (!_BitScanReverse64(&index, num)) {
-#else
-	if (!_BitScanReverse(&index, num)) {
-#endif
 		/* undefined behavior */
 		return 64;
 	}
@@ -214,7 +206,7 @@ IR_ALWAYS_INLINE int ir_nlzl(uint64_t num)
 	return (int) (64 - 1) - index;
 #else
 	uint64_t x;
-	uint64_t n;
+	uint32_t n;
 
 	n = 64;
 	x = num >> 32; if (x != 0) {n -= 32; num = x;}
@@ -223,7 +215,7 @@ IR_ALWAYS_INLINE int ir_nlzl(uint64_t num)
 	x = num >> 4;  if (x != 0) {n -=  4; num = x;}
 	x = num >> 2;  if (x != 0) {n -=  2; num = x;}
 	x = num >> 1;  if (x != 0) return n - 2;
-	return n - num;
+	return n - (uint32_t)num;
 #endif
 }
 

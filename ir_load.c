@@ -16,7 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #ifndef _WIN32
-#include <unistd.h>
+# include <unistd.h>
 #endif
 
 const unsigned char *yy_buf;
@@ -42,22 +42,32 @@ static ir_strtab op_tab;
 	((ir_ref)0xc0000000 - (ref))
 
 static ir_ref ir_use_var(ir_parser_ctx *p, uint32_t n, const char *str, size_t len) {
-	ir_ref ref = ir_strtab_find(&p->var_tab, str, len);
+	ir_ref ref;
+	uint32_t len32;
+
+	IR_ASSERT(len <= 0xffffffff);
+	len32 = (uint32_t)len;
+	ref = ir_strtab_find(&p->var_tab, str, len32);
 	if (!ref) {
 		p->undef_count++;
 		/* create a linked list of unresolved references with header in "var_tab" */
 		ref = IR_UNUSED; /* list terminator */
-		ir_strtab_lookup(&p->var_tab, str, len, IR_ENCODE_UNRESOLVED_REF(p->ctx->insns_count, n));
+		ir_strtab_lookup(&p->var_tab, str, len32, IR_ENCODE_UNRESOLVED_REF(p->ctx->insns_count, n));
 	} else if (IR_IS_UNRESOLVED(ref)) {
 		/* keep the linked list of unresolved references with header in "var_tab" */
 		/* "ref" keeps the tail of the list */
-		ir_strtab_update(&p->var_tab, str, len, IR_ENCODE_UNRESOLVED_REF(p->ctx->insns_count, n));
+		ir_strtab_update(&p->var_tab, str, len32, IR_ENCODE_UNRESOLVED_REF(p->ctx->insns_count, n));
 	}
 	return ref;
 }
 
 static void ir_define_var(ir_parser_ctx *p, const char *str, size_t len, ir_ref ref) {
-	ir_ref old_ref = ir_strtab_lookup(&p->var_tab, str, len, ref);
+	ir_ref old_ref;
+	uint32_t len32;
+
+	IR_ASSERT(len <= 0xffffffff);
+	len32 = (uint32_t)len;
+	old_ref = ir_strtab_lookup(&p->var_tab, str, len32, ref);
 	if (ref != old_ref) {
 		if (IR_IS_UNRESOLVED(old_ref)) {
 			p->undef_count--;
@@ -67,9 +77,9 @@ static void ir_define_var(ir_parser_ctx *p, const char *str, size_t len, ir_ref 
 				old_ref = *ptr;
 				*ptr = ref;
 			} while (old_ref != IR_UNUSED);
-			ir_strtab_update(&p->var_tab, str, len, ref);
+			ir_strtab_update(&p->var_tab, str, len32, ref);
 		} else {
-			fprintf(stderr, "ERROR: Redefined variable `%*s` on line %d\n", (int)len, str, yy_line);
+			fprintf(stderr, "ERROR: Redefined variable `%*s` on line %d\n", (int)len32, str, yy_line);
 			exit(2);
 		}
 	}
@@ -862,7 +872,8 @@ static int parse_type(int sym, uint8_t *t) {
 	size_t len;
 	ir_ref ref;
 	sym = parse_ID(sym, &str, &len);
-	ref = ir_strtab_find(&type_tab, str, len);
+	IR_ASSERT(len <= 0xffffffff);
+	ref = ir_strtab_find(&type_tab, str, (uint32_t)len);
 	if (!ref) yy_error("invalid type");
 	*t = ref;
 	return sym;
@@ -873,7 +884,8 @@ static int parse_func(int sym, uint8_t *op) {
 	size_t len;
 	ir_ref ref;
 	sym = parse_ID(sym, &str, &len);
-	ref = ir_strtab_find(&op_tab, str, len);
+	IR_ASSERT(len <= 0xffffffff);
+	ref = ir_strtab_find(&op_tab, str, (uint32_t)len);
 	if (!ref) yy_error("invalid op");
 	*op = ref - 1;
 	return sym;
@@ -896,7 +908,7 @@ static int parse_val(int sym, ir_parser_ctx *p, uint8_t op, uint32_t n, ir_ref *
 		sym = parse_DECNUMBER(sym, IR_I32, &val);
 		if (kind != IR_OPND_NUM && kind != IR_OPND_PROB) yy_error("unexpected number");
 		if (val.i64 < 0 || val.i64 > 0x7fffffff) yy_error("number out of range");
-		*ref = val.u64;
+		*ref = val.i32;
 	} else if (sym == YY_NULL) {
 		sym = get_sym();
 		*ref = IR_UNUSED;
@@ -1049,12 +1061,12 @@ void ir_loader_init(void)
 
 	ir_strtab_init(&type_tab, IR_LAST_OP, 0);
 	for (i = 1; i < IR_LAST_TYPE; i++) {
-		ir_strtab_lookup(&type_tab, ir_type_cname[i], strlen(ir_type_cname[i]), i);
+		ir_strtab_lookup(&type_tab, ir_type_cname[i], (uint32_t)strlen(ir_type_cname[i]), i);
 	}
 
 	ir_strtab_init(&op_tab, IR_LAST_OP, 0);
 	for (i = 0; i < IR_LAST_OP; i++) {
-		ir_strtab_lookup(&op_tab, ir_op_name[i], strlen(ir_op_name[i]), i + 1);
+		ir_strtab_lookup(&op_tab, ir_op_name[i], (uint32_t)strlen(ir_op_name[i]), i + 1);
 	}
 }
 
