@@ -16,6 +16,20 @@
 
 #define IR_VERSION "0.0.1"
 
+#ifdef _WIN32
+/* TODO Handle ARM, too. */
+# if defined(_M_X64)
+#  define __SIZEOF_SIZE_T__ 8
+# elif defined(_M_IX86)
+#  define __SIZEOF_SIZE_T__ 4
+# endif
+/* Only supported is little endian for any arch on Windows,
+   so just fake the same for all. */
+# define __ORDER_LITTLE_ENDIAN__ 1
+# define __BYTE_ORDER__ __ORDER_LITTLE_ENDIAN__
+# define __has_builtin(arg) (0)
+#endif
+
 #if defined(IR_TARGET_X86)
 # define IR_TARGET "x86"
 #elif defined(IR_TARGET_X64)
@@ -326,6 +340,11 @@ typedef int32_t ir_ref;
 #define IR_LAST_FOLDABLE_OP  IR_COPY
 
 /* IR Constant Value */
+#ifndef IR_64
+# define ADDR_MEMBER            uintptr_t                  addr;
+#else
+# define ADDR_MEMBER
+#endif
 typedef union _ir_val {
 	double                             d;
 	uint64_t                           u64;
@@ -338,9 +357,7 @@ typedef union _ir_val {
 			uint32_t                   u32;
 			int32_t                    i32;
 			float                      f;
-#ifndef IR_64
-            uintptr_t                  addr;
-#endif
+			ADDR_MEMBER
 			IR_STRUCT_LOHI(
 				union {
 					uint16_t           u16;
@@ -361,6 +378,7 @@ typedef union _ir_val {
 		uint32_t                       u32_hi
 	);
 } ir_val;
+#undef ADDR_MEMBER
 
 /* IR constant flags */
 #define IR_CONST_EMIT          (1<<0)
@@ -374,7 +392,7 @@ typedef struct _ir_insn {
 				union {
 					IR_STRUCT_LOHI(
 						uint8_t        op,
-						uint8_t        type;
+						uint8_t        type
 					);
 					uint16_t           opt;
 				},

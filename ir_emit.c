@@ -16,7 +16,13 @@
 #endif
 
 #include "ir_private.h"
-#include <dlfcn.h>
+#ifndef _WIN32
+# include <dlfcn.h>
+#else
+# define WIN32_LEAN_AND_MEAN
+# include <windows.h>
+# include <psapi.h>
+#endif
 
 #define DASM_M_GROW(ctx, t, p, sz, need) \
   do { \
@@ -202,10 +208,25 @@ static void *ir_resolve_sym_name(const char *name)
 	void *handle = NULL;
 	void *addr;
 
-#ifdef RTLD_DEFAULT
+#ifndef _WIN32
+# ifdef RTLD_DEFAULT
 	handle = RTLD_DEFAULT;
-#endif
+# endif
 	addr = dlsym(handle, name);
+#else
+	HMODULE mods[256];
+	DWORD cbNeeded;
+	uint32_t i = 0;
+
+	addr = NULL;
+
+	EnumProcessModules(GetCurrentProcess(), mods, sizeof(mods), &cbNeeded);
+
+	while(!addr && i < (cbNeeded / sizeof(HMODULE))) {
+		addr = GetProcAddress(mods[i], name);
+		i++;
+	}
+#endif
 	IR_ASSERT(addr != NULL);
 	return addr;
 }

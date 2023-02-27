@@ -862,7 +862,11 @@ static void ir_add_phi_move(ir_ctx *ctx, uint32_t b, ir_ref from, ir_ref to)
 	}
 }
 
+#ifndef _WIN32
 static int ir_block_cmp(const void *b1, const void *b2, void *data)
+#else
+static int ir_block_cmp(void *data, const void *b1, const void *b2)
+#endif
 {
 	ir_ctx *ctx = data;
 	int d1 = ctx->cfg_blocks[*(ir_ref*)b1].loop_depth;
@@ -1047,7 +1051,12 @@ int ir_coalesce(ir_ctx *ctx)
 		}
 	}
 
-	qsort_r(blocks.l.a.refs, ir_worklist_len(&blocks), sizeof(ir_ref), ir_block_cmp, ctx);
+#ifndef _WIN32
+# define qsort_fn qsort_r
+#else
+# define qsort_fn qsort_s
+#endif
+	qsort_fn(blocks.l.a.refs, ir_worklist_len(&blocks), sizeof(ir_ref), ir_block_cmp, ctx);
 
 	while (ir_worklist_len(&blocks)) {
 		uint32_t i;

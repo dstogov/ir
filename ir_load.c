@@ -15,7 +15,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
 const unsigned char *yy_buf;
 const unsigned char *yy_end;

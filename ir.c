@@ -18,7 +18,12 @@
 # define _GNU_SOURCE
 #endif
 
-#include <sys/mman.h>
+#ifndef _WIN32
+# include <sys/mman.h>
+#else
+# define WIN32_LEAN_AND_MEAN
+# include <windows.h>
+#endif
 
 #include "ir.h"
 #include "ir_private.h"
@@ -1125,7 +1130,7 @@ void ir_hashtab_init(ir_hashtab *tab, uint32_t size)
 void ir_hashtab_free(ir_hashtab *tab)
 {
 	uint32_t hash_size = (uint32_t)(-(int32_t)tab->mask);
-	char *data = tab->data - (hash_size * sizeof(uint32_t));
+	char *data = (char*)tab->data - (hash_size * sizeof(uint32_t));
 	ir_mem_free(data);
 	tab->data = NULL;
 }
@@ -1209,6 +1214,49 @@ void ir_hashtab_key_sort(ir_hashtab *tab)
 }
 
 /* Memory API */
+#ifdef _WIN32
+void *ir_mem_mmap(size_t size)
+{
+	void *ret;
+
+#ifdef _M_X64
+	DWORD size_hi = size >> 32, size_lo = size & 0xffffffff;
+#else
+	DWORD size_hi = size, size_lo = 0;
+#endif
+
+	HANDLE h = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_EXECUTE_READWRITE, size_hi, size_lo, NULL);
+
+	ret = MapViewOfFile(h, FILE_MAP_COPY | FILE_MAP_EXECUTE, size_hi, size_lo, size);
+	if (!ret) {
+		CloseHandle(h);
+	}
+
+	return ret;
+}
+
+int ir_mem_unmap(void *ptr, size_t size)
+{
+	/* XXX file handle is leaked. */
+	UnmapViewOfFile(ptr);
+	return 1;
+}
+
+int ir_mem_protect(void *ptr, size_t size)
+{
+	return 1;
+}
+
+int ir_mem_unprotect(void *ptr, size_t size)
+{
+	return 1;
+}
+
+int ir_mem_flush(void *ptr, size_t size)
+{
+	return 1;
+}
+#else
 void *ir_mem_mmap(size_t size)
 {
 	return mmap(NULL, size, PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -1242,6 +1290,7 @@ int ir_mem_flush(void *ptr, size_t size)
 #endif
 	return 1;
 }
+#endif
 
 /* Alias Analyses */
 typedef enum _ir_alias {
