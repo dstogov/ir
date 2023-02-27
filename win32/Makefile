@@ -72,7 +72,7 @@ $(BUILD_DIR)\gen_ir_fold_hash.exe: $(SRC_DIR)\gen_ir_fold_hash.c $(SRC_DIR)\ir_s
 $(BUILD_DIR)\minilua.exe: $(SRC_DIR)\dynasm\minilua.c
 	"$(CC)" /Fo$(BUILD_DIR)\ /Fe$@ $**
 $(BUILD_DIR)\ir_emit_$(DASM_ARCH).h: $(BUILD_DIR)\minilua.exe
-	$(BUILD_DIR)\minilua.exe $(SRC_DIR)\dynasm\dynasm.lua $(DASM_FLAGS) -o $@ $(SRC_DIR)\ir_$(DASM_ARCH).dasc
+	$(BUILD_DIR)\minilua.exe $(SRC_DIR)\dynasm\dynasm.lua $(DASM_FLAGS) -o $@ $(SRC_DIR)/ir_$(DASM_ARCH).dasc
 
 {$(SRC_DIR)}.c{$(BUILD_DIR)}.obj:
 	"$(CC)" $(CFLAGS) /Fo$@ /c $<
