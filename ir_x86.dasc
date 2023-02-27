@@ -2907,8 +2907,8 @@ static void ir_emit_mem_shift_const(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg reg;
 	int32_t offset = 0;
 
-	IR_ASSERT(IR_IS_SIGNED_32BIT(ctx->ir_base[insn->op2].val.i64));
-	shift = ctx->ir_base[insn->op2].val.i32;
+	IR_ASSERT(IR_IS_SIGNED_32BIT(ctx->ir_base[op_insn->op2].val.i64));
+	shift = ctx->ir_base[op_insn->op2].val.i32;
 	if (insn->op == IR_VSTORE) {
 		offset = ir_ref_spill_slot(ctx, insn->op2, &reg);
 	} else if (insn->op == IR_STORE) {
