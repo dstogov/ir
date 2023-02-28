@@ -7,9 +7,11 @@
 
 #include "ir.h"
 #include "ir_builder.h"
-#include <sys/time.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
+# include <sys/time.h>
+#endif
 
 #define BAILOUT 16
 #define MAX_ITERATIONS 1000
@@ -57,10 +59,12 @@ typedef int (*mandelbrot_t)(double, double);
 
 void run(mandelbrot_t mandelbrot)
 {
+#ifndef _WIN32
 	struct timeval aTv;
 	gettimeofday(&aTv, NULL);
 	long init_time = aTv.tv_sec;
 	long init_usec = aTv.tv_usec;
+#endif
 
 	int x,y;
 	for (y = -39; y < 39; y++) {
@@ -75,9 +79,11 @@ void run(mandelbrot_t mandelbrot)
 	}
 	printf ("\n");
 
+#ifndef _WIN32
 	gettimeofday(&aTv,NULL);
 	double query_time = (aTv.tv_sec - init_time) + (double)(aTv.tv_usec - init_usec)/1000000.0;
 	printf ("C Elapsed %0.3f\n", query_time);
+#endif
 }
 
 int main(int argc, char **argv)
@@ -177,6 +183,7 @@ int main(int argc, char **argv)
 	if (entry) {
 		ir_disasm("test", entry, size, 0, &ctx, stderr);
 
+#ifndef _WIN32
 		ir_perf_map_register("test", entry, size);
 		ir_perf_jitdump_open();
 		ir_perf_jitdump_register("test", entry,	size);
@@ -184,10 +191,13 @@ int main(int argc, char **argv)
 		ir_mem_unprotect(entry, 4096);
 		ir_gdb_register("test", entry, size, sizeof(void*), 0);
 		ir_mem_protect(entry, 4096);
+#endif
 
 		run((mandelbrot_t)entry);
 
+#ifndef _WIN32
 		ir_perf_jitdump_close();
+#endif
 	}
 
 	ir_free(&ctx);
