@@ -2061,7 +2061,10 @@ static void ir_emit_prologue(ir_ctx *ctx)
 					offset -= sizeof(void*);
 					|	mov aword [Ra(fp)+offset], Ra(i)
 				} else {
-					IR_ASSERT(0 && "NIY FP register saing");
+					ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
+
+					offset -= sizeof(void*);
+					|	movsd qword [Ra(fp)+offset], xmm(i-IR_REG_FP_FIRST)
 				}
 			}
 		}
@@ -2090,7 +2093,10 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 					offset -= sizeof(void*);
 					|	mov Ra(i), aword [Ra(fp)+offset]
 				} else {
-					IR_ASSERT(0 && "NIY FP register saing");
+					ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
+
+					offset -= sizeof(void*);
+					|	movsd xmm(i-IR_REG_FP_FIRST), qword [Ra(fp)+offset]
 				}
 			}
 		}
