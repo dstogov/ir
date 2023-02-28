@@ -1227,12 +1227,12 @@ void *ir_mem_mmap(size_t size)
 #ifdef _M_X64
 	DWORD size_hi = size >> 32, size_lo = size & 0xffffffff;
 #else
-	DWORD size_hi = size, size_lo = 0;
+	DWORD size_hi = 0, size_lo = size;
 #endif
 
 	HANDLE h = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_EXECUTE_READWRITE, size_hi, size_lo, NULL);
 
-	ret = MapViewOfFile(h, FILE_MAP_COPY | FILE_MAP_EXECUTE, size_hi, size_lo, size);
+	ret = MapViewOfFile(h, FILE_MAP_READ | FILE_MAP_WRITE | FILE_MAP_EXECUTE, 0, 0, size);
 	if (!ret) {
 		CloseHandle(h);
 	}
