@@ -338,14 +338,21 @@ int ir_disasm(const char    *name,
 	uint32_t jmp_table_offset = 0;
 	ir_hashtab_bucket *b;
 	int32_t entry;
+	cs_err ret;
 
 # if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 #  if defined(__x86_64__) || defined(_WIN64)
-	if (cs_open(CS_ARCH_X86, CS_MODE_64, &cs) != CS_ERR_OK)
+	ret = cs_open(CS_ARCH_X86, CS_MODE_64, &cs);
+	if (ret != CS_ERR_OK) {
+		fprintf(stderr, "cs_open(CS_ARCH_X86, CS_MODE_64, ...) failed; [%d] %s\n", ret, cs_strerror(ret));
 		return 0;
+	}
 #  else
-	if (cs_open(CS_ARCH_X86, CS_MODE_32, &cs) != CS_ERR_OK)
+	ret = cs_open(CS_ARCH_X86, CS_MODE_32, &cs);
+	if (ret != CS_ERR_OK) {
+		fprintf(stderr, "cs_open(CS_ARCH_X86, CS_MODE_32, ...) failed; [%d] %s\n", ret, cs_strerror(ret));
 		return 0;
+	}
 #  endif
 	cs_option(cs, CS_OPT_DETAIL, CS_OPT_ON);
 #  if DISASM_INTEL_SYNTAX
