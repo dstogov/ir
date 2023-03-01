@@ -1,0 +1,20 @@
+--TEST--
+004: lt function
+--TARGET--
+Windows-x86_64
+--ARGS--
+-S
+--CODE--
+{
+	double c = 0;
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	bool ret = LT(x, c);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	xorpd %xmm1, %xmm1
+	ucomisd %xmm0, %xmm1
+	seta %al
+	retq

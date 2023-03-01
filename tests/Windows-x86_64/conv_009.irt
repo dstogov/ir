@@ -1,0 +1,17 @@
+--TEST--
+009: type conversion FP2FP
+--TARGET--
+Windows-x86_64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	float ret = FP2FP(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	cvtsd2ss %xmm0, %xmm0
+	retq

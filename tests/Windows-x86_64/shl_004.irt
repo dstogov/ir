@@ -1,0 +1,19 @@
+--TEST--
+004: shl function
+--TARGET--
+Windows-x86_64
+--ARGS--
+-S
+--CODE--
+{
+	int32_t c = 17;
+	l_1 = START(l_4);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t ret = SHL(c, x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	movl $0x11, %eax
+	shll %cl, %eax
+	retq

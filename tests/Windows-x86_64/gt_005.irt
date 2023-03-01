@@ -1,0 +1,23 @@
+--TEST--
+005: gt function
+--TARGET--
+Windows-x86_64
+--ARGS--
+-S -mavx
+--CODE--
+{
+	double c = 0;
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	bool ret = GT(x, c);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	vucomisd .L1(%rip), %xmm0
+	seta %al
+	retq
+.rodata
+	.db 0x90, 0x90, 0x90
+.L1:
+	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00

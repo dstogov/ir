@@ -1,0 +1,25 @@
+--TEST--
+002: alloca function
+--TARGET--
+Windows-x86_64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	int32_t x = PARAM(l_1, "x", 1);
+	uintptr_t ret, l_2 = ALLOCA(l_1, x);
+	l_4 = RETURN(l_2, ret);
+}
+--EXPECT--
+test:
+	pushq %rbp
+	movq %rsp, %rbp
+	movl %ecx, %eax
+	addq $7, %rax
+	andq $0xfffffffffffffff8, %rax
+	subq %rax, %rsp
+	movq %rsp, %rax
+	movq %rbp, %rsp
+	popq %rbp
+	retq

@@ -1,0 +1,18 @@
+--TEST--
+003: min function
+--TARGET--
+Windows-x86_64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	double y = PARAM(l_1, "y", 2);
+	double ret = MIN(x, y);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	minsd %xmm1, %xmm0
+	retq

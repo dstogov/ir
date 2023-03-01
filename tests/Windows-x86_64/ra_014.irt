@@ -1,0 +1,25 @@
+--TEST--
+014: Register Allocation (SHL + SHL)
+--TARGET--
+Windows-x86_64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	uint32_t x = PARAM(l_1, "x", 1);
+	uint32_t y = PARAM(l_1, "y", 2);
+	uint32_t ret = SHL(x, y);
+	uint32_t ret2 = SHL(x, ret);
+	l_4 = RETURN(l_1, ret2);
+}
+--EXPECT--
+test:
+	movl %ecx, %eax
+	movl %edx, %ecx
+	movl %eax, %edx
+	shll %cl, %edx
+	movl %edx, %ecx
+	shll %cl, %eax
+	retq
+

@@ -1,0 +1,33 @@
+--TEST--
+013: Register Allocation (MOD + MOD + MOD)
+--TARGET--
+Windows-x86_64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	uint32_t x_1 = PARAM(l_1, "x", 1);
+	uint32_t y_1 = PARAM(l_1, "y", 2);
+	uint32_t z_1 = PARAM(l_1, "z", 3);
+	uint32_t v_1 = PARAM(l_1, "v", 4);
+	uint32_t x_2 = MOD(x_1, y_1);
+	uint32_t x_3 = MOD(x_2, z_1);
+	uint32_t x_4 = MOD(v_1, x_3);
+	l_4 = RETURN(l_1, x_4);
+}
+--EXPECT--
+test:
+	movl %edx, %r10d
+	movl %ecx, %eax
+	xorl %edx, %edx
+	divl %r10d
+	movl %edx, %eax
+	xorl %edx, %edx
+	divl %r8d
+	movl %edx, %ecx
+	movl %r9d, %eax
+	xorl %edx, %edx
+	divl %ecx
+	movl %edx, %eax
+	retq

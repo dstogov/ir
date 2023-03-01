@@ -1,0 +1,18 @@
+--TEST--
+006: type conversion INT2FP
+--TARGET--
+Windows-x86_64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	int32_t x = PARAM(l_1, "x", 1);
+	double ret = INT2FP(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	pxor %xmm0, %xmm0
+	cvtsi2sdl %ecx, %xmm0
+	retq

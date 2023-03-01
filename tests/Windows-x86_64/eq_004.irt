@@ -1,0 +1,25 @@
+--TEST--
+004: eq function
+--TARGET--
+Windows-x86_64
+--ARGS--
+-S
+--CODE--
+{
+	double c = 0;
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	bool ret = EQ(x, c);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	ucomisd .L1(%rip), %xmm0
+	setnp %al
+	movl $0, %ecx
+	cmovnel %ecx, %eax
+	retq
+.rodata
+	.db 0x90, 0x90, 0x90
+.L1:
+	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
