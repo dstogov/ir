@@ -33,7 +33,11 @@
 #if defined(IR_TARGET_X86)
 # define IR_TARGET "x86"
 #elif defined(IR_TARGET_X64)
-# define IR_TARGET "x86_64"
+# ifdef _WIN64
+#  define IR_TARGET "Windows-x86_64" /* 64-bit Windows use different ABI and calling convention */
+# else
+#  define IR_TARGET "x86_64"
+# endif
 #elif defined(IR_TARGET_AARCH64)
 # define IR_TARGET "aarch64"
 #else

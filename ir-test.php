@@ -67,10 +67,8 @@ function run_test($build_dir, $test, $name, $code, $expect, $args) {
 		if (PHP_OS_FAMILY != "Windows") {
 			$cmd = "diff -u $base.exp $output > $base.diff";
 		} else {
-			/* Diff somehow resets terminal and breaks "cooring".
-			 * "start" is added wspecially to prevent this
-			 */
-			$cmd = "start diff --strip-trailing-cr -u $base.exp $output > $base.diff 2>&1";
+			/* Diff somehow resets terminal and breaks "cooring" */
+			$cmd = "diff --strip-trailing-cr -u $base.exp $output > $base.diff 2>&1";
 		}
 		if (@system($cmd) != 0) {
 			return false;
