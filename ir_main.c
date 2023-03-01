@@ -229,7 +229,9 @@ int main(int argc, char **argv)
 	uint32_t mflags = 0;
 	uint64_t debug_regset = 0xffffffffffffffff;
 	bool dump_size = 0;
-
+#ifdef _WIN32
+	bool abort_fault = 1;
+#endif
 	ir_consistency_check();
 
 	for (i = 1; i < argc; i++) {
@@ -332,6 +334,10 @@ int main(int argc, char **argv)
 			}
 			debug_regset = strtoull(argv[i + 1], NULL, 0);
 			i++;
+#ifdef _WIN32
+		} else if (strcmp(argv[i], "--no-abort-fault") == 0) {
+			abort_fault = 0;
+#endif
 		} else if (argv[i][0] == '-') {
 			fprintf(stderr, "ERROR: Unknown option '%s' (use --help)\n", argv[i]);
 			return 1;
@@ -360,6 +366,12 @@ int main(int argc, char **argv)
 		fprintf(stderr, "ERROR: Cannot open input file '%s'\n", input);
 		return 1;
 	}
+
+#ifdef _WIN32
+	if (!abort_fault) {
+		_set_abort_behavior(0, _WRITE_ABORT_MSG|_CALL_REPORTFAULT);
+	}
+#endif
 
 	ir_loader_init();
 
@@ -411,6 +423,11 @@ int main(int argc, char **argv)
 		if (entry) {
 			if (dump_asm) {
 				ir_disasm_add_symbol("test", (uintptr_t)entry, size);
+#ifdef _WIN32
+				/* Quick workaraund to prevent *.irt tests failures */
+				// TODO: try to find a general solution ???
+				ir_disasm_add_symbol("printf", (uintptr_t)(void*)printf, sizeof(void*));
+#endif
 				ir_disasm("test", entry, size, 0, &ctx, stderr);
 			}
 			if (dump_size) {

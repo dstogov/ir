@@ -45,10 +45,15 @@ function run_test($build_dir, $test, $name, $code, $expect, $args) {
 	if (!@file_put_contents($input, $code)) {
 		return false;
 	}
-	@system("$build_dir/ir $input $args >$output 2>&1");
-//	if (@system("$build_dir/ir $input $args 2>&1 >$output") != 0) {
-//		return false;
-//	}
+	if (PHP_OS_FAMILY != "Windows") {
+		$cmd = "$build_dir/ir $input $args >$output 2>&1";
+	} else {
+		$cmd = "$build_dir\\ir $input $args --no-abort-fault >$output 2>&1";
+	}
+	$ret = @system($cmd);
+	if ($ret === false) {
+		return false;
+	}
 	$out = @file_get_contents($output);
 	if ($out === false) {
 		return false;
@@ -59,7 +64,15 @@ function run_test($build_dir, $test, $name, $code, $expect, $args) {
 		if (!@file_put_contents("$base.exp", "$expect\n")) {
 			return false;
 		}
-		if (@system("diff -u $base.exp $output > $base.diff") != 0) {
+		if (PHP_OS_FAMILY != "Windows") {
+			$cmd = "diff -u $base.exp $output > $base.diff";
+		} else {
+			/* Diff somehow resets terminal and breaks "cooring".
+			 * "start" is added wspecially to prevent this
+			 */
+			$cmd = "start diff --strip-trailing-cr -u $base.exp $output > $base.diff 2>&1";
+		}
+		if (@system($cmd) != 0) {
 			return false;
 		}
 		return false;
@@ -93,10 +106,21 @@ function find_tests($dir) {
 }
 
 function run_tests() {
+	global $show_diff, $colorize;
+
 	$build_dir = getenv("BUILD_DIR") ?? ".";
 	$src_dir = getenv("SRC_DIR") ?? ".";
 	$skiped = 0;
-    $target = @system("$build_dir/ir --target");
+	if (PHP_OS_FAMILY != "Windows") {
+		$cmd = "$build_dir/ir --target";
+	} else {
+		$cmd = "$build_dir\\ir --target";
+	}
+	$target = @system($cmd);
+	if ($target === false) {
+		echo "Cannot run '$cmd'\n";
+		return 1;
+	}
 	$tests = find_tests("$src_dir/tests");
 	$bad = array();
 	$failed = array();
@@ -107,7 +131,11 @@ function run_tests() {
 		$count++;
 		if (parse_test($test, $name, $code, $expect, $opt, $test_target, $xfail)) {
 			if ($test_target !== null && $target != $test_target) {
-				echo "\r\e[1;33mSKIP\e[0m: $name [$test]\n";
+				if ($colorize) {
+					echo "\r\e[1;33mSKIP\e[0m: $name [$test]\n";
+				} else {
+					echo "\rSKIP: $name [$test]\n";
+				}
 				$skiped++;
 				continue;
 			}
@@ -116,23 +144,38 @@ function run_tests() {
 			echo $str;
 			flush();
 			$ret = run_test($build_dir, $test, $name, $code, $expect, $opt);
-	        echo str_repeat(" ", $len);
+			echo str_repeat(" ", $len);
 			if ($ret) {
-				echo "\r\e[1;32mPASS\e[0m: $name [$test]\n";
+				if ($colorize) {
+					echo "\r\e[1;32mPASS\e[0m: $name [$test]\n";
+				} else {
+					echo "\rPASS: $name [$test]\n";
+				}
 			} else if (isset($xfail)) {
-				echo "\r\e[1;31mXFAIL\e[0m: $name [$test]  XFAIL REASON: $xfail\n";
+				if ($colorize) {
+					echo "\r\e[1;31mXFAIL\e[0m: $name [$test]  XFAIL REASON: $xfail\n";
+				} else {
+					echo "\rXFAIL: $name [$test]  XFAIL REASON: $xfail\n";
+				}
 				$xfailed[$test] = array($name, $xfail);
 			} else {
-				echo "\r\e[1;31mFAIL\e[0m: $name [$test]\n";
+				if ($colorize) {
+					echo "\r\e[1;31mFAIL\e[0m: $name [$test]\n";
+				} else {
+					echo "\rFAIL: $name [$test]\n";
+				}
 				$failed[$test] = $name;
-				global $show_diff;
 				if ($show_diff) {
 					$base   = substr($test, 0, -4);
 					echo file_get_contents("$base.diff");
 				}
 			}
 		} else {
-			echo "\r\e[1;31mBROK\e[0m: $name [$test]\n";
+			if ($colorize) {
+				echo "\r\e[1;31mBROK\e[0m: $name [$test]\n";
+			} else {
+				echo "\rBROK: $name [$test]\n";
+			}
 			$bad[] = $test;
 		}
 	}
@@ -173,5 +216,12 @@ function run_tests() {
 	return count($failed) > 0 ? 1 : 0;
 }
 
+$colorize = true;
+if (function_exists('sapi_windows_vt100_support') && !sapi_windows_vt100_support(STDOUT, true)) {
+    $colorize = false;
+}
+if (in_array('--no-color', $argv, true)) {
+    $colorize = false;
+}
 $show_diff = in_array('--show-diff', $argv, true);
 exit(run_tests());

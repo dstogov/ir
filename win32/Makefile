@@ -34,6 +34,10 @@ CC=cl.exe
 LD=link.exe
 !endif
 
+!if "$(PHP)" == ""
+PHP=php.exe
+!endif
+
 !if "$(TARGET)" == ""
 TARGET = $(VSCMD_ARG_TGT_ARCH)
 !endif
@@ -101,6 +105,9 @@ builddir:
 
 test: $(BUILD_DIR)\ir.exe
 	$(BUILD_DIR)\ir.exe $(SRC_DIR)\test.ir --dump --save $(BUILD_DIR)\test.log
+	set BUILD_DIR=$(BUILD_DIR)
+	set SRC_DIR=$(SRC_DIR)
+	$(PHP) $(SRC_DIR)\ir-test.php
 
 clean:
 	del /f /q $(BUILD_DIR)\*.obj $(BUILD_DIR)\*.exe $(BUILD_DIR)\*.pdb $(BUILD_DIR)\*.ilk $(BUILD_DIR)\*.h

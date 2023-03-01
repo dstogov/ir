@@ -875,7 +875,11 @@ static int ir_block_cmp(void *data, const void *b1, const void *b2)
 	if (d1 > d2) {
 		return -1;
 	} else if (d1 == d2) {
-		return 0;
+		if (ctx->cfg_blocks[*(ir_ref*)b1].start < ctx->cfg_blocks[*(ir_ref*)b2].start) {
+			return -1;
+		} else {
+			return 1;
+		}
 	} else {
 		return 1;
 	}

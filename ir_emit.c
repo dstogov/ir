@@ -218,12 +218,21 @@ static void *ir_resolve_sym_name(const char *name)
 	DWORD cbNeeded;
 	uint32_t i = 0;
 
+	/* Quick workaraund to prevent *.irt tests failures */
+	// TODO: try to find a general solution ???
+	if (strcmp(name, "printf") == 0) {
+		return (void*)printf;
+	}
+
 	addr = NULL;
 
 	EnumProcessModules(GetCurrentProcess(), mods, sizeof(mods), &cbNeeded);
 
-	while(!addr && i < (cbNeeded / sizeof(HMODULE))) {
+	while(i < (cbNeeded / sizeof(HMODULE))) {
 		addr = GetProcAddress(mods[i], name);
+		if (addr) {
+			return addr;
+		}
 		i++;
 	}
 #endif
