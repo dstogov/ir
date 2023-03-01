@@ -390,9 +390,11 @@ int ir_disasm(const char    *name,
 		}
 		jmp_table_offset = ctx->jmp_table_offset;
 		if (jmp_table_offset) {
-			uint32_t n = orig_size - jmp_table_offset;
+			uint32_t n;
 			uintptr_t *p;
 
+			IR_ASSERT(orig_size - jmp_table_offset <= 0xffffffff);
+			n = (uint32_t)(orig_size - jmp_table_offset);
 			if (size > jmp_table_offset) {
 				size = jmp_table_offset;
 			}
@@ -514,7 +516,9 @@ int ir_disasm(const char    *name,
 						if (r > p && *r == 'x' && *(r - 1) == '0') {
 							r -= 2;
 						}
-						fwrite(p, 1, r - p, f);
+						if (r > p) {
+							fwrite(p, 1, r - p, f);
+						}
 						if (entry >= 0) {
 							fprintf(f, ".ENTRY_%d%s\n", entry, q);
 						} else {
@@ -548,7 +552,7 @@ int ir_disasm(const char    *name,
 			}
 			if (p != q && *(q-1) == '-') {
 				q--;
-				addr = (uint32_t)(-addr);
+				addr = (uint32_t)(-(int64_t)addr);
 			}
 			if (addr >= (uint64_t)(uintptr_t)start && addr < (uint64_t)(uintptr_t)orig_end) {
 				entry = ir_hashtab_find(&labels, (uint32_t)((uintptr_t)addr - (uintptr_t)start));
@@ -559,11 +563,13 @@ int ir_disasm(const char    *name,
 					} else {
 						fprintf(f, ".L%d", -entry);
 					}
-				} else {
+				} else if (r > p) {
 					fwrite(p, 1, r - p, f);
 				}
 			} else if ((sym = ir_disasm_resolver(addr, &offset))) {
-				fwrite(p, 1, q - p, f);
+				if (q > p) {
+					fwrite(p, 1, q - p, f);
+				}
 				fputs(sym, f);
 				if (offset != 0) {
 					if (offset > 0) {
@@ -572,7 +578,7 @@ int ir_disasm(const char    *name,
 						fprintf(f, "-%" PRIx64, offset);
 					}
 				}
-			} else {
+			} else if (r > p) {
 				fwrite(p, 1, r - p, f);
 			}
 			p = r;
@@ -590,7 +596,9 @@ int ir_disasm(const char    *name,
 	}
 	if (rodata_offset) {
 		const unsigned char *p = (unsigned char*)start + rodata_offset;
-		uint32_t n = jmp_table_offset ? (jmp_table_offset - rodata_offset) : (orig_size - rodata_offset);
+		uint32_t n = jmp_table_offset ?
+			(uint32_t)(jmp_table_offset - rodata_offset) :
+			(uint32_t)(orig_size - rodata_offset);
 		uint32_t j;
 
 		while (n > 0) {
@@ -621,7 +629,7 @@ int ir_disasm(const char    *name,
 	}
 	if (jmp_table_offset) {
 		uintptr_t *p = (uintptr_t*)(unsigned char*)start + jmp_table_offset;
-		uint32_t n = orig_size - jmp_table_offset;
+		uint32_t n = (uint32_t)(orig_size - jmp_table_offset);
 
 		fprintf(f, ".align %d\n", (int)sizeof(void*));
 
