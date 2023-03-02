@@ -1,0 +1,25 @@
+--TEST--
+002: Memory update (binary op with reg)
+--TARGET--
+Windows-x86_64
+--ARGS--
+-S
+--CODE--
+{
+	int32_t c = 0x80;
+	l_1 = START(l_5);
+	int32_t y = PARAM(l_1, "y", 1);
+	int32_t v = VAR(l_1, "_spill_");
+	l_2 = VSTORE(l_1, v, y);
+	int32_t z, l_3 = VLOAD(l_2, v);
+	int32_t ret = AND(z, y);
+	l_4 = VSTORE(l_3, v, ret);
+	l_5 = RETURN(l_4);
+}
+--EXPECT--
+test:
+	subq $8, %rsp
+	movl %ecx, (%rsp)
+	andl %ecx, (%rsp)
+	addq $8, %rsp
+	retq

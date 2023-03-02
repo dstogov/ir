@@ -1,0 +1,35 @@
+--TEST--
+Simple CALL
+--TARGET--
+Windows-x86_64
+--ARGS--
+-S --run
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 42;
+	uintptr_t c_5 = func(printf, 4);
+	uintptr_t c_6 = "hello %d!\n";
+	l_1 = START(l_4);
+	int32_t d_2, l_2 = CALL/2(l_1, c_5, c_6, c_4);
+	l_4 = RETURN(l_2, d_2);
+}
+--EXPECT--
+test:
+	subq $0x28, %rsp
+	leaq .L1(%rip), %rcx
+	movl $0x2a, %edx
+	movabsq $printf, %rax
+	callq *%rax
+	addq $0x28, %rsp
+	retq
+.rodata
+	.db 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
+.L1:
+	.db 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x25, 0x64, 0x21, 0x0a, 0x00
+
+hello 42!
+
+exit code = 10

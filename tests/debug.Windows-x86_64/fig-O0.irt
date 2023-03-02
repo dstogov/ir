@@ -1,0 +1,179 @@
+--TEST--
+Fig -O0
+--TARGET--
+Windows-x86_64
+--ARGS--
+-S -O0
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t i_1 = 1;
+	int32_t i_4 = 4;
+	ll_1 = START(ll_16);                # <-
+	int32_t a_0 = PARAM(ll_1, "a", 0);
+	int32_t b_0 = PARAM(ll_1, "b", 1);
+	int32_t c_0 = PARAM(ll_1, "c", 2);
+	int32_t d_0 = PARAM(ll_1, "d", 3);
+	int32_t l_0 = PARAM(ll_1, "l", 4);
+	int32_t m_0 = PARAM(ll_1, "m", 5);
+	int32_t s_0 = PARAM(ll_1, "s", 6);
+	int32_t t_0 = PARAM(ll_1, "t", 7);	
+	int32_t cond1 = PARAM(ll_1, "cond1", 8);	
+	int32_t cond2 = PARAM(ll_1, "cond2", 9);	
+	ll_2 = END(ll_1);
+	ll_3 = LOOP_BEGIN(ll_2, ll_12);     # <-
+	int32_t a_1 = PHI(ll_3, a_0, a_3);
+	int32_t d_1 = PHI(ll_3, d_0, d_3);
+	int32_t m_1 = PHI(ll_3, m_0, m_3);
+	int32_t s_1 = PHI(ll_3, s_0, s_3);
+	int32_t t_1 = PHI(ll_3, t_0, t_3);
+	ll_4 = IF(ll_3, cond1);
+	ll_5 = IF_TRUE(ll_4);
+	int32_t l_1 = MUL(c_0, b_0);
+	int32_t m_2 = ADD(l_1, i_4);
+	int32_t a_2 = COPY(c_0);
+	ll_6 = END(ll_5);
+	ll_7 = IF_FALSE(ll_4);
+	int32_t d_2 = COPY(c_0);
+	int32_t l_2 = MUL(d_2, b_0);
+	int32_t s_2 = MUL(a_1, b_0);
+	int32_t t_2 = ADD(s_2, i_1);
+	ll_8 = END(ll_7);
+	ll_9 = MERGE(ll_6, ll_8);
+	int32_t a_3 = PHI(ll_9, a_2, a_1);
+	int32_t d_3 = PHI(ll_9, d_1, d_2);
+	int32_t l_3 = PHI(ll_9, l_1, l_2);
+	int32_t m_3 = PHI(ll_9, m_2, m_1);
+	int32_t s_3 = PHI(ll_9, s_1, s_2);
+	int32_t t_3 = PHI(ll_9, t_1, t_2);
+	int32_t x_0 = MUL(a_3, b_0);
+	int32_t y_0 = ADD(x_0, i_1);
+	ll_10 = IF(ll_9, cond2);
+	ll_11 = IF_TRUE(ll_10);
+	ll_12 = LOOP_END(ll_11, ll_3);
+	ll_13 = IF_FALSE(ll_10);
+	int32_t ret1 = ADD(a_3, b_0);
+	int32_t ret2 = ADD(ret1, c_0);
+	int32_t ret3 = ADD(ret2, d_3);
+	int32_t ret4 = ADD(ret3, l_3);
+	int32_t ret5 = ADD(ret4, m_3);
+	int32_t ret6 = ADD(ret5, s_3);
+	int32_t ret7 = ADD(ret6, t_3);
+	int32_t ret8 = ADD(ret7, y_0);
+	ll_16 = RETURN(ll_13, ret8);
+}
+--EXPECT--
+test:
+	subq $0x80, %rsp
+	movl %ecx, (%rsp)
+	movl %edx, 4(%rsp)
+	movl %r8d, 8(%rsp)
+	movl %r9d, 0xc(%rsp)
+	movl (%rsp), %eax
+	movl %eax, 0x10(%rsp)
+	movl 0xc(%rsp), %eax
+	movl %eax, 0x14(%rsp)
+	movl 0x90(%rsp), %eax
+	movl %eax, 0x18(%rsp)
+	movl 0x98(%rsp), %eax
+	movl %eax, 0x1c(%rsp)
+	movl 0xa0(%rsp), %eax
+	movl %eax, 0x20(%rsp)
+.L1:
+	cmpl $0, 0xa8(%rsp)
+	je .L2
+	movl 8(%rsp), %eax
+	imull 4(%rsp), %eax
+	movl %eax, 0x24(%rsp)
+	movl 0x24(%rsp), %eax
+	addl $4, %eax
+	movl %eax, 0x28(%rsp)
+	movl 8(%rsp), %eax
+	movl %eax, 0x2c(%rsp)
+	movl 0x2c(%rsp), %eax
+	movl %eax, 0x40(%rsp)
+	movl 0x14(%rsp), %eax
+	movl %eax, 0x44(%rsp)
+	movl 0x24(%rsp), %eax
+	movl %eax, 0x48(%rsp)
+	movl 0x28(%rsp), %eax
+	movl %eax, 0x4c(%rsp)
+	movl 0x1c(%rsp), %eax
+	movl %eax, 0x50(%rsp)
+	movl 0x20(%rsp), %eax
+	movl %eax, 0x54(%rsp)
+	jmp .L3
+.L2:
+	movl 8(%rsp), %eax
+	movl %eax, 0x30(%rsp)
+	movl 0x30(%rsp), %eax
+	imull 4(%rsp), %eax
+	movl %eax, 0x34(%rsp)
+	movl 0x10(%rsp), %eax
+	imull 4(%rsp), %eax
+	movl %eax, 0x38(%rsp)
+	movl 0x38(%rsp), %eax
+	addl $1, %eax
+	movl %eax, 0x3c(%rsp)
+	movl 0x10(%rsp), %eax
+	movl %eax, 0x40(%rsp)
+	movl 0x30(%rsp), %eax
+	movl %eax, 0x44(%rsp)
+	movl 0x34(%rsp), %eax
+	movl %eax, 0x48(%rsp)
+	movl 0x18(%rsp), %eax
+	movl %eax, 0x4c(%rsp)
+	movl 0x38(%rsp), %eax
+	movl %eax, 0x50(%rsp)
+	movl 0x3c(%rsp), %eax
+	movl %eax, 0x54(%rsp)
+.L3:
+	movl 0x40(%rsp), %eax
+	imull 4(%rsp), %eax
+	movl %eax, 0x58(%rsp)
+	movl 0x58(%rsp), %eax
+	addl $1, %eax
+	movl %eax, 0x5c(%rsp)
+	cmpl $0, 0xb0(%rsp)
+	je .L4
+	movl 0x40(%rsp), %eax
+	movl %eax, 0x10(%rsp)
+	movl 0x44(%rsp), %eax
+	movl %eax, 0x14(%rsp)
+	movl 0x4c(%rsp), %eax
+	movl %eax, 0x18(%rsp)
+	movl 0x50(%rsp), %eax
+	movl %eax, 0x1c(%rsp)
+	movl 0x54(%rsp), %eax
+	movl %eax, 0x20(%rsp)
+	jmp .L1
+.L4:
+	movl 0x40(%rsp), %eax
+	addl 4(%rsp), %eax
+	movl %eax, 0x60(%rsp)
+	movl 0x60(%rsp), %eax
+	addl 8(%rsp), %eax
+	movl %eax, 0x64(%rsp)
+	movl 0x64(%rsp), %eax
+	addl 0x44(%rsp), %eax
+	movl %eax, 0x68(%rsp)
+	movl 0x68(%rsp), %eax
+	addl 0x48(%rsp), %eax
+	movl %eax, 0x6c(%rsp)
+	movl 0x6c(%rsp), %eax
+	addl 0x4c(%rsp), %eax
+	movl %eax, 0x70(%rsp)
+	movl 0x70(%rsp), %eax
+	addl 0x50(%rsp), %eax
+	movl %eax, 0x74(%rsp)
+	movl 0x74(%rsp), %eax
+	addl 0x54(%rsp), %eax
+	movl %eax, 0x78(%rsp)
+	movl 0x78(%rsp), %eax
+	addl 0x5c(%rsp), %eax
+	movl %eax, 0x7c(%rsp)
+	movl 0x7c(%rsp), %eax
+	addq $0x80, %rsp
+	retq

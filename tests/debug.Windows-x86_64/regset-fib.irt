@@ -1,0 +1,134 @@
+--TEST--
+Fib
+--TARGET--
+Windows-x86_64
+--ARGS--
+--debug-regset 0x3ffff --save --dump-live-ranges -S --run
+--CODE--
+{
+	int32_t zero = 0;
+	double c_0 = 0;
+	double c_1 = 1;
+	double c_10000 = 10000;
+	uintptr_t f = func(printf, 4);
+	uintptr_t format = "%g\n";
+	l_1 = START(l_6);
+	double lo_1 = COPY(c_0);
+	double hi_1 = COPY(c_1);
+	l_2 = END(l_1);
+	l_3 = LOOP_BEGIN(l_2, l_9);
+	double lo_2 = PHI(l_3, lo_1, lo_3);
+	double hi_2 = PHI(l_3, hi_1, hi_3);
+	bool b = LT(hi_2, c_10000);
+	l_4 = IF(l_3, b);
+	l_7 = IF_TRUE(l_4);
+	double hi_3 = ADD(hi_2, lo_2);
+	double lo_3 = SUB(hi_3, lo_2);
+	l_8 = CALL/2(l_7, f, format, lo_3);
+#	ll = CALL/2(l_7, f, format, lo_3);
+#	l_8 = CALL/2(ll, f, format, lo_3);
+	l_9 = LOOP_END(l_8, l_3);
+	l_5 = IF_FALSE(l_4);
+	l_6 = RETURN(l_5, zero);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 0;
+	double c_5 = 0;
+	double c_6 = 1;
+	double c_7 = 10000;
+	uintptr_t c_8 = func(printf, 4);
+	uintptr_t c_9 = "%g\n";
+	l_1 = START(l_15);
+	l_2 = END(l_1);
+	l_3 = LOOP_BEGIN(l_2, l_13);
+	double d_4 = PHI(l_3, c_5, d_10);
+	double d_5 = PHI(l_3, c_6, d_9);
+	bool d_6 = LT(d_5, c_7);
+	l_7 = IF(l_3, d_6);
+	l_8 = IF_TRUE(l_7);
+	double d_9 = ADD(d_5, d_4);
+	double d_10 = SUB(d_9, d_4);
+	l_11 = CALL/2(l_8, c_8, c_9, d_10);
+	l_13 = LOOP_END(l_11, l_3);
+	l_14 = IF_FALSE(l_7);
+	l_15 = RETURN(l_14, c_4);
+}
+{ # LIVE-RANGES (vregs_count=3)
+TMP
+	[%xmm0]: [2.2-2.3)
+	[%rax]: [11.0-11.1)
+	[%xmm0]: [13.2-13.3)
+R1 (d_4) [%xmm0]: [3.0-10.1), DEF(4.2), USE(9.1/2), USE(10.1/2)
+R2 (d_5, d_9) [SPILL=0x0]
+	[%xmm1]: [3.0-10.0), DEF(5.2), USE(6.1/1)!, USE(9.0/1)!, DEF(9.0)!, DEF(9.2)!, USE(10.0/1, hint=%xmm1, hint=R3)!
+	: [10.0-14.0), PHI_USE(13.2, phi=d_5/3)
+R3 (d_10) [SPILL=0x8]
+	[%xmm1]: [10.0-11.0), DEF(10.0, hint=R2)!, DEF(10.2)!, USE(11.0/4, hint=%xmm1)
+	: [11.0-14.0), PHI_USE(13.2, phi=d_4/3)
+[%rax] : [15.0-15.1)
+[%rcx] : [11.0-11.1)
+[%xmm1] : [11.0-11.1)
+[%SCRATCH] : [11.1-11.2)
+}
+test:
+	subq $0x38, %rsp
+	xorpd %xmm0, %xmm0
+	movsd .L3(%rip), %xmm1
+	movsd %xmm1, 0x20(%rsp)
+.L1:
+	movsd 0x20(%rsp), %xmm1
+	ucomisd .L4(%rip), %xmm1
+	jp .L2
+	jae .L2
+	movsd 0x20(%rsp), %xmm1
+	addsd %xmm0, %xmm1
+	movsd %xmm1, 0x20(%rsp)
+	movsd 0x20(%rsp), %xmm1
+	subsd %xmm0, %xmm1
+	movsd %xmm1, 0x28(%rsp)
+	movsd 0x28(%rsp), %xmm1
+	leaq .L5(%rip), %rcx
+	movq %xmm1, %rdx
+	movabsq $printf, %rax
+	callq *%rax
+	movsd 0x28(%rsp), %xmm0
+	jmp .L1
+.L2:
+	xorl %eax, %eax
+	addq $0x38, %rsp
+	retq
+.rodata
+	.db 0x90, 0x90, 0x90
+.L3:
+	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f
+.L4:
+	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x88, 0xc3, 0x40
+.L5:
+	.db 0x25, 0x67, 0x0a, 0x00
+
+1
+1
+2
+3
+5
+8
+13
+21
+34
+55
+89
+144
+233
+377
+610
+987
+1597
+2584
+4181
+6765
+
+exit code = 0

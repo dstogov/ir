@@ -1,0 +1,19 @@
+--TEST--
+SCCP 001
+--TARGET--
+Windows-x86_64
+--ARGS--
+-S
+--CODE--
+{
+	int64_t i_1 = 10;
+	int64_t i_4 = 4;
+	l_1 = START(l_2);
+	int64_t z1 = BSWAP(i_1);
+	l_2 = RETURN(l_1, z1);
+}
+--EXPECT--
+test:
+	movl $0xa, %eax
+	bswapq %rax
+	retq

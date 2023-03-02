@@ -1,0 +1,96 @@
+--TEST--
+Mandelbrot Test
+--TARGET--
+Windows-x86_64
+--ARGS--
+-S
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	double c_4 = 0.5;
+	double c_5 = 0;
+	int32_t c_6 = 0;
+	int32_t c_7 = 1;
+	double c_8 = 16;
+	int32_t c_9 = 1000;
+	l_1 = START(l_35);
+	double d_2 = PARAM(l_1, "x", 0);
+	double d_3 = PARAM(l_1, "y", 1);
+	double d_4 = VAR(l_1, "cr");
+	double d_5 = SUB(d_3, c_4);
+	double d_6 = VAR(l_1, "ci");
+	double d_7 = VAR(l_1, "zi");
+	double d_8 = VAR(l_1, "zr");
+	int32_t d_9 = VAR(l_1, "i");
+	l_10 = END(l_1);
+	l_11 = LOOP_BEGIN(l_10, l_37);
+	double d_12 = PHI(l_11, c_5, d_25);
+	double d_13 = PHI(l_11, c_5, d_23);
+	int32_t d_14 = PHI(l_11, c_6, d_15);
+	int32_t d_15 = ADD(d_14, c_7);
+	double d_16 = VAR(l_11, "temp");
+	double d_17 = MUL(d_13, d_12);
+	double d_18 = VAR(l_11, "zr2");
+	double d_19 = MUL(d_13, d_13);
+	double d_20 = VAR(l_11, "zi2");
+	double d_21 = MUL(d_12, d_12);
+	double d_22 = SUB(d_19, d_21);
+	double d_23 = ADD(d_22, d_5);
+	double d_24 = ADD(d_17, d_17);
+	double d_25 = ADD(d_24, d_2);
+	double d_26 = ADD(d_21, d_19);
+	bool d_27 = GT(d_26, c_8);
+	l_28 = IF(l_11, d_27);
+	l_29 = IF_TRUE(l_28);
+	l_30 = RETURN(l_29, d_15);
+	l_31 = IF_FALSE(l_28);
+	bool d_32 = GT(d_15, c_9);
+	l_33 = IF(l_31, d_32);
+	l_34 = IF_TRUE(l_33);
+	l_35 = RETURN(l_34, c_6, l_30);
+	l_36 = IF_FALSE(l_33);
+	l_37 = LOOP_END(l_36, l_11);
+}
+--EXPECT--
+test:
+	subq $8, %rsp
+	movsd %xmm6, (%rsp)
+	subsd .L4(%rip), %xmm1
+	xorpd %xmm3, %xmm3
+	xorpd %xmm2, %xmm2
+	xorl %eax, %eax
+.L1:
+	leal 1(%rax), %eax
+	movapd %xmm2, %xmm4
+	mulsd %xmm2, %xmm4
+	movapd %xmm3, %xmm5
+	mulsd %xmm3, %xmm5
+	movapd %xmm5, %xmm6
+	addsd %xmm4, %xmm6
+	ucomisd .L5(%rip), %xmm6
+	ja .L2
+	cmpl $0x3e8, %eax
+	jg .L3
+	mulsd %xmm2, %xmm3
+	subsd %xmm5, %xmm4
+	movapd %xmm4, %xmm2
+	addsd %xmm1, %xmm2
+	addsd %xmm3, %xmm3
+	addsd %xmm0, %xmm3
+	jmp .L1
+.L2:
+	movsd (%rsp), %xmm6
+	addq $8, %rsp
+	retq
+.L3:
+	xorl %eax, %eax
+	movsd (%rsp), %xmm6
+	addq $8, %rsp
+	retq
+.rodata
+.L4:
+	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f
+.L5:
+	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x40
