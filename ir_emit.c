@@ -78,6 +78,18 @@ static bool ir_is_fastcall(ir_ctx *ctx, ir_insn *insn)
 # define ir_is_fastcall(ctx, insn) 0
 #endif
 
+#ifdef _WIN64
+static bool ir_is_vararg(ir_ctx *ctx, ir_insn *insn)
+{
+	if (IR_IS_CONST_REF(insn->op2)) {
+		return (ctx->ir_base[insn->op2].const_flags & IR_CONST_VARARG_FUNC) != 0;
+	} else if (ctx->ir_base[insn->op2].op == IR_BITCAST) {
+		return (ctx->ir_base[insn->op2].op2 & IR_CONST_VARARG_FUNC) != 0;
+	}
+	return 0;
+}
+#endif
+
 IR_ALWAYS_INLINE uint32_t ir_rule(ir_ctx *ctx, ir_ref ref)
 {
 	IR_ASSERT(!IR_IS_CONST_REF(ref));
@@ -119,6 +131,10 @@ static ir_reg ir_get_param_reg(ir_ctx *ctx, ir_ref ref)
 					}
 				}
 				int_param++;
+#ifdef _WIN64
+				/* WIN64 calling convention use common couter for int and fp registers */
+				fp_param++;
+#endif
 			} else if (IR_IS_TYPE_FP(insn->type)) {
 				if (use == ref) {
 					if (fp_param < fp_reg_params_count) {
@@ -128,6 +144,10 @@ static ir_reg ir_get_param_reg(ir_ctx *ctx, ir_ref ref)
 					}
 				}
 				fp_param++;
+#ifdef _WIN64
+				/* WIN64 calling convention use common couter for int and fp registers */
+				int_param++;
+#endif
 			} else {
 				IR_ASSERT(0);
 			}
@@ -169,6 +189,10 @@ static int ir_get_args_regs(ir_ctx *ctx, ir_insn *insn, int8_t *regs)
 				regs[j] = IR_REG_NONE;
 			}
 			int_param++;
+#ifdef _WIN64
+			/* WIN64 calling convention use common couter for int and fp registers */
+			fp_param++;
+#endif
 		} else if (IR_IS_TYPE_FP(type)) {
 			if (fp_param < fp_reg_params_count) {
 				regs[j] = fp_reg_params[fp_param];
@@ -177,6 +201,10 @@ static int ir_get_args_regs(ir_ctx *ctx, ir_insn *insn, int8_t *regs)
 				regs[j] = IR_REG_NONE;
 			}
 			fp_param++;
+#ifdef _WIN64
+			/* WIN64 calling convention use common couter for int and fp registers */
+			int_param++;
+#endif
 		} else {
 			IR_ASSERT(0);
 		}

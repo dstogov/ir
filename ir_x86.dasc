@@ -2064,7 +2064,11 @@ static void ir_emit_prologue(ir_ctx *ctx)
 					ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
 
 					offset -= sizeof(void*);
-					|	movsd qword [Ra(fp)+offset], xmm(i-IR_REG_FP_FIRST)
+					if (ctx->flags & IR_AVX) {
+						|	vmovsd qword [Ra(fp)+offset], xmm(i-IR_REG_FP_FIRST)
+					} else {
+						|	movsd qword [Ra(fp)+offset], xmm(i-IR_REG_FP_FIRST)
+					}
 				}
 			}
 		}
@@ -2096,7 +2100,11 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 					ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
 
 					offset -= sizeof(void*);
-					|	movsd xmm(i-IR_REG_FP_FIRST), qword [Ra(fp)+offset]
+					if (ctx->flags & IR_AVX) {
+						|	vmovsd xmm(i-IR_REG_FP_FIRST), qword [Ra(fp)+offset]
+					} else {
+						|	movsd xmm(i-IR_REG_FP_FIRST), qword [Ra(fp)+offset]
+					}
 				}
 			}
 		}
@@ -5858,11 +5866,19 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn)
 				used_stack += IR_MAX(sizeof(void*), ir_type_size[type]);
 			}
 			int_param++;
+#ifdef _WIN64
+			/* WIN64 calling convention use common couter for int and fp registers */
+			fp_param++;
+#endif
 		} else if (IR_IS_TYPE_FP(type)) {
 			if (fp_param >= fp_reg_params_count) {
 				used_stack += IR_MAX(sizeof(void*), ir_type_size[type]);
 			}
 			fp_param++;
+#ifdef _WIN64
+			/* WIN64 calling convention use common couter for int and fp registers */
+			int_param++;
+#endif
 		} else {
 			IR_ASSERT(0);
 		}
@@ -5951,6 +5967,10 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 				dst_reg = IR_REG_NONE; /* pass argument through stack */
 			}
 			int_param++;
+#ifdef _WIN64
+			/* WIN64 calling convention use common couter for int and fp registers */
+			fp_param++;
+#endif
 		} else if (IR_IS_TYPE_FP(type)) {
 			if (fp_param < fp_reg_params_count) {
 				dst_reg = fp_reg_params[fp_param];
@@ -5958,6 +5978,10 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 				dst_reg = IR_REG_NONE; /* pass argument through stack */
 			}
 			fp_param++;
+#ifdef _WIN64
+			/* WIN64 calling convention use common couter for int and fp registers */
+			int_param++;
+#endif
 		} else {
 			IR_ASSERT(0);
 		}
@@ -6016,6 +6040,10 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 					dst_reg = IR_REG_NONE; /* argument already passed through stack */
 				}
 				int_param++;
+#ifdef _WIN64
+				/* WIN64 calling convention use common couter for int and fp registers */
+				fp_param++;
+#endif
 			} else if (IR_IS_TYPE_FP(type)) {
 				if (fp_param < fp_reg_params_count) {
 					dst_reg = fp_reg_params[fp_param];
@@ -6023,6 +6051,10 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 					dst_reg = IR_REG_NONE; /* argument already passed through stack */
 				}
 				fp_param++;
+#ifdef _WIN64
+				/* WIN64 calling convention use common couter for int and fp registers */
+				int_param++;
+#endif
 			} else {
 				IR_ASSERT(0);
 			}
@@ -6125,6 +6157,30 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 			}
 		}
 	}
+
+#ifdef _WIN64
+	/* WIN64 calling convention requires duplcation of parameters passed in FP register into GP ones */
+	if (ir_is_vararg(ctx, insn)) {
+		n = IR_MIN(n, IR_MAX_REG_ARGS + 2);
+		for (j = 3; j <= n; j++) {
+			arg = ir_insn_op(insn, j);
+			arg_insn = &ctx->ir_base[arg];
+			type = arg_insn->type;
+			if (IR_IS_TYPE_FP(type)) {
+				src_reg = fp_reg_params[j-3];
+				dst_reg = int_reg_params[j-3];
+|.if X64
+				if (ctx->flags & IR_AVX) {
+					|	vmovd Rq(dst_reg), xmm(src_reg-IR_REG_FP_FIRST)
+				} else {
+					|	movd Rq(dst_reg), xmm(src_reg-IR_REG_FP_FIRST)
+				}
+|.endif
+			}
+		}
+	}
+#endif
+
 	return used_stack;
 }
 
@@ -7237,6 +7293,10 @@ static void ir_emit_load_params(ir_ctx *ctx)
 					src_reg = IR_REG_NONE;
 				}
 				int_param_num++;
+#ifdef _WIN64
+				/* WIN64 calling convention use common couter for int and fp registers */
+				fp_param_num++;
+#endif
 			} else {
 				if (fp_param_num < fp_reg_params_count) {
 					src_reg = fp_reg_params[fp_param_num];
@@ -7244,6 +7304,10 @@ static void ir_emit_load_params(ir_ctx *ctx)
 					src_reg = IR_REG_NONE;
 				}
 				fp_param_num++;
+#ifdef _WIN64
+				/* WIN64 calling convention use common couter for int and fp registers */
+				int_param_num++;
+#endif
 			}
 			if (ctx->vregs[use]) {
 				dst_reg = IR_REG_NUM(ctx->regs[use][0]);
@@ -7360,6 +7424,10 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 					src_reg = IR_REG_NONE;
 				}
 				int_param_num++;
+#ifdef _WIN64
+				/* WIN64 calling convention use common couter for int and fp registers */
+				fp_param_num++;
+#endif
 			} else {
 				if (fp_param_num < fp_reg_params_count) {
 					src_reg = fp_reg_params[fp_param_num];
@@ -7367,6 +7435,10 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 					src_reg = IR_REG_NONE;
 				}
 				fp_param_num++;
+#ifdef _WIN64
+				/* WIN64 calling convention use common couter for int and fp registers */
+				int_param_num++;
+#endif
 			}
 			if (src_reg == IR_REG_NONE) {
 				if (ctx->vregs[use]) {
