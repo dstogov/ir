@@ -13,5 +13,5 @@ Windows-x86_64
 }
 --EXPECT--
 test:
-	movd %rcx, %xmm0
+	movq %rcx, %xmm0
 	retq
