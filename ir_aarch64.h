@@ -139,6 +139,7 @@ enum _ir_reg {
 #define IR_REG_FP_ARG7  IR_REG_V6
 #define IR_REG_FP_ARG8  IR_REG_V7
 #define IR_MAX_REG_ARGS 16
+#define IR_SHADOW_ARGS  0
 
 # define IR_REGSET_SCRATCH \
 	(IR_REGSET_INTERVAL(IR_REG_X0, IR_REG_X18) \

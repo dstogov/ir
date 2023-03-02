@@ -5737,6 +5737,8 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 
 static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_reg, ir_reg tmp_fp_reg)
 {
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
 	int i;
 	int8_t *pred, *loc, *types;
 	ir_reg to, from_reg;
@@ -5756,7 +5758,7 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 		if (from_reg != to) {
 			loc[from_reg] = from_reg;
 			pred[to] = from_reg;
-			types[to] = copies[i].type;
+			types[from_reg] = copies[i].type;
 			IR_REGSET_INCL(todo, to);
 		}
 	}
@@ -5774,13 +5776,32 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 			to = IR_REGSET_FIRST(ready);
 			IR_REGSET_EXCL(ready, to);
 			from_reg = pred[to];
-			type = types[to];
 			c = loc[from_reg];
+			type = types[c];
 			if (IR_IS_TYPE_INT(type)) {
-				ir_emit_mov(ctx, type, to, c);
+				if (ir_type_size[type] > 2) {
+					ir_emit_mov(ctx, type, to, c);
+				} else if (ir_type_size[type] == 2) {
+					if (IR_IS_TYPE_SIGNED(type)) {
+						|	movsx Rd(to), Rw(c)
+						type = IR_I32;
+					} else {
+						|	movzx Rd(to), Rw(c)
+						type = IR_U32;
+					}
+				} else /* if (ir_type_size[type] == 1) */ {
+					if (IR_IS_TYPE_SIGNED(type)) {
+						|	movsx Rd(to), Rb(c)
+						type = IR_I32;
+					} else {
+						|	movzx Rd(to), Rb(c)
+						type = IR_U32;
+					}
+				}
 			} else {
 				ir_emit_fp_mov(ctx, type, to, c);
 			}
+			types[to] = type;
 			loc[from_reg] = to;
 			if (from_reg == c && pred[from_reg] != IR_REG_NONE) {
 				IR_REGSET_INCL(ready, from_reg);
@@ -5790,11 +5811,12 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 		IR_REGSET_EXCL(todo, to);
 		from_reg = pred[to];
 		if (to != loc[from_reg]) {
-			type = types[to];
+			type = types[from_reg];
 			if (IR_IS_TYPE_INT(type)) {
 				IR_ASSERT(tmp_reg != IR_REG_NONE);
 				IR_ASSERT(tmp_reg >= IR_REG_GP_FIRST && tmp_reg <= IR_REG_GP_LAST);
 				ir_emit_mov(ctx, type, tmp_reg, to);
+				types[tmp_reg] = type;
 				loc[to] = tmp_reg;
 			} else {
 				IR_ASSERT(tmp_fp_reg != IR_REG_NONE);
@@ -5846,6 +5868,9 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn)
 		}
 	}
 
+	/* Reserved "home space" or "shadow store" for register arguments (used in Windows64 ABI) */
+	used_stack += IR_SHADOW_ARGS;
+
 	return used_stack;
 }
 
@@ -5865,7 +5890,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 	int fp_reg_params_count = IR_REG_FP_ARGS;
 	const int8_t *int_reg_params = _ir_int_reg_params;
 	const int8_t *fp_reg_params = _ir_fp_reg_params;
-	int32_t used_stack, stack_offset = 0;
+	int32_t used_stack, stack_offset = IR_SHADOW_ARGS;
 	ir_copy *copies;
 	bool do_pass3 = 0;
 	ir_reg tmp_fp_reg = IR_REG_FP_LAST; /* Temporary register for FP loads and swap */
@@ -5976,7 +6001,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 
 	/* 3. move the remaining memory and immediate values */
 	if (do_pass3) {
-		stack_offset = 0;
+		stack_offset = IR_SHADOW_ARGS;
 		int_param = 0;
 		fp_param = 0;
 		for (j = 3; j <= n; j++) {
@@ -6018,6 +6043,11 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 							} else if (ir_type_size[type] == 1) {
 								type = IR_ADDR;
 							}
+						}
+						if (type == IR_I8 || type == IR_I16) {
+							type = IR_I32;
+						} else if (type == IR_U8 || type == IR_U16) {
+							type = IR_U32;
 						}
 						ir_emit_load(ctx, type, dst_reg, arg);
 					} else {

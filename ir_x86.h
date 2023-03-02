@@ -124,7 +124,8 @@ enum _ir_reg {
 # define IR_REG_FP_ARG2  IR_REG_XMM1
 # define IR_REG_FP_ARG3  IR_REG_XMM2
 # define IR_REG_FP_ARG4  IR_REG_XMM3
-# define IR_MAX_REG_ARGS 8
+# define IR_MAX_REG_ARGS 4
+# define IR_SHADOW_ARGS  32 /* Reserved space in bytes - "home space" or "shadow store" for register arguments */
 
 # define IR_REGSET_SCRATCH \
 	(IR_REGSET_INTERVAL(IR_REG_RAX, IR_REG_RDX) \
@@ -158,6 +159,7 @@ enum _ir_reg {
 # define IR_REG_FP_ARG7  IR_REG_XMM6
 # define IR_REG_FP_ARG8  IR_REG_XMM7
 # define IR_MAX_REG_ARGS 14
+# define IR_SHADOW_ARGS  0
 
 # define IR_REGSET_SCRATCH \
 	(IR_REGSET_INTERVAL(IR_REG_RAX, IR_REG_RDX) \
@@ -183,6 +185,7 @@ enum _ir_reg {
 # define IR_REG_INT_FCARG1 IR_REG_RCX
 # define IR_REG_INT_FCARG2 IR_REG_RDX
 # define IR_MAX_REG_ARGS   2
+# define IR_SHADOW_ARGS    0
 
 # define IR_REGSET_SCRATCH \
 	(IR_REGSET_INTERVAL(IR_REG_RAX, IR_REG_RDX) | IR_REGSET_FP)
