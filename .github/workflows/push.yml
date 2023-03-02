@@ -88,23 +88,36 @@ jobs:
     strategy:
       matrix:
         arch: [x86, amd64]
-        include:
-          - vcpkg_dir: .\win32\vcpkg
-          - vcpkg_triplet: x86-windows
-            arch: x86
-          - vcpkg_triplet: x64-windows
-            arch: amd64
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: ${{ matrix.arch }}
+      - name: Prepare env
+        shell: powershell
+        run: |
+          $tag = (nmake -nologo -f win32\Makefile capstone_tag).Trim()
+          echo ("CAPSTONE_TAG=" + $tag) | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $dir = (nmake -nologo -f win32\Makefile capstone_dir).Trim()
+          echo ("CAPSTONE_DIR=" + $dir) | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo ("VCVER=" + $env:VCToolsVersion) | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Cache capstone
+        id: cache-capstone
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.CAPSTONE_DIR }}
+          key: capstone-${{ matrix.arch }}-${{ env.CAPSTONE_TAG }}-${{ env.VCVER }}-0
+      - if: ${{ steps.cache-capstone.outputs.cache-hit != 'true' }}
+        name: Prepare capstone
+        shell: cmd
+        run: |
+          nmake -nologo -f win32\Makefile capstone
       - name: Build
         shell: cmd
-        run: nmake -nologo -f win32/Makefile VCPKG_DIR=${{ matrix.vcpkg_dir }} VCPKG_TRIPLET=${{ matrix.vcpkg_triplet }}
+        run: nmake -nologo -f win32/Makefile
       - name: Test
         shell: cmd
         run: |
-          nmake -nologo -f win32/Makefile VCPKG_DIR=${{ matrix.vcpkg_dir }} VCPKG_TRIPLET=${{ matrix.vcpkg_triplet }} test-ci
+          nmake -nologo -f win32/Makefile test-ci
 
