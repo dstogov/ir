@@ -15,8 +15,8 @@ Windows-x86_64
 }
 --EXPECT--
 test:
-	movq %rdi, %rax
-	leaq .L1(%rip), %rdi
+	movq %rcx, %rax
+	leaq .L1(%rip), %rcx
 	jmpq *%rax
 .rodata
 	.db 0x90, 0x90, 0x90, 0x90

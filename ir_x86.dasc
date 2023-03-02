@@ -5935,6 +5935,11 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 		used_stack = 0;
 	} else {
 		used_stack = ir_call_used_stack(ctx, insn);
+		if (IR_SHADOW_ARGS
+		 && insn->op == IR_TAILCALL
+		 && used_stack == IR_SHADOW_ARGS) {
+			used_stack = 0;
+		}
 		if (ctx->fixed_call_stack_size
 		 && used_stack <= ctx->fixed_call_stack_size
 #ifdef IR_HAVE_FASTCALL
