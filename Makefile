@@ -56,11 +56,16 @@ $(BUILD_DIR)/ir: $(OBJS_COMMON) $(OBJS_IR)
 $(BUILD_DIR)/ir_test: $(OBJS_COMMON) $(OBJS_IR_TEST)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lcapstone
 
-$(OBJS_COMMON) $(OBJS_IR) $(OBJS_IR_TEST): $(SRC_DIR)/ir.h
-$(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_cfg.o $(BUILD_DIR)/ir_sccp.o $(BUILD_DIR)/ir_gcm.o $(BUILD_DIR)/ir_ra.o $(BUILD_DIR)/ir_disasm.o: $(SRC_DIR)/ir_private.h
+$(OBJS_COMMON): $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h
+
+$(BUILD_DIR)/ir_main.o: $(SRC_DIR)/ir.h
+$(BUILD_DIR)/ir_test.o: $(SRC_DIR)/ir.h $(SRC_DIR)/ir_builder.h
 $(BUILD_DIR)/ir.o: $(SRC_DIR)/ir_fold.h $(BUILD_DIR)/ir_fold_hash.h
-$(BUILD_DIR)/ir_emit.o $(BUILD_DIR)/ir_ra.o: $(SRC_DIR)/ir_$(DASM_ARCH).h
-$(BUILD_DIR)/ir_emit.o:  $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h
+$(BUILD_DIR)/ir_ra.o: $(SRC_DIR)/ir_$(DASM_ARCH).h
+$(BUILD_DIR)/ir_emit.o: $(SRC_DIR)/ir_$(DASM_ARCH).h $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h
+$(BUILD_DIR)/ir_gdb.o: $(SRC_DIR)/ir_elf.h
+$(BUILD_DIR)/ir_perf.o: $(SRC_DIR)/ir_elf.h
+$(BUILD_DIR)/ir_disasm.o: $(SRC_DIR)/ir_elf.h
 
 $(SRC_DIR)/ir_load.c: $(SRC_DIR)/ir.g
 	$(LLK) ir.g

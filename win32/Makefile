@@ -52,6 +52,8 @@ DASM_ARCH=x86
 DASM_FLAGS=
 !endif
 
+VCPKG_CAPSTONE=$(VCPKG_DIR)\installed\$(VCPKG_TRIPLET)\include\capstone
+
 LDFLAGS=$(LDFLAGS) /libpath:$(VCPKG_DIR)\installed\$(VCPKG_TRIPLET)\lib
 
 LIBS=psapi.lib capstone.lib
@@ -63,12 +65,14 @@ OBJS_COMMON=$(BUILD_DIR)\ir.obj $(BUILD_DIR)\ir_strtab.obj $(BUILD_DIR)\ir_cfg.o
 OBJS_IR = $(BUILD_DIR)\ir_main.obj
 OBJS_IR_TEST = $(BUILD_DIR)\ir_test.obj
 
-all: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\ir_test.exe
+all: $(BUILD_DIR) $(BUILD_DIR)\ir.exe $(BUILD_DIR)\ir_test.exe
 
-$(BUILD_DIR)\ir.exe: builddir capstone $(BUILD_DIR)\ir_emit_$(DASM_ARCH).h $(BUILD_DIR)\ir_fold_hash.h $(OBJS_IR) $(OBJS_COMMON)
+#$(BUILD_DIR)\ir.exe: builddir capstone $(BUILD_DIR)\ir_emit_$(DASM_ARCH).h $(BUILD_DIR)\ir_fold_hash.h $(OBJS_IR) $(OBJS_COMMON)
+$(BUILD_DIR)\ir.exe: $(OBJS_IR) $(OBJS_COMMON)
 	"$(LD)" $(LDFLAGS) $(OBJS_COMMON) $(OBJS_IR) $(LIBS) /out:$@
 
-$(BUILD_DIR)\ir_test.exe: builddir capstone $(BUILD_DIR)\ir_emit_$(DASM_ARCH).h $(BUILD_DIR)\ir_fold_hash.h $(OBJS_IR_TEST) $(OBJS_COMMON)
+#$(BUILD_DIR)\ir_test.exe: builddir capstone $(BUILD_DIR)\ir_emit_$(DASM_ARCH).h $(BUILD_DIR)\ir_fold_hash.h $(OBJS_IR_TEST) $(OBJS_COMMON)
+$(BUILD_DIR)\ir_test.exe: $(OBJS_IR_TEST) $(OBJS_COMMON) $(LIBCAPSTONE)
 	"$(LD)" $(LDFLAGS) $(OBJS_COMMON) $(OBJS_IR_TEST) $(LIBS) /out:$@
 
 $(BUILD_DIR)\ir_fold_hash.h: $(BUILD_DIR)\gen_ir_fold_hash.exe $(SRC_DIR)\ir_fold.h $(SRC_DIR)\ir.h
@@ -78,32 +82,34 @@ $(BUILD_DIR)\gen_ir_fold_hash.exe: $(SRC_DIR)\gen_ir_fold_hash.c $(SRC_DIR)\ir_s
 
 $(BUILD_DIR)\minilua.exe: $(SRC_DIR)\dynasm\minilua.c
 	"$(CC)" /Fo$(BUILD_DIR)\ /Fe$@ $**
-$(BUILD_DIR)\ir_emit_$(DASM_ARCH).h: $(BUILD_DIR)\minilua.exe
+$(BUILD_DIR)\ir_emit_$(DASM_ARCH).h: $(SRC_DIR)/ir_$(DASM_ARCH).dasc $(BUILD_DIR)\minilua.exe
 	$(BUILD_DIR)\minilua.exe $(SRC_DIR)\dynasm\dynasm.lua $(DASM_FLAGS) -o $@ $(SRC_DIR)/ir_$(DASM_ARCH).dasc
+
+$(OBJS_COMMON): $(SRC_DIR)\ir.h $(SRC_DIR)\ir_private.h
+
+$(BUILD_DIR)\ir_main.obj: $(SRC_DIR)\ir.h
+$(BUILD_DIR)\ir_test.obj: $(SRC_DIR)\ir.h $(SRC_DIR)\ir_builder.h
+$(BUILD_DIR)\ir.obj: $(SRC_DIR)\ir_fold.h $(BUILD_DIR)\ir_fold_hash.h
+$(BUILD_DIR)\ir_ra.obj: $(SRC_DIR)\ir_$(DASM_ARCH).h
+$(BUILD_DIR)\ir_emit.obj: $(SRC_DIR)\ir_$(DASM_ARCH).h $(BUILD_DIR)\ir_emit_$(DASM_ARCH).h
+$(BUILD_DIR)\ir_disasm.obj: $(VCPKG_CAPSTONE)
 
 {$(SRC_DIR)}.c{$(BUILD_DIR)}.obj:
 	"$(CC)" $(CFLAGS) /Fo$@ /c $<
 
 # If the vcpkg dir exists, lets assume we're good with the deps.
-!if !exist($(VCPKG_DIR))
-vcpkg:
+$(VCPKG_DIR)\vcpkg.exe:
 	git clone https://github.com/Microsoft/vcpkg.git "$(VCPKG_DIR)"
 	"$(VCPKG_DIR)\bootstrap-vcpkg.bat"
-!else
-vcpkg:
-!endif
 
-capstone: vcpkg
+$(VCPKG_CAPSTONE): $(VCPKG_DIR)\vcpkg.exe
 	"$(VCPKG_DIR)\vcpkg.exe" install --triplet=$(VCPKG_TRIPLET) capstone[x86]
 
-!if !exist($(BUILD_DIR))
-builddir:
+$(BUILD_DIR):
 	md "$(BUILD_DIR)"
-!else
-builddir:
-!endif
 
 test: $(BUILD_DIR)\ir.exe
+	set PATH=$(VCPKG_DIR)\installed\$(VCPKG_TRIPLET)\bin:%%PATH%%
 	$(BUILD_DIR)\ir.exe $(SRC_DIR)\test.ir --dump --save $(BUILD_DIR)\test.log
 	set BUILD_DIR=$(BUILD_DIR)
 	set SRC_DIR=$(SRC_DIR)
