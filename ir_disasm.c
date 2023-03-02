@@ -361,8 +361,11 @@ int ir_disasm(const char    *name,
 	cs_option(cs, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
 #  endif
 # elif defined(IR_TARGET_AARCH64)
-	if (cs_open(CS_ARCH_ARM64, CS_MODE_ARM, &cs) != CS_ERR_OK)
+	ret = cs_open(CS_ARCH_ARM64, CS_MODE_ARM, &cs);
+	if (ret != CS_ERR_OK) {
+		fprintf(stderr, "cs_open(CS_ARCH_ARM64, CS_MODE_ARM, ...) failed; [%d] %s\n", ret, cs_strerror(ret));
 		return 0;
+	}
 	cs_option(cs, CS_OPT_DETAIL, CS_OPT_ON);
 	cs_option(cs, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
 # endif
