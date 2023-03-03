@@ -27,7 +27,9 @@
    so just fake the same for all. */
 # define __ORDER_LITTLE_ENDIAN__ 1
 # define __BYTE_ORDER__ __ORDER_LITTLE_ENDIAN__
-# define __has_builtin(arg) (0)
+# ifndef __has_builtin
+#  define __has_builtin(arg) (0)
+# endif
 #endif
 
 #if defined(IR_TARGET_X86)
