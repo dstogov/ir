@@ -7776,9 +7776,13 @@ static void ir_calc_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
 				if (!IR_REGSET_IN(data->used_preserved_regs, ival->reg)
 				 && !IR_REGSET_IN(fixed_regset, ival->reg)
 				 && IR_REGSET_IN(IR_REGSET_PRESERVED, ival->reg)) {
-					IR_ASSERT(!ctx->fixed_save_regset && "NIY"); // TODO: Preserved reg and fixed frame conflict ???
-					IR_REGSET_INCL(data->used_preserved_regs, ival->reg);
-					additional_size += sizeof(void*);
+					if (!ctx->fixed_save_regset) {
+						IR_REGSET_INCL(data->used_preserved_regs, ival->reg);
+						additional_size += sizeof(void*);
+					} else {
+						// TODO: Preserved reg and fixed frame conflict ???
+						// IR_ASSERT(!ctx->fixed_save_regset && "NIY"); 
+					}
 				}
 			}
 		}
