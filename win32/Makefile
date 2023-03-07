@@ -30,6 +30,10 @@ LDFLAGS=$(LDFLAGS) /DEBUG
 CC=cl.exe
 !endif
 
+!if "$(CXX)" == ""
+CXX=cl.exe
+!endif
+
 !if "$(LD)" == ""
 LD=link.exe
 !endif
@@ -108,12 +112,15 @@ $(VCPKG_CAPSTONE): $(VCPKG_DIR)\vcpkg.exe
 $(BUILD_DIR):
 	md "$(BUILD_DIR)"
 
-test: $(BUILD_DIR)\ir.exe
+$(BUILD_DIR)\ir-test.exe: $(SRC_DIR)/ir-test.cxx
+	"$(CXX)" /std:c++17 $(SRC_DIR)\ir-test.cxx /Fe:$@
+
+test: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\ir-test.exe
 	set PATH=$(VCPKG_DIR)\installed\$(VCPKG_TRIPLET)\bin:%%PATH%%
 	$(BUILD_DIR)\ir.exe $(SRC_DIR)\test.ir --dump --save $(BUILD_DIR)\test.log
 	set BUILD_DIR=$(BUILD_DIR)
 	set SRC_DIR=$(SRC_DIR)
-	$(PHP) $(SRC_DIR)\ir-test.php --no-color
+	$(BUILD_DIR)\ir-test.exe
 
 clean:
 	del /f /q $(BUILD_DIR)\*.obj $(BUILD_DIR)\*.exe $(BUILD_DIR)\*.pdb $(BUILD_DIR)\*.ilk $(BUILD_DIR)\*.h
