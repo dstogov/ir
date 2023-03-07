@@ -7062,6 +7062,9 @@ static void ir_emit_exitcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	|	mov Ra(IR_REG_INT_ARG2), rsp
 	|	mov aword [rsp+4*8], Ra(IR_REG_INT_ARG2)
 	|	mov Ra(IR_REG_INT_ARG1), [rsp+16*8+16*8+8]
+	|.if X64WIN
+	|	sub rsp, 32 /* shadow space */
+	|.endif
 	|.else
 	|	sub esp, 8*4+8*8+12 /* CPU regs + SSE regs */
 	|	mov aword [esp+0*4], eax
@@ -7105,7 +7108,9 @@ static void ir_emit_exitcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 
 	//  restore SP
-	|.if X64
+	|.if X64WIN
+	|	add rsp, 32+16*8+16*8+16 /* shadow space + CPU regs + SSE regs */
+	|.elif X64
 	|	add rsp, 16*8+16*8+16 /* CPU regs + SSE regs */
 	|.else
 	|	add esp, 8*4+8*8+16 /* CPU regs + SSE regs */
