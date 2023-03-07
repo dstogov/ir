@@ -50,13 +50,19 @@ function run_test($build_dir, $test, $name, $code, $expect, $args) {
 	} else {
 		$cmd = "$build_dir\\ir $input $args --no-abort-fault >$output 2>&1";
 	}
-	$ret = @system($cmd);
+	$ret = @system($cmd, $result_code);
 	if ($ret === false) {
 		return false;
+	}
+	if ($result_code) {
 	}
 	$out = @file_get_contents($output);
 	if ($out === false) {
 		return false;
+	}
+	if ($result_code) {
+		$out = "\nExit Code = $result_code\n";
+		file_put_contents($output, $out);
 	}
 	$out = trim($out);
 	$out = str_replace("\r", "", $out);

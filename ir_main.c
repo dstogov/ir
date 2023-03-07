@@ -9,6 +9,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _WIN32
+# include <windows.h>
+#endif
+
 static void help(const char *cmd)
 {
 	printf(
@@ -370,6 +374,7 @@ int main(int argc, char **argv)
 #ifdef _WIN32
 	if (!abort_fault) {
 		_set_abort_behavior(0, _WRITE_ABORT_MSG|_CALL_REPORTFAULT);
+		SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);
 	}
 #endif
 
