@@ -1,3 +1,10 @@
+/*
+ * IR - Lightweight JIT Compilation Framework
+ * (Test runner implementation)
+ * Copyright (C) 2023 by IR project.
+ * Authors: Dmitry Stogov <dmitry@php.net>, Anatol Belski <anbelski@linux.microsoft.com>
+ */
+
 #include <string>
 #include <regex>
 #include <iostream>
