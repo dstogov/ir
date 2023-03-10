@@ -1524,7 +1524,7 @@ void _ir_ENTRY(ir_ctx *ctx, ir_ref num)
 
 void _ir_BEGIN(ir_ctx *ctx, ir_ref src)
 {
-//	IR_ASSERT(!ctx->control);
+	IR_ASSERT(!ctx->control);
 	if (src
 	 && src + 1 == ctx->insns_count
 	 && ctx->ir_base[src].op == IR_END) {
@@ -1548,7 +1548,7 @@ ir_ref _ir_IF(ir_ctx *ctx, ir_ref condition)
 
 void _ir_IF_TRUE(ir_ctx *ctx, ir_ref if_ref)
 {
-//	IR_ASSERT(!ctx->control);
+	IR_ASSERT(!ctx->control);
 	IR_ASSERT(if_ref);
 	IR_ASSERT(ctx->ir_base[if_ref].op == IR_IF);
 	ctx->control = ir_emit1(ctx, IR_IF_TRUE, if_ref);
@@ -1556,7 +1556,7 @@ void _ir_IF_TRUE(ir_ctx *ctx, ir_ref if_ref)
 
 void _ir_IF_TRUE_cold(ir_ctx *ctx, ir_ref if_ref)
 {
-//	IR_ASSERT(!ctx->control);
+	IR_ASSERT(!ctx->control);
 	IR_ASSERT(if_ref);
 	IR_ASSERT(ctx->ir_base[if_ref].op == IR_IF);
 	/* op2 is used as an indicator of low-probability branch */
@@ -1565,7 +1565,7 @@ void _ir_IF_TRUE_cold(ir_ctx *ctx, ir_ref if_ref)
 
 void _ir_IF_FALSE(ir_ctx *ctx, ir_ref if_ref)
 {
-//	IR_ASSERT(!ctx->control);
+	IR_ASSERT(!ctx->control);
 	IR_ASSERT(if_ref);
 	IR_ASSERT(ctx->ir_base[if_ref].op == IR_IF);
 	ctx->control = ir_emit1(ctx, IR_IF_FALSE, if_ref);
@@ -1573,7 +1573,7 @@ void _ir_IF_FALSE(ir_ctx *ctx, ir_ref if_ref)
 
 void _ir_IF_FALSE_cold(ir_ctx *ctx, ir_ref if_ref)
 {
-//	IR_ASSERT(!ctx->control);
+	IR_ASSERT(!ctx->control);
 	IR_ASSERT(if_ref);
 	IR_ASSERT(ctx->ir_base[if_ref].op == IR_IF);
 	/* op2 is used as an indicator of low-probability branch */
@@ -1592,13 +1592,13 @@ ir_ref _ir_END(ir_ctx *ctx)
 
 void _ir_MERGE_2(ir_ctx *ctx, ir_ref src1, ir_ref src2)
 {
-//	IR_ASSERT(!ctx->control);
+	IR_ASSERT(!ctx->control);
 	ctx->control = ir_emit2(ctx, IR_MERGE, src1, src2);
 }
 
 void _ir_MERGE_N(ir_ctx *ctx, ir_ref n, ir_ref *inputs)
 {
-//	IR_ASSERT(!ctx->control);
+	IR_ASSERT(!ctx->control);
 	IR_ASSERT(n > 0);
 	if (n == 1) {
 		_ir_BEGIN(ctx, inputs[0]);
@@ -1643,7 +1643,7 @@ void _ir_MERGE_LIST(ir_ctx *ctx, ir_ref list)
 	if (list != IR_UNUSED) {
 		uint32_t n = 0;
 
-//		IR_ASSERT(!ctx->control);
+		IR_ASSERT(!ctx->control);
 
 		/* count inputs count */
 		do {
@@ -1677,7 +1677,7 @@ void _ir_MERGE_LIST(ir_ctx *ctx, ir_ref list)
 
 ir_ref _ir_LOOP_BEGIN(ir_ctx *ctx, ir_ref src1)
 {
-//	IR_ASSERT(!ctx->control);
+	IR_ASSERT(!ctx->control);
 	ctx->control = ir_emit2(ctx, IR_LOOP_BEGIN, src1, IR_UNUSED);
 	return ctx->control;
 }
@@ -1778,7 +1778,7 @@ void _ir_UNREACHABLE(ir_ctx *ctx)
 	IR_ASSERT(ctx->control);
 	ctx->control = ir_emit3(ctx, IR_UNREACHABLE, ctx->control, IR_UNUSED, ctx->ir_base[1].op1);
 	ctx->ir_base[1].op1 = ctx->control;
-//	ctx->control = IE_UNUSED;
+	ctx->control = IR_UNUSED;
 }
 
 void _ir_TAILCALL(ir_ctx *ctx, ir_ref func)
@@ -1875,13 +1875,13 @@ ir_ref _ir_SWITCH(ir_ctx *ctx, ir_ref val)
 
 void _ir_CASE_VAL(ir_ctx *ctx, ir_ref switch_ref, ir_ref val)
 {
-//	IR_ASSERT(!ctx->control);
+	IR_ASSERT(!ctx->control);
 	ctx->control = ir_emit2(ctx, IR_CASE_VAL, switch_ref, val);
 }
 
 void _ir_CASE_DEFAULT(ir_ctx *ctx, ir_ref switch_ref)
 {
-//	IR_ASSERT(!ctx->control);
+	IR_ASSERT(!ctx->control);
 	ctx->control = ir_emit1(ctx, IR_CASE_DEFAULT, switch_ref);
 }
 
@@ -1890,7 +1890,7 @@ void _ir_RETURN(ir_ctx *ctx, ir_ref val)
 	IR_ASSERT(ctx->control);
 	ctx->control = ir_emit3(ctx, IR_RETURN, ctx->control, val, ctx->ir_base[1].op1);
 	ctx->ir_base[1].op1 = ctx->control;
-//	ctx-control = IR_UNUSED;
+	ctx->control = IR_UNUSED;
 }
 
 void _ir_IJMP(ir_ctx *ctx, ir_ref addr)
