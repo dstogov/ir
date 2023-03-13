@@ -6,6 +6,7 @@ BUILD_DIR  = .
 SRC_DIR    = .
 
 CC         = gcc
+CXX        = g++
 BUILD_CC   = gcc
 CFLAGS     = -Wall -Wextra -Wno-unused-parameter
 LDFLAGS    = -lm
@@ -83,20 +84,24 @@ $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h: $(SRC_DIR)/ir_$(DASM_ARCH).dasc $(SRC_DIR)/
 $(OBJS_COMMON) $(OBJS_IR) $(OBJS_IR_TEST): $(BUILD_DIR)/$(notdir %.o): $(SRC_DIR)/$(notdir %.c)
 	$(CC) $(CFLAGS) -I$(BUILD_DIR) -o $@ -c $<
 
-test: $(BUILD_DIR)/ir
+$(BUILD_DIR)/ir-test: $(SRC_DIR)/ir-test.cxx
+	$(CXX) -O3 -std=c++17 $(SRC_DIR)/ir-test.cxx -o $(BUILD_DIR)/ir-test
+
+test: $(BUILD_DIR)/ir $(BUILD_DIR)/ir-test
 	$(BUILD_DIR)/ir $(SRC_DIR)/test.ir --dump --save 2>$(BUILD_DIR)/test.log
 	$(BUILD_DIR)/ir $(SRC_DIR)/test.ir --dot $(BUILD_DIR)/ir.dot
 	dot -Tpdf $(BUILD_DIR)/ir.dot -o $(BUILD_DIR)/ir.pdf
-	BUILD_DIR=$(BUILD_DIR) SRC_DIR=$(SRC_DIR) $(PHP) $(SRC_DIR)/ir-test.php
+	BUILD_DIR=$(BUILD_DIR) SRC_DIR=$(SRC_DIR) $(BUILD_DIR)/ir-test
 
-test-ci: $(BUILD_DIR)/ir
-	BUILD_DIR=$(BUILD_DIR) SRC_DIR=$(SRC_DIR) $(PHP) $(SRC_DIR)/ir-test.php --show-diff
+test-ci: $(BUILD_DIR)/ir $(BUILD_DIR)/ir-test
+	BUILD_DIR=$(BUILD_DIR) SRC_DIR=$(SRC_DIR) $(BUILD_DIR)/ir-test --show-diff
 
 clean:
 	rm -rf $(BUILD_DIR)/ir $(BUILD_DIR)/ir_test $(BUILD_DIR)/*.o \
 	$(BUILD_DIR)/minilua $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h \
 	$(BUILD_DIR)/ir_fold_hash.h $(BUILD_DIR)/gen_ir_fold_hash \
-	$(BUILD_DIR)/ir.dot $(BUILD_DIR)/ir.pdf $(BUILD_DIR)/test.log
+	$(BUILD_DIR)/ir.dot $(BUILD_DIR)/ir.pdf $(BUILD_DIR)/test.log \
+	$(BUILD_DIR)/ir-test
 	find $(SRC_DIR)/tests -type f -name '*.diff' -delete
 	find $(SRC_DIR)/tests -type f -name '*.out' -delete
 	find $(SRC_DIR)/tests -type f -name '*.exp' -delete
