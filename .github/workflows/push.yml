@@ -107,5 +107,4 @@ jobs:
         shell: cmd
         run: |
           nmake -nologo -f win32/Makefile VCPKG_DIR=${{ matrix.vcpkg_dir }} VCPKG_TRIPLET=${{ matrix.vcpkg_triplet }} test
-          type win32\build_${{ matrix.vcpkg_triplet }}\test.log
 
