@@ -84,8 +84,8 @@ $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h: $(SRC_DIR)/ir_$(DASM_ARCH).dasc $(SRC_DIR)/
 $(OBJS_COMMON) $(OBJS_IR) $(OBJS_IR_TEST): $(BUILD_DIR)/$(notdir %.o): $(SRC_DIR)/$(notdir %.c)
 	$(CC) $(CFLAGS) -I$(BUILD_DIR) -o $@ -c $<
 
-$(BUILD_DIR)/ir-test: $(SRC_DIR)/ir-test.cxx
-	$(CXX) -O3 -std=c++17 $(SRC_DIR)/ir-test.cxx -o $(BUILD_DIR)/ir-test
+$(BUILD_DIR)/ir-test: $(SRC_DIR)/misc-utils/ir-test.cxx
+	$(CXX) -O3 -std=c++17 $(SRC_DIR)/misc-utils/ir-test.cxx -o $(BUILD_DIR)/ir-test
 
 test: $(BUILD_DIR)/ir $(BUILD_DIR)/ir-test
 	$(BUILD_DIR)/ir $(SRC_DIR)/test.ir --dump --save 2>$(BUILD_DIR)/test.log

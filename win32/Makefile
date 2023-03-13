@@ -112,8 +112,8 @@ $(VCPKG_CAPSTONE): $(VCPKG_DIR)\vcpkg.exe
 $(BUILD_DIR):
 	md "$(BUILD_DIR)"
 
-$(BUILD_DIR)\ir-test.exe: $(SRC_DIR)/ir-test.cxx
-	"$(CXX)" /std:c++17 $(SRC_DIR)\ir-test.cxx /Fe:$@
+$(BUILD_DIR)\ir-test.exe: $(SRC_DIR)\misc-utils\ir-test.cxx
+	"$(CXX)" /std:c++17 $(SRC_DIR)\misc-utils\ir-test.cxx /Fe:$@
 
 test: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\ir-test.exe
 	set PATH=$(VCPKG_DIR)\installed\$(VCPKG_TRIPLET)\bin:%%PATH%%
