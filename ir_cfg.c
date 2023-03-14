@@ -802,11 +802,14 @@ next:
 						if (!ir_worklist_len(&work)) {
 							ir_bitset_clear(work.visited, ir_bitset_len(ir_worklist_capasity(&work)));
 						}
+						blocks[pred].loop_header = 0; /* support for merged loops */
 						ir_worklist_push(&work, pred);
 					} else {
 						/* Otherwise it's a cross-join edge.  See if it's a branch
 						   to an ancestor on the DJ spanning tree.  */
-						irreducible = (entry_times[pred] > entry_times[i] && exit_times[pred] < exit_times[i]);
+						if (entry_times[pred] > entry_times[i] && exit_times[pred] < exit_times[i]) {
+							irreducible = 1;
+						}
 					}
 				}
 				p++;
