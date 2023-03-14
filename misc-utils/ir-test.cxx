@@ -15,6 +15,8 @@
 #include <exception>
 #include <cstdlib>
 
+#include "popl.hpp"
+
 #ifdef _WIN32
 # include <windows.h>
 # define popen _popen
@@ -232,27 +234,80 @@ namespace ir {
 			return 1 <= b.compare(a);
 		});
 	}
+
+	void usage(popl::OptionParser& op) {
+		std::cerr << "Usage: ir-test [options]" << std::endl;
+		std::cerr << std::endl;
+		std::cerr << "Execute IR tests" << std::endl;
+		std::cerr << std::endl;
+		std::cout << op << std::endl;
+	}
+
+	enum init_status { INIT_EXIT_OK, INIT_EXIT_ERR, INIT_OK = UINT8_MAX };
+
+	init_status init(int argc, char **argv) {
+		popl::OptionParser op{};
+
+		auto diff_opt = op.add<popl::Switch>("", "show-diff", "Print failed test diff to stdout");
+		auto no_color_opt = op.add<popl::Switch>("", "no-color", "Disable output colorization");
+		auto build_dir_opt = op.add<popl::Value<std::string>>("", "build-dir", "Bulid dir path. " \
+		                     "When passed, overrides the BUILD_DIR environment variable", ".");
+		auto src_dir_opt = op.add<popl::Value<std::string>>("", "src-dir", "Source dir path. " \
+		                   "When passed, overrides the SRC_DIR environment variable", ".");
+		// XXX support multiple test dirs?
+		auto test_dir_opt = op.add<popl::Value<std::string>>("", "test-dir", "Test dir path. ", "." PATH_SEP "tests");
+		auto ir_exe_opt = op.add<popl::Value<std::string>>("", "ir-exe", "Path to the `ir` test app. ");
+		auto help_opt = op.add<popl::Switch>("h", "help", "Display help text and exit");
+
+		try {
+			op.parse(argc, argv);
+
+			if (op.unknown_options().size() > 0) {
+				for (const auto& unknown_option: op.unknown_options())
+					std::cout << "\r" << ir::colorize("ERROR", ir::RED) << ": unknown option '" <<
+					          unknown_option << "'" << std::endl;
+				std::cerr << "\rTry 'ir-test --help' for more information." << std::endl;
+				return INIT_EXIT_ERR;
+			}
+
+			ir::init_console();
+
+			if (help_opt->is_set()) {
+				usage(op);
+				return INIT_EXIT_OK;
+			}
+
+			::show_diff = diff_opt->is_set();
+			::colorize = !no_color_opt->is_set();
+			::build_dir = build_dir_opt->is_set() ? build_dir_opt->value() : ir::get_dir_from_env("BUILD_DIR");
+			::src_dir = src_dir_opt->is_set() ? src_dir_opt->value() : ir::get_dir_from_env("SRC_DIR");
+			::test_dir = test_dir_opt->is_set() ? test_dir_opt->value() : ::src_dir + PATH_SEP + "tests";
+			::ir_exe = ir_exe_opt->is_set() ? ir_exe_opt->value() : ::build_dir + PATH_SEP + "ir" + EXE_SUF;
+
+			::ir_target = ir::trim(ir::exec(::ir_exe + " --target"));
+		} catch (const popl::invalid_option& e) {
+			std::cout << "\r" << ir::colorize("ERROR", ir::RED) << ": " << e.what() << '\n';
+			std::cerr << "\rTry 'ir-test --help' for more information." << std::endl;
+			return INIT_EXIT_ERR;
+		} catch (const std::exception& e) {
+			std::cout << "\r" << ir::colorize("ERROR", ir::RED) << ": " << e.what() << '\n';
+			return INIT_EXIT_ERR;
+		}
+		return INIT_OK;
+	}
 }
 
 int main(int argc, char **argv) {
-	for (int i = 1; i < argc; i++) {
-		// XXX use some cleaner arg parsing solution
-		if (!std::string(argv[i]).compare("--show-diff")) {
-			::show_diff = true;
-		} else if (!std::string(argv[i]).compare("--no-color")) {
-			::colorize = false;
-		}
-	}
-	ir::init_console();
+	auto init_status = ir::init(argc, argv);
+	if (ir::INIT_OK != init_status) return init_status;
 
-	::build_dir = ir::get_dir_from_env("BUILD_DIR");
-	::src_dir = ir::get_dir_from_env("SRC_DIR");
-	::test_dir = ::src_dir + PATH_SEP + "tests";
-	::ir_exe = ::build_dir + PATH_SEP + "ir" + EXE_SUF;
-	::ir_target = ir::trim(ir::exec(::ir_exe + " --target"));
 	std::vector<std::string> irt_files;
-
-	ir::find_tests_in_dir(::test_dir, irt_files);
+	try {
+		ir::find_tests_in_dir(::test_dir, irt_files);
+	} catch (const std::exception& e) {
+		std::cout << "\r" << ir::colorize("ERROR", ir::RED) << ": " << e.what() << '\n';
+		std::exit(3);
+	}
 	for (const std::string& test_fl : irt_files) {
 		try {
 			auto test = ir::test(test_fl);
@@ -288,12 +343,12 @@ int main(int argc, char **argv) {
 					f.close();
 				}
 			}
-		} catch (ir::broken_test_exception& e) {
+		} catch (const ir::broken_test_exception& e) {
 			std::cout << "\r" << ir::colorize("BROK", ir::RED) << ": [" << test_fl << "]\n";
 			::bad_list.push_back(test_fl);
-		} catch (std::string& s) {
+		} catch (const std::string& s) {
 			std::cout << "\r" << ir::colorize("ERROR", ir::RED) << ": " << s << '\n';
-		} catch (std::exception& e) {
+		} catch (const std::exception& e) {
 			std::cout << "\r" << ir::colorize("ERROR", ir::RED) << ": " << e.what() << '\n';
 		}
 
