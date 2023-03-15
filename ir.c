@@ -1423,16 +1423,7 @@ static ir_ref ir_find_aliasing_load(ir_ctx *ctx, ir_ref ref, ir_type type, ir_re
 			}
 		} else if (insn->op == IR_RSTORE) {
 			modified_regset |= (1 << insn->op3);
-		} else if (insn->op == IR_START
-			 || insn->op == IR_BEGIN
-			 || insn->op == IR_IF_TRUE
-			 || insn->op == IR_IF_FALSE
-			 || insn->op == IR_CASE_VAL
-			 || insn->op == IR_CASE_DEFAULT
-			 || insn->op == IR_MERGE
-			 || insn->op == IR_LOOP_BEGIN
-			 || insn->op == IR_ENTRY
-			 || insn->op == IR_CALL) {
+		} else if (insn->op >= IR_START || insn->op == IR_CALL) {
 			return IR_UNUSED;
 		}
 		ref = insn->op1;
@@ -1929,15 +1920,7 @@ void _ir_GUARD(ir_ctx *ctx, ir_ref condition, ir_ref addr)
 					condition = IR_FALSE;
 					break;
 				}
-			} else if (insn->op == IR_START
-				 || insn->op == IR_BEGIN
-				 || insn->op == IR_IF_TRUE
-				 || insn->op == IR_IF_FALSE
-				 || insn->op == IR_CASE_VAL
-				 || insn->op == IR_CASE_DEFAULT
-				 || insn->op == IR_MERGE
-				 || insn->op == IR_LOOP_BEGIN
-				 || insn->op == IR_ENTRY) {
+			} else if (insn->op >= IR_START) {
 				break;
 			}
 			ref = insn->op1;
@@ -1969,15 +1952,7 @@ void _ir_GUARD_NOT(ir_ctx *ctx, ir_ref condition, ir_ref addr)
 					condition = IR_TRUE;
 					break;
 				}
-			} else if (insn->op == IR_START
-				 || insn->op == IR_BEGIN
-				 || insn->op == IR_IF_TRUE
-				 || insn->op == IR_IF_FALSE
-				 || insn->op == IR_CASE_VAL
-				 || insn->op == IR_CASE_DEFAULT
-				 || insn->op == IR_MERGE
-				 || insn->op == IR_LOOP_BEGIN
-				 || insn->op == IR_ENTRY) {
+			} else if (insn->op >= IR_START) {
 				break;
 			}
 			ref = insn->op1;
@@ -2115,16 +2090,7 @@ check_aliasing:
 			if (ir_check_partial_aliasing(ctx, addr, insn->op2, type, type2) != IR_NO_ALIAS) {
 				break;
 			}
-		} else if (insn->op == IR_START
-			 || insn->op == IR_BEGIN
-			 || insn->op == IR_IF_TRUE
-			 || insn->op == IR_IF_FALSE
-			 || insn->op == IR_CASE_VAL
-			 || insn->op == IR_CASE_DEFAULT
-			 || insn->op == IR_MERGE
-			 || insn->op == IR_LOOP_BEGIN
-			 || insn->op == IR_ENTRY
-			 || insn->op == IR_CALL) {
+		} else if (insn->op >= IR_START || insn->op == IR_CALL) {
 			break;
 		}
 		prev = ref;

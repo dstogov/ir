@@ -287,6 +287,13 @@ typedef enum _ir_type {
 	_(TRAP,         x1,   src, ___, ___) /* DebugBreak                  */ \
 	/* memory reference ops (A, H, U, S, TMP, STR, NEW, X, V) ???       */ \
 	\
+	/* guards                                                           */ \
+	_(GUARD,        c3,   src, def, def) /* IF without second successor */ \
+	_(GUARD_NOT  ,  c3,   src, def, def) /* IF without second successor */ \
+	\
+	/* deoptimization                                                   */ \
+	_(SNAPSHOT,     xN,   src, def, def) /* SNAPSHOT(src, args...)      */ \
+	\
 	/* control-flow nodes                                               */ \
 	_(START,        S0X2, ret, ent, ___) /* function start              */ \
 	_(ENTRY,        S0X2, num, ent, ___) /* code entry (op3 keeps addr) */ \
@@ -304,13 +311,6 @@ typedef enum _ir_type {
 	_(RETURN,       T2X1, src, def, ret) /* function return             */ \
 	_(IJMP,         T2X1, src, def, ret) /* computed goto               */ \
 	_(UNREACHABLE,  T2X1, src, def, ret) /* unreachable (tailcall, etc) */ \
-	\
-	/* guards                                                           */ \
-	_(GUARD,        c3,   src, def, def) /* IF without second successor */ \
-	_(GUARD_NOT  ,  c3,   src, def, def) /* IF without second successor */ \
-	\
-	/* deoptimization                                                   */ \
-	_(SNAPSHOT,     xN,   src, def, def) /* SNAPSHOT(src, args...)      */ \
 	\
 	/* deoptimization helper                                            */ \
 	_(EXITCALL,     x2,   src, def, ___) /* save CPU regs and call op2  */ \
