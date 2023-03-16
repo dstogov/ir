@@ -118,9 +118,7 @@ $(BUILD_DIR)\ir-test.exe: $(SRC_DIR)\misc-utils\ir-test.cxx
 test: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\ir-test.exe
 	set PATH=$(VCPKG_DIR)\installed\$(VCPKG_TRIPLET)\bin:%%PATH%%
 	$(BUILD_DIR)\ir.exe $(SRC_DIR)\test.ir --dump --save $(BUILD_DIR)\test.log
-	set BUILD_DIR=$(BUILD_DIR)
-	set SRC_DIR=$(SRC_DIR)
-	$(BUILD_DIR)\ir-test.exe
+	$(BUILD_DIR)\ir-test.exe --build-dir $(BUILD_DIR) --src-dir $(SRC_DIR)
 
 clean:
 	del /f /q $(BUILD_DIR)\*.obj $(BUILD_DIR)\*.exe $(BUILD_DIR)\*.pdb $(BUILD_DIR)\*.ilk $(BUILD_DIR)\*.h
