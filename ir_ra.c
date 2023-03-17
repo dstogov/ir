@@ -385,20 +385,27 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 #endif
 
 			if (n > 1) {
-				IR_ASSERT(succ > b);
 				/* live = union of successors.liveIn */
-				ir_bitset_copy(live, bb_live + (len * succ), len);
+				if (EXPECTED(succ > b) && EXPECTED((ctx->cfg_blocks[succ].flags & IR_BB_ENTRY) == 0)) {
+					ir_bitset_copy(live, bb_live + (len * succ), len);
+				} else {
+					IR_ASSERT(succ > b || (ctx->cfg_blocks[succ].flags & IR_BB_LOOP_HEADER));
+					ir_bitset_clear(live, len);
+				}
 				for (p++, n--; n > 0; p++, n--) {
 					succ = *p;
-					IR_ASSERT(succ > b);
-					ir_bitset_union(live, bb_live + (len * succ), len);
+					if (EXPECTED(succ > b) && EXPECTED((ctx->cfg_blocks[succ].flags & IR_BB_ENTRY) == 0)) {
+						ir_bitset_union(live, bb_live + (len * succ), len);
+					} else {
+						IR_ASSERT(succ > b || (ctx->cfg_blocks[succ].flags & IR_BB_LOOP_HEADER));
+					}
 				}
 			} else {
 				/* live = successor.liveIn */
-				if (EXPECTED(succ > b)) {
+				if (EXPECTED(succ > b) && EXPECTED((ctx->cfg_blocks[succ].flags & IR_BB_ENTRY) == 0)) {
 					ir_bitset_copy(live, bb_live + (len * succ), len);
 				} else {
-					IR_ASSERT(ctx->cfg_blocks[succ].flags & IR_BB_LOOP_HEADER);
+					IR_ASSERT(succ > b || (ctx->cfg_blocks[succ].flags & IR_BB_LOOP_HEADER));
 					ir_bitset_clear(live, len);
 				}
 

@@ -816,6 +816,7 @@ struct _ir_use_list {
 #define IR_BB_DESSA_MOVES      (1<<5) /* translation out of SSA requires MOVEs */
 #define IR_BB_EMPTY            (1<<6)
 #define IR_BB_SKIP             (1<<7) /* skip during code generation           */
+#define IR_BB_PREV_EMPTY_ENTRY (1<<8)
 
 struct _ir_block {
 	uint32_t flags;

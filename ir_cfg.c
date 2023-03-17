@@ -87,7 +87,7 @@ IR_ALWAYS_INLINE void _ir_add_predecessors(ir_insn *insn, ir_worklist *worklist)
 			IR_ASSERT(ref);
 			ir_worklist_push(worklist, ref);
 		}
-	} else if (insn->op != IR_START && insn->op != IR_ENTRY) {
+	} else if (insn->op != IR_START) {
 		if (EXPECTED(insn->op1)) {
 			ir_worklist_push(worklist, insn->op1);
 		}
@@ -167,14 +167,7 @@ int ir_build_cfg(ir_ctx *ctx)
 	/* START node my be inaccessible from "stop" nodes */
 	ir_bitset_incl(bb_leaks, 1);
 
-	/* ENTRY nodes may be  inaccessible from "stop" nodes */
-	ref = ctx->ir_base[1].op2;
-	while (ref) {
-		ir_bitset_incl(bb_leaks, ref);
-		ref = ctx->ir_base[ref].op2;
-	}
-
-	/* Add all not processed START, ENTRY and succcessor of IF and SWITCH */
+	/* Add not processed START and succcessor of IF and SWITCH */
 	IR_BITSET_FOREACH_DIFFERENCE(bb_leaks, bb_starts, len, start) {
 		ir_worklist_push(&worklist, start);
 	} IR_BITSET_FOREACH_END();
@@ -259,10 +252,6 @@ next_successor:
 			bb->flags = IR_BB_START;
 			bb->predecessors_count = 0;
 			ir_worklist_push(&worklist, b);
-		} else if (insn->op == IR_ENTRY) {
-			bb->flags = IR_BB_ENTRY;
-			bb->predecessors_count = 0;
-			ir_worklist_push(&worklist, b);
 		} else {
 			bb->flags = IR_BB_UNREACHABLE; /* all blocks are marked as UNREACHABLE first */
 			if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
@@ -271,10 +260,14 @@ next_successor:
 				edges_count += n;
 				count += n;
 			} else if (EXPECTED(insn->op1)) {
+				if (insn->op == IR_ENTRY) {
+					bb->flags |= IR_BB_ENTRY;
+				}
 				bb->predecessors_count = 1;
 				edges_count++;
 				count++;
 			} else {
+				IR_ASSERT(insn->op == IR_BEGIN); /* start of unreachable block */
 				bb->predecessors_count = 0;
 			}
 		}
@@ -595,16 +588,6 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 	postnum = 1;
 	compute_postnum(ctx, &postnum, 1);
 
-	if (ctx->ir_base[1].op2) {
-		for (b = 2, bb = &ctx->cfg_blocks[2]; b <= ctx->cfg_blocks_count; b++, bb++) {
-			if (bb->flags & IR_BB_ENTRY) {
-				compute_postnum(ctx, &postnum, b);
-				bb->idom = 1;
-			}
-		}
-		ctx->cfg_blocks[1].postnum = postnum;
-	}
-
 	/* Find immediate dominators */
 	blocks = ctx->cfg_blocks;
 	edges  = ctx->cfg_edges;
@@ -635,7 +618,7 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 					uint32_t pred_b = *p;
 					ir_block *pred_bb = &blocks[pred_b];
 
-					if (pred_bb->idom > 0 && !(pred_bb->flags & IR_BB_ENTRY)) {
+					if (pred_bb->idom > 0) {
 						if (idom == 0) {
 							idom = pred_b;
 						} else if (idom != pred_b) {
@@ -669,10 +652,7 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 	/* Construct dominators tree */
 	for (b = 2, bb = &blocks[2]; b <= blocks_count; b++, bb++) {
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
-		if (bb->flags & IR_BB_ENTRY) {
-			bb->idom = 0;
-			bb->dom_depth = 0;
-		} else if (bb->idom > 0) {
+		if (bb->idom > 0) {
 			ir_block *idom_bb = &blocks[bb->idom];
 
 			bb->dom_depth = idom_bb->dom_depth + 1;
@@ -875,11 +855,10 @@ next:
 int ir_schedule_blocks(ir_ctx *ctx)
 {
 	ir_bitqueue blocks;
-	uint32_t b, *p, successor, best_successor, j, last_non_empty = 0;
-	ir_block *bb, *successor_bb, *best_successor_bb;
+	uint32_t b, best_successor, j, last_non_empty;
+	ir_block *bb, *best_successor_bb;
 	ir_insn *insn;
 	uint32_t *list, *map;
-	uint32_t prob, best_successor_prob;
 	uint32_t count = 0;
 	bool reorder = 0;
 
@@ -893,6 +872,11 @@ int ir_schedule_blocks(ir_ctx *ctx)
 		 && (ctx->ir_base[bb->end].op == IR_END || ctx->ir_base[bb->end].op == IR_LOOP_END)
 		 && !(bb->flags & IR_BB_DESSA_MOVES)) {
 			bb->flags |= IR_BB_EMPTY;
+			if ((ctx->flags & IR_MERGE_EMPTY_ENTRIES) && (bb->flags & IR_BB_ENTRY)) {
+				if (ctx->cfg_edges[bb->successors] == b + 1) {
+					(bb + 1)->flags |= IR_BB_PREV_EMPTY_ENTRY;
+				}
+			}
 		}
 		ir_bitset_incl(blocks.set, b);
 	}
@@ -900,27 +884,18 @@ int ir_schedule_blocks(ir_ctx *ctx)
 	while ((b = ir_bitqueue_pop(&blocks)) != (uint32_t)-1) {
 		bb = &ctx->cfg_blocks[b];
 		/* Start trace */
+		last_non_empty = 0;
 		do {
-			if (bb->predecessors_count > 1
-			 && (ctx->flags & IR_MERGE_EMPTY_ENTRIES)) {
-				/* Insert empty ENTRY blocks */
-				for (j = 0, p = &ctx->cfg_edges[bb->predecessors]; j < bb->predecessors_count; j++, p++) {
-					uint32_t predecessor = *p;
+			if (UNEXPECTED(bb->flags & IR_BB_PREV_EMPTY_ENTRY) && ir_bitqueue_in(&blocks, b - 1)) {
+				/* Schedule the previous empty ENTRY block before this one */
+				uint32_t predecessor = b - 1;
 
-					if (ir_bitqueue_in(&blocks, predecessor)
-					 && (ctx->cfg_blocks[predecessor].flags & IR_BB_ENTRY)
-					 && ctx->cfg_blocks[predecessor].end == ctx->cfg_blocks[predecessor].start + 1) {
-						ir_bitqueue_del(&blocks, predecessor);
-						count++;
-						list[count] = predecessor;
-						map[predecessor] = count;
-						if (predecessor != count) {
-							reorder = 1;
-						}
-						if (!(bb->flags & IR_BB_EMPTY)) {
-							last_non_empty = b;
-						}
-					}
+				ir_bitqueue_del(&blocks, predecessor);
+				count++;
+				list[count] = predecessor;
+				map[predecessor] = count;
+				if (predecessor != count) {
+					reorder = 1;
 				}
 			}
 			count++;
@@ -933,36 +908,55 @@ int ir_schedule_blocks(ir_ctx *ctx)
 				last_non_empty = b;
 			}
 			best_successor_bb = NULL;
-			for (b = 0, p = &ctx->cfg_edges[bb->successors]; b < bb->successors_count; b++, p++) {
-				successor = *p;
-				if (ir_bitqueue_in(&blocks, successor)) {
-					successor_bb = &ctx->cfg_blocks[successor];
-					insn = &ctx->ir_base[successor_bb->start];
-					if (insn->op == IR_IF_TRUE || insn->op == IR_IF_FALSE || insn->op == IR_CASE_DEFAULT) {
-						prob = insn->op2;
-					} else if (insn->op == IR_CASE_VAL) {
-						prob = insn->op3;
-					} else {
-						prob = 0;
-					}
-					if (!best_successor_bb
-					 || successor_bb->loop_depth > best_successor_bb->loop_depth) {
-						// TODO: use block frequency
-						best_successor = successor;
-						best_successor_bb = successor_bb;
-						best_successor_prob = prob;
-					} else if ((best_successor_prob && prob
-								&& prob > best_successor_prob)
-							|| (!best_successor_prob && prob
-								&& prob > 100 / bb->successors_count)
-							|| (best_successor_prob && !prob
-								&& best_successor_prob < 100 / bb->successors_count)
-							|| (!best_successor_prob && !prob
-								&& (best_successor_bb->flags & IR_BB_EMPTY)
-								&& !(successor_bb->flags & IR_BB_EMPTY))) {
-						best_successor = successor;
-						best_successor_bb = successor_bb;
-						best_successor_prob = prob;
+			if (bb->successors_count == 1) {
+				best_successor = ctx->cfg_edges[bb->successors];
+				if (ir_bitqueue_in(&blocks, best_successor)) {
+					best_successor_bb = &ctx->cfg_blocks[best_successor];
+				}
+			} else if (bb->successors_count > 1) {
+				uint32_t prob, best_successor_prob;
+				uint32_t *p, successor;
+				ir_block *successor_bb;
+
+				for (b = 0, p = &ctx->cfg_edges[bb->successors]; b < bb->successors_count; b++, p++) {
+					successor = *p;
+					if (ir_bitqueue_in(&blocks, successor)) {
+						successor_bb = &ctx->cfg_blocks[successor];
+						insn = &ctx->ir_base[successor_bb->start];
+						if (insn->op == IR_IF_TRUE || insn->op == IR_IF_FALSE) {
+							prob = insn->op2;
+							if (!prob) {
+								prob = 100 / bb->successors_count;
+								if (!(successor_bb->flags & IR_BB_EMPTY)) {
+									prob++;
+								}
+							}
+						} else if (insn->op == IR_CASE_DEFAULT) {
+							prob = insn->op2;
+							if (!prob) {
+								prob = 100 / bb->successors_count;
+							}
+						} else if (insn->op == IR_CASE_VAL) {
+							prob = insn->op3;
+							if (!prob) {
+								prob = 100 / bb->successors_count;
+							}
+						} else if (insn->op == IR_ENTRY) {
+							if ((ctx->flags & IR_MERGE_EMPTY_ENTRIES) && (successor_bb->flags & IR_BB_EMPTY)) {
+								prob = 99; /* prefer empty ENTRY block to go first */
+							} else {
+								prob = 1;
+							}
+						} else {
+							prob = 100 / bb->successors_count;
+						}
+						if (!best_successor_bb
+						 || successor_bb->loop_depth > best_successor_bb->loop_depth
+						 || prob > best_successor_prob) {
+							best_successor = successor;
+							best_successor_bb = successor_bb;
+							best_successor_prob = prob;
+						}
 					}
 				}
 			}
@@ -970,7 +964,7 @@ int ir_schedule_blocks(ir_ctx *ctx)
 				/* Try to continue trace using the other successor of the last IF */
 				if ((bb->flags & IR_BB_EMPTY) && last_non_empty) {
 					bb = &ctx->cfg_blocks[last_non_empty];
-					if (bb->successors_count == 2) {
+					if (bb->successors_count == 2 && ctx->ir_base[bb->end].op == IR_IF) {
 						b = ctx->cfg_edges[bb->successors];
 
 						if (!ir_bitqueue_in(&blocks, b)) {

@@ -377,12 +377,12 @@ int ir_disasm(const char    *name,
 	ir_hashtab_init(&labels, 32);
 
 	if (ctx) {
-		ir_ref entry;
-
-		entry = ctx->ir_base[1].op2;
-		while (entry != IR_UNUSED) {
-			ir_hashtab_add(&labels, ctx->ir_base[entry].op3, ctx->ir_base[entry].op1);
-			entry = ctx->ir_base[entry].op2;
+		if (ctx->entries_count) {
+			int i = ctx->entries_count;
+			do {
+				ir_insn *insn = &ctx->ir_base[ctx->entries[--i]];
+				ir_hashtab_add(&labels, insn->op3, insn->op2);
+			} while (i != 0);
 		}
 
 		rodata_offset = ctx->rodata_offset;

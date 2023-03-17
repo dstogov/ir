@@ -163,7 +163,7 @@ void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 #define ir_op_flag_c1X2    (ir_op_flag_c | 1 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_c3      (ir_op_flag_c | 3 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_S       (IR_OP_FLAG_CONTROL|IR_OP_FLAG_BB_START)
-#define ir_op_flag_S0X2    (ir_op_flag_S | 0 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_S0X1    (ir_op_flag_S | 0 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_S1      (ir_op_flag_S | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_S1X1    (ir_op_flag_S | 1 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_S2      (ir_op_flag_S | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
@@ -200,7 +200,6 @@ void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 #define ir_op_kind_reg     IR_OPND_CONTROL_DEP
 #define ir_op_kind_beg     IR_OPND_CONTROL_REF
 #define ir_op_kind_ret     IR_OPND_CONTROL_REF
-#define ir_op_kind_ent     IR_OPND_CONTROL_REF
 #define ir_op_kind_str     IR_OPND_STR
 #define ir_op_kind_num     IR_OPND_NUM
 #define ir_op_kind_fld     IR_OPND_STR
@@ -324,6 +323,8 @@ void ir_init(ir_ctx *ctx, ir_ref consts_limit, ir_ref insns_limit)
 	ctx->prev_ref = NULL;
 	ctx->data = NULL;
 	ctx->snapshot_create = NULL;
+	ctx->entries_count = 0;
+	ctx->entries = NULL;
 
 	ctx->code_buffer = NULL;
 	ctx->code_buffer_size = 0;
@@ -385,6 +386,9 @@ void ir_free(ir_ctx *ctx)
 	}
 	if (ctx->prev_ref) {
 		ir_mem_free(ctx->prev_ref);
+	}
+	if (ctx->entries) {
+		ir_mem_free(ctx->entries);
 	}
 }
 
@@ -1506,11 +1510,14 @@ void _ir_START(ir_ctx *ctx)
 	ctx->control = ir_emit0(ctx, IR_START);
 }
 
-void _ir_ENTRY(ir_ctx *ctx, ir_ref num)
+void _ir_ENTRY(ir_ctx *ctx, ir_ref src, ir_ref num)
 {
 	IR_ASSERT(!ctx->control);
-	ctx->control = ir_emit2(ctx, IR_ENTRY, num, ctx->ir_base[1].op2);
-	ctx->ir_base[1].op2 = ctx->control;
+	/* fake control edge */
+	IR_ASSERT((ir_op_flags[ctx->ir_base[src].op] & IR_OP_FLAG_TERMINATOR)
+		|| ctx->ir_base[src].op == IR_END
+		|| ctx->ir_base[src].op == IR_LOOP_END); /* return from a recursive call */
+	ctx->control = ir_emit2(ctx, IR_ENTRY, src, num);
 }
 
 void _ir_BEGIN(ir_ctx *ctx, ir_ref src)

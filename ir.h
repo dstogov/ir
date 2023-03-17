@@ -167,7 +167,6 @@ typedef enum _ir_type {
  * reg - data-control dependency on region (PHI, VAR, PARAM)
  * beg - reference to a LOOP_BEGIN region (LOOP_END)
  * ret - reference to a previous RETURN instruction (RETURN)
- * ent - reference to a previous ENTRY instruction (ENTRY)
  * str - string: variable/argument name (VAR, PARAM, CALL, TAILCALL)
  * num - number: argument number (PARAM)
  * prb - branch probability 1-99 (0 - unspecified): (IF_TRUE, IF_FALSE, CASE_VAL, CASE_DEFAULT)
@@ -295,8 +294,8 @@ typedef enum _ir_type {
 	_(SNAPSHOT,     xN,   src, def, def) /* SNAPSHOT(src, args...)      */ \
 	\
 	/* control-flow nodes                                               */ \
-	_(START,        S0X2, ret, ent, ___) /* function start              */ \
-	_(ENTRY,        S0X2, num, ent, ___) /* code entry (op3 keeps addr) */ \
+	_(START,        S0X1, ret, ___, ___) /* function start              */ \
+	_(ENTRY,        S1X1, src, num, ___) /* entry with a fake src edge  */ \
 	_(BEGIN,        S1,   src, ___, ___) /* block start                 */ \
 	_(IF_TRUE,      S1X1, src, prb, ___) /* IF TRUE proj.               */ \
 	_(IF_FALSE,     S1X1, src, prb, ___) /* IF FALSE proj.              */ \
@@ -541,6 +540,8 @@ struct _ir_ctx {
 	ir_snapshot_create_t   snapshot_create;
 	uint32_t           rodata_offset;
 	uint32_t           jmp_table_offset;
+	uint32_t           entries_count;
+	ir_ref            *entries;
 	void              *code_buffer;
 	size_t             code_buffer_size;
 	ir_strtab          strtab;

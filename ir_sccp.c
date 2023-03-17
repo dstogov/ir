@@ -210,7 +210,7 @@ static void ir_sccp_make_nop(ir_ctx *ctx, ir_ref ref)
 
 	insn = &ctx->ir_base[ref];
 	n = ir_input_edges_count(ctx, insn);
-	insn->optx = IR_NOP;
+	insn->opt = IR_NOP; /* keep "inputs_count" */
 	for (j = 1, p = insn->ops + j; j <= n; j++, p++) {
 		*p = IR_UNUSED;
 	}
@@ -525,11 +525,6 @@ int ir_sccp(ir_ctx *ctx)
 	ir_bitqueue_init(&worklist, ctx->insns_count);
 	worklist.pos = 0;
 	ir_bitset_incl(worklist.set, 1);
-	i = ctx->ir_base[1].op2;
-	while (i) {
-		ir_bitset_incl(worklist.set, i);
-		i = ctx->ir_base[i].op2;
-	}
 	while ((i = ir_bitqueue_pop(&worklist)) >= 0) {
 		insn = &ctx->ir_base[i];
 		flags = ir_op_flags[insn->op];
@@ -625,7 +620,7 @@ int ir_sccp(ir_ctx *ctx)
 					continue;
 				}
 			} else {
-				IR_ASSERT(insn->op == IR_START || insn->op == IR_ENTRY || IR_IS_FEASIBLE(insn->op1));
+				IR_ASSERT(insn->op == IR_START || IR_IS_FEASIBLE(insn->op1));
 				IR_MAKE_BOTTOM(i);
 			}
 		} else {

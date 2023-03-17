@@ -499,7 +499,7 @@
 #define ir_TRAP()                         do {_ir_CTX->control = ir_emit1(_ir_CTX, IR_TRAP, _ir_CTX->control);} while (0)
 
 #define ir_START()                        _ir_START(_ir_CTX)
-#define ir_ENTRY(_num)                    _ir_ENTRY(_ir_CTX, (_num))
+#define ir_ENTRY(_src, _num)              _ir_ENTRY(_ir_CTX, (_src), (_num))
 #define ir_BEGIN(_src)                    _ir_BEGIN(_ir_CTX, (_src))
 #define ir_IF(_condition)                 _ir_IF(_ir_CTX, (_condition))
 #define ir_IF_TRUE(_if)                   _ir_IF_TRUE(_ir_CTX, (_if))
@@ -561,7 +561,7 @@ void   _ir_RSTORE(ir_ctx *ctx, ir_ref reg, ir_ref val);
 ir_ref _ir_LOAD(ir_ctx *ctx, ir_type type, ir_ref addr);
 void   _ir_STORE(ir_ctx *ctx, ir_ref addr, ir_ref val);
 void   _ir_START(ir_ctx *ctx);
-void   _ir_ENTRY(ir_ctx *ctx, ir_ref num);
+void   _ir_ENTRY(ir_ctx *ctx, ir_ref src, ir_ref num);
 void   _ir_BEGIN(ir_ctx *ctx, ir_ref src);
 ir_ref _ir_END(ir_ctx *ctx);
 ir_ref _ir_END_LIST(ir_ctx *ctx, ir_ref list);

@@ -283,12 +283,15 @@ bool ir_check(ir_ctx *ctx)
 						}
 						break;
 					case IR_UNREACHABLE:
-					case IR_IJMP:
 					case IR_RETURN:
 						if (use_list->count == 1) {
-							/* UNREACHABLE, IJMP and RETURN may be used in MERGE with the following ENTRY */
-							break;
+							/* UNREACHABLE and RETURN may be linked with the following ENTRY by a fake edge */
+							if (ctx->ir_base[ctx->use_edges[use_list->refs]].op == IR_ENTRY) {
+								break;
+							}
 						}
+						IR_FALLTHROUGH;
+					case IR_IJMP:
 						if (use_list->count != 0) {
 							fprintf(stderr, "ir_base[%d].op (%s) must not have successors (%d)\n",
 								i, ir_op_name[insn->op], use_list->count);
@@ -308,6 +311,18 @@ bool ir_check(ir_ctx *ctx)
 							if (insn->op == IR_CALL && count == 2) {
 								/* result of CALL may be used as data in control instruction */
 								break;
+							}
+							if ((insn->op == IR_LOOP_END || insn->op == IR_END) && count == 2) {
+								/* LOOP_END/END may be linked with the following ENTRY by a fake edge */
+								if (ctx->ir_base[ctx->use_edges[use_list->refs]].op == IR_ENTRY) {
+									count--;
+								}
+								if (ctx->ir_base[ctx->use_edges[use_list->refs + 1]].op == IR_ENTRY) {
+									count--;
+								}
+								if (count == 1) {
+									break;
+								}
 							}
 							fprintf(stderr, "ir_base[%d].op (%s) must have 1 succesor (%d)\n",
 								i, ir_op_name[insn->op], count);
