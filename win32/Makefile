@@ -17,7 +17,8 @@ VCPKG_DIR=win32\vcpkg
 !endif
 PATH=$(PATH);$(VCPKG_DIR)\installed\$(VCPKG_TRIPLET)\bin
 
-CFLAGS=/nologo /utf-8 /W3 /EHsc /Zi /I$(BUILD_DIR) /I$(VCPKG_DIR)\installed\$(VCPKG_TRIPLET)\include
+CFLAGS=/nologo /utf-8 /W3 /EHsc /Zi /I$(SRC_DIR) /I$(BUILD_DIR) /I$(VCPKG_DIR)\installed\$(VCPKG_TRIPLET)\include
+CXXFLAGS=/I$(SRC_DIR)\c++\include
 LDFLAGS=/nologo
 !if "$(BUILD)" == "release"
 CFLAGS=$(CFLAGS) /MT /Ox
@@ -68,8 +69,10 @@ OBJS_COMMON=$(BUILD_DIR)\ir.obj $(BUILD_DIR)\ir_strtab.obj $(BUILD_DIR)\ir_cfg.o
 	$(BUILD_DIR)\ir_disasm.obj $(BUILD_DIR)\ir_check.obj
 OBJS_IR = $(BUILD_DIR)\ir_main.obj
 OBJS_IR_TEST = $(BUILD_DIR)\ir_test.obj
+OBJS_IR_TEST2 = $(BUILD_DIR)\c++\ir_test2.obj
+OBJS_IR_TEST3 = $(BUILD_DIR)\c++\ir_test3.obj
 
-all: $(BUILD_DIR) $(BUILD_DIR)\ir.exe $(BUILD_DIR)\ir_test.exe
+all: $(BUILD_DIR) $(BUILD_DIR)\ir.exe $(BUILD_DIR)\ir_test.exe $(BUILD_DIR)\ir_test2.exe $(BUILD_DIR)\ir_test3.exe
 
 #$(BUILD_DIR)\ir.exe: builddir capstone $(BUILD_DIR)\ir_emit_$(DASM_ARCH).h $(BUILD_DIR)\ir_fold_hash.h $(OBJS_IR) $(OBJS_COMMON)
 $(BUILD_DIR)\ir.exe: $(OBJS_IR) $(OBJS_COMMON)
@@ -78,6 +81,11 @@ $(BUILD_DIR)\ir.exe: $(OBJS_IR) $(OBJS_COMMON)
 #$(BUILD_DIR)\ir_test.exe: builddir capstone $(BUILD_DIR)\ir_emit_$(DASM_ARCH).h $(BUILD_DIR)\ir_fold_hash.h $(OBJS_IR_TEST) $(OBJS_COMMON)
 $(BUILD_DIR)\ir_test.exe: $(OBJS_IR_TEST) $(OBJS_COMMON) $(LIBCAPSTONE)
 	"$(LD)" $(LDFLAGS) $(OBJS_COMMON) $(OBJS_IR_TEST) $(LIBS) /out:$@
+
+$(BUILD_DIR)\ir_test2.exe: $(OBJS_IR_TEST2) $(OBJS_COMMON)
+	"$(LD)" $(LDFLAGS) $(OBJS_COMMON) $(OBJS_IR_TEST2) $(LIBS) /out:$@
+$(BUILD_DIR)\ir_test3.exe: $(OBJS_IR_TEST3) $(OBJS_COMMON)
+	"$(LD)" $(LDFLAGS) $(OBJS_COMMON) $(OBJS_IR_TEST3) $(LIBS) /out:$@
 
 $(BUILD_DIR)\ir_fold_hash.h: $(BUILD_DIR)\gen_ir_fold_hash.exe $(SRC_DIR)\ir_fold.h $(SRC_DIR)\ir.h
 	$(BUILD_DIR)\gen_ir_fold_hash.exe < $(SRC_DIR)\ir_fold.h > $(BUILD_DIR)\ir_fold_hash.h
@@ -101,6 +109,9 @@ $(BUILD_DIR)\ir_disasm.obj: $(VCPKG_CAPSTONE)
 {$(SRC_DIR)}.c{$(BUILD_DIR)}.obj:
 	"$(CC)" $(CFLAGS) /Fo$@ /c $<
 
+{$(SRC_DIR)\c++}.cxx{$(BUILD_DIR)\c++}.obj:
+	"$(CXX)" $(CFLAGS) $(CXXFLAGS) /Fo$@ /c $<
+
 # If the vcpkg dir exists, lets assume we're good with the deps.
 $(VCPKG_DIR)\vcpkg.exe:
 	git clone https://github.com/Microsoft/vcpkg.git "$(VCPKG_DIR)"
@@ -111,6 +122,7 @@ $(VCPKG_CAPSTONE): $(VCPKG_DIR)\vcpkg.exe
 
 $(BUILD_DIR):
 	md "$(BUILD_DIR)"
+	md "$(BUILD_DIR)\c++"
 
 $(BUILD_DIR)\ir-test.exe: $(SRC_DIR)/ir-test.cxx
 	"$(CXX)" /std:c++17 $(SRC_DIR)\ir-test.cxx /Fe:$@

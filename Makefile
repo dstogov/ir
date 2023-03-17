@@ -7,8 +7,9 @@ SRC_DIR    = .
 
 CC         = gcc
 CXX        = g++
+CXXFLAGS   = -I$(SRC_DIR)/c++/include -Wno-reorder
 BUILD_CC   = gcc
-CFLAGS     = -Wall -Wextra -Wno-unused-parameter
+CFLAGS     = -Wall -Wextra -Wno-unused-parameter -I$(SRC_DIR)
 LDFLAGS    = -lm
 PHP        = php
 LLK        = llk
@@ -44,17 +45,26 @@ OBJS_COMMON = $(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_strtab.o $(BUILD_DIR)/ir_cfg.o \
 	$(BUILD_DIR)/ir_disasm.o $(BUILD_DIR)/ir_gdb.o $(BUILD_DIR)/ir_perf.o $(BUILD_DIR)/ir_check.o
 OBJS_IR = $(BUILD_DIR)/ir_main.o
 OBJS_IR_TEST = $(BUILD_DIR)/ir_test.o
+OBJS_IR_TEST2 = $(BUILD_DIR)/c++/ir_test2.o
+OBJS_IR_TEST3 = $(BUILD_DIR)/c++/ir_test3.o
 
-all: $(BUILD_DIR) $(BUILD_DIR)/ir $(BUILD_DIR)/ir_test
+all: $(BUILD_DIR) $(BUILD_DIR)/ir $(BUILD_DIR)/ir_test $(BUILD_DIR)/ir_test2 $(BUILD_DIR)/ir_test3
 
 $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
+	@mkdir -p $(BUILD_DIR)/c++
 
 $(BUILD_DIR)/ir: $(OBJS_COMMON) $(OBJS_IR)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lcapstone
 
 $(BUILD_DIR)/ir_test: $(OBJS_COMMON) $(OBJS_IR_TEST)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lcapstone
+
+$(BUILD_DIR)/ir_test2: $(OBJS_COMMON) $(OBJS_IR_TEST2)
+	$(CXX) $(CFLAGS) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) -lcapstone
+$(BUILD_DIR)/ir_test3: $(OBJS_COMMON) $(OBJS_IR_TEST3)
+	$(CXX) $(CFLAGS) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) -lcapstone
+
 
 $(OBJS_COMMON): $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h
 
@@ -83,6 +93,11 @@ $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h: $(SRC_DIR)/ir_$(DASM_ARCH).dasc $(SRC_DIR)/
 $(OBJS_COMMON) $(OBJS_IR) $(OBJS_IR_TEST): $(BUILD_DIR)/$(notdir %.o): $(SRC_DIR)/$(notdir %.c)
 	$(CC) $(CFLAGS) -I$(BUILD_DIR) -o $@ -c $<
 
+$(OBJS_IR_TEST2): $(BUILD_DIR)/c++/$(notdir %.o): $(SRC_DIR)/c++/$(notdir %.cxx)
+	$(CXX) $(CFLAGS) $(CXXFLAGS) -I$(BUILD_DIR) -o $@ -c $<
+$(OBJS_IR_TEST3): $(BUILD_DIR)/c++/$(notdir %.o): $(SRC_DIR)/c++/$(notdir %.cxx)
+	$(CXX) $(CFLAGS) $(CXXFLAGS) -I$(BUILD_DIR) -o $@ -c $<
+
 $(BUILD_DIR)/ir-test: $(SRC_DIR)/ir-test.cxx
 	$(CXX) -O3 -std=c++17 $(SRC_DIR)/ir-test.cxx -o $(BUILD_DIR)/ir-test
 
@@ -100,7 +115,8 @@ clean:
 	$(BUILD_DIR)/minilua $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h \
 	$(BUILD_DIR)/ir_fold_hash.h $(BUILD_DIR)/gen_ir_fold_hash \
 	$(BUILD_DIR)/ir.dot $(BUILD_DIR)/ir.pdf $(BUILD_DIR)/test.log \
-	$(BUILD_DIR)/ir-test
+	$(BUILD_DIR)/ir-test $(BUILD_DIR)/ir_test2 $(BUILD_DIR)/ir_test3 \
+	$(BUILD_DIR)/c++/*.o
 	find $(SRC_DIR)/tests -type f -name '*.diff' -delete
 	find $(SRC_DIR)/tests -type f -name '*.out' -delete
 	find $(SRC_DIR)/tests -type f -name '*.exp' -delete

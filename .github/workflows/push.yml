@@ -25,7 +25,7 @@ jobs:
             libcapstone4 \
             make
       - name: make
-        run: make TARGET=x86_64 all
+        run: make CXX=g++-12 TARGET=x86_64 all
       - name: test
         run: make CXX=g++-12 TARGET=x86_64 test-ci
   Linux_i386:
@@ -42,6 +42,7 @@ jobs:
           DEBIAN_FRONTEND=noninteractive apt install -y \
             gcc g++-12 \
             gcc-multilib \
+            g++-12-multilib \
             libc6:i386 \
             make \
             wget
@@ -56,7 +57,7 @@ jobs:
           cd ..
           rm -rf capstone-4.0.2 capstone.tar.gz
       - name: make
-        run: make TARGET=x86 all
+        run: make CXX=g++-12 TARGET=x86 all
       - name: test
         run: make CXX=g++-12 TARGET=x86 test-ci
   Linux_aarch64:
@@ -80,7 +81,7 @@ jobs:
               libcapstone4 \
               make
           run: |
-            make CC=gcc TARGET=aarch64 all
+            make CC=gcc CXX=g++-12 TARGET=aarch64 all
             # FIXME: For some reason some of the object files are rebuilt
             make CC=gcc CXX=g++-12 TARGET=aarch64 test-ci
 
