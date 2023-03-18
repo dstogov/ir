@@ -88,9 +88,9 @@ void run(mandelbrot_t mandelbrot)
 
 int main(int argc, char **argv)
 {
-    ir_ctx ctx;
-    FILE *f;
-    int i;
+	ir_ctx ctx;
+	FILE *f;
+	int i;
 	int opt_level = 2;
 	uint32_t mflags = 0;
 	uint64_t debug_regset = 0xffffffffffffffff;
@@ -134,7 +134,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-    ir_init(&ctx, 256, 1024);
+	ir_init(&ctx, 256, 1024);
 	ctx.flags |= IR_FUNCTION;
 	ctx.flags |= mflags;
 	if (opt_level > 0) {
