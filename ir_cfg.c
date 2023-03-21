@@ -866,18 +866,7 @@ int ir_schedule_blocks(ir_ctx *ctx)
 	blocks.pos = 0;
 	list = ir_mem_malloc(sizeof(uint32_t) * (ctx->cfg_blocks_count + 1) * 2);
 	map = list + (ctx->cfg_blocks_count + 1);
-	for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
-		if (ctx->prev_ref[bb->end] == bb->start
-		 && bb->successors_count == 1
-		 && (ctx->ir_base[bb->end].op == IR_END || ctx->ir_base[bb->end].op == IR_LOOP_END)
-		 && !(bb->flags & IR_BB_DESSA_MOVES)) {
-			bb->flags |= IR_BB_EMPTY;
-			if ((ctx->flags & IR_MERGE_EMPTY_ENTRIES) && (bb->flags & IR_BB_ENTRY)) {
-				if (ctx->cfg_edges[bb->successors] == b + 1) {
-					(bb + 1)->flags |= IR_BB_PREV_EMPTY_ENTRY;
-				}
-			}
-		}
+	for (b = 1; b <= ctx->cfg_blocks_count; b++) {
 		ir_bitset_incl(blocks.set, b);
 	}
 
@@ -1012,6 +1001,22 @@ int ir_schedule_blocks(ir_ctx *ctx)
 		}
 		ir_mem_free(ctx->cfg_blocks);
 		ctx->cfg_blocks = cfg_blocks;
+
+		if (ctx->osr_entry_loads) {
+			ir_list *list = (ir_list*)ctx->osr_entry_loads;
+			uint32_t pos = 0, count;
+
+			while (1) {
+				b = ir_list_at(list, pos);
+				if (b == 0) {
+					break;
+				}
+				ir_list_set(list, pos, map[b]);
+				pos++;
+				count = ir_list_at(list, pos);
+				pos += count + 1;
+			}
+		}
 	}
 
 	ir_mem_free(list);
@@ -1028,10 +1033,7 @@ uint32_t ir_skip_empty_target_blocks(ir_ctx *ctx, uint32_t b)
 	while (1) {
 		bb = &ctx->cfg_blocks[b];
 
-		if (ctx->prev_ref[bb->end] == bb->start
-		 && bb->successors_count == 1
-		 && (ctx->ir_base[bb->end].op == IR_END || ctx->ir_base[bb->end].op == IR_LOOP_END)
-		 && !(bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_DESSA_MOVES))) {
+		if ((bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
 			b = ctx->cfg_edges[bb->successors];
 		} else {
 			break;
@@ -1051,10 +1053,7 @@ uint32_t ir_skip_empty_next_blocks(ir_ctx *ctx, uint32_t b)
 
 		bb = &ctx->cfg_blocks[b];
 
-		if (ctx->prev_ref[bb->end] == bb->start
-		 && bb->successors_count == 1
-		 && (ctx->ir_base[bb->end].op == IR_END || ctx->ir_base[bb->end].op == IR_LOOP_END)
-		 && !(bb->flags & (IR_BB_START|/*IR_BB_ENTRY|*/IR_BB_DESSA_MOVES))) {
+		if ((bb->flags & (IR_BB_START|IR_BB_EMPTY)) == IR_BB_EMPTY) {
 			b++;
 		} else {
 			break;

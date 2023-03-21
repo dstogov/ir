@@ -325,6 +325,7 @@ void ir_init(ir_ctx *ctx, ir_ref consts_limit, ir_ref insns_limit)
 	ctx->snapshot_create = NULL;
 	ctx->entries_count = 0;
 	ctx->entries = NULL;
+	ctx->osr_entry_loads = NULL;
 
 	ctx->code_buffer = NULL;
 	ctx->code_buffer_size = 0;
@@ -389,6 +390,10 @@ void ir_free(ir_ctx *ctx)
 	}
 	if (ctx->entries) {
 		ir_mem_free(ctx->entries);
+	}
+	if (ctx->osr_entry_loads) {
+		ir_list_free((ir_list*)ctx->osr_entry_loads);
+		ir_mem_free(ctx->osr_entry_loads);
 	}
 }
 

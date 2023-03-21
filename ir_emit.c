@@ -311,6 +311,10 @@ static void *ir_jmp_addr(ir_ctx *ctx, ir_insn *insn, ir_insn *addr_insn)
 # pragma GCC diagnostic pop
 #endif
 
+
+/* Forward Declarations */
+static void ir_emit_osr_entry_loads(ir_ctx *ctx, int b, ir_block *bb);
+
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 # include "ir_emit_x86.h"
 #elif defined(IR_TARGET_AARCH64)
@@ -319,31 +323,107 @@ static void *ir_jmp_addr(ir_ctx *ctx, ir_insn *insn, ir_insn *addr_insn)
 # error "Unknown IR target"
 #endif
 
+static IR_NEVER_INLINE void ir_emit_osr_entry_loads(ir_ctx *ctx, int b, ir_block *bb)
+{
+	ir_list *list = (ir_list*)ctx->osr_entry_loads;
+	int pos = 0, count, i;
+	ir_ref ref;
+
+	IR_ASSERT(ctx->binding);
+	IR_ASSERT(list);
+	while (1) {
+		i = ir_list_at(list, pos);
+		if (b == i) {
+			break;
+		}
+		IR_ASSERT(i != 0); /* end marker */
+		pos++;
+		count = ir_list_at(list, pos);
+		pos += count + 1;
+	}
+	pos++;
+	count = ir_list_at(list, pos);
+	pos++;
+
+	for (i = 0; i < count; i++, pos++) {
+		ref = ir_list_at(list, pos);
+		IR_ASSERT(ref >= 0 && ctx->vregs[ref] && ctx->live_intervals[ctx->vregs[ref]]);
+		if (ctx->live_intervals[ctx->vregs[ref]]->stack_spill_pos == -1) {
+			/* not spilled */
+			ir_reg reg = ctx->live_intervals[ctx->vregs[ref]]->reg;
+			ir_type type = ctx->ir_base[ref].type;
+			int32_t offset = -ir_binding_find(ctx, ref);
+
+			IR_ASSERT(offset > 0);
+			if (IR_IS_TYPE_INT(type)) {
+				ir_emit_load_mem_int(ctx, type, reg, ctx->spill_base, offset);
+			} else {
+				ir_emit_load_mem_fp(ctx, type, reg, ctx->spill_base, offset);
+			}
+		}
+	}
+}
+
 int ir_match(ir_ctx *ctx)
 {
 	uint32_t b;
-	ir_ref i;
+	ir_ref start, ref, *prev_ref;
 	ir_block *bb;
-
-	if (!ctx->prev_ref) {
-		ir_build_prev_refs(ctx);
-	}
+	ir_insn *insn;
 
 	ctx->rules = ir_mem_calloc(ctx->insns_count, sizeof(uint32_t));
+
+	prev_ref = ctx->prev_ref;
+	if (!prev_ref) {
+		ir_build_prev_refs(ctx);
+		prev_ref = ctx->prev_ref;
+	}
+
 	for (b = ctx->cfg_blocks_count, bb = ctx->cfg_blocks + b; b > 0; b--, bb--) {
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
+		start = bb->start;
 		if (bb->flags & IR_BB_ENTRY) {
-			ir_insn *insn = &ctx->ir_base[bb->start];
+			insn = &ctx->ir_base[start];
 			IR_ASSERT(insn->op == IR_ENTRY);
 			insn->op3 = ctx->entries_count++;
 		}
-		for (i = bb->end; i > bb->start; i = ctx->prev_ref[i]) {
-			if (!ctx->rules[i]) {
-				ctx->rules[i] = ir_match_insn(ctx, i, bb);
+		ctx->rules[start] = IR_SKIP;
+		ref = bb->end;
+		insn = &ctx->ir_base[ref];
+		if (insn->op == IR_END || insn->op == IR_LOOP_END) {
+			ctx->rules[ref] = insn->op;
+			ref = prev_ref[ref];
+			if (ref == bb->start && bb->successors_count == 1) {
+				if (EXPECTED(!(bb->flags & IR_BB_ENTRY))) {
+					bb->flags |= IR_BB_EMPTY;
+				} else if (ctx->flags & IR_MERGE_EMPTY_ENTRIES) {
+					bb->flags |= IR_BB_EMPTY;
+					if (ctx->cfg_edges[bb->successors] == b + 1) {
+						(bb + 1)->flags |= IR_BB_PREV_EMPTY_ENTRY;
+					}
+				}
+				continue;
 			}
-			ir_match_insn2(ctx, i, bb);
 		}
-		ctx->rules[i] = IR_SKIP;
+		while (ref > start) {
+			if (!ctx->rules[ref]) {
+				ctx->rules[ref] = ir_match_insn(ctx, ref, bb);
+			}
+			ir_match_insn2(ctx, ref, bb);
+			ref = prev_ref[ref];
+		}
+	}
+
+	if (ctx->entries_count) {
+		ctx->entries = ir_mem_malloc(ctx->entries_count * sizeof(ir_ref));
+
+		for (b = ctx->cfg_blocks_count, bb = ctx->cfg_blocks + b; b > 0; b--, bb--) {
+			if (bb->flags & IR_BB_ENTRY) {
+				ir_ref i = bb->start;
+				ir_insn *insn = ctx->ir_base + i;
+				ctx->entries[insn->op3] = b;
+			}
+		}
 	}
 
 	return 1;

@@ -542,6 +542,7 @@ struct _ir_ctx {
 	uint32_t           jmp_table_offset;
 	uint32_t           entries_count;
 	ir_ref            *entries;
+	void              *osr_entry_loads;
 	void              *code_buffer;
 	size_t             code_buffer_size;
 	ir_strtab          strtab;

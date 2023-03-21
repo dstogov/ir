@@ -587,6 +587,12 @@ IR_ALWAYS_INLINE ir_ref ir_list_at(ir_list *l, uint32_t i)
 	return ir_array_at(&l->a, i);
 }
 
+IR_ALWAYS_INLINE void ir_list_set(ir_list *l, uint32_t i, ir_ref val)
+{
+	IR_ASSERT(i < l->len);
+	ir_array_set_unchecked(&l->a, i, val);
+}
+
 /* Worklist (unique list) */
 typedef struct _ir_worklist {
 	ir_list l;
@@ -815,8 +821,8 @@ struct _ir_use_list {
 #define IR_BB_IRREDUCIBLE_LOOP (1<<4)
 #define IR_BB_DESSA_MOVES      (1<<5) /* translation out of SSA requires MOVEs */
 #define IR_BB_EMPTY            (1<<6)
-#define IR_BB_SKIP             (1<<7) /* skip during code generation           */
-#define IR_BB_PREV_EMPTY_ENTRY (1<<8)
+#define IR_BB_PREV_EMPTY_ENTRY (1<<7)
+#define IR_BB_OSR_ENTRY_LOADS  (1<<8) /* OSR Entry-point with register LOADs   */
 
 struct _ir_block {
 	uint32_t flags;

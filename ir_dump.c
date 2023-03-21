@@ -250,6 +250,30 @@ void ir_dump_cfg(ir_ctx *ctx, FILE *f)
 			if (bb->loop_depth != 0) {
 				fprintf(f, "\tloop_depth=%d\n", bb->loop_depth);
 			}
+			if (bb->flags & IR_BB_OSR_ENTRY_LOADS) {
+				ir_list *list = (ir_list*)ctx->osr_entry_loads;
+				uint32_t pos = 0, i, count;
+
+				IR_ASSERT(list);
+				while (1) {
+					i = ir_list_at(list, pos);
+					if (b == i) {
+						break;
+					}
+					IR_ASSERT(i != 0); /* end marker */
+					pos++;
+					count = ir_list_at(list, pos);
+					pos += count + 1;
+				}
+				pos++;
+				count = ir_list_at(list, pos);
+				pos++;
+
+				for (i = 0; i < count; i++, pos++) {
+					ir_ref ref = ir_list_at(list, pos);
+					fprintf(f, "\tOSR_ENTRY_LOAD=d_%d\n", ref);
+				}
+			}
 			if (bb->flags & IR_BB_DESSA_MOVES) {
 				ctx->data = f;
 				ir_gen_dessa_moves(ctx, b, ir_dump_dessa_move);
@@ -370,7 +394,7 @@ void ir_dump_live_ranges(ir_ctx *ctx, FILE *f)
 		}
 	}
 #if 1
-	n = ctx->vregs_count + ir_regs_number() + 1;
+	n = ctx->vregs_count + ir_regs_number() + 2;
 	for (i = ctx->vregs_count + 1; i <= n; i++) {
 		ir_live_interval *ival = ctx->live_intervals[i];
 

@@ -418,8 +418,13 @@ static const int8_t *_ir_fp_fc_reg_params = NULL;
 
 const char *ir_reg_name(int8_t reg, ir_type type)
 {
-	if (reg == IR_REG_NUM) {
-		return "SCRATCH";
+	if (reg >= IR_REG_NUM) {
+		if (reg == IR_REG_SCRATCH) {
+			return "SCRATCH";
+		} else {
+			IR_ASSERT(reg == IR_REG_ALL);
+			return "ALL";
+		}
 	}
 	IR_ASSERT(reg >= 0 && reg < IR_REG_NUM);
 	if (type == IR_VOID) {
@@ -794,7 +799,7 @@ cmp_fp:
 				def_reg = IR_REG_FP_RET1;
 #endif
 			}
-			constraints->tmp_regs[0] = IR_SCRATCH_REG(IR_REG_NUM, IR_USE_SUB_REF, IR_DEF_SUB_REF);
+			constraints->tmp_regs[0] = IR_SCRATCH_REG(IR_REG_SCRATCH, IR_USE_SUB_REF, IR_DEF_SUB_REF);
 			n = 1;
 			IR_FALLTHROUGH;
 		case IR_TAILCALL:
@@ -1590,14 +1595,12 @@ store_int:
 			return IR_RSTORE;
 		case IR_START:
 		case IR_BEGIN:
-//		case IR_END:
 		case IR_IF_TRUE:
 		case IR_IF_FALSE:
 		case IR_CASE_VAL:
 		case IR_CASE_DEFAULT:
 		case IR_MERGE:
 		case IR_LOOP_BEGIN:
-//		case IR_LOOP_END:
 		case IR_UNREACHABLE:
 			return IR_SKIP;
 		case IR_RETURN:
@@ -5709,7 +5712,7 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 					void *addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op2]);
 
 					|	.aword &addr
-					bb->flags |= IR_BB_SKIP;
+					bb->flags |= IR_BB_EMPTY;
 					continue;
 				}
 			}
@@ -7559,7 +7562,8 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 	ctx->regs = ir_mem_malloc(sizeof(ir_regs) * ctx->insns_count);
 	memset(ctx->regs, IR_REG_NONE, sizeof(ir_regs) * ctx->insns_count);
 
-	ctx->live_intervals = ir_mem_calloc(ctx->vregs_count + 1 + IR_REG_NUM + 1, sizeof(ir_live_interval*));
+	/* vregs + tmp + fixed + SRATCH + ALL */
+	ctx->live_intervals = ir_mem_calloc(ctx->vregs_count + 1 + IR_REG_NUM + 2, sizeof(ir_live_interval*));
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		for (i = bb->start, insn = ctx->ir_base + i, rule = ctx->rules + i; i <= bb->end;) {
@@ -7665,7 +7669,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 								ir_reg reg = ir_get_free_reg(constraints.tmp_regs[n].type, available);
 								IR_REGSET_EXCL(available, reg);
 								ctx->regs[i][constraints.tmp_regs[n].num] = reg;
-							} else if (constraints.tmp_regs[n].reg == IR_REG_NUM) {
+							} else if (constraints.tmp_regs[n].reg == IR_REG_SCRATCH) {
 								available = IR_REGSET_DIFFERENCE(available, IR_REGSET_SCRATCH);
 							} else {
 								IR_REGSET_EXCL(available, constraints.tmp_regs[n].reg);
@@ -7918,10 +7922,6 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		data.stack_frame_alignment = 0;
 	}
 
-	if (ctx->entries_count) {
-		ctx->entries = ir_mem_malloc(ctx->entries_count * sizeof(ir_ref));
-	}
-
 	Dst = &data.dasm_state;
 	data.dasm_state = NULL;
 	dasm_init(&data.dasm_state, DASM_MAXSECTION);
@@ -7947,12 +7947,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
-		if (bb->flags & IR_BB_SKIP) {
-			continue;
-		} else if (ctx->prev_ref[bb->end] == bb->start
-		 && bb->successors_count == 1
-		 && (ctx->ir_base[bb->end].op == IR_END || ctx->ir_base[bb->end].op == IR_LOOP_END)
-		 && !(bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_DESSA_MOVES))) {
+		if ((bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
 			continue;
 		}
 		|=>b:
@@ -8388,6 +8383,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					break;
 				case IR_END:
 				case IR_LOOP_END:
+					if (bb->flags & IR_BB_OSR_ENTRY_LOADS) {
+						ir_emit_osr_entry_loads(ctx, b, bb);
+					}
 					if (bb->flags & IR_BB_DESSA_MOVES) {
 						data.dessa_from_block = b;
 						ir_gen_dessa_moves(ctx, b, ir_emit_dessa_move);

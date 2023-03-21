@@ -93,6 +93,8 @@ enum _ir_reg {
 #define IR_REG_FP_FIRST IR_REG_V0
 #define IR_REG_GP_LAST  (IR_REG_FP_FIRST - 1)
 #define IR_REG_FP_LAST  (IR_REG_NUM - 1)
+#define IR_REG_SCRATCH  (IR_REG_NUM)        /* special name for regset */
+#define IR_REG_ALL      (IR_REG_NUM + 1)    /* special name for regset */
 
 #define IR_REGSET_64BIT 1
 

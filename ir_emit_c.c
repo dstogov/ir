@@ -712,6 +712,12 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 	vars = ir_bitset_malloc(ctx->vregs_count + 1);
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
+		if (ctx->prev_ref[bb->end] == bb->start
+		 && bb->successors_count == 1
+		 && (ctx->ir_base[bb->end].op == IR_END || ctx->ir_base[bb->end].op == IR_LOOP_END)
+		 && !(bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_DESSA_MOVES))) {
+			bb->flags |= IR_BB_EMPTY;
+		}
 		for (i = bb->start, insn = ctx->ir_base + i; i <= bb->end;) {
 			if (ctx->vregs[i]) {
 				if (!ir_bitset_in(vars, ctx->vregs[i])) {
@@ -750,10 +756,7 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
-		if (ctx->prev_ref[bb->end] == bb->start
-		 && bb->successors_count == 1
-		 && (ctx->ir_base[bb->end].op == IR_END || ctx->ir_base[bb->end].op == IR_LOOP_END)
-		 && !(bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_DESSA_MOVES))) {
+		if ((bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
 			continue;
 		}
 		if (bb->predecessors_count > 1 || (bb->predecessors_count == 1 && ctx->cfg_edges[bb->predecessors] != prev)) {
