@@ -111,7 +111,7 @@ void ir_save(ir_ctx *ctx, FILE *f)
 		} else {
 			fprintf(f, ");");
 		}
-		if (ctx->binding) {
+		if ((flags & IR_OP_FLAG_DATA) && ctx->binding) {
 			ir_ref var = ir_binding_find(ctx, i);
 			if (var) {
 				if (var >= 0) {
