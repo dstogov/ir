@@ -42,7 +42,7 @@ static void ir_gcm_schedule_early(ir_ctx *ctx, uint32_t *_blocks, ir_ref ref, ir
 		}
 	}
 	if (UNEXPECTED(reschedule_late)) {
-		/* Floating nodes that doesn't sepend on other nodes
+		/* Floating nodes that doesn't depend on other nodes
 		 * (e.g. only on constants), has to be scheduled to the
 		 * last common ancestor. Otherwise they always goes to the
 		 * first block.
