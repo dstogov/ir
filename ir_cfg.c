@@ -262,6 +262,7 @@ next_successor:
 			} else if (EXPECTED(insn->op1)) {
 				if (insn->op == IR_ENTRY) {
 					bb->flags |= IR_BB_ENTRY;
+					ctx->entries_count++;
 				}
 				bb->predecessors_count = 1;
 				edges_count++;

@@ -654,6 +654,7 @@ restart:
 	new_ctx.fixed_call_stack_size = ctx->fixed_call_stack_size;
 	new_ctx.fixed_regset = ctx->fixed_regset;
 	new_ctx.fixed_save_regset = ctx->fixed_save_regset;
+	new_ctx.entries_count = ctx->entries_count;
 
 	/* Copy constants */
 	if (consts_count == ctx->consts_count) {

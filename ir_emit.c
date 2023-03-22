@@ -370,6 +370,7 @@ int ir_match(ir_ctx *ctx)
 	ir_ref start, ref, *prev_ref;
 	ir_block *bb;
 	ir_insn *insn;
+	uint32_t entries_count = 0;
 
 	ctx->rules = ir_mem_calloc(ctx->insns_count, sizeof(uint32_t));
 
@@ -379,13 +380,20 @@ int ir_match(ir_ctx *ctx)
 		prev_ref = ctx->prev_ref;
 	}
 
+	if (ctx->entries_count) {
+		ctx->entries = ir_mem_malloc(ctx->entries_count * sizeof(ir_ref));
+	}
+
 	for (b = ctx->cfg_blocks_count, bb = ctx->cfg_blocks + b; b > 0; b--, bb--) {
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		start = bb->start;
 		if (bb->flags & IR_BB_ENTRY) {
+			IR_ASSERT(entries_count < ctx->entries_count);
 			insn = &ctx->ir_base[start];
 			IR_ASSERT(insn->op == IR_ENTRY);
-			insn->op3 = ctx->entries_count++;
+			insn->op3 = entries_count;
+			ctx->entries[entries_count] = b;
+			entries_count++;
 		}
 		ctx->rules[start] = IR_SKIP;
 		ref = bb->end;
@@ -415,14 +423,10 @@ int ir_match(ir_ctx *ctx)
 	}
 
 	if (ctx->entries_count) {
-		ctx->entries = ir_mem_malloc(ctx->entries_count * sizeof(ir_ref));
-
-		for (b = ctx->cfg_blocks_count, bb = ctx->cfg_blocks + b; b > 0; b--, bb--) {
-			if (bb->flags & IR_BB_ENTRY) {
-				ir_ref i = bb->start;
-				ir_insn *insn = ctx->ir_base + i;
-				ctx->entries[insn->op3] = b;
-			}
+		ctx->entries_count = entries_count;
+		if (!entries_count) {
+			ir_mem_free(ctx->entries);
+			ctx->entries = NULL;
 		}
 	}
 
