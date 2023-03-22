@@ -37,7 +37,7 @@ x86_64
 	int32_t d_22 = PHI(l_21, c_5, d_14);
 	l_23 = IF(l_21, d_3);
 	l_24 = IF_TRUE(l_23);
-	l_25 = LOOP_END(l_24, l_13);
+	l_25 = LOOP_END(l_24);
 	l_26 = IF_FALSE(l_23);
 	bool d_28 = EQ(d_22, c_4);
 	l_29 = IF(l_26, d_28);

@@ -46,7 +46,7 @@ void gen_mandelbrot(ir_ctx *ctx)
 				ir_IF_TRUE(if_2);
 					ir_RETURN(ir_CONST_I32(0));
 				ir_IF_FALSE(if_2);
-					ir_ref loop_end = ir_LOOP_END(loop);
+					ir_ref loop_end = ir_LOOP_END();
 
 	/* close loop */
 	ir_MERGE_SET_OP(loop, 2, loop_end);

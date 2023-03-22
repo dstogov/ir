@@ -30,7 +30,7 @@ Windows-x86_64
 	int32_t x_3 = PHI(ll_8, x_2, x_1);
 	ll_10 = IF(ll_8, cond);
 	ll_11 = IF_TRUE(ll_10);
-	ll_12 = LOOP_END(ll_11, ll_3);
+	ll_12 = LOOP_END(ll_11);
 	ll_13 = IF_FALSE(ll_10);
 	int32_t xx = MUL(x_3, i_2);
 	int32_t yy = MUL(xx, ret);

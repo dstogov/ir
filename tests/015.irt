@@ -50,7 +50,7 @@
 	int32_t d_39 = ADD(d_38, c_4);
 	l_40 = IF(l_31, d_11);
 	l_41 = IF_TRUE(l_40);
-	l_42 = LOOP_END(l_41, l_13);
+	l_42 = LOOP_END(l_41);
 	l_43 = IF_FALSE(l_40);
 	int32_t d_44 = ADD(d_32, d_3);
 	int32_t d_45 = ADD(d_44, d_4);
@@ -104,7 +104,7 @@
 	int32_t d_33 = PHI(l_28, d_20, d_26);
 	l_34 = IF(l_28, d_11);
 	l_35 = IF_TRUE(l_34);
-	l_36 = LOOP_END(l_35, l_15);
+	l_36 = LOOP_END(l_35);
 	l_37 = IF_FALSE(l_34);
 	int32_t d_38 = MUL(d_29, d_3);
 	int32_t d_39 = ADD(d_38, c_4);

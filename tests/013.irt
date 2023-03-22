@@ -39,7 +39,7 @@
 	int32_t d_28 = PHI(l_27, d_23, d_9);
 	l_29 = IF(l_27, d_2);
 	l_30 = IF_TRUE(l_29);
-	l_31 = LOOP_END(l_30, l_7);
+	l_31 = LOOP_END(l_30);
 	l_32 = IF_FALSE(l_29);
 	l_33 = RETURN(l_32, d_19);
 }
@@ -76,7 +76,7 @@
 	NOP;
 	l_25 = IF(l_5, d_2);
 	l_26 = IF_TRUE(l_25);
-	l_27 = LOOP_END(l_26, l_5);
+	l_27 = LOOP_END(l_26);
 	l_28 = IF_FALSE(l_25);
 	l_29 = RETURN(l_28, c_4);
 }

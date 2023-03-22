@@ -24,7 +24,7 @@ aarch64
 	int32_t hi_3 = ADD(hi_2, lo_2);
 	int32_t lo_3 = SUB(hi_3, lo_2);
 	l_8 = CALL/2(l_7, f, format, lo_3);
-	l_9 = LOOP_END(l_8, l_3);
+	l_9 = LOOP_END(l_8);
 	l_5 = IF_FALSE(l_4);
 	l_6 = RETURN(l_5, c_0);
 }

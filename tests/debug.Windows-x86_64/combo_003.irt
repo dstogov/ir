@@ -41,7 +41,7 @@ Windows-x86_64
 	int32_t d_28 = PHI(l_27, d_23, d_9);
 	l_29 = IF(l_27, d_2);
 	l_30 = IF_TRUE(l_29);
-	l_31 = LOOP_END(l_30, l_7);
+	l_31 = LOOP_END(l_30);
 	l_32 = IF_FALSE(l_29);
 	int32_t xx = MUL(d_19, d_28);	
 	l_34 = RETURN(l_32, xx);

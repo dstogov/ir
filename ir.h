@@ -165,7 +165,6 @@ typedef enum _ir_type {
  * arg - argument referene CALL/TAILCALL/CARG->CARG
  * src - reference to a previous control region (IF, IF_TRUE, IF_FALSE, MERGE, LOOP_BEGIN, LOOP_END, RETURN)
  * reg - data-control dependency on region (PHI, VAR, PARAM)
- * beg - reference to a LOOP_BEGIN region (LOOP_END)
  * ret - reference to a previous RETURN instruction (RETURN)
  * str - string: variable/argument name (VAR, PARAM, CALL, TAILCALL)
  * num - number: argument number (PARAM)
@@ -304,7 +303,7 @@ typedef enum _ir_type {
 	_(MERGE,        SN,   src, src, src) /* control merge               */ \
 	_(LOOP_BEGIN,   SN,   src, src, src) /* loop start                  */ \
 	_(END,          E1,   src, ___, ___) /* block end                   */ \
-	_(LOOP_END,     E1X1, src, beg, ___) /* loop end                    */ \
+	_(LOOP_END,     E1,   src, ___, ___) /* loop end                    */ \
 	_(IF,           E2,   src, def, ___) /* conditional control split   */ \
 	_(SWITCH,       E2,   src, def, ___) /* multi-way control split     */ \
 	_(RETURN,       T2X1, src, def, ret) /* function return             */ \

@@ -221,7 +221,7 @@ The textual representation of the IR after system independent optimizations:
 	double d_26 = ADD(d_25, d_4);
 	double d_27 = ADD(d_24, d_24);
 	double d_28 = ADD(d_27, d_2);
-	l_29 = LOOP_END(l_23, l_6);
+	l_29 = LOOP_END(l_23);
 }
 ```
 The visualized graph:

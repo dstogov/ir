@@ -52,7 +52,7 @@ Windows-x86_64
 	int32_t y_0 = ADD(x_0, i_1);
 	ll_10 = IF(ll_9, cond2);
 	ll_11 = IF_TRUE(ll_10);
-	ll_12 = LOOP_END(ll_11, ll_3);
+	ll_12 = LOOP_END(ll_11);
 	ll_13 = IF_FALSE(ll_10);
 	int32_t ret1 = ADD(a_3, b_0);
 	int32_t ret2 = ADD(ret1, c_0);

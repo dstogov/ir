@@ -37,10 +37,10 @@ aarch64
 	l_23 = MERGE(l_20, l_22);
 	int32_t d_24 = PHI(l_23, d_19, d_12);
 	int32_t d_25 = ADD(d_11, c_5);
-	l_26 = LOOP_END(l_23, l_10);
+	l_26 = LOOP_END(l_23);
 	l_27 = IF_FALSE(l_14);
 	int32_t d_29 = ADD(d_4, c_5);
-	l_30 = LOOP_END(l_27, l_3);
+	l_30 = LOOP_END(l_27);
 	l_31 = IF_FALSE(l_7);
 	l_35 = RETURN(l_31, d_5);
 }

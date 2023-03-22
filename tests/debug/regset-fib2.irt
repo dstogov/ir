@@ -26,7 +26,7 @@ x86_64
 	double lo_3 = SUB(hi_3, lo_2);
 	ll = CALL/2(l_7, f, format, lo_3);
 	l_8 = CALL/2(ll, f, format, lo_3);
-	l_9 = LOOP_END(l_8, l_3);
+	l_9 = LOOP_END(l_8);
 	l_5 = IF_FALSE(l_4);
 	l_6 = RETURN(l_5, zero);
 }
@@ -53,7 +53,7 @@ x86_64
 	double d_10 = SUB(d_9, d_4);
 	l_11 = CALL/2(l_8, c_8, c_9, d_10);
 	l_13 = CALL/2(l_11, c_8, c_9, d_10);
-	l_15 = LOOP_END(l_13, l_3);
+	l_15 = LOOP_END(l_13);
 	l_16 = IF_FALSE(l_7);
 	l_17 = RETURN(l_16, c_4);
 }

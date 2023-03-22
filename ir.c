@@ -171,7 +171,6 @@ void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 #define ir_op_flag_SN      (ir_op_flag_S | 4 | (4 << IR_OP_FLAG_OPERANDS_SHIFT)) // MERGE (number of operands encoded in op1)
 #define ir_op_flag_E       (IR_OP_FLAG_CONTROL|IR_OP_FLAG_BB_END)
 #define ir_op_flag_E1      (ir_op_flag_E | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
-#define ir_op_flag_E1X1    (ir_op_flag_E | 1 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_E2      (ir_op_flag_E | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_T       (IR_OP_FLAG_CONTROL|IR_OP_FLAG_BB_END|IR_OP_FLAG_TERMINATOR)
 #define ir_op_flag_T2X1    (ir_op_flag_T | 2 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
@@ -198,7 +197,6 @@ void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 #define ir_op_kind_ref     IR_OPND_DATA
 #define ir_op_kind_src     IR_OPND_CONTROL
 #define ir_op_kind_reg     IR_OPND_CONTROL_DEP
-#define ir_op_kind_beg     IR_OPND_CONTROL_REF
 #define ir_op_kind_ret     IR_OPND_CONTROL_REF
 #define ir_op_kind_str     IR_OPND_STR
 #define ir_op_kind_num     IR_OPND_NUM
@@ -1685,12 +1683,12 @@ ir_ref _ir_LOOP_BEGIN(ir_ctx *ctx, ir_ref src1)
 	return ctx->control;
 }
 
-ir_ref _ir_LOOP_END(ir_ctx *ctx, ir_ref loop)
+ir_ref _ir_LOOP_END(ir_ctx *ctx)
 {
 	ir_ref ref;
 
 	IR_ASSERT(ctx->control);
-	ref = ir_emit2(ctx, IR_LOOP_END, ctx->control, loop);
+	ref = ir_emit1(ctx, IR_LOOP_END, ctx->control);
 	ctx->control = IR_UNUSED;
 	return ref;
 }

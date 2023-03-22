@@ -511,7 +511,7 @@
 #define ir_MERGE_N(_n, _inputs)           _ir_MERGE_N(_ir_CTX, (_n), (_inputs))
 #define ir_MERGE_SET_OP(_ref, _pos, _src) _ir_MERGE_SET_OP(_ir_CTX, (_ref), (_pos), (_src))
 #define ir_LOOP_BEGIN(_src1)              _ir_LOOP_BEGIN(_ir_CTX, (_src1))
-#define ir_LOOP_END(_loop)                _ir_LOOP_END(_ir_CTX, (_loop))
+#define ir_LOOP_END()                     _ir_LOOP_END(_ir_CTX)
 #define ir_SWITCH(_val)                   _ir_SWITCH(_ir_CTX, (_val))
 #define ir_CASE_VAL(_switch, _val)        _ir_CASE_VAL(_ir_CTX, (_switch), (_val))
 #define ir_CASE_DEFAULT(_switch)          _ir_CASE_DEFAULT(_ir_CTX, (_switch))
@@ -575,7 +575,7 @@ void   _ir_MERGE_N(ir_ctx *ctx, ir_ref n, ir_ref *inputs);
 void   _ir_MERGE_SET_OP(ir_ctx *ctx, ir_ref merge, ir_ref pos, ir_ref src);
 void   _ir_MERGE_LIST(ir_ctx *ctx, ir_ref list);
 ir_ref _ir_LOOP_BEGIN(ir_ctx *ctx, ir_ref src1);
-ir_ref _ir_LOOP_END(ir_ctx *ctx, ir_ref loop);
+ir_ref _ir_LOOP_END(ir_ctx *ctx);
 ir_ref _ir_TLS(ir_ctx *ctx, ir_ref index, ir_ref offset);
 void   _ir_UNREACHABLE(ir_ctx *ctx);
 ir_ref _ir_SWITCH(ir_ctx *ctx, ir_ref val);

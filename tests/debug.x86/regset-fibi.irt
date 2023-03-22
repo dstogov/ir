@@ -24,7 +24,7 @@ x86
 	int32_t hi_3 = ADD(hi_2, lo_2);
 	int32_t lo_3 = SUB(hi_3, lo_2);
 	l_8 = CALL/2(l_7, f, format, lo_3);
-	l_9 = LOOP_END(l_8, l_3);
+	l_9 = LOOP_END(l_8);
 	l_5 = IF_FALSE(l_4);
 	l_6 = RETURN(l_5, c_0);
 }
@@ -49,7 +49,7 @@ x86
 	int32_t d_9 = ADD(d_5, d_4);
 	int32_t d_10 = SUB(d_9, d_4);
 	l_11 = CALL/2(l_8, c_7, c_8, d_10);
-	l_13 = LOOP_END(l_11, l_3);
+	l_13 = LOOP_END(l_11);
 	l_14 = IF_FALSE(l_7);
 	l_15 = RETURN(l_14, c_4);
 }

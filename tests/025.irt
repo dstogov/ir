@@ -49,7 +49,7 @@
 	l_34 = IF_TRUE(l_33);
 	l_35 = RETURN(l_34, c_6, l_30);
 	l_36 = IF_FALSE(l_33);
-	l_37 = LOOP_END(l_36, l_11);
+	l_37 = LOOP_END(l_36);
 }
 --EXPECT--
 {

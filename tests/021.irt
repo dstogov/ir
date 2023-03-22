@@ -16,7 +16,7 @@
 	int32_t d_6 = ADD(d_5, c_4);
 	l_7 = IF(l_4, d_6);
 	l_8 = IF_TRUE(l_7);
-	l_9 = LOOP_END(l_8, l_4);
+	l_9 = LOOP_END(l_8);
 	l_10 = IF_FALSE(l_7);
 	l_11 = RETURN(l_10, d_5);
 }
@@ -34,7 +34,7 @@
 	int32_t d_6 = ADD(d_5, c_4);
 	l_7 = IF(l_4, d_6);
 	l_8 = IF_TRUE(l_7);
-	l_9 = LOOP_END(l_8, l_4);
+	l_9 = LOOP_END(l_8);
 	l_10 = IF_FALSE(l_7);
 	l_11 = RETURN(l_10, d_5);
 }
