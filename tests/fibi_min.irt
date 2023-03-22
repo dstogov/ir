@@ -1,0 +1,53 @@
+--TEST--
+FibI
+--ARGS--
+--run
+--CODE--
+{
+	int32_t c_0 = 0;
+	int32_t c_1 = 1;
+	int32_t c_100 = 100;
+	int32_t c_10000 = 10000;
+	uintptr_t f = func(printf);
+	uintptr_t format = "%d\n";
+	l_1 = START(l_6);
+	int32_t lo_1 = COPY(c_0);
+	int32_t hi_1 = COPY(c_1);
+	l_2 = END(l_1);
+	l_3 = LOOP_BEGIN(l_2, l_9);
+	int32_t lo_2 = PHI(l_3, lo_1, lo_3);
+	int32_t hi_2 = PHI(l_3, hi_1, hi_3);
+	bool b = LT(hi_2, c_10000);
+	l_4 = IF(l_3, b);
+	l_7 = IF_TRUE(l_4);
+	int32_t hi_3 = ADD(hi_2, lo_2);
+	int32_t lo_3 = SUB(hi_3, lo_2);
+	int32_t out = MIN(lo_3, c_100);
+	l_8 = CALL/2(l_7, f, format, out);
+	l_9 = LOOP_END(l_8);
+	l_5 = IF_FALSE(l_4);
+	l_6 = RETURN(l_5, c_0);
+}
+--EXPECT--
+1
+1
+2
+3
+5
+8
+13
+21
+34
+55
+89
+100
+100
+100
+100
+100
+100
+100
+100
+100
+
+exit code = 0
