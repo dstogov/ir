@@ -137,13 +137,13 @@ static int _save(ir_ctx *ctx, uint32_t dump, uint32_t pass, const char *dump_fil
 
 int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, const char *dump_file)
 {
-	if (opt_level > 0) {
-		ir_build_def_use_lists(ctx);
-	}
-
 	if ((dump & (IR_DUMP_AFTER_LOAD|IR_DUMP_AFTER_ALL))
 	 && !_save(ctx, dump, IR_DUMP_AFTER_LOAD, dump_file)) {
 		return 0;
+	}
+
+	if (opt_level > 0 || (ctx->flags & (IR_GEN_NATIVE|IR_GEN_C))) {
+		ir_build_def_use_lists(ctx);
 	}
 
 	ir_check(ctx);
@@ -157,10 +157,14 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, const char *dump_
 		}
 	}
 
+	if (opt_level > 0 || (ctx->flags & (IR_GEN_NATIVE|IR_GEN_C))) {
+		ir_build_cfg(ctx);
+	}
+
 	/* Schedule */
 	if (opt_level > 0) {
-		ir_build_cfg(ctx);
 		if (opt_level == 1) {
+			/* With -O2 unreachable blocks are removed by SCCP */
 			ir_remove_unreachable_blocks(ctx);
 		}
 		ir_build_dominators_tree(ctx);
@@ -175,9 +179,6 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, const char *dump_
 		 && !_save(ctx, dump, IR_DUMP_AFTER_SCHEDULE, dump_file)) {
 			return 0;
 		}
-	} else if (ctx->flags & (IR_GEN_NATIVE|IR_GEN_C)) {
-		ir_build_def_use_lists(ctx);
-		ir_build_cfg(ctx);
 	}
 
 	if (ctx->flags & IR_GEN_NATIVE) {
