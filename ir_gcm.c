@@ -117,20 +117,33 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 		}
 		IR_ASSERT(lca != 0 && "No Common Antecessor");
 		b = lca;
-		uint32_t loop_depth = ctx->cfg_blocks[b].loop_depth;
-		if (loop_depth) {
-			while (lca != ctx->cfg_blocks[_blocks[ref]].dom_parent) {
-				if (ctx->cfg_blocks[lca].loop_depth < loop_depth) {
-					loop_depth = ctx->cfg_blocks[lca].loop_depth;
-					b = lca;
-					if (!loop_depth) {
-						break;
+
+		if (b != _blocks[ref]) {
+			ir_block *bb = &ctx->cfg_blocks[b];
+			uint32_t loop_depth = bb->loop_depth;
+
+			if (loop_depth) {
+				insn = &ctx->ir_base[ref];
+				if (insn->op >= IR_ADD_OV && insn->op <= IR_OVERFLOW) {
+					/* Don't move overflow checking math out of the loop */
+					// TODO: this should be turned into a more general check to prohibit LICM ???
+				} else {
+					lca = bb->dom_parent;
+					while (lca != _blocks[ref]) {
+						bb = &ctx->cfg_blocks[lca];
+						if (bb->loop_depth < loop_depth) {
+							loop_depth = bb->loop_depth;
+							b = lca;
+							if (!loop_depth) {
+								break;
+							}
+						}
+						lca = bb->dom_parent;
 					}
 				}
-				lca = ctx->cfg_blocks[lca].dom_parent;
 			}
+			_blocks[ref] = b;
 		}
-		_blocks[ref] = b;
 	}
 }
 
