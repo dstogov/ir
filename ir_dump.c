@@ -54,9 +54,9 @@ void ir_dump(ir_ctx *ctx, FILE *f)
 
 void ir_dump_dot(ir_ctx *ctx, FILE *f)
 {
-	int DATA_WEIGHT    = 1;
-	int CONTROL_WEIGHT = 2;
-	int REF_WEIGHT     = 1;
+	int DATA_WEIGHT    = 0;
+	int CONTROL_WEIGHT = 5;
+	int REF_WEIGHT     = 4;
 	ir_ref i, j, n, ref, *p;
 	ir_insn *insn;
 	uint32_t flags;
@@ -73,11 +73,11 @@ void ir_dump_dot(ir_ctx *ctx, FILE *f)
 		flags = ir_op_flags[insn->op];
 		if (flags & IR_OP_FLAG_CONTROL) {
 			if (insn->op == IR_START) {
-				fprintf(f, "\t{rank=min; n%d [label=\"%d: %s\",shape=box,style=\"rounded,filled\",fillcolor=red,rank=min];}\n", i, i, ir_op_name[insn->op]);
+				fprintf(f, "\t{rank=min; n%d [label=\"%d: %s\",shape=box,style=\"rounded,filled\",fillcolor=red];}\n", i, i, ir_op_name[insn->op]);
 			} else if (insn->op == IR_ENTRY) {
 				fprintf(f, "\t{n%d [label=\"%d: %s\",shape=box,style=\"rounded,filled\",fillcolor=red];}\n", i, i, ir_op_name[insn->op]);
 			} else if (flags & IR_OP_FLAG_TERMINATOR) {
-				fprintf(f, "\t{rank=max; n%d [label=\"%d: %s\",shape=box,style=\"rounded,filled\",fillcolor=red,rank=max];}\n", i, i, ir_op_name[insn->op]);
+				fprintf(f, "\t{rank=max; n%d [label=\"%d: %s\",shape=box,style=\"rounded,filled\",fillcolor=red];}\n", i, i, ir_op_name[insn->op]);
 			} else if (flags & IR_OP_FLAG_MEM) {
 				fprintf(f, "\tn%d [label=\"%d: %s\",shape=box,style=filled,fillcolor=pink];\n", i, i, ir_op_name[insn->op]);
 			} else {
@@ -86,7 +86,7 @@ void ir_dump_dot(ir_ctx *ctx, FILE *f)
 		} else if (flags & IR_OP_FLAG_DATA) {
 			if (IR_OPND_KIND(flags, 1) == IR_OPND_DATA) {
 				/* not a leaf */
-				fprintf(f, "\tn%d [label=\"%d: %s %s\"", i, i, ir_op_name[insn->op], ir_type_name[insn->type]);
+				fprintf(f, "\tn%d [label=\"%d: %s\"", i, i, ir_op_name[insn->op]);
 				fprintf(f, ",shape=diamond,style=filled,fillcolor=deepskyblue];\n");
 			} else {
 				if (insn->op == IR_PARAM) {
@@ -108,13 +108,17 @@ void ir_dump_dot(ir_ctx *ctx, FILE *f)
 					case IR_OPND_VAR:
 						if (IR_IS_CONST_REF(ref)) {
 							fprintf(f, "\tc%d -> n%d [color=blue,weight=%d];\n", -ref, i, DATA_WEIGHT);
+						} else if (insn->op == IR_PHI
+								&& ctx->ir_base[insn->op1].op == IR_LOOP_BEGIN
+								&& ctx->ir_base[ir_insn_op(&ctx->ir_base[insn->op1], j - 1)].op == IR_LOOP_END) {
+							fprintf(f, "\tn%d -> n%d [color=blue,dir=back];\n", i, ref);
 						} else {
 							fprintf(f, "\tn%d -> n%d [color=blue,weight=%d];\n", ref, i, DATA_WEIGHT);
 						}
 						break;
 					case IR_OPND_CONTROL:
 						if (insn->op == IR_LOOP_BEGIN && ctx->ir_base[ref].op == IR_LOOP_END) {
-							fprintf(f, "\tn%d -> n%d [style=bold,color=red,weight=%d];\n", ref, i, REF_WEIGHT);
+							fprintf(f, "\tn%d -> n%d [style=bold,color=red,dir=back];\n", i, ref);
 						} else if (insn->op == IR_ENTRY) {
 							fprintf(f, "\tn%d -> n%d [style=bold,color=red,style=dashed,weight=%d];\n", ref, i, CONTROL_WEIGHT);
 						} else {
@@ -123,7 +127,7 @@ void ir_dump_dot(ir_ctx *ctx, FILE *f)
 						break;
 					case IR_OPND_CONTROL_DEP:
 					case IR_OPND_CONTROL_REF:
-						fprintf(f, "\tn%d -> n%d [style=dashed,weight=%d];\n", i, ref, REF_WEIGHT);
+						fprintf(f, "\tn%d -> n%d [style=dashed,dir=back,weight=%d];\n", ref, i, REF_WEIGHT);
 						break;
 				}
 			}
