@@ -1060,7 +1060,6 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 						if (op1_insn->op == IR_AND && ctx->use_lists[insn->op1].count == 1) {
 							if (IR_IS_CONST_REF(op1_insn->op2)
 							 && op1_insn->op1 > bb->start
-							 && op1_insn->op1 < ref
 							 && !ctx->rules[op1_insn->op1]) {
 								ir_match_fuse_load(ctx, op1_insn->op1, bb);
 							}
@@ -1090,7 +1089,7 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 						return IR_COPY_INT;
 					} else if ((ir_type_size[insn->type] >= 4 && insn->op == IR_ADD && IR_IS_SIGNED_32BIT(op2_insn->val.i64)) ||
 							(ir_type_size[insn->type] >= 4 && insn->op == IR_SUB && IR_IS_SIGNED_32BIT(-op2_insn->val.i64))) {
-						if (insn->op1 > bb->start && insn->op1 < ref && ctx->use_lists[insn->op1].count == 1) {
+						if (insn->op1 > bb->start && ctx->use_lists[insn->op1].count == 1) {
 							if (!ctx->rules[insn->op1]) {
 								ctx->rules[insn->op1] = ir_match_insn(ctx, insn->op1, bb);
 							}
@@ -1125,12 +1124,12 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 						}
 					}
 				} else if ((ctx->flags & IR_OPT_CODEGEN) && insn->op == IR_ADD && ir_type_size[insn->type] >= 4) {
-					if (insn->op1 > bb->start && insn->op1 < ref && ctx->use_lists[insn->op1].count == 1) {
+					if (insn->op1 > bb->start && ctx->use_lists[insn->op1].count == 1) {
 						if (!ctx->rules[insn->op1]) {
 							ctx->rules[insn->op1] = ir_match_insn(ctx, insn->op1, bb);
 						}
 					}
-					if (insn->op2 > bb->start && insn->op2 < ref && ctx->use_lists[insn->op2].count == 1) {
+					if (insn->op2 > bb->start && ctx->use_lists[insn->op2].count == 1) {
 						if (!ctx->rules[insn->op2]) {
 							ctx->rules[insn->op2] = ir_match_insn(ctx, insn->op2, bb);
 						}
@@ -1381,7 +1380,6 @@ binop_fp:
 			IR_FALLTHROUGH;
 		case IR_TAILCALL:
 			if (insn->op2 > bb->start
-			 && insn->op2 < ref
 			 && !ctx->rules[insn->op2]) {
 				ir_match_fuse_load(ctx, insn->op2, bb);
 			}
@@ -1406,7 +1404,6 @@ binop_fp:
 store_int:
 				if ((ctx->flags & IR_OPT_CODEGEN)
 				 && insn->op3 > bb->start
-				 && insn->op3 < ref
 				 && (ctx->use_lists[insn->op3].count == 1 ||
 				     (ctx->use_lists[insn->op3].count == 2
 				   && (ctx->ir_base[insn->op3].op == IR_ADD_OV ||
@@ -1560,7 +1557,6 @@ store_int:
 			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
 				if ((ctx->flags & IR_OPT_CODEGEN)
 				 && insn->op2 > bb->start
-				 && insn->op2 < ref
 				 && ctx->use_lists[insn->op2].count == 1
 				 && IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
 					ir_insn *op_insn = &ctx->ir_base[insn->op2];
@@ -1588,7 +1584,6 @@ store_int:
 				}
 			}
 			if (insn->op2 > bb->start
-			 && insn->op2 < ref
 			 && !ctx->rules[insn->op2]) {
 				ir_match_fuse_load(ctx, insn->op2, bb);
 			}
@@ -1612,7 +1607,7 @@ store_int:
 				return IR_RETURN_FP;
 			}
 		case IR_IF:
-			if (insn->op2 > bb->start && insn->op2 < ref && ctx->use_lists[insn->op2].count == 1) {
+			if (insn->op2 > bb->start && ctx->use_lists[insn->op2].count == 1) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT) {
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
@@ -1636,7 +1631,6 @@ store_int:
 								if (op1_insn->op == IR_AND && ctx->use_lists[insn->op1].count == 1) {
 									if (IR_IS_CONST_REF(op1_insn->op2)
 									 && op1_insn->op1 > bb->start
-									 && op1_insn->op1 < ref
 									 && !ctx->rules[op1_insn->op1]) {
 										ir_match_fuse_load(ctx, op1_insn->op1, bb);
 									}
@@ -1662,7 +1656,6 @@ store_int:
 					ir_match_fuse_load_commutative_int(ctx, op2_insn, bb);
 					if (IR_IS_CONST_REF(op2_insn->op2)
 					 && op2_insn->op1 > bb->start
-					 && op2_insn->op1 < ref
 					 && !ctx->rules[op2_insn->op1]) {
 						ir_match_fuse_load(ctx, op2_insn->op1, bb);
 					}
@@ -1744,7 +1737,7 @@ store_int:
 			}
 		case IR_GUARD:
 		case IR_GUARD_NOT:
-			if (insn->op2 > bb->start && insn->op2 < ref && ctx->use_lists[insn->op2].count == 1) {
+			if (insn->op2 > bb->start && ctx->use_lists[insn->op2].count == 1) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT
 					// TODO: register allocator may clobber operands of CMP before they are used in the GUARD_CMP
@@ -1764,7 +1757,6 @@ store_int:
 					ir_match_fuse_load_commutative_int(ctx, op2_insn, bb);
 					if (IR_IS_CONST_REF(op2_insn->op2)
 					 && op2_insn->op1 > bb->start
-					 && op2_insn->op1 < ref
 					 && !ctx->rules[op2_insn->op1]) {
 						ir_match_fuse_load(ctx, op2_insn->op1, bb);
 					}
@@ -1779,7 +1771,6 @@ store_int:
 			return insn->op;
 		case IR_IJMP:
 			if (insn->op2 > bb->start
-			 && insn->op2 < ref
 			 && !ctx->rules[insn->op2]) {
 				ir_match_fuse_load(ctx, insn->op2, bb);
 			}

@@ -795,7 +795,7 @@ binop_fp:
 			break;
 		case IR_RSTORE:
 			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
-				if ((ctx->flags & IR_OPT_CODEGEN) && insn->op2 > bb->start && insn->op2 < ref && ctx->use_lists[insn->op2].count == 1) {
+				if ((ctx->flags & IR_OPT_CODEGEN) && insn->op2 > bb->start && ctx->use_lists[insn->op2].count == 1) {
 					ir_insn *op_insn = &ctx->ir_base[insn->op2];
 
 					if (!ctx->rules[insn->op2]) {
@@ -840,7 +840,7 @@ binop_fp:
 				return IR_RETURN_FP;
 			}
 		case IR_IF:
-			if (insn->op2 > bb->start && insn->op2 < ref && ctx->use_lists[insn->op2].count == 1) {
+			if (insn->op2 > bb->start && ctx->use_lists[insn->op2].count == 1) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT) {
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
@@ -862,7 +862,7 @@ binop_fp:
 			}
 		case IR_GUARD:
 		case IR_GUARD_NOT:
-			if (insn->op2 > bb->start && insn->op2 < ref && ctx->use_lists[insn->op2].count == 1) {
+			if (insn->op2 > bb->start && ctx->use_lists[insn->op2].count == 1) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT
 					// TODO: register allocator may clobber operands of CMP before they are used in the GUARD_CMP
