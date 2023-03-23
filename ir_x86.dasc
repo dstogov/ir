@@ -1060,9 +1060,7 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 							ir_match_fuse_load(ctx, op1_insn->op2, bb);
 						}
 						if (op1_insn->op == IR_AND && ctx->use_lists[insn->op1].count == 1) {
-							if (IR_IS_CONST_REF(op1_insn->op2)
-							 && op1_insn->op1 > bb->start
-							 && !ctx->rules[op1_insn->op1]) {
+							if (IR_IS_CONST_REF(op1_insn->op2)) {
 								ir_match_fuse_load(ctx, op1_insn->op1, bb);
 							}
 							ctx->rules[insn->op1] = IR_SKIP_TEST_INT;
@@ -1390,8 +1388,7 @@ binop_fp:
 			ctx->flags |= IR_HAS_CALLS;
 			IR_FALLTHROUGH;
 		case IR_TAILCALL:
-			if (insn->op2 > bb->start
-			 && !ctx->rules[insn->op2]) {
+			if (insn->op2 > bb->start) {
 				ir_match_fuse_load(ctx, insn->op2, bb);
 			}
 			return insn->op;
@@ -1593,8 +1590,7 @@ store_int:
 					}
 				}
 			}
-			if (insn->op2 > bb->start
-			 && !ctx->rules[insn->op2]) {
+			if (insn->op2 > bb->start) {
 				ir_match_fuse_load(ctx, insn->op2, bb);
 			}
 			return IR_RSTORE;
@@ -1639,9 +1635,7 @@ store_int:
 									ir_match_fuse_load(ctx, op1_insn->op2, bb);
 								}
 								if (op1_insn->op == IR_AND && ctx->use_lists[insn->op1].count == 1) {
-									if (IR_IS_CONST_REF(op1_insn->op2)
-									 && op1_insn->op1 > bb->start
-									 && !ctx->rules[op1_insn->op1]) {
+									if (IR_IS_CONST_REF(op1_insn->op2)) {
 										ir_match_fuse_load(ctx, op1_insn->op1, bb);
 									}
 									ctx->rules[op2_insn->op1] = IR_TEST_INT;
@@ -1664,9 +1658,7 @@ store_int:
 					}
 				} else if (op2_insn->op == IR_AND) { // TODO: OR, XOR. etc
 					ir_match_fuse_load_commutative_int(ctx, op2_insn, bb);
-					if (IR_IS_CONST_REF(op2_insn->op2)
-					 && op2_insn->op1 > bb->start
-					 && !ctx->rules[op2_insn->op1]) {
+					if (IR_IS_CONST_REF(op2_insn->op2)) {
 						ir_match_fuse_load(ctx, op2_insn->op1, bb);
 					}
 					ctx->rules[insn->op2] = IR_SKIP_TEST_INT;
@@ -1765,9 +1757,7 @@ store_int:
 					}
 				} else if (op2_insn->op == IR_AND) { // TODO: OR, XOR. etc
 					ir_match_fuse_load_commutative_int(ctx, op2_insn, bb);
-					if (IR_IS_CONST_REF(op2_insn->op2)
-					 && op2_insn->op1 > bb->start
-					 && !ctx->rules[op2_insn->op1]) {
+					if (IR_IS_CONST_REF(op2_insn->op2)) {
 						ir_match_fuse_load(ctx, op2_insn->op1, bb);
 					}
 					ctx->rules[insn->op2] = IR_SKIP_TEST_INT;
@@ -1780,8 +1770,7 @@ store_int:
 			ir_match_fuse_load(ctx, insn->op2, bb);
 			return insn->op;
 		case IR_IJMP:
-			if (insn->op2 > bb->start
-			 && !ctx->rules[insn->op2]) {
+			if (insn->op2 > bb->start) {
 				ir_match_fuse_load(ctx, insn->op2, bb);
 			}
 			return insn->op;
