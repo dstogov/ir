@@ -387,7 +387,7 @@ int ir_match(ir_ctx *ctx)
 	for (b = ctx->cfg_blocks_count, bb = ctx->cfg_blocks + b; b > 0; b--, bb--) {
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		start = bb->start;
-		if (bb->flags & IR_BB_ENTRY) {
+		if (UNEXPECTED(bb->flags & IR_BB_ENTRY)) {
 			IR_ASSERT(entries_count < ctx->entries_count);
 			insn = &ctx->ir_base[start];
 			IR_ASSERT(insn->op == IR_ENTRY);
@@ -397,27 +397,31 @@ int ir_match(ir_ctx *ctx)
 		}
 		ctx->rules[start] = IR_SKIP;
 		ref = bb->end;
-		insn = &ctx->ir_base[ref];
-		if (insn->op == IR_END || insn->op == IR_LOOP_END) {
-			ctx->rules[ref] = insn->op;
-			ref = prev_ref[ref];
-			if (ref == bb->start && bb->successors_count == 1) {
-				if (EXPECTED(!(bb->flags & IR_BB_ENTRY))) {
-					bb->flags |= IR_BB_EMPTY;
-				} else if (ctx->flags & IR_MERGE_EMPTY_ENTRIES) {
-					bb->flags |= IR_BB_EMPTY;
-					if (ctx->cfg_edges[bb->successors] == b + 1) {
-						(bb + 1)->flags |= IR_BB_PREV_EMPTY_ENTRY;
+		if (bb->successors_count == 1) {
+			insn = &ctx->ir_base[ref];
+			if (insn->op == IR_END || insn->op == IR_LOOP_END) {
+				ctx->rules[ref] = insn->op;
+				ref = prev_ref[ref];
+				if (ref == start) {
+					if (EXPECTED(!(bb->flags & IR_BB_ENTRY))) {
+						bb->flags |= IR_BB_EMPTY;
+					} else if (ctx->flags & IR_MERGE_EMPTY_ENTRIES) {
+						bb->flags |= IR_BB_EMPTY;
+						if (ctx->cfg_edges[bb->successors] == b + 1) {
+							(bb + 1)->flags |= IR_BB_PREV_EMPTY_ENTRY;
+						}
 					}
+					continue;
 				}
-				continue;
 			}
 		}
-		while (ref > start) {
-			if (!ctx->rules[ref]) {
-				ctx->rules[ref] = ir_match_insn(ctx, ref, bb);
+		while (ref != start) {
+			uint32_t rule = ctx->rules[ref];
+
+			if (!rule) {
+				ctx->rules[ref] = rule = ir_match_insn(ctx, ref, bb);
 			}
-			ir_match_insn2(ctx, ref, bb);
+			ir_match_insn2(ctx, ref, bb, rule);
 			ref = prev_ref[ref];
 		}
 	}

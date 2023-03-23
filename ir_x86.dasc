@@ -891,10 +891,12 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb);
 static void ir_match_fuse_addr(ir_ctx *ctx, ir_ref addr_ref, ir_block *bb)
 {
 	if (!IR_IS_CONST_REF(addr_ref)) {
-		if (!ctx->rules[addr_ref]) {
-			ctx->rules[addr_ref] = ir_match_insn(ctx, addr_ref, bb);
+		uint32_t rule = ctx->rules[addr_ref];
+
+		if (!rule) {
+			ctx->rules[addr_ref] = rule = ir_match_insn(ctx, addr_ref, bb);
 		}
-		if (ctx->rules[addr_ref] == IR_LEA_OB) {
+		if (rule == IR_LEA_OB) {
 			ir_use_list *use_list = &ctx->use_lists[addr_ref];
 			ir_ref j = use_list->count;
 
@@ -1090,22 +1092,21 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 					} else if ((ir_type_size[insn->type] >= 4 && insn->op == IR_ADD && IR_IS_SIGNED_32BIT(op2_insn->val.i64)) ||
 							(ir_type_size[insn->type] >= 4 && insn->op == IR_SUB && IR_IS_SIGNED_32BIT(-op2_insn->val.i64))) {
 						if (insn->op1 > bb->start && ctx->use_lists[insn->op1].count == 1) {
-							if (!ctx->rules[insn->op1]) {
-								ctx->rules[insn->op1] = ir_match_insn(ctx, insn->op1, bb);
+							uint32_t rule = ctx->rules[insn->op1];
+
+							if (!rule) {
+								ctx->rules[insn->op1] = rule = ir_match_insn(ctx, insn->op1, bb);
 							}
-						}
-						if (ctx->rules[insn->op1] == IR_LEA_SI
-						 && ctx->use_lists[insn->op1].count == 1) {
-							ctx->rules[insn->op1] = IR_SKIP;
-							return IR_LEA_SI_O; // lea ret, [op1.op1.reg*op1.op2.scale+op2.offset]
-						} else if (ctx->rules[insn->op1] == IR_LEA_SIB
-								&& ctx->use_lists[insn->op1].count == 1) {
-							ctx->rules[insn->op1] = IR_SKIP;
-							return IR_LEA_SIB_O; // lea ret, [op1.op1.reg+op1.op1.reg*op1.op2.scale+op2.offset]
-						} else if (ctx->rules[insn->op1] == IR_LEA_IB
-								&& ctx->use_lists[insn->op1].count == 1) {
-							ctx->rules[insn->op1] = IR_SKIP;
-							return IR_LEA_IB_O; // lea ret, [op1.op1.reg+op1.op2.reg+op2.offset]
+							if (rule == IR_LEA_SI) {
+								ctx->rules[insn->op1] = IR_SKIP;
+								return IR_LEA_SI_O; // lea ret, [op1.op1.reg*op1.op2.scale+op2.offset]
+							} else if (rule == IR_LEA_SIB) {
+								ctx->rules[insn->op1] = IR_SKIP;
+								return IR_LEA_SIB_O; // lea ret, [op1.op1.reg+op1.op1.reg*op1.op2.scale+op2.offset]
+							} else if (rule == IR_LEA_IB) {
+								ctx->rules[insn->op1] = IR_SKIP;
+								return IR_LEA_IB_O; // lea ret, [op1.op1.reg+op1.op2.reg+op2.offset]
+							}
 						}
 						return IR_LEA_OB; // lea ret, [op1.reg+op2.offset]
 					} else if (op2_insn->val.i64 == 1 || op2_insn->val.i64 == -1) {
@@ -1125,34 +1126,44 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 					}
 				} else if ((ctx->flags & IR_OPT_CODEGEN) && insn->op == IR_ADD && ir_type_size[insn->type] >= 4) {
 					if (insn->op1 > bb->start && ctx->use_lists[insn->op1].count == 1) {
-						if (!ctx->rules[insn->op1]) {
-							ctx->rules[insn->op1] = ir_match_insn(ctx, insn->op1, bb);
+						uint32_t rule =ctx->rules[insn->op1];
+						if (!rule) {
+							ctx->rules[insn->op1] = rule = ir_match_insn(ctx, insn->op1, bb);
+						}
+						if (rule == IR_LEA_OB) {
+							ctx->rules[insn->op1] = IR_SKIP;
+							if (insn->op2 > bb->start && ctx->use_lists[insn->op2].count == 1) {
+								rule = ctx->rules[insn->op2];
+								if (!rule) {
+									ctx->rules[insn->op2] = rule = ir_match_insn(ctx, insn->op2, bb);
+								}
+								if (rule == IR_LEA_SI) {
+									ctx->rules[insn->op2] = IR_SKIP;
+									return IR_LEA_OB_SI; // lea ret, [op1.op1.reg+op1.op2.offset+op2.op1.reg*op2.op2.scale]
+								}
+							}
+							return IR_LEA_OB_I; // lea ret, [op1.op1.reg+op1.op2.offset+op2.reg]
 						}
 					}
 					if (insn->op2 > bb->start && ctx->use_lists[insn->op2].count == 1) {
-						if (!ctx->rules[insn->op2]) {
-							ctx->rules[insn->op2] = ir_match_insn(ctx, insn->op2, bb);
+						uint32_t rule = ctx->rules[insn->op2];
+						if (!rule) {
+							ctx->rules[insn->op2] = rule = ir_match_insn(ctx, insn->op2, bb);
 						}
-					}
-					if (ctx->rules[insn->op1] == IR_LEA_OB
-					 && ctx->use_lists[insn->op1].count == 1) {
-						ctx->rules[insn->op1] = IR_SKIP;
-						if (ctx->rules[insn->op2] == IR_LEA_SI
-						 && ctx->use_lists[insn->op2].count == 1) {
+						if (rule == IR_LEA_OB) {
 							ctx->rules[insn->op2] = IR_SKIP;
-							return IR_LEA_OB_SI; // lea ret, [op1.op1.reg+op1.op2.offset+op2.op1.reg*op2.op2.scale]
+							if (insn->op1 > bb->start && ctx->use_lists[insn->op1].count == 1) {
+								rule =ctx->rules[insn->op1];
+								if (!rule) {
+									ctx->rules[insn->op1] = rule = ir_match_insn(ctx, insn->op1, bb);
+								}
+								if (rule == IR_LEA_SI) {
+									ctx->rules[insn->op1] = IR_SKIP;
+									return IR_LEA_SI_OB; // lea ret, [op1.op1.reg*op1.op2.scale+op2.op1.reg+op2.op2.offset]
+								}
+							}
+							return IR_LEA_I_OB; // lea ret, [op1.reg+op2.op1.reg+op2.op2.offset]
 						}
-						return IR_LEA_OB_I; // lea ret, [op1.op1.reg+op1.op2.offset+op2.reg]
-					}
-					if (ctx->rules[insn->op2] == IR_LEA_OB
-					 && ctx->use_lists[insn->op2].count == 1) {
-						ctx->rules[insn->op2] = IR_SKIP;
-						if (ctx->rules[insn->op1] == IR_LEA_SI
-						 && ctx->use_lists[insn->op1].count == 1) {
-							ctx->rules[insn->op1] = IR_SKIP;
-							return IR_LEA_SI_OB; // lea ret, [op1.op1.reg*op1.op2.scale+op2.op1.reg+op2.op2.offset]
-						}
-						return IR_LEA_I_OB; // lea ret, [op1.reg+op2.op1.reg+op2.op2.offset]
 					}
 					return IR_LEA_IB; // lea ret, [op1.reg+op2.reg]
 				}
@@ -1410,13 +1421,12 @@ store_int:
 				       ctx->ir_base[insn->op3].op == IR_SUB_OV)))
 				 && IR_IS_TYPE_INT(ctx->ir_base[insn->op3].type)) {
 					ir_insn *op_insn = &ctx->ir_base[insn->op3];
+					uint32_t rule = ctx->rules[insn->op3];
 
-					if (!ctx->rules[insn->op3]) {
-						ctx->rules[insn->op3] = ir_match_insn(ctx, insn->op3, bb);
+					if (!rule) {
+						ctx->rules[insn->op3] = rule = ir_match_insn(ctx, insn->op3, bb);
 					}
-					if ((ctx->rules[insn->op3] == IR_BINOP_INT && op_insn->op != IR_MUL) ||
-							ctx->rules[insn->op3] == IR_LEA_OB ||
-							ctx->rules[insn->op3] == IR_LEA_IB) {
+					if ((rule == IR_BINOP_INT && op_insn->op != IR_MUL) || rule == IR_LEA_OB || rule == IR_LEA_IB) {
 						if (ctx->ir_base[op_insn->op1].op == load_op
 						 && ctx->ir_base[op_insn->op1].op2 == insn->op2) {
 							if (op_insn->op1 > bb->start
@@ -1440,7 +1450,7 @@ store_int:
 								return IR_MEM_BINOP_INT;
 							}
 						}
-					} else if (ctx->rules[insn->op3] == IR_INC) {
+					} else if (rule == IR_INC) {
 						if (ctx->ir_base[op_insn->op1].op == load_op
 						 && ctx->ir_base[op_insn->op1].op2 == insn->op2) {
 							if (op_insn->op1 > bb->start
@@ -1451,7 +1461,7 @@ store_int:
 								return IR_MEM_INC;
 							}
 						}
-					} else if (ctx->rules[insn->op3] == IR_DEC) {
+					} else if (rule == IR_DEC) {
 						if (ctx->ir_base[op_insn->op1].op == load_op
 						 && ctx->ir_base[op_insn->op1].op2 == insn->op2) {
 							if (op_insn->op1 > bb->start
@@ -1462,7 +1472,7 @@ store_int:
 								return IR_MEM_DEC;
 							}
 						}
-					} else if (ctx->rules[insn->op3] == IR_MUL_PWR2) {
+					} else if (rule == IR_MUL_PWR2) {
 						if (ctx->ir_base[op_insn->op1].op == load_op
 						 && ctx->ir_base[op_insn->op1].op2 == insn->op2) {
 							if (op_insn->op1 > bb->start
@@ -1473,7 +1483,7 @@ store_int:
 								return IR_MEM_MUL_PWR2;
 							}
 						}
-					} else if (ctx->rules[insn->op3] == IR_DIV_PWR2) {
+					} else if (rule == IR_DIV_PWR2) {
 						if (ctx->ir_base[op_insn->op1].op == load_op
 						 && ctx->ir_base[op_insn->op1].op2 == insn->op2) {
 							if (op_insn->op1 > bb->start
@@ -1484,7 +1494,7 @@ store_int:
 								return IR_MEM_DIV_PWR2;
 							}
 						}
-					} else if (ctx->rules[insn->op3] == IR_MOD_PWR2) {
+					} else if (rule == IR_MOD_PWR2) {
 						if (ctx->ir_base[op_insn->op1].op == load_op
 						 && ctx->ir_base[op_insn->op1].op2 == insn->op2) {
 							if (op_insn->op1 > bb->start
@@ -1495,7 +1505,7 @@ store_int:
 								return IR_MEM_MOD_PWR2;
 							}
 						}
-					} else if (ctx->rules[insn->op3] == IR_SHIFT) {
+					} else if (rule == IR_SHIFT) {
 						if (ctx->ir_base[op_insn->op1].op == load_op
 						 && ctx->ir_base[op_insn->op1].op2 == insn->op2) {
 							if (op_insn->op1 > bb->start
@@ -1506,7 +1516,7 @@ store_int:
 								return IR_MEM_SHIFT;
 							}
 						}
-					} else if (ctx->rules[insn->op3] == IR_SHIFT_CONST) {
+					} else if (rule == IR_SHIFT_CONST) {
 						if (ctx->ir_base[op_insn->op1].op == load_op
 						 && ctx->ir_base[op_insn->op1].op2 == insn->op2) {
 							if (op_insn->op1 > bb->start
@@ -1517,7 +1527,7 @@ store_int:
 								return IR_MEM_SHIFT_CONST;
 							}
 						}
-					} else if (ctx->rules[insn->op3] == IR_OP_INT && op_insn->op != IR_BSWAP) {
+					} else if (rule == IR_OP_INT && op_insn->op != IR_BSWAP) {
 						if (ctx->ir_base[op_insn->op1].op == load_op
 						 && ctx->ir_base[op_insn->op1].op2 == insn->op2) {
 							if (op_insn->op1 > bb->start
@@ -1790,9 +1800,9 @@ store_int:
 	return insn->op;
 }
 
-static void ir_match_insn2(ir_ctx *ctx, ir_ref ref, ir_block *bb)
+static void ir_match_insn2(ir_ctx *ctx, ir_ref ref, ir_block *bb, uint32_t rule)
 {
-	if (ctx->rules[ref] == IR_LEA_IB) {
+	if (rule == IR_LEA_IB) {
 		ir_insn *insn = &ctx->ir_base[ref];
 
 		if (ir_match_fuse_load(ctx, insn->op2, bb)) {
