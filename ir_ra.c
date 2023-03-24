@@ -1811,6 +1811,41 @@ static void ir_add_to_unhandled(ir_live_interval **unhandled, ir_live_interval *
 	}
 }
 
+/* merge sorted lists */
+static void ir_merge_to_unhandled(ir_live_interval **unhandled, ir_live_interval *ival)
+{
+	ir_live_interval **prev;
+	ir_live_pos pos;
+
+	if (*unhandled == NULL) {
+		*unhandled = ival;
+		while (ival) {
+			ival = ival->list_next = ival->next;
+		}
+	} else {
+		prev = unhandled;
+		while (ival) {
+			pos = ival->range.start;
+			while (*prev && pos >= (*prev)->range.start) {
+				prev = &(*prev)->list_next;
+			}
+			ival->list_next = *prev;
+			*prev = ival;
+		    ival = ival->next;
+		}
+	}
+#if IR_DEBUG
+	ival = *unhandled;
+	pos = 0;
+
+	while (ival) {
+		IR_ASSERT(ival->range.start >= pos);
+		pos = ival->range.start;
+		ival = ival->list_next;
+	}
+#endif
+}
+
 static void ir_add_to_unhandled_spill(ir_live_interval **unhandled, ir_live_interval *ival)
 {
 	ir_live_pos pos = ival->range.start;
@@ -2498,9 +2533,8 @@ static int ir_linear_scan(ir_ctx *ctx)
 	}
 
 	ival = ctx->live_intervals[0];
-	while (ival) {
-		ir_add_to_unhandled(&unhandled, ival);
-		ival = ival->next;
+	if (ival) {
+		ir_merge_to_unhandled(&unhandled, ival);
 	}
 
 	/* vregs + tmp + fixed + SRATCH + ALL */
