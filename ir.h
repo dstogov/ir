@@ -8,6 +8,10 @@
 #ifndef IR_H
 #define IR_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -755,5 +759,9 @@ int ir_mem_unmap(void *ptr, size_t size);
 int ir_mem_protect(void *ptr, size_t size);
 int ir_mem_unprotect(void *ptr, size_t size);
 int ir_mem_flush(void *ptr, size_t size);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif /* IR_H */

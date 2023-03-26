@@ -8,6 +8,10 @@
 #ifndef IR_BUILDER_H
 #define IR_BUILDER_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* _ir_CTX may be redefined by the user */
 #define _ir_CTX                           ctx
 
@@ -588,5 +592,9 @@ void   _ir_GUARD_NOT(ir_ctx *ctx, ir_ref condition, ir_ref addr);
 ir_ref _ir_SNAPSHOT(ir_ctx *ctx, ir_ref n);
 void   _ir_SNAPSHOT_SET_OP(ir_ctx *ctx, ir_ref snapshot, ir_ref pos, ir_ref val);
 ir_ref _ir_EXITCALL(ir_ctx *ctx, ir_ref func);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif /* IR_BUILDER_H */
