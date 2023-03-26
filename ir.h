@@ -456,9 +456,9 @@ void ir_strtab_apply(ir_strtab *strtab, ir_strtab_apply_t func);
 void ir_strtab_free(ir_strtab *strtab);
 
 /* IR Context Flags */
-#define IR_FUNCTION            (1<<0)
-#define IR_FASTCALL_FUNC       (1<<1)
-#define IR_SKIP_PROLOGUE       (1<<2)
+#define IR_FUNCTION            (1<<0) /* Generate a function. */
+#define IR_FASTCALL_FUNC       (1<<1) /* Generate a function with fastcall calling convention, x86 32-bit only. */
+#define IR_SKIP_PROLOGUE       (1<<2) /* Don't generate function prologue. */
 #define IR_USE_FRAME_POINTER   (1<<3)
 #define IR_PREALLOCATED_STACK  (1<<4)
 #define IR_HAS_ALLOCA          (1<<5)
@@ -509,10 +509,10 @@ typedef void (*ir_snapshot_create_t)(ir_ctx *ctx, ir_ref addr);
 struct _ir_ctx {
 	ir_insn           *ir_base;           /* two directional array - instructions grow down, constants grow up */
 	ir_ref             insns_count;
-	ir_ref             insns_limit;
+	ir_ref             insns_limit;       /* initial instructions count */
 	ir_ref             consts_count;
-	ir_ref             consts_limit;
-	uint32_t           flags;
+	ir_ref             consts_limit;      /* initial constants count */
+	uint32_t           flags;             /* IR context flags */
 	ir_ref             fold_cse_limit;
 	ir_insn            fold_insn;
 	ir_hashtab        *binding;
