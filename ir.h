@@ -347,6 +347,9 @@ typedef int32_t ir_ref;
 #define IR_TRUE              (-3)
 #define IR_LAST_FOLDABLE_OP  IR_COPY
 
+#define IR_CONSTS_LIMIT_MIN (-(IR_TRUE - 1))
+#define IR_INSNS_LIMIT_MIN (IR_UNUSED + 1)
+
 /* IR Constant Value */
 #ifndef IR_64
 # define ADDR_MEMBER            uintptr_t                  addr;

@@ -286,8 +286,8 @@ void ir_init(ir_ctx *ctx, ir_ref consts_limit, ir_ref insns_limit)
 {
 	ir_insn *buf;
 
-	IR_ASSERT(consts_limit >= -(IR_TRUE - 1));
-	IR_ASSERT(insns_limit >= IR_UNUSED + 1);
+	IR_ASSERT(consts_limit >= IR_CONSTS_LIMIT_MIN);
+	IR_ASSERT(insns_limit >= IR_INSNS_LIMIT_MIN);
 
 	ctx->insns_count = IR_UNUSED + 1;
 	ctx->insns_limit = insns_limit;
