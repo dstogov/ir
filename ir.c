@@ -282,7 +282,7 @@ void ir_truncate(ir_ctx *ctx)
 	ctx->ir_base = buf + ctx->consts_limit;
 }
 
-void ir_init(ir_ctx *ctx, ir_ref consts_limit, ir_ref insns_limit)
+void ir_init(ir_ctx *ctx, uint32_t flags, ir_ref consts_limit, ir_ref insns_limit)
 {
 	ir_insn *buf;
 
@@ -294,7 +294,7 @@ void ir_init(ir_ctx *ctx, ir_ref consts_limit, ir_ref insns_limit)
 	ctx->consts_count = -(IR_TRUE - 1);
 	ctx->consts_limit = consts_limit;
 	ctx->fold_cse_limit = IR_UNUSED + 1;
-	ctx->flags = 0;
+	ctx->flags = flags;
 
 	ctx->binding = NULL;
 

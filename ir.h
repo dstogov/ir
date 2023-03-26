@@ -557,7 +557,7 @@ struct _ir_ctx {
 };
 
 /* Basic IR Construction API (implementation in ir.c) */
-void ir_init(ir_ctx *ctx, ir_ref consts_limit, ir_ref insns_limit);
+void ir_init(ir_ctx *ctx, uint32_t flags, ir_ref consts_limit, ir_ref insns_limit);
 void ir_free(ir_ctx *ctx);
 void ir_truncate(ir_ctx *ctx);
 

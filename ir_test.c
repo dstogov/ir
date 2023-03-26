@@ -134,12 +134,11 @@ int main(int argc, char **argv)
 		}
 	}
 
-	ir_init(&ctx, 256, 1024);
-	ctx.flags |= IR_FUNCTION;
-	ctx.flags |= mflags;
+	uint32_t flags = IR_FUNCTION | mflags;
 	if (opt_level > 0) {
-		ctx.flags |= IR_OPT_FOLDING | IR_OPT_CFG | IR_OPT_CODEGEN;
+		flags |= IR_OPT_FOLDING | IR_OPT_CFG | IR_OPT_CODEGEN;
 	}
+	ir_init(&ctx, flags, 256, 1024);
 	ctx.fixed_regset = ~debug_regset;
 	gen_mandelbrot(&ctx);
 //	ir_save(&ctx, stderr);
