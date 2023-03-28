@@ -381,19 +381,18 @@ int main(int argc, char **argv)
 
 	ir_loader_init();
 
-	ir_init(&ctx, 256, 1024);
-	ctx.flags |= IR_FUNCTION;
-	ctx.flags |= mflags;
+	uint32_t flags = IR_FUNCTION | mflags;
 
 	if (opt_level > 0) {
-		ctx.flags |= IR_OPT_FOLDING | IR_OPT_CFG | IR_OPT_CODEGEN;
+		flags |= IR_OPT_FOLDING | IR_OPT_CFG | IR_OPT_CODEGEN;
 	}
 	if (emit_c) {
-		ctx.flags |= IR_GEN_C;
+		flags |= IR_GEN_C;
 	}
 	if (dump_asm || run) {
-		ctx.flags |= IR_GEN_NATIVE;
+		flags |= IR_GEN_NATIVE;
 	}
+	ir_init(&ctx, flags, 256, 1024);
 	ctx.fixed_regset = ~debug_regset;
 
 	if (!ir_load(&ctx, f)) {
