@@ -27,8 +27,7 @@ ifeq (x86_64, $(TARGET))
   DASM_FLAGS = -D X64=1
 endif
 ifeq (x86, $(TARGET))
-  CC= gcc -m32
-  CFLAGS += -DIR_TARGET_X86
+  CFLAGS += -m32 -DIR_TARGET_X86
   DASM_ARCH  = x86
   DASM_FLAGS =
 endif
