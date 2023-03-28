@@ -8,7 +8,7 @@
 #include "ir.h"
 #include "ir_private.h"
 
-void ir_dump(ir_ctx *ctx, FILE *f)
+void ir_dump(const ir_ctx *ctx, FILE *f)
 {
 	ir_ref i, j, n, ref, *p;
 	ir_insn *insn;
@@ -52,7 +52,7 @@ void ir_dump(ir_ctx *ctx, FILE *f)
 	}
 }
 
-void ir_dump_dot(ir_ctx *ctx, FILE *f)
+void ir_dump_dot(const ir_ctx *ctx, FILE *f)
 {
 	int DATA_WEIGHT    = 0;
 	int CONTROL_WEIGHT = 5;
@@ -139,7 +139,7 @@ void ir_dump_dot(ir_ctx *ctx, FILE *f)
 	fprintf(f, "}\n");
 }
 
-void ir_dump_use_lists(ir_ctx *ctx, FILE *f)
+void ir_dump_use_lists(const ir_ctx *ctx, FILE *f)
 {
 	ir_ref i, j, n, *p;
 	ir_use_list *list;
@@ -287,7 +287,7 @@ void ir_dump_cfg(ir_ctx *ctx, FILE *f)
 	}
 }
 
-void ir_dump_cfg_map(ir_ctx *ctx, FILE *f)
+void ir_dump_cfg_map(const ir_ctx *ctx, FILE *f)
 {
 	ir_ref i;
     uint32_t *_blocks = ctx->cfg_map;
@@ -301,7 +301,7 @@ void ir_dump_cfg_map(ir_ctx *ctx, FILE *f)
 	}
 }
 
-void ir_dump_live_ranges(ir_ctx *ctx, FILE *f)
+void ir_dump_live_ranges(const ir_ctx *ctx, FILE *f)
 {
     ir_ref i, j, n;
 

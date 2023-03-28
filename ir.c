@@ -67,7 +67,7 @@ const char *ir_op_name[IR_LAST_OP] = {
 #endif
 };
 
-void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
+void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f)
 {
 	if (insn->op == IR_FUNC) {
 		fprintf(f, "%s", ir_get_str(ctx, insn->val.i32));
@@ -637,7 +637,7 @@ ir_ref ir_strl(ir_ctx *ctx, const char *s, size_t len)
 	return ir_strtab_lookup(&ctx->strtab, s, (uint32_t)len, ir_strtab_count(&ctx->strtab) + 1);
 }
 
-const char *ir_get_str(ir_ctx *ctx, ir_ref idx)
+const char *ir_get_str(const ir_ctx *ctx, ir_ref idx)
 {
 	IR_ASSERT(ctx->strtab.data);
 	return ir_strtab_str(&ctx->strtab, idx - 1);
@@ -1073,7 +1073,7 @@ void ir_list_remove(ir_list *l, uint32_t i)
 	l->len--;
 }
 
-bool ir_list_contains(ir_list *l, ir_ref val)
+bool ir_list_contains(const ir_list *l, ir_ref val)
 {
 	uint32_t i;
 
@@ -1147,9 +1147,9 @@ void ir_hashtab_free(ir_hashtab *tab)
 	tab->data = NULL;
 }
 
-ir_ref ir_hashtab_find(ir_hashtab *tab, uint32_t key)
+ir_ref ir_hashtab_find(const ir_hashtab *tab, uint32_t key)
 {
-	char *data = (char*)tab->data;
+	const char *data = (const char*)tab->data;
 	uint32_t pos = ((uint32_t*)data)[(int32_t)(key | tab->mask)];
 	ir_hashtab_bucket *p;
 
@@ -1347,7 +1347,7 @@ static ir_alias ir_check_aliasing(ir_ctx *ctx, ir_ref addr1, ir_ref addr2)
 }
 #endif
 
-static ir_alias ir_check_partial_aliasing(ir_ctx *ctx, ir_ref addr1, ir_ref addr2, ir_type type1, ir_type type2)
+static ir_alias ir_check_partial_aliasing(const ir_ctx *ctx, ir_ref addr1, ir_ref addr2, ir_type type1, ir_type type2)
 {
 	ir_insn *insn1, *insn2;
 

@@ -522,7 +522,7 @@ enum _ir_rule {
 };
 
 /* register allocation */
-bool ir_needs_vreg(ir_ctx *ctx, ir_ref ref)
+bool ir_needs_vreg(const ir_ctx *ctx, ir_ref ref)
 {
 	uint32_t rule;
 
@@ -538,7 +538,7 @@ bool ir_needs_vreg(ir_ctx *ctx, ir_ref ref)
 	 && rule != IR_SKIP_SHIFT;
 }
 
-static bool ir_call_needs_tmp_int_reg(ir_ctx *ctx, ir_insn *insn)
+static bool ir_call_needs_tmp_int_reg(const ir_ctx *ctx, const ir_insn *insn)
 {
 	ir_ref arg;
 	ir_insn *arg_insn;
@@ -582,10 +582,10 @@ static bool ir_call_needs_tmp_int_reg(ir_ctx *ctx, ir_insn *insn)
 	return 0;
 }
 
-int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *constraints)
+int ir_get_target_constraints(const ir_ctx *ctx, ir_ref ref, ir_target_constraints *constraints)
 {
 	uint32_t rule = ir_rule(ctx, ref);
-	ir_insn *insn;
+	const ir_insn *insn;
 	int n = 0, hints_count = 0;
 	int flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG | IR_OP3_MUST_BE_IN_REG;
 	int def_reg = IR_REG_NONE;
@@ -666,7 +666,7 @@ op2_const:
 			insn = &ctx->ir_base[ref];
 			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 			if (IR_IS_CONST_REF(insn->op1)) {
-				ir_insn *val_insn = &ctx->ir_base[insn->op1];
+				const ir_insn *val_insn = &ctx->ir_base[insn->op1];
 				if (ir_type_size[val_insn->type] == 8 && !IR_IS_32BIT(val_insn->type, val_insn->val)) {
 					constraints->tmp_regs[0] = IR_TMP_REG(1, val_insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n = 1;
@@ -675,7 +675,7 @@ op2_const:
 				flags = IR_USE_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
 			}
 			if (IR_IS_CONST_REF(insn->op2) && insn->op1 != insn->op2) {
-				ir_insn *val_insn = &ctx->ir_base[insn->op2];
+				const ir_insn *val_insn = &ctx->ir_base[insn->op2];
 				flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
 				if (ir_type_size[val_insn->type] == 8 && !IR_IS_32BIT(val_insn->type, val_insn->val)) {
 					constraints->tmp_regs[n] = IR_TMP_REG(2, val_insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
@@ -698,7 +698,7 @@ op2_const:
 cmp_fp:
 			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 			if (IR_IS_CONST_REF(insn->op1)) {
-				ir_insn *val_insn = &ctx->ir_base[insn->op1];
+				const ir_insn *val_insn = &ctx->ir_base[insn->op1];
 				constraints->tmp_regs[n] = IR_TMP_REG(1, val_insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 				n++;
 			}
@@ -726,7 +726,7 @@ cmp_fp:
 			flags = IR_OP2_MUST_BE_IN_REG | IR_OP3_MUST_BE_IN_REG;
 			insn = &ctx->ir_base[ref];
 			if (IR_IS_CONST_REF(insn->op2)) {
-				ir_insn *val_insn = &ctx->ir_base[insn->op2];
+				const ir_insn *val_insn = &ctx->ir_base[insn->op2];
 				IR_ASSERT(val_insn->type == IR_ADDR);
 				if (ir_type_size[val_insn->type] == 8 && !IR_IS_SIGNED_32BIT(val_insn->val.i64)) {
 					constraints->tmp_regs[0] = IR_TMP_REG(2, IR_ADDR, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
@@ -734,7 +734,7 @@ cmp_fp:
 				}
 			}
 			if (IR_IS_CONST_REF(insn->op3)) {
-				ir_insn *val_insn = &ctx->ir_base[insn->op3];
+				const ir_insn *val_insn = &ctx->ir_base[insn->op3];
 				if (ir_type_size[val_insn->type] == 8 && !IR_IS_32BIT(val_insn->type, val_insn->val)) {
 					constraints->tmp_regs[n] = IR_TMP_REG(3, val_insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
@@ -755,7 +755,7 @@ cmp_fp:
 			flags = IR_USE_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
 			insn = &ctx->ir_base[ref];
 			if (IR_IS_CONST_REF(insn->op2)) {
-				ir_insn *val_insn = &ctx->ir_base[insn->op2];
+				const ir_insn *val_insn = &ctx->ir_base[insn->op2];
 				IR_ASSERT(val_insn->type == IR_ADDR);
 				if (ir_type_size[val_insn->type] == 8 && !IR_IS_32BIT(val_insn->type, val_insn->val)) {
 					constraints->tmp_regs[0] = IR_TMP_REG(2, IR_ADDR, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);

@@ -62,7 +62,7 @@ static const int8_t *_ir_fp_reg_params;
 static const int8_t _ir_int_fc_reg_params[IR_REG_INT_FCARGS];
 static const int8_t *_ir_fp_fc_reg_params;
 
-static bool ir_is_fastcall(ir_ctx *ctx, ir_insn *insn)
+static bool ir_is_fastcall(const ir_ctx *ctx, const ir_insn *insn)
 {
 	if (sizeof(void*) == 4) {
 		if (IR_IS_CONST_REF(insn->op2)) {
@@ -79,7 +79,7 @@ static bool ir_is_fastcall(ir_ctx *ctx, ir_insn *insn)
 #endif
 
 #ifdef _WIN64
-static bool ir_is_vararg(ir_ctx *ctx, ir_insn *insn)
+static bool ir_is_vararg(const ir_ctx *ctx, ir_insn *insn)
 {
 	if (IR_IS_CONST_REF(insn->op2)) {
 		return (ctx->ir_base[insn->op2].const_flags & IR_CONST_VARARG_FUNC) != 0;
@@ -90,13 +90,13 @@ static bool ir_is_vararg(ir_ctx *ctx, ir_insn *insn)
 }
 #endif
 
-IR_ALWAYS_INLINE uint32_t ir_rule(ir_ctx *ctx, ir_ref ref)
+IR_ALWAYS_INLINE uint32_t ir_rule(const ir_ctx *ctx, ir_ref ref)
 {
 	IR_ASSERT(!IR_IS_CONST_REF(ref));
 	return ctx->rules[ref];
 }
 
-static ir_reg ir_get_param_reg(ir_ctx *ctx, ir_ref ref)
+static ir_reg ir_get_param_reg(const ir_ctx *ctx, ir_ref ref)
 {
 	ir_use_list *use_list = &ctx->use_lists[1];
 	int i;
@@ -156,7 +156,7 @@ static ir_reg ir_get_param_reg(ir_ctx *ctx, ir_ref ref)
 	return IR_REG_NONE;
 }
 
-static int ir_get_args_regs(ir_ctx *ctx, ir_insn *insn, int8_t *regs)
+static int ir_get_args_regs(const ir_ctx *ctx, const ir_insn *insn, int8_t *regs)
 {
 	int j, n;
 	ir_type type;
@@ -212,7 +212,7 @@ static int ir_get_args_regs(ir_ctx *ctx, ir_insn *insn, int8_t *regs)
 	return count;
 }
 
-static bool ir_is_same_mem(ir_ctx *ctx, ir_ref r1, ir_ref r2)
+static bool ir_is_same_mem(const ir_ctx *ctx, ir_ref r1, ir_ref r2)
 {
 	ir_live_interval *ival1, *ival2;
 	int32_t o1, o2;

@@ -452,10 +452,10 @@ typedef void (*ir_strtab_apply_t)(const char *str, uint32_t len, ir_ref val);
 
 void ir_strtab_init(ir_strtab *strtab, uint32_t count, uint32_t buf_size);
 ir_ref ir_strtab_lookup(ir_strtab *strtab, const char *str, uint32_t len, ir_ref val);
-ir_ref ir_strtab_find(ir_strtab *strtab, const char *str, uint32_t len);
+ir_ref ir_strtab_find(const ir_strtab *strtab, const char *str, uint32_t len);
 ir_ref ir_strtab_update(ir_strtab *strtab, const char *str, uint32_t len, ir_ref val);
-const char *ir_strtab_str(ir_strtab *strtab, ir_ref idx);
-void ir_strtab_apply(ir_strtab *strtab, ir_strtab_apply_t func);
+const char *ir_strtab_str(const ir_strtab *strtab, ir_ref idx);
+void ir_strtab_apply(const ir_strtab *strtab, ir_strtab_apply_t func);
 void ir_strtab_free(ir_strtab *strtab);
 
 /* IR Context Flags */
@@ -510,28 +510,28 @@ typedef int8_t ir_regs[4];
 typedef void (*ir_snapshot_create_t)(ir_ctx *ctx, ir_ref addr);
 
 struct _ir_ctx {
-	ir_insn           *ir_base;           /* two directional array - instructions grow down, constants grow up */
-	ir_ref             insns_count;
-	ir_ref             insns_limit;       /* initial instructions count */
-	ir_ref             consts_count;
-	ir_ref             consts_limit;      /* initial constants count */
-	uint32_t           flags;             /* IR context flags */
-	ir_ref             fold_cse_limit;
-	ir_insn            fold_insn;
+	ir_insn           *ir_base;                 /* two directional array - instructions grow down, constants grow up */
+	ir_ref             insns_count;             /* number of instructins stored in instructions buffer */
+	ir_ref             insns_limit;             /* size of allocated instructions buffer (it's extended when overflow) */
+	ir_ref             consts_count;            /* number of constants stored in constants buffer */
+	ir_ref             consts_limit;            /* size of allocated constants buffer (it's extended when overflow) */
+	uint32_t           flags;                   /* IR context flags (see IR_* defines above) */
+	ir_ref             fold_cse_limit;          /* CSE finds identical insns backward from "insn_count" to "fold_cse_limit" */
+	ir_insn            fold_insn;               /* temporary storage for folding engine */
 	ir_hashtab        *binding;
-	ir_use_list       *use_lists;         /* def->use lists for each instruction */
-	ir_ref            *use_edges;
-	ir_ref             use_edges_count;
-	uint32_t           cfg_blocks_count;
-	uint32_t           cfg_edges_count;
-	ir_block          *cfg_blocks;        /* list of Basic Blocks (starts from 1) */
-	uint32_t          *cfg_edges;
-	uint32_t          *cfg_map;           /* map of instructions to Basic Block number */
-	uint32_t          *rules;
+	ir_use_list       *use_lists;               /* def->use lists for each instruction */
+	ir_ref            *use_edges;               /* the actual uses: use = ctx->use_edges[ctx->use_lists[def].refs + n] */
+	ir_ref             use_edges_count;         /* number of elements in use_edges[] array */
+	uint32_t           cfg_blocks_count;        /* number of elements in cfg_blocks[] array */
+	uint32_t           cfg_edges_count;         /* number of elements in cfg_edges[] array */
+	ir_block          *cfg_blocks;              /* list of basic blocks (starts from 1) */
+	uint32_t          *cfg_edges;               /* the actual basic blocks predecessors and successors edges */
+	uint32_t          *cfg_map;                 /* map of instructions to basic block number */
+	uint32_t          *rules;                   /* array of target specific code-generation rules (for each instruction) */
 	uint32_t          *vregs;
 	ir_ref             vregs_count;
-	int32_t            spill_base;        /* base register for special spill area (e.g. PHP VM frame pointer) */
-	uint64_t           fixed_regset;      /* fixed registers, excluded for regular register allocation */
+	int32_t            spill_base;              /* base register for special spill area (e.g. PHP VM frame pointer) */
+	uint64_t           fixed_regset;            /* fixed registers, excluded for regular register allocation */
 	int32_t            fixed_stack_red_zone;    /* reusable stack allocated by caller (default 0) */
 	int32_t            fixed_stack_frame_size;  /* fixed stack allocated by generated code for spills and registers save/restore */
 	int32_t            fixed_call_stack_size;   /* fixed preallocated stack for parameter passing (default 0) */
@@ -541,7 +541,7 @@ struct _ir_ctx {
 	ir_ref            *prev_ref;
 	union {
 		void          *data;
-		ir_ref         control;           /* used by IR construction API (see ir_builder.h) */
+		ir_ref         control;                 /* used by IR construction API (see ir_builder.h) */
 	};
 	ir_snapshot_create_t   snapshot_create;
 	uint32_t           rodata_offset;
@@ -582,11 +582,11 @@ ir_ref ir_const_str(ir_ctx *ctx, ir_ref str);
 
 ir_ref ir_unique_const_addr(ir_ctx *ctx, uintptr_t c);
 
-void ir_print_const(ir_ctx *ctx, ir_insn *insn, FILE *f);
+void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f);
 
 ir_ref ir_str(ir_ctx *ctx, const char *s);
 ir_ref ir_strl(ir_ctx *ctx, const char *s, size_t len);
-const char *ir_get_str(ir_ctx *ctx, ir_ref idx);
+const char *ir_get_str(const ir_ctx *ctx, ir_ref idx);
 
 ir_ref ir_emit(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
 
@@ -613,9 +613,9 @@ IR_ALWAYS_INLINE void ir_set_op3(ir_ctx *ctx, ir_ref ref, ir_ref val)
 	ctx->ir_base[ref].op3 = val;
 }
 
-IR_ALWAYS_INLINE ir_ref ir_insn_op(ir_insn *insn, int32_t n)
+IR_ALWAYS_INLINE ir_ref ir_insn_op(const ir_insn *insn, int32_t n)
 {
-	ir_ref *p = insn->ops + n;
+	const ir_ref *p = insn->ops + n;
 	return *p;
 }
 
@@ -707,21 +707,21 @@ void ir_loader_free(void);
 int ir_load(ir_ctx *ctx, FILE *f);
 
 /* IR save API (implementation in ir_save.c) */
-void ir_save(ir_ctx *ctx, FILE *f);
+void ir_save(const ir_ctx *ctx, FILE *f);
 
 /* IR debug dump API (implementation in ir_dump.c) */
-void ir_dump(ir_ctx *ctx, FILE *f);
-void ir_dump_dot(ir_ctx *ctx, FILE *f);
-void ir_dump_use_lists(ir_ctx *ctx, FILE *f);
+void ir_dump(const ir_ctx *ctx, FILE *f);
+void ir_dump_dot(const ir_ctx *ctx, FILE *f);
+void ir_dump_use_lists(const ir_ctx *ctx, FILE *f);
 void ir_dump_cfg(ir_ctx *ctx, FILE *f);
-void ir_dump_cfg_map(ir_ctx *ctx, FILE *f);
-void ir_dump_live_ranges(ir_ctx *ctx, FILE *f);
+void ir_dump_cfg_map(const ir_ctx *ctx, FILE *f);
+void ir_dump_live_ranges(const ir_ctx *ctx, FILE *f);
 
 /* IR to C conversion (implementation in ir_emit_c.c) */
 int ir_emit_c(ir_ctx *ctx, FILE *f);
 
 /* IR verification API (implementation in ir_check.c) */
-bool ir_check(ir_ctx *ctx);
+bool ir_check(const ir_ctx *ctx);
 void ir_consistency_check(void);
 
 /* Code patching (implementation in ir_patch.c) */

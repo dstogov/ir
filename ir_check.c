@@ -40,7 +40,7 @@ void ir_consistency_check(void)
 	IR_ASSERT(IR_ADD + 1 == IR_SUB);
 }
 
-static bool ir_check_use_list(ir_ctx *ctx, ir_ref from, ir_ref to)
+static bool ir_check_use_list(const ir_ctx *ctx, ir_ref from, ir_ref to)
 {
 	ir_ref n, j, *p;
 	ir_use_list *use_list = &ctx->use_lists[from];
@@ -54,7 +54,7 @@ static bool ir_check_use_list(ir_ctx *ctx, ir_ref from, ir_ref to)
 	return 0;
 }
 
-static bool ir_check_input_list(ir_ctx *ctx, ir_ref from, ir_ref to)
+static bool ir_check_input_list(const ir_ctx *ctx, ir_ref from, ir_ref to)
 {
 	ir_insn *insn = &ctx->ir_base[to];
 	ir_ref n, j, *p;
@@ -68,7 +68,7 @@ static bool ir_check_input_list(ir_ctx *ctx, ir_ref from, ir_ref to)
 	return 0;
 }
 
-bool ir_check(ir_ctx *ctx)
+bool ir_check(const ir_ctx *ctx)
 {
 	ir_ref i, j, n, *p, use;
 	ir_insn *insn, *use_insn;

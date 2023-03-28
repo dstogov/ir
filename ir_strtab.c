@@ -110,10 +110,10 @@ void ir_strtab_init(ir_strtab *strtab, uint32_t size, uint32_t buf_size)
 	}
 }
 
-ir_ref ir_strtab_find(ir_strtab *strtab, const char *str, uint32_t len)
+ir_ref ir_strtab_find(const ir_strtab *strtab, const char *str, uint32_t len)
 {
 	uint32_t h = ir_str_hash(str, len);
-	char *data = (char*)strtab->data;
+	const char *data = (const char*)strtab->data;
 	uint32_t pos = ((uint32_t*)data)[(int32_t)(h | strtab->mask)];
 	ir_strtab_bucket *p;
 
@@ -197,10 +197,10 @@ ir_ref ir_strtab_update(ir_strtab *strtab, const char *str, uint32_t len, ir_ref
 	return 0;
 }
 
-const char *ir_strtab_str(ir_strtab *strtab, ir_ref idx)
+const char *ir_strtab_str(const ir_strtab *strtab, ir_ref idx)
 {
 	IR_ASSERT(idx >= 0 && (uint32_t)idx < strtab->count);
-	return ((ir_strtab_bucket*)strtab->data)[idx].str;
+	return ((const ir_strtab_bucket*)strtab->data)[idx].str;
 }
 
 void ir_strtab_free(ir_strtab *strtab)
@@ -215,12 +215,12 @@ void ir_strtab_free(ir_strtab *strtab)
 	}
 }
 
-void ir_strtab_apply(ir_strtab *strtab, ir_strtab_apply_t func)
+void ir_strtab_apply(const ir_strtab *strtab, ir_strtab_apply_t func)
 {
 	uint32_t i;
 
 	for (i = 0; i < strtab->count; i++) {
-		ir_strtab_bucket *b = &((ir_strtab_bucket*)strtab->data)[i];
+		const ir_strtab_bucket *b = &((ir_strtab_bucket*)strtab->data)[i];
 		func(b->str, b->len, b->val);
 	}
 }

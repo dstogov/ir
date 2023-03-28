@@ -46,7 +46,7 @@ static ir_ref _ir_merge_blocks(ir_ctx *ctx, ir_ref end, ir_ref begin)
 	return next;
 }
 
-IR_ALWAYS_INLINE void _ir_add_successors(ir_ctx *ctx, ir_ref ref, ir_worklist *worklist)
+IR_ALWAYS_INLINE void _ir_add_successors(const ir_ctx *ctx, ir_ref ref, ir_worklist *worklist)
 {
 	ir_use_list *use_list = &ctx->use_lists[ref];
 	ir_ref *p, use, n = use_list->count;
@@ -76,9 +76,10 @@ IR_ALWAYS_INLINE void _ir_add_successors(ir_ctx *ctx, ir_ref ref, ir_worklist *w
 	}
 }
 
-IR_ALWAYS_INLINE void _ir_add_predecessors(ir_insn *insn, ir_worklist *worklist)
+IR_ALWAYS_INLINE void _ir_add_predecessors(const ir_insn *insn, ir_worklist *worklist)
 {
-	ir_ref n, *p, ref;
+	ir_ref n, ref;
+	const ir_ref *p;
 
 	if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
 		n = ir_variable_inputs_count(insn);
@@ -680,10 +681,10 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 	return 1;
 }
 
-static bool ir_dominates(ir_block *blocks, uint32_t b1, uint32_t b2)
+static bool ir_dominates(const ir_block *blocks, uint32_t b1, uint32_t b2)
 {
 	uint32_t b1_depth = blocks[b1].dom_depth;
-	ir_block *bb2 = &blocks[b2];
+	const ir_block *bb2 = &blocks[b2];
 
 	while (bb2->dom_depth > b1_depth) {
 		b2 = bb2->dom_parent;
@@ -1027,7 +1028,7 @@ int ir_schedule_blocks(ir_ctx *ctx)
 }
 
 /* JMP target optimisation */
-uint32_t ir_skip_empty_target_blocks(ir_ctx *ctx, uint32_t b)
+uint32_t ir_skip_empty_target_blocks(const ir_ctx *ctx, uint32_t b)
 {
 	ir_block *bb;
 
@@ -1043,7 +1044,7 @@ uint32_t ir_skip_empty_target_blocks(ir_ctx *ctx, uint32_t b)
 	return b;
 }
 
-uint32_t ir_skip_empty_next_blocks(ir_ctx *ctx, uint32_t b)
+uint32_t ir_skip_empty_next_blocks(const ir_ctx *ctx, uint32_t b)
 {
 	ir_block *bb;
 
@@ -1063,7 +1064,7 @@ uint32_t ir_skip_empty_next_blocks(ir_ctx *ctx, uint32_t b)
 	return b;
 }
 
-void ir_get_true_false_blocks(ir_ctx *ctx, uint32_t b, uint32_t *true_block, uint32_t *false_block, uint32_t *next_block)
+void ir_get_true_false_blocks(const ir_ctx *ctx, uint32_t b, uint32_t *true_block, uint32_t *false_block, uint32_t *next_block)
 {
 	ir_block *bb;
 	uint32_t *p, use_block;

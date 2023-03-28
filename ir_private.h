@@ -260,7 +260,7 @@ IR_ALWAYS_INLINE void ir_bitset_excl(ir_bitset set, uint32_t n)
 	set[n / IR_BITSET_BITS] &= ~(IR_BITSET_ONE << (n % IR_BITSET_BITS));
 }
 
-IR_ALWAYS_INLINE bool ir_bitset_in(ir_bitset set, uint32_t n)
+IR_ALWAYS_INLINE bool ir_bitset_in(const ir_bitset set, uint32_t n)
 {
 	return (set[(n / IR_BITSET_BITS)] & (IR_BITSET_ONE << (n % IR_BITSET_BITS))) != 0;
 }
@@ -275,7 +275,7 @@ IR_ALWAYS_INLINE void ir_bitset_fill(ir_bitset set, uint32_t len)
 	memset(set, 0xff, len * (IR_BITSET_BITS / 8));
 }
 
-IR_ALWAYS_INLINE bool ir_bitset_empty(ir_bitset set, uint32_t len)
+IR_ALWAYS_INLINE bool ir_bitset_empty(const ir_bitset set, uint32_t len)
 {
 	uint32_t i;
 	for (i = 0; i < len; i++) {
@@ -286,17 +286,17 @@ IR_ALWAYS_INLINE bool ir_bitset_empty(ir_bitset set, uint32_t len)
 	return 1;
 }
 
-IR_ALWAYS_INLINE bool ir_bitset_equal(ir_bitset set1, ir_bitset set2, uint32_t len)
+IR_ALWAYS_INLINE bool ir_bitset_equal(const ir_bitset set1, const ir_bitset set2, uint32_t len)
 {
     return memcmp(set1, set2, len * (IR_BITSET_BITS / 8)) == 0;
 }
 
-IR_ALWAYS_INLINE void ir_bitset_copy(ir_bitset set1, ir_bitset set2, uint32_t len)
+IR_ALWAYS_INLINE void ir_bitset_copy(ir_bitset set1, const ir_bitset set2, uint32_t len)
 {
     memcpy(set1, set2, len * (IR_BITSET_BITS / 8));
 }
 
-IR_ALWAYS_INLINE void ir_bitset_intersection(ir_bitset set1, ir_bitset set2, uint32_t len)
+IR_ALWAYS_INLINE void ir_bitset_intersection(ir_bitset set1, const ir_bitset set2, uint32_t len)
 {
     uint32_t i;
 
@@ -305,7 +305,7 @@ IR_ALWAYS_INLINE void ir_bitset_intersection(ir_bitset set1, ir_bitset set2, uin
 	}
 }
 
-IR_ALWAYS_INLINE void ir_bitset_union(ir_bitset set1, ir_bitset set2, uint32_t len)
+IR_ALWAYS_INLINE void ir_bitset_union(ir_bitset set1, const ir_bitset set2, uint32_t len)
 {
 	uint32_t i;
 
@@ -314,7 +314,7 @@ IR_ALWAYS_INLINE void ir_bitset_union(ir_bitset set1, ir_bitset set2, uint32_t l
 	}
 }
 
-IR_ALWAYS_INLINE void ir_bitset_difference(ir_bitset set1, ir_bitset set2, uint32_t len)
+IR_ALWAYS_INLINE void ir_bitset_difference(ir_bitset set1, const ir_bitset set2, uint32_t len)
 {
 	uint32_t i;
 
@@ -323,7 +323,7 @@ IR_ALWAYS_INLINE void ir_bitset_difference(ir_bitset set1, ir_bitset set2, uint3
 	}
 }
 
-IR_ALWAYS_INLINE bool ir_bitset_subset(ir_bitset set1, ir_bitset set2, uint32_t len)
+IR_ALWAYS_INLINE bool ir_bitset_is_subset(const ir_bitset set1, const ir_bitset set2, uint32_t len)
 {
 	uint32_t i;
 
@@ -335,7 +335,7 @@ IR_ALWAYS_INLINE bool ir_bitset_subset(ir_bitset set1, ir_bitset set2, uint32_t 
 	return 1;
 }
 
-IR_ALWAYS_INLINE int ir_bitset_first(ir_bitset set, uint32_t len)
+IR_ALWAYS_INLINE int ir_bitset_first(const ir_bitset set, uint32_t len)
 {
 	uint32_t i;
 
@@ -347,7 +347,7 @@ IR_ALWAYS_INLINE int ir_bitset_first(ir_bitset set, uint32_t len)
 	return -1; /* empty set */
 }
 
-IR_ALWAYS_INLINE int ir_bitset_last(ir_bitset set, uint32_t len)
+IR_ALWAYS_INLINE int ir_bitset_last(const ir_bitset set, uint32_t len)
 {
 	uint32_t i = len;
 
@@ -464,7 +464,7 @@ IR_ALWAYS_INLINE void ir_bitqueue_del(ir_bitqueue *q, uint32_t n)
 	ir_bitset_excl(q->set, n);
 }
 
-IR_ALWAYS_INLINE bool ir_bitqueue_in(ir_bitqueue *q, uint32_t n)
+IR_ALWAYS_INLINE bool ir_bitqueue_in(const ir_bitqueue *q, uint32_t n)
 {
 	return ir_bitset_in(q->set, n);
 }
@@ -492,17 +492,17 @@ IR_ALWAYS_INLINE void ir_array_free(ir_array *a)
 	a->size = 0;
 }
 
-IR_ALWAYS_INLINE uint32_t ir_array_size(ir_array *a)
+IR_ALWAYS_INLINE uint32_t ir_array_size(const ir_array *a)
 {
 	return a->size;
 }
 
-IR_ALWAYS_INLINE ir_ref ir_array_get(ir_array *a, uint32_t i)
+IR_ALWAYS_INLINE ir_ref ir_array_get(const ir_array *a, uint32_t i)
 {
 	return (i < a->size) ? a->refs[i] : IR_UNUSED;
 }
 
-IR_ALWAYS_INLINE ir_ref ir_array_at(ir_array *a, uint32_t i)
+IR_ALWAYS_INLINE ir_ref ir_array_at(const ir_array *a, uint32_t i)
 {
 	IR_ASSERT(i < a->size);
 	return a->refs[i];
@@ -528,7 +528,7 @@ typedef struct _ir_list {
 	uint32_t len;
 } ir_list;
 
-bool ir_list_contains(ir_list *l, ir_ref val);
+bool ir_list_contains(const ir_list *l, ir_ref val);
 void ir_list_insert(ir_list *l, uint32_t i, ir_ref val);
 void ir_list_remove(ir_list *l, uint32_t i);
 
@@ -549,12 +549,12 @@ IR_ALWAYS_INLINE void ir_list_clear(ir_list *l)
 	l->len = 0;
 }
 
-IR_ALWAYS_INLINE uint32_t ir_list_len(ir_list *l)
+IR_ALWAYS_INLINE uint32_t ir_list_len(const ir_list *l)
 {
 	return l->len;
 }
 
-IR_ALWAYS_INLINE uint32_t ir_list_capasity(ir_list *l)
+IR_ALWAYS_INLINE uint32_t ir_list_capasity(const ir_list *l)
 {
 	return ir_array_size(&l->a);
 }
@@ -575,13 +575,13 @@ IR_ALWAYS_INLINE ir_ref ir_list_pop(ir_list *l)
 	return ir_array_at(&l->a, --l->len);
 }
 
-IR_ALWAYS_INLINE ir_ref ir_list_peek(ir_list *l)
+IR_ALWAYS_INLINE ir_ref ir_list_peek(const ir_list *l)
 {
 	IR_ASSERT(l->len > 0);
 	return ir_array_at(&l->a, l->len - 1);
 }
 
-IR_ALWAYS_INLINE ir_ref ir_list_at(ir_list *l, uint32_t i)
+IR_ALWAYS_INLINE ir_ref ir_list_at(const ir_list *l, uint32_t i)
 {
 	IR_ASSERT(i < l->len);
 	return ir_array_at(&l->a, i);
@@ -611,12 +611,12 @@ IR_ALWAYS_INLINE void ir_worklist_free(ir_worklist *w)
 	ir_mem_free(w->visited);
 }
 
-IR_ALWAYS_INLINE uint32_t ir_worklist_len(ir_worklist *w)
+IR_ALWAYS_INLINE uint32_t ir_worklist_len(const ir_worklist *w)
 {
 	return ir_list_len(&w->l);
 }
 
-IR_ALWAYS_INLINE uint32_t ir_worklist_capasity(ir_worklist *w)
+IR_ALWAYS_INLINE uint32_t ir_worklist_capasity(const ir_worklist *w)
 {
 	return ir_list_capasity(&w->l);
 }
@@ -644,7 +644,7 @@ IR_ALWAYS_INLINE ir_ref ir_worklist_pop(ir_worklist *w)
 	return ir_list_pop(&w->l);
 }
 
-IR_ALWAYS_INLINE ir_ref ir_worklist_peek(ir_worklist *w)
+IR_ALWAYS_INLINE ir_ref ir_worklist_peek(const ir_worklist *w)
 {
 	return ir_list_peek(&w->l);
 }
@@ -669,7 +669,7 @@ typedef struct _ir_hashtab {
 
 void ir_hashtab_init(ir_hashtab *tab, uint32_t size);
 void ir_hashtab_free(ir_hashtab *tab);
-ir_ref ir_hashtab_find(ir_hashtab *tab, uint32_t key);
+ir_ref ir_hashtab_find(const ir_hashtab *tab, uint32_t key);
 bool ir_hashtab_add(ir_hashtab *tab, uint32_t key, ir_ref val);
 void ir_hashtab_key_sort(ir_hashtab *tab);
 
@@ -684,7 +684,7 @@ extern const char *ir_op_name[IR_LAST_OP];
 #define IR_IS_CONST_OP(op)       ((op) > IR_NOP && (op) <= IR_C_FLOAT)
 #define IR_IS_FOLDABLE_OP(op)    ((op) <= IR_LAST_FOLDABLE_OP)
 
-IR_ALWAYS_INLINE bool ir_const_is_true(ir_insn *v)
+IR_ALWAYS_INLINE bool ir_const_is_true(const ir_insn *v)
 {
 
 	if (v->type == IR_BOOL) {
@@ -748,7 +748,7 @@ IR_ALWAYS_INLINE bool ir_const_is_true(ir_insn *v)
 #define IR_IS_REF_OPND_KIND(kind) \
 	((kind) >= IR_OPND_DATA && (kind) <= IR_OPND_VAR)
 
-IR_ALWAYS_INLINE ir_ref ir_variable_inputs_count(ir_insn *insn)
+IR_ALWAYS_INLINE ir_ref ir_variable_inputs_count(const ir_insn *insn)
 {
 	uint32_t n = insn->inputs_count;
 	if (n == 0) {
@@ -757,7 +757,7 @@ IR_ALWAYS_INLINE ir_ref ir_variable_inputs_count(ir_insn *insn)
 	return n;
 }
 
-IR_ALWAYS_INLINE ir_ref ir_operands_count(ir_ctx *ctx, ir_insn *insn)
+IR_ALWAYS_INLINE ir_ref ir_operands_count(const ir_ctx *ctx, const ir_insn *insn)
 {
 	uint32_t flags = ir_op_flags[insn->op];
 	uint32_t n = IR_OPERANDS_COUNT(flags);
@@ -774,7 +774,7 @@ IR_ALWAYS_INLINE ir_ref ir_operands_count(ir_ctx *ctx, ir_insn *insn)
 	return n;
 }
 
-IR_ALWAYS_INLINE ir_ref ir_input_edges_count(ir_ctx *ctx, ir_insn *insn)
+IR_ALWAYS_INLINE ir_ref ir_input_edges_count(const ir_ctx *ctx, const ir_insn *insn)
 {
 	uint32_t flags = ir_op_flags[insn->op];
 	uint32_t n = IR_INPUT_EDGES_COUNT(flags);
@@ -792,7 +792,7 @@ IR_ALWAYS_INLINE ir_ref ir_input_edges_count(ir_ctx *ctx, ir_insn *insn)
 }
 
 /*** IR Binding ***/
-IR_ALWAYS_INLINE ir_ref ir_binding_find(ir_ctx *ctx, ir_ref ref)
+IR_ALWAYS_INLINE ir_ref ir_binding_find(const ir_ctx *ctx, ir_ref ref)
 {
 	ir_ref var = ir_hashtab_find(ctx->binding, ref);
 	return (var != (ir_ref)IR_INVALID_VAL) ? var : 0;
@@ -846,11 +846,11 @@ struct _ir_block {
 	uint32_t     loop_depth;
 };
 
-uint32_t ir_skip_empty_target_blocks(ir_ctx *ctx, uint32_t b);
-uint32_t ir_skip_empty_next_blocks(ir_ctx *ctx, uint32_t b);
-void ir_get_true_false_blocks(ir_ctx *ctx, uint32_t b, uint32_t *true_block, uint32_t *false_block, uint32_t *next_block);
+uint32_t ir_skip_empty_target_blocks(const ir_ctx *ctx, uint32_t b);
+uint32_t ir_skip_empty_next_blocks(const ir_ctx *ctx, uint32_t b);
+void ir_get_true_false_blocks(const ir_ctx *ctx, uint32_t b, uint32_t *true_block, uint32_t *false_block, uint32_t *next_block);
 
-IR_ALWAYS_INLINE uint32_t ir_phi_input_number(ir_ctx *ctx, ir_block *bb, uint32_t from)
+IR_ALWAYS_INLINE uint32_t ir_phi_input_number(const ir_ctx *ctx, const ir_block *bb, uint32_t from)
 {
 	uint32_t n, *p;
 
@@ -1055,7 +1055,7 @@ IR_ALWAYS_INLINE void ir_set_alocated_reg(ir_ctx *ctx, ir_ref ref, int op_num, i
 	regs[op_num] = reg;
 }
 
-IR_ALWAYS_INLINE int8_t ir_get_alocated_reg(ir_ctx *ctx, ir_ref ref, int op_num)
+IR_ALWAYS_INLINE int8_t ir_get_alocated_reg(const ir_ctx *ctx, ir_ref ref, int op_num)
 {
 	int8_t *regs = ctx->regs[ref];
 
@@ -1073,8 +1073,8 @@ typedef struct _ir_target_constraints ir_target_constraints;
 #define IR_SCRATCH_REG(_reg, _start, _end) \
 	(ir_tmp_reg){.reg=(_reg), .type=IR_VOID, .start=(_start), .end=(_end)}
 
-bool ir_needs_vreg(ir_ctx *ctx, ir_ref ref);
-int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *constraints);
+bool ir_needs_vreg(const ir_ctx *ctx, ir_ref ref);
+int ir_get_target_constraints(const ir_ctx *ctx, ir_ref ref, ir_target_constraints *constraints);
 
 #endif /* defined(IR_REGSET_64BIT) */
 

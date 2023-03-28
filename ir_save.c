@@ -8,7 +8,7 @@
 #include "ir.h"
 #include "ir_private.h"
 
-void ir_save(ir_ctx *ctx, FILE *f)
+void ir_save(const ir_ctx *ctx, FILE *f)
 {
 	ir_ref i, j, n, ref, *p;
 	ir_insn *insn;
