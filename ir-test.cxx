@@ -180,11 +180,6 @@ namespace ir {
 			return target.length() > 0 && target.compare(::ir_target);
 		}
 		bool run() {
-			std::remove(out_file.c_str());
-			std::remove(exp_file.c_str());
-			std::remove(diff_file.c_str());
-			std::remove(ir_file.c_str());
-
 			std::ofstream in_os(ir_file);
 			in_os << code;
 			in_os.close();
@@ -193,16 +188,13 @@ namespace ir {
 			auto diff_cmd = std::string("diff") + " " + DIFF_ARGS + "-u " + exp_file + " " + out_file + " > " + diff_file + " 2>&1";
 
 			int ret_code = std::system(test_cmd.c_str()) >> 0x8;
-			if (ret_code) {
-				return false;
-			}
 
 			std::stringstream out_buf;
 			out_buf << std::ifstream(out_file).rdbuf();
 			std::string out = trim(out_buf.str());
 			out.erase(std::remove(out.begin(), out.end(), '\r'), out.end());
 
-			if (out.compare(expect)) {
+			if (ret_code || out.compare(expect)) {
 				std::ofstream exp_os(exp_file);
 				exp_os << (expect + "\n");
 				exp_os.close();
@@ -216,6 +208,11 @@ namespace ir {
 				}
 				return false;
 			}
+
+			std::remove(out_file.c_str());
+			std::remove(exp_file.c_str());
+			std::remove(diff_file.c_str());
+			std::remove(ir_file.c_str());
 
 			return true;
 		}
