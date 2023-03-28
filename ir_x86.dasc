@@ -1634,12 +1634,12 @@ store_int:
 								} else {
 									ir_match_fuse_load(ctx, op1_insn->op2, bb);
 								}
-								if (op1_insn->op == IR_AND && ctx->use_lists[insn->op1].count == 1) {
+								if (op1_insn->op == IR_AND && ctx->use_lists[op2_insn->op1].count == 1) {
 									if (IR_IS_CONST_REF(op1_insn->op2)) {
 										ir_match_fuse_load(ctx, op1_insn->op1, bb);
 									}
-									ctx->rules[op2_insn->op1] = IR_TEST_INT;
-									ctx->rules[insn->op2] = IR_SKIP_CMP_INT;
+									ctx->rules[op2_insn->op1] = IR_SKIP_TEST_INT;
+									ctx->rules[insn->op2] = IR_SKIP;
 									return IR_TEST_AND_BRANCH_INT;
 								} else {
 									ctx->rules[op2_insn->op1] = IR_BINOP_INT;

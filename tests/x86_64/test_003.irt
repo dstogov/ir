@@ -1,0 +1,29 @@
+--TEST--
+003: IF(EQ(AND(_,_), 0)) -> TEST
+--TARGET--
+x86_64
+--ARGS--
+-S
+--CODE--
+{
+	int32_t c1 = 0;
+	int32_t c2 = 3;
+	l_1 = START(ret);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t d_1 = AND(x, c2);
+	bool d_2 = EQ(d_1, c1);
+	l_2 = IF(l_1, d_2);
+	l_3 = IF_TRUE(l_2);
+	ret1 = RETURN(l_3, c1);
+	l_5 = IF_FALSE(l_2);
+	ret = RETURN(l_5, c2, ret1);
+}
+--EXPECT--
+test:
+	testl $3, %edi
+	jne .L1
+	xorl %eax, %eax
+	retq
+.L1:
+	movl $3, %eax
+	retq
