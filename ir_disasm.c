@@ -341,7 +341,7 @@ int ir_disasm(const char    *name,
 	cs_err ret;
 
 # if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
-#  if defined(__x86_64__) || defined(_WIN64)
+#  ifdef IR_TARGET_X64
 	ret = cs_open(CS_ARCH_X86, CS_MODE_64, &cs);
 	if (ret != CS_ERR_OK) {
 		fprintf(stderr, "cs_open(CS_ARCH_X86, CS_MODE_64, ...) failed; [%d] %s\n", ret, cs_strerror(ret));

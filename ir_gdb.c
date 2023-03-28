@@ -70,18 +70,18 @@ enum {
 };
 
 enum {
-#if defined(__i386__)
+#if defined(IR_TARGET_X86)
 	DW_REG_AX, DW_REG_CX, DW_REG_DX, DW_REG_BX,
 	DW_REG_SP, DW_REG_BP, DW_REG_SI, DW_REG_DI,
 	DW_REG_RA,
-#elif defined(__x86_64__)
+#elif defined(IR_TARGET_X64)
 	/* Yes, the order is strange, but correct. */
 	DW_REG_AX, DW_REG_DX, DW_REG_CX, DW_REG_BX,
 	DW_REG_SI, DW_REG_DI, DW_REG_BP, DW_REG_SP,
 	DW_REG_8, DW_REG_9, DW_REG_10, DW_REG_11,
 	DW_REG_12, DW_REG_13, DW_REG_14, DW_REG_15,
 	DW_REG_RA,
-#elif defined(__aarch64__)
+#elif defined(IR_TARGET_AARCH64)
 	DW_REG_SP = 31,
 	DW_REG_RA = 30,
 	DW_REG_X29 = 29,
@@ -148,11 +148,11 @@ static const ir_elf_header ir_elfhdr_template = {
 	.eabiversion = 0,
 	.epad        = { 0, 0, 0, 0, 0, 0, 0 },
 	.type        = 1,
-#if defined(__i386__)
+#if defined(IR_TARGET_X86)
 	.machine     = 3,
-#elif defined(__x86_64__)
+#elif defined(IR_TARGET_X64)
 	.machine     = 62,
-#elif defined(__aarch64__)
+#elif defined(IR_TARGET_AARCH64)
 	.machine     = 183,
 #else
 # error "Unsupported target architecture"
@@ -307,10 +307,10 @@ static void ir_gdbjit_ehframe(ir_gdbjit_ctx *ctx, uint32_t sp_offset, uint32_t s
 		DSV(-(int32_t)sizeof(uintptr_t));              /* Data alignment factor. */
 		DB(DW_REG_RA);                                 /* Return address register. */
 		DB(1); DB(DW_EH_PE_textrel|DW_EH_PE_udata4);   /* Augmentation data. */
-#if defined(__x86_64__) || defined(i386)
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 		DB(DW_CFA_def_cfa); DUV(DW_REG_SP); DUV(sizeof(uintptr_t));
 		DB(DW_CFA_offset|DW_REG_RA); DUV(1);
-#elif defined(__aarch64__)
+#elif defined(IR_TARGET_AARCH64)
 		DB(DW_CFA_def_cfa); DUV(DW_REG_SP); DUV(0);
 #endif
 		DALIGNNOP(sizeof(uintptr_t));
@@ -323,7 +323,7 @@ static void ir_gdbjit_ehframe(ir_gdbjit_ctx *ctx, uint32_t sp_offset, uint32_t s
 		DU32(ctx->szmcode);         /* Machine code length. */
 		DB(0);                      /* Augmentation data. */
 		DB(DW_CFA_def_cfa_offset); DUV(sp_offset);
-#if defined(__aarch64__)
+#if defined(IR_TARGET_AARCH64)
 		if (sp_offset) {
 			if (sp_adjustment && sp_adjustment < sp_offset) {
 				DB(DW_CFA_offset|DW_REG_X29); DUV(sp_adjustment / sizeof(uintptr_t));
@@ -336,7 +336,7 @@ static void ir_gdbjit_ehframe(ir_gdbjit_ctx *ctx, uint32_t sp_offset, uint32_t s
 #endif
 		if (sp_adjustment && sp_adjustment > sp_offset) {
 			DB(DW_CFA_advance_loc|1); DB(DW_CFA_def_cfa_offset); DUV(sp_adjustment);
-#if defined(__aarch64__)
+#if defined(IR_TARGET_AARCH64)
 			if (!sp_offset) {
 				DB(DW_CFA_offset|DW_REG_X29); DUV(sp_adjustment / sizeof(uintptr_t));
 				DB(DW_CFA_offset|DW_REG_RA); DUV((sp_adjustment / sizeof(uintptr_t)) - 1);

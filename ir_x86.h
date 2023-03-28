@@ -8,7 +8,7 @@
 #ifndef IR_X86_H
 #define IR_X86_H
 
-#if defined(__x86_64__) || defined(_WIN64)
+#if defined(IR_TARGET_X64)
 # define IR_GP_REGS(_) \
 	_(R0,   rax,   eax,   ax,   al, ah) \
 	_(R1,   rcx,   ecx,   cx,   cl, ch) \
@@ -45,7 +45,7 @@
 	_(XMM14, xmm14) \
 	_(XMM15, xmm15) \
 
-#else
+#elif defined(IR_TARGET_X86)
 
 # define IR_GP_REGS(_) \
 	_(R0,   ___,   eax,   ax,   al, ah) \
@@ -67,6 +67,8 @@
 	_(XMM6,  xmm6) \
 	_(XMM7,  xmm7) \
 
+#else
+# error "Unsupported target architecture"
 #endif
 
 #define IR_GP_REG_ENUM(code, name64, name32, name16, name8, name8h) \
@@ -140,7 +142,7 @@ enum _ir_reg {
 	| IR_REGSET_INTERVAL(IR_REG_R12, IR_REG_R15) \
 	| IR_REGSET_INTERVAL(IR_REG_XMM6, IR_REG_XMM15))
 
-#elif defined(__x86_64__)
+#elif defined(IR_TARGET_X64)
 
 # define IR_REG_INT_RET1 IR_REG_RAX
 # define IR_REG_FP_RET1  IR_REG_XMM0
@@ -174,7 +176,7 @@ enum _ir_reg {
 	| IR_REGSET(IR_REG_RBP) \
 	| IR_REGSET_INTERVAL(IR_REG_R12, IR_REG_R15))
 
-#else
+#elif defined(IR_TARGET_X86)
 
 # define IR_REG_INT_RET1   IR_REG_RAX
 # define IR_REG_INT_RET2   IR_REG_RDX
@@ -197,6 +199,8 @@ enum _ir_reg {
 	| IR_REGSET(IR_REG_RBP) \
 	| IR_REGSET_INTERVAL(IR_REG_RSI, IR_REG_RDI))
 
+#else
+# error "Unsupported target architecture"
 #endif
 
 typedef struct _ir_tmp_reg {

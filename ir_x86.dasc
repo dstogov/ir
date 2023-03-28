@@ -382,7 +382,7 @@ static const int8_t _ir_fp_reg_params[IR_REG_FP_ARGS] = {
 	IR_REG_FP_ARG4,
 };
 
-#elif defined(__x86_64__)
+#elif defined(IR_TARGET_X64)
 
 static const int8_t _ir_int_reg_params[IR_REG_INT_ARGS] = {
 	IR_REG_INT_ARG1,
@@ -4216,7 +4216,7 @@ static void ir_emit_return_void(ir_ctx *ctx)
 
 	ir_emit_epilogue(ctx);
 
-#if !defined(_WIN64) && !defined(__x86_64__)
+#ifdef IR_TARGET_X86
 	if (sizeof(void*) == 4 && (ctx->flags & IR_FASTCALL_FUNC) && data->param_stack_size) {
 		|	ret data->param_stack_size
 		return;
@@ -7289,7 +7289,7 @@ static void ir_emit_load_params(ir_ctx *ctx)
 	const int8_t *fp_reg_params = _ir_fp_reg_params;
 	int32_t stack_offset = 0;
 
-#if !defined(_WIN64) && !defined(__x86_64__)
+#ifdef IR_TARGET_X86
 	if (sizeof(void*) == 4 && (ctx->flags & IR_FASTCALL_FUNC)) {
 		int_reg_params_count = IR_REG_INT_FCARGS;
 		fp_reg_params_count = IR_REG_FP_FCARGS;
@@ -7418,7 +7418,7 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 	int32_t stack_start = 0;
 	int32_t stack_offset = 0;
 
-#if !defined(_WIN64) && !defined(__x86_64__)
+#ifdef IR_TARGET_X86
 	if (sizeof(void*) == 4 && (ctx->flags & IR_FASTCALL_FUNC)) {
 		int_reg_params_count = IR_REG_INT_FCARGS;
 		fp_reg_params_count = IR_REG_FP_FCARGS;
