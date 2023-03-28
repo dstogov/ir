@@ -1044,7 +1044,7 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
 			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)) {
 				if (IR_IS_CONST_REF(insn->op2)
 				 && ctx->ir_base[insn->op2].val.i64 == 0
-				 && insn->op1 == ref - 1) { /* prevoius instruction */
+				 && insn->op1 == ref - 1) { /* previous instruction */
 					ir_insn *op1_insn = &ctx->ir_base[insn->op1];
 
 					if (op1_insn->op == IR_ADD ||
@@ -1619,7 +1619,7 @@ store_int:
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
 						if (IR_IS_CONST_REF(op2_insn->op2)
 						 && ctx->ir_base[op2_insn->op2].val.i64 == 0
-						 && op2_insn->op1 == insn->op2 - 1) { /* prevoius instruction */
+						 && op2_insn->op1 == insn->op2 - 1) { /* previous instruction */
 							ir_insn *op1_insn = &ctx->ir_base[op2_insn->op1];
 
 							if (op1_insn->op == IR_ADD ||
@@ -1669,7 +1669,7 @@ store_int:
 				}
 			}
 			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
-				if (insn->op2 == ref - 1 /* prevoius instruction */
+				if (insn->op2 == ref - 1 /* previous instruction */
 				 && insn->op2 > bb->start) {
 					op2_insn = &ctx->ir_base[insn->op2];
 					if (op2_insn->op == IR_ADD ||
@@ -1688,8 +1688,8 @@ store_int:
 						return IR_JCC_INT;
 					}
 				} else if ((ctx->flags & IR_OPT_CODEGEN)
-				 && insn->op1 == ref - 1 /* prevoius instruction */
-				 && insn->op2 == ref - 2 /* prevoius instruction */
+				 && insn->op1 == ref - 1 /* previous instruction */
+				 && insn->op2 == ref - 2 /* previous instruction */
 				 && insn->op2 > bb->start
 				 && ctx->use_lists[insn->op2].count == 2
 				 && IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
