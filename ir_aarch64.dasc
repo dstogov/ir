@@ -569,7 +569,7 @@ static void ir_match_fuse_addr(ir_ctx *ctx, ir_ref addr_ref, ir_type type)
 	}
 }
 
-static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref, ir_block *bb)
+static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref)
 {
 	ir_insn *op2_insn;
 	ir_insn *insn = &ctx->ir_base[ref];
@@ -795,11 +795,11 @@ binop_fp:
 			break;
 		case IR_RSTORE:
 			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
-				if ((ctx->flags & IR_OPT_CODEGEN) && insn->op2 > bb->start && ctx->use_lists[insn->op2].count == 1) {
+				if ((ctx->flags & IR_OPT_CODEGEN) && ir_in_same_block(ctx, insn->op2) && ctx->use_lists[insn->op2].count == 1) {
 					ir_insn *op_insn = &ctx->ir_base[insn->op2];
 
 					if (!ctx->rules[insn->op2]) {
-						ctx->rules[insn->op2] = ir_match_insn(ctx, insn->op2, bb);
+						ctx->rules[insn->op2] = ir_match_insn(ctx, insn->op2);
 					}
 					if (ctx->rules[insn->op2] == IR_BINOP_INT) {
 						if (ctx->ir_base[op_insn->op1].op == IR_RLOAD
@@ -840,7 +840,7 @@ binop_fp:
 				return IR_RETURN_FP;
 			}
 		case IR_IF:
-			if (insn->op2 > bb->start && ctx->use_lists[insn->op2].count == 1) {
+			if (ir_in_same_block(ctx, insn->op2) && ctx->use_lists[insn->op2].count == 1) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT) {
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
@@ -862,7 +862,7 @@ binop_fp:
 			}
 		case IR_GUARD:
 		case IR_GUARD_NOT:
-			if (insn->op2 > bb->start && ctx->use_lists[insn->op2].count == 1) {
+			if (ir_in_same_block(ctx, insn->op2) && ctx->use_lists[insn->op2].count == 1) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT
 					// TODO: register allocator may clobber operands of CMP before they are used in the GUARD_CMP
@@ -889,7 +889,7 @@ binop_fp:
 	return insn->op;
 }
 
-static void ir_match_insn2(ir_ctx *ctx, ir_ref ref, ir_block *bb, uint32_t rule)
+static void ir_match_insn2(ir_ctx *ctx, ir_ref ref, uint32_t rule)
 {
 }
 

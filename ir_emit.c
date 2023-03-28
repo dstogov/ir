@@ -96,6 +96,12 @@ IR_ALWAYS_INLINE uint32_t ir_rule(const ir_ctx *ctx, ir_ref ref)
 	return ctx->rules[ref];
 }
 
+IR_ALWAYS_INLINE bool ir_in_same_block(ir_ctx *ctx, ir_ref ref)
+{
+	return ref > ctx->bb_start;
+}
+
+
 static ir_reg ir_get_param_reg(const ir_ctx *ctx, ir_ref ref)
 {
 	ir_use_list *use_list = &ctx->use_lists[1];
@@ -415,13 +421,16 @@ int ir_match(ir_ctx *ctx)
 				}
 			}
 		}
+
+		ctx->bb_start = start; /* bb_start is used by matcher to avoid fusion of insns from different blocks */
+
 		while (ref != start) {
 			uint32_t rule = ctx->rules[ref];
 
 			if (!rule) {
-				ctx->rules[ref] = rule = ir_match_insn(ctx, ref, bb);
+				ctx->rules[ref] = rule = ir_match_insn(ctx, ref);
 			}
-			ir_match_insn2(ctx, ref, bb, rule);
+			ir_match_insn2(ctx, ref, rule);
 			ref = prev_ref[ref];
 		}
 	}

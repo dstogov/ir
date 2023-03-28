@@ -542,6 +542,7 @@ struct _ir_ctx {
 	union {
 		void          *data;
 		ir_ref         control;                 /* used by IR construction API (see ir_builder.h) */
+		ir_ref         bb_start;                /* used by target CPU instruction matcher */
 	};
 	ir_snapshot_create_t   snapshot_create;
 	uint32_t           rodata_offset;
