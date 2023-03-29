@@ -38,47 +38,49 @@ aarch64
 	int32_t c_6 = 10000;
 	uintptr_t c_7 = func(printf);
 	uintptr_t c_8 = "%d\n";
-	l_1 = START(l_15);
+	l_1 = START(l_14);
 	l_2 = END(l_1);
-	l_3 = LOOP_BEGIN(l_2, l_13);
-	int32_t d_4 = PHI(l_3, c_4, d_10);
+	l_3 = LOOP_BEGIN(l_2, l_12);
+	int32_t d_4 = PHI(l_3, c_4, d_5);
 	int32_t d_5 = PHI(l_3, c_5, d_9);
 	bool d_6 = LT(d_5, c_6);
 	l_7 = IF(l_3, d_6);
 	l_8 = IF_TRUE(l_7);
 	int32_t d_9 = ADD(d_5, d_4);
-	int32_t d_10 = SUB(d_9, d_4);
-	l_11 = CALL/2(l_8, c_7, c_8, d_10);
-	l_13 = LOOP_END(l_11);
-	l_14 = IF_FALSE(l_7);
-	l_15 = RETURN(l_14, c_4);
+	l_10 = CALL/2(l_8, c_7, c_8, d_5);
+	l_12 = LOOP_END(l_10);
+	l_13 = IF_FALSE(l_7);
+	l_14 = RETURN(l_13, c_4);
 }
-{ # LIVE-RANGES (vregs_count=2)
+{ # LIVE-RANGES (vregs_count=3)
 TMP
 	[%w0]: [2.2-2.3)
-	[%w0]: [6.0-6.2)
-	[%x2]: [11.0-11.1)
-R1 (d_4, d_10) [%w20]: [3.0-10.1), [10.2-14.0), DEF(4.2), USE(9.1/2)!, USE(10.1/2)!, DEF(10.2)!, USE(11.0/4, hint=%w1), PHI_USE(13.2, phi=d_4/3)
-R2 (d_5, d_9) [%w18]: [3.0-9.1), [9.2-14.0), DEF(5.2), USE(6.1/1)!, USE(9.1/1)!, DEF(9.2)!, USE(10.1/1)!, PHI_USE(13.2, phi=d_5/3)
-[%x0] : [11.0-11.1), [15.0-15.1)
-[%x1] : [11.0-11.1)
-[%SCRATCH] : [11.1-11.2)
+	[%w1]: [6.0-6.2)
+	[%x2]: [10.0-10.1)
+	[%w0]: [12.2-12.3)
+R1 (d_4) [%w0]: [3.0-9.1), DEF(4.2), USE(9.1/2)!
+R2 (d_5) [%w18]: [3.0-13.0), DEF(5.2), USE(6.1/1)!, USE(9.1/1)!, USE(10.0/4, hint=%w1), PHI_USE(12.2, phi=d_4/3)
+R3 (d_9) [%w20]: [9.2-13.0), DEF(9.2)!, PHI_USE(12.2, phi=d_5/3)
+[%x0] : [10.0-10.1), [14.0-14.1)
+[%x1] : [10.0-10.1)
+[%SCRATCH] : [10.1-10.2)
 }
 test:
 	stp x29, x30, [sp, #-0x20]!
 	mov x29, sp
 	stp x19, x20, [x29, #0x10]
-	mov w20, wzr
+	mov w0, wzr
 	movz w19, #0x1
 .L1:
-	movz w0, #0x2710
-	cmp w19, w0
+	movz w1, #0x2710
+	cmp w19, w1
 	b.ge .L2
-	add w19, w19, w20
-	sub w20, w19, w20
-	mov w1, w20
+	add w20, w19, w0
+	mov w1, w19
 	adr x0, .L3
 	bl _IO_printf
+	mov w0, w19
+	mov w19, w20
 	b .L1
 .L2:
 	mov w0, wzr
@@ -86,6 +88,7 @@ test:
 	ldp x29, x30, [sp], #0x20
 	ret
 .rodata
+	.db 0x1f, 0x20, 0x03, 0xd5
 .L3:
 	.db 0x25, 0x64, 0x0a, 0x00
 

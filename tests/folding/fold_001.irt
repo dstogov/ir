@@ -1,0 +1,19 @@
+--TEST--
+001: FOLD: SUB(X, X) => 0
+--CODE--
+{
+	l_1 = START(l_4);
+	int32_t d_2 = PARAM(l_1, "a", 1);
+	int32_t d_3 = SUB(d_2, d_2);
+	l_4 = RETURN(l_1, d_3);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 0;
+	l_1 = START(l_3);
+	int32_t d_2 = PARAM(l_1, "a", 1);
+	l_3 = RETURN(l_1, c_4);
+}

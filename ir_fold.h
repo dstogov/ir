@@ -1289,6 +1289,115 @@ IR_FOLD(SUB(_,NEG))
 	IR_FOLD_RESTART;
 }
 
+IR_FOLD(ADD(SUB, _))
+{
+	if (IR_IS_TYPE_INT(IR_OPT_TYPE(opt))) {
+		if (op1_insn->op2 == op2) {
+			/* (a - b) + b => a */
+			IR_FOLD_COPY(op1_insn->op1);
+		}
+	}
+	IR_FOLD_NEXT;
+}
+
+IR_FOLD(ADD(_, SUB))
+{
+	if (IR_IS_TYPE_INT(IR_OPT_TYPE(opt))) {
+		if (op2_insn->op2 == op1) {
+			/* a + (b - a) => b */
+			IR_FOLD_COPY(op2_insn->op1);
+		}
+	}
+	IR_FOLD_NEXT;
+}
+
+IR_FOLD(SUB(ADD, _))
+{
+	if (IR_IS_TYPE_INT(IR_OPT_TYPE(opt))) {
+		if (op1_insn->op1 == op2) {
+			/* (a + b) - a => b */
+			IR_FOLD_COPY(op1_insn->op2);
+		} else if (op1_insn->op2 == op2) {
+			/* (a + b) - a => b */
+			IR_FOLD_COPY(op1_insn->op1);
+		}
+	}
+	IR_FOLD_NEXT;
+}
+
+IR_FOLD(SUB(_, ADD))
+{
+	if (IR_IS_TYPE_INT(IR_OPT_TYPE(opt))) {
+		if (op2_insn->op1 == op1) {
+			/* a - (a + b) => -b */
+			opt = IR_NEG | (opt & IR_OPT_TYPE_MASK);
+			op1 = op2_insn->op2;
+			op2 = IR_UNUSED;
+			IR_FOLD_RESTART;
+		} else if (op2_insn->op2 == op1) {
+			/* b - (a + b) => -a */
+			opt = IR_NEG | (opt & IR_OPT_TYPE_MASK);
+			op1 = op2_insn->op1;
+			op2 = IR_UNUSED;
+			IR_FOLD_RESTART;
+		}
+	}
+	IR_FOLD_NEXT;
+}
+
+IR_FOLD(SUB(SUB, _))
+{
+	if (IR_IS_TYPE_INT(IR_OPT_TYPE(opt))) {
+		if (op1_insn->op1 == op2) {
+			/* (a - b) - a => -b */
+			opt = IR_NEG | (opt & IR_OPT_TYPE_MASK);
+			op1 = op1_insn->op2;
+			op2 = IR_UNUSED;
+			IR_FOLD_RESTART;
+		}
+	}
+	IR_FOLD_NEXT;
+}
+
+IR_FOLD(SUB(_, SUB))
+{
+	if (IR_IS_TYPE_INT(IR_OPT_TYPE(opt))) {
+		if (op2_insn->op1 == op1) {
+			/* a - (a - b) => b */
+			IR_FOLD_COPY(op2_insn->op2);
+		}
+	}
+    IR_FOLD_NEXT;
+}
+
+IR_FOLD(SUB(ADD, ADD))
+{
+	if (IR_IS_TYPE_INT(IR_OPT_TYPE(opt))) {
+		if (op1_insn->op1 == op2_insn->op1) {
+			/* (a + b) - (a + c) => b - c */
+			op1 = op1_insn->op2;
+			op2 = op2_insn->op2;
+			IR_FOLD_RESTART;
+		} else if (op1_insn->op1 == op2_insn->op2) {
+			/* (a + b) - (c + a) => b - c */
+			op1 = op1_insn->op2;
+			op2 = op2_insn->op1;
+			IR_FOLD_RESTART;
+		} else if (op1_insn->op2 == op2_insn->op1) {
+			/* (a + b) - (b + c) => a - c */
+			op1 = op1_insn->op1;
+			op2 = op2_insn->op2;
+			IR_FOLD_RESTART;
+		} else if (op1_insn->op2 == op2_insn->op2) {
+			/* (a + b) - (c + b) => a - c */
+			op1 = op1_insn->op1;
+			op2 = op2_insn->op1;
+			IR_FOLD_RESTART;
+		}
+	}
+    IR_FOLD_NEXT;
+}
+
 // IR_FOLD(SUB(NEG, CONST))  TODO: -a - b => -b - a
 // IR_FOLD(MUL(NEG, CONST))  TODO: -a * b => a * -b
 // IR_FOLD(DIV(NEG, CONST))  TODO: -a / b => a / -b
@@ -1905,8 +2014,19 @@ IR_FOLD(MUL_OV(_, _))
 	IR_FOLD_EMIT;
 }
 
+IR_FOLD(SUB(_, _))
+{
+	if (IR_IS_TYPE_INT(IR_OPT_TYPE(opt)) && op1 == op2) {
+		IR_FOLD_CONST_U(0);
+	}
+	IR_FOLD_NEXT;
+}
+
 IR_FOLD(SUB_OV(_, _))
 {
+	if (op1 == op2) {
+		IR_FOLD_CONST_U(0);
+	}
 	/* skip CSE ??? */
 	IR_FOLD_EMIT;
 }

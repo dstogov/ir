@@ -1,0 +1,25 @@
+--TEST--
+012: FOLD: SUB(ADD(A, B), ADD(B, C)) => SUB(A, C)
+--CODE--
+{
+	l_1 = START(l_6);
+	int32_t d_2 = PARAM(l_1, "a", 1);
+	int32_t d_3 = PARAM(l_1, "b", 2);
+	int32_t d_4 = PARAM(l_1, "c", 3);
+	int32_t d_5 = ADD(d_2, d_3);
+	int32_t d_6 = ADD(d_3, d_4);
+	int32_t d_7 = SUB(d_5, d_6);
+	l_6 = RETURN(l_1, d_7);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	l_1 = START(l_6);
+	int32_t d_2 = PARAM(l_1, "a", 1);
+	int32_t d_3 = PARAM(l_1, "b", 2);
+	int32_t d_4 = PARAM(l_1, "c", 3);
+	int32_t d_5 = SUB(d_2, d_4);
+	l_6 = RETURN(l_1, d_5);
+}
