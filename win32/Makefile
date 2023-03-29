@@ -126,7 +126,7 @@ test-ci: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\ir-test.exe
 	set PATH=$(VCPKG_DIR)\installed\$(VCPKG_TRIPLET)\bin:%%PATH%%
 	set BUILD_DIR=$(BUILD_DIR)
 	set SRC_DIR=$(SRC_DIR)
-	$(BUILD_DIR)\ir-test.exe
+	$(BUILD_DIR)\ir-test.exe --show-diff
 
 clean:
 	del /f /q $(BUILD_DIR)\*.obj $(BUILD_DIR)\*.exe $(BUILD_DIR)\*.pdb $(BUILD_DIR)\*.ilk $(BUILD_DIR)\*.h
