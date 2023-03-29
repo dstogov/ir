@@ -185,7 +185,7 @@ namespace ir {
 			in_os.close();
 
 			auto test_cmd = ::ir_exe + " " + ir_file + " " + args + " " + IR_ARGS + " >" + out_file + " 2>&1";
-			auto diff_cmd = std::string("diff") + " " + DIFF_ARGS + "-u " + exp_file + " " + out_file + " > " + diff_file + " 2>&1";
+			auto diff_cmd = std::string("diff") + " " + DIFF_ARGS + " -u " + exp_file + " " + out_file + " > " + diff_file + " 2>&1";
 
 			int ret_code = std::system(test_cmd.c_str()) >> 0x8;
 
