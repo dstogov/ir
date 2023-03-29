@@ -106,5 +106,5 @@ jobs:
       - name: Test
         shell: cmd
         run: |
-          nmake -nologo -f win32/Makefile VCPKG_DIR=${{ matrix.vcpkg_dir }} VCPKG_TRIPLET=${{ matrix.vcpkg_triplet }} test
+          nmake -nologo -f win32/Makefile VCPKG_DIR=${{ matrix.vcpkg_dir }} VCPKG_TRIPLET=${{ matrix.vcpkg_triplet }} test-ci
 
