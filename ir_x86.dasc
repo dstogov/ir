@@ -19,10 +19,10 @@
 #define IR_IS_UNSIGNED_32BIT(val) (((uintptr_t)(val)) <= 0xffffffff)
 #define IR_IS_32BIT(type, val)    (IR_IS_TYPE_SIGNED(type) ? IR_IS_SIGNED_32BIT((val).i64) : IR_IS_UNSIGNED_32BIT((val).u64))
 #define IR_IS_FP_ZERO(insn)       ((insn.type == IR_DOUBLE) ? (insn.val.u64 == 0) : (insn.val.u32 == 0))
-#define IR_MAY_USE_32BIT_ADDR(a) \
+#define IR_MAY_USE_32BIT_ADDR(addr) \
 	(ctx->code_buffer && \
-	IR_IS_SIGNED_32BIT((char*)addr - (char*)ctx->code_buffer) && \
-	IR_IS_SIGNED_32BIT((char*)addr - ((char*)ctx->code_buffer + ctx->code_buffer_size)))
+	IR_IS_SIGNED_32BIT((char*)(addr) - (char*)ctx->code_buffer) && \
+	IR_IS_SIGNED_32BIT((char*)(addr) - ((char*)ctx->code_buffer + ctx->code_buffer_size)))
 
 #define IR_SPILL_POS_TO_OFFSET(offset) \
 	((ctx->flags & IR_USE_FRAME_POINTER) ? \
@@ -6125,8 +6125,12 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 
 							val_insn->const_flags |= IR_CONST_EMIT;
 							IR_ASSERT(tmp_reg != IR_REG_NONE);
+|.if X64
 							|	lea Ra(tmp_reg), aword [=>label]
 							|	mov [Ra(IR_REG_RSP)+stack_offset], Ra(tmp_reg)
+|.else
+							|	mov [Ra(IR_REG_RSP)+stack_offset], =>label
+|.endif
 						} else if (IR_IS_SIGNED_32BIT(val_insn->val.i64)) {
 							if (ir_type_size[type] <= 4) {
 								|	mov dword [Ra(IR_REG_RSP)+stack_offset], val_insn->val.i32

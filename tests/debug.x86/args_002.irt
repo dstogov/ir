@@ -25,8 +25,7 @@ x86
 --EXPECT--
 test:
 	subl $0x5c, %esp
-	leal .L10, %eax
-	movl %eax, (%esp)
+	movl $.L10, (%esp)
 	movsd .L1, %xmm7
 	movsd %xmm7, 4(%esp)
 	movsd .L2, %xmm7
@@ -51,7 +50,7 @@ test:
 	addl $0x5c, %esp
 	retl
 .rodata
-	.db 0x90, 0x90, 0x90
+	.db 0x90, 0x90, 0x90, 0x90, 0x90
 .L1:
 	.db 0x9a, 0x99, 0x99, 0x99, 0x99, 0x99, 0xb9, 0x3f
 .L2:

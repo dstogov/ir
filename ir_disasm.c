@@ -243,6 +243,12 @@ static uint64_t ir_disasm_rodata_reference(csh cs, const cs_insn *insn)
 			}
 		}
 	}
+	if (insn->id == X86_INS_MOV
+	 && insn->detail->x86.op_count == 2
+	 && insn->detail->x86.operands[0].type == X86_OP_IMM
+	 && insn->detail->x86.operands[0].size == sizeof(void*)) {
+		return (uint32_t)insn->detail->x86.operands[0].imm;
+	}
 #elif defined(IR_TARGET_X64)
 	unsigned int i;
 
