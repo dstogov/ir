@@ -27,9 +27,6 @@
 
 #include "ir_private.h"
 
-#define IR_SKIP      IR_LAST_OP
-#define IR_SKIP_MEM  (IR_LAST_OP+1)
-
 int ir_regs_number(void)
 {
 	return IR_REG_NUM;
@@ -68,7 +65,8 @@ int ir_assign_virtual_registers(ir_ctx *ctx)
 			flags = ir_op_flags[insn->op];
 			if (((flags & IR_OP_FLAG_DATA) && ctx->use_lists[i].count > 0)
 			 || ((flags & IR_OP_FLAG_MEM) && ctx->use_lists[i].count > 1)) {
-				if (!ctx->rules || ir_needs_vreg(ctx, i)) {
+				if (!ctx->rules
+				 || (!(ctx->rules[i] & (IR_FUSED|IR_SKIPPED)) && (ctx->rules[i] != IR_TAILCALL))) {
 					vregs[i] = ++vregs_count;
 				}
 			}
@@ -216,22 +214,22 @@ static void ir_add_fixed_live_range(ir_ctx *ctx, ir_live_range **unused, ir_reg 
 	ir_add_live_range(ctx, unused, v, IR_VOID, start, end);
 }
 
-static void ir_add_tmp(ir_ctx *ctx, ir_ref ref, ir_tmp_reg tmp_reg)
+static void ir_add_tmp(ir_ctx *ctx, ir_ref ref, ir_ref tmp_ref, int32_t tmp_op_num, ir_tmp_reg tmp_reg)
 {
 	ir_live_interval *ival = ir_mem_malloc(sizeof(ir_live_interval));
 
 	ival->type = tmp_reg.type;
 	ival->reg = IR_REG_NONE;
-	ival->flags = IR_LIVE_INTERVAL_TEMP | tmp_reg.num;
-	ival->vreg = 0;
-	ival->stack_spill_pos = -1; // not allocated
+	ival->flags = IR_LIVE_INTERVAL_TEMP;
+	ival->tmp_ref = tmp_ref;
+	ival->tmp_op_num = tmp_op_num;
 	ival->range.start = IR_START_LIVE_POS_FROM_REF(ref) + tmp_reg.start;
 	ival->range.end = ival->end = IR_START_LIVE_POS_FROM_REF(ref) + tmp_reg.end;
 	ival->range.next = NULL;
+	ival->top = NULL;
 	ival->use_pos = NULL;
 
 	if (!ctx->live_intervals[0]) {
-		ival->top = ival;
 		ival->next = NULL;
 		ctx->live_intervals[0] = ival;
 	} else if (ival->range.start >= ctx->live_intervals[0]->range.start) {
@@ -240,31 +238,24 @@ static void ir_add_tmp(ir_ctx *ctx, ir_ref ref, ir_tmp_reg tmp_reg)
 		while (prev->next && ival->range.start >= prev->next->range.start) {
 			prev = prev->next;
 		}
-		ival->top = prev->top;
 		ival->next = prev->next;
 		prev->next = ival;
 	} else {
 		ir_live_interval *next = ctx->live_intervals[0];
 
-		ival->top = ival;
 		ival->next = next;
 		ctx->live_intervals[0] = ival;
-		while (next) {
-			next->top = ival;
-			next = next->next;
-		}
 	}
 	return;
 }
 
-static bool ir_has_tmp(ir_ctx *ctx, ir_ref ref, uint8_t num)
+static bool ir_has_tmp(ir_ctx *ctx, ir_ref ref, int32_t op_num)
 {
 	ir_live_interval *ival = ctx->live_intervals[0];
 
 	if (ival) {
 		while (ival && IR_LIVE_POS_TO_REF(ival->range.start) <= ref) {
-			if (IR_LIVE_POS_TO_REF(ival->range.start) == ref
-			 && ival->flags == (IR_LIVE_INTERVAL_TEMP | num)) {
+			if (ival->tmp_ref == ref && ival->tmp_op_num == op_num) {
 				return 1;
 			}
 			ival = ival->next;
@@ -277,9 +268,11 @@ static void ir_fix_live_range(ir_ctx *ctx, int v, ir_live_pos old_start, ir_live
 {
 	ir_live_range *p = &ctx->live_intervals[v]->range;
 
+#if 0
 	while (p && p->start < old_start) {
 		p = p->next;
 	}
+#endif
 	IR_ASSERT(p && p->start == old_start);
 	p->start = new_start;
 }
@@ -290,7 +283,7 @@ static void ir_add_use_pos(ir_ctx *ctx, int v, ir_use_pos *use_pos)
 	ir_use_pos *prev = NULL;
 	ir_use_pos *p = ival->use_pos;
 
-	if (use_pos->hint != IR_REG_NONE || use_pos->hint_ref != 0) {
+	if (use_pos->hint != IR_REG_NONE || use_pos->hint_ref > 0) {
 		ival->flags |= IR_LIVE_INTERVAL_HAS_HINTS;
 	}
 
@@ -328,11 +321,12 @@ static void ir_add_phi_use(ir_ctx *ctx, int v, int op_num, ir_live_pos pos, ir_r
 {
 	ir_use_pos *use_pos;
 
+	IR_ASSERT(phi_ref > 0);
 	use_pos = ir_mem_malloc(sizeof(ir_use_pos));
 	use_pos->op_num = op_num;
 	use_pos->hint = IR_REG_NONE;
 	use_pos->flags = IR_PHI_USE | IR_USE_SHOULD_BE_IN_REG; // TODO: ???
-	use_pos->hint_ref = phi_ref;
+	use_pos->hint_ref = -phi_ref;
 	use_pos->pos = pos;
 
 	ir_add_use_pos(ctx, v, use_pos);
@@ -348,7 +342,7 @@ static void ir_add_osr_entry_loads(ir_ctx *ctx, ir_block *bb, ir_bitset live, ui
 	IR_BITSET_FOREACH(live, len, i) {
 		/* Skip live references from ENTRY to PARAM. TODO: duplicate PARAM in each ENTRY ??? */
 		ir_use_pos *use_pos = ctx->live_intervals[i]->use_pos;
-		ir_ref ref = (use_pos->flags & IR_PHI_USE) ? use_pos->hint_ref : IR_LIVE_POS_TO_REF(use_pos->pos);
+		ir_ref ref = (use_pos->hint_ref < 0) ? -use_pos->hint_ref : IR_LIVE_POS_TO_REF(use_pos->pos);
 
 		if (use_pos->op_num) {
 			ir_ref *ops = ctx->ir_base[ref].ops;
@@ -397,6 +391,118 @@ static void ir_add_osr_entry_loads(ir_ctx *ctx, ir_block *bb, ir_bitset live, ui
 	}
 }
 
+static void ir_add_fusion_ranges(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_block *bb, ir_bitset live, ir_live_range **unused)
+{
+	ir_ref stack[4];
+	int stack_pos = 0;
+	ir_target_constraints constraints;
+	ir_insn *insn;
+	uint32_t j, n, flags, def_flags;
+	ir_ref *p, child;
+	uint8_t use_flags;
+	ir_reg reg;
+	ir_live_pos use_pos;
+
+	while (1) {
+		IR_ASSERT(input > 0 && ctx->rules[input] & IR_FUSED);
+
+		if (!(ctx->rules[input] & IR_SIMPLE)) {
+			def_flags = ir_get_target_constraints(ctx, input, &constraints);
+			n = constraints.tmps_count;
+			while (n > 0) {
+				n--;
+				if (constraints.tmp_regs[n].type) {
+					ir_add_tmp(ctx, ref, input, constraints.tmp_regs[n].num, constraints.tmp_regs[n]);
+				} else {
+					/* CPU specific constraints */
+					ir_add_fixed_live_range(ctx, unused, constraints.tmp_regs[n].reg,
+						IR_START_LIVE_POS_FROM_REF(ref) + constraints.tmp_regs[n].start,
+						IR_START_LIVE_POS_FROM_REF(ref) + constraints.tmp_regs[n].end);
+				}
+			}
+		} else {
+			def_flags = IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG | IR_OP3_MUST_BE_IN_REG;
+			constraints.hints_count = 0;
+		}
+
+		insn = &ctx->ir_base[input];
+		flags = ir_op_flags[insn->op];
+		n = IR_INPUT_EDGES_COUNT(flags);
+		IR_ASSERT(IR_IS_FIXED_INPUTS_COUNT(n));
+		j = 1;
+		p = insn->ops + j;
+		if (flags & IR_OP_FLAG_CONTROL) {
+			j++;
+			p++;
+		}
+		for (; j <= n; j++, p++) {
+			IR_ASSERT(IR_OPND_KIND(flags, j) == IR_OPND_DATA);
+			child = *p;
+			if (child > 0) {
+				if (ctx->vregs[child]) {
+					use_flags = IR_FUSED_USE | IR_USE_FLAGS(def_flags, j);
+					reg = (j < constraints.hints_count) ? constraints.hints[j] : IR_REG_NONE;
+					use_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
+					if (EXPECTED(reg == IR_REG_NONE)) {
+						use_pos += IR_USE_SUB_REF;
+					}
+
+					if (!ir_bitset_in(live, ctx->vregs[child])) {
+						/* live.add(opd) */
+						ir_bitset_incl(live, ctx->vregs[child]);
+						/* intervals[opd].addRange(b.from, op.id) */
+						ir_add_live_range(ctx, unused, ctx->vregs[child], ctx->ir_base[child].type,
+							IR_START_LIVE_POS_FROM_REF(bb->start), use_pos);
+					}
+					ir_add_use(ctx, ctx->vregs[child], j, use_pos, reg, use_flags, -input);
+				} else if (ctx->rules[child] & IR_FUSED) {
+					IR_ASSERT(stack_pos < (int)(sizeof(stack)/sizeof(stack_pos)));
+					stack[stack_pos++] = child;
+				}
+			}
+		}
+		if (!stack_pos) {
+			break;
+		}
+		input = stack[--stack_pos];
+	}
+
+#if 0
+	do {
+		if (ctx->ir_base[input].op == IR_LOAD) {
+			ir_ref addr = ctx->ir_base[input].op2;
+
+			if (addr < 0) {
+				return;
+			} else if (ctx->vregs[addr]) {
+				op_num = (input - ref) * 4 + 2;
+				input = addr;
+				break;
+			}
+			input = addr;
+			IR_ASSERT(ctx->rules[input] & IR_FUSED);
+		}
+		IR_ASSERT(ctx->ir_base[input].op == IR_ADD);
+		IR_ASSERT(!IR_IS_CONST_REF(ctx->ir_base[input].op1));
+		IR_ASSERT(IR_IS_CONST_REF(ctx->ir_base[input].op2));
+		op_num = (input - ref) * 4 + 1;
+		input = ctx->ir_base[input].op1;
+	} while (0);
+
+	IR_ASSERT(input > 0 && ctx->vregs[input]);
+
+	ir_live_pos use_pos = IR_USE_LIVE_POS_FROM_REF(ref);
+	uint8_t use_flags = IR_USE_MUST_BE_IN_REG;
+
+	/* intervals[opd].addRange(b.from, op.id) */
+	ir_add_live_range(ctx, unused, ctx->vregs[input], ctx->ir_base[input].type,
+		IR_START_LIVE_POS_FROM_REF(bb->start), use_pos);
+	ir_add_use(ctx, ctx->vregs[input], op_num, use_pos, IR_REG_NONE, use_flags, IR_UNUSED);
+	/* live.add(opd) */
+	ir_bitset_incl(live, ctx->vregs[input]);
+#endif
+}
+
 int ir_compute_live_ranges(ir_ctx *ctx)
 {
 	uint32_t b, i, j, k, n, succ, *p;
@@ -418,17 +524,22 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 
 	/* Compute Live Ranges */
 	ctx->flags &= ~(IR_LR_HAVE_VARS|IR_LR_HAVE_DESSA_MOVES);
+	len = ir_bitset_len(ctx->vregs_count + 1);
+	bb_live = ir_mem_malloc((ctx->cfg_blocks_count + 1) * len * sizeof(ir_bitset_base_t));
+
+	/* vregs + tmp + fixed + SRATCH + ALL */
+	ctx->live_intervals = ir_mem_calloc(ctx->vregs_count + 1 + IR_REG_NUM + 2, sizeof(ir_live_interval*));
+
 #ifdef IR_DEBUG
 	visited = ir_bitset_malloc(ctx->cfg_blocks_count + 1);
 #endif
-	len = ir_bitset_len(ctx->vregs_count + 1);
-	bb_live = ir_mem_malloc((ctx->cfg_blocks_count + 1) * len * sizeof(ir_bitset_base_t));
-	/* vregs + tmp + fixed + SRATCH + ALL */
-	ctx->live_intervals = ir_mem_calloc(ctx->vregs_count + 1 + IR_REG_NUM + 2, sizeof(ir_live_interval*));
+
+	/* for each basic block in reverse order */
 	for (b = ctx->cfg_blocks_count; b > 0; b--) {
 		bb = &ctx->cfg_blocks[b];
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		/* for each successor of b */
+
 #ifdef IR_DEBUG
 		ir_bitset_incl(visited, b);
 #endif
@@ -439,67 +550,30 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 		} else {
 			p = &ctx->cfg_edges[bb->successors];
 			succ = *p;
-			/* blocks must be ordered where all dominators of a block are before this block */
+
 #ifdef IR_DEBUG
-            IR_ASSERT(ir_bitset_in(visited, succ) || bb->loop_header == succ);
+			/* blocks must be ordered where all dominators of a block are before this block */
+			IR_ASSERT(ir_bitset_in(visited, succ) || bb->loop_header == succ);
 #endif
 
+			/* live = union of successors.liveIn */
+			if (EXPECTED(succ > b) && EXPECTED(!(ctx->cfg_blocks[succ].flags & IR_BB_ENTRY))) {
+				ir_bitset_copy(live, bb_live + (len * succ), len);
+			} else {
+				IR_ASSERT(succ > b || (ctx->cfg_blocks[succ].flags & IR_BB_LOOP_HEADER));
+				ir_bitset_clear(live, len);
+			}
 			if (n > 1) {
-				/* live = union of successors.liveIn */
-				if (EXPECTED(succ > b) && EXPECTED((ctx->cfg_blocks[succ].flags & IR_BB_ENTRY) == 0)) {
-					ir_bitset_copy(live, bb_live + (len * succ), len);
-				} else {
-					IR_ASSERT(succ > b || (ctx->cfg_blocks[succ].flags & IR_BB_LOOP_HEADER));
-					ir_bitset_clear(live, len);
-				}
 				for (p++, n--; n > 0; p++, n--) {
 					succ = *p;
-					if (EXPECTED(succ > b) && EXPECTED((ctx->cfg_blocks[succ].flags & IR_BB_ENTRY) == 0)) {
+					if (EXPECTED(succ > b) && EXPECTED(!(ctx->cfg_blocks[succ].flags & IR_BB_ENTRY))) {
 						ir_bitset_union(live, bb_live + (len * succ), len);
 					} else {
 						IR_ASSERT(succ > b || (ctx->cfg_blocks[succ].flags & IR_BB_LOOP_HEADER));
 					}
 				}
-			} else {
-				/* live = successor.liveIn */
-				if (EXPECTED(succ > b) && EXPECTED((ctx->cfg_blocks[succ].flags & IR_BB_ENTRY) == 0)) {
-					ir_bitset_copy(live, bb_live + (len * succ), len);
-				} else {
-					IR_ASSERT(succ > b || (ctx->cfg_blocks[succ].flags & IR_BB_LOOP_HEADER));
-					ir_bitset_clear(live, len);
-				}
-
-				/* for each phi function phi of successor */
-				succ_bb = &ctx->cfg_blocks[succ];
-				if (succ_bb->predecessors_count > 1) {
-					ir_use_list *use_list = &ctx->use_lists[succ_bb->start];
-
-					if (use_list->count > 1) {
-						k = ir_phi_input_number(ctx, succ_bb, b);
-						IR_ASSERT(k != 0);
-						for (ref = 0; ref < use_list->count; ref++) {
-							ir_ref use = ctx->use_edges[use_list->refs + ref];
-							insn = &ctx->ir_base[use];
-							if (insn->op == IR_PHI) {
-								ir_ref input = ir_insn_op(insn, k);
-								if (input > 0) {
-									/* live.add(phi.inputOf(b)) */
-									IR_ASSERT(ctx->vregs[input]);
-									ir_bitset_incl(live, ctx->vregs[input]);
-									// TODO: ir_add_live_range() is used just to set ival->type
-									/* intervals[phi.inputOf(b)].addRange(b.from, b.to) */
-									ir_add_live_range(ctx, &unused, ctx->vregs[input], insn->type,
-										IR_START_LIVE_POS_FROM_REF(bb->start),
-										IR_END_LIVE_POS_FROM_REF(bb->end));
-									ir_add_phi_use(ctx, ctx->vregs[input], k, IR_DEF_LIVE_POS_FROM_REF(bb->end), use);
-								}
-							}
-						}
-					}
-				}
 			}
 		}
-
 
 		/* for each opd in live */
 		IR_BITSET_FOREACH(live, len, i) {
@@ -508,6 +582,37 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 				IR_START_LIVE_POS_FROM_REF(bb->start),
 				IR_END_LIVE_POS_FROM_REF(bb->end));
 		} IR_BITSET_FOREACH_END();
+
+		if (bb->successors_count == 1) {
+			/* for each phi function phi of successor */
+			succ = ctx->cfg_edges[bb->successors];
+			succ_bb = &ctx->cfg_blocks[succ];
+			if (succ_bb->predecessors_count > 1) {
+				ir_use_list *use_list = &ctx->use_lists[succ_bb->start];
+
+				if (use_list->count > 1) {
+					k = ir_phi_input_number(ctx, succ_bb, b);
+					IR_ASSERT(k != 0);
+					for (ref = 0; ref < use_list->count; ref++) {
+						ir_ref use = ctx->use_edges[use_list->refs + ref];
+						insn = &ctx->ir_base[use];
+						if (insn->op == IR_PHI) {
+							ir_ref input = ir_insn_op(insn, k);
+							if (input > 0) {
+								/* live.add(phi.inputOf(b)) */
+								IR_ASSERT(ctx->vregs[input]);
+								ir_bitset_incl(live, ctx->vregs[input]);
+								/* intervals[phi.inputOf(b)].addRange(b.from, b.to) */
+								ir_add_live_range(ctx, &unused, ctx->vregs[input], insn->type,
+									IR_START_LIVE_POS_FROM_REF(bb->start),
+									IR_END_LIVE_POS_FROM_REF(bb->end));
+								ir_add_phi_use(ctx, ctx->vregs[input], k, IR_DEF_LIVE_POS_FROM_REF(bb->end), use);
+							}
+						}
+					}
+				}
+			}
+		}
 
 		/* for each operation op of b in reverse order */
 		ref = bb->end;
@@ -524,7 +629,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 			if (ctx->rules) {
 				int n;
 
-				if (ctx->rules[ref] == IR_SKIP_MEM) {
+				if (ctx->rules[ref] & (IR_FUSED|IR_SKIPPED)) {
 					continue;
 				}
 
@@ -533,7 +638,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 				while (n > 0) {
 					n--;
 					if (constraints.tmp_regs[n].type) {
-						ir_add_tmp(ctx, ref, constraints.tmp_regs[n]);
+						ir_add_tmp(ctx, ref, ref, constraints.tmp_regs[n].num, constraints.tmp_regs[n]);
 					} else {
 						/* CPU specific constraints */
 						ir_add_fixed_live_range(ctx, &unused, constraints.tmp_regs[n].reg,
@@ -633,7 +738,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 #endif
 			}
 
-			IR_ASSERT(insn->op != IR_PHI && (!ctx->rules || ctx->rules[ref] != IR_SKIP_MEM));
+			IR_ASSERT(insn->op != IR_PHI && (!ctx->rules || !(ctx->rules[ref] & (IR_FUSED|IR_SKIPPED))));
 			flags = ir_op_flags[insn->op];
 			n = ir_input_edges_count(ctx, insn);
 			j = (flags & IR_OP_FLAG_CONTROL) ? 2 : 1;
@@ -643,27 +748,6 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					uint8_t use_flags = IR_USE_FLAGS(def_flags, j);
 					ir_reg reg = (j < constraints.hints_count) ? constraints.hints[j] : IR_REG_NONE;
 
-					if (input > 0 && ctx->rules && ctx->rules[input] == IR_SKIP_MEM) {
-						do {
-							if (ctx->ir_base[input].op == IR_LOAD) {
-								input = ctx->ir_base[input].op2;
-								use_flags = IR_USE_MUST_BE_IN_REG;
-								if (input < 0 || ctx->rules[input] != IR_SKIP_MEM) {
-									break;
-								}
-							}
-							if (ctx->ir_base[input].op == IR_RLOAD) {
-								/* pass */
-							} else if (ctx->ir_base[input].op == IR_ADD) {
-								IR_ASSERT(!IR_IS_CONST_REF(ctx->ir_base[input].op1));
-								IR_ASSERT(IR_IS_CONST_REF(ctx->ir_base[input].op2));
-								input = ctx->ir_base[input].op1;
-								use_flags = IR_USE_MUST_BE_IN_REG;
-							} else {
-								input = 0;
-							}
-						} while (0);
-					}
 					if (input > 0 && ctx->vregs[input]) {
 						ir_live_pos use_pos;
 						ir_ref hint_ref = 0;
@@ -688,12 +772,19 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 								use_pos = IR_USE_LIVE_POS_FROM_REF(ref);
 							}
 						}
-						/* intervals[opd].addRange(b.from, op.id) */
-						ir_add_live_range(ctx, &unused, ctx->vregs[input], ctx->ir_base[input].type,
-							IR_START_LIVE_POS_FROM_REF(bb->start), use_pos);
+						if (!ir_bitset_in(live, ctx->vregs[input])) {
+							/* live.add(opd) */
+							ir_bitset_incl(live, ctx->vregs[input]);
+							/* intervals[opd].addRange(b.from, op.id) */
+							ir_add_live_range(ctx, &unused, ctx->vregs[input], ctx->ir_base[input].type,
+								IR_START_LIVE_POS_FROM_REF(bb->start), use_pos);
+						}
 						ir_add_use(ctx, ctx->vregs[input], j, use_pos, reg, use_flags, hint_ref);
-						/* live.add(opd) */
-						ir_bitset_incl(live, ctx->vregs[input]);
+					} else if (input > 0) {
+						IR_ASSERT(ctx->rules);
+						if (ctx->rules[input] & IR_FUSED) {
+						    ir_add_fusion_ranges(ctx, ref, input, bb, live, &unused);
+						}
 					} else {
 						if (reg != IR_REG_NONE) {
 							ir_add_fixed_live_range(ctx, &unused, reg,
@@ -842,7 +933,16 @@ static ir_live_pos ir_ivals_overlap(ir_live_range *lrg1, ir_live_range *lrg2)
 
 static ir_live_pos ir_vregs_overlap(ir_ctx *ctx, uint32_t r1, uint32_t r2)
 {
-	return ir_ivals_overlap(&ctx->live_intervals[r1]->range, &ctx->live_intervals[r2]->range);
+	ir_live_interval *ival1 = ctx->live_intervals[r1];
+	ir_live_interval *ival2 = ctx->live_intervals[r2];
+
+#if 0
+	if (ival2->range.start >= ival1->end
+	 || ival1->range.start >= ival2->end) {
+		return 0;
+	}
+#endif
+	return ir_ivals_overlap(&ival1->range, &ival2->range);
 }
 
 static void ir_vregs_join(ir_ctx *ctx, ir_live_range **unused, uint32_t r1, uint32_t r2)
@@ -850,7 +950,7 @@ static void ir_vregs_join(ir_ctx *ctx, ir_live_range **unused, uint32_t r1, uint
 	ir_live_interval *ival = ctx->live_intervals[r2];
 	ir_live_range *live_range = &ival->range;
 	ir_live_range *next;
-	ir_use_pos *use_pos;
+	ir_use_pos *use_pos, *next_pos, **prev;
 
 #if 0
 	fprintf(stderr, "COALESCE %d -> %d\n", r2, r1);
@@ -866,27 +966,42 @@ static void ir_vregs_join(ir_ctx *ctx, ir_live_range **unused, uint32_t r1, uint
 		live_range = next;
 	}
 
-	use_pos = ctx->live_intervals[r1]->use_pos;
+	/* merge sorted use_pos lists */
+	prev = &ctx->live_intervals[r1]->use_pos;
+	use_pos = ival->use_pos;
 	while (use_pos) {
-		if (!(use_pos->flags & IR_PHI_USE) && ctx->vregs[use_pos->hint_ref] == r2) {
+		if (use_pos->hint_ref > 0 && ctx->vregs[use_pos->hint_ref] == r1) {
+			use_pos->hint_ref = 0;
+		}
+		while (*prev && ((*prev)->pos < use_pos->pos ||
+			((*prev)->pos == use_pos->pos &&
+				(use_pos->op_num == 0 || (*prev)->op_num < use_pos->op_num)))) {
+			if ((*prev)->hint_ref > 0 && ctx->vregs[(*prev)->hint_ref] == r2) {
+				(*prev)->hint_ref = 0;
+			}
+			prev = &(*prev)->next;
+		}
+		next_pos = use_pos->next;
+		use_pos->next = *prev;
+		*prev = use_pos;
+		prev = &use_pos->next;
+	    use_pos = next_pos;
+	}
+	use_pos = *prev;
+	while (use_pos) {
+		if (use_pos->hint_ref > 0 && ctx->vregs[use_pos->hint_ref] == r2) {
 			use_pos->hint_ref = 0;
 		}
 		use_pos = use_pos->next;
 	}
 
-	use_pos = ival->use_pos;
-	while (use_pos) {
-		ir_use_pos *next_use_pos = use_pos->next;
-		if (!(use_pos->flags & IR_PHI_USE) && ctx->vregs[use_pos->hint_ref] == r1) {
-			use_pos->hint_ref = 0;
-		}
-		ir_add_use_pos(ctx, r1, use_pos);
-		use_pos = next_use_pos;
+	if (ival->flags & IR_LIVE_INTERVAL_HAS_HINTS) {
+		ctx->live_intervals[r1]->flags |= IR_LIVE_INTERVAL_HAS_HINTS;
 	}
+	ctx->live_intervals[r1]->flags |= IR_LIVE_INTERVAL_COALESCED;
+	ctx->live_intervals[r2] = NULL;
 
 	ir_mem_free(ival);
-	ctx->live_intervals[r2] = NULL;
-	ctx->live_intervals[r1]->flags |= IR_LIVE_INTERVAL_COALESCED;
 }
 
 static bool ir_try_coalesce(ir_ctx *ctx, ir_live_range **unused, ir_ref from, ir_ref to)
@@ -1594,7 +1709,7 @@ static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, ir_live_interval *iva
 	ival->flags &= ~IR_LIVE_INTERVAL_HAS_HINTS;
 	if (p->start == pos) {
 		while (use_pos && pos > use_pos->pos) {
-			if (use_pos->hint != IR_REG_NONE || use_pos->hint_ref != 0) {
+			if (use_pos->hint != IR_REG_NONE || use_pos->hint_ref > 0) {
 				ival->flags |= IR_LIVE_INTERVAL_HAS_HINTS;
 			}
 			prev_use_pos = use_pos;
@@ -1602,7 +1717,7 @@ static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, ir_live_interval *iva
 		}
 	} else {
 		while (use_pos && pos >= use_pos->pos) {
-			if (use_pos->hint != IR_REG_NONE || use_pos->hint_ref != 0) {
+			if (use_pos->hint != IR_REG_NONE || use_pos->hint_ref > 0) {
 				ival->flags |= IR_LIVE_INTERVAL_HAS_HINTS;
 			}
 			prev_use_pos = use_pos;
@@ -1642,7 +1757,7 @@ static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, ir_live_interval *iva
 
 	use_pos = child->use_pos;
 	while (use_pos) {
-		if (use_pos->hint != IR_REG_NONE || use_pos->hint_ref != 0) {
+		if (use_pos->hint != IR_REG_NONE || use_pos->hint_ref > 0) {
 			child->flags |= IR_LIVE_INTERVAL_HAS_HINTS;
 		}
 		use_pos = use_pos->next;
@@ -1740,7 +1855,7 @@ static ir_reg ir_try_allocate_preferred_reg(ir_ctx *ctx, ir_live_interval *ival,
 
 	use_pos = ival->use_pos;
 	while (use_pos) {
-		if (use_pos->hint_ref) {
+		if (use_pos->hint_ref > 0) {
 			reg = ctx->live_intervals[ctx->vregs[use_pos->hint_ref]]->reg;
 			if (reg >= 0 && IR_REGSET_IN(available, reg)) {
 				if (ir_ival_end(ival) <= freeUntilPos[reg]) {
@@ -1765,7 +1880,7 @@ static ir_reg ir_get_preferred_reg(ir_ctx *ctx, ir_live_interval *ival, ir_regse
 		reg = use_pos->hint;
 		if (reg >= 0 && IR_REGSET_IN(available, reg)) {
 			return reg;
-		} else if (use_pos->hint_ref) {
+		} else if (use_pos->hint_ref > 0) {
 			reg = ctx->live_intervals[ctx->vregs[use_pos->hint_ref]]->reg;
 			if (reg >= 0 && IR_REGSET_IN(available, reg)) {
 				return reg;
@@ -1829,6 +1944,7 @@ static void ir_merge_to_unhandled(ir_live_interval **unhandled, ir_live_interval
 			}
 			ival->list_next = *prev;
 			*prev = ival;
+			prev = &ival->list_next;
 		    ival = ival->next;
 		}
 	}
@@ -2376,7 +2492,7 @@ static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 		return 1;
 	}
 	if (!ir_has_tmp(ctx, bb->end, tmp_reg.num)) {
-		ir_add_tmp(ctx, bb->end, tmp_reg);
+		ir_add_tmp(ctx, bb->end, bb->end, tmp_reg.num, tmp_reg);
 	}
 	return 1;
 }
@@ -2788,9 +2904,8 @@ static void assign_regs(ir_ctx *ctx)
 								}
 							}
 						}
-						if (use_pos->flags & IR_PHI_USE) {
-							IR_ASSERT(use_pos->hint_ref > 0);
-							ref = use_pos->hint_ref;
+						if (use_pos->hint_ref < 0) {
+							ref = -use_pos->hint_ref;
 						}
 						ir_set_alocated_reg(ctx, ref, use_pos->op_num, reg);
 
@@ -2807,7 +2922,7 @@ static void assign_regs(ir_ctx *ctx)
 	if (ival) {
 		do {
 			IR_ASSERT(ival->reg != IR_REG_NONE);
-			ctx->regs[IR_LIVE_POS_TO_REF(ival->range.start)][ival->flags & IR_LIVE_INTERVAL_TEMP_NUM_MASK] = ival->reg;
+			ir_set_alocated_reg(ctx, ival->tmp_ref, ival->tmp_op_num, ival->reg);
 			ival = ival->next;
 		} while (ival);
 	}
@@ -2841,7 +2956,7 @@ static void ir_hint_propagation(ir_ctx *ctx)
 			use_pos = ival->use_pos;
 			hint_use_pos = NULL;
 			while (use_pos) {
-				if (use_pos->hint_ref) {
+				if (use_pos->hint_ref > 0) {
 					hint_use_pos = use_pos;
 				} else if (use_pos->hint != IR_REG_NONE) {
 					if (hint_use_pos) {

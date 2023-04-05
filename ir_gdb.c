@@ -498,7 +498,7 @@ ir_gdbjit_descriptor __jit_debug_descriptor = {
 };
 
 #ifdef IR_EXTERNAL_GDB_ENTRY
-__jit_debug_register_code(void);
+void __jit_debug_register_code(void);
 #else
 IR_NEVER_INLINE void __jit_debug_register_code(void)
 {

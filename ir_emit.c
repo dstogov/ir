@@ -183,7 +183,7 @@ static int ir_get_args_regs(const ir_ctx *ctx, const ir_insn *insn, int8_t *regs
 	}
 #endif
 
-	n = ir_input_edges_count(ctx, insn);
+	n = ir_variable_inputs_count(insn);
 	n = IR_MIN(n, IR_MAX_REG_ARGS + 2);
 	for (j = 3; j <= n; j++) {
 		type = ctx->ir_base[ir_insn_op(insn, j)].type;
@@ -401,7 +401,7 @@ int ir_match(ir_ctx *ctx)
 			ctx->entries[entries_count] = b;
 			entries_count++;
 		}
-		ctx->rules[start] = IR_SKIP;
+		ctx->rules[start] = IR_SKIPPED | IR_NOP;
 		ref = bb->end;
 		if (bb->successors_count == 1) {
 			insn = &ctx->ir_base[ref];

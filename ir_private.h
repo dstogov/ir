@@ -905,6 +905,7 @@ typedef struct _ir_live_interval ir_live_interval;
 #define IR_DEF_REUSES_OP1_REG            (1<<2)
 #define IR_DEF_CONFLICTS_WITH_INPUT_REGS (1<<3)
 
+#define IR_FUSED_USE                     (1<<6)
 #define IR_PHI_USE                       (1<<7)
 
 #define IR_OP1_MUST_BE_IN_REG            (1<<8)
@@ -920,7 +921,7 @@ struct _ir_use_pos {
 	uint16_t       op_num; /* 0 - means result */
 	int8_t         hint;
 	uint8_t        flags;
-	ir_ref         hint_ref;
+	ir_ref         hint_ref; /* negative references are used for FUSION anf PHI */
 	ir_live_pos    pos;
 	ir_use_pos    *next;
 };
@@ -932,23 +933,28 @@ struct _ir_live_range {
 };
 
 /* ir_live_interval.flags bits (two low bits are reserved for temporary register number) */
-#define IR_LIVE_INTERVAL_TEMP_NUM_MASK   0x3
-#define IR_LIVE_INTERVAL_FIXED           (1<<2)
-#define IR_LIVE_INTERVAL_TEMP            (1<<3)
-#define IR_LIVE_INTERVAL_VAR             (1<<4)
-#define IR_LIVE_INTERVAL_COALESCED       (1<<5)
-#define IR_LIVE_INTERVAL_HAS_HINTS       (1<<6)
-#define IR_LIVE_INTERVAL_MEM_PARAM       (1<<7)
-#define IR_LIVE_INTERVAL_MEM_LOAD        (1<<8)
-#define IR_LIVE_INTERVAL_REG_LOAD        (1<<9)
-#define IR_LIVE_INTERVAL_SPILL_SPECIAL   (1<<10) /* spill slot is pre-allocated in a special area (see ir_ctx.spill_reserved_base) */
+#define IR_LIVE_INTERVAL_FIXED           (1<<0)
+#define IR_LIVE_INTERVAL_TEMP            (1<<1)
+#define IR_LIVE_INTERVAL_VAR             (1<<2)
+#define IR_LIVE_INTERVAL_COALESCED       (1<<3)
+#define IR_LIVE_INTERVAL_HAS_HINTS       (1<<4)
+#define IR_LIVE_INTERVAL_MEM_PARAM       (1<<5)
+#define IR_LIVE_INTERVAL_MEM_LOAD        (1<<6)
+#define IR_LIVE_INTERVAL_REG_LOAD        (1<<7)
+#define IR_LIVE_INTERVAL_SPILL_SPECIAL   (1<<8) /* spill slot is pre-allocated in a special area (see ir_ctx.spill_reserved_base) */
 
 struct _ir_live_interval {
 	uint8_t           type;
 	int8_t            reg;
 	uint16_t          flags;
-	int32_t           vreg;
-	int32_t           stack_spill_pos;
+	union {
+		int32_t       vreg;
+		int32_t       tmp_ref;
+	};
+	union {
+		int32_t       stack_spill_pos;
+		ir_ref        tmp_op_num;
+	};
 	ir_live_range     range;
 	ir_live_pos       end;       /* end of the last live range (cahce of ival.range.{next->}end) */
 	ir_live_range    *current_range;
@@ -1050,8 +1056,10 @@ IR_ALWAYS_INLINE void ir_set_alocated_reg(ir_ctx *ctx, ir_ref ref, int op_num, i
 {
 	int8_t *regs = ctx->regs[ref];
 
-	/* regs[] is not limited by the declared boundary 4, the real boundary checked below */
-	IR_ASSERT(op_num <= IR_MAX(3, ir_input_edges_count(ctx, &ctx->ir_base[ref])));
+	if (op_num > 0) {
+		/* regs[] is not limited by the declared boundary 4, the real boundary checked below */
+		IR_ASSERT(op_num <= IR_MAX(3, ir_input_edges_count(ctx, &ctx->ir_base[ref])));
+	}
 	regs[op_num] = reg;
 }
 
@@ -1065,6 +1073,14 @@ IR_ALWAYS_INLINE int8_t ir_get_alocated_reg(const ir_ctx *ctx, ir_ref ref, int o
 }
 
 /*** IR Target Interface ***/
+
+/* ctx->rules[] flags */
+#define IR_FUSED     (1U<<31) /* Insn is fused into others (code is generated as part of the fusion root) */
+#define IR_SKIPPED   (1U<<30) /* Insn is skipped (code is not generated) */
+#define IR_SIMPLE    (1U<<29) /* Insn doesn't have any target constraints */
+
+#define IR_RULE_MASK 0xff
+
 typedef enum _ir_reg ir_reg;
 typedef struct _ir_target_constraints ir_target_constraints;
 
@@ -1073,7 +1089,6 @@ typedef struct _ir_target_constraints ir_target_constraints;
 #define IR_SCRATCH_REG(_reg, _start, _end) \
 	(ir_tmp_reg){.reg=(_reg), .type=IR_VOID, .start=(_start), .end=(_end)}
 
-bool ir_needs_vreg(const ir_ctx *ctx, ir_ref ref);
 int ir_get_target_constraints(const ir_ctx *ctx, ir_ref ref, ir_target_constraints *constraints);
 
 #endif /* defined(IR_REGSET_64BIT) */

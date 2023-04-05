@@ -353,20 +353,40 @@ void ir_dump_live_ranges(const ir_ctx *ctx, FILE *f)
 				fprintf(f, ": [%d.%d-%d.%d)",
 					IR_LIVE_POS_TO_REF(p->start), IR_LIVE_POS_TO_SUB_REF(p->start),
 					IR_LIVE_POS_TO_REF(p->end), IR_LIVE_POS_TO_SUB_REF(p->end));
-				p = p->next;
-				while (p) {
-					fprintf(f, ", [%d.%d-%d.%d)",
-						IR_LIVE_POS_TO_REF(p->start), IR_LIVE_POS_TO_SUB_REF(p->start),
-						IR_LIVE_POS_TO_REF(p->end), IR_LIVE_POS_TO_SUB_REF(p->end));
-
+				if (i == 0) {
+					/* This is a TMP register */
+					if (ival->tmp_ref == IR_LIVE_POS_TO_REF(p->start)) {
+						fprintf(f, "/%d", ival->tmp_op_num);
+					} else {
+						fprintf(f, "/%d.%d", ival->tmp_ref, ival->tmp_op_num);
+					}
+				} else {
 					p = p->next;
+					while (p) {
+						fprintf(f, ", [%d.%d-%d.%d)",
+							IR_LIVE_POS_TO_REF(p->start), IR_LIVE_POS_TO_SUB_REF(p->start),
+							IR_LIVE_POS_TO_REF(p->end), IR_LIVE_POS_TO_SUB_REF(p->end));
+						p = p->next;
+					}
 				}
 				use_pos = ival->use_pos;
 				while (use_pos) {
 					if (use_pos->flags & IR_PHI_USE) {
+						IR_ASSERT(use_pos->op_num > 0);
 						fprintf(f, ", PHI_USE(%d.%d, phi=d_%d/%d)",
 							IR_LIVE_POS_TO_REF(use_pos->pos), IR_LIVE_POS_TO_SUB_REF(use_pos->pos),
-							use_pos->hint_ref, use_pos->op_num);
+							-use_pos->hint_ref, use_pos->op_num);
+					} else if (use_pos->flags & IR_FUSED_USE) {
+						fprintf(f, ", USE(%d.%d/%d.%d",
+							IR_LIVE_POS_TO_REF(use_pos->pos), IR_LIVE_POS_TO_SUB_REF(use_pos->pos),
+							-use_pos->hint_ref, use_pos->op_num);
+						if (use_pos->hint >= 0) {
+							fprintf(f, ", hint=%%%s", ir_reg_name(use_pos->hint, ival->type));
+						}
+						fprintf(f, ")");
+						if (use_pos->flags & IR_USE_MUST_BE_IN_REG) {
+							fprintf(f, "!");
+						}
 					} else {
 						if (!use_pos->op_num) {
 							fprintf(f, ", DEF(%d.%d",
