@@ -694,7 +694,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 								/* We may reuse parameter stack slot for spilling */
 								ctx->live_intervals[ctx->vregs[ref]]->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
 							} else if (insn->op == IR_VLOAD) {
-								/* Load may be fused into the useage instruction */
+								/* Load may be fused into the usage instruction */
 								ctx->live_intervals[ctx->vregs[ref]]->flags |= IR_LIVE_INTERVAL_MEM_LOAD;
 							}
 							def_pos = IR_DEF_LIVE_POS_FROM_REF(ref);
@@ -1495,7 +1495,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy)
 			ir_live_pos _start = _ival->range.start; \
 			ir_live_pos _end = ir_ival_end(_ival); \
 			fprintf(stderr, action " R%d [%d.%d...%d.%d)" comment "\n", \
-				_ival->vreg, \
+				(_ival->flags & IR_LIVE_INTERVAL_TEMP) ? 0 : _ival->vreg, \
 				IR_LIVE_POS_TO_REF(_start), IR_LIVE_POS_TO_SUB_REF(_start), \
 				IR_LIVE_POS_TO_REF(_end), IR_LIVE_POS_TO_SUB_REF(_end)); \
 		} \
@@ -1506,7 +1506,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy)
 			ir_live_pos _start = _ival->range.start; \
 			ir_live_pos _end = ir_ival_end(_ival); \
 			fprintf(stderr, action " R%d [%d.%d...%d.%d) to %s" comment "\n", \
-				_ival->vreg, \
+				(_ival->flags & IR_LIVE_INTERVAL_TEMP) ? 0 : _ival->vreg, \
 				IR_LIVE_POS_TO_REF(_start), IR_LIVE_POS_TO_SUB_REF(_start), \
 				IR_LIVE_POS_TO_REF(_end), IR_LIVE_POS_TO_SUB_REF(_end), \
 				ir_reg_name(_ival->reg, _ival->type)); \
@@ -1519,7 +1519,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy)
 			ir_live_pos _end = ir_ival_end(_ival); \
 			ir_live_pos _pos = (pos); \
 			fprintf(stderr, "      ---- Split R%d [%d.%d...%d.%d) at %d.%d\n", \
-				_ival->vreg, \
+				(_ival->flags & IR_LIVE_INTERVAL_TEMP) ? 0 : _ival->vreg, \
 				IR_LIVE_POS_TO_REF(_start), IR_LIVE_POS_TO_SUB_REF(_start), \
 				IR_LIVE_POS_TO_REF(_end), IR_LIVE_POS_TO_SUB_REF(_end), \
 				IR_LIVE_POS_TO_REF(_pos), IR_LIVE_POS_TO_SUB_REF(_pos)); \
@@ -1532,7 +1532,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy)
 			ir_live_pos _end = ir_ival_end(_ival); \
 			ir_live_pos _pos = (pos); \
 			fprintf(stderr, action " R%d [%d.%d...%d.%d) assigned to %s at %d.%d\n", \
-				_ival->vreg, \
+				(_ival->flags & IR_LIVE_INTERVAL_TEMP) ? 0 : _ival->vreg, \
 				IR_LIVE_POS_TO_REF(_start), IR_LIVE_POS_TO_SUB_REF(_start), \
 				IR_LIVE_POS_TO_REF(_end), IR_LIVE_POS_TO_SUB_REF(_end), \
 				ir_reg_name(_ival->reg, _ival->type), \
@@ -2077,14 +2077,30 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 		other = other->list_next;
 	}
 
-	/* Try to use hint */
-	reg = ir_try_allocate_preferred_reg(ctx, ival, available, freeUntilPos);
-	if (reg != IR_REG_NONE) {
-		ival->reg = reg;
-		IR_LOG_LSRA_ASSIGN("    ---- Assign", ival, " (hint available without spilling)");
-		ival->list_next = *active;
-		*active = ival;
-		return reg;
+	if (ival->flags & IR_LIVE_INTERVAL_HAS_HINTS) {
+		/* Try to use hint */
+		reg = ir_try_allocate_preferred_reg(ctx, ival, available, freeUntilPos);
+		if (reg != IR_REG_NONE) {
+			ival->reg = reg;
+			IR_LOG_LSRA_ASSIGN("    ---- Assign", ival, " (hint available without spilling)");
+			ival->list_next = *active;
+			*active = ival;
+			return reg;
+		}
+	}
+
+	if (ival->top && ival->top != ival) {
+		/* Try to reuse the register previously allocated for splited interval */
+		reg = ival->top->reg;
+		if (reg >= 0
+		 && IR_REGSET_IN(available, reg)
+		 && ir_ival_end(ival) <= freeUntilPos[reg]) {
+			ival->reg = reg;
+			IR_LOG_LSRA_ASSIGN("    ---- Assign", ival, " (available without spilling)");
+			ival->list_next = *active;
+			*active = ival;
+			return reg;
+		}
 	}
 
 	/* reg = register with highest freeUntilPos */
@@ -2120,13 +2136,16 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 		ir_live_pos split_pos = ir_last_use_pos_before(ival, pos,
 			IR_USE_MUST_BE_IN_REG | IR_USE_SHOULD_BE_IN_REG);
 		if (split_pos > ival->range.start) {
-			ir_reg pref_reg;
-
 			split_pos = ir_find_optimal_split_position(ctx, ival, split_pos, pos, 0);
 			other = ir_split_interval_at(ctx, ival, split_pos);
-			pref_reg = ir_try_allocate_preferred_reg(ctx, ival, available, freeUntilPos);
-			if (pref_reg != IR_REG_NONE) {
-				ival->reg = pref_reg;
+			if (ival->flags & IR_LIVE_INTERVAL_HAS_HINTS) {
+				ir_reg pref_reg = ir_try_allocate_preferred_reg(ctx, ival, available, freeUntilPos);
+
+				if (pref_reg != IR_REG_NONE) {
+					ival->reg = pref_reg;
+				} else {
+					ival->reg = reg;
+				}
 			} else {
 				ival->reg = reg;
 			}
@@ -2285,7 +2304,10 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 	}
 
 	/* register hinting */
-	reg = ir_get_preferred_reg(ctx, ival, available);
+	reg = IR_REG_NONE;
+	if (ival->flags & IR_LIVE_INTERVAL_HAS_HINTS) {
+		reg = ir_get_preferred_reg(ctx, ival, available);
+	}
 	if (reg == IR_REG_NONE) {
 select_register:
 		reg = IR_REGSET_FIRST(available);
@@ -2506,7 +2528,7 @@ static bool ir_ival_spill_for_fuse_load(ir_ctx *ctx, ir_live_interval *ival, ir_
 		IR_ASSERT(ival->top == ival && !ival->next && use_pos && use_pos->op_num == 0);
 		insn = &ctx->ir_base[IR_LIVE_POS_TO_REF(use_pos->pos)];
 		IR_ASSERT(insn->op == IR_PARAM);
-		use_pos =use_pos->next;
+		use_pos = use_pos->next;
 		if (use_pos && (use_pos->next || (use_pos->flags & IR_USE_MUST_BE_IN_REG))) {
 			return 0;
 		}
@@ -2524,7 +2546,7 @@ static bool ir_ival_spill_for_fuse_load(ir_ctx *ctx, ir_live_interval *ival, ir_
 
 		insn = &ctx->ir_base[IR_LIVE_POS_TO_REF(use_pos->pos)];
 		IR_ASSERT(insn->op == IR_VLOAD);
-		use_pos =use_pos->next;
+		use_pos = use_pos->next;
 		if (use_pos && (use_pos->next || (use_pos->flags & IR_USE_MUST_BE_IN_REG))) {
 			return 0;
 		}
@@ -2565,7 +2587,7 @@ static void ir_assign_bound_spill_slots(ir_ctx *ctx)
 				if (b->val < 0) {
 					/* special spill slot */
 					ival->stack_spill_pos = -b->val;
-					ival->flags |= IR_LIVE_INTERVAL_SPILL_SPECIAL;
+					ival->flags |= IR_LIVE_INTERVAL_SPILLED | IR_LIVE_INTERVAL_SPILL_SPECIAL;
 				} else {
 					/* node is bound to VAR node */
 					ir_live_interval *var_ival;
@@ -2576,6 +2598,7 @@ static void ir_assign_bound_spill_slots(ir_ctx *ctx)
 						var_ival->stack_spill_pos = ir_allocate_spill_slot(ctx, var_ival->type, ctx->data);
 					}
 					ival->stack_spill_pos = var_ival->stack_spill_pos;
+					ival->flags |= IR_LIVE_INTERVAL_SPILLED;
 				}
 			}
 		}
@@ -2782,20 +2805,22 @@ static int ir_linear_scan(ir_ctx *ctx)
 			ival = ctx->live_intervals[j];
 			if (ival
 			 && (ival->next || ival->reg == IR_REG_NONE)
-			 && ival->stack_spill_pos == -1
-			 && !(ival->flags & IR_LIVE_INTERVAL_MEM_PARAM)) {
-				ir_live_range *r;
+			 && ival->stack_spill_pos == -1) {
+				ival->flags |= IR_LIVE_INTERVAL_SPILLED;
+				if (!(ival->flags & IR_LIVE_INTERVAL_MEM_PARAM)) {
+					ir_live_range *r;
 
-				other = ival;
-				while (other->next) {
-					other = other->next;
+					other = ival;
+					while (other->next) {
+						other = other->next;
+					}
+					r = &other->range;
+					while (r->next) {
+						r = r->next;
+					}
+					ival->end = r->end;
+					ir_add_to_unhandled_spill(&unhandled, ival);
 				}
-				r = &other->range;
-				while (r->next) {
-					r = r->next;
-				}
-				ival->end = r->end;
-				ir_add_to_unhandled_spill(&unhandled, ival);
 			}
 		}
 
@@ -2885,7 +2910,7 @@ static void assign_regs(ir_ctx *ctx)
 							/* load op1 directly into result (valid only when op1 register is not reused) */
 							ctx->regs[ref][1] = reg | IR_REG_SPILL_LOAD;
 						}
-						if (ival->top->stack_spill_pos != -1) {
+						if (ival->top->flags & IR_LIVE_INTERVAL_SPILLED) {
 							// TODO: Insert spill loads and stotres in optimal positons (resolution)
 
 							if (use_pos->op_num == 0) {

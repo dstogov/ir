@@ -47,7 +47,9 @@ test:
 	addl %ebx, %eax
 	addl %ebp, %eax
 	addl %esi, %eax
+	movl 0x2c(%esp), %ecx
 	addl %ecx, %eax
+	movl 0x30(%esp), %ecx
 	addl %ecx, %eax
 	addl %edi, %eax
 	subl 0x38(%esp), %eax

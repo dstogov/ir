@@ -942,6 +942,7 @@ struct _ir_live_range {
 #define IR_LIVE_INTERVAL_MEM_LOAD        (1<<6)
 #define IR_LIVE_INTERVAL_REG_LOAD        (1<<7)
 #define IR_LIVE_INTERVAL_SPILL_SPECIAL   (1<<8) /* spill slot is pre-allocated in a special area (see ir_ctx.spill_reserved_base) */
+#define IR_LIVE_INTERVAL_SPILLED         (1<<9)
 
 struct _ir_live_interval {
 	uint8_t           type;
