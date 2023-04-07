@@ -371,7 +371,7 @@ static void ir_add_osr_entry_loads(ir_ctx *ctx, ir_block *bb, ir_bitset live, ui
 				continue;
 			}
 		}
-		fprintf(stderr, "ENTRY %d (block %i) - live var %d\n", ctx->ir_base[bb->start].op2, b, ref);
+		fprintf(stderr, "ENTRY %d (block %d start %d) - live var %d\n", ctx->ir_base[bb->start].op2, b, bb->start, ref);
 		ok = 0;
 	} IR_BITSET_FOREACH_END();
 

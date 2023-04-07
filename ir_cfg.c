@@ -806,6 +806,7 @@ next:
 				}
 			} else if (ir_worklist_len(&work)) {
 				bb->flags |= IR_BB_LOOP_HEADER;
+				bb->loop_depth = 1;
 				while (ir_worklist_len(&work)) {
 					j = ir_worklist_pop(&work);
 					while (blocks[j].loop_header > 0) {
@@ -836,10 +837,16 @@ next:
 		i = sorted_blocks[n];
 		ir_block *bb = &blocks[i];
 		if (bb->loop_header > 0) {
-			bb->loop_depth = blocks[bb->loop_header].loop_depth;
-		}
-		if (bb->flags & IR_BB_LOOP_HEADER) {
-			bb->loop_depth++;
+			ir_block *loop = &blocks[bb->loop_header];
+			uint32_t loop_depth = loop->loop_depth;
+
+			if (bb->flags & IR_BB_LOOP_HEADER) {
+				loop_depth++;
+			}
+			bb->loop_depth = loop_depth;
+			if (bb->flags & (IR_BB_ENTRY|IR_BB_LOOP_WITH_ENTRY)) {
+				loop->flags |= IR_BB_LOOP_WITH_ENTRY;
+			}
 		}
 	}
 

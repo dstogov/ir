@@ -243,7 +243,11 @@ void ir_dump_cfg(ir_ctx *ctx, FILE *f)
 				fprintf(f, "\tUNREACHABLE\n");
 			}
 			if (bb->flags & IR_BB_LOOP_HEADER) {
-				fprintf(f, "\tLOOP_HEADER\n");
+				if (bb->flags & IR_BB_LOOP_WITH_ENTRY) {
+					fprintf(f, "\tLOOP_HEADER, LOOP_WITH_ENTRY\n");
+				} else {
+					fprintf(f, "\tLOOP_HEADER\n");
+				}
 			}
 			if (bb->flags & IR_BB_IRREDUCIBLE_LOOP) {
 				fprintf(stderr, "\tIRREDUCIBLE_LOOP\n");

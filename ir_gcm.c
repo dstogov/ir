@@ -123,10 +123,9 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 			uint32_t loop_depth = bb->loop_depth;
 
 			if (loop_depth) {
-				insn = &ctx->ir_base[ref];
-				if (insn->op >= IR_ADD_OV && insn->op <= IR_OVERFLOW) {
-					/* Don't move overflow checking math out of the loop */
-					// TODO: this should be turned into a more general check to prohibit LICM ???
+				if ((ctx->cfg_blocks[bb->loop_header].flags & IR_BB_LOOP_WITH_ENTRY)
+				 && !(ctx->binding && ir_binding_find(ctx, ref))) {
+					/* Don't move loop invariant code across an OSR ENTRY if we can't restore it */
 				} else {
 					lca = bb->dom_parent;
 					while (lca != _blocks[ref]) {

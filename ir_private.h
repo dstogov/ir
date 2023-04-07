@@ -823,6 +823,7 @@ struct _ir_use_list {
 #define IR_BB_EMPTY            (1<<6)
 #define IR_BB_PREV_EMPTY_ENTRY (1<<7)
 #define IR_BB_OSR_ENTRY_LOADS  (1<<8) /* OSR Entry-point with register LOADs   */
+#define IR_BB_LOOP_WITH_ENTRY  (1<<9) /* set together with LOOP_HEADER if there is an ENTRY in the loop */
 
 struct _ir_block {
 	uint32_t flags;
