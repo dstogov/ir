@@ -221,4 +221,12 @@ struct _ir_target_constraints {
 	int8_t      hints[IR_MAX_REG_ARGS + 3];
 };
 
+#define IR_X86_SSE2  (1<<0)
+#define IR_X86_SSE3  (1<<1)
+#define IR_X86_SSSE3 (1<<2)
+#define IR_X86_SSE41 (1<<3)
+#define IR_X86_SSE42 (1<<4)
+#define IR_X86_AVX   (1<<5)
+#define IR_X86_AVX2  (1<<6)
+
 #endif /* IR_X86_H */

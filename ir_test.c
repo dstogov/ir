@@ -7,6 +7,9 @@
 
 #include "ir.h"
 #include "ir_builder.h"
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
+# include "ir_x86.h"
+#endif
 #include <stdlib.h>
 #include <string.h>
 #ifndef _WIN32
@@ -94,6 +97,9 @@ int main(int argc, char **argv)
 	int opt_level = 2;
 	uint32_t mflags = 0;
 	uint64_t debug_regset = 0xffffffffffffffff;
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
+	uint32_t cpuinfo = ir_cpuinfo();
+#endif
 
 	ir_consistency_check();
 
@@ -109,6 +115,12 @@ int main(int argc, char **argv)
 				/* pass */
 			}
 		} else if (strcmp(argv[i], "-mavx") == 0) {
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
+			if (!(cpuinfo & IR_X86_AVX)) {
+				fprintf(stderr, "ERROR: CPU doesn't support AVX instruction set)\n");
+				return 1;
+			}
+#endif
 			mflags |= IR_AVX;
 		} else if (strcmp(argv[i], "-muse-fp") == 0) {
 			mflags |= IR_USE_FRAME_POINTER;
