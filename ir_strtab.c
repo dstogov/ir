@@ -70,18 +70,19 @@ static void ir_strtab_resize(ir_strtab *strtab)
 
 static void ir_strtab_grow_buf(ir_strtab *strtab, uint32_t len)
 {
-	char *old = strtab->buf;
+	size_t old = (size_t)strtab->buf;
 
 	do {
 		strtab->buf_size *= 2;
 	} while (UNEXPECTED(strtab->buf_size - strtab->buf_top < len + 1));
 
 	strtab->buf = ir_mem_realloc(strtab->buf, strtab->buf_size);
-	if (strtab->buf != old) {
+	if ((size_t)strtab->buf != old) {
+		size_t offset = (size_t)strtab->buf - old;
 		ir_strtab_bucket *p = (ir_strtab_bucket*)strtab->data;
 		uint32_t i;
 		for (i = strtab->count; i > 0; i--) {
-			p->str = strtab->buf + (p->str - old);
+			p->str += offset;
 			p++;
 		}
 	}
