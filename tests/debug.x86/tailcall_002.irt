@@ -13,7 +13,7 @@ TAILCALL for functions with stack argumnts is not implemented
 	uintptr_t f = PARAM(l_1, "f", 1);
 	int32_t p = PARAM(l_1, "p", 2);
 	int32_t d_2, l_2 = TAILCALL/2(l_1, f, c_6, p);
-	l_4 = UNREACHABLE(l_2, d_2);
+	l_4 = UNREACHABLE(l_2);
 }
 --EXPECT--
 test:

@@ -174,6 +174,7 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f)
 #define ir_op_flag_E2      (ir_op_flag_E | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_T       (IR_OP_FLAG_CONTROL|IR_OP_FLAG_BB_END|IR_OP_FLAG_TERMINATOR)
 #define ir_op_flag_T2X1    (ir_op_flag_T | 2 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_T1X2    (ir_op_flag_T | 1 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_l       (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_LOAD)
 #define ir_op_flag_l0      ir_op_flag_l
 #define ir_op_flag_l1      (ir_op_flag_l | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))

@@ -16,7 +16,7 @@ TAILCALL for functions with stack argumnts is not implemented
 	uintptr_t c_6 = "hello %d!\n";
 	l_1 = START(l_4);
 	char d_2, l_2 = TAILCALL/2(l_1, c_5, c_6, c_4);
-	l_4 = UNREACHABLE(l_2, d_2);
+	l_4 = UNREACHABLE(l_2);
 }
 --EXPECT--
 test:

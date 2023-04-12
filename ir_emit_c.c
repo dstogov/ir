@@ -649,6 +649,16 @@ static uint8_t ir_get_return_type(ir_ctx *ctx)
 					return 0;
 				}
 			}
+		} else if (insn->op == IR_UNREACHABLE) {
+			ir_insn *prev = &ctx->ir_base[insn->op1];
+
+			IR_ASSERT(prev->op == IR_TAILCALL);
+			if (ret_type == 255) {
+				ret_type = prev->type;
+			} else if (ret_type != prev->type) {
+				IR_ASSERT(0 && "conflicting return types");
+				return 0;
+			}
 		}
 		ref = ctx->ir_base[ref].op3;
 	}

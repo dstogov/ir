@@ -65,8 +65,7 @@ int ir_assign_virtual_registers(ir_ctx *ctx)
 			flags = ir_op_flags[insn->op];
 			if (((flags & IR_OP_FLAG_DATA) && ctx->use_lists[i].count > 0)
 			 || ((flags & IR_OP_FLAG_MEM) && ctx->use_lists[i].count > 1)) {
-				if (!ctx->rules
-				 || (!(ctx->rules[i] & (IR_FUSED|IR_SKIPPED)) && (ctx->rules[i] != IR_TAILCALL))) {
+				if (!ctx->rules || !(ctx->rules[i] & (IR_FUSED|IR_SKIPPED))) {
 					vregs[i] = ++vregs_count;
 				}
 			}

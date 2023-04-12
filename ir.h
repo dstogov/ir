@@ -312,7 +312,7 @@ typedef enum _ir_type {
 	_(SWITCH,       E2,   src, def, ___) /* multi-way control split     */ \
 	_(RETURN,       T2X1, src, def, ret) /* function return             */ \
 	_(IJMP,         T2X1, src, def, ret) /* computed goto               */ \
-	_(UNREACHABLE,  T2X1, src, def, ret) /* unreachable (tailcall, etc) */ \
+	_(UNREACHABLE,  T1X2, src, ___, ret) /* unreachable (tailcall, etc) */ \
 	\
 	/* deoptimization helper                                            */ \
 	_(EXITCALL,     x2,   src, def, ___) /* save CPU regs and call op2  */ \
