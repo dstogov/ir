@@ -835,6 +835,7 @@ binop_fp:
 				return IR_IF_INT;
 			} else {
 				IR_ASSERT(0 && "NIY IR_IF_FP");
+				break;
 			}
 		case IR_GUARD:
 		case IR_GUARD_NOT:
