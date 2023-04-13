@@ -318,6 +318,8 @@ void ir_init(ir_ctx *ctx, uint32_t flags, ir_ref consts_limit, ir_ref insns_limi
 	ctx->fixed_regset = 0;
 	ctx->fixed_save_regset = 0;
 	ctx->live_intervals = NULL;
+	ctx->arena = NULL;
+	ctx->unused_ranges = NULL;
 	ctx->regs = NULL;
 	ctx->prev_ref = NULL;
 	ctx->data = NULL;
@@ -379,7 +381,10 @@ void ir_free(ir_ctx *ctx)
 		ir_mem_free(ctx->vregs);
 	}
 	if (ctx->live_intervals) {
-		ir_free_live_intervals(ctx->live_intervals, ctx->vregs_count);
+		ir_mem_free(ctx->live_intervals);
+	}
+	if (ctx->arena) {
+		ir_arena_free(ctx->arena);
 	}
 	if (ctx->regs) {
 		ir_mem_free(ctx->regs);

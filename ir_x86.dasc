@@ -7570,6 +7570,11 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 
 	/* vregs + tmp + fixed + SRATCH + ALL */
 	ctx->live_intervals = ir_mem_calloc(ctx->vregs_count + 1 + IR_REG_NUM + 2, sizeof(ir_live_interval*));
+
+    if (!ctx->arena) {
+		ctx->arena = ir_arena_create(16 * 1024);
+	}
+
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		for (i = bb->start, insn = ctx->ir_base + i, rule = ctx->rules + i; i <= bb->end;) {
@@ -7612,7 +7617,8 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 							}
 						}
 						if (!ctx->live_intervals[ctx->vregs[i]]) {
-							ir_live_interval *ival = ir_mem_calloc(1, sizeof(ir_live_interval));
+							ir_live_interval *ival = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
+							memset(ival, 0, sizeof(ir_live_interval));
 							ctx->live_intervals[ctx->vregs[i]] = ival;
 							ival->type = insn->type;
 							ival->reg = IR_REG_NONE;
@@ -7637,7 +7643,8 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 									if (use_insn->op == IR_VLOAD) {
 										if (ctx->vregs[use]
 										 && !ctx->live_intervals[ctx->vregs[use]]) {
-											ir_live_interval *ival = ir_mem_calloc(1, sizeof(ir_live_interval));
+											ir_live_interval *ival = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
+											memset(ival, 0, sizeof(ir_live_interval));
 											ctx->live_intervals[ctx->vregs[use]] = ival;
 											ival->type = insn->type;
 											ival->reg = IR_REG_NONE;
@@ -7649,7 +7656,8 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 										if (!IR_IS_CONST_REF(use_insn->op3)
 										 && ctx->vregs[use_insn->op3]
 										 && !ctx->live_intervals[ctx->vregs[use_insn->op3]]) {
-											ir_live_interval *ival = ir_mem_calloc(1, sizeof(ir_live_interval));
+											ir_live_interval *ival = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
+											memset(ival, 0, sizeof(ir_live_interval));
 											ctx->live_intervals[ctx->vregs[use_insn->op3]] = ival;
 											ival->type = insn->type;
 											ival->reg = IR_REG_NONE;

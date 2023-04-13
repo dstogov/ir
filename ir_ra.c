@@ -123,7 +123,7 @@ static void ir_add_local_var(ir_ctx *ctx, int v, uint8_t type)
 
 	IR_ASSERT(!ival);
 
-	ival = ir_mem_malloc(sizeof(ir_live_interval));
+	ival = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
 	IR_ASSERT(type != IR_VOID);
 	ival->type = type;
 	ival->reg = IR_REG_NONE;
@@ -148,7 +148,7 @@ static void ir_add_live_range(ir_ctx *ctx, int v, uint8_t type, ir_live_pos star
 	ir_live_range *p, *q, *next, *prev;
 
 	if (!ival) {
-		ival = ir_mem_malloc(sizeof(ir_live_interval));
+		ival = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
 		IR_ASSERT(type != IR_VOID);
 		ival->type = type;
 		ival->reg = IR_REG_NONE;
@@ -203,7 +203,7 @@ static void ir_add_live_range(ir_ctx *ctx, int v, uint8_t type, ir_live_pos star
 		q = ctx->unused_ranges;
 		ctx->unused_ranges = q->next;
 	} else {
-		q = ir_mem_malloc(sizeof(ir_live_range));
+		q = ir_arena_alloc(&ctx->arena, sizeof(ir_live_range));
 	}
 	if (prev) {
 		prev->next = q;
@@ -227,7 +227,7 @@ static void ir_add_fixed_live_range(ir_ctx *ctx, ir_reg reg, ir_live_pos start, 
 	int v = ctx->vregs_count + 1 + reg;
 	ir_live_interval *ival = ctx->live_intervals[v];
 	if (!ival) {
-		ival = ir_mem_malloc(sizeof(ir_live_interval));
+		ival = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
 		ival->type = IR_VOID;
 		ival->reg = reg;
 		ival->flags = IR_LIVE_INTERVAL_FIXED;
@@ -249,7 +249,7 @@ static void ir_add_fixed_live_range(ir_ctx *ctx, ir_reg reg, ir_live_pos start, 
 
 static void ir_add_tmp(ir_ctx *ctx, ir_ref ref, ir_ref tmp_ref, int32_t tmp_op_num, ir_tmp_reg tmp_reg)
 {
-	ir_live_interval *ival = ir_mem_malloc(sizeof(ir_live_interval));
+	ir_live_interval *ival = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
 
 	ival->type = tmp_reg.type;
 	ival->reg = IR_REG_NONE;
@@ -336,11 +336,11 @@ static void ir_add_use_pos(ir_ctx *ctx, int v, ir_use_pos *use_pos)
 	}
 }
 
-static void ir_add_use(ir_ctx *ctx, int v, int op_num, ir_live_pos pos, ir_reg hint, uint8_t use_flags, ir_ref hint_ref)
+IR_ALWAYS_INLINE void ir_add_use(ir_ctx *ctx, int v, int op_num, ir_live_pos pos, ir_reg hint, uint8_t use_flags, ir_ref hint_ref)
 {
 	ir_use_pos *use_pos;
 
-	use_pos = ir_mem_malloc(sizeof(ir_use_pos));
+	use_pos = ir_arena_alloc(&ctx->arena, sizeof(ir_use_pos));
 	use_pos->op_num = op_num;
 	use_pos->hint = hint;
 	use_pos->flags = use_flags;
@@ -355,7 +355,7 @@ static void ir_add_phi_use(ir_ctx *ctx, int v, int op_num, ir_live_pos pos, ir_r
 	ir_use_pos *use_pos;
 
 	IR_ASSERT(phi_ref > 0);
-	use_pos = ir_mem_malloc(sizeof(ir_use_pos));
+	use_pos = ir_arena_alloc(&ctx->arena, sizeof(ir_use_pos));
 	use_pos->op_num = op_num;
 	use_pos->hint = IR_REG_NONE;
 	use_pos->flags = IR_PHI_USE | IR_USE_SHOULD_BE_IN_REG; // TODO: ???
@@ -561,11 +561,14 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 
 	/* vregs + tmp + fixed + SRATCH + ALL */
 	ctx->live_intervals = ir_mem_calloc(ctx->vregs_count + 1 + IR_REG_NUM + 2, sizeof(ir_live_interval*));
-	ctx->unused_ranges = NULL;
 
 #ifdef IR_DEBUG
 	visited = ir_bitset_malloc(ctx->cfg_blocks_count + 1);
 #endif
+
+    if (!ctx->arena) {
+		ctx->arena = ir_arena_create(16 * 1024);
+	}
 
 	/* for each basic block in reverse order */
 	for (b = ctx->cfg_blocks_count; b > 0; b--) {
@@ -884,11 +887,6 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 		}
 	}
 
-	if (ctx->unused_ranges) {
-		ir_free_live_ranges(ctx->unused_ranges);
-		ctx->unused_ranges = NULL;
-	}
-
 	if (loops) {
 		ir_mem_free(loops);
 		ir_bitqueue_free(&queue);
@@ -901,46 +899,6 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 
 	return 1;
 }
-
-void ir_free_live_ranges(ir_live_range *live_range)
-{
-	ir_live_range *p;
-
-	while (live_range) {
-		p = live_range;
-		live_range = live_range->next;
-		ir_mem_free(p);
-	}
-}
-
-void ir_free_live_intervals(ir_live_interval **live_intervals, int count)
-{
-	int i;
-	ir_live_interval *ival, *next;
-	ir_use_pos *use_pos;
-
-	/* vregs + tmp + fixed + SRATCH + ALL */
-	count += IR_REG_NUM + 2;
-	for (i = 0; i <= count; i++) {
-		ival = live_intervals[i];
-		while (ival) {
-			if (ival->range.next) {
-				ir_free_live_ranges(ival->range.next);
-			}
-			use_pos = ival->use_pos;
-			while (use_pos) {
-				ir_use_pos *p = use_pos;
-				use_pos = p->next;
-				ir_mem_free(p);
-			}
-			next = ival->next;
-			ir_mem_free(ival);
-			ival = next;
-		}
-	}
-	ir_mem_free(live_intervals);
-}
-
 
 /* Live Ranges coalescing */
 
@@ -1035,7 +993,8 @@ static void ir_vregs_join(ir_ctx *ctx, uint32_t r1, uint32_t r2)
 	ctx->live_intervals[r1]->flags |= IR_LIVE_INTERVAL_COALESCED;
 	ctx->live_intervals[r2] = NULL;
 
-	ir_mem_free(ival);
+	// TODO: remember to reuse ???
+	//ir_mem_free(ival);
 }
 
 static bool ir_try_coalesce(ir_ctx *ctx, ir_ref from, ir_ref to)
@@ -1262,7 +1221,6 @@ int ir_coalesce(ir_ctx *ctx)
 	ir_worklist blocks;
 	bool compact = 0;
 
-	ctx->unused_ranges = NULL;
 	/* Collect a list of blocks which are predecossors to block with phi finctions */
 	ir_worklist_init(&blocks, ctx->cfg_blocks_count + 1);
 	for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
@@ -1323,10 +1281,6 @@ int ir_coalesce(ir_ctx *ctx)
 				}
 			}
 		}
-	}
-	if (ctx->unused_ranges) {
-		ir_free_live_ranges(ctx->unused_ranges);
-		ctx->unused_ranges = NULL;
 	}
 	ir_worklist_free(&blocks);
 
@@ -1760,7 +1714,7 @@ static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, ir_live_interval *iva
 		}
 	}
 
-	child = ir_mem_malloc(sizeof(ir_live_interval));
+	child = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
 	child->type = ival->type;
 	child->reg = IR_REG_NONE;
 	child->flags = 0;
@@ -1779,7 +1733,9 @@ static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, ir_live_interval *iva
 	if (pos == p->start) {
 		prev->next = NULL;
 		ival->end = prev->end;
-		ir_mem_free(p);
+		/* Cache to reuse */
+		p->next = ctx->unused_ranges;
+		ctx->unused_ranges = p;
 	} else {
 		p->end = ival->end = pos;
 		p->next = NULL;

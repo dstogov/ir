@@ -221,6 +221,79 @@ IR_ALWAYS_INLINE int ir_nlzl(uint64_t num)
 
 /*** Helper data types ***/
 
+/* Arena */
+struct _ir_arena {
+	char     *ptr;
+	char     *end;
+	ir_arena *prev;
+};
+
+IR_ALWAYS_INLINE ir_arena* ir_arena_create(size_t size)
+{
+	ir_arena *arena;
+
+	IR_ASSERT(size >= IR_ALIGNED_SIZE(sizeof(ir_arena), 8));
+	arena = (ir_arena*)ir_mem_malloc(size);
+	arena->ptr = (char*) arena + IR_ALIGNED_SIZE(sizeof(ir_arena), 8);
+	arena->end = (char*) arena + size;
+	arena->prev = NULL;
+	return arena;
+}
+
+IR_ALWAYS_INLINE void ir_arena_free(ir_arena *arena)
+{
+	do {
+		ir_arena *prev = arena->prev;
+		ir_mem_free(arena);
+		arena = prev;
+	} while (arena);
+}
+
+IR_ALWAYS_INLINE void* ir_arena_alloc(ir_arena **arena_ptr, size_t size)
+{
+	ir_arena *arena = *arena_ptr;
+	char *ptr = arena->ptr;
+
+	size = IR_ALIGNED_SIZE(size, 8);
+
+	if (EXPECTED(size <= (size_t)(arena->end - ptr))) {
+		arena->ptr = ptr + size;
+	} else {
+		size_t arena_size =
+			UNEXPECTED((size + IR_ALIGNED_SIZE(sizeof(ir_arena), 8)) > (size_t)(arena->end - (char*) arena)) ?
+				(size + IR_ALIGNED_SIZE(sizeof(ir_arena), 8)) :
+				(size_t)(arena->end - (char*) arena);
+		ir_arena *new_arena = (ir_arena*)ir_mem_malloc(arena_size);
+
+		ptr = (char*) new_arena + IR_ALIGNED_SIZE(sizeof(ir_arena), 8);
+		new_arena->ptr = (char*) new_arena + IR_ALIGNED_SIZE(sizeof(ir_arena), 8) + size;
+		new_arena->end = (char*) new_arena + arena_size;
+		new_arena->prev = arena;
+		*arena_ptr = new_arena;
+	}
+
+	return (void*) ptr;
+}
+
+IR_ALWAYS_INLINE void* ir_arena_checkpoint(ir_arena *arena)
+{
+	return arena->ptr;
+}
+
+IR_ALWAYS_INLINE void ir_release(ir_arena **arena_ptr, void *checkpoint)
+{
+	ir_arena *arena = *arena_ptr;
+
+	while (UNEXPECTED((char*)checkpoint > arena->end) ||
+	       UNEXPECTED((char*)checkpoint <= (char*)arena)) {
+		ir_arena *prev = arena->prev;
+		ir_mem_free(arena);
+		*arena_ptr = arena = prev;
+	}
+	IR_ASSERT((char*)checkpoint > (char*)arena && (char*)checkpoint <= arena->end);
+	arena->ptr = (char*)checkpoint;
+}
+
 /* Bitsets */
 #if defined(IR_TARGET_X86)
 # define IR_BITSET_BITS 32
@@ -967,8 +1040,6 @@ struct _ir_live_interval {
 typedef int (*emit_copy_t)(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to);
 
 int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy);
-void ir_free_live_ranges(ir_live_range *live_range);
-void ir_free_live_intervals(ir_live_interval **live_intervals, int count);
 
 #if defined(IR_REGSET_64BIT)
 
