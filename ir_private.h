@@ -878,8 +878,6 @@ ir_ref ir_folding(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3,
 /*** IR Live Info ***/
 typedef ir_ref                   ir_live_pos;
 typedef struct _ir_use_pos       ir_use_pos;
-typedef struct _ir_live_range    ir_live_range;
-typedef struct _ir_live_interval ir_live_interval;
 
 #define IR_SUB_REFS_COUNT                4
 

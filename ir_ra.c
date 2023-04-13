@@ -142,7 +142,7 @@ static void ir_add_local_var(ir_ctx *ctx, int v, uint8_t type)
 	ctx->flags |= IR_LR_HAVE_VARS;
 }
 
-static void ir_add_live_range(ir_ctx *ctx, ir_live_range **unused, int v, uint8_t type, ir_live_pos start, ir_live_pos end)
+static void ir_add_live_range(ir_ctx *ctx, int v, uint8_t type, ir_live_pos start, ir_live_pos end)
 {
 	ir_live_interval *ival = ctx->live_intervals[v];
 	ir_live_range *p, *q, *next, *prev;
@@ -184,9 +184,9 @@ static void ir_add_live_range(ir_ctx *ctx, ir_live_range **unused, int v, uint8_
 						p->end = next->end;
 					}
 					p->next = next->next;
-					/* list of deleted structures is keapt in "unused" list */
-					next->next = *unused;
-					*unused = next;
+					/* remember in the "unused_ranges" list */
+					next->next = ctx->unused_ranges;
+					ctx->unused_ranges = next;
 					next = p->next;
 				}
 				if (!p->next) {
@@ -198,10 +198,10 @@ static void ir_add_live_range(ir_ctx *ctx, ir_live_range **unused, int v, uint8_
 		prev = p;
 		p = prev->next;
 	}
-	if (*unused) {
+	if (ctx->unused_ranges) {
 		/* reuse */
-		q = *unused;
-		*unused = q->next;
+		q = ctx->unused_ranges;
+		ctx->unused_ranges = q->next;
 	} else {
 		q = ir_mem_malloc(sizeof(ir_live_range));
 	}
@@ -222,7 +222,7 @@ static void ir_add_live_range(ir_ctx *ctx, ir_live_range **unused, int v, uint8_
 	}
 }
 
-static void ir_add_fixed_live_range(ir_ctx *ctx, ir_live_range **unused, ir_reg reg, ir_live_pos start, ir_live_pos end)
+static void ir_add_fixed_live_range(ir_ctx *ctx, ir_reg reg, ir_live_pos start, ir_live_pos end)
 {
 	int v = ctx->vregs_count + 1 + reg;
 	ir_live_interval *ival = ctx->live_intervals[v];
@@ -244,7 +244,7 @@ static void ir_add_fixed_live_range(ir_ctx *ctx, ir_live_range **unused, ir_reg 
 		ctx->live_intervals[v] = ival;
 		return;
 	}
-	ir_add_live_range(ctx, unused, v, IR_VOID, start, end);
+	ir_add_live_range(ctx, v, IR_VOID, start, end);
 }
 
 static void ir_add_tmp(ir_ctx *ctx, ir_ref ref, ir_ref tmp_ref, int32_t tmp_op_num, ir_tmp_reg tmp_reg)
@@ -417,14 +417,14 @@ static void ir_add_osr_entry_loads(ir_ctx *ctx, ir_block *bb, ir_bitset live, ui
 #if 0
 		/* ENTRY "clobbers" all registers */
 		ir_ref ref = ctx->ir_base[bb->start].op1;
-		ir_add_fixed_live_range(ctx, &unused, IR_REG_ALL,
+		ir_add_fixed_live_range(ctx, IR_REG_ALL,
 			IR_DEF_LIVE_POS_FROM_REF(ref),
 			IR_SAVE_LIVE_POS_FROM_REF(ref));
 #endif
 	}
 }
 
-static void ir_add_fusion_ranges(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_block *bb, ir_bitset live, ir_live_range **unused)
+static void ir_add_fusion_ranges(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_block *bb, ir_bitset live)
 {
 	ir_ref stack[4];
 	int stack_pos = 0;
@@ -448,7 +448,7 @@ static void ir_add_fusion_ranges(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_block
 					ir_add_tmp(ctx, ref, input, constraints.tmp_regs[n].num, constraints.tmp_regs[n]);
 				} else {
 					/* CPU specific constraints */
-					ir_add_fixed_live_range(ctx, unused, constraints.tmp_regs[n].reg,
+					ir_add_fixed_live_range(ctx, constraints.tmp_regs[n].reg,
 						IR_START_LIVE_POS_FROM_REF(ref) + constraints.tmp_regs[n].start,
 						IR_START_LIVE_POS_FROM_REF(ref) + constraints.tmp_regs[n].end);
 				}
@@ -484,7 +484,7 @@ static void ir_add_fusion_ranges(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_block
 						/* live.add(opd) */
 						ir_bitset_incl(live, ctx->vregs[child]);
 						/* intervals[opd].addRange(b.from, op.id) */
-						ir_add_live_range(ctx, unused, ctx->vregs[child], ctx->ir_base[child].type,
+						ir_add_live_range(ctx, ctx->vregs[child], ctx->ir_base[child].type,
 							IR_START_LIVE_POS_FROM_REF(bb->start), use_pos);
 					}
 					ir_add_use(ctx, ctx->vregs[child], j, use_pos, reg, use_flags, -input);
@@ -528,7 +528,7 @@ static void ir_add_fusion_ranges(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_block
 	uint8_t use_flags = IR_USE_MUST_BE_IN_REG;
 
 	/* intervals[opd].addRange(b.from, op.id) */
-	ir_add_live_range(ctx, unused, ctx->vregs[input], ctx->ir_base[input].type,
+	ir_add_live_range(ctx, ctx->vregs[input], ctx->ir_base[input].type,
 		IR_START_LIVE_POS_FROM_REF(bb->start), use_pos);
 	ir_add_use(ctx, ctx->vregs[input], op_num, use_pos, IR_REG_NONE, use_flags, IR_UNUSED);
 	/* live.add(opd) */
@@ -549,7 +549,6 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 	ir_bitset live, bb_live;
 	ir_bitset loops = NULL;
 	ir_bitqueue queue;
-	ir_live_range *unused = NULL;
 
 	if (!(ctx->flags & IR_LINEAR) || !ctx->vregs) {
 		return 0;
@@ -562,6 +561,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 
 	/* vregs + tmp + fixed + SRATCH + ALL */
 	ctx->live_intervals = ir_mem_calloc(ctx->vregs_count + 1 + IR_REG_NUM + 2, sizeof(ir_live_interval*));
+	ctx->unused_ranges = NULL;
 
 #ifdef IR_DEBUG
 	visited = ir_bitset_malloc(ctx->cfg_blocks_count + 1);
@@ -611,7 +611,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 		/* for each opd in live */
 		IR_BITSET_FOREACH(live, len, i) {
 			/* intervals[opd].addRange(b.from, b.to) */
-			ir_add_live_range(ctx, &unused, i, IR_VOID,
+			ir_add_live_range(ctx, i, IR_VOID,
 				IR_START_LIVE_POS_FROM_REF(bb->start),
 				IR_END_LIVE_POS_FROM_REF(bb->end));
 		} IR_BITSET_FOREACH_END();
@@ -636,7 +636,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 								IR_ASSERT(ctx->vregs[input]);
 								ir_bitset_incl(live, ctx->vregs[input]);
 								/* intervals[phi.inputOf(b)].addRange(b.from, b.to) */
-								ir_add_live_range(ctx, &unused, ctx->vregs[input], insn->type,
+								ir_add_live_range(ctx, ctx->vregs[input], insn->type,
 									IR_START_LIVE_POS_FROM_REF(bb->start),
 									IR_END_LIVE_POS_FROM_REF(bb->end));
 								ir_add_phi_use(ctx, ctx->vregs[input], k, IR_DEF_LIVE_POS_FROM_REF(bb->end), use);
@@ -674,7 +674,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						ir_add_tmp(ctx, ref, ref, constraints.tmp_regs[n].num, constraints.tmp_regs[n]);
 					} else {
 						/* CPU specific constraints */
-						ir_add_fixed_live_range(ctx, &unused, constraints.tmp_regs[n].reg,
+						ir_add_fixed_live_range(ctx, constraints.tmp_regs[n].reg,
 							IR_START_LIVE_POS_FROM_REF(ref) + constraints.tmp_regs[n].start,
 							IR_START_LIVE_POS_FROM_REF(ref) + constraints.tmp_regs[n].end);
 					}
@@ -709,10 +709,10 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							def_pos = IR_SAVE_LIVE_POS_FROM_REF(ref);
 							if (insn->op == IR_PARAM) {
 								/* parameter register must be kept before it's copied */
-								ir_add_fixed_live_range(ctx, &unused, reg,
+								ir_add_fixed_live_range(ctx, reg,
 									IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
 							} else {
-								ir_add_fixed_live_range(ctx, &unused, reg,
+								ir_add_fixed_live_range(ctx, reg,
 									IR_DEF_LIVE_POS_FROM_REF(ref), def_pos);
 							}
 						} else if (def_flags & IR_DEF_REUSES_OP1_REG) {
@@ -761,7 +761,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 
 			    ir_live_pos use_pos = IR_USE_LIVE_POS_FROM_REF(ref);
 
-				ir_add_live_range(ctx, &unused, ctx->vregs[insn->op2], ctx->ir_base[insn->op2].type,
+				ir_add_live_range(ctx, ctx->vregs[insn->op2], ctx->ir_base[insn->op2].type,
 					IR_START_LIVE_POS_FROM_REF(bb->start), use_pos);
 				ir_add_use(ctx, ctx->vregs[insn->op2], 2, use_pos, IR_REG_NONE, 0, IR_UNUSED);
 				ir_bitset_incl(live, ctx->vregs[insn->op2]);
@@ -790,13 +790,13 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							IR_ASSERT(ctx->vregs[ref]);
 							hint_ref = ref;
 							if (reg != IR_REG_NONE) {
-								ir_add_fixed_live_range(ctx, &unused, reg,
+								ir_add_fixed_live_range(ctx, reg,
 									use_pos, IR_USE_LIVE_POS_FROM_REF(ref));
 							}
 						} else {
 							if (reg != IR_REG_NONE) {
 								use_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
-								ir_add_fixed_live_range(ctx, &unused, reg,
+								ir_add_fixed_live_range(ctx, reg,
 									use_pos, IR_USE_LIVE_POS_FROM_REF(ref));
 							} else if ((def_flags & IR_DEF_REUSES_OP1_REG) && input == insn->op1) {
 								/* Input is the same as "op1" */
@@ -809,18 +809,18 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							/* live.add(opd) */
 							ir_bitset_incl(live, ctx->vregs[input]);
 							/* intervals[opd].addRange(b.from, op.id) */
-							ir_add_live_range(ctx, &unused, ctx->vregs[input], ctx->ir_base[input].type,
+							ir_add_live_range(ctx, ctx->vregs[input], ctx->ir_base[input].type,
 								IR_START_LIVE_POS_FROM_REF(bb->start), use_pos);
 						}
 						ir_add_use(ctx, ctx->vregs[input], j, use_pos, reg, use_flags, hint_ref);
 					} else if (input > 0) {
 						IR_ASSERT(ctx->rules);
 						if (ctx->rules[input] & IR_FUSED) {
-						    ir_add_fusion_ranges(ctx, ref, input, bb, live, &unused);
+						    ir_add_fusion_ranges(ctx, ref, input, bb, live);
 						}
 					} else {
 						if (reg != IR_REG_NONE) {
-							ir_add_fixed_live_range(ctx, &unused, reg,
+							ir_add_fixed_live_range(ctx, reg,
 								IR_LOAD_LIVE_POS_FROM_REF(ref), IR_USE_LIVE_POS_FROM_REF(ref));
 						}
 					}
@@ -852,7 +852,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 
 				IR_BITSET_FOREACH(live, len, i) {
 					ir_bitset_incl(child_live_in, i);
-					ir_add_live_range(ctx, &unused, i, IR_VOID,
+					ir_add_live_range(ctx, i, IR_VOID,
 						IR_START_LIVE_POS_FROM_REF(child_bb->start),
 						IR_END_LIVE_POS_FROM_REF(child_bb->end));
 				} IR_BITSET_FOREACH_END();
@@ -884,8 +884,9 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 		}
 	}
 
-	if (unused) {
-		ir_free_live_ranges(unused);
+	if (ctx->unused_ranges) {
+		ir_free_live_ranges(ctx->unused_ranges);
+		ctx->unused_ranges = NULL;
 	}
 
 	if (loops) {
@@ -978,7 +979,7 @@ static ir_live_pos ir_vregs_overlap(ir_ctx *ctx, uint32_t r1, uint32_t r2)
 	return ir_ivals_overlap(&ival1->range, &ival2->range);
 }
 
-static void ir_vregs_join(ir_ctx *ctx, ir_live_range **unused, uint32_t r1, uint32_t r2)
+static void ir_vregs_join(ir_ctx *ctx, uint32_t r1, uint32_t r2)
 {
 	ir_live_interval *ival = ctx->live_intervals[r2];
 	ir_live_range *live_range = &ival->range;
@@ -989,13 +990,13 @@ static void ir_vregs_join(ir_ctx *ctx, ir_live_range **unused, uint32_t r1, uint
 	fprintf(stderr, "COALESCE %d -> %d\n", r2, r1);
 #endif
 
-	ir_add_live_range(ctx, unused, r1, ival->type, live_range->start, live_range->end);
+	ir_add_live_range(ctx, r1, ival->type, live_range->start, live_range->end);
 	live_range = live_range->next;
 	while (live_range) {
 		next = live_range->next;
-		live_range->next = *unused;
-		*unused = live_range;
-		ir_add_live_range(ctx, unused, r1, ival->type, live_range->start, live_range->end);
+		live_range->next = ctx->unused_ranges;
+		ctx->unused_ranges = live_range;
+		ir_add_live_range(ctx, r1, ival->type, live_range->start, live_range->end);
 		live_range = next;
 	}
 
@@ -1037,7 +1038,7 @@ static void ir_vregs_join(ir_ctx *ctx, ir_live_range **unused, uint32_t r1, uint
 	ir_mem_free(ival);
 }
 
-static bool ir_try_coalesce(ir_ctx *ctx, ir_live_range **unused, ir_ref from, ir_ref to)
+static bool ir_try_coalesce(ir_ctx *ctx, ir_ref from, ir_ref to)
 {
 	ir_ref i;
 	uint32_t v1 = ctx->vregs[from];
@@ -1048,13 +1049,13 @@ static bool ir_try_coalesce(ir_ctx *ctx, ir_live_range **unused, ir_ref from, ir
 		uint16_t f2 = ctx->live_intervals[v2]->flags;
 
 		if ((f1 & IR_LIVE_INTERVAL_COALESCED) && !(f2 & IR_LIVE_INTERVAL_COALESCED)) {
-			ir_vregs_join(ctx, unused, v1, v2);
+			ir_vregs_join(ctx, v1, v2);
 			ctx->vregs[to] = v1;
 		} else if ((f2 & IR_LIVE_INTERVAL_COALESCED) && !(f1 & IR_LIVE_INTERVAL_COALESCED)) {
-			ir_vregs_join(ctx, unused, v2, v1);
+			ir_vregs_join(ctx, v2, v1);
 			ctx->vregs[from] = v2;
 		} else if (from < to) {
-			ir_vregs_join(ctx, unused, v1, v2);
+			ir_vregs_join(ctx, v1, v2);
 			if (f2 & IR_LIVE_INTERVAL_COALESCED) {
 				for (i = 0; i < ctx->insns_count; i++) {
 					if (ctx->vregs[i] == v2) {
@@ -1065,7 +1066,7 @@ static bool ir_try_coalesce(ir_ctx *ctx, ir_live_range **unused, ir_ref from, ir
 				ctx->vregs[to] = v1;
 			}
 		} else {
-			ir_vregs_join(ctx,unused, v2, v1);
+			ir_vregs_join(ctx, v2, v1);
 			if (f1 & IR_LIVE_INTERVAL_COALESCED) {
 				for (i = 0; i < ctx->insns_count; i++) {
 					if (ctx->vregs[i] == v1) {
@@ -1260,8 +1261,8 @@ int ir_coalesce(ir_ctx *ctx)
 	ir_insn *insn;
 	ir_worklist blocks;
 	bool compact = 0;
-	ir_live_range *unused = NULL;
 
+	ctx->unused_ranges = NULL;
 	/* Collect a list of blocks which are predecossors to block with phi finctions */
 	ir_worklist_init(&blocks, ctx->cfg_blocks_count + 1);
 	for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
@@ -1311,7 +1312,7 @@ int ir_coalesce(ir_ctx *ctx)
 			if (insn->op == IR_PHI) {
 				input = ir_insn_op(insn, k);
 				if (input > 0) {
-					if (!ir_try_coalesce(ctx, &unused, input, use)) {
+					if (!ir_try_coalesce(ctx, input, use)) {
 						ir_add_phi_move(ctx, b, input, use);
 					} else {
 						compact = 1;
@@ -1323,8 +1324,9 @@ int ir_coalesce(ir_ctx *ctx)
 			}
 		}
 	}
-	if (unused) {
-		ir_free_live_ranges(unused);
+	if (ctx->unused_ranges) {
+		ir_free_live_ranges(ctx->unused_ranges);
+		ctx->unused_ranges = NULL;
 	}
 	ir_worklist_free(&blocks);
 

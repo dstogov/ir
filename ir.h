@@ -505,6 +505,7 @@ typedef struct _ir_ctx           ir_ctx;
 typedef struct _ir_use_list      ir_use_list;
 typedef struct _ir_block         ir_block;
 typedef struct _ir_live_interval ir_live_interval;
+typedef struct _ir_live_range    ir_live_range;
 typedef int8_t ir_regs[4];
 
 typedef void (*ir_snapshot_create_t)(ir_ctx *ctx, ir_ref addr);
@@ -537,6 +538,7 @@ struct _ir_ctx {
 	int32_t            fixed_call_stack_size;   /* fixed preallocated stack for parameter passing (default 0) */
 	uint64_t           fixed_save_regset;       /* registers that always saved/restored in prologue/epilugue */
 	ir_live_interval **live_intervals;
+	ir_live_range     *unused_ranges;
 	ir_regs           *regs;
 	ir_ref            *prev_ref;
 	union {
