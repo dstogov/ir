@@ -38,7 +38,7 @@ bool ir_reg_is_int(int32_t reg)
 	return reg >= IR_REG_GP_FIRST && reg <= IR_REG_GP_LAST;
 }
 
-int ir_assign_virtual_registers(ir_ctx *ctx)
+static int ir_assign_virtual_registers_slow(ir_ctx *ctx)
 {
 	uint32_t *vregs;
 	uint32_t vregs_count = 0;
@@ -75,6 +75,40 @@ int ir_assign_virtual_registers(ir_ctx *ctx)
 			insn += n;
 		}
 	}
+	ctx->vregs_count = vregs_count;
+	ctx->vregs = vregs;
+
+	return 1;
+}
+
+int ir_assign_virtual_registers(ir_ctx *ctx)
+{
+	uint32_t *vregs;
+	uint32_t vregs_count = 0;
+	ir_ref i;
+	ir_insn *insn;
+
+	if (!ctx->rules) {
+		return ir_assign_virtual_registers_slow(ctx);
+	}
+
+	/* Assign unique virtual register to each rule that needs it */
+	vregs = ir_mem_malloc(ctx->insns_count * sizeof(ir_ref));
+
+	for (i = 1, insn = &ctx->ir_base[1]; i < ctx->insns_count; i++, insn++) {
+		uint32_t v = 0;
+
+		if (ctx->rules[i] && !(ctx->rules[i] & (IR_FUSED|IR_SKIPPED))) {
+			uint32_t flags = ir_op_flags[insn->op];
+
+			if (((flags & IR_OP_FLAG_DATA) && ctx->use_lists[i].count > 0)
+			 || ((flags & IR_OP_FLAG_MEM) && ctx->use_lists[i].count > 1)) {
+				v = ++vregs_count;
+			}
+		}
+		vregs[i] = v;
+	}
+
 	ctx->vregs_count = vregs_count;
 	ctx->vregs = vregs;
 
