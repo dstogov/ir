@@ -1482,7 +1482,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy)
 		if (ctx->flags & IR_DEBUG_RA) { \
 			ir_live_interval *_ival = (ival); \
 			ir_live_pos _start = _ival->range.start; \
-			ir_live_pos _end = ir_ival_end(_ival); \
+			ir_live_pos _end = _ival->end; \
 			fprintf(stderr, action " R%d [%d.%d...%d.%d)" comment "\n", \
 				(_ival->flags & IR_LIVE_INTERVAL_TEMP) ? 0 : _ival->vreg, \
 				IR_LIVE_POS_TO_REF(_start), IR_LIVE_POS_TO_SUB_REF(_start), \
@@ -1493,7 +1493,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy)
 		if (ctx->flags & IR_DEBUG_RA) { \
 			ir_live_interval *_ival = (ival); \
 			ir_live_pos _start = _ival->range.start; \
-			ir_live_pos _end = ir_ival_end(_ival); \
+			ir_live_pos _end = _ival->end; \
 			fprintf(stderr, action " R%d [%d.%d...%d.%d) to %s" comment "\n", \
 				(_ival->flags & IR_LIVE_INTERVAL_TEMP) ? 0 : _ival->vreg, \
 				IR_LIVE_POS_TO_REF(_start), IR_LIVE_POS_TO_SUB_REF(_start), \
@@ -1505,7 +1505,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy)
 		if (ctx->flags & IR_DEBUG_RA) { \
 			ir_live_interval *_ival = (ival); \
 			ir_live_pos _start = _ival->range.start; \
-			ir_live_pos _end = ir_ival_end(_ival); \
+			ir_live_pos _end = _ival->end; \
 			ir_live_pos _pos = (pos); \
 			fprintf(stderr, "      ---- Split R%d [%d.%d...%d.%d) at %d.%d\n", \
 				(_ival->flags & IR_LIVE_INTERVAL_TEMP) ? 0 : _ival->vreg, \
@@ -1518,7 +1518,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy)
 		if (ctx->flags & IR_DEBUG_RA) { \
 			ir_live_interval *_ival = (ival); \
 			ir_live_pos _start = _ival->range.start; \
-			ir_live_pos _end = ir_ival_end(_ival); \
+			ir_live_pos _end = _ival->end; \
 			ir_live_pos _pos = (pos); \
 			fprintf(stderr, action " R%d [%d.%d...%d.%d) assigned to %s at %d.%d\n", \
 				(_ival->flags & IR_LIVE_INTERVAL_TEMP) ? 0 : _ival->vreg, \
@@ -1534,20 +1534,6 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy)
 # define IR_LOG_LSRA_SPLIT(ival, pos)
 # define IR_LOG_LSRA_CONFLICT(action, ival, pos);
 #endif
-
-IR_ALWAYS_INLINE ir_live_pos ir_ival_end(ir_live_interval *ival)
-{
-#if 1
-	return ival->end;
-#else
-	ir_live_range *live_range = &ival->range;
-
-	while (live_range->next) {
-		live_range = live_range->next;
-	}
-	return live_range->end;
-#endif
-}
 
 #ifdef IR_DEBUG
 static bool ir_ival_covers(ir_live_interval *ival, ir_live_pos position)
@@ -1636,7 +1622,7 @@ static ir_live_pos ir_find_optimal_split_position(ir_ctx *ctx, ir_live_interval 
 
 	IR_ASSERT(min_pos < max_pos);
 	IR_ASSERT(min_pos >= ival->range.start);
-	IR_ASSERT(max_pos < ir_ival_end(ival));
+	IR_ASSERT(max_pos < ival->end);
 
 	min_bb = ir_block_from_live_pos(ctx, min_pos);
 	max_bb = ir_block_from_live_pos(ctx, max_pos);
@@ -1836,7 +1822,7 @@ static ir_reg ir_try_allocate_preferred_reg(ir_ctx *ctx, ir_live_interval *ival,
 	while (use_pos) {
 		reg = use_pos->hint;
 		if (reg >= 0 && IR_REGSET_IN(available, reg)) {
-			if (ir_ival_end(ival) <= freeUntilPos[reg]) {
+			if (ival->end <= freeUntilPos[reg]) {
 				/* register available for the whole interval */
 				return reg;
 			}
@@ -1849,7 +1835,7 @@ static ir_reg ir_try_allocate_preferred_reg(ir_ctx *ctx, ir_live_interval *ival,
 		if (use_pos->hint_ref > 0) {
 			reg = ctx->live_intervals[ctx->vregs[use_pos->hint_ref]]->reg;
 			if (reg >= 0 && IR_REGSET_IN(available, reg)) {
-				if (ir_ival_end(ival) <= freeUntilPos[reg]) {
+				if (ival->end <= freeUntilPos[reg]) {
 					/* register available for the whole interval */
 					return reg;
 				}
@@ -2082,7 +2068,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 		reg = ival->top->reg;
 		if (reg >= 0
 		 && IR_REGSET_IN(available, reg)
-		 && ir_ival_end(ival) <= freeUntilPos[reg]) {
+		 && ival->end <= freeUntilPos[reg]) {
 			ival->reg = reg;
 			IR_LOG_LSRA_ASSIGN("    ---- Assign", ival, " (available without spilling)");
 			ival->list_next = *active;
@@ -2110,7 +2096,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 	if (!pos) {
 		/* no register available without spilling */
 		return IR_REG_NONE;
-	} else if (ir_ival_end(ival) <= pos) {
+	} else if (ival->end <= pos) {
 		/* register available for the whole interval */
 		ival->reg = reg;
 		IR_LOG_LSRA_ASSIGN("    ---- Assign", ival, " (available without spilling)");
@@ -2337,7 +2323,7 @@ spill_current:
 		}
 	}
 
-	if (ir_ival_end(ival) > blockPos[reg]) {
+	if (ival->end > blockPos[reg]) {
 		/* spilling make a register free only for the first part of current */
 		IR_LOG_LSRA("    ---- Conflict with others", ival, " (spilling make a register free only for the first part)");
 		/* split current at optimal position before block_pos[reg] */
@@ -2392,7 +2378,7 @@ spill_current:
 					child = ir_split_interval_at(ctx, other, split_pos);
 					IR_LOG_LSRA("      ---- Finish", other, "");
 				} else {
-					if (ir_first_use_pos_after(other, other->range.start, IR_USE_MUST_BE_IN_REG) < ir_ival_end(other)) {
+					if (ir_first_use_pos_after(other, other->range.start, IR_USE_MUST_BE_IN_REG) < other->end) {
 						if (next_use_pos > ival->range.start && !(ival->flags & IR_LIVE_INTERVAL_TEMP)) {
 							goto spill_current;
                         }
@@ -2411,7 +2397,7 @@ spill_current:
 				}
 
 				split_pos = ir_first_use_pos_after(child, ival->range.start, IR_USE_MUST_BE_IN_REG | IR_USE_SHOULD_BE_IN_REG) - 1; // TODO: ???
-				if (split_pos > child->range.start && split_pos < ir_ival_end(child)) {
+				if (split_pos > child->range.start && split_pos < child->end) {
 					ir_live_pos opt_split_pos = ir_find_optimal_split_position(ctx, child, ival->range.start, split_pos, 1);
 					if (opt_split_pos > child->range.start) {
 						split_pos = opt_split_pos;
