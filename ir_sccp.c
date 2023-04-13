@@ -216,6 +216,33 @@ static void ir_sccp_make_nop(ir_ctx *ctx, ir_ref ref)
 	}
 }
 
+static void ir_sccp_remove_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_bitqueue *worklist)
+{
+	ir_ref j, n, *p;
+	ir_use_list *use_list = &ctx->use_lists[ref];
+	ir_insn *insn;
+
+	use_list->refs = 0;
+	use_list->count = 0;
+
+	insn = &ctx->ir_base[ref];
+	n = ir_input_edges_count(ctx, insn);
+	insn->opt = IR_NOP; /* keep "inputs_count" */
+	for (j = 1, p = insn->ops + j; j <= n; j++, p++) {
+		ir_ref input = *p;
+		*p = IR_UNUSED;
+		if (input > 0 && _values[input].op == IR_BOTTOM) {
+			ir_sccp_remove_from_use_list(ctx, input, ref);
+			/* schedule DCE */
+			if ((IR_IS_FOLDABLE_OP(ctx->ir_base[input].op) && ctx->use_lists[input].count == 0)
+			 || ((ir_op_flags[ctx->ir_base[input].op] & (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_MASK)) == (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_LOAD)
+					&& ctx->use_lists[input].count == 1)) {
+				ir_bitqueue_add(worklist, input);
+			}
+		}
+	}
+}
+
 static void ir_sccp_replace_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_ref new_ref, ir_bitqueue *worklist)
 {
 	ir_ref j, n, *p, use, k, l;
@@ -226,8 +253,10 @@ static void ir_sccp_replace_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_r
 
 	insn = &ctx->ir_base[ref];
 	n = ir_input_edges_count(ctx, insn);
+	insn->opt = IR_NOP; /* keep "inputs_count" */
 	for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
 		ir_ref input = *p;
+		*p = IR_UNUSED;
 		if (input > 0) {
 			ir_sccp_remove_from_use_list(ctx, input, ref);
 			/* schedule DCE */
@@ -269,7 +298,8 @@ static void ir_sccp_replace_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_r
 		}
 	}
 
-	ir_sccp_make_nop(ctx, ref);
+	use_list->refs = 0;
+	use_list->count = 0;
 }
 
 static void ir_sccp_fold2(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_bitqueue *worklist)
@@ -560,6 +590,9 @@ int ir_sccp(ir_ctx *ctx)
 				if (!changed) {
 					continue;
 				}
+			} else if (ctx->use_lists[i].count == 0) {
+				/* dead code */
+				continue;
 			} else if (EXPECTED(IR_IS_FOLDABLE_OP(insn->op))) {
 				bool may_benefit = 0;
 				bool has_top = 0;
@@ -786,7 +819,7 @@ int ir_sccp(ir_ctx *ctx)
 			insn = &ctx->ir_base[i];
 			if (ir_op_flags[insn->op] & (IR_OP_FLAG_DATA|IR_OP_FLAG_MEM)) {
 				if (insn->op != IR_PARAM && insn->op != IR_VAR) {
-					ir_sccp_make_nop(ctx, i);
+					ir_sccp_remove_insn(ctx, _values, i, &worklist);
 				}
 			} else {
 				if (ir_op_flags[insn->op] & IR_OP_FLAG_TERMINATOR) {
@@ -825,7 +858,7 @@ int ir_sccp(ir_ctx *ctx)
 			insn = &ctx->ir_base[i];
 			if (IR_IS_FOLDABLE_OP(insn->op)) {
 				if (ctx->use_lists[i].count == 0) {
-					ir_sccp_replace_insn(ctx, _values, i, IR_UNUSED, &worklist);
+					ir_sccp_remove_insn(ctx, _values, i, &worklist);
 				} else {
 					ir_sccp_fold2(ctx, _values, i, &worklist);
 				}
@@ -838,7 +871,7 @@ int ir_sccp(ir_ctx *ctx)
 				ctx->ir_base[next].op1 = insn->op1;
 				ir_sccp_replace_use(ctx, insn->op1, i, next);
 				insn->op1 = IR_UNUSED;
-				ir_sccp_replace_insn(ctx, _values, i, IR_UNUSED, &worklist);
+				ir_sccp_remove_insn(ctx, _values, i, &worklist);
 			}
 		}
 	}
