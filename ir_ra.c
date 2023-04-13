@@ -1936,7 +1936,7 @@ static void ir_merge_to_unhandled(ir_live_interval **unhandled, ir_live_interval
 			ival->list_next = *prev;
 			*prev = ival;
 			prev = &ival->list_next;
-		    ival = ival->next;
+			ival = ival->next;
 		}
 	}
 #if IR_DEBUG
@@ -2015,19 +2015,14 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 		reg = other->reg;
 		IR_ASSERT(reg >= 0);
 		if (reg >= IR_REG_SCRATCH) {
-			ir_regset regset;
-
 			if (reg == IR_REG_SCRATCH) {
-				regset = IR_REGSET_INTERSECTION(available, IR_REGSET_SCRATCH);
+				available = IR_REGSET_DIFFERENCE(available, IR_REGSET_SCRATCH);
 			} else {
 				IR_ASSERT(reg == IR_REG_ALL);
-				regset = available;
+				available = IR_REGSET_EMPTY;
 			}
-			IR_REGSET_FOREACH(regset, reg) {
-				freeUntilPos[reg] = 0;
-			} IR_REGSET_FOREACH_END();
-		} else if (IR_REGSET_IN(available, reg)) {
-			freeUntilPos[reg] = 0;
+		} else {
+			IR_REGSET_EXCL(available, reg);
 		}
 		other = other->list_next;
 	}
@@ -2038,31 +2033,33 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 	 * but it is still necessary after coalescing and splitting
 	 */
 	other = inactive;
+	pos = ival->end;
 	while (other) {
 		/* freeUntilPos[it.reg] = next intersection of it with current */
-		reg = other->reg;
-		IR_ASSERT(reg >= 0);
-		if (reg >= IR_REG_SCRATCH) {
+		if (other->current_range->start < pos) {
 			next = ir_ivals_overlap(&ival->range, other->current_range);
 			if (next) {
-				ir_regset regset;
+				reg = other->reg;
+				IR_ASSERT(reg >= 0);
+				if (reg >= IR_REG_SCRATCH) {
+					ir_regset regset;
 
-				if (reg == IR_REG_SCRATCH) {
-					regset = IR_REGSET_INTERSECTION(available, IR_REGSET_SCRATCH);
-				} else {
-					IR_ASSERT(reg == IR_REG_ALL);
-					regset = available;
-				}
-				IR_REGSET_FOREACH(regset, reg) {
+					if (reg == IR_REG_SCRATCH) {
+						regset = IR_REGSET_INTERSECTION(available, IR_REGSET_SCRATCH);
+					} else {
+						IR_ASSERT(reg == IR_REG_ALL);
+						regset = available;
+					}
+					IR_REGSET_FOREACH(regset, reg) {
+						if (next < freeUntilPos[reg]) {
+							freeUntilPos[reg] = next;
+						}
+					} IR_REGSET_FOREACH_END();
+				} else if (IR_REGSET_IN(available, reg)) {
 					if (next < freeUntilPos[reg]) {
 						freeUntilPos[reg] = next;
 					}
-				} IR_REGSET_FOREACH_END();
-			}
-		} else if (IR_REGSET_IN(available, reg)) {
-			next = ir_ivals_overlap(&ival->range, other->current_range);
-			if (next && next < freeUntilPos[reg]) {
-				freeUntilPos[reg] = next;
+				}
 			}
 		}
 		other = other->list_next;
@@ -2102,9 +2099,8 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 			pos = freeUntilPos[i];
 			reg = i;
 		} else if (freeUntilPos[i] == pos
-				&& (reg == IR_REG_NONE
-					|| (!IR_REGSET_IN(IR_REGSET_SCRATCH, reg)
-						&& IR_REGSET_IN(IR_REGSET_SCRATCH, i)))) {
+				&& !IR_REGSET_IN(IR_REGSET_SCRATCH, reg)
+				&& IR_REGSET_IN(IR_REGSET_SCRATCH, i)) {
 			/* prefer caller-saved registers to avoid save/restore in prologue/epilogue */
 			pos = freeUntilPos[i];
 			reg = i;
@@ -2699,21 +2695,24 @@ static int ir_linear_scan(ir_ctx *ctx)
 		while (other) {
 			ir_live_range *r = other->current_range;
 
-			if (r && r->end <= position) {
+			IR_ASSERT(r);
+			if (r->end <= position) {
 				do {
 					r = r->next;
 				} while (r && r->end <= position);
+				if (!r) {
+					/* move i from active to handled */
+					other = other->list_next;
+					if (prev) {
+						prev->list_next = other;
+					} else {
+						active = other;
+					}
+					continue;
+				}
 				other->current_range = r;
 			}
-			/* if (ir_ival_end(other) <= position) {*/
-			if (!r) {
-				/* move i from active to handled */
-				if (prev) {
-					prev->list_next = other->list_next;
-				} else {
-					active = other->list_next;
-				}
-			} else if (position < r->start) {
+			if (position < r->start) {
 				/* move i from active to inactive */
 				if (prev) {
 					prev->list_next = other->list_next;
@@ -2734,22 +2733,24 @@ static int ir_linear_scan(ir_ctx *ctx)
 		while (other) {
 			ir_live_range *r = other->current_range;
 
-			if (r  && r->end <= position) {
+			IR_ASSERT(r);
+			if (r->end <= position) {
 				do {
 					r = r->next;
 				} while (r && r->end <= position);
+				if (!r) {
+					/* move i from inactive to handled */
+					other = other->list_next;
+					if (prev) {
+						prev->list_next = other;
+					} else {
+						inactive = other;
+					}
+					continue;
+				}
 				other->current_range = r;
 			}
-			/* if (ir_ival_end(other) <= position) {*/
-			if (!r) {
-				/* move i from inactive to handled */
-				if (prev) {
-					prev->list_next = other->list_next;
-				} else {
-					inactive = other->list_next;
-				}
-			/* } else if (ir_ival_covers(other, position)) {*/
-			} else if (position >= r->start) {
+			if (position >= r->start) {
 				/* move i from active to inactive */
 				if (prev) {
 					prev->list_next = other->list_next;

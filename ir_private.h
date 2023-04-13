@@ -1043,6 +1043,8 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy);
 
 #if defined(IR_REGSET_64BIT)
 
+typedef enum _ir_reg ir_reg;
+
 /*** Register Sets ***/
 #if IR_REGSET_64BIT
 typedef uint64_t ir_regset;
@@ -1100,13 +1102,21 @@ typedef uint32_t ir_regset;
 # define IR_REGSET_LAST(set)  ((ir_reg)(ir_nlz(set)^31))
 #endif
 
+IR_ALWAYS_INLINE ir_reg ir_regset_pop_first(ir_regset *set)
+{
+	ir_reg reg;
+
+	IR_ASSERT(!IR_REGSET_IS_EMPTY(*set));
+	reg = IR_REGSET_FIRST(*set);
+	*set = (*set) & ((*set) - 1);
+	return reg;
+}
+
 #define IR_REGSET_FOREACH(set, reg) \
 	do { \
 		ir_regset _tmp = (set); \
 		while (!IR_REGSET_IS_EMPTY(_tmp)) { \
-			ir_reg _reg = IR_REGSET_FIRST(_tmp); \
-			IR_REGSET_EXCL(_tmp, _reg); \
-			reg = _reg; \
+			reg = ir_regset_pop_first(&_tmp);
 
 #define IR_REGSET_FOREACH_END() \
 		} \
@@ -1152,7 +1162,6 @@ IR_ALWAYS_INLINE int8_t ir_get_alocated_reg(const ir_ctx *ctx, ir_ref ref, int o
 
 #define IR_RULE_MASK 0xff
 
-typedef enum _ir_reg ir_reg;
 typedef struct _ir_target_constraints ir_target_constraints;
 
 #define IR_TMP_REG(_num, _type, _start, _end) \
