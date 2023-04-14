@@ -11,9 +11,13 @@
 -  irreducable loops detection/support
 
 -  Extend SCCP to support range inference and PI node
+	- See "Eliminating Range Checks using SSA Form" John Gough, Herbert Klaeren
+	- PI nodes may be defined as %dst = BOUND_LOW/HIGH(%ctrl, %src, %low/high_bound)
+	- PI nodes may be inserted after IF and GUARD
+	- PI should not be lifted to BB with PHIs
 
 ?  instruction selection
-	- xor, btsl=INCL, btrl=EXCL, btl=IN, bsr
+	- btsl=INCL, btrl=EXCL, btl=IN, bsr
     - MOVZX to avoid a SHIFT and AND instruction
     - BURS ???
 
@@ -22,9 +26,8 @@
 	   tests/x86/ra_015.irt, tests/x86/combo_004.irt tests/x86/min_005.ir, tests/x86/min_006.irt, tests/x86/abs_001.irt)
 	-  optimisation of spill code placement (BB local or through resolution)
 	-  separate INT and FP allocation phases (for performance)
-	-  respect multi-ENTRY code (Zend/tests/bug72598.phpt)
-	-  proper live ranges for complex codegen rules (Zend/tests/match/042.phpt [jit=1254/ZTS/32])
 	-  tests/x86/ra_007.irt loads one of the parameters too early that leads to the following useless move
+	-  Try to avoid live-interval construction, see "Efficient Global Register Allocation" Ian Rogers
 
 ?  code generation
 	-  COND
@@ -37,5 +40,3 @@
 -  C front-end
 -  interpreter
 -  alias analyzes
-
--  PHP support
