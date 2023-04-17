@@ -768,6 +768,8 @@ int ir_mem_protect(void *ptr, size_t size);
 int ir_mem_unprotect(void *ptr, size_t size);
 int ir_mem_flush(void *ptr, size_t size);
 
+uint32_t ir_cpuinfo(void);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
