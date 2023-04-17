@@ -91,10 +91,10 @@ test: $(BUILD_DIR)/ir $(BUILD_DIR)/ir-test
 	$(BUILD_DIR)/ir $(SRC_DIR)/test.ir --dump --save 2>$(BUILD_DIR)/test.log
 	$(BUILD_DIR)/ir $(SRC_DIR)/test.ir --dot $(BUILD_DIR)/ir.dot
 	dot -Tpdf $(BUILD_DIR)/ir.dot -o $(BUILD_DIR)/ir.pdf
-	BUILD_DIR=$(BUILD_DIR) SRC_DIR=$(SRC_DIR) $(BUILD_DIR)/ir-test
+	$(BUILD_DIR)/ir-test $(SRC_DIR)/tests
 
 test-ci: $(BUILD_DIR)/ir $(BUILD_DIR)/ir-test
-	BUILD_DIR=$(BUILD_DIR) SRC_DIR=$(SRC_DIR) $(BUILD_DIR)/ir-test --show-diff
+	$(BUILD_DIR)/ir-test --show-diff $(SRC_DIR)/tests
 
 clean:
 	rm -rf $(BUILD_DIR)/ir $(BUILD_DIR)/ir_test $(BUILD_DIR)/*.o \
