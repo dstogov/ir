@@ -296,6 +296,7 @@ void ir_init(ir_ctx *ctx, uint32_t flags, ir_ref consts_limit, ir_ref insns_limi
 	ctx->consts_limit = consts_limit;
 	ctx->fold_cse_limit = IR_UNUSED + 1;
 	ctx->flags = flags;
+	ctx->mflags = 0;
 
 	ctx->binding = NULL;
 
