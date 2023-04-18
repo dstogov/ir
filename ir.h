@@ -482,9 +482,6 @@ void ir_strtab_free(ir_strtab *strtab);
 #define IR_GEN_NATIVE          (1<<21)
 #define IR_GEN_C               (1<<22)
 
-/* x86 related */
-#define IR_AVX                 (1<<24)
-
 /* Temporary: Live Ranges */
 #define IR_LR_HAVE_VARS        (1<<25)
 #define IR_LR_HAVE_DESSA_MOVES (1<<26)
@@ -518,6 +515,7 @@ struct _ir_ctx {
 	ir_ref             consts_count;            /* number of constants stored in constants buffer */
 	ir_ref             consts_limit;            /* size of allocated constants buffer (it's extended when overflow) */
 	uint32_t           flags;                   /* IR context flags (see IR_* defines above) */
+	uint32_t           mflags;                  /* CPU specific flags (see IR_X86_... macros below) */
 	ir_ref             fold_cse_limit;          /* CSE finds identical insns backward from "insn_count" to "fold_cse_limit" */
 	ir_insn            fold_insn;               /* temporary storage for folding engine */
 	ir_hashtab        *binding;
@@ -732,6 +730,19 @@ void ir_consistency_check(void);
 /* Code patching (implementation in ir_patch.c) */
 int ir_patch(const void *code, size_t size, uint32_t jmp_table_size, const void *from_addr, const void *to_addr);
 
+/* CPU information (implementation in ir_cpuinfo.c) */
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
+# define IR_X86_SSE2  (1<<0)
+# define IR_X86_SSE3  (1<<1)
+# define IR_X86_SSSE3 (1<<2)
+# define IR_X86_SSE41 (1<<3)
+# define IR_X86_SSE42 (1<<4)
+# define IR_X86_AVX   (1<<5)
+# define IR_X86_AVX2  (1<<6)
+#endif
+
+uint32_t ir_cpuinfo(void);
+
 /* Deoptimization helpers */
 const void *ir_emit_exitgroup(uint32_t first_exit_point, uint32_t exit_points_per_group, const void *exit_addr, void *code_buffer, size_t code_buffer_size, size_t *size_ptr);
 
@@ -767,8 +778,6 @@ int ir_mem_unmap(void *ptr, size_t size);
 int ir_mem_protect(void *ptr, size_t size);
 int ir_mem_unprotect(void *ptr, size_t size);
 int ir_mem_flush(void *ptr, size_t size);
-
-uint32_t ir_cpuinfo(void);
 
 #ifdef __cplusplus
 } /* extern "C" */

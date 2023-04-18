@@ -9,8 +9,6 @@
 
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 
-#include "ir_x86.h"
-
 #ifndef _WIN32
 IR_ALWAYS_INLINE void ir_cpuid_ex(uint32_t info[4], uint32_t function, uint32_t index)
 {

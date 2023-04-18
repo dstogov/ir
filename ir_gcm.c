@@ -659,6 +659,7 @@ restart:
 
 	ir_init(&new_ctx, ctx->flags, consts_count, insns_count);
 	new_ctx.insns_count = insns_count;
+	new_ctx.mflags = ctx->mflags;
 	new_ctx.spill_base = ctx->spill_base;
 	new_ctx.fixed_stack_red_zone = ctx->fixed_stack_red_zone;
 	new_ctx.fixed_stack_frame_size = ctx->fixed_stack_frame_size;

@@ -20,7 +20,9 @@ static void help(const char *cmd)
 		"Options:\n"
 		"  -O[012]                    - optimiztion level\n"
 		"  -S                         - dump final target assembler code\n"
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 		"  -mavx                      - use AVX instruction set\n"
+#endif
 		"  -muse-fp                   - use base frame pointer register\n"
 		"  --emit-c [file-name]       - convert to C source\n"
 		"  --save [file-name]         - save IR\n"
@@ -231,6 +233,7 @@ int main(int argc, char **argv)
 	bool emit_c = 0, dump_asm = 0, run = 0;
 	uint32_t dump = 0;
 	int opt_level = 2;
+	uint32_t flags = 0;
 	uint32_t mflags = 0;
 	uint64_t debug_regset = 0xffffffffffffffff;
 	bool dump_size = 0;
@@ -316,21 +319,23 @@ int main(int argc, char **argv)
 			dump_asm = 1;
 		} else if (strcmp(argv[i], "--run") == 0) {
 			run = 1;
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 		} else if (strcmp(argv[i], "-mavx") == 0) {
-			mflags |= IR_AVX;
+			mflags |= IR_X86_AVX;
+#endif
 		} else if (strcmp(argv[i], "-muse-fp") == 0) {
-			mflags |= IR_USE_FRAME_POINTER;
+			flags |= IR_USE_FRAME_POINTER;
 		} else if (strcmp(argv[i], "-mfastcall") == 0) {
-			mflags |= IR_FASTCALL_FUNC;
+			flags |= IR_FASTCALL_FUNC;
 #ifdef IR_DEBUG
 		} else if (strcmp(argv[i], "--debug-sccp") == 0) {
-			mflags |= IR_DEBUG_SCCP;
+			flags |= IR_DEBUG_SCCP;
 		} else if (strcmp(argv[i], "--debug-gcm") == 0) {
-			mflags |= IR_DEBUG_GCM;
+			flags |= IR_DEBUG_GCM;
 		} else if (strcmp(argv[i], "--debug-schedule") == 0) {
-			mflags |= IR_DEBUG_SCHEDULE;
+			flags |= IR_DEBUG_SCHEDULE;
 		} else if (strcmp(argv[i], "--debug-ra") == 0) {
-			mflags |= IR_DEBUG_RA;
+			flags |= IR_DEBUG_RA;
 #endif
 		} else if (strcmp(argv[i], "--debug-regset") == 0) {
 			if (i + 1 == argc || argv[i + 1][0] == '-') {
@@ -372,6 +377,20 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
+	uint32_t cpuinfo = ir_cpuinfo();
+
+	if (!(cpuinfo & IR_X86_SSE2)) {
+		fprintf(stderr, "ERROR: incompatible CPU (SSE2 is not supported)\n");
+		return 1;
+	}
+
+	if ((mflags & IR_X86_AVX) & !(cpuinfo & IR_X86_AVX)) {
+		fprintf(stderr, "ERROR: -mAVX is not compatible with CPU (AVX is not supported)\n");
+		return 1;
+	}
+#endif
+
 #ifdef _WIN32
 	if (!abort_fault) {
 		_set_abort_behavior(0, _WRITE_ABORT_MSG|_CALL_REPORTFAULT);
@@ -381,7 +400,7 @@ int main(int argc, char **argv)
 
 	ir_loader_init();
 
-	uint32_t flags = IR_FUNCTION | mflags;
+	flags |= IR_FUNCTION;
 
 	if (opt_level > 0) {
 		flags |= IR_OPT_FOLDING | IR_OPT_CFG | IR_OPT_CODEGEN;
@@ -393,6 +412,7 @@ int main(int argc, char **argv)
 		flags |= IR_GEN_NATIVE;
 	}
 	ir_init(&ctx, flags, 256, 1024);
+	ctx.mflags = mflags;
 	ctx.fixed_regset = ~debug_regset;
 
 	if (!ir_load(&ctx, f)) {

@@ -95,11 +95,9 @@ int main(int argc, char **argv)
 	FILE *f;
 	int i;
 	int opt_level = 2;
+	uint32_t flags = 0;
 	uint32_t mflags = 0;
 	uint64_t debug_regset = 0xffffffffffffffff;
-#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
-	uint32_t cpuinfo = ir_cpuinfo();
-#endif
 
 	ir_consistency_check();
 
@@ -114,25 +112,21 @@ int main(int argc, char **argv)
 			} else {
 				/* pass */
 			}
-		} else if (strcmp(argv[i], "-mavx") == 0) {
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
-			if (!(cpuinfo & IR_X86_AVX)) {
-				fprintf(stderr, "ERROR: CPU doesn't support AVX instruction set)\n");
-				return 1;
-			}
+		} else if (strcmp(argv[i], "-mavx") == 0) {
+			mflags |= IR_X86_AVX;
 #endif
-			mflags |= IR_AVX;
 		} else if (strcmp(argv[i], "-muse-fp") == 0) {
-			mflags |= IR_USE_FRAME_POINTER;
+			flags |= IR_USE_FRAME_POINTER;
 #ifdef IR_DEBUG
 		} else if (strcmp(argv[i], "--debug-sccp") == 0) {
-			mflags |= IR_DEBUG_SCCP;
+			flags |= IR_DEBUG_SCCP;
 		} else if (strcmp(argv[i], "--debug-gcm") == 0) {
-			mflags |= IR_DEBUG_GCM;
+			flags |= IR_DEBUG_GCM;
 		} else if (strcmp(argv[i], "--debug-schedule") == 0) {
-			mflags |= IR_DEBUG_SCHEDULE;
+			flags |= IR_DEBUG_SCHEDULE;
 		} else if (strcmp(argv[i], "--debug-ra") == 0) {
-			mflags |= IR_DEBUG_RA;
+			flags |= IR_DEBUG_RA;
 #endif
 		} else if (strcmp(argv[i], "--debug-regset") == 0) {
 			if (i + 1 == argc || argv[i + 1][0] == '-') {
@@ -146,11 +140,26 @@ int main(int argc, char **argv)
 		}
 	}
 
-	uint32_t flags = IR_FUNCTION | mflags;
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
+	uint32_t cpuinfo = ir_cpuinfo();
+
+	if (!(cpuinfo & IR_X86_SSE2)) {
+		fprintf(stderr, "ERROR: incompatible CPU (SSE2 is not supported)\n");
+		return 1;
+	}
+
+	if ((mflags & IR_X86_AVX) & !(cpuinfo & IR_X86_AVX)) {
+		fprintf(stderr, "ERROR: -mAVX is not compatible with CPU (AVX is not supported)\n");
+		return 1;
+	}
+#endif
+
+	flags |= IR_FUNCTION;
 	if (opt_level > 0) {
 		flags |= IR_OPT_FOLDING | IR_OPT_CFG | IR_OPT_CODEGEN;
 	}
 	ir_init(&ctx, flags, 256, 1024);
+	ctx.mflags = mflags;
 	ctx.fixed_regset = ~debug_regset;
 	gen_mandelbrot(&ctx);
 //	ir_save(&ctx, stderr);
