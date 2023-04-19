@@ -12,8 +12,10 @@
 #include <sstream>
 #include <filesystem>
 #include <array>
+#include <set>
 #include <exception>
 #include <cstdlib>
+#include <cassert>
 
 #ifdef _WIN32
 # include <windows.h>
@@ -37,7 +39,8 @@ std::vector<std::string> bad_list;
 std::vector<std::tuple<std::string, std::string>> failed;
 std::vector<std::tuple<std::string, std::string, std::string>> xfailed_list;
 bool show_diff = false, colorize = true;
-std::string src_dir, build_dir, test_dir, ir_exe, ir_target;
+std::string ir_exe, ir_target;
+std::string this_exe, this_exe_path;
 
 namespace ir {
 	decltype(auto) trim(std::string s) {
@@ -58,12 +61,6 @@ namespace ir {
 			result += buffer.data();
 		}
 		return result;
-	}
-
-	decltype(auto) get_dir_from_env(const char* name) {
-		const char* _tmp = std::getenv(name);
-		std::string ret = _tmp ? _tmp : ".";
-		return ret;
 	}
 
 	enum color { GREEN, YELLOW, RED };
@@ -218,38 +215,102 @@ namespace ir {
 		}
 	};
 
-	void find_tests_in_dir(std::string& test_dir, std::vector<std::string>& irt_files) {
-		for (const std::filesystem::directory_entry& ent :
-		        std::filesystem::recursive_directory_iterator(test_dir)) {
-			std::string fl(ent.path().string());
-			if (fl.length() < 4 || 0 != fl.compare(fl.length()-4, 4, ".irt")) continue;
-			irt_files.push_back(fl);
+	void find_tests_in_dir(std::set<std::string>& user_files, std::vector<std::string>& irt_files) {
+		assert(user_files.size()>0);
+
+		for (const auto& f : user_files) {
+			if (std::filesystem::is_directory(f)) {
+				for (const std::filesystem::directory_entry& ent :
+					 std::filesystem::recursive_directory_iterator(f)) {
+					std::string fl(ent.path().string());
+					if (fl.length() < 4 || ent.path().extension() != ".irt")
+						continue;
+					irt_files.push_back(fl);
+				}
+			} else {
+				irt_files.push_back(f);
+			}
 		}
-		std::sort(irt_files.begin(), irt_files.end(), [&](const std::string& a, const std::string& b) {
-			return 1 <= b.compare(a);
-		});
+
+		std::sort(irt_files.begin(),
+		          irt_files.end(),
+				  [&](const std::string& a, const std::string& b) {
+			          return 1 <= b.compare(a);
+				  });
 	}
 }
 
+static void print_help(void)
+{
+	std::cout << "Run IR uint tests\n";
+	std::cout << "Usage:\n  ";
+	std::cout << ::this_exe
+	          << " [--show-diff] [--no-color] [test folders or files...]\n";
+	std::cout << "  Run all tests if no test folders/files are specified\n";
+}
+
 int main(int argc, char **argv) {
+	// Save this executable path to infer ir executable path
+	::this_exe = argv[0];
+	::this_exe_path = std::filesystem::path{::this_exe}.parent_path().string();
+
+	// Store test folders/files specified by user
+	std::set<std::string> user_files;
+	bool bad_opt = false;     // unsupported option given
+	bool bad_files = false;   // bad file or folder given
+
 	for (int i = 1; i < argc; i++) {
 		// XXX use some cleaner arg parsing solution
 		if (!std::string(argv[i]).compare("--show-diff")) {
 			::show_diff = true;
+			continue;
 		} else if (!std::string(argv[i]).compare("--no-color")) {
 			::colorize = false;
+			continue;
+		} else if (!std::string(argv[i]).compare("--help")) {
+			print_help();
+			return 0;
+		} else if (std::string(argv[i]).find_first_of("-") == 0) {
+			// Unsupported options
+			bad_opt = true;
+			std::cerr << ir::colorize("ERROR", ir::RED)
+				     << ": Unsupported Option [" << argv[i] << "]\n";
+		} else {
+			// User specified test folders/files
+			std::string file = argv[i];
+			if (std::filesystem::exists(file)
+			    && (std::filesystem::is_directory(file)
+		            || std::filesystem::is_regular_file(file))) {
+				user_files.insert(argv[i]);
+			} else {
+				bad_files = true;
+				std::cerr << ir::colorize("ERROR", ir::RED)
+				     << ": Bad File or Folder [" << file << "] \n";
+			}
 		}
+	} /* for: arguments iteration */
+
+	if (bad_opt || bad_files) {
+		if (bad_opt)
+			print_help();
+		return 1;
 	}
+
 	ir::init_console();
 
-	::build_dir = ir::get_dir_from_env("BUILD_DIR");
-	::src_dir = ir::get_dir_from_env("SRC_DIR");
-	::test_dir = ::src_dir + PATH_SEP + "tests";
-	::ir_exe = ::build_dir + PATH_SEP + "ir" + EXE_SUF;
+	::ir_exe = ::this_exe_path + PATH_SEP + "ir" + EXE_SUF;
 	::ir_target = ir::trim(ir::exec(::ir_exe + " --target"));
-	std::vector<std::string> irt_files;
 
-	ir::find_tests_in_dir(::test_dir, irt_files);
+	// Get test files, either specified by user or all tests by default
+	std::vector<std::string> irt_files;
+	if (user_files.empty()) {
+		// Pretend user specified all test
+		std::string tests_dir = ::this_exe_path + PATH_SEP + "tests";
+		user_files.insert(tests_dir);
+	}
+	ir::find_tests_in_dir(user_files, irt_files);
+
+	// Run each test
 	for (const std::string& test_fl : irt_files) {
 		try {
 			auto test = ir::test(test_fl);
