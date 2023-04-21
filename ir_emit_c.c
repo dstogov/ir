@@ -756,8 +756,7 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 					return 0;
 				}
 			}
-			n = ir_operands_count(ctx, insn);
-			n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
+			n = ir_insn_len(insn);
 			i += n;
 			insn += n;
 		}
@@ -955,8 +954,7 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 				default:
 					IR_ASSERT(0 && "NIY instruction");
 			}
-			n = ir_operands_count(ctx, insn);
-			n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
+			n = ir_insn_len(insn);
 			i += n;
 			insn += n;
 		}

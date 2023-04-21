@@ -990,7 +990,7 @@ void ir_build_def_use_lists(ir_ctx *ctx)
 				lists[def].count++;
 			}
 		}
-		n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
+		n = ir_insn_inputs_to_len(n);
 		i += n;
 		insn += n;
 	}
@@ -1012,7 +1012,7 @@ void ir_build_def_use_lists(ir_ctx *ctx)
 				edges[use_list->refs + use_list->count++] = i;
 			}
 		}
-		n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
+		n = ir_insn_inputs_to_len(n);
 		i += n;
 		insn += n;
 	}

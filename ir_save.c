@@ -123,7 +123,7 @@ void ir_save(const ir_ctx *ctx, FILE *f)
 			}
 		}
 		fprintf(f, "\n");
-		n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
+		n = ir_insn_inputs_to_len(n);
 		i += n;
 		insn += n;
 	}

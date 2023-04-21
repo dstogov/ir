@@ -529,7 +529,7 @@ int ir_schedule(ir_ctx *ctx)
 			consts_count += ir_count_constant(used, insn->op2);
 		}
 		n = ir_input_edges_count(ctx, insn);
-		insns_count += 1 + (n >> 2); // support for multi-word instructions like MERGE
+		insns_count += ir_insn_inputs_to_len(n);
 		i = _next[i];
 		insn = &ctx->ir_base[i];
 		/* Schedule PARAM, VAR, PI */
@@ -547,7 +547,7 @@ int ir_schedule(ir_ctx *ctx)
 			ir_bitset_incl(scheduled, i);
 			_xlat[i] = insns_count;
 			/* Reuse "n" from MERGE and skip first input */
-			insns_count += 1 + ((n + 1) >> 2); // support for multi-word instructions like PHI
+			insns_count += ir_insn_inputs_to_len(n + 1);
 			for (j = n, p = insn->ops + 2; j > 0; p++, j--) {
 				input = *p;
 				if (input < IR_TRUE) {
@@ -591,7 +591,7 @@ restart:
 			}
 			ir_bitset_incl(scheduled, i);
 			_xlat[i] = insns_count;
-			insns_count += 1 + (n >> 2); // support for multi-word instructions like CALL
+			insns_count += ir_insn_inputs_to_len(n);
 			i = _next[i];
 			insn = &ctx->ir_base[i];
 		}
@@ -830,8 +830,7 @@ void ir_build_prev_refs(ir_ctx *ctx)
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		for (i = bb->start, insn = ctx->ir_base + i; i < bb->end;) {
 			ctx->prev_ref[i] = prev;
-			n = ir_operands_count(ctx, insn);
-			n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
+			n = ir_insn_len(insn);
 			prev = i;
 			i += n;
 			insn += n;

@@ -57,8 +57,7 @@ static int ir_assign_virtual_registers_slow(ir_ctx *ctx)
 
 		/* skip first instruction */
 		insn = ctx->ir_base + i;
-		n = ir_operands_count(ctx, insn);
-		n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
+		n = ir_insn_len(insn);
 		i += n;
 		insn += n;
 		while (i < bb->end) {
@@ -69,8 +68,7 @@ static int ir_assign_virtual_registers_slow(ir_ctx *ctx)
 					vregs[i] = ++vregs_count;
 				}
 			}
-			n = ir_operands_count(ctx, insn);
-			n = 1 + (n >> 2); // support for multi-word instructions like MERGE and PHI
+			n = ir_insn_len(insn);
 			i += n;
 			insn += n;
 		}

@@ -842,6 +842,22 @@ IR_ALWAYS_INLINE ir_ref ir_input_edges_count(const ir_ctx *ctx, const ir_insn *i
 	return n;
 }
 
+IR_ALWAYS_INLINE uint32_t ir_insn_inputs_to_len(uint32_t inputs_count)
+{
+	return 1 + (inputs_count >> 2);
+}
+
+IR_ALWAYS_INLINE uint32_t ir_insn_len(const ir_insn *insn)
+{
+	uint32_t flags = ir_op_flags[insn->op];
+	uint32_t n = 1;
+	if (UNEXPECTED(IR_OP_HAS_VAR_INPUTS(flags))) {
+		/* MERGE, PHI, CALL, etc */
+		n = ir_insn_inputs_to_len(insn->inputs_count);
+	}
+	return n;
+}
+
 /*** IR Binding ***/
 IR_ALWAYS_INLINE ir_ref ir_binding_find(const ir_ctx *ctx, ir_ref ref)
 {
