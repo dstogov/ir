@@ -155,8 +155,7 @@ typedef enum _ir_type {
  * x     - call      IR_OP_FLAG_MEM + IR_OP_FLAG_CALL
  * a     - alloc     IR_OP_FLAG_MEM + IR_OP_FLAG_ALLOC
  * 0-3   - number of input edges
- * N     - number of arguments is defined in the insn->inputs_count (MERGE)
- * P     - number of arguments is defined in the op1->inputs_count (PHI)
+ * N     - number of arguments is defined in the insn->inputs_count (MERGE, PHI, CALL)
  * X1-X3 - number of extra data ops
  * C     - commutative operation ("d2C" => IR_OP_FLAG_DATA + IR_OP_FLAG_COMMUTATIVE)
  *
@@ -259,7 +258,7 @@ typedef enum _ir_type {
 	_(COND,	        d3,   def, def, def) /* op1 ? op2 : op3             */ \
 	\
 	/* data-flow and miscellaneous ops                                  */ \
-	_(PHI,          dP,   reg, def, def) /* SSA Phi function            */ \
+	_(PHI,          dN,   reg, def, def) /* SSA Phi function            */ \
 	_(COPY,         d1X1, def, opt, ___) /* COPY (last foldable op)     */ \
 	_(PI,           d2,   reg, def, ___) /* e-SSA Pi constraint ???     */ \
 	/* (USE, RENAME)                                                    */ \
@@ -332,8 +331,10 @@ typedef enum _ir_op {
 #define IR_OPT_OP_MASK       0x00ff
 #define IR_OPT_TYPE_MASK     0xff00
 #define IR_OPT_TYPE_SHIFT    8
+#define IR_OPT_INPUTS_SHIFT  16
 
 #define IR_OPT(op, type)     ((uint16_t)(op) | ((uint16_t)(type) << IR_OPT_TYPE_SHIFT))
+#define IR_OPTX(op, type, n) ((uint32_t)(op) | ((uint32_t)(type) << IR_OPT_TYPE_SHIFT) | ((uint32_t)(n) << IR_OPT_INPUTS_SHIFT))
 #define IR_OPT_TYPE(opt)     (((opt) & IR_OPT_TYPE_MASK) >> IR_OPT_TYPE_SHIFT)
 
 /* IR References */
@@ -409,7 +410,7 @@ typedef struct _ir_insn {
 					uint16_t           opt;
 				},
 				union {
-					uint16_t           inputs_count;       /* number of input control edges for MERGE, CALL, TAILCALL */
+					uint16_t           inputs_count;       /* number of input control edges for MERGE, PHI, CALL, TAILCALL */
 					uint16_t           prev_insn_offset;   /* 16-bit backward offset from current instruction for CSE */
 					uint16_t           const_flags;        /* flag to emit constant in rodat section */
 				}

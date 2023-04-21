@@ -530,7 +530,7 @@ static bool ir_call_needs_tmp_int_reg(const ir_ctx *ctx, const ir_insn *insn)
 	}
 #endif
 
-	n = ir_variable_inputs_count(insn);
+	n = insn->inputs_count;
 	for (j = 3; j <= n; j++) {
 		arg = ir_insn_op(insn, j);
 		arg_insn = &ctx->ir_base[arg];

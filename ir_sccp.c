@@ -437,9 +437,6 @@ static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values
 	insn = &ctx->ir_base[ref];
 	IR_ASSERT(insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN);
 	n = insn->inputs_count;
-	if (n == 0) {
-		n = 2;
-	}
 	if (n - unfeasible_inputs == 1) {
 		/* remove MERGE completely */
 		for (j = 1; j <= n; j++) {
@@ -483,9 +480,6 @@ static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values
 		}
 	} else {
 		n = insn->inputs_count;
-		if (n == 0) {
-			n = 3;
-		}
 		i = 1;
 		life_inputs = ir_bitset_malloc(n + 1);
 		for (j = 1; j <= n; j++) {
@@ -505,9 +499,6 @@ static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values
 			j++;
 		}
 		i--;
-		if (i == 2) {
-			i = 0;
-		}
 		insn->inputs_count = i;
 
 		n++;
@@ -534,6 +525,7 @@ static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values
 					ir_insn_set_op(use_insn, i, IR_UNUSED);
 					i++;
 				}
+				use_insn->inputs_count = insn->inputs_count + 1;
 			}
 		}
 		ir_mem_free(life_inputs);
@@ -566,7 +558,7 @@ int ir_sccp(ir_ctx *ctx)
 				if (!IR_IS_FEASIBLE(insn->op1)) {
 					continue;
 				}
-				n = ir_variable_inputs_count(merge_insn) + 1;
+				n = merge_insn->inputs_count + 1;
 				if (n > 3 && _values[i].optx == IR_TOP) {
 					for (j = 0; j < (n>>2); j++) {
 						_values[i+j+1].optx = IR_BOTTOM; /* keep the tail of a long multislot instruction */
@@ -597,8 +589,8 @@ int ir_sccp(ir_ctx *ctx)
 				bool may_benefit = 0;
 				bool has_top = 0;
 
+				IR_ASSERT(!IR_OP_HAS_VAR_INPUTS(flags));
 				n = IR_INPUT_EDGES_COUNT(flags);
-				IR_ASSERT(IR_IS_FIXED_INPUTS_COUNT(n));
 				for (p = insn->ops + 1; n > 0; p++, n--) {
 					ir_ref input = *p;
 					if (input > 0) {
@@ -631,7 +623,7 @@ int ir_sccp(ir_ctx *ctx)
 			if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
 				ir_ref unfeasible_inputs = 0;
 
-				n = ir_variable_inputs_count(insn);
+				n = insn->inputs_count;
 				if (n > 3 && _values[i].optx == IR_TOP) {
 					for (j = 0; j < (n>>2); j++) {
 						_values[i+j+1].optx = IR_BOTTOM; /* keep the tail of a long multislot instruction */
@@ -740,8 +732,7 @@ int ir_sccp(ir_ctx *ctx)
 
 				/* control, call, load and strore instructions may have unprocessed inputs */
 				n = IR_INPUT_EDGES_COUNT(flags);
-				if (!IR_IS_FIXED_INPUTS_COUNT(n)
-				 && (n = ir_variable_inputs_count(insn)) > 3) {
+				if (IR_OP_HAS_VAR_INPUTS(flags) && (n = insn->inputs_count) > 3) {
 					for (j = 0; j < (n>>2); j++) {
 						_values[i+j+1].optx = IR_BOTTOM; /* keep the tail of a long multislot instruction */
 					}

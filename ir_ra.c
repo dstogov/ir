@@ -502,8 +502,8 @@ static void ir_add_fusion_ranges(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_block
 
 		insn = &ctx->ir_base[input];
 		flags = ir_op_flags[insn->op];
+		IR_ASSERT(!IR_OP_HAS_VAR_INPUTS(flags));
 		n = IR_INPUT_EDGES_COUNT(flags);
-		IR_ASSERT(IR_IS_FIXED_INPUTS_COUNT(n));
 		j = 1;
 		p = insn->ops + j;
 		if (flags & IR_OP_FLAG_CONTROL) {
@@ -1244,13 +1244,15 @@ int ir_coalesce(ir_ctx *ctx)
 	ir_worklist_init(&blocks, ctx->cfg_blocks_count + 1);
 	for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
-		if (bb->predecessors_count > 1) {
+		k = bb->predecessors_count;
+		if (k > 1) {
 			uint32_t i;
 
 			use_list = &ctx->use_lists[bb->start];
 			n = use_list->count;
 			if (n > 1) {
-				k = ir_variable_inputs_count(&ctx->ir_base[bb->start]) + 1;
+				IR_ASSERT(k == ctx->ir_base[bb->start].inputs_count);
+				k++;
 				for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
 					use = *p;
 					insn = &ctx->ir_base[use];
@@ -1379,11 +1381,13 @@ int ir_compute_dessa_moves(ir_ctx *ctx)
 
 	for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
-		if (bb->predecessors_count > 1) {
+		k = bb->predecessors_count;
+		if (k > 1) {
 			use_list = &ctx->use_lists[bb->start];
 			n = use_list->count;
 			if (n > 1) {
-				k = ir_variable_inputs_count(&ctx->ir_base[bb->start]) + 1;
+				IR_ASSERT(k == ctx->ir_base[bb->start].inputs_count);
+				k++;
 				for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
 					use = *p;
 					insn = &ctx->ir_base[use];

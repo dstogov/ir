@@ -215,17 +215,10 @@ int ir_gcm(ir_ctx *ctx)
 			insn = &ctx->ir_base[ref];
 			_blocks[ref] = 1; /* pin to block */
 			flags = ir_op_flags[insn->op];
-#if 1
-			n = IR_INPUT_EDGES_COUNT(flags);
-			if (!IR_IS_FIXED_INPUTS_COUNT(n) || n > 1) {
+			if (IR_OP_HAS_VAR_INPUTS(flags) || IR_INPUT_EDGES_COUNT(flags) > 1) {
+				/* insn has input data edges */
 				ir_list_push_unchecked(&queue_early, ref);
 			}
-#else
-			if (IR_OPND_KIND(flags, 2) == IR_OPND_DATA
-			 || IR_OPND_KIND(flags, 3) == IR_OPND_DATA) {
-				ir_list_push_unchecked(&queue_early, ref);
-			}
-#endif
 			ref = insn->op1; /* control predecessor */
 		} while (ref != 1); /* IR_START */
 		_blocks[1] = 1; /* pin to block */
@@ -272,17 +265,10 @@ int ir_gcm(ir_ctx *ctx)
 			ir_bitset_incl(visited, ref);
 			_blocks[ref] = b; /* pin to block */
 			flags = ir_op_flags[insn->op];
-#if 1
-			n = IR_INPUT_EDGES_COUNT(flags);
-			if (!IR_IS_FIXED_INPUTS_COUNT(n) || n > 1) {
+			if (IR_OP_HAS_VAR_INPUTS(flags) || IR_INPUT_EDGES_COUNT(flags) > 1) {
+				/* insn has input data edges */
 				ir_list_push_unchecked(&queue_early, ref);
 			}
-#else
-			if (IR_OPND_KIND(flags, 2) == IR_OPND_DATA
-			 || IR_OPND_KIND(flags, 3) == IR_OPND_DATA) {
-				ir_list_push_unchecked(&queue_early, ref);
-			}
-#endif
 			if (insn->type != IR_VOID) {
 				IR_ASSERT(flags & IR_OP_FLAG_MEM);
 				ir_list_push_unchecked(&queue_late, ref);

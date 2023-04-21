@@ -829,16 +829,20 @@ _yy_state_0:
 					sym = get_sym();
 				}
 			} else if (sym == YY__LPAREN || sym == YY__SEMICOLON) {
+				n = 0;
 				if (sym == YY__LPAREN) {
 					sym = get_sym();
 					if (sym == YY_ID || sym == YY_STRING || sym == YY_DECNUMBER || sym == YY_NULL) {
 						sym = parse_val(sym, p, op, 1, &op1);
+						n = 1;
 						if (sym == YY__COMMA) {
 							sym = get_sym();
 							sym = parse_val(sym, p, op, 2, &op2);
+							n = 2;
 							if (sym == YY__COMMA) {
 								sym = get_sym();
 								sym = parse_val(sym, p, op, 3, &op3);
+								n = 3;
 							}
 						}
 					}
@@ -853,7 +857,14 @@ _yy_state_0:
 				 && !IR_IS_UNRESOLVED(op3)) {
 					ref = ir_fold(p->ctx, IR_OPT(op, t), op1, op2, op3);
 				} else {
-					ref = ir_emit(p->ctx, IR_OPT(op, t), op1, op2, op3);
+					uint32_t opt;
+
+					if (!IR_OP_HAS_VAR_INPUTS(ir_op_flags[op])) {
+						opt = IR_OPT(op, t);
+					} else {
+						opt = IR_OPTX(op, t, n);
+					}
+					ref = ir_emit(p->ctx, opt, op1, op2, op3);
 				}
 			} else {
 				yy_error_sym("unexpected", sym);

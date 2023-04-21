@@ -150,7 +150,7 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f)
 #define ir_op_flag_d2      (ir_op_flag_d | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_d2C     (ir_op_flag_d | IR_OP_FLAG_COMMUTATIVE | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_d3      (ir_op_flag_d | 3 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
-#define ir_op_flag_dP      (ir_op_flag_d | 5 | (5 << IR_OP_FLAG_OPERANDS_SHIFT)) // PHI (number of operands encoded in op1->op1)
+#define ir_op_flag_dN      (ir_op_flag_d | IR_OP_FLAG_VAR_INPUTS)               // PHI (number of operands encoded in op1->op1)
 #define ir_op_flag_r       IR_OP_FLAG_DATA                                      // "d" and "r" are the same now
 #define ir_op_flag_r0      ir_op_flag_r
 #define ir_op_flag_r0X1    (ir_op_flag_r | 0 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
@@ -168,7 +168,7 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f)
 #define ir_op_flag_S1X1    (ir_op_flag_S | 1 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_S2      (ir_op_flag_S | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_S2X1    (ir_op_flag_S | 2 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
-#define ir_op_flag_SN      (ir_op_flag_S | 4 | (4 << IR_OP_FLAG_OPERANDS_SHIFT)) // MERGE (number of operands encoded in op1)
+#define ir_op_flag_SN      (ir_op_flag_S | IR_OP_FLAG_VAR_INPUTS)                // MERGE (number of operands encoded in op1)
 #define ir_op_flag_E       (IR_OP_FLAG_CONTROL|IR_OP_FLAG_BB_END)
 #define ir_op_flag_E1      (ir_op_flag_E | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_E2      (ir_op_flag_E | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
@@ -190,7 +190,7 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f)
 #define ir_op_flag_s3      (ir_op_flag_s | 3 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_x1      (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_CALL | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_x2      (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_CALL | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
-#define ir_op_flag_xN      (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_CALL | 4 | (4 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_xN      (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_CALL | IR_OP_FLAG_VAR_INPUTS)
 #define ir_op_flag_a2      (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_ALLOC | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 
 #define ir_op_kind____     IR_OPND_UNUSED
@@ -878,6 +878,9 @@ ir_fold_const:
 ir_ref ir_fold(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
 {
 	if (UNEXPECTED(!(ctx->flags & IR_OPT_FOLDING))) {
+		if ((opt & IR_OPT_OP_MASK) == IR_PHI) {
+			opt |= (3 << IR_OPT_INPUTS_SHIFT);
+		}
 		return ir_emit(ctx, opt, op1, op2, op3);
 	}
 	return ir_folding(ctx, opt, op1, op2, op3, ctx->ir_base + op1, ctx->ir_base + op2, ctx->ir_base + op3);
@@ -916,10 +919,7 @@ ir_ref ir_emit_N(ir_ctx *ctx, uint32_t opt, int32_t count)
 	ctx->insns_count = ref + 1 + count/4;
 
 	insn = &ctx->ir_base[ref];
-	insn->optx = opt;
-	if ((opt & IR_OPT_OP_MASK) != IR_PHI) {
-		insn->inputs_count = count;
-	}
+	insn->optx = opt | (count << IR_OPT_INPUTS_SHIFT);
 	for (i = 1, p = insn->ops + i; i <= (count|3); i++, p++) {
 		*p = IR_UNUSED;
 	}
@@ -931,29 +931,15 @@ void ir_set_op(ir_ctx *ctx, ir_ref ref, int32_t n, ir_ref val)
 {
 	ir_insn *insn = &ctx->ir_base[ref];
 
+#ifdef IR_DEBUG
 	if (n > 3) {
-		int32_t count = 3;
+		int32_t count;
 
-		if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
-			count = insn->inputs_count;
-			if (count == 0) {
-				count = 2;
-			}
-		} else if (insn->op == IR_CALL || insn->op == IR_TAILCALL || insn->op == IR_SNAPSHOT) {
-			count = insn->inputs_count;
-			if (count == 0) {
-				count = 2;
-			}
-		} else if (insn->op == IR_PHI) {
-			count = ctx->ir_base[insn->op1].inputs_count + 1;
-			if (count == 1) {
-				count = 3;
-			}
-		} else {
-			IR_ASSERT(0);
-		}
+		IR_ASSERT(IR_OP_HAS_VAR_INPUTS(ir_op_flags[insn->op]));
+		count = insn->inputs_count;
 		IR_ASSERT(n <= count);
 	}
+#endif
 	ir_insn_set_op(insn, n, val);
 }
 
@@ -1467,7 +1453,7 @@ ir_ref _ir_PHI_2(ir_ctx *ctx, ir_ref src1, ir_ref src2)
 
 	IR_ASSERT(ctx->control);
 	IR_ASSERT(ctx->ir_base[ctx->control].op == IR_MERGE || ctx->ir_base[ctx->control].op == IR_LOOP_BEGIN);
-	return ir_emit3(ctx, IR_OPT(IR_PHI, type), ctx->control, src1, src2);
+	return ir_emit3(ctx, IR_OPTX(IR_PHI, type, 3), ctx->control, src1, src2);
 }
 
 ir_ref _ir_PHI_N(ir_ctx *ctx, ir_ref n, ir_ref *inputs)
@@ -1506,9 +1492,8 @@ void _ir_PHI_SET_OP(ir_ctx *ctx, ir_ref phi, ir_ref pos, ir_ref src)
 	ir_ref *ops = insn->ops;
 
 	IR_ASSERT(insn->op == IR_PHI);
-	insn = &ctx->ir_base[insn->op1];
-	IR_ASSERT(insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN);
-	IR_ASSERT(pos > 0 && pos <= (insn->inputs_count ? insn->inputs_count : 2));
+	IR_ASSERT(ctx->ir_base[insn->op1].op == IR_MERGE || ctx->ir_base[insn->op1].op == IR_LOOP_BEGIN);
+	IR_ASSERT(pos > 0 && pos < insn->inputs_count);
 	pos++; /* op1 is used for control */
 	ops[pos] = src;
 }
@@ -1601,7 +1586,7 @@ ir_ref _ir_END(ir_ctx *ctx)
 void _ir_MERGE_2(ir_ctx *ctx, ir_ref src1, ir_ref src2)
 {
 	IR_ASSERT(!ctx->control);
-	ctx->control = ir_emit2(ctx, IR_MERGE, src1, src2);
+	ctx->control = ir_emit2(ctx, IR_OPTX(IR_MERGE, IR_VOID, 2), src1, src2);
 }
 
 void _ir_MERGE_N(ir_ctx *ctx, ir_ref n, ir_ref *inputs)
@@ -1628,7 +1613,7 @@ void _ir_MERGE_SET_OP(ir_ctx *ctx, ir_ref merge, ir_ref pos, ir_ref src)
 	ir_ref *ops = insn->ops;
 
 	IR_ASSERT(insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN);
-	IR_ASSERT(pos > 0 && pos <= (insn->inputs_count ? insn->inputs_count : 2));
+	IR_ASSERT(pos > 0 && pos <= insn->inputs_count);
 	ops[pos] = src;
 }
 
@@ -1686,7 +1671,7 @@ void _ir_MERGE_LIST(ir_ctx *ctx, ir_ref list)
 ir_ref _ir_LOOP_BEGIN(ir_ctx *ctx, ir_ref src1)
 {
 	IR_ASSERT(!ctx->control);
-	ctx->control = ir_emit2(ctx, IR_LOOP_BEGIN, src1, IR_UNUSED);
+	ctx->control = ir_emit2(ctx, IR_OPTX(IR_LOOP_BEGIN, IR_VOID, 2), src1, IR_UNUSED);
 	return ctx->control;
 }
 
@@ -1703,20 +1688,13 @@ ir_ref _ir_LOOP_END(ir_ctx *ctx)
 ir_ref _ir_CALL(ir_ctx *ctx, ir_type type, ir_ref func)
 {
 	IR_ASSERT(ctx->control);
-	return ctx->control = ir_emit2(ctx, IR_OPT(IR_CALL, type), ctx->control, func);
+	return ctx->control = ir_emit2(ctx, IR_OPTX(IR_CALL, type, 2), ctx->control, func);
 }
 
 ir_ref _ir_CALL_1(ir_ctx *ctx, ir_type type, ir_ref func, ir_ref arg1)
 {
-	ir_ref call;
-
 	IR_ASSERT(ctx->control);
-	call = ir_emit_N(ctx, IR_OPT(IR_CALL, type), 3);
-	ir_set_op(ctx, call, 1, ctx->control);
-	ir_set_op(ctx, call, 2, func);
-	ir_set_op(ctx, call, 3, arg1);
-	ctx->control = call;
-	return call;
+	return ctx->control = ir_emit3(ctx, IR_OPTX(IR_CALL, type, 3), ctx->control, func, arg1);
 }
 
 ir_ref _ir_CALL_2(ir_ctx *ctx, ir_type type, ir_ref func, ir_ref arg1, ir_ref arg2)
@@ -1792,20 +1770,14 @@ void _ir_UNREACHABLE(ir_ctx *ctx)
 void _ir_TAILCALL(ir_ctx *ctx, ir_ref func)
 {
 	IR_ASSERT(ctx->control);
-	ctx->control = ir_emit2(ctx, IR_TAILCALL, ctx->control, func);
+	ctx->control = ir_emit2(ctx, IR_OPTX(IR_TAILCALL, IR_VOID, 2), ctx->control, func);
 	_ir_UNREACHABLE(ctx);
 }
 
 void _ir_TAILCALL_1(ir_ctx *ctx, ir_ref func, ir_ref arg1)
 {
-	ir_ref call;
-
 	IR_ASSERT(ctx->control);
-	call = ir_emit_N(ctx, IR_TAILCALL, 3);
-	ir_set_op(ctx, call, 1, ctx->control);
-	ir_set_op(ctx, call, 2, func);
-	ir_set_op(ctx, call, 3, arg1);
-	ctx->control = call;
+	ctx->control = ir_emit3(ctx, IR_OPTX(IR_TAILCALL, IR_VOID, 3), ctx->control, func, arg1);
 	_ir_UNREACHABLE(ctx);
 }
 

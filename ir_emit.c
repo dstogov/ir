@@ -183,7 +183,7 @@ static int ir_get_args_regs(const ir_ctx *ctx, const ir_insn *insn, int8_t *regs
 	}
 #endif
 
-	n = ir_variable_inputs_count(insn);
+	n = insn->inputs_count;
 	n = IR_MIN(n, IR_MAX_REG_ARGS + 2);
 	for (j = 3; j <= n; j++) {
 		type = ctx->ir_base[ir_insn_op(insn, j)].type;

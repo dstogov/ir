@@ -1165,6 +1165,7 @@ IR_FOLD(PHI(_, _)) // TODO: PHI(_, _, _)
 		IR_FOLD_COPY(op2);
 	}
 	/* skip CSE */
+	opt = opt | (3 << IR_OPT_INPUTS_SHIFT);
 	IR_FOLD_EMIT;
 }
 

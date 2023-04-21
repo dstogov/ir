@@ -82,7 +82,7 @@ IR_ALWAYS_INLINE void _ir_add_predecessors(const ir_insn *insn, ir_worklist *wor
 	const ir_ref *p;
 
 	if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
-		n = ir_variable_inputs_count(insn);
+		n = insn->inputs_count;
 		for (p = insn->ops + 1; n > 0; p++, n--) {
 			ref = *p;
 			IR_ASSERT(ref);
@@ -256,7 +256,7 @@ next_successor:
 		} else {
 			bb->flags = IR_BB_UNREACHABLE; /* all blocks are marked as UNREACHABLE first */
 			if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
-				n = ir_variable_inputs_count(insn);
+				n = insn->inputs_count;
 				bb->predecessors_count = n;
 				edges_count += n;
 				count += n;
@@ -286,7 +286,7 @@ next_successor:
 		insn = &ctx->ir_base[bb->start];
 		if (bb->predecessors_count > 1) {
 			uint32_t *q = edges + bb->predecessors;
-			n = ir_variable_inputs_count(insn);
+			n = insn->inputs_count;
 			for (p = insn->ops + 1; n > 0; p++, q++, n--) {
 				ref = *p;
 				IR_ASSERT(ref);
@@ -382,9 +382,6 @@ static void ir_remove_merge_input(ir_ctx *ctx, ir_ref merge, ir_ref from)
 
 	IR_ASSERT(insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN);
 	n = insn->inputs_count;
-	if (n == 0) {
-		n = 3;
-	}
 	i = 1;
 	life_inputs = ir_bitset_malloc(n + 1);
 	for (j = 1; j <= n; j++) {
@@ -425,9 +422,6 @@ static void ir_remove_merge_input(ir_ctx *ctx, ir_ref merge, ir_ref from)
 			}
 		}
 	} else {
-		if (i == 2) {
-			i = 0;
-		}
 		insn->inputs_count = i;
 
 		n++;
@@ -531,9 +525,11 @@ int ir_remove_unreachable_blocks(ir_ctx *ctx)
 			ir_insn *insn = &ctx->ir_base[bb->start];
 			ir_ref *p, ref;
 
-			if (bb->predecessors_count > 1) {
+			n = bb->predecessors_count;
+			if (n > 1) {
 				uint32_t *q = edges + bb->predecessors;
-				n = ir_variable_inputs_count(insn);
+
+				IR_ASSERT(n == insn->inputs_count);
 				for (p = insn->ops + 1; n > 0; p++, q++, n--) {
 					ref = *p;
 					IR_ASSERT(ref);
@@ -542,7 +538,7 @@ int ir_remove_unreachable_blocks(ir_ctx *ctx)
 					*q = pred_b;
 					edges[pred_bb->successors + pred_bb->successors_count++] = b;
 				}
-			} else if (bb->predecessors_count == 1) {
+			} else if (n == 1) {
 				ref = insn->op1;
 				IR_ASSERT(ref);
 				IR_ASSERT(IR_OPND_KIND(ir_op_flags[insn->op], 1) == IR_OPND_CONTROL);

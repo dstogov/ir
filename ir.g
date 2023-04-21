@@ -221,12 +221,16 @@ ir_insn(ir_parser_ctx *p):
 				")"
 			)?
 		|
+			{n = 0;}
 			(	"("
 				(	val(p, op, 1, &op1)
+					{n = 1;}
 					(	","
 						val(p, op, 2, &op2)
+						{n = 2;}
 						(	","
 							val(p, op, 3, &op3)
+							{n = 3;}
 						)?
 					)?
 				)?
@@ -239,7 +243,14 @@ ir_insn(ir_parser_ctx *p):
 				 && !IR_IS_UNRESOLVED(op3)) {
 					ref = ir_fold(p->ctx, IR_OPT(op, t), op1, op2, op3);
 				} else {
-					ref = ir_emit(p->ctx, IR_OPT(op, t), op1, op2, op3);
+					uint32_t opt;
+
+					if (!IR_OP_HAS_VAR_INPUTS(ir_op_flags[op])) {
+						opt = IR_OPT(op, t);
+					} else {
+						opt = IR_OPTX(op, t, n);
+					}
+					ref = ir_emit(p->ctx, opt, op1, op2, op3);
 				}
 			}
 		)

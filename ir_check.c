@@ -235,6 +235,13 @@ bool ir_check(const ir_ctx *ctx)
 		}
 
 		switch (insn->op) {
+			case IR_PHI:
+				if (insn->inputs_count != ctx->ir_base[insn->op1].inputs_count + 1) {
+					fprintf(stderr, "ir_base[%d] inconsistent PHI inputs_count (%d != %d)\n",
+						i, insn->inputs_count, ctx->ir_base[insn->op1].inputs_count + 1);
+					ok = 0;
+				}
+				break;
 			case IR_LOAD:
 			case IR_STORE:
 				type = ctx->ir_base[insn->op2].type;
