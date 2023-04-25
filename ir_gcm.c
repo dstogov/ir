@@ -131,6 +131,10 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 					while (lca != _blocks[ref]) {
 						bb = &ctx->cfg_blocks[lca];
 						if (bb->loop_depth < loop_depth) {
+							if ((ctx->cfg_blocks[bb->loop_header].flags & IR_BB_LOOP_WITH_ENTRY)
+							 && !(ctx->binding && ir_binding_find(ctx, ref))) {
+								break;
+							}
 							loop_depth = bb->loop_depth;
 							b = lca;
 							if (!loop_depth) {
