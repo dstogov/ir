@@ -4,6 +4,8 @@ TARGET     = x86_64
 BUILD      = debug
 BUILD_DIR  = .
 SRC_DIR    = .
+EXAMPLES_SRC_DIR = $(SRC_DIR)/examples
+EXAMPLES_BUILD_DIR = $(BUILD_DIR)/examples
 
 CC         = gcc
 CXX        = g++
@@ -45,11 +47,15 @@ OBJS_COMMON = $(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_strtab.o $(BUILD_DIR)/ir_cfg.o \
 	$(BUILD_DIR)/ir_cpuinfo.o
 OBJS_IR = $(BUILD_DIR)/ir_main.o
 OBJS_IR_TEST = $(BUILD_DIR)/ir_test.o
+EXAMPLE_EXES = $(EXAMPLES_BUILD_DIR)/0001-basic $(EXAMPLES_BUILD_DIR)/0005-basic-runner-func
 
 all: $(BUILD_DIR) $(BUILD_DIR)/ir $(BUILD_DIR)/ir_test
 
 $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
+
+$(EXAMPLES_BUILD_DIR):
+	@mkdir -p $(EXAMPLES_BUILD_DIR)
 
 $(BUILD_DIR)/ir: $(OBJS_COMMON) $(OBJS_IR)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lcapstone
@@ -84,6 +90,9 @@ $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h: $(SRC_DIR)/ir_$(DASM_ARCH).dasc $(SRC_DIR)/
 $(OBJS_COMMON) $(OBJS_IR) $(OBJS_IR_TEST): $(BUILD_DIR)/$(notdir %.o): $(SRC_DIR)/$(notdir %.c)
 	$(CC) $(CFLAGS) -I$(BUILD_DIR) -o $@ -c $<
 
+$(EXAMPLE_EXES): $(EXAMPLES_BUILD_DIR)/$(notdir %): $(EXAMPLES_SRC_DIR)/$(notdir %.c)
+	$(CC) $(CFLAGS) -I$(BUILD_DIR) $< -o $@ $(OBJS_COMMON) $(LDFLAGS) -lcapstone
+
 $(BUILD_DIR)/ir-test: $(SRC_DIR)/ir-test.cxx
 	$(CXX) -O3 -std=c++17 $(SRC_DIR)/ir-test.cxx -o $(BUILD_DIR)/ir-test
 
@@ -95,6 +104,8 @@ test: $(BUILD_DIR)/ir $(BUILD_DIR)/ir-test
 
 test-ci: $(BUILD_DIR)/ir $(BUILD_DIR)/ir-test
 	$(BUILD_DIR)/ir-test --show-diff $(SRC_DIR)/tests
+
+examples: $(OBJS_COMMON) $(EXAMPLES_BUILD_DIR) $(EXAMPLE_EXES)
 
 clean:
 	rm -rf $(BUILD_DIR)/ir $(BUILD_DIR)/ir_test $(BUILD_DIR)/*.o \

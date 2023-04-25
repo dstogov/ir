@@ -12,12 +12,15 @@ BUILD_DIR=win32\build_$(VCPKG_TRIPLET)
 !endif
 SRC_DIR=.
 
+EXAMPLES_SRC_DIR=$(SRC_DIR)\examples
+EXAMPLES_BUILD_DIR=$(BUILD_DIR)\examples
+
 !if "$(VCPKG_DIR)" == ""
 VCPKG_DIR=win32\vcpkg
 !endif
 PATH=$(PATH);$(VCPKG_DIR)\installed\$(VCPKG_TRIPLET)\bin
 
-CFLAGS=/nologo /utf-8 /W3 /EHsc /Zi /I$(BUILD_DIR) /I$(VCPKG_DIR)\installed\$(VCPKG_TRIPLET)\include
+CFLAGS=/nologo /utf-8 /W3 /EHsc /Zi /I$(SRC_DIR) /I$(BUILD_DIR) /I$(VCPKG_DIR)\installed\$(VCPKG_TRIPLET)\include
 LDFLAGS=/nologo
 !if "$(BUILD)" == "release"
 CFLAGS=$(CFLAGS) /MT /Ox
@@ -68,6 +71,7 @@ OBJS_COMMON=$(BUILD_DIR)\ir.obj $(BUILD_DIR)\ir_strtab.obj $(BUILD_DIR)\ir_cfg.o
 	$(BUILD_DIR)\ir_disasm.obj $(BUILD_DIR)\ir_check.obj $(BUILD_DIR)\ir_cpuinfo.obj
 OBJS_IR = $(BUILD_DIR)\ir_main.obj
 OBJS_IR_TEST = $(BUILD_DIR)\ir_test.obj
+EXAMPLE_EXES = $(EXAMPLES_BUILD_DIR)\0001-basic.exe $(EXAMPLES_BUILD_DIR)\0005-basic-runner-func.exe
 
 all: $(BUILD_DIR) $(BUILD_DIR)\ir.exe $(BUILD_DIR)\ir_test.exe
 
@@ -101,6 +105,10 @@ $(BUILD_DIR)\ir_disasm.obj: $(VCPKG_CAPSTONE)
 {$(SRC_DIR)}.c{$(BUILD_DIR)}.obj:
 	"$(CC)" $(CFLAGS) /Fo$@ /c $<
 
+{$(EXAMPLES_SRC_DIR)}.c{$(EXAMPLES_BUILD_DIR)}.exe:
+	"$(CC)" $(CFLAGS) /Fo$*.obj /c $<
+	"$(LD)" $(LDFLAGS) $(OBJS_COMMON) $*.obj $(LIBS) /out:$@
+
 # If the vcpkg dir exists, lets assume we're good with the deps.
 $(VCPKG_DIR)\vcpkg.exe:
 	git clone https://github.com/Microsoft/vcpkg.git "$(VCPKG_DIR)"
@@ -111,6 +119,9 @@ $(VCPKG_CAPSTONE): $(VCPKG_DIR)\vcpkg.exe
 
 $(BUILD_DIR):
 	md "$(BUILD_DIR)"
+
+$(EXAMPLES_BUILD_DIR):
+	md "$(EXAMPLES_BUILD_DIR)"
 
 $(BUILD_DIR)\ir-test.exe: $(SRC_DIR)/ir-test.cxx
 	"$(CXX)" /std:c++17 $(SRC_DIR)\ir-test.cxx /Fe:$@
@@ -123,6 +134,8 @@ test: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\ir-test.exe
 test-ci: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\ir-test.exe
 	set PATH=$(VCPKG_DIR)\installed\$(VCPKG_TRIPLET)\bin:%%PATH%%
 	$(BUILD_DIR)\ir-test.exe --show-diff $(SRC_DIR)\tests
+
+examples: $(OBJS_COMMON) $(EXAMPLES_BUILD_DIR) $(EXAMPLE_EXES)
 
 clean:
 	del /f /q $(BUILD_DIR)\*.obj $(BUILD_DIR)\*.exe $(BUILD_DIR)\*.pdb $(BUILD_DIR)\*.ilk $(BUILD_DIR)\*.h
