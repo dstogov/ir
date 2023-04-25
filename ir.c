@@ -2042,6 +2042,7 @@ void _ir_STORE(ir_ctx *ctx, ir_ref addr, ir_ref val)
 	ir_insn *insn;
 	ir_type type = ctx->ir_base[val].type;
 	ir_type type2;
+	bool guarded = 0;
 
 	IR_ASSERT(ctx->control);
 	while (1) {
@@ -2052,15 +2053,17 @@ void _ir_STORE(ir_ctx *ctx, ir_ref addr, ir_ref val)
 					if (insn->op3 == val) {
 						return;
 					} else {
-						if (prev) {
-							ctx->ir_base[prev].op1 = insn->op1;
-						} else {
-							ctx->control = insn->op1;
+						if (!guarded) {
+							if (prev) {
+								ctx->ir_base[prev].op1 = insn->op1;
+							} else {
+								ctx->control = insn->op1;
+							}
+							insn->optx = IR_NOP;
+							insn->op1 = IR_NOP;
+							insn->op2 = IR_NOP;
+							insn->op3 = IR_NOP;
 						}
-						insn->optx = IR_NOP;
-						insn->op1 = IR_NOP;
-						insn->op2 = IR_NOP;
-						insn->op3 = IR_NOP;
 						break;
 					}
 				} else {
@@ -2079,6 +2082,8 @@ check_aliasing:
 			if (ir_check_partial_aliasing(ctx, addr, insn->op2, type, type2) != IR_NO_ALIAS) {
 				break;
 			}
+		} else if (insn->op == IR_GUARD || insn->op == IR_GUARD_NOT) {
+			guarded = 1;
 		} else if (insn->op >= IR_START || insn->op == IR_CALL) {
 			break;
 		}
