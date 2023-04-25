@@ -1392,10 +1392,11 @@ static ir_alias ir_check_partial_aliasing(const ir_ctx *ctx, ir_ref addr1, ir_re
 
 static ir_ref ir_find_aliasing_load(ir_ctx *ctx, ir_ref ref, ir_type type, ir_ref addr)
 {
+	ir_ref limit = (addr > 0) ? addr : 1;
 	ir_insn *insn;
 	uint32_t modified_regset = 0;
 
-	while (1) {
+	while (ref > limit) {
 		insn = &ctx->ir_base[ref];
 		if (insn->op == IR_LOAD) {
 			if (insn->type == type && insn->op2 == addr) {
@@ -1428,6 +1429,7 @@ static ir_ref ir_find_aliasing_load(ir_ctx *ctx, ir_ref ref, ir_type type, ir_re
 		}
 		ref = insn->op1;
 	}
+	return IR_UNUSED;
 }
 
 /* IR Construction API */
@@ -2037,6 +2039,7 @@ ir_ref _ir_LOAD(ir_ctx *ctx, ir_type type, ir_ref addr)
 
 void _ir_STORE(ir_ctx *ctx, ir_ref addr, ir_ref val)
 {
+	ir_ref limit = (addr > 0) ? addr : 1;
 	ir_ref ref = ctx->control;
 	ir_ref prev = IR_UNUSED;
 	ir_insn *insn;
@@ -2045,7 +2048,7 @@ void _ir_STORE(ir_ctx *ctx, ir_ref addr, ir_ref val)
 	bool guarded = 0;
 
 	IR_ASSERT(ctx->control);
-	while (1) {
+	while (ref > limit) {
 		insn = &ctx->ir_base[ref];
 		if (insn->op == IR_STORE) {
 			if (insn->op2 == addr) {
