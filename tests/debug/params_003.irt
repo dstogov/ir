@@ -33,14 +33,14 @@ test:
 	movl %esi, %edx
 	movl %edi, %esi
 	leaq .L1(%rip), %rdi
-	movl 0x30(%rsp), %r10d
-	movl %r10d, 8(%rsp)
-	movl 0x38(%rsp), %r10d
-	movl %r10d, 0x10(%rsp)
-	movl 0x40(%rsp), %r10d
-	movl %r10d, 0x18(%rsp)
-	movl 0x48(%rsp), %r10d
-	movl %r10d, 0x20(%rsp)
+	movl 0x30(%rsp), %eax
+	movl %eax, 8(%rsp)
+	movl 0x38(%rsp), %eax
+	movl %eax, 0x10(%rsp)
+	movl 0x40(%rsp), %eax
+	movl %eax, 0x18(%rsp)
+	movl 0x48(%rsp), %eax
+	movl %eax, 0x20(%rsp)
 	movabsq $_IO_printf, %rax
 	callq *%rax
 	addq $0x28, %rsp

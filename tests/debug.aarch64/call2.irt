@@ -27,10 +27,10 @@ test:
 	mov x29, sp
 	str x19, [x29, #0x18]
 	mov w19, w0
-	mov w4, w1
+	mov w16, w1
 	mov w1, w2
 	mov w2, w3
-	mov w3, w4
+	mov w3, w16
 	adr x0, .L1
 	bl _IO_printf
 	add w0, w0, w19

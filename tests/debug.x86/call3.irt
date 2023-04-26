@@ -25,12 +25,12 @@ test:
 	movl 0x20(%esp), %ebx
 	movl 0x30(%esp), %eax
 	movl $.L1, (%esp)
-	movl 0x28(%esp), %ecx
-	movl %ecx, 4(%esp)
-	movl 0x2c(%esp), %ecx
-	movl %ecx, 8(%esp)
-	movl 0x24(%esp), %ecx
-	movl %ecx, 0xc(%esp)
+	movl 0x28(%esp), %eax
+	movl %eax, 4(%esp)
+	movl 0x2c(%esp), %eax
+	movl %eax, 8(%esp)
+	movl 0x24(%esp), %eax
+	movl %eax, 0xc(%esp)
 	calll *(%eax)
 	addl %ebx, %eax
 	movl 0x18(%esp), %ebx

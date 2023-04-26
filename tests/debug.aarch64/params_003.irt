@@ -37,10 +37,10 @@ test:
 	mov w2, w1
 	mov w1, w0
 	adr x0, .L1
-	ldr w9, [x29, #0x20]
-	str w9, [sp, #8]
-	ldr w9, [x29, #0x28]
-	str w9, [sp, #0x10]
+	ldr w16, [x29, #0x20]
+	str w16, [sp, #8]
+	ldr w16, [x29, #0x28]
+	str w16, [sp, #0x10]
 	bl _IO_printf
 	add sp, sp, #0x20
 	ldp x29, x30, [sp], #0x10
