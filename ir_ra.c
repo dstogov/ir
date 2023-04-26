@@ -1469,24 +1469,27 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy)
 		}
 	} IR_BITSET_FOREACH_END();
 
-	while ((i = ir_bitset_pop_first(todo, len)) >= 0) {
+	while (1) {
 		ir_ref a, b, c;
 
 		while ((b = ir_bitset_pop_first(ready, len)) >= 0) {
 			a = pred[b];
 			c = loc[a];
 			emit_copy(ctx, ctx->ir_base[b].type, c, b);
+			ir_bitset_excl(todo, b);
 			loc[a] = b;
 			if (a == c && pred[a]) {
 				ir_bitset_incl(ready, a);
 			}
 		}
-		b = i;
-		if (b != loc[pred[b]]) {
-			emit_copy(ctx, ctx->ir_base[b].type, b, 0);
-			loc[b] = 0;
-			ir_bitset_incl(ready, b);
+		b = ir_bitset_pop_first(todo, len);
+		if (b < 0) {
+			break;
 		}
+		IR_ASSERT(b != loc[pred[b]]);
+		emit_copy(ctx, ctx->ir_base[b].type, b, 0);
+		loc[b] = 0;
+		ir_bitset_incl(ready, b);
 	}
 
 	ir_mem_free(ready);

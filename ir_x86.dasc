@@ -5782,12 +5782,11 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 		}
 	} IR_REGSET_FOREACH_END();
 
-	while (todo != IR_REGSET_EMPTY) {
+	while (1) {
 		ir_ref /*a, b,*/ c;
 
 		while (ready != IR_REGSET_EMPTY) {
-			to = IR_REGSET_FIRST(ready);
-			IR_REGSET_EXCL(ready, to);
+			to = ir_regset_pop_first(&ready);
 			from_reg = pred[to];
 			c = loc[from_reg];
 			type = types[c];
@@ -5814,31 +5813,34 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 			} else {
 				ir_emit_fp_mov(ctx, type, to, c);
 			}
+			IR_REGSET_EXCL(todo, to);
 			types[to] = type;
 			loc[from_reg] = to;
 			if (from_reg == c && pred[from_reg] != IR_REG_NONE) {
 				IR_REGSET_INCL(ready, from_reg);
 			}
 		}
-		to = IR_REGSET_FIRST(todo);
-		IR_REGSET_EXCL(todo, to);
-		from_reg = pred[to];
-		if (to != loc[from_reg]) {
-			type = types[from_reg];
-			if (IR_IS_TYPE_INT(type)) {
-				IR_ASSERT(tmp_reg != IR_REG_NONE);
-				IR_ASSERT(tmp_reg >= IR_REG_GP_FIRST && tmp_reg <= IR_REG_GP_LAST);
-				ir_emit_mov(ctx, type, tmp_reg, to);
-				types[tmp_reg] = type;
-				loc[to] = tmp_reg;
-			} else {
-				IR_ASSERT(tmp_fp_reg != IR_REG_NONE);
-				IR_ASSERT(tmp_fp_reg >= IR_REG_FP_FIRST && tmp_fp_reg <= IR_REG_FP_LAST);
-				ir_emit_fp_mov(ctx, type, tmp_fp_reg, to);
-				loc[to] = tmp_fp_reg;
-			}
-			IR_REGSET_INCL(ready, to);
+
+		if (todo == IR_REGSET_EMPTY) {
+			break;
 		}
+		to = ir_regset_pop_first(&todo);
+		from_reg = pred[to];
+		IR_ASSERT(to != loc[from_reg]);
+		type = types[from_reg];
+		if (IR_IS_TYPE_INT(type)) {
+			IR_ASSERT(tmp_reg != IR_REG_NONE);
+			IR_ASSERT(tmp_reg >= IR_REG_GP_FIRST && tmp_reg <= IR_REG_GP_LAST);
+			ir_emit_mov(ctx, type, tmp_reg, to);
+			types[tmp_reg] = type;
+			loc[to] = tmp_reg;
+		} else {
+			IR_ASSERT(tmp_fp_reg != IR_REG_NONE);
+			IR_ASSERT(tmp_fp_reg >= IR_REG_FP_FIRST && tmp_fp_reg <= IR_REG_FP_LAST);
+			ir_emit_fp_mov(ctx, type, tmp_fp_reg, to);
+			loc[to] = tmp_fp_reg;
+		}
+		IR_REGSET_INCL(ready, to);
 	}
 
 	ir_mem_free(loc);
