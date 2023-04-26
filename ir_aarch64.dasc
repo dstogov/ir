@@ -436,6 +436,10 @@ int ir_get_target_constraints(const ir_ctx *ctx, ir_ref ref, ir_target_constrain
 			if (insn->inputs_count > 2) {
 				constraints->hints[2] = IR_REG_NONE;
 				constraints->hints_count = ir_get_args_regs(ctx, insn, constraints->hints);
+				if (!IR_IS_CONST_REF(insn->op2)) {
+					constraints->tmp_regs[n] = IR_TMP_REG(1, IR_ADDR, IR_LOAD_SUB_REF, IR_USE_SUB_REF);
+					n++;
+				}
 			}
 			flags = IR_USE_MUST_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG | IR_OP3_SHOULD_BE_IN_REG;
 			break;
@@ -3471,7 +3475,7 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn)
 	return used_stack;
 }
 
-static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg tmp_reg)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
@@ -3490,13 +3494,16 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	int32_t used_stack, stack_offset = 0;
 	ir_copy *copies;
 	bool do_pass3 = 0;
-	/* For temporaries may use any scratch registers except for argunebts used for parameters */
-	ir_reg tmp_reg = IR_REG_IP0;
+	/* For temporaries we may use any scratch registers except for registers used for parameters */
 	ir_reg tmp_fp_reg = IR_REG_FP_LAST; /* Temporary register for FP loads and swap */
 
 	n = ir_input_edges_count(ctx, insn);
 	if (n < 3) {
 		return 0;
+	}
+
+	if (tmp_reg == IR_REG_NONE) {
+		tmp_reg = IR_REG_IP0;
 	}
 
 	if (insn->op == IR_CALL && (ctx->flags & IR_PREALLOCATED_STACK)) {
@@ -3682,7 +3689,7 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg def_reg;
-	int32_t used_stack = ir_emit_arguments(ctx, def, insn);
+	int32_t used_stack = ir_emit_arguments(ctx, def, insn, ctx->regs[def][1]);
 
 	if (IR_IS_CONST_REF(insn->op2)) {
 		ir_insn *addr_insn = &ctx->ir_base[insn->op2];
@@ -3751,7 +3758,7 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-	int32_t used_stack = ir_emit_arguments(ctx, def, insn);
+	int32_t used_stack = ir_emit_arguments(ctx, def, insn, ctx->regs[def][1]);
 
 	if (used_stack != 0) {
 		ir_emit_call(ctx, def, insn);
