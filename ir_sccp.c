@@ -871,6 +871,7 @@ int ir_sccp(ir_ctx *ctx)
 	ir_bitqueue_free(&worklist);
 
 	ctx->flags &= ~IR_OPT_IN_SCCP;
+	ctx->flags |= IR_SCCP_DONE;
 
 	return 1;
 }

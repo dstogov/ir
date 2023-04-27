@@ -483,6 +483,9 @@ void ir_strtab_free(ir_strtab *strtab);
 #define IR_GEN_NATIVE          (1<<21)
 #define IR_GEN_C               (1<<22)
 
+/* Temporary: SCCP */
+#define IR_SCCP_DONE           (1<<25)
+
 /* Temporary: Live Ranges */
 #define IR_LR_HAVE_VARS        (1<<25)
 #define IR_LR_HAVE_DESSA_MOVES (1<<26)

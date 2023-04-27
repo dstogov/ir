@@ -101,6 +101,7 @@ int ir_build_cfg(ir_ctx *ctx)
 	uint32_t b;
 	ir_insn *insn;
 	ir_worklist worklist;
+	uint32_t bb_init_falgs;
 	uint32_t count, bb_count = 0;
 	uint32_t edges_count = 0;
 	ir_block *blocks, *bb;
@@ -221,7 +222,6 @@ next_successor:
 			_ir_add_successors(ctx, ref, &worklist);
 		} while (ir_worklist_len(&worklist));
 	}
-	ir_worklist_clear(&worklist);
 
 	IR_ASSERT(bb_count > 0);
 
@@ -230,6 +230,8 @@ next_successor:
 	b = 1;
 	bb = blocks + 1;
 	count = 0;
+	/* SCCP already removed UNREACHABKE blocks, otherwiseall blocks are marked as UNREACHABLE first */
+	bb_init_falgs = (ctx->flags & IR_SCCP_DONE) ? 0 : IR_BB_UNREACHABLE;
 	IR_BITSET_FOREACH(bb_starts, len, start) {
 		end = _blocks[start];
 		_blocks[start] = b;
@@ -252,9 +254,8 @@ next_successor:
 		if (insn->op == IR_START) {
 			bb->flags = IR_BB_START;
 			bb->predecessors_count = 0;
-			ir_worklist_push(&worklist, b);
 		} else {
-			bb->flags = IR_BB_UNREACHABLE; /* all blocks are marked as UNREACHABLE first */
+			bb->flags = bb_init_falgs;
 			if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
 				n = insn->inputs_count;
 				bb->predecessors_count = n;
@@ -312,22 +313,33 @@ next_successor:
 	ctx->cfg_edges = edges;
 	ctx->cfg_map = _blocks;
 
-	/* Mark reachable blocks */
-	while (ir_worklist_len(&worklist) != 0) {
-		uint32_t *p;
+	if (!(ctx->flags & IR_SCCP_DONE)) {
+		uint32_t reachable_count = 0;
 
-		b = ir_worklist_pop(&worklist);
-		bb = &blocks[b];
-		bb->flags &= ~IR_BB_UNREACHABLE;
-		n = bb->successors_count;
-		if (n > 1) {
-			for (p = edges + bb->successors; n > 0; p++, n--) {
-				ir_worklist_push(&worklist, *p);
+		/* Mark reachable blocks */
+		ir_worklist_clear(&worklist);
+		ir_worklist_push(&worklist, 1);
+		while (ir_worklist_len(&worklist) != 0) {
+			uint32_t *p;
+
+			reachable_count++;
+			b = ir_worklist_pop(&worklist);
+			bb = &blocks[b];
+			bb->flags &= ~IR_BB_UNREACHABLE;
+			n = bb->successors_count;
+			if (n > 1) {
+				for (p = edges + bb->successors; n > 0; p++, n--) {
+					ir_worklist_push(&worklist, *p);
+				}
+			} else if (n == 1) {
+				ir_worklist_push(&worklist, edges[bb->successors]);
 			}
-		} else if (n == 1) {
-			ir_worklist_push(&worklist, edges[bb->successors]);
+		}
+		if (reachable_count != ctx->cfg_blocks_count) {
+			ir_remove_unreachable_blocks(ctx);
 		}
 	}
+
 	ir_worklist_free(&worklist);
 
 	return 1;
