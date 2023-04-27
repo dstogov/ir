@@ -473,6 +473,7 @@ void ir_strtab_free(ir_strtab *strtab);
 #define IR_GEN_ENDBR           (1<<10)
 #define IR_MERGE_EMPTY_ENTRIES (1<<11)
 
+#define IR_CFG_HAS_LOOPS       (1<<14)
 #define IR_IRREDUCIBLE_CFG     (1<<15)
 
 #define IR_OPT_FOLDING         (1<<16)
@@ -483,8 +484,11 @@ void ir_strtab_free(ir_strtab *strtab);
 #define IR_GEN_NATIVE          (1<<21)
 #define IR_GEN_C               (1<<22)
 
-/* Temporary: SCCP */
+/* Temporary: SCCP -> CFG */
 #define IR_SCCP_DONE           (1<<25)
+
+/* Temporary: Dominators -> Loops */
+#define IR_NO_LOOPS            (1<<25)
 
 /* Temporary: Live Ranges */
 #define IR_LR_HAVE_VARS        (1<<25)

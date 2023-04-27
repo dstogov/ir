@@ -596,6 +596,8 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 	uint32_t *edges;
 	bool changed;
 
+	ctx->flags &= ~IR_NO_LOOPS;
+
 	postnum = 1;
 	compute_postnum(ctx, &postnum, 1);
 
@@ -700,7 +702,8 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 	ir_block *blocks, *bb;
 	uint32_t *edges;
 
-	//ir_dump_cfg(ctx, stderr);
+	ctx->flags |= IR_NO_LOOPS;
+
 	/* Find immediate dominators */
 	blocks = ctx->cfg_blocks;
 	edges  = ctx->cfg_edges;
@@ -719,6 +722,7 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 
 		if (UNEXPECTED(idom > b)) {
 			// TODO: try to remove this case ???
+			ctx->flags &= ~IR_NO_LOOPS;
 			while (1) {
 				k--;
 				p++;
@@ -744,6 +748,8 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 						idom = blocks[idom].idom;
 					}
 				}
+			} else {
+				ctx->flags &= ~IR_NO_LOOPS;
 			}
 		}
 		bb->idom = idom;
@@ -794,6 +800,10 @@ int ir_find_loops(ir_ctx *ctx)
 	ir_block *blocks = ctx->cfg_blocks;
 	uint32_t *edges = ctx->cfg_edges;
 	ir_worklist work;
+
+	if (ctx->flags & IR_NO_LOOPS) {
+		return 1;
+	}
 
 	/* We don't materialize the DJ spanning tree explicitly, as we are only interested in ancestor
 	 * queries. These are implemented by checking entry/exit times of the DFS search. */
@@ -900,6 +910,7 @@ next:
 				}
 			} else if (ir_worklist_len(&work)) {
 				bb->flags |= IR_BB_LOOP_HEADER;
+				ctx->flags |= IR_CFG_HAS_LOOPS;
 				bb->loop_depth = 1;
 				while (ir_worklist_len(&work)) {
 					j = ir_worklist_pop(&work);
@@ -927,19 +938,21 @@ next:
 		}
 	}
 
-	for (n = 1; n < count; n++) {
-		i = sorted_blocks[n];
-		ir_block *bb = &blocks[i];
-		if (bb->loop_header > 0) {
-			ir_block *loop = &blocks[bb->loop_header];
-			uint32_t loop_depth = loop->loop_depth;
+	if (ctx->flags & IR_CFG_HAS_LOOPS) {
+		for (n = 1; n < count; n++) {
+			i = sorted_blocks[n];
+			ir_block *bb = &blocks[i];
+			if (bb->loop_header > 0) {
+				ir_block *loop = &blocks[bb->loop_header];
+				uint32_t loop_depth = loop->loop_depth;
 
-			if (bb->flags & IR_BB_LOOP_HEADER) {
-				loop_depth++;
-			}
-			bb->loop_depth = loop_depth;
-			if (bb->flags & (IR_BB_ENTRY|IR_BB_LOOP_WITH_ENTRY)) {
-				loop->flags |= IR_BB_LOOP_WITH_ENTRY;
+				if (bb->flags & IR_BB_LOOP_HEADER) {
+					loop_depth++;
+				}
+				bb->loop_depth = loop_depth;
+				if (bb->flags & (IR_BB_ENTRY|IR_BB_LOOP_WITH_ENTRY)) {
+					loop->flags |= IR_BB_LOOP_WITH_ENTRY;
+				}
 			}
 		}
 	}
