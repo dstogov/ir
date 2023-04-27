@@ -553,6 +553,7 @@ int ir_remove_unreachable_blocks(ir_ctx *ctx)
 	return 1;
 }
 
+#if 0
 static void compute_postnum(const ir_ctx *ctx, uint32_t *cur, uint32_t b)
 {
 	uint32_t i, *p;
@@ -593,54 +594,56 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 	blocks[1].idom = 1;
 	do {
 		changed = 0;
-		/* Iterating in Reverse Post Oorder */
+		/* Iterating in Reverse Post Order */
 		for (b = 2, bb = &blocks[2]; b <= blocks_count; b++, bb++) {
 			IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 			if (bb->predecessors_count == 1) {
-				uint32_t idom = 0;
 				uint32_t pred_b = edges[bb->predecessors];
-				ir_block *pred_bb = &blocks[pred_b];
 
-				if (pred_bb->idom > 0) {
-					idom = pred_b;
-				}
-				if (idom > 0 && bb->idom != idom) {
-					bb->idom = idom;
+				IR_ASSERT(blocks[pred_b].idom > 0);
+				if (bb->idom != pred_b) {
+					bb->idom = pred_b;
 					changed = 1;
 				}
 			} else if (bb->predecessors_count) {
 				uint32_t idom = 0;
 				uint32_t k = bb->predecessors_count;
 				uint32_t *p = edges + bb->predecessors;
+
 				do {
 					uint32_t pred_b = *p;
 					ir_block *pred_bb = &blocks[pred_b];
+					ir_block *idom_bb;
 
 					if (pred_bb->idom > 0) {
-						if (idom == 0) {
-							idom = pred_b;
-						} else if (idom != pred_b) {
-							ir_block *idom_bb = &blocks[idom];
+						idom = pred_b;
+						idom_bb = &blocks[idom];
 
-							do {
-								while (pred_bb->postnum < idom_bb->postnum) {
-									pred_b = pred_bb->idom;
-									pred_bb = &blocks[pred_b];
+						while (--k > 0) {
+							pred_b = *(++p);
+							pred_bb = &blocks[pred_b];
+							if (pred_bb->idom > 0) {
+								while (idom != pred_b) {
+									while (pred_bb->postnum < idom_bb->postnum) {
+										pred_b = pred_bb->idom;
+										pred_bb = &blocks[pred_b];
+									}
+									while (idom_bb->postnum < pred_bb->postnum) {
+										idom = idom_bb->idom;
+										idom_bb = &blocks[idom];
+									}
 								}
-								while (idom_bb->postnum < pred_bb->postnum) {
-									idom = idom_bb->idom;
-									idom_bb = &blocks[idom];
-								}
-							} while (idom != pred_b);
+							}
 						}
+
+						if (bb->idom != idom) {
+							bb->idom = idom;
+							changed = 1;
+						}
+						break;
 					}
 					p++;
 				} while (--k > 0);
-
-				if (idom > 0 && bb->idom != idom) {
-					bb->idom = idom;
-					changed = 1;
-				}
 			}
 		}
 	} while (changed);
@@ -676,6 +679,89 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 
 	return 1;
 }
+#else
+/* A single pass modification of "A Simple, Fast Dominance Algorithm" by
+ * Cooper, Harvey and Kennedy, that relays on IR block ordering */
+int ir_build_dominators_tree(ir_ctx *ctx)
+{
+	uint32_t blocks_count, b;
+	ir_block *blocks, *bb;
+	uint32_t *edges;
+
+	//ir_dump_cfg(ctx, stderr);
+	/* Find immediate dominators */
+	blocks = ctx->cfg_blocks;
+	edges  = ctx->cfg_edges;
+	blocks_count = ctx->cfg_blocks_count;
+	blocks[1].idom = 1;
+	blocks[1].dom_depth = 0;
+
+	/* Iterating in Reverse Post Order */
+	for (b = 2, bb = &blocks[2]; b <= blocks_count; b++, bb++) {
+		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
+		IR_ASSERT(bb->predecessors_count > 0);
+		uint32_t k = bb->predecessors_count;
+		uint32_t *p = edges + bb->predecessors;
+		uint32_t idom = *p;
+		ir_block *idom_bb;
+
+		if (UNEXPECTED(idom > b)) {
+			// TODO: try to remove this case ???
+			while (1) {
+				k--;
+				p++;
+				idom = *p;
+				if (idom < b) {
+					break;
+				}
+				IR_ASSERT(k == 0);
+			}
+		}
+		IR_ASSERT(blocks[idom].idom > 0);
+
+		while (--k > 0) {
+			uint32_t pred_b = *(++p);
+
+			if (pred_b < b) {
+				IR_ASSERT(blocks[pred_b].idom > 0);
+				while (idom != pred_b) {
+					while (pred_b > idom) {
+						pred_b = blocks[pred_b].idom;
+					}
+					while (idom > pred_b) {
+						idom = blocks[idom].idom;
+					}
+				}
+			}
+		}
+		bb->idom = idom;
+		idom_bb = &blocks[idom];
+
+		bb->dom_depth = idom_bb->dom_depth + 1;
+		/* Sort by block number to traverse children in pre-order */
+		if (idom_bb->dom_child == 0) {
+			idom_bb->dom_child = b;
+		} else if (b < idom_bb->dom_child) {
+			bb->dom_next_child = idom_bb->dom_child;
+			idom_bb->dom_child = b;
+		} else {
+			int child = idom_bb->dom_child;
+			ir_block *child_bb = &blocks[child];
+
+			while (child_bb->dom_next_child > 0 && b > child_bb->dom_next_child) {
+				child = child_bb->dom_next_child;
+				child_bb = &blocks[child];
+			}
+			bb->dom_next_child = child_bb->dom_next_child;
+			child_bb->dom_next_child = b;
+		}
+	}
+
+	blocks[1].idom = 0;
+
+	return 1;
+}
+#endif
 
 static bool ir_dominates(const ir_block *blocks, uint32_t b1, uint32_t b2)
 {
