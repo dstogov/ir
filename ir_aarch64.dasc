@@ -3066,7 +3066,7 @@ static void ir_emit_rload(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (IR_REGSET_IN(IR_REGSET_UNION(ctx->fixed_regset, IR_REGSET_FIXED), src_reg)) {
 		if (ctx->vregs[def]
 		 && ctx->live_intervals[ctx->vregs[def]]
-		 && ctx->live_intervals[ctx->vregs[def]]->top->stack_spill_pos != -1) {
+		 && ctx->live_intervals[ctx->vregs[def]]->stack_spill_pos != -1) {
 			ir_emit_store(ctx, type, def, src_reg);
 		}
 	} else {
@@ -4560,7 +4560,6 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 							} else {
 								ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type, &data->ra_data);
 							}
-							ival->top = ival;
 							if (insn->op == IR_VAR) {
 								ir_use_list *use_list = &ctx->use_lists[i];
 								ir_ref i, n, *p, use;
@@ -4581,7 +4580,6 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 											ival->reg = IR_REG_NONE;
 											ival->vreg = ctx->vregs[use];
 											ival->stack_spill_pos = stack_spill_pos;
-											ival->top = ival;
 										}
 									} else if (use_insn->op == IR_VSTORE) {
 										if (!IR_IS_CONST_REF(use_insn->op3)
@@ -4594,7 +4592,6 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 											ival->reg = IR_REG_NONE;
 											ival->vreg = ctx->vregs[insn->op3];
 											ival->stack_spill_pos = stack_spill_pos;
-											ival->top = ival;
 										}
 									}
 								}

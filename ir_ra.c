@@ -132,8 +132,6 @@ static void ir_add_local_var(ir_ctx *ctx, int v, uint8_t type)
 	ival->range.end = ival->end = IR_END_LIVE_POS_FROM_REF(ctx->insns_count - 1);
 	ival->range.next = NULL;
 	ival->use_pos = NULL;
-
-	ival->top = ival;
 	ival->next = NULL;
 
 	ctx->live_intervals[v] = ival;
@@ -157,8 +155,6 @@ static ir_live_interval *ir_add_live_range(ir_ctx *ctx, int v, uint8_t type, ir_
 		ival->range.end = ival->end = end;
 		ival->range.next = NULL;
 		ival->use_pos = NULL;
-
-		ival->top = ival;
 		ival->next = NULL;
 
 		ctx->live_intervals[v] = ival;
@@ -258,8 +254,6 @@ static void ir_add_fixed_live_range(ir_ctx *ctx, ir_reg reg, ir_live_pos start, 
 		ival->range.end = ival->end = end;
 		ival->range.next = NULL;
 		ival->use_pos = NULL;
-
-		ival->top = ival;
 		ival->next = NULL;
 
 		ctx->live_intervals[v] = ival;
@@ -297,7 +291,6 @@ static void ir_add_tmp(ir_ctx *ctx, ir_ref ref, ir_ref tmp_ref, int32_t tmp_op_n
 	ival->range.start = IR_START_LIVE_POS_FROM_REF(ref) + tmp_reg.start;
 	ival->range.end = ival->end = IR_START_LIVE_POS_FROM_REF(ref) + tmp_reg.end;
 	ival->range.next = NULL;
-	ival->top = NULL;
 	ival->use_pos = NULL;
 
 	if (!ctx->live_intervals[0]) {
@@ -1727,7 +1720,7 @@ static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, ir_live_interval *iva
 	child = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
 	child->type = ival->type;
 	child->reg = IR_REG_NONE;
-	child->flags = 0;
+	child->flags = IR_LIVE_INTERVAL_SPLIT_CHILD;
 	child->vreg = ival->vreg;
 	child->stack_spill_pos = -1; // not allocated
 	child->range.start = pos;
@@ -1736,7 +1729,6 @@ static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, ir_live_interval *iva
 	child->end = ival->end;
 	child->use_pos = prev_use_pos ? prev_use_pos->next : use_pos;
 
-	child->top = ival->top;
 	child->next = ival->next;
 	ival->next = child;
 
@@ -2087,9 +2079,9 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 		}
 	}
 
-	if (ival->top && ival->top != ival) {
+	if (ival->flags & IR_LIVE_INTERVAL_SPLIT_CHILD) {
 		/* Try to reuse the register previously allocated for splited interval */
-		reg = ival->top->reg;
+		reg = ctx->live_intervals[ival->vreg]->reg;
 		if (reg >= 0
 		 && IR_REGSET_IN(available, reg)
 		 && ival->end <= freeUntilPos[reg]) {
@@ -2522,7 +2514,7 @@ static bool ir_ival_spill_for_fuse_load(ir_ctx *ctx, ir_live_interval *ival, ir_
 	ir_insn *insn;
 
 	if (ival->flags & IR_LIVE_INTERVAL_MEM_PARAM) {
-		IR_ASSERT(ival->top == ival && !ival->next && use_pos && use_pos->op_num == 0);
+		IR_ASSERT(!ival->next && use_pos && use_pos->op_num == 0);
 		insn = &ctx->ir_base[IR_LIVE_POS_TO_REF(use_pos->pos)];
 		IR_ASSERT(insn->op == IR_PARAM);
 		use_pos = use_pos->next;
@@ -2886,7 +2878,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 static void assign_regs(ir_ctx *ctx)
 {
 	ir_ref i;
-	ir_live_interval *ival;
+	ir_live_interval *ival, *top_ival;
 	ir_use_pos *use_pos;
 	int8_t reg;
 	ir_ref ref;
@@ -2895,7 +2887,7 @@ static void assign_regs(ir_ctx *ctx)
 	memset(ctx->regs, IR_REG_NONE, sizeof(ir_regs) * ctx->insns_count);
 
 	for (i = 1; i <= ctx->vregs_count; i++) {
-		ival = ctx->live_intervals[i];
+		top_ival = ival = ctx->live_intervals[i];
 		if (ival) {
 			do {
 				if (ival->reg >= 0) {
@@ -2912,7 +2904,7 @@ static void assign_regs(ir_ctx *ctx)
 							/* load op1 directly into result (valid only when op1 register is not reused) */
 							ctx->regs[ref][1] = reg | IR_REG_SPILL_LOAD;
 						}
-						if (ival->top->flags & IR_LIVE_INTERVAL_SPILLED) {
+						if (top_ival->flags & IR_LIVE_INTERVAL_SPILLED) {
 							// TODO: Insert spill loads and stotres in optimal positons (resolution)
 
 							if (use_pos->op_num == 0) {

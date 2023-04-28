@@ -1009,6 +1009,7 @@ struct _ir_live_range {
 #define IR_LIVE_INTERVAL_REG_LOAD        (1<<7)
 #define IR_LIVE_INTERVAL_SPILL_SPECIAL   (1<<8) /* spill slot is pre-allocated in a special area (see ir_ctx.spill_reserved_base) */
 #define IR_LIVE_INTERVAL_SPILLED         (1<<9)
+#define IR_LIVE_INTERVAL_SPLIT_CHILD     (1<<10)
 
 struct _ir_live_interval {
 	uint8_t           type;
@@ -1026,7 +1027,6 @@ struct _ir_live_interval {
 	ir_live_range     range;
 	ir_live_range    *current_range;
 	ir_use_pos       *use_pos;
-	ir_live_interval *top;
 	ir_live_interval *next;
 	ir_live_interval *list_next; /* linked list of active, inactive or unhandled intervals */
 };
