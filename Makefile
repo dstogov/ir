@@ -54,6 +54,9 @@ $(BUILD_DIR):
 $(BUILD_DIR)/ir: $(OBJS_COMMON) $(OBJS_IR)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lcapstone
 
+$(BUILD_DIR)/ir.a: $(OBJS_COMMON)
+	ar r $@ $^
+
 $(BUILD_DIR)/ir_test: $(OBJS_COMMON) $(OBJS_IR_TEST)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lcapstone
 
