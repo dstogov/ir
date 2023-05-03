@@ -612,15 +612,15 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					}
 				}
 			}
-		}
 
-		/* for each opd in live */
-		IR_BITSET_FOREACH(live, len, i) {
-			/* intervals[opd].addRange(b.from, b.to) */
-			ir_add_live_range(ctx, i, IR_VOID,
-				IR_START_LIVE_POS_FROM_REF(bb->start),
-				IR_END_LIVE_POS_FROM_REF(bb->end));
-		} IR_BITSET_FOREACH_END();
+			/* for each opd in live */
+			IR_BITSET_FOREACH(live, len, i) {
+				/* intervals[opd].addRange(b.from, b.to) */
+				ir_add_live_range(ctx, i, IR_VOID,
+					IR_START_LIVE_POS_FROM_REF(bb->start),
+					IR_END_LIVE_POS_FROM_REF(bb->end));
+			} IR_BITSET_FOREACH_END();
+		}
 
 		if (bb->successors_count == 1) {
 			/* for each phi function phi of successor */
