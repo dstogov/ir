@@ -1027,7 +1027,6 @@ void ir_array_grow(ir_array *a, uint32_t size)
 {
 	IR_ASSERT(size > a->size);
 	a->refs = ir_mem_realloc(a->refs, size * sizeof(ir_ref));
-	memset(a->refs + a->size, 0, (size - a->size) * sizeof(ir_ref));
 	a->size = size;
 }
 
