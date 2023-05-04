@@ -138,15 +138,14 @@ static void ir_add_local_var(ir_ctx *ctx, int v, uint8_t type)
 	ctx->flags |= IR_LR_HAVE_VARS;
 }
 
-static ir_live_interval *ir_add_live_range(ir_ctx *ctx, int v, uint8_t type, ir_live_pos start, ir_live_pos end)
+static ir_live_interval *ir_add_live_range(ir_ctx *ctx, int v, ir_live_pos start, ir_live_pos end)
 {
 	ir_live_interval *ival = ctx->live_intervals[v];
-	ir_live_range *p, *q, *next, *prev;
+	ir_live_range *p, *q;
 
 	if (!ival) {
 		ival = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
-		IR_ASSERT(type != IR_VOID);
-		ival->type = type;
+		ival->type = IR_VOID;
 		ival->reg = IR_REG_NONE;
 		ival->flags = 0;
 		ival->vreg = v;
@@ -161,57 +160,61 @@ static ir_live_interval *ir_add_live_range(ir_ctx *ctx, int v, uint8_t type, ir_
 		return ival;
 	}
 
-	IR_ASSERT(type == IR_VOID || type == ival->type);
-	if (end == ival->range.start) {
-		ival->range.start = start;
-		return ival;
-	} else if (end < ival->range.start) {
-		if (ctx->unused_ranges) {
-			/* reuse */
-			q = ctx->unused_ranges;
-			ctx->unused_ranges = q->next;
-		} else {
-			q = ir_arena_alloc(&ctx->arena, sizeof(ir_live_range));
-		}
-		q->start = ival->range.start;
-		q->end = ival->range.end;
-		q->next = ival->range.next;
-		ival->range.start = start;
-		ival->range.end = end;
-		ival->range.next = q;
-		return ival;
-	}
-
 	p = &ival->range;
-	prev = NULL;
-	while (p && end >= p->start) {
-		if (p->end >= start) {
-			if (start < p->start) {
-				p->start = start;
-			}
-			if (end > p->end) {
-				p->end = end;
-				/* merge with next */
-				next = p->next;
-				while (next && p->end >= next->start) {
-					if (next->end > p->end) {
-						p->end = next->end;
+	if (end == p->start) {
+		p->start = start;
+		return ival;
+	} else if (end > p->start) {
+		ir_live_range *prev = NULL;
+
+		do {
+			if (p->end >= start) {
+				if (start < p->start) {
+					p->start = start;
+				}
+				if (end > p->end) {
+					/* merge with next */
+					ir_live_range *next = p->next;
+
+					p->end = end;
+					while (next && p->end >= next->start) {
+						if (next->end > p->end) {
+							p->end = next->end;
+						}
+						p->next = next->next;
+						/* remember in the "unused_ranges" list */
+						next->next = ctx->unused_ranges;
+						ctx->unused_ranges = next;
+						next = p->next;
 					}
-					p->next = next->next;
-					/* remember in the "unused_ranges" list */
-					next->next = ctx->unused_ranges;
-					ctx->unused_ranges = next;
-					next = p->next;
+					if (!p->next) {
+						ival->end = p->end;
+					}
 				}
-				if (!p->next) {
-					ival->end = p->end;
-				}
+				return ival;
 			}
+			prev = p;
+			p = prev->next;
+		} while (p && end >= p->start);
+		if (!p) {
+			ival->end = end;
+		}
+		if (prev) {
+			if (ctx->unused_ranges) {
+				/* reuse */
+				q = ctx->unused_ranges;
+				ctx->unused_ranges = q->next;
+			} else {
+				q = ir_arena_alloc(&ctx->arena, sizeof(ir_live_range));
+			}
+			prev->next = q;
+			q->start = start;
+			q->end = end;
+			q->next = p;
 			return ival;
 		}
-		prev = p;
-		p = prev->next;
 	}
+
 	if (ctx->unused_ranges) {
 		/* reuse */
 		q = ctx->unused_ranges;
@@ -219,21 +222,12 @@ static ir_live_interval *ir_add_live_range(ir_ctx *ctx, int v, uint8_t type, ir_
 	} else {
 		q = ir_arena_alloc(&ctx->arena, sizeof(ir_live_range));
 	}
-	if (prev) {
-		prev->next = q;
-	} else {
-		q->start = ival->range.start;
-		q->end = ival->range.end;
-		q->next = ival->range.next;
-		p = q;
-		q = &ival->range;
-	}
-	q->start = start;
-	q->end = end;
-	q->next = p;
-	if (!p) {
-		ival->end = end;
-	}
+	q->start = p->start;
+	q->end = p->end;
+	q->next = p->next;
+	p->start = start;
+	p->end = end;
+	p->next = q;
 	return ival;
 }
 
@@ -275,7 +269,7 @@ static void ir_add_fixed_live_range(ir_ctx *ctx, ir_reg reg, ir_live_pos start, 
 	} else if (end == ival->range.start) {
 		ival->range.start = start;
 	} else {
-		ir_add_live_range(ctx, v, IR_VOID, start, end);
+		ir_add_live_range(ctx, v, start, end);
 	}
 }
 
@@ -517,9 +511,9 @@ static void ir_add_fusion_ranges(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_block
 
 					if (!ir_bitset_in(live, v)) {
 						/* live.add(opd) */
-						ir_bitset_incl(live, ctx->vregs[child]);
+						ir_bitset_incl(live, v);
 						/* intervals[opd].addRange(b.from, op.id) */
-						ival = ir_add_live_range(ctx, v, ctx->ir_base[child].type,
+						ival = ir_add_live_range(ctx, v,
 							IR_START_LIVE_POS_FROM_REF(bb->start), use_pos);
 					} else {
 						ival = ctx->live_intervals[v];
@@ -616,7 +610,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 			/* for each opd in live */
 			IR_BITSET_FOREACH(live, len, i) {
 				/* intervals[opd].addRange(b.from, b.to) */
-				ir_add_live_range(ctx, i, IR_VOID,
+				ir_add_live_range(ctx, i,
 					IR_START_LIVE_POS_FROM_REF(bb->start),
 					IR_END_LIVE_POS_FROM_REF(bb->end));
 			} IR_BITSET_FOREACH_END();
@@ -644,7 +638,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 								IR_ASSERT(v);
 								ir_bitset_incl(live, v);
 								/* intervals[phi.inputOf(b)].addRange(b.from, b.to) */
-								ival = ir_add_live_range(ctx, v, insn->type,
+								ival = ir_add_live_range(ctx, v,
 									IR_START_LIVE_POS_FROM_REF(bb->start),
 									IR_END_LIVE_POS_FROM_REF(bb->end));
 								ir_add_phi_use(ctx, ival, k, IR_DEF_LIVE_POS_FROM_REF(bb->end), use);
@@ -703,6 +697,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						ir_bitset_excl(live, v);
 						ival = ir_fix_live_range(ctx, v,
 							IR_START_LIVE_POS_FROM_REF(bb->start), IR_DEF_LIVE_POS_FROM_REF(ref));
+						ival->type = insn->type;
 						if (IR_REGSET_IN(IR_REGSET_UNION(ctx->fixed_regset, IR_REGSET_FIXED), insn->op2)) {
 							ival->flags = IR_LIVE_INTERVAL_REG_LOAD;
 							ival->reg = insn->op2;
@@ -747,12 +742,14 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						/* intervals[opd].setFrom(op.id) */
 						ival = ir_fix_live_range(ctx, v,
 							IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
+						ival->type = insn->type;
 						ir_add_use(ctx, ival, 0, def_pos, reg, def_flags, hint_ref);
 					} else {
 						/* live.remove(opd) */
 						ir_bitset_excl(live, v);
 						/* PHIs inputs must not be processed */
 						ival = ctx->live_intervals[v];
+						ival->type = insn->type;
 						ir_add_use(ctx, ival, 0, IR_DEF_LIVE_POS_FROM_REF(ref), IR_REG_NONE, IR_USE_SHOULD_BE_IN_REG, 0);
 						continue;
 					}
@@ -772,7 +769,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 
 			    ir_live_pos use_pos = IR_USE_LIVE_POS_FROM_REF(ref);
 
-				ival = ir_add_live_range(ctx, ctx->vregs[insn->op2], ctx->ir_base[insn->op2].type,
+				ival = ir_add_live_range(ctx, ctx->vregs[insn->op2],
 					IR_START_LIVE_POS_FROM_REF(bb->start), use_pos);
 				ir_add_use(ctx, ival, 2, use_pos, IR_REG_NONE, 0, IR_UNUSED);
 				ir_bitset_incl(live, ctx->vregs[insn->op2]);
@@ -816,14 +813,16 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 								use_pos = IR_USE_LIVE_POS_FROM_REF(ref);
 							}
 						}
-						if (!ir_bitset_in(live, ctx->vregs[input])) {
+
+						uint32_t v = ctx->vregs[input];
+						if (!ir_bitset_in(live, v)) {
 							/* live.add(opd) */
-							ir_bitset_incl(live, ctx->vregs[input]);
+							ir_bitset_incl(live, v);
 							/* intervals[opd].addRange(b.from, op.id) */
-							ival = ir_add_live_range(ctx, ctx->vregs[input], ctx->ir_base[input].type,
+							ival = ir_add_live_range(ctx, v,
 								IR_START_LIVE_POS_FROM_REF(bb->start), use_pos);
 						} else {
-							ival = ctx->live_intervals[ctx->vregs[input]];
+							ival = ctx->live_intervals[v];
 						}
 						ir_add_use(ctx, ival, j, use_pos, reg, use_flags, hint_ref);
 					} else if (input > 0) {
@@ -865,7 +864,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 
 				IR_BITSET_FOREACH(live, len, i) {
 					ir_bitset_incl(child_live_in, i);
-					ir_add_live_range(ctx, i, IR_VOID,
+					ir_add_live_range(ctx, i,
 						IR_START_LIVE_POS_FROM_REF(child_bb->start),
 						IR_END_LIVE_POS_FROM_REF(child_bb->end));
 				} IR_BITSET_FOREACH_END();
@@ -958,13 +957,13 @@ static void ir_vregs_join(ir_ctx *ctx, uint32_t r1, uint32_t r2)
 	fprintf(stderr, "COALESCE %d -> %d\n", r2, r1);
 #endif
 
-	ir_add_live_range(ctx, r1, ival->type, live_range->start, live_range->end);
+	ir_add_live_range(ctx, r1, live_range->start, live_range->end);
 	live_range = live_range->next;
 	while (live_range) {
 		next = live_range->next;
 		live_range->next = ctx->unused_ranges;
 		ctx->unused_ranges = live_range;
-		ir_add_live_range(ctx, r1, ival->type, live_range->start, live_range->end);
+		ir_add_live_range(ctx, r1, live_range->start, live_range->end);
 		live_range = next;
 	}
 
@@ -2631,7 +2630,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 	data.unused_slot_1 = 0;
 
 	if (ctx->flags & IR_LR_HAVE_VARS) {
-		for (j = 0; j <= ctx->vregs_count; j++) {
+		for (j = 1; j <= ctx->vregs_count; j++) {
 			ival = ctx->live_intervals[j];
 			if (ival) {
 				if (ival->flags & IR_LIVE_INTERVAL_VAR) {
