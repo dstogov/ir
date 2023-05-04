@@ -694,6 +694,10 @@ restart:
 
 	ir_mem_free(used);
 
+#ifndef IR_BITSET_LIVENESS
+	new_ctx.cfg_map = ir_mem_calloc(ctx->insns_count, sizeof(uint32_t));
+#endif
+
 	/* Copy instructions and count use edges */
 	edges_count = 0;
 	for (i = 1; i != 0; i = _next[i]) {
@@ -702,6 +706,9 @@ restart:
 		new_ref = _xlat[i];
 		new_insn = &new_ctx.ir_base[new_ref];
 		*new_insn = *insn;
+#ifndef IR_BITSET_LIVENESS
+		new_ctx.cfg_map[new_ref] = _blocks[i];
+#endif
 
 		n = ir_input_edges_count(ctx, insn);
 		for (j = n, p = insn->ops + 1, q = new_insn->ops + 1; j > 0; p++, q++, j--) {

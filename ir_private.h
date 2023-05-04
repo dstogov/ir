@@ -1167,4 +1167,6 @@ int ir_get_target_constraints(const ir_ctx *ctx, ir_ref ref, ir_target_constrain
 
 #endif /* defined(IR_REGSET_64BIT) */
 
+//#define IR_BITSET_LIVENESS
+
 #endif /* IR_PRIVATE_H */
