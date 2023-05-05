@@ -30,7 +30,7 @@
 #else
 # define PATH_SEP "/"
 # define EXE_SUF ""
-# define REGEX_FLAGS std::regex::ECMAScript | std::regex::multiline
+# define REGEX_FLAGS std::regex::ECMAScript
 # define DIFF_CMD "diff"
 # define DIFF_ARGS "--strip-trailing-cr -u"
 # define IR_ARGS ""
