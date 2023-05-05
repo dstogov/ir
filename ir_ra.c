@@ -138,33 +138,36 @@ static void ir_add_local_var(ir_ctx *ctx, int v, uint8_t type)
 	ctx->flags |= IR_LR_HAVE_VARS;
 }
 
+static ir_live_interval *ir_new_live_range(ir_ctx *ctx, int v, ir_live_pos start, ir_live_pos end)
+{
+	ir_live_interval *ival = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
+
+	ival->type = IR_VOID;
+	ival->reg = IR_REG_NONE;
+	ival->flags = 0;
+	ival->vreg = v;
+	ival->stack_spill_pos = -1; // not allocated
+	ival->range.start = start;
+	ival->range.end = ival->end = end;
+	ival->range.next = NULL;
+	ival->use_pos = NULL;
+	ival->next = NULL;
+
+	ctx->live_intervals[v] = ival;
+	return ival;
+}
+
 static ir_live_interval *ir_add_live_range(ir_ctx *ctx, int v, ir_live_pos start, ir_live_pos end)
 {
 	ir_live_interval *ival = ctx->live_intervals[v];
 	ir_live_range *p, *q;
 
 	if (!ival) {
-		ival = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
-		ival->type = IR_VOID;
-		ival->reg = IR_REG_NONE;
-		ival->flags = 0;
-		ival->vreg = v;
-		ival->stack_spill_pos = -1; // not allocated
-		ival->range.start = start;
-		ival->range.end = ival->end = end;
-		ival->range.next = NULL;
-		ival->use_pos = NULL;
-		ival->next = NULL;
-
-		ctx->live_intervals[v] = ival;
-		return ival;
+		return ir_new_live_range(ctx, v, start, end);
 	}
 
 	p = &ival->range;
-	if (end == p->start) {
-		p->start = start;
-		return ival;
-	} else if (end > p->start) {
+	if (end >= p->start) {
 		ir_live_range *prev = NULL;
 
 		do {
@@ -229,6 +232,17 @@ static ir_live_interval *ir_add_live_range(ir_ctx *ctx, int v, ir_live_pos start
 	p->end = end;
 	p->next = q;
 	return ival;
+}
+
+IR_ALWAYS_INLINE ir_live_interval *ir_add_prev_live_range(ir_ctx *ctx, int v, ir_live_pos start, ir_live_pos end)
+{
+	ir_live_interval *ival = ctx->live_intervals[v];
+
+	if (ival && ival->range.start == end) {
+		ival->range.start = start;
+		return ival;
+	}
+	return ir_add_live_range(ctx, v, start, end);
 }
 
 static void ir_add_fixed_live_range(ir_ctx *ctx, ir_reg reg, ir_live_pos start, ir_live_pos end)
@@ -612,7 +626,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 			/* for each opd in live */
 			IR_BITSET_FOREACH(live, len, i) {
 				/* intervals[opd].addRange(b.from, b.to) */
-				ir_add_live_range(ctx, i,
+				ir_add_prev_live_range(ctx, i,
 					IR_START_LIVE_POS_FROM_REF(bb->start),
 					IR_END_LIVE_POS_FROM_REF(bb->end));
 			} IR_BITSET_FOREACH_END();
@@ -639,7 +653,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							IR_ASSERT(v);
 							ir_bitset_incl(live, v);
 							/* intervals[phi.inputOf(b)].addRange(b.from, b.to) */
-							ival = ir_add_live_range(ctx, v,
+							ival = ir_add_prev_live_range(ctx, v,
 								IR_START_LIVE_POS_FROM_REF(bb->start),
 								IR_END_LIVE_POS_FROM_REF(bb->end));
 							ir_add_phi_use(ctx, ival, k, IR_DEF_LIVE_POS_FROM_REF(bb->end), use);
@@ -940,7 +954,7 @@ IR_ALWAYS_INLINE void ir_live_out_push(ir_ctx *ctx, uint32_t *live_outs, ir_list
 #if 0
 	ir_block *bb = &ctx->cfg_blocks[b];
 	live_outs[b] = v;
-	ir_add_live_range(ctx, v,
+	ir_add_prev_live_range(ctx, v,
 		IR_START_LIVE_POS_FROM_REF(bb->start),
 		IR_END_LIVE_POS_FROM_REF(bb->end));
 #else
@@ -1251,7 +1265,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 		while (n != 0) {
 			i = ir_list_at(&live_lists, n);
 			SET_LIVE_IN_BLOCK(i, b);
-			ir_add_live_range(ctx, i,
+			ir_add_prev_live_range(ctx, i,
 				IR_START_LIVE_POS_FROM_REF(bb->start),
 				IR_END_LIVE_POS_FROM_REF(bb->end));
 			n = ir_list_at(&live_lists, n - 1);
