@@ -1032,6 +1032,20 @@ static void ir_compute_live_sets(ir_ctx *ctx, uint32_t *live_outs, ir_list *live
 				ir_block *bb = &ctx->cfg_blocks[b];
 				uint32_t *p, n = bb->predecessors_count;
 
+				if (bb->flags & IR_BB_ENTRY) {
+					/* live_in_push(ENTRY, v) */
+					ir_insn *insn = &ctx->ir_base[bb->start];
+
+					IR_ASSERT(insn->op == IR_ENTRY);
+					IR_ASSERT(insn->op3 >= 0 && insn->op3 < ctx->entries_count);
+					if (live_lists->len >= live_lists->a.size) {
+						ir_array_grow(&live_lists->a, live_lists->a.size + 1024);
+					}
+					ir_list_push_unchecked(live_lists, live_outs[ctx->cfg_blocks_count + 1 + insn->op3]);
+					ir_list_push_unchecked(live_lists, v);
+					live_outs[ctx->cfg_blocks_count + 1 + insn->op3] = ir_list_len(live_lists) - 1;
+					continue;
+				}
 				for (p = &ctx->cfg_edges[bb->predecessors]; n > 0; p++, n--) {
 					uint32_t pred_block = *p;
 
@@ -1220,7 +1234,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 		ctx->arena = ir_arena_create(16 * 1024);
 	}
 
-	live_outs = ir_mem_calloc(ctx->cfg_blocks_count + 1, sizeof(uint32_t));
+	live_outs = ir_mem_calloc(ctx->cfg_blocks_count + 1 + ctx->entries_count, sizeof(uint32_t));
 	ir_list_init(&live_lists, 1024);
 	ir_compute_live_sets(ctx, live_outs, &live_lists);
 	live_in_block = ir_mem_calloc(ctx->vregs_count + 1, sizeof(uint32_t));
@@ -1464,7 +1478,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 			b = ctx->entries[i];
 			bb = &ctx->cfg_blocks[b];
 			IR_ASSERT(bb->predecessors_count == 1);
-			ir_add_osr_entry_loads(ctx, bb, live_outs[ctx->cfg_edges[bb->predecessors]], &live_lists, b);
+			ir_add_osr_entry_loads(ctx, bb, live_outs[ctx->cfg_blocks_count + 1 + i], &live_lists, b);
 		}
 		if (ctx->osr_entry_loads) {
 			ir_list_push((ir_list*)ctx->osr_entry_loads, 0);
