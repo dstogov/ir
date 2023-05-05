@@ -788,6 +788,7 @@ IR_ALWAYS_INLINE bool ir_const_is_true(const ir_insn *v)
 #define IR_OP_FLAG_BB_START       (1<<12)
 #define IR_OP_FLAG_BB_END         (1<<13)
 #define IR_OP_FLAG_TERMINATOR     (1<<14)
+#define IR_OP_FLAG_PINNED         (1<<15)
 
 #define IR_OP_FLAG_MEM_LOAD       ((0<<6)|(0<<7))
 #define IR_OP_FLAG_MEM_STORE      ((0<<6)|(1<<7))
@@ -891,6 +892,13 @@ struct _ir_use_list {
 #define IR_BB_PREV_EMPTY_ENTRY (1<<7)
 #define IR_BB_OSR_ENTRY_LOADS  (1<<8) /* OSR Entry-point with register LOADs   */
 #define IR_BB_LOOP_WITH_ENTRY  (1<<9) /* set together with LOOP_HEADER if there is an ENTRY in the loop */
+
+/* The following flags are set by GCM */
+#define IR_BB_HAS_PHI          (1<<10)
+#define IR_BB_HAS_PI           (1<<11)
+#define IR_BB_HAS_PARAM        (1<<12)
+#define IR_BB_HAS_VAR          (1<<13)
+
 
 struct _ir_block {
 	uint32_t flags;

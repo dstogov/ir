@@ -622,29 +622,27 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 			/* for each phi function phi of successor */
 			succ = ctx->cfg_edges[bb->successors];
 			succ_bb = &ctx->cfg_blocks[succ];
-			if (succ_bb->predecessors_count > 1) {
+			if (succ_bb->flags & IR_BB_HAS_PHI) {
 				ir_use_list *use_list = &ctx->use_lists[succ_bb->start];
 
-				if (use_list->count > 1) {
-					k = ir_phi_input_number(ctx, succ_bb, b);
-					IR_ASSERT(k != 0);
-					for (ref = 0; ref < use_list->count; ref++) {
-						ir_ref use = ctx->use_edges[use_list->refs + ref];
-						insn = &ctx->ir_base[use];
-						if (insn->op == IR_PHI) {
-							ir_ref input = ir_insn_op(insn, k);
-							if (input > 0) {
-								uint32_t v = ctx->vregs[input];
+				k = ir_phi_input_number(ctx, succ_bb, b);
+				IR_ASSERT(k != 0);
+				for (ref = 0; ref < use_list->count; ref++) {
+					ir_ref use = ctx->use_edges[use_list->refs + ref];
+					insn = &ctx->ir_base[use];
+					if (insn->op == IR_PHI) {
+						ir_ref input = ir_insn_op(insn, k);
+						if (input > 0) {
+							uint32_t v = ctx->vregs[input];
 
-								/* live.add(phi.inputOf(b)) */
-								IR_ASSERT(v);
-								ir_bitset_incl(live, v);
-								/* intervals[phi.inputOf(b)].addRange(b.from, b.to) */
-								ival = ir_add_live_range(ctx, v,
-									IR_START_LIVE_POS_FROM_REF(bb->start),
-									IR_END_LIVE_POS_FROM_REF(bb->end));
-								ir_add_phi_use(ctx, ival, k, IR_DEF_LIVE_POS_FROM_REF(bb->end), use);
-							}
+							/* live.add(phi.inputOf(b)) */
+							IR_ASSERT(v);
+							ir_bitset_incl(live, v);
+							/* intervals[phi.inputOf(b)].addRange(b.from, b.to) */
+							ival = ir_add_live_range(ctx, v,
+								IR_START_LIVE_POS_FROM_REF(bb->start),
+								IR_END_LIVE_POS_FROM_REF(bb->end));
+							ir_add_phi_use(ctx, ival, k, IR_DEF_LIVE_POS_FROM_REF(bb->end), use);
 						}
 					}
 				}
@@ -784,8 +782,13 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 			IR_ASSERT(insn->op != IR_PHI && (!ctx->rules || !(ctx->rules[ref] & (IR_FUSED|IR_SKIPPED))));
 			flags = ir_op_flags[insn->op];
 			n = ir_input_edges_count(ctx, insn);
-			j = (flags & IR_OP_FLAG_CONTROL) ? 2 : 1;
-			for (p = insn->ops + j; j <= n; j++, p++) {
+			j = 1;
+			p = insn->ops + 1;
+			if (flags & (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_PINNED)) {
+				j++;
+				p++;
+			}
+			for (; j <= n; j++, p++) {
 				if (IR_OPND_KIND(flags, j) == IR_OPND_DATA) {
 					ir_ref input = *p;
 					uint8_t use_flags = IR_USE_FLAGS(def_flags, j);
@@ -1037,7 +1040,7 @@ static void ir_compute_live_sets(ir_ctx *ctx, uint32_t *live_outs, ir_list *live
 					ir_insn *insn = &ctx->ir_base[bb->start];
 
 					IR_ASSERT(insn->op == IR_ENTRY);
-					IR_ASSERT(insn->op3 >= 0 && insn->op3 < ctx->entries_count);
+					IR_ASSERT(insn->op3 >= 0 && insn->op3 < (ir_ref)ctx->entries_count);
 					if (live_lists->len >= live_lists->a.size) {
 						ir_array_grow(&live_lists->a, live_lists->a.size + 1024);
 					}
@@ -1258,27 +1261,24 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 			/* for each phi function phi of successor */
 			succ = ctx->cfg_edges[bb->successors];
 			succ_bb = &ctx->cfg_blocks[succ];
-			if (succ_bb->predecessors_count > 1) {
+			if (succ_bb->flags & IR_BB_HAS_PHI) {
 				ir_use_list *use_list = &ctx->use_lists[succ_bb->start];
+				ir_ref n, *p;
 
-				if (use_list->count > 1) {
-					ir_ref n, *p;
+				k = ir_phi_input_number(ctx, succ_bb, b);
+				IR_ASSERT(k != 0);
+				n = use_list->count;
+				for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
+					ir_ref use = *p;
+					insn = &ctx->ir_base[use];
+					if (insn->op == IR_PHI) {
+						ir_ref input = ir_insn_op(insn, k);
+						if (input > 0) {
+							uint32_t v = ctx->vregs[input];
 
-					k = ir_phi_input_number(ctx, succ_bb, b);
-					IR_ASSERT(k != 0);
-					n = use_list->count;
-					for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
-						ir_ref use = *p;
-						insn = &ctx->ir_base[use];
-						if (insn->op == IR_PHI) {
-							ir_ref input = ir_insn_op(insn, k);
-							if (input > 0) {
-								uint32_t v = ctx->vregs[input];
-
-								IR_ASSERT(v);
-								ival = ctx->live_intervals[v];
-								ir_add_phi_use(ctx, ival, k, IR_DEF_LIVE_POS_FROM_REF(bb->end), use);
-							}
+							IR_ASSERT(v);
+							ival = ctx->live_intervals[v];
+							ir_add_phi_use(ctx, ival, k, IR_DEF_LIVE_POS_FROM_REF(bb->end), use);
 						}
 					}
 				}
@@ -1413,8 +1413,13 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 			IR_ASSERT(insn->op != IR_PHI && (!ctx->rules || !(ctx->rules[ref] & (IR_FUSED|IR_SKIPPED))));
 			flags = ir_op_flags[insn->op];
 			n = ir_input_edges_count(ctx, insn);
-			j = (flags & IR_OP_FLAG_CONTROL) ? 2 : 1;
-			for (p = insn->ops + j; j <= n; j++, p++) {
+			j = 1;
+			p = insn->ops + 1;
+			if (flags & (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_PINNED)) {
+				j++;
+				p++;
+			}
+			for (; j <= n; j++, p++) {
 				if (IR_OPND_KIND(flags, j) == IR_OPND_DATA) {
 					ir_ref input = *p;
 					ir_reg reg = (j < constraints.hints_count) ? constraints.hints[j] : IR_REG_NONE;
@@ -1819,22 +1824,18 @@ int ir_coalesce(ir_ctx *ctx)
 	ir_worklist_init(&blocks, ctx->cfg_blocks_count + 1);
 	for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
-		k = bb->predecessors_count;
-		if (k > 1) {
-			uint32_t i;
-
+		if (bb->flags & IR_BB_HAS_PHI) {
+			k = bb->predecessors_count;
 			use_list = &ctx->use_lists[bb->start];
 			n = use_list->count;
-			if (n > 1) {
-				IR_ASSERT(k == ctx->ir_base[bb->start].inputs_count);
-				k++;
-				for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
-					use = *p;
-					insn = &ctx->ir_base[use];
-					if (insn->op == IR_PHI) {
-						for (j = 2; j <= k; j++) {
-							ir_worklist_push(&blocks, ctx->cfg_edges[bb->predecessors + (j-2)]);
-						}
+			IR_ASSERT(k == ctx->ir_base[bb->start].inputs_count);
+			k++;
+			for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
+				use = *p;
+				insn = &ctx->ir_base[use];
+				if (insn->op == IR_PHI) {
+					for (j = 2; j <= k; j++) {
+						ir_worklist_push(&blocks, ctx->cfg_edges[bb->predecessors + (j-2)]);
 					}
 				}
 			}

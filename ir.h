@@ -146,6 +146,7 @@ typedef enum _ir_type {
  * v     - void
  * d     - data      IR_OP_FLAG_DATA
  * r     - ref       IR_OP_FLAG_DATA alias
+ * p     - pinned    IR_OP_FLAG_DATA + IR_OP_FLAG_PINNED
  * c     - control   IR_OP_FLAG_CONTROL
  * S     - control   IR_OP_FLAG_CONTROL + IR_OP_FLAG_BB_START
  * E     - control   IR_OP_FLAG_CONTROL + IR_OP_FLAG_BB_END
@@ -258,14 +259,14 @@ typedef enum _ir_type {
 	_(COND,	        d3,   def, def, def) /* op1 ? op2 : op3             */ \
 	\
 	/* data-flow and miscellaneous ops                                  */ \
-	_(PHI,          dN,   reg, def, def) /* SSA Phi function            */ \
+	_(PHI,          pN,   reg, def, def) /* SSA Phi function            */ \
 	_(COPY,         d1X1, def, opt, ___) /* COPY (last foldable op)     */ \
-	_(PI,           d2,   reg, def, ___) /* e-SSA Pi constraint ???     */ \
+	_(PI,           p2,   reg, def, ___) /* e-SSA Pi constraint ???     */ \
 	/* (USE, RENAME)                                                    */ \
 	\
 	/* data ops                                                         */ \
-	_(PARAM,        r1X2, reg, str, num) /* incoming parameter proj.    */ \
-	_(VAR,	        r1X1, reg, str, ___) /* local variable              */ \
+	_(PARAM,        p1X2, reg, str, num) /* incoming parameter proj.    */ \
+	_(VAR,	        p1X1, reg, str, ___) /* local variable              */ \
 	_(FUNC_ADDR,    r0,   ___, ___, ___) /* constant func ref           */ \
 	_(FUNC,         r0,   ___, ___, ___) /* constant func ref           */ \
 	_(STR,          r0,   ___, ___, ___) /* constant str ref            */ \

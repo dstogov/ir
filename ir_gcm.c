@@ -233,6 +233,7 @@ int ir_gcm(ir_ctx *ctx)
 			ref = *p;
 			use_insn = &ctx->ir_base[ref];
 			if (use_insn->op == IR_PARAM || use_insn->op == IR_VAR) {
+				ctx->cfg_blocks[1].flags |= (use_insn->op == IR_PARAM) ? IR_BB_HAS_PARAM : IR_BB_HAS_VAR;
 				_blocks[ref] = 1; /* pin to block */
 			}
 		}
@@ -288,9 +289,11 @@ int ir_gcm(ir_ctx *ctx)
 			ref = *p;
 			use_insn = &ctx->ir_base[ref];
 			if (use_insn->op == IR_PARAM || use_insn->op == IR_VAR) {
+				bb->flags |= (use_insn->op == IR_PARAM) ? IR_BB_HAS_PARAM : IR_BB_HAS_VAR;
 				_blocks[ref] = b; /* pin to block */
 				ir_bitset_incl(visited, ref);
 			} else if (use_insn->op == IR_PHI || use_insn->op == IR_PI) {
+				bb->flags |= (use_insn->op == IR_PHI) ? IR_BB_HAS_PHI : IR_BB_HAS_PI;
 				ir_bitset_incl(visited, ref);
 				if (EXPECTED(ctx->use_lists[ref].count != 0)) {
 					_blocks[ref] = b; /* pin to block */
@@ -481,13 +484,15 @@ int ir_schedule(ir_ctx *ctx)
 		_move_down = _next[i];
 		b = _blocks[i];
 		bb = &ctx->cfg_blocks[b];
-
-		/* insert after the start of the block and all PARAM, VAR, PI, PHI */
 		k = _next[bb->start];
-		insn = &ctx->ir_base[k];
-		while (insn->op == IR_PARAM || insn->op == IR_VAR || insn->op == IR_PI || insn->op == IR_PHI) {
-			k = _next[k];
+
+		if (bb->flags & (IR_BB_HAS_PHI|IR_BB_HAS_PI|IR_BB_HAS_PARAM|IR_BB_HAS_VAR)) {
+			/* insert after the start of the block and all PARAM, VAR, PI, PHI */
 			insn = &ctx->ir_base[k];
+			while (insn->op == IR_PHI || insn->op == IR_PARAM || insn->op == IR_VAR || insn->op == IR_PI) {
+				k = _next[k];
+				insn = &ctx->ir_base[k];
+			}
 		}
 
 		/* insert before "k" */
@@ -536,30 +541,32 @@ int ir_schedule(ir_ctx *ctx)
 		insns_count += ir_insn_inputs_to_len(n);
 		i = _next[i];
 		insn = &ctx->ir_base[i];
-		/* Schedule PARAM, VAR, PI */
-		while (insn->op == IR_PARAM || insn->op == IR_VAR || insn->op == IR_PI) {
-			ir_bitset_incl(scheduled, i);
-			_xlat[i] = insns_count;
-			insns_count += 1;
-			i = _next[i];
-			insn = &ctx->ir_base[i];
-		}
-		/* Schedule PHIs */
-		while (insn->op == IR_PHI) {
-			ir_ref j, *p, input;
-
-			ir_bitset_incl(scheduled, i);
-			_xlat[i] = insns_count;
-			/* Reuse "n" from MERGE and skip first input */
-			insns_count += ir_insn_inputs_to_len(n + 1);
-			for (j = n, p = insn->ops + 2; j > 0; p++, j--) {
-				input = *p;
-				if (input < IR_TRUE) {
-					consts_count += ir_count_constant(used, input);
-				}
+		if (bb->flags & (IR_BB_HAS_PHI|IR_BB_HAS_PI|IR_BB_HAS_PARAM|IR_BB_HAS_VAR)) {
+			/* Schedule PARAM, VAR, PI */
+			while (insn->op == IR_PARAM || insn->op == IR_VAR || insn->op == IR_PI) {
+				ir_bitset_incl(scheduled, i);
+				_xlat[i] = insns_count;
+				insns_count += 1;
+				i = _next[i];
+				insn = &ctx->ir_base[i];
 			}
-			i = _next[i];
-			insn = &ctx->ir_base[i];
+			/* Schedule PHIs */
+			while (insn->op == IR_PHI) {
+				ir_ref j, *p, input;
+
+				ir_bitset_incl(scheduled, i);
+				_xlat[i] = insns_count;
+				/* Reuse "n" from MERGE and skip first input */
+				insns_count += ir_insn_inputs_to_len(n + 1);
+				for (j = n, p = insn->ops + 2; j > 0; p++, j--) {
+					input = *p;
+					if (input < IR_TRUE) {
+						consts_count += ir_count_constant(used, input);
+					}
+				}
+				i = _next[i];
+				insn = &ctx->ir_base[i];
+			}
 		}
 		while (i != bb->end) {
 			ir_ref n, j, *p, input;
