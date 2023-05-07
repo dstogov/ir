@@ -1,12 +1,8 @@
-# TRAGET may be "x86_64" or "x86" or "aarch64"
-TARGET     = x86_64
 # BUILD can be "debug" or "release"
 BUILD      = debug
 BUILD_DIR  = .
 SRC_DIR    = .
 
-CC         = gcc
-CXX        = g++
 BUILD_CC   = gcc
 CFLAGS     = -Wall -Wextra -Wno-unused-parameter
 LDFLAGS    = -lm
@@ -21,21 +17,55 @@ ifeq (release, $(BUILD))
  CFLAGS += -O2 -g
 endif
 
-ifeq (x86_64, $(TARGET))
-  CFLAGS += -DIR_TARGET_X64
-  DASM_ARCH  = x86
-  DASM_FLAGS = -D X64=1
+processor :=
+ifndef CROSS_COMPILE
+  processor := $(shell uname -m)
+  CC  ?= gcc
+  CXX ?= g++
+  ifeq ($(strip $(processor)+$(TARGET)),x86_64+x86)
+    check_x86 := $(shell echo | cpp -m32 -dM - | grep "__i386__" >/dev/null && echo 1)
+    ifeq ($(check_x86),1)
+      CFLAGS += -m32
+      processor = i386
+    else
+      $(error "gcc-multilib is not available. Check the installation or specify with CROSS_COMPILE.")
+    endif
+  endif
+else # CROSS_COMPILE was set
+  CC  := $(CROSS_COMPILE)gcc
+  CXX := $(CROSS_COMPILE)g++
+  check_aarch64 := $(shell echo | $(CROSS_COMPILE)cpp -dM - | grep "__aarch64__" >/dev/null && echo 1)
+  ifeq ($(check_aarch64),1)
+    processor = aarch64
+  endif
+  check_x64 := $(shell echo | $(CROSS_COMPILE)cpp -dM - | grep "__x86_64__" >/dev/null && echo 1)
+  ifeq ($(check_x64),1)
+    processor = x86_64
+  endif
+  check_x86 := $(shell echo | $(CROSS_COMPILE)cpp -dM - | grep "__i386__" >/dev/null && echo 1)
+  ifeq ($(check_x86),1)
+    processor = i386
+  endif
+  ifdef SYSROOT
+    CC += --sysroot=$(SYSROOT)
+  endif
 endif
-ifeq (x86, $(TARGET))
-  CFLAGS += -m32 -DIR_TARGET_X86
-  DASM_ARCH  = x86
-  DASM_FLAGS =
-endif
-ifeq (aarch64, $(TARGET))
-  CC= aarch64-linux-gnu-gcc --sysroot=$(HOME)/php/ARM64
-  CFLAGS += -DIR_TARGET_AARCH64
+
+# Follow platform-specific configurations
+ifeq ($(processor),$(filter $(processor),aarch64 arm64))
+  CFLAGS    += -D IR_TARGET_AARCH64
   DASM_ARCH  = aarch64
   DASM_FLAGS =
+else ifeq ($(processor),$(filter $(processor),x86_64))
+  CFLAGS    += -D IR_TARGET_X64
+  DASM_ARCH  = x86
+  DASM_FLAGS = -D X64=1
+else ifeq ($(processor),$(filter $(processor),i386 i686))
+  CFLAGS    += -D IR_TARGET_X86
+  DASM_ARCH  = x86
+  DASM_FLAGS =
+else
+  $(error Unsupported architecture)
 endif
 
 OBJS_COMMON = $(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_strtab.o $(BUILD_DIR)/ir_cfg.o \
