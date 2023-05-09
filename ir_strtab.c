@@ -16,7 +16,7 @@ typedef struct _ir_strtab_bucket {
 	ir_ref      val;
 } ir_strtab_bucket;
 
-uint32_t ir_str_hash(const char *str, size_t len)
+static uint32_t ir_str_hash(const char *str, size_t len)
 {
 	size_t i;
 	uint32_t h = 5381;
