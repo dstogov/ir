@@ -489,6 +489,7 @@ enum _ir_rule {
 	IR_GUARD_CMP_INT,
 	IR_GUARD_CMP_FP,
 	IR_GUARD_TEST_INT,
+	IR_GUARD_JCC_INT,
 	IR_GUARD_OVERFLOW,
 	IR_OVERFLOW_AND_BRANCH,
 	IR_MIN_MAX_INT,
@@ -1725,6 +1726,86 @@ store_int:
 				     (insn->op2 == ctx->prev_ref[ref] - 1
 				   && ctx->ir_base[ctx->prev_ref[ref]].op == IR_SNAPSHOT))) {
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
+						if (IR_IS_CONST_REF(op2_insn->op2)
+						 && ctx->ir_base[op2_insn->op2].val.i64 == 0) {
+							if (op2_insn->op1 == insn->op2 - 1) { /* previous instruction */
+								ir_insn *op1_insn = &ctx->ir_base[op2_insn->op1];
+
+								if (op1_insn->op == IR_ADD ||
+							        op1_insn->op == IR_SUB ||
+//							        op1_insn->op == IR_MUL ||
+							        op1_insn->op == IR_OR  ||
+							        op1_insn->op == IR_AND ||
+							        op1_insn->op == IR_XOR) {
+
+									if (ir_op_flags[op1_insn->op] & IR_OP_FLAG_COMMUTATIVE) {
+										ir_match_fuse_load_commutative_int(ctx, op1_insn, ref);
+									} else {
+										ir_match_fuse_load(ctx, op1_insn->op2, ref);
+									}
+									if (op1_insn->op == IR_AND && ctx->use_lists[op2_insn->op1].count == 1) {
+										/* v = AND(_, _); c = CMP(v, 0) ... IF(c) => SKIP_TEST; SKIP ... GUARD_TEST */
+										if (IR_IS_CONST_REF(op1_insn->op2)) {
+											ir_match_fuse_load(ctx, op1_insn->op1, ref);
+										}
+										ctx->rules[op2_insn->op1] = IR_FUSED | IR_TEST_INT;
+										ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_NOP;
+										return IR_GUARD_TEST_INT;
+									} else {
+										/* v = BINOP(_, _); c = CMP(v, 0) ... IF(c) => BINOP; SKIP_CMP ... GUARD_JCC */
+										ctx->rules[op2_insn->op1] = IR_BINOP_INT;
+										ctx->rules[insn->op2] = IR_FUSED | IR_CMP_INT;
+										return IR_GUARD_JCC_INT;
+									}
+								}
+							} else if ((ctx->flags & IR_OPT_CODEGEN)
+							 && op2_insn->op1 == insn->op2 - 2 /* before previous instruction */
+							 && ir_in_same_block(ctx, op2_insn->op1)
+							 && ctx->use_lists[op2_insn->op1].count == 2) {
+								ir_insn *store_insn = &ctx->ir_base[insn->op2 - 1];
+
+								if (store_insn->op == IR_STORE && store_insn->op3 == op2_insn->op1) {
+									ir_insn *op_insn = &ctx->ir_base[op2_insn->op1];
+
+									if (op_insn->op == IR_ADD ||
+									    op_insn->op == IR_SUB ||
+//									    op_insn->op == IR_MUL ||
+									    op_insn->op == IR_OR  ||
+									    op_insn->op == IR_AND ||
+									    op_insn->op == IR_XOR) {
+										if (ctx->ir_base[op_insn->op1].op == IR_LOAD
+										 && ctx->ir_base[op_insn->op1].op2 == store_insn->op2) {
+											if (ir_in_same_block(ctx, op_insn->op1)
+											 && ctx->use_lists[op_insn->op1].count == 2
+											 && store_insn->op1 == op_insn->op1) {
+												/* v = MEM_BINOP(_, _); IF(v) => MEM_BINOP; GUARD_JCC */
+												ctx->rules[op2_insn->op1] = IR_FUSED | IR_BINOP_INT;
+												ctx->rules[op_insn->op1] = IR_SKIPPED | IR_LOAD;
+												ir_match_fuse_addr(ctx, store_insn->op2);
+												ctx->rules[insn->op2 - 1] = IR_MEM_BINOP_INT;
+												ctx->rules[insn->op2] = IR_SKIPPED | IR_NOP;
+												return IR_GUARD_JCC_INT;
+											}
+										} else if ((ir_op_flags[op_insn->op] & IR_OP_FLAG_COMMUTATIVE)
+										 && ctx->ir_base[op_insn->op2].op == IR_LOAD
+										 && ctx->ir_base[op_insn->op2].op2 == store_insn->op2) {
+											if (ir_in_same_block(ctx, op_insn->op2)
+											 && ctx->use_lists[op_insn->op2].count == 2
+											 && store_insn->op1 == op_insn->op2) {
+												/* v = MEM_BINOP(_, _); IF(v) => MEM_BINOP; JCC */
+												ir_swap_ops(op_insn);
+												ctx->rules[op2_insn->op1] = IR_FUSED | IR_BINOP_INT;
+												ctx->rules[op_insn->op1] = IR_SKIPPED | IR_LOAD;
+												ir_match_fuse_addr(ctx, store_insn->op2);
+												ctx->rules[insn->op2 - 1] = IR_MEM_BINOP_INT;
+												ctx->rules[insn->op2] = IR_SKIPPED | IR_NOP;
+												return IR_GUARD_JCC_INT;
+											}
+										}
+									}
+								}
+							}
+						}
 						/* c = CMP(_, _) ... GUARD(c) => SKIP_CMP ... GUARD_CMP */
 						ir_match_fuse_load_cmp_int(ctx, op2_insn, ref);
 						ctx->rules[insn->op2] = IR_FUSED | IR_CMP_INT;
@@ -6772,6 +6853,17 @@ static bool ir_emit_guard_test_int(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn 
 	return ir_emit_guard_jcc(ctx, b, def, op, addr, 1);
 }
 
+static bool ir_emit_guard_jcc_int(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
+{
+	void *addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op3]);
+	ir_op op = ctx->ir_base[insn->op2].op;
+
+	if (insn->op == IR_GUARD) {
+		op ^= 1; // reverse
+	}
+	return ir_emit_guard_jcc(ctx, b, def, op, addr, 1);
+}
+
 static bool ir_emit_guard_overflow(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
@@ -8327,6 +8419,11 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					break;
 				case IR_GUARD_TEST_INT:
 					if (ir_emit_guard_test_int(ctx, b, i, insn)) {
+						goto next_block;
+					}
+					break;
+				case IR_GUARD_JCC_INT:
+					if (ir_emit_guard_jcc_int(ctx, b, i, insn)) {
 						goto next_block;
 					}
 					break;
