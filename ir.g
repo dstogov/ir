@@ -110,7 +110,7 @@ static void report_undefined_var(const char *str, uint32_t len, ir_ref val)
 	}
 }
 
-void ir_check_indefined_vars(ir_parser_ctx *p)
+static void ir_check_indefined_vars(ir_parser_ctx *p)
 {
 	ir_strtab_apply(&p->var_tab, report_undefined_var);
 	exit(2);
