@@ -18,7 +18,7 @@ static void help(const char *cmd)
 	printf(
 		"Usage: %s [options] input-file...\n"
 		"Options:\n"
-		"  -O[012]                    - optimiztion level\n"
+		"  -O[012]                    - optimiztion level (default: 2)\n"
 		"  -S                         - dump final target assembler code\n"
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 		"  -mavx                      - use AVX instruction set\n"
@@ -381,8 +381,8 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if ((mflags & IR_X86_AVX) & !(cpuinfo & IR_X86_AVX)) {
-		fprintf(stderr, "ERROR: -mAVX is not compatible with CPU (AVX is not supported)\n");
+	if ((mflags & IR_X86_AVX) && !(cpuinfo & IR_X86_AVX)) {
+		fprintf(stderr, "ERROR: -mavx is not compatible with CPU (AVX is not supported)\n");
 		return 1;
 	}
 #endif
