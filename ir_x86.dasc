@@ -1743,20 +1743,10 @@ store_int:
 									} else {
 										ir_match_fuse_load(ctx, op1_insn->op2, ref);
 									}
-									if (op1_insn->op == IR_AND && ctx->use_lists[op2_insn->op1].count == 1) {
-										/* v = AND(_, _); c = CMP(v, 0) ... IF(c) => SKIP_TEST; SKIP ... GUARD_TEST */
-										if (IR_IS_CONST_REF(op1_insn->op2)) {
-											ir_match_fuse_load(ctx, op1_insn->op1, ref);
-										}
-										ctx->rules[op2_insn->op1] = IR_FUSED | IR_TEST_INT;
-										ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_NOP;
-										return IR_GUARD_TEST_INT;
-									} else {
-										/* v = BINOP(_, _); c = CMP(v, 0) ... IF(c) => BINOP; SKIP_CMP ... GUARD_JCC */
-										ctx->rules[op2_insn->op1] = IR_BINOP_INT;
-										ctx->rules[insn->op2] = IR_FUSED | IR_CMP_INT;
-										return IR_GUARD_JCC_INT;
-									}
+									/* v = BINOP(_, _); c = CMP(v, 0) ... IF(c) => BINOP; SKIP_CMP ... GUARD_JCC */
+									ctx->rules[op2_insn->op1] = IR_BINOP_INT;
+									ctx->rules[insn->op2] = IR_FUSED | IR_CMP_INT;
+									return IR_GUARD_JCC_INT;
 								}
 							} else if ((ctx->flags & IR_OPT_CODEGEN)
 							 && op2_insn->op1 == insn->op2 - 2 /* before previous instruction */
