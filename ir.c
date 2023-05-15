@@ -222,15 +222,15 @@ static void ir_grow_bottom(ir_ctx *ctx)
 
 	if (ctx->consts_limit < 1024 * 4) {
 		ctx->consts_limit *= 2;
-	} else if (ctx->insns_limit < 1024 * 4 * 2) {
+	} else if (ctx->consts_limit < 1024 * 4 * 2) {
 		ctx->consts_limit = 1024 * 4 * 2;
 	} else {
 		ctx->consts_limit += 1024 * 4;
 	}
 	buf = ir_mem_realloc(buf, (ctx->consts_limit + ctx->insns_limit) * sizeof(ir_insn));
-	memmove(buf + ctx->consts_limit - ctx->consts_count,
-		buf + old_consts_limit - ctx->consts_count,
-		(old_consts_limit + ctx->insns_limit) * sizeof(ir_insn));
+	memmove(buf + (ctx->consts_limit - old_consts_limit),
+		buf,
+		(old_consts_limit + ctx->insns_count) * sizeof(ir_insn));
 	ctx->ir_base = buf + ctx->consts_limit;
 }
 
