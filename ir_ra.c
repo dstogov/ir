@@ -2007,6 +2007,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy)
 	ir_insn *insn;
 	uint32_t len;
 	ir_bitset todo, ready;
+	bool have_constants = 0;
 
 	bb = &ctx->cfg_blocks[b];
 	if (!(bb->flags & IR_BB_DESSA_MOVES)) {
@@ -2031,7 +2032,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy)
 		if (insn->op == IR_PHI) {
 			input = ir_insn_op(insn, k);
 			if (IR_IS_CONST_REF(input)) {
-				emit_copy(ctx, insn->type, input, ref);
+				have_constants = 1;
 			} else if (ctx->vregs[input] != ctx->vregs[ref]) {
 				loc[ref] = pred[input] = 0;
 				ir_bitset_incl(todo, ref);
@@ -2040,53 +2041,63 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy)
 		}
 	}
 
-	if (n == 0) {
-		ir_mem_free(todo);
-		ir_mem_free(loc);
-		return 1;
-	}
+	if (n > 0) {
+		ready = ir_bitset_malloc(ctx->insns_count);
+		IR_BITSET_FOREACH(todo, len, ref) {
+			insn = &ctx->ir_base[ref];
+			IR_ASSERT(insn->op == IR_PHI);
+			input = ir_insn_op(insn, k);
+			loc[input] = input;
+			pred[ref] = input;
+		} IR_BITSET_FOREACH_END();
 
-	ready = ir_bitset_malloc(ctx->insns_count);
-	IR_BITSET_FOREACH(todo, len, ref) {
-		insn = &ctx->ir_base[ref];
-		IR_ASSERT(insn->op == IR_PHI);
-		input = ir_insn_op(insn, k);
-		loc[input] = input;
-		pred[ref] = input;
-	} IR_BITSET_FOREACH_END();
-
-	IR_BITSET_FOREACH(todo, len, i) {
-		if (!loc[i]) {
-			ir_bitset_incl(ready, i);
-		}
-	} IR_BITSET_FOREACH_END();
-
-	while (1) {
-		ir_ref a, b, c;
-
-		while ((b = ir_bitset_pop_first(ready, len)) >= 0) {
-			a = pred[b];
-			c = loc[a];
-			emit_copy(ctx, ctx->ir_base[b].type, c, b);
-			ir_bitset_excl(todo, b);
-			loc[a] = b;
-			if (a == c && pred[a]) {
-				ir_bitset_incl(ready, a);
+		IR_BITSET_FOREACH(todo, len, i) {
+			if (!loc[i]) {
+				ir_bitset_incl(ready, i);
 			}
+		} IR_BITSET_FOREACH_END();
+
+		while (1) {
+			ir_ref a, b, c;
+
+			while ((b = ir_bitset_pop_first(ready, len)) >= 0) {
+				a = pred[b];
+				c = loc[a];
+				emit_copy(ctx, ctx->ir_base[b].type, c, b);
+				ir_bitset_excl(todo, b);
+				loc[a] = b;
+				if (a == c && pred[a]) {
+					ir_bitset_incl(ready, a);
+				}
+			}
+			b = ir_bitset_pop_first(todo, len);
+			if (b < 0) {
+				break;
+			}
+			IR_ASSERT(b != loc[pred[b]]);
+			emit_copy(ctx, ctx->ir_base[b].type, b, 0);
+			loc[b] = 0;
+			ir_bitset_incl(ready, b);
 		}
-		b = ir_bitset_pop_first(todo, len);
-		if (b < 0) {
-			break;
-		}
-		IR_ASSERT(b != loc[pred[b]]);
-		emit_copy(ctx, ctx->ir_base[b].type, b, 0);
-		loc[b] = 0;
-		ir_bitset_incl(ready, b);
+
+		ir_mem_free(ready);
 	}
 
-	ir_mem_free(ready);
 	ir_mem_free(todo);
 	ir_mem_free(loc);
+
+	if (have_constants) {
+		for (i = 0, p = &ctx->use_edges[use_list->refs]; i < use_list->count; i++, p++) {
+			ref = *p;
+			insn = &ctx->ir_base[ref];
+			if (insn->op == IR_PHI) {
+				input = ir_insn_op(insn, k);
+				if (IR_IS_CONST_REF(input)) {
+					emit_copy(ctx, insn->type, input, ref);
+				}
+			}
+		}
+	}
 
 	return 1;
 }
@@ -3080,7 +3091,7 @@ static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 			tmp_reg.start = IR_DEF_SUB_REF;
 			tmp_reg.end = IR_SAVE_SUB_REF;
 		} else if (IR_IS_TYPE_FP(type)) {
-			tmp_reg.num = 2;
+			tmp_reg.num = 1;
 			tmp_reg.type = type;
 			tmp_reg.start = IR_DEF_SUB_REF;
 			tmp_reg.end = IR_SAVE_SUB_REF;
@@ -3090,12 +3101,12 @@ static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 		}
 	} else if (from != 0) {
 		if (IR_IS_TYPE_INT(type)) {
-			tmp_reg.num = 1;
+			tmp_reg.num = 0;
 			tmp_reg.type = type;
 			tmp_reg.start = IR_DEF_SUB_REF;
 			tmp_reg.end = IR_SAVE_SUB_REF;
 		} else if (IR_IS_TYPE_FP(type)) {
-			tmp_reg.num = 3;
+			tmp_reg.num = 1;
 			tmp_reg.type = type;
 			tmp_reg.start = IR_DEF_SUB_REF;
 			tmp_reg.end = IR_SAVE_SUB_REF;

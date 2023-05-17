@@ -320,6 +320,7 @@ static void *ir_jmp_addr(ir_ctx *ctx, ir_insn *insn, ir_insn *addr_insn)
 
 /* Forward Declarations */
 static void ir_emit_osr_entry_loads(ir_ctx *ctx, int b, ir_block *bb);
+static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb);
 
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 # include "ir_emit_x86.h"
@@ -365,6 +366,130 @@ static IR_NEVER_INLINE void ir_emit_osr_entry_loads(ir_ctx *ctx, int b, ir_block
 				ir_emit_load_mem_int(ctx, type, reg, ctx->spill_base, offset);
 			} else {
 				ir_emit_load_mem_fp(ctx, type, reg, ctx->spill_base, offset);
+			}
+		}
+	}
+}
+
+static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb)
+{
+	uint32_t succ, k, n = 0;
+	ir_block *succ_bb;
+	ir_use_list *use_list;
+	ir_ref i, *p, ref, input;
+	ir_insn *insn;
+	bool do_third_pass = 0;
+	ir_copy *copies;
+	ir_reg tmp_reg = ctx->regs[bb->end][0];
+	ir_reg tmp_fp_reg = ctx->regs[bb->end][1];
+	ir_reg src, dst;
+
+	IR_ASSERT(bb->successors_count == 1);
+	succ = ctx->cfg_edges[bb->successors];
+	succ_bb = &ctx->cfg_blocks[succ];
+	IR_ASSERT(succ_bb->predecessors_count > 1);
+	use_list = &ctx->use_lists[succ_bb->start];
+	k = ir_phi_input_number(ctx, succ_bb, b);
+
+	copies = ir_mem_malloc(use_list->count * sizeof(ir_copy));
+
+	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < use_list->count; i++, p++) {
+		ref = *p;
+		insn = &ctx->ir_base[ref];
+		if (insn->op == IR_PHI) {
+			input = ir_insn_op(insn, k);
+			if (IR_IS_CONST_REF(input)) {
+				do_third_pass = 1;
+			} else {
+				dst = IR_REG_NUM(ctx->regs[ref][0]);
+				src = ir_get_alocated_reg(ctx, ref, k);
+
+				if (dst == IR_REG_NONE) {
+					/* STORE to memory */
+					if (src == IR_REG_NONE) {
+						if (!ir_is_same_mem(ctx, input, ref)) {
+							ir_reg tmp = IR_IS_TYPE_INT(insn->type) ?  tmp_reg : tmp_fp_reg;
+
+							IR_ASSERT(tmp != IR_REG_NONE);
+							ir_emit_load(ctx, insn->type, tmp, input);
+							ir_emit_store(ctx, insn->type, ref, tmp);
+						}
+					} else {
+						if (src & IR_REG_SPILL_LOAD) {
+							src &= ~IR_REG_SPILL_LOAD;
+							ir_emit_load(ctx, insn->type, src, input);
+							if (ir_is_same_mem(ctx, input, ref)) {
+								continue;
+							}
+						}
+						ir_emit_store(ctx, insn->type, src, ref);
+					}
+				} else {
+					if (src == IR_REG_NONE) {
+						do_third_pass = 1;
+					} else {
+						if (src & IR_REG_SPILL_LOAD) {
+							src &= ~IR_REG_SPILL_LOAD;
+							ir_emit_load(ctx, insn->type, src, input);
+						}
+						if (src != dst) {
+							copies[n].type = insn->type;
+							copies[n].from = src;
+							copies[n].to = dst;
+							n++;
+						}
+					}
+				}
+				if (ctx->regs[ref][0] & IR_REG_SPILL_STORE) {
+					do_third_pass = 1;
+				}
+			}
+		}
+	}
+
+	if (n > 0) {
+		ir_parallel_copy(ctx, copies, n, tmp_reg, tmp_fp_reg);
+	}
+	ir_mem_free(copies);
+
+	if (do_third_pass) {
+		for (i = 0, p = &ctx->use_edges[use_list->refs]; i < use_list->count; i++, p++) {
+			ref = *p;
+			insn = &ctx->ir_base[ref];
+			if (insn->op == IR_PHI) {
+				input = ir_insn_op(insn, k);
+				dst = IR_REG_NUM(ctx->regs[ref][0]);
+
+				if (IR_IS_CONST_REF(input)) {
+					if (dst == IR_REG_NONE) {
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
+						if (IR_IS_TYPE_INT(insn->type) && (ir_type_size[insn->type] != 8 || IR_IS_SIGNED_32BIT(ctx->ir_base[input].val.i64))) {
+							ir_emit_store_imm(ctx, insn->type, ref, ctx->ir_base[input].val.i32);
+							continue;
+						}
+#endif
+						ir_reg tmp = IR_IS_TYPE_INT(insn->type) ?  tmp_reg : tmp_fp_reg;
+
+						IR_ASSERT(tmp != IR_REG_NONE);
+						ir_emit_load(ctx, insn->type, tmp, input);
+						ir_emit_store(ctx, insn->type, ref, tmp);
+					} else {
+						ir_emit_load(ctx, insn->type, dst, input);
+					}
+				} else if (dst != IR_REG_NONE) {
+					 src = ir_get_alocated_reg(ctx, ref, k);
+
+					if (src == IR_REG_NONE) {
+						if ((ctx->regs[ref][0] & IR_REG_SPILL_STORE) && ir_is_same_mem(ctx, input, ref)) {
+							/* avoid LOAD and SAVE to the same memory */
+							continue;
+						}
+						ir_emit_load(ctx, insn->type, dst, input);
+					}
+				}
+				if (dst != IR_REG_NONE && (ctx->regs[ref][0] & IR_REG_SPILL_STORE)) {
+					ir_emit_store(ctx, insn->type, ref, dst);
+				}
 			}
 		}
 	}

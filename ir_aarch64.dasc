@@ -3387,7 +3387,7 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 		if (from_reg != to) {
 			loc[from_reg] = from_reg;
 			pred[to] = from_reg;
-			types[to] = copies[i].type;
+			types[from_reg] = copies[i].type;
 			IR_REGSET_INCL(todo, to);
 		}
 	}
@@ -3404,8 +3404,8 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 		while (ready != IR_REGSET_EMPTY) {
 			to = ir_regset_pop_first(&ready);
 			from_reg = pred[to];
-			type = types[to];
 			c = loc[from_reg];
+			type = types[from_reg];
 			if (IR_IS_TYPE_INT(type)) {
 				ir_emit_mov(ctx, type, to, c);
 			} else {
@@ -3424,7 +3424,7 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 		to = ir_regset_pop_first(&todo);
 		from_reg = pred[to];
 		IR_ASSERT(to != loc[from_reg]);
-		type = types[to];
+		type = types[from_reg];
 		if (IR_IS_TYPE_INT(type)) {
 			IR_ASSERT(tmp_reg != IR_REG_NONE);
 			IR_ASSERT(tmp_reg >= IR_REG_GP_FIRST && tmp_reg <= IR_REG_GP_LAST);
@@ -4179,107 +4179,6 @@ static void ir_emit_exitcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
-static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
-{
-	ir_backend_data *data = ctx->data;
-	uint32_t from_block = data->dessa_from_block;
-	ir_block *from_bb = &ctx->cfg_blocks[from_block];
-	ir_ref ref = from_bb->end;
-	int8_t to_reg, from_reg;
-	ir_block *to_bb;
-	int j, k;
-	ir_ref phi = 0;
-	bool spill_store = 0;
-
-	IR_ASSERT(from_bb->successors_count == 1);
-	to_bb = &ctx->cfg_blocks[ctx->cfg_edges[from_bb->successors]];
-	k = ir_phi_input_number(ctx, to_bb, from_block);
-	if (to) {
-		phi = to;
-	} else {
-		ir_use_list *use_list = &ctx->use_lists[from];
-
-		for (j = 0; j < use_list->count; j++) {
-			ir_ref use = ctx->use_edges[use_list->refs + j];
-			ir_insn *insn = &ctx->ir_base[use];
-			if (insn->op == IR_PHI && ir_insn_op(insn, k) == from && insn->op1 == to_bb->start) {
-				phi = use;
-				break;
-			}
-		}
-	}
-	IR_ASSERT(phi != 0);
-
-	if (IR_IS_TYPE_INT(type)) {
-		to_reg = to ? ctx->regs[phi][0] : ctx->regs[ref][0]; /* temporary register for integer swap (see ir_fix_dessa_tmps) */
-		from_reg = from ? ir_get_alocated_reg(ctx, phi, k) : ctx->regs[ref][0]; /* temporary register for integer swap (see ir_fix_dessa_tmps) */
-		if (from_reg != IR_REG_NONE && (from_reg & IR_REG_SPILL_LOAD)) {
-			from_reg &= ~IR_REG_SPILL_LOAD;
-			ir_emit_load(ctx, type, from_reg, from);
-		}
-		if (to_reg != IR_REG_NONE && (to_reg & IR_REG_SPILL_STORE)) {
-			if (from_reg != IR_REG_NONE) {
-				/* store directly into spill slot (valid only when to_reg register is not reused) */
-				to_reg = IR_REG_NONE;
-			} else {
-				to_reg &= ~IR_REG_SPILL_STORE;
-				spill_store = 1;
-			}
-		}
-		if (from_reg != IR_REG_NONE && to_reg != IR_REG_NONE) {
-			if (from_reg != to_reg) {
-				ir_emit_mov(ctx, type, to_reg, from_reg);
-			}
-		} else if (to_reg != IR_REG_NONE) {
-			ir_emit_load(ctx, type, to_reg, from);
-		} else if (from_reg != IR_REG_NONE) {
-			ir_emit_store(ctx, type, to, from_reg);
-		} else if (IR_IS_CONST_REF(from) || !ir_is_same_mem(ctx, from, to)) {
-			from_reg = ctx->regs[ref][1]; /* temporary register for int mem->mem (see ir_fix_dessa_tmps) */
-			IR_ASSERT(from_reg != IR_REG_NONE);
-			ir_emit_load(ctx, type, from_reg, from);
-			ir_emit_store(ctx, type, to, from_reg);
-		}
-		if (spill_store) {
-			ir_emit_store(ctx, type, to, to_reg);
-		}
-	} else {
-		to_reg = to ? ctx->regs[phi][0] : ctx->regs[ref][2]; /* temporary register for fp swap (see ir_fix_dessa_tmps) */
-		from_reg = from ? ir_get_alocated_reg(ctx, phi, k) : ctx->regs[ref][2]; /* temporary register for fp swap (see ir_fix_dessa_tmps) */
-		if (from_reg != IR_REG_NONE && (from_reg & IR_REG_SPILL_LOAD)) {
-			from_reg &= ~IR_REG_SPILL_LOAD;
-			ir_emit_load(ctx, type, from_reg, from);
-		}
-		if (to_reg != IR_REG_NONE && (to_reg & IR_REG_SPILL_STORE)) {
-			if (from_reg != IR_REG_NONE) {
-				/* store directly into spill slot (valid only when to_reg register is not reused) */
-				to_reg = IR_REG_NONE;
-			} else {
-				to_reg &= ~IR_REG_SPILL_STORE;
-				spill_store = 1;
-			}
-		}
-		if (from_reg != IR_REG_NONE && to_reg != IR_REG_NONE) {
-			if (from_reg != to_reg) {
-				ir_emit_fp_mov(ctx, type, to_reg, from_reg);
-			}
-		} else if (to_reg != IR_REG_NONE) {
-			ir_emit_load(ctx, type, to_reg, from);
-		} else if (from_reg != IR_REG_NONE) {
-			ir_emit_store(ctx, type, to, from_reg);
-		} else if (IR_IS_CONST_REF(from) || !ir_is_same_mem(ctx, from, to)) {
-			from_reg = ctx->regs[ref][3]; /* temporary register for fp mem->mem (see ir_fix_dessa_tmps) */
-			IR_ASSERT(from_reg != IR_REG_NONE);
-			ir_emit_load(ctx, type, from_reg, from);
-			ir_emit_store(ctx, type, to, from_reg);
-		}
-		if (spill_store) {
-			ir_emit_store(ctx, type, to, to_reg);
-		}
-	}
-	return 1;
-}
-
 static void ir_emit_param_move(ir_ctx *ctx, uint8_t type, ir_reg from_reg, ir_reg to_reg, ir_ref to, int32_t offset)
 {
 	ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
@@ -4394,11 +4293,11 @@ static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 	if (to == 0) {
 		if (IR_IS_TYPE_INT(type)) {
 			if (ctx->regs[ref][0] == IR_REG_NONE) {
-				ctx->regs[ref][0] = ctx->regs[ref][1] != IR_REG_X0 ? IR_REG_X0 : IR_REG_X1; //???
+				ctx->regs[ref][0] = IR_REG_X0;
 			}
 		} else if (IR_IS_TYPE_FP(type)) {
-			if (ctx->regs[ref][2] == IR_REG_NONE) {
-				ctx->regs[ref][2] = ctx->regs[ref][3] != IR_REG_V0 ? IR_REG_V0 : IR_REG_V1; //???
+			if (ctx->regs[ref][1] == IR_REG_NONE) {
+				ctx->regs[ref][1] = IR_REG_V0;
 			}
 		} else {
 			IR_ASSERT(0);
@@ -4406,12 +4305,12 @@ static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 		}
 	} else if (from != 0) {
 		if (IR_IS_TYPE_INT(type)) {
-			if (ctx->regs[ref][1] == IR_REG_NONE) {
-				ctx->regs[ref][1] = ctx->regs[ref][0] != IR_REG_X0 ? IR_REG_X0 : IR_REG_X1; //???
+			if (ctx->regs[ref][0] == IR_REG_NONE) {
+				ctx->regs[ref][0] = IR_REG_X0;
 			}
 		} else if (IR_IS_TYPE_FP(type)) {
-			if (ctx->regs[ref][3] == IR_REG_NONE) {
-				ctx->regs[ref][3] = ctx->regs[ref][2] != IR_REG_V0 ? IR_REG_V0 : IR_REG_V1; //???
+			if (ctx->regs[ref][1] == IR_REG_NONE) {
+				ctx->regs[ref][1] = IR_REG_V0;
 			}
 		} else {
 			IR_ASSERT(0);
@@ -4986,8 +4885,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 						ir_emit_osr_entry_loads(ctx, b, bb);
 					}
 					if (bb->flags & IR_BB_DESSA_MOVES) {
-						data.dessa_from_block = b;
-						ir_gen_dessa_moves(ctx, b, ir_emit_dessa_move);
+						ir_emit_dessa_moves(ctx, b, bb);
 					}
 					do {
 						ir_ref succ = ctx->cfg_edges[bb->successors];
