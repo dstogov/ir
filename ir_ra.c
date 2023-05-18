@@ -3289,9 +3289,6 @@ static int ir_linear_scan(ir_ctx *ctx)
 		if (ival) {
 			if (ival->flags & IR_LIVE_INTERVAL_VAR) {
 				/* pass */
-			} else if (ival->flags & IR_LIVE_INTERVAL_REG_LOAD) {
-				/* pre-allocated fixed register */
-				IR_ASSERT(IR_REGSET_IN(IR_REGSET_UNION(ctx->fixed_regset, IR_REGSET_FIXED), ival->reg));
 			} else if (!(ival->flags & (IR_LIVE_INTERVAL_MEM_PARAM|IR_LIVE_INTERVAL_MEM_LOAD))
 					|| !ir_ival_spill_for_fuse_load(ctx, ival, &data)) {
 				ir_add_to_unhandled(&unhandled, ival);
