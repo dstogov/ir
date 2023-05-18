@@ -383,8 +383,11 @@ IR_ALWAYS_INLINE void ir_add_use(ir_ctx *ctx, ir_live_interval *ival, int op_num
 	use_pos->hint_ref = hint_ref;
 	use_pos->pos = pos;
 
-	if (hint != IR_REG_NONE || hint_ref > 0) {
-		ival->flags |= IR_LIVE_INTERVAL_HAS_HINTS;
+	if (hint != IR_REG_NONE) {
+		ival->flags |= IR_LIVE_INTERVAL_HAS_HINT_REGS;
+	}
+	if (hint_ref > 0) {
+		ival->flags |= IR_LIVE_INTERVAL_HAS_HINT_REFS;
 	}
 
 	ir_add_use_pos(ctx, ival, use_pos);
@@ -1600,10 +1603,8 @@ static void ir_vregs_join(ir_ctx *ctx, uint32_t r1, uint32_t r2)
 		use_pos = use_pos->next;
 	}
 
-	if (ival->flags & IR_LIVE_INTERVAL_HAS_HINTS) {
-		ctx->live_intervals[r1]->flags |= IR_LIVE_INTERVAL_HAS_HINTS;
-	}
-	ctx->live_intervals[r1]->flags |= IR_LIVE_INTERVAL_COALESCED;
+	ctx->live_intervals[r1]->flags |=
+		IR_LIVE_INTERVAL_COALESCED | (ival->flags & (IR_LIVE_INTERVAL_HAS_HINT_REGS|IR_LIVE_INTERVAL_HAS_HINT_REFS));
 	ctx->live_intervals[r2] = NULL;
 
 	// TODO: remember to reuse ???
@@ -2313,19 +2314,25 @@ static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, ir_live_interval *iva
 	use_pos = ival->use_pos;
 	prev_use_pos = NULL;
 
-	ival->flags &= ~IR_LIVE_INTERVAL_HAS_HINTS;
+	ival->flags &= ~(IR_LIVE_INTERVAL_HAS_HINT_REGS|IR_LIVE_INTERVAL_HAS_HINT_REFS);
 	if (p->start == pos) {
 		while (use_pos && pos > use_pos->pos) {
-			if (use_pos->hint != IR_REG_NONE || use_pos->hint_ref > 0) {
-				ival->flags |= IR_LIVE_INTERVAL_HAS_HINTS;
+			if (use_pos->hint != IR_REG_NONE) {
+				ival->flags |= IR_LIVE_INTERVAL_HAS_HINT_REGS;
+			}
+			if (use_pos->hint_ref > 0) {
+				ival->flags |= IR_LIVE_INTERVAL_HAS_HINT_REFS;
 			}
 			prev_use_pos = use_pos;
 			use_pos = use_pos->next;
 		}
 	} else {
 		while (use_pos && pos >= use_pos->pos) {
-			if (use_pos->hint != IR_REG_NONE || use_pos->hint_ref > 0) {
-				ival->flags |= IR_LIVE_INTERVAL_HAS_HINTS;
+			if (use_pos->hint != IR_REG_NONE) {
+				ival->flags |= IR_LIVE_INTERVAL_HAS_HINT_REGS;
+			}
+			if (use_pos->hint_ref > 0) {
+				ival->flags |= IR_LIVE_INTERVAL_HAS_HINT_REFS;
 			}
 			prev_use_pos = use_pos;
 			use_pos = use_pos->next;
@@ -2365,8 +2372,11 @@ static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, ir_live_interval *iva
 
 	use_pos = child->use_pos;
 	while (use_pos) {
-		if (use_pos->hint != IR_REG_NONE || use_pos->hint_ref > 0) {
-			child->flags |= IR_LIVE_INTERVAL_HAS_HINTS;
+		if (use_pos->hint != IR_REG_NONE) {
+			child->flags |= IR_LIVE_INTERVAL_HAS_HINT_REGS;
+		}
+		if (use_pos->hint_ref > 0) {
+			child->flags |= IR_LIVE_INTERVAL_HAS_HINT_REFS;
 		}
 		use_pos = use_pos->next;
 	}
@@ -2449,30 +2459,34 @@ static ir_reg ir_try_allocate_preferred_reg(ir_ctx *ctx, ir_live_interval *ival,
 	ir_use_pos *use_pos;
 	ir_reg reg;
 
-	use_pos = ival->use_pos;
-	while (use_pos) {
-		reg = use_pos->hint;
-		if (reg >= 0 && IR_REGSET_IN(available, reg)) {
-			if (ival->end <= freeUntilPos[reg]) {
-				/* register available for the whole interval */
-				return reg;
-			}
-		}
-		use_pos = use_pos->next;
-	}
-
-	use_pos = ival->use_pos;
-	while (use_pos) {
-		if (use_pos->hint_ref > 0) {
-			reg = ctx->live_intervals[ctx->vregs[use_pos->hint_ref]]->reg;
+	if (ival->flags & IR_LIVE_INTERVAL_HAS_HINT_REGS) {
+		use_pos = ival->use_pos;
+		while (use_pos) {
+			reg = use_pos->hint;
 			if (reg >= 0 && IR_REGSET_IN(available, reg)) {
 				if (ival->end <= freeUntilPos[reg]) {
 					/* register available for the whole interval */
 					return reg;
 				}
 			}
+			use_pos = use_pos->next;
 		}
-		use_pos = use_pos->next;
+	}
+
+	if (ival->flags & IR_LIVE_INTERVAL_HAS_HINT_REFS) {
+		use_pos = ival->use_pos;
+		while (use_pos) {
+			if (use_pos->hint_ref > 0) {
+				reg = ctx->live_intervals[ctx->vregs[use_pos->hint_ref]]->reg;
+				if (reg >= 0 && IR_REGSET_IN(available, reg)) {
+					if (ival->end <= freeUntilPos[reg]) {
+						/* register available for the whole interval */
+						return reg;
+					}
+				}
+			}
+			use_pos = use_pos->next;
+		}
 	}
 
 	return IR_REG_NONE;
@@ -2507,8 +2521,8 @@ static void ir_add_to_unhandled(ir_live_interval **unhandled, ir_live_interval *
 	if (*unhandled == NULL
 	 || pos < (*unhandled)->range.start
 	 || (pos == (*unhandled)->range.start
-	  && (ival->flags & IR_LIVE_INTERVAL_HAS_HINTS)
-	  && !((*unhandled)->flags & IR_LIVE_INTERVAL_HAS_HINTS))
+	  && (ival->flags & (IR_LIVE_INTERVAL_HAS_HINT_REGS|IR_LIVE_INTERVAL_HAS_HINT_REFS))
+	  && !((*unhandled)->flags & (IR_LIVE_INTERVAL_HAS_HINT_REGS|IR_LIVE_INTERVAL_HAS_HINT_REFS)))
 	 || (pos == (*unhandled)->range.start
 	  && ival->vreg > (*unhandled)->vreg)) {
 		ival->list_next = *unhandled;
@@ -2519,8 +2533,8 @@ static void ir_add_to_unhandled(ir_live_interval **unhandled, ir_live_interval *
 		while (prev->list_next) {
 			if (pos < prev->list_next->range.start
 			 || (pos == prev->list_next->range.start
-			  && (ival->flags & IR_LIVE_INTERVAL_HAS_HINTS)
-			  && !(prev->list_next->flags & IR_LIVE_INTERVAL_HAS_HINTS))
+			  && (ival->flags & (IR_LIVE_INTERVAL_HAS_HINT_REGS|IR_LIVE_INTERVAL_HAS_HINT_REFS))
+			  && !(prev->list_next->flags & (IR_LIVE_INTERVAL_HAS_HINT_REGS|IR_LIVE_INTERVAL_HAS_HINT_REFS)))
 			 || (pos == prev->list_next->range.start
 			  && ival->vreg > prev->list_next->vreg)) {
 				break;
@@ -2682,7 +2696,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 		other = other->list_next;
 	}
 
-	if (ival->flags & IR_LIVE_INTERVAL_HAS_HINTS) {
+	if (ival->flags & (IR_LIVE_INTERVAL_HAS_HINT_REGS|IR_LIVE_INTERVAL_HAS_HINT_REFS)) {
 		/* Try to use hint */
 		reg = ir_try_allocate_preferred_reg(ctx, ival, available, freeUntilPos);
 		if (reg != IR_REG_NONE) {
@@ -2742,7 +2756,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 		if (split_pos > ival->range.start) {
 			split_pos = ir_find_optimal_split_position(ctx, ival, split_pos, pos, 0);
 			other = ir_split_interval_at(ctx, ival, split_pos);
-			if (ival->flags & IR_LIVE_INTERVAL_HAS_HINTS) {
+			if (ival->flags & (IR_LIVE_INTERVAL_HAS_HINT_REGS|IR_LIVE_INTERVAL_HAS_HINT_REFS)) {
 				ir_reg pref_reg = ir_try_allocate_preferred_reg(ctx, ival, available, freeUntilPos);
 
 				if (pref_reg != IR_REG_NONE) {
@@ -2909,7 +2923,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 
 	/* register hinting */
 	reg = IR_REG_NONE;
-	if (ival->flags & IR_LIVE_INTERVAL_HAS_HINTS) {
+	if (ival->flags & (IR_LIVE_INTERVAL_HAS_HINT_REGS|IR_LIVE_INTERVAL_HAS_HINT_REFS)) {
 		reg = ir_get_preferred_reg(ctx, ival, available);
 	}
 	if (reg == IR_REG_NONE) {
@@ -3571,6 +3585,7 @@ static void ir_add_hint(ir_ctx *ctx, ir_ref ref, ir_live_pos pos, ir_reg hint)
 		if (use_pos->pos == pos) {
 			if (use_pos->hint == IR_REG_NONE) {
 				use_pos->hint = hint;
+				ival->flags |= IR_LIVE_INTERVAL_HAS_HINT_REGS;
 			}
 		}
 		use_pos = use_pos->next;
@@ -3586,7 +3601,8 @@ static void ir_hint_propagation(ir_ctx *ctx)
 
 	for (i = 1; i <= ctx->vregs_count; i++) {
 		ival = ctx->live_intervals[i];
-		if (ival) {
+		if (ival
+		 && (ival->flags & (IR_LIVE_INTERVAL_HAS_HINT_REGS|IR_LIVE_INTERVAL_HAS_HINT_REFS)) == (IR_LIVE_INTERVAL_HAS_HINT_REGS|IR_LIVE_INTERVAL_HAS_HINT_REFS)) {
 			use_pos = ival->use_pos;
 			hint_use_pos = NULL;
 			while (use_pos) {
