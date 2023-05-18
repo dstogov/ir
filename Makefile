@@ -47,7 +47,7 @@ OBJS_COMMON = $(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_strtab.o $(BUILD_DIR)/ir_cfg.o \
 	$(BUILD_DIR)/ir_cpuinfo.o
 OBJS_IR = $(BUILD_DIR)/ir_main.o
 OBJS_IR_TEST = $(BUILD_DIR)/ir_test.o
-EXAMPLE_EXES = $(EXAMPLES_BUILD_DIR)/0001-basic $(EXAMPLES_BUILD_DIR)/0005-basic-runner-func
+EXAMPLE_EXES = $(EXAMPLES_BUILD_DIR)/0001-basic $(EXAMPLES_BUILD_DIR)/0001-while $(EXAMPLES_BUILD_DIR)/0005-basic-runner-func
 
 all: $(BUILD_DIR) $(BUILD_DIR)/ir $(BUILD_DIR)/ir_test
 

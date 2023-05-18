@@ -1,0 +1,63 @@
+/*
+ * IR - Lightweight JIT Compilation Framework
+ * (Exmaples package)
+ * Copyright (C) 2023 by IR project.
+ * Authors: Anatol Belski <anbelski@linux.microsoft.com>
+ */
+
+#include "ir.h"
+#include "ir_builder.h"
+#include <stdlib.h>
+
+/*
+ * int32_t myfunc() {
+ * 	int32_t i = 0;
+ * 	while (i++ < 42);
+ *	return i;
+ * }
+ */
+typedef int32_t (*myfunc_t)(void);
+
+void gen_myfunc(ir_ctx *ctx)
+{
+	ir_START();
+	ir_ref i = ir_COPY_I32(ir_CONST_I32(0));
+	ir_ref loop = ir_LOOP_BEGIN(ir_END());
+		ir_ref phi_i_1 = ir_PHI_2(i, IR_UNUSED);
+		ir_ref cond = ir_IF(ir_GE(phi_i_1, ir_CONST_I32(42)));
+			ir_IF_TRUE(cond);
+				ir_ref loop_end = ir_LOOP_END();
+			ir_IF_FALSE(cond);
+				ir_ref i_2 = ir_ADD_I32(phi_i_1, ir_CONST_I32(1));
+	/* close loop */
+	ir_MERGE_SET_OP(loop, 2, loop_end);
+	ir_PHI_SET_OP(phi_i_1, 2, i_2);
+
+	ir_RETURN(i_2);
+}
+
+int main(int argc, char **argv)
+{
+	ir_ctx ctx = {0};
+
+	ir_consistency_check();
+
+	ir_init(&ctx, IR_FUNCTION, IR_CONSTS_LIMIT_MIN, IR_INSNS_LIMIT_MIN);
+
+	gen_myfunc(&ctx);
+
+	ir_build_def_use_lists(&ctx);
+	ir_build_cfg(&ctx);
+	ir_match(&ctx);
+	ir_assign_virtual_registers(&ctx);
+
+	size_t size;
+	void *entry = ir_emit_code(&ctx, &size);
+	if (entry) {
+		printf("%d\n", ((myfunc_t)entry)());
+	}
+
+	ir_free(&ctx);
+
+	return 0;
+}
