@@ -237,6 +237,23 @@ static bool ir_is_same_mem(const ir_ctx *ctx, ir_ref r1, ir_ref r2)
 	return o1 == o2;
 }
 
+static bool ir_is_same_mem_var(const ir_ctx *ctx, ir_ref r1, int32_t offset)
+{
+	ir_live_interval *ival1;
+	int32_t o1;
+
+	if (IR_IS_CONST_REF(r1)) {
+		return 0;
+	}
+
+	IR_ASSERT(ctx->vregs[r1]);
+	ival1 = ctx->live_intervals[ctx->vregs[r1]];
+	IR_ASSERT(ival1);
+	o1 = ival1->stack_spill_pos;
+	IR_ASSERT(o1 != -1);
+	return o1 == offset;
+}
+
 static void *ir_resolve_sym_name(const char *name)
 {
 	void *handle = NULL;

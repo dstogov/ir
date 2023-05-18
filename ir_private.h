@@ -1009,15 +1009,14 @@ struct _ir_live_range {
 /* ir_live_interval.flags bits (two low bits are reserved for temporary register number) */
 #define IR_LIVE_INTERVAL_FIXED           (1<<0)
 #define IR_LIVE_INTERVAL_TEMP            (1<<1)
-#define IR_LIVE_INTERVAL_VAR             (1<<2)
-#define IR_LIVE_INTERVAL_COALESCED       (1<<3)
-#define IR_LIVE_INTERVAL_HAS_HINT_REGS   (1<<4)
-#define IR_LIVE_INTERVAL_HAS_HINT_REFS   (1<<5)
-#define IR_LIVE_INTERVAL_MEM_PARAM       (1<<6)
-#define IR_LIVE_INTERVAL_MEM_LOAD        (1<<7)
-#define IR_LIVE_INTERVAL_SPILL_SPECIAL   (1<<8) /* spill slot is pre-allocated in a special area (see ir_ctx.spill_reserved_base) */
-#define IR_LIVE_INTERVAL_SPILLED         (1<<9)
-#define IR_LIVE_INTERVAL_SPLIT_CHILD     (1<<10)
+#define IR_LIVE_INTERVAL_HAS_HINT_REGS   (1<<2)
+#define IR_LIVE_INTERVAL_HAS_HINT_REFS   (1<<3)
+#define IR_LIVE_INTERVAL_MEM_PARAM       (1<<4)
+#define IR_LIVE_INTERVAL_MEM_LOAD        (1<<5)
+#define IR_LIVE_INTERVAL_COALESCED       (1<<6)
+#define IR_LIVE_INTERVAL_SPILL_SPECIAL   (1<<7) /* spill slot is pre-allocated in a special area (see ir_ctx.spill_reserved_base) */
+#define IR_LIVE_INTERVAL_SPILLED         (1<<8)
+#define IR_LIVE_INTERVAL_SPLIT_CHILD     (1<<9)
 
 struct _ir_live_interval {
 	uint8_t           type;

@@ -493,8 +493,7 @@ void ir_strtab_free(ir_strtab *strtab);
 #define IR_NO_LOOPS            (1<<25)
 
 /* Temporary: Live Ranges */
-#define IR_LR_HAVE_VARS        (1<<25)
-#define IR_LR_HAVE_DESSA_MOVES (1<<26)
+#define IR_LR_HAVE_DESSA_MOVES (1<<25)
 
 /* Temporary: Register Allocator */
 #define IR_RA_HAVE_SPLITS      (1<<25)
@@ -555,6 +554,8 @@ struct _ir_ctx {
 		void          *data;
 		ir_ref         control;                 /* used by IR construction API (see ir_builder.h) */
 		ir_ref         bb_start;                /* used by target CPU instruction matcher */
+		ir_ref         vars;                    /* list of VARs (used by register allocator) */
+		int32_t        stack_frame_size;        /* spill stack frame size (used by register allocator) */
 	};
 	ir_snapshot_create_t   snapshot_create;
 	uint32_t           rodata_offset;
