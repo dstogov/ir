@@ -541,6 +541,8 @@ static void ir_add_fusion_ranges(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_block
 				} else if (ctx->rules[child] & IR_FUSED) {
 					IR_ASSERT(stack_pos < (int)(sizeof(stack)/sizeof(stack_pos)));
 					stack[stack_pos++] = child;
+				} else if (ctx->rules[child] == (IR_SKIPPED|IR_RLOAD)) {
+					ir_set_alocated_reg(ctx, input, j, ctx->ir_base[child].op2);
 				}
 			}
 		}
@@ -568,6 +570,11 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 
 	if (!(ctx->flags & IR_LINEAR) || !ctx->vregs) {
 		return 0;
+	}
+
+	if (ctx->rules) {
+		ctx->regs = ir_mem_malloc(sizeof(ir_regs) * ctx->insns_count);
+		memset(ctx->regs, IR_REG_NONE, sizeof(ir_regs) * ctx->insns_count);
 	}
 
 	/* Compute Live Ranges */
@@ -715,12 +722,9 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						ival = ir_fix_live_range(ctx, v,
 							IR_START_LIVE_POS_FROM_REF(bb->start), IR_DEF_LIVE_POS_FROM_REF(ref));
 						ival->type = insn->type;
-						if (IR_REGSET_IN(IR_REGSET_UNION(ctx->fixed_regset, IR_REGSET_FIXED), insn->op2)) {
-							ival->flags = IR_LIVE_INTERVAL_REG_LOAD;
-							ival->reg = insn->op2;
-						} else {
-							ir_add_use(ctx, ival, 0, IR_DEF_LIVE_POS_FROM_REF(ref), insn->op2, IR_USE_SHOULD_BE_IN_REG, 0);
-						}
+						/* Fixed RLOADs are handled without live-ranges */
+						IR_ASSERT(!IR_REGSET_IN(IR_REGSET_UNION(ctx->fixed_regset, IR_REGSET_FIXED), insn->op2));
+						ir_add_use(ctx, ival, 0, IR_DEF_LIVE_POS_FROM_REF(ref), insn->op2, IR_USE_SHOULD_BE_IN_REG, 0);
 						continue;
 					} else if (insn->op != IR_PHI) {
 						ir_live_pos def_pos;
@@ -851,6 +855,8 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						IR_ASSERT(ctx->rules);
 						if (ctx->rules[input] & IR_FUSED) {
 						    ir_add_fusion_ranges(ctx, ref, input, bb, live);
+						} else if (ctx->rules[input] == (IR_SKIPPED|IR_RLOAD)) {
+							ir_set_alocated_reg(ctx, ref, j, ctx->ir_base[input].op2);
 						}
 					} else {
 						if (reg != IR_REG_NONE) {
@@ -1219,6 +1225,8 @@ static void ir_add_fusion_ranges(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_block
 				} else if (ctx->rules[child] & IR_FUSED) {
 					IR_ASSERT(stack_pos < (int)(sizeof(stack)/sizeof(stack_pos)));
 					stack[stack_pos++] = child;
+				} else if (ctx->rules[child] == (IR_SKIPPED|IR_RLOAD)) {
+					ir_set_alocated_reg(ctx, input, j, ctx->ir_base[child].op2);
 				}
 			}
 		}
@@ -1242,6 +1250,11 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 
 	if (!(ctx->flags & IR_LINEAR) || !ctx->vregs) {
 		return 0;
+	}
+
+	if (ctx->rules) {
+		ctx->regs = ir_mem_malloc(sizeof(ir_regs) * ctx->insns_count);
+		memset(ctx->regs, IR_REG_NONE, sizeof(ir_regs) * ctx->insns_count);
 	}
 
 	/* Compute Live Ranges */
@@ -1349,12 +1362,9 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						ival = ir_fix_live_range(ctx, v,
 							IR_START_LIVE_POS_FROM_REF(bb->start), IR_DEF_LIVE_POS_FROM_REF(ref));
 						ival->type = insn->type;
-						if (IR_REGSET_IN(IR_REGSET_UNION(ctx->fixed_regset, IR_REGSET_FIXED), insn->op2)) {
-							ival->flags = IR_LIVE_INTERVAL_REG_LOAD;
-							ival->reg = insn->op2;
-						} else {
-							ir_add_use(ctx, ival, 0, IR_DEF_LIVE_POS_FROM_REF(ref), insn->op2, IR_USE_SHOULD_BE_IN_REG, 0);
-						}
+						/* Fixed RLOADs are handled without live-ranges */
+						IR_ASSERT(!IR_REGSET_IN(IR_REGSET_UNION(ctx->fixed_regset, IR_REGSET_FIXED), insn->op2));
+						ir_add_use(ctx, ival, 0, IR_DEF_LIVE_POS_FROM_REF(ref), insn->op2, IR_USE_SHOULD_BE_IN_REG, 0);
 						continue;
 					} else if (insn->op != IR_PHI) {
 						ir_live_pos def_pos;
@@ -1483,6 +1493,8 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						IR_ASSERT(ctx->rules);
 						if (ctx->rules[input] & IR_FUSED) {
 						    ir_add_fusion_ranges(ctx, ref, input, bb, live_in_block, b);
+						} else if (ctx->rules[input] == (IR_SKIPPED|IR_RLOAD)) {
+							ir_set_alocated_reg(ctx, ref, j, ctx->ir_base[input].op2);
 						}
 					} else {
 						if (reg != IR_REG_NONE) {
@@ -3512,8 +3524,10 @@ static void assign_regs(ir_ctx *ctx)
 	int8_t reg;
 	ir_ref ref;
 
-	ctx->regs = ir_mem_malloc(sizeof(ir_regs) * ctx->insns_count);
-	memset(ctx->regs, IR_REG_NONE, sizeof(ir_regs) * ctx->insns_count);
+	if (!ctx->regs) {
+		ctx->regs = ir_mem_malloc(sizeof(ir_regs) * ctx->insns_count);
+		memset(ctx->regs, IR_REG_NONE, sizeof(ir_regs) * ctx->insns_count);
+	}
 
 	for (i = 1; i <= ctx->vregs_count; i++) {
 		top_ival = ival = ctx->live_intervals[i];

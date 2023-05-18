@@ -739,6 +739,11 @@ binop_fp:
 				return IR_STORE_FP;
 			}
 			break;
+		case IR_RLOAD:
+			if (IR_REGSET_IN(IR_REGSET_UNION(ctx->fixed_regset, IR_REGSET_FIXED), insn->op2)) {
+				return IR_SKIPPED | IR_RLOAD;
+			}
+			return IR_RLOAD;
 		case IR_RSTORE:
 			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
 				if ((ctx->flags & IR_OPT_CODEGEN) && ir_in_same_block(ctx, insn->op2) && ctx->use_lists[insn->op2].count == 1) {
