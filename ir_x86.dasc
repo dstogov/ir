@@ -567,7 +567,8 @@ int ir_get_target_constraints(const ir_ctx *ctx, ir_ref ref, ir_target_constrain
 			constraints->hints_count = 2;
 			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 			constraints->tmp_regs[0] = IR_SCRATCH_REG(IR_REG_RDX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
-			n = 1;
+			constraints->tmp_regs[1] = IR_SCRATCH_REG(IR_REG_RAX, IR_LOAD_SUB_REF, IR_LOAD_SUB_REF);
+			n = 2;
 			break;
 		case IR_DIV_INT:
 			/* %rax - used as input and result */
@@ -576,7 +577,8 @@ int ir_get_target_constraints(const ir_ctx *ctx, ir_ref ref, ir_target_constrain
 			constraints->hints_count = 2;
 			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 			constraints->tmp_regs[0] = IR_SCRATCH_REG(IR_REG_RDX, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
-			n = 1;
+			constraints->tmp_regs[1] = IR_SCRATCH_REG(IR_REG_RAX, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
+			n = 2;
 			goto op2_const;
 		case IR_MOD_INT:
 			constraints->def_reg = IR_REG_RDX;
@@ -584,7 +586,7 @@ int ir_get_target_constraints(const ir_ctx *ctx, ir_ref ref, ir_target_constrain
 			constraints->hints_count = 2;
 			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 			constraints->tmp_regs[0] = IR_SCRATCH_REG(IR_REG_RAX, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
-			constraints->tmp_regs[1] = IR_SCRATCH_REG(IR_REG_RDX, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+			constraints->tmp_regs[1] = IR_SCRATCH_REG(IR_REG_RDX, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 			n = 2;
 			goto op2_const;
 		case IR_MIN_MAX_INT:
@@ -775,7 +777,10 @@ op2_const:
 			break;
 		case IR_PI:
 		case IR_PHI:
+			flags = IR_USE_SHOULD_BE_IN_REG;
+			break;
 		case IR_RLOAD:
+			constraints->def_reg = ctx->ir_base[ref].op2;
 			flags = IR_USE_SHOULD_BE_IN_REG;
 			break;
 		case IR_EXITCALL:

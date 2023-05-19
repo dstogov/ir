@@ -453,7 +453,10 @@ int ir_get_target_constraints(const ir_ctx *ctx, ir_ref ref, ir_target_constrain
 			break;
 		case IR_PI:
 		case IR_PHI:
+			flags = IR_USE_SHOULD_BE_IN_REG;
+			break;
 		case IR_RLOAD:
+			constraints->def_reg = ctx->ir_base[ref].op2;
 			flags = IR_USE_SHOULD_BE_IN_REG;
 			break;
 		case IR_EXITCALL:
