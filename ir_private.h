@@ -801,10 +801,9 @@ IR_ALWAYS_INLINE bool ir_const_is_true(const ir_insn *v)
 #define IR_OPND_CONTROL           0x2
 #define IR_OPND_CONTROL_DEP       0x3
 #define IR_OPND_CONTROL_REF       0x4
-#define IR_OPND_VAR               0x5
-#define IR_OPND_STR               0x6
-#define IR_OPND_NUM               0x7
-#define IR_OPND_PROB              0x8
+#define IR_OPND_STR               0x5
+#define IR_OPND_NUM               0x6
+#define IR_OPND_PROB              0x7
 
 #define IR_OP_FLAGS(op_flags, op1_flags, op2_flags, op3_flags) \
 	((op_flags) | ((op1_flags) << 20) | ((op2_flags) << 24) | ((op3_flags) << 28))
@@ -818,7 +817,7 @@ IR_ALWAYS_INLINE bool ir_const_is_true(const ir_insn *v)
 	(((flags) >> (16 + (4 * (((i) > 3) ? 3 : (i))))) & 0xf)
 
 #define IR_IS_REF_OPND_KIND(kind) \
-	((kind) >= IR_OPND_DATA && (kind) <= IR_OPND_VAR)
+	((kind) >= IR_OPND_DATA && (kind) <= IR_OPND_CONTROL_REF)
 
 IR_ALWAYS_INLINE ir_ref ir_operands_count(const ir_ctx *ctx, const ir_insn *insn)
 {

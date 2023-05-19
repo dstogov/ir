@@ -737,21 +737,21 @@ int ir_sccp(ir_ctx *ctx)
 						_values[i+j+1].optx = IR_BOTTOM; /* keep the tail of a long multislot instruction */
 					}
 					for (j = 2, p = insn->ops + j; j <= n; j++, p++) {
-						IR_ASSERT(IR_OPND_KIND(flags, j) == IR_OPND_DATA || IR_OPND_KIND(flags, j) == IR_OPND_VAR);
+						IR_ASSERT(IR_OPND_KIND(flags, j) == IR_OPND_DATA);
 						use = *p;
 						if (use > 0 && UNEXPECTED(_values[use].optx == IR_TOP)) {
 							ir_bitqueue_add(&worklist, use);
 						}
 					}
 				} else if (n >= 2) {
-					IR_ASSERT(IR_OPND_KIND(flags, 2) == IR_OPND_DATA || IR_OPND_KIND(flags, 2) == IR_OPND_VAR);
+					IR_ASSERT(IR_OPND_KIND(flags, 2) == IR_OPND_DATA);
 					use = insn->op2;
 					if (use > 0 && UNEXPECTED(_values[use].optx == IR_TOP)) {
 						ir_bitqueue_add(&worklist, use);
 					}
 					if (n > 2) {
 						IR_ASSERT(n == 3);
-						IR_ASSERT(IR_OPND_KIND(flags, 3) == IR_OPND_DATA || IR_OPND_KIND(flags, 3) == IR_OPND_VAR);
+						IR_ASSERT(IR_OPND_KIND(flags, 3) == IR_OPND_DATA);
 						use = insn->op3;
 						if (use > 0 && UNEXPECTED(_values[use].optx == IR_TOP)) {
 							ir_bitqueue_add(&worklist, use);

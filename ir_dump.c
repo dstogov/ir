@@ -105,7 +105,6 @@ void ir_dump_dot(const ir_ctx *ctx, FILE *f)
 			if (ref) {
 				switch (IR_OPND_KIND(flags, j)) {
 					case IR_OPND_DATA:
-					case IR_OPND_VAR:
 						if (IR_IS_CONST_REF(ref)) {
 							fprintf(f, "\tc%d -> n%d [color=blue,weight=%d];\n", -ref, i, DATA_WEIGHT);
 						} else if (insn->op == IR_PHI

@@ -95,8 +95,7 @@ bool ir_check(const ir_ctx *ctx)
 					use_insn = &ctx->ir_base[use];
 					switch (IR_OPND_KIND(flags, j)) {
 						case IR_OPND_DATA:
-							if (use_insn->op == IR_VAR
-							 || !(ir_op_flags[use_insn->op] & IR_OP_FLAG_DATA)) {
+							if (!(ir_op_flags[use_insn->op] & IR_OP_FLAG_DATA)) {
 								if (!(ir_op_flags[use_insn->op] & IR_OP_FLAG_MEM)
 								 || use_insn->type == IR_VOID) {
 									fprintf(stderr, "ir_base[%d].ops[%d] reference (%d) must be DATA\n", i, j, use);
@@ -197,16 +196,6 @@ bool ir_check(const ir_ctx *ctx)
 						case IR_OPND_CONTROL_REF:
 							if (!(ir_op_flags[use_insn->op] & IR_OP_FLAG_CONTROL)) {
 								fprintf(stderr, "ir_base[%d].ops[%d] reference (%d) must be CONTROL\n", i, j, use);
-								ok = 0;
-							}
-							break;
-						case IR_OPND_VAR:
-							if (ctx->ir_base[use].op != IR_VAR) {
-								fprintf(stderr, "ir_base[%d].ops[%d] reference (%d) must be VAR\n", i, j, use);
-								ok = 0;
-							}
-							if (use >= i) {
-								fprintf(stderr, "ir_base[%d].ops[%d] invalid forward reference (%d)\n", i, j, use);
 								ok = 0;
 							}
 							break;
