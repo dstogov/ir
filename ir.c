@@ -1441,12 +1441,12 @@ static ir_ref ir_find_aliasing_load(ir_ctx *ctx, ir_ref ref, ir_type type, ir_re
 
 /* IR Construction API */
 
-ir_ref _ir_PARAM(ir_ctx *ctx, ir_type type, const char* name, ir_ref num)
+ir_ref _ir_PARAM(ir_ctx *ctx, ir_type type, const char* name, int pos)
 {
 	IR_ASSERT(ctx->control);
 	IR_ASSERT(ctx->ir_base[ctx->control].op == IR_START);
-	IR_ASSERT(ctx->insns_count == num + 1);
-	return ir_param(ctx, type, ctx->control, name, num);
+	IR_ASSERT(ctx->insns_count == pos + 1);
+	return ir_param(ctx, type, ctx->control, name, pos);
 }
 
 ir_ref _ir_VAR(ir_ctx *ctx, ir_type type, const char* name)
