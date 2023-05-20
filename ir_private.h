@@ -779,7 +779,6 @@ IR_ALWAYS_INLINE bool ir_const_is_true(const ir_insn *v)
 #define IR_OP_FLAG_EDGES_MASK     0x03
 #define IR_OP_FLAG_VAR_INPUTS     0x04
 #define IR_OP_FLAG_OPERANDS_MASK  0x18
-#define IR_OP_FLAG_MEM_MASK       ((1<<6)|(1<<7))
 
 #define IR_OP_FLAG_DATA           (1<<8)
 #define IR_OP_FLAG_CONTROL        (1<<9)
@@ -790,11 +789,11 @@ IR_ALWAYS_INLINE bool ir_const_is_true(const ir_insn *v)
 #define IR_OP_FLAG_TERMINATOR     (1<<14)
 #define IR_OP_FLAG_PINNED         (1<<15)
 
+#define IR_OP_FLAG_MEM_MASK       ((1<<6)|(1<<7))
 #define IR_OP_FLAG_MEM_LOAD       ((0<<6)|(0<<7))
 #define IR_OP_FLAG_MEM_STORE      ((0<<6)|(1<<7))
 #define IR_OP_FLAG_MEM_CALL       ((1<<6)|(0<<7))
 #define IR_OP_FLAG_MEM_ALLOC      ((1<<6)|(1<<7))
-#define IR_OP_FLAG_MEM_MASK       ((1<<6)|(1<<7))
 
 #define IR_OPND_UNUSED            0x0
 #define IR_OPND_DATA              0x1
