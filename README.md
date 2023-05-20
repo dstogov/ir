@@ -94,7 +94,7 @@ with second chance bin-packing. [5] [6]
 
 ## Machine Code Generations
 
-IR Framework implements X86_64, x86 and AAtch64 back-ends. The current
+IR Framework implements X86_64, x86 and AArch64 back-ends. The current
 implementation uses DynAsm [?]. (In the future, this should be replaced with
 a faster “binary” encoder). Code generator walks throw all instructions of each
 basic blocks and emits some code according to “rules” selected during
