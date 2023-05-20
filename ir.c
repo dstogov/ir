@@ -1680,7 +1680,7 @@ void _ir_MERGE_LIST(ir_ctx *ctx, ir_ref list)
 ir_ref _ir_LOOP_BEGIN(ir_ctx *ctx, ir_ref src1)
 {
 	IR_ASSERT(!ctx->control);
-	ctx->control = ir_emit2(ctx, IR_OPTX(IR_LOOP_BEGIN, IR_VOID, 2), src1, IR_UNUSED);
+	ctx->control = ir_emit1(ctx, IR_OPTX(IR_LOOP_BEGIN, IR_VOID, 2), src1);
 	return ctx->control;
 }
 
