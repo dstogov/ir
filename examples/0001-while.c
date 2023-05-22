@@ -50,6 +50,7 @@ int main(int argc, char **argv)
 	ir_build_cfg(&ctx);
 	ir_match(&ctx);
 	ir_assign_virtual_registers(&ctx);
+	ir_compute_dessa_moves(&ctx);
 
 	size_t size;
 	void *entry = ir_emit_code(&ctx, &size);
