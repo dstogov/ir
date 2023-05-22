@@ -433,7 +433,7 @@ extern "C" {
 #define ir_HARD_COPY_I32(_op1)            ir_BINARY_OP_I32(IR_COPY, (_op1), 1)
 #define ir_HARD_COPY_I64(_op1)            ir_BINARY_OP_I64(IR_COPY, (_op1), 1)
 #define ir_HARD_COPY_D(_op1)              ir_BINARY_OP_I64(IR_COPY, (_op1), 1)
-#define ir_HARD_COPY_F(_op1)              ir_BIMARY_OP_I64(IR_COPY, (_op1), 1)
+#define ir_HARD_COPY_F(_op1)              ir_BINARY_OP_I64(IR_COPY, (_op1), 1)
 
 #define ir_PARAM(_type, _name, _num)      _ir_PARAM(_ir_CTX, (_type), (_name), (_num))
 #define ir_VAR(_type, _name)              _ir_VAR(_ir_CTX, (_type), (_name))
