@@ -10,8 +10,8 @@
 	l_1 = START(l_33);
 	bool d_2 = PARAM(l_1, "cond", 0);
 	int32_t d_3 = PARAM(l_1, "z", 1);
-	bool d_4 = COPY(c_4);
-	bool d_5 = COPY(d_3);
+	int32_t d_4 = COPY(c_4);
+	int32_t d_5 = COPY(d_3);
 	l_6 = END(l_1);
 	l_7 = LOOP_BEGIN(l_6, l_31);
 	int32_t d_8 = PHI(l_7, d_4, d_19);

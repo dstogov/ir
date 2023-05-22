@@ -1152,6 +1152,7 @@ IR_FOLD(FP2FP(C_DOUBLE))
 /* Copy Propagation */
 IR_FOLD(COPY(_))
 {
+	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
 	if (!op2) {
 		IR_FOLD_COPY(op1);
 	}
