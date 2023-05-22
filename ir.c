@@ -67,13 +67,16 @@ const char *ir_op_name[IR_LAST_OP] = {
 #endif
 };
 
-void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f)
+void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted)
 {
 	if (insn->op == IR_FUNC) {
 		fprintf(f, "%s", ir_get_str(ctx, insn->val.i32));
 		return;
 	} else if (insn->op == IR_STR) {
-		fprintf(f, "\"%s\"", ir_get_str(ctx, insn->val.i32));
+		if (quoted)
+			fprintf(f, "\"%s\"", ir_get_str(ctx, insn->val.i32));
+		else
+			fprintf(f, "%s", ir_get_str(ctx, insn->val.i32));
 		return;
 	}
 	IR_ASSERT(IR_IS_CONST_OP(insn->op) || insn->op == IR_FUNC_ADDR);

@@ -18,7 +18,7 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 		fprintf(f, "\ttmp = ");
 	}
 	if (IR_IS_CONST_REF(from)) {
-		ir_print_const(ctx, &ctx->ir_base[from], f);
+		ir_print_const(ctx, &ctx->ir_base[from], f, true);
 		fprintf(f, ";\n");
 	} else if (from) {
 		fprintf(f, "d_%d;\n", ctx->vregs[from]);
@@ -31,7 +31,7 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 static void ir_emit_ref(ir_ctx *ctx, FILE *f, ir_ref ref)
 {
 	if (IR_IS_CONST_REF(ref)) {
-		ir_print_const(ctx, &ctx->ir_base[ref], f);
+		ir_print_const(ctx, &ctx->ir_base[ref], f, true);
 	} else {
 		ir_insn *insn = &ctx->ir_base[ref];
 		if (insn->op == IR_VLOAD) {
