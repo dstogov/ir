@@ -65,11 +65,7 @@ void ir_dump_dot(const ir_ctx *ctx, FILE *f)
 	fprintf(f, "\trankdir=TB;\n");
 	for (i = 1 - ctx->consts_count, insn = ctx->ir_base + i; i < IR_UNUSED; i++, insn++) {
 		fprintf(f, "\tc%d [label=\"C%d: CONST %s(", -i, -i, ir_type_name[insn->type]);
-		/* FIXME(tony):
-  		   We still cannot handle strings with double quote inside, such as
-				"Hamlet said, \"To be, or not to be\"".
-   		   'dot' command reports syntax error.
-		*/
+		/* FIXME(tony): We still cannot handle strings with escaped double quote inside */
 		ir_print_const(ctx, insn, f, false);
 		fprintf(f, ")\",style=filled,fillcolor=yellow];\n");
 	}
