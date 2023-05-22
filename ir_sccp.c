@@ -775,7 +775,7 @@ int ir_sccp(ir_ctx *ctx)
 		for (i = 1; i < ctx->insns_count; i++) {
 			if (IR_IS_CONST_OP(_values[i].op)) {
 				fprintf(stderr, "%d. CONST(", i);
-				ir_print_const(ctx, &_values[i], stderr);
+				ir_print_const(ctx, &_values[i], stderr, true);
 				fprintf(stderr, ")\n");
 #if IR_COMBO_COPY_PROPAGATION
 			} else if (_values[i].op == IR_COPY) {

@@ -26,13 +26,13 @@ void ir_save(const ir_ctx *ctx, FILE *f)
 			}
 		} else if (insn->op == IR_FUNC_ADDR) {
 			fprintf(f, "func_addr(");
-			ir_print_const(ctx, insn, f);
+			ir_print_const(ctx, insn, f, true);
 			if (insn->const_flags) {
 				fprintf(f, ", %d", insn->const_flags);
 			}
 			fprintf(f, ")");
 		} else {
-			ir_print_const(ctx, insn, f);
+			ir_print_const(ctx, insn, f, true);
 		}
 		fprintf(f, ";\n");
 	}
