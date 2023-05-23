@@ -47,6 +47,9 @@ OBJS_COMMON = $(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_strtab.o $(BUILD_DIR)/ir_cfg.o \
 	$(BUILD_DIR)/ir_cpuinfo.o
 OBJS_IR = $(BUILD_DIR)/ir_main.o
 OBJS_IR_TEST = $(BUILD_DIR)/ir_test.o
+
+#FIXME(Tony): Will become terribly long when we have many many examples.
+#             Consider to use examples/Makefile of their own.
 EXAMPLE_EXES = $(EXAMPLES_BUILD_DIR)/0001-basic $(EXAMPLES_BUILD_DIR)/0001-while $(EXAMPLES_BUILD_DIR)/0005-basic-runner-func
 
 all: $(BUILD_DIR) $(BUILD_DIR)/ir $(BUILD_DIR)/ir_test
@@ -91,7 +94,7 @@ $(OBJS_COMMON) $(OBJS_IR) $(OBJS_IR_TEST): $(BUILD_DIR)/$(notdir %.o): $(SRC_DIR
 	$(CC) $(CFLAGS) -I$(BUILD_DIR) -o $@ -c $<
 
 $(EXAMPLE_EXES): $(EXAMPLES_BUILD_DIR)/$(notdir %): $(EXAMPLES_SRC_DIR)/$(notdir %.c)
-	$(CC) $(CFLAGS) -I$(SRC_DIR) $< -o $@ $(OBJS_COMMON) $(LDFLAGS) -lcapstone
+	$(CC) $(CFLAGS) -I$(SRC_DIR) -I$(EXAMPLES_SRC_DIR) $< -o $@ $(OBJS_COMMON) $(LDFLAGS) -lcapstone
 
 $(BUILD_DIR)/ir-test: $(SRC_DIR)/ir-test.cxx
 	$(CXX) -O3 -std=c++17 $(SRC_DIR)/ir-test.cxx -o $(BUILD_DIR)/ir-test
@@ -117,3 +120,6 @@ clean:
 	find $(SRC_DIR)/tests -type f -name '*.out' -delete
 	find $(SRC_DIR)/tests -type f -name '*.exp' -delete
 	find $(SRC_DIR)/tests -type f -name '*.ir' -delete
+
+cleanexample:
+	rm -rf $(EXAMPLE_EXES)

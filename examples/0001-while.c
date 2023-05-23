@@ -16,8 +16,6 @@
  *	return i;
  * }
  */
-typedef int32_t (*myfunc_t)(void);
-
 void gen_myfunc(ir_ctx *ctx)
 {
 	ir_START();
@@ -35,23 +33,4 @@ void gen_myfunc(ir_ctx *ctx)
 	ir_RETURN(i_2);
 }
 
-int main(int argc, char **argv)
-{
-	ir_ctx ctx = {0};
-
-	ir_consistency_check();
-
-	ir_init(&ctx, IR_FUNCTION | IR_OPT_FOLDING, IR_CONSTS_LIMIT_MIN, IR_INSNS_LIMIT_MIN);
-
-	gen_myfunc(&ctx);
-
-	size_t size;
-	void *entry = ir_jit_compile(&ctx, 2, &size);
-	if (entry) {
-		printf("%d\n", ((myfunc_t)entry)());
-	}
-
-	ir_free(&ctx);
-
-	return 0;
-}
+#include "exmplfrm.h"

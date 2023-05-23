@@ -14,7 +14,6 @@
  *	return x - y;
  * }
  */
-typedef int32_t (*myfunc_t)(int32_t, int32_t);
 
 void gen_myfunc(ir_ctx *ctx)
 {
@@ -25,23 +24,13 @@ void gen_myfunc(ir_ctx *ctx)
 	ir_RETURN(cr);
 }
 
-int main(int argc, char **argv)
+#define USE_CUSTOM_RUN
+typedef int32_t (*myfunc_t)(int32_t, int32_t);
+void run_myfunc(myfunc_t func)
 {
-	ir_ctx ctx = {0};
-
-	ir_consistency_check();
-
-	ir_init(&ctx, IR_FUNCTION | IR_OPT_FOLDING, IR_CONSTS_LIMIT_MIN, IR_INSNS_LIMIT_MIN);
-
-	gen_myfunc(&ctx);
-
-	size_t size;
-	void *entry = ir_jit_compile(&ctx, 2, &size);
-	if (entry) {
-		printf("42 - 24 = %d\n", ((myfunc_t)entry)(42, 24));
+	if (func) {
+		printf("42 - 24 = %d\n", ((myfunc_t)func)(42, 24));
 	}
-
-	ir_free(&ctx);
-
-	return 0;
 }
+
+#include "exmplfrm.h"

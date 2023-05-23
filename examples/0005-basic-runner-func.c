@@ -14,8 +14,6 @@
  *	return x - y + .3;
  * }
  */
-typedef double (*myfunc_t)(double, double);
-
 void gen_myfunc(ir_ctx *ctx)
 {
 	ir_START();
@@ -29,7 +27,9 @@ void gen_myfunc(ir_ctx *ctx)
 	ir_RETURN(cr0);
 }
 
-void run(myfunc_t func)
+#define USE_CUSTOM_RUN
+typedef double (*myfunc_t)(double, double);
+void run_myfunc(myfunc_t func)
 {
 	const double N = 2;
 	double x, y;
@@ -41,23 +41,5 @@ void run(myfunc_t func)
 	}
 }
 
-int main(int argc, char **argv)
-{
-	ir_ctx ctx = {0};
-
-	ir_consistency_check();
-
-	ir_init(&ctx, IR_FUNCTION | IR_OPT_FOLDING, 256, 1024);
-
-	gen_myfunc(&ctx);
-
-	size_t size;
-	void *entry = ir_jit_compile(&ctx, 2, &size);
-	if (entry) {
-		run(entry);
-	}
-
-	ir_free(&ctx);
-
-	return 0;
-}
+/* main() */
+#include "exmplfrm.h"
