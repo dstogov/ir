@@ -24,14 +24,13 @@ void gen_myfunc(ir_ctx *ctx)
 	ir_ref i = ir_COPY_I32(ir_CONST_I32(0));
 	ir_ref loop = ir_LOOP_BEGIN(ir_END());
 		ir_ref phi_i_1 = ir_PHI_2(i, IR_UNUSED);
-		ir_ref cond = ir_IF(ir_GE(phi_i_1, ir_CONST_I32(42)));
+		ir_ref i_2 = ir_ADD_I32(phi_i_1, ir_CONST_I32(1));
+		ir_ref cond = ir_IF(ir_LT(phi_i_1, ir_CONST_I32(42)));
 			ir_IF_TRUE(cond);
-				ir_ref loop_end = ir_LOOP_END();
+				/* close loop */
+				ir_MERGE_SET_OP(loop, 2, ir_LOOP_END());
+				ir_PHI_SET_OP(phi_i_1, 2, i_2);
 			ir_IF_FALSE(cond);
-				ir_ref i_2 = ir_ADD_I32(phi_i_1, ir_CONST_I32(1));
-	/* close loop */
-	ir_MERGE_SET_OP(loop, 2, loop_end);
-	ir_PHI_SET_OP(phi_i_1, 2, i_2);
 
 	ir_RETURN(i_2);
 }

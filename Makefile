@@ -91,7 +91,7 @@ $(OBJS_COMMON) $(OBJS_IR) $(OBJS_IR_TEST): $(BUILD_DIR)/$(notdir %.o): $(SRC_DIR
 	$(CC) $(CFLAGS) -I$(BUILD_DIR) -o $@ -c $<
 
 $(EXAMPLE_EXES): $(EXAMPLES_BUILD_DIR)/$(notdir %): $(EXAMPLES_SRC_DIR)/$(notdir %.c)
-	$(CC) $(CFLAGS) -I$(BUILD_DIR) $< -o $@ $(OBJS_COMMON) $(LDFLAGS) -lcapstone
+	$(CC) $(CFLAGS) -I$(SRC_DIR) $< -o $@ $(OBJS_COMMON) $(LDFLAGS) -lcapstone
 
 $(BUILD_DIR)/ir-test: $(SRC_DIR)/ir-test.cxx
 	$(CXX) -O3 -std=c++17 $(SRC_DIR)/ir-test.cxx -o $(BUILD_DIR)/ir-test

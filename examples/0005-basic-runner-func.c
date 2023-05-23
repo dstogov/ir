@@ -36,7 +36,7 @@ void run(myfunc_t func)
 	for (y = -N; y < N; y++) {
 		for (x = -N; x < N; x++) {
 			double ret = func(x, y);
-			printf("%4.1f - %4.1f = %4.1f\n", x, y, ret);
+			printf("%4.1f - %4.1f + 0.3 = %4.1f\n", x, y, ret);
 		}
 	}
 }
