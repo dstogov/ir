@@ -468,7 +468,7 @@ extern "C" {
 #define ir_VLOAD_I64(_var)                _ir_VLOAD(_ir_CTX, IR_I64, (_var))
 #define ir_VLOAD_D(_var)                  _ir_VLOAD(_ir_CTX, IR_DOUBLE, (_var))
 #define ir_VLOAD_F(_var)                  _ir_VLOAD(_ir_CTX, IR_FLOAT, (_var))
-#define ir_VSTORE(_var, _val)             _ir_VSTRORE(_ir_CTX, (_var), (_val))
+#define ir_VSTORE(_var, _val)             _ir_VSTORE(_ir_CTX, (_var), (_val))
 #define ir_RLOAD(_type, _reg)             _ir_RLOAD(_ir_CTX, (_type), (_reg))
 #define ir_RLOAD_B(_reg)                  _ir_RLOAD(_ir_CTX, IR_BOOL, (_reg))
 #define ir_RLOAD_U8(_reg)                 _ir_RLOAD(_ir_CTX, IR_U8, (_reg))
