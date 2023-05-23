@@ -47,18 +47,12 @@ int main(int argc, char **argv)
 
 	ir_consistency_check();
 
-	ir_init(&ctx, IR_FUNCTION, 256, 1024);
+	ir_init(&ctx, IR_FUNCTION | IR_OPT_FOLDING, 256, 1024);
 
 	gen_myfunc(&ctx);
 
-	ir_build_def_use_lists(&ctx);
-	ir_build_cfg(&ctx);
-	ir_match(&ctx);
-	ir_assign_virtual_registers(&ctx);
-	ir_compute_dessa_moves(&ctx);
-
 	size_t size;
-	void *entry = ir_emit_code(&ctx, &size);
+	void *entry = ir_jit_compile(&ctx, 2, &size);
 	if (entry) {
 		run(entry);
 	}

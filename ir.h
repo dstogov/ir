@@ -757,6 +757,61 @@ uint32_t ir_cpuinfo(void);
 /* Deoptimization helpers */
 const void *ir_emit_exitgroup(uint32_t first_exit_point, uint32_t exit_points_per_group, const void *exit_addr, void *code_buffer, size_t code_buffer_size, size_t *size_ptr);
 
+/* A reference IR JIT compiler */
+IR_ALWAYS_INLINE void *ir_jit_compile(ir_ctx *ctx, int opt_level, size_t *size)
+{
+	if (opt_level == 0) {
+		if (ctx->flags & IR_OPT_FOLDING) {
+			// IR_ASSERT(0 && "IR_OPT_FOLDING is incompatible with -O0");
+			return NULL;
+		}
+		ctx->flags &= ~(IR_OPT_CFG | IR_OPT_CODEGEN);
+
+		ir_build_def_use_lists(ctx);
+
+		if (!ir_build_cfg(ctx)
+		 || !ir_match(ctx)
+		 || !ir_assign_virtual_registers(ctx)
+		 || !ir_compute_dessa_moves(ctx)) {
+			return NULL;
+		}
+
+		return ir_emit_code(ctx, size);
+	} else if (opt_level == 1 || opt_level == 2) {
+		if (!(ctx->flags & IR_OPT_FOLDING)) {
+			// IR_ASSERT(0 && "IR_OPT_FOLDING must be set in ir_init() for -O1 and -O2");
+			return NULL;
+		}
+		ctx->flags |= IR_OPT_CFG | IR_OPT_CODEGEN;
+
+		ir_build_def_use_lists(ctx);
+
+		if (opt_level == 2
+		 && !ir_sccp(ctx)) {
+			return NULL;
+		}
+
+		if (!ir_build_cfg(ctx)
+		 || !ir_build_dominators_tree(ctx)
+		 || !ir_find_loops(ctx)
+		 || !ir_gcm(ctx)
+		 || !ir_schedule(ctx)
+		 || !ir_match(ctx)
+		 || !ir_assign_virtual_registers(ctx)
+		 || !ir_compute_live_ranges(ctx)
+		 || !ir_coalesce(ctx)
+		 || !ir_reg_alloc(ctx)
+		 || !ir_schedule_blocks(ctx)) {
+			return NULL;
+		}
+
+		return ir_emit_code(ctx, size);
+	} else {
+		// IR_ASSERT(0 && "wrong optimization level");
+		return NULL;
+	}
+}
+
 /* IR Memmory Allocation */
 #ifndef ir_mem_malloc
 # define ir_mem_malloc   malloc
