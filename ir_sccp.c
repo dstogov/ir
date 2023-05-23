@@ -659,7 +659,11 @@ int ir_sccp(ir_ctx *ctx)
 					ir_bitqueue_add(&worklist, insn->op2);
 					continue;
 				}
-				if (!IR_IS_BOTTOM(insn->op2)) {
+				if (!IR_IS_BOTTOM(insn->op2)
+#if IR_COMBO_COPY_PROPAGATION
+				 && (IR_IS_CONST_REF(insn->op2) || _values[insn->op2].op != IR_COPY)
+#endif
+				) {
 					bool b = ir_sccp_is_true(ctx, _values, insn->op2);
 					use_list = &ctx->use_lists[i];
 					IR_ASSERT(use_list->count == 2);
