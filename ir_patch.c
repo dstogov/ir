@@ -151,7 +151,7 @@ static int ir_patch_code(const void *code, size_t size, const void *from_addr, c
 	uint8_t *p, *end;
 
 	p = (uint8_t*)code;
-	end = p + size - 5;
+	end = p + size - 4;
 	while (p < end) {
 		if ((*(unaligned_uint16_t*)p & 0xf0ff) == 0x800f && p + *(unaligned_int32_t*)(p+2) == (uint8_t*)from_addr - 6) {
 			*(unaligned_int32_t*)(p+2) = ((uint8_t*)to_addr - (p + 6));
