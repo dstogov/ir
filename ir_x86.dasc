@@ -5791,7 +5791,9 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 					void *addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op2]);
 
 					|	.aword &addr
-					bb->flags |= IR_BB_EMPTY;
+					if (ctx->ir_base[bb->start].op != IR_CASE_DEFAULT) {
+						bb->flags |= IR_BB_EMPTY;
+					}
 					continue;
 				}
 			}
