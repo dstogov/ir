@@ -38,8 +38,8 @@ Windows-x86_64
 }
 --EXPECT--
 test:
-	leal (%rdx, %rdx), %eax
 .L1:
 	testb %cl, %cl
 	jne .L1
+	leal (%rdx, %rdx), %eax
 	retq

@@ -105,15 +105,17 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 			if (insn->op == IR_PHI) {
 				ir_ref *p = insn->ops + 2; /* PHI data inputs */
 				ir_ref *q = ctx->ir_base[insn->op1].ops + 1; /* MERGE inputs */
+				ir_ref n = insn->inputs_count - 1;
 
-				while (*p != ref) {
-					p++;
-					q++;
+				for (;n > 0; p++, q++, n--) {
+					if (*p == ref) {
+						b = _blocks[*q];
+						lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
+					}
 				}
-				b = _blocks[*q];
-				IR_ASSERT(b);
+			} else {
+				lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
 			}
-			lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
 		}
 		IR_ASSERT(lca != 0 && "No Common Antecessor");
 		b = lca;
@@ -123,26 +125,29 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 			uint32_t loop_depth = bb->loop_depth;
 
 			if (loop_depth) {
-				if ((ctx->cfg_blocks[bb->loop_header].flags & IR_BB_LOOP_WITH_ENTRY)
+				uint32_t flags = (bb->flags & IR_BB_LOOP_HEADER) ? bb->flags : ctx->cfg_blocks[bb->loop_header].flags;
+
+				if ((flags & IR_BB_LOOP_WITH_ENTRY)
 				 && !(ctx->binding && ir_binding_find(ctx, ref))) {
 					/* Don't move loop invariant code across an OSR ENTRY if we can't restore it */
 				} else {
-					lca = bb->dom_parent;
-					while (lca != _blocks[ref]) {
+					do {
+						lca = bb->dom_parent;
 						bb = &ctx->cfg_blocks[lca];
 						if (bb->loop_depth < loop_depth) {
-							if ((ctx->cfg_blocks[bb->loop_header].flags & IR_BB_LOOP_WITH_ENTRY)
+							if (!bb->loop_depth) {
+								b = lca;
+								break;
+							}
+							flags = (bb->flags & IR_BB_LOOP_HEADER) ? bb->flags : ctx->cfg_blocks[bb->loop_header].flags;
+							if ((flags & IR_BB_LOOP_WITH_ENTRY)
 							 && !(ctx->binding && ir_binding_find(ctx, ref))) {
 								break;
 							}
 							loop_depth = bb->loop_depth;
 							b = lca;
-							if (!loop_depth) {
-								break;
-							}
 						}
-						lca = bb->dom_parent;
-					}
+					} while (lca != _blocks[ref]);
 				}
 			}
 			_blocks[ref] = b;
@@ -180,14 +185,17 @@ static void ir_gcm_schedule_rest(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 				ir_ref *p = insn->ops + 2; /* PHI data inputs */
 				ir_ref *q = ctx->ir_base[insn->op1].ops + 1; /* MERGE inputs */
 
-				while (*p != ref) {
-					p++;
-					q++;
+				ir_ref n = insn->inputs_count - 1;
+
+				for (;n > 0; p++, q++, n--) {
+					if (*p == ref) {
+						b = _blocks[*q];
+						lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
+					}
 				}
-				b = _blocks[*q];
-				IR_ASSERT(b);
+			} else {
+				lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
 			}
-			lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
 		}
 		IR_ASSERT(lca != 0 && "No Common Antecessor");
 		b = lca;
@@ -288,11 +296,7 @@ int ir_gcm(ir_ctx *ctx)
 		for (p = &ctx->use_edges[use_list->refs]; n > 0; n--, p++) {
 			ref = *p;
 			use_insn = &ctx->ir_base[ref];
-			if (use_insn->op == IR_PARAM || use_insn->op == IR_VAR) {
-				bb->flags |= (use_insn->op == IR_PARAM) ? IR_BB_HAS_PARAM : IR_BB_HAS_VAR;
-				_blocks[ref] = b; /* pin to block */
-				ir_bitset_incl(visited, ref);
-			} else if (use_insn->op == IR_PHI || use_insn->op == IR_PI) {
+			if (use_insn->op == IR_PHI || use_insn->op == IR_PI) {
 				bb->flags |= (use_insn->op == IR_PHI) ? IR_BB_HAS_PHI : IR_BB_HAS_PI;
 				ir_bitset_incl(visited, ref);
 				if (EXPECTED(ctx->use_lists[ref].count != 0)) {
@@ -300,6 +304,17 @@ int ir_gcm(ir_ctx *ctx)
 					ir_list_push_unchecked(&queue_early, ref);
 					ir_list_push_unchecked(&queue_late, ref);
 				}
+			} else if (use_insn->op == IR_PARAM) {
+				bb->flags |= IR_BB_HAS_PARAM;
+				_blocks[ref] = b; /* pin to block */
+				ir_bitset_incl(visited, ref);
+				if (EXPECTED(ctx->use_lists[ref].count != 0)) {
+					ir_list_push_unchecked(&queue_late, ref);
+				}
+			} else if (use_insn->op == IR_VAR) {
+				bb->flags |= IR_BB_HAS_VAR;
+				_blocks[ref] = b; /* pin to block */
+				ir_bitset_incl(visited, ref);
 			}
 		}
 	}

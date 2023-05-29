@@ -38,9 +38,8 @@ aarch64
 }
 --EXPECT--
 test:
-	add w1, w1, w1
 .L1:
 	cmp w0, #0
 	b.ne .L1
-	mov w0, w1
+	add w0, w1, w1
 	ret

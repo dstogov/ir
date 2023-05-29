@@ -38,8 +38,8 @@ x86_64
 }
 --EXPECT--
 test:
-	leal (%rsi, %rsi), %eax
 .L1:
 	testb %dil, %dil
 	jne .L1
+	leal (%rsi, %rsi), %eax
 	retq
