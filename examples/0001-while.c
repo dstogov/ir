@@ -20,7 +20,9 @@ typedef int32_t (*myfunc_t)(void);
 
 void gen_myfunc(ir_ctx *ctx)
 {
+	/* Function entry start */
 	ir_START();
+	/* Declare loop counter. */
 	ir_ref i = ir_COPY_I32(ir_CONST_I32(0));
 	ir_ref loop = ir_LOOP_BEGIN(ir_END());
 		ir_ref phi_i_1 = ir_PHI_2(i, IR_UNUSED);
@@ -32,6 +34,7 @@ void gen_myfunc(ir_ctx *ctx)
 				ir_PHI_SET_OP(phi_i_1, 2, i_2);
 			ir_IF_FALSE(cond);
 
+	/* Function end */
 	ir_RETURN(i_2);
 }
 
