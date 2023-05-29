@@ -4532,7 +4532,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 										ctx->live_intervals[ctx->vregs[use_insn->op3]] = ival;
 										ival->type = insn->type;
 										ival->reg = IR_REG_NONE;
-										ival->vreg = ctx->vregs[insn->op3];
+										ival->vreg = ctx->vregs[use_insn->op3];
 										ival->stack_spill_pos = stack_spill_pos;
 									}
 								}
