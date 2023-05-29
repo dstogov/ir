@@ -768,7 +768,10 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 		if ((bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
 			continue;
 		}
-		if (bb->predecessors_count > 1 || (bb->predecessors_count == 1 && ctx->cfg_edges[bb->predecessors] != prev)) {
+		if (bb->predecessors_count > 1
+		 || (bb->predecessors_count == 1 && ctx->cfg_edges[bb->predecessors] != prev)
+		 || ctx->ir_base[bb->start].op == IR_CASE_VAL
+		 || ctx->ir_base[bb->start].op == IR_CASE_DEFAULT) {
 			fprintf(f, "bb%d:\n", b);
 		}
 		prev = b;
