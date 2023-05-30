@@ -80,9 +80,11 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 {
 	ir_ref n, *p, use;
 	ir_insn *insn;
+	ir_use_list *use_list;
 
 	ir_bitset_incl(visited, ref);
-	n = ctx->use_lists[ref].count;
+	use_list = &ctx->use_lists[ref];
+	n = use_list->count;
 	if (n) {
 		uint32_t lca, b;
 
@@ -91,7 +93,7 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 		IR_ASSERT(insn->op != IR_PHI && insn->op != IR_PI);
 
 		lca = 0;
-		for (p = &ctx->use_edges[ctx->use_lists[ref].refs]; n > 0; p++, n--) {
+		for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
 			use = *p;
 			b = _blocks[use];
 			if (!b) {
@@ -124,9 +126,21 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 			ir_block *bb = &ctx->cfg_blocks[b];
 			uint32_t loop_depth = bb->loop_depth;
 
-			if (loop_depth) {
-				uint32_t flags = (bb->flags & IR_BB_LOOP_HEADER) ? bb->flags : ctx->cfg_blocks[bb->loop_header].flags;
+			if (loop_depth
+			 && !(ctx->binding && ir_binding_find(ctx, ref))) {
+				uint32_t flags;
 
+				use_list = &ctx->use_lists[ref];
+				if (use_list->count == 1) {
+					use = ctx->use_edges[use_list->refs];
+					insn = &ctx->ir_base[use];
+					if (insn->op == IR_IF || insn->op == IR_GUARD || insn->op == IR_GUARD_NOT) {
+						_blocks[ref] = b;
+						return;
+					}
+				}
+
+				flags = (bb->flags & IR_BB_LOOP_HEADER) ? bb->flags : ctx->cfg_blocks[bb->loop_header].flags;
 				if ((flags & IR_BB_LOOP_WITH_ENTRY)
 				 && !(ctx->binding && ir_binding_find(ctx, ref))) {
 					/* Don't move loop invariant code across an OSR ENTRY if we can't restore it */
