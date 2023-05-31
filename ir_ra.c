@@ -2517,7 +2517,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 	int i, reg;
 	ir_live_pos pos, next;
 	ir_live_interval *other;
-	ir_regset available;
+	ir_regset available, overlapped, scratch;
 
 	if (IR_IS_TYPE_FP(ival->type)) {
 		available = IR_REGSET_FP;
@@ -2570,6 +2570,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 	 * This loop is not necessary for program in SSA form (see LSRA on SSA fig. 6),
 	 * but it is still necessary after coalescing and splitting
 	 */
+	overlapped = IR_REGSET_EMPTY;
 	other = inactive;
 	pos = ival->end;
 	while (other) {
@@ -2588,12 +2589,14 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 						IR_ASSERT(reg == IR_REG_ALL);
 						regset = available;
 					}
+					overlapped = IR_REGSET_UNION(overlapped, regset);
 					IR_REGSET_FOREACH(regset, reg) {
 						if (next < freeUntilPos[reg]) {
 							freeUntilPos[reg] = next;
 						}
 					} IR_REGSET_FOREACH_END();
 				} else if (IR_REGSET_IN(available, reg)) {
+					IR_REGSET_INCL(overlapped, reg);
 					if (next < freeUntilPos[reg]) {
 						freeUntilPos[reg] = next;
 					}
@@ -2603,36 +2606,57 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 		other = other->list_next;
 	}
 
-	if (ival->flags & (IR_LIVE_INTERVAL_HAS_HINT_REGS|IR_LIVE_INTERVAL_HAS_HINT_REFS)) {
-		/* Try to use hint */
-		reg = ir_try_allocate_preferred_reg(ctx, ival, available, freeUntilPos);
-		if (reg != IR_REG_NONE) {
-			ival->reg = reg;
-			IR_LOG_LSRA_ASSIGN("    ---- Assign", ival, " (hint available without spilling)");
-			ival->list_next = *active;
-			*active = ival;
-			return reg;
-		}
-	}
+	available = IR_REGSET_DIFFERENCE(available, overlapped);
+	if (available != IR_REGSET_EMPTY) {
 
-	if (ival->flags & IR_LIVE_INTERVAL_SPLIT_CHILD) {
-		/* Try to reuse the register previously allocated for splited interval */
-		reg = ctx->live_intervals[ival->vreg]->reg;
-		if (reg >= 0
-		 && IR_REGSET_IN(available, reg)
-		 && ival->end <= freeUntilPos[reg]) {
-			ival->reg = reg;
-			IR_LOG_LSRA_ASSIGN("    ---- Assign", ival, " (available without spilling)");
+		if (ival->flags & (IR_LIVE_INTERVAL_HAS_HINT_REGS|IR_LIVE_INTERVAL_HAS_HINT_REFS)) {
+			/* Try to use hint */
+			reg = ir_try_allocate_preferred_reg(ctx, ival, available, freeUntilPos);
+			if (reg != IR_REG_NONE) {
+				ival->reg = reg;
+				IR_LOG_LSRA_ASSIGN("    ---- Assign", ival, " (hint available without spilling)");
+				if (*unhandled && ival->end > (*unhandled)->range.start) {
+					ival->list_next = *active;
+					*active = ival;
+				}
+				return reg;
+			}
+		}
+
+		if (ival->flags & IR_LIVE_INTERVAL_SPLIT_CHILD) {
+			/* Try to reuse the register previously allocated for splited interval */
+			reg = ctx->live_intervals[ival->vreg]->reg;
+			if (reg >= 0 && IR_REGSET_IN(available, reg)) {
+				ival->reg = reg;
+				IR_LOG_LSRA_ASSIGN("    ---- Assign", ival, " (available without spilling)");
+				if (*unhandled && ival->end > (*unhandled)->range.start) {
+					ival->list_next = *active;
+					*active = ival;
+				}
+				return reg;
+			}
+		}
+
+		scratch = IR_REGSET_INTERSECTION(available, IR_REGSET_SCRATCH);
+		if (scratch != IR_REGSET_EMPTY) {
+			/* prefer caller-saved registers to avoid save/restore in prologue/epilogue */
+			reg = IR_REGSET_FIRST(scratch);
+		} else {
+			reg = IR_REGSET_FIRST(available);
+		}
+		ival->reg = reg;
+		IR_LOG_LSRA_ASSIGN("    ---- Assign", ival, " (available without spilling)");
+		if (*unhandled && ival->end > (*unhandled)->range.start) {
 			ival->list_next = *active;
 			*active = ival;
-			return reg;
 		}
+		return reg;
 	}
 
 	/* reg = register with highest freeUntilPos */
 	reg = IR_REG_NONE;
 	pos = 0;
-	IR_REGSET_FOREACH(available, i) {
+	IR_REGSET_FOREACH(overlapped, i) {
 		if (freeUntilPos[i] > pos) {
 			pos = freeUntilPos[i];
 			reg = i;
@@ -2645,17 +2669,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 		}
 	} IR_REGSET_FOREACH_END();
 
-	if (!pos) {
-		/* no register available without spilling */
-		return IR_REG_NONE;
-	} else if (ival->end <= pos) {
-		/* register available for the whole interval */
-		ival->reg = reg;
-		IR_LOG_LSRA_ASSIGN("    ---- Assign", ival, " (available without spilling)");
-		ival->list_next = *active;
-		*active = ival;
-		return reg;
-	} else if (pos > ival->range.start) {
+	if (pos > ival->range.start) {
 		/* register available for the first part of the interval */
 		/* split current before freeUntilPos[reg] */
 		ir_live_pos split_pos = ir_last_use_pos_before(ival, pos,
@@ -2664,7 +2678,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 			split_pos = ir_find_optimal_split_position(ctx, ival, split_pos, pos, 0);
 			other = ir_split_interval_at(ctx, ival, split_pos);
 			if (ival->flags & (IR_LIVE_INTERVAL_HAS_HINT_REGS|IR_LIVE_INTERVAL_HAS_HINT_REFS)) {
-				ir_reg pref_reg = ir_try_allocate_preferred_reg(ctx, ival, available, freeUntilPos);
+				ir_reg pref_reg = ir_try_allocate_preferred_reg(ctx, ival, IR_REGSET_UNION(available, overlapped), freeUntilPos);
 
 				if (pref_reg != IR_REG_NONE) {
 					ival->reg = pref_reg;
@@ -2675,8 +2689,10 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 				ival->reg = reg;
 			}
 			IR_LOG_LSRA_ASSIGN("    ---- Assign", ival, " (available without spilling for the first part)");
-			ival->list_next = *active;
-			*active = ival;
+			if (*unhandled && ival->end > (*unhandled)->range.start) {
+				ival->list_next = *active;
+				*active = ival;
+			}
 			ir_add_to_unhandled(unhandled, other);
 			IR_LOG_LSRA("      ---- Queue", other, "");
 			return reg;
@@ -2994,9 +3010,11 @@ spill_current:
 	/* current.reg = reg */
 	ival->reg = reg;
 	IR_LOG_LSRA_ASSIGN("    ---- Assign", ival, " (after splitting others)");
-	ival->list_next = *active;
-	*active = ival;
 
+	if (*unhandled && ival->end > (*unhandled)->range.start) {
+		ival->list_next = *active;
+		*active = ival;
+	}
 	return reg;
 }
 
@@ -3275,7 +3293,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 				other->current_range = r;
 			}
 			if (position >= r->start) {
-				/* move i from active to inactive */
+				/* move i from inactive to active */
 				if (prev) {
 					prev->list_next = other->list_next;
 				} else {
@@ -3380,8 +3398,10 @@ static int ir_linear_scan(ir_ctx *ctx)
 				} else {
 					ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type, &data);
 				}
-				ival->list_next = active;
-				active = ival;
+				if (unhandled && ival->end > unhandled->range.start) {
+					ival->list_next = active;
+					active = ival;
+				}
 			}
 		}
 	}
