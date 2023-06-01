@@ -1390,8 +1390,14 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						IR_ASSERT(ctx->rules);
 						if (ctx->rules[input] & IR_FUSED) {
 						    ir_add_fusion_ranges(ctx, ref, input, bb, live_in_block, b);
-						} else if (ctx->rules[input] == (IR_SKIPPED|IR_RLOAD)) {
-							ir_set_alocated_reg(ctx, ref, j, ctx->ir_base[input].op2);
+						} else {
+							if (ctx->rules[input] == (IR_SKIPPED|IR_RLOAD)) {
+								ir_set_alocated_reg(ctx, ref, j, ctx->ir_base[input].op2);
+							}
+							if (reg != IR_REG_NONE) {
+								use_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
+								ir_add_fixed_live_range(ctx, reg, use_pos, use_pos + IR_USE_SUB_REF);
+							}
 						}
 					}
 				} else if (reg != IR_REG_NONE) {
