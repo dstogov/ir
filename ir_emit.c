@@ -325,6 +325,8 @@ static void *ir_jmp_addr(ir_ctx *ctx, ir_insn *insn, ir_insn *addr_insn)
 # include "dynasm/dasm_x86.h"
 #elif defined(IR_TARGET_AARCH64)
 # include "dynasm/dasm_proto.h"
+static int ir_add_veneer(dasm_State *Dst, void *buffer, uint32_t ins, int *b, uint32_t *cp, ptrdiff_t offset);
+# define DASM_ADD_VENEER ir_add_veneer
 # include "dynasm/dasm_arm64.h"
 #else
 # error "Unknown IR target"

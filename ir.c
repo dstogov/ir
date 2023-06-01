@@ -335,6 +335,14 @@ void ir_init(ir_ctx *ctx, uint32_t flags, ir_ref consts_limit, ir_ref insns_limi
 	ctx->code_buffer = NULL;
 	ctx->code_buffer_size = 0;
 
+#if defined(IR_TARGET_AARCH64)
+	ctx->deoptimization_exits = 0;
+	ctx->veneers_size = 0;
+	ctx->get_exit_addr = NULL;
+	ctx->get_veneer = NULL;
+	ctx->set_veneer = NULL;
+#endif
+
 	ctx->strtab.data = NULL;
 
 	buf = ir_mem_malloc((consts_limit + insns_limit) * sizeof(ir_insn));

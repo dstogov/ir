@@ -693,6 +693,12 @@ restart:
 	new_ctx.fixed_regset = ctx->fixed_regset;
 	new_ctx.fixed_save_regset = ctx->fixed_save_regset;
 	new_ctx.entries_count = ctx->entries_count;
+#if defined(IR_TARGET_AARCH64)
+	new_ctx.deoptimization_exits = ctx->deoptimization_exits;
+	new_ctx.get_exit_addr = ctx->get_exit_addr;
+	new_ctx.get_veneer = ctx->get_veneer;
+	new_ctx.set_veneer = ctx->set_veneer;
+#endif
 
 	/* Copy constants */
 	if (consts_count == ctx->consts_count) {

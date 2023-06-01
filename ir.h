@@ -517,6 +517,12 @@ typedef int8_t ir_regs[4];
 
 typedef void (*ir_snapshot_create_t)(ir_ctx *ctx, ir_ref addr);
 
+#if defined(IR_TARGET_AARCH64)
+typedef const void *(*ir_get_exit_addr_t)(uint32_t exit_num);
+typedef const void *(*ir_get_veneer_t)(ir_ctx *ctx, const void *addr);
+typedef bool (*ir_set_veneer_t)(ir_ctx *ctx, const void *addr, const void *veneer);
+#endif
+
 struct _ir_ctx {
 	ir_insn           *ir_base;                 /* two directional array - instructions grow down, constants grow up */
 	ir_ref             insns_count;             /* number of instructins stored in instructions buffer */
@@ -565,6 +571,14 @@ struct _ir_ctx {
 	void              *osr_entry_loads;
 	void              *code_buffer;
 	size_t             code_buffer_size;
+#if defined(IR_TARGET_AARCH64)
+	int32_t            deoptimization_exits;
+	int32_t            veneers_size;
+	uint32_t           code_size;
+	ir_get_exit_addr_t get_exit_addr;
+	ir_get_veneer_t    get_veneer;
+	ir_set_veneer_t    set_veneer;
+#endif
 	ir_strtab          strtab;
 	ir_ref             prev_insn_chain[IR_LAST_FOLDABLE_OP + 1];
 	ir_ref             prev_const_chain[IR_LAST_TYPE];
@@ -693,6 +707,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size);
 int  ir_disasm_init(void);
 void ir_disasm_free(void);
 void ir_disasm_add_symbol(const char *name, uint64_t addr, uint64_t size);
+const char* ir_disasm_find_symbol(uint64_t addr, int64_t *offset);
 int  ir_disasm(const char *name,
                const void *start,
                size_t      size,

@@ -4131,7 +4131,7 @@ static void ir_emit_tls(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 ||#else
 ||	code = 0xd53bd040 | reg; // TODO: hard-coded: mrs reg, tpidr_el0
 |	.long code
-||//???	ZEND_ASSERT(insn->op2 <= LDR_STR_PIMM64);
+||//???	IR_ASSERT(insn->op2 <= LDR_STR_PIMM64);
 |	ldr Rx(reg), [Rx(reg), #insn->op2]
 ||#endif
 	if (ctx->regs[def][0] & IR_REG_SPILL_STORE) {
@@ -4743,6 +4743,9 @@ static void ir_calc_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
 
 static void* dasm_labels[ir_lb_MAX];
 
+/* Veneers support (TODO: avid global variable usage) */
+static ir_ctx *ir_current_ctx;
+
 void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 {
 	uint32_t b, n, target;
@@ -5017,6 +5020,17 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		}
 	}
 
+	if (ctx->deoptimization_exits) {
+		for (i = 0; i < ctx->deoptimization_exits; i++) {
+			const void *exit_addr = ctx->get_exit_addr(i);
+
+			if (!exit_addr) {
+				return 0;
+			}
+			|	b &exit_addr
+		}
+	}
+
 	if (data.rodata_label) {
 		|.rodata
 	}
@@ -5143,6 +5157,16 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		ir_mem_unprotect(entry, size);
 	}
 
+	ir_current_ctx = ctx;
+	ctx->veneers_size = 0;
+	if (data.jmp_table_label) {
+		ctx->code_size = dasm_getpclabel(&data.dasm_state, data.jmp_table_label);
+	} else if (data.rodata_label) {
+		ctx->code_size = dasm_getpclabel(&data.dasm_state, data.jmp_table_label);
+	} else {
+		ctx->code_size = size;
+	}
+
 	ret = dasm_encode(&data.dasm_state, entry);
 	if (ret != DASM_S_OK) {
 		IR_ASSERT(0);
@@ -5177,6 +5201,8 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	}
 
 	dasm_free(&data.dasm_state);
+
+	*size_ptr += ctx->veneers_size;
 
 	ir_mem_flush(entry, size);
 
@@ -5246,6 +5272,7 @@ const void *ir_emit_exitgroup(uint32_t first_exit_point, uint32_t exit_points_pe
 		ir_mem_unprotect(entry, size);
 	}
 
+	ir_current_ctx = NULL;
 	ret = dasm_encode(&dasm_state, entry);
 	if (ret != DASM_S_OK) {
 		IR_ASSERT(0);
@@ -5266,4 +5293,114 @@ const void *ir_emit_exitgroup(uint32_t first_exit_point, uint32_t exit_points_pe
 
 	*size_ptr = size;
 	return entry;
+}
+
+static int ir_add_veneer(dasm_State *Dst, void *buffer, uint32_t ins, int *b, uint32_t *cp, ptrdiff_t offset)
+{
+	ir_ctx *ctx = ir_current_ctx;
+	const void *addr, *veneer = NULL;
+	ptrdiff_t na;
+	int n, m;
+
+	IR_ASSERT(ctx && ctx->code_buffer);
+
+	if ((ins >> 16) == DASM_REL_A) {
+		addr = (void*)((((ptrdiff_t)(*(b-1))) << 32) | (unsigned int)(*(b-2)));
+		if (ctx->get_veneer) {
+			veneer = ctx->get_veneer(ctx, addr);
+		}
+	} else {
+		IR_ASSERT(0 && "too long jmp distance");
+		return 0;
+	}
+
+	if (veneer) {
+		na = (ptrdiff_t)veneer - (ptrdiff_t)cp + 4;
+		n = (int)na;
+
+		/* check if we can jump to veneer */
+		if ((ptrdiff_t)n != na) {
+			/* pass */
+		} else if (!(ins & 0xf800)) {  /* B, BL */
+			if ((n & 3) == 0 && ((n+0x08000000) >> 28) == 0) {
+				return n;
+			}
+		} else if ((ins & 0x800)) {  /* B.cond, CBZ, CBNZ, LDR* literal */
+			if ((n & 3) == 0 && ((n+0x00100000) >> 21) == 0) {
+				return n;
+			}
+		} else if ((ins & 0x3000) == 0x2000) {  /* ADR */
+			/* pass */
+		} else if ((ins & 0x3000) == 0x3000) {  /* ADRP */
+			/* pass */
+		} else if ((ins & 0x1000)) {  /* TBZ, TBNZ */
+			if ((n & 3) == 0 && ((n+0x00008000) >> 16) == 0) {
+				return n;
+			}
+		}
+	}
+
+	veneer = (char*)buffer + (Dst->codesize + ctx->veneers_size);
+	if (veneer > (void*)((char*)ctx->code_buffer + ctx->code_buffer_size)) {
+		IR_ASSERT(0 && "too long jmp distance" && "jit buffer overflow");
+		return 0; /* jit_buffer_size overflow */
+	}
+
+	na = (ptrdiff_t)veneer - (ptrdiff_t)cp + 4;
+	n = (int)na;
+
+	/* check if we can jump to veneer */
+	if ((ptrdiff_t)n != na) {
+		IR_ASSERT(0 && "too long jmp distance");
+		return 0;
+	} else if (!(ins & 0xf800)) {  /* B, BL */
+		if ((n & 3) != 0 || ((n+0x08000000) >> 28) != 0) {
+			IR_ASSERT(0 && "too long jmp distance");
+			return 0;
+		}
+	} else if ((ins & 0x800)) {  /* B.cond, CBZ, CBNZ, LDR* literal */
+		if ((n & 3) != 0 || ((n+0x00100000) >> 21) != 0) {
+			IR_ASSERT(0 && "too long jmp distance");
+			return 0;
+		}
+	} else if ((ins & 0x3000) == 0x2000) {  /* ADR */
+		IR_ASSERT(0 && "too long jmp distance");
+		return 0;
+	} else if ((ins & 0x3000) == 0x3000) {  /* ADRP */
+		IR_ASSERT(0 && "too long jmp distance");
+		return 0;
+	} else if ((ins & 0x1000)) {  /* TBZ, TBNZ */
+		if ((n & 3) != 0 || ((n+0x00008000) >> 16) != 0) {
+			IR_ASSERT(0 && "too long jmp distance");
+			return 0;
+		}
+	} else if ((ins & 0x8000)) {  /* absolute */
+		IR_ASSERT(0 && "too long jmp distance");
+		return 0;
+	} else {
+		IR_ASSERT(0 && "too long jmp distance");
+		return 0;
+	}
+
+	/* check if we can use B to jump from veneer */
+	na = (ptrdiff_t)cp + offset - (ptrdiff_t)veneer - 4;
+	m = (int)na;
+	if ((ptrdiff_t)m != na) {
+		IR_ASSERT(0 && "too long jmp distance");
+		return 0;
+	} else if ((m & 3) != 0 || ((m+0x08000000) >> 28) != 0) {
+		IR_ASSERT(0 && "too long jmp distance");
+		return 0;
+	}
+
+	if (!ctx->set_veneer || !ctx->set_veneer(ctx, addr, veneer)) {
+		IR_ASSERT(0 && "too long jmp distance");
+		return 0;
+	}
+
+	/* generate B instruction */
+	*(uint32_t*)veneer = 0x14000000 | ((m >> 2) & 0x03ffffff);
+	ctx->veneers_size += 4;
+
+	return n;
 }

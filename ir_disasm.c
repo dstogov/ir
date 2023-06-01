@@ -178,8 +178,7 @@ static void ir_disasm_destroy_symbols(ir_sym_node *n)
 	}
 }
 
-static const char* ir_disasm_find_symbol(uint64_t  addr,
-                                         int64_t  *offset)
+const char* ir_disasm_find_symbol(uint64_t addr, int64_t *offset)
 {
 	ir_sym_node *node = _symbols;
 	while (node) {
