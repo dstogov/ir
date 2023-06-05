@@ -1,0 +1,32 @@
+--TEST--
+GH-34: Simple if-else IR program compile failure
+--TARGET--
+x86_64
+--ARGS--
+-O0 -S
+--CODE--
+{
+        uintptr_t c_1 = 0;
+        bool c_2 = 0;
+        bool c_3 = 1;
+        int32_t c_4 = 1;
+        int32_t c_5 = 4;
+        l_1 = START(l_9);
+        int32_t p = PARAM(l_1, "p", 1);
+        bool d_2 = LT(c_4, c_5);
+        l_3 = IF(l_1, d_2);
+        l_4 = IF_TRUE(l_3);
+        l_5 = END(l_4);
+        l_6 = IF_FALSE(l_3);
+        l_7 = END(l_6);
+        l_8 = MERGE(l_5, l_7);
+        l_9 = RETURN(l_8, c_5);
+}
+--EXPECT--
+test:
+	movl $1, %eax
+	cmpl $4, %eax
+	jge .L1
+.L1:
+	movl $4, %eax
+	retq

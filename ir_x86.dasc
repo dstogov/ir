@@ -604,10 +604,8 @@ op2_const:
 			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 			if (IR_IS_CONST_REF(insn->op1)) {
 				const ir_insn *val_insn = &ctx->ir_base[insn->op1];
-				if (ir_type_size[val_insn->type] == 8 && !IR_IS_32BIT(val_insn->type, val_insn->val)) {
-					constraints->tmp_regs[0] = IR_TMP_REG(1, val_insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
-					n = 1;
-				}
+				constraints->tmp_regs[0] = IR_TMP_REG(1, val_insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n = 1;
 			} else if (ir_rule(ctx, insn->op1) & IR_FUSED) {
 				flags = IR_USE_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
 			}
@@ -618,11 +616,6 @@ op2_const:
 					constraints->tmp_regs[n] = IR_TMP_REG(2, val_insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
 				}
-			}
-			if (n == 0 && IR_IS_CONST_REF(insn->op1) && IR_IS_CONST_REF(insn->op2)) {
-				insn = &ctx->ir_base[insn->op1];
-				constraints->tmp_regs[n] = IR_TMP_REG(2, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
-				n++;
 			}
 			break;
 		case IR_CMP_FP:
