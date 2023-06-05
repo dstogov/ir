@@ -1365,6 +1365,8 @@ binop_fp:
 			return insn->op;
 		case IR_VAR:
 			return IR_SKIPPED | IR_VAR;
+		case IR_PARAM:
+			return ctx->use_lists[ref].count > 0 ? IR_PARAM : IR_SKIPPED | IR_PARAM;
 		case IR_ALLOCA:
 			/* alloca() may be use only in functions */
 			if (ctx->flags & IR_FUNCTION) {

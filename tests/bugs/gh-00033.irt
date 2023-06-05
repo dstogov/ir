@@ -1,0 +1,28 @@
+--TEST--
+GH-33: IR program failed to compile with "-O0" "-S" options
+--TARGET--
+x86_64
+--ARGS--
+-O0 -S
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 10;
+	l_1 = START(l_4);
+	int32_t d_2 = PARAM(l_1, "x", 0);
+	int32_t d_3 = DIV(d_2, c_4);
+	l_4 = RETURN(l_1, null);
+}
+--EXPECT--
+test:
+	subq $8, %rsp
+	movl %edi, (%rsp)
+	movl (%rsp), %eax
+	movl $0xa, %ecx
+	cltd
+	idivl %ecx
+	movl %eax, 4(%rsp)
+	addq $8, %rsp
+	retq

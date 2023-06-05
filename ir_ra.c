@@ -62,7 +62,7 @@ static int ir_assign_virtual_registers_slow(ir_ctx *ctx)
 		insn += n;
 		while (i < bb->end) {
 			flags = ir_op_flags[insn->op];
-			if (((flags & IR_OP_FLAG_DATA) && ctx->use_lists[i].count > 0)
+			if (((flags & IR_OP_FLAG_DATA) && insn->op != IR_VAR && (insn->op != IR_PARAM || ctx->use_lists[i].count > 0))
 			 || ((flags & IR_OP_FLAG_MEM) && ctx->use_lists[i].count > 1)) {
 				if (!ctx->rules || !(ctx->rules[i] & (IR_FUSED|IR_SKIPPED))) {
 					vregs[i] = ++vregs_count;
@@ -99,7 +99,7 @@ int ir_assign_virtual_registers(ir_ctx *ctx)
 		if (ctx->rules[i] && !(ctx->rules[i] & (IR_FUSED|IR_SKIPPED))) {
 			uint32_t flags = ir_op_flags[insn->op];
 
-			if (((flags & IR_OP_FLAG_DATA) && ctx->use_lists[i].count > 0)
+			if ((flags & IR_OP_FLAG_DATA)
 			 || ((flags & IR_OP_FLAG_MEM) && ctx->use_lists[i].count > 1)) {
 				v = ++vregs_count;
 			}
@@ -323,7 +323,7 @@ static ir_live_interval *ir_fix_live_range(ir_ctx *ctx, int v, ir_live_pos old_s
 		p = p->next;
 	}
 #endif
-	IR_ASSERT(p && p->start == old_start);
+	IR_ASSERT(ival && p->start == old_start);
 	p->start = new_start;
 	return ival;
 }
