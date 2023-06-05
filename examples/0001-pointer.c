@@ -10,32 +10,26 @@
 #include <stdlib.h>
 
 /*
- * int32_t myfunc() {
- * 	int32_t i = 0;
- * 	while (i++ < 42);
- *	return i;
+ * void myfunc(uint32_t *i) {
+ *	(*i)++;
  * }
  */
-typedef int32_t (*myfunc_t)(void);
+typedef uint32_t (*myfunc_t)(uint32_t*);
 
 void gen_myfunc(ir_ctx *ctx)
 {
 	/* Function entry start */
 	ir_START();
-	/* Declare loop counter. */
-	ir_ref i = ir_COPY_I32(ir_CONST_I32(0));
-	ir_ref loop = ir_LOOP_BEGIN(ir_END());
-		ir_ref phi_i_1 = ir_PHI_2(i, IR_UNUSED);
-		ir_ref i_2 = ir_ADD_I32(phi_i_1, ir_CONST_I32(1));
-		ir_ref cond = ir_IF(ir_LT(phi_i_1, ir_CONST_I32(42)));
-			ir_IF_TRUE(cond);
-				/* close loop */
-				ir_MERGE_SET_OP(loop, 2, ir_LOOP_END());
-				ir_PHI_SET_OP(phi_i_1, 2, i_2);
-			ir_IF_FALSE(cond);
+	/* Declare function parameters */
+	ir_ref i_ptr = ir_PARAM(IR_U32, "i", 1);
 
-	/* Function end */
-	ir_RETURN(i_2);
+	/* Dereference the argument pointer value, increment and store back. */
+	ir_ref i_val = ir_LOAD_U32(i_ptr);
+	ir_ref i_inc_val = ir_ADD_U32(i_val, ir_CONST_U32(1));
+	ir_STORE(i_ptr, i_inc_val);
+
+	/* Function end, declared void */
+	ir_RETURN(IR_UNUSED);
 }
 
 int main(int argc, char **argv)
@@ -51,7 +45,10 @@ int main(int argc, char **argv)
 	size_t size;
 	void *entry = ir_jit_compile(&ctx, 2, &size);
 	if (entry) {
-		printf("%d\n", ((myfunc_t)entry)());
+		uint32_t i = 42;
+		printf("i=%u ", i);
+		((myfunc_t)entry)(&i);
+		printf("i=%u\n", i);
 	}
 
 	ir_free(&ctx);

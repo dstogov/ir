@@ -71,7 +71,8 @@ OBJS_COMMON=$(BUILD_DIR)\ir.obj $(BUILD_DIR)\ir_strtab.obj $(BUILD_DIR)\ir_cfg.o
 	$(BUILD_DIR)\ir_disasm.obj $(BUILD_DIR)\ir_check.obj $(BUILD_DIR)\ir_cpuinfo.obj
 OBJS_IR = $(BUILD_DIR)\ir_main.obj
 OBJS_IR_TEST = $(BUILD_DIR)\ir_test.obj
-EXAMPLE_EXES = $(EXAMPLES_BUILD_DIR)\0001-basic.exe $(EXAMPLES_BUILD_DIR)\0001-while.exe $(EXAMPLES_BUILD_DIR)\0005-basic-runner-func.exe
+EXAMPLE_EXES = $(EXAMPLES_BUILD_DIR)\0001-basic.exe $(EXAMPLES_BUILD_DIR)\0001-while.exe $(EXAMPLES_BUILD_DIR)\0005-basic-runner-func.exe \
+	       $(EXAMPLES_BUILD_DIR)\0001-pointer.exe
 
 all: $(BUILD_DIR) $(BUILD_DIR)\ir.exe $(BUILD_DIR)\ir_test.exe
 

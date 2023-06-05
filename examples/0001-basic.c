@@ -18,10 +18,14 @@ typedef int32_t (*myfunc_t)(int32_t, int32_t);
 
 void gen_myfunc(ir_ctx *ctx)
 {
+	/* Function entry start */
 	ir_START();
+	/* Declare function parameters */
 	ir_ref x = ir_PARAM(IR_I32, "x", 1);
 	ir_ref y = ir_PARAM(IR_I32, "y", 2);
+	/* Subtract y from x and save it into a new ref. */
 	ir_ref cr = ir_SUB_I32(x, y);
+	/* Function end */
 	ir_RETURN(cr);
 }
 

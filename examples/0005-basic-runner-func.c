@@ -18,14 +18,17 @@ typedef double (*myfunc_t)(double, double);
 
 void gen_myfunc(ir_ctx *ctx)
 {
+	/* Function entry start */
 	ir_START();
+	/* Declare function parameters */
 	ir_ref x = ir_PARAM(IR_DOUBLE, "x", 1);
 	ir_ref y = ir_PARAM(IR_DOUBLE, "y", 2);
-	ir_ref cr0 = ir_SUB_D(x, y);
 
+	ir_ref cr0 = ir_SUB_D(x, y);
 	ir_ref cd = ir_CONST_DOUBLE(.3);
 	cr0 = ir_ADD_D(cr0, cd);
 
+	/* Function end */
 	ir_RETURN(cr0);
 }
 
