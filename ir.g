@@ -97,7 +97,7 @@ static void ir_define_var(ir_parser_ctx *p, const char *str, size_t len, ir_ref 
 			} while (old_ref != IR_UNUSED);
 			ir_strtab_update(&p->var_tab, str, len32, ref);
 		} else {
-			fprintf(stderr, "ERROR: Redefined variable `%*s` on line %d\n", (int)len32, str, yy_line);
+			fprintf(stderr, "ERROR: Redefined variable `%.*s` on line %d\n", (int)len32, str, yy_line);
 			exit(2);
 		}
 	}
@@ -106,7 +106,7 @@ static void ir_define_var(ir_parser_ctx *p, const char *str, size_t len, ir_ref 
 static void report_undefined_var(const char *str, uint32_t len, ir_ref val)
 {
 	if (IR_IS_UNRESOLVED(val)) {
-		fprintf(stderr, "ERROR: Undefined variable `%*s`\n", (int)len, str);
+		fprintf(stderr, "ERROR: Undefined variable `%.*s`\n", (int)len, str);
 	}
 }
 
