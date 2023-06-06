@@ -6793,17 +6793,19 @@ static bool ir_emit_guard(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 	} else {
 |.if X64
 		if (insn->op == IR_GUARD) {
-			|	jne >1
-		} else {
 			|	je >1
+		} else {
+			|	jne >1
 		}
+		|.cold_code
+		|1:
 		if (IR_IS_SIGNED_32BIT(addr)) {
 			|	mov rax, ((ptrdiff_t)addr)    // 0x48 0xc7 0xc0 <imm-32-bit>
 		} else {
 			|	mov64 rax, ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
 		}
 		|	jmp aword [rax]
-		|1:
+		|.code
 |.endif
 		return 0;
 	}
