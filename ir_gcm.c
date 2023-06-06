@@ -166,6 +166,11 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 			}
 			_blocks[ref] = b;
 		}
+
+		if (ctx->ir_base[ref + 1].op == IR_OVERFLOW) {
+			/* OVERFLOW is a projection and must be scheduled together with previous ADD/SUB/MUL_OV */
+			_blocks[ref + 1] = b;
+		}
 	}
 }
 
@@ -214,6 +219,10 @@ static void ir_gcm_schedule_rest(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 		IR_ASSERT(lca != 0 && "No Common Antecessor");
 		b = lca;
 		_blocks[ref] = b;
+		if (ctx->ir_base[ref + 1].op == IR_OVERFLOW) {
+			/* OVERFLOW is a projection and must be scheduled together with previous ADD/SUB/MUL_OV */
+			_blocks[ref + 1] = b;
+		}
 	}
 }
 
