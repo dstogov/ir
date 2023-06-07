@@ -316,28 +316,30 @@ int ir_gcm(ir_ctx *ctx)
 
 		use_list = &ctx->use_lists[ref];
 		n = use_list->count;
-		for (p = &ctx->use_edges[use_list->refs]; n > 0; n--, p++) {
-			ref = *p;
-			use_insn = &ctx->ir_base[ref];
-			if (use_insn->op == IR_PHI || use_insn->op == IR_PI) {
-				bb->flags |= (use_insn->op == IR_PHI) ? IR_BB_HAS_PHI : IR_BB_HAS_PI;
-				ir_bitset_incl(visited, ref);
-				if (EXPECTED(ctx->use_lists[ref].count != 0)) {
+		if (n > 1) {
+			for (p = &ctx->use_edges[use_list->refs]; n > 0; n--, p++) {
+				ref = *p;
+				use_insn = &ctx->ir_base[ref];
+				if (use_insn->op == IR_PHI || use_insn->op == IR_PI) {
+					bb->flags |= (use_insn->op == IR_PHI) ? IR_BB_HAS_PHI : IR_BB_HAS_PI;
+					ir_bitset_incl(visited, ref);
+					if (EXPECTED(ctx->use_lists[ref].count != 0)) {
+						_blocks[ref] = b; /* pin to block */
+						ir_list_push_unchecked(&queue_early, ref);
+						ir_list_push_unchecked(&queue_late, ref);
+					}
+				} else if (use_insn->op == IR_PARAM) {
+					bb->flags |= IR_BB_HAS_PARAM;
 					_blocks[ref] = b; /* pin to block */
-					ir_list_push_unchecked(&queue_early, ref);
-					ir_list_push_unchecked(&queue_late, ref);
+					ir_bitset_incl(visited, ref);
+					if (EXPECTED(ctx->use_lists[ref].count != 0)) {
+						ir_list_push_unchecked(&queue_late, ref);
+					}
+				} else if (use_insn->op == IR_VAR) {
+					bb->flags |= IR_BB_HAS_VAR;
+					_blocks[ref] = b; /* pin to block */
+					ir_bitset_incl(visited, ref);
 				}
-			} else if (use_insn->op == IR_PARAM) {
-				bb->flags |= IR_BB_HAS_PARAM;
-				_blocks[ref] = b; /* pin to block */
-				ir_bitset_incl(visited, ref);
-				if (EXPECTED(ctx->use_lists[ref].count != 0)) {
-					ir_list_push_unchecked(&queue_late, ref);
-				}
-			} else if (use_insn->op == IR_VAR) {
-				bb->flags |= IR_BB_HAS_VAR;
-				_blocks[ref] = b; /* pin to block */
-				ir_bitset_incl(visited, ref);
 			}
 		}
 	}
