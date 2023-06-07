@@ -412,25 +412,27 @@ static void ir_remove_merge_input(ir_ctx *ctx, ir_ref merge, ir_ref from)
 	    insn->op = IR_BEGIN;
 		insn->inputs_count = 0;
 		use_list = &ctx->use_lists[merge];
-		for (k = 0, p = &ctx->use_edges[use_list->refs]; k < use_list->count; k++, p++) {
-			use = *p;
-			use_insn = &ctx->ir_base[use];
-			if (use_insn->op == IR_PHI) {
-				/* Convert PHI to COPY */
-			    i = 2;
-				for (j = 2; j <= n; j++) {
-					ir_ref input = ir_insn_op(use_insn, j);
+		if (use_list->count > 1) {
+			for (k = 0, p = &ctx->use_edges[use_list->refs]; k < use_list->count; k++, p++) {
+				use = *p;
+				use_insn = &ctx->ir_base[use];
+				if (use_insn->op == IR_PHI) {
+					/* Convert PHI to COPY */
+					i = 2;
+					for (j = 2; j <= n; j++) {
+						ir_ref input = ir_insn_op(use_insn, j);
 
-					if (ir_bitset_in(life_inputs, j - 1)) {
-						use_insn->op1 = ir_insn_op(use_insn, j);
-					} else if (input > 0) {
-						ir_remove_from_use_list(ctx, input, use);
+						if (ir_bitset_in(life_inputs, j - 1)) {
+							use_insn->op1 = ir_insn_op(use_insn, j);
+						} else if (input > 0) {
+							ir_remove_from_use_list(ctx, input, use);
+						}
 					}
+					use_insn->op = IR_COPY;
+					use_insn->op2 = IR_UNUSED;
+					use_insn->op3 = IR_UNUSED;
+					ir_remove_from_use_list(ctx, merge, use);
 				}
-				use_insn->op = IR_COPY;
-				use_insn->op2 = IR_UNUSED;
-				use_insn->op3 = IR_UNUSED;
-				ir_remove_from_use_list(ctx, merge, use);
 			}
 		}
 	} else {
@@ -438,22 +440,24 @@ static void ir_remove_merge_input(ir_ctx *ctx, ir_ref merge, ir_ref from)
 
 		n++;
 		use_list = &ctx->use_lists[merge];
-		for (k = 0, p = &ctx->use_edges[use_list->refs]; k < use_list->count; k++, p++) {
-			use = *p;
-			use_insn = &ctx->ir_base[use];
-			if (use_insn->op == IR_PHI) {
-			    i = 2;
-				for (j = 2; j <= n; j++) {
-					ir_ref input = ir_insn_op(use_insn, j);
+		if (use_list->count > 1) {
+			for (k = 0, p = &ctx->use_edges[use_list->refs]; k < use_list->count; k++, p++) {
+				use = *p;
+				use_insn = &ctx->ir_base[use];
+				if (use_insn->op == IR_PHI) {
+					i = 2;
+					for (j = 2; j <= n; j++) {
+						ir_ref input = ir_insn_op(use_insn, j);
 
-					if (ir_bitset_in(life_inputs, j - 1)) {
-						IR_ASSERT(input);
-						if (i != j) {
-							ir_insn_set_op(use_insn, i, input);
+						if (ir_bitset_in(life_inputs, j - 1)) {
+							IR_ASSERT(input);
+							if (i != j) {
+								ir_insn_set_op(use_insn, i, input);
+							}
+							i++;
+						} else if (input > 0) {
+							ir_remove_from_use_list(ctx, input, use);
 						}
-						i++;
-					} else if (input > 0) {
-						ir_remove_from_use_list(ctx, input, use);
 					}
 				}
 			}
