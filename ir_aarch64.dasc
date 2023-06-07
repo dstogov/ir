@@ -4828,7 +4828,12 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		if (ctx->fixed_stack_red_zone) {
 			IR_ASSERT(ctx->fixed_stack_red_zone == ctx->fixed_stack_frame_size + ctx->fixed_call_stack_size);
 		}
-		IR_ASSERT(data.ra_data.stack_frame_size <= ctx->fixed_stack_frame_size);
+		if (data.ra_data.stack_frame_size > ctx->fixed_stack_frame_size) {
+			// TODO: report error to caller
+			fprintf(stderr, "IR Compilation Aborted: data.ra_data.stack_frame_size > ctx->fixed_stack_frame_size at %s:%d\n",
+				__FILE__, __LINE__);
+			return NULL;
+		}
 		data.ra_data.stack_frame_size = ctx->fixed_stack_frame_size;
 		data.call_stack_size = ctx->fixed_call_stack_size;
 		data.stack_frame_alignment = 0;
