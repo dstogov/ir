@@ -126,8 +126,9 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 			ir_block *bb = &ctx->cfg_blocks[b];
 			uint32_t loop_depth = bb->loop_depth;
 
-			if (loop_depth
-			 && !(ctx->binding && ir_binding_find(ctx, ref))) {
+			if (loop_depth) {
+// TODO: proper support for anti-dependencies between bound nodes ???
+//			 && !(ctx->binding && ir_binding_find(ctx, ref))) {
 				uint32_t flags;
 
 				use_list = &ctx->use_lists[ref];
