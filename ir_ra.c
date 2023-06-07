@@ -3407,6 +3407,11 @@ static int ir_linear_scan(ir_ctx *ctx)
 				if (unhandled && ival->end > unhandled->range.start) {
 					ival->list_next = active;
 					active = ival;
+				} else {
+					size = ir_type_size[ival->type];
+					IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8);
+					ival->list_next = handled[size];
+					handled[size] = ival;
 				}
 			}
 		}
