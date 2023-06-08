@@ -766,7 +766,7 @@ op2_const:
 			break;
 		case IR_PARAM:
 			constraints->def_reg = ir_get_param_reg(ctx, ref);
-			flags = (constraints->def_reg == IR_REG_NONE) ? IR_USE_MUST_BE_IN_REG : IR_USE_SHOULD_BE_IN_REG;
+			flags = 0;
 			break;
 		case IR_PI:
 		case IR_PHI:
@@ -1847,9 +1847,17 @@ static void ir_match_insn2(ir_ctx *ctx, ir_ref ref, uint32_t rule)
 	if (rule == IR_LEA_IB) {
 		ir_insn *insn = &ctx->ir_base[ref];
 
-		if (ir_match_fuse_load(ctx, insn->op2, ref)) {
+		if (insn->op1 == insn->op2) {
+			/* pass */
+		} else if (ir_match_fuse_load(ctx, insn->op2, ref) ||
+		    (ctx->ir_base[insn->op2].op == IR_PARAM
+		  && ctx->use_lists[insn->op2].count == 1
+		  && ir_get_param_reg(ctx, insn->op2) == IR_REG_NONE)) {
 			ctx->rules[ref] = IR_BINOP_INT;
-		} else if (ir_match_fuse_load(ctx, insn->op1, ref)) {
+		} else if (ir_match_fuse_load(ctx, insn->op1, ref) ||
+		    (ctx->ir_base[insn->op1].op == IR_PARAM
+		  && ctx->use_lists[insn->op1].count == 1
+		  && ir_get_param_reg(ctx, insn->op1) == IR_REG_NONE)) {
 			/* swap for better load fusion */
 			ir_swap_ops(insn);
 			ctx->rules[ref] = IR_BINOP_INT;

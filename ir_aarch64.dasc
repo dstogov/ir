@@ -449,7 +449,7 @@ int ir_get_target_constraints(const ir_ctx *ctx, ir_ref ref, ir_target_constrain
 			break;
 		case IR_PARAM:
 			constraints->def_reg = ir_get_param_reg(ctx, ref);
-			flags = (constraints->def_reg == IR_REG_NONE) ? IR_USE_MUST_BE_IN_REG : IR_USE_SHOULD_BE_IN_REG;
+			flags = 0;
 			break;
 		case IR_PI:
 		case IR_PHI:

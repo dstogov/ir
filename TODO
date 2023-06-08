@@ -26,7 +26,6 @@
 	   tests/x86/ra_015.irt, tests/x86/combo_004.irt tests/x86/min_005.ir, tests/x86/min_006.irt, tests/x86/abs_001.irt)
 	-  optimisation of spill code placement (BB local or through resolution)
 	-  separate INT and FP allocation phases (for performance)
-	-  tests/x86/ra_007.irt loads one of the parameters too early that leads to the following useless move
 	-  Try to avoid live-interval construction, see "Efficient Global Register Allocation" Ian Rogers
 
 ?  code generation

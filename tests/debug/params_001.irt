@@ -30,16 +30,13 @@ x86_64
 }
 --EXPECT--
 test:
-	movl 8(%rsp), %eax
-	movl 0x10(%rsp), %r10d
-	movl 0x18(%rsp), %r11d
-	addl %edi, %esi
-	addl %esi, %edx
-	addl %edx, %ecx
-	addl %r8d, %ecx
-	addl %r9d, %ecx
+	leal (%rsi, %rdi), %eax
+	addl %edx, %eax
 	addl %ecx, %eax
-	addl %r10d, %eax
-	addl %r11d, %eax
+	addl %r8d, %eax
+	addl %r9d, %eax
+	addl 8(%rsp), %eax
+	addl 0x10(%rsp), %eax
+	addl 0x18(%rsp), %eax
 	subl 0x20(%rsp), %eax
 	retq

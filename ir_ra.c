@@ -1713,6 +1713,9 @@ static int ir_try_swap_operands(ir_ctx *ctx, ir_ref i, ir_insn *insn)
 			ir_live_interval *ival = ctx->live_intervals[ctx->vregs[insn->op2]];
 			ir_live_range *r = &ival->range;
 
+			if ((ival->flags & IR_LIVE_INTERVAL_MEM_PARAM) && ctx->use_lists[insn->op2].count == 1) {
+				return 0;
+			}
 			while (r) {
 				if (r->end == pos) {
 					r->end = load_pos;
