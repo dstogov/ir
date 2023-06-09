@@ -385,6 +385,55 @@ static void ir_add_phi_use(ir_ctx *ctx, ir_live_interval *ival, int op_num, ir_l
 	ir_add_use_pos(ctx, ival, use_pos);
 }
 
+static void ir_add_hint(ir_ctx *ctx, ir_ref ref, ir_live_pos pos, ir_reg hint)
+{
+	ir_live_interval *ival = ctx->live_intervals[ctx->vregs[ref]];
+
+	if (!(ival->flags & IR_LIVE_INTERVAL_HAS_HINT_REGS)) {
+		ir_use_pos *use_pos = ival->use_pos;
+
+		while (use_pos) {
+			if (use_pos->pos == pos) {
+				if (use_pos->hint == IR_REG_NONE) {
+					use_pos->hint = hint;
+					ival->flags |= IR_LIVE_INTERVAL_HAS_HINT_REGS;
+				}
+			}
+			use_pos = use_pos->next;
+		}
+	}
+}
+
+static void ir_hint_propagation(ir_ctx *ctx)
+{
+	int i;
+	ir_live_interval *ival;
+	ir_use_pos *use_pos;
+	ir_use_pos *hint_use_pos;
+
+	for (i = ctx->vregs_count; i > 0; i--) {
+		ival = ctx->live_intervals[i];
+		if (ival
+		 && (ival->flags & (IR_LIVE_INTERVAL_HAS_HINT_REGS|IR_LIVE_INTERVAL_HAS_HINT_REFS)) == (IR_LIVE_INTERVAL_HAS_HINT_REGS|IR_LIVE_INTERVAL_HAS_HINT_REFS)) {
+			use_pos = ival->use_pos;
+			hint_use_pos = NULL;
+			while (use_pos) {
+				if (use_pos->op_num == 0) {
+					if (use_pos->hint_ref > 0) {
+						hint_use_pos = use_pos;
+					}
+				} else if (use_pos->hint != IR_REG_NONE) {
+					if (hint_use_pos) {
+						ir_add_hint(ctx, hint_use_pos->hint_ref, hint_use_pos->pos, use_pos->hint);
+						hint_use_pos = NULL;
+					}
+				}
+				use_pos = use_pos->next;
+			}
+		}
+	}
+}
+
 #ifdef IR_BITSET_LIVENESS
 /* DFS + Loop-Forest livness for SSA using bitset(s) */
 static void ir_add_osr_entry_loads(ir_ctx *ctx, ir_block *bb, ir_bitset live, uint32_t len, uint32_t b)
@@ -1812,6 +1861,8 @@ int ir_coalesce(ir_ctx *ctx)
 	}
 	ir_worklist_free(&blocks);
 
+	ir_hint_propagation(ctx);
+
 	if (ctx->rules) {
 		/* try to swap operands of commutative instructions for better register allocation */
 		for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
@@ -2370,6 +2421,23 @@ int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type, ir_reg_alloc_data *dat
 	return ret;
 }
 
+static ir_reg ir_get_first_reg_hint(ir_ctx *ctx, ir_live_interval *ival, ir_regset available)
+{
+	ir_use_pos *use_pos;
+	ir_reg reg;
+
+	use_pos = ival->use_pos;
+	while (use_pos) {
+		reg = use_pos->hint;
+		if (reg >= 0 && IR_REGSET_IN(available, reg)) {
+			return reg;
+		}
+		use_pos = use_pos->next;
+	}
+
+	return IR_REG_NONE;
+}
+
 static ir_reg ir_try_allocate_preferred_reg(ir_ctx *ctx, ir_live_interval *ival, ir_regset available, ir_live_pos *freeUntilPos)
 {
 	ir_use_pos *use_pos;
@@ -2646,10 +2714,35 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 			}
 		}
 
+		/* prefer caller-saved registers to avoid save/restore in prologue/epilogue */
 		scratch = IR_REGSET_INTERSECTION(available, IR_REGSET_SCRATCH);
 		if (scratch != IR_REGSET_EMPTY) {
-			/* prefer caller-saved registers to avoid save/restore in prologue/epilogue */
-			reg = IR_REGSET_FIRST(scratch);
+			/* prefer registers that don't conflict with the hints for the following unhandled intervals */
+			if (1) {
+				ir_regset non_conflicting = scratch;
+
+				other = *unhandled;
+				while (other && other->range.start < ival->range.end) {
+					if (other->flags & IR_LIVE_INTERVAL_HAS_HINT_REGS) {
+						reg = ir_get_first_reg_hint(ctx, other, non_conflicting);
+
+						if (reg >= 0) {
+							IR_REGSET_EXCL(non_conflicting, reg);
+							if (non_conflicting == IR_REGSET_EMPTY) {
+								break;
+							}
+						}
+					}
+					other = other->list_next;
+				}
+				if (non_conflicting != IR_REGSET_EMPTY) {
+					reg = IR_REGSET_FIRST(non_conflicting);
+				} else {
+					reg = IR_REGSET_FIRST(scratch);
+				}
+			} else {
+				reg = IR_REGSET_FIRST(scratch);
+			}
 		} else {
 			reg = IR_REGSET_FIRST(available);
 		}
@@ -3507,55 +3600,8 @@ static void assign_regs(ir_ctx *ctx)
 	}
 }
 
-static void ir_add_hint(ir_ctx *ctx, ir_ref ref, ir_live_pos pos, ir_reg hint)
-{
-	ir_live_interval *ival = ctx->live_intervals[ctx->vregs[ref]];
-	ir_use_pos *use_pos = ival->use_pos;
-
-	while (use_pos) {
-		if (use_pos->pos == pos) {
-			if (use_pos->hint == IR_REG_NONE) {
-				use_pos->hint = hint;
-				ival->flags |= IR_LIVE_INTERVAL_HAS_HINT_REGS;
-			}
-		}
-		use_pos = use_pos->next;
-	}
-}
-
-static void ir_hint_propagation(ir_ctx *ctx)
-{
-	int i;
-	ir_live_interval *ival;
-	ir_use_pos *use_pos;
-	ir_use_pos *hint_use_pos;
-
-	for (i = 1; i <= ctx->vregs_count; i++) {
-		ival = ctx->live_intervals[i];
-		if (ival
-		 && (ival->flags & (IR_LIVE_INTERVAL_HAS_HINT_REGS|IR_LIVE_INTERVAL_HAS_HINT_REFS)) == (IR_LIVE_INTERVAL_HAS_HINT_REGS|IR_LIVE_INTERVAL_HAS_HINT_REFS)) {
-			use_pos = ival->use_pos;
-			hint_use_pos = NULL;
-			while (use_pos) {
-				if (use_pos->hint_ref > 0) {
-					hint_use_pos = use_pos;
-				} else if (use_pos->hint != IR_REG_NONE) {
-					if (hint_use_pos) {
-						if (use_pos->op_num != 0) {
-							ir_add_hint(ctx, hint_use_pos->hint_ref, hint_use_pos->pos, use_pos->hint);
-						}
-						hint_use_pos = NULL;
-					}
-				}
-				use_pos = use_pos->next;
-			}
-		}
-	}
-}
-
 int ir_reg_alloc(ir_ctx *ctx)
 {
-	ir_hint_propagation(ctx);
 	if (ir_linear_scan(ctx)) {
 		assign_regs(ctx);
 		return 1;

@@ -30,14 +30,13 @@ x86_64
 }
 --EXPECT--
 test:
-	addsd %xmm0, %xmm1
-	addsd %xmm2, %xmm1
-	addsd %xmm3, %xmm1
-	addsd %xmm4, %xmm1
-	addsd %xmm5, %xmm1
-	addsd %xmm6, %xmm1
-	addsd %xmm7, %xmm1
-	movapd %xmm1, %xmm0
+	addsd %xmm1, %xmm0
+	addsd %xmm2, %xmm0
+	addsd %xmm3, %xmm0
+	addsd %xmm4, %xmm0
+	addsd %xmm5, %xmm0
+	addsd %xmm6, %xmm0
+	addsd %xmm7, %xmm0
 	addsd 8(%rsp), %xmm0
 	subsd 0x10(%rsp), %xmm0
 	retq

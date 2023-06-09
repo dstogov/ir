@@ -14,9 +14,8 @@ x86
 }
 --EXPECT--
 test:
-	movb 4(%esp), %al
-	movb 8(%esp), %cl
-	cmpb %al, %cl
-	cmovaw %ax, %cx
-	movb %cl, %al
+	movb 4(%esp), %cl
+	movb 8(%esp), %al
+	cmpb %cl, %al
+	cmovaw %cx, %ax
 	retl
