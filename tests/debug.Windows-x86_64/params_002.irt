@@ -30,14 +30,13 @@ Windows-x86_64
 }
 --EXPECT--
 test:
-	addsd %xmm0, %xmm1
-	addsd %xmm2, %xmm1
-	addsd %xmm3, %xmm1
-	addsd 8(%rsp), %xmm1
-	addsd 0x10(%rsp), %xmm1
-	addsd 0x18(%rsp), %xmm1
-	addsd 0x20(%rsp), %xmm1
-	movapd %xmm1, %xmm0
+	addsd %xmm1, %xmm0
+	addsd %xmm2, %xmm0
+	addsd %xmm3, %xmm0
+	addsd 8(%rsp), %xmm0
+	addsd 0x10(%rsp), %xmm0
+	addsd 0x18(%rsp), %xmm0
+	addsd 0x20(%rsp), %xmm0
 	addsd 0x28(%rsp), %xmm0
 	subsd 0x30(%rsp), %xmm0
 	retq
