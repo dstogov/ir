@@ -740,7 +740,7 @@ binop_fp:
 			}
 			break;
 		case IR_RLOAD:
-			if (IR_REGSET_IN(IR_REGSET_UNION(ctx->fixed_regset, IR_REGSET_FIXED), insn->op2)) {
+			if (IR_REGSET_IN(IR_REGSET_UNION((ir_regset)ctx->fixed_regset, IR_REGSET_FIXED), insn->op2)) {
 				return IR_SKIPPED | IR_RLOAD;
 			}
 			return IR_RLOAD;
@@ -3146,7 +3146,7 @@ static void ir_emit_rload(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg src_reg = insn->op2;
 	ir_type type = insn->type;
 
-	if (IR_REGSET_IN(IR_REGSET_UNION(ctx->fixed_regset, IR_REGSET_FIXED), src_reg)) {
+	if (IR_REGSET_IN(IR_REGSET_UNION((ir_regset)ctx->fixed_regset, IR_REGSET_FIXED), src_reg)) {
 		if (ctx->vregs[def]
 		 && ctx->live_intervals[ctx->vregs[def]]
 		 && ctx->live_intervals[ctx->vregs[def]]->stack_spill_pos != -1) {
@@ -5148,7 +5148,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 								c = '\b';
 							} else if (str[i+1] == 'e') {
 								i++;
-								c = '\e';
+								c = 27; /* '\e'; */
 							} else if (str[i+1] == 'f') {
 								i++;
 								c = '\f';
