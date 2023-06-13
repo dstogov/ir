@@ -7210,7 +7210,8 @@ static void ir_emit_exitcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	|	movsd qword [rsp+16*8+15*8], xmm15
 	|
 	|	mov Ra(IR_REG_INT_ARG2), rsp
-	|	mov aword [rsp+4*8], Ra(IR_REG_INT_ARG2)
+	|	lea Ra(IR_REG_INT_ARG1), [rsp+16*8+16*8+16]
+	|	mov aword [rsp+4*8], Ra(IR_REG_INT_ARG1)
 	|	mov Ra(IR_REG_INT_ARG1), [rsp+16*8+16*8+8]
 	|.if X64WIN
 	|	sub rsp, 32 /* shadow space */
@@ -7234,7 +7235,8 @@ static void ir_emit_exitcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	|	movsd qword [esp+8*4+7*8], xmm7
 	|
 	|	mov Ra(IR_REG_INT_FCARG2), esp
-	|	mov aword [esp+4*4], Ra(IR_REG_INT_FCARG2)
+	|	lea Ra(IR_REG_INT_FCARG1), [esp+8*4+8*8+16]
+	|	mov aword [esp+4*4], Ra(IR_REG_INT_FCARG1)
 	|	mov Ra(IR_REG_INT_FCARG1), [esp+8*4+8*8+12]
 	|.endif
 

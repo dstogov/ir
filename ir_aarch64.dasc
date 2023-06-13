@@ -4230,7 +4230,8 @@ static void ir_emit_exitcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	|	stp x0, x1, [sp, #-16]!
 
 	|	mov Rx(IR_REG_INT_ARG2), sp
-	|	str Rx(IR_REG_INT_ARG2), [sp, #(31*8)]
+	|	add Rx(IR_REG_INT_ARG1), Rx(IR_REG_INT_ARG2), #(32*8+32*8)
+	|	str Rx(IR_REG_INT_ARG1), [sp, #(31*8)]
 	|	mov Rx(IR_REG_INT_ARG1), Rx(IR_REG_INT_TMP)
 
 	if (IR_IS_CONST_REF(insn->op2)) {
