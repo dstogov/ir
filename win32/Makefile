@@ -1,29 +1,34 @@
 
-!if "$(BUILD)" == ""
+!if "$(BUILD)" != "debug"
 BUILD=release
 !endif
 
-!if "$(VCPKG_TRIPLET)" == ""
-VCPKG_TRIPLET=$(VSCMD_ARG_TGT_ARCH)-windows
-!endif
-
 !if "$(BUILD_DIR)" == ""
-BUILD_DIR=win32\build_$(VCPKG_TRIPLET)
+BUILD_DIR=win32\build_$(VSCMD_ARG_TGT_ARCH)_$(BUILD)
 !endif
 SRC_DIR=.
 
 EXAMPLES_SRC_DIR=$(SRC_DIR)\examples
 EXAMPLES_BUILD_DIR=$(BUILD_DIR)\examples
 
-!if "$(VCPKG_DIR)" == ""
-VCPKG_DIR=win32\vcpkg
+CAPSTONE_TAG=5.0-rc2
+!if "$(CAPSTONE_DIR)" == ""
+CAPSTONE_DIR=win32\capstone
 !endif
-PATH=$(PATH);$(VCPKG_DIR)\installed\$(VCPKG_TRIPLET)\bin
+CAPSTONE_VCXPRJ=capstone_static\capstone_static.vcxproj
+CAPSTONE_VCXPRJ_PATH=$(CAPSTONE_DIR)\msvc\$(CAPSTONE_VCXPRJ)
+!if "$(VSCMD_ARG_TGT_ARCH)" == "x64"
+CAPSTONE_ARTIFACTS_DIR=$(CAPSTONE_DIR)\msvc\$(VSCMD_ARG_TGT_ARCH)\$(BUILD)
+!else
+CAPSTONE_ARTIFACTS_DIR=$(CAPSTONE_DIR)\msvc\$(BUILD)
+!endif
+PATH=$(PATH);$(CAPSTONE_ARTIFACTS_DIR)
 
-CFLAGS=/nologo /utf-8 /W3 /EHsc /Zi /I$(SRC_DIR) /I$(BUILD_DIR) /I$(VCPKG_DIR)\installed\$(VCPKG_TRIPLET)\include
+CFLAGS=/nologo /utf-8 /W3 /EHsc /Zi /I$(BUILD_DIR) /I$(CAPSTONE_DIR)\include
 LDFLAGS=/nologo
 !if "$(BUILD)" == "release"
 CFLAGS=$(CFLAGS) /MT /Ox
+LDFLAGS=$(LDFLAGS) /LTCG
 !else
 CFLAGS=$(CFLAGS) /MTd /Od /DEBUG /D_DEBUG /DIR_DEBUG=1
 LDFLAGS=$(LDFLAGS) /DEBUG
@@ -59,9 +64,11 @@ DASM_ARCH=x86
 DASM_FLAGS=
 !endif
 
-VCPKG_CAPSTONE=$(VCPKG_DIR)\installed\$(VCPKG_TRIPLET)\include\capstone
-
-LDFLAGS=$(LDFLAGS) /libpath:$(VCPKG_DIR)\installed\$(VCPKG_TRIPLET)\lib
+!if "$(VSCMD_ARG_TGT_ARCH)" == "x64"
+LDFLAGS=$(LDFLAGS) /libpath:$(CAPSTONE_DIR)\msvc\$(VSCMD_ARG_TGT_ARCH)\$(BUILD)
+!else
+LDFLAGS=$(LDFLAGS) /libpath:$(CAPSTONE_DIR)\msvc\$(BUILD)
+!endif
 
 LIBS=psapi.lib capstone.lib
 
@@ -76,7 +83,6 @@ EXAMPLE_EXES = $(EXAMPLES_BUILD_DIR)\0001-basic.exe $(EXAMPLES_BUILD_DIR)\0001-w
 
 all: $(BUILD_DIR) $(BUILD_DIR)\ir.exe $(BUILD_DIR)\ir_test.exe
 
-#$(BUILD_DIR)\ir.exe: builddir capstone $(BUILD_DIR)\ir_emit_$(DASM_ARCH).h $(BUILD_DIR)\ir_fold_hash.h $(OBJS_IR) $(OBJS_COMMON)
 $(BUILD_DIR)\ir.exe: $(OBJS_IR) $(OBJS_COMMON)
 	"$(LD)" $(LDFLAGS) $(OBJS_COMMON) $(OBJS_IR) $(LIBS) /out:$@
 
@@ -101,7 +107,7 @@ $(BUILD_DIR)\ir_test.obj: $(SRC_DIR)\ir.h $(SRC_DIR)\ir_builder.h
 $(BUILD_DIR)\ir.obj: $(SRC_DIR)\ir_fold.h $(BUILD_DIR)\ir_fold_hash.h
 $(BUILD_DIR)\ir_ra.obj: $(SRC_DIR)\ir_$(DASM_ARCH).h
 $(BUILD_DIR)\ir_emit.obj: $(SRC_DIR)\ir_$(DASM_ARCH).h $(BUILD_DIR)\ir_emit_$(DASM_ARCH).h
-$(BUILD_DIR)\ir_disasm.obj: $(VCPKG_CAPSTONE)
+$(BUILD_DIR)\ir_disasm.obj: capstone
 
 {$(SRC_DIR)}.c{$(BUILD_DIR)}.obj:
 	"$(CC)" $(CFLAGS) /Fo$@ /c $<
@@ -110,13 +116,32 @@ $(BUILD_DIR)\ir_disasm.obj: $(VCPKG_CAPSTONE)
 	"$(CC)" $(CFLAGS) /Fo$*.obj /c $<
 	"$(LD)" $(LDFLAGS) $(OBJS_COMMON) $*.obj $(LIBS) /out:$@
 
-# If the vcpkg dir exists, lets assume we're good with the deps.
-$(VCPKG_DIR)\vcpkg.exe:
-	git clone https://github.com/Microsoft/vcpkg.git "$(VCPKG_DIR)"
-	"$(VCPKG_DIR)\bootstrap-vcpkg.bat"
+capstone:
+!if !exist($(CAPSTONE_DIR))
+	git clone --branch $(CAPSTONE_TAG) https://github.com/capstone-engine/capstone "$(CAPSTONE_DIR)"
+	devenv "$(CAPSTONE_DIR)\msvc\capstone.sln" /upgrade
+# Remove unused features to simplify the resulting lib
+	powershell -Command "foreach ($$D in 'CAPSTONE_HAS_ARM64', 'CAPSTONE_HAS_ARM', 'CAPSTONE_HAS_BPF', \
+		'CAPSTONE_HAS_EVM', 'CAPSTONE_HAS_M680X', 'CAPSTONE_HAS_M68K', 'CAPSTONE_HAS_MIPS', \
+		'CAPSTONE_HAS_MOS65XX', 'CAPSTONE_HAS_POWERPC', 'CAPSTONE_HAS_RISCV', 'CAPSTONE_HAS_SPARC', \
+		'CAPSTONE_HAS_SYSZ', 'CAPSTONE_HAS_TMS320C64X', 'CAPSTONE_HAS_WASM', 'CAPSTONE_HAS_XCORE') { \
+			(Get-Content $(CAPSTONE_VCXPRJ_PATH)) -replace ($$D + ';'), '' | \
+			Out-File -encoding ASCII $(CAPSTONE_VCXPRJ_PATH) \
+		}"
+!endif
+!if !exist($(CAPSTONE_ARTIFACTS_DIR))
+!if "$(VSCMD_ARG_TGT_ARCH)" == "x64"
+	devenv "$(CAPSTONE_DIR)\msvc\capstone.sln" /build "$(BUILD)|x64" /project $(CAPSTONE_VCXPRJ)
+!else
+	devenv "$(CAPSTONE_DIR)\msvc\capstone.sln" /build "$(BUILD)|win32" /project $(CAPSTONE_VCXPRJ)
+!endif
+!endif
 
-$(VCPKG_CAPSTONE): $(VCPKG_DIR)\vcpkg.exe
-	"$(VCPKG_DIR)\vcpkg.exe" install --triplet=$(VCPKG_TRIPLET) capstone[x86]
+capstone_tag:
+	@echo $(CAPSTONE_TAG)
+
+capstone_dir:
+	@echo $(CAPSTONE_DIR)
 
 $(BUILD_DIR):
 	md "$(BUILD_DIR)"
@@ -128,12 +153,10 @@ $(BUILD_DIR)\ir-test.exe: $(SRC_DIR)/ir-test.cxx
 	"$(CXX)" /std:c++17 $(SRC_DIR)\ir-test.cxx /Fe:$@
 
 test: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\ir-test.exe
-	set PATH=$(VCPKG_DIR)\installed\$(VCPKG_TRIPLET)\bin:%%PATH%%
 	$(BUILD_DIR)\ir.exe $(SRC_DIR)\test.ir --dump --save $(BUILD_DIR)\test.log
 	$(BUILD_DIR)\ir-test.exe $(SRC_DIR)\tests
 
 test-ci: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\ir-test.exe
-	set PATH=$(VCPKG_DIR)\installed\$(VCPKG_TRIPLET)\bin:%%PATH%%
 	$(BUILD_DIR)\ir-test.exe --show-diff $(SRC_DIR)\tests
 
 examples: $(OBJS_COMMON) $(EXAMPLES_BUILD_DIR) $(EXAMPLE_EXES)
