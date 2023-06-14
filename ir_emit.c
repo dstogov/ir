@@ -434,8 +434,8 @@ static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb)
 							ir_emit_store(ctx, insn->type, ref, tmp);
 						}
 					} else {
-						if (src & IR_REG_SPILL_LOAD) {
-							src &= ~IR_REG_SPILL_LOAD;
+						if (IR_REG_SPILLED(src)) {
+							src = IR_REG_NUM(src);
 							ir_emit_load(ctx, insn->type, src, input);
 							if (ir_is_same_mem(ctx, input, ref)) {
 								continue;
@@ -447,8 +447,8 @@ static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb)
 					if (src == IR_REG_NONE) {
 						do_third_pass = 1;
 					} else {
-						if (src & IR_REG_SPILL_LOAD) {
-							src &= ~IR_REG_SPILL_LOAD;
+						if (IR_REG_SPILLED(src)) {
+							src = IR_REG_NUM(src);
 							ir_emit_load(ctx, insn->type, src, input);
 						}
 						if (src != dst) {
@@ -459,7 +459,7 @@ static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb)
 						}
 					}
 				}
-				if (ctx->regs[ref][0] & IR_REG_SPILL_STORE) {
+				if (IR_REG_SPILLED(ctx->regs[ref][0])) {
 					do_third_pass = 1;
 				}
 			}
@@ -499,14 +499,14 @@ static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb)
 					 src = ir_get_alocated_reg(ctx, ref, k);
 
 					if (src == IR_REG_NONE) {
-						if ((ctx->regs[ref][0] & IR_REG_SPILL_STORE) && ir_is_same_mem(ctx, input, ref)) {
+						if (IR_REG_SPILLED(ctx->regs[ref][0]) && ir_is_same_mem(ctx, input, ref)) {
 							/* avoid LOAD and SAVE to the same memory */
 							continue;
 						}
 						ir_emit_load(ctx, insn->type, dst, input);
 					}
 				}
-				if (dst != IR_REG_NONE && (ctx->regs[ref][0] & IR_REG_SPILL_STORE)) {
+				if (dst != IR_REG_NONE && IR_REG_SPILLED(ctx->regs[ref][0])) {
 					ir_emit_store(ctx, insn->type, ref, dst);
 				}
 			}

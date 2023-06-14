@@ -1043,7 +1043,8 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy);
 
 #if defined(IR_REGSET_64BIT)
 
-typedef enum _ir_reg ir_reg;
+/*typedef enum _ir_reg ir_reg;*/
+typedef int8_t ir_reg;
 
 /*** Register Sets ***/
 #if IR_REGSET_64BIT

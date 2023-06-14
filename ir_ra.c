@@ -3551,7 +3551,7 @@ static void assign_regs(ir_ctx *ctx)
 						if (use_pos->op_num == 0
 						 && (use_pos->flags & IR_DEF_REUSES_OP1_REG)
 						 && ctx->regs[ref][1] != IR_REG_NONE
-						 && (ctx->regs[ref][1] & IR_REG_SPILL_LOAD)
+						 && IR_REG_SPILLED(ctx->regs[ref][1])
 						 && (ctx->regs[ref][2] == IR_REG_NONE || IR_REG_NUM(ctx->regs[ref][2]) != reg)
 						 && (ctx->regs[ref][3] == IR_REG_NONE || IR_REG_NUM(ctx->regs[ref][3]) != reg)) {
 							/* load op1 directly into result (valid only when op1 register is not reused) */

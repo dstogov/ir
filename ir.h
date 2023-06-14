@@ -686,8 +686,10 @@ int ir_schedule(ir_ctx *ctx);
 #define IR_REG_NONE        -1
 #define IR_REG_SPILL_LOAD  (1<<6)
 #define IR_REG_SPILL_STORE (1<<6)
+#define IR_REG_SPILLED(r) \
+	((r) & (IR_REG_SPILL_LOAD|IR_REG_SPILL_STORE))
 #define IR_REG_NUM(r) \
-	((r) == IR_REG_NONE ? IR_REG_NONE : ((r) & ~(IR_REG_SPILL_LOAD|IR_REG_SPILL_STORE)))
+	((int8_t)((r) == IR_REG_NONE ? IR_REG_NONE : ((r) & ~(IR_REG_SPILL_LOAD|IR_REG_SPILL_STORE))))
 
 int ir_assign_virtual_registers(ir_ctx *ctx);
 int ir_compute_live_ranges(ir_ctx *ctx);
