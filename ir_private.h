@@ -1126,7 +1126,6 @@ IR_ALWAYS_INLINE ir_reg ir_regset_pop_first(ir_regset *set)
 /*** IR Register Allocation ***/
 /* Flags for ctx->regs[][] (low bits are used for register number itself) */
 typedef struct _ir_reg_alloc_data {
-	int32_t stack_frame_size;
 	int32_t unused_slot_4;
 	int32_t unused_slot_2;
 	int32_t unused_slot_1;

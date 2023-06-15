@@ -561,9 +561,11 @@ struct _ir_ctx {
 		ir_ref         control;                 /* used by IR construction API (see ir_builder.h) */
 		ir_ref         bb_start;                /* used by target CPU instruction matcher */
 		ir_ref         vars;                    /* list of VARs (used by register allocator) */
-		int32_t        stack_frame_size;        /* spill stack frame size (used by register allocator) */
 	};
 	ir_snapshot_create_t   snapshot_create;
+	int32_t            stack_frame_alignment;
+	int32_t            stack_frame_size;        /* spill stack frame size (used by register allocator and code generator) */
+	int32_t            call_stack_size;         /* stack for parameter passing (used by register allocator and code generator) */
 	uint32_t           rodata_offset;
 	uint32_t           jmp_table_offset;
 	uint32_t           entries_count;

@@ -2357,19 +2357,19 @@ int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type, ir_reg_alloc_data *dat
 	uint8_t size = ir_type_size[type];
 
 	if (size == 8) {
-		ret = data->stack_frame_size;
-		data->stack_frame_size += 8;
+		ret = ctx->stack_frame_size;
+		ctx->stack_frame_size += 8;
 	} else if (size == 4) {
 		if (data->unused_slot_4) {
 			ret = data->unused_slot_4;
 			data->unused_slot_4 = 0;
 		} else {
-			ret = data->stack_frame_size;
+			ret = ctx->stack_frame_size;
 			if (sizeof(void*) == 8) {
-				data->unused_slot_4 = data->stack_frame_size + 4;
-				data->stack_frame_size += 8;
+				data->unused_slot_4 = ctx->stack_frame_size + 4;
+				ctx->stack_frame_size += 8;
 			} else {
-				data->stack_frame_size += 4;
+				ctx->stack_frame_size += 4;
 			}
 		}
 	} else if (size == 2) {
@@ -2381,13 +2381,13 @@ int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type, ir_reg_alloc_data *dat
 			data->unused_slot_2 = data->unused_slot_4 + 2;
 			data->unused_slot_4 = 0;
 		} else {
-			ret = data->stack_frame_size;
-			data->unused_slot_2 = data->stack_frame_size + 2;
+			ret = ctx->stack_frame_size;
+			data->unused_slot_2 = ctx->stack_frame_size + 2;
 			if (sizeof(void*) == 8) {
-				data->unused_slot_4 = data->stack_frame_size + 4;
-				data->stack_frame_size += 8;
+				data->unused_slot_4 = ctx->stack_frame_size + 4;
+				ctx->stack_frame_size += 8;
 			} else {
-				data->stack_frame_size += 4;
+				ctx->stack_frame_size += 4;
 			}
 		}
 	} else if (size == 1) {
@@ -2404,14 +2404,14 @@ int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type, ir_reg_alloc_data *dat
 			data->unused_slot_2 = data->unused_slot_4 + 2;
 			data->unused_slot_4 = 0;
 		} else {
-			ret = data->stack_frame_size;
-			data->unused_slot_1 = data->stack_frame_size + 1;
-			data->unused_slot_2 = data->stack_frame_size + 2;
+			ret = ctx->stack_frame_size;
+			data->unused_slot_1 = ctx->stack_frame_size + 1;
+			data->unused_slot_2 = ctx->stack_frame_size + 2;
 			if (sizeof(void*) == 8) {
-				data->unused_slot_4 = data->stack_frame_size + 4;
-				data->stack_frame_size += 8;
+				data->unused_slot_4 = ctx->stack_frame_size + 4;
+				ctx->stack_frame_size += 8;
 			} else {
-				data->stack_frame_size += 4;
+				ctx->stack_frame_size += 4;
 			}
 		}
 	} else {
@@ -3276,7 +3276,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 	}
 
 	ctx->data = &data;
-	data.stack_frame_size = 0;
+	ctx->stack_frame_size = 0;
 	data.unused_slot_4 = 0;
 	data.unused_slot_2 = 0;
 	data.unused_slot_1 = 0;
@@ -3512,8 +3512,6 @@ static int ir_linear_scan(ir_ctx *ctx)
 			}
 		}
 	}
-
-	ctx->stack_frame_size = data.stack_frame_size;
 
 #ifdef IR_DEBUG
 	if (ctx->flags & IR_DEBUG_RA) {
