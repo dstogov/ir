@@ -3223,22 +3223,10 @@ static void ir_assign_bound_spill_slots(ir_ctx *ctx)
 			if (ival
 			 && ival->stack_spill_pos == -1
 			 && (ival->next || ival->reg == IR_REG_NONE)) {
-				if (b->val < 0) {
-					/* special spill slot */
-					ival->stack_spill_pos = -b->val;
-					ival->flags |= IR_LIVE_INTERVAL_SPILLED | IR_LIVE_INTERVAL_SPILL_SPECIAL;
-				} else {
-					/* node is bound to VAR node */
-					ir_live_interval *var_ival;
-
-					IR_ASSERT(ctx->ir_base[b->val].op == IR_VAR);
-					var_ival = ctx->live_intervals[ctx->vregs[b->val]];
-					if (var_ival->stack_spill_pos == -1) {
-						var_ival->stack_spill_pos = ir_allocate_spill_slot(ctx, var_ival->type, ctx->data);
-					}
-					ival->stack_spill_pos = var_ival->stack_spill_pos;
-					ival->flags |= IR_LIVE_INTERVAL_SPILLED;
-				}
+				IR_ASSERT(b->val < 0);
+				/* special spill slot */
+				ival->stack_spill_pos = -b->val;
+				ival->flags |= IR_LIVE_INTERVAL_SPILLED | IR_LIVE_INTERVAL_SPILL_SPECIAL;
 			}
 		}
 		b++;
@@ -3541,7 +3529,7 @@ static void assign_regs(ir_ctx *ctx)
 		top_ival = ival = ctx->live_intervals[i];
 		if (ival) {
 			do {
-				if (ival->reg >= 0) {
+				if (ival->reg != IR_REG_NONE) {
 					use_pos = ival->use_pos;
 					while (use_pos) {
 						ref = IR_LIVE_POS_TO_REF(use_pos->pos);
@@ -3553,21 +3541,34 @@ static void assign_regs(ir_ctx *ctx)
 						 && (ctx->regs[ref][2] == IR_REG_NONE || IR_REG_NUM(ctx->regs[ref][2]) != reg)
 						 && (ctx->regs[ref][3] == IR_REG_NONE || IR_REG_NUM(ctx->regs[ref][3]) != reg)) {
 							/* load op1 directly into result (valid only when op1 register is not reused) */
-							ctx->regs[ref][1] = reg | IR_REG_SPILL_LOAD;
+							if (top_ival->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL) {
+								ctx->regs[ref][1] = reg | IR_REG_SPILL_SPECIAL;
+							} else {
+								ctx->regs[ref][1] = reg | IR_REG_SPILL_LOAD;
+							}
 						}
 						if (top_ival->flags & IR_LIVE_INTERVAL_SPILLED) {
 							// TODO: Insert spill loads and stotres in optimal positons (resolution)
 
 							if (use_pos->op_num == 0) {
-								reg |= IR_REG_SPILL_STORE;
+								if (top_ival->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL) {
+									reg |= IR_REG_SPILL_SPECIAL;
+								} else {
+									reg |= IR_REG_SPILL_STORE;
+								}
 							} else {
 								if ((use_pos->flags & IR_USE_MUST_BE_IN_REG)
 								 || ctx->ir_base[ref].op == IR_CALL
 								 || ctx->ir_base[ref].op == IR_TAILCALL
+								 || ctx->ir_base[ref].op == IR_SNAPSHOT
 								 || (use_pos->op_num == 2
 								  && ctx->ir_base[ref].op1 == ctx->ir_base[ref].op2
 								  && IR_REG_NUM(ctx->regs[ref][1]) == reg)) {
-									reg |= IR_REG_SPILL_LOAD;
+									if (top_ival->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL) {
+										reg |= IR_REG_SPILL_SPECIAL;
+									} else {
+										reg |= IR_REG_SPILL_LOAD;
+									}
 								} else {
 									/* fuse spill load (valid only when register is not reused) */
 									reg = IR_REG_NONE;
@@ -3579,6 +3580,18 @@ static void assign_regs(ir_ctx *ctx)
 						}
 						ir_set_alocated_reg(ctx, ref, use_pos->op_num, reg);
 
+						use_pos = use_pos->next;
+					}
+				} else if ((top_ival->flags & IR_LIVE_INTERVAL_SPILLED)
+				 && !(top_ival->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL)) {
+					use_pos = ival->use_pos;
+					while (use_pos) {
+						ref = IR_LIVE_POS_TO_REF(use_pos->pos);
+						if (ctx->ir_base[ref].op == IR_SNAPSHOT) {
+							/* A reference to a CPU spill slot */
+							reg = IR_REG_SPILL_STORE | IR_REG_STACK_POINTER;
+							ir_set_alocated_reg(ctx, ref, use_pos->op_num, reg);
+						}
 						use_pos = use_pos->next;
 					}
 				}

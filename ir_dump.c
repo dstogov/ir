@@ -346,11 +346,11 @@ void ir_dump_live_ranges(const ir_ctx *ctx, FILE *f)
 			}
 			if (ival->next) {
 				fprintf(f, "\n\t");
-			} else if (ival->reg >= 0) {
+			} else if (ival->reg != IR_REG_NONE) {
 				fprintf(f, " ");
 			}
 			do {
-				if (ival->reg >= 0) {
+				if (ival->reg != IR_REG_NONE) {
 					fprintf(f, "[%%%s]", ir_reg_name(ival->reg, ival->type));
 				}
 				p = &ival->range;

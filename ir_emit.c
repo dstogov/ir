@@ -374,7 +374,7 @@ static IR_NEVER_INLINE void ir_emit_osr_entry_loads(ir_ctx *ctx, int b, ir_block
 	for (i = 0; i < count; i++, pos++) {
 		ref = ir_list_at(list, pos);
 		IR_ASSERT(ref >= 0 && ctx->vregs[ref] && ctx->live_intervals[ctx->vregs[ref]]);
-		if (ctx->live_intervals[ctx->vregs[ref]]->stack_spill_pos == -1) {
+		if (!(ctx->live_intervals[ctx->vregs[ref]]->flags & IR_LIVE_INTERVAL_SPILLED)) {
 			/* not spilled */
 			ir_reg reg = ctx->live_intervals[ctx->vregs[ref]]->reg;
 			ir_type type = ctx->ir_base[ref].type;
@@ -386,6 +386,8 @@ static IR_NEVER_INLINE void ir_emit_osr_entry_loads(ir_ctx *ctx, int b, ir_block
 			} else {
 				ir_emit_load_mem_fp(ctx, type, reg, ctx->spill_base, offset);
 			}
+		} else {
+			IR_ASSERT(ctx->live_intervals[ctx->vregs[ref]]->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL);
 		}
 	}
 }
@@ -588,4 +590,14 @@ int ir_match(ir_ctx *ctx)
 	}
 
 	return 1;
+}
+
+int32_t ir_get_spill_slot_offset(ir_ctx *ctx, ir_ref ref)
+{
+	int32_t offset;
+
+	IR_ASSERT(ref >= 0 && ctx->vregs[ref] && ctx->live_intervals[ctx->vregs[ref]]);
+	offset = ctx->live_intervals[ctx->vregs[ref]]->stack_spill_pos;
+	IR_ASSERT(offset != -1);
+	return IR_SPILL_POS_TO_OFFSET(offset);
 }

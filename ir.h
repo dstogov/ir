@@ -685,13 +685,14 @@ int ir_gcm(ir_ctx *ctx);
 int ir_schedule(ir_ctx *ctx);
 
 /* Liveness & Register Allocation (implementation in ir_ra.c) */
-#define IR_REG_NONE        -1
-#define IR_REG_SPILL_LOAD  (1<<6)
-#define IR_REG_SPILL_STORE (1<<6)
+#define IR_REG_NONE          -1
+#define IR_REG_SPILL_LOAD    (1<<6)
+#define IR_REG_SPILL_STORE   (1<<6)
+#define IR_REG_SPILL_SPECIAL (1<<7)
 #define IR_REG_SPILLED(r) \
-	((r) & (IR_REG_SPILL_LOAD|IR_REG_SPILL_STORE))
+	((r) & (IR_REG_SPILL_LOAD|IR_REG_SPILL_STORE|IR_REG_SPILL_SPECIAL))
 #define IR_REG_NUM(r) \
-	((int8_t)((r) == IR_REG_NONE ? IR_REG_NONE : ((r) & ~(IR_REG_SPILL_LOAD|IR_REG_SPILL_STORE))))
+	((int8_t)((r) == IR_REG_NONE ? IR_REG_NONE : ((r) & ~(IR_REG_SPILL_LOAD|IR_REG_SPILL_STORE|IR_REG_SPILL_SPECIAL))))
 
 int ir_assign_virtual_registers(ir_ctx *ctx);
 int ir_compute_live_ranges(ir_ctx *ctx);
@@ -702,6 +703,7 @@ int ir_reg_alloc(ir_ctx *ctx);
 int ir_regs_number(void);
 bool ir_reg_is_int(int32_t reg);
 const char *ir_reg_name(int8_t reg, ir_type type);
+int32_t ir_get_spill_slot_offset(ir_ctx *ctx, ir_ref ref);
 
 /* Target CPU instruction selection and code geneartion (see ir_x86.c) */
 int ir_match(ir_ctx *ctx);

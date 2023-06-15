@@ -113,12 +113,8 @@ void ir_save(const ir_ctx *ctx, FILE *f)
 		if (((flags & IR_OP_FLAG_DATA) || ((flags & IR_OP_FLAG_MEM) && insn->type != IR_VOID)) && ctx->binding) {
 			ir_ref var = ir_binding_find(ctx, i);
 			if (var) {
-				if (var >= 0) {
-					fprintf(f, " # BIND(d_%d);", var);
-				} else {
-					// TODO: use callback ???
-					fprintf(f, " # BIND(%d);", var);
-				}
+				IR_ASSERT(var < 0);
+				fprintf(f, " # BIND(0x%x);", -var);
 			}
 		}
 		fprintf(f, "\n");
