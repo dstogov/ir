@@ -577,7 +577,7 @@ int ir_disasm(const char    *name,
 				}
 			} else if ((sym = ir_disasm_resolver(addr, &offset))) {
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
-				if (offset && *(q-1) == '$') {
+				if (offset && p != q && *(q-1) == '$') {
 					if (r > p) {
 						fwrite(p, 1, r - p, f);
 					}
