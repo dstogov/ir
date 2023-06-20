@@ -1381,8 +1381,7 @@ store_int:
 				 && (ctx->use_lists[insn->op3].count == 1 ||
 				     (ctx->use_lists[insn->op3].count == 2
 				   && (ctx->ir_base[insn->op3].op == IR_ADD_OV ||
-				       ctx->ir_base[insn->op3].op == IR_SUB_OV)))
-				 && IR_IS_TYPE_INT(ctx->ir_base[insn->op3].type)) {
+				       ctx->ir_base[insn->op3].op == IR_SUB_OV)))) {
 					ir_insn *op_insn = &ctx->ir_base[insn->op3];
 					uint32_t rule = ctx->rules[insn->op3];
 
@@ -1397,6 +1396,10 @@ store_int:
 							/* l = LOAD(_, a) ... v = BINOP(l, _) ... STORE(l, a, v) => SKIP ... SKIP_MEM_BINOP ... MEM_BINOP */
 							ctx->rules[insn->op3] = IR_FUSED | IR_BINOP_INT;
 							ctx->rules[op_insn->op1] = IR_SKIPPED | load_op;
+							if (ctx->ir_base[op_insn->op2].op == IR_LOAD) {
+								ir_match_fuse_addr(ctx, ctx->ir_base[op_insn->op2].op2);
+								ctx->rules[op_insn->op2] = IR_LOAD_INT;
+							}
 							ir_match_fuse_addr(ctx, insn->op2);
 							return IR_MEM_BINOP_INT;
 						} else if ((ir_op_flags[op_insn->op] & IR_OP_FLAG_COMMUTATIVE)
@@ -1408,6 +1411,10 @@ store_int:
 							ir_swap_ops(op_insn);
 							ctx->rules[insn->op3] = IR_FUSED | IR_BINOP_INT;
 							ctx->rules[op_insn->op1] = IR_SKIPPED | load_op;
+							if (ctx->ir_base[op_insn->op2].op == IR_LOAD) {
+								ir_match_fuse_addr(ctx, ctx->ir_base[op_insn->op2].op2);
+								ctx->rules[op_insn->op2] = IR_LOAD_INT;
+							}
 							ir_match_fuse_addr(ctx, insn->op2);
 							return IR_MEM_BINOP_INT;
 						}
@@ -1469,6 +1476,10 @@ store_int:
 							/* l = LOAD(_, a) ... v = SHIFT(l, _) ... STORE(l, a, v) => SKIP ... SKIP_SHIFT ... MEM_SHIFT */
 							ctx->rules[insn->op3] = IR_FUSED | IR_SHIFT;
 							ctx->rules[op_insn->op1] = IR_SKIPPED | load_op;
+							if (ctx->ir_base[op_insn->op2].op == IR_LOAD) {
+								ir_match_fuse_addr(ctx, ctx->ir_base[op_insn->op2].op2);
+								ctx->rules[op_insn->op2] = IR_LOAD_INT;
+							}
 							return IR_MEM_SHIFT;
 						}
 					} else if (rule == IR_SHIFT_CONST) {
