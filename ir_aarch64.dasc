@@ -439,7 +439,7 @@ int ir_get_target_constraints(const ir_ctx *ctx, ir_ref ref, ir_target_constrain
 					n++;
 				}
 			}
-			flags = IR_USE_MUST_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG | IR_OP3_SHOULD_BE_IN_REG;
+			flags = IR_USE_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG | IR_OP3_SHOULD_BE_IN_REG;
 			break;
 		case IR_COPY_INT:
 		case IR_COPY_FP:

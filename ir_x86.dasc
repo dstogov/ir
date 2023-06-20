@@ -563,9 +563,9 @@ int ir_get_target_constraints(const ir_ctx *ctx, ir_ref ref, ir_target_constrain
 			constraints->def_reg = IR_REG_RAX;
 			constraints->hints[1] = IR_REG_RAX;
 			constraints->hints_count = 2;
-			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
+			flags = IR_USE_SHOULD_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 			constraints->tmp_regs[0] = IR_SCRATCH_REG(IR_REG_RDX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
-			constraints->tmp_regs[1] = IR_SCRATCH_REG(IR_REG_RAX, IR_LOAD_SUB_REF, IR_LOAD_SUB_REF);
+			constraints->tmp_regs[1] = IR_SCRATCH_REG(IR_REG_RAX, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 			n = 2;
 			break;
 		case IR_DIV_INT:
@@ -573,7 +573,7 @@ int ir_get_target_constraints(const ir_ctx *ctx, ir_ref ref, ir_target_constrain
 			constraints->def_reg = IR_REG_RAX;
 			constraints->hints[1] = IR_REG_RAX;
 			constraints->hints_count = 2;
-			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
+			flags = IR_USE_SHOULD_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 			constraints->tmp_regs[0] = IR_SCRATCH_REG(IR_REG_RDX, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 			constraints->tmp_regs[1] = IR_SCRATCH_REG(IR_REG_RAX, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 			n = 2;
@@ -582,7 +582,7 @@ int ir_get_target_constraints(const ir_ctx *ctx, ir_ref ref, ir_target_constrain
 			constraints->def_reg = IR_REG_RDX;
 			constraints->hints[1] = IR_REG_RAX;
 			constraints->hints_count = 2;
-			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
+			flags = IR_USE_SHOULD_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 			constraints->tmp_regs[0] = IR_SCRATCH_REG(IR_REG_RAX, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 			constraints->tmp_regs[1] = IR_SCRATCH_REG(IR_REG_RDX, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 			n = 2;
@@ -738,7 +738,7 @@ op2_const:
 					n++;
 				}
 			}
-			flags = IR_USE_MUST_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG | IR_OP3_SHOULD_BE_IN_REG;
+			flags = IR_USE_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG | IR_OP3_SHOULD_BE_IN_REG;
 			break;
 		case IR_BINOP_SSE2:
 			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
