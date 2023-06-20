@@ -1,0 +1,39 @@
+--TEST--
+002: Register Allocation (spill load into result - movsd (%rsp), %xmm1)
+--TARGET--
+x86_64
+--ARGS--
+-S
+--CODE--
+{
+	uintptr_t fn = func(printf);
+	uintptr_t format = "hello\n";
+	l_1 = START(l_3);
+	double x = PARAM(l_1, "x", 1);
+	double y = PARAM(l_1, "y", 2);
+	double z = PARAM(l_1, "z", 2);
+	l_2 = CALL(l_1, fn, format);
+	double ret1 = SUB(x, y);
+	double ret2 = SUB(y, z);
+	double ret = ADD(ret1, ret2);
+	l_3 = RETURN(l_2, ret);
+}
+--EXPECT--
+test:
+	subq $0x18, %rsp
+	movsd %xmm0, (%rsp)
+	movsd %xmm1, 8(%rsp)
+	movsd %xmm2, 0x10(%rsp)
+	leaq .L1(%rip), %rdi
+	movabsq $_IO_printf, %rax
+	callq *%rax
+	movsd (%rsp), %xmm1
+	subsd 8(%rsp), %xmm1
+	movsd 8(%rsp), %xmm0
+	subsd 0x10(%rsp), %xmm0
+	addsd %xmm1, %xmm0
+	addq $0x18, %rsp
+	retq
+.rodata
+.L1:
+	.db 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x0a, 0x00

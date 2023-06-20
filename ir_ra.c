@@ -3525,78 +3525,105 @@ static void assign_regs(ir_ctx *ctx)
 		memset(ctx->regs, IR_REG_NONE, sizeof(ir_regs) * ctx->insns_count);
 	}
 
-	for (i = 1; i <= ctx->vregs_count; i++) {
-		top_ival = ival = ctx->live_intervals[i];
-		if (ival) {
-			do {
-				if (ival->reg != IR_REG_NONE) {
-					use_pos = ival->use_pos;
-					while (use_pos) {
-						ref = IR_LIVE_POS_TO_REF(use_pos->pos);
+	if (!(ctx->flags & (IR_RA_HAVE_SPLITS|IR_RA_HAVE_SPILLS))) {
+		for (i = 1; i <= ctx->vregs_count; i++) {
+			top_ival = ival = ctx->live_intervals[i];
+			if (ival) {
+				do {
+					if (ival->reg != IR_REG_NONE) {
 						reg = ival->reg;
-						if (use_pos->op_num == 0
-						 && (use_pos->flags & IR_DEF_REUSES_OP1_REG)
-						 && ctx->regs[ref][1] != IR_REG_NONE
-						 && IR_REG_SPILLED(ctx->regs[ref][1])
-						 && (ctx->regs[ref][2] == IR_REG_NONE || IR_REG_NUM(ctx->regs[ref][2]) != reg)
-						 && (ctx->regs[ref][3] == IR_REG_NONE || IR_REG_NUM(ctx->regs[ref][3]) != reg)) {
-							/* load op1 directly into result (valid only when op1 register is not reused) */
-							if (top_ival->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL) {
-								ctx->regs[ref][1] = reg | IR_REG_SPILL_SPECIAL;
-							} else {
-								ctx->regs[ref][1] = reg | IR_REG_SPILL_LOAD;
-							}
+						use_pos = ival->use_pos;
+						while (use_pos) {
+							ref = (use_pos->hint_ref < 0) ? -use_pos->hint_ref : IR_LIVE_POS_TO_REF(use_pos->pos);
+							ir_set_alocated_reg(ctx, ref, use_pos->op_num, reg);
+							use_pos = use_pos->next;
 						}
-						if (top_ival->flags & IR_LIVE_INTERVAL_SPILLED) {
-							// TODO: Insert spill loads and stotres in optimal positons (resolution)
+					}
+					ival = ival->next;
+				} while (ival);
+			}
+		}
+	} else {
+		for (i = 1; i <= ctx->vregs_count; i++) {
+			top_ival = ival = ctx->live_intervals[i];
+			if (ival) {
+				do {
+					if (ival->reg != IR_REG_NONE) {
+						use_pos = ival->use_pos;
+						while (use_pos) {
+							reg = ival->reg;
+							ref = (use_pos->hint_ref < 0) ? -use_pos->hint_ref : IR_LIVE_POS_TO_REF(use_pos->pos);
+							if (use_pos->op_num == 0
+							 && (use_pos->flags & IR_DEF_REUSES_OP1_REG)
+							 && ctx->regs[ref][1] != IR_REG_NONE
+							 && IR_REG_SPILLED(ctx->regs[ref][1])
+							 && IR_REG_NUM(ctx->regs[ref][1]) != reg
+							 && IR_REG_NUM(ctx->regs[ref][2]) != reg
+							 && IR_REG_NUM(ctx->regs[ref][3]) != reg) {
+								/* load op1 directly into result (valid only when op1 register is not reused) */
+								ir_reg old_reg = IR_REG_NUM(ctx->regs[ref][1]);
 
-							if (use_pos->op_num == 0) {
-								if (top_ival->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL) {
-									reg |= IR_REG_SPILL_SPECIAL;
+								if (ctx->live_intervals[ctx->vregs[ctx->ir_base[ref].op1]]->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL) {
+									ctx->regs[ref][1] = reg | IR_REG_SPILL_SPECIAL;
 								} else {
-									reg |= IR_REG_SPILL_STORE;
+									ctx->regs[ref][1] = reg | IR_REG_SPILL_LOAD;
 								}
-							} else {
-								if ((use_pos->flags & IR_USE_MUST_BE_IN_REG)
-								 || ctx->ir_base[ref].op == IR_CALL
-								 || ctx->ir_base[ref].op == IR_TAILCALL
-								 || ctx->ir_base[ref].op == IR_SNAPSHOT
-								 || (use_pos->op_num == 2
-								  && ctx->ir_base[ref].op1 == ctx->ir_base[ref].op2
-								  && IR_REG_NUM(ctx->regs[ref][1]) == reg)) {
+								if (IR_REG_NUM(ctx->regs[ref][2]) == old_reg) {
+									ctx->regs[ref][2] = reg;
+								}
+								if (IR_REG_NUM(ctx->regs[ref][3]) == old_reg) {
+									ctx->regs[ref][3] = reg;
+								}
+							}
+							if (top_ival->flags & IR_LIVE_INTERVAL_SPILLED) {
+								// TODO: Insert spill loads and stotres in optimal positons (resolution)
+
+								if (use_pos->op_num == 0) {
 									if (top_ival->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL) {
 										reg |= IR_REG_SPILL_SPECIAL;
 									} else {
-										reg |= IR_REG_SPILL_LOAD;
+										reg |= IR_REG_SPILL_STORE;
 									}
 								} else {
-									/* fuse spill load (valid only when register is not reused) */
-									reg = IR_REG_NONE;
+									if ((use_pos->flags & IR_USE_MUST_BE_IN_REG)
+									 || ctx->ir_base[ref].op == IR_CALL
+									 || ctx->ir_base[ref].op == IR_TAILCALL
+									 || ctx->ir_base[ref].op == IR_SNAPSHOT) {
+										if (top_ival->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL) {
+											reg |= IR_REG_SPILL_SPECIAL;
+										} else {
+											reg |= IR_REG_SPILL_LOAD;
+										}
+									} else if (use_pos->op_num == 2
+									  && ctx->ir_base[ref].op1 == ctx->ir_base[ref].op2
+									  && IR_REG_NUM(ctx->regs[ref][1]) == reg) {
+										/* pass */
+									} else {
+										/* fuse spill load (valid only when register is not reused) */
+										reg = IR_REG_NONE;
+									}
 								}
 							}
-						}
-						if (use_pos->hint_ref < 0) {
-							ref = -use_pos->hint_ref;
-						}
-						ir_set_alocated_reg(ctx, ref, use_pos->op_num, reg);
-
-						use_pos = use_pos->next;
-					}
-				} else if ((top_ival->flags & IR_LIVE_INTERVAL_SPILLED)
-				 && !(top_ival->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL)) {
-					use_pos = ival->use_pos;
-					while (use_pos) {
-						ref = IR_LIVE_POS_TO_REF(use_pos->pos);
-						if (ctx->ir_base[ref].op == IR_SNAPSHOT) {
-							/* A reference to a CPU spill slot */
-							reg = IR_REG_SPILL_STORE | IR_REG_STACK_POINTER;
 							ir_set_alocated_reg(ctx, ref, use_pos->op_num, reg);
+
+							use_pos = use_pos->next;
 						}
-						use_pos = use_pos->next;
+					} else if ((top_ival->flags & IR_LIVE_INTERVAL_SPILLED)
+					 && !(top_ival->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL)) {
+						use_pos = ival->use_pos;
+						while (use_pos) {
+							ref = (use_pos->hint_ref < 0) ? -use_pos->hint_ref : IR_LIVE_POS_TO_REF(use_pos->pos);
+							if (ctx->ir_base[ref].op == IR_SNAPSHOT) {
+								/* A reference to a CPU spill slot */
+								reg = IR_REG_SPILL_STORE | IR_REG_STACK_POINTER;
+								ir_set_alocated_reg(ctx, ref, use_pos->op_num, reg);
+							}
+							use_pos = use_pos->next;
+						}
 					}
-				}
-				ival = ival->next;
-			} while (ival);
+					ival = ival->next;
+				} while (ival);
+			}
 		}
 	}
 
