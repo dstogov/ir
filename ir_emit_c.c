@@ -621,54 +621,6 @@ static void ir_emit_store(ir_ctx *ctx, FILE *f, ir_insn *insn)
 	fprintf(f, ";\n");
 }
 
-static uint8_t ir_get_return_type(ir_ctx *ctx)
-{
-	ir_ref ref;
-	ir_insn *insn;
-	uint8_t ret_type = 255;
-
-	/* Check all RETURN nodes */
-	ref = ctx->ir_base[1].op1;
-	while (ref) {
-		insn = &ctx->ir_base[ref];
-		if (insn->op == IR_RETURN) {
-			if (ret_type == 255) {
-				if (insn->op2) {
-					ret_type = ctx->ir_base[insn->op2].type;
-				} else {
-					ret_type = IR_VOID;
-				}
-			} else if (insn->op2) {
-				if (ret_type != ctx->ir_base[insn->op2].type) {
-					IR_ASSERT(0 && "conflicting return types");
-					return 0;
-				}
-			} else {
-				if (ret_type != IR_VOID) {
-					IR_ASSERT(0 && "conflicting return types");
-					return 0;
-				}
-			}
-		} else if (insn->op == IR_UNREACHABLE) {
-			ir_insn *prev = &ctx->ir_base[insn->op1];
-
-			IR_ASSERT(prev->op == IR_TAILCALL);
-			if (ret_type == 255) {
-				ret_type = prev->type;
-			} else if (ret_type != prev->type) {
-				IR_ASSERT(0 && "conflicting return types");
-				return 0;
-			}
-		}
-		ref = ctx->ir_base[ref].op3;
-	}
-
-	if (ret_type == 255) {
-		ret_type = IR_VOID;
-	}
-	return ret_type;
-}
-
 static int ir_emit_func(ir_ctx *ctx, FILE *f)
 {
 	ir_ref i, n, *p;

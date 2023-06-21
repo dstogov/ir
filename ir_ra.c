@@ -3501,6 +3501,16 @@ static int ir_linear_scan(ir_ctx *ctx)
 		}
 	}
 
+#ifdef IR_TARGET_X86
+	ir_type ret_type = ir_get_return_type(ctx);
+
+	if (ret_type == IR_FLOAT || ret_type == IR_DOUBLE) {
+		ctx->ret_slot = ir_allocate_spill_slot(ctx, ret_type, &data);
+	} else {
+		ctx->ret_slot = -1;
+	}
+#endif
+
 #ifdef IR_DEBUG
 	if (ctx->flags & IR_DEBUG_RA) {
 		fprintf(stderr, "---- Finish LSRA\n");
@@ -3519,6 +3529,7 @@ static void assign_regs(ir_ctx *ctx)
 	ir_use_pos *use_pos;
 	int8_t reg;
 	ir_ref ref;
+	ir_regset used_regs = 0;
 
 	if (!ctx->regs) {
 		ctx->regs = ir_mem_malloc(sizeof(ir_regs) * ctx->insns_count);
@@ -3532,6 +3543,7 @@ static void assign_regs(ir_ctx *ctx)
 				do {
 					if (ival->reg != IR_REG_NONE) {
 						reg = ival->reg;
+						IR_REGSET_INCL(used_regs, reg);
 						use_pos = ival->use_pos;
 						while (use_pos) {
 							ref = (use_pos->hint_ref < 0) ? -use_pos->hint_ref : IR_LIVE_POS_TO_REF(use_pos->pos);
@@ -3549,6 +3561,7 @@ static void assign_regs(ir_ctx *ctx)
 			if (ival) {
 				do {
 					if (ival->reg != IR_REG_NONE) {
+						IR_REGSET_INCL(used_regs, ival->reg);
 						use_pos = ival->use_pos;
 						while (use_pos) {
 							reg = ival->reg;
@@ -3632,10 +3645,17 @@ static void assign_regs(ir_ctx *ctx)
 	if (ival) {
 		do {
 			IR_ASSERT(ival->reg != IR_REG_NONE);
+			IR_REGSET_INCL(used_regs, ival->reg);
 			ir_set_alocated_reg(ctx, ival->tmp_ref, ival->tmp_op_num, ival->reg);
 			ival = ival->next;
 		} while (ival);
 	}
+
+	ctx->used_preserved_regs = IR_REGSET_UNION((ir_regset)ctx->fixed_save_regset,
+		IR_REGSET_DIFFERENCE(IR_REGSET_INTERSECTION(used_regs, IR_REGSET_PRESERVED),
+			(ctx->flags & IR_FUNCTION) ? (ir_regset)ctx->fixed_regset : IR_REGSET_PRESERVED));
+
+	ir_fix_stack_frame(ctx);
 }
 
 int ir_reg_alloc(ir_ctx *ctx)

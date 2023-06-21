@@ -148,7 +148,6 @@ static bool aarch64_may_encode_addr_offset(int64_t offset, uint32_t type_size)
 
 typedef struct _ir_backend_data {
     ir_reg_alloc_data  ra_data;
-	ir_regset          used_preserved_regs;
 	uint32_t           dessa_from_block;
 	dasm_State        *dasm_state;
 	int                rodata_label, jmp_table_label;
@@ -1212,11 +1211,12 @@ static void ir_emit_prologue(ir_ctx *ctx)
 			| sub sp, sp, #(ctx->stack_frame_size + ctx->call_stack_size)
 		}
 	}
-	if (data->used_preserved_regs) {
+	if (ctx->used_preserved_regs) {
 		int offset;
 		uint32_t i;
 		ir_reg prev = IR_REG_NONE;
 		ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
+		ir_regset used_preserved_regs = ctx->used_preserved_regs;
 
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
 			offset = ctx->stack_frame_size + sizeof(void*) * 2;
@@ -1224,7 +1224,7 @@ static void ir_emit_prologue(ir_ctx *ctx)
 			offset = ctx->stack_frame_size + ctx->call_stack_size;
 		}
 		for (i = 0; i < IR_REG_NUM; i++) {
-			if (IR_REGSET_IN(data->used_preserved_regs, i)) {
+			if (IR_REGSET_IN(used_preserved_regs, i)) {
 			    if (prev == IR_REG_NONE) {
 					prev = i;
 				} else if (i < IR_REG_FP_FIRST) {
@@ -1262,11 +1262,12 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
-	if (data->used_preserved_regs) {
+	if (ctx->used_preserved_regs) {
 		int offset;
 		uint32_t i;
 		ir_reg prev = IR_REG_NONE;
 		ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
+		ir_regset used_preserved_regs = ctx->used_preserved_regs;
 
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
 			offset = ctx->stack_frame_size + sizeof(void*) * 2;
@@ -1274,7 +1275,7 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 			offset = ctx->stack_frame_size + ctx->call_stack_size;
 		}
 		for (i = 0; i < IR_REG_NUM; i++) {
-			if (IR_REGSET_IN(data->used_preserved_regs, i)) {
+			if (IR_REGSET_IN(used_preserved_regs, i)) {
 			    if (prev == IR_REG_NONE) {
 					prev = i;
 				} else if (i < IR_REG_FP_FIRST) {
@@ -4652,47 +4653,12 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 		}
 	}
 
-	if (ctx->fixed_save_regset) {
-		ir_reg reg;
-		(void) reg;
-
-		data->used_preserved_regs = (ir_regset)ctx->fixed_save_regset;
-		IR_REGSET_FOREACH(data->used_preserved_regs, reg) {
-			ctx->stack_frame_size += sizeof(void*);
-		} IR_REGSET_FOREACH_END();
-	}
-
-	if ((ctx->flags & IR_HAS_CALLS) && !(ctx->flags & IR_FUNCTION)) {
-		while (IR_ALIGNED_SIZE(ctx->stack_frame_size, 16) != ctx->stack_frame_size) {
-			ctx->stack_frame_size += sizeof(void*);
-			ctx->stack_frame_alignment += sizeof(void*);
-		}
-	} else if (ctx->flags & IR_HAS_CALLS) {
-		ctx->flags |= IR_USE_FRAME_POINTER;
-		/* Stack must be 16 byte aligned */
-		/* Stack must be 16 byte aligned */
-		if (!(ctx->flags & IR_FUNCTION)) {
-			while (IR_ALIGNED_SIZE(ctx->stack_frame_size, 16) != ctx->stack_frame_size) {
-				ctx->stack_frame_size += sizeof(void*);
-				ctx->stack_frame_alignment += sizeof(void*);
-			}
-		} else if (ctx->flags & IR_USE_FRAME_POINTER) {
-			while (IR_ALIGNED_SIZE(ctx->stack_frame_size + sizeof(void*) * 2, 16) != ctx->stack_frame_size + sizeof(void*) * 2) {
-				ctx->stack_frame_size += sizeof(void*);
-				ctx->stack_frame_alignment += sizeof(void*);
-			}
-		} else {
-			while (IR_ALIGNED_SIZE(ctx->stack_frame_size, 16) != ctx->stack_frame_size) {
-				ctx->stack_frame_size += sizeof(void*);
-				ctx->stack_frame_alignment += sizeof(void*);
-			}
-		}
-	}
-
-	ir_fix_param_spills(ctx);
+	ctx->used_preserved_regs = ctx->fixed_save_regset;
+	ctx->flags |= IR_NO_STACK_COMBINE;
+	ir_fix_stack_frame(ctx);
 }
 
-static void ir_preallocate_call_stack(ir_ctx *ctx, ir_backend_data *data)
+static void ir_preallocate_call_stack(ir_ctx *ctx)
 {
 	int call_stack_size, peak_call_stack_size = 0;
 	ir_ref i, n;
@@ -4715,57 +4681,24 @@ static void ir_preallocate_call_stack(ir_ctx *ctx, ir_backend_data *data)
 	}
 }
 
-static void ir_calc_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
+void ir_fix_stack_frame(ir_ctx *ctx)
 {
-	int i;
-	ir_live_interval **p, *ival;
 	uint32_t additional_size = 0;
-	ir_regset fixed_regset = (ctx->flags & IR_FUNCTION) ? (ir_regset)ctx->fixed_regset : IR_REGSET_PRESERVED;
 
-	if (ctx->fixed_save_regset) {
+	if (ctx->used_preserved_regs) {
+		ir_regset used_preserved_regs = (ir_regset)ctx->used_preserved_regs;
 		ir_reg reg;
 		(void) reg;
 
-		data->used_preserved_regs = (ir_regset)ctx->fixed_save_regset;
-		IR_REGSET_FOREACH(data->used_preserved_regs, reg) {
+		IR_REGSET_FOREACH(used_preserved_regs, reg) {
 			additional_size += sizeof(void*);
 		} IR_REGSET_FOREACH_END();
 	}
 
-	for (i = 1, p = ctx->live_intervals + i; i <= ctx->vregs_count; i++, p++) {
-		ival = *p;
-		if (ival) {
-			if (ival->reg != IR_REG_NONE) {
-				if (!IR_REGSET_IN(data->used_preserved_regs, ival->reg)
-				 && !IR_REGSET_IN(fixed_regset, ival->reg)
-				 && IR_REGSET_IN(IR_REGSET_PRESERVED, ival->reg)) {
-					if (!ctx->fixed_save_regset) {
-						IR_REGSET_INCL(data->used_preserved_regs, ival->reg);
-						additional_size += sizeof(void*);
-					} else {
-						// TODO: Preserved reg and fixed frame conflict ???
-						// IR_ASSERT(!ctx->fixed_save_regset && "NIY");
-					}
-				}
-			}
-		}
-	}
-
-	ival = ctx->live_intervals[0];
-	while (ival) {
-		if (ival->reg != IR_REG_NONE) {
-			if (!IR_REGSET_IN(data->used_preserved_regs, ival->reg)
-			 && !IR_REGSET_IN(fixed_regset, ival->reg)
-			 && IR_REGSET_IN(IR_REGSET_PRESERVED, ival->reg)) {
-				IR_REGSET_INCL(data->used_preserved_regs, ival->reg);
-				additional_size += sizeof(void*);
-			}
-		}
-		ival = ival->next;
-	}
-
 	ctx->stack_frame_size = IR_ALIGNED_SIZE(ctx->stack_frame_size, sizeof(void*));
 	ctx->stack_frame_size += additional_size;
+	ctx->stack_frame_alignment = 0;
+	ctx->call_stack_size = 0;
 
 	if ((ctx->flags & IR_HAS_CALLS) && !(ctx->flags & IR_FUNCTION)) {
 		while (IR_ALIGNED_SIZE(ctx->stack_frame_size, 16) != ctx->stack_frame_size) {
@@ -4787,7 +4720,7 @@ static void ir_calc_stack_frame_size(ir_ctx *ctx, ir_backend_data *data)
 			}
 		} else {
 			if (!(ctx->flags & IR_NO_STACK_COMBINE)) {
-				ir_preallocate_call_stack(ctx, data);
+				ir_preallocate_call_stack(ctx);
 			}
 			while (IR_ALIGNED_SIZE(ctx->stack_frame_size + ctx->call_stack_size, 16) !=
 					ctx->stack_frame_size + ctx->call_stack_size) {
@@ -4818,23 +4751,19 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	void *entry;
 	size_t size;
 
-	if (!ctx->live_intervals) {
-		ctx->stack_frame_size = 0;
-	}
-	ctx->stack_frame_alignment = 0;
-	ctx->call_stack_size = 0;
 	data.ra_data.unused_slot_4 = 0;
 	data.ra_data.unused_slot_2 = 0;
 	data.ra_data.unused_slot_1 = 0;
-	data.used_preserved_regs = 0;
 	data.rodata_label = 0;
 	data.jmp_table_label = 0;
 	ctx->data = &data;
 
 	if (!ctx->live_intervals) {
+		ctx->stack_frame_size = 0;
+		ctx->stack_frame_alignment = 0;
+		ctx->call_stack_size = 0;
+		ctx->used_preserved_regs = 0;
 		ir_allocate_unique_spill_slots(ctx);
-	} else {
-		ir_calc_stack_frame_size(ctx, &data);
 	}
 
 	if (ctx->fixed_stack_frame_size != -1) {
@@ -4847,6 +4776,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 			fprintf(stderr, "IR Compilation Aborted: ctx->stack_frame_size > ctx->fixed_stack_frame_size at %s:%d\n",
 				__FILE__, __LINE__);
 #endif
+			ctx->data = NULL;
 			return NULL;
 		}
 		ctx->stack_frame_size = ctx->fixed_stack_frame_size;
@@ -5093,6 +5023,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 			const void *exit_addr = ctx->get_exit_addr(i);
 
 			if (!exit_addr) {
+				ctx->data = NULL;
 				return 0;
 			}
 			|	b &exit_addr
@@ -5209,6 +5140,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		if (ctx->code_buffer == NULL) {
 			ir_mem_unmap(entry, size);
 		}
+		ctx->data = NULL;
 		return NULL;
 	}
 	size = *size_ptr;
@@ -5216,6 +5148,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	if (ctx->code_buffer != NULL) {
 		if (IR_ALIGNED_SIZE(size, 16) > ctx->code_buffer_size) {
 			dasm_free(&data.dasm_state);
+			ctx->data = NULL;
 			return NULL;
 		}
 		entry = ctx->code_buffer;
@@ -5242,6 +5175,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		if (ctx->code_buffer == NULL) {
 			ir_mem_unmap(entry, size);
 		}
+		ctx->data = NULL;
 		return NULL;
 	}
 
@@ -5278,6 +5212,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		ir_mem_protect(entry, size);
 	}
 
+	ctx->data = NULL;
 	return entry;
 }
 

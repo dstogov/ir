@@ -2105,3 +2105,41 @@ check_aliasing:
 	}
 	ctx->control = ir_emit3(ctx, IR_STORE, ctx->control, addr, val);
 }
+
+ir_type ir_get_return_type(ir_ctx *ctx)
+{
+	ir_ref ref;
+	ir_insn *insn;
+	uint8_t ret_type = 255;
+
+	/* Check all RETURN nodes */
+	ref = ctx->ir_base[1].op1;
+	while (ref) {
+		insn = &ctx->ir_base[ref];
+		if (insn->op == IR_RETURN) {
+			if (ret_type == 255) {
+				if (insn->op2) {
+					ret_type = ctx->ir_base[insn->op2].type;
+				} else {
+					ret_type = IR_VOID;
+				}
+			} else if (insn->op2) {
+				if (ret_type != ctx->ir_base[insn->op2].type) {
+					IR_ASSERT(0 && "conflicting return types");
+					return IR_VOID;
+				}
+			} else {
+				if (ret_type != IR_VOID) {
+					IR_ASSERT(0 && "conflicting return types");
+					return IR_VOID;
+				}
+			}
+		}
+		ref = ctx->ir_base[ref].op3;
+	}
+
+	if (ret_type == 255) {
+		ret_type = IR_VOID;
+	}
+	return (ir_type)ret_type;
+}

@@ -567,6 +567,11 @@ struct _ir_ctx {
 	int32_t            stack_frame_alignment;
 	int32_t            stack_frame_size;        /* spill stack frame size (used by register allocator and code generator) */
 	int32_t            call_stack_size;         /* stack for parameter passing (used by register allocator and code generator) */
+	uint64_t           used_preserved_regs;
+#ifdef IR_TARGET_X86
+	int32_t            param_stack_size;
+	int32_t            ret_slot;
+#endif
 	uint32_t           rodata_offset;
 	uint32_t           jmp_table_offset;
 	uint32_t           entries_count;
