@@ -1164,9 +1164,7 @@ IR_ALWAYS_INLINE int8_t ir_get_alocated_reg(const ir_ctx *ctx, ir_ref ref, int o
 
 #define IR_RULE_MASK 0xff
 
-#ifdef IR_DEBUG
 extern const char *ir_rule_name[];
-#endif
 
 typedef struct _ir_target_constraints ir_target_constraints;
 

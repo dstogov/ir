@@ -505,7 +505,6 @@ void ir_strtab_free(ir_strtab *strtab);
 # define IR_DEBUG_GCM         (1<<28)
 # define IR_DEBUG_SCHEDULE    (1<<29)
 # define IR_DEBUG_RA          (1<<30)
-# define IR_DEBUG_CODEGEN     (1<<31)
 #endif
 
 typedef struct _ir_ctx           ir_ctx;
@@ -757,6 +756,7 @@ void ir_dump_use_lists(const ir_ctx *ctx, FILE *f);
 void ir_dump_cfg(ir_ctx *ctx, FILE *f);
 void ir_dump_cfg_map(const ir_ctx *ctx, FILE *f);
 void ir_dump_live_ranges(const ir_ctx *ctx, FILE *f);
+void ir_dump_codegen(const ir_ctx *ctx, FILE *f);
 
 /* IR to C conversion (implementation in ir_emit_c.c) */
 int ir_emit_c(ir_ctx *ctx, FILE *f);

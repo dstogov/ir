@@ -514,14 +514,12 @@ enum _ir_rule {
 	IR_LAST_RULE
 };
 
-#ifdef IR_DEBUG
 #define IR_RULE_NAME(name)  #name,
 const char *ir_rule_name[IR_LAST_OP] = {
 	NULL,
 	IR_RULES(IR_RULE_NAME)
 	NULL
 };
-#endif
 
 /* register allocation */
 int ir_get_target_constraints(const ir_ctx *ctx, ir_ref ref, ir_target_constraints *constraints)

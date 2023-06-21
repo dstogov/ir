@@ -61,6 +61,7 @@ static void help(const char *cmd)
 #define IR_DUMP_CFG                 (1<<4)
 #define IR_DUMP_CFG_MAP             (1<<5)
 #define IR_DUMP_LIVE_RANGES         (1<<6)
+#define IR_DUMP_CODEGEN             (1<<7)
 
 #define IR_DUMP_AFTER_LOAD          (1<<16)
 #define IR_DUMP_AFTER_SCCP          (1<<17)
@@ -98,7 +99,12 @@ static int _save(ir_ctx *ctx, uint32_t dump, uint32_t pass, const char *dump_fil
 				snprintf(fn, sizeof(fn)-1, "06-coalescing-%s", dump_file);
                 dump_file = fn;
 			} else if (pass == IR_DUMP_FINAL) {
-				snprintf(fn, sizeof(fn)-1, "07-final-%s", dump_file);
+				if (dump & IR_DUMP_CODEGEN) {
+					snprintf(fn, sizeof(fn)-1, "07-codegen-%s", dump_file);
+				} else {
+					snprintf(fn, sizeof(fn)-1, "07-final-%s", dump_file);
+				}
+                dump_file = fn;
                 dump_file = fn;
 			}
 		}
@@ -110,7 +116,9 @@ static int _save(ir_ctx *ctx, uint32_t dump, uint32_t pass, const char *dump_fil
 	} else {
 	    f = stderr;
 	}
-	if (dump & IR_DUMP_SAVE) {
+	if (pass == IR_DUMP_FINAL && (dump & IR_DUMP_CODEGEN)) {
+		ir_dump_codegen(ctx, f);
+	} else if (dump & IR_DUMP_SAVE) {
 		ir_save(ctx, f);
 	}
 	if (dump & IR_DUMP_DUMP) {
@@ -209,7 +217,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, const char *dump_
 		ir_compute_dessa_moves(ctx);
 	}
 
-	if ((dump & (IR_DUMP_FINAL|IR_DUMP_AFTER_ALL))
+	if ((dump & (IR_DUMP_FINAL|IR_DUMP_AFTER_ALL|IR_DUMP_CODEGEN))
 	 && !_save(ctx, dump, IR_DUMP_FINAL, dump_file)) {
 		return 0;
 	}
@@ -293,6 +301,8 @@ int main(int argc, char **argv)
 			dump |= IR_DUMP_CFG_MAP;
 		} else if (strcmp(argv[i], "--dump-live-ranges") == 0) {
 			dump |= IR_DUMP_LIVE_RANGES;
+		} else if (strcmp(argv[i], "--dump-codegen") == 0) {
+			dump |= IR_DUMP_CODEGEN;
 		} else if (strcmp(argv[i], "--dump-after-load") == 0) {
 			dump |= IR_DUMP_AFTER_LOAD;
 		} else if (strcmp(argv[i], "--dump-after-sccp") == 0) {
@@ -332,8 +342,6 @@ int main(int argc, char **argv)
 			flags |= IR_DEBUG_SCHEDULE;
 		} else if (strcmp(argv[i], "--debug-ra") == 0) {
 			flags |= IR_DEBUG_RA;
-		} else if (strcmp(argv[i], "--debug-codegen") == 0) {
-			flags |= IR_DEBUG_CODEGEN;
 #endif
 		} else if (strcmp(argv[i], "--debug-regset") == 0) {
 			if (i + 1 == argc || argv[i + 1][0] == '-') {
