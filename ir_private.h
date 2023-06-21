@@ -1123,6 +1123,8 @@ IR_ALWAYS_INLINE ir_reg ir_regset_pop_first(ir_regset *set)
 		} \
 	} while (0)
 
+#endif /* defined(IR_REGSET_64BIT) */
+
 /*** IR Register Allocation ***/
 /* Flags for ctx->regs[][] (low bits are used for register number itself) */
 typedef struct _ir_reg_alloc_data {
@@ -1162,6 +1164,10 @@ IR_ALWAYS_INLINE int8_t ir_get_alocated_reg(const ir_ctx *ctx, ir_ref ref, int o
 
 #define IR_RULE_MASK 0xff
 
+#ifdef IR_DEBUG
+extern const char *ir_rule_name[];
+#endif
+
 typedef struct _ir_target_constraints ir_target_constraints;
 
 #define IR_TMP_REG(_num, _type, _start, _end) \
@@ -1170,8 +1176,6 @@ typedef struct _ir_target_constraints ir_target_constraints;
 	(ir_tmp_reg){.reg=(_reg), .type=IR_VOID, .start=(_start), .end=(_end)}
 
 int ir_get_target_constraints(const ir_ctx *ctx, ir_ref ref, ir_target_constraints *constraints);
-
-#endif /* defined(IR_REGSET_64BIT) */
 
 //#define IR_BITSET_LIVENESS
 

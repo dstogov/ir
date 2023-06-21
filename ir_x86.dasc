@@ -441,77 +441,93 @@ const char *ir_reg_name(int8_t reg, ir_type type)
 	return NULL;
 }
 
+#define IR_RULES(_)        \
+	_(CMP_INT)             \
+	_(CMP_FP)              \
+	_(MUL_INT)             \
+	_(DIV_INT)             \
+	_(MOD_INT)             \
+	_(TEST_INT)            \
+	_(SETCC_INT)           \
+	_(TESTCC_INT)          \
+	_(LEA_OB)              \
+	_(LEA_SI)              \
+	_(LEA_SIB)             \
+	_(LEA_IB)              \
+	_(LEA_SI_O)            \
+	_(LEA_SIB_O)           \
+	_(LEA_IB_O)            \
+	_(LEA_I_OB)            \
+	_(LEA_OB_I)            \
+	_(LEA_OB_SI)           \
+	_(LEA_SI_OB)           \
+	_(LEA_B_SI)            \
+	_(LEA_SI_B)            \
+	_(INC)                 \
+	_(DEC)                 \
+	_(MUL_PWR2)            \
+	_(DIV_PWR2)            \
+	_(MOD_PWR2)            \
+	_(BOOL_NOT_INT)        \
+	_(ABS_INT)             \
+	_(OP_INT)              \
+	_(OP_FP)               \
+	_(IMUL3)               \
+	_(BINOP_INT)           \
+	_(BINOP_SSE2)          \
+	_(BINOP_AVX)           \
+	_(SHIFT)               \
+	_(SHIFT_CONST)         \
+	_(COPY_INT)            \
+	_(COPY_FP)             \
+	_(CMP_AND_BRANCH_INT)  \
+	_(CMP_AND_BRANCH_FP)   \
+	_(TEST_AND_BRANCH_INT) \
+	_(JCC_INT)             \
+	_(GUARD_CMP_INT)       \
+	_(GUARD_CMP_FP)        \
+	_(GUARD_TEST_INT)      \
+	_(GUARD_JCC_INT)       \
+	_(GUARD_OVERFLOW)      \
+	_(OVERFLOW_AND_BRANCH) \
+	_(MIN_MAX_INT)         \
+	_(MEM_OP_INT)          \
+	_(MEM_INC)             \
+	_(MEM_DEC)             \
+	_(MEM_MUL_PWR2)        \
+	_(MEM_DIV_PWR2)        \
+	_(MEM_MOD_PWR2)        \
+	_(MEM_BINOP_INT)       \
+	_(MEM_SHIFT)           \
+	_(MEM_SHIFT_CONST)     \
+	_(REG_BINOP_INT)       \
+	_(VSTORE_INT)          \
+	_(VSTORE_FP)           \
+	_(LOAD_INT)            \
+	_(LOAD_FP)             \
+	_(STORE_INT)           \
+	_(STORE_FP)            \
+	_(IF_INT)              \
+	_(RETURN_VOID)         \
+	_(RETURN_INT)          \
+	_(RETURN_FP)           \
+
+#define IR_RULE_ENUM(name) IR_ ## name,
+
 enum _ir_rule {
-	IR_CMP_INT = IR_LAST_OP,
-	IR_CMP_FP,
-	IR_MUL_INT,
-	IR_DIV_INT,
-	IR_MOD_INT,
-	IR_TEST_INT,
-	IR_SETCC_INT,
-	IR_TESTCC_INT,
-	IR_LEA_OB,
-	IR_LEA_SI,
-	IR_LEA_SIB,
-	IR_LEA_IB,
-	IR_LEA_SI_O,
-	IR_LEA_SIB_O,
-	IR_LEA_IB_O,
-	IR_LEA_I_OB,
-	IR_LEA_OB_I,
-	IR_LEA_OB_SI,
-	IR_LEA_SI_OB,
-	IR_LEA_B_SI,
-	IR_LEA_SI_B,
-	IR_INC,
-	IR_DEC,
-	IR_MUL_PWR2,
-	IR_DIV_PWR2,
-	IR_MOD_PWR2,
-	IR_BOOL_NOT_INT,
-	IR_ABS_INT,
-	IR_OP_INT,
-	IR_OP_FP,
-	IR_IMUL3,
-	IR_BINOP_INT,
-	IR_BINOP_SSE2,
-	IR_BINOP_AVX,
-	IR_SHIFT,
-	IR_SHIFT_CONST,
-	IR_COPY_INT,
-	IR_COPY_FP,
-	IR_CMP_AND_BRANCH_INT,
-	IR_CMP_AND_BRANCH_FP,
-	IR_TEST_AND_BRANCH_INT,
-	IR_JCC_INT,
-	IR_GUARD_CMP_INT,
-	IR_GUARD_CMP_FP,
-	IR_GUARD_TEST_INT,
-	IR_GUARD_JCC_INT,
-	IR_GUARD_OVERFLOW,
-	IR_OVERFLOW_AND_BRANCH,
-	IR_MIN_MAX_INT,
-	IR_MEM_OP_INT,
-	IR_MEM_INC,
-	IR_MEM_DEC,
-	IR_MEM_MUL_PWR2,
-	IR_MEM_DIV_PWR2,
-	IR_MEM_MOD_PWR2,
-	IR_MEM_BINOP_INT,
-	IR_MEM_SHIFT,
-	IR_MEM_SHIFT_CONST,
-	IR_REG_BINOP_INT,
-	IR_VSTORE_INT,
-	IR_VSTORE_FP,
-	IR_LOAD_INT,
-	IR_LOAD_FP,
-	IR_STORE_INT,
-	IR_STORE_FP,
-	IR_IF_INT,
-	IR_RETURN_VOID,
-	IR_RETURN_INT,
-	IR_RETURN_FP,
+	IR_FIRST_RULE = IR_LAST_OP,
+	IR_RULES(IR_RULE_ENUM)
+	IR_LAST_RULE
 };
+
+#ifdef IR_DEBUG
+#define IR_RULE_NAME(name)  #name,
+const char *ir_rule_name[IR_LAST_OP] = {
+	NULL,
+	IR_RULES(IR_RULE_NAME)
+	NULL
+};
+#endif
 
 /* register allocation */
 int ir_get_target_constraints(const ir_ctx *ctx, ir_ref ref, ir_target_constraints *constraints)

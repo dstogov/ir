@@ -127,6 +127,8 @@ int main(int argc, char **argv)
 			flags |= IR_DEBUG_SCHEDULE;
 		} else if (strcmp(argv[i], "--debug-ra") == 0) {
 			flags |= IR_DEBUG_RA;
+		} else if (strcmp(argv[i], "--debug-codegen") == 0) {
+			flags |= IR_DEBUG_CODEGEN;
 #endif
 		} else if (strcmp(argv[i], "--debug-regset") == 0) {
 			if (i + 1 == argc || argv[i + 1][0] == '-') {

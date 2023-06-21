@@ -505,6 +505,7 @@ void ir_strtab_free(ir_strtab *strtab);
 # define IR_DEBUG_GCM         (1<<28)
 # define IR_DEBUG_SCHEDULE    (1<<29)
 # define IR_DEBUG_RA          (1<<30)
+# define IR_DEBUG_CODEGEN     (1<<31)
 #endif
 
 typedef struct _ir_ctx           ir_ctx;
