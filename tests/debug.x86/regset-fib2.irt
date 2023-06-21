@@ -84,12 +84,10 @@ test:
 	movsd 0xc(%esp), %xmm0
 	addsd %xmm1, %xmm0
 	movsd %xmm0, 0xc(%esp)
-	movsd 0xc(%esp), %xmm0
 	subsd %xmm1, %xmm0
 	movsd %xmm0, 0x14(%esp)
-	movl $.L5, (%esp)
-	movsd 0x14(%esp), %xmm0
 	movsd %xmm0, 4(%esp)
+	movl $.L5, (%esp)
 	calll printf
 	movl $.L5, (%esp)
 	movsd 0x14(%esp), %xmm7
@@ -102,7 +100,7 @@ test:
 	addl $0x1c, %esp
 	retl
 .rodata
-	.db 0x90, 0x90, 0x90
+	.db 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
 .L3:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f
 .L4:

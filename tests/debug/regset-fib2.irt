@@ -86,10 +86,8 @@ test:
 	movsd (%rsp), %xmm0
 	addsd %xmm1, %xmm0
 	movsd %xmm0, (%rsp)
-	movsd (%rsp), %xmm0
 	subsd %xmm1, %xmm0
 	movsd %xmm0, 8(%rsp)
-	movsd 8(%rsp), %xmm0
 	leaq .L5(%rip), %rdi
 	movabsq $_IO_printf, %rax
 	callq *%rax
@@ -104,7 +102,7 @@ test:
 	addq $0x18, %rsp
 	retq
 .rodata
-	.db 0x90, 0x90, 0x90, 0x90
+	.db 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
 .L3:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f
 .L4:
