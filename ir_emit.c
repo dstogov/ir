@@ -443,7 +443,7 @@ static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb)
 								continue;
 							}
 						}
-						ir_emit_store(ctx, insn->type, src, ref);
+						ir_emit_store(ctx, insn->type, ref, src);
 					}
 				} else {
 					if (src == IR_REG_NONE) {
