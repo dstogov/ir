@@ -167,6 +167,8 @@ test:
 	ldr d0, [sp, #0x10]
 	fmul d0, d0, d0
 	str d0, [sp, #0x28]
+	ldr d0, [sp, #0x28]
+	ldr d1, [sp, #0x20]
 	fadd d0, d0, d1
 	ldr d1, .L5
 	fcmp d0, d1
