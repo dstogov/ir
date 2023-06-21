@@ -873,6 +873,13 @@ static int32_t ir_ref_spill_slot(ir_ctx *ctx, ir_ref ref, ir_reg *reg)
 	return IR_SPILL_POS_TO_OFFSET(offset);
 }
 
+static bool ir_is_same_spill_slot(ir_ctx *ctx, ir_ref ref, ir_reg reg, int32_t offset)
+{
+	ir_reg fp;
+
+	return ir_ref_spill_slot(ctx, ref, &fp) == offset && reg == fp;
+}
+
 static int32_t ir_var_spill_slot(ir_ctx *ctx, ir_ref ref, ir_reg *reg)
 {
 	ir_insn *var_insn = &ctx->ir_base[ref];
@@ -2929,11 +2936,9 @@ static void ir_emit_load_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		int32_t offset = ir_fuse_addr(ctx, insn->op2, &op1_reg, &op2_reg);
 
 		if (op2_reg == IR_REG_NONE) {
-			if (IR_REG_SPILLED(ctx->regs[def][0])) {
-				ir_reg fp;
-				if (ir_ref_spill_slot(ctx, def, &fp) == offset && op1_reg == fp) {
-					return;
-				}
+			if (IR_REG_SPILLED(ctx->regs[def][0]) && ir_is_same_spill_slot(ctx, def, op1_reg, offset)) {
+				/* avoid load to the same location (valid only when register is not reused) */
+				return;
 			}
 			ir_emit_load_mem_int(ctx, type, def_reg, op1_reg, offset);
 		} else {
@@ -2996,11 +3001,9 @@ static void ir_emit_load_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		int32_t offset = ir_fuse_addr(ctx, insn->op2, &op1_reg, &op2_reg);
 
 		if (op2_reg == IR_REG_NONE) {
-			if (IR_REG_SPILLED(ctx->regs[def][0])) {
-				ir_reg fp;
-				if (ir_ref_spill_slot(ctx, def, &fp) == offset && op1_reg == fp) {
-					return;
-				}
+			if (IR_REG_SPILLED(ctx->regs[def][0]) && ir_is_same_spill_slot(ctx, def, op1_reg, offset)) {
+				/* avoid load to the same location (valid only when register is not reused) */
+				return;
 			}
 			ir_emit_load_mem_fp(ctx, type, def_reg, op1_reg, offset);
 		} else {
@@ -3042,11 +3045,9 @@ static void ir_emit_store_int(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 		int32_t offset = ir_fuse_addr(ctx, insn->op2, &op1_reg, &op2_reg);
 
 		if (op2_reg == IR_REG_NONE) {
-			if (!IR_IS_CONST_REF(insn->op3) && IR_REG_SPILLED(op3_reg)) {
-				ir_reg fp;
-				if (ir_ref_spill_slot(ctx, insn->op3, &fp) == offset && op1_reg == fp) {
-					return;
-				}
+			if (!IR_IS_CONST_REF(insn->op3) && IR_REG_SPILLED(op3_reg) && ir_is_same_spill_slot(ctx, insn->op3, op1_reg, offset)) {
+				/* avoid store to the same location */
+				return;
 			}
 			if (op3_reg == IR_REG_NONE) {
 				IR_ASSERT(IR_IS_CONST_REF(insn->op3) && ctx->ir_base[insn->op3].val.i64 == 0);
@@ -3113,11 +3114,9 @@ static void ir_emit_store_fp(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 		int32_t offset = ir_fuse_addr(ctx, insn->op2, &op1_reg, &op2_reg);
 
 		if (op2_reg == IR_REG_NONE) {
-			if (!IR_IS_CONST_REF(insn->op3) && IR_REG_SPILLED(op3_reg)) {
-				ir_reg fp;
-				if (ir_ref_spill_slot(ctx, insn->op3, &fp) == offset && op1_reg == fp) {
-					return;
-				}
+			if (!IR_IS_CONST_REF(insn->op3) && IR_REG_SPILLED(op3_reg) && ir_is_same_spill_slot(ctx, insn->op3, op1_reg, offset)) {
+				/* avoid store to the same location */
+				return;
 			}
 			if (IR_REG_SPILLED(op3_reg) || IR_IS_CONST_REF(insn->op3)) {
 				op3_reg = IR_REG_NUM(op3_reg);
@@ -3154,7 +3153,6 @@ static void ir_emit_rload(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_reg src_reg = insn->op2;
 	ir_type type = insn->type;
-	ir_reg fp;
 
 	if (IR_REGSET_IN(IR_REGSET_UNION((ir_regset)ctx->fixed_regset, IR_REGSET_FIXED), src_reg)) {
 		if (ctx->vregs[def]
@@ -3169,7 +3167,7 @@ static void ir_emit_rload(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			/* op3 is used as a flag that the value is already stored in memory.
 			 * If op3 is set we don't have to store the value once again (in case of spilling)
 			 */
-			if (!insn->op3 || insn->op3 != ir_ref_spill_slot(ctx, def, &fp) || fp != ctx->spill_base) {
+			if (!insn->op3 || !ir_is_same_spill_slot(ctx, def, ctx->spill_base, insn->op3)) {
 				ir_emit_store(ctx, type, def, src_reg);
 			}
 		} else {
@@ -3182,7 +3180,7 @@ static void ir_emit_rload(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 			}
 			if (IR_REG_SPILLED(ctx->regs[def][0])
-			 && (!insn->op3 || insn->op3 != ir_ref_spill_slot(ctx, def, &fp) || fp != ctx->spill_base)) {
+			 && (!insn->op3 || !ir_is_same_spill_slot(ctx, def, ctx->spill_base, insn->op3))) {
 				ir_emit_store(ctx, type, def, def_reg);
 			}
 		}
