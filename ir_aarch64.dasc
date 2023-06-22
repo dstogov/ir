@@ -1221,7 +1221,7 @@ static void ir_emit_prologue(ir_ctx *ctx)
 		uint32_t i;
 		ir_reg prev = IR_REG_NONE;
 		ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
-		ir_regset used_preserved_regs = ctx->used_preserved_regs;
+		ir_regset used_preserved_regs = (ir_regset)ctx->used_preserved_regs;
 
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
 			offset = ctx->stack_frame_size + sizeof(void*) * 2;
@@ -1272,7 +1272,7 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 		uint32_t i;
 		ir_reg prev = IR_REG_NONE;
 		ir_reg fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
-		ir_regset used_preserved_regs = ctx->used_preserved_regs;
+		ir_regset used_preserved_regs = (ir_regset)ctx->used_preserved_regs;
 
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
 			offset = ctx->stack_frame_size + sizeof(void*) * 2;
