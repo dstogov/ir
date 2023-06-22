@@ -141,9 +141,9 @@ test:
 	movsd 0x2c(%esp), %xmm1
 	subsd .L4, %xmm1
 	movsd %xmm1, (%esp)
-	xorpd %xmm1, %xmm1
 	xorpd %xmm0, %xmm0
 	movsd %xmm0, 8(%esp)
+	xorpd %xmm1, %xmm1
 	xorl %eax, %eax
 .L1:
 	leal 1(%eax), %eax
@@ -153,7 +153,6 @@ test:
 	movapd %xmm1, %xmm0
 	mulsd %xmm1, %xmm0
 	movsd %xmm0, 0x18(%esp)
-	movsd 0x18(%esp), %xmm0
 	addsd 0x10(%esp), %xmm0
 	ucomisd .L5, %xmm0
 	ja .L2
@@ -175,6 +174,7 @@ test:
 	addl $0x20, %esp
 	retl
 .rodata
+	.db 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
 .L4:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f
 .L5:

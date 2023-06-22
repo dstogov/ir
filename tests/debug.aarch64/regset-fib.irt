@@ -78,8 +78,8 @@ test:
 	mov x29, sp
 	fmov d0, xzr
 	str d0, [x29, #0x10]
-	ldr d1, .L3
-	str d1, [x29, #0x18]
+	ldr d0, .L3
+	str d0, [x29, #0x18]
 .L1:
 	ldr d0, .L4
 	ldr d1, [x29, #0x18]
@@ -89,11 +89,8 @@ test:
 	ldr d0, [x29, #0x10]
 	fadd d1, d1, d0
 	str d1, [x29, #0x18]
-	ldr d1, [x29, #0x18]
-	ldr d0, [x29, #0x10]
 	fsub d0, d1, d0
 	str d0, [x29, #0x10]
-	ldr d0, [x29, #0x10]
 	adr x0, .L5
 	bl _IO_printf
 	b .L1
@@ -102,7 +99,6 @@ test:
 	ldp x29, x30, [sp], #0x20
 	ret
 .rodata
-	.db 0x1f, 0x20, 0x03, 0xd5
 .L3:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f
 .L4:

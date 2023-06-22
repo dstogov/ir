@@ -73,9 +73,9 @@ R3 (d_10) [SPILL=0x8]
 }
 test:
 	subl $0x1c, %esp
-	xorpd %xmm1, %xmm1
 	movsd .L3, %xmm0
 	movsd %xmm0, 0xc(%esp)
+	xorpd %xmm1, %xmm1
 .L1:
 	movsd 0xc(%esp), %xmm0
 	ucomisd .L4, %xmm0
@@ -84,12 +84,10 @@ test:
 	movsd 0xc(%esp), %xmm0
 	addsd %xmm1, %xmm0
 	movsd %xmm0, 0xc(%esp)
-	movsd 0xc(%esp), %xmm0
 	subsd %xmm1, %xmm0
 	movsd %xmm0, 0x14(%esp)
-	movl $.L5, (%esp)
-	movsd 0x14(%esp), %xmm0
 	movsd %xmm0, 4(%esp)
+	movl $.L5, (%esp)
 	calll printf
 	movsd 0x14(%esp), %xmm1
 	jmp .L1
@@ -98,7 +96,7 @@ test:
 	addl $0x1c, %esp
 	retl
 .rodata
-	.db 0x90, 0x90, 0x90
+	.db 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
 .L3:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f
 .L4:

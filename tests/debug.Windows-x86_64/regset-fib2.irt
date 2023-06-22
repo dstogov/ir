@@ -75,9 +75,9 @@ R3 (d_10) [SPILL=0x8]
 }
 test:
 	subq $0x38, %rsp
+	movsd .L3(%rip), %xmm0
+	movsd %xmm0, 0x20(%rsp)
 	xorpd %xmm0, %xmm0
-	movsd .L3(%rip), %xmm1
-	movsd %xmm1, 0x20(%rsp)
 .L1:
 	movsd 0x20(%rsp), %xmm1
 	ucomisd .L4(%rip), %xmm1
@@ -86,10 +86,8 @@ test:
 	movsd 0x20(%rsp), %xmm1
 	addsd %xmm0, %xmm1
 	movsd %xmm1, 0x20(%rsp)
-	movsd 0x20(%rsp), %xmm1
 	subsd %xmm0, %xmm1
 	movsd %xmm1, 0x28(%rsp)
-	movsd 0x28(%rsp), %xmm1
 	leaq .L5(%rip), %rcx
 	movq %xmm1, %rdx
 	movabsq $printf, %rax
@@ -106,7 +104,7 @@ test:
 	addq $0x38, %rsp
 	retq
 .rodata
-	.db 0x90, 0x90, 0x90, 0x90, 0x90
+	.db 0x90
 .L3:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f
 .L4:
