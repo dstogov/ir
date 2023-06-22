@@ -82,8 +82,8 @@ test:
 .L1:
 	testl %ebx, %ebx
 	je .L3
-	movl %edi, %eax
 	movl %r8d, %ecx
+	movl %edi, %eax
 .L2:
 	testl %ebp, %ebp
 	jne .L1

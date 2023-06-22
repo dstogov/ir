@@ -5873,9 +5873,10 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 	dasm_State **Dst = &data->dasm_state;
 	int i;
 	int8_t *pred, *loc, *types;
-	ir_reg to, from_reg;
+	ir_reg to, from_reg, c;
 	ir_type type;
 	ir_regset todo, ready;
+	ir_reg last_reg = IR_REG_NONE, last_fp_reg = IR_REG_NONE;
 
 	loc = ir_mem_malloc(IR_REG_NUM * 3 * sizeof(int8_t));
 	pred = loc + IR_REG_NUM;
@@ -5891,7 +5892,17 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 			loc[from_reg] = from_reg;
 			pred[to] = from_reg;
 			types[from_reg] = copies[i].type;
-			IR_REGSET_INCL(todo, to);
+			/* temporary register may de the same as some of destionations */
+			if (to == tmp_reg) {
+				IR_ASSERT(last_reg == IR_REG_NONE);
+				last_reg = to;
+			} else if (to == tmp_fp_reg) {
+				IR_ASSERT(last_fp_reg == IR_REG_NONE);
+				last_fp_reg = to;
+			} else {
+				IR_ASSERT(!IR_REGSET_IN(todo, to));
+				IR_REGSET_INCL(todo, to);
+			}
 		}
 	}
 
@@ -5902,8 +5913,6 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 	} IR_REGSET_FOREACH_END();
 
 	while (1) {
-		ir_ref /*a, b,*/ c;
-
 		while (ready != IR_REGSET_EMPTY) {
 			to = ir_regset_pop_first(&ready);
 			from_reg = pred[to];
@@ -5958,6 +5967,46 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 			loc[to] = tmp_fp_reg;
 		}
 		IR_REGSET_INCL(ready, to);
+	}
+
+	if (last_reg != IR_REG_NONE) {
+		to = last_reg;
+		from_reg = pred[to];
+		c = loc[from_reg];
+		if (to != c) {
+			type = types[from_reg];
+			IR_ASSERT(IR_IS_TYPE_INT(type));
+			if (ir_type_size[type] > 2) {
+				ir_emit_mov(ctx, type, to, c);
+			} else if (ir_type_size[type] == 2) {
+				if (IR_IS_TYPE_SIGNED(type)) {
+					|	movsx Rd(to), Rw(c)
+					type = IR_I32;
+				} else {
+					|	movzx Rd(to), Rw(c)
+					type = IR_U32;
+				}
+			} else /* if (ir_type_size[type] == 1) */ {
+				if (IR_IS_TYPE_SIGNED(type)) {
+					|	movsx Rd(to), Rb(c)
+					type = IR_I32;
+				} else {
+					|	movzx Rd(to), Rb(c)
+					type = IR_U32;
+				}
+			}
+		}
+	}
+
+	if (last_fp_reg != IR_REG_NONE) {
+		to = last_fp_reg;
+		from_reg = pred[to];
+		c = loc[from_reg];
+		if (to != c) {
+			type = types[from_reg];
+			IR_ASSERT(!IR_IS_TYPE_INT(type));
+			ir_emit_fp_mov(ctx, type, to, c);
+		}
 	}
 
 	ir_mem_free(loc);

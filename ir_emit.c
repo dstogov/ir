@@ -47,6 +47,14 @@ typedef struct _ir_copy {
 	ir_reg  to;
 } ir_copy;
 
+typedef struct _ir_delayed_copy {
+	ir_ref  input;
+	ir_ref  output;
+	ir_type type;
+	ir_reg  from;
+	ir_reg  to;
+} ir_delayed_copy;
+
 #if IR_REG_INT_ARGS
 static const int8_t _ir_int_reg_params[IR_REG_INT_ARGS];
 #else
@@ -394,16 +402,14 @@ static IR_NEVER_INLINE void ir_emit_osr_entry_loads(ir_ctx *ctx, int b, ir_block
 
 static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb)
 {
-	uint32_t succ, k, n = 0;
+	uint32_t succ, k, n = 0, n2 = 0;
 	ir_block *succ_bb;
 	ir_use_list *use_list;
-	ir_ref i, *p, ref, input;
-	ir_insn *insn;
-	bool do_third_pass = 0;
+	ir_ref i, *p;
 	ir_copy *copies;
+	ir_delayed_copy *copies2;
 	ir_reg tmp_reg = ctx->regs[bb->end][0];
 	ir_reg tmp_fp_reg = ctx->regs[bb->end][1];
-	ir_reg src, dst;
 
 	IR_ASSERT(bb->successors_count == 1);
 	succ = ctx->cfg_edges[bb->successors];
@@ -412,57 +418,74 @@ static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb)
 	use_list = &ctx->use_lists[succ_bb->start];
 	k = ir_phi_input_number(ctx, succ_bb, b);
 
-	copies = ir_mem_malloc(use_list->count * sizeof(ir_copy));
+	copies = ir_mem_malloc(use_list->count * sizeof(ir_copy) + use_list->count * sizeof(ir_delayed_copy));
+	copies2 = (ir_delayed_copy*)(copies + use_list->count);
 
 	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < use_list->count; i++, p++) {
-		ref = *p;
-		insn = &ctx->ir_base[ref];
+		ir_ref ref = *p;
+		ir_insn *insn = &ctx->ir_base[ref];
+
 		if (insn->op == IR_PHI) {
-			input = ir_insn_op(insn, k);
-			if (IR_IS_CONST_REF(input)) {
-				do_third_pass = 1;
-			} else {
-				dst = IR_REG_NUM(ctx->regs[ref][0]);
-				src = ir_get_alocated_reg(ctx, ref, k);
+			ir_ref input = ir_insn_op(insn, k);
+			ir_reg src = ir_get_alocated_reg(ctx, ref, k);
+			ir_reg dst = ctx->regs[ref][0];
 
-				if (dst == IR_REG_NONE) {
-					/* STORE to memory */
-					if (src == IR_REG_NONE) {
-						if (!ir_is_same_mem(ctx, input, ref)) {
-							ir_reg tmp = IR_IS_TYPE_INT(insn->type) ?  tmp_reg : tmp_fp_reg;
+			if (dst == IR_REG_NONE) {
+				/* STORE to memory cannot clobber any input register (do it right now) */
+				if (IR_IS_CONST_REF(input)) {
+					IR_ASSERT(src == IR_REG_NONE);
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
+					if (IR_IS_TYPE_INT(insn->type)
+					 && (ir_type_size[insn->type] != 8 || IR_IS_SIGNED_32BIT(ctx->ir_base[input].val.i64))) {
+						ir_emit_store_imm(ctx, insn->type, ref, ctx->ir_base[input].val.i32);
+						continue;
+					}
+#endif
+					ir_reg tmp = IR_IS_TYPE_INT(insn->type) ?  tmp_reg : tmp_fp_reg;
 
-							IR_ASSERT(tmp != IR_REG_NONE);
-							ir_emit_load(ctx, insn->type, tmp, input);
-							ir_emit_store(ctx, insn->type, ref, tmp);
-						}
-					} else {
-						if (IR_REG_SPILLED(src)) {
-							src = IR_REG_NUM(src);
-							ir_emit_load(ctx, insn->type, src, input);
-							if (ir_is_same_mem(ctx, input, ref)) {
-								continue;
-							}
-						}
-						ir_emit_store(ctx, insn->type, ref, src);
+					IR_ASSERT(tmp != IR_REG_NONE);
+					ir_emit_load(ctx, insn->type, tmp, input);
+					ir_emit_store(ctx, insn->type, ref, tmp);
+				} else if (src == IR_REG_NONE) {
+					if (!ir_is_same_mem(ctx, input, ref)) {
+						ir_reg tmp = IR_IS_TYPE_INT(insn->type) ?  tmp_reg : tmp_fp_reg;
+
+						IR_ASSERT(tmp != IR_REG_NONE);
+						ir_emit_load(ctx, insn->type, tmp, input);
+						ir_emit_store(ctx, insn->type, ref, tmp);
 					}
 				} else {
-					if (src == IR_REG_NONE) {
-						do_third_pass = 1;
-					} else {
-						if (IR_REG_SPILLED(src)) {
-							src = IR_REG_NUM(src);
-							ir_emit_load(ctx, insn->type, src, input);
-						}
-						if (src != dst) {
-							copies[n].type = insn->type;
-							copies[n].from = src;
-							copies[n].to = dst;
-							n++;
+					if (IR_REG_SPILLED(src)) {
+						src = IR_REG_NUM(src);
+						ir_emit_load(ctx, insn->type, src, input);
+						if (ir_is_same_mem(ctx, input, ref)) {
+							continue;
 						}
 					}
+					ir_emit_store(ctx, insn->type, ref, src);
 				}
-				if (IR_REG_SPILLED(ctx->regs[ref][0])) {
-					do_third_pass = 1;
+			} else if (src == IR_REG_NONE) {
+				/* STORE of constant or memory can't be clobber by parallel reg->reg copies (delay it) */
+				copies2[n2].input = input;
+				copies2[n2].output = ref;
+				copies2[n2].type = insn->type;
+				copies2[n2].from = src;
+				copies2[n2].to = dst;
+				n2++;
+			} else {
+				IR_ASSERT(!IR_IS_CONST_REF(input));
+				if (IR_REG_SPILLED(src)) {
+					ir_emit_load(ctx, insn->type, IR_REG_NUM(src), input);
+				}
+				if (IR_REG_SPILLED(dst) && (!IR_REG_SPILLED(src) || !ir_is_same_mem(ctx, input, ref))) {
+					ir_emit_store(ctx, insn->type, ref, IR_REG_NUM(src));
+				}
+				if (IR_REG_NUM(src) != IR_REG_NUM(dst)) {
+					/* Schedule parallel reg->reg copy */
+					copies[n].type = insn->type;
+					copies[n].from = IR_REG_NUM(src);
+					copies[n].to = IR_REG_NUM(dst);
+					n++;
 				}
 			}
 		}
@@ -471,49 +494,30 @@ static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb)
 	if (n > 0) {
 		ir_parallel_copy(ctx, copies, n, tmp_reg, tmp_fp_reg);
 	}
-	ir_mem_free(copies);
 
-	if (do_third_pass) {
-		for (i = 0, p = &ctx->use_edges[use_list->refs]; i < use_list->count; i++, p++) {
-			ref = *p;
-			insn = &ctx->ir_base[ref];
-			if (insn->op == IR_PHI) {
-				input = ir_insn_op(insn, k);
-				dst = IR_REG_NUM(ctx->regs[ref][0]);
+	for (n = 0; n < n2; n++) {
+		ir_ref input = copies2[n].input;
+		ir_ref ref = copies2[n].output;
+		ir_type type = copies2[n].type;
+		ir_reg dst = copies2[n].to;
 
-				if (IR_IS_CONST_REF(input)) {
-					if (dst == IR_REG_NONE) {
-#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
-						if (IR_IS_TYPE_INT(insn->type) && (ir_type_size[insn->type] != 8 || IR_IS_SIGNED_32BIT(ctx->ir_base[input].val.i64))) {
-							ir_emit_store_imm(ctx, insn->type, ref, ctx->ir_base[input].val.i32);
-							continue;
-						}
-#endif
-						ir_reg tmp = IR_IS_TYPE_INT(insn->type) ?  tmp_reg : tmp_fp_reg;
-
-						IR_ASSERT(tmp != IR_REG_NONE);
-						ir_emit_load(ctx, insn->type, tmp, input);
-						ir_emit_store(ctx, insn->type, ref, tmp);
-					} else {
-						ir_emit_load(ctx, insn->type, dst, input);
-					}
-				} else if (dst != IR_REG_NONE) {
-					 src = ir_get_alocated_reg(ctx, ref, k);
-
-					if (src == IR_REG_NONE) {
-						if (IR_REG_SPILLED(ctx->regs[ref][0]) && ir_is_same_mem(ctx, input, ref)) {
-							/* avoid LOAD and SAVE to the same memory */
-							continue;
-						}
-						ir_emit_load(ctx, insn->type, dst, input);
-					}
-				}
-				if (dst != IR_REG_NONE && IR_REG_SPILLED(ctx->regs[ref][0])) {
-					ir_emit_store(ctx, insn->type, ref, dst);
-				}
+		IR_ASSERT(dst != IR_REG_NONE);
+		if (IR_IS_CONST_REF(input)) {
+			ir_emit_load(ctx, type, IR_REG_NUM(dst), input);
+		} else {
+			IR_ASSERT(copies2[n].from == IR_REG_NONE);
+			if (IR_REG_SPILLED(dst) && ir_is_same_mem(ctx, input, ref)) {
+				/* avoid LOAD and STORE to the same memory */
+				continue;
 			}
+			ir_emit_load(ctx, type, IR_REG_NUM(dst), input);
+		}
+		if (IR_REG_SPILLED(dst)) {
+			ir_emit_store(ctx, type, ref, IR_REG_NUM(dst));
 		}
 	}
+
+	ir_mem_free(copies);
 }
 
 int ir_match(ir_ctx *ctx)

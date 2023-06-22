@@ -79,8 +79,8 @@ test:
 .L1:
 	testl %r10d, %r10d
 	je .L3
-	movl %edx, %edi
 	movl %ebp, %r9d
+	movl %edx, %edi
 .L2:
 	testl %r11d, %r11d
 	jne .L1
