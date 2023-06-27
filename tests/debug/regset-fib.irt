@@ -83,7 +83,6 @@ test:
 	ucomisd .L4(%rip), %xmm0
 	jp .L2
 	jae .L2
-	movsd (%rsp), %xmm0
 	addsd %xmm1, %xmm0
 	movsd %xmm0, (%rsp)
 	subsd %xmm1, %xmm0
@@ -98,6 +97,7 @@ test:
 	addq $0x18, %rsp
 	retq
 .rodata
+	.db 0x90, 0x90, 0x90, 0x90, 0x90
 .L3:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f
 .L4:
