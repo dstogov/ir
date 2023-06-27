@@ -3106,12 +3106,12 @@ spill_current:
 				IR_ASSERT(other->type != IR_VOID);
 				IR_LOG_LSRA_CONFLICT("      ---- Conflict with inactive", other, overlap);
 				// TODO: optimal split position (this case is not tested)
+				child = ir_split_interval_at(ctx, other, overlap);
 				if (prev) {
 					prev->list_next = other = other->list_next;
 				} else {
 					*inactive = other = other->list_next;
 				}
-				child = ir_split_interval_at(ctx, other, overlap);
 				ir_add_to_unhandled(unhandled, child);
 				IR_LOG_LSRA("      ---- Queue", child, "");
 				continue;
