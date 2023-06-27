@@ -2807,7 +2807,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 	return IR_REG_NONE;
 }
 
-static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_live_interval **active, ir_live_interval *inactive, ir_live_interval **unhandled)
+static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_live_interval **active, ir_live_interval **inactive, ir_live_interval **unhandled)
 {
 	ir_live_pos nextUsePos[IR_REG_NUM];
 	ir_live_pos blockPos[IR_REG_NUM];
@@ -2901,7 +2901,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 	}
 
 	/* for each interval it in inactive intersecting with current */
-	other = inactive;
+	other = *inactive;
 	while (other) {
 		/* freeUntilPos[it.reg] = next intersection of it with current */
 		reg = other->reg;
@@ -3093,7 +3093,8 @@ spill_current:
 	}
 
 	/* split any inactive interval for reg at the end of its lifetime hole */
-	other = inactive;
+	other = *inactive;
+	prev = NULL;
 	while (other) {
 		/* freeUntilPos[it.reg] = next intersection of it with current */
 		if (reg == other->reg) {
@@ -3105,11 +3106,18 @@ spill_current:
 				IR_ASSERT(other->type != IR_VOID);
 				IR_LOG_LSRA_CONFLICT("      ---- Conflict with inactive", other, overlap);
 				// TODO: optimal split position (this case is not tested)
+				if (prev) {
+					prev->list_next = other = other->list_next;
+				} else {
+					*inactive = other = other->list_next;
+				}
 				child = ir_split_interval_at(ctx, other, overlap);
 				ir_add_to_unhandled(unhandled, child);
 				IR_LOG_LSRA("      ---- Queue", child, "");
+				continue;
 			}
 		}
+		prev = other;
 		other = other->list_next;
 	}
 
@@ -3403,7 +3411,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 
 		reg = ir_try_allocate_free_reg(ctx, ival, &active, inactive, &unhandled);
 		if (reg == IR_REG_NONE) {
-			reg = ir_allocate_blocked_reg(ctx, ival, &active, inactive, &unhandled);
+			reg = ir_allocate_blocked_reg(ctx, ival, &active, &inactive, &unhandled);
 		}
 	}
 
