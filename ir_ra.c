@@ -2214,7 +2214,15 @@ static ir_block *ir_block_from_live_pos(ir_ctx *ctx, ir_live_pos pos)
 	IR_ASSERT(0);
 	return NULL;
 #else
-	return &ctx->cfg_blocks[ctx->cfg_map[ref]];
+	uint32_t b = ctx->cfg_map[ref];
+
+	while (!b) {
+		ref--;
+		IR_ASSERT(ref > 0);
+		b = ctx->cfg_map[ref];
+	}
+	IR_ASSERT(b <= ctx->cfg_blocks_count);
+	return &ctx->cfg_blocks[b];
 #endif
 }
 
