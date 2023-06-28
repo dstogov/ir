@@ -2901,7 +2901,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 				blockPos[reg] = nextUsePos[reg] = 0;
 			} else {
 				pos = ir_first_use_pos_after(other, ival->range.start,
-					IR_USE_MUST_BE_IN_REG /* | IR_USE_SHOULD_BE_IN_REG */); // TODO: ???
+					IR_USE_MUST_BE_IN_REG | IR_USE_SHOULD_BE_IN_REG);
 				if (pos < nextUsePos[reg]) {
 					nextUsePos[reg] = pos;
 				}
@@ -2950,7 +2950,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 					}
 				} else {
 					pos = ir_first_use_pos_after(other, ival->range.start,
-						IR_USE_MUST_BE_IN_REG /* | IR_USE_SHOULD_BE_IN_REG */); // TODO: ???
+						IR_USE_MUST_BE_IN_REG | IR_USE_SHOULD_BE_IN_REG);
 					if (pos < nextUsePos[reg]) {
 						nextUsePos[reg] = pos;
 					}

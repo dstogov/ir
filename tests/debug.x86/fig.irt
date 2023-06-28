@@ -66,54 +66,51 @@ x86
 }
 --EXPECT--
 test:
-	subl $0x18, %esp
-	movl %ebx, 0x14(%esp)
-	movl %ebp, 0x10(%esp)
-	movl %esi, 0xc(%esp)
-	movl %edi, 8(%esp)
-	movl 0x1c(%esp), %eax
-	movl 0x20(%esp), %ecx
-	movl 0x24(%esp), %edx
-	movl 0x28(%esp), %ebx
-	movl %edx, %ebp
-	imull %ecx, %ebp
-	movl %ebp, (%esp)
-	leal 4(%ebp), %ebp
-	movl %ebp, 4(%esp)
+	subl $0x14, %esp
+	movl %ebx, 0x10(%esp)
+	movl %ebp, 0xc(%esp)
+	movl %esi, 8(%esp)
+	movl %edi, 4(%esp)
+	movl 0x18(%esp), %eax
+	movl 0x1c(%esp), %ecx
+	movl 0x24(%esp), %ebx
+	movl 0x2c(%esp), %ebp
+	imull %ecx, %edx
+	movl %edx, (%esp)
+	leal 4(%edx), %edx
 .L1:
-	cmpl $0, 0x3c(%esp)
+	cmpl $0, 0x38(%esp)
 	je .L3
-	movl 4(%esp), %eax
-	movl %eax, 0x30(%esp)
-	movl %edx, %eax
+	movl %edx, %ebp
+	movl 0x20(%esp), %eax
 .L2:
-	cmpl $0, 0x40(%esp)
+	cmpl $0, 0x3c(%esp)
 	jne .L1
 	movl %eax, %esi
 	imull %ecx, %esi
 	addl %ecx, %eax
-	addl %edx, %eax
-	addl %ebx, %eax
-	movl (%esp), %edi
+	movl 0x20(%esp), %edi
 	addl %edi, %eax
-	movl 0x30(%esp), %ebp
+	addl %ebx, %eax
+	movl (%esp), %edx
+	addl %edx, %eax
 	addl %ebp, %eax
-	movl 0x34(%esp), %ecx
+	movl 0x30(%esp), %ecx
 	addl %ecx, %eax
-	movl 0x38(%esp), %edi
+	movl 0x34(%esp), %edi
 	addl %edi, %eax
 	leal 1(%eax, %esi), %eax
-	movl 0x14(%esp), %ebx
-	movl 0x10(%esp), %ebp
-	movl 0xc(%esp), %esi
-	movl 8(%esp), %edi
-	addl $0x18, %esp
+	movl 0x10(%esp), %ebx
+	movl 0xc(%esp), %ebp
+	movl 8(%esp), %esi
+	movl 4(%esp), %edi
+	addl $0x14, %esp
 	retl
 .L3:
 	movl %eax, %esi
 	imull %ecx, %esi
-	movl %esi, 0x34(%esp)
+	movl %esi, 0x30(%esp)
 	leal 1(%esi), %edi
-	movl %edi, 0x38(%esp)
-	movl %edx, %ebx
+	movl %edi, 0x34(%esp)
+	movl 0x20(%esp), %ebx
 	jmp .L2
