@@ -20,9 +20,9 @@ x86
 --EXPECT--
 test:
 	subl $4, %esp
+	movl 0xc(%esp), %eax
+	movl %eax, (%esp)
 	movl 8(%esp), %eax
-	movl 0xc(%esp), %ecx
-	movl %ecx, (%esp)
 	andl (%esp), %eax
 	addl %eax, %eax
 	movl %eax, (%esp)

@@ -14,7 +14,7 @@ x86
 }
 --EXPECT--
 test:
-	movl 8(%esp), %eax
 	movl 4(%esp), %ecx
+	movl 8(%esp), %eax
 	shll %cl, %eax
 	retl

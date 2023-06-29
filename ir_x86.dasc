@@ -541,7 +541,7 @@ int ir_get_target_constraints(const ir_ctx *ctx, ir_ref ref, ir_target_constrain
 					flags = IR_OP2_MUST_BE_IN_REG;
 				}
 			} else {
-				flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
+				flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 			}
 			if (IR_IS_CONST_REF(insn->op2) && insn->op1 != insn->op2) {
 				insn = &ctx->ir_base[insn->op2];
@@ -558,7 +558,7 @@ int ir_get_target_constraints(const ir_ctx *ctx, ir_ref ref, ir_target_constrain
 			if (rule & IR_FUSED) {
 				flags = IR_OP2_MUST_BE_IN_REG;
 			} else {
-				flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
+				flags = IR_DEF_REUSES_OP1_REG | IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 			}
 			constraints->hints[1] = IR_REG_NONE;
 			constraints->hints[2] = IR_REG_RCX;
@@ -749,7 +749,7 @@ op2_const:
 			flags = IR_USE_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG | IR_OP3_SHOULD_BE_IN_REG;
 			break;
 		case IR_BINOP_SSE2:
-			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
+			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 			break;
 		case IR_SHIFT_CONST:
 		case IR_INC:
@@ -759,7 +759,7 @@ op2_const:
 		case IR_MOD_PWR2:
 		case IR_OP_INT:
 		case IR_OP_FP:
-			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;
+			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
 			break;
 		case IR_COPY_INT:
 		case IR_COPY_FP:
@@ -2238,6 +2238,9 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		} else {
 			ir_emit_load(ctx, type, def_reg, op1);
 		}
+		if (op1 == op2) {
+			op2_reg = def_reg;
+		}
 	}
 
 	if (op2_reg != IR_REG_NONE) {
@@ -3467,6 +3470,9 @@ static void ir_emit_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			ir_emit_fp_mov(ctx, type, def_reg, op1_reg);
 		} else {
 			ir_emit_load(ctx, type, def_reg, op1);
+		}
+		if (op1 == op2) {
+			op2_reg = def_reg;
 		}
 	}
 	if (op2_reg != IR_REG_NONE) {

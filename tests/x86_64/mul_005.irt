@@ -15,5 +15,5 @@ x86_64
 --EXPECT--
 test:
 	movw %di, %ax
-	addw %di, %ax
+	addw %ax, %ax
 	retq

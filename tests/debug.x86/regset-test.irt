@@ -110,30 +110,29 @@ R1 (d_2) [SPILL=0x24]
 	[%xmm0]: [2.2-10.2), DEF(2.2)
 	: [10.2-24.0), [26.0-29.0), [31.0-36.0)
 	: [36.0-38.0), USE(36.1/2)
-R2 (d_3) [%xmm1]: [3.2-5.0), DEF(3.2), USE(5.0/1, hint=R3)!
+R2 (d_3) [SPILL=0x2c]: [3.2-5.0), DEF(3.2), USE(5.0/1, hint=R3)
 R3 (d_5) [SPILL=0x0]
 	[%xmm1]: [5.0-10.2), DEF(5.0, hint=R2)!
 	: [10.2-24.0), [26.0-29.0), [31.0-34.0)
 	: [34.0-38.0), USE(34.1/2)
 R4 (d_12, d_36) [SPILL=0x8]
-	[%xmm1]: [11.0-20.0), DEF(12.2), USE(20.0/1, hint=R8)!, USE(20.0/2)
-	: [20.0-24.0), [26.0-29.0), [31.0-31.3)
-	[%xmm1]: [31.3-32.0), [36.0-38.0), USE(32.0/1)!, DEF(36.0, hint=R12)!, PHI_USE(37.2, phi=d_12/3)
+	: [11.0-24.0), [26.0-29.0), [31.0-32.0), DEF(12.2), USE(20.0/1, hint=R8), USE(20.0/2), USE(32.0/1)
+	[%xmm0]: [36.0-38.0), DEF(36.0, hint=R12)!, PHI_USE(37.2, phi=d_12/3)
 R5 (d_13, d_34) [SPILL=0x10]
-	[%xmm0]: [11.0-18.0), DEF(13.2), USE(18.0/1, hint=R7)!, USE(18.0/2)
-	: [18.0-24.0), [26.0-29.0), [31.0-32.0)
+	[%xmm0]: [11.0-20.0), DEF(13.2), USE(18.0/1, hint=R7), USE(18.0/2)
+	: [20.0-24.0), [26.0-29.0), [31.0-32.0)
 	: [32.0-32.1), USE(32.1/2, hint=R10)
-	[%xmm0]: [34.0-38.0), DEF(34.0, hint=R11)!, PHI_USE(37.2, phi=d_13/3)
+	[%xmm1]: [34.0-38.0), DEF(34.0, hint=R11)!, PHI_USE(37.2, phi=d_13/3)
 R6 (d_14, d_15) [%eax]: [11.0-15.1), [15.2-25.0), [26.0-29.0), [31.0-38.0), DEF(14.2), USE(15.1/1)!, DEF(15.2)!, USE(25.0/2, hint=%eax), USE(28.1/27.1), PHI_USE(37.2, phi=d_14/3)
-R7 (d_18) [%xmm0]: [18.0-24.0), [26.0-29.0), [31.0-33.0), DEF(18.0, hint=R5)!, USE(21.1/2), USE(33.0/1, hint=R11)!
+R7 (d_18) [%xmm1]: [18.0-24.0), [26.0-29.0), [31.0-33.0), DEF(18.0, hint=R5)!, USE(21.1/2), USE(33.0/1, hint=R11)
 R8 (d_20) [SPILL=0x18]
-	[%xmm1]: [20.0-21.0), DEF(20.0, hint=R4)!, USE(21.0/1, hint=R9)!
+	[%xmm0]: [20.0-21.0), DEF(20.0, hint=R4)!, USE(21.0/1, hint=R9)
 	: [21.0-24.0), [26.0-29.0), [31.0-33.0)
 	: [33.0-33.1), USE(33.1/2)
-R9 (d_21) [%xmm1]: [21.0-23.1), DEF(21.0, hint=R8)!, USE(23.1/22.1)!
-R10 (d_32) [%xmm1]: [32.0-35.0), DEF(32.0, hint=R4)!, USE(35.0/1, hint=R12)!, USE(35.0/2)
-R11 (d_33) [%xmm0]: [33.0-34.0), DEF(33.0, hint=R7)!, USE(34.0/1, hint=R5)!
-R12 (d_35) [%xmm1]: [35.0-36.0), DEF(35.0, hint=R10)!, USE(36.0/1, hint=R4)!
+R9 (d_21) [%xmm0]: [21.0-23.1), DEF(21.0, hint=R8)!, USE(23.1/22.1)!
+R10 (d_32) [%xmm0]: [32.0-35.0), DEF(32.0, hint=R4)!, USE(35.0/1, hint=R12), USE(35.0/2)
+R11 (d_33) [%xmm1]: [33.0-34.0), DEF(33.0, hint=R7)!, USE(34.0/1, hint=R5)
+R12 (d_35) [%xmm0]: [35.0-36.0), DEF(35.0, hint=R10)!, USE(36.0/1, hint=R4)
 [%eax] : [25.0-25.1), [30.0-30.1)
 }
 test:
@@ -148,24 +147,24 @@ test:
 	xorl %eax, %eax
 .L1:
 	leal 1(%eax), %eax
-	movsd 0x10(%esp), %xmm0
-	mulsd %xmm0, %xmm0
-	movsd 8(%esp), %xmm1
+	movsd 0x10(%esp), %xmm1
 	mulsd %xmm1, %xmm1
-	movsd %xmm1, 0x18(%esp)
-	addsd %xmm0, %xmm1
-	ucomisd .L5, %xmm1
+	movsd 8(%esp), %xmm0
+	mulsd %xmm0, %xmm0
+	movsd %xmm0, 0x18(%esp)
+	addsd %xmm1, %xmm0
+	ucomisd .L5, %xmm0
 	ja .L2
 	cmpl $0x3e8, %eax
 	jg .L3
-	movsd 8(%esp), %xmm1
-	mulsd 0x10(%esp), %xmm1
-	subsd 0x18(%esp), %xmm0
-	addsd (%esp), %xmm0
-	movsd %xmm0, 0x10(%esp)
-	addsd %xmm1, %xmm1
-	addsd 0x24(%esp), %xmm1
-	movsd %xmm1, 8(%esp)
+	movsd 8(%esp), %xmm0
+	mulsd 0x10(%esp), %xmm0
+	subsd 0x18(%esp), %xmm1
+	addsd (%esp), %xmm1
+	movsd %xmm1, 0x10(%esp)
+	addsd %xmm0, %xmm0
+	addsd 0x24(%esp), %xmm0
+	movsd %xmm0, 8(%esp)
 	jmp .L1
 .L2:
 	addl $0x20, %esp

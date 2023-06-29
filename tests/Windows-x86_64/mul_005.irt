@@ -15,5 +15,5 @@ Windows-x86_64
 --EXPECT--
 test:
 	movw %cx, %ax
-	addw %cx, %ax
+	addw %ax, %ax
 	retq

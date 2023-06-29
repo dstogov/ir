@@ -63,7 +63,7 @@ TMP
 	[%xmm0]: [13.2-13.3)/1
 R1 (d_4) [%xmm1]: [3.0-10.1), DEF(4.2), USE(9.1/2), USE(10.1/2)
 R2 (d_5, d_9) [SPILL=0x0]
-	[%xmm0]: [3.0-10.0), DEF(5.2), USE(7.1/6.1)!, USE(9.0/1)!, DEF(9.0)!, USE(10.0/1, hint=%xmm0, hint=R3)!
+	[%xmm0]: [3.0-10.0), DEF(5.2), USE(7.1/6.1)!, USE(9.0/1), DEF(9.0)!, USE(10.0/1, hint=%xmm0, hint=R3)
 	: [10.0-14.0), PHI_USE(13.2, phi=d_5/3)
 R3 (d_10) [SPILL=0x8]
 	[%xmm0]: [10.0-11.0), DEF(10.0, hint=R2)!, USE(11.0/4, hint=%xmm0)

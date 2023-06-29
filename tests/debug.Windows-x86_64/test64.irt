@@ -64,9 +64,9 @@ test:
 .L1:
 	leaq 1(%rax), %rax
 	movapd %xmm2, %xmm4
-	mulsd %xmm2, %xmm4
+	mulsd %xmm4, %xmm4
 	movapd %xmm3, %xmm5
-	mulsd %xmm3, %xmm5
+	mulsd %xmm5, %xmm5
 	movapd %xmm5, %xmm6
 	addsd %xmm4, %xmm6
 	ucomisd .L5(%rip), %xmm6
