@@ -773,6 +773,18 @@ IR_ALWAYS_INLINE bool ir_const_is_true(const ir_insn *v)
 	return 0;
 }
 
+IR_ALWAYS_INLINE bool ir_ref_is_true(ir_ctx *ctx, ir_ref ref)
+{
+	if (ref == IR_TRUE) {
+		return 1;
+	} else if (ref == IR_FALSE) {
+		return 0;
+	} else {
+		IR_ASSERT(IR_IS_CONST_REF(ref));
+		return ir_const_is_true(&ctx->ir_base[ref]);
+	}
+}
+
 /* IR OP flags */
 #define IR_OP_FLAG_OPERANDS_SHIFT 3
 

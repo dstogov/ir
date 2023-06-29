@@ -3956,8 +3956,9 @@ static void ir_emit_guard(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	IR_ASSERT(IR_IS_TYPE_INT(type));
 	if (IR_IS_CONST_REF(insn->op2)) {
-		if ((insn->op == IR_GUARD && insn->op2 == IR_FALSE) ||
-				(insn->op == IR_GUARD_NOT && insn->op2 == IR_TRUE)) {
+		bool is_true = ir_ref_is_true(ctx, insn->op2);
+
+		if ((insn->op == IR_GUARD && !is_true) || (insn->op == IR_GUARD_NOT && is_true)) {
 			if (IR_IS_CONST_REF(insn->op3)) {
 				void *addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op3]);
 
