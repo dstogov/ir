@@ -92,7 +92,7 @@ $(BUILD_DIR)\ir_test.exe: $(OBJS_IR_TEST) $(OBJS_COMMON) $(LIBCAPSTONE)
 
 $(BUILD_DIR)\ir_fold_hash.h: $(BUILD_DIR)\gen_ir_fold_hash.exe $(SRC_DIR)\ir_fold.h $(SRC_DIR)\ir.h
 	$(BUILD_DIR)\gen_ir_fold_hash.exe < $(SRC_DIR)\ir_fold.h > $(BUILD_DIR)\ir_fold_hash.h
-$(BUILD_DIR)\gen_ir_fold_hash.exe: $(SRC_DIR)\gen_ir_fold_hash.c $(SRC_DIR)\ir_strtab.c
+$(BUILD_DIR)\gen_ir_fold_hash.exe: $(SRC_DIR)\gen_ir_fold_hash.c $(SRC_DIR)\ir_strtab.c $(SRC_DIR)\ir.h
 	"$(CC)" $(CFLAGS) /Fo$(BUILD_DIR)\ /Fe$@ $**
 
 $(BUILD_DIR)\minilua.exe: $(SRC_DIR)\dynasm\minilua.c

@@ -80,7 +80,7 @@ $(SRC_DIR)/ir_load.c: $(SRC_DIR)/ir.g
 
 $(BUILD_DIR)/ir_fold_hash.h: $(BUILD_DIR)/gen_ir_fold_hash $(SRC_DIR)/ir_fold.h $(SRC_DIR)/ir.h
 	$(BUILD_DIR)/gen_ir_fold_hash < $(SRC_DIR)/ir_fold.h > $(BUILD_DIR)/ir_fold_hash.h
-$(BUILD_DIR)/gen_ir_fold_hash: $(SRC_DIR)/gen_ir_fold_hash.c $(SRC_DIR)/ir_strtab.c
+$(BUILD_DIR)/gen_ir_fold_hash: $(SRC_DIR)/gen_ir_fold_hash.c $(SRC_DIR)/ir_strtab.c $(SRC_DIR)/ir.h
 	$(BUILD_CC) $(CFLAGS) $(LDFALGS) -o $@ $^
 
 $(BUILD_DIR)/minilua: $(SRC_DIR)/dynasm/minilua.c
