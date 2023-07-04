@@ -2217,20 +2217,6 @@ static ir_live_pos ir_first_use_pos(ir_live_interval *ival, uint8_t flags)
 static ir_block *ir_block_from_live_pos(ir_ctx *ctx, ir_live_pos pos)
 {
 	ir_ref ref = IR_LIVE_POS_TO_REF(pos);
-
-#ifdef IR_BITSET_LIVENESS
-	uint32_t b;
-	ir_block *bb;
-
-	// TODO: use binary search or map
-	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; b++, bb++) {
-		if (ref >= bb->start && ref <= bb->end) {
-			return bb;
-		}
-	}
-	IR_ASSERT(0);
-	return NULL;
-#else
 	uint32_t b = ctx->cfg_map[ref];
 
 	while (!b) {
@@ -2240,7 +2226,6 @@ static ir_block *ir_block_from_live_pos(ir_ctx *ctx, ir_live_pos pos)
 	}
 	IR_ASSERT(b <= ctx->cfg_blocks_count);
 	return &ctx->cfg_blocks[b];
-#endif
 }
 
 static ir_live_pos ir_find_optimal_split_position(ir_ctx *ctx, ir_live_interval *ival, ir_live_pos min_pos, ir_live_pos max_pos, bool prefer_max)
