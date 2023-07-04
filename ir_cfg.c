@@ -725,7 +725,7 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 		ir_block *idom_bb;
 
 		if (UNEXPECTED(idom > b)) {
-			// TODO: try to remove this case ???
+			/* In rare cases, LOOP_BEGIN.op1 may be a back-edge. Skip back-edges. */
 			ctx->flags &= ~IR_NO_LOOPS;
 			while (1) {
 				k--;
@@ -734,7 +734,7 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 				if (idom < b) {
 					break;
 				}
-				IR_ASSERT(k == 0);
+				IR_ASSERT(k > 0);
 			}
 		}
 		IR_ASSERT(blocks[idom].idom > 0);
