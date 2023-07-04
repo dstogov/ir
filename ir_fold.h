@@ -479,10 +479,6 @@ IR_FOLD(ABS(C_FLOAT))
 	IR_FOLD_CONST_F(fabsf(op1_insn->val.f));
 }
 
-
-//IR_FOLD(CAST(CONST))
-//TODO: type casting
-
 IR_FOLD(ADD_OV(C_U8, C_U8))
 IR_FOLD(ADD_OV(C_U16, C_U16))
 IR_FOLD(ADD_OV(C_U32, C_U32))
@@ -1184,7 +1180,7 @@ IR_FOLD(COND(C_I64, _))
 IR_FOLD(COND(C_DOUBLE, _))
 IR_FOLD(COND(C_FLOAT, _))
 {
-	if (op1_insn->val.u64) { // TODO: ???
+	if (ir_const_is_true(op1_insn)) {
 		IR_FOLD_COPY(op2);
 	} else {
 		IR_FOLD_COPY(op3);
@@ -1201,7 +1197,6 @@ IR_FOLD(ABS(ABS))
 IR_FOLD(ABS(NEG))
 {
 	/* abs(neg(y)) => abs(y) */
-	// TODO: PHIBARIER ???
 	op1 = op1_insn->op1;
 	IR_FOLD_RESTART;
 }
@@ -1985,6 +1980,27 @@ IR_FOLD(XOR(XOR, C_I64))
 		op1 = op1_insn->op1;
 		op2 = ir_const(ctx, val, IR_OPT_TYPE(opt));
 		IR_FOLD_RESTART;
+	}
+	IR_FOLD_NEXT;
+}
+
+IR_FOLD(AND(AND, _))
+IR_FOLD(OR(OR, _))
+IR_FOLD(MIN(MIN, _))
+IR_FOLD(MAX(MAX, _))
+{
+	if (op1_insn->op1 == op2 || op1_insn->op2 == op2) {
+		IR_FOLD_COPY(op2);
+	}
+	IR_FOLD_NEXT;
+}
+
+IR_FOLD(XOR(XOR, _))
+{
+	if (op1_insn->op1 == op2) {
+		IR_FOLD_COPY(op1_insn->op2);
+	} else if (op1_insn->op2 == op2) {
+		IR_FOLD_COPY(op1_insn->op1);
 	}
 	IR_FOLD_NEXT;
 }
