@@ -932,6 +932,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 		live_in_block[v] = b; \
 	} while (0)
 
+/* Returns the last virtual register alive at the end of the block (it is used as an already-visited marker) */
 IR_ALWAYS_INLINE uint32_t ir_live_out_top(ir_ctx *ctx, uint32_t *live_outs, ir_list *live_lists, uint32_t b)
 {
 #if 0
@@ -944,6 +945,7 @@ IR_ALWAYS_INLINE uint32_t ir_live_out_top(ir_ctx *ctx, uint32_t *live_outs, ir_l
 #endif
 }
 
+/* Remember a virtual register alive at the end of the block */
 IR_ALWAYS_INLINE void ir_live_out_push(ir_ctx *ctx, uint32_t *live_outs, ir_list *live_lists, uint32_t b, uint32_t v)
 {
 #if 0
@@ -956,9 +958,10 @@ IR_ALWAYS_INLINE void ir_live_out_push(ir_ctx *ctx, uint32_t *live_outs, ir_list
 	if (live_lists->len >= live_lists->a.size) {
 		ir_array_grow(&live_lists->a, live_lists->a.size + 1024);
 	}
-	ir_list_push_unchecked(live_lists, live_outs[b]);
-	ir_list_push_unchecked(live_lists, v);
-	live_outs[b] = ir_list_len(live_lists) - 1;
+	/* Form a linked list of virtual register live at the end of the block */
+	ir_list_push_unchecked(live_lists, live_outs[b]); /* push old root of the list (previous element of the list) */
+	live_outs[b] = ir_list_len(live_lists);           /* remember the new root */
+	ir_list_push_unchecked(live_lists, v);            /* push a virtual register */
 #endif
 }
 
@@ -977,6 +980,7 @@ static void ir_compute_live_sets(ir_ctx *ctx, uint32_t *live_outs, ir_list *live
 	ir_list_init(&fuse_queue, 16);
 	ir_list_init(&block_queue, 256);
 
+	/* For each virtual register explore paths from all uses to definition */
 	for (i = ctx->insns_count - 1; i > 0; i--) {
 		uint32_t v = ctx->vregs[i];
 
@@ -985,6 +989,7 @@ static void ir_compute_live_sets(ir_ctx *ctx, uint32_t *live_outs, ir_list *live
 			ir_use_list *use_list = &ctx->use_lists[i];
 			ir_ref *p, n = use_list->count;
 
+			/* Collect all blocks where 'v' is used in a 'block_queue' */
 			for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
 				ir_ref use = *p;
 				ir_insn *insn = &ctx->ir_base[use];
@@ -1032,13 +1037,14 @@ static void ir_compute_live_sets(ir_ctx *ctx, uint32_t *live_outs, ir_list *live
 				} else {
 					uint32_t use_block = ctx->cfg_map[use];
 
+					/* Check if the vitual register is alive at the start of 'use_block' */
 					if (def_block != use_block && ir_live_out_top(ctx, live_outs, live_lists, use_block) != v) {
 						ir_list_push(&block_queue, use_block);
 					}
 				}
 			}
 
-			/* UP_AND_MARK */
+			/* UP_AND_MARK: Traverse through predecessor blocks until we reache the block where 'v' is defined*/
 			while (ir_list_len(&block_queue)) {
 				uint32_t b = ir_list_pop(&block_queue);
 				ir_block *bb = &ctx->cfg_blocks[b];
@@ -1061,7 +1067,9 @@ static void ir_compute_live_sets(ir_ctx *ctx, uint32_t *live_outs, ir_list *live
 				for (p = &ctx->cfg_edges[bb->predecessors]; n > 0; p++, n--) {
 					uint32_t pred_block = *p;
 
+					/* Check if 'pred_block' wasn't traversed before */
 					if (ir_live_out_top(ctx, live_outs, live_lists, pred_block) != v) {
+						/* Mark a virtual register 'v' alive at the end of 'pred_block' */
 						ir_live_out_push(ctx, live_outs, live_lists, pred_block, v);
 						if (pred_block != def_block) {
 							ir_list_push(&block_queue, pred_block);
@@ -1266,6 +1274,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 		bb = &ctx->cfg_blocks[b];
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 
+		/* For all virtual register alive at the end of the block */
 		n = live_outs[b];
 		while (n != 0) {
 			i = ir_list_at(&live_lists, n);
@@ -1277,7 +1286,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 		}
 
 		if (bb->successors_count == 1) {
-			/* for each phi function phi of successor */
+			/* for each phi function of the successor */
 			succ = ctx->cfg_edges[bb->successors];
 			succ_bb = &ctx->cfg_blocks[succ];
 			if (succ_bb->flags & IR_BB_HAS_PHI) {
@@ -1304,7 +1313,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 			}
 		}
 
-		/* for each operation op of b in reverse order */
+		/* for each operation of the block in reverse order */
 		ref = bb->end;
 		insn = &ctx->ir_base[ref];
 		if (insn->op == IR_END || insn->op == IR_LOOP_END) {
