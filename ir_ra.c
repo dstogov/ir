@@ -989,7 +989,7 @@ static void ir_compute_live_sets(ir_ctx *ctx, uint32_t *live_outs, ir_list *live
 			ir_use_list *use_list = &ctx->use_lists[i];
 			ir_ref *p, n = use_list->count;
 
-			/* Collect all blocks where 'v' is used in a 'block_queue' */
+			/* Collect all blocks where 'v' is used into a 'block_queue' */
 			for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
 				ir_ref use = *p;
 				ir_insn *insn = &ctx->ir_base[use];
