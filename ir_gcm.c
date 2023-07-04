@@ -119,7 +119,7 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 				lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
 			}
 		}
-		IR_ASSERT(lca != 0 && "No Common Antecessor");
+		IR_ASSERT(lca != 0 && "No Common Ancestor");
 		b = lca;
 
 		if (b != _blocks[ref]) {
@@ -215,7 +215,7 @@ static void ir_gcm_schedule_rest(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 				lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
 			}
 		}
-		IR_ASSERT(lca != 0 && "No Common Antecessor");
+		IR_ASSERT(lca != 0 && "No Common Ancestor");
 		b = lca;
 		_blocks[ref] = b;
 		if (ctx->ir_base[ref + 1].op == IR_OVERFLOW) {
