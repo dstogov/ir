@@ -995,7 +995,13 @@ void ir_build_def_use_lists(ir_ctx *ctx)
 	ir_use_list *use_list;
 
 	for (i = IR_UNUSED + 1, insn = ctx->ir_base + i; i < ctx->insns_count;) {
-		n = ir_input_edges_count(ctx, insn);
+		uint32_t flags = ir_op_flags[insn->op];
+
+		if (UNEXPECTED(IR_OP_HAS_VAR_INPUTS(flags))) {
+			n = insn->inputs_count;
+		} else {
+			n = insn->inputs_count = IR_INPUT_EDGES_COUNT(flags);
+		}
 		for (j = n, p = insn->ops + 1; j > 0; j--, p++) {
 			def = *p;
 			if (def > 0) {
@@ -1016,7 +1022,7 @@ void ir_build_def_use_lists(ir_ctx *ctx)
 
 	edges = ir_mem_malloc(edges_count * sizeof(ir_ref));
 	for (i = IR_UNUSED + 1, insn = ctx->ir_base + i; i < ctx->insns_count;) {
-		n = ir_input_edges_count(ctx, insn);
+		n = insn->inputs_count;
 		for (j = n, p = insn->ops + 1; j > 0; j--, p++) {
 			def = *p;
 			if (def > 0) {
@@ -1047,7 +1053,13 @@ void ir_build_def_use_lists(ir_ctx *ctx)
 	linked_lists_size = IR_ALIGNED_SIZE(ctx->insns_count, 1024);
 	linked_lists = ir_mem_malloc(linked_lists_size * sizeof(ir_ref));
 	for (i = IR_UNUSED + 1, insn = ctx->ir_base + i; i < ctx->insns_count;) {
-		n = ir_input_edges_count(ctx, insn);
+		uint32_t flags = ir_op_flags[insn->op];
+
+		if (UNEXPECTED(IR_OP_HAS_VAR_INPUTS(flags))) {
+			n = insn->inputs_count;
+		} else {
+			n = insn->inputs_count = IR_INPUT_EDGES_COUNT(flags);
+		}
 		for (j = n, p = insn->ops + 1; j > 0; j--, p++) {
 			def = *p;
 			if (def > 0) {

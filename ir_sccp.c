@@ -209,7 +209,7 @@ static void ir_sccp_make_nop(ir_ctx *ctx, ir_ref ref)
 	use_list->count = 0;
 
 	insn = &ctx->ir_base[ref];
-	n = ir_input_edges_count(ctx, insn);
+	n = insn->inputs_count;
 	insn->opt = IR_NOP; /* keep "inputs_count" */
 	for (j = 1, p = insn->ops + j; j <= n; j++, p++) {
 		*p = IR_UNUSED;
@@ -226,7 +226,7 @@ static void ir_sccp_remove_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_bi
 	use_list->count = 0;
 
 	insn = &ctx->ir_base[ref];
-	n = ir_input_edges_count(ctx, insn);
+	n = insn->inputs_count;
 	insn->opt = IR_NOP; /* keep "inputs_count" */
 	for (j = 1, p = insn->ops + j; j <= n; j++, p++) {
 		ir_ref input = *p;
@@ -252,7 +252,7 @@ static void ir_sccp_replace_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_r
 	IR_ASSERT(ref != new_ref);
 
 	insn = &ctx->ir_base[ref];
-	n = ir_input_edges_count(ctx, insn);
+	n = insn->inputs_count;
 	insn->opt = IR_NOP; /* keep "inputs_count" */
 	for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
 		ir_ref input = *p;
@@ -275,7 +275,7 @@ static void ir_sccp_replace_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_r
 		use = *p;
 		if (IR_IS_FEASIBLE(use)) {
 			insn = &ctx->ir_base[use];
-			l = ir_input_edges_count(ctx, insn);
+			l = insn->inputs_count;
 			for (k = 1; k <= l; k++) {
 				if (ir_insn_op(insn, k) == ref) {
 					ir_insn_set_op(insn, k, new_ref);
@@ -337,6 +337,8 @@ restart:
 				ir_ref n, j, *p, use;
 
 				insn->optx = ctx->fold_insn.opt;
+				IR_ASSERT(!IR_OP_HAS_VAR_INPUTS(ir_op_flags[opt & IR_OPT_OP_MASK]));
+				insn->inputs_count = IR_INPUT_EDGES_COUNT(ir_op_flags[opt & IR_OPT_OP_MASK]);
 				if (insn->op1 != ctx->fold_insn.op1) {
 					if (!IR_IS_CONST_REF(insn->op1) && insn->op1 != ctx->fold_insn.op2 && insn->op1 != ctx->fold_insn.op3) {
 						ir_sccp_remove_from_use_list(ctx, insn->op1, ref);

@@ -532,7 +532,6 @@ static void ir_add_fusion_ranges(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_block
 
 		insn = &ctx->ir_base[input];
 		flags = ir_op_flags[insn->op];
-		IR_ASSERT(!IR_OP_HAS_VAR_INPUTS(flags));
 		n = IR_INPUT_EDGES_COUNT(flags);
 		j = 1;
 		p = insn->ops + j;
@@ -799,14 +798,13 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 
 			IR_ASSERT(insn->op != IR_PHI && (!ctx->rules || !(ctx->rules[ref] & (IR_FUSED|IR_SKIPPED))));
 			flags = ir_op_flags[insn->op];
-			n = ir_input_edges_count(ctx, insn);
 			j = 1;
 			p = insn->ops + 1;
 			if (flags & (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_PINNED)) {
 				j++;
 				p++;
 			}
-			for (; j <= n; j++, p++) {
+			for (; j <= insn->inputs_count; j++, p++) {
 				ir_ref input = *p;
 				ir_reg reg = (j < constraints.hints_count) ? constraints.hints[j] : IR_REG_NONE;
 				ir_live_pos use_pos;
@@ -1408,14 +1406,13 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 
 			IR_ASSERT(insn->op != IR_PHI && (!ctx->rules || !(ctx->rules[ref] & (IR_FUSED|IR_SKIPPED))));
 			flags = ir_op_flags[insn->op];
-			n = ir_input_edges_count(ctx, insn);
 			j = 1;
 			p = insn->ops + 1;
 			if (flags & (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_PINNED)) {
 				j++;
 				p++;
 			}
-			for (; j <= n; j++, p++) {
+			for (; j <= insn->inputs_count; j++, p++) {
 				ir_ref input = *p;
 				ir_reg reg = (j < constraints.hints_count) ? constraints.hints[j] : IR_REG_NONE;
 				ir_live_pos use_pos;

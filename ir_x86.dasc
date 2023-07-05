@@ -6037,7 +6037,7 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn)
 	}
 #endif
 
-	n = ir_input_edges_count(ctx, insn);
+	n = insn->inputs_count;
 	for (j = 3; j <= n; j++) {
 		type = ctx->ir_base[ir_insn_op(insn, j)].type;
 		if (IR_IS_TYPE_INT(type)) {
@@ -6091,7 +6091,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 	/* For temporaries we may use any scratch registers except for registers used for parameters */
 	ir_reg tmp_fp_reg = IR_REG_FP_LAST; /* Temporary register for FP loads and swap */
 
-	n = ir_input_edges_count(ctx, insn);
+	n = insn->inputs_count;
 	if (n < 3) {
 		return 0;
 	}
@@ -7736,7 +7736,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 							}
 						} while (n);
 					}
-					n = ir_input_edges_count(ctx, insn);
+					n = insn->inputs_count;
 					for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
 						ir_ref input = *p;
 						if (IR_OPND_KIND(insn_flags, j) == IR_OPND_DATA && input > 0 && ctx->vregs[input]) {

@@ -861,13 +861,7 @@ IR_ALWAYS_INLINE uint32_t ir_insn_inputs_to_len(uint32_t inputs_count)
 
 IR_ALWAYS_INLINE uint32_t ir_insn_len(const ir_insn *insn)
 {
-	uint32_t flags = ir_op_flags[insn->op];
-	uint32_t n = 1;
-	if (UNEXPECTED(IR_OP_HAS_VAR_INPUTS(flags))) {
-		/* MERGE, PHI, CALL, etc */
-		n = ir_insn_inputs_to_len(insn->inputs_count);
-	}
-	return n;
+	return ir_insn_inputs_to_len(insn->inputs_count);
 }
 
 /*** IR Binding ***/
@@ -1153,7 +1147,7 @@ IR_ALWAYS_INLINE void ir_set_alocated_reg(ir_ctx *ctx, ir_ref ref, int op_num, i
 
 	if (op_num > 0) {
 		/* regs[] is not limited by the declared boundary 4, the real boundary checked below */
-		IR_ASSERT(op_num <= IR_MAX(3, ir_input_edges_count(ctx, &ctx->ir_base[ref])));
+		IR_ASSERT(op_num <= IR_MAX(3, ctx->ir_base[ref].inputs_count));
 	}
 	regs[op_num] = reg;
 }
@@ -1163,7 +1157,7 @@ IR_ALWAYS_INLINE int8_t ir_get_alocated_reg(const ir_ctx *ctx, ir_ref ref, int o
 	int8_t *regs = ctx->regs[ref];
 
 	/* regs[] is not limited by the declared boundary 4, the real boundary checked below */
-	IR_ASSERT(op_num <= IR_MAX(3, ir_input_edges_count(ctx, &ctx->ir_base[ref])));
+	IR_ASSERT(op_num <= IR_MAX(3, ctx->ir_base[ref].inputs_count));
 	return regs[op_num];
 }
 

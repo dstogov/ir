@@ -530,7 +530,7 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 		ir_emit_ref(ctx, f, insn->op2);
 	}
 	fprintf(f, "(");
-	n = ir_input_edges_count(ctx, insn);
+	n = insn->inputs_count;
 	for (j = 3; j <= n; j++) {
 		if (j != 3) {
 			fprintf(f, ", ");
@@ -553,7 +553,7 @@ static void ir_emit_tailcall(ir_ctx *ctx, FILE *f, ir_insn *insn)
 		ir_emit_ref(ctx, f, insn->op2);
 	}
 	fprintf(f, "(");
-	n = ir_input_edges_count(ctx, insn);
+	n = insn->inputs_count;
 	for (j = 3; j <= n; j++) {
 		if (j != 3) {
 			fprintf(f, ", ");

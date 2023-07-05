@@ -26,7 +26,7 @@ static void ir_gcm_schedule_early(ir_ctx *ctx, uint32_t *_blocks, ir_ref ref, ir
 	_blocks[ref] = 1;
 	dom_depth = 0;
 
-	n = ir_input_edges_count(ctx, insn);
+	n = insn->inputs_count;
 	for (p = insn->ops + 1; n > 0; p++, n--) {
 		input = *p;
 		if (input > 0) {
@@ -236,7 +236,6 @@ int ir_gcm(ir_ctx *ctx)
 	uint32_t *_blocks, b;
 	ir_insn *insn, *use_insn;
 	ir_use_list *use_list;
-	uint32_t flags;
 
 	IR_ASSERT(ctx->cfg_map);
 	_blocks = ctx->cfg_map;
@@ -248,8 +247,7 @@ int ir_gcm(ir_ctx *ctx)
 		do {
 			insn = &ctx->ir_base[ref];
 			_blocks[ref] = 1; /* pin to block */
-			flags = ir_op_flags[insn->op];
-			if (IR_OP_HAS_VAR_INPUTS(flags) || IR_INPUT_EDGES_COUNT(flags) > 1) {
+			if (insn->inputs_count > 1) {
 				/* insn has input data edges */
 				ir_list_push_unchecked(&queue_early, ref);
 			}
@@ -272,7 +270,7 @@ int ir_gcm(ir_ctx *ctx)
 		while (ir_list_len(&queue_early)) {
 			ref = ir_list_pop(&queue_early);
 			insn = &ctx->ir_base[ref];
-			n = ir_input_edges_count(ctx, insn);
+			n = insn->inputs_count;
 			for (p = insn->ops + 1; n > 0; p++, n--) {
 				ref = *p;
 				if (ref > 0 && _blocks[ref] == 0) {
@@ -299,13 +297,12 @@ int ir_gcm(ir_ctx *ctx)
 			insn = &ctx->ir_base[ref];
 			ir_bitset_incl(visited, ref);
 			_blocks[ref] = b; /* pin to block */
-			flags = ir_op_flags[insn->op];
-			if (IR_OP_HAS_VAR_INPUTS(flags) || IR_INPUT_EDGES_COUNT(flags) > 1) {
+			if (insn->inputs_count > 1) {
 				/* insn has input data edges */
 				ir_list_push_unchecked(&queue_early, ref);
 			}
 			if (insn->type != IR_VOID) {
-				IR_ASSERT(flags & IR_OP_FLAG_MEM);
+				IR_ASSERT(ir_op_flags[insn->op] & IR_OP_FLAG_MEM);
 				ir_list_push_unchecked(&queue_late, ref);
 			}
 			ref = insn->op1; /* control predecessor */
@@ -350,7 +347,7 @@ int ir_gcm(ir_ctx *ctx)
 		n--;
 		ref = ir_list_at(&queue_early, n);
 		insn = &ctx->ir_base[ref];
-		k = ir_input_edges_count(ctx, insn) - 1;
+		k = insn->inputs_count - 1;
 		for (p = insn->ops + 2; k > 0; p++, k--) {
 			ref = *p;
 			if (ref > 0 && _blocks[ref] == 0) {
@@ -576,7 +573,7 @@ int ir_schedule(ir_ctx *ctx)
 			IR_ASSERT(insn->op2 < IR_TRUE);
 			consts_count += ir_count_constant(used, insn->op2);
 		}
-		n = ir_input_edges_count(ctx, insn);
+		n = insn->inputs_count;
 		insns_count += ir_insn_inputs_to_len(n);
 		i = _next[i];
 		insn = &ctx->ir_base[i];
@@ -611,7 +608,7 @@ int ir_schedule(ir_ctx *ctx)
 			ir_ref n, j, *p, input;
 
 restart:
-			n = ir_input_edges_count(ctx, insn);
+			n = insn->inputs_count;
 			for (j = n, p = insn->ops + 1; j > 0; p++, j--) {
 				input = *p;
 				if (input > 0) {
@@ -758,7 +755,7 @@ restart:
 		*new_insn = *insn;
 		new_ctx.cfg_map[new_ref] = _blocks[i];
 
-		n = ir_input_edges_count(ctx, insn);
+		n = insn->inputs_count;
 		for (j = n, p = insn->ops + 1, q = new_insn->ops + 1; j > 0; p++, q++, j--) {
 			ref = *p;
 			*q = ref = _xlat[ref];
