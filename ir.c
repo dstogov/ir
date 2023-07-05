@@ -984,6 +984,7 @@ ir_ref ir_bind(ir_ctx *ctx, ir_ref var, ir_ref def)
 }
 
 /* Batch construction of def->use edges */
+#if 0
 void ir_build_def_use_lists(ir_ctx *ctx)
 {
 	ir_ref n, i, j, *p, def;
@@ -1032,6 +1033,71 @@ void ir_build_def_use_lists(ir_ctx *ctx)
 	ctx->use_edges_count = edges_count;
 	ctx->use_lists = lists;
 }
+#else
+void ir_build_def_use_lists(ir_ctx *ctx)
+{
+	ir_ref n, i, j, *p, def;
+	ir_insn *insn;
+	size_t linked_lists_size, linked_lists_top = 0, edges_count = 0;
+	ir_use_list *lists = ir_mem_calloc(ctx->insns_count, sizeof(ir_use_list));
+	ir_ref *edges;
+	ir_use_list *use_list;
+	ir_ref *linked_lists;
+
+	linked_lists_size = IR_ALIGNED_SIZE(ctx->insns_count, 1024);
+	linked_lists = ir_mem_malloc(linked_lists_size * sizeof(ir_ref));
+	for (i = IR_UNUSED + 1, insn = ctx->ir_base + i; i < ctx->insns_count;) {
+		n = ir_input_edges_count(ctx, insn);
+		for (j = n, p = insn->ops + 1; j > 0; j--, p++) {
+			def = *p;
+			if (def > 0) {
+				use_list = &lists[def];
+				edges_count++;
+				if (!use_list->refs) {
+					/* store a single "use" directly in "refs" using a positive number */
+					use_list->refs = i;
+					use_list->count = 1;
+				} else {
+					if (UNEXPECTED(linked_lists_top >= linked_lists_size)) {
+						linked_lists_size += 1024;
+						linked_lists = ir_mem_realloc(linked_lists, linked_lists_size * sizeof(ir_ref));
+					}
+					/* form a linked list of "uses" (like in binsort) */
+					linked_lists[linked_lists_top] = i; /* store the "use" */
+					linked_lists[linked_lists_top + 1] = use_list->refs; /* store list next */
+					use_list->refs = -(linked_lists_top + 1); /* store a head of the list using a negative number */
+					linked_lists_top += 2;
+					use_list->count++;
+				}
+			}
+		}
+		n = ir_insn_inputs_to_len(n);
+		i += n;
+		insn += n;
+	}
+
+	ctx->use_edges_count = edges_count;
+	edges = ir_mem_malloc(edges_count * sizeof(ir_ref));
+	for (use_list = lists + ctx->insns_count - 1; use_list != lists; use_list--) {
+		n = use_list->refs;
+		if (n) {
+			/* transform linked list to plain array */
+			while (n < 0) {
+				n = -n;
+				edges[--edges_count] = linked_lists[n - 1];
+				n = linked_lists[n];
+			}
+			IR_ASSERT(n > 0);
+			edges[--edges_count] = n;
+			use_list->refs = edges_count;
+		}
+	}
+
+	ctx->use_edges = edges;
+	ctx->use_lists = lists;
+	ir_mem_free(linked_lists);
+}
+#endif
 
 /* Helper Data Types */
 void ir_array_grow(ir_array *a, uint32_t size)
