@@ -42,15 +42,10 @@ static void ir_gcm_schedule_early(ir_ctx *ctx, uint32_t *_blocks, ir_ref ref, ir
 		}
 	}
 	if (UNEXPECTED(reschedule_late)) {
-		/* Floating nodes that doesn't depend on other nodes
-		 * (e.g. only on constants), has to be scheduled to the
-		 * last common ancestor. Otherwise they always goes to the
+		/* Floating nodes that don't depend on other nodes
+		 * (e.g. only on constants), have to be scheduled to the
+		 * last common ancestor. Otherwise they always go to the
 		 * first block.
-		 *
-		 * TODO:
-		 * It's possible to reuse ir_gcm_schedule_late() and move
-		 * these nodes out of the loops, but then we mgiht need
-		 * to rematerialize them at proper place(s).
 		 */
 		ir_list_push_unchecked(queue_rest, ref);
 	}
