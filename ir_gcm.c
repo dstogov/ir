@@ -465,7 +465,7 @@ int ir_schedule(ir_ctx *ctx)
 	ir_ref *_xlat;
 	uint32_t flags;
 	ir_ref *edges;
-	ir_bitset used, scheduled;
+	ir_bitset used;
 	uint32_t b, prev_b;
 	uint32_t *_blocks = ctx->cfg_map;
 	ir_ref *_next = ir_mem_malloc(ctx->insns_count * sizeof(ir_ref));
@@ -554,10 +554,7 @@ int ir_schedule(ir_ctx *ctx)
 	}
 #endif
 
-	_xlat = ir_mem_malloc((ctx->consts_count + ctx->insns_count) * sizeof(ir_ref));
-	if (ctx->binding) {
-		memset(_xlat, 0, (ctx->consts_count + ctx->insns_count) * sizeof(ir_ref));
-	}
+	_xlat = ir_mem_calloc((ctx->consts_count + ctx->insns_count), sizeof(ir_ref));
 	_xlat += ctx->consts_count;
 	_xlat[IR_TRUE] = IR_TRUE;
 	_xlat[IR_FALSE] = IR_FALSE;
@@ -567,13 +564,11 @@ int ir_schedule(ir_ctx *ctx)
 	consts_count = -(IR_TRUE - 1);
 
 	/* Topological sort according dependencies inside each basic block */
-	scheduled = ir_bitset_malloc(ctx->insns_count);
 	used = ir_bitset_malloc(ctx->consts_count + 1);
 	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; b++, bb++) {
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		/* Schedule BB start */
 		i = bb->start;
-		ir_bitset_incl(scheduled, i);
 		_xlat[i] = bb->start = insns_count;
 		insn = &ctx->ir_base[i];
 		if (insn->op == IR_CASE_VAL) {
@@ -587,7 +582,6 @@ int ir_schedule(ir_ctx *ctx)
 		if (bb->flags & (IR_BB_HAS_PHI|IR_BB_HAS_PI|IR_BB_HAS_PARAM|IR_BB_HAS_VAR)) {
 			/* Schedule PARAM, VAR, PI */
 			while (insn->op == IR_PARAM || insn->op == IR_VAR || insn->op == IR_PI) {
-				ir_bitset_incl(scheduled, i);
 				_xlat[i] = insns_count;
 				insns_count += 1;
 				i = _next[i];
@@ -597,7 +591,6 @@ int ir_schedule(ir_ctx *ctx)
 			while (insn->op == IR_PHI) {
 				ir_ref j, *p, input;
 
-				ir_bitset_incl(scheduled, i);
 				_xlat[i] = insns_count;
 				/* Reuse "n" from MERGE and skip first input */
 				insns_count += ir_insn_inputs_to_len(n + 1);
@@ -619,7 +612,7 @@ restart:
 			for (j = n, p = insn->ops + 1; j > 0; p++, j--) {
 				input = *p;
 				if (input > 0) {
-					if (!ir_bitset_in(scheduled, input) && _blocks[input] == b) {
+					if (!_xlat[input] && _blocks[input] == b) {
 						/* "input" should be before "i" to satisfy dependency */
 #ifdef IR_DEBUG
 						if (ctx->flags & IR_DEBUG_SCHEDULE) {
@@ -643,14 +636,12 @@ restart:
 					consts_count += ir_count_constant(used, input);
 				}
 			}
-			ir_bitset_incl(scheduled, i);
 			_xlat[i] = insns_count;
 			insns_count += ir_insn_inputs_to_len(n);
 			i = _next[i];
 			insn = &ctx->ir_base[i];
 		}
 		/* Schedule BB end */
-		ir_bitset_incl(scheduled, i);
 		_xlat[i] = bb->end = insns_count;
 		insns_count++;
 		if (IR_INPUT_EDGES_COUNT(ir_op_flags[insn->op]) == 2) {
@@ -681,7 +672,6 @@ restart:
 		}
 		if (!changed) {
 			ir_mem_free(used);
-			ir_mem_free(scheduled);
 			_xlat -= ctx->consts_count;
 			ir_mem_free(_xlat);
 			ir_mem_free(_next);
@@ -846,7 +836,7 @@ restart:
 		if (n) {
 			for (p = &ctx->use_edges[use_list->refs]; n > 0; n--, p++) {
 				ref = *p;
-				if (ir_bitset_in(scheduled, ref)) {
+				if (_xlat[ref]) {
 					*edges = _xlat[ref];
 					edges++;
 					k++;
@@ -858,7 +848,6 @@ restart:
 	}
 	IR_ASSERT(new_ctx.use_edges_count >= edges_count);
 
-	ir_mem_free(scheduled);
 	_xlat -= ctx->consts_count;
 	ir_mem_free(_xlat);
 
