@@ -11,11 +11,12 @@
 #include "ir.h"
 #include "ir_private.h"
 
-static void ir_gcm_schedule_early(ir_ctx *ctx, uint32_t *_blocks, ir_ref ref, ir_list *queue_rest)
+static int32_t ir_gcm_schedule_early(ir_ctx *ctx, int32_t *_blocks, ir_ref ref, ir_list *queue_rest)
 {
 	ir_ref n, *p, input;
 	ir_insn *insn;
-	uint32_t dom_depth, b;
+	uint32_t dom_depth;
+	int32_t b, result;
 	bool reschedule_late = 1;
 
 	insn = &ctx->ir_base[ref];
@@ -23,24 +24,28 @@ static void ir_gcm_schedule_early(ir_ctx *ctx, uint32_t *_blocks, ir_ref ref, ir
 	IR_ASSERT(insn->op != IR_PARAM && insn->op != IR_VAR);
 	IR_ASSERT(insn->op != IR_PHI && insn->op != IR_PI);
 
-	_blocks[ref] = 1;
+	result = 1;
 	dom_depth = 0;
 
 	n = insn->inputs_count;
 	for (p = insn->ops + 1; n > 0; p++, n--) {
 		input = *p;
 		if (input > 0) {
-			if (_blocks[input] == 0) {
-				ir_gcm_schedule_early(ctx, _blocks, input, queue_rest);
-			}
 			b = _blocks[input];
+			if (b == 0) {
+				b = ir_gcm_schedule_early(ctx, _blocks, input, queue_rest);
+			} else if (b < 0) {
+				b = -b;
+			}
 			if (dom_depth < ctx->cfg_blocks[b].dom_depth) {
 				dom_depth = ctx->cfg_blocks[b].dom_depth;
-				_blocks[ref] = b;
+				result = b;
 			}
 			reschedule_late = 0;
 		}
 	}
+	_blocks[ref] = -result;
+
 	if (UNEXPECTED(reschedule_late)) {
 		/* Floating nodes that don't depend on other nodes
 		 * (e.g. only on constants), have to be scheduled to the
@@ -49,10 +54,11 @@ static void ir_gcm_schedule_early(ir_ctx *ctx, uint32_t *_blocks, ir_ref ref, ir
 		 */
 		ir_list_push_unchecked(queue_rest, ref);
 	}
+	return result;
 }
 
 /* Last Common Ancestor */
-static uint32_t ir_gcm_find_lca(ir_ctx *ctx, uint32_t b1, uint32_t b2)
+static int32_t ir_gcm_find_lca(ir_ctx *ctx, int32_t b1, int32_t b2)
 {
 	uint32_t dom_depth;
 
@@ -71,17 +77,18 @@ static uint32_t ir_gcm_find_lca(ir_ctx *ctx, uint32_t b1, uint32_t b2)
 	return b2;
 }
 
-static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visited, ir_ref ref)
+static void ir_gcm_schedule_late(ir_ctx *ctx, int32_t *_blocks, ir_ref ref)
 {
 	ir_ref n, *p, use;
 	ir_insn *insn;
 	ir_use_list *use_list;
 
-	ir_bitset_incl(visited, ref);
+	IR_ASSERT(_blocks[ref] < 0);
+	_blocks[ref] = -_blocks[ref];
 	use_list = &ctx->use_lists[ref];
 	n = use_list->count;
 	if (n) {
-		uint32_t lca, b;
+		int32_t lca, b;
 
 		insn = &ctx->ir_base[ref];
 		IR_ASSERT(insn->op != IR_PARAM && insn->op != IR_VAR);
@@ -93,8 +100,8 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 			b = _blocks[use];
 			if (!b) {
 				continue;
-			} else if (!ir_bitset_in(visited, use)) {
-				ir_gcm_schedule_late(ctx, _blocks, visited, use);
+			} else if (b < 0) {
+				ir_gcm_schedule_late(ctx, _blocks, use);
 				b = _blocks[use];
 				IR_ASSERT(b != 0);
 			}
@@ -159,24 +166,25 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 				}
 			}
 			_blocks[ref] = b;
-		}
-
-		if (ctx->ir_base[ref + 1].op == IR_OVERFLOW) {
-			/* OVERFLOW is a projection and must be scheduled together with previous ADD/SUB/MUL_OV */
-			_blocks[ref + 1] = b;
+			if (ctx->ir_base[ref + 1].op == IR_OVERFLOW) {
+				/* OVERFLOW is a projection and must be scheduled together with previous ADD/SUB/MUL_OV */
+				_blocks[ref + 1] = b;
+			}
 		}
 	}
 }
 
-static void ir_gcm_schedule_rest(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visited, ir_ref ref)
+static void ir_gcm_schedule_rest(ir_ctx *ctx, int32_t *_blocks, ir_ref ref)
 {
 	ir_ref n, *p, use;
 	ir_insn *insn;
 
-	ir_bitset_incl(visited, ref);
+	IR_ASSERT(_blocks[ref] < 0);
+	_blocks[ref] = -_blocks[ref];
 	n = ctx->use_lists[ref].count;
 	if (n) {
-		uint32_t lca, b;
+		uint32_t lca;
+		int32_t b;
 
 		insn = &ctx->ir_base[ref];
 		IR_ASSERT(insn->op != IR_PARAM && insn->op != IR_VAR);
@@ -188,8 +196,8 @@ static void ir_gcm_schedule_rest(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 			b = _blocks[use];
 			if (!b) {
 				continue;
-			} else if (!ir_bitset_in(visited, use)) {
-				ir_gcm_schedule_late(ctx, _blocks, visited, use);
+			} else if (b < 0) {
+				ir_gcm_schedule_late(ctx, _blocks, use);
 				b = _blocks[use];
 				IR_ASSERT(b != 0);
 			}
@@ -223,17 +231,16 @@ static void ir_gcm_schedule_rest(ir_ctx *ctx, uint32_t *_blocks, ir_bitset visit
 int ir_gcm(ir_ctx *ctx)
 {
 	ir_ref k, n, *p, ref;
-	ir_bitset visited;
 	ir_block *bb;
 	ir_list queue_early;
 	ir_list queue_late;
 	ir_list queue_rest;
-	uint32_t *_blocks, b;
+	int32_t *_blocks, b;
 	ir_insn *insn, *use_insn;
 	ir_use_list *use_list;
 
 	IR_ASSERT(ctx->cfg_map);
-	_blocks = ctx->cfg_map;
+	_blocks = (int32_t*)ctx->cfg_map;
 
 	ir_list_init(&queue_early, ctx->insns_count);
 
@@ -281,7 +288,6 @@ int ir_gcm(ir_ctx *ctx)
 	}
 
 	ir_list_init(&queue_late, ctx->insns_count);
-	visited = ir_bitset_malloc(ctx->insns_count);
 
 	/* pin and collect control and control depended (PARAM, VAR, PHI, PI) instructions */
 	b = ctx->cfg_blocks_count;
@@ -291,7 +297,6 @@ int ir_gcm(ir_ctx *ctx)
 
 		/* process the last instruction of the block */
 		insn = &ctx->ir_base[ref];
-		ir_bitset_incl(visited, ref);
 		_blocks[ref] = b; /* pin to block */
 		if (insn->inputs_count > 1) {
 			/* insn has input data edges */
@@ -301,7 +306,6 @@ int ir_gcm(ir_ctx *ctx)
 
 		while (ref != bb->start) {
 			insn = &ctx->ir_base[ref];
-			ir_bitset_incl(visited, ref);
 			_blocks[ref] = b; /* pin to block */
 			if (insn->inputs_count > 1) {
 				/* insn has input data edges */
@@ -315,7 +319,6 @@ int ir_gcm(ir_ctx *ctx)
 		}
 
 		/* process the first instruction of the block */
-		ir_bitset_incl(visited, ref);
 		_blocks[ref] = b; /* pin to block */
 
 		use_list = &ctx->use_lists[ref];
@@ -326,7 +329,6 @@ int ir_gcm(ir_ctx *ctx)
 				use_insn = &ctx->ir_base[ref];
 				if (use_insn->op == IR_PHI || use_insn->op == IR_PI) {
 					bb->flags |= (use_insn->op == IR_PHI) ? IR_BB_HAS_PHI : IR_BB_HAS_PI;
-					ir_bitset_incl(visited, ref);
 					if (EXPECTED(ctx->use_lists[ref].count != 0)) {
 						_blocks[ref] = b; /* pin to block */
 						ir_list_push_unchecked(&queue_early, ref);
@@ -335,14 +337,12 @@ int ir_gcm(ir_ctx *ctx)
 				} else if (use_insn->op == IR_PARAM) {
 					bb->flags |= IR_BB_HAS_PARAM;
 					_blocks[ref] = b; /* pin to block */
-					ir_bitset_incl(visited, ref);
 					if (EXPECTED(ctx->use_lists[ref].count != 0)) {
 						ir_list_push_unchecked(&queue_late, ref);
 					}
 				} else if (use_insn->op == IR_VAR) {
 					bb->flags |= IR_BB_HAS_VAR;
 					_blocks[ref] = b; /* pin to block */
-					ir_bitset_incl(visited, ref);
 				}
 			}
 		}
@@ -381,8 +381,8 @@ int ir_gcm(ir_ctx *ctx)
 		k = use_list->count;
 		for (p = &ctx->use_edges[use_list->refs]; k > 0; p++, k--) {
 			ref = *p;
-			if (!ir_bitset_in(visited, ref) && _blocks[ref]) {
-				ir_gcm_schedule_late(ctx, _blocks, visited, ref);
+			if (_blocks[ref] < 0) {
+				ir_gcm_schedule_late(ctx, _blocks, ref);
 			}
 		}
 	}
@@ -391,10 +391,9 @@ int ir_gcm(ir_ctx *ctx)
 	while (n > 0) {
 		n--;
 		ref = ir_list_at(&queue_rest, n);
-		ir_gcm_schedule_rest(ctx, _blocks, visited, ref);
+		ir_gcm_schedule_rest(ctx, _blocks, ref);
 	}
 
-	ir_mem_free(visited);
 	ir_list_free(&queue_early);
 	ir_list_free(&queue_late);
 	ir_list_free(&queue_rest);
