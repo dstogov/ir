@@ -288,7 +288,18 @@ int ir_gcm(ir_ctx *ctx)
 	for (bb = ctx->cfg_blocks + b; b > 0; bb--, b--) {
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		ref = bb->end;
-		do {
+
+		/* process the last instruction of the block */
+		insn = &ctx->ir_base[ref];
+		ir_bitset_incl(visited, ref);
+		_blocks[ref] = b; /* pin to block */
+		if (insn->inputs_count > 1) {
+			/* insn has input data edges */
+			ir_list_push_unchecked(&queue_early, ref);
+		}
+		ref = insn->op1; /* control predecessor */
+
+		while (ref != bb->start) {
 			insn = &ctx->ir_base[ref];
 			ir_bitset_incl(visited, ref);
 			_blocks[ref] = b; /* pin to block */
@@ -301,7 +312,9 @@ int ir_gcm(ir_ctx *ctx)
 				ir_list_push_unchecked(&queue_late, ref);
 			}
 			ref = insn->op1; /* control predecessor */
-		} while (ref != bb->start);
+		}
+
+		/* process the first instruction of the block */
 		ir_bitset_incl(visited, ref);
 		_blocks[ref] = b; /* pin to block */
 
