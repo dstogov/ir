@@ -461,9 +461,8 @@ IR_ALWAYS_INLINE ir_ref ir_count_constant(ir_bitset used, ir_ref ref)
 int ir_schedule(ir_ctx *ctx)
 {
 	ir_ctx new_ctx;
-	ir_ref i, j, k, n, *p, *q, ref, new_ref, prev_ref, insns_count, consts_count, edges_count;
+	ir_ref i, j, k, n, *p, *q, ref, new_ref, prev_ref, insns_count, consts_count, use_edges_count;
 	ir_ref *_xlat;
-	uint32_t flags;
 	ir_ref *edges;
 	ir_bitset used;
 	uint32_t b, prev_b;
@@ -741,112 +740,108 @@ restart:
 	ir_mem_free(used);
 
 	new_ctx.cfg_map = ir_mem_calloc(ctx->insns_count, sizeof(uint32_t));
-
-	/* Copy instructions and count use edges */
-	edges_count = 0;
-	for (i = 1; i != 0; i = _next[i]) {
-		insn = &ctx->ir_base[i];
-
-		new_ref = _xlat[i];
-		new_insn = &new_ctx.ir_base[new_ref];
-		*new_insn = *insn;
-		new_ctx.cfg_map[new_ref] = _blocks[i];
-
-		n = insn->inputs_count;
-		for (j = n, p = insn->ops + 1, q = new_insn->ops + 1; j > 0; p++, q++, j--) {
-			ref = *p;
-			*q = ref = _xlat[ref];
-			edges_count += (ref > 0);
-		}
-
-		flags = ir_op_flags[insn->op];
-		j = IR_OPERANDS_COUNT(flags);
-		if (j > n) {
-			switch (j) {
-				case 3:
-					switch (IR_OPND_KIND(flags, 3)) {
-						case IR_OPND_CONTROL_REF:
-							new_insn->op3 = _xlat[insn->op3];
-							break;
-						case IR_OPND_STR:
-							new_insn->op3 = ir_str(&new_ctx, ir_get_str(ctx, insn->op3));
-							break;
-						default:
-							break;
-					}
-					if (n == 2) {
-						break;
-					}
-					IR_FALLTHROUGH;
-				case 2:
-					switch (IR_OPND_KIND(flags, 2)) {
-						case IR_OPND_CONTROL_REF:
-							new_insn->op2 = _xlat[insn->op2];
-							break;
-						case IR_OPND_STR:
-							new_insn->op2 = ir_str(&new_ctx, ir_get_str(ctx, insn->op2));
-							break;
-						default:
-							break;
-					}
-					if (n == 1) {
-						break;
-					}
-					IR_FALLTHROUGH;
-				case 1:
-					switch (IR_OPND_KIND(flags, 1)) {
-						case IR_OPND_CONTROL_REF:
-							new_insn->op1 = _xlat[insn->op1];
-							break;
-						case IR_OPND_STR:
-							new_insn->op1 = ir_str(&new_ctx, ir_get_str(ctx, insn->op1));
-							break;
-						default:
-							break;
-					}
-					break;
-				default:
-					break;
-			}
-		}
-	}
-
-	if (ctx->binding) {
-		ir_xlat_binding(ctx, _xlat);
-		new_ctx.binding = ctx->binding;
-		ctx->binding = NULL;
-	}
-
-	/* Copy use lists and edges */
-	new_ctx.use_lists = lists = ir_mem_malloc(insns_count * sizeof(ir_use_list));
-	new_ctx.use_edges = edges = ir_mem_malloc(edges_count * sizeof(ir_ref));
-	new_ctx.use_edges_count = edges_count;
 	new_ctx.prev_ref = _prev = ir_mem_malloc(insns_count * sizeof(ir_ref));
+	new_ctx.use_lists = lists = ir_mem_malloc(insns_count * sizeof(ir_use_list));
+	new_ctx.use_edges = edges = ir_mem_malloc(ctx->use_edges_count * sizeof(ir_ref));
+
+	/* Copy instructions, use lists and use edges */
 	prev_ref = 0;
-	edges_count = 0;
+	use_edges_count = 0;
 	for (i = 1; i != 0; i = _next[i]) {
-		use_list = &ctx->use_lists[i];
 		new_ref = _xlat[i];
+		new_ctx.cfg_map[new_ref] = _blocks[i];
 		_prev[new_ref] = prev_ref;
 		prev_ref = new_ref;
-		new_list = &lists[new_ref];
-		new_list->refs = edges_count;
+
+		use_list = &ctx->use_lists[i];
 		n = use_list->count;
 		k = 0;
-		if (n) {
-			for (p = &ctx->use_edges[use_list->refs]; n > 0; n--, p++) {
+		if (n == 1) {
+			ref = ctx->use_edges[use_list->refs];
+			if (_xlat[ref]) {
+				*edges = _xlat[ref];
+				edges++;
+				k = 1;
+			}
+		} else {
+			p = &ctx->use_edges[use_list->refs];
+			while (n--) {
 				ref = *p;
 				if (_xlat[ref]) {
 					*edges = _xlat[ref];
 					edges++;
 					k++;
 				}
+				p++;
 			}
-			edges_count += k;
 		}
+		new_list = &lists[new_ref];
+		new_list->refs = use_edges_count;
+		use_edges_count += k;
 		new_list->count = k;
+
+		insn = &ctx->ir_base[i];
+		new_insn = &new_ctx.ir_base[new_ref];
+
+		new_insn->optx = insn->optx;
+		n = new_insn->inputs_count;
+		switch (n) {
+			case 0:
+				new_insn->op1 = insn->op1;
+				new_insn->op2 = insn->op2;
+				new_insn->op3 = insn->op3;
+				break;
+			case 1:
+				new_insn->op1 = _xlat[insn->op1];
+				if (new_insn->op == IR_PARAM || insn->op == IR_VAR) {
+					new_insn->op2 = ir_str(&new_ctx, ir_get_str(ctx, insn->op2));
+				} else {
+					new_insn->op2 = insn->op2;
+				}
+				new_insn->op3 = insn->op3;
+				break;
+			case 2:
+				new_insn->op1 = _xlat[insn->op1];
+				new_insn->op2 = _xlat[insn->op2];
+				new_insn->op3 = insn->op3;
+				break;
+			case 3:
+				new_insn->op1 = _xlat[insn->op1];
+				new_insn->op2 = _xlat[insn->op2];
+				new_insn->op3 = _xlat[insn->op3];
+				break;
+			default:
+				for (j = n, p = insn->ops + 1, q = new_insn->ops + 1; j > 0; p++, q++, j--) {
+					*q = _xlat[*p];
+				}
+				break;
+		}
 	}
-	IR_ASSERT(new_ctx.use_edges_count >= edges_count);
+
+	/* Update list of terminators (IR_OPND_CONTROL_REF) */
+	insn = &new_ctx.ir_base[1];
+	ref = insn->op1;
+	if (ref) {
+		insn->op1 = ref = _xlat[ref];
+		while (1) {
+			insn = &new_ctx.ir_base[ref];
+			ref = insn->op3;
+			if (!ref) {
+				break;
+			}
+			insn->op3 = ref = _xlat[ref];
+		}
+	}
+
+	IR_ASSERT(ctx->use_edges_count >= use_edges_count);
+	new_ctx.use_edges_count = use_edges_count;
+	new_ctx.use_edges = ir_mem_realloc(new_ctx.use_edges, use_edges_count * sizeof(ir_ref));
+
+	if (ctx->binding) {
+		ir_xlat_binding(ctx, _xlat);
+		new_ctx.binding = ctx->binding;
+		ctx->binding = NULL;
+	}
 
 	_xlat -= ctx->consts_count;
 	ir_mem_free(_xlat);
