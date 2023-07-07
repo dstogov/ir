@@ -503,7 +503,7 @@ int ir_schedule(ir_ctx *ctx)
 				_next[i] = _move_down;
 				_move_down = i;
 			}
-        } else if (b) {
+		} else if (b) {
 			bb = &ctx->cfg_blocks[b];
 			IR_ASSERT(i != bb->start);
 			if (_prev[bb->end]) {
