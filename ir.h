@@ -395,7 +395,6 @@ typedef union _ir_val {
 #undef ADDR_MEMBER
 
 /* IR constant flags */
-#define IR_CONST_USED          (1<<0)
 #define IR_CONST_EMIT          (1<<0)
 #define IR_CONST_FASTCALL_FUNC (1<<1)
 #define IR_CONST_VARARG_FUNC   (1<<2)

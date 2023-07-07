@@ -449,12 +449,10 @@ static void ir_xlat_binding(ir_ctx *ctx, ir_ref *_xlat)
 	binding->count = n2;
 }
 
-IR_ALWAYS_INLINE ir_ref ir_count_constant(ir_ctx *ctx, ir_ref ref)
+IR_ALWAYS_INLINE ir_ref ir_count_constant(ir_ref *_xlat, ir_ref ref)
 {
-	ir_insn *insn = &ctx->ir_base[ref];
-
-	if (!(insn->const_flags & IR_CONST_USED)) {
-		insn->const_flags |= IR_CONST_USED;
+	if (!_xlat[ref]) {
+		_xlat[ref] = ref; /* this is only a "used constant" marker */
 		return 1;
 	}
 	return 0;
@@ -572,7 +570,7 @@ int ir_schedule(ir_ctx *ctx)
 		insn = &ctx->ir_base[i];
 		if (insn->op == IR_CASE_VAL) {
 			IR_ASSERT(insn->op2 < IR_TRUE);
-			consts_count += ir_count_constant(ctx, insn->op2);
+			consts_count += ir_count_constant(_xlat, insn->op2);
 		}
 		n = insn->inputs_count;
 		insns_count += ir_insn_inputs_to_len(n);
@@ -596,7 +594,7 @@ int ir_schedule(ir_ctx *ctx)
 				for (j = n, p = insn->ops + 2; j > 0; p++, j--) {
 					input = *p;
 					if (input < IR_TRUE) {
-						consts_count += ir_count_constant(ctx, input);
+						consts_count += ir_count_constant(_xlat, input);
 					}
 				}
 				i = _next[i];
@@ -610,29 +608,32 @@ restart:
 			n = insn->inputs_count;
 			for (j = n, p = insn->ops + 1; j > 0; p++, j--) {
 				input = *p;
-				if (input > 0) {
-					if (!_xlat[input] && _blocks[input] == b) {
-						/* "input" should be before "i" to satisfy dependency */
+				if (!_xlat[input]) {
+					/* input is not scheduled yet */
+					if (input > 0) {
+						if (_blocks[input] == b) {
+							/* "input" should be before "i" to satisfy dependency */
 #ifdef IR_DEBUG
-						if (ctx->flags & IR_DEBUG_SCHEDULE) {
-							fprintf(stderr, "Wrong dependency %d:%d -> %d\n", b, input, i);
-						}
+							if (ctx->flags & IR_DEBUG_SCHEDULE) {
+								fprintf(stderr, "Wrong dependency %d:%d -> %d\n", b, input, i);
+							}
 #endif
-						/* remove "input" */
-						_prev[_next[input]] = _prev[input];
-						_next[_prev[input]] = _next[input];
-						/* insert before "i" */
-						_prev[input] = _prev[i];
-						_next[input] = i;
-						_next[_prev[i]] = input;
-						_prev[i] = input;
-						/* restart from "input" */
-						i = input;
-						insn = &ctx->ir_base[i];
-						goto restart;
+							/* remove "input" */
+							_prev[_next[input]] = _prev[input];
+							_next[_prev[input]] = _next[input];
+							/* insert before "i" */
+							_prev[input] = _prev[i];
+							_next[input] = i;
+							_next[_prev[i]] = input;
+							_prev[i] = input;
+							/* restart from "input" */
+							i = input;
+							insn = &ctx->ir_base[i];
+							goto restart;
+						}
+					} else if (input < IR_TRUE) {
+						consts_count += ir_count_constant(_xlat, input);
 					}
-				} else if (input < IR_TRUE) {
-					consts_count += ir_count_constant(ctx, input);
 				}
 			}
 			_xlat[i] = insns_count;
@@ -645,7 +646,7 @@ restart:
 		insns_count++;
 		if (IR_INPUT_EDGES_COUNT(ir_op_flags[insn->op]) == 2) {
 			if (insn->op2 < IR_TRUE) {
-				consts_count += ir_count_constant(ctx, insn->op2);
+				consts_count += ir_count_constant(_xlat, insn->op2);
 			}
 		}
 	}
@@ -679,13 +680,6 @@ restart:
 			ctx->flags |= IR_LINEAR;
 			ir_truncate(ctx);
 
-			ref = 1 - consts_count;
-			insn = &ctx->ir_base[ref];
-			while (ref != IR_TRUE) {
-				insn->const_flags &= ~IR_CONST_USED;
-				insn++;
-				ref++;
-			}
 			return 1;
 		}
 	}
@@ -718,24 +712,23 @@ restart:
 		new_insn = &new_ctx.ir_base[ref];
 
 		memcpy(new_insn, insn, sizeof(ir_insn) * (IR_TRUE - ref));
-		while (ref != IR_TRUE) {
-			_xlat[ref] = ref;
-			new_insn->const_flags &= ~IR_CONST_USED;
-			if (new_insn->op == IR_FUNC || new_insn->op == IR_STR) {
-				new_insn->val.addr = ir_str(&new_ctx, ir_get_str(ctx, new_insn->val.i32));
+		if (ctx->strtab.data) {
+			while (ref != IR_TRUE) {
+				if (new_insn->op == IR_FUNC || new_insn->op == IR_STR) {
+					new_insn->val.addr = ir_str(&new_ctx, ir_get_str(ctx, new_insn->val.i32));
+				}
+				new_insn++;
+				ref++;
 			}
-			new_insn++;
-			ref++;
 		}
 	} else {
 		new_ref = -new_ctx.consts_count;
 		new_insn = &new_ctx.ir_base[new_ref];
 		for (ref = IR_TRUE - 1, insn = &ctx->ir_base[ref]; ref > -ctx->consts_count; insn--, ref--) {
-			if (!(insn->const_flags & IR_CONST_USED)) {
+			if (!_xlat[ref]) {
 				continue;
 			}
-			new_insn->opt = insn->opt;
-			new_insn->const_flags = insn->const_flags & ~IR_CONST_USED;
+			new_insn->optx = insn->optx;
 			new_insn->prev_const = 0;
 			if (insn->op == IR_FUNC || insn->op == IR_STR) {
 				new_insn->val.addr = ir_str(&new_ctx, ir_get_str(ctx, insn->val.i32));
