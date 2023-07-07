@@ -449,10 +449,12 @@ static void ir_xlat_binding(ir_ctx *ctx, ir_ref *_xlat)
 	binding->count = n2;
 }
 
-IR_ALWAYS_INLINE ir_ref ir_count_constant(ir_bitset used, ir_ref ref)
+IR_ALWAYS_INLINE ir_ref ir_count_constant(ir_ctx *ctx, ir_ref ref)
 {
-	if (!ir_bitset_in(used, -ref)) {
-		ir_bitset_incl(used, -ref);
+	ir_insn *insn = &ctx->ir_base[ref];
+
+	if (!(insn->const_flags & IR_CONST_USED)) {
+		insn->const_flags |= IR_CONST_USED;
 		return 1;
 	}
 	return 0;
@@ -464,7 +466,6 @@ int ir_schedule(ir_ctx *ctx)
 	ir_ref i, j, k, n, *p, *q, ref, new_ref, prev_ref, insns_count, consts_count, use_edges_count;
 	ir_ref *_xlat;
 	ir_ref *edges;
-	ir_bitset used;
 	uint32_t b, prev_b;
 	uint32_t *_blocks = ctx->cfg_map;
 	ir_ref *_next = ir_mem_malloc(ctx->insns_count * sizeof(ir_ref));
@@ -563,7 +564,6 @@ int ir_schedule(ir_ctx *ctx)
 	consts_count = -(IR_TRUE - 1);
 
 	/* Topological sort according dependencies inside each basic block */
-	used = ir_bitset_malloc(ctx->consts_count + 1);
 	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; b++, bb++) {
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		/* Schedule BB start */
@@ -572,7 +572,7 @@ int ir_schedule(ir_ctx *ctx)
 		insn = &ctx->ir_base[i];
 		if (insn->op == IR_CASE_VAL) {
 			IR_ASSERT(insn->op2 < IR_TRUE);
-			consts_count += ir_count_constant(used, insn->op2);
+			consts_count += ir_count_constant(ctx, insn->op2);
 		}
 		n = insn->inputs_count;
 		insns_count += ir_insn_inputs_to_len(n);
@@ -596,7 +596,7 @@ int ir_schedule(ir_ctx *ctx)
 				for (j = n, p = insn->ops + 2; j > 0; p++, j--) {
 					input = *p;
 					if (input < IR_TRUE) {
-						consts_count += ir_count_constant(used, input);
+						consts_count += ir_count_constant(ctx, input);
 					}
 				}
 				i = _next[i];
@@ -632,7 +632,7 @@ restart:
 						goto restart;
 					}
 				} else if (input < IR_TRUE) {
-					consts_count += ir_count_constant(used, input);
+					consts_count += ir_count_constant(ctx, input);
 				}
 			}
 			_xlat[i] = insns_count;
@@ -645,7 +645,7 @@ restart:
 		insns_count++;
 		if (IR_INPUT_EDGES_COUNT(ir_op_flags[insn->op]) == 2) {
 			if (insn->op2 < IR_TRUE) {
-				consts_count += ir_count_constant(used, insn->op2);
+				consts_count += ir_count_constant(ctx, insn->op2);
 			}
 		}
 	}
@@ -660,6 +660,7 @@ restart:
 #endif
 
 #if 1
+	/* Check if scheduling didn't make any modifications */
 	if (consts_count == ctx->consts_count && insns_count == ctx->insns_count) {
 		bool changed = 0;
 
@@ -670,7 +671,6 @@ restart:
 			}
 		}
 		if (!changed) {
-			ir_mem_free(used);
 			_xlat -= ctx->consts_count;
 			ir_mem_free(_xlat);
 			ir_mem_free(_next);
@@ -679,6 +679,13 @@ restart:
 			ctx->flags |= IR_LINEAR;
 			ir_truncate(ctx);
 
+			ref = 1 - consts_count;
+			insn = &ctx->ir_base[ref];
+			while (ref != IR_TRUE) {
+				insn->const_flags &= ~IR_CONST_USED;
+				insn++;
+				ref++;
+			}
 			return 1;
 		}
 	}
@@ -713,6 +720,7 @@ restart:
 		memcpy(new_insn, insn, sizeof(ir_insn) * (IR_TRUE - ref));
 		while (ref != IR_TRUE) {
 			_xlat[ref] = ref;
+			new_insn->const_flags &= ~IR_CONST_USED;
 			if (new_insn->op == IR_FUNC || new_insn->op == IR_STR) {
 				new_insn->val.addr = ir_str(&new_ctx, ir_get_str(ctx, new_insn->val.i32));
 			}
@@ -720,24 +728,26 @@ restart:
 			ref++;
 		}
 	} else {
-		IR_BITSET_FOREACH(used, ir_bitset_len(ctx->consts_count + 1), ref) {
-			new_ref = new_ctx.consts_count;
-			IR_ASSERT(new_ref < ctx->consts_limit);
-			new_ctx.consts_count = new_ref + 1;
-			_xlat[-ref] = new_ref = -new_ref;
-			insn = &ctx->ir_base[-ref];
-			new_insn = &new_ctx.ir_base[new_ref];
-			new_insn->optx = insn->optx;
+		new_ref = -new_ctx.consts_count;
+		new_insn = &new_ctx.ir_base[new_ref];
+		for (ref = IR_TRUE - 1, insn = &ctx->ir_base[ref]; ref > -ctx->consts_count; insn--, ref--) {
+			if (!(insn->const_flags & IR_CONST_USED)) {
+				continue;
+			}
+			new_insn->opt = insn->opt;
+			new_insn->const_flags = insn->const_flags & ~IR_CONST_USED;
 			new_insn->prev_const = 0;
 			if (insn->op == IR_FUNC || insn->op == IR_STR) {
 				new_insn->val.addr = ir_str(&new_ctx, ir_get_str(ctx, insn->val.i32));
 			} else {
 				new_insn->val.u64 = insn->val.u64;
 			}
-		} IR_BITSET_FOREACH_END();
+			_xlat[ref] = new_ref;
+			new_ref--;
+			new_insn--;
+		}
+		new_ctx.consts_count = -new_ref;
 	}
-
-	ir_mem_free(used);
 
 	new_ctx.cfg_map = ir_mem_calloc(ctx->insns_count, sizeof(uint32_t));
 	new_ctx.prev_ref = _prev = ir_mem_malloc(insns_count * sizeof(ir_ref));
