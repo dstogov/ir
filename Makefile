@@ -26,18 +26,18 @@ endif
 ifeq (x86_64, $(TARGET))
   CFLAGS += -DIR_TARGET_X64
   DASM_ARCH  = x86
-  DASM_FLAGS = -D X64=1
+  DASM_FLAGS = -M -D X64=1
 endif
 ifeq (x86, $(TARGET))
   CFLAGS += -m32 -DIR_TARGET_X86
   DASM_ARCH  = x86
-  DASM_FLAGS =
+  DASM_FLAGS = -M
 endif
 ifeq (aarch64, $(TARGET))
   CC= aarch64-linux-gnu-gcc --sysroot=$(HOME)/php/ARM64
   CFLAGS += -DIR_TARGET_AARCH64
   DASM_ARCH  = aarch64
-  DASM_FLAGS =
+  DASM_FLAGS = -M
 endif
 
 OBJS_COMMON = $(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_strtab.o $(BUILD_DIR)/ir_cfg.o \
