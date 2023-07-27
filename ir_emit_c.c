@@ -91,6 +91,8 @@ static void ir_emit_signed_cast(FILE *f, ir_type type)
 {
 	if (!IR_IS_TYPE_SIGNED(type)) {
 		switch (ir_type_size[type]) {
+			default:
+				IR_ASSERT(0);
 			case 1:
 				fprintf(f, "(int8_t)");
 				break;
@@ -103,8 +105,6 @@ static void ir_emit_signed_cast(FILE *f, ir_type type)
 			case 8:
 				fprintf(f, "(int64_t)");
 				break;
-			default:
-				IR_ASSERT(0);
 		}
 	}
 }
@@ -113,6 +113,8 @@ static void ir_emit_unsigned_cast(FILE *f, ir_type type)
 {
 	if (!IR_IS_TYPE_UNSIGNED(type)) {
 		switch (ir_type_size[type]) {
+			default:
+				IR_ASSERT(0);
 			case 1:
 				fprintf(f, "(uint8_t)");
 				break;
@@ -125,8 +127,6 @@ static void ir_emit_unsigned_cast(FILE *f, ir_type type)
 			case 8:
 				fprintf(f, "(uint64_t)");
 				break;
-			default:
-				IR_ASSERT(0);
 		}
 	}
 }
@@ -208,14 +208,14 @@ static void ir_emit_bswap(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 	ir_emit_def_ref(ctx, f, def);
 
 	switch (ir_type_size[insn->type]) {
+		default:
+			IR_ASSERT(0);
 		case 4:
 			fprintf(f, "__builtin_bswap32(");
 			break;
 		case 8:
 			fprintf(f, "__builtin_bswap64(");
 			break;
-		default:
-			IR_ASSERT(0);
 	}
 
 	ir_emit_ref(ctx, f, insn->op1);
@@ -229,6 +229,8 @@ static void ir_emit_sext(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 	IR_ASSERT(ir_type_size[insn->type] > ir_type_size[ctx->ir_base[insn->op1].type]);
 	ir_emit_def_ref(ctx, f, def);
 	switch (ir_type_size[insn->type]) {
+		default:
+			IR_ASSERT(0);
 		case 1:
 			fprintf(f, "(int8_t)");
 			break;
@@ -241,10 +243,10 @@ static void ir_emit_sext(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 		case 8:
 			fprintf(f, "(int64_t)");
 			break;
-		default:
-			IR_ASSERT(0);
 	}
 	switch (ir_type_size[ctx->ir_base[insn->op1].type]) {
+		default:
+			IR_ASSERT(0);
 		case 1:
 			fprintf(f, "(int8_t)");
 			break;
@@ -257,8 +259,6 @@ static void ir_emit_sext(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 		case 8:
 			fprintf(f, "(int64_t)");
 			break;
-		default:
-			IR_ASSERT(0);
 	}
 	ir_emit_ref(ctx, f, insn->op1);
 	fprintf(f, ";\n");
@@ -271,6 +271,8 @@ static void ir_emit_zext(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 	IR_ASSERT(ir_type_size[insn->type] > ir_type_size[ctx->ir_base[insn->op1].type]);
 	ir_emit_def_ref(ctx, f, def);
 	switch (ir_type_size[insn->type]) {
+		default:
+			IR_ASSERT(0);
 		case 1:
 			fprintf(f, "(uint8_t)");
 			break;
@@ -283,10 +285,10 @@ static void ir_emit_zext(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 		case 8:
 			fprintf(f, "(uint64_t)");
 			break;
-		default:
-			IR_ASSERT(0);
 	}
 	switch (ir_type_size[ctx->ir_base[insn->op1].type]) {
+		default:
+			IR_ASSERT(0);
 		case 1:
 			fprintf(f, "(uint8_t)");
 			break;
@@ -299,8 +301,6 @@ static void ir_emit_zext(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 		case 8:
 			fprintf(f, "(uint64_t)");
 			break;
-		default:
-			IR_ASSERT(0);
 	}
 	ir_emit_ref(ctx, f, insn->op1);
 	fprintf(f, ";\n");
@@ -313,6 +313,8 @@ static void ir_emit_trunc(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 	IR_ASSERT(ir_type_size[insn->type] < ir_type_size[ctx->ir_base[insn->op1].type]);
 	ir_emit_def_ref(ctx, f, def);
 	switch (ir_type_size[insn->type]) {
+		default:
+			IR_ASSERT(0);
 		case 1:
 			fprintf(f, "(uint8_t)");
 			break;
@@ -325,10 +327,10 @@ static void ir_emit_trunc(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 		case 8:
 			fprintf(f, "(uint64_t)");
 			break;
-		default:
-			IR_ASSERT(0);
 	}
 	switch (ir_type_size[ctx->ir_base[insn->op1].type]) {
+		default:
+			IR_ASSERT(0);
 		case 1:
 			fprintf(f, "(uint8_t)");
 			break;
@@ -341,8 +343,6 @@ static void ir_emit_trunc(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 		case 8:
 			fprintf(f, "(uint64_t)");
 			break;
-		default:
-			IR_ASSERT(0);
 	}
 	ir_emit_ref(ctx, f, insn->op1);
 	fprintf(f, ";\n");
@@ -362,37 +362,31 @@ static void ir_emit_bitcast(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 			fprintf(f, "; ");
 			ir_emit_ref(ctx, f, def);
 			fprintf(f, " = _u.bits;}\n");
-		} else if (ctx->ir_base[insn->op1].type == IR_FLOAT) {
+		} else {
+			IR_ASSERT(ctx->ir_base[insn->op1].type == IR_FLOAT);
 			fprintf(f, "\t{union {float f; uint32_t bits;} _u; _u.f = ");
 			ir_emit_ref(ctx, f, insn->op1);
 			fprintf(f, "; ");
 			ir_emit_ref(ctx, f, def);
 			fprintf(f, " = _u.bits;}\n");
-		} else {
-			IR_ASSERT(0);
-		}
-	} else if (IR_IS_TYPE_FP(insn->type)) {
-		if (IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)) {
-			if (insn->type == IR_DOUBLE) {
-				fprintf(f, "\t{union {double d; uint64_t bits;} _u; _u.bits = ");
-				ir_emit_ref(ctx, f, insn->op1);
-				fprintf(f, "; ");
-				ir_emit_ref(ctx, f, def);
-				fprintf(f, " = _u.d;}\n");
-			} else if (insn->type == IR_FLOAT) {
-				fprintf(f, "\t{union {float f; uint32_t bits;} _u; _u.buts = ");
-				ir_emit_ref(ctx, f, insn->op1);
-				fprintf(f, "; ");
-				ir_emit_ref(ctx, f, def);
-				fprintf(f, " = _u.f;}\n");
-			} else {
-				IR_ASSERT(0);
-			}
-		} else {
-			IR_ASSERT(0);
 		}
 	} else {
-		IR_ASSERT(0);
+		IR_ASSERT(IR_IS_TYPE_FP(insn->type));
+		IR_ASSERT(IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type));
+		if (insn->type == IR_DOUBLE) {
+			fprintf(f, "\t{union {double d; uint64_t bits;} _u; _u.bits = ");
+			ir_emit_ref(ctx, f, insn->op1);
+			fprintf(f, "; ");
+			ir_emit_ref(ctx, f, def);
+			fprintf(f, " = _u.d;}\n");
+		} else {
+			IR_ASSERT(insn->type == IR_FLOAT);
+			fprintf(f, "\t{union {float f; uint32_t bits;} _u; _u.buts = ");
+			ir_emit_ref(ctx, f, insn->op1);
+			fprintf(f, "; ");
+			ir_emit_ref(ctx, f, def);
+			fprintf(f, " = _u.f;}\n");
+		}
 	}
 }
 
@@ -410,10 +404,9 @@ static void ir_emit_minmax_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 	ir_emit_ref(ctx, f, insn->op1);
 	if (insn->op == IR_MIN) {
 		fprintf(f, " < ");
-	} else if (insn->op == IR_MAX) {
-		fprintf(f, " > ");
 	} else {
-		IR_ASSERT(0);
+		IR_ASSERT(insn->op == IR_MAX);
+		fprintf(f, " > ");
 	}
 	ir_emit_ref(ctx, f, insn->op2);
 	fprintf(f, " ? ");
@@ -508,10 +501,9 @@ static void ir_emit_switch(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn
 			fprintf(f, "\t\tcase ");
 			ir_emit_ref(ctx, f, use_insn->op2);
 			fprintf(f, ": goto bb%d;\n", ir_skip_empty_target_blocks(ctx, use_block));
-		} else if (use_insn->op == IR_CASE_DEFAULT) {
-			fprintf(f, "\t\tdefault: goto bb%d;\n", ir_skip_empty_target_blocks(ctx, use_block));
 		} else {
-			IR_ASSERT(0);
+			IR_ASSERT(use_insn->op == IR_CASE_DEFAULT);
+			fprintf(f, "\t\tdefault: goto bb%d;\n", ir_skip_empty_target_blocks(ctx, use_block));
 		}
 	}
 	fprintf(f, "\t}\n");

@@ -2411,7 +2411,8 @@ int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type, ir_reg_alloc_data *dat
 				ctx->stack_frame_size += 4;
 			}
 		}
-	} else if (size == 1) {
+	} else {
+		IR_ASSERT(size == 1);
 		if (data->unused_slot_1) {
 			ret = data->unused_slot_1;
 			data->unused_slot_1 = 0;
@@ -2435,9 +2436,6 @@ int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type, ir_reg_alloc_data *dat
 				ctx->stack_frame_size += 4;
 			}
 		}
-	} else {
-		IR_ASSERT(0);
-		ret = -1;
 	}
 	return ret;
 }
@@ -3170,14 +3168,12 @@ static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 			tmp_reg.type = type;
 			tmp_reg.start = IR_DEF_SUB_REF;
 			tmp_reg.end = IR_SAVE_SUB_REF;
-		} else if (IR_IS_TYPE_FP(type)) {
+		} else {
+			IR_ASSERT(IR_IS_TYPE_FP(type));
 			tmp_reg.num = 1;
 			tmp_reg.type = type;
 			tmp_reg.start = IR_DEF_SUB_REF;
 			tmp_reg.end = IR_SAVE_SUB_REF;
-		} else {
-			IR_ASSERT(0);
-			return 0;
 		}
 	} else if (from != 0) {
 		if (IR_IS_TYPE_INT(type)) {
@@ -3185,14 +3181,12 @@ static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 			tmp_reg.type = type;
 			tmp_reg.start = IR_DEF_SUB_REF;
 			tmp_reg.end = IR_SAVE_SUB_REF;
-		} else if (IR_IS_TYPE_FP(type)) {
+		} else {
+			IR_ASSERT(IR_IS_TYPE_FP(type));
 			tmp_reg.num = 1;
 			tmp_reg.type = type;
 			tmp_reg.start = IR_DEF_SUB_REF;
 			tmp_reg.end = IR_SAVE_SUB_REF;
-		} else {
-			IR_ASSERT(0);
-			return 0;
 		}
 	} else {
 		return 1;

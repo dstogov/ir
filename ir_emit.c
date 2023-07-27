@@ -149,7 +149,8 @@ static ir_reg ir_get_param_reg(const ir_ctx *ctx, ir_ref ref)
 				/* WIN64 calling convention use common couter for int and fp registers */
 				fp_param++;
 #endif
-			} else if (IR_IS_TYPE_FP(insn->type)) {
+			} else {
+				IR_ASSERT(IR_IS_TYPE_FP(insn->type));
 				if (use == ref) {
 					if (fp_param < fp_reg_params_count) {
 						return fp_reg_params[fp_param];
@@ -162,8 +163,6 @@ static ir_reg ir_get_param_reg(const ir_ctx *ctx, ir_ref ref)
 				/* WIN64 calling convention use common couter for int and fp registers */
 				int_param++;
 #endif
-			} else {
-				IR_ASSERT(0);
 			}
 		}
 	}
@@ -207,7 +206,8 @@ static int ir_get_args_regs(const ir_ctx *ctx, const ir_insn *insn, int8_t *regs
 			/* WIN64 calling convention use common couter for int and fp registers */
 			fp_param++;
 #endif
-		} else if (IR_IS_TYPE_FP(type)) {
+		} else {
+			IR_ASSERT(IR_IS_TYPE_FP(type));
 			if (fp_param < fp_reg_params_count) {
 				regs[j] = fp_reg_params[fp_param];
 				count = j + 1;
@@ -219,8 +219,6 @@ static int ir_get_args_regs(const ir_ctx *ctx, const ir_insn *insn, int8_t *regs
 			/* WIN64 calling convention use common couter for int and fp registers */
 			int_param++;
 #endif
-		} else {
-			IR_ASSERT(0);
 		}
 	}
 	return count;

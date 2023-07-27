@@ -766,10 +766,10 @@ IR_ALWAYS_INLINE bool ir_const_is_true(const ir_insn *v)
 		return v->val.i64 != 0;
 	} else if (v->type == IR_DOUBLE) {
 		return v->val.d != 0.0;
-	} else if (v->type == IR_FLOAT) {
+	} else {
+		IR_ASSERT(v->type == IR_FLOAT);
 		return v->val.f != 0.0;
 	}
-	IR_ASSERT(0 && "NYI");
 	return 0;
 }
 

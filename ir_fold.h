@@ -984,6 +984,8 @@ IR_FOLD(TRUNC(C_U64))
 	IR_ASSERT(IR_IS_TYPE_INT(IR_OPT_TYPE(opt)));
 	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] < ir_type_size[op1_insn->type]);
 	switch (IR_OPT_TYPE(opt)) {
+		default:
+			IR_ASSERT(0);
 		case IR_I8:
 			IR_FOLD_CONST_I(op1_insn->val.i8);
 		case IR_I16:
@@ -996,8 +998,6 @@ IR_FOLD(TRUNC(C_U64))
 			IR_FOLD_CONST_U(op1_insn->val.u16);
 		case IR_U32:
 			IR_FOLD_CONST_U(op1_insn->val.u32);
-		default:
-			IR_ASSERT(0);
 	}
 }
 
@@ -1018,6 +1018,8 @@ IR_FOLD(BITCAST(C_ADDR))
 {
 	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] == ir_type_size[op1_insn->type]);
 	switch (IR_OPT_TYPE(opt)) {
+		default:
+			IR_ASSERT(0);
 		case IR_I8:
 			IR_FOLD_CONST_I(op1_insn->val.i8);
 		case IR_I16:
@@ -1042,8 +1044,6 @@ IR_FOLD(BITCAST(C_ADDR))
 			IR_FOLD_CONST_I(op1_insn->val.c);
 		case IR_ADDR:
 			IR_FOLD_CONST_U(op1_insn->val.addr);
-		default:
-			IR_ASSERT(0);
 	}
 }
 
@@ -1077,6 +1077,8 @@ IR_FOLD(FP2INT(C_FLOAT))
 {
 	IR_ASSERT(IR_IS_TYPE_INT(IR_OPT_TYPE(opt)));
 	switch (IR_OPT_TYPE(opt)) {
+		default:
+			IR_ASSERT(0);
 		case IR_I8:
 			IR_FOLD_CONST_I((int8_t)op1_insn->val.f);
 		case IR_I16:
@@ -1093,8 +1095,6 @@ IR_FOLD(FP2INT(C_FLOAT))
 			IR_FOLD_CONST_U((uint32_t)op1_insn->val.f);
 		case IR_U64:
 			IR_FOLD_CONST_U((uint64_t)op1_insn->val.f);
-		default:
-			IR_ASSERT(0);
 	}
 }
 
@@ -1102,6 +1102,8 @@ IR_FOLD(FP2INT(C_DOUBLE))
 {
 	IR_ASSERT(IR_IS_TYPE_INT(IR_OPT_TYPE(opt)));
 	switch (IR_OPT_TYPE(opt)) {
+		default:
+			IR_ASSERT(0);
 		case IR_I8:
 			IR_FOLD_CONST_I((int8_t)op1_insn->val.d);
 		case IR_I16:
@@ -1118,8 +1120,6 @@ IR_FOLD(FP2INT(C_DOUBLE))
 			IR_FOLD_CONST_U((uint32_t)op1_insn->val.d);
 		case IR_U64:
 			IR_FOLD_CONST_U((uint64_t)op1_insn->val.d);
-		default:
-			IR_ASSERT(0);
 	}
 }
 

@@ -31,6 +31,8 @@
 
 |.macro ASM_REG_OP, op, type, reg
 ||	switch (ir_type_size[type]) {
+|| 		default:
+||			IR_ASSERT(0);
 ||		case 1:
 |			op Rb(reg)
 ||			break;
@@ -45,13 +47,13 @@
 |			op Rq(reg)
 || 			break;
 |.endif
-|| 		default:
-||			IR_ASSERT(0);
 ||	}
 |.endmacro
 
 |.macro ASM_MEM_OP, op, type, mem
 ||	switch (ir_type_size[type]) {
+|| 		default:
+||			IR_ASSERT(0);
 ||		case 1:
 |			op byte mem
 ||			break;
@@ -66,13 +68,13 @@
 |			op qword mem
 || 			break;
 |.endif
-|| 		default:
-||			IR_ASSERT(0);
 ||	}
 |.endmacro
 
 |.macro ASM_REG_REG_OP, op, type, dst, src
 ||	switch (ir_type_size[type]) {
+|| 		default:
+||			IR_ASSERT(0);
 ||		case 1:
 |			op Rb(dst), Rb(src)
 ||			break;
@@ -87,13 +89,13 @@
 |			op Rq(dst), Rq(src)
 || 			break;
 |.endif
-|| 		default:
-||			IR_ASSERT(0);
 ||	}
 |.endmacro
 
 |.macro ASM_REG_REG_OP2, op, type, dst, src
 ||	switch (ir_type_size[type]) {
+|| 		default:
+||			IR_ASSERT(0);
 ||		case 1:
 ||		case 2:
 |			op Rw(dst), Rw(src)
@@ -106,13 +108,13 @@
 |			op Rq(dst), Rq(src)
 || 			break;
 |.endif
-|| 		default:
-||			IR_ASSERT(0);
 ||	}
 |.endmacro
 
 |.macro ASM_REG_IMM_OP, op, type, dst, src
 ||	switch (ir_type_size[type]) {
+|| 		default:
+||			IR_ASSERT(0);
 ||		case 1:
 |			op Rb(dst), src
 ||			break;
@@ -127,13 +129,13 @@
 |			op Rq(dst), src
 || 			break;
 |.endif
-|| 		default:
-||			IR_ASSERT(0);
 ||	}
 |.endmacro
 
 |.macro ASM_MEM_REG_OP, op, type, dst, src
 ||	switch (ir_type_size[type]) {
+|| 		default:
+||			IR_ASSERT(0);
 ||		case 1:
 |			op byte dst, Rb(src)
 ||			break;
@@ -148,13 +150,13 @@
 |			op qword dst, Rq(src)
 || 			break;
 |.endif
-|| 		default:
-||			IR_ASSERT(0);
 ||	}
 |.endmacro
 
 |.macro ASM_MEM_IMM_OP, op, type, dst, src
 ||	switch (ir_type_size[type]) {
+|| 		default:
+||			IR_ASSERT(0);
 ||		case 1:
 |			op byte dst, src
 ||			break;
@@ -169,13 +171,13 @@
 |			op qword dst, src
 || 			break;
 |.endif
-|| 		default:
-||			IR_ASSERT(0);
 ||	}
 |.endmacro
 
 |.macro ASM_REG_MEM_OP, op, type, dst, src
 ||	switch (ir_type_size[type]) {
+|| 		default:
+||			IR_ASSERT(0);
 ||		case 1:
 |			op Rb(dst), byte src
 ||			break;
@@ -190,13 +192,13 @@
 |			op Rq(dst), qword src
 || 			break;
 |.endif
-|| 		default:
-||			IR_ASSERT(0);
 ||	}
 |.endmacro
 
 |.macro ASM_REG_REG_IMUL, type, dst, src
 ||	switch (ir_type_size[type]) {
+|| 		default:
+||			IR_ASSERT(0);
 ||		case 2:
 |			imul Rw(dst), Rw(src)
 || 			break;
@@ -208,13 +210,13 @@
 |			imul Rq(dst), Rq(src)
 || 			break;
 |.endif
-|| 		default:
-||			IR_ASSERT(0);
 ||	}
 |.endmacro
 
 |.macro ASM_REG_IMM_IMUL, type, dst, src
 ||	switch (ir_type_size[type]) {
+|| 		default:
+||			IR_ASSERT(0);
 ||		case 2:
 |			imul Rw(dst), src
 || 			break;
@@ -226,13 +228,13 @@
 |			imul Rq(dst), src
 || 			break;
 |.endif
-|| 		default:
-||			IR_ASSERT(0);
 ||	}
 |.endmacro
 
 |.macro ASM_REG_MEM_IMUL, type, dst, src
 ||	switch (ir_type_size[type]) {
+|| 		default:
+||			IR_ASSERT(0);
 ||		case 2:
 |			imul Rw(dst), word src
 || 			break;
@@ -244,8 +246,6 @@
 |			imul Rq(dst), qword src
 || 			break;
 |.endif
-|| 		default:
-||			IR_ASSERT(0);
 ||	}
 |.endmacro
 
@@ -428,11 +428,10 @@ const char *ir_reg_name(int8_t reg, ir_type type)
 		return _ir_reg_name32[reg];
 	} else if (ir_type_size[type] == 2) {
 		return _ir_reg_name16[reg];
-	} else if (ir_type_size[type] == 1) {
+	} else {
+		IR_ASSERT(ir_type_size[type] == 1);
 		return _ir_reg_name8[reg];
 	}
-	IR_ASSERT(0);
-	return NULL;
 }
 
 #define IR_RULES(_)        \
@@ -1253,15 +1252,11 @@ binop_fp:
 		case IR_BSWAP:
 		case IR_NOT:
 			if (insn->type == IR_BOOL) {
-				if (IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)) {
-					return IR_BOOL_NOT_INT;
-				} else {
-					IR_ASSERT(0); // TODO: IR_BOOL_NOT_FP
-				}
-			} else if (IR_IS_TYPE_INT(insn->type)) {
-				return IR_OP_INT;
+				IR_ASSERT(IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)); // TODO: IR_BOOL_NOT_FP
+				return IR_BOOL_NOT_INT;
 			} else {
-				IR_ASSERT(0);
+				IR_ASSERT(IR_IS_TYPE_INT(insn->type));
+				return IR_OP_INT;
 			}
 			break;
 		case IR_NEG:
@@ -2251,6 +2246,8 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 		}
 		switch (insn->op) {
+			default:
+				IR_ASSERT(0 && "NIY binary op");
 			case IR_ADD:
 			case IR_ADD_OV:
 				|	ASM_REG_REG_OP add, type, def_reg, op2_reg
@@ -2272,9 +2269,6 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			case IR_XOR:
 				|	ASM_REG_REG_OP xor, type, def_reg, op2_reg
 				break;
-			default:
-				IR_ASSERT(0 && "NIY binary op");
-				break;
 		}
 	} else if (IR_IS_CONST_REF(op2)) {
 		ir_insn *val_insn = &ctx->ir_base[op2];
@@ -2283,6 +2277,8 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		IR_ASSERT(IR_IS_32BIT(val_insn->type, val_insn->val));
 		val = val_insn->val.i32;
 		switch (insn->op) {
+			default:
+				IR_ASSERT(0 && "NIY binary op");
 			case IR_ADD:
 			case IR_ADD_OV:
 				|	ASM_REG_IMM_OP add, type, def_reg, val
@@ -2304,9 +2300,6 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			case IR_XOR:
 				|	ASM_REG_IMM_OP xor, type, def_reg, val
 				break;
-			default:
-				IR_ASSERT(0 && "NIY binary op");
-				break;
 		}
 	} else {
 		int32_t offset = 0;
@@ -2318,6 +2311,8 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 		if (op2_reg != IR_REG_NONE) {
 			switch (insn->op) {
+				default:
+					IR_ASSERT(0 && "NIY binary op");
 				case IR_ADD:
 				case IR_ADD_OV:
 					|	ASM_REG_MEM_OP add, type, def_reg, [Ra(op2_reg)+offset]
@@ -2339,12 +2334,11 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				case IR_XOR:
 					|	ASM_REG_MEM_OP xor, type, def_reg, [Ra(op2_reg)+offset]
 					break;
-				default:
-					IR_ASSERT(0 && "NIY binary op");
-					break;
 			}
 		} else {
 			switch (insn->op) {
+				default:
+					IR_ASSERT(0 && "NIY binary op");
 				case IR_ADD:
 				case IR_ADD_OV:
 					|	ASM_REG_MEM_OP add, type, def_reg, [offset]
@@ -2365,9 +2359,6 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					break;
 				case IR_XOR:
 					|	ASM_REG_MEM_OP xor, type, def_reg, [offset]
-					break;
-				default:
-					IR_ASSERT(0 && "NIY binary op");
 					break;
 			}
 		}
@@ -2401,6 +2392,8 @@ static void ir_emit_imul3(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			ir_emit_load(ctx, type, op1_reg, op1);
 		}
 		switch (ir_type_size[type]) {
+			default:
+				IR_ASSERT(0);
 			case 2:
 				|	imul Rw(def_reg), Rw(op1_reg), val
 				break;
@@ -2412,8 +2405,6 @@ static void ir_emit_imul3(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |				imul Rq(def_reg), Rq(op1_reg), val
 ||				break;
 |.endif
-			default:
-				IR_ASSERT(0);
 		}
 	} else {
 		int32_t offset = 0;
@@ -2424,6 +2415,8 @@ static void ir_emit_imul3(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			offset = ir_ref_spill_slot(ctx, op1, &op1_reg);
 		}
 		switch (ir_type_size[type]) {
+			default:
+				IR_ASSERT(0);
 			case 2:
 				|	imul Rw(def_reg), word [Ra(op1_reg)+offset], val
 				break;
@@ -2435,8 +2428,6 @@ static void ir_emit_imul3(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |					imul Rq(def_reg), qword [Ra(op1_reg)+offset], val
 ||	 			break;
 |.endif
-			default:
-				IR_ASSERT(0);
 		}
 	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
@@ -2581,11 +2572,9 @@ static void ir_emit_mem_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			reg = IR_REG_NUM(reg);
 			ir_emit_load(ctx, IR_ADDR, reg, insn->op2);
 		}
-	} else if (insn->op == IR_VSTORE) {
-		offset = ir_var_spill_slot(ctx, insn->op2, &reg);
 	} else {
-		IR_ASSERT(0);
-		return;
+		IR_ASSERT(insn->op == IR_VSTORE);
+		offset = ir_var_spill_slot(ctx, insn->op2, &reg);
 	}
 
 	if (op2_reg == IR_REG_NONE) {
@@ -2593,6 +2582,8 @@ static void ir_emit_mem_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 		IR_ASSERT(IR_IS_CONST_REF(op2) && (ir_type_size[type] != 8 || IR_IS_32BIT(type, ctx->ir_base[op2].val)));
 		switch (op_insn->op) {
+			default:
+				IR_ASSERT(0 && "NIY binary op");
 			case IR_ADD:
 			case IR_ADD_OV:
 				if (reg != IR_REG_NONE) {
@@ -2630,9 +2621,6 @@ static void ir_emit_mem_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					|	ASM_MEM_IMM_OP xor, type, [offset], val->i32
 				}
 				break;
-			default:
-				IR_ASSERT(0 && "NIY binary op");
-				break;
 		}
 	} else {
 		if (IR_REG_SPILLED(op2_reg) || IR_IS_CONST_REF(op2)) {
@@ -2640,6 +2628,8 @@ static void ir_emit_mem_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			ir_emit_load(ctx, type, op2_reg, op2);
 		}
 		switch (op_insn->op) {
+			default:
+				IR_ASSERT(0 && "NIY binary op");
 			case IR_ADD:
 			case IR_ADD_OV:
 				if (reg != IR_REG_NONE) {
@@ -2677,9 +2667,6 @@ static void ir_emit_mem_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					|	ASM_MEM_REG_OP xor, type, [offset], op2_reg
 				}
 				break;
-			default:
-				IR_ASSERT(0 && "NIY binary op");
-				break;
 		}
 	}
 }
@@ -2702,6 +2689,8 @@ static void ir_emit_reg_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 		IR_ASSERT(IR_IS_CONST_REF(op2) && (ir_type_size[type] != 8 || IR_IS_32BIT(type, ctx->ir_base[op2].val)));
 		switch (op_insn->op) {
+			default:
+				IR_ASSERT(0 && "NIY binary op");
 			case IR_ADD:
 				|	ASM_REG_IMM_OP add, type, reg, val->i32
 				break;
@@ -2717,9 +2706,6 @@ static void ir_emit_reg_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			case IR_XOR:
 				|	ASM_REG_IMM_OP xor, type, reg, val->i32
 				break;
-			default:
-				IR_ASSERT(0 && "NIY binary op");
-				break;
 		}
 	} else {
 		if (IR_REG_SPILLED(op2_reg) || IR_IS_CONST_REF(op2)) {
@@ -2727,6 +2713,8 @@ static void ir_emit_reg_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			ir_emit_load(ctx, type, op2_reg, op2);
 		}
 		switch (op_insn->op) {
+			default:
+				IR_ASSERT(0 && "NIY binary op");
 			case IR_ADD:
 				|	ASM_REG_REG_OP add, type, reg, op2_reg
 				break;
@@ -2741,9 +2729,6 @@ static void ir_emit_reg_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 			case IR_XOR:
 				|	ASM_REG_REG_OP xor, type, reg, op2_reg
-				break;
-			default:
-				IR_ASSERT(0 && "NIY binary op");
 				break;
 		}
 	}
@@ -2781,12 +2766,11 @@ static void ir_emit_mul_div_mod_pwr2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	} else if (insn->op == IR_DIV) {
 		uint32_t shift = IR_LOG2(ctx->ir_base[insn->op2].val.u64);
 		|	ASM_REG_IMM_OP shr, insn->type, def_reg, shift
-	} else if (insn->op == IR_MOD) {
+	} else {
+		IR_ASSERT(insn->op == IR_MOD);
 		uint64_t mask = ctx->ir_base[insn->op2].val.u64 - 1;
 		IR_ASSERT(IR_IS_UNSIGNED_32BIT(mask));
 		|	ASM_REG_IMM_OP and, insn->type, def_reg, mask
-	} else {
-		IR_ASSERT(0);
 	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, type, def, def_reg);
@@ -2816,11 +2800,9 @@ static void ir_emit_mem_mul_div_mod_pwr2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			reg = IR_REG_NUM(reg);
 			ir_emit_load(ctx, IR_ADDR, reg, insn->op2);
 		}
-	} else if (insn->op == IR_VSTORE) {
-		offset = ir_var_spill_slot(ctx, insn->op2, &reg);
 	} else {
-		IR_ASSERT(0);
-		return;
+		IR_ASSERT(insn->op == IR_VSTORE);
+		offset = ir_var_spill_slot(ctx, insn->op2, &reg);
 	}
 
 	if (op_insn->op == IR_MUL) {
@@ -2829,12 +2811,11 @@ static void ir_emit_mem_mul_div_mod_pwr2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	} else if (op_insn->op == IR_DIV) {
 		uint32_t shift = IR_LOG2(ctx->ir_base[op_insn->op2].val.u64);
 		|	ASM_MEM_IMM_OP shr, type, [Ra(reg)+offset], shift
-	} else if (op_insn->op == IR_MOD) {
+	} else {
+		IR_ASSERT(op_insn->op == IR_MOD);
 		uint64_t mask = ctx->ir_base[op_insn->op2].val.u64 - 1;
 		IR_ASSERT(IR_IS_UNSIGNED_32BIT(mask));
 		|	ASM_MEM_IMM_OP and, type, [Ra(reg)+offset], mask
-	} else {
-		IR_ASSERT(0);
 	}
 }
 
@@ -2875,6 +2856,8 @@ static void ir_emit_shift(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 	}
 	switch (insn->op) {
+		default:
+			IR_ASSERT(0);
 		case IR_SHL:
 			|	ASM_REG_IMM_OP shl, insn->type, def_reg, cl
 			break;
@@ -2890,8 +2873,6 @@ static void ir_emit_shift(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		case IR_ROR:
 			|	ASM_REG_IMM_OP ror, insn->type, def_reg, cl
 			break;
-		default:
-			IR_ASSERT(0);
 	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, type, def, def_reg);
@@ -2923,11 +2904,9 @@ static void ir_emit_mem_shift(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			reg = IR_REG_NUM(reg);
 			ir_emit_load(ctx, IR_ADDR, reg, insn->op2);
 		}
-	} else if (insn->op == IR_VSTORE) {
-		offset = ir_var_spill_slot(ctx, insn->op2, &reg);
 	} else {
-		IR_ASSERT(0);
-		return;
+		IR_ASSERT(insn->op == IR_VSTORE);
+		offset = ir_var_spill_slot(ctx, insn->op2, &reg);
 	}
 
 	if (op2_reg != IR_REG_NONE && IR_REG_SPILLED(op2_reg)) {
@@ -2942,6 +2921,8 @@ static void ir_emit_mem_shift(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 	}
 	switch (op_insn->op) {
+		default:
+			IR_ASSERT(0);
 		case IR_SHL:
 			|	ASM_MEM_IMM_OP shl, type, [Ra(reg)+offset], cl
 			break;
@@ -2957,8 +2938,6 @@ static void ir_emit_mem_shift(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		case IR_ROR:
 			|	ASM_MEM_IMM_OP ror, type, [Ra(reg)+offset], cl
 			break;
-		default:
-			IR_ASSERT(0);
 	}
 }
 
@@ -2988,6 +2967,8 @@ static void ir_emit_shift_const(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 	}
 	switch (insn->op) {
+		default:
+			IR_ASSERT(0);
 		case IR_SHL:
 			|	ASM_REG_IMM_OP shl, insn->type, def_reg, shift
 			break;
@@ -3003,8 +2984,6 @@ static void ir_emit_shift_const(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		case IR_ROR:
 			|	ASM_REG_IMM_OP ror, insn->type, def_reg, shift
 			break;
-		default:
-			IR_ASSERT(0);
 	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, type, def, def_reg);
@@ -3037,14 +3016,14 @@ static void ir_emit_mem_shift_const(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			reg = IR_REG_NUM(reg);
 			ir_emit_load(ctx, IR_ADDR, reg, insn->op2);
 		}
-	} else if (insn->op == IR_VSTORE) {
-		offset = ir_var_spill_slot(ctx, insn->op2, &reg);
 	} else {
-		IR_ASSERT(0);
-		return;
+		IR_ASSERT(insn->op == IR_VSTORE);
+		offset = ir_var_spill_slot(ctx, insn->op2, &reg);
 	}
 
 	switch (op_insn->op) {
+		default:
+			IR_ASSERT(0);
 		case IR_SHL:
 			|	ASM_MEM_IMM_OP shl, type, [Ra(reg)+offset], shift
 			break;
@@ -3060,8 +3039,6 @@ static void ir_emit_mem_shift_const(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		case IR_ROR:
 			|	ASM_MEM_IMM_OP ror, type, [Ra(reg)+offset], shift
 			break;
-		default:
-			IR_ASSERT(0);
 	}
 }
 
@@ -3095,8 +3072,11 @@ static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		|	ASM_REG_OP not, insn->type, def_reg
 	} else if (insn->op == IR_NEG) {
 		|	ASM_REG_OP neg, insn->type, def_reg
-	} else if (insn->op == IR_BSWAP) {
+	} else {
+		IR_ASSERT(insn->op == IR_BSWAP);
 		switch (ir_type_size[insn->type]) {
+			default:
+				IR_ASSERT(0);
 			case 4:
 				|	bswap Rd(def_reg)
 				break;
@@ -3106,11 +3086,7 @@ static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|	bswap Rq(def_reg)
 |.endif
 				break;
-			default:
-				IR_ASSERT(0);
 		}
-	} else {
-		IR_ASSERT(0);
 	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, type, def, def_reg);
@@ -3140,11 +3116,9 @@ static void ir_emit_mem_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			reg = IR_REG_NUM(reg);
 			ir_emit_load(ctx, IR_ADDR, reg, insn->op2);
 		}
-	} else if (insn->op == IR_VSTORE) {
-		offset = ir_var_spill_slot(ctx, insn->op2, &reg);
 	} else {
-		IR_ASSERT(0);
-		return;
+		IR_ASSERT(insn->op == IR_VSTORE);
+		offset = ir_var_spill_slot(ctx, insn->op2, &reg);
 	}
 
 	if (op_insn->op == IR_ADD) {
@@ -3153,10 +3127,9 @@ static void ir_emit_mem_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		|	ASM_MEM_OP dec, type, [Ra(reg)+offset]
 	} else if (insn->op == IR_NOT) {
 		|	ASM_MEM_OP not, type, [Ra(reg)+offset]
-	} else if (insn->op == IR_NEG) {
-		|	ASM_MEM_OP neg, type, [Ra(reg)+offset]
 	} else {
-		IR_ASSERT(0);
+		IR_ASSERT(insn->op == IR_NEG);
+		|	ASM_MEM_OP neg, type, [Ra(reg)+offset]
 	}
 }
 
@@ -3318,7 +3291,8 @@ static void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				ir_emit_store(ctx, type, def, IR_REG_RAX);
 			}
 		}
-	} else if (insn->op == IR_MOD) {
+	} else {
+		IR_ASSERT(insn->op == IR_MOD);
 		if (ir_type_size[type] == 1) {
 			if (def_reg != IR_REG_NONE) {
 				|	mov al, ah
@@ -3336,8 +3310,6 @@ static void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				ir_emit_store(ctx, type, def, IR_REG_RDX);
 			}
 		}
-	} else {
-		IR_ASSERT(0);
 	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, type, def, def_reg);
@@ -3409,7 +3381,8 @@ static void ir_emit_op_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|	xorps xmm(def_reg-IR_REG_FP_FIRST), [->float_neg_const]
 			}
 		}
-	} else if (insn->op == IR_ABS) {
+	} else {
+		IR_ASSERT(insn->op == IR_ABS);
 		if (insn->type == IR_DOUBLE) {
 			if (!data->double_abs_const) {
 				data->double_abs_const = 1;
@@ -3440,8 +3413,6 @@ static void ir_emit_op_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|	andps xmm(def_reg-IR_REG_FP_FIRST), [->float_abs_const]
 			}
 		}
-	} else {
-		IR_ASSERT(0);
 	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, insn->type, def, def_reg);
@@ -3483,6 +3454,8 @@ static void ir_emit_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 		}
 		switch (insn->op) {
+			default:
+				IR_ASSERT(0 && "NIY binary op");
 			case IR_ADD:
 				|	ASM_SSE2_REG_REG_OP addss, addsd, type, def_reg, op2_reg
 				break;
@@ -3501,9 +3474,6 @@ static void ir_emit_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			case IR_MAX:
 				|	ASM_SSE2_REG_REG_OP maxss, maxsd, type, def_reg, op2_reg
 				break;
-			default:
-				IR_ASSERT(0 && "NIY binary op");
-				break;
 		}
 	} else if (IR_IS_CONST_REF(op2)) {
 		ir_insn *val_insn = &ctx->ir_base[op2];
@@ -3511,6 +3481,8 @@ static void ir_emit_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 		val_insn->const_flags |= IR_CONST_EMIT;
 		switch (insn->op) {
+			default:
+				IR_ASSERT(0 && "NIY binary op");
 			case IR_ADD:
 				|	ASM_SSE2_REG_MEM_OP addss, addsd, type, def_reg, [=>label]
 				break;
@@ -3529,9 +3501,6 @@ static void ir_emit_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			case IR_MAX:
 				|	ASM_SSE2_REG_MEM_OP maxss, maxsd, type, def_reg, [=>label]
 				break;
-			default:
-				IR_ASSERT(0 && "NIY binary op");
-				break;
 		}
 	} else {
 		int32_t offset = 0;
@@ -3542,6 +3511,8 @@ static void ir_emit_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			offset = ir_ref_spill_slot(ctx, op2, &op2_reg);
 		}
 		switch (insn->op) {
+			default:
+				IR_ASSERT(0 && "NIY binary op");
 			case IR_ADD:
 				|	ASM_SSE2_REG_MEM_OP addss, addsd, type, def_reg, [Ra(op2_reg)+offset]
 				break;
@@ -3559,9 +3530,6 @@ static void ir_emit_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 			case IR_MAX:
 				|	ASM_SSE2_REG_MEM_OP maxss, maxsd, type, def_reg, [Ra(op2_reg)+offset]
-				break;
-			default:
-				IR_ASSERT(0 && "NIY binary op");
 				break;
 		}
 	}
@@ -3595,6 +3563,8 @@ static void ir_emit_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 		}
 		switch (insn->op) {
+			default:
+				IR_ASSERT(0 && "NIY binary op");
 			case IR_ADD:
 				|	ASM_AVX_REG_REG_REG_OP vaddss, vaddsd, type, def_reg, op1_reg, op2_reg
 				break;
@@ -3613,9 +3583,6 @@ static void ir_emit_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			case IR_MAX:
 				|	ASM_AVX_REG_REG_REG_OP vmaxss, vmaxsd, type, def_reg, op1_reg, op2_reg
 				break;
-			default:
-				IR_ASSERT(0 && "NIY binary op");
-				break;
 		}
 	} else if (IR_IS_CONST_REF(op2)) {
 		ir_insn *val_insn = &ctx->ir_base[op2];
@@ -3623,6 +3590,8 @@ static void ir_emit_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 		val_insn->const_flags |= IR_CONST_EMIT;
 		switch (insn->op) {
+			default:
+				IR_ASSERT(0 && "NIY binary op");
 			case IR_ADD:
 				|	ASM_AVX_REG_REG_MEM_OP vaddss, vaddsd, type, def_reg, op1_reg, [=>label]
 				break;
@@ -3641,9 +3610,6 @@ static void ir_emit_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			case IR_MAX:
 				|	ASM_AVX_REG_REG_MEM_OP vmaxss, vmaxsd, type, def_reg, op1_reg, [=>label]
 				break;
-			default:
-				IR_ASSERT(0 && "NIY binary op");
-				break;
 		}
 	} else {
 		int32_t offset = 0;
@@ -3654,6 +3620,8 @@ static void ir_emit_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			offset = ir_ref_spill_slot(ctx, op2, &op2_reg);
 		}
 		switch (insn->op) {
+			default:
+				IR_ASSERT(0 && "NIY binary op");
 			case IR_ADD:
 				|	ASM_AVX_REG_REG_MEM_OP vaddss, vaddsd, type, def_reg, op1_reg, [Ra(op2_reg)+offset]
 				break;
@@ -3671,9 +3639,6 @@ static void ir_emit_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 			case IR_MAX:
 				|	ASM_AVX_REG_REG_MEM_OP vmaxss, vmaxsd, type, def_reg, op1_reg, [Ra(op2_reg)+offset]
-				break;
-			default:
-				IR_ASSERT(0 && "NIY binary op");
 				break;
 		}
 	}
@@ -3746,6 +3711,8 @@ static void _ir_emit_setcc_int(ir_ctx *ctx, uint8_t op, ir_reg def_reg)
 	dasm_State **Dst = &data->dasm_state;
 
 	switch (op) {
+		default:
+			IR_ASSERT(0 && "NIY binary op");
 		case IR_EQ:
 			|	sete Rb(def_reg)
 			break;
@@ -3775,9 +3742,6 @@ static void _ir_emit_setcc_int(ir_ctx *ctx, uint8_t op, ir_reg def_reg)
 			break;
 		case IR_UGT:
 			|	seta Rb(def_reg)
-			break;
-		default:
-			IR_ASSERT(0 && "NIY binary op");
 			break;
 	}
 }
@@ -4022,6 +3986,8 @@ static void ir_emit_cmp_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	IR_ASSERT(def_reg != IR_REG_NONE);
 	switch (op) {
+		default:
+			IR_ASSERT(0 && "NIY binary op");
 		case IR_EQ:
 			|	setnp Rb(def_reg)
 			|	mov Rd(tmp_reg), 0
@@ -4047,9 +4013,6 @@ static void ir_emit_cmp_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			break;
 		case IR_GT:
 			|	seta Rb(def_reg)
-			break;
-		default:
-			IR_ASSERT(0 && "NIY binary op");
 			break;
 	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
@@ -4101,6 +4064,8 @@ static void ir_emit_jcc(ir_ctx *ctx, uint8_t op, uint32_t b, ir_ref def, ir_insn
 
 	if (int_cmp) {
 		switch (op) {
+			default:
+				IR_ASSERT(0 && "NIY binary op");
 			case IR_EQ:
 				|	je =>true_block
 				break;
@@ -4131,12 +4096,11 @@ static void ir_emit_jcc(ir_ctx *ctx, uint8_t op, uint32_t b, ir_ref def, ir_insn
 			case IR_UGT:
 				|	ja =>true_block
 				break;
-			default:
-				IR_ASSERT(0 && "NIY binary op");
-				break;
 		}
 	} else {
 		switch (op) {
+			default:
+				IR_ASSERT(0 && "NIY binary op");
 			case IR_EQ:
 				if (!false_block) {
 					|	jp >1
@@ -4191,9 +4155,6 @@ static void ir_emit_jcc(ir_ctx *ctx, uint8_t op, uint32_t b, ir_ref def, ir_insn
 //			case IR_UGE: fprintf(stderr, "\tjae .LL%d\n", true_block); break;
 //			case IR_ULE: fprintf(stderr, "\tjbe .LL%d\n", true_block); break;
 //			case IR_UGT: fprintf(stderr, "\tja .LL%d\n", true_block); break;
-			default:
-				IR_ASSERT(0 && "NIY binary op");
-				break;
 		}
 	}
 	if (false_block) {
@@ -5684,10 +5645,9 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 				max.u64 = (int64_t)IR_MAX(max.u64, val->val.u64);
 			}
 			count++;
-		} else if (use_insn->op == IR_CASE_DEFAULT) {
-			default_label = ir_skip_empty_target_blocks(ctx, use_block);
 		} else {
-			IR_ASSERT(0);
+			IR_ASSERT(use_insn->op == IR_CASE_DEFAULT);
+			default_label = ir_skip_empty_target_blocks(ctx, use_block);
 		}
 	}
 
@@ -5760,6 +5720,8 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 		if (sizeof(void*) == 8) {
 |.if X64
 			switch (ir_type_size[type]) {
+				default:
+					IR_ASSERT(0);
 				case 1:
 					if (IR_IS_TYPE_SIGNED(type)) {
 						|	movsx Ra(op2_reg), Rb(op2_reg)
@@ -5783,8 +5745,6 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 					break;
 				case 8:
 					break;
-				default:
-					IR_ASSERT(0);
 			}
 			|	lea Ra(tmp_reg), aword [>1]
 			|	jmp aword [Ra(tmp_reg)+Ra(op2_reg)*8+(int32_t)offset]
@@ -5792,6 +5752,8 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 		} else {
 |.if not X64
 			switch (ir_type_size[type]) {
+				default:
+					IR_ASSERT(0 && "Unsupported type size");
 				case 1:
 					if (IR_IS_TYPE_SIGNED(type)) {
 						|	movsx Ra(op2_reg), Rb(op2_reg)
@@ -5808,8 +5770,6 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 					break;
 				case 4:
 					break;
-				default:
-					IR_ASSERT(0 && "Unsupported type size");
 			}
 			|//	jmp aword [Ra(op2_reg)*4+(int32_t)offset+>1]
 			|	lea Ra(op2_reg), aword [Ra(op2_reg)*4+(int32_t)offset] // TODO: reg clobbering
@@ -6049,7 +6009,8 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn)
 			/* WIN64 calling convention use common couter for int and fp registers */
 			fp_param++;
 #endif
-		} else if (IR_IS_TYPE_FP(type)) {
+		} else {
+			IR_ASSERT(IR_IS_TYPE_FP(type));
 			if (fp_param >= fp_reg_params_count) {
 				used_stack += IR_MAX(sizeof(void*), ir_type_size[type]);
 			}
@@ -6058,8 +6019,6 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn)
 			/* WIN64 calling convention use common couter for int and fp registers */
 			int_param++;
 #endif
-		} else {
-			IR_ASSERT(0);
 		}
 	}
 
@@ -6160,7 +6119,8 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 			/* WIN64 calling convention use common couter for int and fp registers */
 			fp_param++;
 #endif
-		} else if (IR_IS_TYPE_FP(type)) {
+		} else {
+			IR_ASSERT(IR_IS_TYPE_FP(type));
 			if (fp_param < fp_reg_params_count) {
 				dst_reg = fp_reg_params[fp_param];
 			} else {
@@ -6171,8 +6131,6 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 			/* WIN64 calling convention use common couter for int and fp registers */
 			int_param++;
 #endif
-		} else {
-			IR_ASSERT(0);
 		}
 		if (dst_reg != IR_REG_NONE) {
 			if (IR_IS_CONST_REF(arg) || src_reg == IR_REG_NONE) {
@@ -6233,7 +6191,8 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 				/* WIN64 calling convention use common couter for int and fp registers */
 				fp_param++;
 #endif
-			} else if (IR_IS_TYPE_FP(type)) {
+			} else {
+				IR_ASSERT(IR_IS_TYPE_FP(type));
 				if (fp_param < fp_reg_params_count) {
 					dst_reg = fp_reg_params[fp_param];
 				} else {
@@ -6244,8 +6203,6 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 				/* WIN64 calling convention use common couter for int and fp registers */
 				int_param++;
 #endif
-			} else {
-				IR_ASSERT(0);
 			}
 			if (dst_reg != IR_REG_NONE) {
 				if (IR_IS_CONST_REF(arg) || src_reg == IR_REG_NONE) {
@@ -6459,7 +6416,8 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			} else if (ctx->use_lists[def].count > 1) {
 				ir_emit_store(ctx, insn->type, def, IR_REG_INT_RET1);
 			}
-		} else if (IR_IS_TYPE_FP(insn->type)) {
+		} else {
+			IR_ASSERT(IR_IS_TYPE_FP(insn->type));
 			def_reg = IR_REG_NUM(ctx->regs[def][0]);
 #ifdef IR_REG_FP_RET1
 			if (def_reg != IR_REG_NONE) {
@@ -6475,8 +6433,6 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 #else
 			IR_ASSERT(0); // TODO: float/double return value
 #endif
-		} else {
-			IR_ASSERT(0);
 		}
 	}
 }
@@ -6614,6 +6570,8 @@ static bool ir_emit_guard_jcc(ir_ctx *ctx, uint32_t b, ir_ref def, uint8_t op, v
 			if (b == ctx->cfg_blocks_count || target != ir_skip_empty_next_blocks(ctx, b + 1)) {
 				if (int_cmp) {
 					switch (op) {
+						default:
+							IR_ASSERT(0 && "NIY binary op");
 						case IR_EQ:
 							|	jne =>target
 							break;
@@ -6644,12 +6602,11 @@ static bool ir_emit_guard_jcc(ir_ctx *ctx, uint32_t b, ir_ref def, uint8_t op, v
 						case IR_UGT:
 							|	jbe =>target
 							break;
-						default:
-							IR_ASSERT(0 && "NIY binary op");
-							break;
 					}
 				} else {
 					switch (op) {
+						default:
+							IR_ASSERT(0 && "NIY binary op");
 						case IR_EQ:
 							|	jne =>target
 							|	jp =>target
@@ -6672,9 +6629,6 @@ static bool ir_emit_guard_jcc(ir_ctx *ctx, uint32_t b, ir_ref def, uint8_t op, v
 							|	jp &addr
 							|	jbe =>target
 							break;
-						default:
-							IR_ASSERT(0 && "NIY binary op");
-							break;
 					}
 				}
 				|	jmp &addr
@@ -6687,6 +6641,8 @@ static bool ir_emit_guard_jcc(ir_ctx *ctx, uint32_t b, ir_ref def, uint8_t op, v
 		if (sizeof(void*) == 4 || IR_MAY_USE_32BIT_ADDR(target_addr)) {
 			if (int_cmp) {
 				switch (op) {
+					default:
+						IR_ASSERT(0 && "NIY binary op");
 					case IR_EQ:
 						|	jne &target_addr
 						break;
@@ -6717,12 +6673,11 @@ static bool ir_emit_guard_jcc(ir_ctx *ctx, uint32_t b, ir_ref def, uint8_t op, v
 					case IR_UGT:
 						|	jbe &target_addr
 						break;
-					default:
-						IR_ASSERT(0 && "NIY binary op");
-						break;
 				}
 			} else {
 				switch (op) {
+					default:
+						IR_ASSERT(0 && "NIY binary op");
 					case IR_EQ:
 						|	jne &target_addr
 						|	jp &target_addr
@@ -6745,9 +6700,6 @@ static bool ir_emit_guard_jcc(ir_ctx *ctx, uint32_t b, ir_ref def, uint8_t op, v
 						|	jp &addr
 						|	jbe &target_addr
 						break;
-					default:
-						IR_ASSERT(0 && "NIY binary op");
-						break;
 				}
 			}
 			|	jmp &addr
@@ -6757,6 +6709,8 @@ static bool ir_emit_guard_jcc(ir_ctx *ctx, uint32_t b, ir_ref def, uint8_t op, v
 
 	if (int_cmp) {
 		switch (op) {
+			default:
+				IR_ASSERT(0 && "NIY binary op");
 			case IR_EQ:
 				|	je &addr
 				break;
@@ -6787,12 +6741,11 @@ static bool ir_emit_guard_jcc(ir_ctx *ctx, uint32_t b, ir_ref def, uint8_t op, v
 			case IR_UGT:
 				|	ja &addr
 				break;
-			default:
-				IR_ASSERT(0 && "NIY binary op");
-				break;
 		}
 	} else {
 		switch (op) {
+			default:
+				IR_ASSERT(0 && "NIY binary op");
 			case IR_EQ:
 				|	jp >1
 				|	je &addr
@@ -6822,9 +6775,6 @@ static bool ir_emit_guard_jcc(ir_ctx *ctx, uint32_t b, ir_ref def, uint8_t op, v
 //			case IR_UGE: fprintf(stderr, "\tjae .LL%d\n", true_block); break;
 //			case IR_ULE: fprintf(stderr, "\tjbe .LL%d\n", true_block); break;
 //			case IR_UGT: fprintf(stderr, "\tja .LL%d\n", true_block); break;
-			default:
-				IR_ASSERT(0 && "NIY binary op");
-				break;
 		}
 	}
 	return 0;
@@ -7054,6 +7004,8 @@ static void ir_emit_lea(ir_ctx *ctx, ir_ref def, ir_type type, ir_reg base_reg, 
 		if (base_reg == IR_REG_NONE) {
 			if (!offset) {
 				switch (scale) {
+					default:
+						IR_ASSERT(0);
 					case 2:
 						if (ir_type_size[type] == 4) {
 							|	lea Rd(def_reg), dword [Rd(index_reg)*2]
@@ -7075,11 +7027,11 @@ static void ir_emit_lea(ir_ctx *ctx, ir_ref def, ir_type type, ir_reg base_reg, 
 							|	lea Ra(def_reg), aword [Ra(index_reg)*8]
 						}
 						break;
-					default:
-						IR_ASSERT(0);
 				}
 			} else {
 				switch (scale) {
+					default:
+						IR_ASSERT(0);
 					case 2:
 						if (ir_type_size[type] == 4) {
 							|	lea Rd(def_reg), dword [Rd(index_reg)*2+offset]
@@ -7101,13 +7053,13 @@ static void ir_emit_lea(ir_ctx *ctx, ir_ref def, ir_type type, ir_reg base_reg, 
 							|	lea Ra(def_reg), aword [Ra(index_reg)*8+offset]
 						}
 						break;
-					default:
-						IR_ASSERT(0);
 				}
 			}
 		} else {
 			if (!offset) {
 				switch (scale) {
+					default:
+						IR_ASSERT(0);
 					case 1:
 						if (ir_type_size[type] == sizeof(void*)) {
 							if (def_reg == base_reg) {
@@ -7149,11 +7101,11 @@ static void ir_emit_lea(ir_ctx *ctx, ir_ref def, ir_type type, ir_reg base_reg, 
 							|	lea Ra(def_reg), aword [Ra(base_reg)+Ra(index_reg)*8]
 						}
 						break;
-					default:
-						IR_ASSERT(0);
 				}
 			} else {
 				switch (scale) {
+					default:
+						IR_ASSERT(0);
 					case 1:
 						if (ir_type_size[type] == 4) {
 							|	lea Rd(def_reg), dword [Rd(base_reg)+Rd(index_reg)+offset]
@@ -7182,8 +7134,6 @@ static void ir_emit_lea(ir_ctx *ctx, ir_ref def, ir_type type, ir_reg base_reg, 
 							|	lea Ra(def_reg), aword [Ra(base_reg)+Ra(index_reg)*8+offset]
 						}
 						break;
-					default:
-						IR_ASSERT(0);
 				}
 			}
 		}
@@ -7479,26 +7429,22 @@ static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 			if (ctx->regs[ref][0] == IR_REG_NONE) {
 				ctx->regs[ref][0] = IR_REG_RAX;
 			}
-		} else if (IR_IS_TYPE_FP(type)) {
+		} else {
+			IR_ASSERT(IR_IS_TYPE_FP(type));
 			if (ctx->regs[ref][1] == IR_REG_NONE) {
 				ctx->regs[ref][1] = IR_REG_XMM0;
 			}
-		} else {
-			IR_ASSERT(0);
-			return 0;
 		}
 	} else if (from != 0) {
 		if (IR_IS_TYPE_INT(type)) {
 			if (ctx->regs[ref][0] == IR_REG_NONE) {
 				ctx->regs[ref][0] = IR_REG_RAX;
 			}
-		} else if (IR_IS_TYPE_FP(type)) {
+		} else {
+			IR_ASSERT(IR_IS_TYPE_FP(type));
 			if (ctx->regs[ref][1] == IR_REG_NONE) {
 				ctx->regs[ref][1] = IR_REG_XMM0;
 			}
-		} else {
-			IR_ASSERT(0);
-			return 0;
 		}
 	}
 	return 1;
