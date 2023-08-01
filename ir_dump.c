@@ -670,8 +670,19 @@ void ir_dump_codegen(const ir_ctx *ctx, FILE *f)
 		if (insn->op == IR_END || insn->op == IR_LOOP_END) {
 			uint32_t succ;
 
-			IR_ASSERT(bb->successors_count == 1);
-			succ = ctx->cfg_edges[bb->successors];
+			if (bb->successors_count == 1) {
+				succ = ctx->cfg_edges[bb->successors];
+			} else {
+				/* END may have a fake control edge to ENTRY */
+				IR_ASSERT(bb->successors_count == 2);
+				succ = ctx->cfg_edges[bb->successors];
+				if (ctx->ir_base[ctx->cfg_blocks[succ].start].op == IR_ENTRY) {
+					succ = ctx->cfg_edges[bb->successors + 1];
+				} else {
+					uint32_t fake_succ = ctx->cfg_edges[bb->successors + 1];
+					IR_ASSERT(ctx->ir_base[ctx->cfg_blocks[fake_succ].start].op == IR_ENTRY);
+				}
+			}
 			if (succ != b + 1) {
 				fprintf(f, "\t# GOTO BB%d\n", succ);
 			}
