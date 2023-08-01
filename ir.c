@@ -1543,6 +1543,9 @@ ir_ref _ir_PHI_2(ir_ctx *ctx, ir_ref src1, ir_ref src2)
 
 	IR_ASSERT(ctx->control);
 	IR_ASSERT(ctx->ir_base[ctx->control].op == IR_MERGE || ctx->ir_base[ctx->control].op == IR_LOOP_BEGIN);
+	if (src1 == src2) {
+		return src1;
+	}
 	return ir_emit3(ctx, IR_OPTX(IR_PHI, type, 3), ctx->control, src1, src2);
 }
 
