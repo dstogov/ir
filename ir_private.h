@@ -1137,6 +1137,7 @@ typedef struct _ir_reg_alloc_data {
 	int32_t unused_slot_4;
 	int32_t unused_slot_2;
 	int32_t unused_slot_1;
+	ir_live_interval **handled;
 } ir_reg_alloc_data;
 
 int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type, ir_reg_alloc_data *data);

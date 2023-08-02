@@ -2377,13 +2377,21 @@ int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type, ir_reg_alloc_data *dat
 	int32_t ret;
 	uint8_t size = ir_type_size[type];
 
-	if (size == 8) {
+	IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8);
+	if (data->handled && data->handled[size]) {
+		ret = data->handled[size]->stack_spill_pos;
+		data->handled[size] = data->handled[size]->list_next;
+	} else if (size == 8) {
 		ret = ctx->stack_frame_size;
 		ctx->stack_frame_size += 8;
 	} else if (size == 4) {
 		if (data->unused_slot_4) {
 			ret = data->unused_slot_4;
 			data->unused_slot_4 = 0;
+	    } else if (data->handled && data->handled[8]) {
+			ret = data->handled[8]->stack_spill_pos;
+			data->handled[8] = data->handled[8]->list_next;
+			data->unused_slot_4 = ret + 4;
 		} else {
 			ret = ctx->stack_frame_size;
 			if (sizeof(void*) == 8) {
@@ -2401,6 +2409,15 @@ int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type, ir_reg_alloc_data *dat
 			ret = data->unused_slot_4;
 			data->unused_slot_2 = data->unused_slot_4 + 2;
 			data->unused_slot_4 = 0;
+	    } else if (data->handled && data->handled[4]) {
+			ret = data->handled[4]->stack_spill_pos;
+			data->handled[4] = data->handled[4]->list_next;
+			data->unused_slot_2 = ret + 2;
+	    } else if (data->handled && data->handled[8]) {
+			ret = data->handled[8]->stack_spill_pos;
+			data->handled[8] = data->handled[8]->list_next;
+			data->unused_slot_2 = ret + 2;
+			data->unused_slot_4 = ret + 4;
 		} else {
 			ret = ctx->stack_frame_size;
 			data->unused_slot_2 = ctx->stack_frame_size + 2;
@@ -2425,6 +2442,21 @@ int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type, ir_reg_alloc_data *dat
 			data->unused_slot_1 = data->unused_slot_4 + 1;
 			data->unused_slot_2 = data->unused_slot_4 + 2;
 			data->unused_slot_4 = 0;
+	    } else if (data->handled && data->handled[2]) {
+			ret = data->handled[2]->stack_spill_pos;
+			data->handled[2] = data->handled[2]->list_next;
+			data->unused_slot_1 = ret + 1;
+	    } else if (data->handled && data->handled[4]) {
+			ret = data->handled[4]->stack_spill_pos;
+			data->handled[4] = data->handled[4]->list_next;
+			data->unused_slot_1 = ret + 1;
+			data->unused_slot_2 = ret + 2;
+	    } else if (data->handled && data->handled[8]) {
+			ret = data->handled[8]->stack_spill_pos;
+			data->handled[8] = data->handled[8]->list_next;
+			data->unused_slot_1 = ret + 1;
+			data->unused_slot_2 = ret + 2;
+			data->unused_slot_4 = ret + 4;
 		} else {
 			ret = ctx->stack_frame_size;
 			data->unused_slot_1 = ctx->stack_frame_size + 1;
@@ -3301,6 +3333,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 	data.unused_slot_4 = 0;
 	data.unused_slot_2 = 0;
 	data.unused_slot_1 = 0;
+	data.handled = NULL;
 
 	while (vars) {
 		ir_insn *insn = &ctx->ir_base[vars];
@@ -3484,7 +3517,9 @@ static int ir_linear_scan(ir_ctx *ctx)
 		if (unhandled) {
 			uint8_t size;
 			ir_live_interval *handled[9] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+			ir_live_interval *old;
 
+			data.handled = handled;
 			active = NULL;
 			while (unhandled) {
 				ival = unhandled;
@@ -3505,32 +3540,44 @@ static int ir_linear_scan(ir_ctx *ctx)
 						}
 						size = ir_type_size[other->type];
 						IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8);
-						other->list_next = handled[size];
-						handled[size] = other;
+						old = handled[size];
+						while (old) {
+							if (old->stack_spill_pos == other->stack_spill_pos) {
+								break;
+							}
+							old = old->list_next;
+						}
+						if (!old) {
+							other->list_next = handled[size];
+							handled[size] = other;
+						}
 					} else {
 						prev = other;
 					}
 					other = prev ? prev->list_next : active;
 				}
 
-				size = ir_type_size[ival->type];
-				IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8);
-				if (handled[size] != NULL) {
-					ival->stack_spill_pos = handled[size]->stack_spill_pos;
-					handled[size] = handled[size]->list_next;
-				} else {
-					ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type, &data);
-				}
+				ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type, &data);
 				if (unhandled && ival->end > unhandled->range.start) {
 					ival->list_next = active;
 					active = ival;
 				} else {
 					size = ir_type_size[ival->type];
 					IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8);
-					ival->list_next = handled[size];
-					handled[size] = ival;
+					old = handled[size];
+					while (old) {
+						if (old->stack_spill_pos == ival->stack_spill_pos) {
+							break;
+						}
+						old = old->list_next;
+					}
+					if (!old) {
+						ival->list_next = handled[size];
+						handled[size] = ival;
+					}
 				}
 			}
+			data.handled = NULL;
 		}
 	}
 

@@ -4754,6 +4754,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	data.ra_data.unused_slot_4 = 0;
 	data.ra_data.unused_slot_2 = 0;
 	data.ra_data.unused_slot_1 = 0;
+	data.ra_data.handled = NULL;
 	data.rodata_label = 0;
 	data.jmp_table_label = 0;
 	ctx->data = &data;
