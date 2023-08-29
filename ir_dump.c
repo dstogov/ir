@@ -678,9 +678,11 @@ void ir_dump_codegen(const ir_ctx *ctx, FILE *f)
 				succ = ctx->cfg_edges[bb->successors];
 				if (ctx->ir_base[ctx->cfg_blocks[succ].start].op == IR_ENTRY) {
 					succ = ctx->cfg_edges[bb->successors + 1];
+#ifdef IR_DEBUG
 				} else {
 					uint32_t fake_succ = ctx->cfg_edges[bb->successors + 1];
 					IR_ASSERT(ctx->ir_base[ctx->cfg_blocks[fake_succ].start].op == IR_ENTRY);
+#endif
 				}
 			}
 			if (succ != b + 1) {
