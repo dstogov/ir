@@ -1643,7 +1643,7 @@ static void ir_add_phi_move(ir_ctx *ctx, uint32_t b, ir_ref from, ir_ref to)
 	}
 }
 
-#ifndef _WIN32
+#ifdef _GNU_SOURCE
 static int ir_block_cmp(const void *b1, const void *b2, void *data)
 #else
 static int ir_block_cmp(void *data, const void *b1, const void *b2)
@@ -1836,10 +1836,12 @@ int ir_coalesce(ir_ctx *ctx)
 		}
 	}
 
-#ifndef _WIN32
-# define qsort_fn qsort_r
+#ifdef _WIN32
+# define qsort_fn(base, num, width, func, data) qsort_s(base, num, width, func, data)
+#elif defined(_GNU_SOURCE)
+# define qsort_fn(base, num, width, func, data) qsort_r(base, num, width, func, data)
 #else
-# define qsort_fn qsort_s
+# define qsort_fn(base, num, width, func, data) qsort_r(base, num, width, data, func)
 #endif
 	qsort_fn(blocks.l.a.refs, ir_worklist_len(&blocks), sizeof(ir_ref), ir_block_cmp, ctx);
 
