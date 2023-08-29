@@ -1643,10 +1643,10 @@ static void ir_add_phi_move(ir_ctx *ctx, uint32_t b, ir_ref from, ir_ref to)
 	}
 }
 
-#ifdef _GNU_SOURCE
-static int ir_block_cmp(const void *b1, const void *b2, void *data)
-#else
+#if defined(_WIN32) || defined(__APPLE__) || defined(__FreeBSD__)
 static int ir_block_cmp(void *data, const void *b1, const void *b2)
+#else
+static int ir_block_cmp(const void *b1, const void *b2, void *data)
 #endif
 {
 	ir_ctx *ctx = data;
@@ -1838,10 +1838,10 @@ int ir_coalesce(ir_ctx *ctx)
 
 #ifdef _WIN32
 # define qsort_fn(base, num, width, func, data) qsort_s(base, num, width, func, data)
-#elif defined(_GNU_SOURCE)
-# define qsort_fn(base, num, width, func, data) qsort_r(base, num, width, func, data)
-#else
+#elif defined(__APPLE__) || defined(__FreeBSD__)
 # define qsort_fn(base, num, width, func, data) qsort_r(base, num, width, data, func)
+#else
+# define qsort_fn(base, num, width, func, data) qsort_r(base, num, width, func, data)
 #endif
 	qsort_fn(blocks.l.a.refs, ir_worklist_len(&blocks), sizeof(ir_ref), ir_block_cmp, ctx);
 
