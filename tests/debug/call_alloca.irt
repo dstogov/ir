@@ -52,7 +52,7 @@ test:
 	movb $0xa, 5(%rdi)
 	movb $0, 6(%rdi)
 	movl $0x2a, %esi
-	movabsq $_IO_printf, %rax
+	movabsq $printf, %rax
 	callq *%rax
 	movq %rbp, %rsp
 	popq %rbp

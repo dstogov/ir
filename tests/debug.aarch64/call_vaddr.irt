@@ -57,7 +57,7 @@ test:
 	strb w1, [x0, #5]
 	strb wzr, [x0, #6]
 	movz w1, #0x2a
-	bl _IO_printf
+	bl printf
 	ldp x29, x30, [sp], #0x20
 	ret
 

@@ -32,7 +32,7 @@ test:
 	mov w2, w3
 	mov w3, w16
 	adr x0, .L1
-	bl _IO_printf
+	bl printf
 	add w0, w0, w19
 	ldr x19, [x29, #0x18]
 	ldp x29, x30, [sp], #0x20

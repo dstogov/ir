@@ -77,7 +77,7 @@ test:
 	add w20, w19, w0
 	mov w1, w19
 	adr x0, .L3
-	bl _IO_printf
+	bl printf
 	mov w0, w19
 	mov w19, w20
 	b .L1

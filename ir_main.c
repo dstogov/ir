@@ -453,12 +453,20 @@ int main(int argc, char **argv)
 
 		if (entry) {
 			if (dump_asm) {
+				ir_ref i;
+				ir_insn *insn;
+
 				ir_disasm_add_symbol("test", (uintptr_t)entry, size);
-#ifdef _WIN32
-				/* Quick workaraund to prevent *.irt tests failures */
-				// TODO: try to find a general solution ???
-				ir_disasm_add_symbol("printf", (uintptr_t)(void*)printf, sizeof(void*));
-#endif
+
+				for (i = IR_UNUSED + 1, insn = ctx.ir_base - i; i < ctx.consts_count; i++, insn--) {
+					if (insn->op == IR_FUNC) {
+						const char *name = ir_get_str(&ctx, insn->val.i32);
+						void *addr = ir_resolve_sym_name(name);
+
+						ir_disasm_add_symbol(name, (uintptr_t)addr, sizeof(void*));
+					}
+				}
+
 				ir_disasm("test", entry, size, 0, &ctx, stderr);
 			}
 			if (dump_size) {

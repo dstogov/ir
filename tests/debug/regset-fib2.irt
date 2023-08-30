@@ -88,11 +88,11 @@ test:
 	subsd %xmm1, %xmm0
 	movsd %xmm0, 8(%rsp)
 	leaq .L5(%rip), %rdi
-	movabsq $_IO_printf, %rax
+	movabsq $printf, %rax
 	callq *%rax
 	leaq .L5(%rip), %rdi
 	movsd 8(%rsp), %xmm0
-	movabsq $_IO_printf, %rax
+	movabsq $printf, %rax
 	callq *%rax
 	movsd 8(%rsp), %xmm1
 	jmp .L1

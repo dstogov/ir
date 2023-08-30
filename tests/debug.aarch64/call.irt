@@ -22,7 +22,7 @@ test:
 	mov x29, sp
 	adr x0, .L1
 	movz w1, #0x2a
-	bl _IO_printf
+	bl printf
 	ldp x29, x30, [sp], #0x10
 	ret
 .rodata

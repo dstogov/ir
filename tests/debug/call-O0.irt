@@ -21,7 +21,7 @@ test:
 	subq $8, %rsp
 	leaq .L1(%rip), %rdi
 	movl $0x2a, %esi
-	movabsq $_IO_printf, %rax
+	movabsq $printf, %rax
 	callq *%rax
 	movl %eax, (%rsp)
 	movl (%rsp), %eax

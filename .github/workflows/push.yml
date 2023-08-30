@@ -84,6 +84,17 @@ jobs:
             # FIXME: For some reason some of the object files are rebuilt
             make CC=gcc CXX=g++-12 TARGET=aarch64 test-ci
 
+  MACOS_x86_64:
+    runs-on: macos-11
+    steps:
+      - uses: actions/checkout@v3
+      - name: brew
+        run: brew install capstone
+      - name: make
+        run: make TARGET=x86_64 all
+      - name: test
+        run: make CXX=g++-12 TARGET=x86_64 test-ci
+
   Windows:
     strategy:
       matrix:

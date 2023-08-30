@@ -31,7 +31,7 @@ test:
 	movl %edx, %esi
 	movl %eax, %edx
 	leaq .L1(%rip), %rdi
-	movabsq $_IO_printf, %rax
+	movabsq $printf, %rax
 	callq *%rax
 	addl %ebx, %eax
 	movq (%rsp), %rbx

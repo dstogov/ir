@@ -25,7 +25,7 @@ test:
 	movsd %xmm1, 8(%rsp)
 	movsd %xmm2, 0x10(%rsp)
 	leaq .L1(%rip), %rdi
-	movabsq $_IO_printf, %rax
+	movabsq $printf, %rax
 	callq *%rax
 	movsd (%rsp), %xmm1
 	addsd %xmm1, %xmm1

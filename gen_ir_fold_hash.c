@@ -10,6 +10,8 @@
 #include "ir.h"
 #include <string.h>
 
+#include "ir_strtab.c"
+
 #define MAX_RULES 2048
 #define MAX_SLOTS (MAX_RULES * 4)
 

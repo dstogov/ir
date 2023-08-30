@@ -37,7 +37,7 @@ test:
 	movq $9, 0x18(%rsp)
 	movabsq $0x100000000, %rax
 	movq %rax, 0x20(%rsp)
-	movabsq $_IO_printf, %rax
+	movabsq $printf, %rax
 	callq *%rax
 	addq $0x28, %rsp
 	retq
