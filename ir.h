@@ -727,9 +727,9 @@ int  ir_disasm(const char *name,
                FILE       *f);
 
 /* Linux perf interface (implementation in ir_perf.c) */
-void ir_perf_jitdump_open(void);
-void ir_perf_jitdump_close(void);
-void ir_perf_jitdump_register(const char *name, const void *start, size_t size);
+int ir_perf_jitdump_open(void);
+int ir_perf_jitdump_close(void);
+int ir_perf_jitdump_register(const char *name, const void *start, size_t size);
 void ir_perf_map_register(const char *name, const void *start, size_t size);
 
 /* GDB JIT interface (implementation in ir_gdb.c) */

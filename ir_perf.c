@@ -97,7 +97,7 @@ static uint64_t ir_perf_timestamp(void)
 	return ((uint64_t)ts.tv_sec * 1000000000) + ts.tv_nsec;
 }
 
-void ir_perf_jitdump_open(void)
+int ir_perf_jitdump_open(void)
 {
 	char filename[64];
 	int fd, ret;
@@ -106,7 +106,7 @@ void ir_perf_jitdump_open(void)
 
 	sprintf(filename, "/tmp/jit-%d.dump", getpid());
 	if (!ir_perf_timestamp()) {
-		return;
+		return 0;
 	}
 
 #if defined(__linux__)
@@ -118,7 +118,7 @@ void ir_perf_jitdump_open(void)
 	size_t pathlen = sizeof(path);
 	int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1};
 	if (sysctl(mib, 4, path, &pathlen, NULL, 0) == -1) {
-		return;
+		return 0;
 	}
 	fd = open(path, O_RDONLY);
 #elif defined(__sun)
@@ -127,7 +127,7 @@ void ir_perf_jitdump_open(void)
 	char path[PATH_MAX];
 	if (find_path(B_APP_IMAGE_SYMBOL, B_FIND_PATH_IMAGE_PATH,
 		NULL, path, sizeof(path)) != B_OK) {
-		return;
+		return 0;
 	}
 
 	fd = open(path, O_RDONLY);
@@ -135,7 +135,7 @@ void ir_perf_jitdump_open(void)
 	fd = -1;
 #endif
 	if (fd < 0) {
-		return;
+		return 0;
 	}
 
 	ret = read(fd, &elf_hdr, sizeof(elf_hdr));
@@ -146,12 +146,12 @@ void ir_perf_jitdump_open(void)
 	    elf_hdr.emagic[1] != 'E' ||
 	    elf_hdr.emagic[2] != 'L' ||
 	    elf_hdr.emagic[3] != 'F') {
-		return;
+		return 0;
 	}
 
 	jitdump_fd = open(filename, O_CREAT | O_TRUNC | O_RDWR, 0666);
 	if (jitdump_fd < 0) {
-		return;
+		return 0;
 	}
 
 	jitdump_mem = mmap(NULL,
@@ -162,7 +162,7 @@ void ir_perf_jitdump_open(void)
 	if (jitdump_mem == MAP_FAILED) {
 		close(jitdump_fd);
 		jitdump_fd = -1;
-		return;
+		return 0;
 	}
 
 	memset(&jit_hdr, 0, sizeof(jit_hdr));
@@ -173,27 +173,35 @@ void ir_perf_jitdump_open(void)
 	jit_hdr.process_id      = getpid();
 	jit_hdr.time_stamp      = ir_perf_timestamp();
 	jit_hdr.flags           = 0;
-	write(jitdump_fd, &jit_hdr, sizeof(jit_hdr));
+	if (write(jitdump_fd, &jit_hdr, sizeof(jit_hdr)) != sizeof(jit_hdr)) {
+		return 0;
+	}
+	return 1;
 }
 
-void ir_perf_jitdump_close(void)
+int ir_perf_jitdump_close(void)
 {
+	int ret = 1;
+
 	if (jitdump_fd >= 0) {
 		ir_perf_jitdump_record rec;
 
 		rec.event      = IR_PERF_JITDUMP_RECORD_CLOSE;
 		rec.size       = sizeof(rec);
 		rec.time_stamp = ir_perf_timestamp();
-		write(jitdump_fd, &rec, sizeof(rec));
+		if (write(jitdump_fd, &rec, sizeof(rec)) != sizeof(rec)) {
+			ret = 0;
+		}
 		close(jitdump_fd);
 
 		if (jitdump_mem != MAP_FAILED) {
 			munmap(jitdump_mem, sysconf(_SC_PAGESIZE));
 		}
 	}
+	return ret;
 }
 
-void ir_perf_jitdump_register(const char *name, const void *start, size_t size)
+int ir_perf_jitdump_register(const char *name, const void *start, size_t size)
 {
 	if (jitdump_fd >= 0) {
 		static uint64_t id = 1;
@@ -231,10 +239,13 @@ void ir_perf_jitdump_register(const char *name, const void *start, size_t size)
 		rec.code_size      = (uint64_t)size;
 		rec.code_id        = id++;
 
-		write(jitdump_fd, &rec, sizeof(rec));
-		write(jitdump_fd, name, len + 1);
-		write(jitdump_fd, start, size);
+		if (write(jitdump_fd, &rec, sizeof(rec)) != sizeof(rec)
+		 || write(jitdump_fd, name, len + 1) < 0
+		 || write(jitdump_fd, start, size) < 0) {
+			return 0;
+		}
 	}
+	return 1;
 }
 
 void ir_perf_map_register(const char *name, const void *start, size_t size)
