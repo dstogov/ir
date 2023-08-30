@@ -1440,13 +1440,28 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|	ASM_REG_REG_IMM_OP subs, type, def_reg, op1_reg, val
 				break;
 			case IR_OR:
-				|	ASM_REG_REG_IMM_OP orr, type, def_reg, op1_reg, val
+				if (ir_type_size[type] == 8) {
+					uint64_t val = ctx->ir_base[op2].val.u64;
+					|	ASM_REG_REG_IMM_OP orr, type, def_reg, op1_reg, val
+				} else {
+					|	ASM_REG_REG_IMM_OP orr, type, def_reg, op1_reg, val
+				}
 				break;
 			case IR_AND:
-				|	ASM_REG_REG_IMM_OP and, type, def_reg, op1_reg, val
+				if (ir_type_size[type] == 8) {
+					uint64_t val = ctx->ir_base[op2].val.u64;
+					|	ASM_REG_REG_IMM_OP and, type, def_reg, op1_reg, val
+				} else {
+					|	ASM_REG_REG_IMM_OP and, type, def_reg, op1_reg, val
+				}
 				break;
 			case IR_XOR:
-				|	ASM_REG_REG_IMM_OP eor, type, def_reg, op1_reg, val
+				if (ir_type_size[type] == 8) {
+					uint64_t val = ctx->ir_base[op2].val.u64;
+					|	ASM_REG_REG_IMM_OP eor, type, def_reg, op1_reg, val
+				} else {
+					|	ASM_REG_REG_IMM_OP eor, type, def_reg, op1_reg, val
+				}
 				break;
 		}
 	}
