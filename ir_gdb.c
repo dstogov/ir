@@ -14,6 +14,7 @@
 
 #ifdef __FreeBSD__
 # include <sys/types.h>
+# include <sys/sysctl.h>
 # include <libutil.h>
 #endif
 
