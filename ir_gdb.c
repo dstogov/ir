@@ -12,6 +12,11 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#ifdef __FreeBSD__
+# include <sys/types.h>
+# include <libutil.h>
+#endif
+
 #include "ir.h"
 #include "ir_private.h"
 #include "ir_elf.h"
