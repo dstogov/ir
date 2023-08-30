@@ -40,7 +40,7 @@ test:
 	str d31, [sp]
 	fmov d31, xzr
 	str d31, [sp, #8]
-	bl _IO_printf
+	bl printf
 	add sp, sp, #0x10
 	ldp x29, x30, [sp], #0x10
 	ret

@@ -20,7 +20,7 @@ x86_64
 test:
 	leaq .L1(%rip), %rdi
 	movl $0x2a, %esi
-	movabsq $_IO_printf, %rax
+	movabsq $printf, %rax
 	jmpq *%rax
 .rodata
 .L1:

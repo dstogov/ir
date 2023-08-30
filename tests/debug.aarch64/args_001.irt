@@ -41,7 +41,7 @@ test:
 	str x16, [sp, #8]
 	movz x16, #0x1, lsl #32
 	str x16, [sp, #0x10]
-	bl _IO_printf
+	bl printf
 	add sp, sp, #0x20
 	ldp x29, x30, [sp], #0x10
 	ret

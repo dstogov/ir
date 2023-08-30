@@ -76,7 +76,7 @@ test:
 	leal (%rbx, %rax), %ebp
 	movl %ebx, %esi
 	leaq .L3(%rip), %rdi
-	movabsq $_IO_printf, %rax
+	movabsq $printf, %rax
 	callq *%rax
 	movl %ebx, %eax
 	movl %ebp, %ebx

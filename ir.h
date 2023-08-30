@@ -714,6 +714,9 @@ int32_t ir_get_spill_slot_offset(ir_ctx *ctx, ir_ref ref);
 int ir_match(ir_ctx *ctx);
 void *ir_emit_code(ir_ctx *ctx, size_t *size);
 
+/* Target address resolution (implementation in ir_emit.c) */
+void *ir_resolve_sym_name(const char *name);
+
 /* Target CPU disassembler (implementation in ir_disasm.c) */
 int  ir_disasm_init(void);
 void ir_disasm_free(void);

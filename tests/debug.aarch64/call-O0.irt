@@ -22,7 +22,7 @@ test:
 	mov x29, sp
 	adr x0, .L1
 	movz w1, #0x2a
-	bl _IO_printf
+	bl printf
 	str w0, [x29, #0x10]
 	ldr w0, [x29, #0x10]
 	ldp x29, x30, [sp], #0x20

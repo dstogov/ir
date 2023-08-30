@@ -91,10 +91,10 @@ test:
 	fsub d0, d1, d0
 	str d0, [x29, #0x10]
 	adr x0, .L5
-	bl _IO_printf
+	bl printf
 	adr x0, .L5
 	ldr d0, [x29, #0x10]
-	bl _IO_printf
+	bl printf
 	b .L1
 .L2:
 	mov w0, wzr

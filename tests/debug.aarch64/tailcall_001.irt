@@ -20,7 +20,7 @@ aarch64
 test:
 	adr x0, .L1
 	movz w1, #0x2a
-	b _IO_printf
+	b printf
 .rodata
 	.db 0x1f, 0x20, 0x03, 0xd5
 .L1:

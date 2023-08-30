@@ -22,7 +22,7 @@ test:
 	movl %edi, %edx
 	movl %edx, %esi
 	leaq .L1(%rip), %rdi
-	movabsq $_IO_printf, %rax
+	movabsq $printf, %rax
 	callq *%rax
 	addq $8, %rsp
 	retq

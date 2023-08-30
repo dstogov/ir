@@ -260,7 +260,7 @@ static bool ir_is_same_mem_var(const ir_ctx *ctx, ir_ref r1, int32_t offset)
 	return o1 == offset;
 }
 
-static void *ir_resolve_sym_name(const char *name)
+void *ir_resolve_sym_name(const char *name)
 {
 	void *handle = NULL;
 	void *addr;
