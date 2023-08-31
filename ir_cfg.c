@@ -1137,6 +1137,14 @@ int ir_schedule_blocks(ir_ctx *ctx)
 				pos += count + 1;
 			}
 		}
+
+		if (ctx->cfg_map) {
+			ir_ref i;
+
+			for (i = IR_UNUSED + 1; i < ctx->insns_count; i++) {
+				ctx->cfg_map[i] = map[ctx->cfg_map[i]];
+			}
+		}
 	}
 
 	ir_mem_free(list);

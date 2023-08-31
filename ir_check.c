@@ -68,6 +68,24 @@ static bool ir_check_input_list(const ir_ctx *ctx, ir_ref from, ir_ref to)
 	return 0;
 }
 
+static bool ir_check_domination(const ir_ctx *ctx, ir_ref def, ir_ref use)
+{
+	uint32_t b1 = ctx->cfg_map[def];
+	uint32_t b2 = ctx->cfg_map[use];
+	ir_block *blocks = ctx->cfg_blocks;
+	uint32_t b1_depth = blocks[b1].dom_depth;
+	const ir_block *bb2 = &blocks[b2];
+
+	if (b1 == b2) {
+		return def < use;
+	}
+	while (bb2->dom_depth > b1_depth) {
+		b2 = bb2->dom_parent;
+		bb2 = &blocks[b2];
+	}
+	return b1 == b2;
+}
+
 bool ir_check(const ir_ctx *ctx)
 {
 	ir_ref i, j, n, *p, use;
@@ -165,6 +183,13 @@ bool ir_check(const ir_ctx *ctx)
 										}
 										break;
 								}
+							}
+							if ((ctx->flags & IR_LINEAR)
+							 && ctx->cfg_map
+							 && insn->op != IR_PHI
+							 && !ir_check_domination(ctx, use, i)) {
+								fprintf(stderr, "ir_base[%d].ops[%d] -> %d, %d doesn't dominate %d\n", i, j, use, use, i);
+								ok = 0;
 							}
 							break;
 						case IR_OPND_CONTROL:
@@ -331,6 +356,9 @@ bool ir_check(const ir_ctx *ctx)
 		insn += n;
 	}
 
+//	if (!ok) {
+//		ir_dump_codegen(ctx, stderr);
+//	}
 	IR_ASSERT(ok);
 	return ok;
 }
