@@ -3202,8 +3202,6 @@ static void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg op2_reg = ctx->regs[def][2];
 	int32_t offset = 0;
 
-	IR_ASSERT(def_reg != IR_REG_NONE);
-
 	if (op1_reg != IR_REG_NONE && IR_REG_SPILLED(op1_reg)) {
 		op1_reg = IR_REG_NUM(op1_reg);
 		ir_emit_load(ctx, type, op1_reg, op1);
@@ -3284,19 +3282,27 @@ static void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 
 	if (insn->op == IR_MUL || insn->op == IR_MUL_OV || insn->op == IR_DIV) {
-		if (def_reg != IR_REG_RAX) {
-			if (def_reg != IR_REG_NONE) {
+		if (def_reg != IR_REG_NONE) {
+			if (def_reg != IR_REG_RAX) {
 				ir_emit_mov(ctx, type, def_reg, IR_REG_RAX);
-			} else {
-				ir_emit_store(ctx, type, def, IR_REG_RAX);
 			}
+			if (IR_REG_SPILLED(ctx->regs[def][0])) {
+				ir_emit_store(ctx, type, def, def_reg);
+			}
+		} else {
+			ir_emit_store(ctx, type, def, IR_REG_RAX);
 		}
 	} else {
 		IR_ASSERT(insn->op == IR_MOD);
 		if (ir_type_size[type] == 1) {
 			if (def_reg != IR_REG_NONE) {
 				|	mov al, ah
-				|	mov Rb(def_reg), al
+				if (def_reg != IR_REG_RAX) {
+					|	mov Rb(def_reg), al
+				}
+				if (IR_REG_SPILLED(ctx->regs[def][0])) {
+					ir_emit_store(ctx, type, def, def_reg);
+				}
 			} else {
 				ir_reg fp;
 				int32_t offset = ir_ref_spill_slot(ctx, def, &fp);
@@ -3305,14 +3311,16 @@ static void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 		} else if (def_reg != IR_REG_RDX) {
 			if (def_reg != IR_REG_NONE) {
-				ir_emit_mov(ctx, type, def_reg, IR_REG_RDX);
+				if (def_reg != IR_REG_RDX) {
+					ir_emit_mov(ctx, type, def_reg, IR_REG_RDX);
+				}
+				if (IR_REG_SPILLED(ctx->regs[def][0])) {
+					ir_emit_store(ctx, type, def, def_reg);
+				}
 			} else {
 				ir_emit_store(ctx, type, def, IR_REG_RDX);
 			}
 		}
-	}
-	if (IR_REG_SPILLED(ctx->regs[def][0])) {
-		ir_emit_store(ctx, type, def, def_reg);
 	}
 }
 
