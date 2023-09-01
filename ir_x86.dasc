@@ -7164,6 +7164,14 @@ static void ir_emit_tls(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |	mov Ra(reg), aword [0x2c]
 |	mov Ra(reg), aword [Ra(reg)+insn->op2]
 |	mov Ra(reg), aword [Ra(reg)+insn->op3]
+|.elif X64APPLE
+|	gs
+||	if (!insn->op3) {
+|		mov Ra(reg), aword [insn->op2]
+||	} else {
+|		mov Ra(reg), aword [insn->op2]
+|		mov Ra(reg), aword [Ra(reg)+insn->op3]
+||	}
 |.elif X64
 |	fs
 ||	if (!insn->op3) {
