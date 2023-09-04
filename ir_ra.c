@@ -3778,6 +3778,14 @@ static void assign_regs(ir_ctx *ctx)
 										/* Spilled PHI var is passed through memory */
 										reg = IR_REG_NONE;
 									}
+								} else if (use_pos->hint_ref < 0) {
+									/* Force spill load */
+									// TODO: Find a better solution ???
+									if (top_ival->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL) {
+										reg |= IR_REG_SPILL_SPECIAL;
+									} else {
+										reg |= IR_REG_SPILL_LOAD;
+									}
 								} else {
 									/* reuse register without spill load */
 								}
