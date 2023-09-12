@@ -6259,16 +6259,50 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 									|	lea Ra(dst_reg), aword [=>label]
 									continue;
 								}
-							} else if (ir_type_size[type] == 1) {
-								type = IR_ADDR;
+							}
+							if (type == IR_I8 || type == IR_I16) {
+								type = IR_I32;
+							} else if (type == IR_U8 || type == IR_U16) {
+								type = IR_U32;
+							}
+							ir_emit_load(ctx, type, dst_reg, arg);
+						} else {
+							ir_reg fp;
+							int32_t offset = ir_ref_spill_slot(ctx, arg, &fp);
+
+							if (ir_type_size[type] > 2) {
+								ir_emit_load_mem_int(ctx, type, dst_reg, fp, offset);
+							} else if (ir_type_size[type] == 2) {
+								if (type == IR_I16) {
+									if (fp != IR_REG_NONE) {
+										|	movsx Rd(dst_reg), word [Ra(fp)+offset]
+									} else {
+										|	movsx Rd(dst_reg), word [offset]
+									}
+								} else {
+									if (fp != IR_REG_NONE) {
+										|	movzx Rd(dst_reg), word [Ra(fp)+offset]
+									} else {
+										|	movzx Rd(dst_reg), word [offset]
+									}
+								}
+							} else {
+								IR_ASSERT(ir_type_size[type] == 1);
+								if (type == IR_I8) {
+									if (fp != IR_REG_NONE) {
+										|	movsx Rd(dst_reg), byte [Ra(fp)+offset]
+									} else {
+										|	movsx Rd(dst_reg), byte [offset]
+									}
+								} else {
+									if (fp != IR_REG_NONE) {
+										|	movzx Rd(dst_reg), byte [Ra(fp)+offset]
+									} else {
+										|	movzx Rd(dst_reg), byte [offset]
+									}
+								}
 							}
 						}
-						if (type == IR_I8 || type == IR_I16) {
-							type = IR_I32;
-						} else if (type == IR_U8 || type == IR_U16) {
-							type = IR_U32;
-						}
-						ir_emit_load(ctx, type, dst_reg, arg);
 					} else {
 						ir_emit_load(ctx, type, dst_reg, arg);
 					}
