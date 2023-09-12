@@ -3653,7 +3653,7 @@ static void assign_regs(ir_ctx *ctx)
 	ir_ref i;
 	ir_live_interval *ival, *top_ival;
 	ir_use_pos *use_pos;
-	int8_t reg;
+	int8_t reg, old_reg;
 	ir_ref ref;
 	ir_regset used_regs = 0;
 
@@ -3778,7 +3778,10 @@ static void assign_regs(ir_ctx *ctx)
 										/* Spilled PHI var is passed through memory */
 										reg = IR_REG_NONE;
 									}
-								} else if (use_pos->hint_ref < 0) {
+								} else if (use_pos->hint_ref < 0
+										&& ctx->use_lists[-use_pos->hint_ref].count > 1
+										&& (old_reg = ir_get_alocated_reg(ctx, -use_pos->hint_ref, use_pos->op_num)) != IR_REG_NONE
+										&& (old_reg & (IR_REG_SPILL_SPECIAL|IR_REG_SPILL_LOAD))) {
 									/* Force spill load */
 									// TODO: Find a better solution ???
 									if (top_ival->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL) {
@@ -3786,6 +3789,7 @@ static void assign_regs(ir_ctx *ctx)
 									} else {
 										reg |= IR_REG_SPILL_LOAD;
 									}
+									IR_ASSERT(reg == old_reg);
 								} else {
 									/* reuse register without spill load */
 								}
