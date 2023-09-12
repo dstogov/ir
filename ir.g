@@ -313,8 +313,6 @@ const(uint8_t t, ir_val *val):
 		{if (t == IR_DOUBLE) val->d = NAN; else val->f = NAN;}
 	|	"-" "inf"
 		{if (t == IR_DOUBLE) val->d = -INFINITY; else val->f = -INFINITY;}
-	|	"-" "nan"
-		{if (t == IR_DOUBLE) val->d = -NAN; else val->f = -NAN;}
 ;
 
 /* scanner rules */

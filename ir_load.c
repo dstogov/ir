@@ -957,90 +957,34 @@ static int parse_val(int sym, ir_parser_ctx *p, uint8_t op, uint32_t n, ir_ref *
 }
 
 static int parse_const(int sym, uint8_t t, ir_val *val) {
-	int   sym2;
-	const unsigned char *save_pos;
-	const unsigned char *save_text;
-	int   save_line;
-	int alt46;
-	save_pos  = yy_pos;
-	save_text = yy_text;
-	save_line = yy_line;
-	alt46 = -2;
-	sym2 = sym;
-	if (sym2 == YY_DECNUMBER) {
-		alt46 = 47;
-		goto _yy_state_46;
-	} else if (sym2 == YY_HEXNUMBER) {
-		alt46 = 48;
-		goto _yy_state_46;
-	} else if (sym2 == YY_FLOATNUMBER) {
-		alt46 = 49;
-		goto _yy_state_46;
-	} else if (sym2 == YY_CHARACTER) {
-		alt46 = 50;
-		goto _yy_state_46;
-	} else if (sym2 == YY_INF) {
-		alt46 = 51;
-		goto _yy_state_46;
-	} else if (sym2 == YY_NAN) {
-		alt46 = 52;
-		goto _yy_state_46;
-	} else if (sym2 == YY__MINUS) {
-		sym2 = get_sym();
-		goto _yy_state_46_7;
-	} else {
-		yy_error_sym("unexpected", sym2);
-	}
-_yy_state_46_7:
-	if (sym2 == YY_INF) {
-		alt46 = 53;
-		goto _yy_state_46;
-	} else if (sym2 == YY_NAN) {
-		alt46 = 55;
-		goto _yy_state_46;
-	} else {
-		yy_error_sym("unexpected", sym2);
-	}
-_yy_state_46:
-	yy_pos  = save_pos;
-	yy_text = save_text;
-	yy_line = save_line;
-	switch (alt46) {
-		case 47:
+	switch (sym) {
+		case YY_DECNUMBER:
 			sym = parse_DECNUMBER(sym, t, val);
 			break;
-		case 48:
+		case YY_HEXNUMBER:
 			sym = parse_HEXNUMBER(sym, t, val);
 			break;
-		case 49:
+		case YY_FLOATNUMBER:
 			sym = parse_FLOATNUMBER(sym, t, val);
 			break;
-		case 50:
+		case YY_CHARACTER:
 			sym = parse_CHARACTER(sym, val);
 			break;
-		case 51:
+		case YY_INF:
 			sym = get_sym();
 			if (t == IR_DOUBLE) val->d = INFINITY; else val->f = INFINITY;
 			break;
-		case 52:
+		case YY_NAN:
 			sym = get_sym();
 			if (t == IR_DOUBLE) val->d = NAN; else val->f = NAN;
 			break;
-		case 53:
+		case YY__MINUS:
 			sym = get_sym();
 			if (sym != YY_INF) {
 				yy_error_sym("'inf' expected, got", sym);
 			}
 			sym = get_sym();
 			if (t == IR_DOUBLE) val->d = -INFINITY; else val->f = -INFINITY;
-			break;
-		case 55:
-			sym = get_sym();
-			if (sym != YY_NAN) {
-				yy_error_sym("'nan' expected, got", sym);
-			}
-			sym = get_sym();
-			if (t == IR_DOUBLE) val->d = -NAN; else val->f = -NAN;
 			break;
 		default:
 			yy_error_sym("unexpected", sym);

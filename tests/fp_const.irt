@@ -14,10 +14,8 @@ Floating point constants
 	float c_8 = nan;
 	double c_9 = -inf;
 	float c_10 = -inf;
-	double c_11 = -nan;
-	float c_12 = -nan;
 	l_1 = START(l_3);
-	int32_t d_2, l_2 = CALL/11(l_1, c_1, c_2, c_3, c_4, c_5, c_6, c_7, c_8, c_9, c_10, c_11, c_12);
+	int32_t d_2, l_2 = CALL/9(l_1, c_1, c_2, c_3, c_4, c_5, c_6, c_7, c_8, c_9, c_10);
 	l_3 = RETURN(l_2, d_2);
 }
 --EXPECT--
@@ -35,9 +33,7 @@ Floating point constants
 	float c_11 = nan;
 	double c_12 = -inf;
 	float c_13 = -inf;
-	double c_14 = -nan;
-	float c_15 = -nan;
-	l_1 = START(l_6);
-	int32_t d_2, l_2 = CALL/11(l_1, c_4, c_5, c_6, c_7, c_8, c_9, c_10, c_11, c_12, c_13, c_14, c_15);
-	l_6 = RETURN(l_2, d_2);
+	l_1 = START(l_5);
+	int32_t d_2, l_2 = CALL/9(l_1, c_4, c_5, c_6, c_7, c_8, c_9, c_10, c_11, c_12, c_13);
+	l_5 = RETURN(l_2, d_2);
 }
