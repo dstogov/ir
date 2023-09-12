@@ -1,0 +1,43 @@
+--TEST--
+Floating point constants
+--ARGS--
+--save
+--CODE--
+{
+	uintptr_t c_1 = func(printf);
+	uintptr_t c_2 = "fmt\n";
+	double c_3 = 16.5;
+	float c_4 = 13.4;
+	double c_5 = inf;
+	float c_6 = inf;
+	double c_7 = nan;
+	float c_8 = nan;
+	double c_9 = -inf;
+	float c_10 = -inf;
+	double c_11 = -nan;
+	float c_12 = -nan;
+	l_1 = START(l_3);
+	int32_t d_2, l_2 = CALL/11(l_1, c_1, c_2, c_3, c_4, c_5, c_6, c_7, c_8, c_9, c_10, c_11, c_12);
+	l_3 = RETURN(l_2, d_2);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uintptr_t c_4 = func(printf);
+	uintptr_t c_5 = "fmt\n";
+	double c_6 = 16.5;
+	float c_7 = 13.400000;
+	double c_8 = inf;
+	float c_9 = inf;
+	double c_10 = nan;
+	float c_11 = nan;
+	double c_12 = -inf;
+	float c_13 = -inf;
+	double c_14 = -nan;
+	float c_15 = -nan;
+	l_1 = START(l_6);
+	int32_t d_2, l_2 = CALL/11(l_1, c_4, c_5, c_6, c_7, c_8, c_9, c_10, c_11, c_12, c_13, c_14, c_15);
+	l_6 = RETURN(l_2, d_2);
+}
