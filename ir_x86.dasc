@@ -1910,6 +1910,25 @@ static int32_t ir_var_spill_slot(ir_ctx *ctx, ir_ref ref, ir_reg *reg)
 	return IR_SPILL_POS_TO_OFFSET(var_insn->op3);
 }
 
+static bool ir_may_avoid_spill_load(ir_ctx *ctx, ir_ref ref, ir_ref use)
+{
+	ir_live_interval *ival;
+
+	IR_ASSERT(ctx->vregs[ref] && ctx->live_intervals[ctx->vregs[ref]]);
+	ival = ctx->live_intervals[ctx->vregs[ref]];
+	while (ival) {
+		ir_use_pos *use_pos = ival->use_pos;
+		while (use_pos) {
+			if (IR_LIVE_POS_TO_REF(use_pos->pos) == use) {
+				return !use_pos->next || use_pos->next->op_num == 0;
+			}
+			use_pos = use_pos->next;
+		}
+		ival = ival->next;
+	}
+	return 0;
+}
+
 static void ir_emit_load_imm_int(ir_ctx *ctx, ir_type type, ir_reg reg, int64_t val)
 {
 	ir_backend_data *data = ctx->data;
@@ -5286,6 +5305,9 @@ static void ir_emit_load_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (!IR_IS_CONST_REF(insn->op2) && (ir_rule(ctx, insn->op2) & IR_FUSED)) {
 		offset = ir_fuse_addr(ctx, insn->op2, &op2_reg);
 		if (IR_REG_SPILLED(ctx->regs[def][0]) && ir_is_same_spill_slot(ctx, def, op2_reg, offset)) {
+			if (!ir_may_avoid_spill_load(ctx, def, def)) {
+				ir_emit_load_mem_int(ctx, type, def_reg, op2_reg, offset);
+			}
 			/* avoid load to the same location (valid only when register is not reused) */
 			return;
 		}
@@ -5331,6 +5353,9 @@ static void ir_emit_load_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	} else if (op2_reg == IR_REG_NONE) {
 		offset = ir_fuse_addr(ctx, insn->op2, &op2_reg);
 		if (IR_REG_SPILLED(ctx->regs[def][0]) && ir_is_same_spill_slot(ctx, def, op2_reg, offset)) {
+			if (!ir_may_avoid_spill_load(ctx, def, def)) {
+				ir_emit_load_mem_fp(ctx, type, def_reg, op2_reg, offset);
+			}
 			/* avoid load to the same location (valid only when register is not reused) */
 			return;
 		}
@@ -5379,6 +5404,10 @@ static void ir_emit_store_int(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 	} else if (op2_reg == IR_REG_NONE) {
 		offset = ir_fuse_addr(ctx, insn->op2, &op2_reg);
 		if (!IR_IS_CONST_REF(insn->op3) && IR_REG_SPILLED(op3_reg) && ir_is_same_spill_slot(ctx, insn->op3, op2_reg, offset)) {
+			if (!ir_may_avoid_spill_load(ctx, insn->op3, ref)) {
+				op3_reg = IR_REG_NUM(op3_reg);
+				ir_emit_load(ctx, type, op3_reg, insn->op3);
+			}
 			/* avoid store to the same location */
 			return;
 		}
@@ -5427,6 +5456,10 @@ static void ir_emit_store_fp(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 	} else if (op2_reg == IR_REG_NONE) {
 		offset = ir_fuse_addr(ctx, insn->op2, &op2_reg);
 		if (!IR_IS_CONST_REF(insn->op3) && IR_REG_SPILLED(op3_reg) && ir_is_same_spill_slot(ctx, insn->op3, op2_reg, offset)) {
+			if (!ir_may_avoid_spill_load(ctx, insn->op3, ref)) {
+				op3_reg = IR_REG_NUM(op3_reg);
+				ir_emit_load(ctx, type, op3_reg, insn->op3);
+			}
 			/* avoid store to the same location */
 			return;
 		}
