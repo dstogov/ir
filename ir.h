@@ -531,6 +531,7 @@ struct _ir_ctx {
 	ir_ref             consts_limit;            /* size of allocated constants buffer (it's extended when overflow) */
 	uint32_t           flags;                   /* IR context flags (see IR_* defines above) */
 	uint32_t           mflags;                  /* CPU specific flags (see IR_X86_... macros below) */
+	int32_t            status;                  /* non-zero error code (see IR_ERROR_... macros), app may use negative codes */
 	ir_ref             fold_cse_limit;          /* CSE finds identical insns backward from "insn_count" to "fold_cse_limit" */
 	ir_insn            fold_insn;               /* temporary storage for folding engine */
 	ir_hashtab        *binding;
@@ -841,6 +842,12 @@ IR_ALWAYS_INLINE void *ir_jit_compile(ir_ctx *ctx, int opt_level, size_t *size)
 		return NULL;
 	}
 }
+
+#define IR_ERROR_CODE_MEM_OVERFLOW               1
+#define IR_ERROR_FIXED_STACK_FRAME_OVERFLOW      2
+#define IR_ERROR_UNSUPPORTED_CODE_RULE           3
+#define IR_ERROR_LINK                            4
+#define IR_ERROR_ENCODE                          5
 
 /* IR Memmory Allocation */
 #ifndef ir_mem_malloc

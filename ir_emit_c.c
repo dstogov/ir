@@ -900,6 +900,8 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 					break;
 				default:
 					IR_ASSERT(0 && "NIY instruction");
+					ctx->status = IR_ERROR_UNSUPPORTED_CODE_RULE;
+					return 0;
 			}
 			n = ir_insn_len(insn);
 			i += n;

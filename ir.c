@@ -300,6 +300,7 @@ void ir_init(ir_ctx *ctx, uint32_t flags, ir_ref consts_limit, ir_ref insns_limi
 	ctx->fold_cse_limit = IR_UNUSED + 1;
 	ctx->flags = flags;
 	ctx->mflags = 0;
+	ctx->status = 0;
 
 	ctx->binding = NULL;
 
@@ -1352,7 +1353,11 @@ int ir_mem_flush(void *ptr, size_t size)
 #else
 void *ir_mem_mmap(size_t size)
 {
-	return mmap(NULL, size, PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	void *ret = mmap(NULL, size, PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	if (ret == MAP_FAILED) {
+		ret = NULL;
+	}
+	return ret;
 }
 
 int ir_mem_unmap(void *ptr, size_t size)

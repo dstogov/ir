@@ -432,6 +432,8 @@ int main(int argc, char **argv)
 	}
 
 	if (emit_c) {
+		int ret;
+
 		if (c_file) {
 			f = fopen(c_file, "w+");
 			if (!f) {
@@ -441,9 +443,12 @@ int main(int argc, char **argv)
 		} else {
 		    f = stderr;
 		}
-		ir_emit_c(&ctx, f);
+		ret = ir_emit_c(&ctx, f);
 		if (c_file) {
 			fclose(f);
+		}
+		if (!ret) {
+			fprintf(stderr, "\nERROR: %d\n", ctx.status);
 		}
 	}
 
@@ -490,6 +495,8 @@ int main(int argc, char **argv)
 				fflush(stdout);
 				fprintf(stderr, "\nexit code = %d\n", ret);
 			}
+		} else {
+			fprintf(stderr, "\nERROR: %d\n", ctx.status);
 		}
 	}
 

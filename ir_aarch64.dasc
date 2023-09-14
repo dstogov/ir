@@ -4826,6 +4826,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				__FILE__, __LINE__);
 #endif
 			ctx->data = NULL;
+			ctx->status = IR_ERROR_FIXED_STACK_FRAME_OVERFLOW;
 			return NULL;
 		}
 		ctx->stack_frame_size = ctx->fixed_stack_frame_size;
@@ -5058,7 +5059,10 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					break;
 				default:
 					IR_ASSERT(0 && "NIY rule/insruction");
-					break;
+					dasm_free(&data.dasm_state);
+					ctx->data = NULL;
+					ctx->status = IR_ERROR_UNSUPPORTED_CODE_RULE;
+					return NULL;
 			}
 			n = ir_insn_len(insn);
 			i += n;
@@ -5182,6 +5186,12 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		|.code
 	}
 
+	if (ctx->status) {
+		dasm_free(&data.dasm_state);
+		ctx->data = NULL;
+		return NULL;
+	}
+
 	ret = dasm_link(&data.dasm_state, size_ptr);
 	if (ret != DASM_S_OK) {
 		IR_ASSERT(0);
@@ -5190,6 +5200,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 			ir_mem_unmap(entry, size);
 		}
 		ctx->data = NULL;
+		ctx->status = IR_ERROR_LINK;
 		return NULL;
 	}
 	size = *size_ptr;
@@ -5198,12 +5209,19 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		if (IR_ALIGNED_SIZE(size, 16) > ctx->code_buffer_size) {
 			dasm_free(&data.dasm_state);
 			ctx->data = NULL;
+			ctx->status = IR_ERROR_CODE_MEM_OVERFLOW;
 			return NULL;
 		}
 		entry = ctx->code_buffer;
 		IR_ASSERT((uintptr_t)entry % 16 == 0);
 	} else {
 		entry = ir_mem_mmap(size);
+		if (!entry) {
+			dasm_free(&data.dasm_state);
+			ctx->data = NULL;
+			ctx->status = IR_ERROR_CODE_MEM_OVERFLOW;
+			return NULL;
+		}
 		ir_mem_unprotect(entry, size);
 	}
 
@@ -5225,6 +5243,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 			ir_mem_unmap(entry, size);
 		}
 		ctx->data = NULL;
+		ctx->status = IR_ERROR_ENCODE;
 		return NULL;
 	}
 
