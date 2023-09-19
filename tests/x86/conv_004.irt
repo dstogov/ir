@@ -15,5 +15,5 @@ x86
 }
 --EXPECT--
 test:
-	movd %xmm0, %rax
+	movq %xmm0, %rax
 	retq
