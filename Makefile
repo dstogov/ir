@@ -10,32 +10,32 @@ EXAMPLES_BUILD_DIR = $(BUILD_DIR)/examples
 CC         = gcc
 CXX        = g++
 BUILD_CC   = gcc
-CFLAGS     = -Wall -Wextra -Wno-unused-parameter
+override CFLAGS += -Wall -Wextra -Wno-unused-parameter
 LDFLAGS    = -lm -ldl
 PHP        = php
 LLK        = llk
 #LLK        = $(PHP) $(HOME)/php/llk/llk.php
 
 ifeq (debug, $(BUILD))
- CFLAGS += -O0 -g -DIR_DEBUG=1
+ override CFLAGS += -O0 -g -DIR_DEBUG=1
 endif
 ifeq (release, $(BUILD))
- CFLAGS += -O2 -g
+ override CFLAGS += -O2 -g
 endif
 
 ifeq (x86_64, $(TARGET))
-  CFLAGS += -DIR_TARGET_X64
+  override CFLAGS += -DIR_TARGET_X64
   DASM_ARCH  = x86
   DASM_FLAGS = -M -D X64=1
 endif
 ifeq (x86, $(TARGET))
-  CFLAGS += -m32 -DIR_TARGET_X86
+  override CFLAGS += -m32 -DIR_TARGET_X86
   DASM_ARCH  = x86
   DASM_FLAGS = -M
 endif
 ifeq (aarch64, $(TARGET))
   CC= aarch64-linux-gnu-gcc --sysroot=$(HOME)/php/ARM64
-  CFLAGS += -DIR_TARGET_AARCH64
+  override CFLAGS += -DIR_TARGET_AARCH64
   DASM_ARCH  = aarch64
   DASM_FLAGS = -M
 endif
