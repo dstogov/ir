@@ -22,14 +22,14 @@ jobs:
         run: |
           apt update -y
           DEBIAN_FRONTEND=noninteractive apt install -y \
-            gcc g++-12 \
+            gcc \
             libcapstone-dev \
             libcapstone4 \
             make
       - name: make
         run: make TARGET=x86_64 all
       - name: test
-        run: make CXX=g++-12 TARGET=x86_64 test-ci
+        run: make TARGET=x86_64 test-ci
   Linux_i386:
     name: 'Linux i386'
     runs-on: ubuntu-22.04
@@ -44,7 +44,7 @@ jobs:
           dpkg --add-architecture i386
           apt update -y
           DEBIAN_FRONTEND=noninteractive apt install -y \
-            gcc g++-12 \
+            gcc \
             gcc-multilib \
             libc6:i386 \
             make \
@@ -62,7 +62,7 @@ jobs:
       - name: make
         run: make TARGET=x86 all
       - name: test
-        run: make CXX=g++-12 TARGET=x86 test-ci
+        run: make TARGET=x86 test-ci
   Linux_aarch64:
     name: 'Linux aarch64'
     runs-on: ubuntu-20.04
@@ -78,7 +78,7 @@ jobs:
           install: |
             apt update -y
             DEBIAN_FRONTEND=noninteractive apt install -y \
-              gcc g++-12 \
+              gcc \
               libc6 \
               libcapstone-dev \
               libcapstone4 \
@@ -86,7 +86,7 @@ jobs:
           run: |
             make CC=gcc TARGET=aarch64 all
             # FIXME: For some reason some of the object files are rebuilt
-            make CC=gcc CXX=g++-12 TARGET=aarch64 test-ci
+            make CC=gcc TARGET=aarch64 test-ci
 
   MACOS_x86_64:
     runs-on: macos-11
@@ -99,7 +99,7 @@ jobs:
       - name: make
         run: make TARGET=x86_64 all
       - name: test
-        run: make CXX=g++-12 TARGET=x86_64 test-ci
+        run: make TARGET=x86_64 test-ci
 
   Windows:
     strategy:
