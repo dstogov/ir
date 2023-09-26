@@ -134,10 +134,18 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted
 			fprintf(f, "%" PRIi64, insn->val.i64);
 			break;
 		case IR_DOUBLE:
-			fprintf(f, "%g", insn->val.d);
+			if (isnan(insn->val.d)) {
+				fprintf(f, "nan");
+			} else {
+				fprintf(f, "%g", insn->val.d);
+			}
 			break;
 		case IR_FLOAT:
-			fprintf(f, "%f", insn->val.f);
+			if (isnan(insn->val.f)) {
+				fprintf(f, "nan");
+			} else {
+				fprintf(f, "%f", insn->val.f);
+			}
 			break;
 		default:
 			IR_ASSERT(0);
