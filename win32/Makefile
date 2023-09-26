@@ -38,10 +38,6 @@ LDFLAGS=$(LDFLAGS) /DEBUG
 CC=cl.exe
 !endif
 
-!if "$(CXX)" == ""
-CXX=cl.exe
-!endif
-
 !if "$(LD)" == ""
 LD=link.exe
 !endif
@@ -57,11 +53,13 @@ TARGET = $(VSCMD_ARG_TGT_ARCH)
 CFLAGS=$(CFLAGS) /DIR_TARGET_X64
 DASM_ARCH=x86
 DASM_FLAGS=-D X64=1
+TEST_TARGET=Windows-x86_64
 !endif
 !if "$(TARGET)" == "x86"
 CFLAGS=$(CFLAGS) /DIR_TARGET_X86
 DASM_ARCH=x86
 DASM_FLAGS=
+TEST_TARGET=x86
 !endif
 
 !if "$(VSCMD_ARG_TGT_ARCH)" == "x64"
@@ -149,15 +147,19 @@ $(BUILD_DIR):
 $(EXAMPLES_BUILD_DIR):
 	md "$(EXAMPLES_BUILD_DIR)"
 
-$(BUILD_DIR)\ir-test.exe: $(SRC_DIR)/ir-test.cxx
-	"$(CXX)" /std:c++17 $(SRC_DIR)\ir-test.cxx /Fe:$@
+$(BUILD_DIR)\tester.exe: $(SRC_DIR)/tools/tester.c
+	"$(CC)" $(CFLAGS) $(SRC_DIR)\tools\tester.c /Fe:$@
 
-test: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\ir-test.exe
+test: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\tester.exe
 	$(BUILD_DIR)\ir.exe $(SRC_DIR)\test.ir --dump --save $(BUILD_DIR)\test.log
-	$(BUILD_DIR)\ir-test.exe $(SRC_DIR)\tests
+	$(BUILD_DIR)\tester.exe --test-cmd $(BUILD_DIR)\ir.exe --target $(TEST_TARGET) --default-args "--save" \
+	    --additional-args "--no-abort-fault" \
+		--test-extension ".irt" --code-extension ".ir" $(SRC_DIR)\tests
 
-test-ci: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\ir-test.exe
-	$(BUILD_DIR)\ir-test.exe --show-diff $(SRC_DIR)\tests
+test-ci: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\tester.exe
+	$(BUILD_DIR)\tester.exe --test-cmd $(BUILD_DIR)\ir.exe --target $(TEST_TARGET) --default-args "--save" \
+	    --additional-args "--no-abort-fault" --diff-cmd "diff --strip-trailing-cr -u" \
+		--test-extension ".irt" --code-extension ".ir" --show-diff $(SRC_DIR)\tests
 
 examples: $(OBJS_COMMON) $(EXAMPLES_BUILD_DIR) $(EXAMPLE_EXES)
 

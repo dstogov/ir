@@ -8,7 +8,6 @@ EXAMPLES_SRC_DIR = $(SRC_DIR)/examples
 EXAMPLES_BUILD_DIR = $(BUILD_DIR)/examples
 
 CC         = gcc
-CXX        = g++
 BUILD_CC   = gcc
 override CFLAGS += -Wall -Wextra -Wno-unused-parameter
 LDFLAGS    = -lm -ldl
@@ -94,17 +93,19 @@ $(OBJS_COMMON) $(OBJS_IR) $(OBJS_IR_TEST): $(BUILD_DIR)/$(notdir %.o): $(SRC_DIR
 $(EXAMPLE_EXES): $(EXAMPLES_BUILD_DIR)/$(notdir %): $(EXAMPLES_SRC_DIR)/$(notdir %.c)
 	$(CC) $(CFLAGS) -I$(SRC_DIR) $< -o $@ $(OBJS_COMMON) $(LDFLAGS) -lcapstone
 
-$(BUILD_DIR)/ir-test: $(SRC_DIR)/ir-test.cxx
-	$(CXX) -O3 -std=c++17 $(SRC_DIR)/ir-test.cxx -o $(BUILD_DIR)/ir-test
+$(BUILD_DIR)/tester: $(SRC_DIR)/tools/tester.c
+	$(CC) $(CFLAGS) -o $@ $<
 
-test: $(BUILD_DIR)/ir $(BUILD_DIR)/ir-test
+test: $(BUILD_DIR)/ir $(BUILD_DIR)/tester
 	$(BUILD_DIR)/ir $(SRC_DIR)/test.ir --dump --save 2>$(BUILD_DIR)/test.log
 	$(BUILD_DIR)/ir $(SRC_DIR)/test.ir --dot $(BUILD_DIR)/ir.dot
 	dot -Tpdf $(BUILD_DIR)/ir.dot -o $(BUILD_DIR)/ir.pdf
-	$(BUILD_DIR)/ir-test $(SRC_DIR)/tests
+	$(BUILD_DIR)/tester --test-cmd $(BUILD_DIR)/ir --target $(TARGET) --default-args "--save" \
+		--test-extension ".irt" --code-extension ".ir" $(SRC_DIR)/tests
 
-test-ci: $(BUILD_DIR)/ir $(BUILD_DIR)/ir-test
-	$(BUILD_DIR)/ir-test --show-diff $(SRC_DIR)/tests
+test-ci: $(BUILD_DIR)/ir $(BUILD_DIR)/tester
+	$(BUILD_DIR)/tester --test-cmd $(BUILD_DIR)/ir --target $(TARGET) --default-args "--save" \
+		--test-extension ".irt" --code-extension ".ir" --show-diff $(SRC_DIR)/tests
 
 examples: $(OBJS_COMMON) $(EXAMPLES_BUILD_DIR) $(EXAMPLE_EXES)
 
@@ -113,7 +114,7 @@ clean:
 	$(BUILD_DIR)/minilua $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h \
 	$(BUILD_DIR)/ir_fold_hash.h $(BUILD_DIR)/gen_ir_fold_hash \
 	$(BUILD_DIR)/ir.dot $(BUILD_DIR)/ir.pdf $(BUILD_DIR)/test.log \
-	$(BUILD_DIR)/ir-test
+	$(BUILD_DIR)/tester
 	find $(SRC_DIR)/tests -type f -name '*.diff' -delete
 	find $(SRC_DIR)/tests -type f -name '*.out' -delete
 	find $(SRC_DIR)/tests -type f -name '*.exp' -delete
