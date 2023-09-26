@@ -294,7 +294,7 @@ static int run_test(const char *filename, test *t, int show_diff)
 		out[0] = 0;
 	}
 
-	ret = (same_text(t->expect, out) && ret == 0);
+	ret = ret == 0 && same_text(t->expect, out);
 	if (ret) {
 		unlink(code_filename);
 		unlink(out_filename);
