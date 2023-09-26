@@ -10,18 +10,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <dirent.h>
 #include <fcntl.h>
-#include <unistd.h>
-#include <alloca.h>
 
 #ifdef _WIN32
+# include <io.h>
 # include <windows.h>
+# pragma warning(disable : 4996)
 # define PATH_SEP '\\'
 # define DEFAULT_DIFF_CMD "fc"
+# define S_IRUSR _S_IREAD
+# define S_IWUSR _S_IWRITE
 #else
+# include <dirent.h>
+# include <unistd.h>
+# include <alloca.h>
 # define PATH_SEP '/'
 # define DEFAULT_DIFF_CMD "diff --strip-trailing-cr -u"
+# define O_BINARY 0
 #endif
 
 typedef enum _color {GREEN, YELLOW, RED} color;
@@ -96,7 +101,7 @@ static test *parse_file(const char *filename, int id)
 		return NULL;
 	}
 	size = stat_buf.st_size;
-	fd = open(filename, 0);
+	fd = open(filename, O_RDONLY | O_BINARY, 0);
 	if (fd < 0) {
 		return NULL;
 	}
@@ -199,7 +204,7 @@ static char *read_file(const char *filename)
 	if (!buf) {
 		return NULL;
 	}
-	fd = open(filename, O_RDONLY);
+	fd = open(filename, O_RDONLY | O_BINARY, 0);
 	if (fd < 0) {
 		free(buf);
 		return NULL;
@@ -215,7 +220,7 @@ static char *read_file(const char *filename)
 
 static int write_file(const char *filename, const char *buf, size_t size)
 {
-	int fd = open(filename, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
+	int fd = open(filename, O_CREAT | O_TRUNC | O_WRONLY | O_BINARY, S_IRUSR | S_IWUSR);
 	if (fd < 0) {
 		return 0;
 	}
@@ -247,23 +252,37 @@ static int run_test(const char *filename, test *t, int show_diff)
 	size_t len;
 	int ret;
 	char cmd[4096];
-	char *code_filename, *out_filename, *out;
+	char *code_filename, *out_filename, *exp_filename, *diff_filename, *out;
 
 	len = strlen(filename);
 
 	code_filename = replace_extension(filename, len, code_extension, code_extension_len);
+	out_filename = replace_extension(filename, len, ".out", strlen(".out"));
+	exp_filename = replace_extension(filename, len, ".exp", strlen(".exp"));
+	diff_filename = replace_extension(filename, len, ".diff", strlen(".diff"));
+
+	unlink(code_filename);
+	unlink(out_filename);
+	unlink(exp_filename);
+	unlink(diff_filename);
+
 	if (!write_file(code_filename, t->code, strlen(t->code))) {
 		free(code_filename);
+		free(code_filename);
+		free(out_filename);
+		free(exp_filename);
+		free(diff_filename);
 		return 0;
 	}
 
-	out_filename = replace_extension(filename, len, ".out", strlen(".out"));
 	if ((size_t)snprintf(cmd, sizeof(cmd), "%s %s %s %s > %s 2>&1",
 			test_cmd, code_filename,
 			t->args ? t->args : default_args, additional_args,
 			out_filename) > sizeof(cmd)) {
 		free(code_filename);
 		free(out_filename);
+		free(exp_filename);
+		free(diff_filename);
 		return 0;
 	}
 
@@ -275,15 +294,12 @@ static int run_test(const char *filename, test *t, int show_diff)
 		out[0] = 0;
 	}
 
-	ret = same_text(t->expect, out) && ret == 0;
+	ret = (same_text(t->expect, out) && ret == 0);
 	if (ret) {
 		unlink(code_filename);
 		unlink(out_filename);
 	} else {
-		char *exp_filename = replace_extension(filename, len, ".exp", strlen(".exp"));
 		if (write_file(exp_filename, t->expect, strlen(t->expect))) {
-			char *diff_filename = replace_extension(filename, len, ".diff", strlen(".diff"));
-
 			if ((size_t)snprintf(cmd, sizeof(cmd), "%s %s %s > %s",
 					diff_cmd, exp_filename, out_filename, diff_filename) < sizeof(cmd)) {
 				system(cmd);
@@ -292,16 +308,16 @@ static int run_test(const char *filename, test *t, int show_diff)
 					printf("\n");
 					printf("%s", diff);
 					free(diff);
-	            }
+				}
 			}
-			free(diff_filename);
 		}
-		free(exp_filename);
 	}
 
 	free(out);
 	free(code_filename);
 	free(out_filename);
+	free(exp_filename);
+	free(diff_filename);
 
 	return ret;
 }
@@ -317,13 +333,56 @@ static void add_file(char *name)
 
 static void find_files_in_dir(const char *dir_name, size_t dir_name_len)
 {
-	DIR *dir = opendir(dir_name);
-	struct dirent *info;
 	char *name;
 	size_t len;
+#ifdef _WIN32
+	char buf[MAX_PATH];
+	HANDLE dir;
+	WIN32_FIND_DATA info;
+
+	memcpy(buf, dir_name, dir_name_len);
+	buf[dir_name_len] = '\\';
+	buf[dir_name_len + 1] = '*';
+	buf[dir_name_len + 2] = 0;
+
+	dir = FindFirstFile(buf, &info);
+	if (dir == INVALID_HANDLE_VALUE) {
+		fprintf(stderr, "ERROR: Cannot read directory [%s]\n", dir_name);
+		return;
+	}
+	do {
+		len = strlen(info.cFileName);
+		if (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+			if ((len == 1 && info.cFileName[0] == '.')
+			 || (len == 2 && info.cFileName[0] == '.' && info.cFileName[1] == '.')) {
+				/* skip */
+			} else {
+				name = malloc(dir_name_len + len + 2);
+				memcpy(name, dir_name, dir_name_len);
+				name[dir_name_len] = PATH_SEP;
+				memcpy(name + dir_name_len + 1, info.cFileName, len + 1);
+				find_files_in_dir(name, dir_name_len + len + 1);
+				free(name);
+			}
+		} else /*if (info.dwFileAttributes & FILE_ATTRIBUTE_NORMAL)*/ {
+			if (!test_extension
+			 || stricmp(info.cFileName + len - test_extension_len, test_extension) == 0) {
+				name = malloc(dir_name_len + len + 2);
+				memcpy(name, dir_name, dir_name_len);
+				name[dir_name_len] = PATH_SEP;
+				memcpy(name + dir_name_len + 1, info.cFileName, len + 1);
+				add_file(name);
+			}
+		}
+	} while (FindNextFile(dir, &info));
+	FindClose(dir);
+#else
+	DIR *dir = opendir(dir_name);
+	struct dirent *info;
 
 	if (!dir) {
 		fprintf(stderr, "ERROR: Cannot read directory [%s]\n", dir_name);
+		return;
 	}
 	while ((info = readdir(dir)) != 0) {
 		len = strlen(info->d_name);
@@ -351,6 +410,7 @@ static void find_files_in_dir(const char *dir_name, size_t dir_name_len)
 		}
 	}
 	closedir(dir);
+#endif
 }
 
 static int cmp_files(const void *s1, const void *s2)
@@ -418,7 +478,11 @@ int main(int argc, char **argv)
 	int bad_files = 0;   // bad file or folder given
 	int show_diff = 0;
 	struct stat stat_buf;
+#ifdef _WIN32
+	char **tests = _alloca(sizeof(char*) * argc);
+#else
 	char **tests = alloca(sizeof(char*) * argc);
+#endif
 	int i, tests_count = 0;
 	int skipped = 0;
 	int passed = 0;
@@ -476,9 +540,9 @@ int main(int argc, char **argv)
 	if (!code_extension) {
 		code_extension = ".code";
 	}
-	code_extension_len = strlen(code_extension);
+	code_extension_len = (int)strlen(code_extension);
 	if (test_extension) {
-		test_extension_len = strlen(test_extension);
+		test_extension_len = (int)strlen(test_extension);
 		if (strcmp(test_extension, code_extension) == 0) {
 			fprintf(stderr, "ERROR: --test-extension and --code-extension can't be the same\n");
 			return 1;

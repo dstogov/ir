@@ -148,17 +148,17 @@ $(EXAMPLES_BUILD_DIR):
 	md "$(EXAMPLES_BUILD_DIR)"
 
 $(BUILD_DIR)\tester.exe: $(SRC_DIR)/tools/tester.c
-	"$(CC)" $(CFLAGS) $(SRC_DIR)\tester.c /Fe:$@
+	"$(CC)" $(CFLAGS) $(SRC_DIR)\tools\tester.c /Fe:$@
 
 test: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\tester.exe
 	$(BUILD_DIR)\ir.exe $(SRC_DIR)\test.ir --dump --save $(BUILD_DIR)\test.log
-	$(BUILD_DIR)\tester.exe --test-cmd $(BUILD_DIR)/ir.exe --target $(TEST_TARGET) --default-args "--save" \
-	    --aditional_args "--no-abort-fault" \
+	$(BUILD_DIR)\tester.exe --test-cmd $(BUILD_DIR)\ir.exe --target $(TEST_TARGET) --default-args "--save" \
+	    --additional-args "--no-abort-fault" \
 		--test-extension ".irt" --code-extension ".ir" $(SRC_DIR)\tests
 
 test-ci: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\tester.exe
-	$(BUILD_DIR)\tester.exe --test-cmd $(BUILD_DIR)/ir.exe --target $(TEST_TARGET) --default-args "--save" \
-	    --aditional_args "--no-abort-fault" --diff-cmd "diff --strip-trailing-cr -u" \
+	$(BUILD_DIR)\tester.exe --test-cmd $(BUILD_DIR)\ir.exe --target $(TEST_TARGET) --default-args "--save" \
+	    --additional-args "--no-abort-fault" --diff-cmd "diff --strip-trailing-cr -u" \
 		--test-extension ".irt" --code-extension ".ir" --show-diff $(SRC_DIR)\tests
 
 examples: $(OBJS_COMMON) $(EXAMPLES_BUILD_DIR) $(EXAMPLE_EXES)
