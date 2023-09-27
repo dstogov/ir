@@ -10,7 +10,7 @@ aarch64
 	bool c_2 = 0;
 	bool c_3 = 1;
 	int32_t c_4 = 42;
-	uintptr_t c_5 = func(printf);
+	uintptr_t c_5 = func(printf, 4);
 	uintptr_t c_6 = "hello %d!\n";
 	l_1 = START(l_4);
 	int32_t d_2, l_2 = CALL/2(l_1, c_5, c_6, c_4);

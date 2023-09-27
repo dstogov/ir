@@ -86,7 +86,7 @@ static bool ir_is_fastcall(const ir_ctx *ctx, const ir_insn *insn)
 # define ir_is_fastcall(ctx, insn) 0
 #endif
 
-#ifdef _WIN64
+#if defined(_WIN64) || defined(IR_REG_VARARG_FP_REGS)
 static bool ir_is_vararg(const ir_ctx *ctx, ir_insn *insn)
 {
 	if (IR_IS_CONST_REF(insn->op2)) {

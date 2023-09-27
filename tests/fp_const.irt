@@ -4,7 +4,7 @@ Floating point constants
 --save
 --CODE--
 {
-	uintptr_t c_1 = func(printf);
+	uintptr_t c_1 = func(printf, 4);
 	uintptr_t c_2 = "fmt\n";
 	double c_3 = 16.5;
 	float c_4 = 13.4;
@@ -23,7 +23,7 @@ Floating point constants
 	uintptr_t c_1 = 0;
 	bool c_2 = 0;
 	bool c_3 = 1;
-	uintptr_t c_4 = func(printf);
+	uintptr_t c_4 = func(printf, 4);
 	uintptr_t c_5 = "fmt\n";
 	double c_6 = 16.5;
 	float c_7 = 13.400000;

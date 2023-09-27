@@ -6405,6 +6405,13 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 		}
 	}
 #endif
+#ifdef IR_REG_VARARG_FP_REGS
+	/* set hidden argument to specify the number of vector registers used */
+	if (ir_is_vararg(ctx, insn)) {
+		fp_param = IR_MIN(fp_param, fp_reg_params_count);
+		|	mov Rd(IR_REG_VARARG_FP_REGS), fp_param
+	}
+#endif
 
 	return used_stack;
 }
@@ -6429,13 +6436,20 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		if (sizeof(void*) == 4 || IR_MAY_USE_32BIT_ADDR(addr)) {
 			|	call aword &addr
 		} else {
+			ir_reg tmp_reg = IR_REG_RAX;
+
+#ifdef IR_REG_VARARG_FP_REGS
+			if (ir_is_vararg(ctx, insn)) {
+				tmp_reg = IR_REG_R11;
+			}
+#endif
 |.if X64
 			if (IR_IS_SIGNED_32BIT(addr)) {
-				|	mov rax, ((ptrdiff_t)addr)    // 0x48 0xc7 0xc0 <imm-32-bit>
+				|	mov Rq(tmp_reg), ((ptrdiff_t)addr)    // 0x48 0xc7 0xc0 <imm-32-bit>
 			} else {
-				|	mov64 rax, ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
+				|	mov64 Rq(tmp_reg), ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
 			}
-			|	call rax
+			|	call Rq(tmp_reg)
 |.endif
 		}
     } else {
@@ -6540,13 +6554,20 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		if (sizeof(void*) == 4 || IR_MAY_USE_32BIT_ADDR(addr)) {
 			|	jmp aword &addr
 		} else {
+			ir_reg tmp_reg = IR_REG_RAX;
+
+#ifdef IR_REG_VARARG_FP_REGS
+			if (ir_is_vararg(ctx, insn)) {
+				tmp_reg = IR_REG_R11;
+			}
+#endif
 |.if X64
 			if (IR_IS_SIGNED_32BIT(addr)) {
-				|	mov rax, ((ptrdiff_t)addr)    // 0x48 0xc7 0xc0 <imm-32-bit>
+				|	mov Rq(tmp_reg), ((ptrdiff_t)addr)    // 0x48 0xc7 0xc0 <imm-32-bit>
 			} else {
-				|	mov64 rax, ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
+				|	mov64 Rq(tmp_reg), ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
 			}
-			|	jmp rax
+			|	jmp Rq(tmp_reg)
 |.endif
 		}
     } else {

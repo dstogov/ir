@@ -16,7 +16,7 @@ x86_64
 	double c_8 = 0.8;
 	double c_9 = 0.9;
 	double c_10 = 0.0;
-	uintptr_t f = func(printf);
+	uintptr_t f = func(printf, 4);
 	uintptr_t fmt = "%g %g %g %g %g %g %g %g %g %g\n";
 	l_1 = START(l_3);
 	int32_t d_2, l_2 = CALL/11(l_1, f, fmt, c_1, c_2, c_3, c_4, c_5, c_6, c_7, c_8, c_9, c_10);
@@ -37,12 +37,13 @@ test:
 	movabsq $0x3feccccccccccccd, %rax
 	movq %rax, (%rsp)
 	movq $0, 8(%rsp)
-	movabsq $printf, %rax
-	callq *%rax
+	movl $8, %eax
+	movabsq $printf, %r11
+	callq *%r11
 	addq $0x18, %rsp
 	retq
 .rodata
-	.db 0x90, 0x90, 0x90, 0x90, 0x90
+	.db 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
 .L1:
 	.db 0x9a, 0x99, 0x99, 0x99, 0x99, 0x99, 0xb9, 0x3f
 .L2:

@@ -18,7 +18,7 @@ x86_64
 	char nl = '\n';
 	char zero = 0;
 	uintptr_t one = 1;
-	uintptr_t c_5 = func(printf);
+	uintptr_t c_5 = func(printf, 4);
 	l_1 = START(l_4);
 	uint64_t var = VAR(l_1, "str");
 	uintptr_t a_0 = VADDR(var);
@@ -50,8 +50,9 @@ test:
 	movb $0xa, 5(%rdi)
 	movb $0, 6(%rdi)
 	movl $0x2a, %esi
-	movabsq $printf, %rax
-	callq *%rax
+	movl $0, %eax
+	movabsq $printf, %r11
+	callq *%r11
 	addq $8, %rsp
 	retq
 

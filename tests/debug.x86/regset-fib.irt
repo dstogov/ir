@@ -10,7 +10,7 @@ x86
 	double c_0 = 0;
 	double c_1 = 1;
 	double c_10000 = 10000;
-	uintptr_t f = func(printf);
+	uintptr_t f = func(printf, 4);
 	uintptr_t format = "%g\n";
 	l_1 = START(l_6);
 	double lo_1 = COPY(c_0);
@@ -40,7 +40,7 @@ x86
 	double c_5 = 0;
 	double c_6 = 1;
 	double c_7 = 10000;
-	uintptr_t c_8 = func(printf);
+	uintptr_t c_8 = func(printf, 4);
 	uintptr_t c_9 = "%g\n";
 	l_1 = START(l_15);
 	l_2 = END(l_1);
