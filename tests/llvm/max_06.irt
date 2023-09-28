@@ -1,0 +1,18 @@
+--TEST--
+006: max function
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	double y = PARAM(l_1, "y", 2);
+	double ret = MAX(x, y);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+define double @test(double %d2, double %d3)
+{
+	%d4 = call double @llvm.maxnum.f64(double %d3, double %d2)
+	ret double %d4
+}

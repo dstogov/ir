@@ -1,0 +1,46 @@
+--TEST--
+DESSA 003
+--ARGS--
+--emit-llvm
+--CODE--
+# Figure 8 (swap problem) from "Translating Out of Static Single Assignment Form" by Sreedhar
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 1;
+	int32_t c_12 = 12;
+	l_1 = START(l_11);
+	int32_t x0 = PARAM(l_1, "x", 0);
+	int32_t y1 = PARAM(l_1, "y", 1);
+	int32_t cond = PARAM(l_1, "z", 2);
+	int32_t x1 = DIV(x0, c_12);
+	l_3 = END(l_1);
+	l_4 = LOOP_BEGIN(l_3, l_9);
+	int32_t x2 = PHI(l_4, x1, x3);
+	int32_t y2 = PHI(l_4, y1, y3);
+	int32_t z = COPY(x2);
+	int32_t x3 = COPY(y2);
+	int32_t y3 = COPY(z);
+	l_7 = IF(l_4, cond);
+	l_8 = IF_TRUE(l_7);
+	l_9 = LOOP_END(l_8);
+	l_10 = IF_FALSE(l_7);
+	l_11 = RETURN(l_10, z);
+}
+--EXPECT--
+define i32 @test(i32 %d2, i32 %d3, i32 %d4)
+{
+l1:
+	%d5 = sdiv i32 %d2, 12
+	br label %l2
+l2:
+	%d8 = phi i32 [%d5, %l1], [%d9, %l3]
+	%d9 = phi i32 [%d3, %l1], [%d8, %l3]
+	%t10 = icmp ne i32 %d4, 0
+	br i1 %t10, label %l3, label %l4
+l3:
+	br label %l2
+l4:
+	ret i32 %d8
+}

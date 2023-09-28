@@ -1,7 +1,7 @@
 --TEST--
 007: type conversion FP2INT
 --ARGS--
---emit-c
+--emit-llvm
 --CODE--
 {
 	l_1 = START(l_4);
@@ -10,10 +10,8 @@
 	l_4 = RETURN(l_1, ret);
 }
 --EXPECT--
-uint32_t test(float x)
+define i32 @test(float %d2)
 {
-	float d_1 = x;
-	uint32_t d_2;
-	d_2 = d_1;
-	return d_2;
+	%d3 = fptoui float %d2 to i32
+	ret i32 %d3
 }

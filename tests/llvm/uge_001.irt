@@ -1,0 +1,18 @@
+--TEST--
+001: uge function
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	l_1 = START(l_4);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t y = PARAM(l_1, "y", 2);
+	bool ret = UGE(x, y);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+define i1 @test(i32 %d2, i32 %d3)
+{
+	%d4 = icmp ule i32 %d3, %d2
+	ret i1 %d4
+}

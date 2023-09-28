@@ -1,0 +1,17 @@
+--TEST--
+001: abs function
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	l_1 = START(l_4);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t ret = ABS(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+define i32 @test(i32 %d2)
+{
+	%d3 = call i32 @llvm.abs.i32(i32 %d2, i1 0)
+	ret i32 %d3
+}

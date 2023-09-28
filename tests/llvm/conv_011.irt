@@ -1,0 +1,17 @@
+--TEST--
+011: type conversion TRUNC
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	l_1 = START(l_4);
+	int32_t x = PARAM(l_1, "x", 1);
+	int8_t ret = TRUNC(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+define i8 @test(i32 %d2)
+{
+	%d3 = trunc i32 %d2 to i8
+	ret i8 %d3
+}

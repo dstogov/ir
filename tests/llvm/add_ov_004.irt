@@ -1,0 +1,36 @@
+--TEST--
+004: add_ov function (jmp probability)
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	int32_t c_1 = 0;
+	int32_t c = 2;
+	l_1 = START(l_8);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t ret1 = ADD_OV(x, c);
+	bool ov = OVERFLOW(ret1);
+	l_2 = IF(l_1, ov);
+	l_3 = IF_TRUE(l_2, 1);
+	l_4 = END(l_3);
+	l_5 = IF_FALSE(l_2);
+	l_6 = END(l_5);
+	l_7 = MERGE(l_4, l_6);
+	int32_t ret = PHI(l_7, c_1, ret1);
+	l_8 = RETURN(l_7, ret);
+}
+--EXPECT--
+define i32 @test(i32 %d2)
+{
+	%t3 = call {i32, i1} @llvm.sadd.with.overflow.i32(i32 %d2, i32 2)
+	%d3 = extractvalue {i32, i1} %t3, 0
+	%d4 = extractvalue {i32, i1} %t3, 1
+	br i1 %d4, label %l4, label %l2
+l2:
+	br label %l3
+l3:
+	%d11 = phi i32 [0, %l4], [%d3, %l2]
+	ret i32 %d11
+l4:
+	br label %l3
+}

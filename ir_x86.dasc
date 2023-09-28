@@ -6436,19 +6436,19 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		if (sizeof(void*) == 4 || IR_MAY_USE_32BIT_ADDR(addr)) {
 			|	call aword &addr
 		} else {
-			ir_reg tmp_reg = IR_REG_RAX;
+|.if X64
+||			ir_reg tmp_reg = IR_REG_RAX;
 
 #ifdef IR_REG_VARARG_FP_REGS
-			if (ir_is_vararg(ctx, insn)) {
-				tmp_reg = IR_REG_R11;
-			}
+||			if (ir_is_vararg(ctx, insn)) {
+||				tmp_reg = IR_REG_R11;
+||			}
 #endif
-|.if X64
-			if (IR_IS_SIGNED_32BIT(addr)) {
+||			if (IR_IS_SIGNED_32BIT(addr)) {
 				|	mov Rq(tmp_reg), ((ptrdiff_t)addr)    // 0x48 0xc7 0xc0 <imm-32-bit>
-			} else {
+||			} else {
 				|	mov64 Rq(tmp_reg), ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
-			}
+||			}
 			|	call Rq(tmp_reg)
 |.endif
 		}
@@ -6554,19 +6554,19 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		if (sizeof(void*) == 4 || IR_MAY_USE_32BIT_ADDR(addr)) {
 			|	jmp aword &addr
 		} else {
-			ir_reg tmp_reg = IR_REG_RAX;
+|.if X64
+||			ir_reg tmp_reg = IR_REG_RAX;
 
 #ifdef IR_REG_VARARG_FP_REGS
-			if (ir_is_vararg(ctx, insn)) {
-				tmp_reg = IR_REG_R11;
-			}
+||			if (ir_is_vararg(ctx, insn)) {
+||				tmp_reg = IR_REG_R11;
+||			}
 #endif
-|.if X64
-			if (IR_IS_SIGNED_32BIT(addr)) {
+||			if (IR_IS_SIGNED_32BIT(addr)) {
 				|	mov Rq(tmp_reg), ((ptrdiff_t)addr)    // 0x48 0xc7 0xc0 <imm-32-bit>
-			} else {
+||			} else {
 				|	mov64 Rq(tmp_reg), ((ptrdiff_t)addr)  // 0x48 0xb8 <imm-64-bit>
-			}
+||			}
 			|	jmp Rq(tmp_reg)
 |.endif
 		}

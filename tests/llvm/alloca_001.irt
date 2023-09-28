@@ -1,0 +1,17 @@
+--TEST--
+001: alloca function
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	int32_t size = 10;
+	l_1 = START(l_4);
+	uintptr_t ret, l_2 = ALLOCA(l_1, size);
+	l_4 = RETURN(l_2, ret);
+}
+--EXPECT--
+define ptr @test()
+{
+	%d2 = alloca i8, i32 10, align 16
+	ret ptr %d2
+}

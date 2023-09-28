@@ -554,7 +554,7 @@ static void ir_emit_tailcall(ir_ctx *ctx, FILE *f, ir_insn *insn)
 	}
 	fprintf(f, ");\n");
 	if (insn->type == IR_VOID) {
-		fprintf(f, "\treturn;");
+		fprintf(f, "\treturn;\n");
 	}
 }
 
@@ -613,7 +613,7 @@ static void ir_emit_store(ir_ctx *ctx, FILE *f, ir_insn *insn)
 	fprintf(f, ";\n");
 }
 
-static int ir_emit_func(ir_ctx *ctx, FILE *f)
+static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 {
 	ir_ref i, n, *p;
 	ir_insn *insn;
@@ -642,7 +642,7 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 
 	/* Emit function prototype */
 	fprintf(f, "%s", ir_type_cname[ret_type]);
-	fprintf(f, " test(");
+	fprintf(f, " %s(", name);
 	if (has_params) {
 		use_list = &ctx->use_lists[1];
 		n = use_list->count;
@@ -849,7 +849,7 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 					IR_ASSERT(bb->successors_count == 0);
 					fprintf(f, "\treturn");
 					if (!insn->op2) {
-						fprintf(f, ";");
+						fprintf(f, ";\n");
 					} else {
 						fprintf(f, " ");
 						ir_emit_ref(ctx, f, insn->op2);
@@ -914,7 +914,7 @@ static int ir_emit_func(ir_ctx *ctx, FILE *f)
 	return 1;
 }
 
-int ir_emit_c(ir_ctx *ctx, FILE *f)
+int ir_emit_c(ir_ctx *ctx, const char *name, FILE *f)
 {
-	return ir_emit_func(ctx, f);
+	return ir_emit_func(ctx, name, f);
 }

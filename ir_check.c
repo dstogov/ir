@@ -168,6 +168,10 @@ bool ir_check(const ir_ctx *ctx)
 												/* second argument of SHIFT may be incompatible with result */
 												break;
 											}
+											if (insn->op == IR_NOT && insn->type == IR_BOOL) {
+												/* bolean not */
+												break;
+											}
 											if (sizeof(void*) == 8) {
 												if (insn->type == IR_ADDR && use_insn->type == IR_U64) {
 													break;

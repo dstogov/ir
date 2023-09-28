@@ -1,0 +1,17 @@
+--TEST--
+001: trap function
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	l_1 = START(l_3);
+	int32_t d_2 = PARAM(l_1, "x", 1);
+	l_2 = TRAP(l_1);
+	l_3 = RETURN(l_2, d_2);
+}
+--EXPECT--
+define i32 @test(i32 %d2)
+{
+	call void @llvm.debugtrap()
+	ret i32 %d2
+}

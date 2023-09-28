@@ -1,0 +1,17 @@
+--TEST--
+003: neg function
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	l_1 = START(l_4);
+	float x = PARAM(l_1, "x", 1);
+	float ret = NEG(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+define float @test(float %d2)
+{
+	%d3 = fneg float %d2
+	ret float %d3
+}

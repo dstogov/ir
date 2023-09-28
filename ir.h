@@ -484,7 +484,7 @@ void ir_strtab_free(ir_strtab *strtab);
 #define IR_OPT_IN_SCCP         (1<<19)
 #define IR_LINEAR              (1<<20)
 #define IR_GEN_NATIVE          (1<<21)
-#define IR_GEN_C               (1<<22)
+#define IR_GEN_CODE            (1<<22) /* C or LLVM */
 
 /* Temporary: SCCP -> CFG */
 #define IR_SCCP_DONE           (1<<25)
@@ -763,7 +763,10 @@ void ir_dump_live_ranges(const ir_ctx *ctx, FILE *f);
 void ir_dump_codegen(const ir_ctx *ctx, FILE *f);
 
 /* IR to C conversion (implementation in ir_emit_c.c) */
-int ir_emit_c(ir_ctx *ctx, FILE *f);
+int ir_emit_c(ir_ctx *ctx, const char *name, FILE *f);
+
+/* IR to LLVM conversion (implementation in ir_emit_llvm.c) */
+int ir_emit_llvm(ir_ctx *ctx, const char *name, FILE *f);
 
 /* IR verification API (implementation in ir_check.c) */
 bool ir_check(const ir_ctx *ctx);

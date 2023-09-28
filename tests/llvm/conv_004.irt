@@ -1,0 +1,17 @@
+--TEST--
+004: type conversion BITCAST
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	uint64_t ret = BITCAST(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+define i64 @test(double %d2)
+{
+	%d3 = bitcast double %d2 to i64
+	ret i64 %d3
+}

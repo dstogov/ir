@@ -25,6 +25,7 @@ static void help(const char *cmd)
 #endif
 		"  -muse-fp                   - use base frame pointer register\n"
 		"  --emit-c [file-name]       - convert to C source\n"
+		"  --emit-llvm [file-name]    - convert to LLVM\n"
 		"  --save [file-name]         - save IR\n"
 		"  --dot  [file-name]         - dump IR graph\n"
 		"  --dump [file-name]         - dump IR table\n"
@@ -152,7 +153,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, const char *dump_
 		return 0;
 	}
 
-	if (opt_level > 0 || (ctx->flags & (IR_GEN_NATIVE|IR_GEN_C))) {
+	if (opt_level > 0 || (ctx->flags & (IR_GEN_NATIVE|IR_GEN_CODE))) {
 		ir_build_def_use_lists(ctx);
 	}
 
@@ -167,7 +168,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, const char *dump_
 		}
 	}
 
-	if (opt_level > 0 || (ctx->flags & (IR_GEN_NATIVE|IR_GEN_C))) {
+	if (opt_level > 0 || (ctx->flags & (IR_GEN_NATIVE|IR_GEN_CODE))) {
 		ir_build_cfg(ctx);
 	}
 
@@ -212,7 +213,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, const char *dump_
 		}
 
 		ir_schedule_blocks(ctx);
-	} else if (ctx->flags & (IR_GEN_NATIVE|IR_GEN_C)) {
+	} else if (ctx->flags & (IR_GEN_NATIVE|IR_GEN_CODE)) {
 		ir_assign_virtual_registers(ctx);
 		ir_compute_dessa_moves(ctx);
 	}
@@ -231,10 +232,10 @@ int main(int argc, char **argv)
 {
 	int i;
 	char *input = NULL;
-	char *dump_file = NULL, *c_file = NULL;
+	char *dump_file = NULL, *c_file = NULL, *llvm_file = 0;
 	FILE *f;
 	ir_ctx ctx;
-	bool emit_c = 0, dump_asm = 0, run = 0;
+	bool emit_c = 0, emit_llvm = 0, dump_asm = 0, run = 0;
 	uint32_t dump = 0;
 	int opt_level = 2;
 	uint32_t flags = 0;
@@ -272,6 +273,12 @@ int main(int argc, char **argv)
 			emit_c = 1;
 			if (i + 1 < argc && argv[i + 1][0] != '-') {
 				c_file = argv[i + 1];
+				i++;
+			}
+		} else if (strcmp(argv[i], "--emit-llvm") == 0) {
+			emit_llvm = 1;
+			if (i + 1 < argc && argv[i + 1][0] != '-') {
+				llvm_file = argv[i + 1];
 				i++;
 			}
 		} else if (strcmp(argv[i], "--save") == 0) {
@@ -411,8 +418,8 @@ int main(int argc, char **argv)
 	if (opt_level > 0) {
 		flags |= IR_OPT_FOLDING | IR_OPT_CFG | IR_OPT_CODEGEN;
 	}
-	if (emit_c) {
-		flags |= IR_GEN_C;
+	if (emit_c || emit_llvm) {
+		flags |= IR_GEN_CODE;
 	}
 	if (dump_asm || run) {
 		flags |= IR_GEN_NATIVE;
@@ -443,8 +450,29 @@ int main(int argc, char **argv)
 		} else {
 		    f = stderr;
 		}
-		ret = ir_emit_c(&ctx, f);
+		ret = ir_emit_c(&ctx, "test", f);
 		if (c_file) {
+			fclose(f);
+		}
+		if (!ret) {
+			fprintf(stderr, "\nERROR: %d\n", ctx.status);
+		}
+	}
+
+	if (emit_llvm) {
+		int ret;
+
+		if (llvm_file) {
+			f = fopen(llvm_file, "w+");
+			if (!f) {
+				fprintf(stderr, "ERROR: Cannot create file '%s'\n", llvm_file);
+				return 0;
+			}
+		} else {
+		    f = stderr;
+		}
+		ret = ir_emit_llvm(&ctx, "test", f);
+		if (llvm_file) {
 			fclose(f);
 		}
 		if (!ret) {

@@ -837,8 +837,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							ival = ctx->live_intervals[v];
 						}
 						ir_add_use(ctx, ival, j, use_pos, reg, IR_USE_FLAGS(def_flags, j), hint_ref);
-					} else {
-						IR_ASSERT(ctx->rules);
+					} else if (ctx->rules) {
 						if (ctx->rules[input] & IR_FUSED) {
 						    ir_add_fusion_ranges(ctx, ref, input, bb, live);
 						} else if (ctx->rules[input] == (IR_SKIPPED|IR_RLOAD)) {
@@ -1449,8 +1448,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							ival = ctx->live_intervals[v];
 						}
 						ir_add_use(ctx, ival, j, use_pos, reg, IR_USE_FLAGS(def_flags, j), hint_ref);
-					} else {
-						IR_ASSERT(ctx->rules);
+					} else if (ctx->rules) {
 						if (ctx->rules[input] & IR_FUSED) {
 						    ir_add_fusion_ranges(ctx, ref, input, bb, live_in_block, b);
 						} else {

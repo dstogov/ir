@@ -1,0 +1,18 @@
+--TEST--
+001: vload function
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	l_1 = START(l_3);
+	int32_t d_2 = VAR(l_1, "v");
+	int32_t d_3, l_2 = VLOAD(l_1, d_2); 
+	l_3 = RETURN(l_2, d_3);
+}
+--EXPECT--
+define i32 @test()
+{
+	%d2 = alloca i32
+	%d3 = load i32, ptr %d2
+	ret i32 %d3
+}

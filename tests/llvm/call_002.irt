@@ -1,0 +1,20 @@
+--TEST--
+Indirect CALL
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	uintptr_t c_6 = "hello %d!\n";
+	l_1 = START(l_4);
+	uintptr_t f = PARAM(l_1, "f", 1);
+	int32_t p = PARAM(l_1, "p", 2);
+	int32_t d_2, l_2 = CALL/2(l_1, f, c_6, p);
+	l_4 = RETURN(l_2, d_2);
+}
+--EXPECT--
+define i32 @test(ptr %d2, i32 %d3)
+{
+	%d4 = call i32 %d2(ptr @.str4, i32 %d3)
+	ret i32 %d4
+}
+@.str4 = private unnamed_addr constant [12 x i8] c"hello %d!\0A\00"

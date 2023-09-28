@@ -2205,20 +2205,23 @@ ir_type ir_get_return_type(ir_ctx *ctx)
 	ir_ref ref;
 	ir_insn *insn;
 	uint8_t ret_type = 255;
+	ir_type type;
 
 	/* Check all RETURN nodes */
 	ref = ctx->ir_base[1].op1;
 	while (ref) {
 		insn = &ctx->ir_base[ref];
 		if (insn->op == IR_RETURN) {
+			type = ctx->ir_base[insn->op2].type;
+check_type:
 			if (ret_type == 255) {
 				if (insn->op2) {
-					ret_type = ctx->ir_base[insn->op2].type;
+					ret_type = type;
 				} else {
 					ret_type = IR_VOID;
 				}
 			} else if (insn->op2) {
-				if (ret_type != ctx->ir_base[insn->op2].type) {
+				if (ret_type != type) {
 					IR_ASSERT(0 && "conflicting return types");
 					return IR_VOID;
 				}
@@ -2227,6 +2230,12 @@ ir_type ir_get_return_type(ir_ctx *ctx)
 					IR_ASSERT(0 && "conflicting return types");
 					return IR_VOID;
 				}
+			}
+		} else if (insn->op == IR_UNREACHABLE) {
+			insn = &ctx->ir_base[insn->op1];
+			if (insn->op == IR_TAILCALL) {
+				type = insn->type;
+				goto check_type;
 			}
 		}
 		ref = ctx->ir_base[ref].op3;

@@ -73,7 +73,8 @@ LIBS=psapi.lib capstone.lib
 OBJS_COMMON=$(BUILD_DIR)\ir.obj $(BUILD_DIR)\ir_strtab.obj $(BUILD_DIR)\ir_cfg.obj \
 	$(BUILD_DIR)\ir_sccp.obj $(BUILD_DIR)\ir_gcm.obj $(BUILD_DIR)\ir_ra.obj $(BUILD_DIR)\ir_emit.obj \
 	$(BUILD_DIR)\ir_load.obj $(BUILD_DIR)\ir_save.obj $(BUILD_DIR)\ir_emit_c.obj $(BUILD_DIR)\ir_dump.obj \
-	$(BUILD_DIR)\ir_disasm.obj $(BUILD_DIR)\ir_check.obj $(BUILD_DIR)\ir_cpuinfo.obj
+	$(BUILD_DIR)\ir_disasm.obj $(BUILD_DIR)\ir_check.obj $(BUILD_DIR)\ir_cpuinfo.obj \
+	$(BUILD_DIR)\ir_emit_llvm.obj
 OBJS_IR = $(BUILD_DIR)\ir_main.obj
 OBJS_IR_TEST = $(BUILD_DIR)\ir_test.obj
 EXAMPLE_EXES = $(EXAMPLES_BUILD_DIR)\0001-basic.exe $(EXAMPLES_BUILD_DIR)\0001-while.exe $(EXAMPLES_BUILD_DIR)\0005-basic-runner-func.exe \

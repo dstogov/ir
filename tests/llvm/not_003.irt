@@ -1,0 +1,17 @@
+--TEST--
+003: not function
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	l_1 = START(l_4);
+	uint32_t x = PARAM(l_1, "x", 1);
+	bool ret = NOT(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+define i1 @test(i32 %d2)
+{
+	%d3 = icmp eq i32 %d2, 0
+	ret i1 %d3
+}

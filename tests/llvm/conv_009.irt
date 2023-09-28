@@ -1,0 +1,17 @@
+--TEST--
+009: type conversion FP2FP
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	float ret = FP2FP(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+define float @test(double %d2)
+{
+	%d3 = fptrunc double %d2 to float
+	ret float %d3
+}
