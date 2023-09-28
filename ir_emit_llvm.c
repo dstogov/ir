@@ -516,7 +516,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					ir_emit_phi(ctx, f, i, insn, bb);
 					break;
 				case IR_VAR:
-					ir_use_list *use_list = &ctx->use_lists[i];
+					use_list = &ctx->use_lists[i];
 					if (use_list->count > 0) {
 						fprintf(f, "\t%%d%d = alloca %s\n", i, ir_type_llvm_name[insn->type]);
 					}
