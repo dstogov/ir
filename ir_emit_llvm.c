@@ -167,13 +167,13 @@ static void ir_emit_binary_overflow_op(ir_ctx *ctx, FILE *f, int def, ir_insn *i
 	fprintf(f, "extractvalue {%s, i1} %%t%d, 0\n", ir_type_llvm_name[type], def);
 }
 
-static void ir_emit_rol_ror(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *op1, const char *op2)
+static void ir_emit_rol_ror(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *op)
 {
 	ir_type type = ctx->ir_base[insn->op1].type;
 
 	ir_emit_def_ref(ctx, f, def);
 	fprintf(f, "call %s @llvm.%s.%s(%s ",
-		ir_type_llvm_name[type], insn->op == IR_ROL ? "fshl" : "fshr", ir_type_llvm_name[type], ir_type_llvm_name[type]);
+		ir_type_llvm_name[type], op, ir_type_llvm_name[type], ir_type_llvm_name[type]);
 	ir_emit_ref(ctx, f, insn->op1);
 	fprintf(f, ", %s ", ir_type_llvm_name[type]);
 	ir_emit_ref(ctx, f, insn->op1);
@@ -201,23 +201,23 @@ static void ir_emit_conv(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const cha
 	fprintf(f, " to %s\n", ir_type_llvm_name[insn->type]);
 }
 
-static void ir_emit_minmax_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
+static void ir_emit_minmax_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *op, const char *uop, const char *fop)
 {
 	ir_type type = insn->type;
 
 	ir_emit_def_ref(ctx, f, def);
 	if (IR_IS_TYPE_FP(type)) {
 		fprintf(f, "call %s @llvm.%s.%s(%s ", ir_type_llvm_name[type],
-			insn->op == IR_MIN ? "minnum" : "maxnum", type == IR_DOUBLE ? "f64" : "f32",
+			fop, type == IR_DOUBLE ? "f64" : "f32",
 			ir_type_llvm_name[type]);
 	} else {
 		IR_ASSERT(IR_IS_TYPE_INT(type));
 		if (IR_IS_TYPE_UNSIGNED(type)) {
 			fprintf(f, "call %s @llvm.%s.%s(%s ", ir_type_llvm_name[type],
-				insn->op == IR_MIN ? "umin" : "umax", ir_type_llvm_name[type], ir_type_llvm_name[type]);
+				uop, ir_type_llvm_name[type], ir_type_llvm_name[type]);
 		} else {
 			fprintf(f, "call %s @llvm.%s.%s(%s ", ir_type_llvm_name[type],
-				insn->op == IR_MIN ? "smin" : "smax", ir_type_llvm_name[type], ir_type_llvm_name[type]);
+				op, ir_type_llvm_name[type], ir_type_llvm_name[type]);
 		}
 	}
 	ir_emit_ref(ctx, f, insn->op1);
@@ -449,43 +449,27 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	ir_insn *insn;
 	ir_use_list *use_list;
 	uint8_t ret_type;
-	bool has_params = 0;
+	bool first;
 	uint32_t b, target;
 	ir_block *bb;
 
-	ret_type = ir_get_return_type(ctx);
-
-	if (!ctx->prev_ref) {
-		ir_build_prev_refs(ctx);
-	}
-
-	use_list = &ctx->use_lists[1];
-	n = use_list->count;
-	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
-		insn = &ctx->ir_base[*p];
-		if (insn->op == IR_PARAM) {
-			has_params = 1;
-			break;
-		}
-	}
-
 	/* Emit function prototype */
+	ret_type = ir_get_return_type(ctx);
 	fprintf(f, "define %s", ir_type_llvm_name[ret_type]);
 	fprintf(f, " @%s(", name);
-	if (has_params) {
-		use_list = &ctx->use_lists[1];
-		n = use_list->count;
-		for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
-			use = *p;
-			insn = &ctx->ir_base[use];
-			if (insn->op == IR_PARAM) {
-				if (has_params) {
-					has_params = 0;
-				} else {
-					fprintf(f, ", ");
-				}
-				fprintf(f, "%s %%d%d", ir_type_llvm_name[insn->type], use);
+	use_list = &ctx->use_lists[1];
+	n = use_list->count;
+	first = 1;
+	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
+		use = *p;
+		insn = &ctx->ir_base[use];
+		if (insn->op == IR_PARAM) {
+			if (first) {
+				first = 0;
+			} else {
+				fprintf(f, ", ");
 			}
+			fprintf(f, "%s %%d%d", ir_type_llvm_name[insn->type], use);
 		}
 	}
 	fprintf(f, ")\n{\n");
@@ -582,8 +566,10 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					ir_emit_binary_op(ctx, f, i, insn, "xor", NULL, NULL);
 					break;
 				case IR_MIN:
+					ir_emit_minmax_op(ctx, f, i, insn, "smin", "umin", "minnum");
+					break;
 				case IR_MAX:
-					ir_emit_minmax_op(ctx, f, i, insn);
+					ir_emit_minmax_op(ctx, f, i, insn, "smax", "umax", "maxnum");
 					break;
 				case IR_COND:
 					ir_emit_conditional_op(ctx, f, i, insn);
@@ -601,10 +587,10 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					ir_emit_binary_op(ctx, f, i, insn, "ashr", NULL, NULL);
 					break;
 				case IR_ROL:
-					ir_emit_rol_ror(ctx, f, i, insn, "<<", ">>");
+					ir_emit_rol_ror(ctx, f, i, insn, "fshl");
 					break;
 				case IR_ROR:
-					ir_emit_rol_ror(ctx, f, i, insn, ">>", "<<");
+					ir_emit_rol_ror(ctx, f, i, insn, "fshr");
 					break;
 				case IR_BSWAP:
 					ir_emit_bswap(ctx, f, i, insn);

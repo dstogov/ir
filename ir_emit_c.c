@@ -619,48 +619,30 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	ir_insn *insn;
 	ir_use_list *use_list;
 	uint8_t ret_type;
-	bool has_params = 0;
+	bool first;
 	ir_bitset vars;
 	uint32_t b, target, prev = 0;
 	ir_block *bb;
 
+	/* Emit function prototype */
 	ret_type = ir_get_return_type(ctx);
-
-	if (!ctx->prev_ref) {
-		ir_build_prev_refs(ctx);
-	}
-
+	fprintf(f, "%s", ir_type_cname[ret_type]);
+	fprintf(f, " %s(", name);
 	use_list = &ctx->use_lists[1];
 	n = use_list->count;
+	first = 1;
 	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
 		insn = &ctx->ir_base[*p];
 		if (insn->op == IR_PARAM) {
-			has_params = 1;
-			break;
-		}
-	}
-
-	/* Emit function prototype */
-	fprintf(f, "%s", ir_type_cname[ret_type]);
-	fprintf(f, " %s(", name);
-	if (has_params) {
-		use_list = &ctx->use_lists[1];
-		n = use_list->count;
-		for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
-			insn = &ctx->ir_base[*p];
-			if (insn->op == IR_PARAM) {
-				if (has_params) {
-					has_params = 0;
-				} else {
-					fprintf(f, ", ");
-				}
-				fprintf(f, "%s %s", ir_type_cname[insn->type], ir_get_str(ctx, insn->op2));
+			if (first) {
+				first = 0;
+			} else {
+				fprintf(f, ", ");
 			}
+			fprintf(f, "%s %s", ir_type_cname[insn->type], ir_get_str(ctx, insn->op2));
 		}
 	}
-	fprintf(f, ")\n");
-
-	fprintf(f, "{\n");
+	fprintf(f, ")\n{\n");
 
 	/* Emit declarations for local variables */
 	vars = ir_bitset_malloc(ctx->vregs_count + 1);
