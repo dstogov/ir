@@ -297,6 +297,37 @@ static void ir_emit_if(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn *in
 	fprintf(f, ", label %%l%d, label %%l%d\n", true_block, false_block);
 }
 
+static void ir_emit_guard(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
+{
+	ir_type type = ctx->ir_base[insn->op2].type;
+
+	// TODO: i1 @llvm.expect.i1(i1 <val>, i1 <expected_val>) ???
+	if (type == IR_BOOL) {
+		fprintf(f, "\tbr i1 ");
+		ir_emit_ref(ctx, f, insn->op2);
+	} else if (IR_IS_TYPE_FP(type)) {
+		fprintf(f, "\t%%t%d = fcmp une %s ", def, ir_type_llvm_name[type]);
+		ir_emit_ref(ctx, f, insn->op2);
+		fprintf(f, ", 0.0\n");
+		fprintf(f, "\tbr i1 %%t%d", def);
+	} else {
+		fprintf(f, "\t%%t%d = icmp ne %s ", def, ir_type_llvm_name[type]);
+		ir_emit_ref(ctx, f, insn->op2);
+		fprintf(f, ", 0\n");
+		fprintf(f, "\tbr i1 %%t%d", def);
+	}
+	fprintf(f, ", label %%l%d_true, label %%l%d_false\n", def, def);
+	fprintf(f, "l%d_%s:\n", def, insn->op == IR_GUARD ? "false" : "true");
+	fprintf(f, "\tindirectbr ptr ");
+	if (IR_IS_CONST_REF(insn->op3) && ctx->ir_base[insn->op3].op == IR_ADDR) {
+		fprintf(f, "inttoptr(i64 u0x%" PRIxPTR " to ptr)", ctx->ir_base[insn->op3].val.addr);
+	} else {
+		ir_emit_ref(ctx, f, insn->op3);
+	}
+	fprintf(f, ", []\n");
+	fprintf(f, "l%d_%s:\n", def, insn->op == IR_GUARD ? "true" : "false");
+}
+
 static void ir_emit_switch(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn *insn)
 {
 	ir_type type = ctx->ir_base[insn->op2].type;
@@ -390,7 +421,11 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 static void ir_emit_ijmp(ir_ctx *ctx, FILE *f, ir_insn *insn)
 {
 	fprintf(f, "\tindirectbr ptr ");
-	ir_emit_ref(ctx, f, insn->op2);
+	if (IR_IS_CONST_REF(insn->op2) && ctx->ir_base[insn->op2].op == IR_ADDR) {
+		fprintf(f, "inttoptr(i64 u0x%" PRIxPTR " to ptr)", ctx->ir_base[insn->op2].val.addr);
+	} else {
+		ir_emit_ref(ctx, f, insn->op2);
+	}
 	fprintf(f, ", []\n");
 }
 
@@ -710,11 +745,13 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_TRAP:
 					fprintf(f, "\tcall void @llvm.debugtrap()\n");
 					break;
+				case IR_GUARD:
+				case IR_GUARD_NOT:
+					ir_emit_guard(ctx, f, i, insn);
+					break;
 				case IR_RLOAD:
 				case IR_RSTORE:
 				case IR_TLS:
-				case IR_GUARD:
-				case IR_GUARD_NOT:
 				default:
 					IR_ASSERT(0 && "NIY instruction");
 					ctx->status = IR_ERROR_UNSUPPORTED_CODE_RULE;
