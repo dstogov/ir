@@ -17,7 +17,7 @@ Simple TAILCALL
 --EXPECT--
 define i8 @test()
 {
-	%d2 = tail call i8 @printf(ptr @.str6, i32 42)
+	%d2 = tail call i8 (...) @printf(ptr @.str6, i32 42)
 	ret i8 %d2
 }
 declare void @printf()

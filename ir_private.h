@@ -1186,6 +1186,8 @@ void ir_fix_stack_frame(ir_ctx *ctx);
 
 /* Utility */
 ir_type ir_get_return_type(ir_ctx *ctx);
+bool ir_is_fastcall(const ir_ctx *ctx, const ir_insn *insn);
+bool ir_is_vararg(const ir_ctx *ctx, ir_insn *insn);
 
 //#define IR_BITSET_LIVENESS
 

@@ -350,7 +350,14 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 	if (insn->op == IR_TAILCALL) {
 		fprintf(f, "tail ");
 	}
-	fprintf(f, "call %s ", ir_type_llvm_name[insn->type]);
+	fprintf(f, "call ");
+	if (ir_is_fastcall(ctx, insn)) {
+		fprintf(f, "x86_fastcallcc ");
+	}
+	fprintf(f, "%s ", ir_type_llvm_name[insn->type]);
+	if (ir_is_vararg(ctx, insn)) {
+		fprintf(f, "(...) ");
+	}
 
 	// TODO: function prototype ???
 

@@ -17,7 +17,7 @@ Simple CALL
 --EXPECT--
 define i32 @test()
 {
-	%d2 = call i32 @printf(ptr @.str6, i32 42)
+	%d2 = call i32 (...) @printf(ptr @.str6, i32 42)
 	ret i32 %d2
 }
 declare void @printf()

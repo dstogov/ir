@@ -70,7 +70,7 @@ static const int8_t *_ir_fp_reg_params;
 static const int8_t _ir_int_fc_reg_params[IR_REG_INT_FCARGS];
 static const int8_t *_ir_fp_fc_reg_params;
 
-static bool ir_is_fastcall(const ir_ctx *ctx, const ir_insn *insn)
+bool ir_is_fastcall(const ir_ctx *ctx, const ir_insn *insn)
 {
 	if (sizeof(void*) == 4) {
 		if (IR_IS_CONST_REF(insn->op2)) {
@@ -83,11 +83,13 @@ static bool ir_is_fastcall(const ir_ctx *ctx, const ir_insn *insn)
 	return 0;
 }
 #else
-# define ir_is_fastcall(ctx, insn) 0
+bool ir_is_fastcall(const ir_ctx *ctx, const ir_insn *insn)
+{
+	return 0;
+}
 #endif
 
-#if defined(_WIN64) || defined(IR_REG_VARARG_FP_REGS)
-static bool ir_is_vararg(const ir_ctx *ctx, ir_insn *insn)
+bool ir_is_vararg(const ir_ctx *ctx, ir_insn *insn)
 {
 	if (IR_IS_CONST_REF(insn->op2)) {
 		return (ctx->ir_base[insn->op2].const_flags & IR_CONST_VARARG_FUNC) != 0;
@@ -96,7 +98,6 @@ static bool ir_is_vararg(const ir_ctx *ctx, ir_insn *insn)
 	}
 	return 0;
 }
-#endif
 
 IR_ALWAYS_INLINE uint32_t ir_rule(const ir_ctx *ctx, ir_ref ref)
 {
