@@ -1,5 +1,5 @@
 --TEST--
-005: Common Sub-expresion Elimination & Commutative Expressions
+005: Common Sub-expression Elimination & Commutative Expressions
 --CODE--
 {
 	int32_t c_4 = 1;

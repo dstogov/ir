@@ -1,6 +1,6 @@
 /*
  * IR - Lightweight JIT Compilation Framework
- * (Exmaples package)
+ * (Examples package)
  * Copyright (C) 2023 by IR project.
  * Authors: Anatol Belski <anbelski@linux.microsoft.com>
  */
