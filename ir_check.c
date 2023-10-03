@@ -169,7 +169,7 @@ bool ir_check(const ir_ctx *ctx)
 												break;
 											}
 											if (insn->op == IR_NOT && insn->type == IR_BOOL) {
-												/* bolean not */
+												/* boolean not */
 												break;
 											}
 											if (sizeof(void*) == 8) {
@@ -295,13 +295,13 @@ bool ir_check(const ir_ctx *ctx)
 					case IR_SWITCH:
 						/* may have many successors */
 						if (use_list->count < 1) {
-							fprintf(stderr, "ir_base[%d].op (SWITCH) must have at least 1 succesor (%d)\n", i, use_list->count);
+							fprintf(stderr, "ir_base[%d].op (SWITCH) must have at least 1 successor (%d)\n", i, use_list->count);
 							ok = 0;
 						}
 						break;
 					case IR_IF:
 						if (use_list->count != 2) {
-							fprintf(stderr, "ir_base[%d].op (IF) must have 2 succesors (%d)\n", i, use_list->count);
+							fprintf(stderr, "ir_base[%d].op (IF) must have 2 successors (%d)\n", i, use_list->count);
 							ok = 0;
 						}
 						break;
@@ -347,7 +347,7 @@ bool ir_check(const ir_ctx *ctx)
 									break;
 								}
 							}
-							fprintf(stderr, "ir_base[%d].op (%s) must have 1 succesor (%d)\n",
+							fprintf(stderr, "ir_base[%d].op (%s) must have 1 successor (%d)\n",
 								i, ir_op_name[insn->op], count);
 							ok = 0;
 						}

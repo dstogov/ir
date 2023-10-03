@@ -9,7 +9,7 @@
  * Representation" In ACM SIGPLAN Workshop on Intermediate Representations
  * (IR '95), pages 35-49, Jan. 1995.
  *
- * The phisical IR representation is based on Mike Pall's LuaJIT IR.
+ * The physical IR representation is based on Mike Pall's LuaJIT IR.
  * See: M. Pall. "LuaJIT 2.0 intellectual property disclosure and research
  * opportunities" November 2009 http://lua-users.org/lists/lua-l/2009-11/msg00089.html
  */
@@ -814,7 +814,7 @@ restart:
 			}
 		}
 		if (any == 0x7f) {
-			/* All parrerns ar checked. Pass on to CSE. */
+			/* All parrerns are checked. Pass on to CSE. */
 			goto ir_fold_cse;
 		}
 		/* op2/op1/op  op2/_/op    _/op1/op    _/_/op

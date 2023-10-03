@@ -464,7 +464,7 @@ static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb)
 					ir_emit_store(ctx, insn->type, ref, src);
 				}
 			} else if (src == IR_REG_NONE) {
-				/* STORE of constant or memory can't be clobber by parallel reg->reg copies (delay it) */
+				/* STORE of constant or memory can't be clobbered by parallel reg->reg copies (delay it) */
 				copies2[n2].input = input;
 				copies2[n2].output = ref;
 				copies2[n2].type = insn->type;

@@ -1,5 +1,5 @@
 --TEST--
-022: Translation out of SSA (Figure 8 (swap problen) from "Translating Out of Static Single Assignment Form" by Sreedhar)
+022: Translation out of SSA (Figure 8 (swap problem) from "Translating Out of Static Single Assignment Form" by Sreedhar)
 --ARGS--
 --save --dump-live-ranges --dump-cfg
 --CODE--

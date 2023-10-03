@@ -18,7 +18,7 @@ static void help(const char *cmd)
 	printf(
 		"Usage: %s [options] input-file...\n"
 		"Options:\n"
-		"  -O[012]                    - optimiztion level (default: 2)\n"
+		"  -O[012]                    - optimization level (default: 2)\n"
 		"  -S                         - dump final target assembler code\n"
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 		"  -mavx                      - use AVX instruction set\n"
@@ -29,7 +29,7 @@ static void help(const char *cmd)
 		"  --save [file-name]         - save IR\n"
 		"  --dot  [file-name]         - dump IR graph\n"
 		"  --dump [file-name]         - dump IR table\n"
-		"  --dump-after-load          - dump IR after load and local optimiztion\n"
+		"  --dump-after-load          - dump IR after load and local optimization\n"
 		"  --dump-after-sccp          - dump IR after SCCP optimization pass\n"
 		"  --dump-after-gcm           - dump IR after GCM optimization pass\n"
 		"  --dump-after-schedule      - dump IR after SCHEDULE pass\n"

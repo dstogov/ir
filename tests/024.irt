@@ -1,5 +1,5 @@
 --TEST--
-024: SCCP (Removimg inputs of MERGE/PHI)
+024: SCCP (Removing inputs of MERGE/PHI)
 --ARGS--
 --save --dump-after-sccp
 --CODE--

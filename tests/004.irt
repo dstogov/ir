@@ -1,5 +1,5 @@
 --TEST--
-004: Common Sub-expresion Elimination
+004: Common Sub-expression Elimination
 --CODE--
 {
 	int32_t c_4 = 1;
