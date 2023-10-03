@@ -148,7 +148,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if ((mflags & IR_X86_AVX) & !(cpuinfo & IR_X86_AVX)) {
+	if ((mflags & IR_X86_AVX) && !(cpuinfo & IR_X86_AVX)) {
 		fprintf(stderr, "ERROR: -mAVX is not compatible with CPU (AVX is not supported)\n");
 		return 1;
 	}
