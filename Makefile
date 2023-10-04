@@ -4,6 +4,7 @@ TARGET     = x86_64
 BUILD      = debug
 BUILD_DIR  = .
 SRC_DIR    = .
+HAVE_LLVM  = no
 EXAMPLES_SRC_DIR = $(SRC_DIR)/examples
 EXAMPLES_BUILD_DIR = $(BUILD_DIR)/examples
 
@@ -39,12 +40,18 @@ ifeq (aarch64, $(TARGET))
   DASM_FLAGS = -M
 endif
 
+ifeq (yes, $(HAVE_LLVM))
+  override CFLAGS += -DHAVE_LLVM
+  LLVM_OBJS=$(BUILD_DIR)/ir_load_llvm.o
+  LLVM_LIBS=-lLLVM
+endif
+
 OBJS_COMMON = $(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_strtab.o $(BUILD_DIR)/ir_cfg.o \
 	$(BUILD_DIR)/ir_sccp.o $(BUILD_DIR)/ir_gcm.o $(BUILD_DIR)/ir_ra.o $(BUILD_DIR)/ir_emit.o \
 	$(BUILD_DIR)/ir_load.o $(BUILD_DIR)/ir_save.o $(BUILD_DIR)/ir_emit_c.o $(BUILD_DIR)/ir_dump.o \
 	$(BUILD_DIR)/ir_disasm.o $(BUILD_DIR)/ir_gdb.o $(BUILD_DIR)/ir_perf.o $(BUILD_DIR)/ir_check.o \
 	$(BUILD_DIR)/ir_cpuinfo.o $(BUILD_DIR)/ir_emit_llvm.o
-OBJS_IR = $(BUILD_DIR)/ir_main.o
+OBJS_IR = $(BUILD_DIR)/ir_main.o $(LLVM_OBJS)
 OBJS_IR_TEST = $(BUILD_DIR)/ir_test.o
 EXAMPLE_EXES = $(EXAMPLES_BUILD_DIR)/0001-basic $(EXAMPLES_BUILD_DIR)/0001-while $(EXAMPLES_BUILD_DIR)/0005-basic-runner-func \
 	       $(EXAMPLES_BUILD_DIR)/0001-pointer $(EXAMPLES_BUILD_DIR)/0001-func
@@ -58,7 +65,7 @@ $(EXAMPLES_BUILD_DIR):
 	@mkdir -p $(EXAMPLES_BUILD_DIR)
 
 $(BUILD_DIR)/ir: $(OBJS_COMMON) $(OBJS_IR)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lcapstone
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LLVM_LIBS) -lcapstone
 
 $(BUILD_DIR)/ir_test: $(OBJS_COMMON) $(OBJS_IR_TEST)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lcapstone

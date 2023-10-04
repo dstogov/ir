@@ -399,8 +399,8 @@ extern "C" {
 #define ir_COND_D(_op1, _op2, _op3)       ir_fold3(_ir_CTX, IR_OPT(IR_COND, IR_DOUBLE), (_op1), (_op2), (_op3))
 #define ir_COND_F(_op1, _op2, _op3)       ir_fold3(_ir_CTX, IR_OPT(IR_COND, IR_FLOAT),  (_op1), (_op2), (_op3))
 
-#define ir_PHI_2(_src1, _src2)            _ir_PHI_2(_ir_CTX, (_src1), (_src2))
-#define ir_PHI_N(_n, _inputs)             _ir_PHI_N(_ir_CTX, (_n), (_inputs))
+#define ir_PHI_2(type, _src1, _src2)      _ir_PHI_2(_ir_CTX, type, (_src1), (_src2))
+#define ir_PHI_N(type, _n, _inputs)       _ir_PHI_N(_ir_CTX, type, (_n), (_inputs))
 #define ir_PHI_SET_OP(_ref, _pos, _src)   _ir_PHI_SET_OP(_ir_CTX, (_ref), (_pos), (_src))
 
 #define ir_COPY_B(_op1)                   ir_UNARY_OP_B(IR_COPY, (_op1))
@@ -455,6 +455,7 @@ extern "C" {
 #define ir_ALLOCA(_size)                  _ir_ALLOCA(_ir_CTX, (_size))
 #define ir_AFREE(_size)                   _ir_AFREE(_ir_CTX, (_size))
 #define ir_VADDR(_var)                    ir_emit1(_ir_CTX, IR_OPT(IR_VADDR, IR_ADDR), (_var))
+#define ir_VLOAD(_type, _var)             _ir_VLOAD(_ir_CTX, (_type), (_var))
 #define ir_VLOAD_B(_var)                  _ir_VLOAD(_ir_CTX, IR_BOOL, (_var))
 #define ir_VLOAD_U8(_var)                 _ir_VLOAD(_ir_CTX, IR_U8, (_var))
 #define ir_VLOAD_U16(_var)                _ir_VLOAD(_ir_CTX, IR_U16, (_var))
@@ -539,8 +540,8 @@ extern "C" {
 #define ir_MERGE_WITH_EMPTY_FALSE(_if)    do {ir_ref end = ir_END(); ir_IF_FALSE(_if); ir_MERGE_2(end, ir_END());} while (0)
 
 ir_ref _ir_ADD_OFFSET(ir_ctx *ctx, ir_ref addr, uintptr_t offset);
-ir_ref _ir_PHI_2(ir_ctx *ctx, ir_ref src1, ir_ref src2);
-ir_ref _ir_PHI_N(ir_ctx *ctx, ir_ref n, ir_ref *inputs);
+ir_ref _ir_PHI_2(ir_ctx *ctx, ir_type type, ir_ref src1, ir_ref src2);
+ir_ref _ir_PHI_N(ir_ctx *ctx, ir_type type, ir_ref n, ir_ref *inputs);
 void   _ir_PHI_SET_OP(ir_ctx *ctx, ir_ref phi, ir_ref pos, ir_ref src);
 ir_ref _ir_PARAM(ir_ctx *ctx, ir_type type, const char* name, ir_ref num);
 ir_ref _ir_VAR(ir_ctx *ctx, ir_type type, const char* name);

@@ -1315,6 +1315,104 @@ void ir_hashtab_key_sort(ir_hashtab *tab)
 	} while (--i);
 }
 
+static void ir_addrtab_resize(ir_hashtab *tab)
+{
+	uint32_t old_hash_size = (uint32_t)(-(int32_t)tab->mask);
+	char *old_data = tab->data;
+	uint32_t size = tab->size * 2;
+	uint32_t hash_size = ir_hashtab_hash_size(size);
+	char *data = ir_mem_malloc(hash_size * sizeof(uint32_t) + size * sizeof(ir_addrtab_bucket));
+	ir_addrtab_bucket *p;
+	uint32_t pos, i;
+
+	memset(data, -1, hash_size * sizeof(uint32_t));
+	tab->data = data + (hash_size * sizeof(uint32_t));
+	tab->mask = (uint32_t)(-(int32_t)hash_size);
+	tab->size = size;
+
+	memcpy(tab->data, old_data, tab->count * sizeof(ir_addrtab_bucket));
+	ir_mem_free(old_data - (old_hash_size * sizeof(uint32_t)));
+
+	i = tab->count;
+	pos = 0;
+	p = (ir_addrtab_bucket*)tab->data;
+	do {
+		uint32_t key = (uint32_t)p->key | tab->mask;
+		p->next = ((uint32_t*)tab->data)[(int32_t)key];
+		((uint32_t*)tab->data)[(int32_t)key] = pos;
+		pos += sizeof(ir_addrtab_bucket);
+		p++;
+	} while (--i);
+}
+
+void ir_addrtab_init(ir_hashtab *tab, uint32_t size)
+{
+	IR_ASSERT(size > 0);
+	uint32_t hash_size = ir_hashtab_hash_size(size);
+	char *data = ir_mem_malloc(hash_size * sizeof(uint32_t) + size * sizeof(ir_addrtab_bucket));
+	memset(data, -1, hash_size * sizeof(uint32_t));
+	tab->data = (data + (hash_size * sizeof(uint32_t)));
+	tab->mask = (uint32_t)(-(int32_t)hash_size);
+	tab->size = size;
+	tab->count = 0;
+	tab->pos = 0;
+}
+
+void ir_addrtab_free(ir_hashtab *tab)
+{
+	uint32_t hash_size = (uint32_t)(-(int32_t)tab->mask);
+	char *data = (char*)tab->data - (hash_size * sizeof(uint32_t));
+	ir_mem_free(data);
+	tab->data = NULL;
+}
+
+ir_ref ir_addrtab_find(const ir_hashtab *tab, uint64_t key)
+{
+	const char *data = (const char*)tab->data;
+	uint32_t pos = ((uint32_t*)data)[(int32_t)(key | tab->mask)];
+	ir_addrtab_bucket *p;
+
+	while (pos != IR_INVALID_IDX) {
+		p = (ir_addrtab_bucket*)(data + pos);
+		if (p->key == key) {
+			return p->val;
+		}
+		pos = p->next;
+	}
+	return IR_INVALID_VAL;
+}
+
+bool ir_addrtab_add(ir_hashtab *tab, uint64_t key, ir_ref val)
+{
+	char *data = (char*)tab->data;
+	uint32_t pos = ((uint32_t*)data)[(int32_t)(key | tab->mask)];
+	ir_addrtab_bucket *p;
+
+	while (pos != IR_INVALID_IDX) {
+		p = (ir_addrtab_bucket*)(data + pos);
+		if (p->key == key) {
+			return p->val == val;
+		}
+		pos = p->next;
+	}
+
+	if (UNEXPECTED(tab->count >= tab->size)) {
+		ir_addrtab_resize(tab);
+		data = tab->data;
+	}
+
+	pos = tab->pos;
+	tab->pos += sizeof(ir_addrtab_bucket);
+	tab->count++;
+	p = (ir_addrtab_bucket*)(data + pos);
+	p->key = key;
+	p->val = val;
+	key |= tab->mask;
+	p->next = ((uint32_t*)data)[(int32_t)key];
+	((uint32_t*)data)[(int32_t)key] = pos;
+	return 1;
+}
+
 /* Memory API */
 #ifdef _WIN32
 void *ir_mem_mmap(size_t size)
@@ -1550,19 +1648,17 @@ ir_ref _ir_VAR(ir_ctx *ctx, ir_type type, const char* name)
 	return ir_var(ctx, type, ctx->control, name);
 }
 
-ir_ref _ir_PHI_2(ir_ctx *ctx, ir_ref src1, ir_ref src2)
+ir_ref _ir_PHI_2(ir_ctx *ctx, ir_type type, ir_ref src1, ir_ref src2)
 {
-	ir_type type = ctx->ir_base[src1].type;
-
 	IR_ASSERT(ctx->control);
 	IR_ASSERT(ctx->ir_base[ctx->control].op == IR_MERGE || ctx->ir_base[ctx->control].op == IR_LOOP_BEGIN);
-	if (src1 == src2) {
+	if (src1 == src2 && src1 != IR_UNUSED) {
 		return src1;
 	}
 	return ir_emit3(ctx, IR_OPTX(IR_PHI, type, 3), ctx->control, src1, src2);
 }
 
-ir_ref _ir_PHI_N(ir_ctx *ctx, ir_ref n, ir_ref *inputs)
+ir_ref _ir_PHI_N(ir_ctx *ctx, ir_type type, ir_ref n, ir_ref *inputs)
 {
 	IR_ASSERT(ctx->control);
 	IR_ASSERT(n > 0);
@@ -1573,17 +1669,19 @@ ir_ref _ir_PHI_N(ir_ctx *ctx, ir_ref n, ir_ref *inputs)
 		ir_ref ref = inputs[0];
 
 		IR_ASSERT(ctx->ir_base[ctx->control].op == IR_MERGE || ctx->ir_base[ctx->control].op == IR_LOOP_BEGIN);
-		for (i = 1; i < n; i++) {
-			if (inputs[i] != ref) {
-				break;
+		if (ref != IR_UNUSED) {
+			for (i = 1; i < n; i++) {
+				if (inputs[i] != ref) {
+					break;
+				}
+			}
+			if (i == n) {
+				/* all the same */
+				return ref;
 			}
 		}
-		if (i == n) {
-			/* all the same */
-			return ref;
-		}
 
-		ref = ir_emit_N(ctx, IR_OPT(IR_PHI, ctx->ir_base[inputs[0]].type), n + 1);
+		ref = ir_emit_N(ctx, IR_OPT(IR_PHI, type), n + 1);
 		ir_set_op(ctx, ref, 1, ctx->control);
 		for (i = 0; i < n; i++) {
 			ir_set_op(ctx, ref, i + 2, inputs[i]);
