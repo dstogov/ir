@@ -1,12 +1,16 @@
 # IR - Lightweight JIT Compilation Framework
 
-The main task of this framework is transformation of the IR (Intermediate
-Representation) into an optimized in-memory target machine code, that may
-be directly executed.
+IR Framework is a practical solution for implementing JIT in medium-size projects. 
+It defines Intermediate Representaion (IR), provies simple API for IR construction and
+a set of algorithms for optimization, scheduling, register allocation and code
+generation. The resulting generated in-memory code, may be directly executed.
 
-This is not a stable finished product yet. It’s used as a base for development
-of the next generation JIT compiler for PHP-9. There are a lot of required
-things are not implemented yet.
+This is not a stable finished product yet. It’s still under active development.
+It was started as a base for development of the next generation JIT compiler for PHP-9,
+but it's completly PHP independent.
+
+A preesentation about IR framewor design and implementation details is available at
+[researchgate](https://www.researchgate.net/publication/374470404_IR_JIT_Framework_a_base_for_the_next_generation_JIT_for_PHP).
 
 ## IR - Intermediate Representation
 
@@ -108,6 +112,10 @@ and inserts the necessary spill load/store and SSA deconstruction code.
 - Target CPU disassembler for generated code (uses libcapstone [?])
 - GDB/JIT interface to allow debugging of JIT-ed code
 - Linux perf interface to analyze the code performance
+
+## LLVM interopability
+
+Under development...
 
 ## IR Example
 
@@ -271,6 +279,50 @@ test:
 
 A new experimental JIT for PHP based on IR is developed at [php-ir](https://github.com/dstogov/php-src/tree/php-ir/ext/opcache/jit) branch.
 See [README-IR.md](https://github.com/dstogov/php-src/blob/php-ir/ext/opcache/jit/README-IR.md).
+
+### Building and Testing PHP with JIT based on IR Framework
+
+Install pre-requested libraries. PHP and their extensions may require different libraries.
+JIT itself needs just **libcapstone** to produce disassembler output.
+
+```
+sudo dbf install capstone-devel
+```
+
+Build PHP
+
+```
+git clone -b php-ir --single-branch git@github.com:dstogov/php-src.git php-ir
+cd php-ir
+./buildconf --force
+mkdir install
+./configure --with-capstone --prefix=`pwd`/install --with-config-file-path=`pwd`/install/etc
+make
+make install
+mkdir install/etc
+cat > install/etc/php.ini <<EOL
+zend_extension=opcache.so
+opcache.enable=1
+opcache.enable_cli=1
+opcache.optimization_level=-1
+opcache.jit_buffer_size=32M
+opcache.jit=tracing
+opcache.huge_code_pages=1
+EOL
+```
+
+Check if opcache s loaded
+
+```
+sapi/cli/php -v | grep -i opcache
+```
+
+See JIT in action
+
+```
+sapi/cli/php -d opcache.jit=tracing -d opcache.jit_debug=1 Zend/bench.php
+sapi/cli/php -d opcache.jit=function -d opcache.jit_debug=1 Zend/bench.php
+```
 
 ## References
 
