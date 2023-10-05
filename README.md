@@ -1,7 +1,7 @@
 # IR - Lightweight JIT Compilation Framework
 
 IR Framework is a practical solution for implementing JIT in medium-size projects. 
-It defines Intermediate Representaion (IR), provies simple API for IR construction and
+It defines Intermediate Representaion (IR), provides a simple API for IR construction and
 a set of algorithms for optimization, scheduling, register allocation and code
 generation. The resulting generated in-memory code, may be directly executed.
 
