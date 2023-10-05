@@ -9,7 +9,7 @@ This is not a stable finished product yet. It’s still under active development
 It was started as a base for development of the next generation JIT compiler for PHP-9,
 but it's completly PHP independent.
 
-A preesentation about IR framewor design and implementation details is available at
+A presentation about IR framewor design and implementation details is available at
 [researchgate](https://www.researchgate.net/publication/374470404_IR_JIT_Framework_a_base_for_the_next_generation_JIT_for_PHP).
 
 ## IR - Intermediate Representation
