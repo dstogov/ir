@@ -150,12 +150,12 @@ void gen_mandelbrot(ir_ctx *ctx)
 	ir_ref ci = ir_COPY_D(x);
 	ir_ref zi = ir_COPY_D(ir_CONST_DOUBLE(0.0));
 	ir_ref zr = ir_COPY_D(ir_CONST_DOUBLE(0.0));
-	ir_ref i = ir_COPY_D(ir_CONST_I32(0));
+	ir_ref i = ir_COPY_I32(ir_CONST_I32(0));
 
 	ir_ref loop = ir_LOOP_BEGIN(ir_END());
-		ir_ref zi_1 = ir_PHI_2(zi, IR_UNUSED);
-		ir_ref zr_1 = ir_PHI_2(zr, IR_UNUSED);
-		ir_ref i_1 = ir_PHI_2(i, IR_UNUSED);
+		ir_ref zi_1 = ir_PHI_2(IR_DOUBLE, zi, IR_UNUSED);
+		ir_ref zr_1 = ir_PHI_2(IR_DOUBLE, zr, IR_UNUSED);
+		ir_ref i_1 = ir_PHI_2(IR_I32, i, IR_UNUSED);
 
 		ir_ref i_2 = ir_ADD_I32(i_1, ir_CONST_I32(1));
 		ir_ref temp = ir_MUL_D(zr_1, zi_1);
