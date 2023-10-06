@@ -268,7 +268,6 @@ static int run_test(const char *filename, test *t, int show_diff)
 
 	if (!write_file(code_filename, t->code, strlen(t->code))) {
 		free(code_filename);
-		free(code_filename);
 		free(out_filename);
 		free(exp_filename);
 		free(diff_filename);

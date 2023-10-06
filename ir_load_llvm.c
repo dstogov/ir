@@ -17,7 +17,7 @@
 #define IR_BAD_TYPE IR_LAST_TYPE
 
 static ir_ref llvm2ir_const_expr(ir_ctx *ctx, LLVMValueRef expr);
-static ir_ref llvm2ir_auto_cast(ir_ctx *ctx, ir_ref ref, ir_type type);
+static ir_ref llvm2ir_auto_cast(ir_ctx *ctx, ir_ref ref, ir_type src_type, ir_type type);
 
 static ir_type llvm2ir_type(LLVMTypeRef type)
 {
@@ -45,12 +45,15 @@ static ir_type llvm2ir_type(LLVMTypeRef type)
 		case LLVMFunctionTypeKind:
 		case LLVMLabelTypeKind:
 			return IR_ADDR;
+		case LLVMVectorTypeKind:
+			IR_ASSERT(0 && "NIY LLVMVectorTypeKind use -fno-vectorize -fno-slp-vectorize");
 		default:
 			break;
 	}
 
 	str = LLVMPrintTypeToString(type);
 	fprintf(stderr, "Unsupported LLVM type: %s\n", str);
+	IR_ASSERT(0);
 	LLVMDisposeMessage(str);
 	return IR_BAD_TYPE;
 }
@@ -84,6 +87,8 @@ static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 					return ir_const_u32(ctx, LLVMConstIntGetZExtValue(op));
 				case IR_U64:
 					return ir_const_u64(ctx, LLVMConstIntGetZExtValue(op));
+				case IR_ADDR:
+					return ir_const_addr(ctx, LLVMConstIntGetZExtValue(op));
 				case IR_CHAR:
 					return ir_const_char(ctx, LLVMConstIntGetZExtValue(op));
 				default:
@@ -102,13 +107,16 @@ static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 		case LLVMConstantExprValueKind:
 			ref = llvm2ir_const_expr(ctx, op);
 			if (ctx->ir_base[ref].type != type) {
-				ref = llvm2ir_auto_cast(ctx, ref, type);
+				ref = llvm2ir_auto_cast(ctx, ref, ctx->ir_base[ref].type, type);
 			}
 			return ref;
 		case LLVMArgumentValueKind:
 		case LLVMInstructionValueKind:
 			ref  = ir_addrtab_find(ctx->binding, (uintptr_t)op);
 			IR_ASSERT(ref != (ir_ref)IR_INVALID_VAL);
+			if (ctx->ir_base[ref].type != type) {
+				ref = llvm2ir_auto_cast(ctx, ref, ctx->ir_base[ref].type, type);
+			}
 			return ref;
 		case LLVMGlobalVariableValueKind:
 			// TODO: resolve variable address
@@ -124,6 +132,7 @@ static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 				flags |= IR_CONST_FASTCALL_FUNC;
 			} else {
 				fprintf(stderr, "Unsupported Calling Convention: %d\n", cconv);
+				IR_ASSERT(0);
 				return 0;
 			}
 			if (LLVMIsFunctionVarArg(LLVMTypeOf(op))) {
@@ -132,6 +141,38 @@ static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 			name = LLVMGetValueName2(op, &name_len);
 			ref = ir_const_func(ctx, ir_strl(ctx, name, name_len), flags);
 			return ref;
+		case LLVMUndefValueValueKind:
+			switch (type) {
+				case IR_BOOL:
+					return ir_const_bool(ctx, 0);
+				case IR_I8:
+					return ir_const_i8(ctx, 0);
+				case IR_I16:
+					return ir_const_i16(ctx, 0);
+				case IR_I32:
+					return ir_const_i32(ctx, 0);
+				case IR_I64:
+					return ir_const_i64(ctx, 0);
+				case IR_U8:
+					return ir_const_u8(ctx, 0);
+				case IR_U16:
+					return ir_const_u16(ctx, 0);
+				case IR_U32:
+					return ir_const_u32(ctx, 0);
+				case IR_U64:
+					return ir_const_u64(ctx, 0);
+				case IR_ADDR:
+					return IR_NULL;
+				case IR_CHAR:
+					return ir_const_char(ctx, 0);
+				case IR_DOUBLE:
+					return ir_const_double(ctx, 0);
+				case IR_FLOAT:
+					return ir_const_float(ctx, 0);
+				default:
+					IR_ASSERT(0);
+					return 0;
+			}
 		default:
 			IR_ASSERT(0);
 			return 0;
@@ -155,15 +196,16 @@ static void llvm2ir_ret(ir_ctx *ctx, LLVMValueRef insn)
 	ir_RETURN(ref);
 }
 
-static void llvm2ir_jmp(ir_ctx *ctx, LLVMValueRef insn)
+static ir_ref llvm2ir_jmp(ir_ctx *ctx, LLVMValueRef insn)
 {
 	ir_ref ref;
 
-	ref = ir_END(); // TODO: LOOP_END
+	ref = ir_END(); /* END may be converted to LOOP_END later */
 	ir_addrtab_add(ctx->binding, (uintptr_t)insn, ref);
+	return ref;
 }
 
-static void llvm2ir_if(ir_ctx *ctx, LLVMValueRef insn)
+static ir_ref llvm2ir_if(ir_ctx *ctx, LLVMValueRef insn)
 {
 	ir_ref ref;
 	LLVMValueRef op0 = LLVMGetOperand(insn, 0);
@@ -171,9 +213,10 @@ static void llvm2ir_if(ir_ctx *ctx, LLVMValueRef insn)
 
 	ref = ir_IF(llvm2ir_op(ctx, op0, type));
 	ir_addrtab_add(ctx->binding, (uintptr_t)insn, ref);
+	return ref;
 }
 
-static void llvm2ir_switch(ir_ctx *ctx, LLVMValueRef insn)
+static ir_ref llvm2ir_switch(ir_ctx *ctx, LLVMValueRef insn)
 {
 	ir_ref ref;
 	LLVMValueRef op0 = LLVMGetOperand(insn, 0);
@@ -181,6 +224,7 @@ static void llvm2ir_switch(ir_ctx *ctx, LLVMValueRef insn)
 
 	ref = ir_SWITCH(llvm2ir_op(ctx, op0, type));
 	ir_addrtab_add(ctx->binding, (uintptr_t)insn, ref);
+	return ref;
 }
 
 static ir_ref llvm2ir_unary_op(ir_ctx *ctx, LLVMValueRef expr, ir_op op)
@@ -293,14 +337,28 @@ static ir_ref llvm2ir_cond_op(ir_ctx *ctx, LLVMValueRef expr)
 
 static void llvm2ir_alloca(ir_ctx *ctx, LLVMValueRef insn)
 {
-	ir_type type = llvm2ir_type(LLVMGetAllocatedType(insn));
 	LLVMValueRef op0 = LLVMGetOperand(insn, 0);
 	ir_ref ref;
 
 	if (LLVMGetValueKind(op0) == LLVMConstantIntValueKind && LLVMConstIntGetZExtValue(op0) == 1) {
-		ref = ir_VAR(type, ""); // TODO: unique name
+		LLVMTypeKind type_kind = LLVMGetTypeKind(LLVMGetAllocatedType(insn));
+
+		if (type_kind == LLVMIntegerTypeKind
+		 || type_kind == LLVMFloatTypeKind
+		 || type_kind == LLVMDoubleTypeKind
+		 || type_kind == LLVMPointerTypeKind
+		 || type_kind == LLVMFunctionTypeKind
+		 || type_kind == LLVMLabelTypeKind) {
+			ir_type type = llvm2ir_type(LLVMGetAllocatedType(insn));
+
+			ref = ir_VAR(type, ""); // TODO: unique name
+		} else {
+			ref = ir_ALLOCA(ir_MUL_A(llvm2ir_op(ctx, op0, IR_ADDR),
+				ir_const_addr(ctx, LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, LLVMGetAllocatedType(insn)))));
+		}
 	} else {
-		ref = ir_ALLOCA(ir_MUL_A(llvm2ir_op(ctx, op0, IR_ADDR), ir_const_addr(ctx, ir_type_size[type])));
+		ref = ir_ALLOCA(ir_MUL_A(llvm2ir_op(ctx, op0, IR_ADDR),
+			ir_const_addr(ctx, LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, LLVMGetAllocatedType(insn)))));
 	}
 	ir_addrtab_add(ctx->binding, (uintptr_t)insn, ref);
 }
@@ -343,22 +401,17 @@ static void llvm2ir_call(ir_ctx *ctx, LLVMValueRef insn)
 	LLVMTypeRef ftype = LLVMGetCalledFunctionType(insn);
 //	uint32_t cconv = LLVMGetInstructionCallConv(insn);
 //	LLVMBool tail = LLVMIsTailCall(insn);
-	ir_type type = llvm2ir_type(LLVMGetReturnType(ftype));
+	ir_type type;
 	uint32_t i, count =	LLVMGetNumArgOperands(insn);
-	ir_ref ref, func_ref;
-
-	func_ref = llvm2ir_op(ctx, func, IR_ADDR);
-	ref = ir_emit_N(ctx, IR_OPT(IR_CALL, type), count + 2);
-	ir_set_op(ctx, ref, 1, ctx->control);
-	ir_set_op(ctx, ref, 2, func_ref);
-	ctx->control = ref;
+	ir_ref ref;
+	ir_ref *args = alloca(sizeof(ref) * count);
 
 	for (i = 0; i < count; i++) {
         arg = LLVMGetOperand(insn, i);
         type = llvm2ir_type(LLVMTypeOf(arg));
-		ir_set_op(ctx, ref, i + 3, llvm2ir_op(ctx, arg, type));
+        args[i] = llvm2ir_op(ctx, arg, type);
 	}
-
+	ref = ir_CALL_N(llvm2ir_type(LLVMGetReturnType(ftype)), llvm2ir_op(ctx, func, IR_ADDR), count, args);
 	ir_addrtab_add(ctx->binding, (uintptr_t)insn, ref);
 }
 
@@ -562,12 +615,41 @@ static ir_ref llvm2ir_const_expr(ir_ctx *ctx, LLVMValueRef expr)
 			break;
 	}
 	fprintf(stderr, "Unsupported LLVM expr: %d\n", opcode);
+	IR_ASSERT(0);
 	return 0;
 }
 
-static ir_ref llvm2ir_auto_cast(ir_ctx *ctx, ir_ref ref, ir_type type)
+static ir_ref llvm2ir_auto_cast(ir_ctx *ctx, ir_ref ref, ir_type src_type, ir_type type)
 {
-	// TODO:
+	if (type == IR_ADDR && ctx->ir_base[ref].op == IR_VAR) {
+		return ir_VADDR(ref);
+	} else if (IR_IS_TYPE_INT(type)) {
+		if (IR_IS_TYPE_INT(src_type)) {
+			if (ir_type_size[type] == ir_type_size[src_type]) {
+				if (type == IR_ADDR) {
+					return ref;
+				} else {
+					return ir_BITCAST(type, ref);
+				}
+			} else if (ir_type_size[type] > ir_type_size[src_type]) {
+				if (IR_IS_TYPE_SIGNED(src_type)) {
+					return ir_SEXT(type, ref);
+				} else {
+					return ir_ZEXT(type, ref);
+				}
+			} else if (ir_type_size[type] < ir_type_size[src_type]) {
+				return ir_TRUNC(type, ref);
+			}
+		} else {
+			// TODO: FP to INT conversion
+		}
+	} else if (IR_IS_TYPE_FP(type)) {
+		if (IR_IS_TYPE_FP(src_type)) {
+			return ir_FP2FP(type, ref);
+		} else {
+			return ir_INT2FP(type, ref);
+		}
+	}
 	IR_ASSERT(0);
 	return ref;
 }
@@ -589,7 +671,7 @@ static void llvm2ir_bb_start(ir_ctx *ctx, LLVMBasicBlockRef bb, LLVMBasicBlockRe
 			IR_ASSERT(LLVMGetNumSuccessors(insn) == 2);
 			true_bb = LLVMGetSuccessor(insn, 0); /* true branch */
 			false_bb = LLVMGetSuccessor(insn, 1); /* false branch */
-			IR_ASSERT(true_bb != false_bb); // TODO:
+			IR_ASSERT(true_bb != false_bb);
 			if (bb == true_bb) {
 				ir_IF_TRUE(ref);
 			} else {
@@ -630,81 +712,20 @@ static void llvm2ir_bb_start(ir_ctx *ctx, LLVMBasicBlockRef bb, LLVMBasicBlockRe
 	}
 }
 
-static ir_ref llvm2ir_bb_end(ir_ctx *ctx, LLVMBasicBlockRef bb, LLVMBasicBlockRef pred_bb)
-{
-	LLVMValueRef insn = LLVMGetLastInstruction(pred_bb);
-	LLVMOpcode opcode = LLVMGetInstructionOpcode(insn);
-	ir_ref ref;
-
-	if (opcode == LLVMBr) {
-		ref = ir_addrtab_find(ctx->binding, (uintptr_t)insn);
-		if (ref == (ir_ref)IR_INVALID_VAL) {
-			return IR_UNUSED;
-		} else if (LLVMIsConditional(insn)) {
-			LLVMBasicBlockRef true_bb, false_bb;
-
-			IR_ASSERT(LLVMGetNumSuccessors(insn) == 2);
-			true_bb = LLVMGetSuccessor(insn, 0); /* true branch */
-			false_bb = LLVMGetSuccessor(insn, 1); /* false branch */
-			IR_ASSERT(true_bb != false_bb); // TODO:
-			if (bb == true_bb) {
-				ir_IF_TRUE(ref);
-				ref = ir_END();
-			} else {
-				IR_ASSERT(bb == false_bb);
-				ir_IF_FALSE(ref);
-				ref = ir_END();
-			}
-		}
-	} else if (opcode == LLVMSwitch) {
-		ir_ref ref = ir_addrtab_find(ctx->binding, (uintptr_t)insn);
-		uint32_t i, n, count;
-
-		IR_ASSERT(ref != (ir_ref)IR_INVALID_VAL);
-		count = LLVMGetNumOperands(insn);
-		n = 0;
-		if (LLVMGetSwitchDefaultDest(insn) == bb) {
-			n++;
-		}
-		for (i = 2; i < count; i += 2) {
-			if ((LLVMBasicBlockRef)LLVMGetOperand(insn, i + 1) == bb) {
-				n++;
-			}
-		}
-		IR_ASSERT(n == 1); // TODO:
-		if (LLVMGetSwitchDefaultDest(insn) == bb) {
-			ir_CASE_DEFAULT(ref);
-			return ir_END();
-		} else  {
-			for (i = 2; i < count; i += 2) {
-				if ((LLVMBasicBlockRef)LLVMGetOperand(insn, i + 1) == bb) {
-					LLVMValueRef val = LLVMGetOperand(insn, i);
-					ir_type type = llvm2ir_type(LLVMTypeOf(val));
-					ir_CASE_VAL(ref, llvm2ir_op(ctx, val, type));
-					return ir_END();
-				}
-			}
-		}
-	} else {
-		IR_ASSERT(0);
-		ref = IR_UNUSED;
-	}
-	return ref;
-}
-
 static int llvm2ir_func(ir_ctx *ctx, LLVMModuleRef module, LLVMValueRef func)
 {
-	uint32_t i, j, count, cconv, bb_count;
+	uint32_t i, j, b, count, cconv, bb_count;
 	LLVMBasicBlockRef *bbs, bb;
 	LLVMValueRef param, insn;
 	LLVMOpcode opcode;
 	ir_type type;
-	ir_ref ref, max_inputs_count;
+	ir_ref ref, merge, max_inputs_count;
 	ir_hashtab bb_hash;
 	ir_use_list *predecessors;
-	uint32_t *predecessor_edges;
-	ir_ref *inputs, *bb_starts;
+	uint32_t *predecessor_edges, *predecessor_refs_count;
+	ir_ref *inputs, *bb_starts, *predecessor_refs;
 
+	// TODO: function prototype
 	cconv = LLVMGetFunctionCallConv(func);
 	if (cconv == LLVMCCallConv || cconv == LLVMFastCallConv) {
 		/* skip */
@@ -712,6 +733,7 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMModuleRef module, LLVMValueRef func)
 		ctx->flags |= IR_FASTCALL_FUNC;
 	} else {
 		fprintf(stderr, "Unsupported Calling Convention: %d\n", cconv);
+		IR_ASSERT(0);
 		return 0;
 	}
 	if (LLVMIsFunctionVarArg(LLVMTypeOf(func))) {
@@ -766,6 +788,8 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMModuleRef module, LLVMValueRef func)
 		predecessors[i].count = 0;
 	}
 	predecessor_edges = ir_mem_malloc(sizeof(uint32_t) * count);
+	predecessor_refs = ir_mem_calloc(sizeof(ir_ref), count);
+	predecessor_refs_count = ir_mem_calloc(sizeof(uint32_t), bb_count);
 	inputs = ir_mem_malloc(sizeof(ir_ref) * max_inputs_count);
 	for (i = 0; i < bb_count; i++) {
 		bb = bbs[i];
@@ -789,10 +813,7 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMModuleRef module, LLVMValueRef func)
 		if (count == 1) {
 			llvm2ir_bb_start(ctx, bb, bbs[predecessor_edges[predecessors[i].refs]]);
 		} else if (count > 1) {
-			for (j = 0; j < count; j++) {
-				inputs[j] = llvm2ir_bb_end(ctx, bb, bbs[predecessor_edges[predecessors[i].refs + j]]);
-			}
-			ir_MERGE_N(count, inputs); // TODO: LOOP_BEGIN
+			ir_MERGE_N(count, predecessor_refs + predecessors[i].refs); /* MERGE may be converted to LOOP_BEGIN later */
 		} else if (i != 0) {
 			ir_BEGIN(IR_UNUSED); /* unreachable block */
 		}
@@ -806,16 +827,100 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMModuleRef module, LLVMValueRef func)
 					break;
 				case LLVMBr:
 					if (!LLVMIsConditional(insn)) {
-						llvm2ir_jmp(ctx, insn);
+						ref = llvm2ir_jmp(ctx, insn);
+						b = ir_addrtab_find(&bb_hash, (uintptr_t)LLVMGetSuccessor(insn, 0));
+						IR_ASSERT(b < bb_count);
+						if (predecessors[b].count > 1) {
+							if (b > i) {
+								predecessor_refs[predecessors[b].refs + predecessor_refs_count[b]] = ref;
+							} else {
+								merge = bb_starts[b];
+								IR_ASSERT(ctx->ir_base[merge].op == IR_MERGE || ctx->ir_base[merge].op == IR_LOOP_BEGIN);
+								ctx->ir_base[merge].op = IR_LOOP_BEGIN;
+								ctx->ir_base[ref].op = IR_LOOP_END;
+								ir_MERGE_SET_OP(merge, predecessor_refs_count[b] + 1, ref);
+							}
+							predecessor_refs_count[b]++;
+						}
 					} else {
-						llvm2ir_if(ctx, insn);
+						ref = llvm2ir_if(ctx, insn);
+						b = ir_addrtab_find(&bb_hash, (uintptr_t)LLVMGetSuccessor(insn, 0)); /* true branch */
+						IR_ASSERT(b < bb_count);
+						if (predecessors[b].count > 1) {
+							ir_IF_TRUE(ref);
+							if (b > i) {
+								predecessor_refs[predecessors[b].refs + predecessor_refs_count[b]] = ir_END();;
+							} else {
+								merge = bb_starts[b];
+								IR_ASSERT(ctx->ir_base[merge].op == IR_MERGE || ctx->ir_base[merge].op == IR_LOOP_BEGIN);
+								ctx->ir_base[merge].op = IR_LOOP_BEGIN;
+								ir_MERGE_SET_OP(merge, predecessor_refs_count[b] + 1, ir_LOOP_END());
+							}
+							predecessor_refs_count[b]++;
+						} else {
+							IR_ASSERT(b > i);
+						}
+						b = ir_addrtab_find(&bb_hash, (uintptr_t)LLVMGetSuccessor(insn, 1)); /* false branch */
+						IR_ASSERT(b < bb_count);
+						if (predecessors[b].count > 1) {
+							ir_IF_FALSE(ref);
+							if (b > i) {
+								predecessor_refs[predecessors[b].refs + predecessor_refs_count[b]] = ir_END();;
+							} else {
+								merge = bb_starts[b];
+								IR_ASSERT(ctx->ir_base[merge].op == IR_MERGE || ctx->ir_base[merge].op == IR_LOOP_BEGIN);
+								ctx->ir_base[merge].op = IR_LOOP_BEGIN;
+								ir_MERGE_SET_OP(merge, predecessor_refs_count[b] + 1, ir_LOOP_END());
+							}
+							predecessor_refs_count[b]++;
+						} else {
+							IR_ASSERT(b > i);
+						}
 					}
 					break;
 				case LLVMSwitch:
-					llvm2ir_switch(ctx, insn);
+					ref = llvm2ir_switch(ctx, insn);
+					b = ir_addrtab_find(&bb_hash, (uintptr_t)LLVMGetSwitchDefaultDest(insn));
+					IR_ASSERT(b < bb_count);
+					if (predecessors[b].count > 1) {
+						ir_CASE_DEFAULT(ref);
+						if (b > i) {
+							predecessor_refs[predecessors[b].refs + predecessor_refs_count[b]] = ir_END();
+						} else {
+							merge = bb_starts[b];
+							IR_ASSERT(ctx->ir_base[merge].op == IR_MERGE || ctx->ir_base[merge].op == IR_LOOP_BEGIN);
+							ctx->ir_base[merge].op = IR_LOOP_BEGIN;
+							ir_MERGE_SET_OP(merge, predecessor_refs_count[b] + 1, ir_LOOP_END());
+						}
+						predecessor_refs_count[b]++;
+					} else {
+						IR_ASSERT(b > i);
+					}
+					count = LLVMGetNumOperands(insn);
+					for (j = 2; j < count; j += 2) {
+						b = ir_addrtab_find(&bb_hash, (uintptr_t)LLVMGetOperand(insn, j + 1));
+						IR_ASSERT(b < bb_count);
+						if (predecessors[b].count > 1) {
+							LLVMValueRef val = LLVMGetOperand(insn, j);
+							ir_type type = llvm2ir_type(LLVMTypeOf(val));
+							ir_CASE_VAL(ref, llvm2ir_op(ctx, val, type));
+							if (b > i) {
+								predecessor_refs[predecessors[b].refs + predecessor_refs_count[b]] = ir_END();
+							} else {
+								merge = bb_starts[b];
+								IR_ASSERT(ctx->ir_base[merge].op == IR_MERGE || ctx->ir_base[merge].op == IR_LOOP_BEGIN);
+								ctx->ir_base[merge].op = IR_LOOP_BEGIN;
+								ir_MERGE_SET_OP(merge, predecessor_refs_count[b] + 1, ir_LOOP_END());
+							}
+							predecessor_refs_count[b]++;
+						} else {
+							IR_ASSERT(b > i);
+						}
+					}
 					break;
 				case LLVMIndirectBr:
 					// TODO:
+					IR_ASSERT(0 && "NIY LLVMIndirectBr");
 					break;
 				case LLVMUnreachable:
 					ir_UNREACHABLE();
@@ -920,29 +1025,21 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMModuleRef module, LLVMValueRef func)
 					break;
 				default:
 					fprintf(stderr, "Unsupported LLVM insn: %d\n", opcode);
+					IR_ASSERT(0);
 					return 0;
 			}
 		}
 	}
 
-	/* Backpatch MERGEs and PHIs */
+	/* Backpatch PHIs */
 	for (i = 0; i < bb_count; i++) {
-		ir_ref merge, phi, *merge_ops;
+		ir_ref phi;
 		uint32_t k;
 
 		bb = bbs[i];
 		count = predecessors[i].count;
 		if (count <= 1) continue;
-		merge = bb_starts[i];
-		IR_ASSERT(ctx->ir_base[merge].op == IR_MERGE || ctx->ir_base[merge].op == IR_LOOP_BEGIN);
-		for (k = 0; k < count; k++) {
-			merge_ops = ctx->ir_base[merge].ops + 1;
-			if (!merge_ops[k]) {
-				ref = llvm2ir_bb_end(ctx, bb, bbs[predecessor_edges[predecessors[i].refs + k]]);
-				IR_ASSERT(ref != IR_UNUSED);
-				ir_MERGE_SET_OP(merge, k + 1, ref);
-			}
-		}
+		IR_ASSERT(ctx->ir_base[bb_starts[i]].op == IR_MERGE || ctx->ir_base[bb_starts[i]].op == IR_LOOP_BEGIN);
 		for (insn = LLVMGetFirstInstruction(bb);
 				insn && LLVMGetInstructionOpcode(insn) == LLVMPHI;
 				insn = LLVMGetNextInstruction(insn)) {
@@ -965,6 +1062,8 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMModuleRef module, LLVMValueRef func)
 		}
 	}
 
+	ir_mem_free(predecessor_refs);
+	ir_mem_free(predecessor_refs_count);
 	ir_mem_free(bb_starts);
 	ir_addrtab_free(ctx->binding);
 	ir_mem_free(ctx->binding);
@@ -974,9 +1073,6 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMModuleRef module, LLVMValueRef func)
 	ir_mem_free(predecessors);
 	ir_mem_free(predecessor_edges);
 	ir_mem_free(inputs);
-
-	fprintf(stderr, "%s:\n", LLVMGetValueName(func));
-	ir_save(ctx, stderr);
 
 	return 1;
 }
@@ -997,6 +1093,15 @@ static int ir_load_llvm_module(LLVMModuleRef module, uint32_t flags)
 			return 0;
 		}
 		ctx.rules = NULL;
+
+		// TODO:
+		fprintf(stderr, "%s:\n", LLVMGetValueName(func));
+		ir_save(&ctx, stderr);
+		if (!ir_check(&ctx)) {
+			ir_free(&ctx);
+			return 0;
+		}
+
 		ir_free(&ctx);
 	}
 

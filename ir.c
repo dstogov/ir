@@ -1963,6 +1963,22 @@ ir_ref _ir_CALL_5(ir_ctx *ctx, ir_type type, ir_ref func, ir_ref arg1, ir_ref ar
 	return call;
 }
 
+ir_ref _ir_CALL_N(ir_ctx *ctx, ir_type type, ir_ref func, uint32_t count, ir_ref *args)
+{
+	ir_ref call;
+	uint32_t i;
+
+	IR_ASSERT(ctx->control);
+	call = ir_emit_N(ctx, IR_OPT(IR_CALL, type), count + 2);
+	ir_set_op(ctx, call, 1, ctx->control);
+	ir_set_op(ctx, call, 2, func);
+	for (i = 0; i < count; i++) {
+		ir_set_op(ctx, call, i + 3, args[i]);
+	}
+	ctx->control = call;
+	return call;
+}
+
 void _ir_UNREACHABLE(ir_ctx *ctx)
 {
 	IR_ASSERT(ctx->control);
@@ -2043,6 +2059,22 @@ void _ir_TAILCALL_5(ir_ctx *ctx, ir_ref func, ir_ref arg1, ir_ref arg2, ir_ref a
 	ir_set_op(ctx, call, 5, arg3);
 	ir_set_op(ctx, call, 6, arg4);
 	ir_set_op(ctx, call, 7, arg5);
+	ctx->control = call;
+	_ir_UNREACHABLE(ctx);
+}
+
+void _ir_TAILCALL_N(ir_ctx *ctx, ir_ref func, uint32_t count, ir_ref *args)
+{
+	ir_ref call;
+	uint32_t i;
+
+	IR_ASSERT(ctx->control);
+	call = ir_emit_N(ctx, IR_TAILCALL, count + 2);
+	ir_set_op(ctx, call, 1, ctx->control);
+	ir_set_op(ctx, call, 2, func);
+	for (i = 0; i < count; i++) {
+		ir_set_op(ctx, call, i + 3, args[i]);
+	}
 	ctx->control = call;
 	_ir_UNREACHABLE(ctx);
 }

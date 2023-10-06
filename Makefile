@@ -80,6 +80,7 @@ $(BUILD_DIR)/ir_emit.o: $(SRC_DIR)/ir_$(DASM_ARCH).h $(BUILD_DIR)/ir_emit_$(DASM
 $(BUILD_DIR)/ir_gdb.o: $(SRC_DIR)/ir_elf.h
 $(BUILD_DIR)/ir_perf.o: $(SRC_DIR)/ir_elf.h
 $(BUILD_DIR)/ir_disasm.o: $(SRC_DIR)/ir_elf.h
+$(BUILD_DIR)/ir_load_llvm.o: $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h $(SRC_DIR)/ir_builder.h
 
 $(SRC_DIR)/ir_load.c: $(SRC_DIR)/ir.g
 	$(LLK) ir.g
