@@ -1643,9 +1643,19 @@ ir_ref _ir_PARAM(ir_ctx *ctx, ir_type type, const char* name, ir_ref num)
 
 ir_ref _ir_VAR(ir_ctx *ctx, ir_type type, const char* name)
 {
-	IR_ASSERT(ctx->control);
-	IR_ASSERT(IR_IS_BB_START(ctx->ir_base[ctx->control].op));
-	return ir_var(ctx, type, ctx->control, name);
+//	IR_ASSERT(ctx->control);
+//	IR_ASSERT(IR_IS_BB_START(ctx->ir_base[ctx->control].op));
+//	TODO: VAR may be insterted after some "memory" instruction
+	ir_ref ref = ctx->control;
+
+	while (1) {
+		IR_ASSERT(ctx->control);
+		if (IR_IS_BB_START(ctx->ir_base[ref].op)) {
+			break;
+		}
+		ref = ctx->ir_base[ref].op1;
+	}
+	return ir_var(ctx, type, ref, name);
 }
 
 ir_ref _ir_PHI_2(ir_ctx *ctx, ir_type type, ir_ref src1, ir_ref src2)

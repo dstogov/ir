@@ -173,11 +173,11 @@ bool ir_check(const ir_ctx *ctx)
 												break;
 											}
 											if (sizeof(void*) == 8) {
-												if (insn->type == IR_ADDR && use_insn->type == IR_U64) {
+												if (insn->type == IR_ADDR && (use_insn->type == IR_U64 || use_insn->type == IR_I64)) {
 													break;
 												}
 											} else {
-												if (insn->type == IR_ADDR && use_insn->type == IR_U32) {
+												if (insn->type == IR_ADDR && (use_insn->type == IR_U32 || use_insn->type == IR_I32)) {
 													break;
 												}
 											}
