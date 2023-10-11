@@ -73,7 +73,7 @@ R2 (d_5, d_9) [SPILL=0x8]
 [%d0] : [11.0-11.1), [13.0-13.1)
 [%SCRATCH] : [11.1-11.2), [13.1-13.2)
 }
-test:
+main:
 	stp x29, x30, [sp, #-0x20]!
 	mov x29, sp
 	fmov d0, xzr

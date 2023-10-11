@@ -17,7 +17,7 @@ x86
 	l_4 = RETURN(l_2, d_2);
 }
 --EXPECT--
-test:
+main:
 	subl $0xc, %esp
 	movl $.L1, (%esp)
 	movl $0x2a, 4(%esp)

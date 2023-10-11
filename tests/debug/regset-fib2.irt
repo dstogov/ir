@@ -73,7 +73,7 @@ R3 (d_10) [SPILL=0x8]
 [%xmm0] : [11.0-11.1), [13.0-13.1)
 [%SCRATCH] : [11.1-11.2), [13.1-13.2)
 }
-test:
+main:
 	subq $0x18, %rsp
 	movsd .L3(%rip), %xmm0
 	movsd %xmm0, (%rsp)

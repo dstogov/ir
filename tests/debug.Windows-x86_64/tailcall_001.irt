@@ -17,7 +17,7 @@ Windows-x86_64
 	l_4 = UNREACHABLE(l_2);
 }
 --EXPECT--
-test:
+main:
 	leaq .L1(%rip), %rcx
 	movl $0x2a, %edx
 	movabsq $printf, %rax

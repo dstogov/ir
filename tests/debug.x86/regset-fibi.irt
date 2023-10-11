@@ -62,7 +62,7 @@ R3 (d_9) [%ebp]: [9.2-13.0), DEF(9.2)!, PHI_USE(12.2, phi=d_5/3)
 [%eax] : [14.0-14.1)
 [%SCRATCH] : [10.1-10.2)
 }
-test:
+main:
 	subl $0x1c, %esp
 	movl %ebx, 0x18(%esp)
 	movl %ebp, 0x14(%esp)

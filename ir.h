@@ -746,13 +746,27 @@ void ir_gdb_unregister_all(void);
 bool ir_gdb_present(void);
 
 /* IR load API (implementation in ir_load.c) */
+
+typedef struct _ir_loader ir_loader;
+
+struct _ir_loader {
+	uint32_t default_func_flags;
+	bool (*init_module)       (ir_loader *loader, const char *name, const char *filename, const char *target);
+	bool (*external_sym_dcl)  (ir_loader *loader, const char *name, bool is_const);
+	bool (*sym_dcl)           (ir_loader *loader, const char *name, bool is_const, bool is_static, size_t size, const void *data);
+	bool (*external_func_dcl) (ir_loader *loader, const char *name);
+	bool (*forward_func_dcl)  (ir_loader *loader, const char *name, bool is_static);
+	bool (*init_func)         (ir_loader *loader, ir_ctx *ctx, const char *name);
+	bool (*process_func)      (ir_loader *loader, ir_ctx *ctx, const char *name);
+};
+
 void ir_loader_init(void);
 void ir_loader_free(void);
 int ir_load(ir_ctx *ctx, FILE *f);
 
 /* IR LLVM load API (implementation in ir_load_llvm.c) */
-int ir_load_llvm_bitcode(const char *filename, uint32_t flags);
-int ir_load_llvm_asm(const char *filename, uint32_t flags);
+int ir_load_llvm_bitcode(ir_loader *loader, const char *filename);
+int ir_load_llvm_asm(ir_loader *loader, const char *filename);
 
 /* IR save API (implementation in ir_save.c) */
 void ir_save(const ir_ctx *ctx, FILE *f);

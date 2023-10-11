@@ -19,7 +19,7 @@ TAILCALL for functions with stack argumnts is not implemented
 	l_4 = UNREACHABLE(l_2);
 }
 --EXPECT--
-test:
+main:
 	leaq .L1(%rip), %rdi
 	movl $0x2a, %esi
 	movabsq $printf, %rax

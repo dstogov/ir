@@ -23,7 +23,7 @@ Windows-x86_64
 	l_3 = RETURN(l_2, d_2);
 }
 --EXPECT--
-test:
+main:
 	subq $0x58, %rsp
 	leaq .L1(%rip), %rcx
 	movl $1, %edx

@@ -23,7 +23,7 @@ x86_64
 	l_3 = RETURN(l_2, d_2);
 }
 --EXPECT--
-test:
+main:
 	subq $0x18, %rsp
 	leaq .L9(%rip), %rdi
 	movsd .L1(%rip), %xmm0

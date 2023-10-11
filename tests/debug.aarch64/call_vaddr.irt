@@ -39,7 +39,7 @@ aarch64
 	l_4 = RETURN(l_2, d_2);
 }
 --EXPECT--
-test:
+main:
 	stp x29, x30, [sp, #-0x20]!
 	mov x29, sp
 	add x0, x29, #0x10

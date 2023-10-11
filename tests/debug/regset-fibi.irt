@@ -64,7 +64,7 @@ R3 (d_9) [%ebp]: [9.2-13.0), DEF(9.2)!, PHI_USE(12.2, phi=d_5/3)
 [%rdi] : [10.0-10.1)
 [%SCRATCH] : [10.1-10.2)
 }
-test:
+main:
 	subq $0x18, %rsp
 	movq %rbx, 0x10(%rsp)
 	movq %rbp, 8(%rsp)

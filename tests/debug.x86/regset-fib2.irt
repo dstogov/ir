@@ -71,7 +71,7 @@ R3 (d_10) [SPILL=0x8]
 [%eax] : [17.0-17.1)
 [%SCRATCH] : [11.1-11.2), [13.1-13.2)
 }
-test:
+main:
 	subl $0x1c, %esp
 	movsd .L3, %xmm0
 	movsd %xmm0, 0xc(%esp)

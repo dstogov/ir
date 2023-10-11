@@ -1365,15 +1365,137 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMModuleRef module, LLVMValueRef func)
 	return 1;
 }
 
-static int ir_load_llvm_module(LLVMModuleRef module, uint32_t flags)
+static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 {
 	ir_ctx ctx;
-	LLVMValueRef func;
+	LLVMValueRef sym, func;
 	LLVMTargetDataRef target_data = LLVMGetModuleDataLayout(module);
+	const char *name;
+	size_t name_len;
+
+	if (loader->init_module
+	 && !loader->init_module(loader,
+			LLVMGetModuleIdentifier(module, &name_len),
+			LLVMGetSourceFileName(module, &name_len),
+			LLVMGetTarget(module))) {
+		return 1;
+	}
+
+	if (loader->external_sym_dcl || loader->sym_dcl) {
+		for (sym = LLVMGetFirstGlobal(module); sym; sym = LLVMGetNextGlobal(sym)) {
+			LLVMLinkage linkage = LLVMGetLinkage(sym);
+			LLVMValueRef init = LLVMGetInitializer(sym);
+			bool is_external = 0;
+			bool is_static = 0;
+
+			IR_ASSERT(!LLVMIsThreadLocal(sym));
+			switch (linkage) {
+				case LLVMExternalLinkage:
+					if (!init) {
+						is_external = 1;
+					}
+					break;
+				case LLVMInternalLinkage:
+				case LLVMPrivateLinkage:
+					is_static = 1;
+					break;
+				default:
+					fprintf(stderr, "Unsupported LLVM linkage: %d\n", linkage);
+					IR_ASSERT(0);
+			}
+			name = LLVMGetValueName(sym);
+			if (is_external) {
+				if (loader->external_sym_dcl
+				 && !loader->external_sym_dcl(loader, name, LLVMIsGlobalConstant(sym))) {
+					return 0;
+				}
+			} else {
+				if (loader->sym_dcl) {
+					LLVMTypeRef type;
+					size_t size;
+					void *data = NULL;
+
+					type = LLVMGlobalGetValueType(sym);
+					size = LLVMABISizeOfType(target_data, type);
+
+					if (init && LLVMGetValueKind(init) != LLVMConstantAggregateZeroValueKind) {
+						// TODO: create data
+					}
+					if (!loader->sym_dcl(loader, name, LLVMIsGlobalConstant(sym), is_static, size, data)) {
+						return 0;
+					}
+				}
+			}
+		}
+	}
+
+	if (loader->external_func_dcl) {
+		for (func = LLVMGetFirstFunction(module); func; func = LLVMGetNextFunction(func)) {
+			LLVMLinkage linkage;
+			bool is_external = 0;
+			bool is_static = 0;
+
+			if (!LLVMIsDeclaration(func)) continue;
+			linkage = LLVMGetLinkage(func);
+			name = LLVMGetValueName(func);
+			if (STR_START(name, name_len, "llvm.")) continue;
+			switch (linkage) {
+				case LLVMExternalLinkage:
+					is_external = 1;
+					break;
+				case LLVMInternalLinkage:
+				case LLVMPrivateLinkage:
+					is_static = 1;
+					break;
+				default:
+					fprintf(stderr, "Unsupported LLVM linkage: %d\n", linkage);
+					IR_ASSERT(0);
+			}
+			if (is_external) {
+				if (!loader->external_func_dcl(loader, name)) {
+					return 0;
+				}
+			} else {
+				if (loader->forward_func_dcl
+				 && !loader->forward_func_dcl(loader, name, is_static)) {
+					return 0;
+				}
+			}
+		}
+	}
+
+	if (loader->forward_func_dcl) {
+		for (func = LLVMGetFirstFunction(module); func; func = LLVMGetNextFunction(func)) {
+			LLVMLinkage linkage;
+			bool is_static = 0;
+
+			if (LLVMIsDeclaration(func)) continue;
+			linkage = LLVMGetLinkage(func);
+			name = LLVMGetValueName(func);
+			if (STR_START(name, name_len, "llvm.")) continue;
+			switch (linkage) {
+				case LLVMExternalLinkage:
+					break;
+				case LLVMInternalLinkage:
+				case LLVMPrivateLinkage:
+					is_static = 1;
+					break;
+				default:
+					fprintf(stderr, "Unsupported LLVM linkage: %d\n", linkage);
+					IR_ASSERT(0);
+			}
+			if (!loader->forward_func_dcl(loader, name, is_static)) {
+				return 0;
+			}
+		}
+	}
 
 	for (func = LLVMGetFirstFunction(module); func; func = LLVMGetNextFunction(func)) {
 		if (LLVMIsDeclaration(func)) continue;
-		ir_init(&ctx, flags, 256, 1024);
+		ir_init(&ctx, loader->default_func_flags, 256, 1024);
+		if (loader->init_func &&  !loader->init_func(loader, &ctx, LLVMGetValueName(func))) {
+			return 0;
+		}
 		ctx.rules = (void*)target_data;
 		if (!llvm2ir_func(&ctx, module, func)) {
 			ctx.rules = NULL;
@@ -1382,11 +1504,7 @@ static int ir_load_llvm_module(LLVMModuleRef module, uint32_t flags)
 		}
 		ctx.rules = NULL;
 
-		// TODO:
-		fprintf(stderr, "%s:\n", LLVMGetValueName(func));
-		ir_save(&ctx, stderr);
-		if (!ir_check(&ctx)) {
-			ir_free(&ctx);
+		if (loader->process_func && !loader->process_func(loader, &ctx, LLVMGetValueName(func))) {
 			return 0;
 		}
 
@@ -1396,7 +1514,7 @@ static int ir_load_llvm_module(LLVMModuleRef module, uint32_t flags)
 	return 1;
 }
 
-int ir_load_llvm_bitcode(const char *filename, uint32_t flags)
+int ir_load_llvm_bitcode(ir_loader *loader, const char *filename)
 {
 	LLVMMemoryBufferRef memory_buffer;
 	LLVMModuleRef module;
@@ -1414,7 +1532,7 @@ int ir_load_llvm_bitcode(const char *filename, uint32_t flags)
 		fprintf(stderr, "Cannot parse LLVM bitcode\n");
 		return 0;
 	}
-	if (!ir_load_llvm_module(module, flags)) {
+	if (!ir_load_llvm_module(loader, module)) {
 		LLVMDisposeModule(module);
 		fprintf(stderr, "Cannot convert LLVM to IR\n");
 		return 0;
@@ -1424,7 +1542,7 @@ int ir_load_llvm_bitcode(const char *filename, uint32_t flags)
 	return 1;
 }
 
-int ir_load_llvm_asm(const char *filename, uint32_t flags)
+int ir_load_llvm_asm(ir_loader *loader, const char *filename)
 {
 	LLVMMemoryBufferRef memory_buffer;
 	LLVMModuleRef module;
@@ -1442,7 +1560,7 @@ int ir_load_llvm_asm(const char *filename, uint32_t flags)
 		free(message);
 		return 0;
 	}
-	if (!ir_load_llvm_module(module, flags)) {
+	if (!ir_load_llvm_module(loader, module)) {
 		LLVMDisposeModule(module);
 		fprintf(stderr, "Cannot convert LLVM to IR\n");
 		return 0;

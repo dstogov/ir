@@ -17,7 +17,7 @@ aarch64
 	l_4 = UNREACHABLE(l_2);
 }
 --EXPECT--
-test:
+main:
 	adr x0, .L1
 	movz w1, #0x2a
 	b printf

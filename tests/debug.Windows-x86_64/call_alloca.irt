@@ -39,7 +39,7 @@ Windows-x86_64
 	l_4 = RETURN(l_2, d_2);
 }
 --EXPECT--
-test:
+main:
 	pushq %rbp
 	movq %rsp, %rbp
 	subq $0x10, %rsp

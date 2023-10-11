@@ -39,7 +39,7 @@ x86_64
 	l_4 = RETURN(l_2, d_2);
 }
 --EXPECT--
-test:
+main:
 	subq $8, %rsp
 	leaq (%rsp), %rdi
 	movb $0x68, (%rdi)

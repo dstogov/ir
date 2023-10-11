@@ -68,6 +68,8 @@ static void help(const char *cmd)
 #define IR_DUMP_LIVE_RANGES         (1<<6)
 #define IR_DUMP_CODEGEN             (1<<7)
 
+#define IR_DUMP_NAME                (1<<8)
+
 #define IR_DUMP_AFTER_LOAD          (1<<16)
 #define IR_DUMP_AFTER_SCCP          (1<<17)
 #define IR_DUMP_AFTER_GCM           (1<<18)
@@ -78,48 +80,43 @@ static void help(const char *cmd)
 #define IR_DUMP_AFTER_ALL           (1<<29)
 #define IR_DUMP_FINAL               (1<<30)
 
-static int _save(ir_ctx *ctx, uint32_t dump, uint32_t pass, const char *dump_file)
+static int _save(ir_ctx *ctx, uint32_t dump, uint32_t pass, FILE *f, const char *func_name)
 {
 	char fn[4096];
-	FILE *f;
+	bool close = 0;
 
-	if (dump_file) {
+	if (!f) {
 		if (dump & IR_DUMP_AFTER_ALL) {
 			if (pass == IR_DUMP_AFTER_LOAD) {
-				snprintf(fn, sizeof(fn)-1, "01-load-%s", dump_file);
-                dump_file = fn;
+				snprintf(fn, sizeof(fn)-1, "01-load-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_SCCP) {
-				snprintf(fn, sizeof(fn)-1, "02-sccp-%s", dump_file);
-                dump_file = fn;
+				snprintf(fn, sizeof(fn)-1, "02-sccp-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_GCM) {
-				snprintf(fn, sizeof(fn)-1, "03-gcm-%s", dump_file);
-                dump_file = fn;
+				snprintf(fn, sizeof(fn)-1, "03-gcm-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_SCHEDULE) {
-				snprintf(fn, sizeof(fn)-1, "04-schedule-%s", dump_file);
-                dump_file = fn;
+				snprintf(fn, sizeof(fn)-1, "04-schedule-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_LIVE_RANGES) {
-				snprintf(fn, sizeof(fn)-1, "05-live-ranges-%s", dump_file);
-                dump_file = fn;
+				snprintf(fn, sizeof(fn)-1, "05-live-ranges-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_COALESCING) {
-				snprintf(fn, sizeof(fn)-1, "06-coalescing-%s", dump_file);
-                dump_file = fn;
+				snprintf(fn, sizeof(fn)-1, "06-coalescing-%s.ir", func_name);
 			} else if (pass == IR_DUMP_FINAL) {
 				if (dump & IR_DUMP_CODEGEN) {
-					snprintf(fn, sizeof(fn)-1, "07-codegen-%s", dump_file);
+					snprintf(fn, sizeof(fn)-1, "07-codegen-%s.ir", func_name);
 				} else {
-					snprintf(fn, sizeof(fn)-1, "07-final-%s", dump_file);
+					snprintf(fn, sizeof(fn)-1, "07-final-%s.ir", func_name);
 				}
-                dump_file = fn;
-                dump_file = fn;
+			} else {
+				f = stderr; // TODO:
 			}
+		} else {
+			snprintf(fn, sizeof(fn)-1, "%s.ir", func_name);
 		}
-		f = fopen(dump_file, "w+");
+		f = fopen(fn, "w+");
 		if (!f) {
-			fprintf(stderr, "ERROR: Cannot create file '%s'\n", dump_file);
+			fprintf(stderr, "ERROR: Cannot create file '%s'\n", fn);
 			return 0;
 		}
-	} else {
-	    f = stderr;
+		close = 1;
 	}
 	if (pass == IR_DUMP_FINAL && (dump & IR_DUMP_CODEGEN)) {
 		ir_dump_codegen(ctx, f);
@@ -144,16 +141,16 @@ static int _save(ir_ctx *ctx, uint32_t dump, uint32_t pass, const char *dump_fil
 	if (dump & IR_DUMP_LIVE_RANGES) {
 		ir_dump_live_ranges(ctx, f);
 	}
-	if (dump_file) {
+	if (close) {
 		fclose(f);
 	}
 	return 1;
 }
 
-int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, const char *dump_file)
+int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, FILE *dump_file, const char *func_name)
 {
 	if ((dump & (IR_DUMP_AFTER_LOAD|IR_DUMP_AFTER_ALL))
-	 && !_save(ctx, dump, IR_DUMP_AFTER_LOAD, dump_file)) {
+	 && !_save(ctx, dump, IR_DUMP_AFTER_LOAD, dump_file, func_name)) {
 		return 0;
 	}
 
@@ -167,7 +164,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, const char *dump_
 	if (opt_level > 1) {
 		ir_sccp(ctx);
 		if ((dump & (IR_DUMP_AFTER_SCCP|IR_DUMP_AFTER_ALL))
-		 && !_save(ctx, dump, IR_DUMP_AFTER_SCCP, dump_file)) {
+		 && !_save(ctx, dump, IR_DUMP_AFTER_SCCP, dump_file, func_name)) {
 			return 0;
 		}
 	}
@@ -182,12 +179,12 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, const char *dump_
 		ir_find_loops(ctx);
 		ir_gcm(ctx);
 		if ((dump & (IR_DUMP_AFTER_GCM|IR_DUMP_AFTER_ALL))
-		 && !_save(ctx, dump, IR_DUMP_AFTER_GCM, dump_file)) {
+		 && !_save(ctx, dump, IR_DUMP_AFTER_GCM, dump_file, func_name)) {
 			return 0;
 		}
 		ir_schedule(ctx);
 		if ((dump & (IR_DUMP_AFTER_SCHEDULE|IR_DUMP_AFTER_ALL))
-		 && !_save(ctx, dump, IR_DUMP_AFTER_SCHEDULE, dump_file)) {
+		 && !_save(ctx, dump, IR_DUMP_AFTER_SCHEDULE, dump_file, func_name)) {
 			return 0;
 		}
 	}
@@ -201,14 +198,14 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, const char *dump_
 		ir_compute_live_ranges(ctx);
 
 		if ((dump & (IR_DUMP_AFTER_LIVE_RANGES|IR_DUMP_AFTER_ALL))
-		 && !_save(ctx, dump, IR_DUMP_AFTER_LIVE_RANGES, dump_file)) {
+		 && !_save(ctx, dump, IR_DUMP_AFTER_LIVE_RANGES, dump_file, func_name)) {
 			return 0;
 		}
 
 		ir_coalesce(ctx);
 
 		if ((dump & (IR_DUMP_AFTER_COALESCING|IR_DUMP_AFTER_ALL))
-		 && !_save(ctx, dump, IR_DUMP_AFTER_COALESCING, dump_file)) {
+		 && !_save(ctx, dump, IR_DUMP_AFTER_COALESCING, dump_file, func_name)) {
 			return 0;
 		}
 
@@ -223,12 +220,138 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, const char *dump_
 	}
 
 	if ((dump & (IR_DUMP_FINAL|IR_DUMP_AFTER_ALL|IR_DUMP_CODEGEN))
-	 && !_save(ctx, dump, IR_DUMP_FINAL, dump_file)) {
+	 && !_save(ctx, dump, IR_DUMP_FINAL, dump_file, func_name)) {
 		return 0;
 	}
 
 	ir_check(ctx);
 
+	return 1;
+}
+
+typedef struct _ir_main_loader {
+	ir_loader  loader;
+	int        opt_level;
+	uint32_t   mflags;
+	uint64_t   debug_regset;
+	uint32_t   dump;
+	bool       dump_asm;
+	bool       dump_size;
+	bool       run;
+	size_t     size;
+	void      *main;
+	FILE      *dump_file;
+	FILE      *c_file;
+	FILE      *llvm_file;
+} ir_main_loader;
+
+static bool ir_loader_external_sym_dcl(ir_loader *loader, const char *name, bool is_const)
+{
+	ir_main_loader *l = (ir_main_loader*) loader;
+
+	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
+		fprintf(l->dump_file, "; external %s %s:\n", is_const ? "const" : "var", name);
+	}
+	return 1;
+}
+
+static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, bool is_const, bool is_static, size_t size, const void *data)
+{
+	ir_main_loader *l = (ir_main_loader*) loader;
+
+	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
+		fprintf(l->dump_file, "; %s%s %s: [%lld]\n", is_static ? "static " : "", is_const ? "const" : "var", name, (long long int)size);
+	}
+	return 1;
+}
+
+static bool ir_loader_external_func_dcl(ir_loader *loader, const char *name)
+{
+	ir_main_loader *l = (ir_main_loader*) loader;
+
+	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
+		fprintf(l->dump_file, "; external func %s:\n", name);
+	}
+	return 1;
+}
+
+static bool ir_loader_init_func(ir_loader *loader, ir_ctx *ctx, const char *name)
+{
+	ir_main_loader *l = (ir_main_loader*) loader;
+
+	ctx->mflags = l->mflags;
+	ctx->fixed_regset = ~l->debug_regset;
+	return 1;
+}
+
+static bool ir_loader_process_func(ir_loader *loader, ir_ctx *ctx, const char *name)
+{
+	ir_main_loader *l = (ir_main_loader*) loader;
+
+	if ((l->dump & IR_DUMP_SAVE) && (l->dump & IR_DUMP_NAME) && l->dump_file) {
+		fprintf(l->dump_file, "%s:\n", name);
+	}
+
+	if (!ir_compile_func(ctx, l->opt_level, l->dump, l->dump_file, name)) {
+		return 0;
+	}
+
+	if (l->c_file) {
+		if (!ir_emit_c(ctx, name, l->c_file)) {
+			fprintf(stderr, "\nERROR: %d\n", ctx->status);
+			return 0;
+		}
+	}
+
+	if (l->llvm_file) {
+		if (!ir_emit_llvm(ctx, name, l->llvm_file)) {
+			fprintf(stderr, "\nERROR: %d\n", ctx->status);
+			return 0;
+		}
+	}
+
+	if (l->dump_asm || l->dump_size || l->run) {
+		size_t size;
+		void *entry = ir_emit_code(ctx, &size);
+
+		l->size += size;
+		if (entry) {
+			if (l->dump_asm) {
+				ir_ref i;
+				ir_insn *insn;
+
+				ir_disasm_add_symbol(name, (uintptr_t)entry, size);
+
+				for (i = IR_UNUSED + 1, insn = ctx->ir_base - i; i < ctx->consts_count; i++, insn--) {
+					if (insn->op == IR_FUNC) {
+						const char *name = ir_get_str(ctx, insn->val.i32);
+						void *addr = ir_resolve_sym_name(name);
+
+						ir_disasm_add_symbol(name, (uintptr_t)addr, sizeof(void*));
+					}
+				}
+
+				ir_disasm(name, entry, size, 0, ctx, stderr);
+			}
+			if (l->run) {
+#ifndef _WIN32
+				ir_perf_map_register(name, entry, size);
+				ir_perf_jitdump_open();
+				ir_perf_jitdump_register(name, entry, size);
+
+				ir_mem_unprotect(entry, 4096);
+				ir_gdb_register(name, entry, size, sizeof(void*), 0);
+				ir_mem_protect(entry, 4096);
+#endif
+				if (strcmp(name, "main") == 0) {
+					l->main = entry;
+				}
+			}
+		} else {
+			fprintf(stderr, "\nERROR: %d\n", ctx->status);
+			return 0;
+		}
+	}
 	return 1;
 }
 
@@ -239,13 +362,12 @@ int main(int argc, char **argv)
 	char *dump_file = NULL, *c_file = NULL, *llvm_file = 0;
 	FILE *f;
 	ir_ctx ctx;
-	bool emit_c = 0, emit_llvm = 0, dump_asm = 0, run = 0;
+	bool emit_c = 0, emit_llvm = 0, dump_size = 0, dump_asm = 0, run = 0;
 	uint32_t dump = 0;
 	int opt_level = 2;
 	uint32_t flags = 0;
 	uint32_t mflags = 0;
 	uint64_t debug_regset = 0xffffffffffffffff;
-	bool dump_size = 0;
 #ifdef _WIN32
 	bool abort_fault = 1;
 #endif
@@ -253,6 +375,8 @@ int main(int argc, char **argv)
 	bool load_llvm_bitcode = 0;
 	bool load_llvm_asm = 0;
 #endif
+	ir_main_loader loader;
+
 	ir_consistency_check();
 
 	for (i = 1; i < argc; i++) {
@@ -441,19 +565,80 @@ int main(int argc, char **argv)
 		flags |= IR_GEN_NATIVE;
 	}
 
+	loader.loader.default_func_flags = flags;
+	loader.loader.init_module        = NULL;
+	loader.loader.external_sym_dcl   = ir_loader_external_sym_dcl;
+	loader.loader.sym_dcl            = ir_loader_sym_dcl;
+	loader.loader.external_func_dcl  = ir_loader_external_func_dcl;
+	loader.loader.forward_func_dcl   = NULL;
+	loader.loader.init_func          = ir_loader_init_func;
+	loader.loader.process_func       = ir_loader_process_func;
+
+	loader.opt_level = opt_level;
+	loader.mflags = mflags;
+	loader.debug_regset = debug_regset;
+	loader.dump = dump;
+	loader.dump_asm = dump_asm;
+	loader.dump_size = dump_size;
+	loader.run = run;
+
+	loader.size = 0;
+	loader.main = NULL;
+
+	loader.dump_file = NULL;
+	loader.c_file = NULL;
+	loader.llvm_file = NULL;
+
+	if (dump_file) {
+		loader.dump_file = fopen(dump_file, "w+");
+		if (!loader.dump_file) {
+			fprintf(stderr, "ERROR: Cannot create file '%s'\n", dump_file);
+			return 0;
+		}
+	} else {
+		loader.dump_file = stderr;
+	}
+	if (emit_c) {
+		if (c_file) {
+			loader.c_file = fopen(c_file, "w+");
+			if (!loader.c_file) {
+				fprintf(stderr, "ERROR: Cannot create file '%s'\n", c_file);
+				return 0;
+			}
+		} else {
+			loader.c_file = stderr;
+		}
+	}
+	if (emit_llvm) {
+		if (llvm_file) {
+			loader.llvm_file = fopen(llvm_file, "w+");
+			if (!loader.llvm_file) {
+				fprintf(stderr, "ERROR: Cannot create file '%s'\n", llvm_file);
+				return 0;
+			}
+		} else {
+			loader.llvm_file = stderr;
+		}
+	}
+
 #if HAVE_LLVM
 	if (load_llvm_bitcode) {
-		if (!ir_load_llvm_bitcode(input, flags)) {
+		loader.dump |= IR_DUMP_NAME;
+		if (!ir_load_llvm_bitcode(&loader.loader, input)) {
+			fprintf(stderr, "ERROR: Cannot load LLVM file '%s'\n", input);
 			return 1;
 		}
-		return 0;
+		goto finish;
 	} else if (load_llvm_asm) {
-		if (!ir_load_llvm_asm(input, flags)) {
+		loader.dump |= IR_DUMP_NAME;
+		if (!ir_load_llvm_asm(&loader.loader, input)) {
+			fprintf(stderr, "ERROR: Cannot load LLVM file '%s'\n", input);
 			return 1;
 		}
-		return 0;
+		goto finish;
 	}
 #endif
+
 	f = fopen(input, "rb");
 	if (!f) {
 		fprintf(stderr, "ERROR: Cannot open input file '%s'\n", input);
@@ -463,8 +648,9 @@ int main(int argc, char **argv)
 	ir_loader_init();
 
 	ir_init(&ctx, flags, 256, 1024);
-	ctx.mflags = mflags;
-	ctx.fixed_regset = ~debug_regset;
+	if (!loader.loader.init_func(&loader.loader, &ctx, run ? "main" : "test")) {
+		return 1;
+	}
 
 	if (!ir_load(&ctx, f)) {
 		fprintf(stderr, "ERROR: Cannot load input file '%s'\n", input);
@@ -472,103 +658,36 @@ int main(int argc, char **argv)
 	}
 	fclose(f);
 
-	if (!ir_compile_func(&ctx, opt_level, dump, dump_file)) {
+	if (!loader.loader.process_func(&loader.loader, &ctx, run ? "main" : "test")) {
 		return 1;
 	}
 
-	if (emit_c) {
-		int ret;
+	ir_loader_free();
 
-		if (c_file) {
-			f = fopen(c_file, "w+");
-			if (!f) {
-				fprintf(stderr, "ERROR: Cannot create file '%s'\n", c_file);
-				return 0;
-			}
-		} else {
-		    f = stderr;
-		}
-		ret = ir_emit_c(&ctx, "test", f);
-		if (c_file) {
-			fclose(f);
-		}
-		if (!ret) {
-			fprintf(stderr, "\nERROR: %d\n", ctx.status);
-		}
-	}
-
-	if (emit_llvm) {
-		int ret;
-
-		if (llvm_file) {
-			f = fopen(llvm_file, "w+");
-			if (!f) {
-				fprintf(stderr, "ERROR: Cannot create file '%s'\n", llvm_file);
-				return 0;
-			}
-		} else {
-		    f = stderr;
-		}
-		ret = ir_emit_llvm(&ctx, "test", f);
-		if (llvm_file) {
-			fclose(f);
-		}
-		if (!ret) {
-			fprintf(stderr, "\nERROR: %d\n", ctx.status);
-		}
-	}
-
-	if (dump_asm || run) {
-		size_t size;
-		void *entry = ir_emit_code(&ctx, &size);
-
-		if (entry) {
-			if (dump_asm) {
-				ir_ref i;
-				ir_insn *insn;
-
-				ir_disasm_add_symbol("test", (uintptr_t)entry, size);
-
-				for (i = IR_UNUSED + 1, insn = ctx.ir_base - i; i < ctx.consts_count; i++, insn--) {
-					if (insn->op == IR_FUNC) {
-						const char *name = ir_get_str(&ctx, insn->val.i32);
-						void *addr = ir_resolve_sym_name(name);
-
-						ir_disasm_add_symbol(name, (uintptr_t)addr, sizeof(void*));
-					}
-				}
-
-				ir_disasm("test", entry, size, 0, &ctx, stderr);
-			}
-			if (dump_size) {
-				fprintf(stderr, "\ncode size = %lld\n", (long long int)size);
-			}
-			if (run) {
-				int (*func)(void) = entry;
-				int ret;
-
-#ifndef _WIN32
-				ir_perf_map_register("test", entry, size);
-				ir_perf_jitdump_open();
-				ir_perf_jitdump_register("test", entry, size);
-
-				ir_mem_unprotect(entry, 4096);
-				ir_gdb_register("test", entry, size, sizeof(void*), 0);
-				ir_mem_protect(entry, 4096);
+#if HAVE_LLVM
+finish:
 #endif
 
-				ret = func();
-				fflush(stdout);
-				fprintf(stderr, "\nexit code = %d\n", ret);
-			}
-		} else {
-			fprintf(stderr, "\nERROR: %d\n", ctx.status);
-		}
+	if (loader.dump_file && loader.dump_file != stderr) {
+		fclose(loader.dump_file);
+	}
+	if (loader.c_file && loader.c_file != stderr) {
+		fclose(loader.c_file);
+	}
+	if (loader.llvm_file && loader.llvm_file != stderr) {
+		fclose(loader.llvm_file);
 	}
 
-	ir_free(&ctx);
+	if (dump_size) {
+		fprintf(stderr, "\ncode size = %lld\n", (long long int)loader.size);
+	}
 
-	ir_loader_free();
+	if (run && loader.main) {
+		int (*func)(void) = loader.main;
+		int ret = func();
+		fflush(stdout);
+		fprintf(stderr, "\nexit code = %d\n", ret);
+	}
 
 	return 0;
 }
