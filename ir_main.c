@@ -662,6 +662,8 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	ir_free(&ctx);
+	
 	ir_loader_free();
 
 #if HAVE_LLVM
