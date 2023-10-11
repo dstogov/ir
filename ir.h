@@ -750,6 +750,10 @@ void ir_loader_init(void);
 void ir_loader_free(void);
 int ir_load(ir_ctx *ctx, FILE *f);
 
+/* IR LLVM load API (implementation in ir_load_llvm.c) */
+int ir_load_llvm_bitcode(const char *filename, uint32_t flags);
+int ir_load_llvm_asm(const char *filename, uint32_t flags);
+
 /* IR save API (implementation in ir_save.c) */
 void ir_save(const ir_ctx *ctx, FILE *f);
 

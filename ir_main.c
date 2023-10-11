@@ -16,7 +16,11 @@
 static void help(const char *cmd)
 {
 	printf(
+#if HAVE_LLVM
+		"Usage: %s [options] [--llvm-bitcode|--llvm-asm] input-file...\n"
+#else
 		"Usage: %s [options] input-file...\n"
+#endif
 		"Options:\n"
 		"  -O[012]                    - optimization level (default: 2)\n"
 		"  -S                         - dump final target assembler code\n"
@@ -245,6 +249,10 @@ int main(int argc, char **argv)
 #ifdef _WIN32
 	bool abort_fault = 1;
 #endif
+#if HAVE_LLVM
+	bool load_llvm_bitcode = 0;
+	bool load_llvm_asm = 0;
+#endif
 	ir_consistency_check();
 
 	for (i = 1; i < argc; i++) {
@@ -361,6 +369,22 @@ int main(int argc, char **argv)
 		} else if (strcmp(argv[i], "--no-abort-fault") == 0) {
 			abort_fault = 0;
 #endif
+#if HAVE_LLVM
+		} else if (strcmp(argv[i], "--llvm-bitcode") == 0) {
+			if (input || i + 1 == argc || argv[i + 1][0] == '-') {
+				fprintf(stderr, "ERROR: Invalid usage' (use --help)\n");
+				return 1;
+			}
+			load_llvm_bitcode = 1;
+			input = argv[++i];
+		} else if (strcmp(argv[i], "--llvm-asm") == 0) {
+			if (input || i + 1 == argc || argv[i + 1][0] == '-') {
+				fprintf(stderr, "ERROR: Invalid usage' (use --help)\n");
+				return 1;
+			}
+			load_llvm_asm = 1;
+			input = argv[++i];
+#endif
 		} else if (argv[i][0] == '-') {
 			fprintf(stderr, "ERROR: Unknown option '%s' (use --help)\n", argv[i]);
 			return 1;
@@ -381,12 +405,6 @@ int main(int argc, char **argv)
 
 	if (!input) {
 		fprintf(stderr, "ERROR: no input file\n");
-		return 1;
-	}
-
-	f = fopen(input, "rb");
-	if (!f) {
-		fprintf(stderr, "ERROR: Cannot open input file '%s'\n", input);
 		return 1;
 	}
 
@@ -411,8 +429,6 @@ int main(int argc, char **argv)
 	}
 #endif
 
-	ir_loader_init();
-
 	flags |= IR_FUNCTION;
 
 	if (opt_level > 0) {
@@ -424,6 +440,28 @@ int main(int argc, char **argv)
 	if (dump_asm || run) {
 		flags |= IR_GEN_NATIVE;
 	}
+
+#if HAVE_LLVM
+	if (load_llvm_bitcode) {
+		if (!ir_load_llvm_bitcode(input, flags)) {
+			return 1;
+		}
+		return 0;
+	} else if (load_llvm_asm) {
+		if (!ir_load_llvm_asm(input, flags)) {
+			return 1;
+		}
+		return 0;
+	}
+#endif
+	f = fopen(input, "rb");
+	if (!f) {
+		fprintf(stderr, "ERROR: Cannot open input file '%s'\n", input);
+		return 1;
+	}
+
+	ir_loader_init();
+
 	ir_init(&ctx, flags, 256, 1024);
 	ctx.mflags = mflags;
 	ctx.fixed_regset = ~debug_regset;
