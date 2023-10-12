@@ -113,7 +113,9 @@ static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 		case LLVMInstructionValueKind:
 			ref = ir_addrtab_find(ctx->binding, (uintptr_t)op);
 			IR_ASSERT(ref != (ir_ref)IR_INVALID_VAL);
-			if (ctx->ir_base[ref].type != type) {
+			if (ctx->ir_base[ref].op == IR_VAR) {
+				return ir_VADDR(ref);
+			} else if (ctx->ir_base[ref].type != type) {
 				ref = llvm2ir_auto_cast(ctx, ref, ctx->ir_base[ref].type, type);
 			}
 			return ref;
@@ -345,10 +347,18 @@ static void llvm2ir_load(ir_ctx *ctx, LLVMValueRef insn)
 	ir_type type = llvm2ir_type(LLVMTypeOf(insn));
 	ir_ref ref;
 
-	ref = llvm2ir_op(ctx, op0, IR_ADDR);
-	if (ctx->ir_base[ref].op == IR_VAR) {
-		ref = ir_VLOAD(type, ref);
+	if (LLVMGetValueKind(op0) == LLVMInstructionValueKind) {
+		ref = ir_addrtab_find(ctx->binding, (uintptr_t)op0);
+		if (ctx->ir_base[ref].op == IR_VAR) {
+			ref = ir_VLOAD(type, ref);
+		} else {
+			if (ctx->ir_base[ref].type != IR_ADDR) {
+				ref = llvm2ir_auto_cast(ctx, ref, ctx->ir_base[ref].type, IR_ADDR);
+			}
+			ref = ir_LOAD(type, ref);
+		}
 	} else {
+		ref = llvm2ir_op(ctx, op0, IR_ADDR);
 		ref = ir_LOAD(type, ref);
 	}
 	ir_addrtab_add(ctx->binding, (uintptr_t)insn, ref);
@@ -361,11 +371,19 @@ static void llvm2ir_store(ir_ctx *ctx, LLVMValueRef insn)
 	ir_type type = llvm2ir_type(LLVMTypeOf(op0));
 	ir_ref ref, val;
 
-	ref = llvm2ir_op(ctx, op1, IR_ADDR);
 	val = llvm2ir_op(ctx, op0, type);
-	if (ctx->ir_base[ref].op == IR_VAR) {
-		ir_VSTORE(ref, val);
+	if (LLVMGetValueKind(op1) == LLVMInstructionValueKind) {
+		ref = ir_addrtab_find(ctx->binding, (uintptr_t)op1);
+		if (ctx->ir_base[ref].op == IR_VAR) {
+			ir_VSTORE(ref, val);
+		} else {
+			if (ctx->ir_base[ref].type != IR_ADDR) {
+				ref = llvm2ir_auto_cast(ctx, ref, ctx->ir_base[ref].type, IR_ADDR);
+			}
+			ir_STORE(ref, val);
+		}
 	} else {
+		ref = llvm2ir_op(ctx, op1, IR_ADDR);
 		ir_STORE(ref, val);
 	}
 	ir_addrtab_add(ctx->binding, (uintptr_t)insn, ctx->control);
@@ -866,9 +884,7 @@ static ir_ref llvm2ir_const_expr(ir_ctx *ctx, LLVMValueRef expr)
 
 static ir_ref llvm2ir_auto_cast(ir_ctx *ctx, ir_ref ref, ir_type src_type, ir_type type)
 {
-	if (type == IR_ADDR && ctx->ir_base[ref].op == IR_VAR) {
-		return ir_VADDR(ref);
-	} else if (IR_IS_TYPE_INT(type)) {
+	if (IR_IS_TYPE_INT(type)) {
 		if (IR_IS_TYPE_INT(src_type)) {
 			if (ir_type_size[type] == ir_type_size[src_type]) {
 				if (type == IR_ADDR) {
