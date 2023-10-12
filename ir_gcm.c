@@ -343,6 +343,10 @@ int ir_gcm(ir_ctx *ctx)
 				} else if (use_insn->op == IR_VAR) {
 					bb->flags |= IR_BB_HAS_VAR;
 					_blocks[ref] = b; /* pin to block */
+					if (EXPECTED(ctx->use_lists[ref].count != 0)) {
+						/* This is necessary only for VADDR */
+						ir_list_push_unchecked(&queue_late, ref);
+					}
 				}
 			}
 		}
@@ -480,6 +484,7 @@ int ir_schedule(ir_ctx *ctx)
 	_prev[ctx->cfg_blocks[1].end] = 0;
 	for (i = 2, j = 1; i < ctx->insns_count; i++) {
 		b = _blocks[i];
+		IR_ASSERT((int32_t)b >= 0);
 		if (b == prev_b) {
 			/* add to the end of the list */
 			_next[j] = i;
