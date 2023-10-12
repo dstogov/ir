@@ -1,0 +1,22 @@
+--TEST--
+GUARD_NOT
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	uintptr_t exit = 0xbaddad;
+	l_1 = START(l_4);
+	int32_t cond = PARAM(l_1, "cond", 1);
+	l_2 = GUARD_NOT(l_1, cond, exit);
+	l_4 = RETURN(l_2);
+}
+--EXPECT--
+define void @test(i32 %d2)
+{
+	%t3 = icmp ne i32 %d2, 0
+	br i1 %t3, label %l3_true, label %l3_false
+l3_true:
+	indirectbr ptr inttoptr(i64 u0xbaddad to ptr), []
+l3_false:
+	ret void
+}

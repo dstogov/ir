@@ -1,0 +1,15 @@
+--TEST--
+002: IJMP - computed goto (constant addr)
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	uintptr_t p = 0xbaddad;
+	l_1 = START(l_2);
+	l_2 = IJMP(l_1, p);
+}
+--EXPECT--
+define void @test()
+{
+	indirectbr ptr inttoptr(i64 u0xbaddad to ptr), []
+}

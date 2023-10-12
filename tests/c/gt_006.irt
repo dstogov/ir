@@ -1,0 +1,21 @@
+--TEST--
+006: gt function
+--ARGS--
+--emit-c
+--CODE--
+{
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	double y = PARAM(l_1, "y", 2);
+	bool ret = GT(x, y);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+bool test(double x, double y)
+{
+	double d_1 = x;
+	double d_2 = y;
+	bool d_3;
+	d_3 = d_2 < d_1;
+	return d_3;
+}
