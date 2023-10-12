@@ -393,10 +393,13 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 
 	if (STR_START(name, name_len, "llvm.lifetime.")) {
 		/* skip */
+		return IR_NULL;
 	} else if (STR_START(name, name_len, "llvm.dbg.")) {
 		/* skip */
+		return IR_NULL;
 	} else if (STR_EQUAL(name, name_len, "llvm.assume")) {
 		/* skip */
+		return IR_NULL;
 	} else if (STR_START(name, name_len, "llvm.smax.")) {
 		IR_ASSERT(count == 2);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
@@ -599,7 +602,9 @@ static void llvm2ir_call(ir_ctx *ctx, LLVMValueRef insn)
 		if (STR_START(name, name_len, "llvm.")) {
 			ref = llvm2ir_intrinsic(ctx, insn, ftype, count, name, name_len);
 			if (ref) {
-				ir_addrtab_add(ctx->binding, (uintptr_t)insn, ref);
+				if (ref != IR_NULL) {
+					ir_addrtab_add(ctx->binding, (uintptr_t)insn, ref);
+				}
 				return;
 			}
 		}
