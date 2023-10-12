@@ -1,0 +1,35 @@
+--TEST--
+003: Dead phi -O2
+--ARGS--
+-O2 --save
+--CODE--
+{
+	l_1 = START(l_12);
+	int32_t d_2 = PARAM(l_1, "x", 0);
+	int32_t d_3 = PARAM(l_1, "y", 1);
+	l_4 = IF(l_1, d_2);
+	l_5 = IF_TRUE(l_4);
+	l_6 = END(l_5);
+	l_7 = IF_FALSE(l_4);
+	l_8 = END(l_7);
+	l_9 = MERGE(l_6, l_8);
+	int32_t d_10 = PHI(l_9, d_2, d_3);
+	int32_t d_11 = NOT(d_10);
+	l_12 = RETURN(l_9);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	l_1 = START(l_10);
+	int32_t d_2 = PARAM(l_1, "x", 0);
+	int32_t d_3 = PARAM(l_1, "y", 1);
+	l_4 = IF(l_1, d_2);
+	l_5 = IF_TRUE(l_4);
+	l_6 = END(l_5);
+	l_7 = IF_FALSE(l_4);
+	l_8 = END(l_7);
+	l_9 = MERGE(l_6, l_8);
+	l_10 = RETURN(l_9, null);
+}

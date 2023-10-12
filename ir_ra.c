@@ -790,6 +790,10 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					ir_bitset_excl(live, v);
 					/* PHIs inputs must not be processed */
 					ival = ctx->live_intervals[v];
+					if (UNEXPECTED(!ival)) {
+						/* Dead PHI */
+						ival = ir_add_live_range(ctx, v, IR_DEF_LIVE_POS_FROM_REF(ref), IR_USE_LIVE_POS_FROM_REF(ref));
+					}
 					ival->type = insn->type;
 					ir_add_use(ctx, ival, 0, IR_DEF_LIVE_POS_FROM_REF(ref), IR_REG_NONE, IR_USE_SHOULD_BE_IN_REG, 0);
 					continue;
@@ -1397,6 +1401,10 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 				} else {
 					/* PHIs inputs must not be processed */
 					ival = ctx->live_intervals[v];
+					if (UNEXPECTED(!ival)) {
+						/* Dead PHI */
+						ival = ir_add_live_range(ctx, v, IR_DEF_LIVE_POS_FROM_REF(ref), IR_USE_LIVE_POS_FROM_REF(ref));
+					}
 					ival->type = insn->type;
 					ir_add_use(ctx, ival, 0, IR_DEF_LIVE_POS_FROM_REF(ref), IR_REG_NONE, IR_USE_SHOULD_BE_IN_REG, 0);
 					continue;
