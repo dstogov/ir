@@ -3106,6 +3106,11 @@ try_next_available_register:
 				split_pos = ir_find_optimal_split_position(ctx, other, split_pos, ival->range.start, 1);
 				if (split_pos > other->range.start) {
 					child = ir_split_interval_at(ctx, other, split_pos);
+					if (prev) {
+						prev->list_next = other->list_next;
+					} else {
+						*active = other->list_next;
+					}
 					IR_LOG_LSRA("      ---- Finish", other, "");
 				} else {
 					if (ir_first_use_pos(other, IR_USE_MUST_BE_IN_REG) <= other->end) {
