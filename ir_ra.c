@@ -1587,6 +1587,7 @@ static void ir_vregs_join(ir_ctx *ctx, uint32_t r1, uint32_t r2)
 
 	ctx->live_intervals[r1]->flags |=
 		IR_LIVE_INTERVAL_COALESCED | (ival->flags & (IR_LIVE_INTERVAL_HAS_HINT_REGS|IR_LIVE_INTERVAL_HAS_HINT_REFS));
+	ctx->live_intervals[r1]->flags &= ~(IR_LIVE_INTERVAL_MEM_PARAM|IR_LIVE_INTERVAL_MEM_LOAD);
 	ctx->live_intervals[r2] = NULL;
 
 	// TODO: remember to reuse ???
