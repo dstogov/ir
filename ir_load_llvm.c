@@ -234,13 +234,16 @@ static ir_ref llvm2ir_binary_op(ir_ctx *ctx, LLVMOpcode opcode, LLVMValueRef exp
 static ir_ref llvm2ir_cast_op(ir_ctx *ctx, LLVMValueRef expr, ir_op op)
 {
 	LLVMValueRef op0 = LLVMGetOperand(expr, 0);
-	ir_type type;
+	ir_type src_type, dst_type;
 	ir_ref ref;
 
-	type = llvm2ir_type(LLVMTypeOf(op0));
-	ref = llvm2ir_op(ctx, op0, type);
-	type = llvm2ir_type(LLVMTypeOf(expr));
-	ref = ir_fold1(ctx, IR_OPT(op, type), ref);
+	src_type = llvm2ir_type(LLVMTypeOf(op0));
+	dst_type = llvm2ir_type(LLVMTypeOf(expr));
+	if (op == IR_ZEXT && src_type == IR_BOOL && (dst_type == IR_I8 || dst_type == IR_U8)) {
+		op = IR_BITCAST;
+	}
+	ref = llvm2ir_op(ctx, op0, src_type);
+	ref = ir_fold1(ctx, IR_OPT(op, dst_type), ref);
 	ir_addrtab_add(ctx->binding, (uintptr_t)expr, ref);
 	return ref;
 }
