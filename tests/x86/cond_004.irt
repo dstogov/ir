@@ -1,0 +1,38 @@
+--TEST--
+004: COND(D,D,D)
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(ret);
+	double x = PARAM(l_1, "x", 1);
+	double y = PARAM(l_1, "y", 2);
+	double z = PARAM(l_1, "z", 3);
+	double val = COND(x, y, z);
+	ret = RETURN(l_1, val);
+}
+--EXPECT--
+test:
+	subl $8, %esp
+	movsd 0xc(%esp), %xmm0
+	movsd 0x14(%esp), %xmm1
+	movsd 0x1c(%esp), %xmm2
+	ucomisd .L4, %xmm0
+	jp .L1
+	je .L2
+.L1:
+	movapd %xmm1, %xmm0
+	jmp .L3
+.L2:
+	movapd %xmm2, %xmm0
+.L3:
+	movsd %xmm0, (%esp)
+	fldl (%esp)
+	addl $8, %esp
+	retl
+.rodata
+	.db 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
+.L4:
+	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00

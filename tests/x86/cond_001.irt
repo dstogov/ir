@@ -1,0 +1,28 @@
+--TEST--
+001: COND(I,I,I)
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(ret);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t y = PARAM(l_1, "y", 2);
+	int32_t z = PARAM(l_1, "z", 3);
+	int32_t val = COND(x, y, z);
+	ret = RETURN(l_1, val);
+}
+--EXPECT--
+test:
+	movl 4(%esp), %eax
+	movl 8(%esp), %ecx
+	movl 0xc(%esp), %edx
+	testl %eax, %eax
+	je .L1
+	movl %ecx, %eax
+	jmp .L2
+.L1:
+	movl %edx, %eax
+.L2:
+	retl

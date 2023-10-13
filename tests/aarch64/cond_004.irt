@@ -1,0 +1,20 @@
+--TEST--
+004: COND(D,D,D)
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(ret);
+	double x = PARAM(l_1, "x", 1);
+	double y = PARAM(l_1, "y", 2);
+	double z = PARAM(l_1, "z", 3);
+	double val = COND(x, y, z);
+	ret = RETURN(l_1, val);
+}
+--EXPECT--
+test:
+	fcmp d0, #0.0
+	fcsel d0, d1, d2, eq
+	ret
