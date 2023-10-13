@@ -17,9 +17,9 @@ Windows-x86_64
 test:
 	testl %ecx, %ecx
 	je .L1
-	movl %edx, %edx
+	movl %edx, %eax
 	jmp .L2
 .L1:
-	movl %r8d, %r8d
+	movl %r8d, %eax
 .L2:
 	retq

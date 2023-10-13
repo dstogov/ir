@@ -22,7 +22,7 @@ test:
 	movl %edx, %eax
 	jmp .L3
 .L2:
-	movl %ecx, %eax
+	movl %r8d, %eax
 .L3:
 	retq
 .rodata
