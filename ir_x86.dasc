@@ -4540,24 +4540,44 @@ static void ir_emit_sext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 		if (ir_type_size[src_type] == 1) {
 			if (ir_type_size[dst_type] == 2) {
-				|	movsx Rw(def_reg), byte [Ra(op1_reg)+offset]
+				if (op1_reg != IR_REG_NONE) {
+					|	movsx Rw(def_reg), byte [Ra(op1_reg)+offset]
+				} else {
+					|	movsx Rw(def_reg), byte [offset]
+				}
 			} else if (ir_type_size[dst_type] == 4) {
-				|	movsx Rd(def_reg), byte [Ra(op1_reg)+offset]
+				if (op1_reg != IR_REG_NONE) {
+					|	movsx Rd(def_reg), byte [Ra(op1_reg)+offset]
+				} else {
+					|	movsx Rd(def_reg), byte [offset]
+				}
 			} else {
 				IR_ASSERT(ir_type_size[dst_type] == 8);
 				IR_ASSERT(sizeof(void*) == 8);
 |.if X64
-				|	movsx Rq(def_reg), byte [Ra(op1_reg)+offset]
+				if (op1_reg != IR_REG_NONE) {
+					|	movsx Rq(def_reg), byte [Ra(op1_reg)+offset]
+				} else {
+					|	movsx Rq(def_reg), byte [offset]
+				}
 |.endif
 			}
 		} else if (ir_type_size[src_type] == 2) {
 			if (ir_type_size[dst_type] == 4) {
-				|	movsx Rd(def_reg), word [Ra(op1_reg)+offset]
+				if (op1_reg != IR_REG_NONE) {
+					|	movsx Rd(def_reg), word [Ra(op1_reg)+offset]
+				} else {
+					|	movsx Rd(def_reg), word [offset]
+				}
 			} else {
 				IR_ASSERT(ir_type_size[dst_type] == 8);
 				IR_ASSERT(sizeof(void*) == 8);
 |.if X64
-				|	movsx Rq(def_reg), word [Ra(op1_reg)+offset]
+				if (op1_reg != IR_REG_NONE) {
+					|	movsx Rq(def_reg), word [Ra(op1_reg)+offset]
+				} else {
+					|	movsx Rq(def_reg), word [offset]
+				}
 |.endif
 			}
 		} else {
@@ -4565,7 +4585,11 @@ static void ir_emit_sext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			IR_ASSERT(ir_type_size[dst_type] == 8);
 			IR_ASSERT(sizeof(void*) == 8);
 |.if X64
-			|	movsxd Rq(def_reg), dword [Ra(op1_reg)+offset]
+			if (op1_reg != IR_REG_NONE) {
+				|	movsxd Rq(def_reg), dword [Ra(op1_reg)+offset]
+			} else {
+				|	movsxd Rq(def_reg), dword [offset]
+			}
 |.endif
 		}
 	}
