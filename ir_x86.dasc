@@ -4083,6 +4083,22 @@ static void ir_emit_cmp_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		case IR_GT:
 			|	seta Rb(def_reg)
 			break;
+		case IR_ULT:
+			|	setb Rb(def_reg)
+			break;
+		case IR_UGE:
+			|	setnp Rb(def_reg)
+			|	mov Rd(tmp_reg), 0
+			|	cmovb Rd(def_reg), Rd(tmp_reg)
+			break;
+		case IR_ULE:
+			|	setbe Rb(def_reg)
+			break;
+		case IR_UGT:
+			|	setnp Rb(def_reg)
+			|	mov Rd(tmp_reg), 0
+			|	cmovbe Rd(def_reg), Rd(tmp_reg)
+			break;
 	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, insn->type, def, def_reg);
@@ -4220,10 +4236,43 @@ static void ir_emit_jcc(ir_ctx *ctx, uint8_t op, uint32_t b, ir_ref def, ir_insn
 				}
 				|	ja =>true_block
 				break;
-//			case IR_ULT: fprintf(stderr, "\tjb .LL%d\n", true_block); break;
-//			case IR_UGE: fprintf(stderr, "\tjae .LL%d\n", true_block); break;
-//			case IR_ULE: fprintf(stderr, "\tjbe .LL%d\n", true_block); break;
-//			case IR_UGT: fprintf(stderr, "\tja .LL%d\n", true_block); break;
+//
+			case IR_ULT:
+				if (swap) {
+					|	jp =>true_block
+				}
+				|	jb =>true_block
+				break;
+			case IR_UGE:
+				if (swap) {
+					|	jae =>true_block
+				} else if (!false_block) {
+					|	jp >1
+					|	jae =>true_block
+					|1:
+				} else {
+					|	jp =>false_block
+					|	jae =>true_block
+				}
+				break;
+			case IR_ULE:
+				if (swap) {
+					|	jp =>true_block
+				}
+				|	jbe =>true_block
+				break;
+			case IR_UGT:
+				if (swap) {
+					|	ja =>true_block
+				} else if (!false_block) {
+					|	jp >1
+					|	ja =>true_block
+					|1:
+				} else {
+					|	jp =>false_block
+					|	ja =>true_block
+				}
+				break;
 		}
 	}
 	if (false_block) {
