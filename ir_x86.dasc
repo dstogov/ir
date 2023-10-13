@@ -111,7 +111,7 @@
 ||	}
 |.endmacro
 
-|.macro ASM_REG_IMM_OP, op, type, dst, src
+|.macro ASM_REG_TXT_OP, op, type, dst, src
 ||	switch (ir_type_size[type]) {
 || 		default:
 ||			IR_ASSERT(0);
@@ -120,6 +120,27 @@
 ||			break;
 ||		case 2:
 |			op Rw(dst), src
+|| 			break;
+||		case 4:
+|			op Rd(dst), src
+|| 			break;
+|.if X64
+||		case 8:
+|			op Rq(dst), src
+|| 			break;
+|.endif
+||	}
+|.endmacro
+
+|.macro ASM_REG_IMM_OP, op, type, dst, src
+||	switch (ir_type_size[type]) {
+|| 		default:
+||			IR_ASSERT(0);
+||		case 1:
+|			op Rb(dst), (src & 0xff)
+||			break;
+||		case 2:
+|			op Rw(dst), (src & 0xffff)
 || 			break;
 ||		case 4:
 |			op Rd(dst), src
@@ -153,7 +174,7 @@
 ||	}
 |.endmacro
 
-|.macro ASM_MEM_IMM_OP, op, type, dst, src
+|.macro ASM_MEM_TXT_OP, op, type, dst, src
 ||	switch (ir_type_size[type]) {
 || 		default:
 ||			IR_ASSERT(0);
@@ -162,6 +183,27 @@
 ||			break;
 ||		case 2:
 |			op word dst, src
+|| 			break;
+||		case 4:
+|			op dword dst, src
+|| 			break;
+|.if X64
+||		case 8:
+|			op qword dst, src
+|| 			break;
+|.endif
+||	}
+|.endmacro
+
+|.macro ASM_MEM_IMM_OP, op, type, dst, src
+||	switch (ir_type_size[type]) {
+|| 		default:
+||			IR_ASSERT(0);
+||		case 1:
+|			op byte dst, (src & 0xff)
+||			break;
+||		case 2:
+|			op word dst, (src & 0xffff)
 || 			break;
 ||		case 4:
 |			op dword dst, src
@@ -2878,19 +2920,19 @@ static void ir_emit_shift(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		default:
 			IR_ASSERT(0);
 		case IR_SHL:
-			|	ASM_REG_IMM_OP shl, insn->type, def_reg, cl
+			|	ASM_REG_TXT_OP shl, insn->type, def_reg, cl
 			break;
 		case IR_SHR:
-			|	ASM_REG_IMM_OP shr, insn->type, def_reg, cl
+			|	ASM_REG_TXT_OP shr, insn->type, def_reg, cl
 			break;
 		case IR_SAR:
-			|	ASM_REG_IMM_OP sar, insn->type, def_reg, cl
+			|	ASM_REG_TXT_OP sar, insn->type, def_reg, cl
 			break;
 		case IR_ROL:
-			|	ASM_REG_IMM_OP rol, insn->type, def_reg, cl
+			|	ASM_REG_TXT_OP rol, insn->type, def_reg, cl
 			break;
 		case IR_ROR:
-			|	ASM_REG_IMM_OP ror, insn->type, def_reg, cl
+			|	ASM_REG_TXT_OP ror, insn->type, def_reg, cl
 			break;
 	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
@@ -2943,19 +2985,19 @@ static void ir_emit_mem_shift(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		default:
 			IR_ASSERT(0);
 		case IR_SHL:
-			|	ASM_MEM_IMM_OP shl, type, [Ra(reg)+offset], cl
+			|	ASM_MEM_TXT_OP shl, type, [Ra(reg)+offset], cl
 			break;
 		case IR_SHR:
-			|	ASM_MEM_IMM_OP shr, type, [Ra(reg)+offset], cl
+			|	ASM_MEM_TXT_OP shr, type, [Ra(reg)+offset], cl
 			break;
 		case IR_SAR:
-			|	ASM_MEM_IMM_OP sar, type, [Ra(reg)+offset], cl
+			|	ASM_MEM_TXT_OP sar, type, [Ra(reg)+offset], cl
 			break;
 		case IR_ROL:
-			|	ASM_MEM_IMM_OP rol, type, [Ra(reg)+offset], cl
+			|	ASM_MEM_TXT_OP rol, type, [Ra(reg)+offset], cl
 			break;
 		case IR_ROR:
-			|	ASM_MEM_IMM_OP ror, type, [Ra(reg)+offset], cl
+			|	ASM_MEM_TXT_OP ror, type, [Ra(reg)+offset], cl
 			break;
 	}
 }
