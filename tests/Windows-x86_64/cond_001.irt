@@ -15,11 +15,11 @@ Windows-x86_64
 }
 --EXPECT--
 test:
-	testl %edi, %edi
+	testl %ecx, %ecx
 	je .L1
-	movl %esi, %eax
+	movl %edx, %edx
 	jmp .L2
 .L1:
-	movl %edx, %eax
+	movl %r8d, %r8d
 .L2:
 	retq

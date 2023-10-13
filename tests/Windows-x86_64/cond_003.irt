@@ -15,10 +15,11 @@ Windows-x86_64
 }
 --EXPECT--
 test:
-	testq %rdi, %rdi
+	testq %ecx, %ecx
 	je .L1
+	movapd %xmm1, %xmm0
 	jmp .L2
 .L1:
-	movapd %xmm1, %xmm0
+	movapd %xmm2, %xmm0
 .L2:
 	retq
