@@ -11,6 +11,7 @@ EXAMPLES_BUILD_DIR = $(BUILD_DIR)/examples
 CC         = gcc
 BUILD_CC   = gcc
 override CFLAGS += -Wall -Wextra -Wno-unused-parameter
+override BUILD_CFLAGS += -Wall -Wextra -Wno-unused-parameter
 LDFLAGS    = -lm -ldl
 PHP        = php
 LLK        = llk
@@ -18,24 +19,29 @@ LLK        = llk
 
 ifeq (debug, $(BUILD))
  override CFLAGS += -O0 -g -DIR_DEBUG=1
+ override BUILD_CFLAGS += -O0 -g -DIR_DEBUG=1
 endif
 ifeq (release, $(BUILD))
  override CFLAGS += -O2 -g
+ override BUILD_CFLAGS += -O2 -g
 endif
 
 ifeq (x86_64, $(TARGET))
   override CFLAGS += -DIR_TARGET_X64
+  override BUILD_CFLAGS += -DIR_TARGET_X64
   DASM_ARCH  = x86
   DASM_FLAGS = -M -D X64=1
 endif
 ifeq (x86, $(TARGET))
   override CFLAGS += -m32 -DIR_TARGET_X86
+  override BUILD_CFLAGS += -m32 -DIR_TARGET_X86
   DASM_ARCH  = x86
   DASM_FLAGS = -M
 endif
 ifeq (aarch64, $(TARGET))
   CC= aarch64-linux-gnu-gcc --sysroot=$(HOME)/php/ARM64
   override CFLAGS += -DIR_TARGET_AARCH64
+  override BUILD_CFLAGS += -DIR_TARGET_AARCH64
   DASM_ARCH  = aarch64
   DASM_FLAGS = -M
 endif
@@ -56,7 +62,7 @@ OBJS_IR_TEST = $(BUILD_DIR)/ir_test.o
 EXAMPLE_EXES = $(EXAMPLES_BUILD_DIR)/0001-basic $(EXAMPLES_BUILD_DIR)/0001-while $(EXAMPLES_BUILD_DIR)/0005-basic-runner-func \
 	       $(EXAMPLES_BUILD_DIR)/0001-pointer $(EXAMPLES_BUILD_DIR)/0001-func
 
-all: $(BUILD_DIR) $(BUILD_DIR)/ir $(BUILD_DIR)/ir_test
+all: $(BUILD_DIR) $(BUILD_DIR)/ir $(BUILD_DIR)/ir_test $(BUILD_DIR)/tester
 
 $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
@@ -88,10 +94,10 @@ $(SRC_DIR)/ir_load.c: $(SRC_DIR)/ir.g
 $(BUILD_DIR)/ir_fold_hash.h: $(BUILD_DIR)/gen_ir_fold_hash $(SRC_DIR)/ir_fold.h $(SRC_DIR)/ir.h
 	$(BUILD_DIR)/gen_ir_fold_hash < $(SRC_DIR)/ir_fold.h > $(BUILD_DIR)/ir_fold_hash.h
 $(BUILD_DIR)/gen_ir_fold_hash: $(SRC_DIR)/gen_ir_fold_hash.c $(SRC_DIR)/ir_strtab.c $(SRC_DIR)/ir.h
-	$(BUILD_CC) $(CFLAGS) $(LDFALGS) -o $@ $<
+	$(BUILD_CC) $(BUILD_CFLAGS) $(LDFALGS) -o $@ $<
 
 $(BUILD_DIR)/minilua: $(SRC_DIR)/dynasm/minilua.c
-	$(BUILD_CC) $(SRC_DIR)/dynasm/minilua.c -lm -o $@
+	$(BUILD_CC) $(BUILD_CFLAGS) $(SRC_DIR)/dynasm/minilua.c -lm -o $@
 $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h: $(SRC_DIR)/ir_$(DASM_ARCH).dasc $(SRC_DIR)/dynasm/*.lua $(BUILD_DIR)/minilua
 	$(BUILD_DIR)/minilua $(SRC_DIR)/dynasm/dynasm.lua $(DASM_FLAGS) -o $@ $(SRC_DIR)/ir_$(DASM_ARCH).dasc
 
@@ -102,7 +108,7 @@ $(EXAMPLE_EXES): $(EXAMPLES_BUILD_DIR)/$(notdir %): $(EXAMPLES_SRC_DIR)/$(notdir
 	$(CC) $(CFLAGS) -I$(SRC_DIR) $< -o $@ $(OBJS_COMMON) $(LDFLAGS) -lcapstone
 
 $(BUILD_DIR)/tester: $(SRC_DIR)/tools/tester.c
-	$(CC) $(CFLAGS) -o $@ $<
+	$(BUILD_CC) $(BUILD_CFLAGS) -o $@ $<
 
 test: $(BUILD_DIR)/ir $(BUILD_DIR)/tester
 	$(BUILD_DIR)/ir $(SRC_DIR)/test.ir --dump --save 2>$(BUILD_DIR)/test.log
