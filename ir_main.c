@@ -323,7 +323,7 @@ static bool ir_loader_process_func(ir_loader *loader, ir_ctx *ctx, const char *n
 				ir_disasm_add_symbol(name, (uintptr_t)entry, size);
 
 				for (i = IR_UNUSED + 1, insn = ctx->ir_base - i; i < ctx->consts_count; i++, insn--) {
-					if (insn->op == IR_FUNC) {
+					if (insn->op == IR_FUNC || insn->op == IR_SYM) {
 						const char *name = ir_get_str(ctx, insn->val.i32);
 						void *addr = ir_resolve_sym_name(name);
 
@@ -561,7 +561,7 @@ int main(int argc, char **argv)
 	if (emit_c || emit_llvm) {
 		flags |= IR_GEN_CODE;
 	}
-	if (dump_asm || run) {
+	if (dump_asm || dump_size || run) {
 		flags |= IR_GEN_NATIVE;
 	}
 

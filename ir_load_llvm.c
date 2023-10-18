@@ -121,7 +121,8 @@ static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 			return ref;
 		case LLVMGlobalVariableValueKind:
 			// TODO: resolve variable address
-			return IR_NULL;
+			name = LLVMGetValueName2(op, &name_len);
+			return ir_const_sym(ctx, ir_strl(ctx, name, name_len));
 		case LLVMFunctionValueKind:
 			// TODO: function prototype
 			// TODO: resolve function address
@@ -296,6 +297,7 @@ static ir_ref llvm2ir_fcmp_op(ir_ctx *ctx, LLVMValueRef expr)
 		case LLVMRealOLT: op = IR_LT;  break;
 		case LLVMRealOLE: op = IR_LE;  break;
 		case LLVMRealUNO: op = IR_NE;  break; // TODO: isnan() upport. IR_NE is invalid ???
+		case LLVMRealORD: op = IR_NE;  break; // TODO: isnan() upport. IR_NE is invalid ???
 		default: IR_ASSERT(0); return 0;
 	}
 	ref = ir_fold2(ctx, IR_OPT(op, IR_BOOL), llvm2ir_op(ctx, op0, type), llvm2ir_op(ctx, op1, type));
@@ -332,14 +334,22 @@ static void llvm2ir_alloca(ir_ctx *ctx, LLVMValueRef insn)
 		 || type_kind == LLVMLabelTypeKind) {
 			ir_type type = llvm2ir_type(LLVMGetAllocatedType(insn));
 
-			ref = ir_VAR(type, ""); // TODO: unique name
+			size_t name_len;
+			const char *name = LLVMGetValueName2(insn, &name_len);
+			char buf[32];
+
+			if (!name || !name_len) {
+				sprintf(buf, "var_%d", ctx->insns_count);
+				name = buf;
+			}
+			ref = ir_VAR(type, name);
 		} else {
-			ref = ir_ALLOCA(ir_MUL_A(llvm2ir_op(ctx, op0, IR_ADDR),
-				ir_const_addr(ctx, LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, LLVMGetAllocatedType(insn)))));
+			ref = ir_ALLOCA(ir_MUL_I32(llvm2ir_op(ctx, op0, IR_I32),
+				ir_const_i32(ctx, LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, LLVMGetAllocatedType(insn)))));
 		}
 	} else {
-		ref = ir_ALLOCA(ir_MUL_A(llvm2ir_op(ctx, op0, IR_ADDR),
-			ir_const_addr(ctx, LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, LLVMGetAllocatedType(insn)))));
+		ref = ir_ALLOCA(ir_MUL_I32(llvm2ir_op(ctx, op0, IR_I32),
+			ir_const_i32(ctx, LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, LLVMGetAllocatedType(insn)))));
 	}
 	ir_addrtab_add(ctx->binding, (uintptr_t)insn, ref);
 }
@@ -554,7 +564,8 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 		val.u64 = 0;
 		return ir_COND(type, overflow, ir_const(ctx, val, type), ref);
 	} else if (STR_START(name, name_len, "llvm.abs.")) {
-		IR_ASSERT(count == 1);
+		IR_ASSERT(count == 2);
+		// TODO: support for the second argument
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
 		IR_ASSERT(IR_IS_TYPE_INT(type));
 		return ir_ABS(type, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
@@ -584,6 +595,12 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 		return ir_ROR(type,
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type),
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 2), type));
+	} else if (STR_EQUAL(name, name_len, "llvm.va_start")) {
+		// TODO:
+	} else if (STR_EQUAL(name, name_len, "llvm.va_end")) {
+		// TODO:
+	} else if (STR_EQUAL(name, name_len, "llvm.va_copy")) {
+		// TODO:
 	} else if (STR_START(name, name_len, "llvm.ctpop.")) {
 		// TODO:
 	} else if (STR_START(name, name_len, "llvm.memset.")) {
@@ -597,6 +614,46 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 	} else if (STR_EQUAL(name, name_len, "llvm.debugtrap")) {
 		ir_TRAP();
 		return ctx->control;
+	} else if (STR_START(name, name_len, "llvm.sqrt.")) {
+		// TODO:
+	} else if (STR_START(name, name_len, "llvm.powi.")) {
+		// TODO:
+	} else if (STR_START(name, name_len, "llvm.sin.")) {
+		// TODO:
+	} else if (STR_START(name, name_len, "llvm.cos.")) {
+		// TODO:
+	} else if (STR_START(name, name_len, "llvm.pow.")) {
+		// TODO:
+	} else if (STR_START(name, name_len, "llvm.exp.")) {
+		// TODO:
+	} else if (STR_START(name, name_len, "llvm.exp2.")) {
+		// TODO:
+	} else if (STR_START(name, name_len, "llvm.exp10.")) {
+		// TODO:
+	} else if (STR_START(name, name_len, "llvm.ldexp.")) {
+		// TODO:
+	} else if (STR_START(name, name_len, "llvm.frexp.")) {
+		// TODO:
+	} else if (STR_START(name, name_len, "llvm.log.")) {
+		// TODO:
+	} else if (STR_START(name, name_len, "llvm.log10.")) {
+		// TODO:
+	} else if (STR_START(name, name_len, "llvm.log2.")) {
+		// TODO:
+	} else if (STR_START(name, name_len, "llvm.frexp.")) {
+		// TODO:
+	} else if (STR_START(name, name_len, "llvm.copysign.")) {
+		// TODO:
+	} else if (STR_START(name, name_len, "llvm.floor.")) {
+		// TODO:
+	} else if (STR_START(name, name_len, "llvm.ceil.")) {
+		// TODO:
+	} else if (STR_START(name, name_len, "llvm.trunc.")) {
+		// TODO:
+	} else if (STR_START(name, name_len, "llvm.round.")) {
+		// TODO:
+	} else if (STR_START(name, name_len, "llvm.fmuladd.")) {
+		// TODO:
 	} else {
 		fprintf(stderr, "Unsupported LLVM intrinsic: %s\n", name);
 		IR_ASSERT(0);
@@ -637,7 +694,11 @@ static void llvm2ir_call(ir_ctx *ctx, LLVMValueRef insn)
         type = llvm2ir_type(LLVMTypeOf(arg));
         args[i] = llvm2ir_op(ctx, arg, type);
 	}
-	ref = ir_CALL_N(llvm2ir_type(LLVMGetReturnType(ftype)), llvm2ir_op(ctx, func, IR_ADDR), count, args);
+	if (LLVMIsTailCall(insn) && LLVMGetInstructionOpcode(LLVMGetNextInstruction(insn)) == LLVMRet) {
+		ref = ir_TAILCALL_N(llvm2ir_type(LLVMGetReturnType(ftype)), llvm2ir_op(ctx, func, IR_ADDR), count, args);
+	} else {
+		ref = ir_CALL_N(llvm2ir_type(LLVMGetReturnType(ftype)), llvm2ir_op(ctx, func, IR_ADDR), count, args);
+	}
 	ir_addrtab_add(ctx->binding, (uintptr_t)insn, ref);
 }
 
@@ -1074,12 +1135,21 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMModuleRef module, LLVMValueRef func)
 
 	ir_START();
 	for (i = 0; i < LLVMCountParams(func); i++) {
+		size_t name_len;
+		const char *name;
+		char buf[32];
+
 		param = LLVMGetParam(func, i);
 		type = llvm2ir_type(LLVMTypeOf(param));
 		if (type == IR_BAD_TYPE) {
 			return 0;
 		}
-		ref = ir_PARAM(type, "", i + 1); // TODO: unique name
+		name = LLVMGetValueName2(param, &name_len);
+		if (!name || !name_len) {
+			sprintf(buf, "arg_%d", i + 1);
+			name = buf;
+		}
+		ref = ir_PARAM(type, name, i + 1);
 		ir_addrtab_add(ctx->binding, (uintptr_t)param, ref);
 	}
 
@@ -1161,7 +1231,9 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMModuleRef module, LLVMValueRef func)
 			opcode = LLVMGetInstructionOpcode(insn);
 			switch (opcode) {
 				case LLVMRet:
-					llvm2ir_ret(ctx, insn);
+					if (ctx->control) {
+						llvm2ir_ret(ctx, insn);
+					}
 					break;
 				case LLVMBr:
 					if (!LLVMIsConditional(insn)) {

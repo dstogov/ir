@@ -269,6 +269,7 @@ typedef enum _ir_type {
 	_(VAR,	        p1X1, reg, str, ___) /* local variable              */ \
 	_(FUNC_ADDR,    r0,   ___, ___, ___) /* constant func ref           */ \
 	_(FUNC,         r0,   ___, ___, ___) /* constant func ref           */ \
+	_(SYM,          r0,   ___, ___, ___) /* constant symbol ref         */ \
 	_(STR,          r0,   ___, ___, ___) /* constant str ref            */ \
 	\
 	/* call ops                                                         */ \
@@ -614,6 +615,7 @@ ir_ref ir_const_addr(ir_ctx *ctx, uintptr_t c);
 ir_ref ir_const_func_addr(ir_ctx *ctx, uintptr_t c, uint16_t flags);
 
 ir_ref ir_const_func(ir_ctx *ctx, ir_ref str, uint16_t flags);
+ir_ref ir_const_sym(ir_ctx *ctx, ir_ref str);
 ir_ref ir_const_str(ir_ctx *ctx, ir_ref str);
 
 ir_ref ir_unique_const_addr(ir_ctx *ctx, uintptr_t c);

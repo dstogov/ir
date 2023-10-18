@@ -60,6 +60,7 @@ static void ir_emit_def_ref(ir_ctx *ctx, FILE *f, ir_ref def)
 			return;
 		}
 	}
+	IR_ASSERT(ctx->vregs[def]);
 	fprintf(f, "\td_%d = ", ctx->vregs[def]);
 }
 
@@ -513,8 +514,10 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 {
 	int j, n;
 
-	if (insn->type != IR_VOID) {
+	if (insn->type != IR_VOID && ctx->vregs[def] != IR_UNUSED) {
 		ir_emit_def_ref(ctx, f, def);
+	} else {
+		fprintf(f, "\t");
 	}
 	if (IR_IS_CONST_REF(insn->op2)) {
 		fprintf(f, "%s", ir_get_str(ctx, ctx->ir_base[insn->op2].val.i32));
@@ -538,6 +541,8 @@ static void ir_emit_tailcall(ir_ctx *ctx, FILE *f, ir_insn *insn)
 
 	if (insn->type != IR_VOID) {
 		fprintf(f, "\treturn ");
+	} else {
+		fprintf(f, "\t");
 	}
 	if (IR_IS_CONST_REF(insn->op2)) {
 		fprintf(f, "%s", ir_get_str(ctx, ctx->ir_base[insn->op2].val.i32));
@@ -568,7 +573,7 @@ static void ir_emit_ijmp(ir_ctx *ctx, FILE *f, ir_insn *insn)
 static void ir_emit_alloca(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 {
 	ir_emit_def_ref(ctx, f, def);
-	fprintf(f, "alloca(");
+	fprintf(f, "(uintptr_t)alloca(");
 	ir_emit_ref(ctx, f, insn->op2);
 	fprintf(f, ");\n");
 }
@@ -601,14 +606,34 @@ static void ir_emit_vstore(ir_ctx *ctx, FILE *f, ir_insn *insn)
 static void ir_emit_load(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 {
 	ir_emit_def_ref(ctx, f, def);
-	fprintf(f, "*((%s*)d_%d);\n", ir_type_cname[insn->type], ctx->vregs[insn->op2]);
+	fprintf(f, "*((%s*)", ir_type_cname[insn->type]);
+	if (IR_IS_CONST_REF(insn->op2)) {
+		ir_insn *const_insn = &ctx->ir_base[insn->op2];
+
+		if (const_insn->op == IR_SYM) {
+			fprintf(f, "&");
+		}
+		ir_print_const(ctx, const_insn, f, true);
+	} else {
+		fprintf(f, "d_%d", ctx->vregs[insn->op2]);
+	}
+	fprintf(f, ");\n");
 }
 
 static void ir_emit_store(ir_ctx *ctx, FILE *f, ir_insn *insn)
 {
 	ir_type type = ctx->ir_base[insn->op3].type;
 
-	fprintf(f, "\t*((%s*)d_%d) = ", ir_type_cname[type], ctx->vregs[insn->op2]);
+	fprintf(f, "\t*((%s*)", ir_type_cname[type]);
+	if (IR_IS_CONST_REF(insn->op2)) {
+		if (insn->op == IR_SYM) {
+			fprintf(f, "&");
+		}
+		ir_print_const(ctx, &ctx->ir_base[insn->op2], f, true);
+	} else {
+		fprintf(f, "d_%d", ctx->vregs[insn->op2]);
+	}
+	fprintf(f, ") = ");
 	ir_emit_ref(ctx, f, insn->op3);
 	fprintf(f, ";\n");
 }

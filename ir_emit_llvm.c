@@ -31,10 +31,17 @@ static void ir_emit_ref(ir_ctx *ctx, FILE *f, ir_ref ref)
 {
 	if (IR_IS_CONST_REF(ref)) {
 		ir_insn *insn = &ctx->ir_base[ref];
-		if (insn->op == IR_FUNC) {
+		if (insn->op == IR_FUNC || insn->op == IR_SYM) {
 			fprintf(f, "@%s", ir_get_str(ctx, insn->val.i32));
 		} else if (insn->op == IR_STR) {
 			fprintf(f, "@.str%d", -ref);
+		} else if (insn->op == IR_ADDR) {
+			if (insn->val.addr == 0) {
+				fprintf(f, "null");
+			} else if (insn->op == IR_ADDR) {
+				fprintf(f, "u0x%" PRIxPTR, insn->val.addr);
+//				fprintf(f, "inttoptr(i64 u0x%" PRIxPTR " to ptr)", insn->val.addr);
+			}
 		} else if (IR_IS_TYPE_FP(insn->type)) {
 			if (insn->type == IR_DOUBLE) {
 				if (isnan(insn->val.d)) {
@@ -132,6 +139,36 @@ static void ir_emit_binary_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, cons
 {
 	ir_type type = ctx->ir_base[insn->op1].type;
 
+	if (insn->type == IR_ADDR) {
+		type = sizeof(void*) == 8 ? IR_U64 : IR_U32;
+		if (!IR_IS_CONST_REF(insn->op1) && ctx->ir_base[insn->op1].type != IR_I64 && ctx->ir_base[insn->op1].type != IR_U64) {
+			fprintf(f, "\t%%t%d_1 = ptrtoint ptr ", def);
+			ir_emit_ref(ctx, f, insn->op1);
+			fprintf(f, " to i64\n");
+		}
+		if (!IR_IS_CONST_REF(insn->op2) && ctx->ir_base[insn->op2].type != IR_I64 && ctx->ir_base[insn->op2].type != IR_U64) {
+			fprintf(f, "\t%%t%d_2 = ptrtoint ptr ", def);
+			ir_emit_ref(ctx, f, insn->op2);
+			fprintf(f, " to i64\n");
+		}
+		fprintf(f, "\t%%t%d = %s %s ", def, uop ? uop : op, ir_type_llvm_name[type]);
+		if (IR_IS_CONST_REF(insn->op1)) {
+			fprintf(f, "%" PRIu64 ", ", ctx->ir_base[insn->op1].val.u64);
+		} else if (ctx->ir_base[insn->op1].type == IR_I64 || ctx->ir_base[insn->op1].type == IR_U64) {
+			fprintf(f, "%%d%d, ", insn->op1);
+		} else {
+			fprintf(f, "%%t%d_1, ", def);
+		}
+		if (IR_IS_CONST_REF(insn->op2)) {
+			fprintf(f, "%" PRIu64 "\n", ctx->ir_base[insn->op2].val.u64);
+		} else if (ctx->ir_base[insn->op2].type == IR_I64 || ctx->ir_base[insn->op2].type == IR_U64) {
+			fprintf(f, "%%d%d\n", insn->op2);
+		} else {
+			fprintf(f, "%%t%d_2\n", def);
+		}
+		fprintf(f, "\t%%d%d = inttoptr i64 %%t%d to ptr\n", def, def);
+		return;
+	}
 	ir_emit_def_ref(ctx, f, def);
 	if (fop && IR_IS_TYPE_FP(type)) {
 		fprintf(f, "%s ", fop);
@@ -409,12 +446,14 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 	}
 	fprintf(f, ")\n");
 	if (insn->op == IR_TAILCALL) {
-		fprintf(f, "\tret %s", ir_type_llvm_name[insn->type]);
 		if (insn->type != IR_VOID) {
+			fprintf(f, "\tret %s", ir_type_llvm_name[insn->type]);
 			fprintf(f, " ");
 			ir_emit_ref(ctx, f, def);
+			fprintf(f, "\n");
+		} else {
+			fprintf(f, "\tunreachable\n");
 		}
-		fprintf(f, "\n");
 	}
 }
 
@@ -534,7 +573,6 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_CASE_DEFAULT:
 				case IR_MERGE:
 				case IR_LOOP_BEGIN:
-				case IR_UNREACHABLE:
 				case IR_PARAM:
 					/* skip */
 					break;
@@ -724,6 +762,10 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_CALL:
 				case IR_TAILCALL:
 					ir_emit_call(ctx, f, i, insn);
+					if (insn->op == IR_TAILCALL) {
+						i = bb->end + 1;
+						continue;
+					}
 					break;
 				case IR_IJMP:
 					ir_emit_ijmp(ctx, f, insn);
@@ -749,6 +791,9 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_GUARD_NOT:
 					ir_emit_guard(ctx, f, i, insn);
 					break;
+				case IR_UNREACHABLE:
+					fprintf(f, "\tunreachable\n");
+					break;
 				case IR_RLOAD:
 				case IR_RSTORE:
 				case IR_TLS:
@@ -769,6 +814,10 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 		if (insn->op == IR_FUNC) {
 			// TODO: function prototype ???
 			fprintf(f, "declare void @%s()\n", ir_get_str(ctx, insn->val.i32));
+		} else if (insn->op == IR_SYM) {
+			// TODO: symbol "global" or "constant" ???
+			// TODO: symbol type ???
+			fprintf(f, "@%s = external global ptr\n", ir_get_str(ctx, insn->val.i32));
 		} else if (insn->op == IR_STR) {
 			const char *str = ir_get_str(ctx, insn->val.i32);
 			// TODO: strlen != size ???

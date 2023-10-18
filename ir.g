@@ -187,6 +187,8 @@ ir_insn(ir_parser_ctx *p):
 		)?
 		")"
 		{ref = ir_const_func(p->ctx, ir_strl(p->ctx, func, func_len), flags.u16);}
+	|	"sym" "(" ID(&func, &func_len) ")"
+		{ref = ir_const_sym(p->ctx, ir_strl(p->ctx, func, func_len));}
 	|	"func_addr" "("
 		(	DECNUMBER(IR_ADDR, &val)
 		|	HEXNUMBER(IR_ADDR, &val)

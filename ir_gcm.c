@@ -719,7 +719,7 @@ restart:
 		memcpy(new_insn, insn, sizeof(ir_insn) * (IR_TRUE - ref));
 		if (ctx->strtab.data) {
 			while (ref != IR_TRUE) {
-				if (new_insn->op == IR_FUNC || new_insn->op == IR_STR) {
+				if (new_insn->op == IR_FUNC || new_insn->op == IR_SYM || new_insn->op == IR_STR) {
 					new_insn->val.addr = ir_str(&new_ctx, ir_get_str(ctx, new_insn->val.i32));
 				}
 				new_insn++;
@@ -735,7 +735,7 @@ restart:
 			}
 			new_insn->optx = insn->optx;
 			new_insn->prev_const = 0;
-			if (insn->op == IR_FUNC || insn->op == IR_STR) {
+			if (insn->op == IR_FUNC || insn->op == IR_SYM || insn->op == IR_STR) {
 				new_insn->val.addr = ir_str(&new_ctx, ir_get_str(ctx, insn->val.i32));
 			} else {
 				new_insn->val.u64 = insn->val.u64;
