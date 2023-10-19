@@ -123,34 +123,64 @@ static void yy_error_sym(const char *msg, int sym);
 
 %}
 
-ir:
+ir(ir_loader *loader):
 	{ir_parser_ctx p;}
+	{ir_ctx ctx;}
+	{char name[256];}
+	{p.ctx = &ctx;}
 	(
-		ir_func_prototype(&p)
+		(
+			ir_func_prototype(&p, name)
+			{ir_init(&ctx, loader->default_func_flags, 256, 1024);}
+			{if (loader->init_func && !loader->init_func(loader, &ctx, name)) yy_error("init_func error");}
+			ir_func(&p)
+			{if (loader->process_func && !loader->process_func(loader, &ctx, name)) yy_error("process_func error");}
+			{ir_free(&ctx);}
+		)+
+	|
+		{ir_init(&ctx, loader->default_func_flags, 256, 1024);}
+		{if (loader->init_func && !loader->init_func(loader, &ctx, NULL)) yy_error("ini_func error");}
 		ir_func(&p)
-	)+
+		{if (loader->process_func && !loader->process_func(loader, &ctx, NULL)) yy_error("process_func error");}
+		{ir_free(&ctx);}
+	)
 ;
 
 ir_func(ir_parser_ctx *p):
+	{p->undef_count = 0;}
+	{ir_strtab_init(&p->var_tab, 256, 4096);}
 	"{" (ir_insn(p) ";")* "}"
+	{if (p->undef_count) ir_check_indefined_vars(p);}
+	{ir_strtab_free(&p->var_tab);}
 ;
 
-ir_func_prototype(ir_parser_ctx *p):
+ir_func_prototype(ir_parser_ctx *p, char *buf):
 	{const char *name;}
 	{size_t len;}
 	{uint8_t t = 0;}
 	"func" ID(&name, &len)
+	{if (len > 255) yy_error("name too long");}
+	{memcpy(buf, name, len);}
+	{buf[len] = 0;}
 	"("
 	(
-		type(&t)
+		"void"
+	|
 		(
-			","
 			type(&t)
-		)*
+			(
+				","
+				type(&t)
+			)*
+		)
 	)?
 	")"
 	":"
-	type(&t)
+	(
+		type(&t)
+	|
+		"void"
+	)
 ;
 
 ir_insn(ir_parser_ctx *p):
@@ -386,14 +416,8 @@ static void yy_error_sym(const char *msg, int sym) {
 	exit(2);
 }
 
-int ir_load(ir_ctx *ctx, FILE *f) {
-	ir_parser_ctx p;
-	int sym;
+int ir_load(ir_loader *loader, FILE *f) {
 	long pos, end;
-
-	p.ctx = ctx;
-	p.undef_count = 0;
-	ir_strtab_init(&p.var_tab, 256, 4096);
 
 	pos = ftell(f);
 	fseek(f, 0, SEEK_END);
@@ -404,17 +428,7 @@ int ir_load(ir_ctx *ctx, FILE *f) {
 	fread((void*)yy_buf, (end - pos), 1, f);
 	*(unsigned char*)yy_end = 0;
 
-	yy_pos = yy_text = yy_buf;
-	yy_line = 1;
-	sym = parse_ir_func(get_sym(), &p);
-	if (sym != YY_EOF) {
-		yy_error_sym("<EOF> expected, got", sym);
-	}
-	if (p.undef_count) {
-		ir_check_indefined_vars(&p);
-	}
-
-	ir_strtab_free(&p.var_tab);
+	parse(loader);
 
 	return 1;
 }

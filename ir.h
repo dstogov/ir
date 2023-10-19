@@ -514,6 +514,7 @@ typedef struct _ir_block         ir_block;
 typedef struct _ir_arena         ir_arena;
 typedef struct _ir_live_interval ir_live_interval;
 typedef struct _ir_live_range    ir_live_range;
+typedef struct _ir_loader        ir_loader;
 typedef int8_t ir_regs[4];
 
 typedef void (*ir_snapshot_create_t)(ir_ctx *ctx, ir_ref addr);
@@ -588,6 +589,7 @@ struct _ir_ctx {
 	ir_get_veneer_t    get_veneer;
 	ir_set_veneer_t    set_veneer;
 #endif
+	ir_loader         *loader;
 	ir_strtab          strtab;
 	ir_ref             prev_insn_chain[IR_LAST_FOLDABLE_OP + 1];
 	ir_ref             prev_const_chain[IR_LAST_TYPE];
@@ -748,23 +750,22 @@ void ir_gdb_unregister_all(void);
 bool ir_gdb_present(void);
 
 /* IR load API (implementation in ir_load.c) */
-
-typedef struct _ir_loader ir_loader;
-
 struct _ir_loader {
 	uint32_t default_func_flags;
 	bool (*init_module)       (ir_loader *loader, const char *name, const char *filename, const char *target);
 	bool (*external_sym_dcl)  (ir_loader *loader, const char *name, bool is_const);
-	bool (*sym_dcl)           (ir_loader *loader, const char *name, bool is_const, bool is_static, size_t size, const void *data);
+	bool (*sym_dcl)           (ir_loader *loader, const char *name, bool is_const, bool is_static, size_t size, bool has_data);
+	bool (*data)              (ir_loader *loader, ir_type type, uint32_t count, void *data);
 	bool (*external_func_dcl) (ir_loader *loader, const char *name);
 	bool (*forward_func_dcl)  (ir_loader *loader, const char *name, bool is_static);
 	bool (*init_func)         (ir_loader *loader, ir_ctx *ctx, const char *name);
 	bool (*process_func)      (ir_loader *loader, ir_ctx *ctx, const char *name);
+	void*(*resolve_sym_name)  (ir_loader *loader, const char *name);
 };
 
 void ir_loader_init(void);
 void ir_loader_free(void);
-int ir_load(ir_ctx *ctx, FILE *f);
+int ir_load(ir_loader *loader, FILE *f);
 
 /* IR LLVM load API (implementation in ir_load_llvm.c) */
 int ir_load_llvm_bitcode(ir_loader *loader, const char *filename);

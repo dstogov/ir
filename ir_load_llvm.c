@@ -34,6 +34,7 @@ static ir_type llvm2ir_type(LLVMTypeRef type)
 				case 32: return IR_I32;
 				case 64: return IR_I64;
 				default:
+					IR_ASSERT(0);
 					break;
 			}
 			break;
@@ -602,6 +603,10 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 	} else if (STR_EQUAL(name, name_len, "llvm.va_copy")) {
 		// TODO:
 	} else if (STR_START(name, name_len, "llvm.ctpop.")) {
+		// TODO:
+	} else if (STR_START(name, name_len, "llvm.ctlz.")) {
+		// TODO:
+	} else if (STR_START(name, name_len, "llvm.cttz.")) {
 		// TODO:
 	} else if (STR_START(name, name_len, "llvm.memset.")) {
 		// TODO:
@@ -1486,6 +1491,80 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMModuleRef module, LLVMValueRef func)
 	return 1;
 }
 
+static int llvm2ir_data(ir_loader *loader, LLVMTypeRef type, LLVMValueRef op)
+{
+	LLVMTypeRef el_type;
+	LLVMValueRef el;
+	LLVMBool lose;
+	ir_type t;
+	ir_val val;
+	uint32_t i, len;
+	void *p = NULL;
+
+	switch (LLVMGetValueKind(op)) {
+		case LLVMConstantIntValueKind:
+			t = llvm2ir_type(type);
+			IR_ASSERT(IR_IS_TYPE_INT(t));
+			if (IR_IS_TYPE_SIGNED(t)) {
+				val.i64 = LLVMConstIntGetSExtValue(op);
+			} else {
+				val.i64 = LLVMConstIntGetZExtValue(op);
+			}
+			switch (ir_type_size[t]) {
+				case 1: p = &val.i8;  break;
+				case 2: p = &val.i16; break;
+				case 4: p = &val.i32; break;
+				case 8: p = &val.i64; break;
+				default:
+					IR_ASSERT(0);
+					break;
+			}
+			return loader->data(loader, t, 1, p);
+		case LLVMConstantFPValueKind:
+			t = llvm2ir_type(type);
+			if (t == IR_DOUBLE) {
+				val.d = LLVMConstRealGetDouble(op, &lose);
+				return loader->data(loader, t, 1, &val.d);
+			} else {
+				IR_ASSERT(t == IR_FLOAT);
+				val.f = (float)LLVMConstRealGetDouble(op, &lose);
+				return loader->data(loader, t, 1, &val.f);
+			}
+		case LLVMConstantPointerNullValueKind:
+			val.addr = 0;
+			return loader->data(loader, IR_ADDR, 1, &val.addr);
+// 		case LLVMConstantArrayValueKind:
+		case LLVMConstantDataArrayValueKind:
+			el_type = LLVMGetElementType(type);
+			len = LLVMGetArrayLength(type);
+			for (i = 0; i < len; i++) {
+				el = LLVMGetAggregateElement(op, i);
+				if (!llvm2ir_data(loader, el_type, el)) {
+					return 0;
+				}
+			}
+			return 1;
+			break;
+		case LLVMConstantExprValueKind:
+			IR_ASSERT(0);
+			return 0;
+		case LLVMGlobalVariableValueKind:
+			IR_ASSERT(0);
+			return 0;
+		case LLVMFunctionValueKind:
+			IR_ASSERT(0);
+			return 0;
+		case LLVMUndefValueValueKind:
+			IR_ASSERT(0);
+			return 0;
+		default:
+			IR_ASSERT(0);
+			return 0;
+	}
+
+	return 1;
+}
+
 static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 {
 	ir_ctx ctx;
@@ -1524,7 +1603,7 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 					fprintf(stderr, "Unsupported LLVM linkage: %d\n", linkage);
 					IR_ASSERT(0);
 			}
-			name = LLVMGetValueName(sym);
+			name = LLVMGetValueName2(sym, &name_len);
 			if (is_external) {
 				if (loader->external_sym_dcl
 				 && !loader->external_sym_dcl(loader, name, LLVMIsGlobalConstant(sym))) {
@@ -1534,16 +1613,19 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 				if (loader->sym_dcl) {
 					LLVMTypeRef type;
 					size_t size;
-					void *data = NULL;
+					bool has_data = 0;
 
 					type = LLVMGlobalGetValueType(sym);
 					size = LLVMABISizeOfType(target_data, type);
 
 					if (init && LLVMGetValueKind(init) != LLVMConstantAggregateZeroValueKind) {
-						// TODO: create data
+						has_data = 1;
 					}
-					if (!loader->sym_dcl(loader, name, LLVMIsGlobalConstant(sym), is_static, size, data)) {
+					if (!loader->sym_dcl(loader, name, LLVMIsGlobalConstant(sym), is_static, size, has_data)) {
 						return 0;
+					}
+					if (has_data) {
+						llvm2ir_data(loader, type, init);
 					}
 				}
 			}
@@ -1558,7 +1640,7 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 
 			if (!LLVMIsDeclaration(func)) continue;
 			linkage = LLVMGetLinkage(func);
-			name = LLVMGetValueName(func);
+			name = LLVMGetValueName2(func, &name_len);
 			if (STR_START(name, name_len, "llvm.")) continue;
 			switch (linkage) {
 				case LLVMExternalLinkage:
@@ -1592,7 +1674,7 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 
 			if (LLVMIsDeclaration(func)) continue;
 			linkage = LLVMGetLinkage(func);
-			name = LLVMGetValueName(func);
+			name = LLVMGetValueName2(func, &name_len);
 			if (STR_START(name, name_len, "llvm.")) continue;
 			switch (linkage) {
 				case LLVMExternalLinkage:
@@ -1614,7 +1696,8 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 	for (func = LLVMGetFirstFunction(module); func; func = LLVMGetNextFunction(func)) {
 		if (LLVMIsDeclaration(func)) continue;
 		ir_init(&ctx, loader->default_func_flags, 256, 1024);
-		if (loader->init_func &&  !loader->init_func(loader, &ctx, LLVMGetValueName(func))) {
+		name = LLVMGetValueName2(func, &name_len);
+		if (loader->init_func &&  !loader->init_func(loader, &ctx, name)) {
 			return 0;
 		}
 		ctx.rules = (void*)target_data;
@@ -1625,7 +1708,7 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 		}
 		ctx.rules = NULL;
 
-		if (loader->process_func && !loader->process_func(loader, &ctx, LLVMGetValueName(func))) {
+		if (loader->process_func && !loader->process_func(loader, &ctx, name)) {
 			return 0;
 		}
 

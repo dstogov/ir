@@ -144,7 +144,7 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted
 			if (isnan(insn->val.f)) {
 				fprintf(f, "nan");
 			} else {
-				fprintf(f, "%f", insn->val.f);
+				fprintf(f, "%g", insn->val.f);
 			}
 			break;
 		default:
@@ -352,6 +352,7 @@ void ir_init(ir_ctx *ctx, uint32_t flags, ir_ref consts_limit, ir_ref insns_limi
 	ctx->set_veneer = NULL;
 #endif
 
+	ctx->loader = NULL;
 	ctx->strtab.data = NULL;
 
 	buf = ir_mem_malloc((consts_limit + insns_limit) * sizeof(ir_insn));

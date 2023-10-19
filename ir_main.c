@@ -6,6 +6,7 @@
  */
 
 #include "ir.h"
+#include "ir_private.h" // TODO: move this together with loader
 #include <stdlib.h>
 #include <string.h>
 
@@ -229,6 +230,10 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, FILE *dump_file, 
 	return 1;
 }
 
+typedef struct _ir_sym {
+	void *addr;
+} ir_sym;
+
 typedef struct _ir_main_loader {
 	ir_loader  loader;
 	int        opt_level;
@@ -243,7 +248,42 @@ typedef struct _ir_main_loader {
 	FILE      *dump_file;
 	FILE      *c_file;
 	FILE      *llvm_file;
+	ir_strtab  symtab;
+	ir_sym    *sym;
+	ir_ref     sym_count;
+	void      *data;
 } ir_main_loader;
+
+static bool ir_loader_add_sym(ir_main_loader *l, const char *name, void *addr)
+{
+	uint32_t len = (uint32_t)strlen(name);
+	ir_ref val = ir_strtab_count(&l->symtab) + 1;
+	ir_ref old_val = ir_strtab_lookup(&l->symtab, name, len, val);
+	if (old_val != val) {
+		return 0;
+	}
+	if (val >= l->sym_count) {
+		l->sym_count += 16;
+		l->sym = ir_mem_realloc(l->sym, sizeof(ir_sym) * l->sym_count);
+	}
+	l->sym[val].addr = addr;
+	return 1;
+}
+
+static void* ir_loader_resolve_sym_name(ir_loader *loader, const char *name)
+{
+	ir_main_loader *l = (ir_main_loader*)loader;
+	uint32_t len = (uint32_t)strlen(name);
+	ir_ref val = ir_strtab_find(&l->symtab, name, len);
+	void *addr;
+
+	if (val) {
+		return l->sym[val].addr;
+	}
+	addr = ir_resolve_sym_name(name);
+	ir_loader_add_sym(l, name, addr); /* cache */
+	return addr;
+}
 
 static bool ir_loader_external_sym_dcl(ir_loader *loader, const char *name, bool is_const)
 {
@@ -252,15 +292,86 @@ static bool ir_loader_external_sym_dcl(ir_loader *loader, const char *name, bool
 	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
 		fprintf(l->dump_file, "; external %s %s:\n", is_const ? "const" : "var", name);
 	}
+	if (l->dump_asm || l->dump_size || l->run) {
+		void *addr = ir_loader_resolve_sym_name(loader, name);
+
+		if (!addr) {
+			return 0;
+		}
+		if (l->dump_asm) {
+			ir_disasm_add_symbol(name, (uintptr_t)addr, sizeof(void*));
+		}
+	}
 	return 1;
 }
 
-static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, bool is_const, bool is_static, size_t size, const void *data)
+static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, bool is_const, bool is_static, size_t size, bool has_data)
 {
 	ir_main_loader *l = (ir_main_loader*) loader;
 
 	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
 		fprintf(l->dump_file, "; %s%s %s: [%lld]\n", is_static ? "static " : "", is_const ? "const" : "var", name, (long long int)size);
+	}
+	if (l->dump_asm || l->dump_size || l->run) {
+		void *data = ir_mem_malloc(size);
+
+		if (!ir_loader_add_sym((ir_main_loader*)loader, name, data)) {
+			ir_mem_free(data);
+			return 0;
+		}
+		memset(data, 0, size);
+		if (has_data) {
+			l->data = data;
+		}
+		if (l->dump_asm) {
+			ir_disasm_add_symbol(name, (uintptr_t)data, size);
+		}
+	}
+	return 1;
+}
+
+static bool ir_loader_data(ir_loader *loader, ir_type type, uint32_t count, void *data)
+{
+	ir_main_loader *l = (ir_main_loader*) loader;
+	size_t size;
+	uint32_t i;
+
+	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
+		switch (ir_type_size[type]) {
+			case 1:
+				for (i = 0; i < count; i++) {
+					fprintf(l->dump_file, ";   .db 0x%02x\n", (uint32_t)*(uint8_t*)data);
+					data = (void*)((uintptr_t)data + 1);
+				}
+				break;
+			case 2:
+				for (i = 0; i < count; i++) {
+					fprintf(l->dump_file, ";   .dw 0x%04x\n", (uint32_t)*(uint16_t*)data);
+					data = (void*)((uintptr_t)data + 1);
+				}
+				break;
+			case 4:
+				for (i = 0; i < count; i++) {
+					fprintf(l->dump_file, ";   .dd 0x%08x\n", *(uint32_t*)data);
+					data = (void*)((uintptr_t)data + 4);
+				}
+				break;
+			case 8:
+				for (i = 0; i < count; i++) {
+					fprintf(l->dump_file, ";   .dq 0x%016lx\n", *(uint64_t*)data);
+					data = (void*)((uintptr_t)data + 8);
+				}
+				break;
+		}
+	}
+	if (l->dump_asm || l->dump_size || l->run) {
+		if (!l->data) {
+			return 0;
+		}
+		size = ir_type_size[type] * count;
+		// TODO: alignement
+		memcpy(l->data, data, size);
+		l->data = (void*)((uintptr_t)l->data + size);
 	}
 	return 1;
 }
@@ -272,6 +383,16 @@ static bool ir_loader_external_func_dcl(ir_loader *loader, const char *name)
 	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
 		fprintf(l->dump_file, "; external func %s:\n", name);
 	}
+	if (l->dump_asm || l->dump_size || l->run) {
+		void *addr = ir_loader_resolve_sym_name(loader, name);
+
+		if (!addr) {
+			return 0;
+		}
+		if (l->dump_asm) {
+			ir_disasm_add_symbol(name, (uintptr_t)addr, sizeof(void*));
+		}
+	}
 	return 1;
 }
 
@@ -281,12 +402,18 @@ static bool ir_loader_init_func(ir_loader *loader, ir_ctx *ctx, const char *name
 
 	ctx->mflags = l->mflags;
 	ctx->fixed_regset = ~l->debug_regset;
+	ctx->loader = loader;
 	return 1;
 }
 
 static bool ir_loader_process_func(ir_loader *loader, ir_ctx *ctx, const char *name)
 {
 	ir_main_loader *l = (ir_main_loader*) loader;
+
+	// TODO: remove this
+	if (name == NULL) {
+		name = (l->run) ? "main" : "test";
+	}
 
 	if ((l->dump & IR_DUMP_SAVE) && (l->dump & IR_DUMP_NAME) && l->dump_file) {
 		fprintf(l->dump_file, "%s:\n", name);
@@ -316,6 +443,10 @@ static bool ir_loader_process_func(ir_loader *loader, ir_ctx *ctx, const char *n
 
 		l->size += size;
 		if (entry) {
+			if (!ir_loader_add_sym(l, name, entry)) {
+				fprintf(stderr, "\nERROR: Symbol redefinition: %s\n", name);
+				return 0;
+			}
 			if (l->dump_asm) {
 				ir_ref i;
 				ir_insn *insn;
@@ -323,11 +454,12 @@ static bool ir_loader_process_func(ir_loader *loader, ir_ctx *ctx, const char *n
 				ir_disasm_add_symbol(name, (uintptr_t)entry, size);
 
 				for (i = IR_UNUSED + 1, insn = ctx->ir_base - i; i < ctx->consts_count; i++, insn--) {
-					if (insn->op == IR_FUNC || insn->op == IR_SYM) {
+					if (insn->op == IR_FUNC) {
 						const char *name = ir_get_str(ctx, insn->val.i32);
-						void *addr = ir_resolve_sym_name(name);
+						void *addr = ir_loader_resolve_sym_name(loader, name);
 
 						ir_disasm_add_symbol(name, (uintptr_t)addr, sizeof(void*));
+//TODO:					} else if (insn->op == IR_SYM) {
 					}
 				}
 
@@ -361,7 +493,6 @@ int main(int argc, char **argv)
 	char *input = NULL;
 	char *dump_file = NULL, *c_file = NULL, *llvm_file = 0;
 	FILE *f;
-	ir_ctx ctx;
 	bool emit_c = 0, emit_llvm = 0, dump_size = 0, dump_asm = 0, run = 0;
 	uint32_t dump = 0;
 	int opt_level = 2;
@@ -563,16 +694,22 @@ int main(int argc, char **argv)
 	}
 	if (dump_asm || dump_size || run) {
 		flags |= IR_GEN_NATIVE;
+		if (emit_c) {
+			fprintf(stderr, "ERROR: --emit-c is incompatible with native code generator (-S, --dump-size, --run)\n");
+			return 1;
+		}
 	}
 
 	loader.loader.default_func_flags = flags;
 	loader.loader.init_module        = NULL;
 	loader.loader.external_sym_dcl   = ir_loader_external_sym_dcl;
 	loader.loader.sym_dcl            = ir_loader_sym_dcl;
+	loader.loader.data               = ir_loader_data;
 	loader.loader.external_func_dcl  = ir_loader_external_func_dcl;
 	loader.loader.forward_func_dcl   = NULL;
 	loader.loader.init_func          = ir_loader_init_func;
 	loader.loader.process_func       = ir_loader_process_func;
+	loader.loader.resolve_sym_name   = ir_loader_resolve_sym_name;
 
 	loader.opt_level = opt_level;
 	loader.mflags = mflags;
@@ -588,6 +725,10 @@ int main(int argc, char **argv)
 	loader.dump_file = NULL;
 	loader.c_file = NULL;
 	loader.llvm_file = NULL;
+
+	ir_strtab_init(&loader.symtab, 16, 4096);
+	loader.sym = NULL;
+	loader.sym_count = 0;
 
 	if (dump_file) {
 		loader.dump_file = fopen(dump_file, "w+");
@@ -647,22 +788,12 @@ int main(int argc, char **argv)
 
 	ir_loader_init();
 
-	ir_init(&ctx, flags, 256, 1024);
-	if (!loader.loader.init_func(&loader.loader, &ctx, run ? "main" : "test")) {
-		return 1;
+	if (!ir_load(&loader.loader, f)) {
+		fprintf(stderr, "ERROR: Cannot load input file '%s'\n", input);
 	}
 
-	if (!ir_load(&ctx, f)) {
-		fprintf(stderr, "ERROR: Cannot load input file '%s'\n", input);
-		return 1;
-	}
 	fclose(f);
 
-	if (!loader.loader.process_func(&loader.loader, &ctx, run ? "main" : "test")) {
-		return 1;
-	}
-
-	ir_free(&ctx);
 	
 	ir_loader_free();
 
@@ -682,6 +813,11 @@ finish:
 
 	if (dump_size) {
 		fprintf(stderr, "\ncode size = %lld\n", (long long int)loader.size);
+	}
+
+	ir_strtab_free(&loader.symtab);
+	if (loader.sym) {
+		ir_mem_free(loader.sym);
 	}
 
 	if (run && loader.main) {

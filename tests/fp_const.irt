@@ -26,7 +26,7 @@ Floating point constants
 	uintptr_t c_4 = func(printf, 4);
 	uintptr_t c_5 = "fmt\n";
 	double c_6 = 16.5;
-	float c_7 = 13.400000;
+	float c_7 = 13.4;
 	double c_8 = inf;
 	float c_9 = inf;
 	double c_10 = nan;

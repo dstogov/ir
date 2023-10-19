@@ -708,6 +708,7 @@ restart:
 	new_ctx.get_veneer = ctx->get_veneer;
 	new_ctx.set_veneer = ctx->set_veneer;
 #endif
+	new_ctx.loader = ctx->loader;
 
 	/* Copy constants */
 	if (consts_count == ctx->consts_count) {

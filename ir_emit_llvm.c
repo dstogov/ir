@@ -44,21 +44,37 @@ static void ir_emit_ref(ir_ctx *ctx, FILE *f, ir_ref ref)
 			}
 		} else if (IR_IS_TYPE_FP(insn->type)) {
 			if (insn->type == IR_DOUBLE) {
-				if (isnan(insn->val.d)) {
+				double d = insn->val.d;
+				if (isnan(d)) {
 					fprintf(f, "nan");
-				} else if (insn->val.d == 0.0) {
+				} else if (d == 0.0) {
 					fprintf(f, "0.0");
 				} else {
-					fprintf(f, "%g", insn->val.d);
+					double e = log10(d);
+					if (e < -4 || e >= 6) {
+						fprintf(f, "%e", d);
+					} else if (round(d) == d) {
+						fprintf(f, "%.0f.0", d);
+					} else {
+						fprintf(f, "%g", d);
+					}
 				}
 			} else {
 				IR_ASSERT(insn->type == IR_FLOAT);
-				if (isnan(insn->val.f)) {
+				double d = insn->val.f;
+				if (isnan(d)) {
 					fprintf(f, "nan");
-				} else if (insn->val.f == 0.0) {
+				} else if (d == 0.0) {
 					fprintf(f, "0.0");
 				} else {
-					fprintf(f, "%e", insn->val.f);
+					double e = log10(d);
+					if (e < -4 || e >= 6) {
+						fprintf(f, "%e", d);
+					} else if (round(d) == d) {
+						fprintf(f, "%.0f.0", d);
+					} else {
+						fprintf(f, "%g", d);
+					}
 				}
 			}
 		} else {

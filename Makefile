@@ -20,10 +20,12 @@ LLK        = llk
 ifeq (debug, $(BUILD))
  override CFLAGS += -O0 -g -DIR_DEBUG=1
  override BUILD_CFLAGS += -O0 -g -DIR_DEBUG=1
+ MINILUA_CFLAGS = -O0 -g
 endif
 ifeq (release, $(BUILD))
  override CFLAGS += -O2 -g
  override BUILD_CFLAGS += -O2 -g
+ MINILUA_CFLAGS = -O2 -g
 endif
 
 ifeq (x86_64, $(TARGET))
@@ -97,7 +99,7 @@ $(BUILD_DIR)/gen_ir_fold_hash: $(SRC_DIR)/gen_ir_fold_hash.c $(SRC_DIR)/ir_strta
 	$(BUILD_CC) $(BUILD_CFLAGS) $(LDFALGS) -o $@ $<
 
 $(BUILD_DIR)/minilua: $(SRC_DIR)/dynasm/minilua.c
-	$(BUILD_CC) $(BUILD_CFLAGS) $(SRC_DIR)/dynasm/minilua.c -lm -o $@
+	$(BUILD_CC) $(MINILUA_CFLAGS) $(SRC_DIR)/dynasm/minilua.c -lm -o $@
 $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h: $(SRC_DIR)/ir_$(DASM_ARCH).dasc $(SRC_DIR)/dynasm/*.lua $(BUILD_DIR)/minilua
 	$(BUILD_DIR)/minilua $(SRC_DIR)/dynasm/dynasm.lua $(DASM_FLAGS) -o $@ $(SRC_DIR)/ir_$(DASM_ARCH).dasc
 
