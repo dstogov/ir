@@ -20,8 +20,8 @@ x86
 	uintptr_t one = 1;
 	uintptr_t c_5 = func(printf, 4);
 	l_1 = START(l_4);
-	uint64_t var = VAR(l_1, "str");
-	uintptr_t a_0 = VADDR(var);
+	uint64_t var_1 = VAR(l_1, "str");
+	uintptr_t a_0 = VADDR(var_1);
 	s_1 = STORE(l_1, a_0, h);
 	uintptr_t a_1 = ADD(a_0, one);
 	s_2 = STORE(s_1, a_1, i);
