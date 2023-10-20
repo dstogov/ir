@@ -77,6 +77,28 @@ static ir_type llvm2ir_signed_type(ir_type type)
 	return type;
 }
 
+static const char *llvm2ir_sym_name(char *buf, const char *name, size_t name_len)
+{
+	size_t i;
+	char c;
+
+	if (name_len > 255) {
+		return NULL;
+	}
+	for (i = 0; i < name_len; i++) {
+		c = name[i];
+		if (!(c >= 'a' && c <= 'z')
+		 && !(c >= 'A' && c <= 'Z')
+		 && !(c >= '0' && c <= '9')
+		 && c != '_') {
+			c = '_';
+		}
+		buf[i] = c;
+	}
+	buf[i] = 0;
+	return buf;
+}
+
 static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 {
 	ir_ref ref;
@@ -85,6 +107,7 @@ static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 	size_t name_len;
 	uint32_t cconv, flags;
 	ir_val val;
+	char buf[256];
 
 	switch (LLVMGetValueKind(op)) {
 		case LLVMConstantIntValueKind:
@@ -123,6 +146,10 @@ static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 		case LLVMGlobalVariableValueKind:
 			// TODO: resolve variable address
 			name = LLVMGetValueName2(op, &name_len);
+			name = llvm2ir_sym_name(buf, name, name_len);
+			if (!name) {
+				return 0;
+			}
 			return ir_const_sym(ctx, ir_strl(ctx, name, name_len));
 		case LLVMFunctionValueKind:
 			// TODO: function prototype
@@ -699,11 +726,19 @@ static void llvm2ir_call(ir_ctx *ctx, LLVMValueRef insn)
         type = llvm2ir_type(LLVMTypeOf(arg));
         args[i] = llvm2ir_op(ctx, arg, type);
 	}
-	if (LLVMIsTailCall(insn) && LLVMGetInstructionOpcode(LLVMGetNextInstruction(insn)) == LLVMRet) {
-		ref = ir_TAILCALL_N(llvm2ir_type(LLVMGetReturnType(ftype)), llvm2ir_op(ctx, func, IR_ADDR), count, args);
-	} else {
+	do {
+		if (LLVMIsTailCall(insn)) {
+			LLVMValueRef next_insn = LLVMGetNextInstruction(insn);
+
+			if (LLVMGetInstructionOpcode(next_insn) == LLVMRet
+			 && LLVMGetNumOperands(next_insn) == 1
+			 && LLVMGetOperand(next_insn, 1) == insn) {
+				ref = ir_TAILCALL_N(llvm2ir_type(LLVMGetReturnType(ftype)), llvm2ir_op(ctx, func, IR_ADDR), count, args);
+				break;
+			}
+		}
 		ref = ir_CALL_N(llvm2ir_type(LLVMGetReturnType(ftype)), llvm2ir_op(ctx, func, IR_ADDR), count, args);
-	}
+	} while (0);
 	ir_addrtab_add(ctx->binding, (uintptr_t)insn, ref);
 }
 
@@ -1106,12 +1141,13 @@ next:
 	return count;
 }
 
-static int llvm2ir_func(ir_ctx *ctx, LLVMModuleRef module, LLVMValueRef func)
+static int llvm2ir_func(ir_ctx *ctx, LLVMValueRef func)
 {
 	uint32_t i, j, b, count, cconv, bb_count;
 	LLVMBasicBlockRef *bbs, bb;
 	LLVMValueRef param, insn;
 	LLVMOpcode opcode;
+	LLVMTypeRef ftype;
 	ir_type type;
 	ir_ref ref, max_inputs_count;
 	ir_hashtab bb_hash;
@@ -1120,6 +1156,7 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMModuleRef module, LLVMValueRef func)
 	ir_ref *inputs, *bb_starts, *predecessor_refs;
 
 	// TODO: function prototype
+	ftype = LLVMGlobalGetValueType(func);
 	cconv = LLVMGetFunctionCallConv(func);
 	if (cconv == LLVMCCallConv || cconv == LLVMFastCallConv) {
 		/* skip */
@@ -1130,9 +1167,10 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMModuleRef module, LLVMValueRef func)
 		IR_ASSERT(0);
 		return 0;
 	}
-	if (LLVMIsFunctionVarArg(LLVMTypeOf(func))) {
-		// TODO:
+	if (LLVMIsFunctionVarArg(ftype)) {
+		ctx->flags |= IR_VARARG_FUNC;
 	}
+	ctx->ret_type = llvm2ir_type(LLVMGetReturnType(ftype));
 
 	/* Reuse "binding" for LLVMValueRef -> ir_ref hash */
 	ctx->binding = ir_mem_malloc(sizeof(ir_hashtab));
@@ -1491,6 +1529,73 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMModuleRef module, LLVMValueRef func)
 	return 1;
 }
 
+static int llvm2ir_external_func(ir_loader *loader, const char *name, LLVMValueRef func)
+{
+	uint32_t i, count, cconv, flags = 0;
+	LLVMTypeRef ftype;
+	ir_type ret_type, *param_types;
+
+	// TODO: function prototype
+	ftype = LLVMGlobalGetValueType(func);
+	cconv = LLVMGetFunctionCallConv(func);
+	if (cconv == LLVMCCallConv || cconv == LLVMFastCallConv) {
+		/* skip */
+	} else if (cconv == LLVMX86FastcallCallConv) {
+		flags |= IR_FASTCALL_FUNC;
+	} else {
+		fprintf(stderr, "Unsupported Calling Convention: %d\n", cconv);
+		IR_ASSERT(0);
+		return 0;
+	}
+	if (LLVMIsFunctionVarArg(ftype)) {
+		flags |= IR_VARARG_FUNC;
+	}
+	ret_type = llvm2ir_type(LLVMGetReturnType(ftype));
+
+	count = LLVMCountParams(func);
+	param_types = alloca(count * sizeof(ir_type));
+	for (i = 0; i < count; i++) {
+		param_types[i] = llvm2ir_type(LLVMTypeOf(LLVMGetParam(func, i)));
+	}
+
+	return loader->external_func_dcl(loader, name, flags, ret_type, count, param_types);
+}
+
+static int llvm2ir_forward_func(ir_loader *loader, const char *name, LLVMValueRef func, LLVMBool is_static)
+{
+	uint32_t i, count, cconv, flags = 0;
+	LLVMTypeRef ftype;
+	ir_type ret_type, *param_types;
+
+	// TODO: function prototype
+	ftype = LLVMGlobalGetValueType(func);
+	cconv = LLVMGetFunctionCallConv(func);
+	if (cconv == LLVMCCallConv || cconv == LLVMFastCallConv) {
+		/* skip */
+	} else if (cconv == LLVMX86FastcallCallConv) {
+		flags |= IR_FASTCALL_FUNC;
+	} else {
+		fprintf(stderr, "Unsupported Calling Convention: %d\n", cconv);
+		IR_ASSERT(0);
+		return 0;
+	}
+	if (LLVMIsFunctionVarArg(ftype)) {
+		flags |= IR_VARARG_FUNC;
+	}
+	if (is_static) {
+		flags |= IR_STATIC;
+	}
+	ret_type = llvm2ir_type(LLVMGetReturnType(ftype));
+
+	count = LLVMCountParams(func);
+	param_types = alloca(count * sizeof(ir_type));
+	for (i = 0; i < count; i++) {
+		param_types[i] = llvm2ir_type(LLVMTypeOf(LLVMGetParam(func, i)));
+	}
+
+	return loader->forward_func_dcl(loader, name, flags, ret_type, count, param_types);
+}
+
 static int llvm2ir_data(ir_loader *loader, LLVMTypeRef type, LLVMValueRef op)
 {
 	LLVMTypeRef el_type;
@@ -1519,20 +1624,20 @@ static int llvm2ir_data(ir_loader *loader, LLVMTypeRef type, LLVMValueRef op)
 					IR_ASSERT(0);
 					break;
 			}
-			return loader->data(loader, t, 1, p);
+			return loader->sym_data(loader, t, 1, p);
 		case LLVMConstantFPValueKind:
 			t = llvm2ir_type(type);
 			if (t == IR_DOUBLE) {
 				val.d = LLVMConstRealGetDouble(op, &lose);
-				return loader->data(loader, t, 1, &val.d);
+				return loader->sym_data(loader, t, 1, &val.d);
 			} else {
 				IR_ASSERT(t == IR_FLOAT);
 				val.f = (float)LLVMConstRealGetDouble(op, &lose);
-				return loader->data(loader, t, 1, &val.f);
+				return loader->sym_data(loader, t, 1, &val.f);
 			}
 		case LLVMConstantPointerNullValueKind:
 			val.addr = 0;
-			return loader->data(loader, IR_ADDR, 1, &val.addr);
+			return loader->sym_data(loader, IR_ADDR, 1, &val.addr);
 // 		case LLVMConstantArrayValueKind:
 		case LLVMConstantDataArrayValueKind:
 			el_type = LLVMGetElementType(type);
@@ -1572,6 +1677,7 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 	LLVMTargetDataRef target_data = LLVMGetModuleDataLayout(module);
 	const char *name;
 	size_t name_len;
+	char buf[256];
 
 	if (loader->init_module
 	 && !loader->init_module(loader,
@@ -1581,51 +1687,63 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 		return 1;
 	}
 
-	if (loader->external_sym_dcl || loader->sym_dcl) {
-		for (sym = LLVMGetFirstGlobal(module); sym; sym = LLVMGetNextGlobal(sym)) {
-			LLVMLinkage linkage = LLVMGetLinkage(sym);
-			LLVMValueRef init = LLVMGetInitializer(sym);
-			bool is_external = 0;
-			bool is_static = 0;
+	for (sym = LLVMGetFirstGlobal(module); sym; sym = LLVMGetNextGlobal(sym)) {
+		LLVMLinkage linkage = LLVMGetLinkage(sym);
+		LLVMValueRef init = LLVMGetInitializer(sym);
+		bool is_external = 0;
+		uint32_t flags = 0;
 
-			IR_ASSERT(!LLVMIsThreadLocal(sym));
-			switch (linkage) {
-				case LLVMExternalLinkage:
-					if (!init) {
-						is_external = 1;
-					}
-					break;
-				case LLVMInternalLinkage:
-				case LLVMPrivateLinkage:
-					is_static = 1;
-					break;
-				default:
-					fprintf(stderr, "Unsupported LLVM linkage: %d\n", linkage);
-					IR_ASSERT(0);
+		IR_ASSERT(!LLVMIsThreadLocal(sym));
+		switch (linkage) {
+			case LLVMExternalLinkage:
+				if (!init) {
+					is_external = 1;
+				}
+				break;
+			case LLVMInternalLinkage:
+			case LLVMPrivateLinkage:
+				flags |= IR_STATIC;
+				break;
+			default:
+				fprintf(stderr, "Unsupported LLVM linkage: %d\n", linkage);
+				IR_ASSERT(0);
+		}
+		name = LLVMGetValueName2(sym, &name_len);
+		if (is_external) {
+			if (LLVMIsGlobalConstant(sym)) {
+				flags |= IR_CONST;
 			}
-			name = LLVMGetValueName2(sym, &name_len);
-			if (is_external) {
-				if (loader->external_sym_dcl
-				 && !loader->external_sym_dcl(loader, name, LLVMIsGlobalConstant(sym))) {
+			if (loader->external_sym_dcl
+			 && !loader->external_sym_dcl(loader, buf, flags)) {
+				return 0;
+			}
+		} else {
+			if (loader->sym_dcl) {
+				LLVMTypeRef type;
+				size_t size;
+				bool has_data = 0;
+				char buf[256];
+
+				type = LLVMGlobalGetValueType(sym);
+				size = LLVMABISizeOfType(target_data, type);
+
+				if (init && LLVMGetValueKind(init) != LLVMConstantAggregateZeroValueKind) {
+					has_data = 1;
+				}
+				name = llvm2ir_sym_name(buf, name, name_len);
+				if (!name) {
 					return 0;
 				}
-			} else {
-				if (loader->sym_dcl) {
-					LLVMTypeRef type;
-					size_t size;
-					bool has_data = 0;
-
-					type = LLVMGlobalGetValueType(sym);
-					size = LLVMABISizeOfType(target_data, type);
-
-					if (init && LLVMGetValueKind(init) != LLVMConstantAggregateZeroValueKind) {
-						has_data = 1;
-					}
-					if (!loader->sym_dcl(loader, name, LLVMIsGlobalConstant(sym), is_static, size, has_data)) {
+				if (LLVMIsGlobalConstant(sym)) {
+					flags |= IR_CONST;
+                }
+				if (!loader->sym_dcl(loader, name, flags, size, has_data)) {
+					return 0;
+				}
+				if (has_data) {
+					llvm2ir_data(loader, type, init);
+					if (!loader->sym_data_end(loader)) {
 						return 0;
-					}
-					if (has_data) {
-						llvm2ir_data(loader, type, init);
 					}
 				}
 			}
@@ -1655,18 +1773,17 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 					IR_ASSERT(0);
 			}
 			if (is_external) {
-				if (!loader->external_func_dcl(loader, name)) {
+				if (!llvm2ir_external_func(loader, name, func)) {
 					return 0;
 				}
 			} else {
 				if (loader->forward_func_dcl
-				 && !loader->forward_func_dcl(loader, name, is_static)) {
+				 && !llvm2ir_forward_func(loader, name, func, is_static)) {
 					return 0;
 				}
 			}
 		}
 	}
-
 	if (loader->forward_func_dcl) {
 		for (func = LLVMGetFirstFunction(module); func; func = LLVMGetNextFunction(func)) {
 			LLVMLinkage linkage;
@@ -1675,7 +1792,6 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 			if (LLVMIsDeclaration(func)) continue;
 			linkage = LLVMGetLinkage(func);
 			name = LLVMGetValueName2(func, &name_len);
-			if (STR_START(name, name_len, "llvm.")) continue;
 			switch (linkage) {
 				case LLVMExternalLinkage:
 					break;
@@ -1687,7 +1803,7 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 					fprintf(stderr, "Unsupported LLVM linkage: %d\n", linkage);
 					IR_ASSERT(0);
 			}
-			if (!loader->forward_func_dcl(loader, name, is_static)) {
+			if (!llvm2ir_forward_func(loader, name, func, is_static)) {
 				return 0;
 			}
 		}
@@ -1695,20 +1811,28 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 
 	for (func = LLVMGetFirstFunction(module); func; func = LLVMGetNextFunction(func)) {
 		if (LLVMIsDeclaration(func)) continue;
-		ir_init(&ctx, loader->default_func_flags, 256, 1024);
 		name = LLVMGetValueName2(func, &name_len);
-		if (loader->init_func &&  !loader->init_func(loader, &ctx, name)) {
+		if (!loader->func_init(loader, &ctx, name)) {
 			return 0;
 		}
+		switch (LLVMGetLinkage(func)) {
+			case LLVMInternalLinkage:
+			case LLVMPrivateLinkage:
+				ctx.flags |= IR_STATIC;
+				break;
+			default:
+				break;
+		}
 		ctx.rules = (void*)target_data;
-		if (!llvm2ir_func(&ctx, module, func)) {
+		if (!llvm2ir_func(&ctx, func)) {
 			ctx.rules = NULL;
 			ir_free(&ctx);
 			return 0;
 		}
 		ctx.rules = NULL;
 
-		if (loader->process_func && !loader->process_func(loader, &ctx, name)) {
+		if (!loader->func_process(loader, &ctx, name)) {
+			ir_free(&ctx);
 			return 0;
 		}
 

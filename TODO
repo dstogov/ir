@@ -33,7 +33,7 @@
 		(add_009.irt, conv_001.irt, conv_002.irt, conv_004.irt, conv_010.irt, sub_009.irt)
 	-  binary code emission without DynAsm ???
 
--  modules (functions, data objecs, import, export, prototypes, forward declarations, memory segments, ref data, expr data) 
+?  modules (functions, data objecs, import, export, prototypes, forward declarations, memory segments, ref data, expr data) 
 -  C front-end
 -  interpreter
 -  alias analyzes

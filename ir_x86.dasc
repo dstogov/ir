@@ -7914,9 +7914,8 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 	ir_reg reg;
 
 #ifndef IR_REG_FP_RET1
-	ir_type ret_type = ir_get_return_type(ctx);
-	if (ret_type == IR_FLOAT || ret_type == IR_DOUBLE) {
-		ctx->ret_slot = ir_allocate_spill_slot(ctx, ret_type, &data->ra_data);
+	if (ctx->ret_type == IR_FLOAT || ctx->ret_type == IR_DOUBLE) {
+		ctx->ret_slot = ir_allocate_spill_slot(ctx, ctx->ret_type, &data->ra_data);
 	} else {
 		ctx->ret_slot = -1;
 	}

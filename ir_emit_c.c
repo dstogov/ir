@@ -643,16 +643,16 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	ir_ref i, n, *p;
 	ir_insn *insn;
 	ir_use_list *use_list;
-	uint8_t ret_type;
 	bool first;
 	ir_bitset vars;
 	uint32_t b, target, prev = 0;
 	ir_block *bb;
 
 	/* Emit function prototype */
-	ret_type = ir_get_return_type(ctx);
-	fprintf(f, "%s", ir_type_cname[ret_type]);
-	fprintf(f, " %s(", name);
+	if (ctx->flags & IR_STATIC) {
+		fprintf(f, "static ");
+	}
+	fprintf(f, "%s %s(", ir_type_cname[ctx->ret_type != (ir_type)-1 ? ctx->ret_type : IR_VOID], name);
 	use_list = &ctx->use_lists[1];
 	n = use_list->count;
 	first = 1;
@@ -924,4 +924,32 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 int ir_emit_c(ir_ctx *ctx, const char *name, FILE *f)
 {
 	return ir_emit_func(ctx, name, f);
+}
+
+void ir_emit_c_func_decl(const char *name, uint32_t flags, ir_type ret_type, uint32_t params_count, ir_type *param_types, FILE *f)
+{
+	if (flags & IR_EXTERN) {
+		fprintf(f, "extern ");
+	} else if (flags & IR_STATIC) {
+		fprintf(f, "static ");
+	}
+	fprintf(f, "%s %s(", ir_type_cname[ret_type], name);
+	if (params_count) {
+		ir_type *p = param_types;
+
+		fprintf(f, "%s", ir_type_cname[*p]);
+		p++;
+		while (--params_count) {
+			fprintf(f, ", %s", ir_type_cname[*p]);
+			p++;
+		}
+		if (flags & IR_VARARG_FUNC) {
+			fprintf(f, ", ...");
+		}
+	} else if (flags & IR_VARARG_FUNC) {
+		fprintf(f, "...");
+	} else {
+		fprintf(f, "void");
+	}
+	fprintf(f, ");\n");
 }

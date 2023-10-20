@@ -545,14 +545,19 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	ir_ref i, n, *p, use;
 	ir_insn *insn;
 	ir_use_list *use_list;
-	uint8_t ret_type;
 	bool first;
 	uint32_t b, target;
 	ir_block *bb;
 
 	/* Emit function prototype */
-	ret_type = ir_get_return_type(ctx);
-	fprintf(f, "define %s", ir_type_llvm_name[ret_type]);
+	fprintf(f, "define ");
+	if (ctx->flags & IR_STATIC) {
+		fprintf(f, "internal ");
+	}
+	if (ctx->flags & IR_FASTCALL_FUNC) {
+		// TODO:
+	}
+	fprintf(f, "%s", ir_type_llvm_name[ctx->ret_type != (ir_type)-1 ? ctx->ret_type : IR_VOID]);
 	fprintf(f, " @%s(", name);
 	use_list = &ctx->use_lists[1];
 	n = use_list->count;
@@ -903,4 +908,27 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 int ir_emit_llvm(ir_ctx *ctx, const char *name, FILE *f)
 {
 	return ir_emit_func(ctx, name, f);
+}
+
+void ir_emit_llvm_func_decl(const char *name, uint32_t flags, ir_type ret_type, uint32_t params_count, ir_type *param_types, FILE *f)
+{
+	fprintf(f, "declare %s @%s(", ir_type_llvm_name[ret_type], name);
+	if (params_count) {
+		ir_type *p = param_types;
+
+		fprintf(f, "%s", ir_type_llvm_name[*p]);
+		p++;
+		while (--params_count) {
+			fprintf(f, ", %s", ir_type_llvm_name[*p]);
+			p++;
+		}
+		if (flags & IR_VARARG_FUNC) {
+			fprintf(f, ", ...");
+		}
+	} else if (flags & IR_VARARG_FUNC) {
+		fprintf(f, "...");
+	} else {
+		fprintf(f, "void");
+	}
+	fprintf(f, ")\n");
 }
