@@ -16,5 +16,5 @@ aarch64
 --EXPECT--
 test:
 	fcmp d0, #0.0
-	fcsel d0, d1, d2, eq
+	fcsel d0, d1, d2, ne
 	ret

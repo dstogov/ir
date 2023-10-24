@@ -104,7 +104,7 @@ test:
 	ldr d1, [sp, #0x68]
 	ldr d0, .L5
 	fcmp d1, d0
-	b.ls .L2
+	b.le .L2
 	ldr w0, [sp, #0x2c]
 	add sp, sp, #0x70
 	ret

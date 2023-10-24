@@ -84,7 +84,7 @@ main:
 	ldr d0, .L4
 	ldr d1, [x29, #0x18]
 	fcmp d0, d1
-	b.ls .L2
+	b.le .L2
 	ldr d0, [x29, #0x10]
 	fadd d1, d1, d0
 	str d1, [x29, #0x18]

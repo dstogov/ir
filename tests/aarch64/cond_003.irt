@@ -16,5 +16,5 @@ aarch64
 --EXPECT--
 test:
 	cmp w0, #0
-	fcsel d0, d0, d1, eq
+	fcsel d0, d0, d1, ne
 	ret
