@@ -823,6 +823,9 @@ int main(int argc, char **argv)
 	loader.sym = NULL;
 	loader.sym_count = 0;
 
+//TODO:	ir_loader_add_sym(&loader, (void*)"printf", printf);
+	ir_loader_add_sym(&loader, (void*)"putchar", putchar);
+
 	if (dump_file) {
 		loader.dump_file = fopen(dump_file, "w+");
 		if (!loader.dump_file) {
