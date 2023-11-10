@@ -120,6 +120,7 @@ static void ir_check_indefined_vars(ir_parser_ctx *p)
 /* forward declarations */
 static void yy_error(const char *msg);
 static void yy_error_sym(const char *msg, int sym);
+static void yy_error_str(const char *msg, const char *str);
 
 %}
 
@@ -239,23 +240,52 @@ ir_sym_data(ir_loader *loader):
 	{uint8_t t = 0;}
 	{ir_val val;}
 	{void *p;}
-	type(&t) const(t, &val)
-	{
-		if (loader->sym_data) {
-			switch (ir_type_size[t]) {
-				case 1: p = &val.i8;  break;
-				case 2: p = &val.i16; break;
-				case 4: p = &val.i32; break;
-				case 8: p = &val.i64; break;
-				default:
-					IR_ASSERT(0);
-					break;
-			}
-			if (!loader->sym_data(loader, t, 1, p)) {
-				yy_error("sym_data error");
+	{const char *name;}
+	{size_t name_len;}
+	{char buf[256];}
+	type(&t)
+	(
+		"sym" "(" ID(&name, &name_len) ")"
+		{
+			if (loader->sym_data_ref) {
+				if (name_len > 255) yy_error("name too long");
+				memcpy(buf, name, name_len);
+				buf[name_len] = 0;
+				if (!loader->sym_data_ref(loader, IR_SYM, buf)) {
+					yy_error("sym_data_ref error");
+				}
 			}
 		}
-	}
+	|	"func" "(" ID(&name, &name_len) ")"
+		{
+			if (loader->sym_data_ref) {
+				if (name_len > 255) yy_error("name too long");
+				memcpy(buf, name, name_len);
+				buf[name_len] = 0;
+				if (!loader->sym_data_ref(loader, IR_FUNC, buf)) {
+					yy_error("sym_data_ref error");
+				}
+			}
+		}
+	|
+		const(t, &val)
+		{
+			if (loader->sym_data) {
+				switch (ir_type_size[t]) {
+					case 1: p = &val.i8;  break;
+					case 2: p = &val.i16; break;
+					case 4: p = &val.i32; break;
+					case 8: p = &val.i64; break;
+					default:
+						IR_ASSERT(0);
+						break;
+				}
+				if (!loader->sym_data(loader, t, 1, p)) {
+					yy_error("sym_data error");
+				}
+			}
+		}
+	)
 ;
 
 ir_func(ir_parser_ctx *p):
@@ -539,6 +569,11 @@ static void yy_error(const char *msg) {
 
 static void yy_error_sym(const char *msg, int sym) {
 	fprintf(stderr, "ERROR: %s '%s' at line %d\n", msg, sym_name[sym], yy_line);
+	exit(2);
+}
+
+static void yy_error_str(const char *msg, const char *str) {
+	fprintf(stderr, "ERROR: %s '%s' at line %d\n", msg, str, yy_line);
 	exit(2);
 }
 

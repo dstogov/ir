@@ -102,6 +102,7 @@ static void ir_check_indefined_vars(ir_parser_ctx *p)
 /* forward declarations */
 static void yy_error(const char *msg);
 static void yy_error_sym(const char *msg, int sym);
+static void yy_error_str(const char *msg, const char *str);
 
 #define YYPOS cpos
 #define YYEND cend
@@ -118,13 +119,13 @@ static void yy_error_sym(const char *msg, int sym);
 #define YY_CONST 9
 #define YY__LBRACK 10
 #define YY__RBRACK 11
-#define YY_FUNC 12
+#define YY_SYM 12
 #define YY__LPAREN 13
-#define YY_VOID 14
-#define YY__POINT_POINT_POINT 15
-#define YY__RPAREN 16
-#define YY__COLON 17
-#define YY_SYM 18
+#define YY__RPAREN 14
+#define YY_FUNC 15
+#define YY_VOID 16
+#define YY__POINT_POINT_POINT 17
+#define YY__COLON 18
 #define YY_FUNC_ADDR 19
 #define YY__SLASH 20
 #define YY_NULL 21
@@ -155,13 +156,13 @@ static const char * sym_name[] = {
 	"const",
 	"[",
 	"]",
-	"func",
+	"sym",
 	"(",
+	")",
+	"func",
 	"void",
 	"...",
-	")",
 	":",
-	"sym",
 	"func_addr",
 	"/",
 	"null",
@@ -183,6 +184,63 @@ static const char * sym_name[] = {
 
 #define YY_IN_SET(sym, set, bitset) \
 	(bitset[sym>>3] & (1 << (sym & 0x7)))
+
+size_t yy_escape(char *buf, unsigned char ch)
+{
+	switch (ch) {
+		case '\\': buf[0] = '\\'; buf[1] = '\\'; return 2;
+		case '\'': buf[0] = '\\'; buf[1] = '\''; return 2;
+		case '\"': buf[0] = '\\'; buf[1] = '\"'; return 2;
+		case '\a': buf[0] = '\\'; buf[1] = '\a'; return 2;
+		case '\b': buf[0] = '\\'; buf[1] = '\b'; return 2;
+		case '\e': buf[0] = '\\'; buf[1] = '\e'; return 2;
+		case '\f': buf[0] = '\\'; buf[1] = '\f'; return 2;
+		case '\n': buf[0] = '\\'; buf[1] = '\n'; return 2;
+		case '\r': buf[0] = '\\'; buf[1] = '\r'; return 2;
+		case '\t': buf[0] = '\\'; buf[1] = '\t'; return 2;
+		case '\v': buf[0] = '\\'; buf[1] = '\v'; return 2;
+		case '\?': buf[0] = '\\'; buf[1] = 0x3f; return 2;
+		default: break;
+	}
+	if (ch < 32 || ch >= 127) {
+		buf[0] = '\\';
+		buf[1] = '0' + ((ch >> 3) % 8);
+		buf[2] = '0' + ((ch >> 6) % 8);
+		buf[3] = '0' + (ch % 8);
+		return 4;
+	} else {
+		buf[0] = ch;
+		return 1;
+	}
+}
+
+const char *yy_escape_char(char *buf, unsigned char ch)
+{
+	size_t len = yy_escape(buf, ch);
+	buf[len] = 0;
+	return buf;
+}
+
+const char *yy_escape_string(char *buf, size_t size, const unsigned char *str, size_t n)
+{
+	size_t i = 0;
+	size_t pos = 0;
+	size_t len;
+
+	while (i < n) {
+		if (pos + 8 > size) {
+			buf[pos++] = '.';
+			buf[pos++] = '.';
+			buf[pos++] = '.';
+			break;
+		}
+		len = yy_escape(buf + pos, str[i]);
+		i++;
+		pos += len;
+	}
+	buf[pos] = 0;
+	return buf;
+}
 
 static int skip_EOL(int sym);
 static int skip_WS(int sym);
@@ -208,6 +266,7 @@ static int parse_CHARACTER(int sym, ir_val *val);
 static int parse_STRING(int sym, const char **str, size_t *len);
 
 static int get_skip_sym(void) {
+	char buf[64];
 	int ch;
 	int ret;
 	int accept = -1;
@@ -688,9 +747,9 @@ _yy_state_error:
 	if (YYPOS >= YYEND) {
 		yy_error("unexpected <EOF>");
 	} else if (YYPOS == yy_text) {
-		yy_error("unexpected character 'escape_char(ch)'");
+		yy_error_str("unexpected character",  yy_escape_char(buf, ch));
 	} else {
-		yy_error("unexpected sequence 'escape_string(yy_text, 1 + YYPOS - yy_text))'");
+		yy_error_str("unexpected sequence", yy_escape_string(buf, sizeof(buf), yy_text, 1 + YYPOS - yy_text));
 	}
 	YYPOS++;
 	goto _yy_state_start;
@@ -763,7 +822,7 @@ static int parse_ir(int sym, ir_loader *loader) {
 	uint32_t params_count;
 	ir_type param_types[256];
 	p.ctx = &ctx;
-	if (YY_IN_SET(sym, (YY_EXTERN,YY_STATIC,YY_VAR,YY_CONST,YY_FUNC), "\012\023\000\000\000")) {
+	if (YY_IN_SET(sym, (YY_EXTERN,YY_STATIC,YY_VAR,YY_CONST,YY_FUNC), "\012\203\000\000\000")) {
 		do {
 			if (sym == YY_EXTERN) {
 				sym = get_sym();
@@ -892,7 +951,7 @@ _yy_state_12:
 			} else {
 				yy_error_sym("unexpected", sym);
 			}
-		} while (YY_IN_SET(sym, (YY_EXTERN,YY_STATIC,YY_VAR,YY_CONST,YY_FUNC), "\012\023\000\000\000"));
+		} while (YY_IN_SET(sym, (YY_EXTERN,YY_STATIC,YY_VAR,YY_CONST,YY_FUNC), "\012\203\000\000\000"));
 	} else if (sym == YY__LBRACE) {
 		if (!loader->func_init(loader, &ctx, NULL)) yy_error("ini_func error");
 		ctx.ret_type = -1;
@@ -942,22 +1001,67 @@ static int parse_ir_sym_data(int sym, ir_loader *loader) {
 	uint8_t t = 0;
 	ir_val val;
 	void *p;
+	const char *name;
+	size_t name_len;
+	char buf[256];
 	sym = parse_type(sym, &t);
-	sym = parse_const(sym, t, &val);
-	if (loader->sym_data) {
-			switch (ir_type_size[t]) {
-				case 1: p = &val.i8;  break;
-				case 2: p = &val.i16; break;
-				case 4: p = &val.i32; break;
-				case 8: p = &val.i64; break;
-				default:
-					IR_ASSERT(0);
-					break;
-			}
-			if (!loader->sym_data(loader, t, 1, p)) {
-				yy_error("sym_data error");
-			}
+	if (sym == YY_SYM) {
+		sym = get_sym();
+		if (sym != YY__LPAREN) {
+			yy_error_sym("'(' expected, got", sym);
 		}
+		sym = get_sym();
+		sym = parse_ID(sym, &name, &name_len);
+		if (sym != YY__RPAREN) {
+			yy_error_sym("')' expected, got", sym);
+		}
+		sym = get_sym();
+		if (loader->sym_data_ref) {
+				if (name_len > 255) yy_error("name too long");
+				memcpy(buf, name, name_len);
+				buf[name_len] = 0;
+				if (!loader->sym_data_ref(loader, IR_SYM, buf)) {
+					yy_error("sym_data_ref error");
+				}
+			}
+	} else if (sym == YY_FUNC) {
+		sym = get_sym();
+		if (sym != YY__LPAREN) {
+			yy_error_sym("'(' expected, got", sym);
+		}
+		sym = get_sym();
+		sym = parse_ID(sym, &name, &name_len);
+		if (sym != YY__RPAREN) {
+			yy_error_sym("')' expected, got", sym);
+		}
+		sym = get_sym();
+		if (loader->sym_data_ref) {
+				if (name_len > 255) yy_error("name too long");
+				memcpy(buf, name, name_len);
+				buf[name_len] = 0;
+				if (!loader->sym_data_ref(loader, IR_FUNC, buf)) {
+					yy_error("sym_data_ref error");
+				}
+			}
+	} else if (YY_IN_SET(sym, (YY_DECNUMBER,YY_HEXNUMBER,YY_FLOATNUMBER,YY_CHARACTER,YY_INF,YY_NAN,YY__MINUS), "\000\000\300\075\000")) {
+		sym = parse_const(sym, t, &val);
+		if (loader->sym_data) {
+				switch (ir_type_size[t]) {
+					case 1: p = &val.i8;  break;
+					case 2: p = &val.i16; break;
+					case 4: p = &val.i32; break;
+					case 8: p = &val.i64; break;
+					default:
+						IR_ASSERT(0);
+						break;
+				}
+				if (!loader->sym_data(loader, t, 1, p)) {
+					yy_error("sym_data error");
+				}
+			}
+	} else {
+		yy_error_sym("unexpected", sym);
+	}
 	return sym;
 }
 
@@ -989,7 +1093,7 @@ static int parse_ir_func_prototype(int sym, ir_parser_ctx *p, char *buf, uint32_
 	const unsigned char *save_pos;
 	const unsigned char *save_text;
 	int   save_line;
-	int alt55;
+	int alt63;
 	const char *name;
 	size_t len;
 	uint8_t t = 0;
@@ -1019,32 +1123,32 @@ static int parse_ir_func_prototype(int sym, ir_parser_ctx *p, char *buf, uint32_
 				save_pos  = yy_pos;
 				save_text = yy_text;
 				save_line = yy_line;
-				alt55 = -2;
+				alt63 = -2;
 				sym2 = sym;
 				if (sym2 == YY__COMMA) {
 					sym2 = get_sym();
-					goto _yy_state_55_1;
+					goto _yy_state_63_1;
 				} else if (sym2 == YY__RPAREN) {
-					alt55 = 60;
-					goto _yy_state_55;
+					alt63 = 68;
+					goto _yy_state_63;
 				} else {
 					yy_error_sym("unexpected", sym2);
 				}
-_yy_state_55_1:
+_yy_state_63_1:
 				if (sym2 == YY_ID) {
-					alt55 = 56;
-					goto _yy_state_55;
+					alt63 = 64;
+					goto _yy_state_63;
 				} else if (sym2 == YY__POINT_POINT_POINT) {
-					alt55 = 58;
-					goto _yy_state_55;
+					alt63 = 66;
+					goto _yy_state_63;
 				} else {
 					yy_error_sym("unexpected", sym2);
 				}
-_yy_state_55:
+_yy_state_63:
 				yy_pos  = save_pos;
 				yy_text = save_text;
 				yy_line = save_line;
-				if (alt55 != 56) {
+				if (alt63 != 64) {
 					break;
 				}
 				sym = get_sym();
@@ -1052,7 +1156,7 @@ _yy_state_55:
 				param_types[n++] = t;
 				if (n > 256) yy_error("name too params");
 			}
-			if (alt55 == 58) {
+			if (alt63 == 66) {
 				sym = get_sym();
 				if (sym != YY__POINT_POINT_POINT) {
 					yy_error_sym("'...' expected, got", sym);
@@ -1087,7 +1191,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 	const unsigned char *save_pos;
 	const unsigned char *save_text;
 	int   save_line;
-	int alt64;
+	int alt72;
 	const char *str, *str2 = NULL, *func;
 	size_t len, len2 = 0, func_len;
 	uint8_t op;
@@ -1103,36 +1207,36 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 	save_pos  = yy_pos;
 	save_text = yy_text;
 	save_line = yy_line;
-	alt64 = -2;
+	alt72 = -2;
 	sym2 = sym;
 	if (sym2 == YY_ID) {
 		sym2 = get_sym();
-		goto _yy_state_64_1;
+		goto _yy_state_72_1;
 	} else {
 		yy_error_sym("unexpected", sym2);
 	}
-_yy_state_64_1:
+_yy_state_72_1:
 	if (sym2 == YY_ID) {
-		alt64 = 65;
-		goto _yy_state_64;
+		alt72 = 73;
+		goto _yy_state_72;
 	} else if (sym2 == YY__EQUAL) {
-		alt64 = 69;
-		goto _yy_state_64;
+		alt72 = 77;
+		goto _yy_state_72;
 	} else {
 		yy_error_sym("unexpected", sym2);
 	}
-_yy_state_64:
+_yy_state_72:
 	yy_pos  = save_pos;
 	yy_text = save_text;
 	yy_line = save_line;
-	if (alt64 == 65) {
+	if (alt72 == 73) {
 		sym = parse_type(sym, &t);
 		sym = parse_ID(sym, &str, &len);
 		if (sym == YY__COMMA) {
 			sym = get_sym();
 			sym = parse_ID(sym, &str2, &len2);
 		}
-	} else if (alt64 == 69) {
+	} else if (alt72 == 77) {
 		sym = parse_ID(sym, &str, &len);
 	} else {
 		yy_error_sym("unexpected", sym);
@@ -1467,6 +1571,11 @@ static void yy_error(const char *msg) {
 
 static void yy_error_sym(const char *msg, int sym) {
 	fprintf(stderr, "ERROR: %s '%s' at line %d\n", msg, sym_name[sym], yy_line);
+	exit(2);
+}
+
+static void yy_error_str(const char *msg, const char *str) {
+	fprintf(stderr, "ERROR: %s '%s' at line %d\n", msg, str, yy_line);
 	exit(2);
 }
 

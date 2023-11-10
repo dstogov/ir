@@ -382,6 +382,12 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 		}
 		fprintf(l->dump_file, "%s %s [%ld]%s\n", (flags & IR_CONST) ? "const" : "var", name, size, has_data ? " = {" : ";");
 	}
+	if (l->c_file) {
+		// TODO:
+	}
+	if (l->llvm_file) {
+		// TODO:
+	}
 	if (l->dump_asm || l->dump_size || l->run) {
 		void *data = ir_mem_malloc(size);
 
@@ -435,6 +441,12 @@ static bool ir_loader_sym_data(ir_loader *loader, ir_type type, uint32_t count, 
 				break;
 		}
 	}
+	if (l->c_file) {
+		// TODO:
+	}
+	if (l->llvm_file) {
+		// TODO:
+	}
 	if (l->dump_asm || l->dump_size || l->run) {
 		size_t size = ir_type_size[type] * count;
 
@@ -448,12 +460,41 @@ static bool ir_loader_sym_data(ir_loader *loader, ir_type type, uint32_t count, 
 	return 1;
 }
 
+static bool ir_loader_sym_data_ref(ir_loader *loader, ir_op op, const char *ref)
+{
+	ir_main_loader *l = (ir_main_loader*) loader;
+
+	IR_ASSERT(op == IR_FUNC || op == IR_SYM);
+	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
+		fprintf(l->dump_file, "\t%s %s(%s),\n", ir_type_cname[IR_ADDR], op == IR_FUNC ? "func" : "sym", ref);
+	}
+	if (l->c_file) {
+		// TODO:
+	}
+	if (l->llvm_file) {
+		// TODO:
+	}
+	if (l->dump_asm || l->dump_size || l->run) {
+		// TODO:
+	}
+	return 1;
+}
+
 static bool ir_loader_sym_data_end(ir_loader *loader)
 {
 	ir_main_loader *l = (ir_main_loader*) loader;
 
 	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
 		fprintf(l->dump_file, "};\n");
+	}
+	if (l->c_file) {
+		// TODO:
+	}
+	if (l->llvm_file) {
+		// TODO:
+	}
+	if (l->dump_asm || l->dump_size || l->run) {
+		// TODO:
 	}
 	return 1;
 }
@@ -799,6 +840,7 @@ int main(int argc, char **argv)
 	loader.loader.forward_func_dcl   = ir_loader_forward_func_dcl;
 	loader.loader.sym_dcl            = ir_loader_sym_dcl;
 	loader.loader.sym_data           = ir_loader_sym_data;
+	loader.loader.sym_data_ref       = ir_loader_sym_data_ref;
 	loader.loader.sym_data_end       = ir_loader_sym_data_end;
 	loader.loader.func_init          = ir_loader_func_init;
 	loader.loader.func_process       = ir_loader_func_process;

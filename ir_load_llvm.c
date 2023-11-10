@@ -1596,7 +1596,7 @@ static int llvm2ir_forward_func(ir_loader *loader, const char *name, LLVMValueRe
 	return loader->forward_func_dcl(loader, name, flags, ret_type, count, param_types);
 }
 
-static int llvm2ir_data(ir_loader *loader, LLVMTypeRef type, LLVMValueRef op)
+static int llvm2ir_data(ir_loader *loader, LLVMTargetDataRef target_data, LLVMTypeRef type, LLVMValueRef op)
 {
 	LLVMTypeRef el_type;
 	LLVMValueRef el;
@@ -1604,9 +1604,13 @@ static int llvm2ir_data(ir_loader *loader, LLVMTypeRef type, LLVMValueRef op)
 	ir_type t;
 	ir_val val;
 	uint32_t i, len;
+	const char *name;
+	size_t name_len;
+	char buf[256];
 	void *p = NULL;
+	LLVMValueKind kind = LLVMGetValueKind(op);
 
-	switch (LLVMGetValueKind(op)) {
+	switch (kind) {
 		case LLVMConstantIntValueKind:
 			t = llvm2ir_type(type);
 			IR_ASSERT(IR_IS_TYPE_INT(t));
@@ -1638,31 +1642,71 @@ static int llvm2ir_data(ir_loader *loader, LLVMTypeRef type, LLVMValueRef op)
 		case LLVMConstantPointerNullValueKind:
 			val.addr = 0;
 			return loader->sym_data(loader, IR_ADDR, 1, &val.addr);
-// 		case LLVMConstantArrayValueKind:
+		case LLVMConstantArrayValueKind:
 		case LLVMConstantDataArrayValueKind:
 			el_type = LLVMGetElementType(type);
 			len = LLVMGetArrayLength(type);
 			for (i = 0; i < len; i++) {
 				el = LLVMGetAggregateElement(op, i);
-				if (!llvm2ir_data(loader, el_type, el)) {
+				if (!llvm2ir_data(loader, target_data, el_type, el)) {
 					return 0;
 				}
 			}
 			return 1;
-			break;
-		case LLVMConstantExprValueKind:
-			IR_ASSERT(0);
-			return 0;
+		case LLVMConstantStructValueKind:
+			len = LLVMCountStructElementTypes(type);
+			for (i = 0; i < len; i++) {
+				// TODO: support for offset and alignment
+				// offset = LLVMOffsetOfElement(target_data, type, i);
+				el_type = LLVMStructGetTypeAtIndex(type, i);
+				el = LLVMGetAggregateElement(op, i);
+				if (!llvm2ir_data(loader, target_data, el_type, el)) {
+					return 0;
+				}
+			}
+			return 1;
+		case LLVMConstantAggregateZeroValueKind:
+			switch (LLVMGetTypeKind(type)) {
+				case LLVMIntegerTypeKind:
+				case LLVMFloatTypeKind:
+				case LLVMDoubleTypeKind:
+				case LLVMPointerTypeKind:
+				case LLVMFunctionTypeKind:
+				case LLVMLabelTypeKind:
+					t = llvm2ir_type(type);
+					val.u64 = 0;
+					return loader->sym_data(loader, t, 1, &val.u64);
+				default:
+					// TODO: use bigger type if possible
+					len = LLVMABISizeOfType(target_data, type);
+					val.u64 = 0;
+					return loader->sym_data(loader, IR_U8, len, &val.u64);
+			}
 		case LLVMGlobalVariableValueKind:
-			IR_ASSERT(0);
-			return 0;
+			// TODO: resolve variable address
+			name = LLVMGetValueName2(op, &name_len);
+			name = llvm2ir_sym_name(buf, name, name_len);
+			if (!name) {
+				return 0;
+			}
+			return loader->sym_data_ref(loader, IR_SYM, name);
 		case LLVMFunctionValueKind:
-			IR_ASSERT(0);
-			return 0;
-		case LLVMUndefValueValueKind:
-			IR_ASSERT(0);
-			return 0;
+			// TODO: function prototype
+			// TODO: resolve function address
+			name = LLVMGetValueName2(op, &name_len);
+			name = llvm2ir_sym_name(buf, name, name_len);
+			if (!name) {
+				return 0;
+			}
+			return loader->sym_data_ref(loader, IR_FUNC, name);
+//		case LLVMConstantExprValueKind:
+//			IR_ASSERT(0);
+//			return 0;
+//		case LLVMUndefValueValueKind:
+//			IR_ASSERT(0);
+//			return 0;
 		default:
+			fprintf(stderr, "Unsupported LLVM value kind: %d\n", kind);
 			IR_ASSERT(0);
 			return 0;
 	}
@@ -1713,8 +1757,12 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 			if (LLVMIsGlobalConstant(sym)) {
 				flags |= IR_CONST;
 			}
+			name = llvm2ir_sym_name(buf, name, name_len);
+			if (!name) {
+				return 0;
+			}
 			if (loader->external_sym_dcl
-			 && !loader->external_sym_dcl(loader, buf, flags)) {
+			 && !loader->external_sym_dcl(loader, name, flags)) {
 				return 0;
 			}
 		} else {
@@ -1741,7 +1789,7 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 					return 0;
 				}
 				if (has_data) {
-					llvm2ir_data(loader, type, init);
+					llvm2ir_data(loader, target_data, type, init);
 					if (!loader->sym_data_end(loader)) {
 						return 0;
 					}
