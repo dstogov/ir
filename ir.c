@@ -433,8 +433,10 @@ static IR_NEVER_INLINE ir_ref ir_const_ex(ir_ctx *ctx, ir_val val, uint8_t type,
 	while (ref) {
 		insn = &ctx->ir_base[ref];
 		if (UNEXPECTED(insn->val.u64 >= val.u64)) {
-			if (insn->val.u64 == val.u64 && insn->optx == optx) {
-				return ref;
+			if (insn->val.u64 == val.u64) {
+				if (insn->optx == optx) {
+					return ref;
+				}
 			} else {
 				break;
 			}
