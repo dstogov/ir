@@ -1,4 +1,3 @@
--  va_arg nodes
 ?  BSTART, BEND nodes (to free data allocated by ALLOCA) (now it's possible to do this through AFREE)
 -  Full support for function prototypes ???
    (now we may only set "fastcall" calling convention for constants or for variables through BITCAST)
@@ -27,6 +26,7 @@
 	-  Try to avoid live-interval construction, see "Efficient Global Register Allocation" Ian Rogers
 
 ?  code generation
+	-  VA_START, VA_END, VA_COPY, VA_ARG nodes
 	-  COND optimization
 	-  TAILCALL with stack arguments (tests/x86/tailcall_001.itr)
 	-  32-bit x86 back-end 64-bit integers support

@@ -471,6 +471,13 @@ static ir_type llvm2ir_overflow_type(LLVMTypeRef stype)
 	return type;
 }
 
+static void llvm2ir_va_arg(ir_ctx *ctx, LLVMValueRef insn)
+{
+	ir_type type = llvm2ir_type(LLVMTypeOf(insn));
+	ir_ref ref = ir_VA_ARG(type, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
+	ir_addrtab_add(ctx->binding, (uintptr_t)insn, ref);
+}
+
 #define STR_START(name, name_len, str) (name_len >= strlen(str) && memcmp(name, str, strlen(str)) == 0)
 #define STR_EQUAL(name, name_len, str) (name_len == strlen(str) && memcmp(name, str, strlen(str)) == 0)
 
@@ -751,11 +758,19 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type),
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 2), type));
 	} else if (STR_EQUAL(name, name_len, "llvm.va_start")) {
-		// TODO:
+		IR_ASSERT(count == 1);
+		ir_VA_START(llvm2ir_op(ctx, LLVMGetOperand(insn, 0), IR_ADDR));
+		return IR_NULL;
 	} else if (STR_EQUAL(name, name_len, "llvm.va_end")) {
-		// TODO:
+		IR_ASSERT(count == 1);
+		ir_VA_END(llvm2ir_op(ctx, LLVMGetOperand(insn, 0), IR_ADDR));
+		return IR_NULL;
 	} else if (STR_EQUAL(name, name_len, "llvm.va_copy")) {
-		// TODO:
+		IR_ASSERT(count == 2);
+		ir_VA_COPY(
+			llvm2ir_op(ctx, LLVMGetOperand(insn, 0), IR_ADDR),
+			llvm2ir_op(ctx, LLVMGetOperand(insn, 1), IR_ADDR));
+		return IR_NULL;
 	} else if (STR_START(name, name_len, "llvm.ctpop.")) {
 		// TODO:
 	} else if (STR_START(name, name_len, "llvm.ctlz.")) {
@@ -1686,6 +1701,9 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMValueRef func)
 					break;
 				case LLVMFreeze:
 					llvm2ir_freeze(ctx, insn);
+					break;
+				case LLVMVAArg:
+					llvm2ir_va_arg(ctx, insn);
 					break;
 				case LLVMExtractValue:
 					if (llvm2ir_extract(ctx, insn)) {

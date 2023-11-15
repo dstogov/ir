@@ -302,6 +302,12 @@ typedef enum _ir_type {
 	_(TRAP,         x1,   src, ___, ___) /* DebugBreak                  */ \
 	/* memory reference ops (A, H, U, S, TMP, STR, NEW, X, V) ???       */ \
 	\
+	/* va_args                                                          */ \
+	_(VA_START,     x2,   src, def, ___) /* va_start(va_list)           */ \
+	_(VA_END,       x2,   src, def, ___) /* va_end(va_list)             */ \
+	_(VA_COPY,      x3,   src, def, def) /* va_copy(dst, stc)           */ \
+	_(VA_ARG,       x2,   src, def, ___) /* va_arg(va_list)             */ \
+	\
 	/* guards                                                           */ \
 	_(GUARD,        c3,   src, def, def) /* IF without second successor */ \
 	_(GUARD_NOT  ,  c3,   src, def, def) /* IF without second successor */ \

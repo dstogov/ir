@@ -667,6 +667,14 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 			fprintf(f, "%s %%d%d", ir_type_llvm_name[insn->type], use);
 		}
 	}
+	if (ctx->flags & IR_VARARG_FUNC) {
+		if (first) {
+			first = 0;
+		} else {
+			fprintf(f, ", ");
+		}
+		fprintf(f, "...");
+	}
 	fprintf(f, ")\n{\n");
 
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
@@ -897,6 +905,29 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_STORE:
 				case IR_VSTORE:
 					ir_emit_store(ctx, f, insn);
+					break;
+				case IR_VA_START:
+					fprintf(f, "\tcall void @llvm.va_start(ptr ");
+					ir_emit_ref(ctx, f, insn->op2);
+					fprintf(f, ")\n");
+					break;
+				case IR_VA_END:
+					fprintf(f, "\tcall void @llvm.va_end(ptr ");
+					ir_emit_ref(ctx, f, insn->op2);
+					fprintf(f, ")\n");
+					break;
+				case IR_VA_COPY:
+					fprintf(f, "\tcall void @llvm.va_copy(ptr");
+					ir_emit_ref(ctx, f, insn->op2);
+					fprintf(f, ", ptr ");
+					ir_emit_ref(ctx, f, insn->op3);
+					fprintf(f, ")\n");
+					break;
+				case IR_VA_ARG:
+					ir_emit_def_ref(ctx, f, i);
+					fprintf(f, "va_arg ptr ");
+					ir_emit_ref(ctx, f, insn->op2);
+					fprintf(f, ", %s\n", ir_type_cname[insn->type]);
 					break;
 				case IR_TRAP:
 					fprintf(f, "\tcall void @llvm.debugtrap()\n");

@@ -546,6 +546,11 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 				fprintf(l->dump_file, ", %s", ir_type_cname[insn->type]);
 				insn++;;
 			}
+			if (ctx->flags & IR_VARARG_FUNC) {
+				fprintf(l->dump_file, ", ...");
+			}
+		} else if (ctx->flags & IR_VARARG_FUNC) {
+			fprintf(l->dump_file, "...");
 		} else {
 			fprintf(l->dump_file, "void");
 		}

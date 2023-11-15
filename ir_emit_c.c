@@ -719,6 +719,17 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 			fprintf(f, "%s %s", ir_type_cname[insn->type], ir_get_str(ctx, insn->op2));
 		}
 	}
+	if (ctx->flags & IR_VARARG_FUNC) {
+		if (first) {
+			first = 0;
+		} else {
+			fprintf(f, ", ");
+		}
+		fprintf(f, "...");
+	}
+	if (first) {
+		fprintf(f, "void");
+	}
 	fprintf(f, ")\n{\n");
 
 	/* Emit declarations for local variables */
@@ -967,6 +978,29 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					break;
 				case IR_STORE:
 					ir_emit_store(ctx, f, insn);
+					break;
+				case IR_VA_START:
+					fprintf(f, "\tva_start(");
+					ir_emit_ref(ctx, f, insn->op2);
+					fprintf(f, ");\n");
+					break;
+				case IR_VA_END:
+					fprintf(f, "\tva_end(");
+					ir_emit_ref(ctx, f, insn->op2);
+					fprintf(f, ");\n");
+					break;
+				case IR_VA_COPY:
+					fprintf(f, "\tva_copy(");
+					ir_emit_ref(ctx, f, insn->op2);
+					fprintf(f, ", ");
+					ir_emit_ref(ctx, f, insn->op3);
+					fprintf(f, ");\n");
+					break;
+				case IR_VA_ARG:
+					ir_emit_def_ref(ctx, f, i);
+					fprintf(f, "va_arg(");
+					ir_emit_ref(ctx, f, insn->op2);
+					fprintf(f, ", %s)\n", ir_type_cname[insn->type]);
 					break;
 				default:
 					IR_ASSERT(0 && "NIY instruction");
