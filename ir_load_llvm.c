@@ -553,24 +553,73 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 		type = llvm2ir_unsigned_type(type);
 		return llvm2ir_binary_expr(ctx, IR_MUL_OV, type, insn);
 	} else if (STR_START(name, name_len, "llvm.sadd.sat.")) {
-		ir_ref ref, overflow;
+		ir_ref ref, overflow, op0, op1, limit;
 		ir_val val;
 
 		IR_ASSERT(count == 2);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
 		IR_ASSERT(IR_IS_TYPE_INT(type));
 		type = llvm2ir_signed_type(type);
-		ref = llvm2ir_binary_expr(ctx, IR_ADD_OV, type, insn);
-		overflow = ir_OVERFLOW(ref);
-		// TODO: support for overflow in case of two negative values ???
-		switch (ir_type_size[type]) {
-			case 1: val.u64 = 0x7f; break;
-			case 2: val.u64 = 0x7fff; break;
-			case 4: val.u64 = 0x7fffffff; break;
-			case 8: val.u64 = 0x7fffffffffffffff; break;
-			default: IR_ASSERT(0);
+		op0 = llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type);
+		op1 = llvm2ir_op(ctx, LLVMGetOperand(insn, 1), type);
+		if (IR_IS_CONST_REF(op0)) {
+			IR_ASSERT(ctx->ir_base[op0].type == type);
+			if (ctx->ir_base[op0].val.i64 >= 0) {
+				// positive_x + MIN -> y, positive_x + MAX = MAX
+				switch (ir_type_size[type]) {
+					case 1: val.u64 = 0x7f; break;
+					case 2: val.u64 = 0x7fff; break;
+					case 4: val.u64 = 0x7fffffff; break;
+					case 8: val.u64 = 0x7fffffffffffffff; break;
+					default: IR_ASSERT(0);
+				}
+			} else {
+				// negative_x + MIN -> MIN, negative_x + MAX = y
+				switch (ir_type_size[type]) {
+					case 1: val.u64 = 0x80; break;
+					case 2: val.u64 = 0x8000; break;
+					case 4: val.u64 = 0x80000000; break;
+					case 8: val.u64 = 0x8000000000000000; break;
+					default: IR_ASSERT(0);
+				}
+			}
+			limit = ir_const(ctx, val, type);
+		} else if (IR_IS_CONST_REF(op1)) {
+			IR_ASSERT(ctx->ir_base[op1].type == type);
+			if (ctx->ir_base[op1].val.i64 >= 0) {
+				// MIN + positive_x -> y, MAX + positive_x = MAX
+				switch (ir_type_size[type]) {
+					case 1: val.u64 = 0x7f; break;
+					case 2: val.u64 = 0x7fff; break;
+					case 4: val.u64 = 0x7fffffff; break;
+					case 8: val.u64 = 0x7fffffffffffffff; break;
+					default: IR_ASSERT(0);
+				}
+			} else {
+				// MIN + negative_x -> MIN, MAX + negative_x = y
+				switch (ir_type_size[type]) {
+					case 1: val.u64 = 0x80; break;
+					case 2: val.u64 = 0x8000; break;
+					case 4: val.u64 = 0x80000000; break;
+					case 8: val.u64 = 0x8000000000000000; break;
+					default: IR_ASSERT(0);
+				}
+			}
+			limit = ir_const(ctx, val, type);
+		} else {
+			ref = ir_SHR(type, op0, ir_const_u8(ctx, ir_type_size[type] * 8 - 1));
+			switch (ir_type_size[type]) {
+				case 1: val.u64 = 0x7f; break;
+				case 2: val.u64 = 0x7fff; break;
+				case 4: val.u64 = 0x7fffffff; break;
+				case 8: val.u64 = 0x7fffffffffffffff; break;
+				default: IR_ASSERT(0);
+			}
+			limit = ir_ADD(type, ref, ir_const(ctx, val, type));
 		}
-		return ir_COND(type, overflow, ir_const(ctx, val, type), ref);
+		ref = ir_fold2(ctx, IR_OPT(IR_ADD_OV, type), op0, op1);
+		overflow = ir_OVERFLOW(ref);
+		return ir_COND(type, overflow, limit, ref);
 	} else if (STR_START(name, name_len, "llvm.uadd.sat.")) {
 		ir_ref ref, overflow;
 		ir_val val;
@@ -590,24 +639,73 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 		}
 		return ir_COND(type, overflow, ir_const(ctx, val, type), ref);
 	} else if (STR_START(name, name_len, "llvm.ssub.sat.")) {
-		ir_ref ref, overflow;
+		ir_ref ref, overflow, op0, op1, limit;
 		ir_val val;
 
 		IR_ASSERT(count == 2);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
 		IR_ASSERT(IR_IS_TYPE_INT(type));
 		type = llvm2ir_signed_type(type);
-		ref = llvm2ir_binary_expr(ctx, IR_SUB_OV, type, insn);
-		overflow = ir_OVERFLOW(ref);
-		// TODO: support for overflow in case of two negative values ???
-		switch (ir_type_size[type]) {
-			case 1: val.u64 = 0x80; break;
-			case 2: val.u64 = 0x8000; break;
-			case 4: val.u64 = 0x80000000; break;
-			case 8: val.u64 = 0x8000000000000000; break;
-			default: IR_ASSERT(0);
+		op0 = llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type);
+		op1 = llvm2ir_op(ctx, LLVMGetOperand(insn, 1), type);
+		if (IR_IS_CONST_REF(op0)) {
+			IR_ASSERT(ctx->ir_base[op0].type == type);
+			if (ctx->ir_base[op0].val.i64 >= 0) {
+				// positive_x - MIN -> MAX, positive_x - MAX = y
+				switch (ir_type_size[type]) {
+					case 1: val.u64 = 0x7f; break;
+					case 2: val.u64 = 0x7fff; break;
+					case 4: val.u64 = 0x7fffffff; break;
+					case 8: val.u64 = 0x7fffffffffffffff; break;
+					default: IR_ASSERT(0);
+				}
+			} else {
+				// negative_x - MIN -> y, negative_x - MAX = MIN
+				switch (ir_type_size[type]) {
+					case 1: val.u64 = 0x80; break;
+					case 2: val.u64 = 0x8000; break;
+					case 4: val.u64 = 0x80000000; break;
+					case 8: val.u64 = 0x8000000000000000; break;
+					default: IR_ASSERT(0);
+				}
+			}
+			limit = ir_const(ctx, val, type);
+		} else if (IR_IS_CONST_REF(op1)) {
+			IR_ASSERT(ctx->ir_base[op1].type == type);
+			if (ctx->ir_base[op1].val.i64 >= 0) {
+				// MIN - positive_x -> MIN, MAX - positive_x = y
+				switch (ir_type_size[type]) {
+					case 1: val.u64 = 0x80; break;
+					case 2: val.u64 = 0x8000; break;
+					case 4: val.u64 = 0x80000000; break;
+					case 8: val.u64 = 0x8000000000000000; break;
+					default: IR_ASSERT(0);
+				}
+			} else {
+				// MIN - negative_x -> y, MAX - negative_x = MAX
+				switch (ir_type_size[type]) {
+					case 1: val.u64 = 0x7f; break;
+					case 2: val.u64 = 0x7fff; break;
+					case 4: val.u64 = 0x7fffffff; break;
+					case 8: val.u64 = 0x7fffffffffffffff; break;
+					default: IR_ASSERT(0);
+				}
+			}
+			limit = ir_const(ctx, val, type);
+		} else {
+			ref = ir_SHR(type, op0, ir_const_u8(ctx, ir_type_size[type] * 8 - 1));
+			switch (ir_type_size[type]) {
+				case 1: val.u64 = 0x7f; break;
+				case 2: val.u64 = 0x7fff; break;
+				case 4: val.u64 = 0x7fffffff; break;
+				case 8: val.u64 = 0x7fffffffffffffff; break;
+				default: IR_ASSERT(0);
+			}
+			limit = ir_ADD(type, ref, ir_const(ctx, val, type));
 		}
-		return ir_COND(type, overflow, ir_const(ctx, val, type), ref);
+		ref = ir_fold2(ctx, IR_OPT(IR_SUB_OV, type), op0, op1);
+		overflow = ir_OVERFLOW(ref);
+		return ir_COND(type, overflow, limit, ref);
 	} else if (STR_START(name, name_len, "llvm.usub.sat.")) {
 		ir_ref ref, overflow;
 		ir_val val;
