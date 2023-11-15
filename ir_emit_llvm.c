@@ -906,6 +906,10 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_VSTORE:
 					ir_emit_store(ctx, f, insn);
 					break;
+				case IR_FRAME_ADDR:
+					ir_emit_def_ref(ctx, f, i);
+					fprintf(f, "\tcall ptr @llvm.frameaddress.p0(i32 0)\n");
+					break;
 				case IR_VA_START:
 					fprintf(f, "\tcall void @llvm.va_start(ptr ");
 					ir_emit_ref(ctx, f, insn->op2);

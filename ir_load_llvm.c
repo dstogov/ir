@@ -799,7 +799,9 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 1), IR_ADDR),
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 2), IR_SIZE_T));
 	} else if (STR_START(name, name_len, "llvm.frameaddress.")) {
-		// TODO:
+		IR_ASSERT(LLVMGetValueKind(LLVMGetOperand(insn, 0)) == LLVMConstantIntValueKind);
+		IR_ASSERT(LLVMConstIntGetSExtValue(LLVMGetOperand(insn, 0)) == 0);
+		return ir_FRAME_ADDR();
 	} else if (STR_EQUAL(name, name_len, "llvm.debugtrap")) {
 		ir_TRAP();
 		return ctx->control;

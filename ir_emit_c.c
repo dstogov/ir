@@ -979,6 +979,10 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_STORE:
 					ir_emit_store(ctx, f, insn);
 					break;
+				case IR_FRAME_ADDR:
+					ir_emit_def_ref(ctx, f, i);
+					fprintf(f, "__builtin_frame_address(0);");
+					break;
 				case IR_VA_START:
 					fprintf(f, "\tva_start(");
 					ir_emit_ref(ctx, f, insn->op2);
@@ -1000,7 +1004,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					ir_emit_def_ref(ctx, f, i);
 					fprintf(f, "va_arg(");
 					ir_emit_ref(ctx, f, insn->op2);
-					fprintf(f, ", %s)\n", ir_type_cname[insn->type]);
+					fprintf(f, ", %s);\n", ir_type_cname[insn->type]);
 					break;
 				default:
 					IR_ASSERT(0 && "NIY instruction");

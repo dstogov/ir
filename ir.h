@@ -274,6 +274,7 @@ typedef enum _ir_type {
 	_(PHI,          pN,   reg, def, def) /* SSA Phi function            */ \
 	_(COPY,         d1X1, def, opt, ___) /* COPY (last foldable op)     */ \
 	_(PI,           p2,   reg, def, ___) /* e-SSA Pi constraint ???     */ \
+	_(FRAME_ADDR,   d0,   ___, ___, ___) /* function frame address      */ \
 	/* (USE, RENAME)                                                    */ \
 	\
 	/* data ops                                                         */ \
