@@ -455,6 +455,58 @@ static void ir_emit_abs(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 	}
 }
 
+static void ir_emit_overflow_math(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *func, const char *op)
+{
+	ir_type type = insn->type;
+	ir_use_list *use_list = &ctx->use_lists[def];
+	ir_ref i, n, *p, overflow = IR_UNUSED;
+
+	n = use_list->count;
+	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
+		ir_insn *use_insn = &ctx->ir_base[*p];
+		if (use_insn->op == IR_OVERFLOW) {
+			overflow = *p;
+			break;
+		}
+	}
+	IR_ASSERT(overflow != IR_UNUSED);
+
+	if (ir_type_size[type] == 4 || ir_type_size[type] == 8) {
+		fprintf(f, "\tint overflow_%d;\n", overflow);
+		ir_emit_def_ref(ctx, f, def);
+		fprintf(f, "__builtin_%s%s%s_overflow(",
+			IR_IS_TYPE_SIGNED(type) ? "s" : "u",
+			func,
+			ir_type_size[type] == 8 ? "ll" : "");
+		ir_emit_ref(ctx, f, insn->op1);
+		fprintf(f, ", ");
+		ir_emit_ref(ctx, f, insn->op2);
+		fprintf(f, ", &overflow_%d);\n", overflow);
+		ir_emit_def_ref(ctx, f, def);
+		fprintf(f, "overflow_%d;\n", overflow);
+	} else {
+		ir_emit_binary_op(ctx, f, def, insn, op);
+		ir_emit_def_ref(ctx, f, overflow);
+		if (IR_IS_TYPE_SIGNED(type)) {
+			fprintf(f, "(int32_t)");
+			ir_emit_ref(ctx, f, def);
+			fprintf(f, " != (int32_t)");
+			ir_emit_ref(ctx, f, insn->op1);
+			fprintf(f, " %s (int32_t)", op);
+			ir_emit_ref(ctx, f, insn->op2);
+			fprintf(f, ";\n");
+		} else {
+			fprintf(f, "(uint32_t)");
+			ir_emit_ref(ctx, f, def);
+			fprintf(f, " != (uint32_t)");
+			ir_emit_ref(ctx, f, insn->op1);
+			fprintf(f, " %s (uint32_t)", op);
+			ir_emit_ref(ctx, f, insn->op2);
+			fprintf(f, ";\n");
+		}
+	}
+}
+
 static void ir_emit_if(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn *insn)
 {
 	uint32_t true_block = 0, false_block = 0, next_block;
@@ -848,6 +900,17 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_FP2INT:
 				case IR_FP2FP:
 					ir_emit_conv(ctx, f, i, insn);
+					break;
+				case IR_ADD_OV:
+					ir_emit_overflow_math(ctx, f, i, insn, "add", "+");
+					break;
+				case IR_SUB_OV:
+					ir_emit_overflow_math(ctx, f, i, insn, "sub", "-");
+					break;
+				case IR_MUL_OV:
+					ir_emit_overflow_math(ctx, f, i, insn, "mul", "*");
+					break;
+				case IR_OVERFLOW:
 					break;
 				case IR_COPY:
 					ir_emit_copy(ctx, f, i, insn);
