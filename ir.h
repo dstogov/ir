@@ -136,6 +136,18 @@ typedef enum _ir_type {
 	IR_LAST_TYPE
 } ir_type;
 
+#ifdef IR_64
+# define IR_SIZE_T     IR_U64
+# define IR_SSIZE_T    IR_I64
+# define IR_UINTPTR_T  IR_U64
+# define IR_INTPTR_T   IR_I64
+#else
+# define IR_SIZE_T     IR_U32
+# define IR_SSIZE_T    IR_I32
+# define IR_UINTPTR_T  IR_U32
+# define IR_INTPTR_T   IR_I32
+#endif
+
 /* List of IR opcodes
  * ==================
  *
@@ -399,6 +411,7 @@ typedef union _ir_val {
 #define IR_CONST_EMIT          (1<<0)
 #define IR_CONST_FASTCALL_FUNC (1<<1)
 #define IR_CONST_VARARG_FUNC   (1<<2)
+#define IR_CONST_BUILTIN_FUNC  (1<<3)
 
 /* IR Instruction */
 typedef struct _ir_insn {

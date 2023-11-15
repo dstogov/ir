@@ -422,9 +422,93 @@ static void ir_emit_switch(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn
 	fprintf(f, "\t]\n");
 }
 
+static const char *ir_builtin_func_name(const char *name, ir_ref *last_arg)
+{
+	if (strcmp(name, "memset")) {
+		*last_arg = IR_FALSE;
+		return (IR_SIZE_T == IR_I32) ? "llvm.memset.p0.i32" : "llvm.memset.p0.i64";
+	} else if (strcmp(name, "memcpy")) {
+		*last_arg = IR_FALSE;
+		return (IR_SIZE_T == IR_I32) ? "llvm.memcpy.p0.p0.i32" : "llvm.memcpy.p0.p0.i64";
+	} else if (strcmp(name, "memmove")) {
+		*last_arg = IR_FALSE;
+		return (IR_SIZE_T == IR_I32) ? "llvm.memmove.p0.p0.i32" : "llvm.memmve.p0.p0.i64";
+	} else if (strcmp(name, "sqrt")) {
+		return "llvm.sqrt.f64";
+	} else if (strcmp(name, "sqrtf")) {
+		return "llvm.sqrt.f32";
+	} else if (strcmp(name, "sin")) {
+		return "llvm.sin.f64";
+	} else if (strcmp(name, "sinf")) {
+		return "llvm.sin.f32";
+	} else if (strcmp(name, "cos")) {
+		return "llvm.cos.f64";
+	} else if (strcmp(name, "cosf")) {
+		return "llvm.cos.f32";
+	} else if (strcmp(name, "pow")) {
+		return "llvm.pow.f64";
+	} else if (strcmp(name, "powf")) {
+		return "llvm.pow.f32";
+	} else if (strcmp(name, "exp")) {
+		return "llvm.exp.f64";
+	} else if (strcmp(name, "expf")) {
+		return "llvm.exp.f32";
+	} else if (strcmp(name, "exp2")) {
+		return "llvm.exp2.f64";
+	} else if (strcmp(name, "exp2f")) {
+		return "llvm.exp2.f32";
+	} else if (strcmp(name, "exp10")) {
+		return "llvm.exp10.f64";
+	} else if (strcmp(name, "exp10f")) {
+		return "llvm.exp10.f32";
+	} else if (strcmp(name, "ldexp")) {
+		return "llvm.ldexp.f64.i32";
+	} else if (strcmp(name, "ldexpf")) {
+		return "llvm.ldexp.f32.i32";
+	} else if (strcmp(name, "frexp")) {
+		return "llvm.frexp.f64.i32";
+	} else if (strcmp(name, "frexpf")) {
+		return "llvm.frexp.f32.i32";
+	} else if (strcmp(name, "log")) {
+		return "llvm.log.f64";
+	} else if (strcmp(name, "logf")) {
+		return "llvm.log.f32";
+	} else if (strcmp(name, "log2")) {
+		return "llvm.log2.f64";
+	} else if (strcmp(name, "log2f")) {
+		return "llvm.log2.f32";
+	} else if (strcmp(name, "log10")) {
+		return "llvm.log10.f64";
+	} else if (strcmp(name, "log10f")) {
+		return "llvm.log10.f32";
+	} else if (strcmp(name, "copysign")) {
+		return "llvm.copysign.f64";
+	} else if (strcmp(name, "copysignf")) {
+		return "llvm.copysign.f32";
+	} else if (strcmp(name, "floor")) {
+		return "llvm.floor.f64";
+	} else if (strcmp(name, "floorf")) {
+		return "llvm.floor.f32";
+	} else if (strcmp(name, "ceil")) {
+		return "llvm.ceil.f64";
+	} else if (strcmp(name, "ceilf")) {
+		return "llvm.ceil.f32";
+	} else if (strcmp(name, "trunc")) {
+		return "llvm.trunc.f64";
+	} else if (strcmp(name, "truncf")) {
+		return "llvm.trunc.f32";
+	} else if (strcmp(name, "round")) {
+		return "llvm.round.f64";
+	} else if (strcmp(name, "roundf")) {
+		return "llvm.round.f32";
+	}
+	return name;
+}
+
 static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 {
 	int j, k, n;
+	ir_ref last_arg = IR_UNUSED;
 
 	if (insn->type != IR_VOID) {
 		ir_emit_def_ref(ctx, f, def);
@@ -446,7 +530,11 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 	// TODO: function prototype ???
 
 	if (IR_IS_CONST_REF(insn->op2)) {
-		fprintf(f, "@%s", ir_get_str(ctx, ctx->ir_base[insn->op2].val.i32));
+		const char *name = ir_get_str(ctx, ctx->ir_base[insn->op2].val.i32);
+		if (ctx->ir_base[insn->op2].const_flags & IR_CONST_BUILTIN_FUNC) {
+			name = ir_builtin_func_name(name, &last_arg);
+		}
+		fprintf(f, "@%s", name);
 	} else {
 		ir_emit_ref(ctx, f, insn->op2);
 	}
@@ -459,6 +547,11 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 		k = ir_insn_op(insn, j);
 		fprintf(f, "%s ", ir_type_llvm_name[ctx->ir_base[k].type]);
 		ir_emit_ref(ctx, f, k);
+	}
+	if (last_arg) {
+		fprintf(f, ", ");
+		fprintf(f, "%s ", ir_type_llvm_name[ctx->ir_base[last_arg].type]);
+		ir_emit_ref(ctx, f, last_arg);
 	}
 	fprintf(f, ")\n");
 	if (insn->op == IR_TAILCALL) {
@@ -833,8 +926,13 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 
 	for (i = IR_UNUSED + 1, insn = ctx->ir_base - i; i < ctx->consts_count; i++, insn--) {
 		if (insn->op == IR_FUNC) {
+			const char *name = ir_get_str(ctx, insn->val.i32);
+			if (insn->const_flags & IR_CONST_BUILTIN_FUNC) {
+				ir_ref dummy;
+				name = ir_builtin_func_name(name, &dummy);
+			}
 			// TODO: function prototype ???
-			fprintf(f, "declare void @%s()\n", ir_get_str(ctx, insn->val.i32));
+			fprintf(f, "declare void @%s()\n", name);
 		} else if (insn->op == IR_SYM) {
 			// TODO: symbol "global" or "constant" ???
 			// TODO: symbol type ???

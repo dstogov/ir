@@ -16,6 +16,12 @@
 
 #define IR_BAD_TYPE IR_LAST_TYPE
 
+#define BUILTIN_FUNC(name) \
+	ir_const_func(ctx, ir_strl(ctx, name, strlen(name)), IR_CONST_BUILTIN_FUNC)
+
+#define BUILTIN_FP_FUNC(type, dname, fname) \
+	((type == IR_DOUBLE) ? BUILTIN_FUNC(dname) : BUILTIN_FUNC(fname))
+
 static ir_ref llvm2ir_const_expr(ir_ctx *ctx, LLVMValueRef expr);
 static ir_ref llvm2ir_auto_cast(ir_ctx *ctx, ir_ref ref, ir_type src_type, ir_type type);
 
@@ -303,6 +309,26 @@ static ir_ref llvm2ir_icmp_op(ir_ctx *ctx, LLVMValueRef expr)
 	return ref;
 }
 
+static ir_ref llvm2ir_fcmp_op_isnan(ir_ctx *ctx, LLVMValueRef expr, ir_type type,
+                                    LLVMRealPredicate predicate, LLVMValueRef op0, LLVMValueRef op1)
+{
+	ir_ref func, ref;
+
+	func = BUILTIN_FP_FUNC(type, "isnan", "isnanf");
+	if (LLVMGetValueKind(op1) == LLVMConstantIntValueKind) {
+		ref = ir_CALL_1(IR_BOOL, func, llvm2ir_op(ctx, op0, type));
+	} else {
+		ref = ir_OR_B(
+			ir_CALL_1(IR_BOOL, func, llvm2ir_op(ctx, op0, type)),
+			ir_CALL_1(IR_BOOL, func, llvm2ir_op(ctx, op1, type)));
+	}
+	if (predicate == LLVMRealORD) {
+		ref = ir_NOT_B(ref);
+	}
+	ir_addrtab_add(ctx->binding, (uintptr_t)expr, ref);
+	return ref;
+}
+
 static ir_ref llvm2ir_fcmp_op(ir_ctx *ctx, LLVMValueRef expr)
 {
 	LLVMValueRef op0 = LLVMGetOperand(expr, 0);
@@ -310,8 +336,9 @@ static ir_ref llvm2ir_fcmp_op(ir_ctx *ctx, LLVMValueRef expr)
 	ir_type type = llvm2ir_type(LLVMTypeOf(op0));
 	ir_ref ref;
 	ir_op op;
+	LLVMRealPredicate predicate = LLVMGetFCmpPredicate(expr);
 
-	switch (LLVMGetFCmpPredicate(expr)) {
+	switch (predicate) {
 		case LLVMRealOEQ:
 		case LLVMRealUEQ: op = IR_EQ;  break;
 		case LLVMRealONE:
@@ -324,8 +351,9 @@ static ir_ref llvm2ir_fcmp_op(ir_ctx *ctx, LLVMValueRef expr)
 		case LLVMRealOGE: op = IR_GE;  break;
 		case LLVMRealOLT: op = IR_LT;  break;
 		case LLVMRealOLE: op = IR_LE;  break;
-		case LLVMRealUNO: op = IR_NE;  break; // TODO: isnan() upport. IR_NE is invalid ???
-		case LLVMRealORD: op = IR_NE;  break; // TODO: isnan() upport. IR_NE is invalid ???
+		case LLVMRealUNO:
+		case LLVMRealORD:
+			return llvm2ir_fcmp_op_isnan(ctx, expr, type, predicate, op0, op1);
 		default: IR_ASSERT(0); return 0;
 	}
 	ref = ir_fold2(ctx, IR_OPT(op, IR_BOOL), llvm2ir_op(ctx, op0, type), llvm2ir_op(ctx, op1, type));
@@ -449,6 +477,7 @@ static ir_type llvm2ir_overflow_type(LLVMTypeRef stype)
 static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftype, uint32_t count, const char *name, size_t name_len)
 {
 	ir_type type;
+	ir_ref func;
 
 	if (STR_START(name, name_len, "llvm.lifetime.")) {
 		/* skip */
@@ -636,56 +665,147 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 	} else if (STR_START(name, name_len, "llvm.cttz.")) {
 		// TODO:
 	} else if (STR_START(name, name_len, "llvm.memset.")) {
-		// TODO:
+		IR_ASSERT(count == 3 || count == 4);
+		func = BUILTIN_FUNC("memset");
+		return ir_CALL_3(IR_VOID, func,
+			llvm2ir_op(ctx, LLVMGetOperand(insn, 0), IR_ADDR),
+			llvm2ir_op(ctx, LLVMGetOperand(insn, 1), IR_I8),
+			llvm2ir_op(ctx, LLVMGetOperand(insn, 2), IR_SIZE_T));
 	} else if (STR_START(name, name_len, "llvm.memcpy.")) {
-		// TODO:
+		IR_ASSERT(count == 3 || count == 4);
+		func = BUILTIN_FUNC("memcpy");
+		return ir_CALL_3(IR_VOID, func,
+			llvm2ir_op(ctx, LLVMGetOperand(insn, 0), IR_ADDR),
+			llvm2ir_op(ctx, LLVMGetOperand(insn, 1), IR_ADDR),
+			llvm2ir_op(ctx, LLVMGetOperand(insn, 2), IR_SIZE_T));
 	} else if (STR_START(name, name_len, "llvm.memmove.")) {
-		// TODO:
+		IR_ASSERT(count == 3 || count == 4);
+		func = BUILTIN_FUNC("memmove");
+		return ir_CALL_3(IR_VOID, func,
+			llvm2ir_op(ctx, LLVMGetOperand(insn, 0), IR_ADDR),
+			llvm2ir_op(ctx, LLVMGetOperand(insn, 1), IR_ADDR),
+			llvm2ir_op(ctx, LLVMGetOperand(insn, 2), IR_SIZE_T));
 	} else if (STR_START(name, name_len, "llvm.frameaddress.")) {
 		// TODO:
 	} else if (STR_EQUAL(name, name_len, "llvm.debugtrap")) {
 		ir_TRAP();
 		return ctx->control;
 	} else if (STR_START(name, name_len, "llvm.sqrt.")) {
-		// TODO:
-	} else if (STR_START(name, name_len, "llvm.powi.")) {
-		// TODO:
+		IR_ASSERT(count == 1);
+		type = llvm2ir_type(LLVMGetReturnType(ftype));
+		IR_ASSERT(IR_IS_TYPE_FP(type));
+		func = BUILTIN_FP_FUNC(type, "sqrt", "sqrtf");
+		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.sin.")) {
-		// TODO:
+		IR_ASSERT(count == 1);
+		type = llvm2ir_type(LLVMGetReturnType(ftype));
+		IR_ASSERT(IR_IS_TYPE_FP(type));
+		func = BUILTIN_FP_FUNC(type, "sin", "sinf");
+		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.cos.")) {
-		// TODO:
+		IR_ASSERT(count == 1);
+		type = llvm2ir_type(LLVMGetReturnType(ftype));
+		IR_ASSERT(IR_IS_TYPE_FP(type));
+		func = BUILTIN_FP_FUNC(type, "cos", "cosf");
+		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.pow.")) {
-		// TODO:
+		IR_ASSERT(count == 2);
+		type = llvm2ir_type(LLVMGetReturnType(ftype));
+		IR_ASSERT(IR_IS_TYPE_FP(type));
+		func = BUILTIN_FP_FUNC(type, "pow", "powf");
+		return ir_CALL_2(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type),
+			llvm2ir_op(ctx, LLVMGetOperand(insn, 1), type));
 	} else if (STR_START(name, name_len, "llvm.exp.")) {
-		// TODO:
+		IR_ASSERT(count == 1);
+		type = llvm2ir_type(LLVMGetReturnType(ftype));
+		IR_ASSERT(IR_IS_TYPE_FP(type));
+		func = BUILTIN_FP_FUNC(type, "exp", "expf");
+		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.exp2.")) {
-		// TODO:
+		IR_ASSERT(count == 1);
+		type = llvm2ir_type(LLVMGetReturnType(ftype));
+		IR_ASSERT(IR_IS_TYPE_FP(type));
+		func = BUILTIN_FP_FUNC(type, "exp2", "exp2f");
+		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.exp10.")) {
-		// TODO:
+		IR_ASSERT(count == 1);
+		type = llvm2ir_type(LLVMGetReturnType(ftype));
+		IR_ASSERT(IR_IS_TYPE_FP(type));
+		func = BUILTIN_FP_FUNC(type, "exp10", "exp10f");
+		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.ldexp.")) {
-		// TODO:
+		IR_ASSERT(count == 2);
+		type = llvm2ir_type(LLVMGetReturnType(ftype));
+		IR_ASSERT(IR_IS_TYPE_FP(type));
+		func = BUILTIN_FP_FUNC(type, "ldexp", "ldexpf");
+		return ir_CALL_2(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type),
+			llvm2ir_op(ctx, LLVMGetOperand(insn, 1), IR_I32));
 	} else if (STR_START(name, name_len, "llvm.frexp.")) {
-		// TODO:
+		IR_ASSERT(count == 2);
+		type = llvm2ir_type(LLVMGetReturnType(ftype));
+		IR_ASSERT(IR_IS_TYPE_FP(type));
+		func = BUILTIN_FP_FUNC(type, "frexp", "frexpf");
+		return ir_CALL_2(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type),
+			llvm2ir_op(ctx, LLVMGetOperand(insn, 1), IR_ADDR));
 	} else if (STR_START(name, name_len, "llvm.log.")) {
-		// TODO:
-	} else if (STR_START(name, name_len, "llvm.log10.")) {
-		// TODO:
+		IR_ASSERT(count == 1);
+		type = llvm2ir_type(LLVMGetReturnType(ftype));
+		IR_ASSERT(IR_IS_TYPE_FP(type));
+		func = BUILTIN_FP_FUNC(type, "log", "logf");
+		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.log2.")) {
-		// TODO:
-	} else if (STR_START(name, name_len, "llvm.frexp.")) {
-		// TODO:
+		IR_ASSERT(count == 1);
+		type = llvm2ir_type(LLVMGetReturnType(ftype));
+		IR_ASSERT(IR_IS_TYPE_FP(type));
+		func = BUILTIN_FP_FUNC(type, "log2", "log2f");
+		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
+	} else if (STR_START(name, name_len, "llvm.log10.")) {
+		IR_ASSERT(count == 1);
+		type = llvm2ir_type(LLVMGetReturnType(ftype));
+		IR_ASSERT(IR_IS_TYPE_FP(type));
+		func = BUILTIN_FP_FUNC(type, "log10", "log10f");
+		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.copysign.")) {
-		// TODO:
+		IR_ASSERT(count == 2);
+		type = llvm2ir_type(LLVMGetReturnType(ftype));
+		IR_ASSERT(IR_IS_TYPE_FP(type));
+		func = BUILTIN_FP_FUNC(type, "copysign", "copysignf");
+		return ir_CALL_2(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type),
+			llvm2ir_op(ctx, LLVMGetOperand(insn, 1), type));
 	} else if (STR_START(name, name_len, "llvm.floor.")) {
-		// TODO:
+		IR_ASSERT(count == 1);
+		type = llvm2ir_type(LLVMGetReturnType(ftype));
+		IR_ASSERT(IR_IS_TYPE_FP(type));
+		func = BUILTIN_FP_FUNC(type, "floor", "floorf");
+		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.ceil.")) {
-		// TODO:
+		IR_ASSERT(count == 1);
+		type = llvm2ir_type(LLVMGetReturnType(ftype));
+		IR_ASSERT(IR_IS_TYPE_FP(type));
+		func = BUILTIN_FP_FUNC(type, "ceil", "ceilf");
+		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.trunc.")) {
-		// TODO:
+		IR_ASSERT(count == 1);
+		type = llvm2ir_type(LLVMGetReturnType(ftype));
+		IR_ASSERT(IR_IS_TYPE_FP(type));
+		func = BUILTIN_FP_FUNC(type, "trunc", "truncf");
+		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.round.")) {
-		// TODO:
-	} else if (STR_START(name, name_len, "llvm.fmuladd.")) {
-		// TODO:
+		IR_ASSERT(count == 1);
+		type = llvm2ir_type(LLVMGetReturnType(ftype));
+		IR_ASSERT(IR_IS_TYPE_FP(type));
+		func = BUILTIN_FP_FUNC(type, "round", "roundf");
+		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
+	} else if (STR_START(name, name_len, "llvm.fmuladd.")
+			|| STR_START(name, name_len, "llvm.fma.")) {
+		IR_ASSERT(count == 3);
+		type = llvm2ir_type(LLVMGetReturnType(ftype));
+		IR_ASSERT(IR_IS_TYPE_FP(type));
+		return ir_fold2(ctx, IR_OPT(IR_ADD, type),
+			ir_fold2(ctx, IR_OPT(IR_MUL, type),
+				llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type),
+				llvm2ir_op(ctx, LLVMGetOperand(insn, 1), type)),
+			llvm2ir_op(ctx, LLVMGetOperand(insn, 2), type));
 	} else {
 		fprintf(stderr, "Unsupported LLVM intrinsic: %s\n", name);
 		IR_ASSERT(0);
