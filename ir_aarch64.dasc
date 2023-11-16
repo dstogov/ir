@@ -354,6 +354,12 @@ int ir_get_target_constraints(const ir_ctx *ctx, ir_ref ref, ir_target_constrain
 				n++;
 			}
 			break;
+		case IR_CTPOP:
+			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;
+			insn = &ctx->ir_base[ref];
+			constraints->tmp_regs[0] = IR_TMP_REG(2, IR_DOUBLE, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
+			n = 1;
+			break;
 		case IR_BINOP_FP:
 		case IR_MIN_MAX_INT:
 			insn = &ctx->ir_base[ref];
@@ -1877,6 +1883,59 @@ static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	} else {
 		IR_ASSERT(insn->op == IR_BSWAP);
 		|	ASM_REG_REG_OP rev, insn->type, def_reg, op1_reg
+	}
+	if (IR_REG_SPILLED(ctx->regs[def][0])) {
+		ir_emit_store(ctx, type, def, def_reg);
+	}
+}
+
+static void ir_emit_ctpop(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_type type = insn->type;
+	ir_ref op1 = insn->op1;
+	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
+	ir_reg op1_reg = ctx->regs[def][1];
+	ir_reg tmp_reg = ctx->regs[def][2];
+	uint32_t code1 = 0x0e205800 | (tmp_reg-IR_REG_FP_FIRST); // cnt v0.8b, v0.8b
+	uint32_t code2 = 0x0e31b800 | (tmp_reg-IR_REG_FP_FIRST); // addv b0, v0.8b
+
+	IR_ASSERT(def_reg != IR_REG_NONE && op1_reg != IR_REG_NONE && tmp_reg != IR_REG_NONE);
+
+	if (IR_REG_SPILLED(op1_reg) || IR_IS_CONST_REF(op1)) {
+		op1_reg = IR_REG_NUM(op1_reg);
+		ir_emit_load(ctx, type, op1_reg, op1);
+	}
+	switch (ir_type_size[insn->type]) {
+		default:
+			IR_ASSERT(0);
+		case 1:
+			|	and	Rw(def_reg-IR_REG_FP_FIRST), Rw(op1_reg), #0xff
+			|	fmov Rs(tmp_reg-IR_REG_FP_FIRST), Rw(def_reg)
+			|	.long code1 // cnt v0.8b, v0.8b
+			|	.long code2 // addv b0, v0.8b
+			|	fmov Rw(def_reg), Rs(tmp_reg-IR_REG_FP_FIRST)
+			break;
+		case 2:
+			|	and	Rw(def_reg-IR_REG_FP_FIRST), Rw(op1_reg), #0xffff
+			|	fmov Rs(tmp_reg-IR_REG_FP_FIRST), Rw(def_reg)
+			|	.long code1 // cnt v0.8b, v0.8b
+			|	.long code2 // addv b0, v0.8b
+			|	fmov Rw(def_reg), Rs(tmp_reg-IR_REG_FP_FIRST)
+			break;
+		case 4:
+			|	fmov Rs(tmp_reg-IR_REG_FP_FIRST), Rw(op1_reg)
+			|	.long code1 // cnt v0.8b, v0.8b
+			|	.long code2 // addv b0, v0.8b
+			|	fmov Rw(def_reg), Rs(tmp_reg-IR_REG_FP_FIRST)
+			break;
+		case 8:
+			|	fmov Rd(tmp_reg-IR_REG_FP_FIRST), Rx(op1_reg)
+			|	.long code1 // cnt v0.8b, v0.8b
+			|	.long code2 // addv b0, v0.8b
+			|	fmov Rx(def_reg), Rd(tmp_reg-IR_REG_FP_FIRST)
+			break;
 	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, type, def, def_reg);
@@ -5046,6 +5105,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					break;
 				case IR_SHIFT_CONST:
 					ir_emit_shift_const(ctx, i, insn);
+					break;
+				case IR_CTPOP:
+					ir_emit_ctpop(ctx, i, insn);
 					break;
 				case IR_OP_INT:
 					ir_emit_op_int(ctx, i, insn);

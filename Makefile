@@ -110,7 +110,7 @@ $(EXAMPLE_EXES): $(EXAMPLES_BUILD_DIR)/$(notdir %): $(EXAMPLES_SRC_DIR)/$(notdir
 	$(CC) $(CFLAGS) -I$(SRC_DIR) $< -o $@ $(OBJS_COMMON) $(LDFLAGS) -lcapstone
 
 $(BUILD_DIR)/tester: $(SRC_DIR)/tools/tester.c
-	$(BUILD_CC) $(BUILD_CFLAGS) -o $@ $<
+	$(CC) $(BUILD_CFLAGS) -o $@ $<
 
 test: $(BUILD_DIR)/ir $(BUILD_DIR)/tester
 	$(BUILD_DIR)/ir $(SRC_DIR)/test.ir --dump --save 2>$(BUILD_DIR)/test.log

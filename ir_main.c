@@ -27,6 +27,7 @@ static void help(const char *cmd)
 		"  -S                         - dump final target assembler code\n"
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 		"  -mavx                      - use AVX instruction set\n"
+		"  -mno-sse41                 - disable SSE 4.1 instruction set\n"
 #endif
 		"  -muse-fp                   - use base frame pointer register\n"
 		"  --emit-c [file-name]       - convert to C source\n"
@@ -636,6 +637,9 @@ int main(int argc, char **argv)
 	int opt_level = 2;
 	uint32_t flags = 0;
 	uint32_t mflags = 0;
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
+	uint32_t mflags_disabled = 0;
+#endif
 	uint64_t debug_regset = 0xffffffffffffffff;
 #ifdef _WIN32
 	bool abort_fault = 1;
@@ -736,6 +740,8 @@ int main(int argc, char **argv)
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 		} else if (strcmp(argv[i], "-mavx") == 0) {
 			mflags |= IR_X86_AVX;
+		} else if (strcmp(argv[i], "-mno-sse41") == 0) {
+			mflags_disabled |= IR_X86_SSE41;
 #endif
 		} else if (strcmp(argv[i], "-muse-fp") == 0) {
 			flags |= IR_USE_FRAME_POINTER;
@@ -812,6 +818,9 @@ int main(int argc, char **argv)
 	if ((mflags & IR_X86_AVX) && !(cpuinfo & IR_X86_AVX)) {
 		fprintf(stderr, "ERROR: -mavx is not compatible with CPU (AVX is not supported)\n");
 		return 1;
+	}
+	if ((cpuinfo & IR_X86_SSE41) && !(mflags_disabled & IR_X86_SSE41)) {
+		mflags |= IR_X86_SSE41;
 	}
 #endif
 
