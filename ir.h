@@ -264,6 +264,9 @@ typedef enum _ir_type {
 	_(ROL,	        d2,   def, def, ___) /* rotate left                 */ \
 	_(ROR,	        d2,   def, def, ___) /* rotate right                */ \
 	_(BSWAP,        d1,   def, ___, ___) /* byte swap                   */ \
+	_(CTPOP,        d1,   def, ___, ___) /* count population            */ \
+	_(CTLZ,         d1,   def, ___, ___) /* count leading zeros         */ \
+	_(CTTZ,         d1,   def, ___, ___) /* count trailing zeros        */ \
 	\
 	/* branch-less conditional ops                                      */ \
 	_(MIN,	        d2C,  def, def, ___) /* min(op1, op2)               */ \

@@ -223,6 +223,14 @@ static void ir_emit_bswap(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 	fprintf(f, ");\n");
 }
 
+static void ir_emit_count(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *name)
+{
+	ir_emit_def_ref(ctx, f, def);
+	fprintf(f, "__builtin_%s%s(", name, ir_type_size[insn->type] == 8 ? "ll" : "");
+	ir_emit_ref(ctx, f, insn->op1);
+	fprintf(f, ");\n");
+}
+
 static void ir_emit_sext(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 {
 	IR_ASSERT(IR_IS_TYPE_INT(insn->type));
@@ -895,6 +903,15 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_BSWAP:
 					ir_emit_bswap(ctx, f, i, insn);
 					break;
+				case IR_CTPOP:
+					ir_emit_count(ctx, f, i, insn, "popcount");
+					break;
+				case IR_CTLZ:
+					ir_emit_count(ctx, f, i, insn, "clz");
+					break;
+				case IR_CTTZ:
+					ir_emit_count(ctx, f, i, insn, "ctz");
+					break;
 				case IR_SEXT:
 					ir_emit_sext(ctx, f, i, insn);
 					break;
@@ -1005,6 +1022,9 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					fprintf(f, "va_arg(");
 					ir_emit_ref(ctx, f, insn->op2);
 					fprintf(f, ", %s);\n", ir_type_cname[insn->type]);
+					break;
+				case IR_TRAP:
+					fprintf(f, "\t__builtin_debugtrap();\n");
 					break;
 				default:
 					IR_ASSERT(0 && "NIY instruction");

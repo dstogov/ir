@@ -772,11 +772,22 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 1), IR_ADDR));
 		return IR_NULL;
 	} else if (STR_START(name, name_len, "llvm.ctpop.")) {
-		// TODO:
+		LLVMValueRef op0 = LLVMGetOperand(insn, 0);
+		ir_type type = llvm2ir_type(LLVMTypeOf(op0));
+
+		return ir_CTPOP(type, llvm2ir_op(ctx, op0, type));
 	} else if (STR_START(name, name_len, "llvm.ctlz.")) {
-		// TODO:
+		LLVMValueRef op0 = LLVMGetOperand(insn, 0);
+		ir_type type = llvm2ir_type(LLVMTypeOf(op0));
+
+		// TODO: support for the second argument
+		return ir_CTLZ(type, llvm2ir_op(ctx, op0, type));
 	} else if (STR_START(name, name_len, "llvm.cttz.")) {
-		// TODO:
+		LLVMValueRef op0 = LLVMGetOperand(insn, 0);
+		ir_type type = llvm2ir_type(LLVMTypeOf(op0));
+
+		// TODO: support for the second argument
+		return ir_CTTZ(type, llvm2ir_op(ctx, op0, type));
 	} else if (STR_START(name, name_len, "llvm.memset.")) {
 		IR_ASSERT(count == 3 || count == 4);
 		func = BUILTIN_FUNC("memset");

@@ -235,14 +235,17 @@ static void ir_emit_rol_ror(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const 
 	fprintf(f, ")\n");
 }
 
-static void ir_emit_bswap(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
+static void ir_emit_bitop(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *name, bool poison)
 {
 	ir_type type = insn->type;
 
 	ir_emit_def_ref(ctx, f, def);
-	fprintf(f, "call %s @llvm.bswap.%s(%s ",
-		ir_type_llvm_name[type], ir_type_llvm_name[type], ir_type_llvm_name[type]);
+	fprintf(f, "call %s @llvm.%s.%s(%s ",
+		ir_type_llvm_name[type], name, ir_type_llvm_name[type], ir_type_llvm_name[type]);
 	ir_emit_ref(ctx, f, insn->op1);
+	if (poison) {
+		fprintf(f, ", 0");
+	}
 	fprintf(f, ")\n");
 }
 
@@ -795,7 +798,16 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					ir_emit_rol_ror(ctx, f, i, insn, "fshr");
 					break;
 				case IR_BSWAP:
-					ir_emit_bswap(ctx, f, i, insn);
+					ir_emit_bitop(ctx, f, i, insn, "bswap", 0);
+					break;
+				case IR_CTPOP:
+					ir_emit_bitop(ctx, f, i, insn, "ctpop", 0);
+					break;
+				case IR_CTLZ:
+					ir_emit_bitop(ctx, f, i, insn, "ctlz", 1);
+					break;
+				case IR_CTTZ:
+					ir_emit_bitop(ctx, f, i, insn, "cttz", 1);
 					break;
 				case IR_SEXT:
 					IR_ASSERT(IR_IS_TYPE_INT(insn->type));
