@@ -965,7 +965,9 @@ finish:
 		int (*func)(void) = loader.main;
 		int ret = func();
 		fflush(stdout);
-		fprintf(stderr, "\nexit code = %d\n", ret);
+		if (ret) {
+			fprintf(stderr, "\nexit code = %d\n", ret);
+		}
 	}
 
 	return 0;
