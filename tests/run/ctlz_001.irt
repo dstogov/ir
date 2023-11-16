@@ -1,68 +1,67 @@
 --TEST--
-CTPOP 002: -mno-bmi1
---TARGET--
-x86_64
+CTLZ 001:
 --ARGS--
--mno-bmi1 --run
+--run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
-func ctpop8(int8_t): int32_t
+func ctlz8(int8_t): int32_t
 {
 	l_1 = START(l_5);
 	int8_t d_2 = PARAM(l_1, "arg_1", 1);
-	int8_t d_3 = CTPOP(d_2);
+	int8_t d_3 = CTLZ(d_2);
 	int32_t d_4 = ZEXT(d_3);
 	l_5 = RETURN(l_1, d_4);
 }
-func ctpop16(int16_t): int32_t
+func ctlz16(int16_t): int32_t
 {
 	l_1 = START(l_5);
 	int16_t d_2 = PARAM(l_1, "arg_1", 1);
-	int16_t d_3 = CTPOP(d_2);
+	int16_t d_3 = CTLZ(d_2);
 	int32_t d_4 = ZEXT(d_3);
 	l_5 = RETURN(l_1, d_4);
 }
-func ctpop32(int32_t): int32_t
+func ctlz32(int32_t): int32_t
 {
 	l_1 = START(l_4);
 	int32_t d_2 = PARAM(l_1, "arg_1", 1);
-	int32_t d_3 = CTPOP(d_2);
+	int32_t d_3 = CTLZ(d_2);
 	l_4 = RETURN(l_1, d_3);
 }
-func ctpop64(int64_t): int32_t
-{
-	l_1 = START(l_5);
-	int64_t d_2 = PARAM(l_1, "arg_1", 1);
-	int64_t d_3 = CTPOP(d_2);
-	int32_t d_4 = TRUNC(d_3);
-	l_5 = RETURN(l_1, d_4);
-}
+#func ctlz64(int64_t): int32_t
+#{
+#	l_1 = START(l_5);
+#	int64_t d_2 = PARAM(l_1, "arg_1", 1);
+#	int64_t d_3 = CTLZ(d_2);
+#	int32_t d_4 = TRUNC(d_3);
+#	l_5 = RETURN(l_1, d_4);
+#}
 func main(void): int32_t
 {
 	uintptr_t c_1 = 0;
 	bool c_2 = 0;
 	bool c_3 = 1;
-	int8_t c_4 = 0;
-	uintptr_t c_5 = func(ctpop8);
-	int8_t c_6 = 85;
-	int8_t c_7 = -1;
+	int8_t c_4 = 1;
+	uintptr_t c_5 = func(ctlz8);
+	int8_t c_6 = 96;
+	int8_t c_7 = -128;
 	uintptr_t c_8 = "u8 : %2d %2d %2d\n";
 	uintptr_t c_9 = func(printf);
-	int16_t c_10 = 0;
-	uintptr_t c_11 = func(ctpop16);
-	int16_t c_12 = 21845;
-	int16_t c_13 = -1;
+	int16_t c_10 = 1;
+	uintptr_t c_11 = func(ctlz16);
+	int16_t c_12 = 1536;
+	int16_t c_13 = -32768;
 	uintptr_t c_14 = "u16: %2d %2d %2d\n";
-	int32_t c_15 = 0;
-	uintptr_t c_16 = func(ctpop32);
-	int32_t c_17 = 1431655765;
-	int32_t c_18 = -1;
+	int32_t c_15 = 1;
+	uintptr_t c_16 = func(ctlz32);
+	int32_t c_17 = 393216;
+	int32_t c_18 = -2147483648;
 	uintptr_t c_19 = "u32: %2d %2d %2d\n";
-	int64_t c_20 = 0;
-	uintptr_t c_21 = func(ctpop64);
-	int64_t c_22 = 6148914691236517205;
-	int64_t c_23 = -1;
+	int64_t c_20 = 1;
+	uintptr_t c_21 = func(ctlz64);
+	int64_t c_22 = 25769803776;
+	int64_t c_23 = -9223372036854775808;
 	uintptr_t c_24 = "u64: %2d %2d %2d\n";
+	int32_t c_25 = 0;
 	l_1 = START(l_22);
 	int32_t d_2, l_2 = CALL/1(l_1, c_5, c_4);
 	int32_t d_3, l_3 = CALL/1(l_2, c_5, c_6);
@@ -76,14 +75,14 @@ func main(void): int32_t
 	int32_t d_13, l_13 = CALL/1(l_12, c_16, c_17);
 	int32_t d_14, l_14 = CALL/1(l_13, c_16, c_18);
 	int32_t d_15, l_15 = CALL/4(l_14, c_9, c_19, d_12, d_13, d_14);
-	int32_t d_17, l_17 = CALL/1(l_15, c_21, c_20);
-	int32_t d_18, l_18 = CALL/1(l_17, c_21, c_22);
-	int32_t d_19, l_19 = CALL/1(l_18, c_21, c_23);
-	int32_t d_20, l_20 = CALL/4(l_19, c_9, c_24, d_17, d_18, d_19);
-	l_22 = RETURN(l_20, c_15);
+#	int32_t d_17, l_17 = CALL/1(l_15, c_21, c_20);
+#	int32_t d_18, l_18 = CALL/1(l_17, c_21, c_22);
+#	int32_t d_19, l_19 = CALL/1(l_18, c_21, c_23);
+#	int32_t d_20, l_20 = CALL/4(l_19, c_9, c_24, d_17, d_18, d_19);
+#	l_22 = RETURN(l_20, c_25);
+	l_22 = RETURN(l_15, c_25);
 }
 --EXPECT--
-u8 :  0  4  8
-u16:  0  8 16
-u32:  0 16 32
-u64:  0 32 64
+u8 :  7  1  0
+u16: 15  5  0
+u32: 31 13  0

@@ -840,6 +840,7 @@ int ir_patch(const void *code, size_t size, uint32_t jmp_table_size, const void 
 # define IR_X86_SSE42 (1<<4)
 # define IR_X86_AVX   (1<<5)
 # define IR_X86_AVX2  (1<<6)
+# define IR_X86_BMI1  (1<<7)
 #endif
 
 uint32_t ir_cpuinfo(void);

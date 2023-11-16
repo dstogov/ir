@@ -547,7 +547,7 @@ const char *ir_reg_name(int8_t reg, ir_type type)
 	_(RETURN_VOID)         \
 	_(RETURN_INT)          \
 	_(RETURN_FP)           \
-	_(CTPOP_POPCNT)        \
+	_(BIT_COUNT)           \
 
 #define IR_RULE_ENUM(name) IR_ ## name,
 
@@ -804,7 +804,7 @@ op2_const:
 		case IR_OP_FP:
 			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
 			break;
-		case IR_CTPOP_POPCNT:
+		case IR_BIT_COUNT:
 			insn = &ctx->ir_base[ref];
 			if (ir_type_size[insn->type] == 1) {
 				flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;
@@ -1913,9 +1913,13 @@ store_int:
 		case IR_FP2FP:
 			ir_match_fuse_load(ctx, insn->op1, ref);
 			return insn->op;
+		case IR_CTLZ:
+		case IR_CTTZ:
+			ir_match_fuse_load(ctx, insn->op1, ref);
+			return IR_BIT_COUNT;
 		case IR_CTPOP:
 			ir_match_fuse_load(ctx, insn->op1, ref);
-			return (ctx->mflags & IR_X86_SSE41) ? IR_CTPOP_POPCNT : IR_CTPOP;
+			return (ctx->mflags & IR_X86_BMI1) ? IR_BIT_COUNT : IR_CTPOP;
 		default:
 			break;
 	}
@@ -3181,7 +3185,7 @@ static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
-static void ir_emit_ctpop_popcnt(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+static void ir_emit_bit_count(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
@@ -3201,17 +3205,75 @@ static void ir_emit_ctpop_popcnt(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			default:
 				IR_ASSERT(0);
 			case 2:
-				|	popcnt Rw(def_reg), Rw(op1_reg)
+				if (insn->op == IR_CTLZ) {
+					if (ctx->mflags & IR_X86_BMI1) {
+						|	lzcnt Rw(def_reg), Rw(op1_reg)
+					} else {
+						|	bsr Rw(def_reg), Rw(op1_reg)
+						|	xor Rw(def_reg), 0xf
+					}
+				} else if (insn->op == IR_CTTZ) {
+					if (ctx->mflags & IR_X86_BMI1) {
+						|	tzcnt Rw(def_reg), Rw(op1_reg)
+					} else {
+						|	bsf Rw(def_reg), Rw(op1_reg)
+					}
+				} else {
+					IR_ASSERT(insn->op == IR_CTPOP);
+					|	popcnt Rw(def_reg), Rw(op1_reg)
+				}
 				break;
 			case 1:
 				|   movzx Rd(op1_reg), Rb(op1_reg)
+				if (insn->op == IR_CTLZ) {
+					if (ctx->mflags & IR_X86_BMI1) {
+						|	lzcnt Rd(def_reg), Rd(op1_reg)
+						|	sub Rd(def_reg), 24
+					} else {
+						|	bsr Rd(def_reg), Rd(op1_reg)
+						|	xor Rw(def_reg), 0x7
+					}
+					break;
+				}
 				IR_FALLTHROUGH;
 			case 4:
-				|	popcnt Rd(def_reg), Rd(op1_reg)
+				if (insn->op == IR_CTLZ) {
+					if (ctx->mflags & IR_X86_BMI1) {
+						|	lzcnt Rd(def_reg), Rd(op1_reg)
+					} else {
+						|	bsr Rd(def_reg), Rd(op1_reg)
+						|	xor Rw(def_reg), 0x1f
+					}
+				} else if (insn->op == IR_CTTZ) {
+					if (ctx->mflags & IR_X86_BMI1) {
+						|	tzcnt Rd(def_reg), Rd(op1_reg)
+					} else {
+						|	bsf Rd(def_reg), Rd(op1_reg)
+					}
+				} else {
+					IR_ASSERT(insn->op == IR_CTPOP);
+					|	popcnt Rd(def_reg), Rd(op1_reg)
+				}
 				break;
 |.if X64
 			case 8:
-				|	popcnt Rq(def_reg), Rq(op1_reg)
+				if (insn->op == IR_CTLZ) {
+					if (ctx->mflags & IR_X86_BMI1) {
+						|	lzcnt Rq(def_reg), Rq(op1_reg)
+					} else {
+						|	bsr Rq(def_reg), Rq(op1_reg)
+						|	xor Rw(def_reg), 0x3f
+					}
+				} else if (insn->op == IR_CTTZ) {
+					if (ctx->mflags & IR_X86_BMI1) {
+						|	tzcnt Rq(def_reg), Rq(op1_reg)
+					} else {
+						|	bsf Rq(def_reg), Rq(op1_reg)
+					}
+				} else {
+					IR_ASSERT(insn->op == IR_CTPOP);
+					|	popcnt Rq(def_reg), Rq(op1_reg)
+				}
 				break;
 |.endif
 		}
@@ -3228,14 +3290,59 @@ static void ir_emit_ctpop_popcnt(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				default:
 					IR_ASSERT(0);
 				case 2:
-					|	popcnt Rw(def_reg), word [Ra(op1_reg)+offset]
+					if (insn->op == IR_CTLZ) {
+						if (ctx->mflags & IR_X86_BMI1) {
+							|	lzcnt Rw(def_reg), word [Ra(op1_reg)+offset]
+						} else {
+							|	bsr Rw(def_reg), word [Ra(op1_reg)+offset]
+							|	xor Rw(def_reg), 0xf
+						}
+					} else if (insn->op == IR_CTTZ) {
+						if (ctx->mflags & IR_X86_BMI1) {
+							|	tzcnt Rw(def_reg), word [Ra(op1_reg)+offset]
+						} else {
+							|	bsf Rw(def_reg), word [Ra(op1_reg)+offset]
+						}
+					} else {
+						|	popcnt Rw(def_reg), word [Ra(op1_reg)+offset]
+					}
 					break;
 				case 4:
-					|	popcnt Rd(def_reg), dword [Ra(op1_reg)+offset]
+					if (insn->op == IR_CTLZ) {
+						if (ctx->mflags & IR_X86_BMI1) {
+							|	lzcnt Rd(def_reg), dword [Ra(op1_reg)+offset]
+						} else {
+							|	bsr Rd(def_reg), dword [Ra(op1_reg)+offset]
+							|	xor Rw(def_reg), 0x1f
+						}
+					} else if (insn->op == IR_CTTZ) {
+						if (ctx->mflags & IR_X86_BMI1) {
+							|	tzcnt Rd(def_reg), dword [Ra(op1_reg)+offset]
+						} else {
+							|	bsf Rd(def_reg), dword [Ra(op1_reg)+offset]
+						}
+					} else {
+						|	popcnt Rd(def_reg), dword [Ra(op1_reg)+offset]
+					}
 					break;
 |.if X64
 				case 8:
-					|	popcnt Rq(def_reg), qword [Ra(op1_reg)+offset]
+					if (insn->op == IR_CTLZ) {
+						if (ctx->mflags & IR_X86_BMI1) {
+							|	lzcnt Rq(def_reg), qword [Ra(op1_reg)+offset]
+						} else {
+							|	bsr Rq(def_reg), qword [Ra(op1_reg)+offset]
+							|	xor Rw(def_reg), 0x3f
+						}
+					} else if (insn->op == IR_CTTZ) {
+						if (ctx->mflags & IR_X86_BMI1) {
+							|	tzcnt Rq(def_reg), qword [Ra(op1_reg)+offset]
+						} else {
+							|	bsf Rq(def_reg), qword [Ra(op1_reg)+offset]
+						}
+					} else {
+						|	popcnt Rq(def_reg), qword [Ra(op1_reg)+offset]
+					}
 					break;
 |.endif
 			}
@@ -3244,14 +3351,59 @@ static void ir_emit_ctpop_popcnt(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				default:
 					IR_ASSERT(0);
 				case 2:
-					|	popcnt Rw(def_reg), word [offset]
+					if (insn->op == IR_CTLZ) {
+						if (ctx->mflags & IR_X86_BMI1) {
+							|	lzcnt Rw(def_reg), word [offset]
+						} else {
+							|	bsr Rw(def_reg), word [offset]
+							|	xor Rw(def_reg), 0xf
+						}
+					} else if (insn->op == IR_CTTZ) {
+						if (ctx->mflags & IR_X86_BMI1) {
+							|	tzcnt Rw(def_reg), word [offset]
+						} else {
+							|	bsf Rw(def_reg), word [offset]
+						}
+					} else {
+						|	popcnt Rw(def_reg), word [offset]
+					}
 					break;
 				case 4:
-					|	popcnt Rd(def_reg), dword [offset]
+					if (insn->op == IR_CTLZ) {
+						if (ctx->mflags & IR_X86_BMI1) {
+							|	lzcnt  Rd(def_reg), dword [offset]
+						} else {
+							|	bsr Rw(def_reg), word [offset]
+							|	xor Rw(def_reg), 0x1f
+						}
+					} else if (insn->op == IR_CTTZ) {
+						if (ctx->mflags & IR_X86_BMI1) {
+							|	tzcnt  Rd(def_reg), dword [offset]
+						} else {
+							|	bsf  Rd(def_reg), dword [offset]
+						}
+					} else {
+						|	popcnt Rd(def_reg), dword [offset]
+					}
 					break;
 |.if X64
 				case 8:
-					|	popcnt Rq(def_reg), qword [offset]
+					if (insn->op == IR_CTLZ) {
+						if (ctx->mflags & IR_X86_BMI1) {
+							|	lzcnt Rq(def_reg), qword [offset]
+						} else {
+							|	bsr Rw(def_reg), word [offset]
+							|	xor Rw(def_reg), 0x1f
+						}
+					} else if (insn->op == IR_CTTZ) {
+						if (ctx->mflags & IR_X86_BMI1) {
+							|	tzcnt Rq(def_reg), qword [offset]
+						} else {
+							|	bsf Rq(def_reg), qword [offset]
+						}
+					} else {
+						|	popcnt Rq(def_reg), qword [offset]
+					}
 					break;
 |.endif
 			}
@@ -8764,8 +8916,8 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_SHIFT_CONST:
 					ir_emit_shift_const(ctx, i, insn);
 					break;
-				case IR_CTPOP_POPCNT:
-					ir_emit_ctpop_popcnt(ctx, i, insn);
+				case IR_BIT_COUNT:
+					ir_emit_bit_count(ctx, i, insn);
 					break;
 				case IR_CTPOP:
 					ir_emit_ctpop(ctx, i, insn);

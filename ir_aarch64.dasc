@@ -655,6 +655,8 @@ binop_fp:
 			return IR_BINOP_INT;
 		case IR_BSWAP:
 		case IR_NOT:
+		case IR_CTLZ:
+		case IR_CTTZ:
 			IR_ASSERT(IR_IS_TYPE_INT(insn->type));
 			return IR_OP_INT;
 		case IR_NEG:
@@ -1880,6 +1882,21 @@ static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			|	cmp Rw(op1_reg), #0
 			|	cneg Rw(def_reg), Rw(op1_reg), lt
 		}
+	} else if (insn->op == IR_CTLZ) {
+		if (ir_type_size[type] == 1) {
+			|	and	Rw(def_reg), Rw(op1_reg), #0xff
+			|	clz Rw(def_reg), Rw(def_reg)
+			|	sub Rw(def_reg), Rw(def_reg), #24
+		} else if (ir_type_size[type] == 2) {
+			|	and	Rw(def_reg), Rw(op1_reg), #0xffff
+			|	clz Rw(def_reg), Rw(def_reg)
+			|	sub Rw(def_reg), Rw(def_reg), #16
+		} else {
+			|	ASM_REG_REG_OP clz, type, def_reg, op1_reg
+		}
+	} else if (insn->op == IR_CTTZ) {
+		|	ASM_REG_REG_OP rbit, insn->type, def_reg, op1_reg
+		|	ASM_REG_REG_OP clz, insn->type, def_reg, def_reg
 	} else {
 		IR_ASSERT(insn->op == IR_BSWAP);
 		|	ASM_REG_REG_OP rev, insn->type, def_reg, op1_reg
@@ -1911,14 +1928,14 @@ static void ir_emit_ctpop(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		default:
 			IR_ASSERT(0);
 		case 1:
-			|	and	Rw(def_reg-IR_REG_FP_FIRST), Rw(op1_reg), #0xff
+			|	and	Rw(def_reg), Rw(op1_reg), #0xff
 			|	fmov Rs(tmp_reg-IR_REG_FP_FIRST), Rw(def_reg)
 			|	.long code1 // cnt v0.8b, v0.8b
 			|	.long code2 // addv b0, v0.8b
 			|	fmov Rw(def_reg), Rs(tmp_reg-IR_REG_FP_FIRST)
 			break;
 		case 2:
-			|	and	Rw(def_reg-IR_REG_FP_FIRST), Rw(op1_reg), #0xffff
+			|	and	Rw(def_reg), Rw(op1_reg), #0xffff
 			|	fmov Rs(tmp_reg-IR_REG_FP_FIRST), Rw(def_reg)
 			|	.long code1 // cnt v0.8b, v0.8b
 			|	.long code2 // addv b0, v0.8b

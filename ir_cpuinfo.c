@@ -46,6 +46,7 @@ uint32_t ir_cpuinfo(void)
 
 	ir_cpuid_ex(info_0x7_0, 0x7, 0);
 	if (bit(info_0x7_0[1], 5U)) ret |= IR_X86_AVX2;
+	if (bit(info_0x7_0[1], 3U)) ret |= IR_X86_BMI1;
 
 #undef bit
 
