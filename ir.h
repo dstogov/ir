@@ -496,37 +496,17 @@ void ir_strtab_free(ir_strtab *strtab);
 #define IR_SKIP_PROLOGUE       (1<<6) /* Don't generate function prologue. */
 #define IR_USE_FRAME_POINTER   (1<<7)
 #define IR_PREALLOCATED_STACK  (1<<8)
-#define IR_HAS_ALLOCA          (1<<9)
-#define IR_HAS_CALLS           (1<<10)
-#define IR_NO_STACK_COMBINE    (1<<11)
-#define IR_START_BR_TARGET     (1<<12)
-#define IR_ENTRY_BR_TARGET     (1<<13)
-#define IR_GEN_ENDBR           (1<<14)
-#define IR_MERGE_EMPTY_ENTRIES (1<<15)
-
-#define IR_CFG_HAS_LOOPS       (1<<16)
-#define IR_IRREDUCIBLE_CFG     (1<<17)
+#define IR_NO_STACK_COMBINE    (1<<9)
+#define IR_START_BR_TARGET     (1<<10)
+#define IR_ENTRY_BR_TARGET     (1<<11)
+#define IR_GEN_ENDBR           (1<<12)
+#define IR_MERGE_EMPTY_ENTRIES (1<<13)
 
 #define IR_OPT_FOLDING         (1<<18)
 #define IR_OPT_CFG             (1<<19) /* merge BBs, by remove END->BEGIN nodes during CFG construction */
 #define IR_OPT_CODEGEN         (1<<20)
-#define IR_OPT_IN_SCCP         (1<<21)
-#define IR_LINEAR              (1<<22)
 #define IR_GEN_NATIVE          (1<<23)
 #define IR_GEN_CODE            (1<<24) /* C or LLVM */
-
-/* Temporary: SCCP -> CFG */
-#define IR_SCCP_DONE           (1<<25)
-
-/* Temporary: Dominators -> Loops */
-#define IR_NO_LOOPS            (1<<25)
-
-/* Temporary: Live Ranges */
-#define IR_LR_HAVE_DESSA_MOVES (1<<25)
-
-/* Temporary: Register Allocator */
-#define IR_RA_HAVE_SPLITS      (1<<25)
-#define IR_RA_HAVE_SPILLS      (1<<26)
 
 /* debug related */
 #ifdef IR_DEBUG
@@ -560,6 +540,7 @@ struct _ir_ctx {
 	ir_ref             consts_count;            /* number of constants stored in constants buffer */
 	ir_ref             consts_limit;            /* size of allocated constants buffer (it's extended when overflow) */
 	uint32_t           flags;                   /* IR context flags (see IR_* defines above) */
+	uint32_t           flags2;                  /* IR context provate flags (see IR_* defines in ir_private.h) */
 	ir_type            ret_type;                /* Function return type */
 	uint32_t           mflags;                  /* CPU specific flags (see IR_X86_... macros below) */
 	int32_t            status;                  /* non-zero error code (see IR_ERROR_... macros), app may use negative codes */

@@ -1423,7 +1423,7 @@ binop_fp:
 			}
 			break;
 		case IR_CALL:
-			ctx->flags |= IR_HAS_CALLS;
+			ctx->flags2 |= IR_HAS_CALLS;
 			IR_FALLTHROUGH;
 		case IR_TAILCALL:
 			if (ir_in_same_block(ctx, insn->op2)) {
@@ -1435,9 +1435,10 @@ binop_fp:
 		case IR_PARAM:
 			return ctx->use_lists[ref].count > 0 ? IR_PARAM : IR_SKIPPED | IR_PARAM;
 		case IR_ALLOCA:
-			/* alloca() may be use only in functions */
+			/* alloca() may be used only in functions */
 			if (ctx->flags & IR_FUNCTION) {
-				ctx->flags |= IR_USE_FRAME_POINTER | IR_HAS_ALLOCA;
+				ctx->flags |= IR_USE_FRAME_POINTER;
+				ctx->flags2 |= IR_HAS_ALLOCA;
 			}
 			return IR_ALLOCA;
 		case IR_VSTORE:
@@ -6144,7 +6145,7 @@ static void ir_emit_alloca(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		IR_ASSERT(IR_IS_TYPE_UNSIGNED(val->type) || val->val.i64 > 0);
 		IR_ASSERT(IR_IS_SIGNED_32BIT(val->val.i64));
 
-		if (ctx->flags & IR_HAS_CALLS) {
+		if (ctx->flags2 & IR_HAS_CALLS) {
 			/* Stack must be 16 byte aligned */
 			size = IR_ALIGNED_SIZE(size, 16);
 		} else {
@@ -6155,7 +6156,7 @@ static void ir_emit_alloca(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			ctx->call_stack_size += size;
 		}
 	} else {
-		int32_t alignment = (ctx->flags & IR_HAS_CALLS) ? 16 : 8;
+		int32_t alignment = (ctx->flags2 & IR_HAS_CALLS) ? 16 : 8;
 		ir_reg op2_reg = ctx->regs[def][2];
 		ir_type type = ctx->ir_base[insn->op2].type;
 
@@ -6201,7 +6202,7 @@ static void ir_emit_afree(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		IR_ASSERT(IR_IS_TYPE_UNSIGNED(val->type) || val->val.i64 > 0);
 		IR_ASSERT(IR_IS_SIGNED_32BIT(val->val.i64));
 
-		if (ctx->flags & IR_HAS_CALLS) {
+		if (ctx->flags2 & IR_HAS_CALLS) {
 			/* Stack must be 16 byte aligned */
 			size = IR_ALIGNED_SIZE(size, 16);
 		} else {
@@ -6212,7 +6213,7 @@ static void ir_emit_afree(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			ctx->call_stack_size -= size;
 		}
 	} else {
-//		int32_t alignment = (ctx->flags & IR_HAS_CALLS) ? 16 : 8;
+//		int32_t alignment = (ctx->flags2 & IR_HAS_CALLS) ? 16 : 8;
 		ir_reg op2_reg = ctx->regs[def][2];
 		ir_type type = ctx->ir_base[insn->op2].type;
 
@@ -8509,7 +8510,7 @@ void ir_fix_stack_frame(ir_ctx *ctx)
 	ctx->stack_frame_alignment = 0;
 	ctx->call_stack_size = 0;
 
-	if (ctx->flags & IR_HAS_CALLS) {
+	if (ctx->flags2 & IR_HAS_CALLS) {
 		/* Stack must be 16 byte aligned */
 		if (!(ctx->flags & IR_FUNCTION)) {
 			while (IR_ALIGNED_SIZE(ctx->stack_frame_size, 16) != ctx->stack_frame_size) {
