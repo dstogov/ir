@@ -251,6 +251,8 @@ typedef struct _ir_main_loader {
 	ir_sym    *sym;
 	ir_ref     sym_count;
 	void      *data;
+	void      *code_buffer;
+	size_t     code_buffer_size;
 } ir_main_loader;
 
 static bool ir_loader_add_sym(ir_main_loader *l, const char *name, void *addr)
@@ -578,10 +580,34 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 
 	if (l->dump_asm || l->dump_size || l->run) {
 		size_t size;
-		void *entry = ir_emit_code(ctx, &size);
+		void *entry;
 
-		l->size += size;
+		if (l->code_buffer) {
+			ctx->code_buffer = (char*)l->code_buffer + l->size;
+			ctx->code_buffer_size = l->code_buffer_size - l->size;
+			ir_mem_unprotect(l->code_buffer, l->code_buffer_size);
+		}
+		entry = ir_emit_code(ctx, &size);
+#ifndef _WIN32
+		if (l->run) {
+			if (!l->code_buffer) {
+				ir_mem_unprotect(entry, size);
+			}
+			ir_gdb_register(name, entry, size, sizeof(void*), 0);
+			if (!l->code_buffer) {
+				ir_mem_protect(entry, size);
+			}
+		}
+#endif
+		if (l->code_buffer) {
+			ir_mem_protect(l->code_buffer, l->code_buffer_size);
+		}
 		if (entry) {
+			l->size += size;
+#if defined(IR_TARGET_AARCH64)
+			l->size += ctx->veneers_size;
+#endif
+			l->size = IR_ALIGNED_SIZE(l->size, 16);
 			if (!ir_loader_add_sym(l, name, entry)) {
 				fprintf(stderr, "\nERROR: Symbol redefinition: %s\n", name);
 				return 0;
@@ -609,10 +635,6 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 				ir_perf_map_register(name, entry, size);
 				ir_perf_jitdump_open();
 				ir_perf_jitdump_register(name, entry, size);
-
-				ir_mem_unprotect(entry, 4096);
-				ir_gdb_register(name, entry, size, sizeof(void*), 0);
-				ir_mem_protect(entry, 4096);
 #endif
 				if (strcmp(name, "main") == 0) {
 					l->main = entry;
@@ -847,6 +869,7 @@ int main(int argc, char **argv)
 		}
 	}
 
+	memset(&loader, 0, sizeof(loader));
 	loader.loader.default_func_flags = flags;
 	loader.loader.init_module        = NULL;
 	loader.loader.external_sym_dcl   = ir_loader_external_sym_dcl;
@@ -867,13 +890,6 @@ int main(int argc, char **argv)
 	loader.dump_asm = dump_asm;
 	loader.dump_size = dump_size;
 	loader.run = run;
-
-	loader.size = 0;
-	loader.main = NULL;
-
-	loader.dump_file = NULL;
-	loader.c_file = NULL;
-	loader.llvm_file = NULL;
 
 	ir_strtab_init(&loader.symtab, 16, 4096);
 	loader.sym = NULL;
@@ -913,6 +929,18 @@ int main(int argc, char **argv)
 			loader.llvm_file = stderr;
 		}
 	}
+
+#if defined(IR_TARGET_AARCH64)
+	if (dump_asm || dump_size || run) {
+		/* Preallocate 2MB JIT code buffer. On AArch64 it may be necessary to generate veneers. */
+		loader.code_buffer_size = 2 * 1024 * 1024;
+		loader.code_buffer = ir_mem_mmap(loader.code_buffer_size);
+		if (!loader.code_buffer) {
+			fprintf(stderr, "ERROR: Cannot allocate JIT code buffer\n");
+			return 0;
+		}
+	}
+#endif
 
 #if HAVE_LLVM
 	if (load_llvm_bitcode) {
