@@ -1,5 +1,5 @@
 --TEST--
-Floating Point number compariosn (001: CMP edge cases)
+Floating Point number comparison (001: CMP edge cases)
 --ARGS--
 --run
 --CODE--
