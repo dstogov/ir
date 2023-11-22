@@ -277,8 +277,7 @@ test:
 
 ## PHP JIT based on IR
 
-A new experimental JIT for PHP based on IR is developed at [php-ir](https://github.com/dstogov/php-src/tree/php-ir/ext/opcache/jit) branch.
-See [README-IR.md](https://github.com/dstogov/php-src/blob/php-ir/ext/opcache/jit/README-IR.md).
+A new experimental JIT for PHP based on this project is developed at [master](https://github.com/php/php-src/tree/master/ext/opcache/jit) php-src branch.
 
 ### Building and Testing PHP with JIT based on IR Framework
 
@@ -292,8 +291,8 @@ sudo dbf install capstone-devel
 Build PHP
 
 ```
-git clone -b php-ir --single-branch git@github.com:dstogov/php-src.git php-ir
-cd php-ir
+git clone https://github.com/php/php-src.git
+cd php-src
 ./buildconf --force
 mkdir install
 ./configure --with-capstone --prefix=`pwd`/install --with-config-file-path=`pwd`/install/etc
