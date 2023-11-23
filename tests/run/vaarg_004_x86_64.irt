@@ -1,0 +1,149 @@
+--TEST--
+VA_ARG 004: va_arg() expanded on x86
+--TARGET--
+x86_64
+--ARGS--
+--run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func sum(int32_t, ...): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 24;
+	int32_t c_5 = 1;
+	int32_t c_6 = 0;
+	uintptr_t c_7 = 0x8;
+	uintptr_t c_8 = 0x10;
+	int32_t c_9 = -2;
+	int32_t c_10 = 41;
+	int32_t c_11 = 8;
+	int32_t c_12 = 2;
+	l_1 = START(l_102);
+	int32_t d_2 = PARAM(l_1, "arg_1", 1);
+	uintptr_t d_3, l_3 = ALLOCA(l_1, c_4);
+	l_4 = VA_START(l_3, d_3);
+	bool d_5 = GT(d_2, c_6);
+	l_6 = IF(l_4, d_5);
+	l_7 = IF_FALSE(l_6);
+	l_8 = END(l_7);
+	l_9 = IF_TRUE(l_6);
+	int32_t d_10, l_10 = LOAD(l_9, d_3);
+	uintptr_t d_11 = ADD(d_3, c_7);
+	uintptr_t d_12 = ADD(d_3, c_8);
+	uintptr_t d_13, l_13 = LOAD(l_10, d_12);
+	uintptr_t d_14, l_14 = LOAD(l_13, d_11);
+	bool d_15 = EQ(d_2, c_5);
+	l_16 = IF(l_14, d_15);
+	l_17 = IF_TRUE(l_16);
+	l_18 = END(l_17);
+	l_19 = IF_FALSE(l_16);
+	int32_t d_20 = AND(d_2, c_9);
+	l_21 = END(l_19);
+	l_22 = LOOP_BEGIN(l_21, l_69);
+	uintptr_t d_23 = PHI(l_22, d_14, d_57);
+	int32_t d_24 = PHI(l_22, c_6, d_62);
+	int32_t d_25 = PHI(l_22, d_10, d_58);
+	int32_t d_26 = PHI(l_22, c_6, d_63);
+	bool d_27 = ULT(d_25, c_10);
+	l_28 = IF(l_22, d_27);
+	l_29 = IF_FALSE(l_28);
+	uintptr_t d_30 = ADD(d_23, c_7);
+	l_31 = STORE(l_29, d_11, d_30);
+	l_32 = END(l_31);
+	l_33 = IF_TRUE(l_28);
+	int64_t d_34 = ZEXT(d_25);
+	uintptr_t d_35 = ADD(d_34, d_13);
+	int32_t d_36 = ADD(d_25, c_11);
+	l_37 = STORE(l_33, d_3, d_36);
+	l_38 = END(l_37);
+	l_39 = MERGE(l_38, l_32);
+	uintptr_t d_40 = PHI(l_39, d_23, d_30);
+	int32_t d_41 = PHI(l_39, d_36, d_25);
+	uintptr_t d_42 = PHI(l_39, d_35, d_23);
+	int32_t d_43, l_43 = LOAD(l_39, d_42);
+	bool d_44 = ULT(d_41, c_10);
+	l_45 = IF(l_43, d_44);
+	l_46 = IF_FALSE(l_45);
+	uintptr_t d_47 = ADD(d_40, c_7);
+	l_48 = STORE(l_46, d_11, d_47);
+	l_49 = END(l_48);
+	l_50 = IF_TRUE(l_45);
+	int64_t d_51 = ZEXT(d_41);
+	uintptr_t d_52 = ADD(d_51, d_13);
+	int32_t d_53 = ADD(d_41, c_11);
+	l_54 = STORE(l_50, d_3, d_53);
+	l_55 = END(l_54);
+	l_56 = MERGE(l_49, l_55);
+	uintptr_t d_57 = PHI(l_56, d_47, d_40);
+	int32_t d_58 = PHI(l_56, d_41, d_53);
+	uintptr_t d_59 = PHI(l_56, d_40, d_52);
+	int32_t d_60 = ADD(d_43, d_24);
+	int32_t d_61, l_61 = LOAD(l_56, d_59);
+	int32_t d_62 = ADD(d_61, d_60);
+	int32_t d_63 = ADD(d_26, c_12);
+	bool d_64 = EQ(d_63, d_20);
+	l_65 = IF(l_61, d_64);
+	l_66 = IF_TRUE(l_65);
+	l_67 = END(l_66);
+	l_68 = IF_FALSE(l_65);
+	l_69 = LOOP_END(l_68);
+	l_70 = MERGE(l_18, l_67);
+	int32_t d_71 = PHI(l_70, c_6, d_62);
+	uintptr_t d_72 = PHI(l_70, d_14, d_57);
+	int32_t d_73 = PHI(l_70, c_6, d_62);
+	int32_t d_74 = PHI(l_70, d_10, d_58);
+	int32_t d_75 = AND(d_2, c_5);
+	bool d_76 = EQ(d_75, c_6);
+	l_77 = IF(l_70, d_76);
+	l_78 = IF_TRUE(l_77);
+	l_79 = END(l_78);
+	l_80 = IF_FALSE(l_77);
+	bool d_81 = ULT(d_74, c_10);
+	l_82 = IF(l_80, d_81);
+	l_83 = IF_FALSE(l_82);
+	uintptr_t d_84 = ADD(d_72, c_7);
+	l_85 = STORE(l_83, d_11, d_84);
+	l_86 = END(l_85);
+	l_87 = IF_TRUE(l_82);
+	int64_t d_88 = ZEXT(d_74);
+	uintptr_t d_89 = ADD(d_88, d_13);
+	int32_t d_90 = ADD(d_74, c_11);
+	l_91 = STORE(l_87, d_3, d_90);
+	l_92 = END(l_91);
+	l_93 = MERGE(l_86, l_92);
+	uintptr_t d_94 = PHI(l_93, d_72, d_89);
+	int32_t d_95, l_95 = LOAD(l_93, d_94);
+	int32_t d_96 = ADD(d_95, d_73);
+	l_97 = END(l_95);
+	l_98 = MERGE/3(l_8, l_79, l_97);
+	int32_t d_99 = PHI/3(l_98, c_6, d_71, d_96);
+	l_101 = VA_END(l_98, d_3);
+	l_102 = RETURN(l_101, d_99);
+}
+func main(void): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 7;
+	int32_t c_5 = 1;
+	int32_t c_6 = 2;
+	int32_t c_7 = 3;
+	int32_t c_8 = 4;
+	int32_t c_9 = 5;
+	int32_t c_10 = 6;
+	uintptr_t c_11 = func(sum, 4);
+	uintptr_t c_12 = "sum %d\n";
+	uintptr_t c_13 = func(printf, 4);
+	int32_t c_14 = 0;
+	int32_t c_15 = 8;
+	int32_t c_16 = 9;
+	l_1 = START(l_7);
+	int32_t d_2, l_2 = CALL/10(l_1, c_11, c_16, c_5, c_6, c_7, c_8, c_9, c_10, c_4, c_15, c_16);
+	int32_t d_5, l_5 = CALL/2(l_2, c_13, c_12, d_2);
+	l_7 = RETURN(l_5, c_14);
+}
+--EXPECT--
+sum 45

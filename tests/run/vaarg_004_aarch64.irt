@@ -1,0 +1,104 @@
+--TEST--
+VA_ARG 004: va_arg() expanded on AArch64
+--TARGET--
+aarch64
+--ARGS--
+--run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func sum(int32_t, ...): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 32;
+	int32_t c_5 = 1;
+	int32_t c_6 = 0;
+	uintptr_t c_7 = 0x18;
+	uintptr_t c_8 = 0x8;
+	int32_t c_9 = -1;
+	int32_t c_10 = 8;
+	int32_t c_11 = -7;
+	l_1 = START(l_57);
+	int32_t d_2 = PARAM(l_1, "arg_1", 1);
+	uintptr_t d_3, l_3 = ALLOCA(l_1, c_4);
+	l_4 = VA_START(l_3, d_3);
+	bool d_5 = GT(d_2, c_6);
+	l_6 = IF(l_4, d_5);
+	l_7 = IF_FALSE(l_6);
+	l_8 = END(l_7);
+	l_9 = IF_TRUE(l_6);
+	uintptr_t d_10, l_10 = LOAD(l_9, d_3);
+	uintptr_t d_11 = ADD(d_3, c_7);
+	uintptr_t d_12 = ADD(d_3, c_8);
+	uintptr_t d_13, l_13 = LOAD(l_10, d_12);
+	int32_t d_14, l_14 = LOAD(l_13, d_11);
+	l_15 = END(l_14);
+	l_16 = LOOP_BEGIN(l_15, l_53);
+	int32_t d_17 = PHI(l_16, d_14, d_42);
+	int32_t d_18 = PHI(l_16, c_6, d_47);
+	int32_t d_19 = PHI(l_16, c_6, d_46);
+	uintptr_t d_20 = PHI(l_16, d_10, d_43);
+	bool d_21 = GT(d_17, c_9);
+	l_22 = IF(l_16, d_21);
+	l_23 = IF_TRUE(l_22);
+	l_24 = END(l_23);
+	l_25 = IF_FALSE(l_22);
+	int32_t d_26 = ADD(d_17, c_10);
+	l_27 = STORE(l_25, d_11, d_26);
+	bool d_28 = ULT(d_17, c_11);
+	l_29 = IF(l_27, d_28);
+	l_30 = IF_FALSE(l_29);
+	l_31 = END(l_30);
+	l_32 = IF_TRUE(l_29);
+	int64_t d_33 = SEXT(d_17);
+	uintptr_t d_34 = ADD(d_33, d_13);
+	l_35 = END(l_32);
+	l_36 = MERGE(l_24, l_31);
+	int32_t d_37 = PHI(l_36, d_17, d_26);
+	uintptr_t d_38 = ADD(d_20, c_8);
+	l_39 = STORE(l_36, d_3, d_38);
+	l_40 = END(l_39);
+	l_41 = MERGE(l_35, l_40);
+	int32_t d_42 = PHI(l_41, d_26, d_37);
+	uintptr_t d_43 = PHI(l_41, d_20, d_38);
+	uintptr_t d_44 = PHI(l_41, d_34, d_20);
+	int32_t d_45, l_45 = LOAD(l_41, d_44);
+	int32_t d_46 = ADD(d_45, d_19);
+	int32_t d_47 = ADD(d_18, c_5);
+	bool d_48 = EQ(d_47, d_2);
+	l_49 = IF(l_45, d_48);
+	l_50 = IF_TRUE(l_49);
+	l_51 = END(l_50);
+	l_52 = IF_FALSE(l_49);
+	l_53 = LOOP_END(l_52);
+	l_54 = MERGE(l_8, l_51);
+	int32_t d_55 = PHI(l_54, c_6, d_46);
+	l_56 = VA_END(l_54, d_3);
+	l_57 = RETURN(l_56, d_55);
+}
+func main(void): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 7;
+	int32_t c_5 = 1;
+	int32_t c_6 = 2;
+	int32_t c_7 = 3;
+	int32_t c_8 = 4;
+	int32_t c_9 = 5;
+	int32_t c_10 = 6;
+	uintptr_t c_11 = func(sum, 4);
+	uintptr_t c_12 = "sum %d\n";
+	uintptr_t c_13 = func(printf, 4);
+	int32_t c_14 = 0;
+	int32_t c_15 = 8;
+	int32_t c_16 = 9;
+	l_1 = START(l_7);
+	int32_t d_2, l_2 = CALL/10(l_1, c_11, c_16, c_5, c_6, c_7, c_8, c_9, c_10, c_4, c_15, c_16);
+	int32_t d_5, l_5 = CALL/2(l_2, c_13, c_12, d_2);
+	l_7 = RETURN(l_5, c_14);
+}
+--EXPECT--
+sum 45
