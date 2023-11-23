@@ -3644,7 +3644,36 @@ static void ir_emit_frame_addr(ir_ctx *ctx, ir_ref def)
 
 static void ir_emit_va_start(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
-#ifndef __APPLE__
+#ifdef __APPLE__
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_reg fp;
+	int arg_area_offset;
+	ir_reg op2_reg = ctx->regs[def][2];
+	ir_reg tmp_reg = ctx->regs[def][3];
+
+	IR_ASSERT(tmp_reg != IR_REG_NONE);
+	if (op2_reg != IR_REG_NONE && IR_REG_SPILLED(op2_reg)) {
+		op2_reg = IR_REG_NUM(op2_reg);
+		ir_emit_load(ctx, IR_ADDR, op2_reg, insn->op2);
+	}
+
+	if (ctx->flags & IR_USE_FRAME_POINTER) {
+		fp = IR_REG_FRAME_POINTER;
+		arg_area_offset = ctx->stack_frame_size + sizeof(void*) * 2 + ctx->param_stack_size;
+	} else {
+		fp = IR_REG_STACK_POINTER;
+		arg_area_offset = ctx->call_stack_size + ctx->stack_frame_size + ctx->param_stack_size;
+	}
+	|	add Rx(tmp_reg), Rx(fp), #arg_area_offset
+	if (op2_reg != IR_REG_NONE) {
+		|	str Rx(tmp_reg), [Rx(op2_reg)]
+	} else {
+		int32_t offset = ir_ref_spill_slot(ctx, insn->op2, &op2_reg);
+
+		|	str Rx(tmp_reg), [Rx(op2_reg), #offset]
+	}
+#else
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg fp;
@@ -3662,12 +3691,11 @@ static void ir_emit_va_start(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
 		fp = IR_REG_FRAME_POINTER;
 		reg_save_area_offset = ctx->locals_area_size + sizeof(void*) * 2;
-		overflow_arg_area_offset = ctx->stack_frame_size + sizeof(void*) * 2; // TODO: ???
+		overflow_arg_area_offset = ctx->stack_frame_size + sizeof(void*) * 2 + ctx->param_stack_size;
 	} else {
 		fp = IR_REG_STACK_POINTER;
-		reg_save_area_offset = ctx->stack_frame_size + ctx->call_stack_size + 4; // TODO: ???
-		overflow_arg_area_offset = 0;
-		IR_ASSERT(0); // TODO: ???
+		reg_save_area_offset = ctx->locals_area_size + ctx->call_stack_size;
+		overflow_arg_area_offset = ctx->call_stack_size + ctx->stack_frame_size + ctx->param_stack_size;
 	}
 
 	/* Set va_list.stack */
@@ -3701,36 +3729,6 @@ static void ir_emit_va_start(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		/* Set va_list.vr_offset */
 		|	str wzr,  [Rx(op2_reg), #offsetof(ir_va_list, vr_offset)]
 	}
-#else
-	ir_backend_data *data = ctx->data;
-	dasm_State **Dst = &data->dasm_state;
-	ir_reg fp;
-	int arg_area_offset;
-	ir_reg op2_reg = ctx->regs[def][2];
-	ir_reg tmp_reg = ctx->regs[def][3];
-
-	IR_ASSERT(tmp_reg != IR_REG_NONE);
-	if (op2_reg != IR_REG_NONE && IR_REG_SPILLED(op2_reg)) {
-		op2_reg = IR_REG_NUM(op2_reg);
-		ir_emit_load(ctx, IR_ADDR, op2_reg, insn->op2);
-	}
-
-	if (ctx->flags & IR_USE_FRAME_POINTER) {
-		fp = IR_REG_FRAME_POINTER;
-		arg_area_offset = 8 + 4; // TODO: ???
-	} else {
-		fp = IR_REG_STACK_POINTER;
-		arg_area_offset = 0;
-		IR_ASSERT(0); // TODO: ???
-	}
-	|	add Rx(tmp_reg), Rx(fp), #arg_area_offset
-	if (op2_reg != IR_REG_NONE) {
-		|	str Rx(tmp_reg), [Rx(op2_reg)]
-	} else {
-		int32_t offset = ir_ref_spill_slot(ctx, insn->op2, &op2_reg);
-
-		|	str Rx(tmp_reg), [Rx(op2_reg), #offset]
-}
 #endif
 }
 
@@ -3741,7 +3739,37 @@ static void ir_emit_va_copy(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 static void ir_emit_va_arg(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
-#ifndef __APPLE__
+#ifdef __APPLE__
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_type type = insn->type;
+	ir_reg def_reg = ctx->regs[def][0];
+	ir_reg op2_reg = ctx->regs[def][2];
+	ir_reg tmp_reg = ctx->regs[def][3];
+
+	IR_ASSERT(def_reg != IR_REG_NONE && tmp_reg != IR_REG_NONE);
+	if (op2_reg != IR_REG_NONE && IR_REG_SPILLED(op2_reg)) {
+		op2_reg = IR_REG_NUM(op2_reg);
+		ir_emit_load(ctx, IR_ADDR, op2_reg, insn->op2);
+	}
+	|	ldr Rx(tmp_reg), [Rx(op2_reg)]
+	if (IR_IS_TYPE_INT(type)) {
+		ir_emit_load_mem_int(ctx, type, def_reg, tmp_reg, 0);
+	} else {
+		ir_emit_load_mem_fp(ctx, type, def_reg, tmp_reg, 0);
+	}
+	|	add Rx(tmp_reg), Rx(tmp_reg), #IR_MAX(ir_type_size[type], sizeof(void*))
+	if (op2_reg != IR_REG_NONE) {
+		|	str Rx(tmp_reg), [Rx(op2_reg)]
+	} else {
+		int32_t offset = ir_ref_spill_slot(ctx, insn->op2, &op2_reg);
+
+		|	str Rx(tmp_reg), [Rx(op2_reg), #offset]
+	}
+	if (IR_REG_SPILLED(ctx->regs[def][0])) {
+		ir_emit_store(ctx, type, def, def_reg);
+	}
+#else
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	ir_type type = insn->type;
@@ -3788,36 +3816,6 @@ static void ir_emit_va_arg(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		|	add Rx(tmp_reg), Rx(tmp_reg), #sizeof(void*)
 		|	str Rx(tmp_reg), [Rx(op2_reg), #offsetof(ir_va_list, stack)]
 		|2:
-	}
-	if (IR_REG_SPILLED(ctx->regs[def][0])) {
-		ir_emit_store(ctx, type, def, def_reg);
-	}
-#else
-	ir_backend_data *data = ctx->data;
-	dasm_State **Dst = &data->dasm_state;
-	ir_type type = insn->type;
-	ir_reg def_reg = ctx->regs[def][0];
-	ir_reg op2_reg = ctx->regs[def][2];
-	ir_reg tmp_reg = ctx->regs[def][3];
-
-	IR_ASSERT(def_reg != IR_REG_NONE && tmp_reg != IR_REG_NONE);
-	if (op2_reg != IR_REG_NONE && IR_REG_SPILLED(op2_reg)) {
-		op2_reg = IR_REG_NUM(op2_reg);
-		ir_emit_load(ctx, IR_ADDR, op2_reg, insn->op2);
-	}
-	|	ldr Rx(tmp_reg), [Rx(op2_reg)]
-	if (IR_IS_TYPE_INT(type)) {
-		ir_emit_load_mem_int(ctx, type, def_reg, tmp_reg, 0);
-	} else {
-		ir_emit_load_mem_fp(ctx, type, def_reg, tmp_reg, 0);
-	}
-	|	add Rx(tmp_reg), Rx(tmp_reg), #IR_MAX(ir_type_size[type], sizeof(void*))
-	if (op2_reg != IR_REG_NONE) {
-		|	str Rx(tmp_reg), [Rx(op2_reg)]
-	} else {
-		int32_t offset = ir_ref_spill_slot(ctx, insn->op2, &op2_reg);
-
-		|	str Rx(tmp_reg), [Rx(op2_reg), #offset]
 	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, type, def, def_reg);
@@ -4996,6 +4994,7 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 	const int8_t *int_reg_params = _ir_int_reg_params;
 	const int8_t *fp_reg_params = _ir_fp_reg_params;
 	int32_t stack_offset = 0;
+	int32_t param_stack_size = 0;
 
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
 		/* skip old frame pointer and return address */
@@ -5035,12 +5034,18 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 				}
 				if (sizeof(void*) == 8) {
 					stack_offset += sizeof(void*);
+					param_stack_size += sizeof(void*);
 				} else {
 					stack_offset += IR_MAX(sizeof(void*), ir_type_size[insn->type]);
+					param_stack_size += IR_MAX(sizeof(void*), ir_type_size[insn->type]);
 				}
 			}
 		}
 	}
+
+	ctx->gp_reg_params = IR_MIN(int_param_num, int_reg_params_count);
+	ctx->fp_reg_params = IR_MIN(fp_param_num, fp_reg_params_count);
+	ctx->param_stack_size = param_stack_size;
 }
 
 static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
@@ -5244,40 +5249,11 @@ static void ir_preallocate_call_stack(ir_ctx *ctx)
 	}
 }
 
-static void ir_count_reg_params(ir_ctx *ctx)
-{
-	ir_use_list *use_list = &ctx->use_lists[1];
-	ir_insn *insn;
-	ir_ref i, n, *p, use;
-	int gp_reg_params = 0;
-	int fp_reg_params = 0;
-
-	n = use_list->count;
-	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
-		use = *p;
-		insn = &ctx->ir_base[use];
-		if (insn->op == IR_PARAM) {
-			if (IR_IS_TYPE_INT(insn->type)) {
-				if (gp_reg_params <= IR_REG_INT_ARGS) {
-					gp_reg_params++;
-				}
-			} else {
-				if (fp_reg_params <= IR_REG_FP_ARGS) {
-					fp_reg_params++;
-				}
-			}
-		}
-	}
-	ctx->gp_reg_params = gp_reg_params;
-	ctx->fp_reg_params = fp_reg_params;
-}
-
 void ir_fix_stack_frame(ir_ctx *ctx)
 {
 	uint32_t additional_size = 0;
 
 	ctx->locals_area_size = ctx->stack_frame_size;
-	ir_count_reg_params(ctx);
 
 	if (ctx->used_preserved_regs) {
 		ir_regset used_preserved_regs = (ir_regset)ctx->used_preserved_regs;
