@@ -75,6 +75,7 @@ test:
 	movl 0x1c(%esp), %ecx
 	movl 0x24(%esp), %ebx
 	movl 0x2c(%esp), %ebp
+	movl 0x20(%esp), %edx
 	imull %ecx, %edx
 	movl %edx, (%esp)
 	leal 4(%edx), %edx
