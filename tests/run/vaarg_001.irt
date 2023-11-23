@@ -6,7 +6,7 @@ VA_ARG 001: va_arg(int)
 extern func printf(uintptr_t, ...): int32_t;
 func sum(int32_t, ...): int32_t
 {
-	int32_t c_4 = 24;
+	int32_t c_4 = 32;
 	int32_t c_5 = 1;
 	int32_t c_6 = 0;
 	l_1 = START(l_25);

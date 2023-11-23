@@ -6,7 +6,7 @@ VA_ARG 002: va_arg(double)
 extern func printf(uintptr_t, ...): int32_t;
 func sum(int32_t, ...): double
 {
-	int32_t c_4 = 24;
+	int32_t c_4 = 32;
 	int32_t c_5 = 1;
 	int32_t c_6 = 0;
 	double c_7 = 0;

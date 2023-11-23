@@ -1,5 +1,5 @@
 --TEST--
-VA_ARG 004: va_arg() expanded on x86
+VA_ARG 004: va_arg() expanded on x86_64
 --TARGET--
 x86_64
 --ARGS--

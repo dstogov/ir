@@ -2310,12 +2310,25 @@ static void ir_emit_prologue(ir_ctx *ctx)
 		}
 	}
 	if ((ctx->flags & IR_VARARG_FUNC) && (ctx->flags2 & IR_HAS_VA_START)) {
-#if defined(IR_TARGET_X64) && !defined(_WIN64)
+		ir_reg fp;
+		int offset;
+
+#if defined(_WIN64)
+		if (ctx->flags & IR_USE_FRAME_POINTER) {
+			fp = IR_REG_FRAME_POINTER;
+			offset = sizeof(void*) * 2;
+		} else {
+			fp = IR_REG_STACK_POINTER;
+			offset = ctx->stack_frame_size + ctx->call_stack_size + sizeof(void*);
+		}
+		|	mov [Ra(fp)+offset], Ra(IR_REG_INT_ARG1)
+		|	mov [Ra(fp)+offset+8], Ra(IR_REG_INT_ARG2)
+		|	mov [Ra(fp)+offset+16], Ra(IR_REG_INT_ARG3)
+		|	mov [Ra(fp)+offset+24], Ra(IR_REG_INT_ARG4)
+#elif defined(IR_TARGET_X64)
 |.if X64
 		const int8_t *int_reg_params = _ir_int_reg_params;
 		const int8_t *fp_reg_params = _ir_fp_reg_params;
-		ir_reg fp;
-		int offset;
 		uint32_t i;
 
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
@@ -6343,7 +6356,36 @@ static void ir_emit_frame_addr(ir_ctx *ctx, ir_ref def)
 
 static void ir_emit_va_start(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
-#if defined(IR_TARGET_X64) && !defined(_WIN64)
+#if defined(_WIN64)
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_reg fp;
+	int arg_area_offset;
+	ir_reg op2_reg = ctx->regs[def][2];
+	ir_reg tmp_reg = ctx->regs[def][3];
+
+	IR_ASSERT(tmp_reg != IR_REG_NONE);
+	if (op2_reg != IR_REG_NONE && IR_REG_SPILLED(op2_reg)) {
+		op2_reg = IR_REG_NUM(op2_reg);
+		ir_emit_load(ctx, IR_ADDR, op2_reg, insn->op2);
+	}
+
+	if (ctx->flags & IR_USE_FRAME_POINTER) {
+		fp = IR_REG_FRAME_POINTER;
+		arg_area_offset = sizeof(void*) * 2 + sizeof(void*); // TODO: ???
+	} else {
+		fp = IR_REG_STACK_POINTER;
+		arg_area_offset = ctx->stack_frame_size + ctx->call_stack_size + sizeof(void*); // TODO: ???
+	}
+	|	lea Ra(tmp_reg), aword [Ra(fp)+arg_area_offset]
+	if (op2_reg != IR_REG_NONE) {
+		|	mov aword [Ra(op2_reg)], Ra(tmp_reg)
+	} else {
+		int32_t offset = ir_ref_spill_slot(ctx, insn->op2, &op2_reg);
+
+		|	mov aword [Ra(op2_reg)+offset], Ra(tmp_reg)
+	}
+#elif defined(IR_TARGET_X64)
 |.if X64
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
@@ -6416,10 +6458,10 @@ static void ir_emit_va_start(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
 		fp = IR_REG_FRAME_POINTER;
-		arg_area_offset = 8 + 4; // TODO: ???
+		arg_area_offset = sizeof(void*) * 2 + sizeof(void*); // TODO: ???
 	} else {
 		fp = IR_REG_STACK_POINTER;
-		arg_area_offset = ctx->stack_frame_size + ctx->call_stack_size + 4; // TODO: ???
+		arg_area_offset = ctx->stack_frame_size + ctx->call_stack_size + sizeof(void*); // TODO: ???
 	}
 	|	lea Ra(tmp_reg), aword [Ra(fp)+arg_area_offset]
 	if (op2_reg != IR_REG_NONE) {
@@ -6441,7 +6483,37 @@ static void ir_emit_va_copy(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 static void ir_emit_va_arg(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
-#if defined(IR_TARGET_X64) && !defined(_WIN64)
+#if defined(_WIN64)
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_type type = insn->type;
+	ir_reg def_reg = ctx->regs[def][0];
+	ir_reg op2_reg = ctx->regs[def][2];
+	ir_reg tmp_reg = ctx->regs[def][3];
+
+	IR_ASSERT(def_reg != IR_REG_NONE && tmp_reg != IR_REG_NONE);
+	if (op2_reg != IR_REG_NONE && IR_REG_SPILLED(op2_reg)) {
+		op2_reg = IR_REG_NUM(op2_reg);
+		ir_emit_load(ctx, IR_ADDR, op2_reg, insn->op2);
+	}
+	|	mov Ra(tmp_reg), aword [Ra(op2_reg)]
+	if (IR_IS_TYPE_INT(type)) {
+		ir_emit_load_mem_int(ctx, type, def_reg, tmp_reg, 0);
+	} else {
+		ir_emit_load_mem_fp(ctx, type, def_reg, tmp_reg, 0);
+	}
+	|	add Ra(tmp_reg), IR_MAX(ir_type_size[type], sizeof(void*))
+	if (op2_reg != IR_REG_NONE) {
+		|	mov aword [Ra(op2_reg)], Ra(tmp_reg)
+	} else {
+		int32_t offset = ir_ref_spill_slot(ctx, insn->op2, &op2_reg);
+
+		|	mov aword [Ra(op2_reg)+offset], Ra(tmp_reg)
+	}
+	if (IR_REG_SPILLED(ctx->regs[def][0])) {
+		ir_emit_store(ctx, type, def, def_reg);
+	}
+#elif defined(IR_TARGET_X64)
 |.if X64
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
