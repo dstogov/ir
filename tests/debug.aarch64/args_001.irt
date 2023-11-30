@@ -16,7 +16,7 @@ aarch64
 	uint32_t c_8 = 8;
 	int64_t c_9 = 9;
 	int64_t c_10 = 0x100000000;
-	uintptr_t f = func(printf, 4);
+	uintptr_t f = func printf(uintptr_t, ...): int32_t;
 	uintptr_t fmt = "%d %d %d %lld 0x%llx %d %d %d %lld 0x%llx\n";
 	l_1 = START(l_3);
 	int32_t d_2, l_2 = CALL/11(l_1, f, fmt, c_1, c_2, c_3, c_4, c_5, c_6, c_7, c_8, c_9, c_10);

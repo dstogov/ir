@@ -6,7 +6,7 @@ x86
 -S
 --CODE--
 {
-	uintptr_t f = func(printf, 4);
+	uintptr_t f = func printf(uintptr_t, ...): int32_t;
 	uintptr_t fmt = "%d %d %d %d %d %d %d %d %d %d\n";
 	l_1 = START(l_3);
 	int32_t p_1 = PARAM(l_1, "p_1", 1);

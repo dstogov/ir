@@ -306,7 +306,7 @@ static bool ir_loader_external_sym_dcl(ir_loader *loader, const char *name, uint
 	return 1;
 }
 
-static void ir_dump_func_dcl(const char *name, uint32_t flags, ir_type ret_type, uint32_t params_count, ir_type *param_types, FILE *f)
+static void ir_dump_func_dcl(const char *name, uint32_t flags, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, FILE *f)
 {
 	if (flags & IR_EXTERN) {
 		fprintf(f, "extern ");
@@ -315,7 +315,7 @@ static void ir_dump_func_dcl(const char *name, uint32_t flags, ir_type ret_type,
 	}
 	fprintf(f, "func %s(", name);
 	if (params_count) {
-		ir_type *p = param_types;
+		const uint8_t *p = param_types;
 
 		fprintf(f, "%s", ir_type_cname[*p]);
 		p++;
@@ -328,14 +328,16 @@ static void ir_dump_func_dcl(const char *name, uint32_t flags, ir_type ret_type,
 		}
 	} else if (flags & IR_VARARG_FUNC) {
 		fprintf(f, "...");
-	} else {
-		fprintf(f, "void");
 	}
-	fprintf(f, "): %s;\n", ir_type_cname[ret_type]);
+	fprintf(f, "): %s", ir_type_cname[ret_type]);
+	if (flags & IR_FASTCALL_FUNC) {
+		fprintf(f, " __fastcall");
+	}
+	fprintf(f, ";\n");
 }
 
-static bool ir_loader_external_func_dcl(ir_loader *loader, const char *name,
-                                        uint32_t flags, ir_type ret_type, uint32_t params_count, ir_type *param_types)
+static bool ir_loader_external_func_dcl(ir_loader *loader, const char *name, uint32_t flags,
+                                        ir_type ret_type, uint32_t params_count, const uint8_t *param_types)
 {
 	ir_main_loader *l = (ir_main_loader*) loader;
 
@@ -361,8 +363,8 @@ static bool ir_loader_external_func_dcl(ir_loader *loader, const char *name,
 	return 1;
 }
 
-static bool ir_loader_forward_func_dcl(ir_loader *loader, const char *name,
-                                       uint32_t flags, ir_type ret_type, uint32_t params_count, ir_type *param_types)
+static bool ir_loader_forward_func_dcl(ir_loader *loader, const char *name, uint32_t flags,
+                                       ir_type ret_type, uint32_t params_count, const uint8_t *param_types)
 {
 	ir_main_loader *l = (ir_main_loader*) loader;
 
@@ -554,10 +556,12 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 			}
 		} else if (ctx->flags & IR_VARARG_FUNC) {
 			fprintf(l->dump_file, "...");
-		} else {
-			fprintf(l->dump_file, "void");
 		}
-		fprintf(l->dump_file, "): %s\n", ir_type_cname[ctx->ret_type != (ir_type)-1 ? ctx->ret_type : IR_VOID]);
+		fprintf(l->dump_file, "): %s", ir_type_cname[ctx->ret_type != (ir_type)-1 ? ctx->ret_type : IR_VOID]);
+		if (ctx->flags & IR_FASTCALL_FUNC) {
+			fprintf(l->dump_file, " __fastcall");
+		}
+		fprintf(l->dump_file, "\n");
 	}
 
 	if (!ir_compile_func(ctx, l->opt_level, l->dump, l->dump_file, name)) {
@@ -620,7 +624,7 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 
 				for (i = IR_UNUSED + 1, insn = ctx->ir_base - i; i < ctx->consts_count; i++, insn--) {
 					if (insn->op == IR_FUNC) {
-						const char *name = ir_get_str(ctx, insn->val.i32);
+						const char *name = ir_get_str(ctx, insn->val.name);
 						void *addr = ir_loader_resolve_sym_name(loader, name);
 
 						ir_disasm_add_symbol(name, (uintptr_t)addr, sizeof(void*));

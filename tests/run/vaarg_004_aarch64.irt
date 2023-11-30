@@ -89,9 +89,9 @@ func main(void): int32_t
 	int32_t c_8 = 4;
 	int32_t c_9 = 5;
 	int32_t c_10 = 6;
-	uintptr_t c_11 = func(sum, 4);
+	uintptr_t c_11 = func sum(int32_t, ...): int32_t;
 	uintptr_t c_12 = "sum %d\n";
-	uintptr_t c_13 = func(printf, 4);
+	uintptr_t c_13 = func printf(uintptr_t, ...): int32_t;
 	int32_t c_14 = 0;
 	int32_t c_15 = 8;
 	int32_t c_16 = 9;

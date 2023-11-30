@@ -9,7 +9,7 @@ x86_64
 	int32_t c_0 = 0;
 	int32_t c_1 = 1;
 	int32_t c_10000 = 10000;
-	uintptr_t f = func(printf, 4);
+	uintptr_t f = func printf(uintptr_t, ...): int32_t;
 	uintptr_t format = "%d\n";
 	l_1 = START(l_6);
 	int32_t lo_1 = COPY(c_0);
@@ -36,7 +36,7 @@ x86_64
 	int32_t c_4 = 0;
 	int32_t c_5 = 1;
 	int32_t c_6 = 10000;
-	uintptr_t c_7 = func(printf, 4);
+	uintptr_t c_7 = func printf(uintptr_t, ...): int32_t;
 	uintptr_t c_8 = "%d\n";
 	l_1 = START(l_14);
 	l_2 = END(l_1);

@@ -132,7 +132,7 @@ ir(ir_loader *loader):
 	{uint32_t flags = 0;}
 	{size_t size;}
 	{uint32_t params_count;}
-	{ir_type param_types[256];}
+	{uint8_t param_types[256];}
 	{p.ctx = &ctx;}
 	(
 		(
@@ -149,7 +149,8 @@ ir(ir_loader *loader):
 				}
 			|
 				{flags = 0;}
-				ir_func_prototype(&p, name, &flags, &ret_type, &params_count, param_types)
+				ir_func_name(name)
+				ir_func_proto(&p, &flags, &ret_type, &params_count, param_types)
 				";"
 				{
 					if (loader->external_func_dcl
@@ -187,7 +188,8 @@ ir(ir_loader *loader):
 					}
 				)
 			|
-				ir_func_prototype(&p, name, &flags, &ret_type, &params_count, param_types)
+				ir_func_name(name)
+				ir_func_proto(&p, &flags, &ret_type, &params_count, param_types)
 				(
 					";"
 					{
@@ -296,15 +298,18 @@ ir_func(ir_parser_ctx *p):
 	{ir_strtab_free(&p->var_tab);}
 ;
 
-ir_func_prototype(ir_parser_ctx *p, char *buf, uint32_t *flags, uint8_t *ret_type, uint32_t *params_count, ir_type *param_types):
+ir_func_name(char *buf):
 	{const char *name;}
 	{size_t len;}
-	{uint8_t t = 0;}
-	{uint32_t n = 0;}
 	"func" ID(&name, &len)
 	{if (len > 255) yy_error("name too long");}
 	{memcpy(buf, name, len);}
 	{buf[len] = 0;}
+;
+
+ir_func_proto(ir_parser_ctx *p, uint32_t *flags, uint8_t *ret_type, uint32_t *params_count, uint8_t *param_types):
+	{uint8_t t = 0;}
+	{uint32_t n = 0;}
 	"("
 	(
 		"void"
@@ -336,6 +341,10 @@ ir_func_prototype(ir_parser_ctx *p, char *buf, uint32_t *flags, uint8_t *ret_typ
 		"void"
 		{*ret_type = IR_VOID;}
 	)
+	(
+		"__fastcall"
+		{*flags |= IR_FASTCALL_FUNC;}
+	)?
 	{*params_count = n;}
 ;
 
@@ -350,8 +359,11 @@ ir_insn(ir_parser_ctx *p):
 	{ir_ref ref;}
 	{ir_val val;}
 	{ir_val count;}
-	{ir_val flags;}
 	{int32_t n;}
+	{uint8_t ret_type;}
+	{uint32_t flags;}
+	{uint32_t params_count;}
+	{uint8_t param_types[256];}
 	(
 		type(&t)
 		ID(&str, &len)
@@ -366,25 +378,23 @@ ir_insn(ir_parser_ctx *p):
 	(	{val.u64 = 0;}
 		const(t, &val)
 		{ref = ir_const(p->ctx, val, t);}
-	|	"func" "(" ID(&func, &func_len)
-		{flags.u64 = 0;}
-		(	","
-			DECNUMBER(IR_U16, &flags)
-		)?
-		")"
-		{ref = ir_const_func(p->ctx, ir_strl(p->ctx, func, func_len), flags.u16);}
+	|	"func"
+		(	ID(&func, &func_len)
+			{flags = 0;}
+			ir_func_proto(p, &flags, &ret_type, &params_count, param_types)
+			{ref = ir_proto(p->ctx, flags, ret_type, params_count, param_types);}
+			{ref = ir_const_func(p->ctx, ir_strl(p->ctx, func, func_len), ref);}
+		|	"*"
+			(	DECNUMBER(IR_ADDR, &val)
+			|	HEXNUMBER(IR_ADDR, &val)
+			)
+			{flags = 0;}
+			ir_func_proto(p, &flags, &ret_type, &params_count, param_types)
+			{ref = ir_proto(p->ctx, flags, ret_type, params_count, param_types);}
+			{ref = ir_const_func_addr(p->ctx, val.addr, ref);}
+		)
 	|	"sym" "(" ID(&func, &func_len) ")"
 		{ref = ir_const_sym(p->ctx, ir_strl(p->ctx, func, func_len));}
-	|	"func_addr" "("
-		(	DECNUMBER(IR_ADDR, &val)
-		|	HEXNUMBER(IR_ADDR, &val)
-		)
-		{flags.u64 = 0;}
-		(	","
-			DECNUMBER(IR_U16, &flags)
-		)?
-		")"
-		{ref = ir_const_func_addr(p->ctx, val.addr, flags.u16);}
 	|   STRING(&func, &func_len)
 		{ref = ir_const_str(p->ctx, ir_strl(p->ctx, func, func_len));}
 	|	func(&op)
@@ -475,6 +485,10 @@ val(ir_parser_ctx *p, uint8_t op, uint32_t n, ir_ref *ref):
 	{size_t len;}
 	{ir_val val;}
 	{uint32_t kind = IR_OPND_KIND(ir_op_flags[op], n);}
+	{uint8_t ret_type;}
+	{uint32_t flags;}
+	{uint32_t params_count;}
+	{uint8_t param_types[256];}
 	(	ID(&str, &len)
 		{if (!IR_IS_REF_OPND_KIND(kind)) yy_error("unexpected reference");}
 		{*ref = ir_use_var(p, n, str, len);}
@@ -487,6 +501,11 @@ val(ir_parser_ctx *p, uint8_t op, uint32_t n, ir_ref *ref):
 		{*ref = val.i32;}
 	|	"null"
 		{*ref = IR_UNUSED;}
+	|   "func"
+		{if (kind != IR_OPND_PROTO) yy_error("unexpected function prototype");}
+		{flags = 0;}
+		ir_func_proto(p, &flags, &ret_type, &params_count, param_types)
+		{*ref = ir_proto(p->ctx, flags, ret_type, params_count, param_types);}
 	)
 ;
 

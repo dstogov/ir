@@ -16,11 +16,18 @@
 
 #define IR_BAD_TYPE IR_LAST_TYPE
 
-#define BUILTIN_FUNC(name) \
-	ir_const_func(ctx, ir_strl(ctx, name, strlen(name)), IR_CONST_BUILTIN_FUNC)
-
-#define BUILTIN_FP_FUNC(type, dname, fname) \
-	((type == IR_DOUBLE) ? BUILTIN_FUNC(dname) : BUILTIN_FUNC(fname))
+#define BUILTIN_FUNC_1(name, ret_type, arg1_type) \
+	ir_const_func(ctx, \
+		ir_strl(ctx, name, strlen(name)), \
+		ir_proto_1(ctx, IR_BUILTIN_FUNC, ret_type, arg1_type))
+#define BUILTIN_FUNC_2(name, ret_type, arg1_type, arg2_type) \
+	ir_const_func(ctx, \
+		ir_strl(ctx, name, strlen(name)), \
+		ir_proto_2(ctx, IR_BUILTIN_FUNC, ret_type, arg1_type, arg2_type))
+#define BUILTIN_FUNC_3(name, ret_type, arg1_type, arg2_type, arg3_type) \
+	ir_const_func(ctx, \
+		ir_strl(ctx, name, strlen(name)), \
+		ir_proto_3(ctx, IR_BUILTIN_FUNC, ret_type, arg1_type, arg2_type, arg3_type))
 
 static ir_ref llvm2ir_const_expr(ir_ctx *ctx, LLVMValueRef expr);
 static ir_ref llvm2ir_auto_cast(ir_ctx *ctx, ir_ref ref, ir_type src_type, ir_type type);
@@ -105,13 +112,44 @@ static const char *llvm2ir_sym_name(char *buf, const char *name, size_t name_len
 	return buf;
 }
 
+static ir_ref llvm2ir_proto(ir_ctx *ctx, uint32_t cconv, LLVMTypeRef ftype)
+{
+	uint8_t flags = 0;
+	ir_type ret_type;
+	uint8_t *arg_types;
+	uint32_t i, num_args;
+	LLVMTypeRef *types;
+
+	if (cconv == LLVMCCallConv || cconv == LLVMFastCallConv) {
+		/* skip */
+	} else if (cconv == LLVMX86FastcallCallConv) {
+		flags |= IR_FASTCALL_FUNC;
+	} else {
+		fprintf(stderr, "Unsupported Calling Convention: %d\n", cconv);
+		IR_ASSERT(0);
+		return 0;
+	}
+	if (LLVMIsFunctionVarArg(ftype)) {
+		flags |= IR_VARARG_FUNC;
+	}
+	ret_type = llvm2ir_type(LLVMGetReturnType(ftype));
+	num_args = LLVMCountParamTypes(ftype);
+	types = alloca(sizeof(LLVMTypeRef) * num_args);
+	arg_types = alloca(num_args);
+	LLVMGetParamTypes(ftype, types);
+	for (i = 0; i < num_args; i++) {
+		arg_types[i] = llvm2ir_type(types[i]);
+	}
+	return ir_proto(ctx, flags, ret_type, num_args, arg_types);
+}
+
 static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 {
 	ir_ref ref;
 	LLVMBool lose;
 	const char *name;
 	size_t name_len;
-	uint32_t cconv, flags;
+	ir_ref proto;
 	ir_val val;
 	char buf[256];
 
@@ -158,24 +196,10 @@ static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 			}
 			return ir_const_sym(ctx, ir_strl(ctx, name, name_len));
 		case LLVMFunctionValueKind:
-			// TODO: function prototype
 			// TODO: resolve function address
-			flags = 0;
-			cconv = LLVMGetFunctionCallConv(op);
-			if (cconv == LLVMCCallConv || cconv == LLVMFastCallConv) {
-				/* skip */
-			} else if (cconv == LLVMX86FastcallCallConv) {
-				flags |= IR_CONST_FASTCALL_FUNC;
-			} else {
-				fprintf(stderr, "Unsupported Calling Convention: %d\n", cconv);
-				IR_ASSERT(0);
-				return 0;
-			}
-			if (LLVMIsFunctionVarArg(LLVMTypeOf(op))) {
-				flags |= IR_CONST_VARARG_FUNC;
-			}
+			proto = llvm2ir_proto(ctx, LLVMGetFunctionCallConv(op), LLVMGlobalGetValueType(op));
 			name = LLVMGetValueName2(op, &name_len);
-			return ir_const_func(ctx, ir_strl(ctx, name, name_len), flags);
+			return ir_const_func(ctx, ir_strl(ctx, name, name_len), proto);
 		case LLVMUndefValueValueKind:
 			val.u64 = 0;
 			return ir_const(ctx, val, type);
@@ -314,7 +338,11 @@ static ir_ref llvm2ir_fcmp_op_isnan(ir_ctx *ctx, LLVMValueRef expr, ir_type type
 {
 	ir_ref func, ref;
 
-	func = BUILTIN_FP_FUNC(type, "isnan", "isnanf");
+	if (type == IR_DOUBLE) {
+		func = BUILTIN_FUNC_1("isnan", IR_BOOL, IR_DOUBLE);
+	} else {
+		func = BUILTIN_FUNC_1("isnanf", IR_BOOL, IR_FLOAT);
+	}
 	if (LLVMGetValueKind(op1) == LLVMConstantIntValueKind) {
 		ref = ir_CALL_1(IR_BOOL, func, llvm2ir_op(ctx, op0, type));
 	} else {
@@ -790,21 +818,21 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 		return ir_CTTZ(type, llvm2ir_op(ctx, op0, type));
 	} else if (STR_START(name, name_len, "llvm.memset.")) {
 		IR_ASSERT(count == 3 || count == 4);
-		func = BUILTIN_FUNC("memset");
+		func = BUILTIN_FUNC_3("memset", IR_ADDR, IR_ADDR, IR_I32, IR_SIZE_T);
 		return ir_CALL_3(IR_VOID, func,
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 0), IR_ADDR),
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 1), IR_I8),
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 2), IR_SIZE_T));
 	} else if (STR_START(name, name_len, "llvm.memcpy.")) {
 		IR_ASSERT(count == 3 || count == 4);
-		func = BUILTIN_FUNC("memcpy");
+		func = BUILTIN_FUNC_3("memcpy", IR_ADDR, IR_ADDR, IR_ADDR, IR_SIZE_T);
 		return ir_CALL_3(IR_VOID, func,
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 0), IR_ADDR),
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 1), IR_ADDR),
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 2), IR_SIZE_T));
 	} else if (STR_START(name, name_len, "llvm.memmove.")) {
 		IR_ASSERT(count == 3 || count == 4);
-		func = BUILTIN_FUNC("memmove");
+		func = BUILTIN_FUNC_3("memmove", IR_ADDR, IR_ADDR, IR_ADDR, IR_SIZE_T);
 		return ir_CALL_3(IR_VOID, func,
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 0), IR_ADDR),
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 1), IR_ADDR),
@@ -820,107 +848,175 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 		IR_ASSERT(count == 1);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
 		IR_ASSERT(IR_IS_TYPE_FP(type));
-		func = BUILTIN_FP_FUNC(type, "sqrt", "sqrtf");
+		if (type == IR_DOUBLE) {
+			func = BUILTIN_FUNC_1("sqrt", IR_DOUBLE, IR_DOUBLE);
+		} else {
+			func = BUILTIN_FUNC_1("sqrtf", IR_FLOAT, IR_FLOAT);
+		}
 		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.sin.")) {
 		IR_ASSERT(count == 1);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
 		IR_ASSERT(IR_IS_TYPE_FP(type));
-		func = BUILTIN_FP_FUNC(type, "sin", "sinf");
+		if (type == IR_DOUBLE) {
+			func = BUILTIN_FUNC_1("sin", IR_DOUBLE, IR_DOUBLE);
+		} else {
+			func = BUILTIN_FUNC_1("sinf", IR_FLOAT, IR_FLOAT);
+		}
 		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.cos.")) {
 		IR_ASSERT(count == 1);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
 		IR_ASSERT(IR_IS_TYPE_FP(type));
-		func = BUILTIN_FP_FUNC(type, "cos", "cosf");
+		if (type == IR_DOUBLE) {
+			func = BUILTIN_FUNC_1("cos", IR_DOUBLE, IR_DOUBLE);
+		} else {
+			func = BUILTIN_FUNC_1("cosf", IR_FLOAT, IR_FLOAT);
+		}
 		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.pow.")) {
 		IR_ASSERT(count == 2);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
 		IR_ASSERT(IR_IS_TYPE_FP(type));
-		func = BUILTIN_FP_FUNC(type, "pow", "powf");
+		if (type == IR_DOUBLE) {
+			func = BUILTIN_FUNC_1("pow", IR_DOUBLE, IR_DOUBLE);
+		} else {
+			func = BUILTIN_FUNC_1("powf", IR_FLOAT, IR_FLOAT);
+		}
 		return ir_CALL_2(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type),
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 1), type));
 	} else if (STR_START(name, name_len, "llvm.exp.")) {
 		IR_ASSERT(count == 1);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
 		IR_ASSERT(IR_IS_TYPE_FP(type));
-		func = BUILTIN_FP_FUNC(type, "exp", "expf");
+		if (type == IR_DOUBLE) {
+			func = BUILTIN_FUNC_1("exp", IR_DOUBLE, IR_DOUBLE);
+		} else {
+			func = BUILTIN_FUNC_1("expf", IR_FLOAT, IR_FLOAT);
+		}
 		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.exp2.")) {
 		IR_ASSERT(count == 1);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
 		IR_ASSERT(IR_IS_TYPE_FP(type));
-		func = BUILTIN_FP_FUNC(type, "exp2", "exp2f");
+		if (type == IR_DOUBLE) {
+			func = BUILTIN_FUNC_1("exp2", IR_DOUBLE, IR_DOUBLE);
+		} else {
+			func = BUILTIN_FUNC_1("exp2f", IR_FLOAT, IR_FLOAT);
+		}
 		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.exp10.")) {
 		IR_ASSERT(count == 1);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
 		IR_ASSERT(IR_IS_TYPE_FP(type));
-		func = BUILTIN_FP_FUNC(type, "exp10", "exp10f");
+		if (type == IR_DOUBLE) {
+			func = BUILTIN_FUNC_1("exp10", IR_DOUBLE, IR_DOUBLE);
+		} else {
+			func = BUILTIN_FUNC_1("exp10f", IR_FLOAT, IR_FLOAT);
+		}
 		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.ldexp.")) {
 		IR_ASSERT(count == 2);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
 		IR_ASSERT(IR_IS_TYPE_FP(type));
-		func = BUILTIN_FP_FUNC(type, "ldexp", "ldexpf");
+		if (type == IR_DOUBLE) {
+			func = BUILTIN_FUNC_2("ldexp", IR_DOUBLE, IR_DOUBLE, IR_I32);
+		} else {
+			func = BUILTIN_FUNC_2("ldexpf", IR_FLOAT, IR_FLOAT, IR_I32);
+		}
 		return ir_CALL_2(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type),
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 1), IR_I32));
 	} else if (STR_START(name, name_len, "llvm.frexp.")) {
 		IR_ASSERT(count == 2);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
 		IR_ASSERT(IR_IS_TYPE_FP(type));
-		func = BUILTIN_FP_FUNC(type, "frexp", "frexpf");
+		if (type == IR_DOUBLE) {
+			func = BUILTIN_FUNC_2("frexp", IR_DOUBLE, IR_DOUBLE, IR_ADDR);
+		} else {
+			func = BUILTIN_FUNC_2("frexpf", IR_FLOAT, IR_FLOAT, IR_ADDR);
+		}
 		return ir_CALL_2(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type),
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 1), IR_ADDR));
 	} else if (STR_START(name, name_len, "llvm.log.")) {
 		IR_ASSERT(count == 1);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
 		IR_ASSERT(IR_IS_TYPE_FP(type));
-		func = BUILTIN_FP_FUNC(type, "log", "logf");
+		if (type == IR_DOUBLE) {
+			func = BUILTIN_FUNC_1("log", IR_DOUBLE, IR_DOUBLE);
+		} else {
+			func = BUILTIN_FUNC_1("logf", IR_FLOAT, IR_FLOAT);
+		}
 		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.log2.")) {
 		IR_ASSERT(count == 1);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
 		IR_ASSERT(IR_IS_TYPE_FP(type));
-		func = BUILTIN_FP_FUNC(type, "log2", "log2f");
+		if (type == IR_DOUBLE) {
+			func = BUILTIN_FUNC_1("log2", IR_DOUBLE, IR_DOUBLE);
+		} else {
+			func = BUILTIN_FUNC_1("log2f", IR_FLOAT, IR_FLOAT);
+		}
 		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.log10.")) {
 		IR_ASSERT(count == 1);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
 		IR_ASSERT(IR_IS_TYPE_FP(type));
-		func = BUILTIN_FP_FUNC(type, "log10", "log10f");
+		if (type == IR_DOUBLE) {
+			func = BUILTIN_FUNC_1("log10", IR_DOUBLE, IR_DOUBLE);
+		} else {
+			func = BUILTIN_FUNC_1("log10f", IR_FLOAT, IR_FLOAT);
+		}
 		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.copysign.")) {
 		IR_ASSERT(count == 2);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
 		IR_ASSERT(IR_IS_TYPE_FP(type));
-		func = BUILTIN_FP_FUNC(type, "copysign", "copysignf");
+		if (type == IR_DOUBLE) {
+			func = BUILTIN_FUNC_2("copysign", IR_DOUBLE, IR_DOUBLE, IR_DOUBLE);
+		} else {
+			func = BUILTIN_FUNC_2("copysignf", IR_FLOAT, IR_FLOAT, IR_FLOAT);
+		}
 		return ir_CALL_2(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type),
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 1), type));
 	} else if (STR_START(name, name_len, "llvm.floor.")) {
 		IR_ASSERT(count == 1);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
 		IR_ASSERT(IR_IS_TYPE_FP(type));
-		func = BUILTIN_FP_FUNC(type, "floor", "floorf");
+		if (type == IR_DOUBLE) {
+			func = BUILTIN_FUNC_1("floor", IR_DOUBLE, IR_DOUBLE);
+		} else {
+			func = BUILTIN_FUNC_1("floorf", IR_FLOAT, IR_FLOAT);
+		}
 		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.ceil.")) {
 		IR_ASSERT(count == 1);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
 		IR_ASSERT(IR_IS_TYPE_FP(type));
-		func = BUILTIN_FP_FUNC(type, "ceil", "ceilf");
+		if (type == IR_DOUBLE) {
+			func = BUILTIN_FUNC_1("ceil", IR_DOUBLE, IR_DOUBLE);
+		} else {
+			func = BUILTIN_FUNC_1("ceilf", IR_FLOAT, IR_FLOAT);
+		}
 		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.trunc.")) {
 		IR_ASSERT(count == 1);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
 		IR_ASSERT(IR_IS_TYPE_FP(type));
-		func = BUILTIN_FP_FUNC(type, "trunc", "truncf");
+		if (type == IR_DOUBLE) {
+			func = BUILTIN_FUNC_1("trunc", IR_DOUBLE, IR_DOUBLE);
+		} else {
+			func = BUILTIN_FUNC_1("truncf", IR_FLOAT, IR_FLOAT);
+		}
 		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.round.")) {
 		IR_ASSERT(count == 1);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
 		IR_ASSERT(IR_IS_TYPE_FP(type));
-		func = BUILTIN_FP_FUNC(type, "round", "roundf");
+		if (type == IR_DOUBLE) {
+			func = BUILTIN_FUNC_1("round", IR_DOUBLE, IR_DOUBLE);
+		} else {
+			func = BUILTIN_FUNC_1("roundf", IR_FLOAT, IR_FLOAT);
+		}
 		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.fmuladd.")
 			|| STR_START(name, name_len, "llvm.fma.")) {
@@ -1782,9 +1878,9 @@ static int llvm2ir_external_func(ir_loader *loader, const char *name, LLVMValueR
 {
 	uint32_t i, count, cconv, flags = 0;
 	LLVMTypeRef ftype;
-	ir_type ret_type, *param_types;
+	ir_type ret_type;
+	uint8_t *param_types;
 
-	// TODO: function prototype
 	ftype = LLVMGlobalGetValueType(func);
 	cconv = LLVMGetFunctionCallConv(func);
 	if (cconv == LLVMCCallConv || cconv == LLVMFastCallConv) {
@@ -1814,9 +1910,9 @@ static int llvm2ir_forward_func(ir_loader *loader, const char *name, LLVMValueRe
 {
 	uint32_t i, count, cconv, flags = 0;
 	LLVMTypeRef ftype;
-	ir_type ret_type, *param_types;
+	ir_type ret_type;
+	uint8_t *param_types;
 
-	// TODO: function prototype
 	ftype = LLVMGlobalGetValueType(func);
 	cconv = LLVMGetFunctionCallConv(func);
 	if (cconv == LLVMCCallConv || cconv == LLVMFastCallConv) {

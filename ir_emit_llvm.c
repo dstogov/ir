@@ -32,7 +32,7 @@ static void ir_emit_ref(ir_ctx *ctx, FILE *f, ir_ref ref)
 	if (IR_IS_CONST_REF(ref)) {
 		ir_insn *insn = &ctx->ir_base[ref];
 		if (insn->op == IR_FUNC || insn->op == IR_SYM) {
-			fprintf(f, "@%s", ir_get_str(ctx, insn->val.i32));
+			fprintf(f, "@%s", ir_get_str(ctx, insn->val.name));
 		} else if (insn->op == IR_STR) {
 			fprintf(f, "@.str%d", -ref);
 		} else if (insn->op == IR_ADDR) {
@@ -533,9 +533,17 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 	// TODO: function prototype ???
 
 	if (IR_IS_CONST_REF(insn->op2)) {
-		const char *name = ir_get_str(ctx, ctx->ir_base[insn->op2].val.i32);
-		if (ctx->ir_base[insn->op2].const_flags & IR_CONST_BUILTIN_FUNC) {
-			name = ir_builtin_func_name(name, &last_arg);
+		const ir_insn *func = &ctx->ir_base[insn->op2];
+		const char *name;
+
+		IR_ASSERT(func->op == IR_FUNC);
+		name = ir_get_str(ctx, func->val.name);
+		if (func->proto) {
+			const ir_proto_t *proto = (const ir_proto_t *)ir_get_str(ctx, func->proto);
+
+			if (proto->flags & IR_BUILTIN_FUNC) {
+				name = ir_builtin_func_name(name, &last_arg);
+			}
 		}
 		fprintf(f, "@%s", name);
 	} else {
@@ -651,7 +659,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 		fprintf(f, "internal ");
 	}
 	if (ctx->flags & IR_FASTCALL_FUNC) {
-		// TODO:
+		fprintf(f, "x86_fastcallcc ");
 	}
 	fprintf(f, "%s", ir_type_llvm_name[ctx->ret_type != (ir_type)-1 ? ctx->ret_type : IR_VOID]);
 	fprintf(f, " @%s(", name);
@@ -840,6 +848,9 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 						ir_emit_conv(ctx, f, i, insn, "bitcast");
 					}
 					break;
+				case IR_PROTO:
+					ir_emit_conv(ctx, f, i, insn, "bitcast");
+					break;
 				case IR_INT2FP:
 					IR_ASSERT(IR_IS_TYPE_FP(insn->type));
 					IR_ASSERT(IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type));
@@ -973,19 +984,26 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 
 	for (i = IR_UNUSED + 1, insn = ctx->ir_base - i; i < ctx->consts_count; i++, insn--) {
 		if (insn->op == IR_FUNC) {
-			const char *name = ir_get_str(ctx, insn->val.i32);
-			if (insn->const_flags & IR_CONST_BUILTIN_FUNC) {
+			const char *name;
+
+			name = ir_get_str(ctx, insn->val.name);
+			if (insn->proto) {
+				const ir_proto_t *proto = (const ir_proto_t *)ir_get_str(ctx, insn->proto);
 				ir_ref dummy;
-				name = ir_builtin_func_name(name, &dummy);
+
+				if (proto->flags & IR_BUILTIN_FUNC) {
+					name = ir_builtin_func_name(name, &dummy);
+				}
+				ir_emit_llvm_func_decl(name, proto->flags, proto->ret_type, proto->params_count, proto->param_types, f);
+			} else {
+				fprintf(f, "declare void @%s()\n", name);
 			}
-			// TODO: function prototype ???
-			fprintf(f, "declare void @%s()\n", name);
 		} else if (insn->op == IR_SYM) {
 			// TODO: symbol "global" or "constant" ???
 			// TODO: symbol type ???
-			fprintf(f, "@%s = external global ptr\n", ir_get_str(ctx, insn->val.i32));
+			fprintf(f, "@%s = external global ptr\n", ir_get_str(ctx, insn->val.name));
 		} else if (insn->op == IR_STR) {
-			const char *str = ir_get_str(ctx, insn->val.i32);
+			const char *str = ir_get_str(ctx, insn->val.str);
 			// TODO: strlen != size ???
 			int len = strlen(str);
 			int j;
@@ -1055,11 +1073,13 @@ int ir_emit_llvm(ir_ctx *ctx, const char *name, FILE *f)
 	return ir_emit_func(ctx, name, f);
 }
 
-void ir_emit_llvm_func_decl(const char *name, uint32_t flags, ir_type ret_type, uint32_t params_count, ir_type *param_types, FILE *f)
+void ir_emit_llvm_func_decl(const char *name, uint32_t flags, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, FILE *f)
 {
-	fprintf(f, "declare %s @%s(", ir_type_llvm_name[ret_type], name);
+	fprintf(f, "declare %s%s @%s(",
+		(flags & IR_FASTCALL_FUNC) ? "x86_fastcallcc ": "",
+		ir_type_llvm_name[ret_type], name);
 	if (params_count) {
-		ir_type *p = param_types;
+		const uint8_t *p = param_types;
 
 		fprintf(f, "%s", ir_type_llvm_name[*p]);
 		p++;

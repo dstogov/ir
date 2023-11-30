@@ -6,7 +6,7 @@ x86_64
 -S
 --CODE--
 {
-	uintptr_t fn = func(printf, 4);
+	uintptr_t fn = func printf(uintptr_t, ...): int32_t;
 	uintptr_t format = "hello\n";
 	l_1 = START(l_3);
 	double x = PARAM(l_1, "x", 1);

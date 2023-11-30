@@ -19,7 +19,7 @@ Windows-x86_64
 	char zero = 0;
 	uint32_t len = 7;
 	uintptr_t one = 1;
-	uintptr_t c_5 = func(printf, 4);
+	uintptr_t c_5 = func printf(uintptr_t, ...): int32_t;
 	l_1 = START(l_4);
 	uintptr_t a_0, s_0 = ALLOCA(l_1, len);
 	s_1 = STORE(s_0, a_0, h);

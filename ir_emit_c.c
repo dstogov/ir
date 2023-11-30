@@ -580,7 +580,8 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 		fprintf(f, "\t");
 	}
 	if (IR_IS_CONST_REF(insn->op2)) {
-		fprintf(f, "%s", ir_get_str(ctx, ctx->ir_base[insn->op2].val.i32));
+		IR_ASSERT(ctx->ir_base[insn->op2].op == IR_FUNC);
+		fprintf(f, "%s", ir_get_str(ctx, ctx->ir_base[insn->op2].val.name));
 	} else {
 		ir_emit_ref(ctx, f, insn->op2);
 	}
@@ -605,7 +606,8 @@ static void ir_emit_tailcall(ir_ctx *ctx, FILE *f, ir_insn *insn)
 		fprintf(f, "\t");
 	}
 	if (IR_IS_CONST_REF(insn->op2)) {
-		fprintf(f, "%s", ir_get_str(ctx, ctx->ir_base[insn->op2].val.i32));
+		IR_ASSERT(ctx->ir_base[insn->op2].op == IR_FUNC);
+		fprintf(f, "%s", ir_get_str(ctx, ctx->ir_base[insn->op2].val.name));
 	} else {
 		ir_emit_ref(ctx, f, insn->op2);
 	}
@@ -712,7 +714,8 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	if (ctx->flags & IR_STATIC) {
 		fprintf(f, "static ");
 	}
-	fprintf(f, "%s %s(", ir_type_cname[ctx->ret_type != (ir_type)-1 ? ctx->ret_type : IR_VOID], name);
+	fprintf(f, "%s %s%s(", ir_type_cname[ctx->ret_type != (ir_type)-1 ? ctx->ret_type : IR_VOID],
+		(ctx->flags & IR_FASTCALL_FUNC) ? "__fastcall " : "", name);
 	use_list = &ctx->use_lists[1];
 	n = use_list->count;
 	first = 1;
@@ -922,6 +925,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					ir_emit_trunc(ctx, f, i, insn);
 					break;
 				case IR_BITCAST:
+				case IR_PROTO:
 					ir_emit_bitcast(ctx, f, i, insn);
 					break;
 				case IR_INT2FP:
@@ -1047,16 +1051,20 @@ int ir_emit_c(ir_ctx *ctx, const char *name, FILE *f)
 	return ir_emit_func(ctx, name, f);
 }
 
-void ir_emit_c_func_decl(const char *name, uint32_t flags, ir_type ret_type, uint32_t params_count, ir_type *param_types, FILE *f)
+void ir_emit_c_func_decl(const char *name, uint32_t flags, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, FILE *f)
 {
 	if (flags & IR_EXTERN) {
 		fprintf(f, "extern ");
 	} else if (flags & IR_STATIC) {
 		fprintf(f, "static ");
 	}
-	fprintf(f, "%s %s(", ir_type_cname[ret_type], name);
+	fprintf(f, "%s ", ir_type_cname[ret_type]);
+	if (flags & IR_FASTCALL_FUNC) {
+		fprintf(f, "__fastcall ");
+	}
+	fprintf(f, "%s(", name);
 	if (params_count) {
-		ir_type *p = param_types;
+		const uint8_t *p = param_types;
 
 		fprintf(f, "%s", ir_type_cname[*p]);
 		p++;
