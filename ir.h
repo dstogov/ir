@@ -415,7 +415,7 @@ typedef union _ir_val {
 				uint16_t               u16_hi
 			);
 		},
-		uint32_t                       u32_hi;
+		uint32_t                       u32_hi
 	);
 } ir_val;
 #undef ADDR_MEMBER
