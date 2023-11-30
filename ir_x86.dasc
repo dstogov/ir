@@ -2310,10 +2310,10 @@ static void ir_emit_prologue(ir_ctx *ctx)
 		}
 	}
 	if ((ctx->flags & IR_VARARG_FUNC) && (ctx->flags2 & IR_HAS_VA_START)) {
+#if defined(_WIN64)
 		ir_reg fp;
 		int offset;
 
-#if defined(_WIN64)
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
 			fp = IR_REG_FRAME_POINTER;
 			offset = sizeof(void*) * 2;
@@ -2329,6 +2329,8 @@ static void ir_emit_prologue(ir_ctx *ctx)
 |.if X64
 		const int8_t *int_reg_params = _ir_int_reg_params;
 		const int8_t *fp_reg_params = _ir_fp_reg_params;
+		ir_reg fp;
+		int offset;
 		uint32_t i;
 
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
