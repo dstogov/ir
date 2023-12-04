@@ -4175,6 +4175,11 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 		} else {
 			ctx->call_stack_size += used_stack;
 			if (used_stack) {
+				if (insn->op == IR_TAILCALL && !(ctx->flags & IR_USE_FRAME_POINTER)) {
+					ctx->flags |= IR_USE_FRAME_POINTER;
+					|	stp x29, x30, [sp, # (-(ctx->stack_frame_size+16))]!
+					|	mov x29, sp
+				}
 				|	sub sp, sp, #used_stack
 			}
 		}
@@ -4367,12 +4372,11 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 	return used_stack;
 }
 
-static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+static void ir_emit_call_ex(ir_ctx *ctx, ir_ref def, ir_insn *insn, int32_t used_stack)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg def_reg;
-	int32_t used_stack = ir_emit_arguments(ctx, def, insn, ctx->regs[def][1]);
 
 	if (IR_IS_CONST_REF(insn->op2)) {
 		ir_insn *addr_insn = &ctx->ir_base[insn->op2];
@@ -4439,6 +4443,12 @@ static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
+static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	int32_t used_stack = ir_emit_arguments(ctx, def, insn, ctx->regs[def][1]);
+	ir_emit_call_ex(ctx, def, insn, used_stack);
+}
+
 static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
@@ -4446,7 +4456,7 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	int32_t used_stack = ir_emit_arguments(ctx, def, insn, ctx->regs[def][1]);
 
 	if (used_stack != 0) {
-		ir_emit_call(ctx, def, insn);
+		ir_emit_call_ex(ctx, def, insn, used_stack);
 		ir_emit_return_void(ctx);
 		return;
 	}
