@@ -1092,8 +1092,6 @@ void ir_emit_llvm_func_decl(const char *name, uint32_t flags, ir_type ret_type, 
 		}
 	} else if (flags & IR_VARARG_FUNC) {
 		fprintf(f, "...");
-	} else {
-		fprintf(f, "void");
 	}
 	fprintf(f, ")\n");
 }
