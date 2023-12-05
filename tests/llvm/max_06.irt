@@ -16,3 +16,4 @@ define double @test(double %d2, double %d3)
 	%d4 = call double @llvm.maxnum.f64(double %d3, double %d2)
 	ret double %d4
 }
+declare double @llvm.maxnum.f64(double, double)

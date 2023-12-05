@@ -255,8 +255,9 @@ typedef struct _ir_main_loader {
 	size_t     code_buffer_size;
 } ir_main_loader;
 
-static bool ir_loader_add_sym(ir_main_loader *l, const char *name, void *addr)
+static bool ir_loader_add_sym(ir_loader *loader, const char *name, void *addr)
 {
+	ir_main_loader *l = (ir_main_loader*)loader;
 	uint32_t len = (uint32_t)strlen(name);
 	ir_ref val = ir_strtab_count(&l->symtab) + 1;
 	ir_ref old_val = ir_strtab_lookup(&l->symtab, name, len, val);
@@ -271,6 +272,14 @@ static bool ir_loader_add_sym(ir_main_loader *l, const char *name, void *addr)
 	return 1;
 }
 
+static bool ir_loader_has_sym(ir_loader *loader, const char *name)
+{
+	ir_main_loader *l = (ir_main_loader*)loader;
+	uint32_t len = (uint32_t)strlen(name);
+	ir_ref val = ir_strtab_find(&l->symtab, name, len);
+	return val != 0;
+}
+
 static void* ir_loader_resolve_sym_name(ir_loader *loader, const char *name)
 {
 	ir_main_loader *l = (ir_main_loader*)loader;
@@ -282,7 +291,7 @@ static void* ir_loader_resolve_sym_name(ir_loader *loader, const char *name)
 		return l->sym[val].addr;
 	}
 	addr = ir_resolve_sym_name(name);
-	ir_loader_add_sym(l, name, addr); /* cache */
+	ir_loader_add_sym(loader, name, addr); /* cache */
 	return addr;
 }
 
@@ -290,8 +299,20 @@ static bool ir_loader_external_sym_dcl(ir_loader *loader, const char *name, uint
 {
 	ir_main_loader *l = (ir_main_loader*) loader;
 
+	if (ir_loader_has_sym(loader, name)) {
+		return 1;
+	}
+
 	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
 		fprintf(l->dump_file, "extern %s %s;\n", (flags & IR_CONST) ? "const" : "var", name);
+	}
+	if (l->c_file) {
+		// TODO:
+		ir_emit_c_sym_decl(name, flags | IR_EXTERN, 0, l->c_file);
+	}
+	if (l->llvm_file) {
+		// TODO:
+		ir_emit_llvm_sym_decl(name, flags | IR_EXTERN, 0, l->llvm_file);
 	}
 	if (l->dump_asm || l->dump_size || l->run) {
 		void *addr = ir_loader_resolve_sym_name(loader, name);
@@ -302,6 +323,8 @@ static bool ir_loader_external_sym_dcl(ir_loader *loader, const char *name, uint
 		if (l->dump_asm) {
 			ir_disasm_add_symbol(name, (uintptr_t)addr, sizeof(void*));
 		}
+	} else {
+		ir_loader_add_sym(loader, name, NULL);
 	}
 	return 1;
 }
@@ -341,6 +364,10 @@ static bool ir_loader_external_func_dcl(ir_loader *loader, const char *name, uin
 {
 	ir_main_loader *l = (ir_main_loader*) loader;
 
+	if (ir_loader_has_sym(loader, name)) {
+		return 1;
+	}
+
 	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
 		ir_dump_func_dcl(name, flags | IR_EXTERN, ret_type, params_count, param_types, l->dump_file);
 	}
@@ -359,6 +386,8 @@ static bool ir_loader_external_func_dcl(ir_loader *loader, const char *name, uin
 		if (l->dump_asm) {
 			ir_disasm_add_symbol(name, (uintptr_t)addr, sizeof(void*));
 		}
+	} else {
+		ir_loader_add_sym(loader, name, NULL);
 	}
 	return 1;
 }
@@ -368,12 +397,18 @@ static bool ir_loader_forward_func_dcl(ir_loader *loader, const char *name, uint
 {
 	ir_main_loader *l = (ir_main_loader*) loader;
 
+	if (ir_loader_has_sym(loader, name)) {
+		return 1;
+	}
+
 	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
 		ir_dump_func_dcl(name, flags, ret_type, params_count, param_types, l->dump_file);
 	}
 	if (l->c_file) {
 		ir_emit_c_func_decl(name, flags, ret_type,  params_count, param_types, l->c_file);
 	}
+
+	ir_loader_add_sym(loader, name, NULL);
 	return 1;
 }
 
@@ -389,14 +424,16 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 	}
 	if (l->c_file) {
 		// TODO:
+		ir_emit_c_sym_decl(name, flags, has_data, l->c_file);
 	}
 	if (l->llvm_file) {
 		// TODO:
+		ir_emit_llvm_sym_decl(name, flags, has_data, l->llvm_file);
 	}
 	if (l->dump_asm || l->dump_size || l->run) {
 		void *data = ir_mem_malloc(size);
 
-		if (!ir_loader_add_sym((ir_main_loader*)loader, name, data)) {
+		if (!ir_loader_add_sym(loader, name, data)) {
 			ir_mem_free(data);
 			return 0;
 		}
@@ -407,6 +444,8 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 		if (l->dump_asm) {
 			ir_disasm_add_symbol(name, (uintptr_t)data, size);
 		}
+	} else {
+		ir_loader_add_sym(loader, name, NULL);
 	}
 	return 1;
 }
@@ -612,7 +651,7 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 			l->size += ctx->veneers_size;
 #endif
 			l->size = IR_ALIGNED_SIZE(l->size, 16);
-			if (!ir_loader_add_sym(l, name, entry)) {
+			if (!ir_loader_add_sym(loader, name, entry)) {
 				fprintf(stderr, "\nERROR: Symbol redefinition: %s\n", name);
 				return 0;
 			}
@@ -886,6 +925,8 @@ int main(int argc, char **argv)
 	loader.loader.func_init          = ir_loader_func_init;
 	loader.loader.func_process       = ir_loader_func_process;
 	loader.loader.resolve_sym_name   = ir_loader_resolve_sym_name;
+	loader.loader.has_sym            = ir_loader_has_sym;
+	loader.loader.add_sym            = ir_loader_add_sym;
 
 	loader.opt_level = opt_level;
 	loader.mflags = mflags;
@@ -899,8 +940,8 @@ int main(int argc, char **argv)
 	loader.sym = NULL;
 	loader.sym_count = 0;
 
-//TODO:	ir_loader_add_sym(&loader, (void*)"printf", printf);
-	ir_loader_add_sym(&loader, (void*)"putchar", putchar);
+//TODO:	ir_loader_add_sym(&loader.loader, (void*)"printf", printf);
+	ir_loader_add_sym(&loader.loader, (void*)"putchar", putchar);
 
 	if (dump_file) {
 		loader.dump_file = fopen(dump_file, "w+");

@@ -15,3 +15,4 @@ define i32 @test(i32 %d2)
 	call void @llvm.debugtrap()
 	ret i32 %d2
 }
+declare void @llvm.debugtrap()

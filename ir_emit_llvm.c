@@ -10,7 +10,21 @@
 
 #include <math.h>
 
-static const char *ir_type_llvm_name[IR_LAST_TYPE] = {
+#define IR_I1  IR_BOOL
+#define IR_F64 IR_DOUBLE
+#define IR_F32 IR_FLOAT
+#define IR_PTR IR_ADDR
+
+#define IR_I8B            (IR_LAST_TYPE + 0)
+#define IR_I16B           (IR_LAST_TYPE + 1)
+#define IR_I32B           (IR_LAST_TYPE + 2)
+#define IR_I64B           (IR_LAST_TYPE + 3)
+#define IR_F64I           (IR_LAST_TYPE + 4)
+#define IR_F32I           (IR_LAST_TYPE + 5)
+
+#define IR_LAST_LLVM_TYPE (IR_LAST_TYPE + 6)
+
+static const char *ir_type_llvm_name[IR_LAST_LLVM_TYPE] = {
 	"void",   // IR_VOID
 	"i1",     // IR_BOOL
 	"i8",     // IR_U8
@@ -25,6 +39,211 @@ static const char *ir_type_llvm_name[IR_LAST_TYPE] = {
 	"i64",    // IR_I64
 	"double", // IR_DOUBLE
 	"float",  // IR_FLOAT
+
+	"{i8, i1}",      // IR_I8B
+	"{i16, i1}",     // IR_I16B
+	"{i32, i1}",     // IR_I32B
+	"{i64, i1}",     // IR_I64B
+	"{double, i32}", // IR_F64I
+	"{float, i32}",  // IR_F32I
+};
+
+#ifdef IR_64
+# define IR_LLVM_MEMSET_NAME  "llvm.memset.p0.i64"
+# define IR_LLVM_MEMCPY_NAME  "llvm.memcpy.p0.p0.i64"
+# define IR_LLVM_MEMMOVE_NAME "llvm.memmove.p0.p0.i64"
+#else
+# define IR_LLVM_MEMSET_NAME  "llvm.memset.p0.i32"
+# define IR_LLVM_MEMCPY_NAME  "llvm.memcpy.p0.p0.i32"
+# define IR_LLVM_MEMMOVE_NAME "llvm.memmove.p0.p0.i32"
+#endif
+
+#define IR_BUILTINS(_) \
+	_("ceil",      CEIL_F64)     \
+	_("ceilf",     CEIL_F32)     \
+	_("copysign",  COPYSIGN_F64) \
+	_("copysignf", COPYSIGN_F32) \
+	_("cos",       COS_F64)      \
+	_("cosf",      COS_F32)      \
+	_("exp",       EXP_F64)      \
+	_("exp10",     EXP10_F64)    \
+	_("exp10f",    EXP10_F32)    \
+	_("exp2",      EXP2_F64)     \
+	_("exp2f",     EXP2_F32)     \
+	_("expf",      EXP_F32)      \
+	_("floor",     FLOOR_F64)    \
+	_("floorf",    FLOOR_F32)    \
+	_("frexp",     FREXP_F64)    \
+	_("frexpf",    FREXP_F32)    \
+	_("ldexp",     LDEXP_F64)    \
+	_("ldexpf",    LDEXP_F32)    \
+	_("log",       LOG_F64)      \
+	_("log10",     LOG10_F64)    \
+	_("log10f",    LOG10_F32)    \
+	_("log2",      LOG2_F64)     \
+	_("log2f",     LOG2_F32)     \
+	_("logf",      LOG_F32)      \
+	_("memcpy",    MEMCPY)       \
+	_("memmove",   MEMMOVE)      \
+	_("memset",    MEMSET)       \
+	_("pow",       POW_F64)      \
+	_("powf",      POW_F32)      \
+	_("round",     ROUND_F64)    \
+	_("roundf",    ROUND_F32)    \
+	_("sin",       SIN_F64)      \
+	_("sinf",      SIN_F32)      \
+	_("sqrt",      SQRT_F64)     \
+	_("sqrtf",     SQRT_F32)     \
+	_("trunc",     TRUNC_F64)    \
+	_("truncf",    TRUNC_F32)    \
+
+#define IR_LLVM_INTRINSICS(_) \
+	_(MEMSET,       IR_LLVM_MEMSET_NAME,           VOID, 4, PTR, I8,  SSIZE_T, I1) \
+	_(MEMCPY,       IR_LLVM_MEMCPY_NAME,           VOID, 4, PTR, PTR, SSIZE_T, I1) \
+	_(MEMMOVE,      IR_LLVM_MEMMOVE_NAME,          VOID, 4, PTR, PTR, SSIZE_T, I1) \
+	_(FRAMEADDRESS, "llvm.frameaddress.p0",        PTR,  1, I32, ___, ___, ___) \
+	_(VA_START,     "llvm.va_start",               VOID, 1, PTR, ___, ___, ___) \
+	_(VA_END,       "llvm.va_end",                 VOID, 1, PTR, ___, ___, ___) \
+	_(VA_COPY,      "llvm.va_copy",                VOID, 2, PTR, PTR, ___, ___) \
+	_(DEBUGTRAP,    "llvm.debugtrap",              VOID, 0, ___, ___, ___, ___) \
+	_(SADD_OV_I8,   "llvm.sadd.with.overflow.i8",  I8B,  2, I8,  I8,  ___, ___) \
+	_(SADD_OV_I16,  "llvm.sadd.with.overflow.i16", I16B, 2, I16, I16, ___, ___) \
+	_(SADD_OV_I32,  "llvm.sadd.with.overflow.i32", I32B, 2, I32, I32, ___, ___) \
+	_(SADD_OV_I64,  "llvm.sadd.with.overflow.i64", I64B, 2, I64, I64, ___, ___) \
+	_(UADD_OV_I8,   "llvm.uadd.with.overflow.i8",  I8B,  2, I8,  I8,  ___, ___) \
+	_(UADD_OV_I16,  "llvm.uadd.with.overflow.i16", I16B, 2, I16, I16, ___, ___) \
+	_(UADD_OV_I32,  "llvm.uadd.with.overflow.i32", I32B, 2, I32, I32, ___, ___) \
+	_(UADD_OV_I64,  "llvm.uadd.with.overflow.i64", I64B, 2, I64, I64, ___, ___) \
+	_(SSUB_OV_I8,   "llvm.ssub.with.overflow.i8",  I8B,  2, I8,  I8,  ___, ___) \
+	_(SSUB_OV_I16,  "llvm.ssub.with.overflow.i16", I16B, 2, I16, I16, ___, ___) \
+	_(SSUB_OV_I32,  "llvm.ssub.with.overflow.i32", I32B, 2, I32, I32, ___, ___) \
+	_(USUB_OV_I8,   "llvm.usub.with.overflow.i8",  I8B,  2, I8,  I8,  ___, ___) \
+	_(USUB_OV_I16,  "llvm.usub.with.overflow.i16", I16B, 2, I16, I16, ___, ___) \
+	_(USUB_OV_I32,  "llvm.usub.with.overflow.i32", I32B, 2, I32, I32, ___, ___) \
+	_(USUB_OV_I64,  "llvm.usub.with.overflow.i64", I64B, 2, I64, I64, ___, ___) \
+	_(SSUB_OV_I64,  "llvm.ssub.with.overflow.i64", I64B, 2, I64, I64, ___, ___) \
+	_(SMUL_OV_I8,   "llvm.smul.with.overflow.i8",  I8B,  2, I8,  I8,  ___, ___) \
+	_(SMUL_OV_I16,  "llvm.smul.with.overflow.i16", I16B, 2, I16, I16, ___, ___) \
+	_(SMUL_OV_I32,  "llvm.smul.with.overflow.i32", I32B, 2, I32, I32, ___, ___) \
+	_(SMUL_OV_I64,  "llvm.smul.with.overflow.i64", I64B, 2, I64, I64, ___, ___) \
+	_(UMUL_OV_I8,   "llvm.umul.with.overflow.i8",  I8B,  2, I8,  I8,  ___, ___) \
+	_(UMUL_OV_I16,  "llvm.umul.with.overflow.i16", I16B, 2, I16, I16, ___, ___) \
+	_(UMUL_OV_I32,  "llvm.umul.with.overflow.i32", I32B, 2, I32, I32, ___, ___) \
+	_(UMUL_OV_I64,  "llvm.umul.with.overflow.i64", I64B, 2, I64, I64, ___, ___) \
+	_(FSHL_I8,      "llvm.fshl.i8",                I8,   3, I8,  I8,  I8,  ___) \
+	_(FSHL_I16,     "llvm.fshl.i16",               I16,  3, I16, I16, I16, ___) \
+	_(FSHL_I32,     "llvm.fshl.i32",               I32,  3, I32, I32, I32, ___) \
+	_(FSHL_I64,     "llvm.fshl.i64",               I64,  3, I64, I64, I64, ___) \
+	_(FSHR_I8,      "llvm.fshr.i8",                I8,   3, I8,  I8,  I8,  ___) \
+	_(FSHR_I16,     "llvm.fshr.i16",               I16,  3, I16, I16, I16, ___) \
+	_(FSHR_I32,     "llvm.fshr.i32",               I32,  3, I32, I32, I32, ___) \
+	_(FSHR_I64,     "llvm.fshr.i64",               I64,  3, I64, I64, I64, ___) \
+	_(BSWAP_I16,    "llvm.bswap.i16",              I16,  1, I16, ___, ___, ___) \
+	_(BSWAP_I32,    "llvm.bswap.i32",              I32,  1, I32, ___, ___, ___) \
+	_(BSWAP_I64,    "llvm.bswap.i64",              I64,  1, I64, ___, ___, ___) \
+	_(CTPOP_I8,     "llvm.ctpop.i8",               I8,   1, I8,  ___, ___, ___) \
+	_(CTPOP_I16,    "llvm.ctpop.i16",              I16,  1, I16, ___, ___, ___) \
+	_(CTPOP_I32,    "llvm.ctpop.i32",              I32,  1, I32, ___, ___, ___) \
+	_(CTPOP_I64,    "llvm.ctpop.i64",              I64,  1, I64, ___, ___, ___) \
+	_(CTLZ_I8,      "llvm.ctlz.i8",                I8,   2, I8,  I1,  ___, ___) \
+	_(CTLZ_I16,     "llvm.ctlz.i16",               I16,  2, I16, I1,  ___, ___) \
+	_(CTLZ_I32,     "llvm.ctlz.i32",               I32,  2, I32, I1,  ___, ___) \
+	_(CTLZ_I64,     "llvm.ctlz.i64",               I64,  2, I64, I1,  ___, ___) \
+	_(CTTZ_I8,      "llvm.cttz.i8",                I8,   2, I8,  I1,  ___, ___) \
+	_(CTTZ_I16,     "llvm.cttz.i16",               I16,  2, I16, I1,  ___, ___) \
+	_(CTTZ_I32,     "llvm.cttz.i32",               I32,  2, I32, I1,  ___, ___) \
+	_(CTTZ_I64,     "llvm.cttz.i64",               I64,  2, I64, I1,  ___, ___) \
+	_(SMIN_I8,      "llvm.smin.i8",                I8,   2, I8,  I8,  ___, ___) \
+	_(SMIN_I16,     "llvm.smin.i16",               I16,  2, I16, I16, ___, ___) \
+	_(SMIN_I32,     "llvm.smin.i32",               I32,  2, I32, I32, ___, ___) \
+	_(SMIN_I64,     "llvm.smin.i64",               I64,  2, I64, I64, ___, ___) \
+	_(UMIN_I8,      "llvm.umin.i8",                I8,   2, I8,  I8,  ___, ___) \
+	_(UMIN_I16,     "llvm.umin.i16",               I16,  2, I16, I16, ___, ___) \
+	_(UMIN_I32,     "llvm.umin.i32",               I32,  2, I32, I32, ___, ___) \
+	_(UMIN_I64,     "llvm.umin.i64",               I64,  2, I64, I64, ___, ___) \
+	_(MINNUM_F64,   "llvm.minnum.f64",             F64,  2, F64, F64, ___, ___) \
+	_(MINNUM_F32,   "llvm.minnum.f32",             F32,  2, F32, F32, ___, ___) \
+	_(SMAX_I8,      "llvm.smax.i8",                I8,   2, I8,  I8,  ___, ___) \
+	_(SMAX_I16,     "llvm.smax.i16",               I16,  2, I16, I16, ___, ___) \
+	_(SMAX_I32,     "llvm.smax.i32",               I32,  2, I32, I32, ___, ___) \
+	_(SMAX_I64,     "llvm.smax.i64",               I64,  2, I64, I64, ___, ___) \
+	_(UMAX_I8,      "llvm.umax.i8",                I8,   2, I8,  I8,  ___, ___) \
+	_(UMAX_I16,     "llvm.umax.i16",               I16,  2, I16, I16, ___, ___) \
+	_(UMAX_I32,     "llvm.umax.i32",               I32,  2, I32, I32, ___, ___) \
+	_(UMAX_I64,     "llvm.umax.i64",               I64,  2, I64, I64, ___, ___) \
+	_(MAXNUM_F64,   "llvm.maxnum.f64",             F64,  2, F64, F64, ___, ___) \
+	_(MAXNUM_F32,   "llvm.maxnum.f32",             F32,  2, F32, F32, ___, ___) \
+	_(ABS_I8,       "llvm.abs.i8",                 I8,   2, I8,  I1,  ___, ___) \
+	_(ABS_I16,      "llvm.abs.i16",                I16,  2, I16, I1,  ___, ___) \
+	_(ABS_I32,      "llvm.abs.i32",                I32,  2, I32, I1,  ___, ___) \
+	_(ABS_I64,      "llvm.abs.i64",                I64,  2, I64, I1,  ___, ___) \
+	_(FABS_F64,     "llvm.fabs.f64",               F64,  1, F64, ___, ___, ___) \
+	_(FABS_F32,     "llvm.fabs.f32",               F32,  1, F32, ___, ___, ___) \
+	_(SQRT_F64,     "llvm.sqrt.f64",               F64,  1, F64, ___, ___, ___) \
+	_(SQRT_F32,     "llvm.sqrt.f32",               F32,  1, F32, ___, ___, ___) \
+	_(SIN_F64,      "llvm.sin.f64",                F64,  1, F64, ___, ___, ___) \
+	_(SIN_F32,      "llvm.sin.f32",                F32,  1, F32, ___, ___, ___) \
+	_(COS_F64,      "llvm.cos.f64",                F64,  1, F64, ___, ___, ___) \
+	_(COS_F32,      "llvm.cos.f32",                F32,  1, F32, ___, ___, ___) \
+	_(POW_F64,      "llvm.pow.f64",                F64,  2, F64, F64, ___, ___) \
+	_(POW_F32,      "llvm.pow.f32",                F32,  2, F32, F32, ___, ___) \
+	_(EXP_F64,      "llvm.exp.f64",                F64,  1, F64, ___, ___, ___) \
+	_(EXP_F32,      "llvm.exp.f32",                F32,  1, F32, ___, ___, ___) \
+	_(EXP2_F64,     "llvm.exp2.f64",               F64,  1, F64, ___, ___, ___) \
+	_(EXP2_F32,     "llvm.exp2.f32",               F32,  1, F32, ___, ___, ___) \
+	_(EXP10_F64,    "llvm.exp10.f64",              F64,  1, F64, ___, ___, ___) \
+	_(EXP10_F32,    "llvm.exp10.f32",              F32,  1, F32, ___, ___, ___) \
+	_(LDEXP_F64,    "llvm.ldexp.f64.i32",          F64,  2, F64, I32, ___, ___) \
+	_(LDEXP_F32,    "llvm.ldexp.f32.i32",          F32,  2, F32, I32, ___, ___) \
+	_(LOG_F64,      "llvm.log.f64",                F64,  1, F64, ___, ___, ___) \
+	_(LOG_F32,      "llvm.log.f32",                F32,  1, F32, ___, ___, ___) \
+	_(LOG2_F64,     "llvm.log2.f64",               F64,  1, F64, ___, ___, ___) \
+	_(LOG2_F32,     "llvm.log2.f32",               F32,  1, F32, ___, ___, ___) \
+	_(LOG10_F64,    "llvm.log10.f64",              F64,  1, F64, ___, ___, ___) \
+	_(LOG10_F32,    "llvm.log10.f32",              F32,  1, F32, ___, ___, ___) \
+	_(COPYSIGN_F64, "llvm.copysign.f64",           F32,  2, F32, F32, ___, ___) \
+	_(COPYSIGN_F32, "llvm.copysign.f32",           F64,  2, F64, F64, ___, ___) \
+	_(FLOOR_F64,    "llvm.floor.f64",              F64,  1, F64, ___, ___, ___) \
+	_(FLOOR_F32,    "llvm.floor.f32",              F32,  1, F32, ___, ___, ___) \
+	_(CEIL_F64,     "llvm.ceil.f64",               F64,  1, F64, ___, ___, ___) \
+	_(CEIL_F32,     "llvm.ceil.f32",               F32,  1, F32, ___, ___, ___) \
+	_(TRUNC_F64,    "llvm.trunc.f64",              F64,  1, F64, ___, ___, ___) \
+	_(TRUNC_F32,    "llvm.trunc.f32",              F32,  1, F32, ___, ___, ___) \
+	_(ROUND_F64,    "llvm.round.f64",              F64,  1, F64, ___, ___, ___) \
+	_(ROUND_F32,    "llvm.round.f32",              F32,  1, F32, ___, ___, ___) \
+	_(FREXP_F64,    "llvm.frexp.f64",              F64I, 1, F64, ___, ___, ___) \
+	_(FREXP_F32,    "llvm.frexp.f32",              F32I, 1, F32, ___, ___, ___) \
+
+#define IR____ 0
+#define IR_LLVM_INTRINSIC_ID(id, name, ret, num, arg1, arg2, arg3, arg4) \
+	IR_LLVM_INTR_ ## id,
+#define IR_LLVM_INTRINSIC_DESC(id, name, ret, num, arg1, arg2, arg3, arg4) \
+	{name, IR_ ## ret, num, {IR_ ## arg1, IR_ ## arg2, IR_ ## arg3, IR_ ## arg4}},
+
+typedef enum _ir_llvm_intrinsic_id {
+	IR_LLVM_INTRINSICS(IR_LLVM_INTRINSIC_ID)
+	IR_LLVM_INTR_LAST
+} ir_llvm_intrinsic_id;
+
+#define IR_LLVM_INTRINSIC_BITSET_LEN ((IR_LLVM_INTR_LAST + (IR_BITSET_BITS - 1)) / IR_BITSET_BITS)
+
+static const struct {
+	const char *name;
+	uint8_t     ret_type;
+	uint8_t     params_count;
+	uint8_t     param_types[4];
+} ir_llvm_intrinsic_desc[] = {
+	IR_LLVM_INTRINSICS(IR_LLVM_INTRINSIC_DESC)
+};
+
+#define IR_LLVM_BUILTIN_DESC(name, id) \
+	{name, IR_LLVM_INTR_ ## id},
+
+static const struct {
+	const char           *name;
+	ir_llvm_intrinsic_id  id;
+} ir_llvm_builtin_map[] = {
+	IR_BUILTINS(IR_LLVM_BUILTIN_DESC)
 };
 
 static void ir_emit_ref(ir_ctx *ctx, FILE *f, ir_ref ref)
@@ -203,14 +422,22 @@ static void ir_emit_binary_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, cons
 	fprintf(f, "\n");
 }
 
-static void ir_emit_binary_overflow_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *op, const char *uop)
+static void ir_emit_binary_overflow_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn,
+                                       ir_llvm_intrinsic_id id, ir_bitset used_intrinsics)
 {
 	ir_type type = insn->type;
 
 	IR_ASSERT(IR_IS_TYPE_INT(type));
-	fprintf(f, "\t%%t%d = call {%s, i1} @llvm.%s.with.overflow.%s(%s ", def, ir_type_llvm_name[type],
-		IR_IS_TYPE_UNSIGNED(type) ? uop : op,
-		ir_type_llvm_name[type], ir_type_llvm_name[type]);
+	if (IR_IS_TYPE_UNSIGNED(type)) id += 4;
+	switch (ir_type_size[type]) {
+		case 1: break;
+		case 2: id += 1; break;
+		case 4: id += 2; break;
+		case 8: id += 3; break;
+	}
+	ir_bitset_incl(used_intrinsics, id);
+	fprintf(f, "\t%%t%d = call {%s, i1} @%s(%s ", def, ir_type_llvm_name[type],
+		ir_llvm_intrinsic_desc[id].name, ir_type_llvm_name[type]);
 	ir_emit_ref(ctx, f, insn->op1);
 	fprintf(f, ", %s ", ir_type_llvm_name[type]);
 	ir_emit_ref(ctx, f, insn->op2);
@@ -220,13 +447,21 @@ static void ir_emit_binary_overflow_op(ir_ctx *ctx, FILE *f, int def, ir_insn *i
 	fprintf(f, "extractvalue {%s, i1} %%t%d, 0\n", ir_type_llvm_name[type], def);
 }
 
-static void ir_emit_rol_ror(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *op)
+static void ir_emit_rol_ror(ir_ctx *ctx, FILE *f, int def, ir_insn *insn,
+                            ir_llvm_intrinsic_id id, ir_bitset used_intrinsics)
 {
 	ir_type type = ctx->ir_base[insn->op1].type;
 
+	switch (ir_type_size[type]) {
+		case 1: break;
+		case 2: id += 1; break;
+		case 4: id += 2; break;
+		case 8: id += 3; break;
+	}
+	ir_bitset_incl(used_intrinsics, id);
 	ir_emit_def_ref(ctx, f, def);
-	fprintf(f, "call %s @llvm.%s.%s(%s ",
-		ir_type_llvm_name[type], op, ir_type_llvm_name[type], ir_type_llvm_name[type]);
+	fprintf(f, "call %s @%s(%s ",
+		ir_type_llvm_name[type], ir_llvm_intrinsic_desc[id].name, ir_type_llvm_name[type]);
 	ir_emit_ref(ctx, f, insn->op1);
 	fprintf(f, ", %s ", ir_type_llvm_name[type]);
 	ir_emit_ref(ctx, f, insn->op1);
@@ -235,13 +470,24 @@ static void ir_emit_rol_ror(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const 
 	fprintf(f, ")\n");
 }
 
-static void ir_emit_bitop(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *name, bool poison)
+static void ir_emit_bitop(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, ir_llvm_intrinsic_id id,
+                          bool poison, ir_bitset used_intrinsics)
 {
 	ir_type type = insn->type;
 
+	if (id == IR_LLVM_INTR_BSWAP_I16) {
+		id -= 1;
+	}
+	switch (ir_type_size[type]) {
+		case 1: break;
+		case 2: id += 1; break;
+		case 4: id += 2; break;
+		case 8: id += 3; break;
+	}
+	ir_bitset_incl(used_intrinsics, id);
 	ir_emit_def_ref(ctx, f, def);
-	fprintf(f, "call %s @llvm.%s.%s(%s ",
-		ir_type_llvm_name[type], name, ir_type_llvm_name[type], ir_type_llvm_name[type]);
+	fprintf(f, "call %s @%s(%s ",
+		ir_type_llvm_name[type], ir_llvm_intrinsic_desc[id].name, ir_type_llvm_name[type]);
 	ir_emit_ref(ctx, f, insn->op1);
 	if (poison) {
 		fprintf(f, ", 0");
@@ -257,25 +503,27 @@ static void ir_emit_conv(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const cha
 	fprintf(f, " to %s\n", ir_type_llvm_name[insn->type]);
 }
 
-static void ir_emit_minmax_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *op, const char *uop, const char *fop)
+static void ir_emit_minmax_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn,
+                              ir_llvm_intrinsic_id id, ir_bitset used_intrinsics)
 {
 	ir_type type = insn->type;
 
-	ir_emit_def_ref(ctx, f, def);
 	if (IR_IS_TYPE_FP(type)) {
-		fprintf(f, "call %s @llvm.%s.%s(%s ", ir_type_llvm_name[type],
-			fop, type == IR_DOUBLE ? "f64" : "f32",
-			ir_type_llvm_name[type]);
+		id += (type == IR_DOUBLE) ? 8 : 9;
 	} else {
-		IR_ASSERT(IR_IS_TYPE_INT(type));
 		if (IR_IS_TYPE_UNSIGNED(type)) {
-			fprintf(f, "call %s @llvm.%s.%s(%s ", ir_type_llvm_name[type],
-				uop, ir_type_llvm_name[type], ir_type_llvm_name[type]);
-		} else {
-			fprintf(f, "call %s @llvm.%s.%s(%s ", ir_type_llvm_name[type],
-				op, ir_type_llvm_name[type], ir_type_llvm_name[type]);
+			id += 4;
+		}
+		switch (ir_type_size[type]) {
+			case 2: id += 1; break;
+			case 4: id += 2; break;
+			case 8: id += 3; break;
 		}
 	}
+	ir_bitset_incl(used_intrinsics, id);
+	ir_emit_def_ref(ctx, f, def);
+	fprintf(f, "call %s @%s(%s ", ir_type_llvm_name[type],
+		ir_llvm_intrinsic_desc[id].name, ir_type_llvm_name[type]);
 	ir_emit_ref(ctx, f, insn->op1);
 	fprintf(f, ", %s ", ir_type_llvm_name[type]);
 	ir_emit_ref(ctx, f, insn->op2);
@@ -309,19 +557,29 @@ static void ir_emit_conditional_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 	fprintf(f, "\n");
 }
 
-static void ir_emit_abs(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
+static void ir_emit_abs(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, ir_bitset used_intrinsics)
 {
 	ir_type type = ctx->ir_base[insn->op1].type;
+	ir_llvm_intrinsic_id id;
 
 	ir_emit_def_ref(ctx, f, def);
 	if (IR_IS_TYPE_FP(type)) {
-		fprintf(f, "call %s @llvm.fabs.%s(%s ",
-			ir_type_llvm_name[type], type == IR_DOUBLE ? "f64" : "f32", ir_type_llvm_name[type]);
+		id = type == IR_DOUBLE ? IR_LLVM_INTR_FABS_F64 : IR_LLVM_INTR_FABS_F32;
+		ir_bitset_incl(used_intrinsics, id);
+		fprintf(f, "call %s @%s(%s ",
+			ir_type_llvm_name[type], ir_llvm_intrinsic_desc[id].name, ir_type_llvm_name[type]);
 		ir_emit_ref(ctx, f, insn->op1);
 		fprintf(f, ")\n");
 	} else {
-		fprintf(f, "call %s @llvm.abs.%s(%s ",
-			ir_type_llvm_name[type], ir_type_llvm_name[type], ir_type_llvm_name[type]);
+		id = IR_LLVM_INTR_ABS_I8;
+		switch (ir_type_size[type]) {
+			case 2: id += 1; break;
+			case 4: id += 2; break;
+			case 8: id += 3; break;
+		}
+		ir_bitset_incl(used_intrinsics, id);
+		fprintf(f, "call %s @%s(%s ",
+			ir_type_llvm_name[type], ir_llvm_intrinsic_desc[id].name, ir_type_llvm_name[type]);
 		ir_emit_ref(ctx, f, insn->op1);
 		fprintf(f, ", i1 0)\n");
 	}
@@ -425,90 +683,26 @@ static void ir_emit_switch(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn
 	fprintf(f, "\t]\n");
 }
 
-static const char *ir_builtin_func_name(const char *name, ir_ref *last_arg)
+static int ir_builtin_func(const char *name)
 {
-	if (strcmp(name, "memset")) {
-		*last_arg = IR_FALSE;
-		return (IR_SIZE_T == IR_I32) ? "llvm.memset.p0.i32" : "llvm.memset.p0.i64";
-	} else if (strcmp(name, "memcpy")) {
-		*last_arg = IR_FALSE;
-		return (IR_SIZE_T == IR_I32) ? "llvm.memcpy.p0.p0.i32" : "llvm.memcpy.p0.p0.i64";
-	} else if (strcmp(name, "memmove")) {
-		*last_arg = IR_FALSE;
-		return (IR_SIZE_T == IR_I32) ? "llvm.memmove.p0.p0.i32" : "llvm.memmve.p0.p0.i64";
-	} else if (strcmp(name, "sqrt")) {
-		return "llvm.sqrt.f64";
-	} else if (strcmp(name, "sqrtf")) {
-		return "llvm.sqrt.f32";
-	} else if (strcmp(name, "sin")) {
-		return "llvm.sin.f64";
-	} else if (strcmp(name, "sinf")) {
-		return "llvm.sin.f32";
-	} else if (strcmp(name, "cos")) {
-		return "llvm.cos.f64";
-	} else if (strcmp(name, "cosf")) {
-		return "llvm.cos.f32";
-	} else if (strcmp(name, "pow")) {
-		return "llvm.pow.f64";
-	} else if (strcmp(name, "powf")) {
-		return "llvm.pow.f32";
-	} else if (strcmp(name, "exp")) {
-		return "llvm.exp.f64";
-	} else if (strcmp(name, "expf")) {
-		return "llvm.exp.f32";
-	} else if (strcmp(name, "exp2")) {
-		return "llvm.exp2.f64";
-	} else if (strcmp(name, "exp2f")) {
-		return "llvm.exp2.f32";
-	} else if (strcmp(name, "exp10")) {
-		return "llvm.exp10.f64";
-	} else if (strcmp(name, "exp10f")) {
-		return "llvm.exp10.f32";
-	} else if (strcmp(name, "ldexp")) {
-		return "llvm.ldexp.f64.i32";
-	} else if (strcmp(name, "ldexpf")) {
-		return "llvm.ldexp.f32.i32";
-	} else if (strcmp(name, "frexp")) {
-		return "llvm.frexp.f64.i32";
-	} else if (strcmp(name, "frexpf")) {
-		return "llvm.frexp.f32.i32";
-	} else if (strcmp(name, "log")) {
-		return "llvm.log.f64";
-	} else if (strcmp(name, "logf")) {
-		return "llvm.log.f32";
-	} else if (strcmp(name, "log2")) {
-		return "llvm.log2.f64";
-	} else if (strcmp(name, "log2f")) {
-		return "llvm.log2.f32";
-	} else if (strcmp(name, "log10")) {
-		return "llvm.log10.f64";
-	} else if (strcmp(name, "log10f")) {
-		return "llvm.log10.f32";
-	} else if (strcmp(name, "copysign")) {
-		return "llvm.copysign.f64";
-	} else if (strcmp(name, "copysignf")) {
-		return "llvm.copysign.f32";
-	} else if (strcmp(name, "floor")) {
-		return "llvm.floor.f64";
-	} else if (strcmp(name, "floorf")) {
-		return "llvm.floor.f32";
-	} else if (strcmp(name, "ceil")) {
-		return "llvm.ceil.f64";
-	} else if (strcmp(name, "ceilf")) {
-		return "llvm.ceil.f32";
-	} else if (strcmp(name, "trunc")) {
-		return "llvm.trunc.f64";
-	} else if (strcmp(name, "truncf")) {
-		return "llvm.trunc.f32";
-	} else if (strcmp(name, "round")) {
-		return "llvm.round.f64";
-	} else if (strcmp(name, "roundf")) {
-		return "llvm.round.f32";
+	int l = 0;
+	int r = sizeof(ir_llvm_builtin_map) / sizeof(ir_llvm_builtin_map[0]);
+
+	while (l >= r) {
+		int n = (l + r) / 2;
+		int ret = strcmp(name, ir_llvm_builtin_map[n].name);
+
+		if (ret < 0) {
+			l = n + 1;
+		} else if (ret > 0) {
+			r = n - 1;
+		}
+		return n;
 	}
-	return name;
+	return -1;
 }
 
-static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
+static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn, ir_bitset used_intrinsics)
 {
 	int j, k, n;
 	ir_ref last_arg = IR_UNUSED;
@@ -542,7 +736,18 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 			const ir_proto_t *proto = (const ir_proto_t *)ir_get_str(ctx, func->proto);
 
 			if (proto->flags & IR_BUILTIN_FUNC) {
-				name = ir_builtin_func_name(name, &last_arg);
+				int n = ir_builtin_func(name);
+				if (n >= 0) {
+					ir_llvm_intrinsic_id id = ir_llvm_builtin_map[n].id;
+
+					if (id == IR_LLVM_INTR_MEMSET
+					 || id == IR_LLVM_INTR_MEMCPY
+					 || id == IR_LLVM_INTR_MEMMOVE) {
+						last_arg = IR_FALSE;
+				    }
+					ir_bitset_incl(used_intrinsics, ir_llvm_builtin_map[n].id);
+					name = ir_llvm_builtin_map[n].name;
+			    }
 			}
 		}
 		fprintf(f, "@%s", name);
@@ -652,6 +857,9 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	bool first;
 	uint32_t b, target;
 	ir_block *bb;
+	ir_bitset_base_t used_intrinsics[IR_LLVM_INTRINSIC_BITSET_LEN];
+
+	memset(used_intrinsics, 0, sizeof(used_intrinsics));
 
 	/* Emit function prototype */
 	fprintf(f, "define ");
@@ -779,16 +987,16 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					ir_emit_binary_op(ctx, f, i, insn, "xor", NULL, NULL);
 					break;
 				case IR_MIN:
-					ir_emit_minmax_op(ctx, f, i, insn, "smin", "umin", "minnum");
+					ir_emit_minmax_op(ctx, f, i, insn, IR_LLVM_INTR_SMIN_I8, used_intrinsics);
 					break;
 				case IR_MAX:
-					ir_emit_minmax_op(ctx, f, i, insn, "smax", "umax", "maxnum");
+					ir_emit_minmax_op(ctx, f, i, insn, IR_LLVM_INTR_SMAX_I8, used_intrinsics);
 					break;
 				case IR_COND:
 					ir_emit_conditional_op(ctx, f, i, insn);
 					break;
 				case IR_ABS:
-					ir_emit_abs(ctx, f, i, insn);
+					ir_emit_abs(ctx, f, i, insn, used_intrinsics);
 					break;
 				case IR_SHL:
 					ir_emit_binary_op(ctx, f, i, insn, "shl", NULL, NULL);
@@ -800,22 +1008,22 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					ir_emit_binary_op(ctx, f, i, insn, "ashr", NULL, NULL);
 					break;
 				case IR_ROL:
-					ir_emit_rol_ror(ctx, f, i, insn, "fshl");
+					ir_emit_rol_ror(ctx, f, i, insn, IR_LLVM_INTR_FSHL_I8, used_intrinsics);
 					break;
 				case IR_ROR:
-					ir_emit_rol_ror(ctx, f, i, insn, "fshr");
+					ir_emit_rol_ror(ctx, f, i, insn, IR_LLVM_INTR_FSHR_I8, used_intrinsics);
 					break;
 				case IR_BSWAP:
-					ir_emit_bitop(ctx, f, i, insn, "bswap", 0);
+					ir_emit_bitop(ctx, f, i, insn, IR_LLVM_INTR_BSWAP_I16, 0, used_intrinsics);
 					break;
 				case IR_CTPOP:
-					ir_emit_bitop(ctx, f, i, insn, "ctpop", 0);
+					ir_emit_bitop(ctx, f, i, insn, IR_LLVM_INTR_CTPOP_I8, 0, used_intrinsics);
 					break;
 				case IR_CTLZ:
-					ir_emit_bitop(ctx, f, i, insn, "ctlz", 1);
+					ir_emit_bitop(ctx, f, i, insn, IR_LLVM_INTR_CTLZ_I8, 1, used_intrinsics);
 					break;
 				case IR_CTTZ:
-					ir_emit_bitop(ctx, f, i, insn, "cttz", 1);
+					ir_emit_bitop(ctx, f, i, insn, IR_LLVM_INTR_CTTZ_I8, 1, used_intrinsics);
 					break;
 				case IR_SEXT:
 					IR_ASSERT(IR_IS_TYPE_INT(insn->type));
@@ -870,13 +1078,13 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					ir_emit_conv(ctx, f, i, insn, "bitcast");
 					break;
 				case IR_ADD_OV:
-					ir_emit_binary_overflow_op(ctx, f, i, insn, "sadd", "uadd");
+					ir_emit_binary_overflow_op(ctx, f, i, insn, IR_LLVM_INTR_SADD_OV_I8, used_intrinsics);
 					break;
 				case IR_SUB_OV:
-					ir_emit_binary_overflow_op(ctx, f, i, insn, "ssub", "usub");
+					ir_emit_binary_overflow_op(ctx, f, i, insn, IR_LLVM_INTR_SSUB_OV_I8, used_intrinsics);
 					break;
 				case IR_MUL_OV:
-					ir_emit_binary_overflow_op(ctx, f, i, insn, "smul", "umul");
+					ir_emit_binary_overflow_op(ctx, f, i, insn, IR_LLVM_INTR_SMUL_OV_I8, used_intrinsics);
 					break;
 				case IR_OVERFLOW:
 					ir_emit_def_ref(ctx, f, i);
@@ -906,7 +1114,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					break;
 				case IR_CALL:
 				case IR_TAILCALL:
-					ir_emit_call(ctx, f, i, insn);
+					ir_emit_call(ctx, f, i, insn, used_intrinsics);
 					if (insn->op == IR_TAILCALL) {
 						i = bb->end + 1;
 						continue;
@@ -931,19 +1139,23 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					break;
 				case IR_FRAME_ADDR:
 					ir_emit_def_ref(ctx, f, i);
+					ir_bitset_incl(used_intrinsics, IR_LLVM_INTR_FRAMEADDRESS);
 					fprintf(f, "\tcall ptr @llvm.frameaddress.p0(i32 0)\n");
 					break;
 				case IR_VA_START:
+					ir_bitset_incl(used_intrinsics, IR_LLVM_INTR_VA_START);
 					fprintf(f, "\tcall void @llvm.va_start(ptr ");
 					ir_emit_ref(ctx, f, insn->op2);
 					fprintf(f, ")\n");
 					break;
 				case IR_VA_END:
+					ir_bitset_incl(used_intrinsics, IR_LLVM_INTR_VA_END);
 					fprintf(f, "\tcall void @llvm.va_end(ptr ");
 					ir_emit_ref(ctx, f, insn->op2);
 					fprintf(f, ")\n");
 					break;
 				case IR_VA_COPY:
+					ir_bitset_incl(used_intrinsics, IR_LLVM_INTR_VA_COPY);
 					fprintf(f, "\tcall void @llvm.va_copy(ptr");
 					ir_emit_ref(ctx, f, insn->op2);
 					fprintf(f, ", ptr ");
@@ -957,6 +1169,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					fprintf(f, ", %s\n", ir_type_cname[insn->type]);
 					break;
 				case IR_TRAP:
+					ir_bitset_incl(used_intrinsics, IR_LLVM_INTR_DEBUGTRAP);
 					fprintf(f, "\tcall void @llvm.debugtrap()\n");
 					break;
 				case IR_GUARD:
@@ -982,6 +1195,17 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 
 	fprintf(f, "}\n");
 
+	IR_BITSET_FOREACH(used_intrinsics, IR_LLVM_INTRINSIC_BITSET_LEN, i) {
+		const char *name = ir_llvm_intrinsic_desc[i].name;
+		if (!ctx->loader || !ctx->loader->has_sym || !ctx->loader->has_sym(ctx->loader, name)) {
+			ir_emit_llvm_func_decl(name, 0, ir_llvm_intrinsic_desc[i].ret_type,
+				ir_llvm_intrinsic_desc[i].params_count, ir_llvm_intrinsic_desc[i].param_types, f);
+			if (ctx->loader->add_sym) {
+				ctx->loader->add_sym(ctx->loader, name, NULL);
+			}
+		}
+	} IR_BITSET_FOREACH_END();
+
 	for (i = IR_UNUSED + 1, insn = ctx->ir_base - i; i < ctx->consts_count; i++, insn--) {
 		if (insn->op == IR_FUNC) {
 			const char *name;
@@ -989,19 +1213,34 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 			name = ir_get_str(ctx, insn->val.name);
 			if (insn->proto) {
 				const ir_proto_t *proto = (const ir_proto_t *)ir_get_str(ctx, insn->proto);
-				ir_ref dummy;
 
 				if (proto->flags & IR_BUILTIN_FUNC) {
-					name = ir_builtin_func_name(name, &dummy);
+					n = ir_builtin_func(name);
+					if (n >= 0) {
+						name = ir_llvm_builtin_map[n].name;
+					}
 				}
-				ir_emit_llvm_func_decl(name, proto->flags, proto->ret_type, proto->params_count, proto->param_types, f);
+				if (!ctx->loader || !ctx->loader->has_sym || !ctx->loader->has_sym(ctx->loader, name)) {
+					ir_emit_llvm_func_decl(name, proto->flags, proto->ret_type, proto->params_count, proto->param_types, f);
+					if (ctx->loader->add_sym) {
+						ctx->loader->add_sym(ctx->loader, name, NULL);
+					}
+				}
 			} else {
 				fprintf(f, "declare void @%s()\n", name);
 			}
 		} else if (insn->op == IR_SYM) {
-			// TODO: symbol "global" or "constant" ???
-			// TODO: symbol type ???
-			fprintf(f, "@%s = external global ptr\n", ir_get_str(ctx, insn->val.name));
+			const char *name;
+
+			name = ir_get_str(ctx, insn->val.name);
+			if (!ctx->loader || !ctx->loader->has_sym || !ctx->loader->has_sym(ctx->loader, name)) {
+				// TODO: symbol "global" or "constant" ???
+				// TODO: symbol type ???
+				fprintf(f, "@%s = external global ptr\n", name);
+				if (ctx->loader->add_sym) {
+					ctx->loader->add_sym(ctx->loader, name, NULL);
+				}
+			}
 		} else if (insn->op == IR_STR) {
 			const char *str = ir_get_str(ctx, insn->val.str);
 			// TODO: strlen != size ???
@@ -1094,4 +1333,26 @@ void ir_emit_llvm_func_decl(const char *name, uint32_t flags, ir_type ret_type, 
 		fprintf(f, "...");
 	}
 	fprintf(f, ")\n");
+}
+
+void ir_emit_llvm_sym_decl(const char *name, uint32_t flags, bool has_data, FILE *f)
+{
+	fprintf(f, "@%s = ", name);
+	if (flags & IR_EXTERN) {
+		fprintf(f, "external ");
+	} else if (flags & IR_STATIC) {
+		fprintf(f, "private ");
+	}
+	if (flags & IR_CONST) {
+		fprintf(f, "constant ");
+	} else {
+		fprintf(f, "global ");
+	}
+	// TODO: type
+	fprintf(f, "ptr");
+	if (!(flags & IR_EXTERN)) {
+		// TODO: init
+		fprintf(f, " zeroinitializer");
+	}
+	fprintf(f, "\n");
 }
