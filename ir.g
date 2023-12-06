@@ -344,6 +344,9 @@ ir_func_proto(ir_parser_ctx *p, uint32_t *flags, uint8_t *ret_type, uint32_t *pa
 	(
 		"__fastcall"
 		{*flags |= IR_FASTCALL_FUNC;}
+	|
+		"__builtin"
+		{*flags |= IR_BUILTIN_FUNC;}
 	)?
 	{*params_count = n;}
 ;

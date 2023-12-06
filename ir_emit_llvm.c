@@ -73,8 +73,8 @@ static const char *ir_type_llvm_name[IR_LAST_LLVM_TYPE] = {
 	_("expf",      EXP_F32)      \
 	_("floor",     FLOOR_F64)    \
 	_("floorf",    FLOOR_F32)    \
-	_("frexp",     FREXP_F64)    \
-	_("frexpf",    FREXP_F32)    \
+	_("isnan",     ISNAN_F64)    \
+	_("isnanf",    ISNAN_F32)    \
 	_("ldexp",     LDEXP_F64)    \
 	_("ldexpf",    LDEXP_F32)    \
 	_("log",       LOG_F64)      \
@@ -211,8 +211,8 @@ static const char *ir_type_llvm_name[IR_LAST_LLVM_TYPE] = {
 	_(TRUNC_F32,    "llvm.trunc.f32",              F32,  1, F32, ___, ___, ___) \
 	_(ROUND_F64,    "llvm.round.f64",              F64,  1, F64, ___, ___, ___) \
 	_(ROUND_F32,    "llvm.round.f32",              F32,  1, F32, ___, ___, ___) \
-	_(FREXP_F64,    "llvm.frexp.f64",              F64I, 1, F64, ___, ___, ___) \
-	_(FREXP_F32,    "llvm.frexp.f32",              F32I, 1, F32, ___, ___, ___) \
+	_(ISNAN_F64,    "fcmp uno double", /* fake */  F64I, 1, F64, ___, ___, ___) \
+	_(ISNAN_F32,    "fcmp uno float",  /* fake */  F32I, 1, F32, ___, ___, ___) \
 
 #define IR____ 0
 #define IR_LLVM_INTRINSIC_ID(id, name, ret, num, arg1, arg2, arg3, arg4) \
@@ -688,16 +688,17 @@ static int ir_builtin_func(const char *name)
 	int l = 0;
 	int r = sizeof(ir_llvm_builtin_map) / sizeof(ir_llvm_builtin_map[0]);
 
-	while (l >= r) {
+	while (l <= r) {
 		int n = (l + r) / 2;
 		int ret = strcmp(name, ir_llvm_builtin_map[n].name);
 
-		if (ret < 0) {
+		if (ret > 0) {
 			l = n + 1;
-		} else if (ret > 0) {
+		} else if (ret < 0) {
 			r = n - 1;
+		} else {
+			return n;
 		}
-		return n;
 	}
 	return -1;
 }
@@ -706,6 +707,39 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn, ir_bit
 {
 	int j, k, n;
 	ir_ref last_arg = IR_UNUSED;
+	const char *name = NULL;
+
+	if (IR_IS_CONST_REF(insn->op2)) {
+		const ir_insn *func = &ctx->ir_base[insn->op2];
+
+		IR_ASSERT(func->op == IR_FUNC);
+		name = ir_get_str(ctx, func->val.name);
+		if (func->proto) {
+			const ir_proto_t *proto = (const ir_proto_t *)ir_get_str(ctx, func->proto);
+
+			if (proto->flags & IR_BUILTIN_FUNC) {
+				int n = ir_builtin_func(name);
+				if (n >= 0) {
+					ir_llvm_intrinsic_id id = ir_llvm_builtin_map[n].id;
+
+					if (id == IR_LLVM_INTR_MEMSET
+					 || id == IR_LLVM_INTR_MEMCPY
+					 || id == IR_LLVM_INTR_MEMMOVE) {
+						last_arg = IR_FALSE;
+				    } else if (id == IR_LLVM_INTR_ISNAN_F64
+				     || id == IR_LLVM_INTR_ISNAN_F32) {
+						ir_emit_def_ref(ctx, f, def);
+						fprintf(f, "%s ", ir_llvm_intrinsic_desc[id].name);
+						ir_emit_ref(ctx, f, insn->op3);
+						fprintf(f, ", 0.0\n");
+						return;
+				    }
+					ir_bitset_incl(used_intrinsics, id);
+					name = ir_llvm_intrinsic_desc[id].name;
+			    }
+			}
+		}
+	}
 
 	if (insn->type != IR_VOID) {
 		ir_emit_def_ref(ctx, f, def);
@@ -727,29 +761,6 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn, ir_bit
 	// TODO: function prototype ???
 
 	if (IR_IS_CONST_REF(insn->op2)) {
-		const ir_insn *func = &ctx->ir_base[insn->op2];
-		const char *name;
-
-		IR_ASSERT(func->op == IR_FUNC);
-		name = ir_get_str(ctx, func->val.name);
-		if (func->proto) {
-			const ir_proto_t *proto = (const ir_proto_t *)ir_get_str(ctx, func->proto);
-
-			if (proto->flags & IR_BUILTIN_FUNC) {
-				int n = ir_builtin_func(name);
-				if (n >= 0) {
-					ir_llvm_intrinsic_id id = ir_llvm_builtin_map[n].id;
-
-					if (id == IR_LLVM_INTR_MEMSET
-					 || id == IR_LLVM_INTR_MEMCPY
-					 || id == IR_LLVM_INTR_MEMMOVE) {
-						last_arg = IR_FALSE;
-				    }
-					ir_bitset_incl(used_intrinsics, ir_llvm_builtin_map[n].id);
-					name = ir_llvm_builtin_map[n].name;
-			    }
-			}
-		}
 		fprintf(f, "@%s", name);
 	} else {
 		ir_emit_ref(ctx, f, insn->op2);
@@ -1217,7 +1228,12 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				if (proto->flags & IR_BUILTIN_FUNC) {
 					n = ir_builtin_func(name);
 					if (n >= 0) {
-						name = ir_llvm_builtin_map[n].name;
+						ir_llvm_intrinsic_id id = ir_llvm_builtin_map[n].id;
+						if (id == IR_LLVM_INTR_ISNAN_F64
+						 || id == IR_LLVM_INTR_ISNAN_F32) {
+							continue;
+						}
+						name = ir_llvm_intrinsic_desc[id].name;
 					}
 				}
 				if (!ctx->loader || !ctx->loader->has_sym || !ctx->loader->has_sym(ctx->loader, name)) {

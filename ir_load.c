@@ -127,22 +127,23 @@ static void yy_error_str(const char *msg, const char *str);
 #define YY__POINT_POINT_POINT 17
 #define YY__COLON 18
 #define YY___FASTCALL 19
-#define YY__STAR 20
-#define YY__SLASH 21
-#define YY_NULL 22
-#define YY_INF 23
-#define YY_NAN 24
-#define YY__MINUS 25
-#define YY_ID 26
-#define YY_DECNUMBER 27
-#define YY_HEXNUMBER 28
-#define YY_FLOATNUMBER 29
-#define YY_CHARACTER 30
-#define YY_STRING 31
-#define YY_EOL 32
-#define YY_WS 33
-#define YY_ONE_LINE_COMMENT 34
-#define YY_COMMENT 35
+#define YY___BUILTIN 20
+#define YY__STAR 21
+#define YY__SLASH 22
+#define YY_NULL 23
+#define YY_INF 24
+#define YY_NAN 25
+#define YY__MINUS 26
+#define YY_ID 27
+#define YY_DECNUMBER 28
+#define YY_HEXNUMBER 29
+#define YY_FLOATNUMBER 30
+#define YY_CHARACTER 31
+#define YY_STRING 32
+#define YY_EOL 33
+#define YY_WS 34
+#define YY_ONE_LINE_COMMENT 35
+#define YY_COMMENT 36
 
 static const char * sym_name[] = {
 	"<EOF>",
@@ -165,6 +166,7 @@ static const char * sym_name[] = {
 	"...",
 	":",
 	"__fastcall",
+	"__builtin",
 	"*",
 	"/",
 	"null",
@@ -293,21 +295,21 @@ _yy_state_start:
 			ch = *++YYPOS;
 			if (ch != 'n') goto _yy_tunnel_4;
 			ret = YY_EXTERN;
-			goto _yy_state_109;
+			goto _yy_state_116;
 		case 'v':
 			ch = *++YYPOS;
 			if (ch == 'a') {
 				ch = *++YYPOS;
 				if (ch != 'r') goto _yy_tunnel_4;
 				ret = YY_VAR;
-				goto _yy_state_109;
+				goto _yy_state_116;
 			} else if (ch == 'o') {
 				ch = *++YYPOS;
 				if (ch != 'i') goto _yy_tunnel_4;
 				ch = *++YYPOS;
 				if (ch != 'd') goto _yy_tunnel_4;
 				ret = YY_VOID;
-				goto _yy_state_109;
+				goto _yy_state_116;
 			} else {
 				goto _yy_tunnel_4;
 			}
@@ -321,7 +323,7 @@ _yy_state_start:
 			ch = *++YYPOS;
 			if (ch != 't') goto _yy_tunnel_4;
 			ret = YY_CONST;
-			goto _yy_state_109;
+			goto _yy_state_116;
 		case 'A':
 		case 'B':
 		case 'C':
@@ -376,28 +378,28 @@ _yy_state_start:
 			ch = *++YYPOS;
 			if (ch != 'c') goto _yy_tunnel_4;
 			ret = YY_FUNC;
-			goto _yy_state_109;
+			goto _yy_state_116;
 		case 'i':
 			ch = *++YYPOS;
 			if (ch != 'n') goto _yy_tunnel_4;
 			ch = *++YYPOS;
 			if (ch != 'f') goto _yy_tunnel_4;
 			ret = YY_INF;
-			goto _yy_state_109;
+			goto _yy_state_116;
 		case 'n':
 			ch = *++YYPOS;
 			if (ch == 'a') {
 				ch = *++YYPOS;
 				if (ch != 'n') goto _yy_tunnel_4;
 				ret = YY_NAN;
-				goto _yy_state_109;
+				goto _yy_state_116;
 			} else if (ch == 'u') {
 				ch = *++YYPOS;
 				if (ch != 'l') goto _yy_tunnel_4;
 				ch = *++YYPOS;
 				if (ch != 'l') goto _yy_tunnel_4;
 				ret = YY_NULL;
-				goto _yy_state_109;
+				goto _yy_state_116;
 			} else {
 				goto _yy_tunnel_4;
 			}
@@ -413,12 +415,12 @@ _yy_state_start:
 				ch = *++YYPOS;
 				if (ch != 'c') goto _yy_tunnel_4;
 				ret = YY_STATIC;
-				goto _yy_state_109;
+				goto _yy_state_116;
 			} else if (ch == 'y') {
 				ch = *++YYPOS;
 				if (ch != 'm') goto _yy_tunnel_4;
 				ret = YY_SYM;
-				goto _yy_state_109;
+				goto _yy_state_116;
 			} else {
 				goto _yy_tunnel_4;
 			}
@@ -426,23 +428,41 @@ _yy_state_start:
 			ch = *++YYPOS;
 			if (ch != '_') goto _yy_tunnel_4;
 			ch = *++YYPOS;
-			if (ch != 'f') goto _yy_tunnel_4;
-			ch = *++YYPOS;
-			if (ch != 'a') goto _yy_tunnel_4;
-			ch = *++YYPOS;
-			if (ch != 's') goto _yy_tunnel_4;
-			ch = *++YYPOS;
-			if (ch != 't') goto _yy_tunnel_4;
-			ch = *++YYPOS;
-			if (ch != 'c') goto _yy_tunnel_4;
-			ch = *++YYPOS;
-			if (ch != 'a') goto _yy_tunnel_4;
-			ch = *++YYPOS;
-			if (ch != 'l') goto _yy_tunnel_4;
-			ch = *++YYPOS;
-			if (ch != 'l') goto _yy_tunnel_4;
-			ret = YY___FASTCALL;
-			goto _yy_state_109;
+			if (ch == 'b') {
+				ch = *++YYPOS;
+				if (ch != 'u') goto _yy_tunnel_4;
+				ch = *++YYPOS;
+				if (ch != 'i') goto _yy_tunnel_4;
+				ch = *++YYPOS;
+				if (ch != 'l') goto _yy_tunnel_4;
+				ch = *++YYPOS;
+				if (ch != 't') goto _yy_tunnel_4;
+				ch = *++YYPOS;
+				if (ch != 'i') goto _yy_tunnel_4;
+				ch = *++YYPOS;
+				if (ch != 'n') goto _yy_tunnel_4;
+				ret = YY___BUILTIN;
+				goto _yy_state_116;
+			} else if (ch == 'f') {
+				ch = *++YYPOS;
+				if (ch != 'a') goto _yy_tunnel_4;
+				ch = *++YYPOS;
+				if (ch != 's') goto _yy_tunnel_4;
+				ch = *++YYPOS;
+				if (ch != 't') goto _yy_tunnel_4;
+				ch = *++YYPOS;
+				if (ch != 'c') goto _yy_tunnel_4;
+				ch = *++YYPOS;
+				if (ch != 'a') goto _yy_tunnel_4;
+				ch = *++YYPOS;
+				if (ch != 'l') goto _yy_tunnel_4;
+				ch = *++YYPOS;
+				if (ch != 'l') goto _yy_tunnel_4;
+				ret = YY___FASTCALL;
+				goto _yy_state_116;
+			} else {
+				goto _yy_tunnel_4;
+			}
 		case ';':
 			YYPOS++;
 			ret = YY__SEMICOLON;
@@ -505,7 +525,7 @@ _yy_state_start:
 			if (ch != 'x') goto _yy_tunnel_19;
 			ch = *++YYPOS;
 			if ((ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'F') || (ch >= 'a' && ch <= 'f')) {
-				goto _yy_state_76;
+				goto _yy_state_77;
 			} else {
 				goto _yy_state_error;
 			}
@@ -706,12 +726,12 @@ _yy_state_50:
 	if (ch == '+' || ch == '-') {
 		ch = *++YYPOS;
 		if ((ch >= '0' && ch <= '9')) {
-			goto _yy_state_79;
+			goto _yy_state_80;
 		} else {
 			goto _yy_state_error;
 		}
 	} else if ((ch >= '0' && ch <= '9')) {
-		goto _yy_state_79;
+		goto _yy_state_80;
 	} else {
 		goto _yy_state_error;
 	}
@@ -732,23 +752,23 @@ _yy_tunnel_58:
 	} else {
 		goto _yy_state_error;
 	}
-_yy_state_76:
+_yy_state_77:
 	ch = *++YYPOS;
 	if ((ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'F') || (ch >= 'a' && ch <= 'f')) {
-		goto _yy_state_76;
+		goto _yy_state_77;
 	} else {
 		ret = YY_HEXNUMBER;
 		goto _yy_fin;
 	}
-_yy_state_79:
+_yy_state_80:
 	ch = *++YYPOS;
 	if ((ch >= '0' && ch <= '9')) {
-		goto _yy_state_79;
+		goto _yy_state_80;
 	} else {
 		ret = YY_FLOATNUMBER;
 		goto _yy_fin;
 	}
-_yy_state_109:
+_yy_state_116:
 	ch = *++YYPOS;
 	if ((ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z') || ch == '_' || (ch >= 'a' && ch <= 'z')) {
 		goto _yy_state_4;
@@ -1061,7 +1081,7 @@ static int parse_ir_sym_data(int sym, ir_loader *loader) {
 					yy_error("sym_data_ref error");
 				}
 			}
-	} else if (YY_IN_SET(sym, (YY_DECNUMBER,YY_HEXNUMBER,YY_FLOATNUMBER,YY_CHARACTER,YY_INF,YY_NAN,YY__MINUS), "\000\000\200\173\000")) {
+	} else if (YY_IN_SET(sym, (YY_DECNUMBER,YY_HEXNUMBER,YY_FLOATNUMBER,YY_CHARACTER,YY_INF,YY_NAN,YY__MINUS), "\000\000\000\367\000")) {
 		sym = parse_const(sym, t, &val);
 		if (loader->sym_data) {
 				switch (ir_type_size[t]) {
@@ -1204,9 +1224,14 @@ _yy_state_63:
 	} else {
 		yy_error_sym("unexpected", sym);
 	}
-	if (sym == YY___FASTCALL) {
-		sym = get_sym();
-		*flags |= IR_FASTCALL_FUNC;
+	if (sym == YY___FASTCALL || sym == YY___BUILTIN) {
+		if (sym == YY___FASTCALL) {
+			sym = get_sym();
+			*flags |= IR_FASTCALL_FUNC;
+		} else {
+			sym = get_sym();
+			*flags |= IR_BUILTIN_FUNC;
+		}
 	}
 	*params_count = n;
 	return sym;
@@ -1217,7 +1242,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 	const unsigned char *save_pos;
 	const unsigned char *save_text;
 	int   save_line;
-	int alt73;
+	int alt74;
 	const char *str, *str2 = NULL, *func;
 	size_t len, len2 = 0, func_len;
 	uint8_t op;
@@ -1236,36 +1261,36 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 	save_pos  = yy_pos;
 	save_text = yy_text;
 	save_line = yy_line;
-	alt73 = -2;
+	alt74 = -2;
 	sym2 = sym;
 	if (sym2 == YY_ID) {
 		sym2 = get_sym();
-		goto _yy_state_73_1;
+		goto _yy_state_74_1;
 	} else {
 		yy_error_sym("unexpected", sym2);
 	}
-_yy_state_73_1:
+_yy_state_74_1:
 	if (sym2 == YY_ID) {
-		alt73 = 74;
-		goto _yy_state_73;
+		alt74 = 75;
+		goto _yy_state_74;
 	} else if (sym2 == YY__EQUAL) {
-		alt73 = 78;
-		goto _yy_state_73;
+		alt74 = 79;
+		goto _yy_state_74;
 	} else {
 		yy_error_sym("unexpected", sym2);
 	}
-_yy_state_73:
+_yy_state_74:
 	yy_pos  = save_pos;
 	yy_text = save_text;
 	yy_line = save_line;
-	if (alt73 == 74) {
+	if (alt74 == 75) {
 		sym = parse_type(sym, &t);
 		sym = parse_ID(sym, &str, &len);
 		if (sym == YY__COMMA) {
 			sym = get_sym();
 			sym = parse_ID(sym, &str2, &len2);
 		}
-	} else if (alt73 == 78) {
+	} else if (alt74 == 79) {
 		sym = parse_ID(sym, &str, &len);
 	} else {
 		yy_error_sym("unexpected", sym);
@@ -1339,7 +1364,7 @@ _yy_state_73:
 				ref = ir_emit_N(p->ctx, IR_OPT(op, t), count.i32);
 				if (sym == YY__LPAREN) {
 					sym = get_sym();
-					if (YY_IN_SET(sym, (YY_ID,YY_STRING,YY_DECNUMBER,YY_NULL,YY_FUNC), "\000\200\100\214\000")) {
+					if (YY_IN_SET(sym, (YY_ID,YY_STRING,YY_DECNUMBER,YY_NULL,YY_FUNC), "\000\200\200\030\001")) {
 						sym = parse_val(sym, p, op, 1, &op1);
 						n = 1;
 						if (n > count.i32) yy_error("too many operands");
@@ -1361,7 +1386,7 @@ _yy_state_73:
 				n = 0;
 				if (sym == YY__LPAREN) {
 					sym = get_sym();
-					if (YY_IN_SET(sym, (YY_ID,YY_STRING,YY_DECNUMBER,YY_NULL,YY_FUNC), "\000\200\100\214\000")) {
+					if (YY_IN_SET(sym, (YY_ID,YY_STRING,YY_DECNUMBER,YY_NULL,YY_FUNC), "\000\200\200\030\001")) {
 						sym = parse_val(sym, p, op, 1, &op1);
 						n = 1;
 						if (sym == YY__COMMA) {

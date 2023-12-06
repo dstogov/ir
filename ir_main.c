@@ -355,6 +355,8 @@ static void ir_dump_func_dcl(const char *name, uint32_t flags, ir_type ret_type,
 	fprintf(f, "): %s", ir_type_cname[ret_type]);
 	if (flags & IR_FASTCALL_FUNC) {
 		fprintf(f, " __fastcall");
+	} else if (flags & IR_BUILTIN_FUNC) {
+		fprintf(f, " __builtin");
 	}
 	fprintf(f, ";\n");
 }

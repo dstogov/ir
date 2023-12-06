@@ -343,7 +343,9 @@ static ir_ref llvm2ir_fcmp_op_isnan(ir_ctx *ctx, LLVMValueRef expr, ir_type type
 	} else {
 		func = BUILTIN_FUNC_1("isnanf", IR_BOOL, IR_FLOAT);
 	}
-	if (LLVMGetValueKind(op1) == LLVMConstantIntValueKind) {
+	if (LLVMGetValueKind(op0) == LLVMConstantFPValueKind) {
+		ref = ir_CALL_1(IR_BOOL, func, llvm2ir_op(ctx, op1, type));
+	} else if (LLVMGetValueKind(op1) == LLVMConstantFPValueKind) {
 		ref = ir_CALL_1(IR_BOOL, func, llvm2ir_op(ctx, op0, type));
 	} else {
 		ref = ir_OR_B(
@@ -926,17 +928,6 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 		}
 		return ir_CALL_2(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type),
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 1), IR_I32));
-	} else if (STR_START(name, name_len, "llvm.frexp.")) {
-		IR_ASSERT(count == 2);
-		type = llvm2ir_type(LLVMGetReturnType(ftype));
-		IR_ASSERT(IR_IS_TYPE_FP(type));
-		if (type == IR_DOUBLE) {
-			func = BUILTIN_FUNC_2("frexp", IR_DOUBLE, IR_DOUBLE, IR_ADDR);
-		} else {
-			func = BUILTIN_FUNC_2("frexpf", IR_FLOAT, IR_FLOAT, IR_ADDR);
-		}
-		return ir_CALL_2(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type),
-			llvm2ir_op(ctx, LLVMGetOperand(insn, 1), IR_ADDR));
 	} else if (STR_START(name, name_len, "llvm.log.")) {
 		IR_ASSERT(count == 1);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
