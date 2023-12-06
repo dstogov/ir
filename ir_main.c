@@ -231,6 +231,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, FILE *dump_file, 
 
 typedef struct _ir_sym {
 	void *addr;
+	void *thunk_addr;
 } ir_sym;
 
 typedef struct _ir_main_loader {
@@ -265,6 +266,9 @@ static bool ir_loader_add_sym(ir_loader *loader, const char *name, void *addr)
 		if (addr && !l->sym[old_val].addr) {
 			/* Update forward declaration */
 			l->sym[old_val].addr = addr;
+			if (l->sym[old_val].thunk_addr) {
+				// TODO: Fix thunk or relocation ???
+			}
 			return 1;
 		}
 		return 0;
@@ -274,6 +278,7 @@ static bool ir_loader_add_sym(ir_loader *loader, const char *name, void *addr)
 		l->sym = ir_mem_realloc(l->sym, sizeof(ir_sym) * l->sym_count);
 	}
 	l->sym[val].addr = addr;
+	l->sym[val].thunk_addr = NULL;
 	return 1;
 }
 
@@ -293,7 +298,15 @@ static void* ir_loader_resolve_sym_name(ir_loader *loader, const char *name)
 	void *addr;
 
 	if (val) {
-		return l->sym[val].addr;
+		if (l->sym[val].addr) {
+			return l->sym[val].addr;
+		}
+		if (!l->sym[val].thunk_addr) {
+			/* Undefined declaration */
+			// TODO: Add thunk or relocation ???
+			l->sym[val].thunk_addr = (void*)(intptr_t)sizeof(void*);
+		}
+		return l->sym[val].thunk_addr;
 	}
 	addr = ir_resolve_sym_name(name);
 	ir_loader_add_sym(loader, name, addr); /* cache */
@@ -312,11 +325,9 @@ static bool ir_loader_external_sym_dcl(ir_loader *loader, const char *name, uint
 		fprintf(l->dump_file, "extern %s %s;\n", (flags & IR_CONST) ? "const" : "var", name);
 	}
 	if (l->c_file) {
-		// TODO:
 		ir_emit_c_sym_decl(name, flags | IR_EXTERN, 0, l->c_file);
 	}
 	if (l->llvm_file) {
-		// TODO:
 		ir_emit_llvm_sym_decl(name, flags | IR_EXTERN, 0, l->llvm_file);
 	}
 	if (l->dump_asm || l->dump_size || l->run) {
@@ -430,11 +441,9 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 		fprintf(l->dump_file, "%s %s [%ld]%s\n", (flags & IR_CONST) ? "const" : "var", name, size, has_data ? " = {" : ";");
 	}
 	if (l->c_file) {
-		// TODO:
 		ir_emit_c_sym_decl(name, flags, has_data, l->c_file);
 	}
 	if (l->llvm_file) {
-		// TODO:
 		ir_emit_llvm_sym_decl(name, flags, has_data, l->llvm_file);
 	}
 	if (l->dump_asm || l->dump_size || l->run) {
