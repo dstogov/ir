@@ -262,6 +262,11 @@ static bool ir_loader_add_sym(ir_loader *loader, const char *name, void *addr)
 	ir_ref val = ir_strtab_count(&l->symtab) + 1;
 	ir_ref old_val = ir_strtab_lookup(&l->symtab, name, len, val);
 	if (old_val != val) {
+		if (addr && !l->sym[old_val].addr) {
+			/* Update forward declaration */
+			l->sym[old_val].addr = addr;
+			return 1;
+		}
 		return 0;
 	}
 	if (val >= l->sym_count) {
