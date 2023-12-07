@@ -1052,7 +1052,7 @@ finish:
 
 	if (dump_size) {
 		if (loader.code_buffer.start) {
-			loader.size = loader.code_buffer.pos - loader.code_buffer.start;
+			loader.size = (char*)loader.code_buffer.pos - (char*)loader.code_buffer.start;
 		}
 		fprintf(stderr, "\ncode size = %lld\n", (long long int)loader.size);
 	}
