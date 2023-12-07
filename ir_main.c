@@ -252,8 +252,7 @@ typedef struct _ir_main_loader {
 	ir_sym    *sym;
 	ir_ref     sym_count;
 	void      *data;
-	void      *code_buffer;
-	size_t     code_buffer_size;
+	ir_code_buffer code_buffer;
 } ir_main_loader;
 
 static bool ir_loader_add_sym(ir_loader *loader, const char *name, void *addr)
@@ -641,32 +640,30 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 		size_t size;
 		void *entry;
 
-		if (l->code_buffer) {
-			ctx->code_buffer = (char*)l->code_buffer + l->size;
-			ctx->code_buffer_size = l->code_buffer_size - l->size;
-			ir_mem_unprotect(l->code_buffer, l->code_buffer_size);
+		if (l->code_buffer.start) {
+			ctx->code_buffer = &l->code_buffer;
+			ir_mem_unprotect(l->code_buffer.start, (char*)l->code_buffer.end - (char*)l->code_buffer.start);
 		}
 		entry = ir_emit_code(ctx, &size);
 #ifndef _WIN32
 		if (l->run) {
-			if (!l->code_buffer) {
+			if (!l->code_buffer.start) {
 				ir_mem_unprotect(entry, size);
 			}
 			ir_gdb_register(name, entry, size, sizeof(void*), 0);
-			if (!l->code_buffer) {
+			if (!l->code_buffer.start) {
 				ir_mem_protect(entry, size);
 			}
 		}
 #endif
-		if (l->code_buffer) {
-			ir_mem_protect(l->code_buffer, l->code_buffer_size);
+		if (l->code_buffer.start) {
+			ir_mem_protect(l->code_buffer.start, (char*)l->code_buffer.end - (char*)l->code_buffer.start);
 		}
 		if (entry) {
-			l->size += size;
-#if defined(IR_TARGET_AARCH64)
-			l->size += ctx->veneers_size;
-#endif
-			l->size = IR_ALIGNED_SIZE(l->size, 16);
+			if (!l->code_buffer.start) {
+				l->size += size;
+				l->size = IR_ALIGNED_SIZE(l->size, 16);
+			}
 			if (!ir_loader_add_sym(loader, name, entry)) {
 				fprintf(stderr, "\nERROR: Symbol redefinition: %s\n", name);
 				return 0;
@@ -994,12 +991,15 @@ int main(int argc, char **argv)
 #if defined(IR_TARGET_AARCH64)
 	if (dump_asm || dump_size || run) {
 		/* Preallocate 2MB JIT code buffer. On AArch64 it may be necessary to generate veneers. */
-		loader.code_buffer_size = 2 * 1024 * 1024;
-		loader.code_buffer = ir_mem_mmap(loader.code_buffer_size);
-		if (!loader.code_buffer) {
+		size_t size = 2 * 1024 * 1024;
+
+		loader.code_buffer.start = ir_mem_mmap(size);
+		if (!loader.code_buffer.start) {
 			fprintf(stderr, "ERROR: Cannot allocate JIT code buffer\n");
 			return 0;
 		}
+		loader.code_buffer.pos = loader.code_buffer.start;
+		loader.code_buffer.end = (char*)loader.code_buffer.start + size;
 	}
 #endif
 
@@ -1051,6 +1051,9 @@ finish:
 	}
 
 	if (dump_size) {
+		if (loader.code_buffer.start) {
+			loader.size = loader.code_buffer.pos - loader.code_buffer.start;
+		}
 		fprintf(stderr, "\ncode size = %lld\n", (long long int)loader.size);
 	}
 

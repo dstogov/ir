@@ -21,8 +21,8 @@
 #define IR_IS_FP_ZERO(insn)       ((insn.type == IR_DOUBLE) ? (insn.val.u64 == 0) : (insn.val.u32 == 0))
 #define IR_MAY_USE_32BIT_ADDR(addr) \
 	(ctx->code_buffer && \
-	IR_IS_SIGNED_32BIT((char*)(addr) - (char*)ctx->code_buffer) && \
-	IR_IS_SIGNED_32BIT((char*)(addr) - ((char*)ctx->code_buffer + ctx->code_buffer_size)))
+	IR_IS_SIGNED_32BIT((char*)(addr) - (char*)ctx->code_buffer->start) && \
+	IR_IS_SIGNED_32BIT((char*)(addr) - ((char*)ctx->code_buffer->end)))
 
 #define IR_SPILL_POS_TO_OFFSET(offset) \
 	((ctx->flags & IR_USE_FRAME_POINTER) ? \
@@ -9675,14 +9675,15 @@ next_block:;
 	}
 	size = *size_ptr;
 
-	if (ctx->code_buffer != NULL) {
-		if (IR_ALIGNED_SIZE(size, 16) > ctx->code_buffer_size) {
+	if (ctx->code_buffer) {
+		entry = ctx->code_buffer->pos;
+		entry = (void*)IR_ALIGNED_SIZE(((size_t)(entry)), 16);
+		if (size > (size_t)((char*)ctx->code_buffer->end - (char*)entry)) {
 			ctx->data = NULL;
 			ctx->status = IR_ERROR_CODE_MEM_OVERFLOW;
 			return NULL;
 		}
-		entry = ctx->code_buffer;
-		IR_ASSERT((uintptr_t)entry % 16 == 0);
+		ctx->code_buffer->pos = (char*)entry + size;
 	} else {
 		entry = ir_mem_mmap(size);
 		if (!entry) {
@@ -9698,7 +9699,12 @@ next_block:;
 	if (ret != DASM_S_OK) {
 		IR_ASSERT(0);
 		dasm_free(&data.dasm_state);
-		if (ctx->code_buffer == NULL) {
+		if (ctx->code_buffer) {
+			if (ctx->code_buffer->pos == (char*)entry + size) {
+				/* rollback */
+				ctx->code_buffer->pos = (char*)entry - size;
+			}
+		} else {
 			ir_mem_unmap(entry, size);
 		}
 		ctx->data = NULL;
@@ -9746,7 +9752,7 @@ next_block:;
 	}
 #endif
 
-	if (ctx->code_buffer == NULL) {
+	if (!ctx->code_buffer) {
 		ir_mem_protect(entry, size);
 	}
 
@@ -9754,7 +9760,7 @@ next_block:;
 	return entry;
 }
 
-const void *ir_emit_exitgroup(uint32_t first_exit_point, uint32_t exit_points_per_group, const void *exit_addr, void *code_buffer, size_t code_buffer_size, size_t *size_ptr)
+const void *ir_emit_exitgroup(uint32_t first_exit_point, uint32_t exit_points_per_group, const void *exit_addr, ir_code_buffer *code_buffer, size_t *size_ptr)
 {
 	void *entry;
 	size_t size;
@@ -9763,8 +9769,8 @@ const void *ir_emit_exitgroup(uint32_t first_exit_point, uint32_t exit_points_pe
 	int ret;
 
 	IR_ASSERT(code_buffer);
-	IR_ASSERT(IR_IS_SIGNED_32BIT((char*)exit_addr - (char*)code_buffer));
-	IR_ASSERT(IR_IS_SIGNED_32BIT((char*)exit_addr - ((char*)code_buffer + code_buffer_size)));
+	IR_ASSERT(IR_IS_SIGNED_32BIT((char*)exit_addr - (char*)code_buffer->start));
+	IR_ASSERT(IR_IS_SIGNED_32BIT((char*)exit_addr - (char*)code_buffer->end));
 
 	Dst = &dasm_state;
 	dasm_state = NULL;
@@ -9788,24 +9794,20 @@ const void *ir_emit_exitgroup(uint32_t first_exit_point, uint32_t exit_points_pe
 		return NULL;
 	}
 
-	if (code_buffer != NULL) {
-		if (IR_ALIGNED_SIZE(size, 16) > code_buffer_size) {
-			dasm_free(&dasm_state);
-			return NULL;
-		}
-		entry = code_buffer;
-		IR_ASSERT((uintptr_t)entry % 16 == 0);
-	} else {
-		entry = ir_mem_mmap(size);
-		ir_mem_unprotect(entry, size);
+	entry = code_buffer->pos;
+	entry = (void*)IR_ALIGNED_SIZE(((size_t)(entry)), 16);
+	if (size > (size_t)((char*)code_buffer->end - (char*)entry)) {
+		return NULL;
 	}
+	code_buffer->pos = (char*)entry + size;
 
 	ret = dasm_encode(&dasm_state, entry);
 	if (ret != DASM_S_OK) {
 		IR_ASSERT(0);
 		dasm_free(&dasm_state);
-		if (code_buffer == NULL) {
-			ir_mem_unmap(entry, size);
+		if (code_buffer->pos == (char*)entry + size) {
+			/* rollback */
+			code_buffer->pos = (char*)entry - size;
 		}
 		return NULL;
 	}
@@ -9813,10 +9815,6 @@ const void *ir_emit_exitgroup(uint32_t first_exit_point, uint32_t exit_points_pe
 	dasm_free(&dasm_state);
 
 	ir_mem_flush(entry, size);
-
-	if (code_buffer == NULL) {
-		ir_mem_protect(entry, size);
-	}
 
 	*size_ptr = size;
 	return entry;
