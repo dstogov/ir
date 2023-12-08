@@ -86,10 +86,8 @@ test:
 	subsd .L3(%rip), %xmm1
 	movsd %xmm1, -0x38(%rbp)
 	movsd %xmm0, -0x30(%rbp)
-	xorpd %xmm0, %xmm0
-	movsd %xmm0, -0x28(%rbp)
-	xorpd %xmm0, %xmm0
-	movsd %xmm0, -0x20(%rbp)
+	movq $0, -0x28(%rbp)
+	movq $0, -0x20(%rbp)
 	subq $8, %rsp
 	movq %rsp, %rax
 	movl $0, (%rax)
@@ -128,7 +126,7 @@ test:
 	popq %rbp
 	retq
 .rodata
-	.db 0x90, 0x90
+	.db 0x90, 0x90, 0x90, 0x90
 .L3:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f
 .L4:
