@@ -47,7 +47,6 @@ static ir_type llvm2ir_type(LLVMTypeRef type)
 				case 32: return IR_I32;
 				case 64: return IR_I64;
 				default:
-					IR_ASSERT(0);
 					break;
 			}
 			break;
@@ -152,8 +151,9 @@ static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 	ir_ref proto;
 	ir_val val;
 	char buf[256];
+	LLVMValueKind kind = LLVMGetValueKind(op);
 
-	switch (LLVMGetValueKind(op)) {
+	switch (kind) {
 		case LLVMConstantIntValueKind:
 			IR_ASSERT(IR_IS_TYPE_INT(type));
 			if (IR_IS_TYPE_SIGNED(type)) {
@@ -201,9 +201,12 @@ static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 			name = LLVMGetValueName2(op, &name_len);
 			return ir_const_func(ctx, ir_strl(ctx, name, name_len), proto);
 		case LLVMUndefValueValueKind:
+		case LLVMPoisonValueValueKind:
+			// TODO: ???
 			val.u64 = 0;
 			return ir_const(ctx, val, type);
 		default:
+			fprintf(stderr, "Unsupported LLVM value kind: %d\n", kind);
 			IR_ASSERT(0);
 			return 0;
 	}
@@ -520,6 +523,9 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 		/* skip */
 		return IR_NULL;
 	} else if (STR_START(name, name_len, "llvm.dbg.")) {
+		/* skip */
+		return IR_NULL;
+	} else if (STR_EQUAL(name, name_len, "llvm.experimental.noalias.scope.decl")) {
 		/* skip */
 		return IR_NULL;
 	} else if (STR_EQUAL(name, name_len, "llvm.assume")) {
@@ -1127,10 +1133,8 @@ static ir_ref llvm2ir_const_element_ptr(ir_ctx *ctx, LLVMValueRef expr)
 
 	type_kind = LLVMGetTypeKind(type);
 	IR_ASSERT(type_kind == LLVMPointerTypeKind);
-	if (LLVMGetValueKind(op0) == LLVMGlobalVariableValueKind) {
-		type = LLVMGlobalGetValueType(op0);
-		type_kind = LLVMGetTypeKind(type);
-	}
+	type = LLVMGetGEPSourceElementType(expr);
+	type_kind = LLVMGetTypeKind(type);
 
 	op = LLVMGetOperand(expr, 1);
 	IR_ASSERT(LLVMGetValueKind(op) == LLVMConstantIntValueKind);
@@ -1932,7 +1936,7 @@ static int llvm2ir_forward_func(ir_loader *loader, const char *name, LLVMValueRe
 	return loader->forward_func_dcl(loader, name, flags, ret_type, count, param_types);
 }
 
-static int llvm2ir_data(ir_loader *loader, LLVMTargetDataRef target_data, LLVMTypeRef type, LLVMValueRef op)
+static int llvm2ir_data(ir_loader *loader, LLVMTargetDataRef target_data, LLVMTypeRef type, LLVMValueRef op, size_t pos)
 {
 	LLVMTypeRef el_type;
 	LLVMValueRef el;
@@ -1944,6 +1948,7 @@ static int llvm2ir_data(ir_loader *loader, LLVMTargetDataRef target_data, LLVMTy
 	size_t name_len;
 	char buf[256];
 	void *p = NULL;
+	size_t offset, el_size;
 	LLVMValueKind kind = LLVMGetValueKind(op);
 
 	switch (kind) {
@@ -1981,22 +1986,27 @@ static int llvm2ir_data(ir_loader *loader, LLVMTargetDataRef target_data, LLVMTy
 		case LLVMConstantArrayValueKind:
 		case LLVMConstantDataArrayValueKind:
 			el_type = LLVMGetElementType(type);
+			el_size = LLVMABISizeOfType(target_data, el_type);
 			len = LLVMGetArrayLength(type);
+			offset = 0;
 			for (i = 0; i < len; i++) {
 				el = LLVMGetAggregateElement(op, i);
-				if (!llvm2ir_data(loader, target_data, el_type, el)) {
+				if (!llvm2ir_data(loader, target_data, el_type, el, pos)) {
 					return 0;
 				}
+				pos += el_size;
 			}
 			return 1;
 		case LLVMConstantStructValueKind:
 			len = LLVMCountStructElementTypes(type);
 			for (i = 0; i < len; i++) {
-				// TODO: support for offset and alignment
-				// offset = LLVMOffsetOfElement(target_data, type, i);
+				offset = LLVMOffsetOfElement(target_data, type, i);
+				if (i > 0 && loader->sym_data_pad) {
+					loader->sym_data_pad(loader, pos + offset);
+				}
 				el_type = LLVMStructGetTypeAtIndex(type, i);
 				el = LLVMGetAggregateElement(op, i);
-				if (!llvm2ir_data(loader, target_data, el_type, el)) {
+				if (!llvm2ir_data(loader, target_data, el_type, el, pos + offset)) {
 					return 0;
 				}
 			}
@@ -2038,9 +2048,20 @@ static int llvm2ir_data(ir_loader *loader, LLVMTargetDataRef target_data, LLVMTy
 //		case LLVMConstantExprValueKind:
 //			IR_ASSERT(0);
 //			return 0;
-//		case LLVMUndefValueValueKind:
-//			IR_ASSERT(0);
-//			return 0;
+		case LLVMUndefValueValueKind:
+		case LLVMPoisonValueValueKind:
+			// TODO: ???
+			if (LLVMGetTypeKind(type) == LLVMArrayTypeKind) {
+				el_type = LLVMGetElementType(type);
+				len = LLVMGetArrayLength(type);
+				t = llvm2ir_type(el_type);
+				val.i64 = 0;
+				return loader->sym_data(loader, t, len, &val.i64);
+			} else {
+				t = llvm2ir_type(type);
+				val.i64 = 0;
+				return loader->sym_data(loader, t, 1, &val.i64);
+			}
 		default:
 			fprintf(stderr, "Unsupported LLVM value kind: %d\n", kind);
 			IR_ASSERT(0);
@@ -2125,7 +2146,7 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 					return 0;
 				}
 				if (has_data) {
-					llvm2ir_data(loader, target_data, type, init);
+					llvm2ir_data(loader, target_data, type, init, 0);
 					if (!loader->sym_data_end(loader)) {
 						return 0;
 					}

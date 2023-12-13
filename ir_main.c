@@ -253,6 +253,7 @@ typedef struct _ir_main_loader {
 	ir_strtab  symtab;
 	ir_sym    *sym;
 	ir_ref     sym_count;
+	void      *data_start;
 	void      *data;
 	ir_code_buffer code_buffer;
 } ir_main_loader;
@@ -456,7 +457,7 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 		}
 		memset(data, 0, size);
 		if (has_data) {
-			l->data = data;
+			l->data_start = l->data = data;
 		}
 		if (l->dump_asm) {
 			ir_disasm_add_symbol(name, (uintptr_t)data, size);
@@ -514,9 +515,35 @@ static bool ir_loader_sym_data(ir_loader *loader, ir_type type, uint32_t count, 
 		if (!l->data) {
 			return 0;
 		}
-		// TODO: alignement
 		memcpy(l->data, data, size);
 		l->data = (void*)((uintptr_t)l->data + size);
+	}
+	return 1;
+}
+
+static bool ir_loader_sym_data_pad(ir_loader *loader, size_t offset)
+{
+	ir_main_loader *l = (ir_main_loader*) loader;
+	size_t i;
+
+	IR_ASSERT(offset >= (size_t)((char*)l->data - (char*)l->data_start));
+	offset -= (char*)l->data - (char*)l->data_start;
+	if (offset) {
+		if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
+			for (i = 0; i < offset; i++) {
+				fprintf(l->dump_file, "\tuint8_t 0x00,\n");
+			}
+		}
+		if (l->c_file) {
+			// TODO:
+		}
+		if (l->llvm_file) {
+			// TODO:
+		}
+		if (l->dump_asm || l->dump_size || l->run) {
+			memset(l->data, 0, offset);
+			l->data = (void*)((uintptr_t)l->data + offset);
+		}
 	}
 	return 1;
 }
@@ -943,6 +970,7 @@ int main(int argc, char **argv)
 	loader.loader.forward_func_dcl   = ir_loader_forward_func_dcl;
 	loader.loader.sym_dcl            = ir_loader_sym_dcl;
 	loader.loader.sym_data           = ir_loader_sym_data;
+	loader.loader.sym_data_pad       = ir_loader_sym_data_pad;
 	loader.loader.sym_data_ref       = ir_loader_sym_data_ref;
 	loader.loader.sym_data_end       = ir_loader_sym_data_end;
 	loader.loader.func_init          = ir_loader_func_init;
