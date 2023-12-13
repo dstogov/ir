@@ -1072,7 +1072,6 @@ finish:
 		int jit_argc = 1;
 		char **jit_argv;
 		int (*func)(int, char**) = loader.main;
-		int ret;
 
 		if (run_args && argc > run_args) {
 			jit_argc = argc - run_args + 1;
@@ -1082,11 +1081,7 @@ finish:
 		for (i = 1; i < jit_argc; i++) {
 			jit_argv[i] = argv[run_args + i - 1];
 		}
-		ret = func(jit_argc, jit_argv);
-		fflush(stdout);
-		if (ret) {
-			fprintf(stderr, "\nexit code = %d\n", ret);
-		}
+		return func(jit_argc, jit_argv);
 	}
 
 	return 0;

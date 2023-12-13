@@ -287,13 +287,19 @@ static int run_test(const char *filename, test *t, int show_diff)
 
 	ret = system(cmd) >> 8;
 
+	if (ret) {
+		FILE *f = fopen(out_filename, "a+");
+		fprintf(f, "\nexit code = %d\n", ret);
+		fclose(f);
+	}
+
 	out = read_file(out_filename);
 	if (!out) {
 		out = malloc(1);
 		out[0] = 0;
 	}
 
-	ret = ret == 0 && same_text(t->expect, out);
+	ret = same_text(t->expect, out);
 	if (ret) {
 		unlink(code_filename);
 		unlink(out_filename);
