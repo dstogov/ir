@@ -536,7 +536,11 @@ static bool ir_loader_sym_data_ref(ir_loader *loader, ir_op op, const char *ref)
 		// TODO:
 	}
 	if (l->dump_asm || l->dump_size || l->run) {
-		// TODO:
+		void *addr = ir_loader_resolve_sym_name(loader, ref);
+
+		IR_ASSERT(addr);
+		memcpy(l->data, &addr, sizeof(void*));
+		l->data = (void*)((uintptr_t)l->data + sizeof(void*));
 	}
 	return 1;
 }
