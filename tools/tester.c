@@ -285,21 +285,47 @@ static int run_test(const char *filename, test *t, int show_diff)
 		return 0;
 	}
 
-	ret = system(cmd) >> 8;
+	ret = system(cmd);
 
-	if (ret) {
-		FILE *f = fopen(out_filename, "a+");
-		fprintf(f, "\nexit code = %d\n", ret);
-		fclose(f);
+	if (ret != -1) {
+	    FILE *f;
+
+#ifdef _WIN32
+		if (ret) {
+			f = fopen(out_filename, "a+");
+			fprintf(f, "\nexit code = %d\n", ret);
+			fclose(f);
+		}
+#else
+		if (WIFEXITED(ret)) {
+			ret = WEXITSTATUS(ret);
+		    if (ret > 128 && ret < 160) {
+				f = fopen(out_filename, "a+");
+				fprintf(f, "\ntermsig = %d\n", ret - 128);
+				fclose(f);
+			} else if (ret) {
+				f = fopen(out_filename, "a+");
+				fprintf(f, "\nexit code = %d\n", ret);
+				fclose(f);
+			}
+		} else if (WIFSIGNALED(ret)) {
+			ret = WTERMSIG(ret);
+			f = fopen(out_filename, "a+");
+			fprintf(f, "\ntermsig = %d\n", ret);
+			fclose(f);
+		}
+#endif
+
+		out = read_file(out_filename);
+		if (!out) {
+			out = malloc(1);
+			out[0] = 0;
+		}
+		ret = same_text(t->expect, out);
+	} else {
+		ret = 0;
 	}
 
-	out = read_file(out_filename);
-	if (!out) {
-		out = malloc(1);
-		out[0] = 0;
-	}
-
-	ret = same_text(t->expect, out);
 	if (ret) {
 		unlink(code_filename);
 		unlink(out_filename);
