@@ -25,6 +25,8 @@ static void help(const char *cmd)
 		"Options:\n"
 		"  -O[012]                    - optimization level (default: 2)\n"
 		"  -S                         - dump final target assembler code\n"
+		"  --run ...                  - run the main() function of generated code\n"
+		"                               (the remaining arguments are passed to main)\n"
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 		"  -mavx                      - use AVX instruction set\n"
 		"  -mno-bmi1                  - disable BMI1 instruction set\n"
@@ -706,7 +708,7 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 
 int main(int argc, char **argv)
 {
-	int i;
+	int i, run_args = 0;
 	char *input = NULL;
 	char *dump_file = NULL, *c_file = NULL, *llvm_file = 0;
 	FILE *f;
@@ -815,6 +817,10 @@ int main(int argc, char **argv)
 			dump_asm = 1;
 		} else if (strcmp(argv[i], "--run") == 0) {
 			run = 1;
+			if (i + 1 < argc) {
+				run_args = i + 1;
+			}
+			break;
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 		} else if (strcmp(argv[i], "-mavx") == 0) {
 			mflags |= IR_X86_AVX;
@@ -1063,8 +1069,20 @@ finish:
 	}
 
 	if (run && loader.main) {
-		int (*func)(void) = loader.main;
-		int ret = func();
+		int jit_argc = 1;
+		char **jit_argv;
+		int (*func)(int, char**) = loader.main;
+		int ret;
+
+		if (run_args && argc > run_args) {
+			jit_argc = argc - run_args + 1;
+		}
+		jit_argv = alloca(sizeof(char*) * jit_argc);
+		jit_argv[0] = "jit code";
+		for (i = 1; i < jit_argc; i++) {
+			jit_argv[i] = argv[run_args + i - 1];
+		}
+		ret = func(jit_argc, jit_argv);
 		fflush(stdout);
 		if (ret) {
 			fprintf(stderr, "\nexit code = %d\n", ret);
