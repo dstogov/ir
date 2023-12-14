@@ -303,6 +303,8 @@ static ir_ref llvm2ir_cast_op(ir_ctx *ctx, LLVMValueRef expr, ir_op op)
 	dst_type = llvm2ir_type(LLVMTypeOf(expr));
 	if (op == IR_ZEXT && src_type == IR_BOOL && (dst_type == IR_I8 || dst_type == IR_U8)) {
 		op = IR_BITCAST;
+	} else if (op == IR_BITCAST && ir_type_size[src_type] != ir_type_size[dst_type]) {
+		op = (ir_type_size[src_type] < ir_type_size[dst_type]) ? IR_ZEXT : IR_TRUNC;
 	}
 	ref = llvm2ir_op(ctx, op0, src_type);
 	ref = ir_fold1(ctx, IR_OPT(op, dst_type), ref);
