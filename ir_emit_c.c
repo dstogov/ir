@@ -743,6 +743,10 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	}
 	fprintf(f, ")\n{\n");
 
+	if (!ctx->prev_ref) {
+		ir_build_prev_refs(ctx);
+	}
+
 	/* Emit declarations for local variables */
 	vars = ir_bitset_malloc(ctx->vregs_count + 1);
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
