@@ -1185,13 +1185,8 @@ static void llvm2ir_element_ptr(ir_ctx *ctx, LLVMValueRef insn)
 
 	type_kind = LLVMGetTypeKind(type);
 	IR_ASSERT(type_kind == LLVMPointerTypeKind);
-	if (LLVMGetValueKind(op0) == LLVMGlobalVariableValueKind) {
-		type = LLVMGlobalGetValueType(op0);
-		type_kind = LLVMGetTypeKind(type);
-	} else {
-		type = LLVMGetGEPSourceElementType(insn);
-		type_kind = LLVMGetTypeKind(type);
-	}
+	type = LLVMGetGEPSourceElementType(insn);
+	type_kind = LLVMGetTypeKind(type);
 
 	op = LLVMGetOperand(insn, 1);
 	if (LLVMGetValueKind(op) == LLVMConstantIntValueKind) {
