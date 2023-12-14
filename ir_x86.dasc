@@ -2790,9 +2790,9 @@ static void ir_emit_min_max_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	} else {
 		IR_ASSERT(insn->op == IR_MAX);
 		if (IR_IS_TYPE_SIGNED(type)) {
-			|	ASM_REG_REG_OP2 cmova, type, def_reg, op2_reg
+			|	ASM_REG_REG_OP2 cmovl, type, def_reg, op2_reg
 		} else {
-			|	ASM_REG_REG_OP2 cmovg, type, def_reg, op2_reg
+			|	ASM_REG_REG_OP2 cmovb, type, def_reg, op2_reg
 		}
 	}
 
