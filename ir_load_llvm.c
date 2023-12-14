@@ -1987,6 +1987,9 @@ static int llvm2ir_data(ir_loader *loader, LLVMTargetDataRef target_data, LLVMTy
 			len = LLVMGetArrayLength(type);
 			offset = 0;
 			for (i = 0; i < len; i++) {
+				if (i > 0 && loader->sym_data_pad) {
+					loader->sym_data_pad(loader, pos + offset);
+				}
 				el = LLVMGetAggregateElement(op, i);
 				if (!llvm2ir_data(loader, target_data, el_type, el, pos)) {
 					return 0;
