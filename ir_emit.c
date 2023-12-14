@@ -609,7 +609,7 @@ int ir_match(ir_ctx *ctx)
 			if (insn->op == IR_END || insn->op == IR_LOOP_END) {
 				ctx->rules[ref] = insn->op;
 				ref = prev_ref[ref];
-				if (ref == start) {
+				if (ref == start && ctx->cfg_edges[bb->successors] != b) {
 					if (EXPECTED(!(bb->flags & IR_BB_ENTRY))) {
 						bb->flags |= IR_BB_EMPTY;
 					} else if (ctx->flags & IR_MERGE_EMPTY_ENTRIES) {
