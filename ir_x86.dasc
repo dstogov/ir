@@ -1062,6 +1062,7 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref)
 		case IR_UGT:
 			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)) {
 				if (IR_IS_CONST_REF(insn->op2)
+				 && !IR_IS_SYM_CONST(ctx->ir_base[insn->op2].op)
 				 && ctx->ir_base[insn->op2].val.i64 == 0
 				 && insn->op1 == ref - 1) { /* previous instruction */
 					ir_insn *op1_insn = &ctx->ir_base[insn->op1];
@@ -1104,7 +1105,9 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref)
 			if (IR_IS_TYPE_INT(insn->type)) {
 				if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
 					op2_insn = &ctx->ir_base[insn->op2];
-					if (IR_IS_CONST_REF(insn->op1)) {
+					if (IR_IS_SYM_CONST(op2_insn->op)) {
+						/* pass */
+					} else if (IR_IS_CONST_REF(insn->op1)) {
 						// const
 					} else if (op2_insn->val.i64 == 0) {
 						return IR_COPY_INT;
@@ -1224,7 +1227,9 @@ binop_fp:
 			if (IR_IS_TYPE_INT(insn->type)) {
 				if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
 					op2_insn = &ctx->ir_base[insn->op2];
-					if (IR_IS_CONST_REF(insn->op1)) {
+					if (IR_IS_SYM_CONST(op2_insn->op)) {
+						/* pass */
+					} else if (IR_IS_CONST_REF(insn->op1)) {
 						// const
 					} else if (op2_insn->val.u64 == 0) {
 						// 0
@@ -1270,7 +1275,8 @@ binop_fp:
 			if (IR_IS_TYPE_SIGNED(insn->type) && ir_type_size[insn->type] != 1) {
 				if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
 					op2_insn = &ctx->ir_base[insn->op2];
-					if (IR_IS_SIGNED_32BIT(op2_insn->val.i64)
+					if (!IR_IS_SYM_CONST(op2_insn->op)
+					 && IR_IS_SIGNED_32BIT(op2_insn->val.i64)
 					 && !IR_IS_CONST_REF(insn->op1)) {
 						/* MUL(_, imm32) => IMUL */
 						ir_match_fuse_load(ctx, insn->op1, ref);
@@ -1285,7 +1291,9 @@ binop_fp:
 			if (IR_IS_TYPE_INT(insn->type)) {
 				if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
 					op2_insn = &ctx->ir_base[insn->op2];
-					if (IR_IS_CONST_REF(insn->op1)) {
+					if (IR_IS_SYM_CONST(op2_insn->op)) {
+						/* pass */
+					} else if (IR_IS_CONST_REF(insn->op1)) {
 						// const
 					} else if (op2_insn->val.u64 == 1) {
 						return IR_COPY_INT;
@@ -1303,7 +1311,9 @@ binop_fp:
 		case IR_MOD:
 			if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
 				op2_insn = &ctx->ir_base[insn->op2];
-				if (IR_IS_CONST_REF(insn->op1)) {
+				if (IR_IS_SYM_CONST(op2_insn->op)) {
+					/* pass */
+				} else if (IR_IS_CONST_REF(insn->op1)) {
 					// const
 				} else if (IR_IS_TYPE_UNSIGNED(insn->type)
 				 && IR_IS_POWER_OF_TWO(op2_insn->val.u64)
@@ -1339,7 +1349,9 @@ binop_fp:
 		case IR_OR:
 			if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
 				op2_insn = &ctx->ir_base[insn->op2];
-				if (IR_IS_CONST_REF(insn->op1)) {
+				if (IR_IS_SYM_CONST(op2_insn->op)) {
+					/* pass */
+				} else if (IR_IS_CONST_REF(insn->op1)) {
 					// const
 				} else if (op2_insn->val.i64 == 0) {
 					return IR_COPY_INT;
@@ -1351,7 +1363,9 @@ binop_fp:
 		case IR_AND:
 			if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
 				op2_insn = &ctx->ir_base[insn->op2];
-				if (IR_IS_CONST_REF(insn->op1)) {
+				if (IR_IS_SYM_CONST(op2_insn->op)) {
+					/* pass */
+				} else if (IR_IS_CONST_REF(insn->op1)) {
 					// const
 				} else if (op2_insn->val.i64 == 0) {
 					// 0
@@ -1363,7 +1377,9 @@ binop_fp:
 		case IR_XOR:
 			if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
 				op2_insn = &ctx->ir_base[insn->op2];
-				if (IR_IS_CONST_REF(insn->op1)) {
+				if (IR_IS_SYM_CONST(op2_insn->op)) {
+					/* pass */
+				} else if (IR_IS_CONST_REF(insn->op1)) {
 					// const
 				}
 			}
@@ -1372,7 +1388,9 @@ binop_fp:
 			if (IR_IS_CONST_REF(insn->op2)) {
 				if (ctx->flags & IR_OPT_CODEGEN) {
 					op2_insn = &ctx->ir_base[insn->op2];
-					if (IR_IS_CONST_REF(insn->op1)) {
+					if (IR_IS_SYM_CONST(op2_insn->op)) {
+						/* pass */
+					} else if (IR_IS_CONST_REF(insn->op1)) {
 						// const
 					} else if (op2_insn->val.u64 == 0) {
 						return IR_COPY_INT;
@@ -1396,7 +1414,9 @@ binop_fp:
 			if (IR_IS_CONST_REF(insn->op2)) {
 				if (ctx->flags & IR_OPT_CODEGEN) {
 					op2_insn = &ctx->ir_base[insn->op2];
-					if (IR_IS_CONST_REF(insn->op1)) {
+					if (IR_IS_SYM_CONST(op2_insn->op)) {
+						/* pass */
+					} else if (IR_IS_CONST_REF(insn->op1)) {
 						// const
 					} else if (op2_insn->val.u64 == 0) {
 						return IR_COPY_INT;
@@ -1670,6 +1690,7 @@ store_int:
 				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT) {
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
 						if (IR_IS_CONST_REF(op2_insn->op2)
+						 && !IR_IS_SYM_CONST(ctx->ir_base[op2_insn->op2].op)
 						 && ctx->ir_base[op2_insn->op2].val.i64 == 0
 						 && op2_insn->op1 == insn->op2 - 1) { /* previous instruction */
 							ir_insn *op1_insn = &ctx->ir_base[op2_insn->op1];
@@ -1810,6 +1831,7 @@ store_int:
 				   && ctx->ir_base[ctx->prev_ref[ref]].op == IR_SNAPSHOT))) {
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
 						if (IR_IS_CONST_REF(op2_insn->op2)
+						 && !IR_IS_SYM_CONST(ctx->ir_base[op2_insn->op2].op)
 						 && ctx->ir_base[op2_insn->op2].val.i64 == 0) {
 							if (op2_insn->op1 == insn->op2 - 1) { /* previous instruction */
 								ir_insn *op1_insn = &ctx->ir_base[op2_insn->op1];
