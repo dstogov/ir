@@ -3899,20 +3899,36 @@ static void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_emit_load(ctx, type, op2_reg, op2);
 	}
 	if (insn->op == IR_MUL || insn->op == IR_MUL_OV) {
-		IR_ASSERT(!IR_IS_TYPE_SIGNED(insn->type));
-		if (op2_reg != IR_REG_NONE) {
-			if (IR_REG_SPILLED(op2_reg)) {
-				op2_reg = IR_REG_NUM(op2_reg);
-				ir_emit_load(ctx, type, op2_reg, op2);
-			}
-			|	ASM_REG_OP mul, type, op2_reg
-		} else {
-			if (ir_rule(ctx, op2) & IR_FUSED) {
-				offset = ir_fuse_load(ctx, op2, &op2_reg);
+		if (IR_IS_TYPE_SIGNED(insn->type)) {
+			if (op2_reg != IR_REG_NONE) {
+				if (IR_REG_SPILLED(op2_reg)) {
+					op2_reg = IR_REG_NUM(op2_reg);
+					ir_emit_load(ctx, type, op2_reg, op2);
+				}
+				|	ASM_REG_OP imul, type, op2_reg
 			} else {
-				offset = ir_ref_spill_slot(ctx, op2, &op2_reg);
+				if (ir_rule(ctx, op2) & IR_FUSED) {
+					offset = ir_fuse_load(ctx, op2, &op2_reg);
+				} else {
+					offset = ir_ref_spill_slot(ctx, op2, &op2_reg);
+				}
+				|	ASM_MEM_OP imul, type, [Ra(op2_reg)+offset]
 			}
-			|	ASM_MEM_OP mul, type, [Ra(op2_reg)+offset]
+		} else {
+			if (op2_reg != IR_REG_NONE) {
+				if (IR_REG_SPILLED(op2_reg)) {
+					op2_reg = IR_REG_NUM(op2_reg);
+					ir_emit_load(ctx, type, op2_reg, op2);
+				}
+				|	ASM_REG_OP mul, type, op2_reg
+			} else {
+				if (ir_rule(ctx, op2) & IR_FUSED) {
+					offset = ir_fuse_load(ctx, op2, &op2_reg);
+				} else {
+					offset = ir_ref_spill_slot(ctx, op2, &op2_reg);
+				}
+				|	ASM_MEM_OP mul, type, [Ra(op2_reg)+offset]
+			}
 		}
 	} else {
 		if (IR_IS_TYPE_SIGNED(type)) {
