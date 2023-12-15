@@ -293,7 +293,7 @@ static ir_ref llvm2ir_binary_op(ir_ctx *ctx, LLVMOpcode opcode, LLVMValueRef exp
 	return ref;
 }
 
-static ir_ref llvm2ir_cast_op(ir_ctx *ctx, LLVMValueRef expr, ir_op op)
+static ir_ref llvm2ir_cast_op(ir_ctx *ctx, LLVMValueRef expr, ir_op op, LLVMOpcode opcode)
 {
 	LLVMValueRef op0 = LLVMGetOperand(expr, 0);
 	ir_type src_type, dst_type;
@@ -305,6 +305,8 @@ static ir_ref llvm2ir_cast_op(ir_ctx *ctx, LLVMValueRef expr, ir_op op)
 		op = IR_BITCAST;
 	} else if (op == IR_BITCAST && ir_type_size[src_type] != ir_type_size[dst_type]) {
 		op = (ir_type_size[src_type] < ir_type_size[dst_type]) ? IR_ZEXT : IR_TRUNC;
+	} else if (op == IR_INT2FP && opcode == LLVMUIToFP) {
+		src_type = llvm2ir_unsigned_type(src_type);
 	}
 	ref = llvm2ir_op(ctx, op0, src_type);
 	ref = ir_fold1(ctx, IR_OPT(op, dst_type), ref);
@@ -1289,24 +1291,24 @@ static ir_ref llvm2ir_const_expr(ir_ctx *ctx, LLVMValueRef expr)
 		case LLVMXor:
 			return llvm2ir_binary_op(ctx, opcode, expr, IR_XOR);
 		case LLVMTrunc:
-			return llvm2ir_cast_op(ctx, expr, IR_TRUNC);
+			return llvm2ir_cast_op(ctx, expr, IR_TRUNC, opcode);
 		case LLVMZExt:
-			return llvm2ir_cast_op(ctx, expr, IR_ZEXT);
+			return llvm2ir_cast_op(ctx, expr, IR_ZEXT, opcode);
 		case LLVMSExt:
-			return llvm2ir_cast_op(ctx, expr, IR_SEXT);
+			return llvm2ir_cast_op(ctx, expr, IR_SEXT, opcode);
 		case LLVMFPTrunc:
 		case LLVMFPExt:
-			return llvm2ir_cast_op(ctx, expr, IR_FP2FP);
+			return llvm2ir_cast_op(ctx, expr, IR_FP2FP, opcode);
 		case LLVMFPToUI:
 		case LLVMFPToSI:
-			return llvm2ir_cast_op(ctx, expr, IR_FP2INT);
+			return llvm2ir_cast_op(ctx, expr, IR_FP2INT, opcode);
 		case LLVMUIToFP:
 		case LLVMSIToFP:
-			return llvm2ir_cast_op(ctx, expr, IR_INT2FP);
+			return llvm2ir_cast_op(ctx, expr, IR_INT2FP, opcode);
 		case LLVMPtrToInt:
 		case LLVMIntToPtr:
 		case LLVMBitCast:
-			return llvm2ir_cast_op(ctx, expr, IR_BITCAST);
+			return llvm2ir_cast_op(ctx, expr, IR_BITCAST, opcode);
 		case LLVMICmp:
 			return llvm2ir_icmp_op(ctx, expr);
 		case LLVMFCmp:
@@ -1752,30 +1754,30 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMValueRef func)
 					llvm2ir_store(ctx, insn);
 					break;
 				case LLVMTrunc:
-					llvm2ir_cast_op(ctx, insn, IR_TRUNC);
+					llvm2ir_cast_op(ctx, insn, IR_TRUNC, opcode);
 					break;
 				case LLVMZExt:
-					llvm2ir_cast_op(ctx, insn, IR_ZEXT);
+					llvm2ir_cast_op(ctx, insn, IR_ZEXT, opcode);
 					break;
 				case LLVMSExt:
-					llvm2ir_cast_op(ctx, insn, IR_SEXT);
+					llvm2ir_cast_op(ctx, insn, IR_SEXT, opcode);
 					break;
 				case LLVMFPTrunc:
 				case LLVMFPExt:
-					llvm2ir_cast_op(ctx, insn, IR_FP2FP);
+					llvm2ir_cast_op(ctx, insn, IR_FP2FP, opcode);
 					break;
 				case LLVMFPToUI:
 				case LLVMFPToSI:
-					llvm2ir_cast_op(ctx, insn, IR_FP2INT);
+					llvm2ir_cast_op(ctx, insn, IR_FP2INT, opcode);
 					break;
 				case LLVMUIToFP:
 				case LLVMSIToFP:
-					llvm2ir_cast_op(ctx, insn, IR_INT2FP);
+					llvm2ir_cast_op(ctx, insn, IR_INT2FP, opcode);
 					break;
 				case LLVMPtrToInt:
 				case LLVMIntToPtr:
 				case LLVMBitCast:
-					llvm2ir_cast_op(ctx, insn, IR_BITCAST);
+					llvm2ir_cast_op(ctx, insn, IR_BITCAST, opcode);
 					break;
 				case LLVMICmp:
 					llvm2ir_icmp_op(ctx, insn);
