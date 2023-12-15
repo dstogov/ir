@@ -1297,7 +1297,9 @@ binop_fp:
 						// const
 					} else if (op2_insn->val.u64 == 1) {
 						return IR_COPY_INT;
-					} else if (IR_IS_POWER_OF_TWO(op2_insn->val.u64)) {
+					} else if (IR_IS_TYPE_UNSIGNED(insn->type)
+							&& IR_IS_POWER_OF_TWO(op2_insn->val.u64)) {
+						// TODO: signed division by power of two ???
 						/* DIV(X, PWR2) => SHR */
 						return IR_DIV_PWR2;
 					}
@@ -1318,6 +1320,7 @@ binop_fp:
 				} else if (IR_IS_TYPE_UNSIGNED(insn->type)
 				 && IR_IS_POWER_OF_TWO(op2_insn->val.u64)
 				 && IR_IS_UNSIGNED_32BIT(op2_insn->val.u64 - 1)) {
+					// TODO: signed division by power of two ???
 					/* MOD(X, PWR2) => AND */
 					return IR_MOD_PWR2;
 				}
@@ -3078,10 +3081,12 @@ static void ir_emit_mul_div_mod_pwr2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 	} else if (insn->op == IR_DIV) {
 		uint32_t shift = IR_LOG2(ctx->ir_base[insn->op2].val.u64);
+		IR_ASSERT(IR_IS_TYPE_UNSIGNED(type));
 		|	ASM_REG_IMM_OP shr, insn->type, def_reg, shift
 	} else {
 		IR_ASSERT(insn->op == IR_MOD);
 		uint64_t mask = ctx->ir_base[insn->op2].val.u64 - 1;
+		IR_ASSERT(IR_IS_TYPE_UNSIGNED(type));
 		IR_ASSERT(IR_IS_UNSIGNED_32BIT(mask));
 		|	ASM_REG_IMM_OP and, insn->type, def_reg, mask
 	}

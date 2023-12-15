@@ -1,0 +1,47 @@
+--TEST--
+MAX 001:
+--ARGS--
+--run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func idiv(int32_t): int32_t
+{
+	int32_t c_16 = 16;
+	l_1 = START(l_5);
+	int32_t d_2 = PARAM(l_1, "arg_1", 1);
+	int32_t d_3 = DIV(d_2, c_16);
+	l_5 = RETURN(l_1, d_3);
+}
+func imod(int32_t): int32_t
+{
+	int32_t c_16 = 16;
+	l_1 = START(l_5);
+	int32_t d_2 = PARAM(l_1, "arg_1", 1);
+	int32_t d_3 = MOD(d_2, c_16);
+	l_5 = RETURN(l_1, d_3);
+}
+func main(void): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 0x000f0005;
+	int32_t c_5 = 0xffff0005;
+	uintptr_t c_6 = func idiv(int8_t): int32_t;
+	uintptr_t c_7 = "idiv: 0x%x 0x%x\n";
+	uintptr_t c_8 = func printf(uintptr_t, ...): int32_t;
+	uintptr_t c_9 = func imod(int8_t): int32_t;
+	uintptr_t c_10 = "imod: 0x%x 0x%x\n";
+	int32_t c_11 = 0;
+	l_1 = START(l_12);
+	int32_t d_2, l_2 = CALL/1(l_1, c_6, c_4);
+	int32_t d_4, l_4 = CALL/1(l_2, c_6, c_5);
+	int32_t d_6, l_6 = CALL/3(l_4, c_8, c_7, d_2, d_4);
+	int32_t d_8, l_8 = CALL/1(l_6, c_9, c_4);
+	int32_t d_9, l_9 = CALL/1(l_8, c_9, c_5);
+	int32_t d_10, l_10 = CALL/3(l_9, c_8, c_10, d_8, d_9);
+	l_12 = RETURN(l_10, c_11);
+}
+--EXPECT--
+idiv: 0xf000 0xfffff001
+imod: 0x5 0xfffffff5
