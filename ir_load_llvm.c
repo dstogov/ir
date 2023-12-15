@@ -1027,6 +1027,9 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 				llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type),
 				llvm2ir_op(ctx, LLVMGetOperand(insn, 1), type)),
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 2), type));
+	} else if (STR_EQUAL(name, name_len, "llvm.bitreverse.i1")) {
+		IR_ASSERT(count == 1);
+		return llvm2ir_op(ctx, LLVMGetOperand(insn, 0), IR_BOOL);
 	} else {
 		fprintf(stderr, "Unsupported LLVM intrinsic: %s\n", name);
 		IR_ASSERT(0);
