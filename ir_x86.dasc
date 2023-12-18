@@ -5645,6 +5645,8 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					| movsx Rd(op1_reg), Rw(op1_reg)
 ||				}
 |.endif
+			} else if (ir_type_size[src_type] > 4) {
+				src64 = 1;
 			}
 		} else {
 			if (ir_type_size[src_type] < 8) {
@@ -5664,6 +5666,7 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |.endif
 			} else {
 				// TODO: uint64_t -> double
+				src64 = 1;
 			}
 		}
 		if (!src64) {
