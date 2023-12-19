@@ -577,7 +577,11 @@ int ir_sccp(ir_ctx *ctx)
 						ir_ref input = ir_insn_op(insn, j + 1);
 
 						if (input > 0 && IR_IS_TOP(input)) {
-							ir_bitqueue_add(&worklist, input);
+							/* do backward propagaton only once */
+							if (!_values[input].op1) {
+								_values[input].op1 = 1;
+								ir_bitqueue_add(&worklist, input);
+							}
 						} else if (ir_sccp_join_values(ctx, _values, i, input)) {
 							changed = 1;
 						}
@@ -600,7 +604,11 @@ int ir_sccp(ir_ctx *ctx)
 					if (input > 0) {
 						if (_values[input].optx == IR_TOP) {
 							has_top = 1;
-							ir_bitqueue_add(&worklist, input);
+							/* do backward propagaton only once */
+							if (!_values[input].op1) {
+								_values[input].op1 = 1;
+								ir_bitqueue_add(&worklist, input);
+							}
 						} else if (_values[input].optx != IR_BOTTOM) {
 							/* Perform folding only if some of direct inputs
 							 * is going to be replaced by a constant or copy.
@@ -660,7 +668,11 @@ int ir_sccp(ir_ctx *ctx)
 			}
 			if (insn->op == IR_IF) {
 				if (IR_IS_TOP(insn->op2)) {
-					ir_bitqueue_add(&worklist, insn->op2);
+					/* do backward propagaton only once */
+					if (!_values[insn->op2].op1) {
+						_values[insn->op2].op1 = 1;
+						ir_bitqueue_add(&worklist, insn->op2);
+					}
 					continue;
 				}
 				if (!IR_IS_BOTTOM(insn->op2)
@@ -693,7 +705,11 @@ int ir_sccp(ir_ctx *ctx)
 				IR_MAKE_BOTTOM(i);
 			} else if (insn->op == IR_SWITCH) {
 				if (IR_IS_TOP(insn->op2)) {
-					ir_bitqueue_add(&worklist, insn->op2);
+					/* do backward propagaton only once */
+					if (!_values[insn->op2].op1) {
+						_values[insn->op2].op1 = 1;
+						ir_bitqueue_add(&worklist, insn->op2);
+					}
 					continue;
 				}
 				if (!IR_IS_BOTTOM(insn->op2)) {
