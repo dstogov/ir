@@ -77,8 +77,7 @@ main:
 	movl %ebx, %esi
 	leaq .L3(%rip), %rdi
 	movl $0, %eax
-	movabsq $printf, %r11
-	callq *%r11
+	callq printf
 	movl %ebx, %eax
 	movl %ebp, %ebx
 	jmp .L1

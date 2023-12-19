@@ -76,8 +76,7 @@ main:
 	leal (%rbx, %rax), %ebp
 	movl %ebx, %edx
 	leaq .L3(%rip), %rcx
-	movabsq $printf, %rax
-	callq *%rax
+	callq printf
 	movl %ebx, %eax
 	movl %ebp, %ebx
 	jmp .L1
@@ -88,7 +87,7 @@ main:
 	addq $0x38, %rsp
 	retq
 .rodata
-	.db 0x90, 0x90, 0x90, 0x90
+	.db 0x90, 0x90, 0x90
 .L3:
 	.db 0x25, 0x64, 0x0a, 0x00
 

@@ -757,6 +757,9 @@ int32_t ir_get_spill_slot_offset(ir_ctx *ctx, ir_ref ref);
 int ir_match(ir_ctx *ctx);
 void *ir_emit_code(ir_ctx *ctx, size_t *size);
 
+bool ir_needs_thunk(ir_code_buffer *code_buffer, void *addr);
+void *ir_emit_thunk(ir_code_buffer *code_buffer, void *addr, size_t *size_ptr);
+
 /* Target address resolution (implementation in ir_emit.c) */
 void *ir_resolve_sym_name(const char *name);
 
