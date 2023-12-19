@@ -21,8 +21,7 @@ main:
 	leaq .L1(%rip), %rdi
 	movl $0x2a, %esi
 	movl $0, %eax
-	movabsq $printf, %r11
-	jmpq *%r11
+	jmp printf
 .rodata
 	.db 0x90, 0x90
 .L1:

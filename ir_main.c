@@ -991,9 +991,6 @@ int main(int argc, char **argv)
 	loader.sym = NULL;
 	loader.sym_count = 0;
 
-//TODO:	ir_loader_add_sym(&loader.loader, (void*)"printf", printf);
-	ir_loader_add_sym(&loader.loader, (void*)"putchar", putchar);
-
 	if (dump_file) {
 		loader.dump_file = fopen(dump_file, "w+");
 		if (!loader.dump_file) {
@@ -1026,10 +1023,10 @@ int main(int argc, char **argv)
 		}
 	}
 
-#if defined(IR_TARGET_AARCH64)
 	if (dump_asm || dump_size || run) {
-		/* Preallocate 2MB JIT code buffer. On AArch64 it may be necessary to generate veneers. */
+		/* Preallocate 2MB JIT code buffer. It may be necessary to generate veneers and thunks. */
 		size_t size = 2 * 1024 * 1024;
+		void *entry;
 
 		loader.code_buffer.start = ir_mem_mmap(size);
 		if (!loader.code_buffer.start) {
@@ -1038,8 +1035,24 @@ int main(int argc, char **argv)
 		}
 		loader.code_buffer.pos = loader.code_buffer.start;
 		loader.code_buffer.end = (char*)loader.code_buffer.start + size;
+
+		if (ir_needs_thunk(&loader.code_buffer, printf)) {
+			ir_mem_unprotect(loader.code_buffer.start, (char*)loader.code_buffer.end - (char*)loader.code_buffer.start);
+			entry = ir_emit_thunk(&loader.code_buffer, printf, &size);
+			ir_loader_add_sym(&loader.loader, (void*)"printf", entry);
+			ir_mem_protect(loader.code_buffer.start, (char*)loader.code_buffer.end - (char*)loader.code_buffer.start);
+		} else {
+			ir_loader_add_sym(&loader.loader, (void*)"printf", printf);
+		}
+		if (ir_needs_thunk(&loader.code_buffer, putchar)) {
+			ir_mem_unprotect(loader.code_buffer.start, (char*)loader.code_buffer.end - (char*)loader.code_buffer.start);
+			entry = ir_emit_thunk(&loader.code_buffer, putchar, &size);
+			ir_loader_add_sym(&loader.loader, (void*)"putchar", entry);
+			ir_mem_protect(loader.code_buffer.start, (char*)loader.code_buffer.end - (char*)loader.code_buffer.start);
+		} else {
+			ir_loader_add_sym(&loader.loader, (void*)"putchar", putchar);
+		}
 	}
-#endif
 
 #if HAVE_LLVM
 	if (load_llvm_bitcode) {

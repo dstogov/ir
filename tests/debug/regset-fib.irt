@@ -89,8 +89,7 @@ main:
 	movsd %xmm0, 8(%rsp)
 	leaq .L5(%rip), %rdi
 	movl $1, %eax
-	movabsq $printf, %r11
-	callq *%r11
+	callq printf
 	movsd 8(%rsp), %xmm1
 	jmp .L1
 .L2:
