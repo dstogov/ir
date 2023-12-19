@@ -45,12 +45,11 @@ main:
 	movq %xmm1, %rdx
 	movq %xmm2, %r8
 	movq %xmm3, %r9
-	movabsq $printf, %rax
-	callq *%rax
+	callq printf
 	addq $0x58, %rsp
 	retq
 .rodata
-	.db 0x90, 0x90
+	.db 0x90
 .L1:
 	.db 0x9a, 0x99, 0x99, 0x99, 0x99, 0x99, 0xb9, 0x3f
 .L2:

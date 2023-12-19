@@ -53,8 +53,7 @@ main:
 	movb $0, 6(%rcx)
 	subq $0x20, %rsp
 	movl $0x2a, %edx
-	movabsq $printf, %rax
-	callq *%rax
+	callq printf
 	addq $0x20, %rsp
 	movq %rbp, %rsp
 	popq %rbp

@@ -89,13 +89,11 @@ main:
 	movsd %xmm1, 0x28(%rsp)
 	leaq .L5(%rip), %rcx
 	movq %xmm1, %rdx
-	movabsq $printf, %rax
-	callq *%rax
+	callq printf
 	leaq .L5(%rip), %rcx
 	movsd 0x28(%rsp), %xmm1
 	movq %xmm1, %rdx
-	movabsq $printf, %rax
-	callq *%rax
+	callq printf
 	movsd 0x28(%rsp), %xmm0
 	jmp .L1
 .L2:
@@ -103,7 +101,7 @@ main:
 	addq $0x38, %rsp
 	retq
 .rodata
-	.db 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
+	.db 0x90, 0x90, 0x90, 0x90, 0x90
 .L3:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f
 .L4:
