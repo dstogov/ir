@@ -314,7 +314,6 @@ void *ir_resolve_sym_name(const char *name)
 		i++;
 	}
 #endif
-	IR_ASSERT(addr != NULL);
 	return addr;
 }
 

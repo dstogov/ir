@@ -236,6 +236,11 @@ typedef struct _ir_sym {
 	void *thunk_addr;
 } ir_sym;
 
+typedef struct _ir_reloc {
+	void   *addr;
+	ir_ref  sym;
+} ir_reloc;
+
 typedef struct _ir_main_loader {
 	ir_loader  loader;
 	int        opt_level;
@@ -252,11 +257,61 @@ typedef struct _ir_main_loader {
 	FILE      *llvm_file;
 	ir_strtab  symtab;
 	ir_sym    *sym;
+	ir_reloc  *reloc;
 	ir_ref     sym_count;
+	ir_ref     reloc_count;
 	void      *data_start;
 	size_t     data_pos;
 	ir_code_buffer code_buffer;
 } ir_main_loader;
+
+static void ir_loader_add_reloc(ir_main_loader *l, const char *name, void *addr)
+{
+	ir_reloc *r;
+	ir_ref val = ir_strtab_count(&l->symtab) + 1;
+	ir_ref sym = ir_strtab_lookup(&l->symtab, name, strlen(name), val);
+
+	if (sym == val) {
+		if (val >= l->sym_count) {
+			l->sym_count += 16;
+			l->sym = ir_mem_realloc(l->sym, sizeof(ir_sym) * l->sym_count);
+		}
+		l->sym[val].addr = NULL;
+		l->sym[val].thunk_addr = NULL;
+	}
+
+	l->reloc = ir_mem_realloc(l->reloc, sizeof(ir_reloc) * (l->reloc_count + 1));
+	r = &l->reloc[l->reloc_count];
+	r->addr = addr;
+	r->sym = sym;
+	l->reloc_count++;
+}
+
+static bool ir_loader_fix_relocs(ir_main_loader *l)
+{
+	bool ret = 1;
+	ir_ref n = l->reloc_count;
+
+	if (n > 0) {
+		ir_reloc *r = l->reloc;
+		ir_sym *s;
+
+		ir_mem_unprotect(l->code_buffer.start, (char*)l->code_buffer.end - (char*)l->code_buffer.start);
+		for (; n > 0; r++, n--) {
+			IR_ASSERT(r->sym > 0 && r->sym < l->sym_count);
+			s = &l->sym[r->sym];
+			if (s->addr) {
+				memcpy(r->addr, &s->addr, sizeof(void*));
+			} else {
+				fprintf(stderr, "Undefined symbol: %s\n", ir_strtab_str(&l->symtab, r->sym));
+				ret = 0;
+				break;
+			}
+		}
+		ir_mem_protect(l->code_buffer.start, (char*)l->code_buffer.end - (char*)l->code_buffer.start);
+	}
+	return ret;
+}
 
 static bool ir_loader_add_sym(ir_loader *loader, const char *name, void *addr)
 {
@@ -311,7 +366,9 @@ static void* ir_loader_resolve_sym_name(ir_loader *loader, const char *name)
 		return l->sym[val].thunk_addr;
 	}
 	addr = ir_resolve_sym_name(name);
-	ir_loader_add_sym(loader, name, addr); /* cache */
+	if (addr) {
+		ir_loader_add_sym(loader, name, addr); /* cache */
+	}
 	return addr;
 }
 
@@ -577,11 +634,14 @@ static bool ir_loader_sym_data_ref(ir_loader *loader, ir_op op, const char *ref)
 		// TODO:
 	}
 	if (l->dump_asm || l->dump_size || l->run) {
+		void *data = (char*)l->data_start + l->data_pos;
 		void *addr = ir_loader_resolve_sym_name(loader, ref);
 
-		IR_ASSERT(addr);
+		if (!addr) {
+			ir_loader_add_reloc(l, ref, data);
+		}
 		IR_ASSERT(l->data_start);
-		memcpy((char*)l->data_start + l->data_pos, &addr, sizeof(void*));
+		memcpy(data, &addr, sizeof(void*));
 	}
 	l->data_pos += sizeof(void*);
 	return 1;
@@ -731,6 +791,7 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 						const char *name = ir_get_str(ctx, insn->val.name);
 						void *addr = ir_loader_resolve_sym_name(loader, name);
 
+						IR_ASSERT(addr);
 						ir_disasm_add_symbol(name, (uintptr_t)addr, sizeof(void*));
 //TODO:					} else if (insn->op == IR_SYM) {
 					}
@@ -1008,7 +1069,9 @@ int main(int argc, char **argv)
 
 	ir_strtab_init(&loader.symtab, 16, 4096);
 	loader.sym = NULL;
+	loader.reloc = NULL;
 	loader.sym_count = 0;
+	loader.reloc_count = 0;
 
 	if (dump_file) {
 		loader.dump_file = fopen(dump_file, "w+");
@@ -1118,6 +1181,10 @@ finish:
 	}
 	if (loader.llvm_file && loader.llvm_file != stderr) {
 		fclose(loader.llvm_file);
+	}
+
+	if (!ir_loader_fix_relocs(&loader)) {
+		IR_ASSERT(0);
 	}
 
 	if (dump_size) {
