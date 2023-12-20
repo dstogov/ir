@@ -759,6 +759,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size);
 
 bool ir_needs_thunk(ir_code_buffer *code_buffer, void *addr);
 void *ir_emit_thunk(ir_code_buffer *code_buffer, void *addr, size_t *size_ptr);
+void ir_fix_thunk(void *thunk_entry, void *addr);
 
 /* Target address resolution (implementation in ir_emit.c) */
 void *ir_resolve_sym_name(const char *name);
@@ -806,7 +807,7 @@ struct _ir_loader {
 	bool (*sym_data_end)      (ir_loader *loader);
 	bool (*func_init)         (ir_loader *loader, ir_ctx *ctx, const char *name);
 	bool (*func_process)      (ir_loader *loader, ir_ctx *ctx, const char *name);
-	void*(*resolve_sym_name)  (ir_loader *loader, const char *name);
+	void*(*resolve_sym_name)  (ir_loader *loader, const char *name, bool add_thunk);
 	bool (*has_sym)           (ir_loader *loader, const char *name);
 	bool (*add_sym)           (ir_loader *loader, const char *name, void *addr);
 };

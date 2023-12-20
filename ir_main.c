@@ -332,6 +332,13 @@ static bool ir_loader_add_sym(ir_loader *loader, const char *name, void *addr)
 			l->sym[old_val].addr = addr;
 			if (l->sym[old_val].thunk_addr) {
 				// TODO: Fix thunk or relocation ???
+				if (l->code_buffer.start) {
+					ir_mem_unprotect(l->code_buffer.start, (char*)l->code_buffer.end - (char*)l->code_buffer.start);
+				}
+				ir_fix_thunk(l->sym[old_val].thunk_addr, addr);
+				if (l->code_buffer.start) {
+					ir_mem_protect(l->code_buffer.start, (char*)l->code_buffer.end - (char*)l->code_buffer.start);
+				}
 			}
 			return 1;
 		}
@@ -354,7 +361,7 @@ static bool ir_loader_has_sym(ir_loader *loader, const char *name)
 	return val != 0;
 }
 
-static void* ir_loader_resolve_sym_name(ir_loader *loader, const char *name)
+static void* ir_loader_resolve_sym_name(ir_loader *loader, const char *name, bool add_thunk)
 {
 	ir_main_loader *l = (ir_main_loader*)loader;
 	uint32_t len = (uint32_t)strlen(name);
@@ -365,10 +372,12 @@ static void* ir_loader_resolve_sym_name(ir_loader *loader, const char *name)
 		if (l->sym[val].addr) {
 			return l->sym[val].addr;
 		}
-		if (!l->sym[val].thunk_addr) {
+		if (!l->sym[val].thunk_addr && add_thunk) {
 			/* Undefined declaration */
 			// TODO: Add thunk or relocation ???
-			l->sym[val].thunk_addr = (void*)(intptr_t)sizeof(void*);
+			size_t size;
+
+			l->sym[val].thunk_addr = ir_emit_thunk(&l->code_buffer, NULL, &size);
 		}
 		return l->sym[val].thunk_addr;
 	}
@@ -397,7 +406,7 @@ static bool ir_loader_external_sym_dcl(ir_loader *loader, const char *name, uint
 		ir_emit_llvm_sym_decl(name, flags | IR_EXTERN, 0, l->llvm_file);
 	}
 	if (l->dump_asm || l->dump_size || l->run) {
-		void *addr = ir_loader_resolve_sym_name(loader, name);
+		void *addr = ir_loader_resolve_sym_name(loader, name, 0);
 
 		if (!addr) {
 			return 0;
@@ -462,7 +471,7 @@ static bool ir_loader_external_func_dcl(ir_loader *loader, const char *name, uin
 		ir_emit_llvm_func_decl(name, flags | IR_EXTERN, ret_type,  params_count, param_types, l->llvm_file);
 	}
 	if (l->dump_asm || l->dump_size || l->run) {
-		void *addr = ir_loader_resolve_sym_name(loader, name);
+		void *addr = ir_loader_resolve_sym_name(loader, name, 0);
 
 		if (!addr) {
 			return 0;
@@ -646,7 +655,7 @@ static bool ir_loader_sym_data_ref(ir_loader *loader, ir_op op, const char *ref,
 	}
 	if (l->dump_asm || l->dump_size || l->run) {
 		void *data = (char*)l->data_start + l->data_pos;
-		void *addr = ir_loader_resolve_sym_name(loader, ref);
+		void *addr = ir_loader_resolve_sym_name(loader, ref, 0);
 
 		if (!addr) {
 			ir_loader_add_reloc(l, ref, data);
@@ -801,7 +810,7 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 				for (i = IR_UNUSED + 1, insn = ctx->ir_base - i; i < ctx->consts_count; i++, insn--) {
 					if (insn->op == IR_FUNC) {
 						const char *name = ir_get_str(ctx, insn->val.name);
-						void *addr = ir_loader_resolve_sym_name(loader, name);
+						void *addr = ir_loader_resolve_sym_name(loader, name, 0);
 
 						IR_ASSERT(addr);
 						ir_disasm_add_symbol(name, (uintptr_t)addr, sizeof(void*));

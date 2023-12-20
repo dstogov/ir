@@ -2162,9 +2162,10 @@ static void ir_emit_load(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref src)
 			ir_insn *insn = &ctx->ir_base[src];
 
 			if (insn->op == IR_SYM || insn->op == IR_FUNC) {
+				const char *name = ir_get_str(ctx, insn->val.name);
 				void *addr = (ctx->loader && ctx->loader->resolve_sym_name) ?
-					ctx->loader->resolve_sym_name(ctx->loader, ir_get_str(ctx, insn->val.name)) :
-					ir_resolve_sym_name(ir_get_str(ctx, insn->val.name));
+					ctx->loader->resolve_sym_name(ctx->loader, name, insn->op == IR_FUNC) :
+					ir_resolve_sym_name(name);
 				IR_ASSERT(addr);
 				ir_emit_load_imm_int(ctx, type, reg, (intptr_t)addr);
 			} else if (insn->op == IR_STR) {
@@ -2250,9 +2251,10 @@ static void ir_emit_store_mem_int_const(ir_ctx *ctx, ir_type type, ir_reg base_r
 		int64_t val = val_insn->val.i64;
 
 		if (val_insn->op == IR_FUNC || val_insn->op == IR_SYM) {
+			const char *name = ir_get_str(ctx, val_insn->val.name);
 			void *addr = (ctx->loader && ctx->loader->resolve_sym_name) ?
-				ctx->loader->resolve_sym_name(ctx->loader, ir_get_str(ctx, val_insn->val.name)) :
-				ir_resolve_sym_name(ir_get_str(ctx, val_insn->val.name));
+				ctx->loader->resolve_sym_name(ctx->loader, name, val_insn->op == IR_FUNC) :
+				ir_resolve_sym_name(name);
 			IR_ASSERT(addr);
 			val = (int64_t)(intptr_t)addr;
 		}
@@ -9871,9 +9873,13 @@ void *ir_emit_thunk(ir_code_buffer *code_buffer, void *addr, size_t *size_ptr)
 	dasm_setup(&dasm_state, dasm_actions);
 
 	|.code
+	|.if X64
 	|	jmp aword [>1]
 	|1:
 	|	.aword &addr
+	|.else
+	|	jmp &addr
+	|.endif
 
 	ret = dasm_link(&dasm_state, &size);
 	if (ret != DASM_S_OK) {
@@ -9901,4 +9907,23 @@ void *ir_emit_thunk(ir_code_buffer *code_buffer, void *addr, size_t *size_ptr)
 	ir_mem_flush(entry, size);
 
 	return entry;
+}
+
+void ir_fix_thunk(void *thunk_entry, void *addr)
+{
+	unsigned char *code = thunk_entry;
+	void **addr_ptr;
+
+	if (sizeof(void*) == 8) {
+		int32_t *offset_ptr;
+
+		IR_ASSERT(code[0] == 0xff && code[1] == 0x25);
+		offset_ptr = (int32_t*)(code + 2);
+		addr_ptr = (void**)(code + 6 + *offset_ptr);
+		*addr_ptr = addr;
+	} else {
+		IR_ASSERT(code[0] == 0xe9);
+		addr_ptr = (void**)(code + 1);
+		*addr_ptr = (void*)((unsigned char*)addr - (code + 5));
+	}
 }

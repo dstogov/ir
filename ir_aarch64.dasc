@@ -1176,9 +1176,10 @@ static void ir_emit_load(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref src)
 			ir_insn *insn = &ctx->ir_base[src];
 
 			if (insn->op == IR_SYM || insn->op == IR_FUNC) {
+				const char *name = ir_get_str(ctx, insn->val.name);
 				void *addr = (ctx->loader && ctx->loader->resolve_sym_name) ?
-					ctx->loader->resolve_sym_name(ctx->loader, ir_get_str(ctx, insn->val.name)) :
-					ir_resolve_sym_name(ir_get_str(ctx, insn->val.name));
+					ctx->loader->resolve_sym_name(ctx->loader, name, insn->op == IR_FUNC) :
+					ir_resolve_sym_name(name);
 				IR_ASSERT(addr);
 				ir_emit_load_imm_int(ctx, type, reg, (intptr_t)addr);
 			} else if (insn->op == IR_STR) {
@@ -6053,4 +6054,21 @@ void *ir_emit_thunk(ir_code_buffer *code_buffer, void *addr, size_t *size_ptr)
 	ir_mem_flush(entry, size);
 
 	return entry;
+}
+
+void ir_fix_thunk(void *thunk_entry, void *addr)
+{
+	uint32_t *code = thunk_entry;
+	IR_ASSERT((code[0] & 0xffe00000) == 0xd2800000
+		&& (code[1] & 0xffe00000) == 0xf2a00000
+		&& (code[2] & 0xffe00000) == 0xf2c00000
+		&& (code[3] & 0xffe00000) == 0xf2e00000
+		&& (code[4] & 0xfffffc1f) == 0xd61f0000);
+
+	code[0] = (code[0] & 0xffe0001f) | (uint32_t)((uint64_t)(addr) & 0xffff) << 5;
+	code[1] = (code[1] & 0xffe0001f) | (uint32_t)(((uint64_t)(addr) >> 16) & 0xffff) << 5;
+	code[2] = (code[2] & 0xffe0001f) | (uint32_t)(((uint64_t)(addr) >> 32) & 0xffff) << 5;
+	code[3] = (code[3] & 0xffe0001f) | (uint32_t)(((uint64_t)(addr) >> 48) & 0xffff) << 5;
+
+	ir_mem_flush(code, sizeof(uint32_t) * 4);
 }
