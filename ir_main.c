@@ -254,7 +254,7 @@ typedef struct _ir_main_loader {
 	ir_sym    *sym;
 	ir_ref     sym_count;
 	void      *data_start;
-	void      *data;
+	size_t     data_pos;
 	ir_code_buffer code_buffer;
 } ir_main_loader;
 
@@ -436,6 +436,9 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 {
 	ir_main_loader *l = (ir_main_loader*) loader;
 
+	l->data_start = NULL;
+	l->data_pos = 0;
+
 	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
 		if (flags & IR_STATIC) {
 			fprintf(l->dump_file, "static ");
@@ -457,7 +460,7 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 		}
 		memset(data, 0, size);
 		if (has_data) {
-			l->data_start = l->data = data;
+			l->data_start = data;
 		}
 		if (l->dump_asm) {
 			ir_disasm_add_symbol(name, (uintptr_t)data, size);
@@ -471,6 +474,7 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 static bool ir_loader_sym_data(ir_loader *loader, ir_type type, uint32_t count, const void *data)
 {
 	ir_main_loader *l = (ir_main_loader*) loader;
+	size_t size = ir_type_size[type] * count;
 
 	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
 		const void *p = data;
@@ -510,14 +514,10 @@ static bool ir_loader_sym_data(ir_loader *loader, ir_type type, uint32_t count, 
 		// TODO:
 	}
 	if (l->dump_asm || l->dump_size || l->run) {
-		size_t size = ir_type_size[type] * count;
-
-		if (!l->data) {
-			return 0;
-		}
-		memcpy(l->data, data, size);
-		l->data = (void*)((uintptr_t)l->data + size);
+		IR_ASSERT(l->data_start);
+		memcpy((char*)l->data_start + l->data_pos, data, size);
 	}
+	l->data_pos += size;
 	return 1;
 }
 
@@ -526,8 +526,8 @@ static bool ir_loader_sym_data_pad(ir_loader *loader, size_t offset)
 	ir_main_loader *l = (ir_main_loader*) loader;
 	size_t i;
 
-	IR_ASSERT(offset >= (size_t)((char*)l->data - (char*)l->data_start));
-	offset -= (char*)l->data - (char*)l->data_start;
+	IR_ASSERT(offset >= l->data_pos);
+	offset -= l->data_pos;
 	if (offset) {
 		if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
 			for (i = 0; i < offset; i++) {
@@ -541,9 +541,10 @@ static bool ir_loader_sym_data_pad(ir_loader *loader, size_t offset)
 			// TODO:
 		}
 		if (l->dump_asm || l->dump_size || l->run) {
-			memset(l->data, 0, offset);
-			l->data = (void*)((uintptr_t)l->data + offset);
+			IR_ASSERT(l->data_start);
+			memset((char*)l->data_start + l->data_pos, 0, offset);
 		}
+		l->data_pos += offset;
 	}
 	return 1;
 }
@@ -566,9 +567,10 @@ static bool ir_loader_sym_data_ref(ir_loader *loader, ir_op op, const char *ref)
 		void *addr = ir_loader_resolve_sym_name(loader, ref);
 
 		IR_ASSERT(addr);
-		memcpy(l->data, &addr, sizeof(void*));
-		l->data = (void*)((uintptr_t)l->data + sizeof(void*));
+		IR_ASSERT(l->data_start);
+		memcpy((char*)l->data_start + l->data_pos, &addr, sizeof(void*));
 	}
+	l->data_pos += sizeof(void*);
 	return 1;
 }
 
