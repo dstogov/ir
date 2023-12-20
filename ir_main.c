@@ -452,7 +452,20 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 		ir_emit_llvm_sym_decl(name, flags, has_data, l->llvm_file);
 	}
 	if (l->dump_asm || l->dump_size || l->run) {
-		void *data = ir_mem_malloc(size);
+		void *data;
+
+		if (flags & IR_CONST) {
+			data = l->code_buffer.pos;
+			// TODO: alignment ???
+			//data = (void*)IR_ALIGNED_SIZE(((size_t)(data)), 16);
+			if (size > (size_t)((char*)l->code_buffer.end - (char*)data)) {
+				return 0;
+			}
+			l->code_buffer.pos = (char*)data + size;
+			ir_mem_unprotect(l->code_buffer.start, (char*)l->code_buffer.end - (char*)l->code_buffer.start);
+		} else {
+			data = ir_mem_malloc(size);
+		}
 
 		if (!ir_loader_add_sym(loader, name, data)) {
 			ir_mem_free(data);
@@ -588,6 +601,10 @@ static bool ir_loader_sym_data_end(ir_loader *loader)
 		// TODO:
 	}
 	if (l->dump_asm || l->dump_size || l->run) {
+		if ((char*)l->data_start >= (char*)l->code_buffer.start
+		 && (char*)l->data_start < (char*)l->code_buffer.end) {
+			ir_mem_protect(l->code_buffer.start, (char*)l->code_buffer.end - (char*)l->code_buffer.start);
+		}
 		// TODO:
 	}
 	return 1;
