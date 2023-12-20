@@ -19,7 +19,7 @@
 /*
  * IR - Lightweight JIT Compilation Framework
  * (IR loader)
- * Copyright (C) 2005-2022 Zend by Perforce.
+ * Copyright (C) 2022 Zend by Perforce.
  * Authors: Dmitry Stogov <dmitry@php.net>
  *
  * This file is generated from "ir.g". Do not edit!
@@ -245,15 +245,20 @@ ir_sym_data(ir_loader *loader):
 	{const char *name;}
 	{size_t name_len;}
 	{char buf[256];}
+	{uintptr_t offset;}
 	type(&t)
 	(
 		"sym" "(" ID(&name, &name_len) ")"
+		(
+			"+" const(t, &val)
+			{offset = (uintptr_t)val.addr;}
+		)?
 		{
 			if (loader->sym_data_ref) {
 				if (name_len > 255) yy_error("name too long");
 				memcpy(buf, name, name_len);
 				buf[name_len] = 0;
-				if (!loader->sym_data_ref(loader, IR_SYM, buf)) {
+				if (!loader->sym_data_ref(loader, IR_SYM, buf, offset)) {
 					yy_error("sym_data_ref error");
 				}
 			}
@@ -264,7 +269,7 @@ ir_sym_data(ir_loader *loader):
 				if (name_len > 255) yy_error("name too long");
 				memcpy(buf, name, name_len);
 				buf[name_len] = 0;
-				if (!loader->sym_data_ref(loader, IR_FUNC, buf)) {
+				if (!loader->sym_data_ref(loader, IR_FUNC, buf, 0)) {
 					yy_error("sym_data_ref error");
 				}
 			}

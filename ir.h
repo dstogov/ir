@@ -802,7 +802,7 @@ struct _ir_loader {
 	bool (*sym_dcl)           (ir_loader *loader, const char *name, uint32_t flags, size_t size, bool has_data);
 	bool (*sym_data)          (ir_loader *loader, ir_type type, uint32_t count, const void *data);
 	bool (*sym_data_pad)      (ir_loader *loader, size_t offset);
-	bool (*sym_data_ref)      (ir_loader *loader, ir_op op, const char *ref);
+	bool (*sym_data_ref)      (ir_loader *loader, ir_op op, const char *ref, uintptr_t offset);
 	bool (*sym_data_end)      (ir_loader *loader);
 	bool (*func_init)         (ir_loader *loader, ir_ctx *ctx, const char *name);
 	bool (*func_process)      (ir_loader *loader, ir_ctx *ctx, const char *name);

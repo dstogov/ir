@@ -1128,25 +1128,21 @@ static void llvm2ir_freeze(ir_ctx *ctx, LLVMValueRef expr)
 	ir_addrtab_add(ctx->binding, (uintptr_t)expr, ref);
 }
 
-static ir_ref llvm2ir_const_element_ptr(ir_ctx *ctx, LLVMValueRef expr)
+static uintptr_t llvm2ir_const_element_ptr_offset(LLVMTargetDataRef target_data, LLVMValueRef expr)
 {
 	LLVMValueRef op;
-	LLVMValueRef op0 = LLVMGetOperand(expr, 0);
-	LLVMTypeRef type = LLVMTypeOf(op0);
+	LLVMTypeRef type;
 	LLVMTypeKind type_kind;
 	uint32_t i, count;
 	uintptr_t index, offset = 0;
-	ir_ref ref;
 
-	type_kind = LLVMGetTypeKind(type);
-	IR_ASSERT(type_kind == LLVMPointerTypeKind);
 	type = LLVMGetGEPSourceElementType(expr);
 	type_kind = LLVMGetTypeKind(type);
 
 	op = LLVMGetOperand(expr, 1);
 	IR_ASSERT(LLVMGetValueKind(op) == LLVMConstantIntValueKind);
 	index = LLVMConstIntGetSExtValue(op);
-	offset += index * LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, type);
+	offset += index * LLVMABISizeOfType(target_data, type);
 
 	count = LLVMGetNumOperands(expr);
 	for (i = 2; i < count; i++) {
@@ -1155,7 +1151,7 @@ static ir_ref llvm2ir_const_element_ptr(ir_ctx *ctx, LLVMValueRef expr)
 			case LLVMStructTypeKind:
 				IR_ASSERT(LLVMGetValueKind(op) == LLVMConstantIntValueKind);
 				index = LLVMConstIntGetSExtValue(op);
-				offset += LLVMOffsetOfElement((LLVMTargetDataRef)ctx->rules, type, index);
+				offset += LLVMOffsetOfElement(target_data, type, index);
 				type = LLVMStructGetTypeAtIndex(type, index);
 				break;
 			case LLVMPointerTypeKind:
@@ -1165,7 +1161,7 @@ static ir_ref llvm2ir_const_element_ptr(ir_ctx *ctx, LLVMValueRef expr)
 				IR_ASSERT(LLVMGetValueKind(op) == LLVMConstantIntValueKind);
 				index = LLVMConstIntGetSExtValue(op);
 				type = LLVMGetElementType(type);
-				offset += index * LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, type);
+				offset += index * LLVMABISizeOfType(target_data, type);
 				break;
 			default:
 				IR_ASSERT(0);
@@ -1173,7 +1169,15 @@ static ir_ref llvm2ir_const_element_ptr(ir_ctx *ctx, LLVMValueRef expr)
 		}
 		type_kind = LLVMGetTypeKind(type);
     }
-    ref = llvm2ir_op(ctx, op0, IR_ADDR);
+	return offset;
+}
+
+static ir_ref llvm2ir_const_element_ptr(ir_ctx *ctx, LLVMValueRef expr)
+{
+	LLVMValueRef op0 = LLVMGetOperand(expr, 0);
+	uintptr_t offset = llvm2ir_const_element_ptr_offset((LLVMTargetDataRef)ctx->rules, expr);
+	ir_ref ref = llvm2ir_op(ctx, op0, IR_ADDR);
+
     if (offset) {
 		ref = ir_ADD_A(ref, ir_const_addr(ctx, (uintptr_t)offset));
     }
@@ -1952,6 +1956,7 @@ static int llvm2ir_data(ir_loader *loader, LLVMTargetDataRef target_data, LLVMTy
 	void *p = NULL;
 	size_t offset, el_size;
 	LLVMValueKind kind = LLVMGetValueKind(op);
+	LLVMOpcode opcode;
 
 	switch (kind) {
 		case LLVMConstantIntValueKind:
@@ -2040,7 +2045,7 @@ static int llvm2ir_data(ir_loader *loader, LLVMTargetDataRef target_data, LLVMTy
 			if (!name) {
 				return 0;
 			}
-			return loader->sym_data_ref(loader, IR_SYM, name);
+			return loader->sym_data_ref(loader, IR_SYM, name, 0);
 		case LLVMFunctionValueKind:
 			// TODO: function prototype
 			// TODO: resolve function address
@@ -2049,10 +2054,25 @@ static int llvm2ir_data(ir_loader *loader, LLVMTargetDataRef target_data, LLVMTy
 			if (!name) {
 				return 0;
 			}
-			return loader->sym_data_ref(loader, IR_FUNC, name);
-//		case LLVMConstantExprValueKind:
-//			IR_ASSERT(0);
-//			return 0;
+			return loader->sym_data_ref(loader, IR_FUNC, name, 0);
+		case LLVMConstantExprValueKind:
+			opcode = LLVMGetConstOpcode(op);
+			if (opcode == LLVMGetElementPtr) {
+				LLVMValueRef op0 = LLVMGetOperand(op, 0);
+
+				if (LLVMGetValueKind(op0) == LLVMGlobalVariableValueKind) {
+					uintptr_t offset = llvm2ir_const_element_ptr_offset(target_data, op);
+					name = LLVMGetValueName2(op0, &name_len);
+					name = llvm2ir_sym_name(buf, name, name_len);
+					if (!name) {
+						return 0;
+					}
+					return loader->sym_data_ref(loader, IR_SYM, name, offset);
+				}
+			}
+			fprintf(stderr, "Unsupported constant expr: %d\n", (int)opcode);
+			IR_ASSERT(0);
+			return 0;
 		case LLVMUndefValueValueKind:
 		case LLVMPoisonValueValueKind:
 			// TODO: ???

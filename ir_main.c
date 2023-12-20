@@ -301,7 +301,14 @@ static bool ir_loader_fix_relocs(ir_main_loader *l)
 			IR_ASSERT(r->sym > 0 && r->sym < l->sym_count);
 			s = &l->sym[r->sym];
 			if (s->addr) {
-				memcpy(r->addr, &s->addr, sizeof(void*));
+				*(void**)r->addr = (void*)((uintptr_t)s->addr + *(uintptr_t*)r->addr);
+#if 0
+				uintptr_t addr;
+
+				memcpy(&addr, r->addr, sizeof(void*));
+				addr += (uintptr_t)s->addr;
+				memcpy(r->addr, &addr, sizeof(void*));
+#endif
 			} else {
 				fprintf(stderr, "Undefined symbol: %s\n", ir_strtab_str(&l->symtab, r->sym));
 				ret = 0;
@@ -500,7 +507,7 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 		if (flags & IR_STATIC) {
 			fprintf(l->dump_file, "static ");
 		}
-		fprintf(l->dump_file, "%s %s [%ld]%s\n", (flags & IR_CONST) ? "const" : "var", name, size, has_data ? " = {" : ";");
+		fprintf(l->dump_file, "%s %s [%" PRIuPTR "]%s\n", (flags & IR_CONST) ? "const" : "var", name, size, has_data ? " = {" : ";");
 	}
 	if (l->c_file) {
 		ir_emit_c_sym_decl(name, flags, has_data, l->c_file);
@@ -571,7 +578,7 @@ static bool ir_loader_sym_data(ir_loader *loader, ir_type type, uint32_t count, 
 				break;
 			case 8:
 				for (i = 0; i < count; i++) {
-					fprintf(l->dump_file, "\t%s 0x%016lx,\n", ir_type_cname[type], *(uint64_t*)p);
+					fprintf(l->dump_file, "\t%s 0x%016" PRIx64 ",\n", ir_type_cname[type], *(uint64_t*)p);
 					p = (void*)((uintptr_t)p + 8);
 				}
 				break;
@@ -619,13 +626,17 @@ static bool ir_loader_sym_data_pad(ir_loader *loader, size_t offset)
 	return 1;
 }
 
-static bool ir_loader_sym_data_ref(ir_loader *loader, ir_op op, const char *ref)
+static bool ir_loader_sym_data_ref(ir_loader *loader, ir_op op, const char *ref, uintptr_t offset)
 {
 	ir_main_loader *l = (ir_main_loader*) loader;
 
 	IR_ASSERT(op == IR_FUNC || op == IR_SYM);
 	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
-		fprintf(l->dump_file, "\t%s %s(%s),\n", ir_type_cname[IR_ADDR], op == IR_FUNC ? "func" : "sym", ref);
+		if (!offset) {
+			fprintf(l->dump_file, "\t%s %s(%s),\n", ir_type_cname[IR_ADDR], op == IR_FUNC ? "func" : "sym", ref);
+		} else {
+			fprintf(l->dump_file, "\t%s %s(%s)+0x%" PRIxPTR ",\n", ir_type_cname[IR_ADDR], op == IR_FUNC ? "func" : "sym", ref, offset);
+		}
 	}
 	if (l->c_file) {
 		// TODO:
@@ -641,6 +652,7 @@ static bool ir_loader_sym_data_ref(ir_loader *loader, ir_op op, const char *ref)
 			ir_loader_add_reloc(l, ref, data);
 		}
 		IR_ASSERT(l->data_start);
+		addr = (void*)((uintptr_t)(addr) + offset);
 		memcpy(data, &addr, sizeof(void*));
 	}
 	l->data_pos += sizeof(void*);
