@@ -560,35 +560,31 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 static bool ir_loader_sym_data(ir_loader *loader, ir_type type, uint32_t count, const void *data)
 {
 	ir_main_loader *l = (ir_main_loader*) loader;
-	size_t size = ir_type_size[type] * count;
+	size_t size = ir_type_size[type];
 
 	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
 		const void *p = data;
 		uint32_t i;
 
-		switch (ir_type_size[type]) {
+		switch (size) {
 			case 1:
 				for (i = 0; i < count; i++) {
 					fprintf(l->dump_file, "\t%s 0x%02x,\n", ir_type_cname[type], (uint32_t)*(uint8_t*)p);
-					p = (void*)((uintptr_t)p + 1);
 				}
 				break;
 			case 2:
 				for (i = 0; i < count; i++) {
 					fprintf(l->dump_file, "\t%s 0x%04x,\n", ir_type_cname[type], (uint32_t)*(uint16_t*)p);
-					p = (void*)((uintptr_t)p + 1);
 				}
 				break;
 			case 4:
 				for (i = 0; i < count; i++) {
 					fprintf(l->dump_file, "\t%s 0x%08x,\n", ir_type_cname[type], *(uint32_t*)p);
-					p = (void*)((uintptr_t)p + 4);
 				}
 				break;
 			case 8:
 				for (i = 0; i < count; i++) {
 					fprintf(l->dump_file, "\t%s 0x%016" PRIx64 ",\n", ir_type_cname[type], *(uint64_t*)p);
-					p = (void*)((uintptr_t)p + 8);
 				}
 				break;
 		}
@@ -601,9 +597,20 @@ static bool ir_loader_sym_data(ir_loader *loader, ir_type type, uint32_t count, 
 	}
 	if (l->dump_asm || l->dump_size || l->run) {
 		IR_ASSERT(l->data_start);
-		memcpy((char*)l->data_start + l->data_pos, data, size);
+		if (count == 1) {
+			memcpy((char*)l->data_start + l->data_pos, data, size);
+		} else {
+			size_t pos = 0;
+			uint32_t i;
+
+			IR_ASSERT(count > 1);
+			for (i = 0; i < count; i++) {
+				memcpy((char*)l->data_start + l->data_pos + pos, data, size);
+				pos += size;
+			}
+		}
 	}
-	l->data_pos += size;
+	l->data_pos += size * count;
 	return 1;
 }
 

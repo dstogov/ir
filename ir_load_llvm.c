@@ -2160,9 +2160,6 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 				type = LLVMGlobalGetValueType(sym);
 				size = LLVMABISizeOfType(target_data, type);
 
-				if (init && LLVMGetValueKind(init) != LLVMConstantAggregateZeroValueKind) {
-					has_data = 1;
-				}
 				name = llvm2ir_sym_name(buf, name, name_len);
 				if (!name) {
 					fprintf(stderr, "Bad LLVM symbol name \"%s\"\n", LLVMGetValueName2(sym, &name_len));
@@ -2171,6 +2168,9 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 				if (LLVMIsGlobalConstant(sym)) {
 					flags |= IR_CONST;
                 }
+				if (init) {
+					has_data = 1;
+				}
 				if (!loader->sym_dcl(loader, name, flags, size, has_data)) {
 					fprintf(stderr, "Cannot compile LLVM symbol \"%s\"\n", name);
 					return 0;
