@@ -176,6 +176,35 @@ static void ir_sccp_remove_from_use_list(ir_ctx *ctx, ir_ref from, ir_ref ref)
 #endif
 }
 
+static void ir_sccp_remove_from_use_list_1(ir_ctx *ctx, ir_ref from, ir_ref ref)
+{
+	ir_ref j, n, *p;
+	ir_use_list *use_list = &ctx->use_lists[from];
+
+	n = use_list->count;
+	j = 0;
+	p = &ctx->use_edges[use_list->refs];
+	while (j < n) {
+		if (*p == ref) {
+			break;
+		}
+		j++;
+	}
+
+	if (j < n) {
+		use_list->count--;
+		j++;
+		while (j < n) {
+			*p = *(p+1);
+			p++;
+			j++;
+		}
+#if IR_COMBO_COPY_PROPAGATION
+		*p = IR_UNUSED;
+#endif
+	}
+}
+
 #if IR_COMBO_COPY_PROPAGATION
 static int ir_sccp_add_to_use_list(ir_ctx *ctx, ir_ref to, ir_ref ref)
 {
@@ -521,7 +550,7 @@ static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values
 							}
 							i++;
 						} else if (!IR_IS_CONST_REF(input)) {
-							ir_sccp_remove_from_use_list(ctx, input, use);
+							ir_sccp_remove_from_use_list_1(ctx, input, use);
 						}
 					}
 					while (i <= n) {
