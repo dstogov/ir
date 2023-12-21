@@ -2110,7 +2110,8 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 			LLVMGetModuleIdentifier(module, &name_len),
 			LLVMGetSourceFileName(module, &name_len),
 			LLVMGetTarget(module))) {
-		return 1;
+		IR_ASSERT(0);
+		return 0;
 	}
 
 	for (sym = LLVMGetFirstGlobal(module); sym; sym = LLVMGetNextGlobal(sym)) {
@@ -2141,10 +2142,12 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 			}
 			name = llvm2ir_sym_name(buf, name, name_len);
 			if (!name) {
+				fprintf(stderr, "Bad LLVM symbol name \"%s\"\n", LLVMGetValueName2(sym, &name_len));
 				return 0;
 			}
 			if (loader->external_sym_dcl
 			 && !loader->external_sym_dcl(loader, name, flags)) {
+				fprintf(stderr, "Cannot compile external LLVM symbol \"%s\"\n", name);
 				return 0;
 			}
 		} else {
@@ -2162,17 +2165,20 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 				}
 				name = llvm2ir_sym_name(buf, name, name_len);
 				if (!name) {
+					fprintf(stderr, "Bad LLVM symbol name \"%s\"\n", LLVMGetValueName2(sym, &name_len));
 					return 0;
 				}
 				if (LLVMIsGlobalConstant(sym)) {
 					flags |= IR_CONST;
                 }
 				if (!loader->sym_dcl(loader, name, flags, size, has_data)) {
+					fprintf(stderr, "Cannot compile LLVM symbol \"%s\"\n", name);
 					return 0;
 				}
 				if (has_data) {
-					llvm2ir_data(loader, target_data, type, init, 0);
-					if (!loader->sym_data_end(loader)) {
+					if (!llvm2ir_data(loader, target_data, type, init, 0)
+					 || !loader->sym_data_end(loader)) {
+						fprintf(stderr, "Cannot compile LLVM symbol \"%s\"\n", name);
 						return 0;
 					}
 				}
@@ -2204,11 +2210,13 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 			}
 			if (is_external) {
 				if (!llvm2ir_external_func(loader, name, func)) {
+					fprintf(stderr, "Cannot compile external LLVM function \"%s\"\n", name);
 					return 0;
 				}
 			} else {
 				if (loader->forward_func_dcl
 				 && !llvm2ir_forward_func(loader, name, func, is_static)) {
+					fprintf(stderr, "Cannot compile forward LLVM function \"%s\"\n", name);
 					return 0;
 				}
 			}
@@ -2234,6 +2242,7 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 					IR_ASSERT(0);
 			}
 			if (!llvm2ir_forward_func(loader, name, func, is_static)) {
+				fprintf(stderr, "Cannot compile forward LLVM function \"%s\"\n", name);
 				return 0;
 			}
 		}
@@ -2243,6 +2252,7 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 		if (LLVMIsDeclaration(func)) continue;
 		name = LLVMGetValueName2(func, &name_len);
 		if (!loader->func_init(loader, &ctx, name)) {
+			fprintf(stderr, "Cannot compile function \"%s\"\n", name);
 			return 0;
 		}
 		switch (LLVMGetLinkage(func)) {
@@ -2257,12 +2267,14 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 		if (!llvm2ir_func(&ctx, func)) {
 			ctx.rules = NULL;
 			ir_free(&ctx);
+			fprintf(stderr, "Cannot compile function \"%s\"\n", name);
 			return 0;
 		}
 		ctx.rules = NULL;
 
 		if (!loader->func_process(loader, &ctx, name)) {
 			ir_free(&ctx);
+			fprintf(stderr, "Cannot compile function \"%s\"\n", name);
 			return 0;
 		}
 
