@@ -1615,7 +1615,7 @@ static bool ir_try_coalesce(ir_ctx *ctx, ir_ref from, ir_ref to)
 		} else if (from < to) {
 			ir_vregs_join(ctx, v1, v2);
 			if (f2 & IR_LIVE_INTERVAL_COALESCED) {
-				for (i = 0; i < ctx->insns_count; i++) {
+				for (i = 1; i < ctx->insns_count; i++) {
 					if (ctx->vregs[i] == v2) {
 						ctx->vregs[i] = v1;
 					}
@@ -1626,7 +1626,7 @@ static bool ir_try_coalesce(ir_ctx *ctx, ir_ref from, ir_ref to)
 		} else {
 			ir_vregs_join(ctx, v2, v1);
 			if (f1 & IR_LIVE_INTERVAL_COALESCED) {
-				for (i = 0; i < ctx->insns_count; i++) {
+				for (i = 1; i < ctx->insns_count; i++) {
 					if (ctx->vregs[i] == v1) {
 						ctx->vregs[i] = v2;
 					}
