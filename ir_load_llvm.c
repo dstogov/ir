@@ -2133,6 +2133,69 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 		return 0;
 	}
 
+	if (loader->external_func_dcl) {
+		for (func = LLVMGetFirstFunction(module); func; func = LLVMGetNextFunction(func)) {
+			LLVMLinkage linkage;
+			bool is_external = 0;
+			bool is_static = 0;
+
+			if (!LLVMIsDeclaration(func)) continue;
+			linkage = LLVMGetLinkage(func);
+			name = LLVMGetValueName2(func, &name_len);
+			if (STR_START(name, name_len, "llvm.")) continue;
+			switch (linkage) {
+				case LLVMExternalLinkage:
+					is_external = 1;
+					break;
+				case LLVMInternalLinkage:
+				case LLVMPrivateLinkage:
+					is_static = 1;
+					break;
+				default:
+					fprintf(stderr, "Unsupported LLVM linkage: %d\n", linkage);
+					IR_ASSERT(0);
+			}
+			if (is_external) {
+				if (!llvm2ir_external_func(loader, name, func)) {
+					fprintf(stderr, "Cannot compile external LLVM function \"%s\"\n", name);
+					return 0;
+				}
+			} else {
+				if (loader->forward_func_dcl
+				 && !llvm2ir_forward_func(loader, name, func, is_static)) {
+					fprintf(stderr, "Cannot compile forward LLVM function \"%s\"\n", name);
+					return 0;
+				}
+			}
+		}
+	}
+
+	if (loader->forward_func_dcl) {
+		for (func = LLVMGetFirstFunction(module); func; func = LLVMGetNextFunction(func)) {
+			LLVMLinkage linkage;
+			bool is_static = 0;
+
+			if (LLVMIsDeclaration(func)) continue;
+			linkage = LLVMGetLinkage(func);
+			name = LLVMGetValueName2(func, &name_len);
+			switch (linkage) {
+				case LLVMExternalLinkage:
+					break;
+				case LLVMInternalLinkage:
+				case LLVMPrivateLinkage:
+					is_static = 1;
+					break;
+				default:
+					fprintf(stderr, "Unsupported LLVM linkage: %d\n", linkage);
+					IR_ASSERT(0);
+			}
+			if (!llvm2ir_forward_func(loader, name, func, is_static)) {
+				fprintf(stderr, "Cannot compile forward LLVM function \"%s\"\n", name);
+				return 0;
+			}
+		}
+	}
+
 	for (sym = LLVMGetFirstGlobal(module); sym; sym = LLVMGetNextGlobal(sym)) {
 		LLVMLinkage linkage = LLVMGetLinkage(sym);
 		LLVMValueRef init = LLVMGetInitializer(sym);
@@ -2201,68 +2264,6 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 						return 0;
 					}
 				}
-			}
-		}
-	}
-
-	if (loader->external_func_dcl) {
-		for (func = LLVMGetFirstFunction(module); func; func = LLVMGetNextFunction(func)) {
-			LLVMLinkage linkage;
-			bool is_external = 0;
-			bool is_static = 0;
-
-			if (!LLVMIsDeclaration(func)) continue;
-			linkage = LLVMGetLinkage(func);
-			name = LLVMGetValueName2(func, &name_len);
-			if (STR_START(name, name_len, "llvm.")) continue;
-			switch (linkage) {
-				case LLVMExternalLinkage:
-					is_external = 1;
-					break;
-				case LLVMInternalLinkage:
-				case LLVMPrivateLinkage:
-					is_static = 1;
-					break;
-				default:
-					fprintf(stderr, "Unsupported LLVM linkage: %d\n", linkage);
-					IR_ASSERT(0);
-			}
-			if (is_external) {
-				if (!llvm2ir_external_func(loader, name, func)) {
-					fprintf(stderr, "Cannot compile external LLVM function \"%s\"\n", name);
-					return 0;
-				}
-			} else {
-				if (loader->forward_func_dcl
-				 && !llvm2ir_forward_func(loader, name, func, is_static)) {
-					fprintf(stderr, "Cannot compile forward LLVM function \"%s\"\n", name);
-					return 0;
-				}
-			}
-		}
-	}
-	if (loader->forward_func_dcl) {
-		for (func = LLVMGetFirstFunction(module); func; func = LLVMGetNextFunction(func)) {
-			LLVMLinkage linkage;
-			bool is_static = 0;
-
-			if (LLVMIsDeclaration(func)) continue;
-			linkage = LLVMGetLinkage(func);
-			name = LLVMGetValueName2(func, &name_len);
-			switch (linkage) {
-				case LLVMExternalLinkage:
-					break;
-				case LLVMInternalLinkage:
-				case LLVMPrivateLinkage:
-					is_static = 1;
-					break;
-				default:
-					fprintf(stderr, "Unsupported LLVM linkage: %d\n", linkage);
-					IR_ASSERT(0);
-			}
-			if (!llvm2ir_forward_func(loader, name, func, is_static)) {
-				fprintf(stderr, "Cannot compile forward LLVM function \"%s\"\n", name);
-				return 0;
 			}
 		}
 	}
