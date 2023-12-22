@@ -35,23 +35,32 @@ static ir_ref llvm2ir_auto_cast(ir_ctx *ctx, ir_ref ref, ir_type src_type, ir_ty
 static ir_type llvm2ir_type(LLVMTypeRef type)
 {
 	char *str;
+	uint32_t width;
 
 	switch (LLVMGetTypeKind(type)) {
 		case LLVMVoidTypeKind:
 			return IR_VOID;
 		case LLVMIntegerTypeKind:
-			switch (LLVMGetIntTypeWidth(type)) {
-				case 1:  return IR_BOOL;
-				case 8:  return IR_I8;
-				case 16: return IR_I16;
-				case 32: return IR_I32;
-				case 64: return IR_I64;
-				default:
-					break;
+			width = LLVMGetIntTypeWidth(type);
+			if (width == 1) {
+				return IR_BOOL;
+			} else if (width <= 8) {
+				return IR_I8;
+			} else if (width <= 16) {
+				return IR_I16;
+			} else if (width <= 32) {
+				return IR_I32;
+			} else if (width <= 64) {
+				return IR_I64;
 			}
 			break;
 		case LLVMFloatTypeKind:
 			return IR_FLOAT;
+#if 0
+		case LLVMX86_FP80TypeKind:
+			// TODO: IR doesn't support "long double". Fallback to "double" ???
+			IR_FALLTHROUGH;
+#endif
 		case LLVMDoubleTypeKind:
 			return IR_DOUBLE;
 		case LLVMPointerTypeKind:
@@ -301,8 +310,18 @@ static ir_ref llvm2ir_cast_op(ir_ctx *ctx, LLVMValueRef expr, ir_op op, LLVMOpco
 
 	src_type = llvm2ir_type(LLVMTypeOf(op0));
 	dst_type = llvm2ir_type(LLVMTypeOf(expr));
-	if (op == IR_ZEXT && src_type == IR_BOOL && (dst_type == IR_I8 || dst_type == IR_U8)) {
-		op = IR_BITCAST;
+	if (op == IR_ZEXT) {
+		if (src_type == IR_BOOL && (dst_type == IR_I8 || dst_type == IR_U8)) {
+			op = IR_BITCAST;
+		} else if (ir_type_size[src_type] == ir_type_size[dst_type]) {
+			// TODO: may be we need to reset high bits ???
+			op = IR_BITCAST;
+		}
+	} else if (op == IR_TRUNC) {
+		if (ir_type_size[src_type] == ir_type_size[dst_type]) {
+			// TODO: may be we need to reset high bits ???
+			op = IR_BITCAST;
+		}
 	} else if (op == IR_BITCAST && ir_type_size[src_type] != ir_type_size[dst_type]) {
 		op = (ir_type_size[src_type] < ir_type_size[dst_type]) ? IR_ZEXT : IR_TRUNC;
 	} else if (op == IR_INT2FP && opcode == LLVMUIToFP) {
