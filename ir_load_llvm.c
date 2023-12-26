@@ -317,6 +317,18 @@ static ir_ref llvm2ir_cast_op(ir_ctx *ctx, LLVMValueRef expr, ir_op op, LLVMOpco
 			// TODO: may be we need to reset high bits ???
 			op = IR_BITCAST;
 		}
+	} else if (op == IR_SEXT) {
+		if (src_type == IR_BOOL) {
+			ref = llvm2ir_op(ctx, op0, src_type);
+			if (ir_type_size[dst_type] > 1) {
+				ref = ir_fold1(ctx, IR_OPT(IR_ZEXT, dst_type), ref);
+			} else {
+				ref = ir_fold1(ctx, IR_OPT(IR_BITCAST, dst_type), ref);
+			}
+			ref = ir_fold1(ctx, IR_OPT(IR_NEG, dst_type), ref);
+			ir_addrtab_add(ctx->binding, (uintptr_t)expr, ref);
+			return ref;
+		}
 	} else if (op == IR_TRUNC) {
 		if (ir_type_size[src_type] == ir_type_size[dst_type]) {
 			// TODO: may be we need to reset high bits ???
