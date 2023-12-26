@@ -6985,9 +6985,14 @@ return os_pushresult(L,remove(filename)==0,filename);
 static int os_exit(lua_State*L){
 exit(luaL_optint(L,1,EXIT_SUCCESS));
 }
+static int os_clock(lua_State*L){
+lua_pushnumber(L,((lua_Number)clock())/(lua_Number)CLOCKS_PER_SEC);
+return 1;
+}
 static const luaL_Reg syslib[]={
 {"exit",os_exit},
 {"remove",os_remove},
+{"clock",os_clock},
 {NULL,NULL}
 };
 static int luaopen_os(lua_State*L){
