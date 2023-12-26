@@ -161,6 +161,7 @@ int main(int argc, char **argv)
 	ir_init(&ctx, flags, 256, 1024);
 	ctx.mflags = mflags;
 	ctx.fixed_regset = ~debug_regset;
+	ctx.ret_type = IR_I32;
 	gen_mandelbrot(&ctx);
 //	ir_save(&ctx, stderr);
 
