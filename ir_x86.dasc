@@ -3368,7 +3368,7 @@ static void ir_emit_mem_shift_const(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
-static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn, uint32_t rule)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
@@ -3390,9 +3390,9 @@ static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			ir_emit_load(ctx, type, def_reg, op1);
 		}
 	}
-	if (insn->op == IR_ADD) {
+	if (rule == IR_INC) {
 		|	ASM_REG_OP inc, insn->type, def_reg
-	} else if (insn->op == IR_SUB) {
+	} else if (rule == IR_DEC) {
 		|	ASM_REG_OP dec, insn->type, def_reg
 	} else if (insn->op == IR_NOT) {
 		|	ASM_REG_OP not, insn->type, def_reg
@@ -3779,7 +3779,7 @@ static void ir_emit_ctpop(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
-static void ir_emit_mem_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+static void ir_emit_mem_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn, uint32_t rule)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
@@ -3807,9 +3807,9 @@ static void ir_emit_mem_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		offset = ir_var_spill_slot(ctx, insn->op2, &reg);
 	}
 
-	if (op_insn->op == IR_ADD) {
+	if (rule == IR_MEM_INC) {
 		|	ASM_MEM_OP inc, type, [Ra(reg)+offset]
-	} else if (op_insn->op == IR_SUB) {
+	} else if (rule == IR_MEM_DEC) {
 		|	ASM_MEM_OP dec, type, [Ra(reg)+offset]
 	} else if (op_insn->op == IR_NOT) {
 		|	ASM_MEM_OP not, type, [Ra(reg)+offset]
@@ -9319,7 +9319,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_INC:
 				case IR_DEC:
 				case IR_OP_INT:
-					ir_emit_op_int(ctx, i, insn);
+					ir_emit_op_int(ctx, i, insn, *rule);
 					break;
 				case IR_ABS_INT:
 					ir_emit_abs_int(ctx, i, insn);
@@ -9498,7 +9498,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_MEM_OP_INT:
 				case IR_MEM_INC:
 				case IR_MEM_DEC:
-					ir_emit_mem_op_int(ctx, i, insn);
+					ir_emit_mem_op_int(ctx, i, insn, *rule);
 					break;
 				case IR_MEM_BINOP_INT:
 					ir_emit_mem_binop_int(ctx, i, insn);
