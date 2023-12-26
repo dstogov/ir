@@ -184,9 +184,11 @@ void dasm_put(Dst_DECL, int start, ...)
   va_start(ap, start);
   while (1) {
     int action = *p++;
-    if (action < DASM_DISP) {
+    while (action < DASM_DISP) {
       ofs++;
-    } else if (action <= DASM_REL_A) {
+      action = *p++;
+    }
+    if (action <= DASM_REL_A) {
       int n = va_arg(ap, int);
       b[pos++] = n;
       switch (action) {
@@ -309,6 +311,10 @@ int dasm_link(Dst_DECL, size_t *szp)
       int op = 0;
       while (1) {
 	int action = *p++;
+	while (action < DASM_DISP) {
+	  op = action;
+	  action = *p++;
+	}
 	switch (action) {
 	case DASM_REL_LG: p++;
 	  /* fallthrough */
@@ -347,7 +353,6 @@ int dasm_link(Dst_DECL, size_t *szp)
 	case DASM_ESC: op = *p++; break;
 	case DASM_MARK: break;
 	case DASM_SECTION: case DASM_STOP: goto stop;
-	default: op = action; break;
 	}
       }
       stop: (void)0;
@@ -404,8 +409,26 @@ int dasm_encode(Dst_DECL, void *buffer)
       dasm_ActList p = D->actionlist + *b++;
       unsigned char *mark = NULL;
       while (1) {
+	int n;
 	int action = *p++;
-	int n = (action >= DASM_DISP && action <= DASM_ALIGN) ? *b++ : 0;
+	while (action < DASM_DISP) {
+	  *cp++ = action;
+	  action = *p++;
+	}
+	if (action >= DASM_ALIGN) {
+	  switch (action) {
+	  case DASM_ALIGN:
+	    b++;
+	    n = *p++;
+	    while (((cp-base) & n)) *cp++ = 0x90; /* nop */
+	    continue;
+	  case DASM_EXTERN: n = DASM_EXTERN(Dst, cp, p[1], *p); p += 2; goto wd;
+	  case DASM_MARK: mark = cp; continue;
+	  case DASM_ESC: action = *p++; *cp++ = action; continue;
+	  case DASM_SECTION: case DASM_STOP: goto stop;
+	  }
+	}
+	n = *b++;
 	switch (action) {
 	case DASM_DISP: if (!mark) mark = cp; {
 	  unsigned char *mm = mark;
@@ -475,16 +498,6 @@ int dasm_encode(Dst_DECL, void *buffer)
 	}
 	case DASM_LABEL_PC: case DASM_SETLABEL: break;
 	case DASM_SPACE: { int fill = *p++; while (n--) *cp++ = fill; break; }
-	case DASM_ALIGN:
-	  n = *p++;
-	  while (((cp-base) & n)) *cp++ = 0x90; /* nop */
-	  break;
-	case DASM_EXTERN: n = DASM_EXTERN(Dst, cp, p[1], *p); p += 2; goto wd;
-	case DASM_MARK: mark = cp; break;
-	case DASM_ESC: action = *p++;
-	  /* fallthrough */
-	default: *cp++ = action; break;
-	case DASM_SECTION: case DASM_STOP: goto stop;
 	}
       }
       stop: (void)0;
