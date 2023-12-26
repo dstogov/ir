@@ -551,9 +551,11 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 		if (l->dump_asm) {
 			ir_disasm_add_symbol(name, (uintptr_t)data, size);
 		}
+#ifndef _WIN32
 		if (l->run) {
 			ir_gdb_register(name, data, size, 0, 0);
 		}
+#endif
 	} else {
 		ir_loader_add_sym(loader, name, NULL);
 	}
