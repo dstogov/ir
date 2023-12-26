@@ -193,12 +193,12 @@ void dasm_put(Dst_DECL, int start, ...)
       case DASM_DISP:
 	if (n == 0) { if (mrm < 0) mrm = p[-2]; if ((mrm&7) != 5) break; }
 	/* fallthrough */
-      case DASM_IMM_DB: if (((n+128)&-256) == 0) goto ob; /* fallthrough */
+      case DASM_IMM_DB: if ((((unsigned)n+128)&-256) == 0) goto ob; /* fallthrough */
       case DASM_REL_A: /* Assumes ptrdiff_t is int. !x64 */
       case DASM_IMM_D: ofs += 4; break;
-      case DASM_IMM_S: CK(((n+128)&-256) == 0, RANGE_I); goto ob;
+      case DASM_IMM_S: CK((((unsigned)n+128)&-256) == 0, RANGE_I); goto ob;
       case DASM_IMM_B: CK((n&-256) == 0, RANGE_I); ob: ofs++; break;
-      case DASM_IMM_WB: if (((n+128)&-256) == 0) goto ob; /* fallthrough */
+      case DASM_IMM_WB: if ((((unsigned)n+128)&-256) == 0) goto ob; /* fallthrough */
       case DASM_IMM_W: CK((n&-65536) == 0, RANGE_I); ofs += 2; break;
       case DASM_SPACE: p++; ofs += n; break;
       case DASM_SETLABEL: b[pos-2] = -0x40000000; break;  /* Neg. label ofs. */
@@ -412,16 +412,16 @@ int dasm_encode(Dst_DECL, void *buffer)
 	  if (*p != DASM_IMM_DB && *p != DASM_IMM_WB) mark = NULL;
 	  if (n == 0) { int mrm = mm[-1]&7; if (mrm == 4) mrm = mm[0]&7;
 	    if (mrm != 5) { mm[-1] -= 0x80; break; } }
-	  if (((n+128) & -256) != 0) goto wd; else mm[-1] -= 0x40;
+	  if ((((unsigned)n+128) & -256) != 0) goto wd; else mm[-1] -= 0x40;
 	}
 	  /* fallthrough */
 	case DASM_IMM_S: case DASM_IMM_B: wb: dasmb(n); break;
-	case DASM_IMM_DB: if (((n+128)&-256) == 0) {
+	case DASM_IMM_DB: if ((((unsigned)n+128)&-256) == 0) {
 	    db: if (!mark) mark = cp; mark[-2] += 2; mark = NULL; goto wb;
 	  } else mark = NULL;
 	  /* fallthrough */
 	case DASM_IMM_D: wd: dasmd(n); break;
-	case DASM_IMM_WB: if (((n+128)&-256) == 0) goto db; else mark = NULL;
+	case DASM_IMM_WB: if ((((unsigned)n+128)&-256) == 0) goto db; else mark = NULL;
 	  /* fallthrough */
 	case DASM_IMM_W: dasmw(n); break;
 	case DASM_VREG: {
