@@ -1048,7 +1048,7 @@ static int parse_ir_sym_data(int sym, ir_loader *loader) {
 	const char *name;
 	size_t name_len;
 	char buf[256];
-	uintptr_t offset;
+	uintptr_t offset = 0;
 	sym = parse_type(sym, &t);
 	if (sym == YY_SYM) {
 		sym = get_sym();

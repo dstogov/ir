@@ -245,7 +245,7 @@ ir_sym_data(ir_loader *loader):
 	{const char *name;}
 	{size_t name_len;}
 	{char buf[256];}
-	{uintptr_t offset;}
+	{uintptr_t offset = 0;}
 	type(&t)
 	(
 		"sym" "(" ID(&name, &name_len) ")"
