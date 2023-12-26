@@ -151,6 +151,17 @@ static ir_ref llvm2ir_proto(ir_ctx *ctx, uint32_t cconv, LLVMTypeRef ftype)
 	return ir_proto(ctx, flags, ret_type, num_args, arg_types);
 }
 
+static bool llvm2ir_is_static(LLVMValueRef op)
+{
+	switch (LLVMGetLinkage(op)) {
+		case LLVMInternalLinkage:
+		case LLVMPrivateLinkage:
+			return 1;
+		default:
+			return 0;
+	}
+}
+
 static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 {
 	ir_ref ref;
@@ -199,15 +210,23 @@ static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 		case LLVMGlobalVariableValueKind:
 			// TODO: resolve variable address
 			name = LLVMGetValueName2(op, &name_len);
-			name = llvm2ir_sym_name(buf, name, name_len);
-			if (!name) {
-				return 0;
+			if (llvm2ir_is_static(op)) {
+				name = llvm2ir_sym_name(buf, name, name_len);
+				if (!name) {
+					return 0;
+				}
 			}
 			return ir_const_sym(ctx, ir_strl(ctx, name, name_len));
 		case LLVMFunctionValueKind:
 			// TODO: resolve function address
 			proto = llvm2ir_proto(ctx, LLVMGetFunctionCallConv(op), LLVMGlobalGetValueType(op));
 			name = LLVMGetValueName2(op, &name_len);
+			if (llvm2ir_is_static(op)) {
+				name = llvm2ir_sym_name(buf, name, name_len);
+				if (!name) {
+					return 0;
+				}
+			}
 			return ir_const_func(ctx, ir_strl(ctx, name, name_len), proto);
 		case LLVMUndefValueValueKind:
 		case LLVMPoisonValueValueKind:
@@ -2196,6 +2215,11 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 				case LLVMInternalLinkage:
 				case LLVMPrivateLinkage:
 					is_static = 1;
+					name = llvm2ir_sym_name(buf, name, name_len);
+					if (!name) {
+						fprintf(stderr, "Bad LLVM function name \"%s\"\n", LLVMGetValueName2(func, &name_len));
+						return 0;
+					}
 					break;
 				default:
 					fprintf(stderr, "Unsupported LLVM linkage: %d\n", linkage);
@@ -2235,10 +2259,6 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 				flags |= IR_CONST;
 			}
 			name = llvm2ir_sym_name(buf, name, name_len);
-			if (!name) {
-				fprintf(stderr, "Bad LLVM symbol name \"%s\"\n", LLVMGetValueName2(sym, &name_len));
-				return 0;
-			}
 			if (loader->external_sym_dcl
 			 && !loader->external_sym_dcl(loader, name, flags)) {
 				fprintf(stderr, "Cannot compile external LLVM symbol \"%s\"\n", name);
@@ -2254,10 +2274,12 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 				type = LLVMGlobalGetValueType(sym);
 				size = LLVMABISizeOfType(target_data, type);
 
-				name = llvm2ir_sym_name(buf, name, name_len);
-				if (!name) {
-					fprintf(stderr, "Bad LLVM symbol name \"%s\"\n", LLVMGetValueName2(sym, &name_len));
-					return 0;
+				if (flags & IR_STATIC) {
+					name = llvm2ir_sym_name(buf, name, name_len);
+					if (!name) {
+						fprintf(stderr, "Bad LLVM symbol name \"%s\"\n", LLVMGetValueName2(sym, &name_len));
+						return 0;
+					}
 				}
 				if (LLVMIsGlobalConstant(sym)) {
 					flags |= IR_CONST;
@@ -2291,6 +2313,11 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 			case LLVMInternalLinkage:
 			case LLVMPrivateLinkage:
 				ctx.flags |= IR_STATIC;
+				name = llvm2ir_sym_name(buf, name, name_len);
+				if (!name) {
+					fprintf(stderr, "Bad LLVM function name \"%s\"\n", LLVMGetValueName2(func, &name_len));
+					return 0;
+				}
 				break;
 			default:
 				break;
