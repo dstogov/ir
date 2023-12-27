@@ -12,6 +12,8 @@
 
 #ifdef _WIN32
 # include <windows.h>
+#else
+# include <alloca.h>
 #endif
 
 static void help(const char *cmd)

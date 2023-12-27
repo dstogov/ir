@@ -29,8 +29,8 @@ ifeq (release, $(BUILD))
 endif
 
 ifeq (x86_64, $(TARGET))
-  override CFLAGS += -DIR_TARGET_X64
-  override BUILD_CFLAGS += -DIR_TARGET_X64
+  override CFLAGS += -m64 -DIR_TARGET_X64
+  override BUILD_CFLAGS += -m64 -DIR_TARGET_X64
   DASM_ARCH  = x86
   DASM_FLAGS = -M -D X64=1
 endif
