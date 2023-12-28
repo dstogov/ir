@@ -2198,11 +2198,39 @@ static void ir_emit_cmp_int_common(ir_ctx *ctx, ir_type type, ir_reg op1_reg, ir
 	dasm_State **Dst = &data->dasm_state;
 
 	IR_ASSERT(op1_reg != IR_REG_NONE);
+	// TODO: prevent repeatable sign/zero extension ???
+	if (ir_type_size[type] == 2) {
+		if (IR_IS_TYPE_SIGNED(type)) {
+			|	sxth Rw(op1_reg), Rw(op1_reg)
+		} else {
+			|	uxth Rw(op1_reg), Rw(op1_reg)
+		}
+	} else if (ir_type_size[type] == 1) {
+		if (IR_IS_TYPE_SIGNED(type)) {
+			|	sxtb Rw(op1_reg), Rw(op1_reg)
+		} else {
+			|	uxtb Rw(op1_reg), Rw(op1_reg)
+		}
+	}
 	if (op2_reg != IR_REG_NONE) {
 		if (ir_type_size[type] == 8) {
 			|	cmp Rx(op1_reg), Rx(op2_reg)
-		} else {
+		} else if (ir_type_size[type] == 4) {
 			|	cmp Rw(op1_reg), Rw(op2_reg)
+		} else if (ir_type_size[type] == 2) {
+			if (IR_IS_TYPE_SIGNED(type)) {
+				|	cmp Rw(op1_reg), Rw(op2_reg), sxth
+			} else {
+				|	cmp Rw(op1_reg), Rw(op2_reg), uxth
+			}
+		} else if (ir_type_size[type] == 1) {
+			if (IR_IS_TYPE_SIGNED(type)) {
+				|	cmp Rw(op1_reg), Rw(op2_reg), sxtb
+			} else {
+				|	cmp Rw(op1_reg), Rw(op2_reg), uxtb
+			}
+		} else {
+			IR_ASSERT(0);
 		}
 	} else {
 		IR_ASSERT(IR_IS_CONST_REF(op2));
