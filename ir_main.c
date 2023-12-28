@@ -12,7 +12,7 @@
 
 #ifdef _WIN32
 # include <windows.h>
-#else
+#elif defined(__linux__) || defined(__sun)
 # include <alloca.h>
 #endif
 
