@@ -2188,13 +2188,13 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 			}
 			if (is_external) {
 				if (!llvm2ir_external_func(loader, name, func)) {
-					fprintf(stderr, "Cannot compile external LLVM function \"%s\"\n", name);
+					fprintf(stderr, "Cannot resolve external LLVM function \"%s\"\n", name);
 					return 0;
 				}
 			} else {
 				if (loader->forward_func_dcl
 				 && !llvm2ir_forward_func(loader, name, func, is_static)) {
-					fprintf(stderr, "Cannot compile forward LLVM function \"%s\"\n", name);
+					fprintf(stderr, "Cannot declare forward LLVM function \"%s\"\n", name);
 					return 0;
 				}
 			}
