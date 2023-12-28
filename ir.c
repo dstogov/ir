@@ -20,6 +20,7 @@
 
 #ifndef _WIN32
 # include <sys/mman.h>
+# include <alloca.h>
 #else
 # define WIN32_LEAN_AND_MEAN
 # include <windows.h>
@@ -29,6 +30,7 @@
 #include "ir_private.h"
 
 #include <stddef.h>
+#include <stdlib.h>
 #include <math.h>
 
 #ifdef HAVE_VALGRIND

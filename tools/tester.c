@@ -7,6 +7,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,6 +22,7 @@
 # define S_IRUSR _S_IREAD
 # define S_IWUSR _S_IWRITE
 #else
+# include <sys/wait.h>
 # include <dirent.h>
 # include <unistd.h>
 # include <alloca.h>
@@ -417,7 +419,15 @@ static void find_files_in_dir(const char *dir_name, size_t dir_name_len)
 	}
 	while ((info = readdir(dir)) != 0) {
 		len = strlen(info->d_name);
+#if defined(DT_DIR)
 		if (info->d_type == DT_DIR) {
+#else
+		char buf[PATH_MAX];
+		struct stat s;
+		snprintf(buf, sizeof(buf), "%s/%s", dir_name, info->d_name);
+		stat(buf, &s);
+		if (S_ISDIR(s.st_mode)) {
+#endif
 			if ((len == 1 && info->d_name[0] == '.')
 			 || (len == 2 && info->d_name[0] == '.' && info->d_name[1] == '.')) {
 				/* skip */
@@ -429,7 +439,11 @@ static void find_files_in_dir(const char *dir_name, size_t dir_name_len)
 				find_files_in_dir(name, dir_name_len + len + 1);
 				free(name);
 			}
+#if defined(DT_DIR)
 		} else if (info->d_type == DT_REG) {
+#else
+		} else if (S_ISREG(s.st_mode)) {
+#endif
 			if (!test_extension
 			 || strcasecmp(info->d_name + len - test_extension_len, test_extension) == 0) {
 				name = malloc(dir_name_len + len + 2);
