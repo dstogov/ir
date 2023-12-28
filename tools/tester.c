@@ -25,7 +25,9 @@
 # include <sys/wait.h>
 # include <dirent.h>
 # include <unistd.h>
-# include <alloca.h>
+# if defined(__linux__) || defined(__sun)
+#  include <alloca.h>
+# endif
 # define PATH_SEP '/'
 # define DEFAULT_DIFF_CMD "diff --strip-trailing-cr -u"
 # define O_BINARY 0

@@ -20,7 +20,9 @@
 
 #ifndef _WIN32
 # include <sys/mman.h>
-# include <alloca.h>
+# if defined(__linux__) || defined(__sun)
+#  include <alloca.h>
+# endif
 #else
 # define WIN32_LEAN_AND_MEAN
 # include <windows.h>
