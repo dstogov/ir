@@ -122,6 +122,42 @@ static void yy_error(const char *msg);
 static void yy_error_sym(const char *msg, int sym);
 static void yy_error_str(const char *msg, const char *str);
 
+static ir_ref ir_make_const_str(ir_ctx *ctx, const char *str, size_t len)
+{
+	char *buf = alloca(len + 1);
+	char *p = buf;
+
+	while (len > 0) {
+		if (*str != '\\') {
+			*p = *str;
+		} else {
+			str++;
+			len--;
+			IR_ASSERT(len != 0);
+			switch (*str) {
+				case '\\': *p = '\\'; break;
+				case '\'': *p = '\''; break;
+				case '"':  *p = '"';  break;
+				case 'a':  *p = '\a'; break;
+				case 'e':  *p = 27;   break; /* '\e'; */
+				case 'f':  *p = '\f'; break;
+				case 'n':  *p = '\n'; break;
+				case 'r':  *p = '\r'; break;
+				case 't':  *p = '\t'; break;
+				case 'v':  *p = '\v'; break;
+				case '?':  *p = 0x3f; break;
+				default:
+					yy_error("unsupported escape sequence");
+			}
+		}
+		str++;
+		p++;
+		len--;
+	}
+	*p = 0;
+	return ir_const_str(ctx, ir_strl(ctx, buf, p - buf));
+}
+
 %}
 
 ir(ir_loader *loader):
@@ -404,7 +440,7 @@ ir_insn(ir_parser_ctx *p):
 	|	"sym" "(" ID(&func, &func_len) ")"
 		{ref = ir_const_sym(p->ctx, ir_strl(p->ctx, func, func_len));}
 	|   STRING(&func, &func_len)
-		{ref = ir_const_str(p->ctx, ir_strl(p->ctx, func, func_len));}
+		{ref = ir_make_const_str(p->ctx, func, func_len);}
 	|	func(&op)
 		(
 			"/"

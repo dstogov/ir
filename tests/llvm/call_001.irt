@@ -21,4 +21,4 @@ define i32 @test()
 	ret i32 %d2
 }
 declare i32 @printf(ptr, ...)
-@.str6 = private unnamed_addr constant [12 x i8] c"hello %d!\0A\00"
+@.str6 = private unnamed_addr constant [11 x i8] c"hello %d!\0A\00"

@@ -1267,45 +1267,6 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 			for (j = 0; j < len; j++) {
 				char c = str[j];
 
-				if (c == '\\') {
-					if (str[j+1] == '\\') {
-						j++;
-						c = '\\';
-					} else if (str[j+1] == '\'') {
-						j++;
-						c = '\'';
-					} else if (str[j+1] == '"') {
-						j++;
-						c = '"';
-					} else if (str[j+1] == 'a') {
-						j++;
-						c = '\a';
-					} else if (str[j+1] == 'b') {
-						j++;
-						c = '\b';
-					} else if (str[j+1] == 'e') {
-						j++;
-						c = 27; /* '\e'; */
-					} else if (str[j+1] == 'f') {
-						j++;
-						c = '\f';
-					} else if (str[j+1] == 'n') {
-						j++;
-						c = '\n';
-					} else if (str[j+1] == 'r') {
-						j++;
-						c = '\r';
-					} else if (str[j+1] == 't') {
-						j++;
-						c = '\t';
-					} else if (str[j+1] == 'v') {
-						j++;
-						c = '\v';
-					} else if (str[j+1] == '?') {
-						j++;
-						c = 0x3f;
-					}
-				}
 				if (c < ' ' || c >= 127) {
 					char c1 = c >> 8;
 					char c2 = c & 15;
