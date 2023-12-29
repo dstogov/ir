@@ -848,6 +848,8 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 			fprintf(stderr, "\nERROR: %d\n", ctx->status);
 			return 0;
 		}
+	} else {
+		ir_loader_add_sym(loader, name, NULL);
 	}
 	return 1;
 }
@@ -1071,8 +1073,8 @@ int main(int argc, char **argv)
 	}
 	if (dump_asm || dump_size || run) {
 		flags |= IR_GEN_NATIVE;
-		if (emit_c) {
-			fprintf(stderr, "ERROR: --emit-c is incompatible with native code generator (-S, --dump-size, --run)\n");
+		if (emit_c || emit_llvm) {
+			fprintf(stderr, "ERROR: --emit-c and --emit-llvm are incompatible with native code generator (-S, --dump-size, --run)\n");
 			return 1;
 		}
 	}
