@@ -76,18 +76,17 @@ OBJS_COMMON=$(BUILD_DIR)\ir.obj $(BUILD_DIR)\ir_strtab.obj $(BUILD_DIR)\ir_cfg.o
 	$(BUILD_DIR)\ir_disasm.obj $(BUILD_DIR)\ir_check.obj $(BUILD_DIR)\ir_cpuinfo.obj \
 	$(BUILD_DIR)\ir_emit_llvm.obj
 OBJS_IR = $(BUILD_DIR)\ir_main.obj
-OBJS_IR_TEST = $(BUILD_DIR)\ir_test.obj
-EXAMPLE_EXES = $(EXAMPLES_BUILD_DIR)\0001-basic.exe $(EXAMPLES_BUILD_DIR)\0001-while.exe $(EXAMPLES_BUILD_DIR)\0005-basic-runner-func.exe \
-	       $(EXAMPLES_BUILD_DIR)\0001-pointer.exe $(EXAMPLES_BUILD_DIR)\0001-func.exe
+EXAMPLE_EXES = $(EXAMPLES_BUILD_DIR)/mandelbrot.exe \
+	$(EXAMPLES_BUILD_DIR)/0001-basic.exe \
+	$(EXAMPLES_BUILD_DIR)/0001-while.exe \
+	$(EXAMPLES_BUILD_DIR)/0001-pointer.exe \
+	$(EXAMPLES_BUILD_DIR)/0001-func.exe \
+	$(EXAMPLES_BUILD_DIR)/0005-basic-runner-func.exe
 
-all: $(BUILD_DIR) $(BUILD_DIR)\ir.exe $(BUILD_DIR)\ir_test.exe
+all: $(BUILD_DIR) $(BUILD_DIR)\ir.exe
 
 $(BUILD_DIR)\ir.exe: $(OBJS_IR) $(OBJS_COMMON)
 	"$(LD)" $(LDFLAGS) $(OBJS_COMMON) $(OBJS_IR) $(LIBS) /out:$@
-
-#$(BUILD_DIR)\ir_test.exe: builddir capstone $(BUILD_DIR)\ir_emit_$(DASM_ARCH).h $(BUILD_DIR)\ir_fold_hash.h $(OBJS_IR_TEST) $(OBJS_COMMON)
-$(BUILD_DIR)\ir_test.exe: $(OBJS_IR_TEST) $(OBJS_COMMON) $(LIBCAPSTONE)
-	"$(LD)" $(LDFLAGS) $(OBJS_COMMON) $(OBJS_IR_TEST) $(LIBS) /out:$@
 
 $(BUILD_DIR)\ir_fold_hash.h: $(BUILD_DIR)\gen_ir_fold_hash.exe $(SRC_DIR)\ir_fold.h $(SRC_DIR)\ir.h
 	$(BUILD_DIR)\gen_ir_fold_hash.exe < $(SRC_DIR)\ir_fold.h > $(BUILD_DIR)\ir_fold_hash.h
@@ -102,7 +101,6 @@ $(BUILD_DIR)\ir_emit_$(DASM_ARCH).h: $(SRC_DIR)/ir_$(DASM_ARCH).dasc $(BUILD_DIR
 $(OBJS_COMMON): $(SRC_DIR)\ir.h $(SRC_DIR)\ir_private.h
 
 $(BUILD_DIR)\ir_main.obj: $(SRC_DIR)\ir.h
-$(BUILD_DIR)\ir_test.obj: $(SRC_DIR)\ir.h $(SRC_DIR)\ir_builder.h
 $(BUILD_DIR)\ir.obj: $(SRC_DIR)\ir_fold.h $(BUILD_DIR)\ir_fold_hash.h
 $(BUILD_DIR)\ir_ra.obj: $(SRC_DIR)\ir_$(DASM_ARCH).h
 $(BUILD_DIR)\ir_emit.obj: $(SRC_DIR)\ir_$(DASM_ARCH).h $(BUILD_DIR)\ir_emit_$(DASM_ARCH).h
@@ -152,7 +150,6 @@ $(BUILD_DIR)\tester.exe: $(SRC_DIR)/tools/tester.c
 	"$(CC)" $(CFLAGS) $(SRC_DIR)\tools\tester.c /Fe:$@
 
 test: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\tester.exe
-	$(BUILD_DIR)\ir.exe $(SRC_DIR)\test.ir --dump --save $(BUILD_DIR)\test.log
 	$(BUILD_DIR)\tester.exe --test-cmd $(BUILD_DIR)\ir.exe --target $(TEST_TARGET) --default-args "--save" \
 	    --additional-args "--no-abort-fault" \
 		--test-extension ".irt" --code-extension ".ir" $(SRC_DIR)\tests
