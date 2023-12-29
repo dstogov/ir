@@ -131,7 +131,7 @@ static int _save(ir_ctx *ctx, uint32_t dump, uint32_t pass, FILE *f, const char 
 		ir_dump(ctx, f);
 	}
 	if (dump & IR_DUMP_DOT) {
-		ir_dump_dot(ctx, f);
+		ir_dump_dot(ctx, func_name, f);
 	}
 	if (dump & IR_DUMP_USE_LISTS) {
 		ir_dump_use_lists(ctx, f);
