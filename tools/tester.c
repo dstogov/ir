@@ -259,6 +259,7 @@ static int run_test(const char *filename, test *t, int show_diff)
 	char *code_filename, *out_filename, *exp_filename, *diff_filename, *out;
 
 	len = strlen(filename);
+	out = NULL;
 
 	code_filename = replace_extension(filename, len, code_extension, code_extension_len);
 	out_filename = replace_extension(filename, len, ".out", strlen(".out"));

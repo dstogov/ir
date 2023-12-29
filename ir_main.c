@@ -1177,12 +1177,18 @@ int main(int argc, char **argv)
 	if (load_llvm_bitcode) {
 		if (!ir_load_llvm_bitcode(&loader.loader, input)) {
 			fprintf(stderr, "ERROR: Cannot load LLVM file '%s'\n", input);
+			if (loader.sym) {
+				ir_mem_free(loader.sym);
+			}
 			return 1;
 		}
 		goto finish;
 	} else if (load_llvm_asm) {
 		if (!ir_load_llvm_asm(&loader.loader, input)) {
 			fprintf(stderr, "ERROR: Cannot load LLVM file '%s'\n", input);
+			if (loader.sym) {
+				ir_mem_free(loader.sym);
+			}
 			return 1;
 		}
 		goto finish;
@@ -1192,6 +1198,9 @@ int main(int argc, char **argv)
 	f = fopen(input, "rb");
 	if (!f) {
 		fprintf(stderr, "ERROR: Cannot open input file '%s'\n", input);
+		if (loader.sym) {
+			ir_mem_free(loader.sym);
+		}
 		return 1;
 	}
 
