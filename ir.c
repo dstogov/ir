@@ -370,6 +370,8 @@ void ir_init(ir_ctx *ctx, uint32_t flags, ir_ref consts_limit, ir_ref insns_limi
 	ctx->ir_base[IR_FALSE].val.u64 = 0;
 	ctx->ir_base[IR_TRUE].optx = IR_OPT(IR_C_BOOL, IR_BOOL);
 	ctx->ir_base[IR_TRUE].val.u64 = 1;
+
+	ctx->ret_type = -1;
 }
 
 void ir_free(ir_ctx *ctx)

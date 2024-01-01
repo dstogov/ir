@@ -192,7 +192,7 @@ int main(int argc, char **argv)
 	ir_save(&ctx, stderr);
 	ir_dump_live_ranges(&ctx, stderr);
 	f = fopen("mandelbrot.dot", "w+");
-	ir_dump_dot(&ctx, f);
+	ir_dump_dot(&ctx, "dump", f);
 	fclose(f);
 
 	size_t size;

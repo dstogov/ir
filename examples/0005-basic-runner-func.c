@@ -46,7 +46,7 @@ void run(myfunc_t func)
 
 int main(int argc, char **argv)
 {
-	ir_ctx ctx = {0};
+	ir_ctx ctx;
 
 	ir_consistency_check();
 

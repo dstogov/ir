@@ -62,9 +62,9 @@ OBJS_COMMON = $(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_strtab.o $(BUILD_DIR)/ir_cfg.o \
 OBJS_IR = $(BUILD_DIR)/ir_main.o $(LLVM_OBJS)
 EXAMPLE_EXES = $(EXAMPLES_BUILD_DIR)/mandelbrot \
 	$(EXAMPLES_BUILD_DIR)/0001-basic \
-	$(EXAMPLES_BUILD_DIR)/0001-while \
-	$(EXAMPLES_BUILD_DIR)/0001-pointer \
-	$(EXAMPLES_BUILD_DIR)/0001-func \
+	$(EXAMPLES_BUILD_DIR)/0002-while \
+	$(EXAMPLES_BUILD_DIR)/0003-pointer \
+	$(EXAMPLES_BUILD_DIR)/0004-func \
 	$(EXAMPLES_BUILD_DIR)/0005-basic-runner-func
 
 all: $(BUILD_DIR) $(BUILD_DIR)/ir $(BUILD_DIR)/tester
