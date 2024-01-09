@@ -46,11 +46,12 @@ void run(myfunc_t func)
 
 int main(int argc, char **argv)
 {
-	ir_ctx ctx = {0};
+	ir_ctx ctx;
 
 	ir_consistency_check();
 
 	ir_init(&ctx, IR_FUNCTION | IR_OPT_FOLDING, 256, 1024);
+	ctx.ret_type = IR_DOUBLE;
 
 	gen_myfunc(&ctx);
 

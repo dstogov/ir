@@ -78,9 +78,9 @@ OBJS_COMMON=$(BUILD_DIR)\ir.obj $(BUILD_DIR)\ir_strtab.obj $(BUILD_DIR)\ir_cfg.o
 OBJS_IR = $(BUILD_DIR)\ir_main.obj
 EXAMPLE_EXES = $(EXAMPLES_BUILD_DIR)/mandelbrot.exe \
 	$(EXAMPLES_BUILD_DIR)/0001-basic.exe \
-	$(EXAMPLES_BUILD_DIR)/0001-while.exe \
-	$(EXAMPLES_BUILD_DIR)/0001-pointer.exe \
-	$(EXAMPLES_BUILD_DIR)/0001-func.exe \
+	$(EXAMPLES_BUILD_DIR)/0002-while.exe \
+	$(EXAMPLES_BUILD_DIR)/0003-pointer.exe \
+	$(EXAMPLES_BUILD_DIR)/0004-func.exe \
 	$(EXAMPLES_BUILD_DIR)/0005-basic-runner-func.exe
 
 all: $(BUILD_DIR) $(BUILD_DIR)\ir.exe
