@@ -256,7 +256,7 @@ static int run_test(const char *filename, test *t, int show_diff)
 	size_t len;
 	int ret;
 	char cmd[4096];
-	char *code_filename, *out_filename, *exp_filename, *diff_filename, *out;
+	char *code_filename, *out_filename, *exp_filename, *diff_filename;
 
 	len = strlen(filename);
 
@@ -293,6 +293,7 @@ static int run_test(const char *filename, test *t, int show_diff)
 
 	if (ret != -1) {
 	    FILE *f;
+	    char *out;
 
 #ifdef _WIN32
 		if (ret) {
@@ -326,6 +327,7 @@ static int run_test(const char *filename, test *t, int show_diff)
 			out[0] = 0;
 		}
 		ret = same_text(t->expect, out);
+		free(out);
 	} else {
 		ret = 0;
 	}
@@ -348,7 +350,6 @@ static int run_test(const char *filename, test *t, int show_diff)
 		}
 	}
 
-	free(out);
 	free(code_filename);
 	free(out_filename);
 	free(exp_filename);
