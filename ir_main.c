@@ -267,6 +267,17 @@ typedef struct _ir_main_loader {
 	ir_code_buffer code_buffer;
 } ir_main_loader;
 
+static void ir_loader_free_symbols(ir_main_loader *l)
+{
+	ir_strtab_free(&l->symtab);
+	if (l->sym) {
+		ir_mem_free(l->sym);
+	}
+	if (l->reloc) {
+		ir_mem_free(l->reloc);
+	}
+}
+
 static void ir_loader_add_reloc(ir_main_loader *l, const char *name, void *addr)
 {
 	ir_reloc *r;
@@ -877,6 +888,7 @@ int main(int argc, char **argv)
 	bool load_llvm_asm = 0;
 #endif
 	ir_main_loader loader;
+	int ret = 0;
 
 	ir_consistency_check();
 
@@ -1114,7 +1126,8 @@ int main(int argc, char **argv)
 		loader.dump_file = fopen(dump_file, "w+");
 		if (!loader.dump_file) {
 			fprintf(stderr, "ERROR: Cannot create file '%s'\n", dump_file);
-			return 0;
+			ret = 1;
+			goto exit;
 		}
 	} else {
 		loader.dump_file = stderr;
@@ -1124,7 +1137,8 @@ int main(int argc, char **argv)
 			loader.c_file = fopen(c_file, "w+");
 			if (!loader.c_file) {
 				fprintf(stderr, "ERROR: Cannot create file '%s'\n", c_file);
-				return 0;
+				ret = 1;
+				goto exit;
 			}
 		} else {
 			loader.c_file = stderr;
@@ -1135,7 +1149,8 @@ int main(int argc, char **argv)
 			loader.llvm_file = fopen(llvm_file, "w+");
 			if (!loader.llvm_file) {
 				fprintf(stderr, "ERROR: Cannot create file '%s'\n", llvm_file);
-				return 0;
+				ret = 1;
+				goto exit;
 			}
 		} else {
 			loader.llvm_file = stderr;
@@ -1150,7 +1165,8 @@ int main(int argc, char **argv)
 		loader.code_buffer.start = ir_mem_mmap(size);
 		if (!loader.code_buffer.start) {
 			fprintf(stderr, "ERROR: Cannot allocate JIT code buffer\n");
-			return 0;
+			ret = 1;
+			goto exit;
 		}
 		loader.code_buffer.pos = loader.code_buffer.start;
 		loader.code_buffer.end = (char*)loader.code_buffer.start + size;
@@ -1177,13 +1193,15 @@ int main(int argc, char **argv)
 	if (load_llvm_bitcode) {
 		if (!ir_load_llvm_bitcode(&loader.loader, input)) {
 			fprintf(stderr, "ERROR: Cannot load LLVM file '%s'\n", input);
-			return 1;
+			ret = 1;
+			goto exit;
 		}
 		goto finish;
 	} else if (load_llvm_asm) {
 		if (!ir_load_llvm_asm(&loader.loader, input)) {
 			fprintf(stderr, "ERROR: Cannot load LLVM file '%s'\n", input);
-			return 1;
+			ret = 1;
+			goto exit;
 		}
 		goto finish;
 	}
@@ -1192,18 +1210,21 @@ int main(int argc, char **argv)
 	f = fopen(input, "rb");
 	if (!f) {
 		fprintf(stderr, "ERROR: Cannot open input file '%s'\n", input);
-		return 1;
+		ret = 1;
+		goto exit;
 	}
 
 	ir_loader_init();
 
 	if (!ir_load(&loader.loader, f)) {
+		fclose(f);
+		ir_loader_free();
 		fprintf(stderr, "ERROR: Cannot load input file '%s'\n", input);
+		ret = 1;
+		goto exit;
 	}
 
 	fclose(f);
-
-	
 	ir_loader_free();
 
 #if HAVE_LLVM
@@ -1231,11 +1252,6 @@ finish:
 		fprintf(stderr, "\ncode size = %lld\n", (long long int)loader.size);
 	}
 
-	ir_strtab_free(&loader.symtab);
-	if (loader.sym) {
-		ir_mem_free(loader.sym);
-	}
-
 	if (run && loader.main) {
 		int jit_argc = 1;
 		char **jit_argv;
@@ -1249,8 +1265,10 @@ finish:
 		for (i = 1; i < jit_argc; i++) {
 			jit_argv[i] = argv[run_args + i - 1];
 		}
-		return func(jit_argc, jit_argv);
+		ret = func(jit_argc, jit_argv);
 	}
 
-	return 0;
+exit:
+	ir_loader_free_symbols(&loader);
+	return ret;
 }
