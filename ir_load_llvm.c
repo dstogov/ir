@@ -1499,7 +1499,8 @@ static uint32_t llvm2ir_compute_post_order(
 		LLVMBasicBlockRef *bbs,
 		uint32_t           bb_count,
 		uint32_t           start,
-		uint32_t          *post_order)
+		uint32_t          *post_order,
+		const ir_use_list *predecessors)
 {
 	uint32_t b, succ_b, j, n, count = 0;
 	LLVMBasicBlockRef bb, succ_bb;
@@ -1509,6 +1510,12 @@ static uint32_t llvm2ir_compute_post_order(
 
 	ir_worklist_init(&worklist, bb_count);
 	ir_worklist_push(&worklist, start);
+	for (j = 0; j < bb_count; j++) {
+		if (predecessors[j].count == 0) {
+			/* unreachable block */
+			ir_worklist_push(&worklist, j);
+		}
+	}
 
 	while (ir_worklist_len(&worklist) != 0) {
 next:
@@ -1644,7 +1651,7 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMValueRef func)
 	b = ir_addrtab_find(&bb_hash, (uintptr_t)bb);
 	IR_ASSERT(b < bb_count);
 	uint32_t *post_order = ir_mem_malloc(sizeof(uint32_t) * bb_count);
-	uint32_t post_order_count = llvm2ir_compute_post_order(&bb_hash, bbs, bb_count, b, post_order);
+	uint32_t post_order_count = llvm2ir_compute_post_order(&bb_hash, bbs, bb_count, b, post_order, predecessors);
 
 	/* Process all reachable basic blocks in proper order */
 	ir_bitset visited = ir_bitset_malloc(bb_count);
