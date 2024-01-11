@@ -724,7 +724,15 @@ op2_const:
 			break;
 		case IR_LOAD_FP:
 		case IR_LOAD_INT:
+		case IR_MEM_OP_INT:
+		case IR_MEM_INC:
+		case IR_MEM_DEC:
+		case IR_MEM_MUL_PWR2:
+		case IR_MEM_DIV_PWR2:
+		case IR_MEM_MOD_PWR2:
 		case IR_MEM_BINOP_INT:
+		case IR_MEM_SHIFT:
+		case IR_MEM_SHIFT_CONST:
 			flags = IR_USE_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
 			insn = &ctx->ir_base[ref];
 			if (IR_IS_CONST_REF(insn->op2)) {
