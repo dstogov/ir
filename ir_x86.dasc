@@ -6436,7 +6436,7 @@ static void ir_emit_alloca(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 		IR_ASSERT(IR_IS_TYPE_INT(val->type));
 		IR_ASSERT(!IR_IS_SYM_CONST(val->op));
-		IR_ASSERT(IR_IS_TYPE_UNSIGNED(val->type) || val->val.i64 > 0);
+		IR_ASSERT(IR_IS_TYPE_UNSIGNED(val->type) || val->val.i64 >= 0);
 		IR_ASSERT(IR_IS_SIGNED_32BIT(val->val.i64));
 
 		if (ctx->flags2 & IR_HAS_CALLS) {
