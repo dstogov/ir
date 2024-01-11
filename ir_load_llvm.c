@@ -2118,6 +2118,16 @@ static int llvm2ir_data(ir_loader *loader, LLVMTargetDataRef target_data, LLVMTy
 			return loader->sym_data_ref(loader, IR_FUNC, name, 0);
 		case LLVMConstantExprValueKind:
 			opcode = LLVMGetConstOpcode(op);
+			if (opcode == LLVMPtrToInt) {
+				LLVMValueRef op0 = LLVMGetOperand(op, 0);
+
+				t = llvm2ir_type(LLVMTypeOf(op0));
+				IR_ASSERT(IR_IS_TYPE_INT(t));
+				if (ir_type_size[t] == ir_type_size[IR_ADDR]) {
+					op = op0;
+					opcode = LLVMGetConstOpcode(op);
+				}
+			}
 			if (opcode == LLVMGetElementPtr) {
 				LLVMValueRef op0 = LLVMGetOperand(op, 0);
 
@@ -2129,6 +2139,19 @@ static int llvm2ir_data(ir_loader *loader, LLVMTargetDataRef target_data, LLVMTy
 						return 0;
 					}
 					return loader->sym_data_ref(loader, IR_SYM, name, offset);
+				}
+			} else if (opcode == LLVMIntToPtr) {
+				LLVMValueRef op0 = LLVMGetOperand(op, 0);
+
+				if (LLVMGetValueKind(op0) == LLVMConstantIntValueKind) {
+					t = llvm2ir_type(LLVMTypeOf(op0));
+					IR_ASSERT(IR_IS_TYPE_INT(t));
+					if (IR_IS_TYPE_SIGNED(t)) {
+						val.i64 = LLVMConstIntGetSExtValue(op0);
+					} else {
+						val.i64 = LLVMConstIntGetZExtValue(op0);
+					}
+					return loader->sym_data(loader, IR_ADDR, 1, &val);
 				}
 			}
 			fprintf(stderr, "Unsupported constant expr: %d\n", (int)opcode);
