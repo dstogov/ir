@@ -1871,6 +1871,34 @@ IR_FOLD(ROR(C_I64, _))
 	IR_FOLD_NEXT;
 }
 
+IR_FOLD(LT(ABS, C_I8))
+IR_FOLD(LT(ABS, C_I16))
+IR_FOLD(LT(ABS, C_I32))
+IR_FOLD(LT(ABS, C_I64))
+IR_FOLD(LT(ABS, C_FLOAT))
+IR_FOLD(LT(ABS, C_DOUBLE))
+{
+	if (op2_insn->val.u64 == 0) {
+		/* abs() < 0 => false */
+		IR_FOLD_COPY(IR_FALSE);
+	}
+	IR_FOLD_NEXT;
+}
+
+IR_FOLD(GE(ABS, C_I8))
+IR_FOLD(GE(ABS, C_I16))
+IR_FOLD(GE(ABS, C_I32))
+IR_FOLD(GE(ABS, C_I64))
+IR_FOLD(GE(ABS, C_FLOAT))
+IR_FOLD(GE(ABS, C_DOUBLE))
+{
+	if (op2_insn->val.u64 == 0) {
+		/* abs() >= 0 => true */
+		IR_FOLD_COPY(IR_TRUE);
+	}
+	IR_FOLD_NEXT;
+}
+
 // TODO: conversions
 
 // TODO: Reassociation
