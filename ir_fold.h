@@ -1020,6 +1020,8 @@ IR_FOLD(BITCAST(C_ADDR))
 	switch (IR_OPT_TYPE(opt)) {
 		default:
 			IR_ASSERT(0);
+		case IR_BOOL:
+			IR_FOLD_BOOL(op1_insn->val.i8 != 0);
 		case IR_I8:
 			IR_FOLD_CONST_I(op1_insn->val.i8);
 		case IR_I16:
