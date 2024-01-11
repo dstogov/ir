@@ -2092,6 +2092,10 @@ static int llvm2ir_data(ir_loader *loader, LLVMTargetDataRef target_data, LLVMTy
 				default:
 					// TODO: use bigger type if possible
 					len = LLVMABISizeOfType(target_data, type);
+					if (!len) {
+						/* an empty structure */
+						return 1;
+					}
 					val.u64 = 0;
 					return loader->sym_data(loader, IR_U8, len, &val.u64);
 			}
