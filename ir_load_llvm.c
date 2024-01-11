@@ -2211,6 +2211,7 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 			name = LLVMGetValueName2(func, &name_len);
 			switch (linkage) {
 				case LLVMExternalLinkage:
+				case LLVMAvailableExternallyLinkage:
 					break;
 				case LLVMInternalLinkage:
 				case LLVMPrivateLinkage:

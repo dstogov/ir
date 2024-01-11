@@ -323,13 +323,30 @@ static bool ir_loader_fix_relocs(ir_main_loader *l)
 				memcpy(r->addr, &addr, sizeof(void*));
 #endif
 			} else {
-				fprintf(stderr, "Undefined symbol: %s\n", ir_strtab_str(&l->symtab, r->sym));
+				fprintf(stderr, "Undefined symbol: %s\n", ir_strtab_str(&l->symtab, r->sym - 1));
 				ret = 0;
 				break;
 			}
 		}
 		ir_mem_protect(l->code_buffer.start, (char*)l->code_buffer.end - (char*)l->code_buffer.start);
 	}
+
+	if (ret) {
+		/* Check for unresolved external symbols */
+		n = ir_strtab_count(&l->symtab);
+		if (n > 0) {
+			ir_sym *s = l->sym + 1;
+			ir_ref j;
+
+			for (j = 1; j < n; s++, j++) {
+				if (!s->addr && s->thunk_addr) {
+					fprintf(stderr, "Undefined symbol: %s\n", ir_strtab_str(&l->symtab, j - 1));
+					ret = 0;
+				}
+			}
+		}
+	}
+
 	return ret;
 }
 
@@ -487,7 +504,9 @@ static bool ir_loader_external_func_dcl(ir_loader *loader, const char *name, uin
 		void *addr = ir_loader_resolve_sym_name(loader, name, 0);
 
 		if (!addr) {
-			return 0;
+			/* Unresolved external function */
+			ir_loader_add_sym(loader, name, NULL);
+			return 1;
 		}
 		if (l->dump_asm) {
 			ir_disasm_add_symbol(name, (uintptr_t)addr, sizeof(void*));
