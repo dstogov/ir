@@ -334,7 +334,7 @@ ir_sym_data(ir_loader *loader):
 ir_func(ir_parser_ctx *p):
 	{p->undef_count = 0;}
 	{ir_strtab_init(&p->var_tab, 256, 4096);}
-	"{" (ir_insn(p) ";")* "}"
+	"{" ( ("NOP" | ir_insn(p) ) ";")* "}"
 	{if (p->undef_count) ir_check_indefined_vars(p);}
 	{ir_strtab_free(&p->var_tab);}
 ;
