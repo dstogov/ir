@@ -47,6 +47,7 @@ uint32_t yy_line;
 typedef struct _ir_parser_ctx {
 	ir_ctx    *ctx;
 	uint32_t   undef_count;
+	ir_ref     curr_ref;
 	ir_strtab  var_tab;
 } ir_parser_ctx;
 
@@ -71,11 +72,11 @@ static ir_ref ir_use_var(ir_parser_ctx *p, uint32_t n, const char *str, size_t l
 		p->undef_count++;
 		/* create a linked list of unresolved references with header in "var_tab" */
 		ref = IR_UNUSED; /* list terminator */
-		ir_strtab_lookup(&p->var_tab, str, len32, IR_ENCODE_UNRESOLVED_REF(p->ctx->insns_count, n));
+		ir_strtab_lookup(&p->var_tab, str, len32, IR_ENCODE_UNRESOLVED_REF(p->curr_ref, n));
 	} else if (IR_IS_UNRESOLVED(ref)) {
 		/* keep the linked list of unresolved references with header in "var_tab" */
 		/* "ref" keeps the tail of the list */
-		ir_strtab_update(&p->var_tab, str, len32, IR_ENCODE_UNRESOLVED_REF(p->ctx->insns_count, n));
+		ir_strtab_update(&p->var_tab, str, len32, IR_ENCODE_UNRESOLVED_REF(p->curr_ref, n));
 	}
 	return ref;
 }
@@ -450,12 +451,14 @@ ir_insn(ir_parser_ctx *p):
 			{if (count.i32 < 0 || count.i32 > 255) yy_error("bad number of operands");}
 			{ref = ir_emit_N(p->ctx, IR_OPT(op, t), count.i32);}
 			(	"("
-				(	val(p, op, 1, &op1)
+				(
+					{p->curr_ref = ref;}
+					val(p, op, 1, &op1)
 					{n = 1;}
 					{if (n > count.i32) yy_error("too many operands");}
 					{ir_set_op(p->ctx, ref, n, op1);}
 					(	","
-						val(p, op, n,  &op1)
+						val(p, op, n + 1, &op1)
 						{n++;}
 						{if (n > count.i32) yy_error("too many operands");}
 						{ir_set_op(p->ctx, ref, n, op1);}
@@ -466,7 +469,9 @@ ir_insn(ir_parser_ctx *p):
 		|
 			{n = 0;}
 			(	"("
-				(	val(p, op, 1, &op1)
+				(
+					{p->curr_ref = p->ctx->insns_count;}
+					val(p, op, 1, &op1)
 					{n = 1;}
 					(	","
 						val(p, op, 2, &op2)

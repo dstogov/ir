@@ -29,6 +29,7 @@ uint32_t yy_line;
 typedef struct _ir_parser_ctx {
 	ir_ctx    *ctx;
 	uint32_t   undef_count;
+	ir_ref     curr_ref;
 	ir_strtab  var_tab;
 } ir_parser_ctx;
 
@@ -53,11 +54,11 @@ static ir_ref ir_use_var(ir_parser_ctx *p, uint32_t n, const char *str, size_t l
 		p->undef_count++;
 		/* create a linked list of unresolved references with header in "var_tab" */
 		ref = IR_UNUSED; /* list terminator */
-		ir_strtab_lookup(&p->var_tab, str, len32, IR_ENCODE_UNRESOLVED_REF(p->ctx->insns_count, n));
+		ir_strtab_lookup(&p->var_tab, str, len32, IR_ENCODE_UNRESOLVED_REF(p->curr_ref, n));
 	} else if (IR_IS_UNRESOLVED(ref)) {
 		/* keep the linked list of unresolved references with header in "var_tab" */
 		/* "ref" keeps the tail of the list */
-		ir_strtab_update(&p->var_tab, str, len32, IR_ENCODE_UNRESOLVED_REF(p->ctx->insns_count, n));
+		ir_strtab_update(&p->var_tab, str, len32, IR_ENCODE_UNRESOLVED_REF(p->curr_ref, n));
 	}
 	return ref;
 }
@@ -1425,13 +1426,14 @@ _yy_state_76:
 				if (sym == YY__LPAREN) {
 					sym = get_sym();
 					if (YY_IN_SET(sym, (YY_ID,YY_STRING,YY_DECNUMBER,YY_NULL,YY_FUNC), "\000\000\001\142\004")) {
+						p->curr_ref = ref;
 						sym = parse_val(sym, p, op, 1, &op1);
 						n = 1;
 						if (n > count.i32) yy_error("too many operands");
 						ir_set_op(p->ctx, ref, n, op1);
 						while (sym == YY__COMMA) {
 							sym = get_sym();
-							sym = parse_val(sym, p, op, n, &op1);
+							sym = parse_val(sym, p, op, n + 1, &op1);
 							n++;
 							if (n > count.i32) yy_error("too many operands");
 							ir_set_op(p->ctx, ref, n, op1);
@@ -1447,6 +1449,7 @@ _yy_state_76:
 				if (sym == YY__LPAREN) {
 					sym = get_sym();
 					if (YY_IN_SET(sym, (YY_ID,YY_STRING,YY_DECNUMBER,YY_NULL,YY_FUNC), "\000\000\001\142\004")) {
+						p->curr_ref = p->ctx->insns_count;
 						sym = parse_val(sym, p, op, 1, &op1);
 						n = 1;
 						if (sym == YY__COMMA) {
