@@ -1,5 +1,6 @@
-# TRAGET may be "x86_64" or "x86" or "aarch64"
+# TARGET may be "x86_64" or "x86" or "aarch64"
 TARGET     = x86_64
+OS         = linux
 # BUILD can be "debug" or "release"
 BUILD      = debug
 BUILD_DIR  = .
@@ -46,6 +47,13 @@ ifeq (aarch64, $(TARGET))
   override BUILD_CFLAGS += -DIR_TARGET_AARCH64
   DASM_ARCH  = aarch64
   DASM_FLAGS = -M
+endif
+ifeq (freebsd, $(OS))
+  CC=clang
+  BUILD_CC=clang
+  override CFLAGS += -I/usr/local/include
+  override BUILD_CFLAGS += -I/usr/local/include
+  LDFLAGS += -L/usr/local/lib -lutil
 endif
 
 ifeq (yes, $(HAVE_LLVM))
