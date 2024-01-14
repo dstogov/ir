@@ -867,7 +867,6 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 			if (l->run) {
 #ifndef _WIN32
 				ir_perf_map_register(name, entry, size);
-				ir_perf_jitdump_open();
 				ir_perf_jitdump_register(name, entry, size);
 #endif
 				if (strcmp(name, "main") == 0) {
@@ -1208,6 +1207,12 @@ int main(int argc, char **argv)
 		}
 	}
 
+#ifndef _WIN32
+	if (run) {
+		ir_perf_jitdump_open();
+	}
+#endif
+
 #if HAVE_LLVM
 	if (load_llvm_bitcode) {
 		if (!ir_load_llvm_bitcode(&loader.loader, input)) {
@@ -1285,6 +1290,9 @@ finish:
 			jit_argv[i] = argv[run_args + i - 1];
 		}
 		ret = func(jit_argc, jit_argv);
+#ifndef _WIN32
+		ir_perf_jitdump_close();
+#endif
 	}
 
 exit:
