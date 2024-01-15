@@ -1,0 +1,87 @@
+--TEST--
+ROL 001:
+--ARGS--
+--run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func rol8(int8_t): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 3;
+	l_1 = START(l_5);
+	int8_t d_2 = PARAM(l_1, "arg_1", 1);
+	int8_t d_3 = ROL(d_2, c_4);
+	int32_t d_4 = ZEXT(d_3);
+	l_5 = RETURN(l_1, d_4);
+}
+func rol16(int16_t): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 3;
+	l_1 = START(l_5);
+	int16_t d_2 = PARAM(l_1, "arg_1", 1);
+	int16_t d_3 = ROL(d_2, c_4);
+	int32_t d_4 = ZEXT(d_3);
+	l_5 = RETURN(l_1, d_4);
+}
+func rol32(int32_t): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 3;
+	l_1 = START(l_4);
+	int32_t d_2 = PARAM(l_1, "arg_1", 1);
+	int32_t d_3 = ROL(d_2, c_4);
+	l_4 = RETURN(l_1, d_3);
+}
+func main(): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int8_t c_4 = 0;
+	uintptr_t c_5 = func rol8(int8_t): int32_t;
+	int8_t c_6 = -1;
+	int8_t c_7 = 15;
+	int8_t c_8 = -16;
+	uintptr_t c_9 = "i8:  %x %x %x %x\n";
+	uintptr_t c_10 = func printf(uintptr_t, ...): int32_t;
+	int16_t c_11 = 0;
+	uintptr_t c_12 = func rol16(int16_t): int32_t;
+	int16_t c_13 = -1;
+	int16_t c_14 = 15;
+	int16_t c_15 = -4096;
+	uintptr_t c_16 = "i16: %x %x %x %x\n";
+	int32_t c_17 = 0;
+	uintptr_t c_18 = func rol32(int32_t): int32_t;
+	int32_t c_19 = -1;
+	int32_t c_20 = 15;
+	int32_t c_21 = -268435456;
+	uintptr_t c_22 = "i32: %x %x %x %x\n";
+	l_1 = START(l_20);
+	int32_t d_2, l_2 = CALL/1(l_1, c_5, c_4);
+	int32_t d_3, l_3 = CALL/1(l_2, c_5, c_6);
+	int32_t d_4, l_4 = CALL/1(l_3, c_5, c_7);
+	int32_t d_5, l_5 = CALL/1(l_4, c_5, c_8);
+	int32_t d_6, l_6 = CALL/5(l_5, c_10, c_9, d_2, d_3, d_4, d_5);
+	int32_t d_8, l_8 = CALL/1(l_6, c_12, c_11);
+	int32_t d_9, l_9 = CALL/1(l_8, c_12, c_13);
+	int32_t d_10, l_10 = CALL/1(l_9, c_12, c_14);
+	int32_t d_11, l_11 = CALL/1(l_10, c_12, c_15);
+	int32_t d_12, l_12 = CALL/5(l_11, c_10, c_16, d_8, d_9, d_10, d_11);
+	int32_t d_14, l_14 = CALL/1(l_12, c_18, c_17);
+	int32_t d_15, l_15 = CALL/1(l_14, c_18, c_19);
+	int32_t d_16, l_16 = CALL/1(l_15, c_18, c_20);
+	int32_t d_17, l_17 = CALL/1(l_16, c_18, c_21);
+	int32_t d_18, l_18 = CALL/5(l_17, c_10, c_22, d_14, d_15, d_16, d_17);
+	l_20 = RETURN(l_18, c_17);
+}
+--EXPECT--
+i8:  0 ff 78 87
+i16: 0 ffff 78 8007
+i32: 0 ffffffff 78 80000007
