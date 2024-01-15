@@ -30,8 +30,8 @@ aarch64
 }
 --EXPECT--
 test:
-	ldr w8, [sp, #8]
-	ldr w9, [sp, #0x10]
+	ldr w8, [sp]
+	ldr w9, [sp, #8]
 	add w0, w1, w0
 	add w0, w0, w2
 	add w0, w0, w3

@@ -85,7 +85,7 @@ test:
 	ldr w0, [sp, #0x18]
 	str w0, [sp, #0x2c]
 .L1:
-	ldr w0, [sp, #0x98]
+	ldr w0, [sp, #0x90]
 	cmp w0, #0
 	b.eq .L2
 	ldr w1, [sp, #8]
@@ -144,7 +144,7 @@ test:
 	ldr w1, [sp, #0x64]
 	add w0, w1, #1
 	str w0, [sp, #0x68]
-	ldr w0, [sp, #0xa0]
+	ldr w0, [sp, #0x98]
 	cmp w0, #0
 	b.eq .L4
 	ldr w0, [sp, #0x4c]

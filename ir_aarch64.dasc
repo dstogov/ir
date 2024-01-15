@@ -4971,7 +4971,7 @@ static void ir_emit_load_params(ir_ctx *ctx)
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
 		stack_offset = sizeof(void*) * 2; /* skip old frame pointer and return address */
 	} else {
-		stack_offset = sizeof(void*) + ctx->stack_frame_size + ctx->call_stack_size; /* skip return address */
+		stack_offset = ctx->stack_frame_size + ctx->call_stack_size;
 	}
 	n = use_list->count;
 	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
@@ -5079,8 +5079,7 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 		/* skip old frame pointer and return address */
 		stack_offset = sizeof(void*) * 2 + (ctx->stack_frame_size - ctx->stack_frame_alignment);
 	} else {
-		 /* skip return address */
-		stack_offset = sizeof(void*) + ctx->stack_frame_size;
+		stack_offset = ctx->stack_frame_size;
 	}
 	n = use_list->count;
 	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {

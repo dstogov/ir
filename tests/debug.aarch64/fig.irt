@@ -66,8 +66,8 @@ aarch64
 }
 --EXPECT--
 test:
-	ldr w4, [sp, #8]
-	ldr w8, [sp, #0x10]
+	ldr w4, [sp]
+	ldr w8, [sp, #8]
 	mul w9, w2, w1
 	add w10, w9, #4
 .L1:

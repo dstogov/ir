@@ -30,8 +30,8 @@ aarch64
 }
 --EXPECT--
 test:
-	ldr d16, [sp, #8]
-	ldr d17, [sp, #0x10]
+	ldr d16, [sp]
+	ldr d17, [sp, #8]
 	fadd d0, d1, d0
 	fadd d0, d0, d2
 	fadd d0, d0, d3
