@@ -88,6 +88,29 @@ jobs:
             # FIXME: For some reason some of the object files are rebuilt
             make CC=gcc TARGET=aarch64 test-ci
 
+  FreeBSD_amd_64:
+    name: 'FreeBSD amd64'
+    runs-on: ubuntu-22.04
+    env:
+      CFLAGS: '-fsanitize=address,undefined'
+    steps:
+      - uses: actions/checkout@v3
+      - name: pkg
+        id: runcmd
+        uses: vmactions/freebsd-vm@v1
+        with:
+          usesh: true
+          sync: rsync
+          copyback: false
+          mem: 2048
+          release: 13.2
+          prepare: |
+            pkg install -y capstone gmake
+
+          run: |
+            gmake all
+            gmake test-ci
+
   MACOS_x86_64:
     runs-on: macos-11
     env:
