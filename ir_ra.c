@@ -3174,7 +3174,6 @@ try_next_available_register:
 
 	/* split any inactive interval for reg at the end of its lifetime hole */
 	other = *inactive;
-	prev = NULL;
 	while (other) {
 		/* freeUntilPos[it.reg] = next intersection of it with current */
 		if (reg == other->reg) {
@@ -3187,17 +3186,12 @@ try_next_available_register:
 				IR_LOG_LSRA_CONFLICT("      ---- Conflict with inactive", other, overlap);
 				// TODO: optimal split position (this case is not tested)
 				child = ir_split_interval_at(ctx, other, overlap);
-				if (prev) {
-					prev->list_next = other = other->list_next;
-				} else {
-					*inactive = other = other->list_next;
-				}
+				/* reset range cache */
+				other->current_range = &other->range;
 				ir_add_to_unhandled(unhandled, child);
 				IR_LOG_LSRA("      ---- Queue", child, "");
-				continue;
 			}
 		}
-		prev = other;
 		other = other->list_next;
 	}
 
