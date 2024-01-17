@@ -474,14 +474,48 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 	int8_t *pred, *loc, *types;
 	ir_reg to, from;
 	ir_type type;
-	ir_regset todo, ready, from_set, to_set;
-	ir_reg last_reg = IR_REG_NONE, last_fp_reg = IR_REG_NONE;
+	ir_regset todo, ready, srcs;
+	ir_reg last_reg, last_fp_reg;
 
 	if (count == 1) {
 		to = copies[0].to;
 		from = copies[0].from;
-		if (from != to) {
-			type = copies[0].type;
+		IR_ASSERT(from != to);
+		type = copies[0].type;
+		if (IR_IS_TYPE_INT(type)) {
+			ir_emit_mov(ctx, type, to, from);
+		} else {
+			ir_emit_fp_mov(ctx, type, to, from);
+		}
+		return 1;
+	}
+
+	loc = alloca(IR_REG_NUM * 3 * sizeof(int8_t));
+	pred = loc + IR_REG_NUM;
+	types = pred + IR_REG_NUM;
+	todo = IR_REGSET_EMPTY;
+	srcs = IR_REGSET_EMPTY;
+
+	for (i = 0; i < count; i++) {
+		from = copies[i].from;
+		to = copies[i].to;
+		IR_ASSERT(from != to);
+		IR_REGSET_INCL(srcs, from);
+		loc[from] = from;
+		pred[to] = from;
+		types[from] = copies[i].type;
+		IR_ASSERT(!IR_REGSET_IN(todo, to));
+		IR_REGSET_INCL(todo, to);
+	}
+
+	ready = IR_REGSET_DIFFERENCE(todo, srcs);
+
+	if (ready == todo) {
+		for (i = 0; i < count; i++) {
+			from = copies[i].from;
+			to = copies[i].to;
+			IR_ASSERT(from != to);
+			type = copies[i].type;
 			if (IR_IS_TYPE_INT(type)) {
 				ir_emit_mov(ctx, type, to, from);
 			} else {
@@ -491,65 +525,84 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 		return 1;
 	}
 
-	loc = alloca(IR_REG_NUM * 3 * sizeof(int8_t));
-	pred = loc + IR_REG_NUM;
-	types = pred + IR_REG_NUM;
-	memset(loc, IR_REG_NONE, IR_REG_NUM * 2 * sizeof(int8_t));
-	todo = IR_REGSET_EMPTY;
-	ready = IR_REGSET_EMPTY;
-	from_set = IR_REGSET_EMPTY;
-	to_set = IR_REGSET_EMPTY;
+	while (ready != IR_REGSET_EMPTY) {
+		ir_reg r;
 
-	for (i = 0; i < count; i++) {
-		from = copies[i].from;
-		to = copies[i].to;
-		if (from != to) {
-			IR_REGSET_INCL(from_set, from);
-			IR_REGSET_INCL(to_set, to);
-			loc[from] = from;
-			pred[to] = from;
-			types[from] = copies[i].type;
-			/* temporary register may be the same as some of destinations */
-			if (to == tmp_reg) {
-				IR_ASSERT(last_reg == IR_REG_NONE);
-				last_reg = to;
-			} else if (to == tmp_fp_reg) {
-				IR_ASSERT(last_fp_reg == IR_REG_NONE);
-				last_fp_reg = to;
-			} else {
-				IR_ASSERT(!IR_REGSET_IN(todo, to));
-				IR_REGSET_INCL(todo, to);
-			}
+		to = ir_regset_pop_first(&ready);
+		from = pred[to];
+		r = loc[from];
+		type = types[from];
+		if (IR_IS_TYPE_INT(type)) {
+			ir_emit_mov_ext(ctx, type, to, r);
+		} else {
+			ir_emit_fp_mov(ctx, type, to, r);
+		}
+		IR_REGSET_EXCL(todo, to);
+		loc[from] = to;
+		if (from == r && IR_REGSET_IN(todo, from)) {
+			IR_REGSET_INCL(ready, from);
 		}
 	}
-
-	if (IR_REGSET_INTERSECTION(from_set, to_set) == IR_REGSET_EMPTY) {
-		for (i = 0; i < count; i++) {
-			from = copies[i].from;
-			to = copies[i].to;
-			if (from != to) {
-				type = copies[i].type;
-				if (IR_IS_TYPE_INT(type)) {
-					ir_emit_mov(ctx, type, to, from);
-				} else {
-					ir_emit_fp_mov(ctx, type, to, from);
-				}
-			}
-		}
+	if (todo == IR_REGSET_EMPTY) {
 		return 1;
 	}
 
-	IR_REGSET_FOREACH(todo, i) {
-		if (loc[i] == IR_REG_NONE) {
-			IR_REGSET_INCL(ready, i);
+	/* temporary registers may be the same as some of the destinations */
+	last_reg = IR_REG_NONE;
+	if (tmp_reg != IR_REG_NONE) {
+		IR_ASSERT(!IR_REGSET_IN(srcs, tmp_reg));
+		if (IR_REGSET_IN(todo, tmp_reg)) {
+			last_reg = tmp_reg;
+			IR_REGSET_EXCL(todo, tmp_reg);
 		}
-	} IR_REGSET_FOREACH_END();
+	}
 
-	while (1) {
-		while (ready != IR_REGSET_EMPTY) {
+	last_fp_reg = IR_REG_NONE;
+	if (tmp_fp_reg != IR_REG_NONE) {
+		IR_ASSERT(!IR_REGSET_IN(srcs, tmp_fp_reg));
+		if (IR_REGSET_IN(todo, tmp_fp_reg)) {
+			last_fp_reg = tmp_fp_reg;
+			IR_REGSET_EXCL(todo, tmp_fp_reg);
+		}
+	}
+
+	while (todo != IR_REGSET_EMPTY) {
+		to = ir_regset_pop_first(&todo);
+		from = pred[to];
+		IR_ASSERT(to != loc[from]);
+		type = types[from];
+		if (IR_IS_TYPE_INT(type)) {
+#ifdef IR_HAVE_SWAP_INT
+			if (pred[from] == to) {
+				ir_emit_swap(ctx, type, to, from);
+				IR_REGSET_EXCL(todo, from);
+				loc[to] = from;
+				loc[from] = to;
+				continue;
+			}
+#endif
+			IR_ASSERT(tmp_reg != IR_REG_NONE);
+			IR_ASSERT(tmp_reg >= IR_REG_GP_FIRST && tmp_reg <= IR_REG_GP_LAST);
+			ir_emit_mov(ctx, type, tmp_reg, to);
+			loc[to] = tmp_reg;
+		} else {
+#ifdef IR_HAVE_SWAP_FP
+			if (pred[from] == to) {
+				ir_emit_swap_fp(ctx, type, to, from);
+				IR_REGSET_EXCL(todo, from);
+				loc[to] = from;
+				loc[from] = to;
+				continue;
+			}
+#endif
+			IR_ASSERT(tmp_fp_reg != IR_REG_NONE);
+			IR_ASSERT(tmp_fp_reg >= IR_REG_FP_FIRST && tmp_fp_reg <= IR_REG_FP_LAST);
+			ir_emit_fp_mov(ctx, type, tmp_fp_reg, to);
+			loc[to] = tmp_fp_reg;
+		}
+		while (1) {
 			ir_reg r;
 
-			to = ir_regset_pop_first(&ready);
 			from = pred[to];
 			r = loc[from];
 			type = types[from];
@@ -560,44 +613,12 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 			}
 			IR_REGSET_EXCL(todo, to);
 			loc[from] = to;
-			if (from == r && pred[from] != IR_REG_NONE) {
-				IR_REGSET_INCL(ready, from);
+			if (from == r && IR_REGSET_IN(todo, from)) {
+				to = from;
+			} else {
+				break;
 			}
 		}
-
-		if (todo == IR_REGSET_EMPTY) {
-			break;
-		}
-		to = ir_regset_pop_first(&todo);
-		from = pred[to];
-		IR_ASSERT(to != loc[from]);
-		type = types[from];
-		if (IR_IS_TYPE_INT(type)) {
-#ifdef IR_HAVE_SWAP_INT
-			if (loc[pred[from]] == to) {
-				ir_emit_swap(ctx, type, to, from);
-				IR_REGSET_EXCL(todo, from);
-				continue;
-			}
-#endif
-			IR_ASSERT(tmp_reg != IR_REG_NONE);
-			IR_ASSERT(tmp_reg >= IR_REG_GP_FIRST && tmp_reg <= IR_REG_GP_LAST);
-			ir_emit_mov(ctx, type, tmp_reg, to);
-			loc[to] = tmp_reg;
-		} else {
-#ifdef IR_HAVE_SWAP_FP
-			if (loc[pred[from]] == to) {
-				ir_emit_swap_fp(ctx, type, to, from);
-				IR_REGSET_EXCL(todo, from);
-				continue;
-			}
-#endif
-			IR_ASSERT(tmp_fp_reg != IR_REG_NONE);
-			IR_ASSERT(tmp_fp_reg >= IR_REG_FP_FIRST && tmp_fp_reg <= IR_REG_FP_LAST);
-			ir_emit_fp_mov(ctx, type, tmp_fp_reg, to);
-			loc[to] = tmp_fp_reg;
-		}
-		IR_REGSET_INCL(ready, to);
 	}
 
 	if (last_reg != IR_REG_NONE) {
