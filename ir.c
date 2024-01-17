@@ -1556,7 +1556,11 @@ int ir_mem_flush(void *ptr, size_t size)
 #else
 void *ir_mem_mmap(size_t size)
 {
-	void *ret = mmap(NULL, size, PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        int prot_flags = PROT_EXEC;
+#if defined(__NetBSD__)
+	prot_flags |= PROT_MPROTECT(PROT_READ|PROT_WRITE);
+#endif
+	void *ret = mmap(NULL, size, prot_flags, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	if (ret == MAP_FAILED) {
 		ret = NULL;
 	}
