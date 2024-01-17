@@ -24,6 +24,10 @@
 # include <psapi.h>
 #endif
 
+#if defined(__linux__) || defined(__sun)
+# include <alloca.h>
+#endif
+
 #define DASM_M_GROW(ctx, t, p, sz, need) \
   do { \
     size_t _sz = (sz), _need = (need); \
@@ -393,6 +397,7 @@ static int ir_add_veneer(dasm_State *Dst, void *buffer, uint32_t ins, int *b, ui
 
 /* Forward Declarations */
 static void ir_emit_osr_entry_loads(ir_ctx *ctx, int b, ir_block *bb);
+static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_reg, ir_reg tmp_fp_reg);
 static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb);
 
 typedef struct _ir_common_backend_data {
@@ -461,6 +466,149 @@ static IR_NEVER_INLINE void ir_emit_osr_entry_loads(ir_ctx *ctx, int b, ir_block
 			IR_ASSERT(ctx->live_intervals[ctx->vregs[ref]]->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL);
 		}
 	}
+}
+
+static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_reg, ir_reg tmp_fp_reg)
+{
+	int i;
+	int8_t *pred, *loc, *types;
+	ir_reg to, from;
+	ir_type type;
+	ir_regset todo, ready, from_set, to_set;
+	ir_reg last_reg = IR_REG_NONE, last_fp_reg = IR_REG_NONE;
+
+	if (count == 1) {
+		to = copies[0].to;
+		from = copies[0].from;
+		if (from != to) {
+			type = copies[0].type;
+			if (IR_IS_TYPE_INT(type)) {
+				ir_emit_mov(ctx, type, to, from);
+			} else {
+				ir_emit_fp_mov(ctx, type, to, from);
+			}
+		}
+		return 1;
+	}
+
+	loc = alloca(IR_REG_NUM * 3 * sizeof(int8_t));
+	pred = loc + IR_REG_NUM;
+	types = pred + IR_REG_NUM;
+	memset(loc, IR_REG_NONE, IR_REG_NUM * 2 * sizeof(int8_t));
+	todo = IR_REGSET_EMPTY;
+	ready = IR_REGSET_EMPTY;
+	from_set = IR_REGSET_EMPTY;
+	to_set = IR_REGSET_EMPTY;
+
+	for (i = 0; i < count; i++) {
+		from = copies[i].from;
+		to = copies[i].to;
+		if (from != to) {
+			IR_REGSET_INCL(from_set, from);
+			IR_REGSET_INCL(to_set, to);
+			loc[from] = from;
+			pred[to] = from;
+			types[from] = copies[i].type;
+			/* temporary register may be the same as some of destinations */
+			if (to == tmp_reg) {
+				IR_ASSERT(last_reg == IR_REG_NONE);
+				last_reg = to;
+			} else if (to == tmp_fp_reg) {
+				IR_ASSERT(last_fp_reg == IR_REG_NONE);
+				last_fp_reg = to;
+			} else {
+				IR_ASSERT(!IR_REGSET_IN(todo, to));
+				IR_REGSET_INCL(todo, to);
+			}
+		}
+	}
+
+	if (IR_REGSET_INTERSECTION(from_set, to_set) == IR_REGSET_EMPTY) {
+		for (i = 0; i < count; i++) {
+			from = copies[i].from;
+			to = copies[i].to;
+			if (from != to) {
+				type = copies[i].type;
+				if (IR_IS_TYPE_INT(type)) {
+					ir_emit_mov(ctx, type, to, from);
+				} else {
+					ir_emit_fp_mov(ctx, type, to, from);
+				}
+			}
+		}
+		return 1;
+	}
+
+	IR_REGSET_FOREACH(todo, i) {
+		if (loc[i] == IR_REG_NONE) {
+			IR_REGSET_INCL(ready, i);
+		}
+	} IR_REGSET_FOREACH_END();
+
+	while (1) {
+		while (ready != IR_REGSET_EMPTY) {
+			ir_reg r;
+
+			to = ir_regset_pop_first(&ready);
+			from = pred[to];
+			r = loc[from];
+			type = types[from];
+			if (IR_IS_TYPE_INT(type)) {
+				ir_emit_mov_ext(ctx, type, to, r);
+			} else {
+				ir_emit_fp_mov(ctx, type, to, r);
+			}
+			IR_REGSET_EXCL(todo, to);
+			loc[from] = to;
+			if (from == r && pred[from] != IR_REG_NONE) {
+				IR_REGSET_INCL(ready, from);
+			}
+		}
+
+		if (todo == IR_REGSET_EMPTY) {
+			break;
+		}
+		to = ir_regset_pop_first(&todo);
+		from = pred[to];
+		IR_ASSERT(to != loc[from]);
+		type = types[from];
+		if (IR_IS_TYPE_INT(type)) {
+			IR_ASSERT(tmp_reg != IR_REG_NONE);
+			IR_ASSERT(tmp_reg >= IR_REG_GP_FIRST && tmp_reg <= IR_REG_GP_LAST);
+			ir_emit_mov(ctx, type, tmp_reg, to);
+			loc[to] = tmp_reg;
+		} else {
+			IR_ASSERT(tmp_fp_reg != IR_REG_NONE);
+			IR_ASSERT(tmp_fp_reg >= IR_REG_FP_FIRST && tmp_fp_reg <= IR_REG_FP_LAST);
+			ir_emit_fp_mov(ctx, type, tmp_fp_reg, to);
+			loc[to] = tmp_fp_reg;
+		}
+		IR_REGSET_INCL(ready, to);
+	}
+
+	if (last_reg != IR_REG_NONE) {
+		to = last_reg;
+		from = pred[to];
+		type = types[from];
+		from = loc[from];
+		if (to != from) {
+			IR_ASSERT(IR_IS_TYPE_INT(type));
+			ir_emit_mov_ext(ctx, type, to, from);
+		}
+	}
+
+	if (last_fp_reg != IR_REG_NONE) {
+		to = last_fp_reg;
+		from = pred[to];
+		type = types[from];
+		from = loc[from];
+		if (to != from) {
+			IR_ASSERT(!IR_IS_TYPE_INT(type));
+			ir_emit_fp_mov(ctx, type, to, from);
+		}
+	}
+
+	return 1;
 }
 
 static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb)

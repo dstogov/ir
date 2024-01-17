@@ -2330,6 +2330,28 @@ static void ir_emit_mov(ir_ctx *ctx, ir_type type, ir_reg dst, ir_reg src)
 	|	ASM_REG_REG_OP mov, type, dst, src
 }
 
+static void ir_emit_mov_ext(ir_ctx *ctx, ir_type type, ir_reg dst, ir_reg src)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+
+	if (ir_type_size[type] > 2) {
+		|	ASM_REG_REG_OP mov, type, dst, src
+	} else if (ir_type_size[type] == 2) {
+		if (IR_IS_TYPE_SIGNED(type)) {
+			|	movsx Rd(dst), Rw(src)
+		} else {
+			|	movzx Rd(dst), Rw(src)
+		}
+	} else /* if (ir_type_size[type] == 1) */ {
+		if (IR_IS_TYPE_SIGNED(type)) {
+			|	movsx Rd(dst), Rb(src)
+		} else {
+			|	movzx Rd(dst), Rb(src)
+		}
+	}
+}
+
 static void ir_emit_fp_mov(ir_ctx *ctx, ir_type type, ir_reg dst, ir_reg src)
 {
 	ir_backend_data *data = ctx->data;
@@ -6950,153 +6972,6 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 			|	jmp =>default_label
 		}
 	}
-}
-
-static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_reg, ir_reg tmp_fp_reg)
-{
-	ir_backend_data *data = ctx->data;
-	dasm_State **Dst = &data->dasm_state;
-	int i;
-	int8_t *pred, *loc, *types;
-	ir_reg to, from_reg, c;
-	ir_type type;
-	ir_regset todo, ready;
-	ir_reg last_reg = IR_REG_NONE, last_fp_reg = IR_REG_NONE;
-
-	loc = ir_mem_malloc(IR_REG_NUM * 3 * sizeof(int8_t));
-	pred = loc + IR_REG_NUM;
-	types = pred + IR_REG_NUM;
-	memset(loc, IR_REG_NONE, IR_REG_NUM * 2 * sizeof(int8_t));
-	todo = IR_REGSET_EMPTY;
-	ready = IR_REGSET_EMPTY;
-
-	for (i = 0; i < count; i++) {
-		from_reg = copies[i].from;
-		to = copies[i].to;
-		if (from_reg != to) {
-			loc[from_reg] = from_reg;
-			pred[to] = from_reg;
-			types[from_reg] = copies[i].type;
-			/* temporary register may be the same as some of destinations */
-			if (to == tmp_reg) {
-				IR_ASSERT(last_reg == IR_REG_NONE);
-				last_reg = to;
-			} else if (to == tmp_fp_reg) {
-				IR_ASSERT(last_fp_reg == IR_REG_NONE);
-				last_fp_reg = to;
-			} else {
-				IR_ASSERT(!IR_REGSET_IN(todo, to));
-				IR_REGSET_INCL(todo, to);
-			}
-		}
-	}
-
-	IR_REGSET_FOREACH(todo, i) {
-		if (loc[i] == IR_REG_NONE) {
-			IR_REGSET_INCL(ready, i);
-		}
-	} IR_REGSET_FOREACH_END();
-
-	while (1) {
-		while (ready != IR_REGSET_EMPTY) {
-			to = ir_regset_pop_first(&ready);
-			from_reg = pred[to];
-			c = loc[from_reg];
-			type = types[from_reg];
-			if (IR_IS_TYPE_INT(type)) {
-				if (ir_type_size[type] > 2) {
-					ir_emit_mov(ctx, type, to, c);
-				} else if (ir_type_size[type] == 2) {
-					if (IR_IS_TYPE_SIGNED(type)) {
-						|	movsx Rd(to), Rw(c)
-						type = IR_I32;
-					} else {
-						|	movzx Rd(to), Rw(c)
-						type = IR_U32;
-					}
-				} else /* if (ir_type_size[type] == 1) */ {
-					if (IR_IS_TYPE_SIGNED(type)) {
-						|	movsx Rd(to), Rb(c)
-						type = IR_I32;
-					} else {
-						|	movzx Rd(to), Rb(c)
-						type = IR_U32;
-					}
-				}
-			} else {
-				ir_emit_fp_mov(ctx, type, to, c);
-			}
-			IR_REGSET_EXCL(todo, to);
-			loc[from_reg] = to;
-			if (from_reg == c && pred[from_reg] != IR_REG_NONE) {
-				IR_REGSET_INCL(ready, from_reg);
-			}
-		}
-
-		if (todo == IR_REGSET_EMPTY) {
-			break;
-		}
-		to = ir_regset_pop_first(&todo);
-		from_reg = pred[to];
-		IR_ASSERT(to != loc[from_reg]);
-		type = types[from_reg];
-		if (IR_IS_TYPE_INT(type)) {
-			IR_ASSERT(tmp_reg != IR_REG_NONE);
-			IR_ASSERT(tmp_reg >= IR_REG_GP_FIRST && tmp_reg <= IR_REG_GP_LAST);
-			ir_emit_mov(ctx, type, tmp_reg, to);
-			loc[to] = tmp_reg;
-		} else {
-			IR_ASSERT(tmp_fp_reg != IR_REG_NONE);
-			IR_ASSERT(tmp_fp_reg >= IR_REG_FP_FIRST && tmp_fp_reg <= IR_REG_FP_LAST);
-			ir_emit_fp_mov(ctx, type, tmp_fp_reg, to);
-			loc[to] = tmp_fp_reg;
-		}
-		IR_REGSET_INCL(ready, to);
-	}
-
-	if (last_reg != IR_REG_NONE) {
-		to = last_reg;
-		from_reg = pred[to];
-		c = loc[from_reg];
-		if (to != c) {
-			type = types[from_reg];
-			IR_ASSERT(IR_IS_TYPE_INT(type));
-			if (ir_type_size[type] > 2) {
-				ir_emit_mov(ctx, type, to, c);
-			} else if (ir_type_size[type] == 2) {
-				if (IR_IS_TYPE_SIGNED(type)) {
-					|	movsx Rd(to), Rw(c)
-					type = IR_I32;
-				} else {
-					|	movzx Rd(to), Rw(c)
-					type = IR_U32;
-				}
-			} else /* if (ir_type_size[type] == 1) */ {
-				if (IR_IS_TYPE_SIGNED(type)) {
-					|	movsx Rd(to), Rb(c)
-					type = IR_I32;
-				} else {
-					|	movzx Rd(to), Rb(c)
-					type = IR_U32;
-				}
-			}
-		}
-	}
-
-	if (last_fp_reg != IR_REG_NONE) {
-		to = last_fp_reg;
-		from_reg = pred[to];
-		c = loc[from_reg];
-		if (to != c) {
-			type = types[from_reg];
-			IR_ASSERT(!IR_IS_TYPE_INT(type));
-			ir_emit_fp_mov(ctx, type, to, c);
-		}
-	}
-
-	ir_mem_free(loc);
-
-	return 1;
 }
 
 static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn)

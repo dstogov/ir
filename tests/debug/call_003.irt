@@ -19,8 +19,8 @@ x86_64
 --EXPECT--
 test:
 	subq $8, %rsp
+	movl %edi, %esi
 	movl %edi, %edx
-	movl %edx, %esi
 	leaq .L1(%rip), %rdi
 	movl $0, %eax
 	callq printf

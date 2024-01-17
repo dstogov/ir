@@ -73,8 +73,8 @@ test:
 .L1:
 	cmp w4, #0
 	b.eq .L3
-	mov w5, w10
 	mov w0, w2
+	mov w5, w10
 .L2:
 	cmp w8, #0
 	b.ne .L1
