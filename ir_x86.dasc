@@ -2330,6 +2330,16 @@ static void ir_emit_mov(ir_ctx *ctx, ir_type type, ir_reg dst, ir_reg src)
 	|	ASM_REG_REG_OP mov, type, dst, src
 }
 
+#define IR_HAVE_SWAP_INT
+
+static void ir_emit_swap(ir_ctx *ctx, ir_type type, ir_reg dst, ir_reg src)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+
+	|	ASM_REG_REG_OP xchg, type, dst, src
+}
+
 static void ir_emit_mov_ext(ir_ctx *ctx, ir_type type, ir_reg dst, ir_reg src)
 {
 	ir_backend_data *data = ctx->data;

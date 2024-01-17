@@ -40,9 +40,7 @@ test:
 .L1:
 	testl %ecx, %ecx
 	je .L2
-	movl %eax, %edx
-	movl %esi, %eax
-	movl %edx, %esi
+	xchgl %eax, %esi
 	jmp .L1
 .L2:
 	retq

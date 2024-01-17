@@ -44,9 +44,7 @@ test:
 .L1:
 	testl %ebx, %ebx
 	je .L2
-	movl %eax, %edx
-	movl %ecx, %eax
-	movl %edx, %ecx
+	xchgl %eax, %ecx
 	jmp .L1
 .L2:
 	movl 4(%esp), %ebx
