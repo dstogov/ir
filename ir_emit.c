@@ -468,6 +468,15 @@ static IR_NEVER_INLINE void ir_emit_osr_entry_loads(ir_ctx *ctx, int b, ir_block
 	}
 }
 
+/*
+ * Parallel copy sequentialization algorithm
+ *
+ * The implementation is based on algorithm 1 desriebed in
+ * "Revisiting Out-of-SSA Translation for Correctness, Code Quality and Efficiency",
+ * Benoit Boissinot, Alain Darte, Fabrice Rastello, Benoit Dupont de Dinechin, Christophe Guillon.
+ * 2009 International Symposium on Code Generation and Optimization, Seattle, WA, USA, 2009,
+ * pp. 114-125, doi: 10.1109/CGO.2009.19.
+ */
 static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_reg, ir_reg tmp_fp_reg)
 {
 	int i;
