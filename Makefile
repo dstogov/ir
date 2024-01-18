@@ -56,6 +56,14 @@ ifeq (FreeBSD, $(OS))
   LDFLAGS += -L/usr/local/lib
 endif
 
+ifeq (NetBSD, $(OS))
+  CC=cc
+  BUILD_CC=$(CC)
+  override CFLAGS += -I/usr/pkg/include
+  override BUILD_CFLAGS += -I/usr/pkg/include
+  LDFLAGS = -L/usr/pkg/lib -Wl,-rpath,/usr/pkg/lib -lm
+endif
+
 ifeq (yes, $(HAVE_LLVM))
   override CFLAGS += -DHAVE_LLVM
   LLVM_OBJS=$(BUILD_DIR)/ir_load_llvm.o
