@@ -457,11 +457,7 @@ static IR_NEVER_INLINE void ir_emit_osr_entry_loads(ir_ctx *ctx, int b, ir_block
 			int32_t offset = -ir_binding_find(ctx, ref);
 
 			IR_ASSERT(offset > 0);
-			if (IR_IS_TYPE_INT(type)) {
-				ir_emit_load_mem_int(ctx, type, reg, ctx->spill_base, offset);
-			} else {
-				ir_emit_load_mem_fp(ctx, type, reg, ctx->spill_base, offset);
-			}
+			ir_emit_load_mem(ctx, type, reg, IR_LOC_MEM_BO(ctx->spill_base, offset));
 		} else {
 			IR_ASSERT(ctx->live_intervals[ctx->vregs[ref]]->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL);
 		}
