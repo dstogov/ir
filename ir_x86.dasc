@@ -1692,6 +1692,21 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref)
 							}
 							/* x = ADD(X, imm32) ... ADD(x, Y) => SKIP ... LEA */
 							return IR_LEA_OB_I;
+						} else if (rule == IR_LEA_SI) {
+							ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_SI;
+							if (ir_in_same_block(ctx, insn->op2) && ctx->use_lists[insn->op2].count == 1) {
+								rule = ctx->rules[insn->op2];
+								if (!rule) {
+									ctx->rules[insn->op2] = rule = ir_match_insn(ctx, insn->op2);
+								}
+								if (rule == IR_LEA_OB) {
+									/* x = ADD(X, imm32) ... y = MUL(Y, 2|4|8) ... ADD(y, x) => SKIP ... SKIP ... LEA */
+									ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_LEA_OB;
+									return IR_LEA_SI_OB;
+								}
+							}
+							/* x = MUL(X, 2|4|8) ... ADD(x, Y) => SKIP ... LEA */
+							return IR_LEA_SI_B;
 						}
 					}
 					if (ir_in_same_block(ctx, insn->op2) && ctx->use_lists[insn->op2].count == 1) {
@@ -1714,6 +1729,21 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref)
 							}
 							/* x = ADD(X, imm32) ... ADD(Y, x) => SKIP ... LEA */
 							return IR_LEA_I_OB;
+						} else if (rule == IR_LEA_SI) {
+							ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_LEA_SI;
+							if (ir_in_same_block(ctx, insn->op1) && ctx->use_lists[insn->op1].count == 1) {
+								rule =ctx->rules[insn->op1];
+								if (!rule) {
+									ctx->rules[insn->op1] = rule = ir_match_insn(ctx, insn->op1);
+								}
+								if (rule == IR_LEA_OB) {
+									/* x = ADD(X, imm32) ... y = MUL(Y, 2|4|8) ... ADD(x, y) => SKIP ... SKIP ... LEA */
+									ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_OB;
+									return IR_LEA_OB_SI;
+								}
+							}
+							/* x = MUL(X, 2|4|8) ... ADD(Y, x) => SKIP ... LEA */
+							return IR_LEA_B_SI;
 						}
 					}
 					/* ADD(X, Y) => LEA [X + Y] */
@@ -2990,10 +3020,10 @@ static ir_loc ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 			scale = ctx->ir_base[op2_insn->op2].val.i32;
 			break;
 		case IR_LEA_SI_B:
-			base_reg_ref = insn->op1;
-			base_reg_op = 1;
-			index_reg_ref = ref;
-			index_reg_op = 2;
+			index_reg_ref = insn->op1;
+			index_reg_op = 1;
+			base_reg_ref = ref;
+			base_reg_op = 2;
 			op1_insn = &ctx->ir_base[insn->op1];
 			scale = ctx->ir_base[op1_insn->op2].val.i32;
 			break;
