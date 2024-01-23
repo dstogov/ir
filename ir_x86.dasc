@@ -15,24 +15,30 @@
 |.globals ir_lb
 |.section code, cold_code, rodata, jmp_table
 
+#ifdef IR_DEBUG
 typedef struct _ir_loc {uint64_t v;} ir_loc;
 
-#define IR_LOC_VAL(loc)       ((loc).v)
+# define IR_LOC_VAL(loc)       ((loc).v)
+#else
+typedef uint64_t ir_loc;
+
+# define IR_LOC_VAL(loc)       (loc)
+#endif
 
 #define IR_LOC_KIND_REG        0
 #define IR_LOC_KIND_IMM        1
 #define IR_LOC_KIND_MEM        2
 
-#define IR_LOC_KIND(loc)       (((uint64_t)(loc).v)>>56)
+#define IR_LOC_KIND(loc)       (IR_LOC_VAL(loc)>>56)
 
 #define IR_LOC_IS_REG(loc)     (IR_LOC_KIND(loc) == IR_LOC_KIND_REG)
 #define IR_LOC_IS_IMM(loc)     (IR_LOC_KIND(loc) == IR_LOC_KIND_IMM)
 #define IR_LOC_IS_MEM(loc)     (IR_LOC_KIND(loc) == IR_LOC_KIND_MEM)
 
-#define IR_LOC_MEM_OFFSET(loc) ((int32_t)((loc).v & 0xffffffff))
-#define IR_LOC_MEM_BASE(loc)   ((ir_reg)(((loc).v >> 32) & 0xff))
-#define IR_LOC_MEM_INDEX(loc)  ((ir_reg)(((loc).v >> 40) & 0xff))
-#define IR_LOC_MEM_SCALE(loc)  ((int32_t)(((loc).v >> 48) & 0xff))
+#define IR_LOC_MEM_OFFSET(loc) ((int32_t)(IR_LOC_VAL(loc) & 0xffffffff))
+#define IR_LOC_MEM_BASE(loc)   ((ir_reg)((IR_LOC_VAL(loc) >> 32) & 0xff))
+#define IR_LOC_MEM_INDEX(loc)  ((ir_reg)((IR_LOC_VAL(loc) >> 40) & 0xff))
+#define IR_LOC_MEM_SCALE(loc)  ((int32_t)((IR_LOC_VAL(loc) >> 48) & 0xff))
 
 #define IR_LOC_MEM_B(b)        IR_LOC_MEM(b, 0, IR_REG_NONE, 1)
 #define IR_LOC_MEM_O(o)        IR_LOC_MEM(IR_REG_NONE, o, IR_REG_NONE, 1)
@@ -44,7 +50,12 @@ static ir_loc IR_LOC_MEM(ir_reg base, int32_t offset, ir_reg index, int32_t scal
 	IR_ASSERT(base == IR_REG_NONE || (base >= IR_REG_GP_FIRST && base <= IR_REG_GP_LAST));
 	IR_ASSERT(index == IR_REG_NONE || (index >= IR_REG_GP_FIRST && index <= IR_REG_GP_LAST));
 	IR_ASSERT(scale == 1 || scale == 2 || scale == 4 || scale == 8);
-	mem.v = ((uint64_t)(uint32_t)offset |
+#ifdef IR_DEBUG
+	mem.v =
+#else
+	mem =
+#endif
+		((uint64_t)(uint32_t)offset |
 		((uint64_t)(uint8_t)base << 32) |
 		((uint64_t)(uint8_t)index << 40) |
 		((uint64_t)(uint8_t)scale << 48) |
@@ -1387,6 +1398,9 @@ static void ir_match_fuse_addr(ir_ctx *ctx, ir_ref addr_ref)
 	if (!IR_IS_CONST_REF(addr_ref)) {
 		uint32_t rule = ctx->rules[addr_ref];
 
+		if (rule & IR_FUSED) {
+			return;
+		}
 		if (!rule) {
 			ctx->rules[addr_ref] = rule = ir_match_insn(ctx, addr_ref);
 		}
@@ -2900,12 +2914,10 @@ static ir_loc ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 	uint32_t rule = ctx->rules[ref];
 	ir_insn *insn = &ctx->ir_base[ref];
 	ir_insn *op1_insn, *op2_insn;
-	ir_ref base_reg_ref = IR_UNUSED, index_reg_ref = IR_UNUSED;
-	ir_ref base_reg_op = 0, index_reg_op = 0;
-	ir_reg base_reg = IR_REG_NONE;
-	ir_reg index_reg = IR_REG_NONE;
-	int32_t offset = 0;
-	int32_t scale = 1;
+	ir_ref base_reg_ref, index_reg_ref;
+	ir_ref base_reg_op, index_reg_op;
+	ir_reg base_reg, index_reg;
+	int32_t offset, scale;
 
 	IR_ASSERT((rule & IR_RULE_MASK) >= IR_LEA_OB && (rule & IR_RULE_MASK) <= IR_LEA_SI_B);
 	switch (rule & IR_RULE_MASK) {
@@ -2918,21 +2930,30 @@ static ir_loc ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 			}
 			base_reg_ref = ref;
 			base_reg_op = 1;
+			index_reg_ref = IR_UNUSED;
+			index_reg_op = 0;
+			scale = 1;
 			break;
 		case IR_LEA_SI:
 			scale = ctx->ir_base[insn->op2].val.i32;
 			index_reg_ref = ref;
 			index_reg_op = 1;
+			base_reg_ref = IR_UNUSED;
+			base_reg_op = 0;
+			offset = 0;
 			break;
 		case IR_LEA_SIB:
 			base_reg_ref = index_reg_ref = ref;
 			base_reg_op = index_reg_op = 1;
 			scale = ctx->ir_base[insn->op2].val.i32 - 1;
+			offset = 0;
 			break;
 		case IR_LEA_IB:
 			base_reg_ref = index_reg_ref = ref;
 			base_reg_op = 1;
 			index_reg_op = 2;
+			offset = 0;
+			scale = 1;
 			break;
 		case IR_LEA_OB_I:
 			base_reg_ref = insn->op1;
@@ -2944,6 +2965,7 @@ static ir_loc ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 			if (op1_insn->op == IR_SUB) {
 				offset = -offset;
 			}
+			scale = 1;
 			break;
 		case IR_LEA_I_OB:
 			base_reg_ref = ref;
@@ -2955,6 +2977,7 @@ static ir_loc ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 			if (op2_insn->op == IR_SUB) {
 				offset = -offset;
 			}
+			scale = 1;
 			break;
 		case IR_LEA_SI_O:
 			index_reg_ref = insn->op1;
@@ -2965,6 +2988,8 @@ static ir_loc ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 			if (insn->op == IR_SUB) {
 				offset = -offset;
 			}
+			base_reg_ref = IR_UNUSED;
+			base_reg_op = 0;
 			break;
 		case IR_LEA_SIB_O:
 			base_reg_ref = index_reg_ref = insn->op1;
@@ -2984,6 +3009,7 @@ static ir_loc ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 			if (insn->op == IR_SUB) {
 				offset = -offset;
 			}
+			scale = 1;
 			break;
 		case IR_LEA_OB_SI:
 			base_reg_ref = insn->op1;
@@ -3018,6 +3044,7 @@ static ir_loc ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 			index_reg_op = 1;
 			op2_insn = &ctx->ir_base[insn->op2];
 			scale = ctx->ir_base[op2_insn->op2].val.i32;
+			offset = 0;
 			break;
 		case IR_LEA_SI_B:
 			index_reg_ref = insn->op1;
@@ -3026,9 +3053,11 @@ static ir_loc ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 			base_reg_op = 2;
 			op1_insn = &ctx->ir_base[insn->op1];
 			scale = ctx->ir_base[op1_insn->op2].val.i32;
+			offset = 0;
 			break;
 	}
 
+	base_reg = IR_REG_NONE;
 	if (base_reg_ref) {
 		if (UNEXPECTED(ctx->rules[base_reg_ref] & IR_FUSED_REG)) {
 			base_reg = ir_get_fused_reg(ctx, root, base_reg_ref, base_reg_op);
@@ -3043,6 +3072,7 @@ static ir_loc ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 		}
 	}
 
+	index_reg = IR_REG_NONE;
 	if (index_reg_ref) {
 		if (base_reg_ref
 			&& ctx->ir_base[index_reg_ref].ops[index_reg_op]
