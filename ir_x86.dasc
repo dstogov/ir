@@ -1331,6 +1331,14 @@ op2_const:
 
 /* instruction selection */
 static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref);
+static bool ir_match_fuse_load(ir_ctx *ctx, ir_ref ref, ir_ref root);
+
+static void ir_swap_ops(ir_insn *insn)
+{
+	ir_ref tmp = insn->op1;
+	insn->op1 = insn->op2;
+	insn->op2 = tmp;
+}
 
 static void ir_match_fuse_addr(ir_ctx *ctx, ir_ref addr_ref)
 {
@@ -1343,6 +1351,28 @@ static void ir_match_fuse_addr(ir_ctx *ctx, ir_ref addr_ref)
 		if (rule >= IR_LEA_OB && rule <= IR_LEA_SI_B) {
 			ir_use_list *use_list = &ctx->use_lists[addr_ref];
 			ir_ref j = use_list->count;
+
+			if (rule == IR_LEA_IB) {
+				ir_insn *insn = &ctx->ir_base[addr_ref];
+
+				if (insn->op1 == insn->op2) {
+					/* pass */
+				} else if (ir_match_fuse_load(ctx, insn->op2, addr_ref) ||
+				    (ctx->ir_base[insn->op2].op == IR_PARAM
+				  && ctx->use_lists[insn->op2].count == 1
+				  && ir_get_param_reg(ctx, insn->op2) == IR_REG_NONE)) {
+					ctx->rules[addr_ref] = IR_BINOP_INT;
+					return;
+				} else if (ir_match_fuse_load(ctx, insn->op1, addr_ref) ||
+				    (ctx->ir_base[insn->op1].op == IR_PARAM
+				  && ctx->use_lists[insn->op1].count == 1
+				  && ir_get_param_reg(ctx, insn->op1) == IR_REG_NONE)) {
+					/* swap for better load fusion */
+					ir_swap_ops(insn);
+					ctx->rules[addr_ref] = IR_BINOP_INT;
+					return;
+				}
+			}
 
 			if (j > 1) {
 				/* check if address is used only in LOAD and STORE */
@@ -1407,13 +1437,6 @@ static bool ir_match_fuse_load(ir_ctx *ctx, ir_ref ref, ir_ref root)
 		return 1;
 	}
 	return 0;
-}
-
-static void ir_swap_ops(ir_insn *insn)
-{
-	ir_ref tmp = insn->op1;
-	insn->op1 = insn->op2;
-	insn->op2 = tmp;
 }
 
 static void ir_match_fuse_load_commutative_int(ir_ctx *ctx, ir_insn *insn, ir_ref root)
@@ -2810,6 +2833,8 @@ static ir_loc ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 	uint32_t rule = ctx->rules[ref];
 	ir_insn *insn = &ctx->ir_base[ref];
 	ir_insn *op1_insn, *op2_insn;
+	ir_ref base_reg_ref = IR_UNUSED, index_reg_ref = IR_UNUSED;
+	ir_ref base_reg_op = 0, index_reg_op = 0;
 	ir_reg base_reg = IR_REG_NONE;
 	ir_reg index_reg = IR_REG_NONE;
 	int32_t offset = 0;
@@ -2824,203 +2849,153 @@ static ir_loc ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 			if (insn->op == IR_SUB) {
 				offset = -offset;
 			}
-			if (UNEXPECTED(rule & IR_FUSED_REG)) {
-				base_reg = ir_get_fused_reg(ctx, root, ref, 1);
-			} else {
-				base_reg = ctx->regs[ref][1];
-			}
-			IR_ASSERT(base_reg != IR_REG_NONE);
-			if (IR_REG_SPILLED(base_reg)) {
-				base_reg = IR_REG_NUM(base_reg);
-				ir_emit_load(ctx, insn->type, base_reg, insn->op1);
-			}
+			base_reg_ref = ref;
+			base_reg_op = 1;
 			break;
 		case IR_LEA_SI:
 			scale = ctx->ir_base[insn->op2].val.i32;
-			index_reg = ctx->regs[ref][1];
-			IR_ASSERT(index_reg != IR_REG_NONE);
-			if (IR_REG_SPILLED(index_reg)) {
-				index_reg = IR_REG_NUM(index_reg);
-				ir_emit_load(ctx, insn->type, index_reg, insn->op1);
-			}
+			index_reg_ref = ref;
+			index_reg_op = 1;
 			break;
 		case IR_LEA_SIB:
-			scale = ctx->ir_base[insn->op2].val.i32;
-			base_reg = ctx->regs[ref][1];
-			IR_ASSERT(base_reg != IR_REG_NONE);
-			if (IR_REG_SPILLED(base_reg)) {
-				base_reg = IR_REG_NUM(base_reg);
-				ir_emit_load(ctx, insn->type, base_reg, insn->op1);
-			}
-			index_reg = base_reg;
+			base_reg_ref = index_reg_ref = ref;
+			base_reg_op = index_reg_op = 1;
+			scale = ctx->ir_base[insn->op2].val.i32 - 1;
 			break;
 		case IR_LEA_IB:
-			base_reg = ctx->regs[ref][1];
-			index_reg = ctx->regs[ref][2];
-			IR_ASSERT(base_reg != IR_REG_NONE && index_reg != IR_REG_NONE);
-			if (IR_REG_SPILLED(base_reg)) {
-				base_reg = IR_REG_NUM(base_reg);
-				ir_emit_load(ctx, insn->type, base_reg, insn->op1);
-			}
-			if (IR_REG_SPILLED(index_reg)) {
-				index_reg = IR_REG_NUM(index_reg);
-				ir_emit_load(ctx, insn->type, index_reg, insn->op2);
-			}
+			base_reg_ref = index_reg_ref = ref;
+			base_reg_op = 1;
+			index_reg_op = 2;
 			break;
 		case IR_LEA_OB_I:
+			base_reg_ref = insn->op1;
+			base_reg_op = 1;
+			index_reg_ref = ref;
+			index_reg_op = 2;
 			op1_insn = &ctx->ir_base[insn->op1];
-			base_reg = ctx->regs[insn->op1][1];
-			index_reg = ctx->regs[ref][2];
 			offset = ctx->ir_base[op1_insn->op2].val.i32;
 			if (op1_insn->op == IR_SUB) {
 				offset = -offset;
 			}
-			IR_ASSERT(base_reg != IR_REG_NONE && index_reg != IR_REG_NONE);
-			if (IR_REG_SPILLED(base_reg)) {
-				base_reg = IR_REG_NUM(base_reg);
-				ir_emit_load(ctx, insn->type, base_reg, op1_insn->op1);
-			}
-			if (IR_REG_SPILLED(index_reg)) {
-				index_reg = IR_REG_NUM(index_reg);
-				ir_emit_load(ctx, insn->type, index_reg, insn->op2);
-			}
 			break;
 		case IR_LEA_I_OB:
+			base_reg_ref = ref;
+			base_reg_op = 1;
+			index_reg_ref = insn->op2;
+			index_reg_op = 1;
 			op2_insn = &ctx->ir_base[insn->op2];
-			base_reg = ctx->regs[ref][1];
-			index_reg = ctx->regs[insn->op2][1];
 			offset = ctx->ir_base[op2_insn->op2].val.i32;
 			if (op2_insn->op == IR_SUB) {
 				offset = -offset;
 			}
-			IR_ASSERT(base_reg != IR_REG_NONE && index_reg != IR_REG_NONE);
-			if (IR_REG_SPILLED(base_reg)) {
-				base_reg = IR_REG_NUM(base_reg);
-				ir_emit_load(ctx, insn->type, base_reg, insn->op1);
-			}
-			if (IR_REG_SPILLED(index_reg)) {
-				index_reg = IR_REG_NUM(index_reg);
-				ir_emit_load(ctx, insn->type, index_reg, op2_insn->op1);
-			}
 			break;
 		case IR_LEA_SI_O:
+			index_reg_ref = insn->op1;
+			index_reg_op = 1;
 			op1_insn = &ctx->ir_base[insn->op1];
-			index_reg = ctx->regs[insn->op1][1];
 			scale = ctx->ir_base[op1_insn->op2].val.i32;
 			offset = ctx->ir_base[insn->op2].val.i32;
 			if (insn->op == IR_SUB) {
 				offset = -offset;
+			}
+			break;
+		case IR_LEA_SIB_O:
+			base_reg_ref = index_reg_ref = insn->op1;
+			base_reg_op = index_reg_op = 1;
+			op1_insn = &ctx->ir_base[insn->op1];
+			scale = ctx->ir_base[op1_insn->op2].val.i32 - 1;
+			offset = ctx->ir_base[insn->op2].val.i32;
+			if (insn->op == IR_SUB) {
+				offset = -offset;
+			}
+			break;
+		case IR_LEA_IB_O:
+			base_reg_ref = index_reg_ref = insn->op1;
+			base_reg_op = 1;
+			index_reg_op = 2;
+			offset = ctx->ir_base[insn->op2].val.i32;
+			if (insn->op == IR_SUB) {
+				offset = -offset;
+			}
+			break;
+		case IR_LEA_OB_SI:
+			base_reg_ref = insn->op1;
+			base_reg_op = 1;
+			index_reg_ref = insn->op2;
+			index_reg_op = 1;
+			op1_insn = &ctx->ir_base[insn->op1];
+			offset = ctx->ir_base[op1_insn->op2].val.i32;
+			if (op1_insn->op == IR_SUB) {
+				offset = -offset;
+			}
+			op2_insn = &ctx->ir_base[insn->op2];
+			scale = ctx->ir_base[op2_insn->op2].val.i32;
+			break;
+		case IR_LEA_SI_OB:
+			index_reg_ref = insn->op1;
+			index_reg_op = 1;
+			base_reg_ref = insn->op2;
+			base_reg_op = 1;
+			op1_insn = &ctx->ir_base[insn->op1];
+			scale = ctx->ir_base[op1_insn->op2].val.i32;
+			op2_insn = &ctx->ir_base[insn->op2];
+			offset = ctx->ir_base[op2_insn->op2].val.i32;
+			if (op2_insn->op == IR_SUB) {
+				offset = -offset;
+			}
+			break;
+		case IR_LEA_B_SI:
+			base_reg_ref = ref;
+			base_reg_op = 1;
+			index_reg_ref = insn->op2;
+			index_reg_op = 1;
+			op2_insn = &ctx->ir_base[insn->op2];
+			scale = ctx->ir_base[op2_insn->op2].val.i32;
+			break;
+		case IR_LEA_SI_B:
+			base_reg_ref = insn->op1;
+			base_reg_op = 1;
+			index_reg_ref = ref;
+			index_reg_op = 2;
+			op1_insn = &ctx->ir_base[insn->op1];
+			scale = ctx->ir_base[op1_insn->op2].val.i32;
+			break;
+	}
+
+	if (base_reg_ref) {
+		if (UNEXPECTED(ctx->rules[base_reg_ref] & IR_FUSED_REG)) {
+			base_reg = ir_get_fused_reg(ctx, root, base_reg_ref, base_reg_op);
+		} else {
+			base_reg = ctx->regs[base_reg_ref][base_reg_op];
+		}
+		IR_ASSERT(base_reg != IR_REG_NONE);
+		if (IR_REG_SPILLED(base_reg)) {
+			base_reg = IR_REG_NUM(base_reg);
+			ir_emit_load(ctx, insn->type, base_reg,
+				ctx->ir_base[base_reg_ref].ops[base_reg_op]);
+		}
+	}
+
+	if (index_reg_ref) {
+		if (base_reg_ref
+			&& ctx->ir_base[index_reg_ref].ops[index_reg_op]
+				== ctx->ir_base[base_reg_ref].ops[base_reg_op]) {
+			index_reg = base_reg;
+		} else {
+			if (UNEXPECTED(ctx->rules[index_reg_ref] & IR_FUSED_REG)) {
+				index_reg = ir_get_fused_reg(ctx, root, index_reg_ref, index_reg_op);
+			} else {
+				index_reg = ctx->regs[index_reg_ref][index_reg_op];
 			}
 			IR_ASSERT(index_reg != IR_REG_NONE);
 			if (IR_REG_SPILLED(index_reg)) {
 				index_reg = IR_REG_NUM(index_reg);
-				ir_emit_load(ctx, insn->type, index_reg, op1_insn->op1);
+				ir_emit_load(ctx, insn->type, index_reg,
+					ctx->ir_base[index_reg_ref].ops[index_reg_op]);
 			}
-			break;
-		case IR_LEA_SIB_O:
-			op1_insn = &ctx->ir_base[insn->op1];
-			base_reg = ctx->regs[insn->op1][1];
-			scale = ctx->ir_base[op1_insn->op2].val.i32 - 1; //?????
-			offset = ctx->ir_base[insn->op2].val.i32;
-			if (insn->op == IR_SUB) {
-				offset = -offset;
-			}
-			IR_ASSERT(base_reg != IR_REG_NONE);
-			if (IR_REG_SPILLED(base_reg)) {
-				base_reg = IR_REG_NUM(base_reg);
-				ir_emit_load(ctx, insn->type, base_reg, op1_insn->op1);
-			}
-			index_reg = base_reg;
-			break;
-		case IR_LEA_IB_O:
-			op1_insn = &ctx->ir_base[insn->op1];
-			base_reg = ctx->regs[insn->op1][1];
-			index_reg = ctx->regs[insn->op1][2];
-			offset = ctx->ir_base[insn->op2].val.i32;
-			if (insn->op == IR_SUB) {
-				offset = -offset;
-			}
-			IR_ASSERT(base_reg != IR_REG_NONE && index_reg != IR_REG_NONE);
-			if (IR_REG_SPILLED(base_reg)) {
-				base_reg = IR_REG_NUM(base_reg);
-				ir_emit_load(ctx, insn->type, base_reg, op1_insn->op1);
-			}
-			if (IR_REG_SPILLED(index_reg)) {
-				index_reg = IR_REG_NUM(index_reg);
-				ir_emit_load(ctx, insn->type, index_reg, op1_insn->op2);
-			}
-			break;
-		case IR_LEA_OB_SI:
-			op1_insn = &ctx->ir_base[insn->op1];
-			op2_insn = &ctx->ir_base[insn->op2];
-			base_reg = ctx->regs[insn->op1][1];
-			index_reg = ctx->regs[insn->op2][1];
-			offset = ctx->ir_base[op1_insn->op2].val.i32;
-			scale = ctx->ir_base[op2_insn->op2].val.i32;
-			if (op1_insn->op == IR_SUB) {
-				offset = -offset;
-			}
-			IR_ASSERT(base_reg != IR_REG_NONE && index_reg != IR_REG_NONE);
-			if (IR_REG_SPILLED(base_reg)) {
-				base_reg = IR_REG_NUM(base_reg);
-				ir_emit_load(ctx, insn->type, base_reg, op1_insn->op1);
-			}
-			if (IR_REG_SPILLED(index_reg)) {
-				index_reg = IR_REG_NUM(index_reg);
-				ir_emit_load(ctx, insn->type, index_reg, op2_insn->op1);
-			}
-			break;
-		case IR_LEA_SI_OB:
-			op1_insn = &ctx->ir_base[insn->op1];
-			op2_insn = &ctx->ir_base[insn->op2];
-			index_reg = ctx->regs[insn->op1][1];
-			base_reg = ctx->regs[insn->op2][1];
-			scale = ctx->ir_base[op1_insn->op2].val.i32;
-			offset = ctx->ir_base[op2_insn->op2].val.i32;
-			if (op1_insn->op == IR_SUB) {
-				offset = -offset;
-			}
-			IR_ASSERT(base_reg != IR_REG_NONE && index_reg != IR_REG_NONE);
-			if (IR_REG_SPILLED(index_reg)) {
-				index_reg = IR_REG_NUM(index_reg);
-				ir_emit_load(ctx, insn->type, index_reg, op1_insn->op1);
-			}
-			if (IR_REG_SPILLED(base_reg)) {
-				base_reg = IR_REG_NUM(base_reg);
-				ir_emit_load(ctx, insn->type, base_reg, op2_insn->op1);
-			}
-			break;
-		case IR_LEA_B_SI:
-			op2_insn = &ctx->ir_base[insn->op2];
-			base_reg = ctx->regs[ref][1];
-			index_reg = ctx->regs[insn->op2][1];
-			scale = ctx->ir_base[op2_insn->op2].val.i32;
-			IR_ASSERT(base_reg != IR_REG_NONE && index_reg != IR_REG_NONE);
-			if (IR_REG_SPILLED(base_reg)) {
-				base_reg = IR_REG_NUM(base_reg);
-				ir_emit_load(ctx, insn->type, base_reg, insn->op1);
-			}
-			if (IR_REG_SPILLED(index_reg)) {
-				index_reg = IR_REG_NUM(index_reg);
-				ir_emit_load(ctx, insn->type, index_reg, op2_insn->op1);
-			}
-			break;
-		case IR_LEA_SI_B:
-			op1_insn = &ctx->ir_base[insn->op1];
-			base_reg = ctx->regs[insn->op1][1];
-			index_reg = ctx->regs[ref][2];
-			scale = ctx->ir_base[op1_insn->op2].val.i32;
-            IR_ASSERT(base_reg != IR_REG_NONE && index_reg != IR_REG_NONE);
-			if (IR_REG_SPILLED(base_reg)) {
-				base_reg = IR_REG_NUM(base_reg);
-				ir_emit_load(ctx, insn->type, base_reg, op1_insn->op1);
-			}
-			if (IR_REG_SPILLED(index_reg)) {
-				index_reg = IR_REG_NUM(index_reg);
-				ir_emit_load(ctx, insn->type, index_reg, insn->op2);
-			}
-			break;
+		}
 	}
+
 	return IR_LOC_MEM(base_reg, offset, index_reg, scale);
 }
 
@@ -8373,30 +8348,44 @@ static bool ir_emit_guard_overflow(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn 
 	return 0;
 }
 
-static void ir_emit_lea(ir_ctx *ctx, ir_ref def, ir_type type, ir_reg base_reg, ir_reg index_reg, uint8_t scale, int32_t offset)
+static void ir_emit_lea(ir_ctx *ctx, ir_ref def, ir_type type)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
-	ir_loc mem;
+	ir_loc mem = ir_fuse_addr(ctx, def, def);
 
 	IR_ASSERT(def_reg != IR_REG_NONE);
 	if (ir_type_size[type] == 4) {
-		if (base_reg == def_reg && offset == 0 && scale == 1 && index_reg != IR_REG_NONE) {
-			|	add Rd(def_reg), Rd(index_reg)
-		} else if (index_reg == def_reg && offset == 0 && scale == 1 && base_reg != IR_REG_NONE) {
-			|	add Rd(def_reg), Rd(base_reg)
+		if (IR_LOC_MEM_BASE(mem) == def_reg
+		 && IR_LOC_MEM_OFFSET(mem) == 0
+		 && IR_LOC_MEM_SCALE(mem) == 1
+		 && IR_LOC_MEM_INDEX(mem) != IR_REG_NONE) {
+			ir_reg reg = IR_LOC_MEM_INDEX(mem);
+			|	add Rd(def_reg), Rd(reg)
+		} else if (IR_LOC_MEM_INDEX(mem) == def_reg
+		 && IR_LOC_MEM_OFFSET(mem) == 0
+		 && IR_LOC_MEM_SCALE(mem) == 1
+		 && IR_LOC_MEM_BASE(mem) != IR_REG_NONE) {
+			ir_reg reg = IR_LOC_MEM_BASE(mem);
+			|	add Rd(def_reg), Rd(reg)
 		} else {
-			mem = IR_LOC_MEM(base_reg, offset, index_reg, scale);
 			|	ASM_TXT_TMEM_OP lea, Rd(def_reg), dword, mem
 		}
 	} else {
-		if (base_reg == def_reg && offset == 0 && scale == 1 && index_reg != IR_REG_NONE) {
-			|	add Ra(def_reg), Ra(index_reg)
-		} else if (index_reg == def_reg && offset == 0 && scale == 1 && base_reg != IR_REG_NONE) {
-			|	add Ra(def_reg), Ra(base_reg)
+		if (IR_LOC_MEM_BASE(mem) == def_reg
+		 && IR_LOC_MEM_OFFSET(mem) == 0
+		 && IR_LOC_MEM_SCALE(mem) == 1
+		 && IR_LOC_MEM_INDEX(mem) != IR_REG_NONE) {
+			ir_reg reg = IR_LOC_MEM_INDEX(mem);
+			|	add Ra(def_reg), Ra(reg)
+		} else if (IR_LOC_MEM_INDEX(mem) == def_reg
+		 && IR_LOC_MEM_OFFSET(mem) == 0
+		 && IR_LOC_MEM_SCALE(mem) == 1
+		 && IR_LOC_MEM_BASE(mem) != IR_REG_NONE) {
+			ir_reg reg = IR_LOC_MEM_BASE(mem);
+			|	add Ra(def_reg), Ra(reg)
 		} else {
-			mem = IR_LOC_MEM(base_reg, offset, index_reg, scale);
 			|	ASM_TXT_TMEM_OP lea, Ra(def_reg), aword, mem
 		}
 	}
@@ -9209,256 +9198,19 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_VA_END:
 					break;
 				case IR_LEA_OB:
-					{
-						ir_reg op1_reg = ctx->regs[i][1];
-						int32_t offset = ctx->ir_base[insn->op2].val.i32;
-
-						if (insn->op == IR_ADD) {
-							offset = ctx->ir_base[insn->op2].val.i32;
-						} else {
-							IR_ASSERT(insn->op == IR_SUB);
-							int64_t long_offset = ctx->ir_base[insn->op2].val.i64;
-							long_offset = -long_offset;
-							IR_ASSERT(IR_IS_SIGNED_32BIT(long_offset));
-							offset = (int32_t)long_offset;
-						}
-						if (IR_REG_SPILLED(op1_reg)) {
-							op1_reg = IR_REG_NUM(op1_reg);
-							ir_emit_load(ctx, insn->type, op1_reg, insn->op1);
-						}
-						ir_emit_lea(ctx, i, insn->type, op1_reg, IR_REG_NONE, 1, offset);
-					}
-					break;
 				case IR_LEA_SI:
-					{
-						ir_reg op1_reg = ctx->regs[i][1];
-						int32_t scale = ctx->ir_base[insn->op2].val.i32;
-
-						IR_ASSERT(op1_reg != IR_REG_NONE);
-						if (IR_REG_SPILLED(op1_reg)) {
-							op1_reg = IR_REG_NUM(op1_reg);
-							ir_emit_load(ctx, insn->type, op1_reg, insn->op1);
-						}
-						ir_emit_lea(ctx, i, insn->type, IR_REG_NONE, op1_reg, scale, 0);
-					}
-					break;
 				case IR_LEA_SIB:
-					{
-						ir_reg op1_reg = ctx->regs[i][1];
-						int32_t scale = ctx->ir_base[insn->op2].val.i32;
-
-						IR_ASSERT(op1_reg != IR_REG_NONE);
-						if (IR_REG_SPILLED(op1_reg)) {
-							op1_reg = IR_REG_NUM(op1_reg);
-							ir_emit_load(ctx, insn->type, op1_reg, insn->op1);
-						}
-						ir_emit_lea(ctx, i, insn->type, op1_reg, op1_reg, scale - 1, 0);
-					}
-					break;
 				case IR_LEA_IB:
-					{
-						ir_reg op1_reg = ctx->regs[i][1];
-						ir_reg op2_reg = ctx->regs[i][2];
-
-						IR_ASSERT(op1_reg != IR_REG_NONE && op2_reg != IR_REG_NONE);
-						if (IR_REG_SPILLED(op1_reg)) {
-							op1_reg = IR_REG_NUM(op1_reg);
-							ir_emit_load(ctx, insn->type, op1_reg, insn->op1);
-						}
-						if (IR_REG_SPILLED(op2_reg)) {
-							op2_reg = IR_REG_NUM(op2_reg);
-							ir_emit_load(ctx, insn->type, op2_reg, insn->op2);
-						}
-						ir_emit_lea(ctx, i, insn->type, op1_reg, op2_reg, 1, 0);
-					}
-					break;
 				case IR_LEA_OB_I:
-					{
-						ir_insn *op1_insn = &ctx->ir_base[insn->op1];
-						ir_reg op1_reg = ctx->regs[insn->op1][1];
-						ir_reg op2_reg = ctx->regs[i][2];
-						int32_t offset = ctx->ir_base[op1_insn->op2].val.i32;
-
-						IR_ASSERT(op1_reg != IR_REG_NONE && op2_reg != IR_REG_NONE);
-						if (IR_REG_SPILLED(op1_reg)) {
-							op1_reg = IR_REG_NUM(op1_reg);
-							ir_emit_load(ctx, insn->type, op1_reg, op1_insn->op1);
-						}
-						if (IR_REG_SPILLED(op2_reg)) {
-							op2_reg = IR_REG_NUM(op2_reg);
-							ir_emit_load(ctx, insn->type, op2_reg, insn->op2);
-						}
-						if (op1_insn->op == IR_SUB) {
-							offset = -offset;
-						}
-						ir_emit_lea(ctx, i, insn->type, op1_reg, op2_reg, 1, offset);
-					}
-					break;
 				case IR_LEA_I_OB:
-					{
-						ir_insn *op2_insn = &ctx->ir_base[insn->op2];
-						ir_reg op1_reg = ctx->regs[i][1];
-						ir_reg op2_reg = ctx->regs[insn->op2][1];
-						int32_t offset = ctx->ir_base[op2_insn->op2].val.i32;
-
-						IR_ASSERT(op1_reg != IR_REG_NONE && op2_reg != IR_REG_NONE);
-						if (IR_REG_SPILLED(op1_reg)) {
-							op1_reg = IR_REG_NUM(op1_reg);
-							ir_emit_load(ctx, insn->type, op1_reg, insn->op1);
-						}
-						if (IR_REG_SPILLED(op2_reg)) {
-							op2_reg = IR_REG_NUM(op2_reg);
-							ir_emit_load(ctx, insn->type, op2_reg, op2_insn->op1);
-						}
-						if (op2_insn->op == IR_SUB) {
-							offset = -offset;
-						}
-						ir_emit_lea(ctx, i, insn->type, op1_reg, op2_reg, 1, offset);
-					}
-					break;
 				case IR_LEA_SI_O:
-					{
-						ir_insn *op1_insn = &ctx->ir_base[insn->op1];
-						ir_reg op1_reg = ctx->regs[insn->op1][1];
-						int32_t scale = ctx->ir_base[op1_insn->op2].val.i32;
-						int32_t offset = ctx->ir_base[insn->op2].val.i32;
-
-						IR_ASSERT(op1_reg != IR_REG_NONE);
-						if (IR_REG_SPILLED(op1_reg)) {
-							op1_reg = IR_REG_NUM(op1_reg);
-							ir_emit_load(ctx, insn->type, op1_reg, op1_insn->op1);
-						}
-						if (insn->op == IR_SUB) {
-							offset = -offset;
-						}
-						ir_emit_lea(ctx, i, insn->type, IR_REG_NONE, op1_reg, scale, offset);
-					}
-					break;
 				case IR_LEA_SIB_O:
-					{
-						ir_insn *op1_insn = &ctx->ir_base[insn->op1];
-						ir_reg op1_reg = ctx->regs[insn->op1][1];
-						int32_t scale = ctx->ir_base[op1_insn->op2].val.i32;
-						int32_t offset = ctx->ir_base[insn->op2].val.i32;
-
-						IR_ASSERT(op1_reg != IR_REG_NONE);
-						if (IR_REG_SPILLED(op1_reg)) {
-							op1_reg = IR_REG_NUM(op1_reg);
-							ir_emit_load(ctx, insn->type, op1_reg, op1_insn->op1);
-						}
-						if (insn->op == IR_SUB) {
-							offset = -offset;
-						}
-						ir_emit_lea(ctx, i, insn->type, op1_reg, op1_reg, scale - 1, offset);
-					}
-					break;
 				case IR_LEA_IB_O:
-					{
-						ir_insn *op1_insn = &ctx->ir_base[insn->op1];
-						ir_reg op1_reg = ctx->regs[insn->op1][1];
-						ir_reg op2_reg = ctx->regs[insn->op1][2];
-						int32_t offset = ctx->ir_base[insn->op2].val.i32;
-
-						IR_ASSERT(op1_reg != IR_REG_NONE && op2_reg != IR_REG_NONE);
-						if (IR_REG_SPILLED(op1_reg)) {
-							op1_reg = IR_REG_NUM(op1_reg);
-							ir_emit_load(ctx, insn->type, op1_reg, op1_insn->op1);
-						}
-						if (IR_REG_SPILLED(op2_reg)) {
-							op2_reg = IR_REG_NUM(op2_reg);
-							ir_emit_load(ctx, insn->type, op2_reg, op1_insn->op2);
-						}
-						if (insn->op == IR_SUB) {
-							offset = -offset;
-						}
-						ir_emit_lea(ctx, i, insn->type, op1_reg, op2_reg, 1, offset);
-					}
-					break;
 				case IR_LEA_OB_SI:
-					{
-						ir_insn *op1_insn = &ctx->ir_base[insn->op1];
-						ir_insn *op2_insn = &ctx->ir_base[insn->op2];
-						ir_reg op1_reg = ctx->regs[insn->op1][1];
-						ir_reg op2_reg = ctx->regs[insn->op2][1];
-						int32_t offset = ctx->ir_base[op1_insn->op2].val.i32;
-						int32_t scale = ctx->ir_base[op2_insn->op2].val.i32;
-
-						IR_ASSERT(op1_reg != IR_REG_NONE && op2_reg != IR_REG_NONE);
-						if (IR_REG_SPILLED(op1_reg)) {
-							op1_reg = IR_REG_NUM(op1_reg);
-							ir_emit_load(ctx, insn->type, op1_reg, op1_insn->op1);
-						}
-						if (IR_REG_SPILLED(op2_reg)) {
-							op2_reg = IR_REG_NUM(op2_reg);
-							ir_emit_load(ctx, insn->type, op2_reg, op2_insn->op1);
-						}
-						if (op1_insn->op == IR_SUB) {
-							offset = -offset;
-						}
-						ir_emit_lea(ctx, i, insn->type, op1_reg, op2_reg, scale, offset);
-					}
-					break;
 				case IR_LEA_SI_OB:
-					{
-						ir_insn *op1_insn = &ctx->ir_base[insn->op1];
-						ir_insn *op2_insn = &ctx->ir_base[insn->op2];
-						ir_reg op1_reg = ctx->regs[insn->op1][1];
-						ir_reg op2_reg = ctx->regs[insn->op2][1];
-						int32_t scale = ctx->ir_base[op1_insn->op2].val.i32;
-						int32_t offset = ctx->ir_base[op2_insn->op2].val.i32;
-
-						IR_ASSERT(op1_reg != IR_REG_NONE && op2_reg != IR_REG_NONE);
-						if (IR_REG_SPILLED(op1_reg)) {
-							op1_reg = IR_REG_NUM(op1_reg);
-							ir_emit_load(ctx, insn->type, op1_reg, op1_insn->op1);
-						}
-						if (IR_REG_SPILLED(op2_reg)) {
-							op2_reg = IR_REG_NUM(op2_reg);
-							ir_emit_load(ctx, insn->type, op2_reg, op2_insn->op1);
-						}
-						if (op1_insn->op == IR_SUB) {
-							offset = -offset;
-						}
-						ir_emit_lea(ctx, i, insn->type, op2_reg, op1_reg, scale, offset);
-					}
-					break;
 				case IR_LEA_B_SI:
-					{
-						ir_insn *op2_insn = &ctx->ir_base[insn->op2];
-						ir_reg op1_reg = ctx->regs[i][1];
-						ir_reg op2_reg = ctx->regs[insn->op2][1];
-						int32_t scale = ctx->ir_base[op2_insn->op2].val.i32;
-
-						IR_ASSERT(op1_reg != IR_REG_NONE && op2_reg != IR_REG_NONE);
-						if (IR_REG_SPILLED(op1_reg)) {
-							op1_reg = IR_REG_NUM(op1_reg);
-							ir_emit_load(ctx, insn->type, op1_reg, insn->op1);
-						}
-						if (IR_REG_SPILLED(op2_reg)) {
-							op2_reg = IR_REG_NUM(op2_reg);
-							ir_emit_load(ctx, insn->type, op2_reg, op2_insn->op1);
-						}
-						ir_emit_lea(ctx, i, insn->type, op1_reg, op2_reg, scale, 0);
-					}
-					break;
 				case IR_LEA_SI_B:
-					{
-						ir_insn *op1_insn = &ctx->ir_base[insn->op1];
-						ir_reg op1_reg = ctx->regs[insn->op1][1];
-						ir_reg op2_reg = ctx->regs[i][2];
-						int32_t scale = ctx->ir_base[op1_insn->op2].val.i32;
-
-						IR_ASSERT(op1_reg != IR_REG_NONE && op2_reg != IR_REG_NONE);
-						if (IR_REG_SPILLED(op1_reg)) {
-							op1_reg = IR_REG_NUM(op1_reg);
-							ir_emit_load(ctx, insn->type, op1_reg, op1_insn->op1);
-						}
-						if (IR_REG_SPILLED(op2_reg)) {
-							op2_reg = IR_REG_NUM(op2_reg);
-							ir_emit_load(ctx, insn->type, op2_reg, insn->op2);
-						}
-						ir_emit_lea(ctx, i, insn->type, op2_reg, op1_reg, scale, 0);
-					}
+					ir_emit_lea(ctx, i, insn->type);
 					break;
 				case IR_MUL_PWR2:
 				case IR_DIV_PWR2:
