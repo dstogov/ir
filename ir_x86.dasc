@@ -465,6 +465,48 @@ static ir_loc IR_LOC_MEM(ir_reg base, int32_t offset, ir_reg index, int32_t scal
 ||	} while (0);
 |.endmacro
 
+|.macro ASM_TMEM_TXT_OP, op, type, op1, op2
+||	IR_ASSERT(IR_LOC_IS_MEM(op1));
+||	do {
+||		int32_t offset = IR_LOC_MEM_OFFSET(op1);
+||		int32_t base = IR_LOC_MEM_BASE(op1);
+||		int32_t index = IR_LOC_MEM_INDEX(op1);
+||		int32_t scale = IR_LOC_MEM_SCALE(op1);
+||  	if (index == IR_REG_NONE) {
+||			if (base == IR_REG_NONE) {
+|				op type [offset], op2
+||			} else {
+|				op type [Ra(base)+offset], op2
+||			}
+||		} else if (scale == 8) {
+||			if (base == IR_REG_NONE) {
+|				op type [Ra(index)*8+offset], op2
+||			} else {
+|				op type [Ra(base)+Ra(index)*8+offset], op2
+||			}
+||		} else if (scale == 4) {
+||			if (base == IR_REG_NONE) {
+|				op type [Ra(index)*4+offset], op2
+||			} else {
+|				op type [Ra(base)+Ra(index)*4+offset], op2
+||			}
+||		} else if (scale == 2) {
+||			if (base == IR_REG_NONE) {
+|				op type [Ra(index)*2+offset], op2
+||			} else {
+|				op type [Ra(base)+Ra(index)*2+offset], op2
+||			}
+||		} else {
+||			IR_ASSERT(scale == 1);
+||			if (base == IR_REG_NONE) {
+|				op type [Ra(index)+offset], op2
+||			} else {
+|				op type [Ra(base)+Ra(index)+offset], op2
+||			}
+||		}
+||	} while (0);
+|.endmacro
+
 |.macro ASM_TXT_TXT_TMEM_OP, op, op1, op2, type, op3
 ||	IR_ASSERT(IR_LOC_IS_MEM(op3));
 ||	do {
@@ -2709,12 +2751,7 @@ static void ir_emit_store_mem_int_const(ir_ctx *ctx, ir_type type, ir_loc mem, i
 		|	lea Ra(tmp_reg), aword [=>label]
 ||		ir_emit_store_mem_int(ctx, type, mem, tmp_reg);
 |.else
-||		//?????
-||		if (base_reg != IR_REG_NONE) {
-			|	mov [Ra(base_reg)+offset], =>label
-||		} else {
-			|	mov [offset], =>label
-||		}
+		|	ASM_TMEM_TXT_OP mov, aword, mem, =>label
 |.endif
 	} else {
 		int64_t val = val_insn->val.i64;
