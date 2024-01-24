@@ -1686,78 +1686,58 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref)
 						}
 					}
 				} else if ((ctx->flags & IR_OPT_CODEGEN) && insn->op == IR_ADD && ir_type_size[insn->type] >= 4) {
-					if (ir_in_same_block(ctx, insn->op1) && ctx->use_lists[insn->op1].count == 1) {
-						uint32_t rule =ctx->rules[insn->op1];
-						if (!rule) {
-							ctx->rules[insn->op1] = rule = ir_match_insn(ctx, insn->op1);
+					if (insn->op1 != insn->op2) {
+						if (ir_in_same_block(ctx, insn->op1) && ctx->use_lists[insn->op1].count == 1) {
+							uint32_t rule =ctx->rules[insn->op1];
+							if (!rule) {
+								ctx->rules[insn->op1] = rule = ir_match_insn(ctx, insn->op1);
+							}
+							if (rule == IR_LEA_OB) {
+								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_OB;
+								if (ir_in_same_block(ctx, insn->op2) && ctx->use_lists[insn->op2].count == 1) {
+									rule = ctx->rules[insn->op2];
+									if (!rule) {
+										ctx->rules[insn->op2] = rule = ir_match_insn(ctx, insn->op2);
+									}
+									if (rule == IR_LEA_SI) {
+										/* x = ADD(X, imm32) ... y = MUL(Y, 2|4|8) ... ADD(x, y) => SKIP ... SKIP ... LEA */
+										ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_LEA_SI;
+										return IR_LEA_OB_SI;
+									}
+								}
+								/* x = ADD(X, imm32) ... ADD(x, Y) => SKIP ... LEA */
+								return IR_LEA_OB_I;
+							} else if (rule == IR_LEA_SI) {
+								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_SI;
+								if (ir_in_same_block(ctx, insn->op2) && ctx->use_lists[insn->op2].count == 1) {
+									rule = ctx->rules[insn->op2];
+									if (!rule) {
+										ctx->rules[insn->op2] = rule = ir_match_insn(ctx, insn->op2);
+									}
+									if (rule == IR_LEA_OB) {
+										/* x = ADD(X, imm32) ... y = MUL(Y, 2|4|8) ... ADD(y, x) => SKIP ... SKIP ... LEA */
+										ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_LEA_OB;
+										return IR_LEA_SI_OB;
+									}
+								}
+								/* x = MUL(X, 2|4|8) ... ADD(x, Y) => SKIP ... LEA */
+								return IR_LEA_SI_B;
+							}
 						}
-						if (rule == IR_LEA_OB) {
-							ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_OB;
-							if (ir_in_same_block(ctx, insn->op2) && ctx->use_lists[insn->op2].count == 1) {
-								rule = ctx->rules[insn->op2];
-								if (!rule) {
-									ctx->rules[insn->op2] = rule = ir_match_insn(ctx, insn->op2);
-								}
-								if (rule == IR_LEA_SI) {
-									/* x = ADD(X, imm32) ... y = MUL(Y, 2|4|8) ... ADD(x, y) => SKIP ... SKIP ... LEA */
-									ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_LEA_SI;
-									return IR_LEA_OB_SI;
-								}
+						if (ir_in_same_block(ctx, insn->op2) && ctx->use_lists[insn->op2].count == 1) {
+							uint32_t rule = ctx->rules[insn->op2];
+							if (!rule) {
+								ctx->rules[insn->op2] = rule = ir_match_insn(ctx, insn->op2);
 							}
-							/* x = ADD(X, imm32) ... ADD(x, Y) => SKIP ... LEA */
-							return IR_LEA_OB_I;
-						} else if (rule == IR_LEA_SI) {
-							ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_SI;
-							if (ir_in_same_block(ctx, insn->op2) && ctx->use_lists[insn->op2].count == 1) {
-								rule = ctx->rules[insn->op2];
-								if (!rule) {
-									ctx->rules[insn->op2] = rule = ir_match_insn(ctx, insn->op2);
-								}
-								if (rule == IR_LEA_OB) {
-									/* x = ADD(X, imm32) ... y = MUL(Y, 2|4|8) ... ADD(y, x) => SKIP ... SKIP ... LEA */
-									ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_LEA_OB;
-									return IR_LEA_SI_OB;
-								}
+							if (rule == IR_LEA_OB) {
+								ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_LEA_OB;
+								/* x = ADD(X, imm32) ... ADD(Y, x) => SKIP ... LEA */
+								return IR_LEA_I_OB;
+							} else if (rule == IR_LEA_SI) {
+								ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_LEA_SI;
+								/* x = MUL(X, 2|4|8) ... ADD(Y, x) => SKIP ... LEA */
+								return IR_LEA_B_SI;
 							}
-							/* x = MUL(X, 2|4|8) ... ADD(x, Y) => SKIP ... LEA */
-							return IR_LEA_SI_B;
-						}
-					}
-					if (ir_in_same_block(ctx, insn->op2) && ctx->use_lists[insn->op2].count == 1) {
-						uint32_t rule = ctx->rules[insn->op2];
-						if (!rule) {
-							ctx->rules[insn->op2] = rule = ir_match_insn(ctx, insn->op2);
-						}
-						if (rule == IR_LEA_OB) {
-							ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_LEA_OB;
-							if (ir_in_same_block(ctx, insn->op1) && ctx->use_lists[insn->op1].count == 1) {
-								rule =ctx->rules[insn->op1];
-								if (!rule) {
-									ctx->rules[insn->op1] = rule = ir_match_insn(ctx, insn->op1);
-								}
-								if (rule == IR_LEA_SI) {
-									/* x = ADD(X, imm32) ... y = MUL(Y, 2|4|8) ... ADD(y, x) => SKIP ... SKIP ... LEA */
-									ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_SI;
-									return IR_LEA_SI_OB;
-								}
-							}
-							/* x = ADD(X, imm32) ... ADD(Y, x) => SKIP ... LEA */
-							return IR_LEA_I_OB;
-						} else if (rule == IR_LEA_SI) {
-							ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_LEA_SI;
-							if (ir_in_same_block(ctx, insn->op1) && ctx->use_lists[insn->op1].count == 1) {
-								rule =ctx->rules[insn->op1];
-								if (!rule) {
-									ctx->rules[insn->op1] = rule = ir_match_insn(ctx, insn->op1);
-								}
-								if (rule == IR_LEA_OB) {
-									/* x = ADD(X, imm32) ... y = MUL(Y, 2|4|8) ... ADD(x, y) => SKIP ... SKIP ... LEA */
-									ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_OB;
-									return IR_LEA_OB_SI;
-								}
-							}
-							/* x = MUL(X, 2|4|8) ... ADD(Y, x) => SKIP ... LEA */
-							return IR_LEA_B_SI;
 						}
 					}
 					/* ADD(X, Y) => LEA [X + Y] */
