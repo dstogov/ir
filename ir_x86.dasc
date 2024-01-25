@@ -2046,7 +2046,8 @@ store_int:
 							/* l = LOAD(_, a) ... v = BINOP(l, _) ... STORE(l, a, v) => SKIP ... SKIP_MEM_BINOP ... MEM_BINOP */
 							ctx->rules[insn->op3] = IR_FUSED | IR_BINOP_INT;
 							ctx->rules[op_insn->op1] = IR_SKIPPED | load_op;
-							if (ctx->rules[op_insn->op2] == (IR_FUSED|IR_SIMPLE|IR_LOAD)) {
+							if (!IR_IS_CONST_REF(op_insn->op2)
+							 && ctx->rules[op_insn->op2] == (IR_FUSED|IR_SIMPLE|IR_LOAD)) {
 								ctx->rules[op_insn->op2] = IR_LOAD_INT;
 							}
 							return IR_MEM_BINOP_INT;
