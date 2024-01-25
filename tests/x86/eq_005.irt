@@ -14,13 +14,9 @@ x86
 }
 --EXPECT--
 test:
-	vmovsd 4(%esp), %xmm0
-	vucomisd .L1, %xmm0
+	vxorpd %xmm0, %xmm0, %xmm0
+	vucomisd 4(%esp), %xmm0
 	setnp %al
 	movl $0, %ecx
 	cmovnel %ecx, %eax
 	retl
-.rodata
-	.db 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
-.L1:
-	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00

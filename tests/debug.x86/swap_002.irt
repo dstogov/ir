@@ -22,8 +22,8 @@ test:
 	subl $4, %esp
 	movl 0xc(%esp), %eax
 	movl %eax, (%esp)
-	movl 8(%esp), %eax
-	andl (%esp), %eax
+	movl (%esp), %eax
+	andl 8(%esp), %eax
 	addl %eax, %eax
 	movl %eax, (%esp)
 	addl $4, %esp
