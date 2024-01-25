@@ -23,6 +23,9 @@
 # if defined(__linux__) || defined(__sun)
 #  include <alloca.h>
 # endif
+# if defined(__APPLE__) && defined(__aarch64__)
+#  include <libkern/OSCacheControl.h>
+# endif
 #else
 # define WIN32_LEAN_AND_MEAN
 # include <windows.h>
@@ -1615,6 +1618,9 @@ int ir_mem_flush(void *ptr, size_t size)
 {
 #if ((defined(__GNUC__) && ZEND_GCC_VERSION >= 4003) || __has_builtin(__builtin___clear_cache))
 	__builtin___clear_cache((char*)(ptr), (char*)(ptr) + size);
+#endif
+#if defined(__APPLE__) && defined(__aarch64__)
+	sys_icache_invalidate(ptr, size);
 #endif
 #ifdef HAVE_VALGRIND
 	VALGRIND_DISCARD_TRANSLATIONS(ptr, size);
