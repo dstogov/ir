@@ -1398,9 +1398,6 @@ static void ir_match_fuse_addr(ir_ctx *ctx, ir_ref addr_ref)
 	if (!IR_IS_CONST_REF(addr_ref)) {
 		uint32_t rule = ctx->rules[addr_ref];
 
-		if (rule & IR_FUSED) {
-			return;
-		}
 		if (!rule) {
 			ctx->rules[addr_ref] = rule = ir_match_insn(ctx, addr_ref);
 		}
@@ -1600,14 +1597,7 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref)
 
 					if (op1_insn->op == IR_AND && ctx->use_lists[insn->op1].count == 1) {
 						/* v = AND(_, _); CMP(v, 0) => SKIP_TEST; TEST */
-						if (ir_op_flags[op1_insn->op] & IR_OP_FLAG_COMMUTATIVE) {
-							ir_match_fuse_load_commutative_int(ctx, op1_insn, ref);
-						} else {
-							ir_match_fuse_load(ctx, op1_insn->op2, ref);
-						}
-						if (IR_IS_CONST_REF(op1_insn->op2)) {
-							ir_match_fuse_load(ctx, op1_insn->op1, ref);
-						}
+						ir_match_fuse_load_cmp_int(ctx, op1_insn, ref);
 						ctx->rules[insn->op1] = IR_FUSED | IR_TEST_INT;
 						return IR_TESTCC_INT;
 					} else if ((op1_insn->op == IR_OR || op1_insn->op == IR_AND || op1_insn->op == IR_XOR) ||
@@ -1994,9 +1984,8 @@ binop_fp:
 #endif
 			IR_FALLTHROUGH;
 		case IR_TAILCALL:
-			if (ir_in_same_block(ctx, insn->op2)) {
-				ir_match_fuse_load(ctx, insn->op2, ref);
-			}
+		case IR_IJMP:
+			ir_match_fuse_load(ctx, insn->op2, ref);
 			return insn->op;
 		case IR_VAR:
 			return IR_SKIPPED | IR_VAR;
@@ -2034,11 +2023,9 @@ store_int:
 							/* l = LOAD(_, a) ... v = BINOP(l, _) ... STORE(l, a, v) => SKIP ... SKIP_MEM_BINOP ... MEM_BINOP */
 							ctx->rules[insn->op3] = IR_FUSED | IR_BINOP_INT;
 							ctx->rules[op_insn->op1] = IR_SKIPPED | load_op;
-							if (ctx->ir_base[op_insn->op2].op == IR_LOAD) {
-								ir_match_fuse_addr(ctx, ctx->ir_base[op_insn->op2].op2);
+							if (ctx->rules[op_insn->op2] == (IR_FUSED|IR_SIMPLE|IR_LOAD)) {
 								ctx->rules[op_insn->op2] = IR_LOAD_INT;
 							}
-							ir_match_fuse_addr(ctx, insn->op2);
 							return IR_MEM_BINOP_INT;
 						} else if ((ir_op_flags[op_insn->op] & IR_OP_FLAG_COMMUTATIVE)
 						 && insn->op1 == op_insn->op2
@@ -2049,11 +2036,6 @@ store_int:
 							ir_swap_ops(op_insn);
 							ctx->rules[insn->op3] = IR_FUSED | IR_BINOP_INT;
 							ctx->rules[op_insn->op1] = IR_SKIPPED | load_op;
-							if (ctx->ir_base[op_insn->op2].op == IR_LOAD) {
-								ir_match_fuse_addr(ctx, ctx->ir_base[op_insn->op2].op2);
-								ctx->rules[op_insn->op2] = IR_LOAD_INT;
-							}
-							ir_match_fuse_addr(ctx, insn->op2);
 							return IR_MEM_BINOP_INT;
 						}
 					} else if (rule == IR_INC) {
@@ -2114,10 +2096,6 @@ store_int:
 							/* l = LOAD(_, a) ... v = SHIFT(l, _) ... STORE(l, a, v) => SKIP ... SKIP_SHIFT ... MEM_SHIFT */
 							ctx->rules[insn->op3] = IR_FUSED | IR_SHIFT;
 							ctx->rules[op_insn->op1] = IR_SKIPPED | load_op;
-							if (ctx->ir_base[op_insn->op2].op == IR_LOAD) {
-								ir_match_fuse_addr(ctx, ctx->ir_base[op_insn->op2].op2);
-								ctx->rules[op_insn->op2] = IR_LOAD_INT;
-							}
 							return IR_MEM_SHIFT;
 						}
 					} else if (rule == IR_SHIFT_CONST) {
@@ -2206,9 +2184,7 @@ store_int:
 					}
 				}
 			}
-			if (ir_in_same_block(ctx, insn->op2)) {
-				ir_match_fuse_load(ctx, insn->op2, ref);
-			}
+			ir_match_fuse_load(ctx, insn->op2, ref);
 			return IR_RSTORE;
 		case IR_START:
 		case IR_BEGIN:
@@ -2241,14 +2217,7 @@ store_int:
 
 							if (op1_insn->op == IR_AND && ctx->use_lists[op2_insn->op1].count == 1) {
 								/* v = AND(_, _); c = CMP(v, 0) ... IF(c) => SKIP_TEST; SKIP ... TEST_AND_BRANCH */
-								if (ir_op_flags[op1_insn->op] & IR_OP_FLAG_COMMUTATIVE) {
-									ir_match_fuse_load_commutative_int(ctx, op1_insn, ref);
-								} else {
-									ir_match_fuse_load(ctx, op1_insn->op2, ref);
-								}
-								if (IR_IS_CONST_REF(op1_insn->op2)) {
-									ir_match_fuse_load(ctx, op1_insn->op1, ref);
-								}
+								ir_match_fuse_load_cmp_int(ctx, op1_insn, ref);
 								ctx->rules[op2_insn->op1] = IR_FUSED | IR_TEST_INT;
 								ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_NOP;
 								return IR_TEST_AND_BRANCH_INT;
@@ -2279,10 +2248,7 @@ store_int:
 					}
 				} else if (op2_insn->op == IR_AND) {
 					/* c = AND(_, _) ... IF(c) => SKIP_TEST ... TEST_AND_BRANCH */
-					ir_match_fuse_load_commutative_int(ctx, op2_insn, ref);
-					if (IR_IS_CONST_REF(op2_insn->op2)) {
-						ir_match_fuse_load(ctx, op2_insn->op1, ref);
-					}
+					ir_match_fuse_load_cmp_int(ctx, op2_insn, ref);
 					ctx->rules[insn->op2] = IR_FUSED | IR_TEST_INT;
 					return IR_TEST_AND_BRANCH_INT;
 				} else if (op2_insn->op == IR_OVERFLOW) {
@@ -2452,10 +2418,7 @@ store_int:
 					}
 				} else if (op2_insn->op == IR_AND) { // TODO: OR, XOR. etc
 					/* c = AND(_, _) ... GUARD(c) => SKIP_TEST ... GUARD_TEST */
-					ir_match_fuse_load_commutative_int(ctx, op2_insn, ref);
-					if (IR_IS_CONST_REF(op2_insn->op2)) {
-						ir_match_fuse_load(ctx, op2_insn->op1, ref);
-					}
+					ir_match_fuse_load_cmp_int(ctx, op2_insn, ref);
 					ctx->rules[insn->op2] = IR_FUSED | IR_TEST_INT;
 					return IR_GUARD_TEST_INT;
 				} else if (op2_insn->op == IR_OVERFLOW) {
@@ -2465,11 +2428,6 @@ store_int:
 				}
 			}
 			ir_match_fuse_load(ctx, insn->op2, ref);
-			return insn->op;
-		case IR_IJMP:
-			if (ir_in_same_block(ctx, insn->op2)) {
-				ir_match_fuse_load(ctx, insn->op2, ref);
-			}
 			return insn->op;
 		case IR_INT2FP:
 			if (ir_type_size[ctx->ir_base[insn->op1].type] > (IR_IS_TYPE_SIGNED(ctx->ir_base[insn->op1].type) ? 2 : 4)) {
