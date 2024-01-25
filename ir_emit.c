@@ -355,22 +355,21 @@ static void *ir_jmp_addr(ir_ctx *ctx, ir_insn *insn, ir_insn *addr_insn)
 	return addr;
 }
 
-static int8_t ir_get_fused_reg(ir_ctx *ctx, ir_ref root, ir_ref ref, uint8_t op_num)
+static int8_t ir_get_fused_reg(ir_ctx *ctx, ir_ref root, ir_ref ref_and_op)
 {
 	if (ctx->fused_regs) {
 		char key[10];
 		ir_ref val;
 
 		memcpy(key, &root, sizeof(ir_ref));
-		memcpy(key + 4, &ref, sizeof(ir_ref));
-		memcpy(key + 8, &op_num, sizeof(uint8_t));
+		memcpy(key + 4, &ref_and_op, sizeof(ir_ref));
 
-		val = ir_strtab_find(ctx->fused_regs, key, 9);
+		val = ir_strtab_find(ctx->fused_regs, key, 8);
 		if (val) {
 			return val;
 		}
 	}
-	return ctx->regs[ref][op_num];
+	return ((int8_t*)ctx->regs)[ref_and_op];
 }
 
 #if defined(__GNUC__)
@@ -457,7 +456,7 @@ static IR_NEVER_INLINE void ir_emit_osr_entry_loads(ir_ctx *ctx, int b, ir_block
 			int32_t offset = -ir_binding_find(ctx, ref);
 
 			IR_ASSERT(offset > 0);
-			ir_emit_load_mem(ctx, type, reg, IR_LOC_MEM_BO(ctx->spill_base, offset));
+			ir_emit_load_mem(ctx, type, reg, IR_MEM_BO(ctx->spill_base, offset));
 		} else {
 			IR_ASSERT(ctx->live_intervals[ctx->vregs[ref]]->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL);
 		}
