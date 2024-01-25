@@ -21,8 +21,8 @@ test:
 	subl $8, %esp
 	movsd 0x14(%esp), %xmm0
 	movsd %xmm0, (%esp)
-	movsd 0xc(%esp), %xmm0
-	addsd (%esp), %xmm0
+	movsd (%esp), %xmm0
+	addsd 0xc(%esp), %xmm0
 	movsd %xmm0, (%esp)
 	addl $8, %esp
 	retl
