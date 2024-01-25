@@ -334,6 +334,14 @@ clang -O2 -fno-vectorize -fno-slp-vectorize -S -emit-llvm -o minilua.ll ./dynasm
 
 Note that the last comand above compiles and runs the Lua interpreter.
 
+Also note that the LLVM code produced by clang is already optimized.
+In case of benchmarking, it may be more honest to avoid LLVM optimizations.
+
+```
+clang -O0 -Xclang -disable-O0-optnone -c -emit-llvm -o tmp.bc ./dynasm/minilua.c
+opt tmp.bc --passes='function(mem2reg)' -S -o minilua.ll
+```
+
 ## PHP JIT based on IR
 
 A new experimental JIT for PHP based on this project is developed at [master](https://github.com/php/php-src/tree/master/ext/opcache/jit) php-src branch.
