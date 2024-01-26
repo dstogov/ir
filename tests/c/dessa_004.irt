@@ -1,0 +1,43 @@
+--TEST--
+DESSA 004
+--ARGS--
+--emit-c
+--CODE--
+func foo(int32_t, uintptr_t, uintptr_t): int32_t
+{
+	l_1 = START(l_26);
+	int32_t d_4 = PARAM(l_1, "cond", 3);
+	uintptr_t d_5 = PARAM(l_1, "x", 4);
+	uintptr_t d_6 = PARAM(l_1, "y", 5);
+	int32_t d_7, l_7 = LOAD(l_1, d_5);
+	int32_t d_9, l_9 = LOAD(l_7, d_6);
+	l_15 = IF(l_9, d_4);
+	l_16 = IF_FALSE(l_15);
+	l_17 = END(l_16);
+	l_18 = IF_TRUE(l_15);
+	l_19 = END(l_18);
+	l_20 = MERGE(l_17, l_19);
+	int32_t d_22 = PHI(l_20, d_7, d_9);
+	int32_t d_23 = PHI(l_20, d_9, d_7);
+	int32_t d_24 = SUB(d_22, d_23);
+	l_26 = RETURN(l_20, d_24);
+}
+--EXPECT--
+int32_t foo(int32_t cond, uintptr_t x, uintptr_t y)
+{
+	int32_t d_1 = cond;
+	uintptr_t d_2 = x;
+	uintptr_t d_3 = y;
+	int32_t d_4;
+	int32_t d_5;
+	int32_t d_6;
+	d_4 = *((int32_t*)d_2);
+	d_5 = *((int32_t*)d_3);
+	if (d_1) goto bb3;
+	tmp = d_4;
+	d_4 = d_5;
+	d_5 = tmp;
+bb3:
+	d_6 = d_5 - d_4;
+	return d_6;
+}

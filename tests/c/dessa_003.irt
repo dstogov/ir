@@ -38,9 +38,9 @@ int32_t test(int32_t x, int32_t y, int32_t z)
 	d_4 = d_1 / 12;
 bb2:
 	if (!d_3) goto bb4;
-	tmp = d_4;
-	d_4 = d_2;
-	d_2 = tmp;
+	tmp = d_2;
+	d_2 = d_4;
+	d_4 = tmp;
 	goto bb2;
 bb4:
 	return d_4;
