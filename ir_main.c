@@ -1266,7 +1266,11 @@ finish:
 	}
 
 	if (!ir_loader_fix_relocs(&loader)) {
-		IR_ASSERT(0);
+		if (run && loader.main) {
+			fprintf(stderr, "ERROR: Cannot run program with undefined sumbols\n");
+			ret = 1;
+			goto exit;
+		}
 	}
 
 	if (dump_size) {
