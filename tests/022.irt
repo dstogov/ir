@@ -70,9 +70,8 @@ BB3:
 	dom_depth=2
 	loop_header=BB2
 	loop_depth=1
-	mov R1 -> TMP
-	mov R2 -> R1
-	mov TMP -> R2
+	# DESSA MOV d_8 {R2} -> d_7 {R1}
+	# DESSA MOV d_7 {R1} -> d_8 {R2}
 BB4:
 	start=12
 	end=13

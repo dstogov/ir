@@ -52,7 +52,7 @@ BB2:
 	predecessors(1) [BB1]
 	dom_parent=BB1
 	dom_depth=1
-	mov R2 -> R1
+	# DESSA MOV d_3 {R2} -> d_11 {R1}
 BB3:
 	start=10
 	end=12

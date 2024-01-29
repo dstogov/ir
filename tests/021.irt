@@ -64,7 +64,7 @@ BB3:
 	dom_depth=2
 	loop_header=BB2
 	loop_depth=1
-	mov R2 -> R1
+	# DESSA MOV d_6 {R2} -> d_5 {R1}
 BB4:
 	start=10
 	end=11
