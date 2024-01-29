@@ -8,6 +8,23 @@
 #include "ir.h"
 #include "ir_private.h"
 
+#define IR_TYPE_TNAME(name, type, field, flags) #field,
+
+static const char *ir_type_tname[IR_LAST_TYPE] = {
+	NULL,
+	IR_TYPES(IR_TYPE_TNAME)
+};
+
+static int ir_add_tmp_type(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
+{
+	if (from == 0) {
+		ir_bitset tmp_types = ctx->data;
+
+		ir_bitset_incl(tmp_types, type);
+	}
+	return 1;
+}
+
 static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 {
 	FILE *f = ctx->data;
@@ -15,7 +32,7 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 	if (to) {
 		fprintf(f, "\td_%d = ", ctx->vregs[to]);
 	} else {
-		fprintf(f, "\ttmp = ");
+		fprintf(f, "\ttmp_%s = ", ir_type_tname[type]);
 	}
 	if (IR_IS_CONST_REF(from)) {
 		ir_print_const(ctx, &ctx->ir_base[from], f, true);
@@ -23,7 +40,7 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 	} else if (from) {
 		fprintf(f, "d_%d;\n", ctx->vregs[from]);
 	} else {
-		fprintf(f, "tmp;\n");
+		fprintf(f, "tmp_%s;\n", ir_type_tname[type]);
 	}
 	return 1;
 }
@@ -706,7 +723,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	ir_insn *insn;
 	ir_use_list *use_list;
 	bool first;
-	ir_bitset vars;
+	ir_bitset vars, tmp_types;
 	uint32_t b, target, prev = 0;
 	ir_block *bb;
 
@@ -748,6 +765,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	}
 
 	/* Emit declarations for local variables */
+	tmp_types = ir_bitset_malloc(IR_LAST_TYPE);
 	vars = ir_bitset_malloc(ctx->vregs_count + 1);
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
@@ -756,6 +774,10 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 		 && (ctx->ir_base[bb->end].op == IR_END || ctx->ir_base[bb->end].op == IR_LOOP_END)
 		 && !(bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_DESSA_MOVES))) {
 			bb->flags |= IR_BB_EMPTY;
+		}
+		if (bb->flags & IR_BB_DESSA_MOVES) {
+			ctx->data = tmp_types;
+			ir_gen_dessa_moves(ctx, b, ir_add_tmp_type);
 		}
 		for (i = bb->start, insn = ctx->ir_base + i; i <= bb->end;) {
 			if (ctx->vregs[i]) {
@@ -791,6 +813,11 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 		}
 	}
 	ir_mem_free(vars);
+
+	IR_BITSET_FOREACH(tmp_types, ir_bitset_len(IR_LAST_TYPE), i) {
+		fprintf(f, "\t%s tmp_%s;\n", ir_type_cname[i], ir_type_tname[i]);
+	} IR_BITSET_FOREACH_END();
+	ir_mem_free(tmp_types);
 
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
