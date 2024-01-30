@@ -75,9 +75,9 @@ R3 (d_10) [SPILL=0x8]
 }
 main:
 	subq $0x18, %rsp
+	xorpd %xmm1, %xmm1
 	movsd .L3(%rip), %xmm0
 	movsd %xmm0, (%rsp)
-	xorpd %xmm1, %xmm1
 .L1:
 	movsd (%rsp), %xmm0
 	ucomisd .L4(%rip), %xmm0

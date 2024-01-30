@@ -1,5 +1,5 @@
 --TEST--
-DESSA 005 (swap & tmp register)
+DESSA 006 (swap & tmp register)
 --TARGET--
 x86_64
 --ARGS--
@@ -12,7 +12,8 @@ func test(double, double, double, double, double, bool): void
 	bool c_3 = 1;
 	uintptr_t c_4 = func printf(uintptr_t, ...): void;
 	uintptr_t c_5 = "%g %g %g %g %g\n";
-	l_1 = START(l_23);
+	uintptr_t c_6 = "*";
+	l_1 = START(l_24);
 	double d_2 = PARAM(l_1, "arg_1", 1);
 	double d_3 = PARAM(l_1, "arg_2", 2);
 	double d_4 = PARAM(l_1, "arg_3", 3);
@@ -20,19 +21,20 @@ func test(double, double, double, double, double, bool): void
 	double d_6 = PARAM(l_1, "arg_5", 5);
 	bool d_7 = PARAM(l_1, "cond", 6);
 	l_8 = END(l_1);
-	l_9 = LOOP_BEGIN(l_8, l_18);
+	l_9 = LOOP_BEGIN(l_8, l_19);
 	double d_10 = PHI(l_9, d_2, d_12);
 	double d_11 = PHI(l_9, d_3, d_10);
 	double d_12 = PHI(l_9, d_4, d_13);
 	double d_13 = PHI(l_9, d_5, d_14);
 	double d_14 = PHI(l_9, d_6, d_12);
 	bool d_15 = PHI(l_9, d_7, c_2);
-	l_16 = IF(l_9, d_15);
-	l_17 = IF_TRUE(l_16);
-	l_18 = LOOP_END(l_17);
-	l_19 = IF_FALSE(l_16);
-	l_20 = CALL/6(l_19, c_4, c_5, d_10, d_11, d_12, d_13, d_14);
-	l_23 = RETURN(l_20, null);
+	l_16 = CALL/1(l_9, c_4, c_6);
+	l_17 = IF(l_16, d_15);
+	l_18 = IF_TRUE(l_17);
+	l_19 = LOOP_END(l_18);
+	l_20 = IF_FALSE(l_17);
+	l_21 = CALL/6(l_20, c_4, c_5, d_10, d_11, d_12, d_13, d_14);
+	l_24 = RETURN(l_21, null);
 }
 func main(): int32_t
 {
@@ -53,28 +55,50 @@ func main(): int32_t
 }
 --EXPECT--
 test:
-	subq $8, %rsp
+	subq $0x38, %rsp
+	movq %rbx, 0x30(%rsp)
+	movsd %xmm0, (%rsp)
+	movsd %xmm1, 8(%rsp)
+	movsd %xmm2, 0x10(%rsp)
+	movsd %xmm3, 0x18(%rsp)
+	movsd %xmm4, 0x20(%rsp)
+	movb %dil, %bl
 .L1:
-	testb %dil, %dil
+	leaq .L4(%rip), %rdi
+	movl $0, %eax
+	callq printf
+	testb %bl, %bl
 	je .L2
-	xorb %dil, %dil
-	movapd %xmm3, %xmm1
-	movapd %xmm4, %xmm3
-	movapd %xmm2, %xmm4
-	movapd %xmm1, %xmm2
-	movapd %xmm0, %xmm1
-	movapd %xmm4, %xmm0
+	xorb %bl, %bl
+	movsd (%rsp), %xmm0
+	movsd %xmm0, 8(%rsp)
+	movsd 0x10(%rsp), %xmm0
+	movsd %xmm0, (%rsp)
+	movsd 0x18(%rsp), %xmm0
+	movsd %xmm0, 0x10(%rsp)
+	movsd 0x20(%rsp), %xmm0
+	movsd %xmm0, 0x18(%rsp)
+	movsd (%rsp), %xmm0
+	movsd %xmm0, 0x20(%rsp)
 	jmp .L1
 .L2:
 	leaq .L3(%rip), %rdi
+	movsd (%rsp), %xmm0
+	movsd 8(%rsp), %xmm1
+	movsd 0x10(%rsp), %xmm2
+	movsd 0x18(%rsp), %xmm3
+	movsd 0x20(%rsp), %xmm4
 	movl $5, %eax
 	callq printf
-	addq $8, %rsp
+	movq 0x30(%rsp), %rbx
+	addq $0x38, %rsp
 	retq
 .rodata
-	.db 0x90, 0x90, 0x90, 0x90
+	.db 0x90, 0x90, 0x90
 .L3:
 	.db 0x25, 0x67, 0x20, 0x25, 0x67, 0x20, 0x25, 0x67, 0x20, 0x25, 0x67, 0x20, 0x25, 0x67, 0x0a, 0x00
+.L4:
+	.db 0x2a, 0x00
 
 main:
 	subq $8, %rsp
@@ -108,5 +132,5 @@ main:
 .L5:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f
 
-0.1 0.2 0.3 0.4 0.5
-0.3 0.1 0.4 0.5 0.3
+*0.1 0.2 0.3 0.4 0.5
+**0.3 0.1 0.4 0.5 0.3
