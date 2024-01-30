@@ -2021,6 +2021,15 @@ int ir_compute_dessa_moves(ir_ctx *ctx)
 	return 1;
 }
 
+/*
+ * Parallel copy sequentialization algorithm
+ *
+ * The implementation is based on algorithm 1 desriebed in
+ * "Revisiting Out-of-SSA Translation for Correctness, Code Quality and Efficiency",
+ * Benoit Boissinot, Alain Darte, Fabrice Rastello, Benoit Dupont de Dinechin, Christophe Guillon.
+ * 2009 International Symposium on Code Generation and Optimization, Seattle, WA, USA, 2009,
+ * pp. 114-125, doi: 10.1109/CGO.2009.19.
+ */
 int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy)
 {
 	uint32_t succ, k, n = 0;
