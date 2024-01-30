@@ -59,8 +59,8 @@ test:
 	vmovsd %xmm6, (%rsp)
 	vsubsd .L4(%rip), %xmm1, %xmm1
 	vxorpd %xmm3, %xmm3, %xmm3
-	vxorpd %xmm2, %xmm2, %xmm2
 	xorl %eax, %eax
+	vxorpd %xmm2, %xmm2, %xmm2
 .L1:
 	leal 1(%rax), %eax
 	vmulsd %xmm2, %xmm2, %xmm4

@@ -68,8 +68,8 @@ main:
 	subq $0x38, %rsp
 	movq %rbx, 0x30(%rsp)
 	movq %rbp, 0x28(%rsp)
-	xorl %eax, %eax
 	movl $1, %ebx
+	xorl %eax, %eax
 .L1:
 	cmpl $0x2710, %ebx
 	jge .L2
