@@ -1,7 +1,9 @@
 --TEST--
 DESSA 004 (swap of coalesced virtual registers)
+--TARGET--
+x86_64
 --ARGS--
---emit-c
+-S
 --CODE--
 func foo(int32_t, uintptr_t, uintptr_t): int32_t
 {
@@ -23,22 +25,12 @@ func foo(int32_t, uintptr_t, uintptr_t): int32_t
 	l_26 = RETURN(l_20, d_24);
 }
 --EXPECT--
-int32_t foo(int32_t cond, uintptr_t x, uintptr_t y)
-{
-	int32_t d_1 = cond;
-	uintptr_t d_2 = x;
-	uintptr_t d_3 = y;
-	int32_t d_4;
-	int32_t d_5;
-	int32_t d_6;
-	int32_t tmp_i32;
-	d_4 = *((int32_t*)d_2);
-	d_5 = *((int32_t*)d_3);
-	if (d_1) goto bb3;
-	tmp_i32 = d_4;
-	d_4 = d_5;
-	d_5 = tmp_i32;
-bb3:
-	d_6 = d_5 - d_4;
-	return d_6;
-}
+foo:
+	movl (%rsi), %ecx
+	movl (%rdx), %eax
+	testl %edi, %edi
+	jne .L1
+	xchgl %eax, %ecx
+.L1:
+	subl %ecx, %eax
+	retq
