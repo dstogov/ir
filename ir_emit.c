@@ -721,7 +721,7 @@ static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_re
 		IR_REGSET_INCL(srcs, from);
 		loc[from] = from;
 		pred[to] = from;
-		types[from] = copies[i].type;
+		types[to] = copies[i].type;
 		IR_ASSERT(!IR_REGSET_IN(todo, to));
 		IR_REGSET_INCL(todo, to);
 	}
@@ -761,7 +761,7 @@ static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_re
 				from = pred[to];
 				IR_ASSERT(from != to);
 				IR_ASSERT(loc[from] == from);
-				type = types[from];
+				type = types[to];
 				todo = ir_dessa_resolve_cycle(ctx, pred, loc, todo, type, to, tmp_reg, tmp_fp_reg);
 				break;
 			}
@@ -778,7 +778,7 @@ static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_re
 		to = ir_regset_pop_first(&ready);
 		from = pred[to];
 		r = loc[from];
-		type = types[from];
+		type = types[to];
 		if (IR_IS_TYPE_INT(type)) {
 			ir_emit_mov_ext(ctx, type, to, r);
 		} else {
