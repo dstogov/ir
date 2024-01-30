@@ -1,0 +1,55 @@
+--TEST--
+DESSA 006 (swap & tmp register)
+--ARGS--
+--emit-c
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uintptr_t c_4 = func printf(uintptr_t, ...): void;
+	uintptr_t c_5 = "%g %g %g %g %g\n";
+	l_1 = START(l_23);
+	double d_2 = PARAM(l_1, "arg_1", 1);
+	double d_3 = PARAM(l_1, "arg_2", 2);
+	double d_4 = PARAM(l_1, "arg_3", 3);
+	double d_5 = PARAM(l_1, "arg_4", 4);
+	double d_6 = PARAM(l_1, "arg_5", 5);
+	bool d_7 = PARAM(l_1, "cond", 6);
+	l_8 = END(l_1);
+	l_9 = LOOP_BEGIN(l_8, l_18);
+	double d_10 = PHI(l_9, d_2, d_12);
+	double d_11 = PHI(l_9, d_3, d_10);
+	double d_12 = PHI(l_9, d_4, d_13);
+	double d_13 = PHI(l_9, d_5, d_14);
+	double d_14 = PHI(l_9, d_6, d_12);
+	bool d_15 = PHI(l_9, d_7, c_2);
+	l_16 = IF(l_9, d_15);
+	l_17 = IF_TRUE(l_16);
+	l_18 = LOOP_END(l_17);
+	l_19 = IF_FALSE(l_16);
+	l_20 = CALL/6(l_19, c_4, c_5, d_10, d_11, d_12, d_13, d_14);
+	l_23 = RETURN(l_20, null);
+}
+--EXPECT--
+void test(double arg_1, double arg_2, double arg_3, double arg_4, double arg_5, bool cond)
+{
+	double d_1 = arg_1;
+	double d_2 = arg_2;
+	double d_3 = arg_3;
+	double d_4 = arg_4;
+	double d_5 = arg_5;
+	bool d_6 = cond;
+bb2:
+	if (!d_6) goto bb4;
+	d_2 = d_1;
+	d_1 = d_3;
+	d_3 = d_4;
+	d_4 = d_5;
+	d_5 = d_1;
+	d_6 = 0;
+	goto bb2;
+bb4:
+	printf("%g %g %g %g %g\n", d_1, d_2, d_3, d_4, d_5);
+	return;
+}

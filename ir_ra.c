@@ -2108,7 +2108,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy)
 				emit_copy(ctx, ctx->ir_base[dst[b]].type, src[c], dst[b]);
 				ir_bitset_excl(todo, b);
 				loc[a] = b;
-				src[a] = dst[b];
+				src[b] = dst[b];
 				if (a == c && pred[a]) {
 					ir_bitset_incl(ready, a);
 				}
