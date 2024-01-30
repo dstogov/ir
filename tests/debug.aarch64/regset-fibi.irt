@@ -68,8 +68,8 @@ main:
 	stp x29, x30, [sp, #-0x20]!
 	mov x29, sp
 	stp x19, x20, [x29, #0x10]
-	mov w0, wzr
 	movz w19, #0x1
+	mov w0, wzr
 .L1:
 	movz w1, #0x2710
 	cmp w19, w1

@@ -82,8 +82,8 @@ test:
 .L1:
 	cmpl $0, 0x38(%esp)
 	je .L3
-	movl 0x20(%esp), %eax
 	movl %edx, %ebp
+	movl 0x20(%esp), %eax
 .L2:
 	cmpl $0, 0x3c(%esp)
 	jne .L1

@@ -755,25 +755,8 @@ static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_dessa_copy *copies, int count,
 	IR_ASSERT(tmp_reg == IR_REG_NONE || !ir_bitset_in(srcs, tmp_reg));
 	IR_ASSERT(tmp_fp_reg == IR_REG_NONE || !ir_bitset_in(srcs, tmp_fp_reg));
 
-	ready = ir_bitset_malloc(len);
-	ir_bitset_copy(ready, todo, ir_bitset_len(len));
-	ir_bitset_difference(ready, srcs, ir_bitset_len(len));
-	if (ir_bitset_equal(ready, todo, ir_bitset_len(len))) {
-		for (i = 0; i < count; i++) {
-			from = copies[i].from;
-			to = copies[i].to;
-			IR_ASSERT(from != to);
-			type = copies[i].type;
-			ir_emit_dessa_move(ctx, type, to, from, tmp_reg, tmp_fp_reg);
-		}
-		ir_mem_free(ready);
-		ir_mem_free(loc);
-		ir_mem_free(srcs);
-		ir_mem_free(todo);
-		return 1;
-	}
-
 	/* first we resolve all "windmill blades" - trees, that don't set temporary registers */
+	ready = ir_bitset_malloc(len);
 	ir_bitset_copy(ready, todo, ir_bitset_len(len));
 	ir_bitset_difference(ready, srcs, ir_bitset_len(len));
 	if (tmp_reg != IR_REG_NONE) {

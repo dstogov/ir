@@ -57,8 +57,8 @@ x86_64
 test:
 	subsd .L4(%rip), %xmm1
 	xorpd %xmm3, %xmm3
-	xorpd %xmm2, %xmm2
 	movabsq $0x200000000, %rax
+	xorpd %xmm2, %xmm2
 .L1:
 	leaq 1(%rax), %rax
 	movapd %xmm2, %xmm4

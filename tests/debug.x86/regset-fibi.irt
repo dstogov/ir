@@ -66,8 +66,8 @@ main:
 	subl $0x1c, %esp
 	movl %ebx, 0x18(%esp)
 	movl %ebp, 0x14(%esp)
-	xorl %eax, %eax
 	movl $1, %ebx
+	xorl %eax, %eax
 .L1:
 	cmpl $0x2710, %ebx
 	jge .L2

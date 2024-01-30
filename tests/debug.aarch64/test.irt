@@ -58,8 +58,8 @@ test:
 	ldr d2, .L4
 	fsub d1, d1, d2
 	fmov d3, xzr
-	fmov d2, xzr
 	mov w0, wzr
+	fmov d2, xzr
 .L1:
 	add w0, w0, #1
 	fmul d4, d2, d2

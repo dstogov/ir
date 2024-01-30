@@ -59,8 +59,8 @@ test:
 	movsd 0xc(%esp), %xmm1
 	subsd .L4, %xmm1
 	xorpd %xmm3, %xmm3
-	xorpd %xmm2, %xmm2
 	xorl %eax, %eax
+	xorpd %xmm2, %xmm2
 .L1:
 	leal 1(%eax), %eax
 	movapd %xmm2, %xmm4
