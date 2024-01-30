@@ -479,7 +479,6 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 	ir_reg to, from;
 	ir_type type;
 	ir_regset todo, ready, srcs;
-	ir_reg last_reg, last_fp_reg;
 
 	if (count == 1) {
 		to = copies[0].to;
@@ -529,6 +528,11 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 		return 1;
 	}
 
+	/* temporary registers can't be the same as some of the destinations */
+	IR_ASSERT(tmp_reg == IR_REG_NONE || !IR_REGSET_IN(todo, tmp_reg));
+	IR_ASSERT(tmp_fp_reg == IR_REG_NONE || !IR_REGSET_IN(todo, tmp_fp_reg));
+
+	/* first we resolve all "windmill blades" - trees (this doesn't requre temporary registers) */
 	while (ready != IR_REGSET_EMPTY) {
 		ir_reg r;
 
@@ -551,25 +555,11 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 		return 1;
 	}
 
-	/* temporary registers may be the same as some of the destinations */
-	last_reg = IR_REG_NONE;
-	if (tmp_reg != IR_REG_NONE) {
-		IR_ASSERT(!IR_REGSET_IN(srcs, tmp_reg));
-		if (IR_REGSET_IN(todo, tmp_reg)) {
-			last_reg = tmp_reg;
-			IR_REGSET_EXCL(todo, tmp_reg);
-		}
-	}
+	/* at this point the sources that are the same as temoraries are already moved */
+	IR_ASSERT(tmp_reg == IR_REG_NONE || !IR_REGSET_IN(srcs, tmp_reg) || pred[loc[tmp_reg]] == tmp_reg);
+	IR_ASSERT(tmp_fp_reg == IR_REG_NONE || !IR_REGSET_IN(srcs, tmp_fp_reg) || pred[loc[tmp_fp_reg]] == tmp_fp_reg);
 
-	last_fp_reg = IR_REG_NONE;
-	if (tmp_fp_reg != IR_REG_NONE) {
-		IR_ASSERT(!IR_REGSET_IN(srcs, tmp_fp_reg));
-		if (IR_REGSET_IN(todo, tmp_fp_reg)) {
-			last_fp_reg = tmp_fp_reg;
-			IR_REGSET_EXCL(todo, tmp_fp_reg);
-		}
-	}
-
+	/* now we resolve all "windmill axles" - cycles (this reuires temporary registers) */
 	while (todo != IR_REGSET_EMPTY) {
 		to = ir_regset_pop_first(&todo);
 		from = pred[to];
@@ -625,27 +615,183 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 		}
 	}
 
-	if (last_reg != IR_REG_NONE) {
-		to = last_reg;
-		from = pred[to];
-		type = types[from];
-		from = loc[from];
-		if (to != from) {
-			IR_ASSERT(IR_IS_TYPE_INT(type));
-			ir_emit_mov_ext(ctx, type, to, from);
+	return 1;
+}
+
+IR_ALWAYS_INLINE ir_regset ir_dessa_resolve_cycle(ir_ctx *ctx, ir_reg *pred, ir_reg *loc, ir_regset todo, ir_type type, ir_reg to, ir_reg tmp_reg, ir_reg tmp_fp_reg)
+{
+	ir_reg from = pred[to];
+
+	if (IR_IS_TYPE_INT(type)) {
+#ifdef IR_HAVE_SWAP_INT
+		if (pred[from] == to) {
+			/* a simple cycle from 2 elements */
+			ir_emit_swap(ctx, type, to, from);
+			IR_REGSET_EXCL(todo, from);
+			IR_REGSET_EXCL(todo, to);
+			loc[to] = from;
+			loc[from] = to;
+			return todo;
+		}
+#endif
+		IR_ASSERT(tmp_reg != IR_REG_NONE);
+		IR_ASSERT(tmp_reg >= IR_REG_GP_FIRST && tmp_reg <= IR_REG_GP_LAST);
+		ir_emit_mov(ctx, type, tmp_reg, to);
+		loc[to] = tmp_reg;
+		while (1) {
+			ir_reg r;
+
+			from = pred[to];
+			r = loc[from];
+			ir_emit_mov(ctx, type, to, r);
+			IR_REGSET_EXCL(todo, to);
+			loc[from] = to;
+			if (from == r && IR_REGSET_IN(todo, from)) {
+				to = from;
+			} else {
+				break;
+			}
+		}
+	} else {
+#ifdef IR_HAVE_SWAP_FP
+		if (pred[from] == to) {
+			/* a simple cycle from 2 elements */
+			ir_emit_swap_fp(ctx, type, to, from);
+			IR_REGSET_EXCL(todo, from);
+			IR_REGSET_EXCL(todo, to);
+			loc[to] = from;
+			loc[from] = to;
+			return todo;
+		}
+#endif
+		IR_ASSERT(tmp_fp_reg != IR_REG_NONE);
+		IR_ASSERT(tmp_fp_reg >= IR_REG_FP_FIRST && tmp_fp_reg <= IR_REG_FP_LAST);
+		ir_emit_fp_mov(ctx, type, tmp_fp_reg, to);
+		loc[to] = tmp_fp_reg;
+		while (1) {
+			ir_reg r;
+
+			from = pred[to];
+			r = loc[from];
+			ir_emit_fp_mov(ctx, type, to, r);
+			IR_REGSET_EXCL(todo, to);
+			loc[from] = to;
+			if (from == r && IR_REGSET_IN(todo, from)) {
+				to = from;
+			} else {
+				break;
+			}
 		}
 	}
 
-	if (last_fp_reg != IR_REG_NONE) {
-		to = last_fp_reg;
-		from = pred[to];
-		type = types[from];
-		from = loc[from];
-		if (to != from) {
-			IR_ASSERT(!IR_IS_TYPE_INT(type));
+	return todo;
+}
+
+static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_reg, ir_reg tmp_fp_reg)
+{
+	int i;
+	int8_t *pred, *loc, *types;
+	ir_reg to, from;
+	ir_type type;
+	ir_regset todo, ready, srcs, visited;
+
+	if (count == 1) {
+		to = copies[0].to;
+		from = copies[0].from;
+		IR_ASSERT(from != to);
+		type = copies[0].type;
+		if (IR_IS_TYPE_INT(type)) {
+			ir_emit_mov(ctx, type, to, from);
+		} else {
 			ir_emit_fp_mov(ctx, type, to, from);
 		}
+		return 1;
 	}
+
+	loc = alloca(IR_REG_NUM * 3 * sizeof(int8_t));
+	pred = loc + IR_REG_NUM;
+	types = pred + IR_REG_NUM;
+	todo = IR_REGSET_EMPTY;
+	srcs = IR_REGSET_EMPTY;
+
+	for (i = 0; i < count; i++) {
+		from = copies[i].from;
+		to = copies[i].to;
+		IR_ASSERT(from != to);
+		IR_REGSET_INCL(srcs, from);
+		loc[from] = from;
+		pred[to] = from;
+		types[from] = copies[i].type;
+		IR_ASSERT(!IR_REGSET_IN(todo, to));
+		IR_REGSET_INCL(todo, to);
+	}
+
+	/* temporary registers can't be the same as some of the sources */
+	IR_ASSERT(tmp_reg == IR_REG_NONE || !IR_REGSET_IN(srcs, tmp_reg));
+	IR_ASSERT(tmp_fp_reg == IR_REG_NONE || !IR_REGSET_IN(srcs, tmp_fp_reg));
+
+	ready = IR_REGSET_DIFFERENCE(todo, srcs);
+	if (ready == todo) {
+		for (i = 0; i < count; i++) {
+			from = copies[i].from;
+			to = copies[i].to;
+			IR_ASSERT(from != to);
+			type = copies[i].type;
+			if (IR_IS_TYPE_INT(type)) {
+				ir_emit_mov(ctx, type, to, from);
+			} else {
+				ir_emit_fp_mov(ctx, type, to, from);
+			}
+		}
+		return 1;
+	}
+
+	/* first we resolve all "windmill axles" - cycles (this requres temporary registers) */
+	ready = IR_REGSET_INTERSECTION(todo, srcs);
+	while (ready != IR_REGSET_EMPTY) {
+		to = IR_REGSET_FIRST(ready);
+		visited = IR_REGSET_EMPTY;
+		IR_REGSET_INCL(visited, to);
+		to = pred[to];
+		while (IR_REGSET_IN(ready, to)) {
+			to = pred[to];
+			if (IR_REGSET_IN(visited, to)) {
+				/* We found a cycle. Resolve it. */
+				IR_REGSET_INCL(visited, to);
+				from = pred[to];
+				IR_ASSERT(from != to);
+				IR_ASSERT(loc[from] == from);
+				type = types[from];
+				todo = ir_dessa_resolve_cycle(ctx, pred, loc, todo, type, to, tmp_reg, tmp_fp_reg);
+				break;
+			}
+			IR_REGSET_INCL(visited, to);
+		}
+		ready = IR_REGSET_DIFFERENCE(ready, visited);
+	}
+
+	/* now we resolve all "windmill blades" - trees (this doesn't requre temporary registers) */
+	ready = IR_REGSET_DIFFERENCE(todo, srcs);
+	while (ready != IR_REGSET_EMPTY) {
+		ir_reg r;
+
+		to = ir_regset_pop_first(&ready);
+		from = pred[to];
+		r = loc[from];
+		type = types[from];
+		if (IR_IS_TYPE_INT(type)) {
+			ir_emit_mov_ext(ctx, type, to, r);
+		} else {
+			ir_emit_fp_mov(ctx, type, to, r);
+		}
+		IR_REGSET_EXCL(todo, to);
+		loc[from] = to;
+		if (from == r && IR_REGSET_IN(todo, from)) {
+			IR_REGSET_INCL(ready, from);
+		}
+	}
+
+	IR_ASSERT(todo == IR_REGSET_EMPTY);
 
 	return 1;
 }
@@ -743,7 +889,7 @@ static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb)
 	}
 
 	if (n > 0) {
-		ir_parallel_copy(ctx, copies, n, tmp_reg, tmp_fp_reg);
+		ir_dessa_parallel_copy(ctx, copies, n, tmp_reg, tmp_fp_reg);
 	}
 
 	for (n = 0; n < n2; n++) {
