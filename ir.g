@@ -401,7 +401,7 @@ ir_insn(ir_parser_ctx *p):
 	{ir_ref op1 = IR_UNUSED;}
 	{ir_ref op2 = IR_UNUSED;}
 	{ir_ref op3 = IR_UNUSED;}
-	{ir_ref ref;}
+	{ir_ref ref = IR_UNUSED;}
 	{ir_val val;}
 	{ir_val count;}
 	{int32_t n;}
