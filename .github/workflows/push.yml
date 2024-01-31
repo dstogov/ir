@@ -133,9 +133,9 @@ jobs:
       - name: brew
         run: brew install capstone
       - name: make
-        run: make TARGET=aarch64 all
+        run: make CC=cc TARGET=aarch64 all
       - name: test
-        run: make TARGET=aarch64 test-ci
+        run: make CC=cc TARGET=aarch64 test-ci
 
   Windows:
     strategy:
