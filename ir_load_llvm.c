@@ -482,7 +482,7 @@ static void llvm2ir_alloca(ir_ctx *ctx, LLVMValueRef insn)
 			char buf[32];
 
 			if (!name || !name_len) {
-				sprintf(buf, "var_%d", ctx->insns_count);
+				snprintf(buf, sizeof(buf), "var_%d", ctx->insns_count);
 				name = buf;
 			}
 			ref = ir_VAR(type, name);
@@ -1592,7 +1592,7 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMValueRef func)
 		}
 		name = LLVMGetValueName2(param, &name_len);
 		if (!name || !name_len) {
-			sprintf(buf, "arg_%d", i + 1);
+			snprintf(buf, sizeof(buf), "arg_%d", i + 1);
 			name = buf;
 		}
 		ref = ir_PARAM(type, name, i + 1);
