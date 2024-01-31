@@ -124,6 +124,19 @@ jobs:
       - name: test
         run: make TARGET=x86_64 test-ci
 
+  MACOS_M1:
+    runs-on: macos-14
+    env:
+      CFLAGS: '-fsanitize=address,undefined'
+    steps:
+      - uses: actions/checkout@v3
+      - name: brew
+        run: brew install capstone
+      - name: make
+        run: make TARGET=aarch64 all
+      - name: test
+        run: make TARGET=aarch64 test-ci
+
   Windows:
     strategy:
       matrix:
