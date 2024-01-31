@@ -133,7 +133,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: brew
-        run: brew install capstone@4.0.2
+        run: brew install capstone
       - name: make
         run: make CC=cc TARGET=aarch64 all
       - name: test
