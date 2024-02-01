@@ -1065,12 +1065,12 @@ static bool ir_may_fuse_imm(ir_ctx *ctx, const ir_insn *val_insn)
 			if (!addr) {
 				return 0;
 			}
-			return IR_IS_UNSIGNED_32BIT((uint64_t)(uintptr_t)addr);
+			return IR_IS_SIGNED_32BIT((intptr_t)addr);
 		} else {
-			return IR_IS_UNSIGNED_32BIT(val_insn->val.u64);
+			return IR_IS_SIGNED_32BIT(val_insn->val.i64);
 		}
 	} else {
-		return (ir_type_size[val_insn->type] <= 4 || IR_IS_32BIT(val_insn->type, val_insn->val));
+		return (ir_type_size[val_insn->type] <= 4 || IR_IS_SIGNED_32BIT(val_insn->val.i64));
 	}
 }
 
@@ -1540,10 +1540,9 @@ static bool ir_match_try_fuse_load(ir_ctx *ctx, ir_ref ref, ir_ref root)
 
 static void ir_match_fuse_load_commutative_int(ir_ctx *ctx, ir_insn *insn, ir_ref root)
 {
-	if (IR_IS_CONST_REF(insn->op2)) {
-		if (ir_may_fuse_addr(ctx, &ctx->ir_base[insn->op2])) {
-			return;
-		}
+	if (IR_IS_CONST_REF(insn->op2)
+	 && ir_may_fuse_imm(ctx, &ctx->ir_base[insn->op2])) {
+		return;
 	} else if (ir_match_try_fuse_load(ctx, insn->op2, root)) {
 		return;
 	} else if (ir_match_try_fuse_load(ctx, insn->op1, root)) {
@@ -1562,10 +1561,9 @@ static void ir_match_fuse_load_commutative_fp(ir_ctx *ctx, ir_insn *insn, ir_ref
 
 static void ir_match_fuse_load_cmp_int(ir_ctx *ctx, ir_insn *insn, ir_ref root)
 {
-	if (IR_IS_CONST_REF(insn->op2)) {
-		if (ir_may_fuse_addr(ctx, &ctx->ir_base[insn->op2])) {
-			ir_match_fuse_load(ctx, insn->op1, root);
-		}
+	if (IR_IS_CONST_REF(insn->op2)
+	 && ir_may_fuse_imm(ctx, &ctx->ir_base[insn->op2])) {
+		ir_match_fuse_load(ctx, insn->op1, root);
 	} else if (!ir_match_try_fuse_load(ctx, insn->op2, root)
 	 && ir_match_try_fuse_load(ctx, insn->op1, root)) {
 		ir_swap_ops(insn);
@@ -1577,10 +1575,9 @@ static void ir_match_fuse_load_cmp_int(ir_ctx *ctx, ir_insn *insn, ir_ref root)
 
 static void ir_match_fuse_load_test_int(ir_ctx *ctx, ir_insn *insn, ir_ref root)
 {
-	if (IR_IS_CONST_REF(insn->op2)) {
-		if (ir_may_fuse_addr(ctx, &ctx->ir_base[insn->op2])) {
-			ir_match_fuse_load(ctx, insn->op1, root);
-		}
+	if (IR_IS_CONST_REF(insn->op2)
+	 && ir_may_fuse_imm(ctx, &ctx->ir_base[insn->op2])) {
+		ir_match_fuse_load(ctx, insn->op1, root);
 	} else if (!ir_match_try_fuse_load(ctx, insn->op2, root)
 	 && ir_match_try_fuse_load(ctx, insn->op1, root)) {
 		ir_swap_ops(insn);
@@ -3099,10 +3096,10 @@ static int32_t ir_fuse_imm(ir_ctx *ctx, ir_ref ref)
 	IR_ASSERT(IR_IS_CONST_REF(ref));
 	if (IR_IS_SYM_CONST(val_insn->op)) {
 		void *addr = ir_sym_val(ctx, val_insn);
-		IR_ASSERT(IR_IS_UNSIGNED_32BIT((uintptr_t)addr));
+		IR_ASSERT(IR_IS_SIGNED_32BIT((intptr_t)addr));
 		return (int32_t)(intptr_t)addr;
 	} else {
-		IR_ASSERT(IR_IS_32BIT(val_insn->type, val_insn->val));
+		IR_ASSERT(IR_IS_SIGNED_32BIT(val_insn->val.i32));
 		return val_insn->val.i32;
 	}
 }
@@ -3563,30 +3560,27 @@ static void ir_emit_mem_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 
 	if (op2_reg == IR_REG_NONE) {
-		ir_val *val = &ctx->ir_base[op2].val;
+		int32_t val = ir_fuse_imm(ctx, op2);
 
-		IR_ASSERT(IR_IS_CONST_REF(op2));
-		IR_ASSERT(!IR_IS_SYM_CONST(ctx->ir_base[op2].op));
-		IR_ASSERT(ir_type_size[type] != 8 || IR_IS_32BIT(type, ctx->ir_base[op2].val));
 		switch (op_insn->op) {
 			default:
 				IR_ASSERT(0 && "NIY binary op");
 			case IR_ADD:
 			case IR_ADD_OV:
-				|	ASM_MEM_IMM_OP add, type, mem, val->i32
+				|	ASM_MEM_IMM_OP add, type, mem, val
 				break;
 			case IR_SUB:
 			case IR_SUB_OV:
-				|	ASM_MEM_IMM_OP sub, type, mem, val->i32
+				|	ASM_MEM_IMM_OP sub, type, mem, val
 				break;
 			case IR_OR:
-				|	ASM_MEM_IMM_OP or, type, mem, val->i32
+				|	ASM_MEM_IMM_OP or, type, mem, val
 				break;
 			case IR_AND:
-				|	ASM_MEM_IMM_OP and, type, mem, val->i32
+				|	ASM_MEM_IMM_OP and, type, mem, val
 				break;
 			case IR_XOR:
-				|	ASM_MEM_IMM_OP xor, type, mem, val->i32
+				|	ASM_MEM_IMM_OP xor, type, mem, val
 				break;
 		}
 	} else {
@@ -3632,28 +3626,25 @@ static void ir_emit_reg_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	reg = insn->op3;
 
 	if (op2_reg == IR_REG_NONE) {
-		ir_val *val = &ctx->ir_base[op2].val;
+		int32_t val = ir_fuse_imm(ctx, op2);
 
-		IR_ASSERT(IR_IS_CONST_REF(op2));
-		IR_ASSERT(!IR_IS_SYM_CONST(ctx->ir_base[op2].op));
-		IR_ASSERT(ir_type_size[type] != 8 || IR_IS_32BIT(type, ctx->ir_base[op2].val));
 		switch (op_insn->op) {
 			default:
 				IR_ASSERT(0 && "NIY binary op");
 			case IR_ADD:
-				|	ASM_REG_IMM_OP add, type, reg, val->i32
+				|	ASM_REG_IMM_OP add, type, reg, val
 				break;
 			case IR_SUB:
-				|	ASM_REG_IMM_OP sub, type, reg, val->i32
+				|	ASM_REG_IMM_OP sub, type, reg, val
 				break;
 			case IR_OR:
-				|	ASM_REG_IMM_OP or, type, reg, val->i32
+				|	ASM_REG_IMM_OP or, type, reg, val
 				break;
 			case IR_AND:
-				|	ASM_REG_IMM_OP and, type, reg, val->i32
+				|	ASM_REG_IMM_OP and, type, reg, val
 				break;
 			case IR_XOR:
-				|	ASM_REG_IMM_OP xor, type, reg, val->i32
+				|	ASM_REG_IMM_OP xor, type, reg, val
 				break;
 		}
 	} else {
