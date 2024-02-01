@@ -304,17 +304,34 @@ void *ir_resolve_sym_name(const char *name)
 	IR_SNAPSHOT_HANDLER_DCL();
 #endif
 
+static void* ir_sym_addr(ir_ctx *ctx, const ir_insn *addr_insn)
+{
+	const char *name = ir_get_str(ctx, addr_insn->val.name);
+	void *addr = (ctx->loader && ctx->loader->resolve_sym_name) ?
+		ctx->loader->resolve_sym_name(ctx->loader, name, 0) :
+		ir_resolve_sym_name(name);
+
+	return addr;
+}
+
+static void* ir_sym_val(ir_ctx *ctx, const ir_insn *addr_insn)
+{
+	const char *name = ir_get_str(ctx, addr_insn->val.name);
+	void *addr = (ctx->loader && ctx->loader->resolve_sym_name) ?
+		ctx->loader->resolve_sym_name(ctx->loader, name, addr_insn->op == IR_FUNC) :
+		ir_resolve_sym_name(name);
+
+	IR_ASSERT(addr);
+	return addr;
+}
+
 static void *ir_call_addr(ir_ctx *ctx, ir_insn *insn, ir_insn *addr_insn)
 {
 	void *addr;
 
 	IR_ASSERT(addr_insn->type == IR_ADDR);
 	if (addr_insn->op == IR_FUNC) {
-		const char* name = ir_get_str(ctx, addr_insn->val.name);
-		addr = (ctx->loader && ctx->loader->resolve_sym_name) ?
-			ctx->loader->resolve_sym_name(ctx->loader, name, 1) :
-			ir_resolve_sym_name(name);
-		IR_ASSERT(addr);
+		addr = ir_sym_val(ctx, addr_insn);
 	} else {
 		IR_ASSERT(addr_insn->op == IR_ADDR || addr_insn->op == IR_FUNC_ADDR);
 		addr = (void*)addr_insn->val.addr;

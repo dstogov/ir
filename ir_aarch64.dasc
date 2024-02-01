@@ -320,7 +320,7 @@ const char *ir_rule_name[IR_LAST_OP] = {
 };
 
 /* register allocation */
-int ir_get_target_constraints(const ir_ctx *ctx, ir_ref ref, ir_target_constraints *constraints)
+int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *constraints)
 {
 	uint32_t rule = ir_rule(ctx, ref);
 	const ir_insn *insn;
@@ -1298,10 +1298,7 @@ static void ir_emit_load(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref src)
 			ir_insn *insn = &ctx->ir_base[src];
 
 			if (insn->op == IR_SYM || insn->op == IR_FUNC) {
-				const char *name = ir_get_str(ctx, insn->val.name);
-				void *addr = (ctx->loader && ctx->loader->resolve_sym_name) ?
-					ctx->loader->resolve_sym_name(ctx->loader, name, insn->op == IR_FUNC) :
-					ir_resolve_sym_name(name);
+				void *addr = ir_sym_val(ctx, insn);
 				IR_ASSERT(addr);
 				ir_emit_load_imm_int(ctx, type, reg, (intptr_t)addr);
 			} else if (insn->op == IR_STR) {
