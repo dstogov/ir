@@ -304,6 +304,7 @@ void *ir_resolve_sym_name(const char *name)
 	IR_SNAPSHOT_HANDLER_DCL();
 #endif
 
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 static void* ir_sym_addr(ir_ctx *ctx, const ir_insn *addr_insn)
 {
 	const char *name = ir_get_str(ctx, addr_insn->val.name);
@@ -313,6 +314,7 @@ static void* ir_sym_addr(ir_ctx *ctx, const ir_insn *addr_insn)
 
 	return addr;
 }
+#endif
 
 static void* ir_sym_val(ir_ctx *ctx, const ir_insn *addr_insn)
 {
