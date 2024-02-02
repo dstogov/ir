@@ -338,7 +338,7 @@ Also note that the LLVM code produced by clang is already optimized.
 In case of benchmarking, it may be more honest to avoid LLVM optimizations.
 
 ```
-clang -O0 -Xclang -disable-O0-optnone -c -emit-llvm -o tmp.bc ./dynasm/minilua.c
+clang -O -Xclang -disable-llvm-passes -c -emit-llvm -o tmp.bc ./dynasm/minilua.c
 opt tmp.bc --passes='function(mem2reg)' -S -o minilua.ll
 ```
 
