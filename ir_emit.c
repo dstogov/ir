@@ -910,6 +910,14 @@ static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb)
 			to = (dst != IR_REG_NONE) ?
 				(ir_ref)dst : (ir_ref)(IR_REG_NUM + ctx->vregs[ref]);
 			if (to != from) {
+				if (to >= IR_REG_NUM
+				 && from >= IR_REG_NUM
+				 && IR_MEM_VAL(ir_vreg_spill_slot(ctx, from - IR_REG_NUM)) ==
+						IR_MEM_VAL(ir_vreg_spill_slot(ctx, to - IR_REG_NUM))) {
+					/* It's possible that different virtual registers share the same special spill slot */
+					// TODO: See ext/opcache/tests/jit/gh11917.phpt failure on Linux 32-bit
+					continue;
+				}
 				copies[n].type = insn->type;
 				copies[n].from = from;
 				copies[n].to = to;
