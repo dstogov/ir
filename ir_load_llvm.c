@@ -1069,6 +1069,16 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 			func = BUILTIN_FUNC_1("roundf", IR_FLOAT, IR_FLOAT);
 		}
 		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
+	} else if (STR_START(name, name_len, "llvm.rint.")) {
+		IR_ASSERT(count == 1);
+		type = llvm2ir_type(LLVMGetReturnType(ftype));
+		IR_ASSERT(IR_IS_TYPE_FP(type));
+		if (type == IR_DOUBLE) {
+			func = BUILTIN_FUNC_1("rint", IR_DOUBLE, IR_DOUBLE);
+		} else {
+			func = BUILTIN_FUNC_1("rintf", IR_FLOAT, IR_FLOAT);
+		}
+		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.fmuladd.")
 			|| STR_START(name, name_len, "llvm.fma.")) {
 		IR_ASSERT(count == 3);

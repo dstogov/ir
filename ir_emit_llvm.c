@@ -88,6 +88,8 @@ static const char *ir_type_llvm_name[IR_LAST_LLVM_TYPE] = {
 	_("memset",    MEMSET)       \
 	_("pow",       POW_F64)      \
 	_("powf",      POW_F32)      \
+	_("rint",      RINT_F64)    \
+	_("rintf",     RINT_F32)    \
 	_("round",     ROUND_F64)    \
 	_("roundf",    ROUND_F32)    \
 	_("sin",       SIN_F64)      \
@@ -209,6 +211,8 @@ static const char *ir_type_llvm_name[IR_LAST_LLVM_TYPE] = {
 	_(CEIL_F32,     "llvm.ceil.f32",               F32,  1, F32, ___, ___, ___) \
 	_(TRUNC_F64,    "llvm.trunc.f64",              F64,  1, F64, ___, ___, ___) \
 	_(TRUNC_F32,    "llvm.trunc.f32",              F32,  1, F32, ___, ___, ___) \
+	_(RINT_F64,     "llvm.rint.f64",               F64,  1, F64, ___, ___, ___) \
+	_(RINT_F32,     "llvm.rint.f32",               F32,  1, F32, ___, ___, ___) \
 	_(ROUND_F64,    "llvm.round.f64",              F64,  1, F64, ___, ___, ___) \
 	_(ROUND_F32,    "llvm.round.f32",              F32,  1, F32, ___, ___, ___) \
 	_(ISNAN_F64,    "fcmp uno double", /* fake */  F64I, 1, F64, ___, ___, ___) \
