@@ -1702,12 +1702,16 @@ int ir_load(ir_loader *loader, FILE *f) {
 	fseek(f, 0, SEEK_END);
 	end = ftell(f);
 	fseek(f, pos, SEEK_SET);
-	yy_buf = alloca(end - pos + 1);
+	yy_buf = ir_mem_malloc(end - pos + 1);
+	if (!yy_buf) {
+		return 0;
+	}
 	yy_end = yy_buf + (end - pos);
 	fread((void*)yy_buf, (end - pos), 1, f);
 	*(unsigned char*)yy_end = 0;
 
 	parse(loader);
+	ir_mem_free((void*)yy_buf);
 
 	return 1;
 }
