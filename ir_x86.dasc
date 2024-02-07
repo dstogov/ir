@@ -780,7 +780,7 @@ IR_ALWAYS_INLINE ir_mem IR_MEM(ir_reg base, int32_t offset, ir_reg index, int32_
 |		op..d xmm(op1-IR_REG_FP_FIRST), xmm(op2-IR_REG_FP_FIRST), qword op3
 ||	} else {
 ||		IR_ASSERT(type == IR_FLOAT);
-|		op..s xmm(op2-IR_REG_FP_FIRST), xmm(op2-IR_REG_FP_FIRST), dword op3
+|		op..s xmm(op1-IR_REG_FP_FIRST), xmm(op2-IR_REG_FP_FIRST), dword op3
 ||	}
 |.endmacro
 
