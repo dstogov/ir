@@ -168,6 +168,7 @@ int main(int argc, char **argv)
 	ir_build_def_use_lists(&ctx);
 	if (opt_level > 1) {
 		ir_sccp(&ctx);
+		ir_combine(&ctx);
 	}
 	ir_build_cfg(&ctx);
 	if (opt_level > 0) {

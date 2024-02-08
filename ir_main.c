@@ -167,6 +167,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, FILE *dump_file, 
 	/* Global Optimization */
 	if (opt_level > 1) {
 		ir_sccp(ctx);
+		ir_combine(ctx);
 		if ((dump & (IR_DUMP_AFTER_SCCP|IR_DUMP_AFTER_ALL))
 		 && !_save(ctx, dump, IR_DUMP_AFTER_SCCP, dump_file, func_name)) {
 			return 0;

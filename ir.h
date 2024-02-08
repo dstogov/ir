@@ -727,6 +727,9 @@ int ir_find_loops(ir_ctx *ctx);
 int ir_schedule_blocks(ir_ctx *ctx);
 void ir_build_prev_refs(ir_ctx *ctx);
 
+/* Instruction Combinator (implementation in ir_combine.c) */
+int ir_combine(ir_ctx *ctx);
+
 /* SCCP - Sparse Conditional Constant Propagation (implementation in ir_sccp.c) */
 int ir_sccp(ir_ctx *ctx);
 
