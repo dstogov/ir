@@ -585,6 +585,10 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 			break;
 		case IR_COPY_INT:
 		case IR_COPY_FP:
+		case IR_ZEXT:
+		case IR_SEXT:
+		case IR_TRUNC:
+		case IR_BITCAST:
 			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG;
 			break;
 		case IR_PARAM:
