@@ -517,12 +517,22 @@ static void ir_combine_phi(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 					ir_ref root_ref = start1->op1;
 					ir_insn *root = &ctx->ir_base[root_ref];
 
-					if (root->op == IR_IF) {
+					if (root->op == IR_IF && ctx->use_lists[root->op2].count == 1) {
 						ir_ref cond_ref = root->op2;
 						ir_insn *cond = &ctx->ir_base[cond_ref];
+						ir_type type = insn->type;
+						bool is_cmp, is_less;
 
-						if (ctx->use_lists[cond_ref].count == 1
-						 && (cond->op == IR_LT || cond->op == IR_LE || cond->op == IR_GT || cond->op == IR_GE)
+						if (IR_IS_TYPE_FP(type)) {
+							is_cmp = (cond->op == IR_LT || cond->op == IR_LE || cond->op == IR_GT || cond->op == IR_GE ||
+								cond->op == IR_ULT || cond->op == IR_ULE || cond->op == IR_UGT || cond->op == IR_UGE);
+						} else if (IR_IS_TYPE_SIGNED(type)) {
+							is_cmp = (cond->op == IR_LT || cond->op == IR_LE || cond->op == IR_GT || cond->op == IR_GE);
+						} else if (IR_IS_TYPE_UNSIGNED(type)) {
+							is_cmp = (cond->op == IR_ULT || cond->op == IR_ULE || cond->op == IR_UGT || cond->op == IR_UGE);
+						}
+
+						if (is_cmp
 						 && ((insn->op2 == cond->op1 && insn->op3 == cond->op2)
 						   || (insn->op2 == cond->op2 && insn->op3 == cond->op1))) {
 							/* MAX/MIN
@@ -555,12 +565,18 @@ static void ir_combine_phi(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 							IR_ASSERT(ctx->use_lists[start1_ref].count == 1);
 							IR_ASSERT(ctx->use_lists[start2_ref].count == 1);
 
+							if (IR_IS_TYPE_FP(type)) {
+								is_less = (cond->op == IR_LT || cond->op == IR_LE ||
+									cond->op == IR_ULT || cond->op == IR_ULE);
+							} else if (IR_IS_TYPE_SIGNED(type)) {
+								is_less = (cond->op == IR_LT || cond->op == IR_LE);
+							} else if (IR_IS_TYPE_UNSIGNED(type)) {
+								is_less = (cond->op == IR_ULT || cond->op == IR_ULE);
+							}
 							insn->op = (
-								((cond->op == IR_LT || cond->op == IR_LE) ?
-									cond->op1 : cond->op2)
+								(is_less ? cond->op1 : cond->op2)
 								==
-								((start1->op == IR_IF_TRUE) ?
-									insn->op2 : insn->op3)
+								((start1->op == IR_IF_TRUE) ? insn->op2 : insn->op3)
 								) ? IR_MIN : IR_MAX;
 							insn->inputs_count = 2;
 							if (insn->op2 > insn->op3) {
