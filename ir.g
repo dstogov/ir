@@ -564,11 +564,11 @@ const(uint8_t t, ir_val *val):
 	|	FLOATNUMBER(t, val)
 	|	CHARACTER(val)
 	|	"inf"
-		{if (t == IR_DOUBLE) val->d = INFINITY; else val->f = INFINITY;}
+		{if (t == IR_DOUBLE) val->d = INFINITY; else {val->f = INFINITY; val->u32_hi = 0;}}
 	|	"nan"
-		{if (t == IR_DOUBLE) val->d = NAN; else val->f = NAN;}
+		{if (t == IR_DOUBLE) val->d = NAN; else {val->f = NAN; val->u32_hi = 0;}}
 	|	"-" "inf"
-		{if (t == IR_DOUBLE) val->d = -INFINITY; else val->f = -INFINITY;}
+		{if (t == IR_DOUBLE) val->d = -INFINITY; else {val->f = -INFINITY; val->u32_hi = 0;}}
 ;
 
 /* scanner rules */
@@ -580,7 +580,7 @@ ID(const char **str, size_t *len):
 DECNUMBER(uint32_t t, ir_val *val):
 	/[\-]?[0-9]+/
 	{if (t == IR_DOUBLE) val->d = atof((const char*)yy_text);
-	else if (t == IR_FLOAT) val->f = strtof((const char*)yy_text, NULL);
+	else if (t == IR_FLOAT) {val->f = strtof((const char*)yy_text, NULL); val->u32_hi = 0;}
 	else if (IR_IS_TYPE_SIGNED(t)) val->i64 = atoll((const char*)yy_text);
 	else val->u64 = strtoull((const char*)yy_text, NULL, 10);}
 ;
@@ -592,7 +592,7 @@ HEXNUMBER(uint32_t t, ir_val *val):
 
 FLOATNUMBER(uint32_t t, ir_val *val):
 	/[\-]?([0-9]*\.[0-9]+([Ee][\+\-]?[0-9]+)?|[0-9]+\.([Ee][\+\-]?[0-9]+)?|[0-9]+[Ee][\+\-]?[0-9]+)/
-	{if (t == IR_DOUBLE) val->d = atof((const char*)yy_text); else val->f = strtof((const char*)yy_text, NULL);}
+	{if (t == IR_DOUBLE) val->d = atof((const char*)yy_text); else {val->f = strtof((const char*)yy_text, NULL); val->u32_hi = 0;}}
 ;
 
 CHARACTER(ir_val *val):

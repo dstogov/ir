@@ -1578,11 +1578,11 @@ static int parse_const(int sym, uint8_t t, ir_val *val) {
 			break;
 		case YY_INF:
 			sym = get_sym();
-			if (t == IR_DOUBLE) val->d = INFINITY; else val->f = INFINITY;
+			if (t == IR_DOUBLE) val->d = INFINITY; else {val->f = INFINITY; val->u32_hi = 0;}
 			break;
 		case YY_NAN:
 			sym = get_sym();
-			if (t == IR_DOUBLE) val->d = NAN; else val->f = NAN;
+			if (t == IR_DOUBLE) val->d = NAN; else {val->f = NAN; val->u32_hi = 0;}
 			break;
 		case YY__MINUS:
 			sym = get_sym();
@@ -1590,7 +1590,7 @@ static int parse_const(int sym, uint8_t t, ir_val *val) {
 				yy_error_sym("'inf' expected, got", sym);
 			}
 			sym = get_sym();
-			if (t == IR_DOUBLE) val->d = -INFINITY; else val->f = -INFINITY;
+			if (t == IR_DOUBLE) val->d = -INFINITY; else {val->f = -INFINITY; val->u32_hi = 0;}
 			break;
 		default:
 			yy_error_sym("unexpected", sym);
@@ -1612,7 +1612,7 @@ static int parse_DECNUMBER(int sym, uint32_t t, ir_val *val) {
 		yy_error_sym("<DECNUMBER> expected, got", sym);
 	}
 	if (t == IR_DOUBLE) val->d = atof((const char*)yy_text);
-	else if (t == IR_FLOAT) val->f = strtof((const char*)yy_text, NULL);
+	else if (t == IR_FLOAT) {val->f = strtof((const char*)yy_text, NULL); val->u32_hi = 0;}
 	else if (IR_IS_TYPE_SIGNED(t)) val->i64 = atoll((const char*)yy_text);
 	else val->u64 = strtoull((const char*)yy_text, NULL, 10);
 	sym = get_sym();
@@ -1632,7 +1632,7 @@ static int parse_FLOATNUMBER(int sym, uint32_t t, ir_val *val) {
 	if (sym != YY_FLOATNUMBER) {
 		yy_error_sym("<FLOATNUMBER> expected, got", sym);
 	}
-	if (t == IR_DOUBLE) val->d = atof((const char*)yy_text); else val->f = strtof((const char*)yy_text, NULL);
+	if (t == IR_DOUBLE) val->d = atof((const char*)yy_text); else {val->f = strtof((const char*)yy_text, NULL); val->u32_hi = 0;}
 	sym = get_sym();
 	return sym;
 }

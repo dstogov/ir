@@ -187,6 +187,7 @@ static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 				val.d = LLVMConstRealGetDouble(op, &lose);
 			} else {
 				val.f = (float)LLVMConstRealGetDouble(op, &lose);
+				val.u32_hi = 0;
 			}
 			return ir_const(ctx, val, type);
 		case LLVMConstantPointerNullValueKind:
@@ -2055,6 +2056,7 @@ static int llvm2ir_data(ir_loader *loader, LLVMTargetDataRef target_data, LLVMTy
 			} else {
 				IR_ASSERT(t == IR_FLOAT);
 				val.f = (float)LLVMConstRealGetDouble(op, &lose);
+				val.u32_hi = 0;
 				return loader->sym_data(loader, t, 1, &val.f);
 			}
 		case LLVMConstantPointerNullValueKind:

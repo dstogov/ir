@@ -878,6 +878,7 @@ static ir_ref _ir_fold_cse(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir
 
 #define IR_FOLD_CONST_F(_val) do { \
 		val.f = (_val); \
+		val.u32_hi = 0; \
 		goto ir_fold_const; \
 	} while (0)
 
