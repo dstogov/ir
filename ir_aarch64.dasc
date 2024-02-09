@@ -387,10 +387,6 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 				n++;
 			}
 			break;
-		case IR_SEXT:
-		case IR_ZEXT:
-			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
-			IR_FALLTHROUGH;
 		case IR_MUL_PWR2:
 		case IR_DIV_PWR2:
 		case IR_MOD_PWR2:
@@ -585,10 +581,13 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 			break;
 		case IR_COPY_INT:
 		case IR_COPY_FP:
-		case IR_ZEXT:
-		case IR_SEXT:
 		case IR_TRUNC:
 		case IR_BITCAST:
+		case IR_PROTO:
+			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
+			break;
+		case IR_ZEXT:
+		case IR_SEXT:
 			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG;
 			break;
 		case IR_PARAM:
@@ -605,11 +604,6 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 			break;
 		case IR_EXITCALL:
 			constraints->def_reg = IR_REG_INT_RET1;
-			break;
-		case IR_TRUNC:
-		case IR_BITCAST:
-		case IR_PROTO:
-			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
 			break;
 		case IR_RSTORE:
 			flags = IR_OP3_SHOULD_BE_IN_REG;

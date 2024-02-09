@@ -13,6 +13,5 @@ x86
 }
 --EXPECT--
 test:
-	movss 4(%esp), %xmm0
-	movd %xmm0, %eax
+	movl 4(%esp), %eax
 	retl
