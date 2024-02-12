@@ -1,10 +1,10 @@
 --TEST--
-MAX 001:
+DIV 001: DIV/MOD power 2
 --ARGS--
 --run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
-func idiv(int32_t): int32_t
+func idiv16(int32_t): int32_t
 {
 	int32_t c_16 = 16;
 	l_1 = START(l_5);
@@ -12,12 +12,44 @@ func idiv(int32_t): int32_t
 	int32_t d_3 = DIV(d_2, c_16);
 	l_5 = RETURN(l_1, d_3);
 }
-func imod(int32_t): int32_t
+func imod16(int32_t): int32_t
 {
 	int32_t c_16 = 16;
 	l_1 = START(l_5);
 	int32_t d_2 = PARAM(l_1, "arg_1", 1);
 	int32_t d_3 = MOD(d_2, c_16);
+	l_5 = RETURN(l_1, d_3);
+}
+func idiv2(int32_t): int32_t
+{
+	int32_t c_2 = 2;
+	l_1 = START(l_5);
+	int32_t d_2 = PARAM(l_1, "arg_1", 1);
+	int32_t d_3 = DIV(d_2, c_2);
+	l_5 = RETURN(l_1, d_3);
+}
+func imod2(int32_t): int32_t
+{
+	int32_t c_2 = 2;
+	l_1 = START(l_5);
+	int32_t d_2 = PARAM(l_1, "arg_1", 1);
+	int32_t d_3 = MOD(d_2, c_2);
+	l_5 = RETURN(l_1, d_3);
+}
+func idiv1(int32_t): int32_t
+{
+	int32_t c_2 = 1;
+	l_1 = START(l_5);
+	int32_t d_2 = PARAM(l_1, "arg_1", 1);
+	int32_t d_3 = DIV(d_2, c_2);
+	l_5 = RETURN(l_1, d_3);
+}
+func imod1(int32_t): int32_t
+{
+	int32_t c_2 = 1;
+	l_1 = START(l_5);
+	int32_t d_2 = PARAM(l_1, "arg_1", 1);
+	int32_t d_3 = MOD(d_2, c_2);
 	l_5 = RETURN(l_1, d_3);
 }
 func main(void): int32_t
@@ -27,21 +59,45 @@ func main(void): int32_t
 	bool c_3 = 1;
 	int32_t c_4 = 0x000f0005;
 	int32_t c_5 = 0xffff0005;
-	uintptr_t c_6 = func idiv(int8_t): int32_t;
-	uintptr_t c_7 = "idiv: 0x%x 0x%x\n";
+	uintptr_t c_6 = func idiv16(int8_t): int32_t;
+	uintptr_t c_7 = "idiv16: 0x%x 0x%x\n";
 	uintptr_t c_8 = func printf(uintptr_t, ...): int32_t;
-	uintptr_t c_9 = func imod(int8_t): int32_t;
-	uintptr_t c_10 = "imod: 0x%x 0x%x\n";
-	int32_t c_11 = 0;
-	l_1 = START(l_12);
+	uintptr_t c_9 = func imod16(int8_t): int32_t;
+	uintptr_t c_10 = "imod16: 0x%x 0x%x\n";
+	uintptr_t c_11 = func idiv2(int8_t): int32_t;
+	uintptr_t c_12 = "idiv2: 0x%x 0x%x\n";
+	uintptr_t c_13 = func imod2(int8_t): int32_t;
+	uintptr_t c_14 = "imod2: 0x%x 0x%x\n";
+	uintptr_t c_15 = func idiv1(int8_t): int32_t;
+	uintptr_t c_16 = "idiv1: 0x%x 0x%x\n";
+	uintptr_t c_17 = func imod1(int8_t): int32_t;
+	uintptr_t c_18 = "imod1: 0x%x 0x%x\n";
+	int32_t c_19 = 0;
+	l_1 = START(l_23);
 	int32_t d_2, l_2 = CALL/1(l_1, c_6, c_4);
 	int32_t d_4, l_4 = CALL/1(l_2, c_6, c_5);
 	int32_t d_6, l_6 = CALL/3(l_4, c_8, c_7, d_2, d_4);
 	int32_t d_8, l_8 = CALL/1(l_6, c_9, c_4);
 	int32_t d_9, l_9 = CALL/1(l_8, c_9, c_5);
 	int32_t d_10, l_10 = CALL/3(l_9, c_8, c_10, d_8, d_9);
-	l_12 = RETURN(l_10, c_11);
+	int32_t d_11, l_11 = CALL/1(l_10, c_11, c_4);
+	int32_t d_12, l_12 = CALL/1(l_11, c_11, c_5);
+	int32_t d_13, l_13 = CALL/3(l_12, c_8, c_12, d_11, d_12);
+	int32_t d_14, l_14 = CALL/1(l_13, c_13, c_4);
+	int32_t d_15, l_15 = CALL/1(l_14, c_13, c_5);
+	int32_t d_16, l_16 = CALL/3(l_15, c_8, c_14, d_14, d_15);
+	int32_t d_17, l_17 = CALL/1(l_16, c_15, c_4);
+	int32_t d_18, l_18 = CALL/1(l_17, c_15, c_5);
+	int32_t d_19, l_19 = CALL/3(l_18, c_8, c_16, d_17, d_18);
+	int32_t d_20, l_20 = CALL/1(l_19, c_17, c_4);
+	int32_t d_21, l_21 = CALL/1(l_20, c_17, c_5);
+	int32_t d_22, l_22 = CALL/3(l_21, c_8, c_18, d_20, d_21);
+	l_23 = RETURN(l_22, c_19);
 }
 --EXPECT--
-idiv: 0xf000 0xfffff001
-imod: 0x5 0xfffffff5
+idiv16: 0xf000 0xfffff001
+imod16: 0x5 0xfffffff5
+idiv2: 0x78002 0xffff8003
+imod2: 0x1 0xffffffff
+idiv1: 0xf0005 0xffff0005
+imod1: 0x0 0x0
