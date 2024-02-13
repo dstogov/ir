@@ -408,6 +408,7 @@ static void* ir_loader_resolve_sym_name(ir_loader *loader, const char *name, boo
 			size_t size;
 
 			l->sym[val].thunk_addr = ir_emit_thunk(&l->code_buffer, NULL, &size);
+			ir_disasm_add_symbol(name, (uint64_t)(uintptr_t)l->sym[val].thunk_addr, size);
 		}
 		return l->sym[val].thunk_addr;
 	}
