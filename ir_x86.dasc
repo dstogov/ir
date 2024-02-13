@@ -7336,26 +7336,30 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 			}
 		}
 
-		if (IR_IS_32BIT(type, max)) {
-			|	ASM_REG_IMM_OP cmp, type, op2_reg, max.i32
-		} else {
-			IR_ASSERT(ir_type_size[type] == 8);
-			IR_ASSERT(sizeof(void*) == 8);
+		if (default_label) {
+			if (IR_IS_32BIT(type, max)) {
+				|	ASM_REG_IMM_OP cmp, type, op2_reg, max.i32
+			} else {
+				IR_ASSERT(ir_type_size[type] == 8);
+				IR_ASSERT(sizeof(void*) == 8);
 |.if X64
-			|	mov64 Rq(tmp_reg), max.i64
-			|	cmp Rq(op2_reg), Rq(tmp_reg)
+				|	mov64 Rq(tmp_reg), max.i64
+				|	cmp Rq(op2_reg), Rq(tmp_reg)
 |.endif
-		}
-		if (IR_IS_TYPE_SIGNED(type)) {
-			|	jg =>default_label
-		} else {
-			|	ja =>default_label
+			}
+			if (IR_IS_TYPE_SIGNED(type)) {
+				|	jg =>default_label
+			} else {
+				|	ja =>default_label
+			}
 		}
 
 		if (IR_IS_32BIT(type, min)) {
 			offset = -min.i64 * sizeof(void*);
 			if (IR_IS_SIGNED_32BIT(offset)) {
-				|	ASM_REG_IMM_OP cmp, type, op2_reg, min.i32
+				if (default_label) {
+					|	ASM_REG_IMM_OP cmp, type, op2_reg, min.i32
+				}
 			} else {
 				|	ASM_REG_REG_OP sub, type, op2_reg, (int32_t)offset // TODO: reg clobbering
 				offset = 0;
@@ -7368,10 +7372,13 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 			offset = 0;
 |.endif
 		}
-		if (IR_IS_TYPE_SIGNED(type)) {
-			|	jl =>default_label
-		} else {
-			|	jb =>default_label
+
+		if (default_label) {
+			if (IR_IS_TYPE_SIGNED(type)) {
+				|	jl =>default_label
+			} else {
+				|	jb =>default_label
+			}
 		}
 		if (sizeof(void*) == 8) {
 |.if X64
@@ -7441,25 +7448,29 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 		|1:
 		for (i = 0; i <= (max.i64 - min.i64); i++) {
 			int b = labels[i];
-			ir_block *bb = &ctx->cfg_blocks[b];
-			ir_insn *insn = &ctx->ir_base[bb->end];
+			if (b) {
+				ir_block *bb = &ctx->cfg_blocks[b];
+				ir_insn *insn = &ctx->ir_base[bb->end];
 
-			if (insn->op == IR_IJMP && IR_IS_CONST_REF(insn->op2)) {
-				ir_ref prev = ctx->prev_ref[bb->end];
-				if (prev != bb->start && ctx->ir_base[prev].op == IR_SNAPSHOT) {
-					prev = ctx->prev_ref[prev];
-				}
-				if (prev == bb->start) {
-					void *addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op2]);
-
-					|	.aword &addr
-					if (ctx->ir_base[bb->start].op != IR_CASE_DEFAULT) {
-						bb->flags |= IR_BB_EMPTY;
+				if (insn->op == IR_IJMP && IR_IS_CONST_REF(insn->op2)) {
+					ir_ref prev = ctx->prev_ref[bb->end];
+					if (prev != bb->start && ctx->ir_base[prev].op == IR_SNAPSHOT) {
+						prev = ctx->prev_ref[prev];
 					}
-					continue;
+					if (prev == bb->start) {
+						void *addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op2]);
+
+						|	.aword &addr
+						if (ctx->ir_base[bb->start].op != IR_CASE_DEFAULT) {
+							bb->flags |= IR_BB_EMPTY;
+						}
+						continue;
+					}
 				}
+				|	.aword =>b
+			} else {
+				|	.aword 0
 			}
-			|	.aword =>b
 		}
 		|.code
 		ir_mem_free(labels);

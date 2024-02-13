@@ -1455,7 +1455,9 @@ static void llvm2ir_bb_start(ir_ctx *ctx, LLVMBasicBlockRef bb, LLVMBasicBlockRe
 
 		IR_ASSERT(ref != (ir_ref)IR_INVALID_VAL);
 		if (LLVMGetSwitchDefaultDest(insn) == bb) {
-			ir_CASE_DEFAULT(ref);
+			if (LLVMGetInstructionOpcode(LLVMGetFirstInstruction(bb)) != LLVMUnreachable) {
+				ir_CASE_DEFAULT(ref);
+			}
 		} else  {
 			uint32_t i;
 			uint32_t count = LLVMGetNumOperands(insn);
@@ -1676,6 +1678,10 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMValueRef func)
 		count = predecessors[i].count;
 		if (count == 1) {
 			llvm2ir_bb_start(ctx, bb, bbs[predecessor_edges[predecessors[i].refs]]);
+			if (!ctx->control) {
+				/* eliminte unreachable CASE_DEFAULT block */
+				continue;
+			}
 		} else if (count > 1) {
 			ir_MERGE_N(count, predecessor_refs + predecessors[i].refs); /* MERGE may be converted to LOOP_BEGIN later */
 		} else if (i != 0) {
