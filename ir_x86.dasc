@@ -2546,6 +2546,7 @@ store_int:
 			return insn->op;
 		case IR_SEXT:
 		case IR_ZEXT:
+		case IR_TRUNC:
 		case IR_BITCAST:
 		case IR_FP2INT:
 		case IR_FP2FP:
@@ -6054,8 +6055,17 @@ static void ir_emit_trunc(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		if (op1_reg != def_reg) {
 			ir_emit_mov(ctx, dst_type, def_reg, op1_reg);
 		}
-	} else {
+	} else if (IR_IS_CONST_REF(insn->op1)) {
 		ir_emit_load(ctx, dst_type, def_reg, insn->op1);
+	} else {
+		ir_mem mem;
+
+		if (ir_rule(ctx, insn->op1) & IR_FUSED) {
+			mem = ir_fuse_load(ctx, def, insn->op1);
+		} else {
+			mem = ir_ref_spill_slot(ctx, insn->op1);
+		}
+		ir_emit_load_mem(ctx, dst_type, def_reg, mem);
 	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, dst_type, def, def_reg);
