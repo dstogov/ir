@@ -619,6 +619,7 @@ static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values
 									IR_ASSERT(use_insn->op1 == ref);
 									use_insn->op1 = prev;
 									ir_sccp_add_to_use_list(ctx, prev, use);
+									p = &ctx->use_edges[use_list->refs + k];
 								}
 							}
 						}
