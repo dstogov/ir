@@ -5201,7 +5201,9 @@ static void ir_emit_load_params(ir_ctx *ctx)
 				dst_reg = IR_REG_NUM(ctx->regs[use][0]);
 				IR_ASSERT(src_reg != IR_REG_NONE || dst_reg != IR_REG_NONE ||
 					stack_offset == ctx->live_intervals[ctx->vregs[use]]->stack_spill_pos +
-						((ctx->flags & IR_USE_FRAME_POINTER) ? -ctx->stack_frame_size : ctx->call_stack_size));
+						((ctx->flags & IR_USE_FRAME_POINTER) ?
+							-(ctx->stack_frame_size - ctx->stack_frame_alignment) :
+							ctx->call_stack_size));
 				if (src_reg != dst_reg) {
 					ir_emit_param_move(ctx, insn->type, src_reg, dst_reg, use, stack_offset);
 				}
