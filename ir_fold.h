@@ -1414,6 +1414,26 @@ IR_FOLD(BSWAP(BSWAP))
 	IR_FOLD_COPY(op1_insn->op1);
 }
 
+IR_FOLD(NOT(EQ))
+IR_FOLD(NOT(NE))
+IR_FOLD(NOT(LT))
+IR_FOLD(NOT(GE))
+IR_FOLD(NOT(LE))
+IR_FOLD(NOT(GT))
+IR_FOLD(NOT(ULT))
+IR_FOLD(NOT(UGE))
+IR_FOLD(NOT(ULE))
+IR_FOLD(NOT(UGT))
+{
+	if (IR_IS_TYPE_INT(ctx->ir_base[op1_insn->op1].type)) {
+		opt = op1_insn->opt ^ 1;
+		op1 = op1_insn->op1;
+		op2 = op1_insn->op2;
+		IR_FOLD_RESTART;
+	}
+	IR_FOLD_NEXT;
+}
+
 IR_FOLD(ADD(_, C_U8))
 IR_FOLD(ADD(_, C_U16))
 IR_FOLD(ADD(_, C_U32))
