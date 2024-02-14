@@ -57,7 +57,7 @@
 	bool c_2 = 0;
 	bool c_3 = 1;
 	int32_t c_4 = 1000;
-	l_1 = START(l_9);
+	l_1 = START(l_12);
 	double d_2 = PARAM(l_1, "x", 0);
 	double d_3 = PARAM(l_1, "y", 1);
 	double d_4 = VAR(l_1, "cr");
@@ -65,5 +65,8 @@
 	double d_6 = VAR(l_1, "zi");
 	double d_7 = VAR(l_1, "zr");
 	int32_t d_8 = VAR(l_1, "i");
-	l_9 = RETURN(l_1, c_4);
+	double d_9 = VAR(l_1, "temp");
+	double d_10 = VAR(l_1, "zr2");
+	double d_11 = VAR(l_1, "zi2");
+	l_12 = RETURN(l_1, c_4);
 }

@@ -603,14 +603,23 @@ static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values
 
 						prev = input_insn->op1;
 						use_list = &ctx->use_lists[ref];
-						for (k = 0, p = &ctx->use_edges[use_list->refs]; k < use_list->count; k++, p++) {
-							use = *p;
-							use_insn = &ctx->ir_base[use];
-							IR_ASSERT((use_insn->op != IR_PHI) && "PHI must be already removed");
-							if (ir_op_flags[use_insn->op] & IR_OP_FLAG_CONTROL) {
-								next = use;
-								next_insn = use_insn;
-								break;
+						if (use_list->count == 1) {
+							next = ctx->use_edges[use_list->refs];
+							next_insn = &ctx->ir_base[next];
+						} else {
+							for (k = 0, p = &ctx->use_edges[use_list->refs]; k < use_list->count; k++, p++) {
+								use = *p;
+								use_insn = &ctx->ir_base[use];
+								IR_ASSERT((use_insn->op != IR_PHI) && "PHI must be already removed");
+								if (ir_op_flags[use_insn->op] & IR_OP_FLAG_CONTROL) {
+									IR_ASSERT(!next);
+									next = use;
+									next_insn = use_insn;
+								} else {
+									IR_ASSERT(use_insn->op1 == ref);
+									use_insn->op1 = prev;
+									ir_sccp_add_to_use_list(ctx, prev, use);
+								}
 							}
 						}
 						IR_ASSERT(prev && next);
