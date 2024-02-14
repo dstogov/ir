@@ -756,7 +756,7 @@ typedef struct _ir_addrtab_bucket {
 void ir_addrtab_init(ir_hashtab *tab, uint32_t size);
 void ir_addrtab_free(ir_hashtab *tab);
 ir_ref ir_addrtab_find(const ir_hashtab *tab, uint64_t key);
-bool ir_addrtab_add(ir_hashtab *tab, uint64_t key, ir_ref val);
+void ir_addrtab_set(ir_hashtab *tab, uint64_t key, ir_ref val);
 
 /*** IR OP info ***/
 extern const uint8_t ir_type_flags[IR_LAST_TYPE];

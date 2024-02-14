@@ -1099,6 +1099,9 @@ int main(int argc, char **argv)
 	if (opt_level > 0) {
 		flags |= IR_OPT_FOLDING | IR_OPT_CFG | IR_OPT_CODEGEN;
 	}
+	if (opt_level > 1) {
+		flags |= IR_OPT_INLINE;
+	}
 	if (emit_c || emit_llvm) {
 		flags |= IR_GEN_CODE;
 	}

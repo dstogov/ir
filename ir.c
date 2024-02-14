@@ -1499,7 +1499,7 @@ ir_ref ir_addrtab_find(const ir_hashtab *tab, uint64_t key)
 	return IR_INVALID_VAL;
 }
 
-bool ir_addrtab_add(ir_hashtab *tab, uint64_t key, ir_ref val)
+void ir_addrtab_set(ir_hashtab *tab, uint64_t key, ir_ref val)
 {
 	char *data = (char*)tab->data;
 	uint32_t pos = ((uint32_t*)data)[(int32_t)(key | tab->mask)];
@@ -1508,7 +1508,8 @@ bool ir_addrtab_add(ir_hashtab *tab, uint64_t key, ir_ref val)
 	while (pos != IR_INVALID_IDX) {
 		p = (ir_addrtab_bucket*)(data + pos);
 		if (p->key == key) {
-			return p->val == val;
+			p->val = val;
+			return;
 		}
 		pos = p->next;
 	}
@@ -1527,7 +1528,6 @@ bool ir_addrtab_add(ir_hashtab *tab, uint64_t key, ir_ref val)
 	key |= tab->mask;
 	p->next = ((uint32_t*)data)[(int32_t)key];
 	((uint32_t*)data)[(int32_t)key] = pos;
-	return 1;
 }
 
 /* Memory API */
