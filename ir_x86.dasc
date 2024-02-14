@@ -6977,6 +6977,10 @@ static void ir_emit_alloca(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 
+	if (ctx->use_lists[def].count == 1) {
+		/* dead alloca */
+		return;
+	}
 	if (IR_IS_CONST_REF(insn->op2)) {
 		ir_insn *val = &ctx->ir_base[insn->op2];
 		int32_t size = val->val.i32;
