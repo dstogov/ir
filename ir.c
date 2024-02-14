@@ -1977,6 +1977,18 @@ ir_ref _ir_END_LIST(ir_ctx *ctx, ir_ref list)
 	return ref;
 }
 
+ir_ref _ir_END_PHI_LIST(ir_ctx *ctx, ir_ref list, ir_ref val)
+{
+	ir_ref ref;
+
+	IR_ASSERT(ctx->control);
+	IR_ASSERT(!list || ctx->ir_base[list].op == IR_END);
+	/* create a liked list of END nodes with the same destination through END.op2 */
+	ref = ir_emit3(ctx, IR_END, ctx->control, list, val);
+	ctx->control = IR_UNUSED;
+	return ref;
+}
+
 void _ir_MERGE_LIST(ir_ctx *ctx, ir_ref list)
 {
 	ir_ref ref = list;
@@ -2014,6 +2026,41 @@ void _ir_MERGE_LIST(ir_ctx *ctx, ir_ref list)
 			}
 		}
 	}
+}
+
+ir_ref _ir_PHI_LIST(ir_ctx *ctx, ir_ref list)
+{
+	ir_insn *merge, *end;
+	ir_ref phi, *ops, i;
+	ir_type type;
+
+	if (list == IR_UNUSED) {
+		return IR_UNUSED;
+	}
+	end = &ctx->ir_base[list];
+	if (!end->op2) {
+		phi = end->op3;
+		end->op3 = IR_UNUSED;
+		_ir_BEGIN(ctx, list);
+	} else if (!end->op3) {
+		_ir_MERGE_LIST(ctx, list);
+		phi = IR_UNUSED;
+	} else {
+		type = ctx->ir_base[end->op3].type;
+		_ir_MERGE_LIST(ctx, list);
+		merge = &ctx->ir_base[ctx->control];
+		IR_ASSERT(merge->op == IR_MERGE);
+		phi = ir_emit_N(ctx, IR_OPT(IR_PHI, type), merge->inputs_count + 1);
+		merge = &ctx->ir_base[ctx->control];
+		ops = merge->ops;
+		ir_set_op(ctx, phi, 1, ctx->control);
+		for (i = 0; i < merge->inputs_count; i++) {
+			end = &ctx->ir_base[ops[i + 1]];
+			ir_set_op(ctx, phi, i + 2, end->op3);
+			end->op3 = IR_END;
+		}
+	}
+	return phi;
 }
 
 ir_ref _ir_LOOP_BEGIN(ir_ctx *ctx, ir_ref src1)
