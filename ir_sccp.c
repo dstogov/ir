@@ -888,7 +888,8 @@ int ir_sccp(ir_ctx *ctx)
 					}
 				}
 				IR_MAKE_BOTTOM(i);
-			} else if ((flags & (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_MASK)) == (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_LOAD)
+			} else if (((flags & (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_MASK)) == (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_LOAD)
+						|| insn->op == IR_ALLOCA)
 					&& ctx->use_lists[i].count == 1) {
 				/* dead load */
 				_values[i].optx = IR_LOAD;
@@ -1022,7 +1023,8 @@ int ir_sccp(ir_ctx *ctx)
 				} else {
 					ir_sccp_fold2(ctx, _values, i, &worklist);
 				}
-			} else if ((ir_op_flags[insn->op] & (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_MASK)) == (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_LOAD)
+			} else if (((ir_op_flags[insn->op] & (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_MASK)) == (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_LOAD)
+						|| insn->op == IR_ALLOCA)
 					&& ctx->use_lists[i].count == 1) {
 				/* dead load */
 				ir_ref next = ctx->use_edges[ctx->use_lists[i].refs];
