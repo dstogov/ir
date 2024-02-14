@@ -938,7 +938,7 @@ int ir_sccp(ir_ctx *ctx)
 #ifdef IR_DEBUG
 	if (ctx->flags & IR_DEBUG_SCCP) {
 		for (i = 1; i < ctx->insns_count; i++) {
-			if (IR_IS_CONST_OP(_values[i].op)) {
+			if (IR_IS_CONST_OP(_values[i].op) || IR_IS_SYM_CONST(_values[i].op)) {
 				fprintf(stderr, "%d. CONST(", i);
 				ir_print_const(ctx, &_values[i], stderr, true);
 				fprintf(stderr, ")\n");
@@ -965,6 +965,10 @@ int ir_sccp(ir_ctx *ctx)
 		} else if (IR_IS_CONST_OP(value->op)) {
 			/* replace instruction by constant */
 			j = ir_const(ctx, value->val, value->type);
+			ir_sccp_replace_insn(ctx, _values, i, j, &worklist);
+		} else if (IR_IS_SYM_CONST(value->op)) {
+			/* replace instruction by constant */
+			j = ir_const_ex(ctx, value->val, value->type, value->optx);
 			ir_sccp_replace_insn(ctx, _values, i, j, &worklist);
 #if IR_COMBO_COPY_PROPAGATION
 		} else if (value->op == IR_COPY) {

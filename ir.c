@@ -488,7 +488,7 @@ ir_ref ir_unique_const_addr(ir_ctx *ctx, uintptr_t addr)
 	return ref;
 }
 
-static IR_NEVER_INLINE ir_ref ir_const_ex(ir_ctx *ctx, ir_val val, uint8_t type, uint32_t optx)
+ir_ref ir_const_ex(ir_ctx *ctx, ir_val val, uint8_t type, uint32_t optx)
 {
 	ir_insn *insn, *prev_insn;
 	ir_ref ref, prev;
