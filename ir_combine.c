@@ -442,57 +442,118 @@ static void ir_combine_trunc(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 
 static void ir_combine_merge(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 {
-	if (insn->inputs_count == 2 && ctx->use_lists[ref].count == 1) {
-		ir_ref end1_ref = insn->op1, end2_ref = insn->op2;
-		ir_insn *end1 = &ctx->ir_base[end1_ref];
-		ir_insn *end2 = &ctx->ir_base[end2_ref];
+	if (ctx->use_lists[ref].count == 1) {
+		if (insn->inputs_count == 2) {
+			ir_ref end1_ref = insn->op1, end2_ref = insn->op2;
+			ir_insn *end1 = &ctx->ir_base[end1_ref];
+			ir_insn *end2 = &ctx->ir_base[end2_ref];
 
-		if (end1->op == IR_END && end2->op == IR_END) {
+			if (end1->op != IR_END || end2->op != IR_END) {
+				return;
+			}
+
 			ir_ref start1_ref = end1->op1, start2_ref = end2->op1;
 			ir_insn *start1 = &ctx->ir_base[start1_ref];
 			ir_insn *start2 = &ctx->ir_base[start2_ref];
 
-			if (start1->op1 == start2->op1) {
-				ir_ref root_ref = start1->op1;
-				ir_insn *root = &ctx->ir_base[root_ref];
+			if (start1->op1 != start2->op1) {
+				return;
+			}
 
-				if (root->op == IR_IF) {
-					/* Empty Diamond
-					 *
-					 *    prev                     prev
-					 *    |  condition             |  condition
-					 *    | /                      |
-					 *    IF                       |
-					 *    | \                      |
-					 *    |  +-----+               |
-					 *    |        IF_FALSE        |
-					 *    IF_TRUE  |           =>  |
-					 *    |        END             |
-					 *    END     /                |
-					 *    |  +---+                 |
-					 *    | /                      |
-					 *    MERGE                    |
-					 *    |                        |
-					 *    next                     next
-					 */
-					ir_ref next_ref = ctx->use_edges[ctx->use_lists[ref].refs];
-					ir_insn *next = &ctx->ir_base[next_ref];
+			ir_ref root_ref = start1->op1;
+			ir_insn *root = &ctx->ir_base[root_ref];
 
-					IR_ASSERT(ctx->use_lists[start1_ref].count == 1);
-					IR_ASSERT(ctx->use_lists[start2_ref].count == 1);
+			if (root->op != IR_IF
+			 && !(root->op == IR_SWITCH && ctx->use_lists[root_ref].count == 2)) {
+				return;
+			}
 
-					next->op1 = root->op1;
-					ir_use_list_replace(ctx, root->op1, root_ref, next_ref);
-					ir_use_list_remove(ctx, root->op2, root_ref);
+			/* Empty Diamond
+			 *
+			 *    prev                     prev
+			 *    |  condition             |  condition
+			 *    | /                      |
+			 *    IF                       |
+			 *    | \                      |
+			 *    |  +-----+               |
+			 *    |        IF_FALSE        |
+			 *    IF_TRUE  |           =>  |
+			 *    |        END             |
+			 *    END     /                |
+			 *    |  +---+                 |
+			 *    | /                      |
+			 *    MERGE                    |
+			 *    |                        |
+			 *    next                     next
+			 */
 
-					MAKE_NOP(root);   CLEAR_USES(root_ref);
-					MAKE_NOP(start1); CLEAR_USES(start1_ref);
-					MAKE_NOP(start2); CLEAR_USES(start2_ref);
-					MAKE_NOP(end1);   CLEAR_USES(end1_ref);
-					MAKE_NOP(end2);   CLEAR_USES(end2_ref);
-					MAKE_NOP(insn);   CLEAR_USES(ref);
+			ir_ref next_ref = ctx->use_edges[ctx->use_lists[ref].refs];
+			ir_insn *next = &ctx->ir_base[next_ref];
+
+			IR_ASSERT(ctx->use_lists[start1_ref].count == 1);
+			IR_ASSERT(ctx->use_lists[start2_ref].count == 1);
+
+			next->op1 = root->op1;
+			ir_use_list_replace(ctx, root->op1, root_ref, next_ref);
+			ir_use_list_remove(ctx, root->op2, root_ref);
+
+			MAKE_NOP(root);   CLEAR_USES(root_ref);
+			MAKE_NOP(start1); CLEAR_USES(start1_ref);
+			MAKE_NOP(start2); CLEAR_USES(start2_ref);
+			MAKE_NOP(end1);   CLEAR_USES(end1_ref);
+			MAKE_NOP(end2);   CLEAR_USES(end2_ref);
+			MAKE_NOP(insn);   CLEAR_USES(ref);
+		} else {
+			ir_ref i, count = insn->inputs_count, *ops = insn->ops + 1;
+			ir_ref root_ref = IR_UNUSED;
+
+			for (i = 0; i < count; i++) {
+				ir_ref end_ref, start_ref;
+				ir_insn *end, *start;
+
+				end_ref = ops[i];
+				end = &ctx->ir_base[end_ref];
+				if (end->op != IR_END) {
+					return;
+				}
+				start_ref = end->op1;
+				start = &ctx->ir_base[start_ref];
+				if (start->op != IR_CASE_VAL && start->op != IR_CASE_DEFAULT) {
+					return;
+				}
+				IR_ASSERT(ctx->use_lists[start_ref].count == 1);
+				if (!root_ref) {
+					root_ref = start->op1;
+					if (ctx->use_lists[root_ref].count != count) {
+						return;
+					}
+				} else if (start->op1 != root_ref) {
+					return;
 				}
 			}
+
+			/* Empty N-Diamond */
+			ir_ref next_ref = ctx->use_edges[ctx->use_lists[ref].refs];
+			ir_insn *next = &ctx->ir_base[next_ref];
+			ir_insn *root = &ctx->ir_base[root_ref];
+
+			next->op1 = root->op1;
+			ir_use_list_replace(ctx, root->op1, root_ref, next_ref);
+			ir_use_list_remove(ctx, root->op2, root_ref);
+
+			MAKE_NOP(root);   CLEAR_USES(root_ref);
+
+			for (i = 0; i < count; i++) {
+				ir_ref end_ref = ops[i];
+				ir_insn *end = &ctx->ir_base[end_ref];
+				ir_ref start_ref = end->op1;
+				ir_insn *start = &ctx->ir_base[start_ref];
+
+				MAKE_NOP(start); CLEAR_USES(start_ref);
+				MAKE_NOP(end);   CLEAR_USES(end_ref);
+			}
+
+			MAKE_NOP(insn);   CLEAR_USES(ref);
 		}
 	}
 }
