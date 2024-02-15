@@ -184,7 +184,7 @@ static bool ir_may_combine_f2d_op(ir_ctx *ctx, ir_ref ref)
 			case IR_ADD:
 			case IR_SUB:
 			case IR_MUL:
-			case IR_DIV:
+//			case IR_DIV:
 			case IR_MIN:
 			case IR_MAX:
 				return ctx->use_lists[ref].count == 1 &&
@@ -280,7 +280,7 @@ static ir_ref ir_combine_f2d_op(ir_ctx *ctx, ir_ref ref, ir_ref use)
 			case IR_ADD:
 			case IR_SUB:
 			case IR_MUL:
-			case IR_DIV:
+//			case IR_DIV:
 			case IR_MIN:
 			case IR_MAX:
 				if (insn->op1 == insn->op2) {
@@ -604,6 +604,57 @@ static void ir_combine_phi(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 							MAKE_NOP(end1);   CLEAR_USES(end1_ref);
 							MAKE_NOP(end2);   CLEAR_USES(end2_ref);
 							MAKE_NOP(merge);  CLEAR_USES(merge_ref);
+#if 0
+						} else {
+							/* COND
+							 *
+							 *    prev                     prev
+							 *    |  cond                  |
+							 *    | /                      |
+							 *    IF                       |
+							 *    | \                      |
+							 *    |  +-----+               |
+							 *    |        IF_FALSE        |
+							 *    IF_TRUE  |           =>  |
+							 *    |        END             |
+							 *    END     /                |
+							 *    |  +---+                 |
+							 *    | /                      |
+							 *    MERGE                    |
+							 *    |    \                   |
+							 *    |     PHI(A, B)          |    COND(cond, A, B)
+							 *    next                     next
+							 */
+							ir_ref next_ref = ctx->use_edges[ctx->use_lists[merge_ref].refs];
+							ir_insn *next;
+
+							if (next_ref == ref) {
+								next_ref = ctx->use_edges[ctx->use_lists[merge_ref].refs + 1];
+							}
+							next = &ctx->ir_base[next_ref];
+
+							IR_ASSERT(ctx->use_lists[start1_ref].count == 1);
+							IR_ASSERT(ctx->use_lists[start2_ref].count == 1);
+
+							insn->op = IR_COND;
+							insn->inputs_count = 3;
+							insn->op1 = cond_ref;
+							if (start1->op == IR_IF_FALSE) {
+								SWAP_REFS(insn->op2, insn->op3);
+							}
+
+							next->op1 = root->op1;
+							ir_use_list_replace(ctx, cond_ref, root_ref, ref);
+							ir_use_list_replace(ctx, root->op1, root_ref, next_ref);
+							ir_use_list_remove(ctx, root->op2, root_ref);
+
+							MAKE_NOP(root);   CLEAR_USES(root_ref);
+							MAKE_NOP(start1); CLEAR_USES(start1_ref);
+							MAKE_NOP(start2); CLEAR_USES(start2_ref);
+							MAKE_NOP(end1);   CLEAR_USES(end1_ref);
+							MAKE_NOP(end2);   CLEAR_USES(end2_ref);
+							MAKE_NOP(merge);  CLEAR_USES(merge_ref);
+#endif
 						}
 					}
 				}
