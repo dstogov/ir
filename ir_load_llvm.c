@@ -1596,53 +1596,6 @@ static void llvm2ir_patch_merge(ir_ctx *ctx, ir_ref merge, ir_ref ref, uint32_t 
 	IR_ASSERT(0);
 }
 
-static uint32_t llvm2ir_compute_post_order(
-		ir_hashtab        *bb_hash,
-		LLVMBasicBlockRef *bbs,
-		uint32_t           bb_count,
-		uint32_t           start,
-		uint32_t          *post_order,
-		const ir_use_list *predecessors)
-{
-	uint32_t b, succ_b, j, n, count = 0;
-	LLVMBasicBlockRef bb, succ_bb;
-	LLVMValueRef insn;
-	LLVMOpcode opcode;
-	ir_worklist worklist;
-
-	ir_worklist_init(&worklist, bb_count);
-	ir_worklist_push(&worklist, start);
-	for (j = 0; j < bb_count; j++) {
-		if (predecessors[j].count == 0) {
-			/* unreachable block */
-			ir_worklist_push(&worklist, j);
-		}
-	}
-
-	while (ir_worklist_len(&worklist) != 0) {
-next:
-		b = ir_worklist_peek(&worklist);
-		bb = bbs[b];
-		insn = LLVMGetLastInstruction(bb);
-		opcode = LLVMGetInstructionOpcode(insn);
-		if (opcode == LLVMBr || opcode == LLVMSwitch) {
-			n = LLVMGetNumSuccessors(insn);
-			for (j = 0; j < n; j++) {
-				succ_bb = LLVMGetSuccessor(insn, j);
-				succ_b = ir_addrtab_find(bb_hash, (uintptr_t)succ_bb);
-				IR_ASSERT(succ_b < bb_count);
-				if (ir_worklist_push(&worklist, succ_b)) {
-					goto next;
-				}
-			}
-		}
-		ir_worklist_pop(&worklist);
-		post_order[count++] = b;
-	}
-	ir_worklist_free(&worklist);
-	return count;
-}
-
 static int llvm2ir_func(ir_ctx *ctx, LLVMValueRef func, LLVMModuleRef module)
 {
 	uint32_t i, cconv;
@@ -1703,7 +1656,7 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMValueRef func, LLVMModuleRef module)
 
 static int llvm2ir_func_ex(ir_ctx *ctx, LLVMValueRef func, LLVMModuleRef module, LLVMValueRef root_func)
 {
-	uint32_t i, j, b, count, bb_count;
+	uint32_t i, j, n, b, succ, count, bb_count, post_order_count, predecessor_edges_count, *post_order;
 	LLVMBasicBlockRef *bbs, bb;
 	LLVMValueRef insn;
 	LLVMOpcode opcode;
@@ -1714,63 +1667,104 @@ static int llvm2ir_func_ex(ir_ctx *ctx, LLVMValueRef func, LLVMModuleRef module,
 	uint32_t *predecessor_edges;
 	ir_ref *inputs, *bb_starts, *predecessor_refs;
 	ir_ref inline_ret = IR_UNUSED;
+	ir_worklist worklist;
 
-	/* Find LLVM BasicBlocks Predecessors */
+	/* Find LLVM Basic Blocks */
 	bb_count = LLVMCountBasicBlocks(func);
 	bbs = ir_mem_malloc(bb_count * sizeof(LLVMBasicBlockRef));
-	predecessors = ir_mem_calloc(bb_count, sizeof(ir_use_list));
 	LLVMGetBasicBlocks(func, bbs);
 	ir_addrtab_init(&bb_hash, bb_count);
 	for (i = 0; i < bb_count; i++) {
 		bb = bbs[i];
 		ir_addrtab_set(&bb_hash, (uintptr_t)bb, i);
 	}
-	for (i = 0; i < bb_count; i++) {
-		bb = bbs[i];
-		insn = LLVMGetLastInstruction(bb);
-		opcode = LLVMGetInstructionOpcode(insn);
-		if (opcode == LLVMBr || opcode == LLVMSwitch) {
-			count = LLVMGetNumSuccessors(insn);
-			for (j = 0; j < count; j++) {
-				uint32_t b = ir_addrtab_find(&bb_hash, (uintptr_t)LLVMGetSuccessor(insn, j));
 
-				IR_ASSERT(b < bb_count);
-				predecessors[b].count++;
-			}
-		}
-	}
-	count = 0;
-	max_inputs_count = 0;
-	for (i = 0; i < bb_count; i++) {
-		predecessors[i].refs = count;
-		count += predecessors[i].count;
-		max_inputs_count = IR_MAX(max_inputs_count, predecessors[i].count);
-		predecessors[i].count = 0;
-	}
-	predecessor_edges = ir_mem_malloc(sizeof(uint32_t) * count);
-	predecessor_refs = ir_mem_calloc(sizeof(ir_ref), count);
-	inputs = ir_mem_malloc(sizeof(ir_ref) * max_inputs_count);
-	for (i = 0; i < bb_count; i++) {
-		bb = bbs[i];
-		insn = LLVMGetLastInstruction(bb);
-		opcode = LLVMGetInstructionOpcode(insn);
-		if (opcode == LLVMBr || opcode == LLVMSwitch) {
-			count = LLVMGetNumSuccessors(insn);
-			for (j = 0; j < count; j++) {
-				uint32_t b = ir_addrtab_find(&bb_hash, (uintptr_t)LLVMGetSuccessor(insn, j));
+	/* Find proper Basic Blocks order */
+	post_order = ir_mem_malloc(sizeof(uint32_t) * bb_count);
+	post_order_count = 0;
 
-				IR_ASSERT(b < bb_count);
-				predecessor_edges[predecessors[b].refs + predecessors[b].count++] = i;
-			}
-		}
-	}
-
-	/* Find proper basic blocks order */
+	ir_worklist_init(&worklist, bb_count);
 	bb = LLVMGetEntryBasicBlock(func);
 	b = ir_addrtab_find(&bb_hash, (uintptr_t)bb);
 	IR_ASSERT(b < bb_count);
-	uint32_t *post_order = ir_mem_malloc(sizeof(uint32_t) * bb_count);
-	uint32_t post_order_count = llvm2ir_compute_post_order(&bb_hash, bbs, bb_count, b, post_order, predecessors);
+	ir_worklist_push(&worklist, b);
+
+	while (ir_worklist_len(&worklist) != 0) {
+next:
+		b = ir_worklist_peek(&worklist);
+		bb = bbs[b];
+		insn = LLVMGetLastInstruction(bb);
+		opcode = LLVMGetInstructionOpcode(insn);
+		if (opcode == LLVMBr || opcode == LLVMSwitch) {
+			n = LLVMGetNumSuccessors(insn);
+			for (j = 0; j < n; j++) {
+				succ = ir_addrtab_find(&bb_hash, (uintptr_t)LLVMGetSuccessor(insn, j));
+				IR_ASSERT(succ < bb_count);
+				if (ir_worklist_push(&worklist, succ)) {
+					goto next;
+				}
+			}
+		}
+		ir_worklist_pop(&worklist);
+		post_order[post_order_count++] = b;
+	}
+
+	/* Find LLVM BasicBlocks Predecessors */
+	predecessors = ir_mem_calloc(bb_count, sizeof(ir_use_list));
+	i = post_order_count;
+	while (i > 0) {
+		i--;
+		b = post_order[i];
+		bb = bbs[b];
+		insn = LLVMGetLastInstruction(bb);
+		opcode = LLVMGetInstructionOpcode(insn);
+		if (opcode == LLVMBr || opcode == LLVMSwitch) {
+			count = LLVMGetNumSuccessors(insn);
+			for (j = 0; j < count; j++) {
+				succ = ir_addrtab_find(&bb_hash, (uintptr_t)LLVMGetSuccessor(insn, j));
+				IR_ASSERT(succ < bb_count);
+				if (ir_bitset_in(worklist.visited, succ)) {
+					predecessors[succ].count++;
+				}
+			}
+		}
+	}
+
+	predecessor_edges_count = 0;
+	max_inputs_count = 0;
+	i = post_order_count;
+	while (i > 0) {
+		i--;
+		b = post_order[i];
+		predecessors[b].refs = predecessor_edges_count;
+		predecessor_edges_count += predecessors[b].count;
+		max_inputs_count = IR_MAX(max_inputs_count, predecessors[b].count);
+		predecessors[b].count = 0;
+	}
+
+	predecessor_edges = ir_mem_malloc(sizeof(uint32_t) * predecessor_edges_count);
+	predecessor_refs = ir_mem_calloc(sizeof(ir_ref), predecessor_edges_count);
+	inputs = ir_mem_malloc(sizeof(ir_ref) * max_inputs_count);
+	i = post_order_count;
+	while (i > 0) {
+		i--;
+		b = post_order[i];
+		bb = bbs[b];
+		insn = LLVMGetLastInstruction(bb);
+		opcode = LLVMGetInstructionOpcode(insn);
+		if (opcode == LLVMBr || opcode == LLVMSwitch) {
+			count = LLVMGetNumSuccessors(insn);
+			for (j = 0; j < count; j++) {
+				succ = ir_addrtab_find(&bb_hash, (uintptr_t)LLVMGetSuccessor(insn, j));
+				IR_ASSERT(succ < bb_count);
+				if (ir_bitset_in(worklist.visited, succ)) {
+					predecessor_edges[predecessors[succ].refs + predecessors[succ].count++] = b;
+				}
+			}
+		}
+	}
+
+	ir_worklist_free(&worklist);
 
 	/* Process all reachable basic blocks in proper order */
 	ir_bitset visited = ir_bitset_malloc(bb_count);
