@@ -830,7 +830,8 @@ static void ir_combine_if(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 	if (cond->op == IR_PHI
 	 && cond->inputs_count == 3
 	 && cond->op1 == insn->op1
-	 && (IR_IS_CONST_REF(cond->op2) || IR_IS_CONST_REF(cond->op3))) {
+	 && ((IR_IS_CONST_REF(cond->op2) && !IR_IS_SYM_CONST(ctx->ir_base[cond->op2].op))
+	  || (IR_IS_CONST_REF(cond->op3) && !IR_IS_SYM_CONST(ctx->ir_base[cond->op3].op)))) {
 		ir_ref merge_ref = insn->op1;
 		ir_insn *merge = &ctx->ir_base[merge_ref];
 
@@ -846,7 +847,7 @@ static void ir_combine_if(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 
 				ir_get_true_false_refs(ctx, ref, &if_true_ref, &if_false_ref);
 
-				if (!IR_IS_CONST_REF(cond->op2)) {
+				if (!IR_IS_CONST_REF(cond->op2) || IR_IS_SYM_CONST(ctx->ir_base[cond->op2].op)) {
 					IR_ASSERT(IR_IS_CONST_REF(cond->op3));
 					SWAP_REFS(cond->op2, cond->op3);
 					SWAP_REFS(merge->op1, merge->op2);
@@ -910,6 +911,7 @@ static void ir_combine_if(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 		}
 	} else if (cond->op >= IR_EQ && cond->op <= IR_UGT
 			&& IR_IS_CONST_REF(cond->op2)
+			&& !IR_IS_SYM_CONST(ctx->ir_base[cond->op2].op)
 			&& ctx->use_lists[insn->op2].count == 1) {
 		ir_ref phi_ref = cond->op1;
 		ir_insn *phi = &ctx->ir_base[phi_ref];
@@ -918,7 +920,8 @@ static void ir_combine_if(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 		 && phi->inputs_count == 3
 		 && phi->op1 == insn->op1
 		 && ctx->use_lists[phi_ref].count == 1
-		 && (IR_IS_CONST_REF(phi->op2) || IR_IS_CONST_REF(phi->op3))) {
+		 && ((IR_IS_CONST_REF(phi->op2) && !IR_IS_SYM_CONST(ctx->ir_base[phi->op2].op))
+		  || (IR_IS_CONST_REF(phi->op3) && !IR_IS_SYM_CONST(ctx->ir_base[phi->op3].op)))) {
 			ir_ref merge_ref = insn->op1;
 			ir_insn *merge = &ctx->ir_base[merge_ref];
 
@@ -934,7 +937,7 @@ static void ir_combine_if(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 
 					ir_get_true_false_refs(ctx, ref, &if_true_ref, &if_false_ref);
 
-					if (!IR_IS_CONST_REF(phi->op2)) {
+					if (!IR_IS_CONST_REF(phi->op2) || IR_IS_SYM_CONST(ctx->ir_base[phi->op2].op)) {
 						IR_ASSERT(IR_IS_CONST_REF(phi->op3));
 						SWAP_REFS(phi->op2, phi->op3);
 						SWAP_REFS(merge->op1, merge->op2);
@@ -969,8 +972,22 @@ static void ir_combine_if(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 					 *    |                        |                              |                  |
 					 */
 
-					if (IR_IS_CONST_REF(phi->op3)) {
-						if (ir_cmp_is_true(cond->op, &ctx->ir_base[phi->op3], &ctx->ir_base[cond->op2])) {
+					if (IR_IS_CONST_REF(phi->op3) && !IR_IS_SYM_CONST(ctx->ir_base[phi->op3].op)) {
+						if (ir_cmp_is_true(cond->op, &ctx->ir_base[phi->op3], &ctx->ir_base[cond->op2]) ^ (op == IR_IF_TRUE)) {
+							ir_use_list_replace(ctx, end1_ref, merge_ref, if_false_ref);
+							ir_use_list_replace(ctx, end2_ref, merge_ref, if_true_ref);
+
+							MAKE_NOP(merge); CLEAR_USES(merge_ref);
+							MAKE_NOP(phi);   CLEAR_USES(phi_ref);
+							MAKE_NOP(cond);  CLEAR_USES(cond_ref);
+							MAKE_NOP(insn);  CLEAR_USES(ref);
+
+							if_false->optx = IR_OPTX(IR_BEGIN, IR_VOID, 1);
+							if_false->op1 = end1_ref;
+
+							if_true->optx = IR_OPTX(IR_BEGIN, IR_VOID, 1);
+							if_true->op1 = end2_ref;
+						} else {
 							ir_use_list_replace(ctx, end1_ref, merge_ref, if_false_ref);
 							ir_use_list_replace(ctx, end2_ref, merge_ref, if_false_ref);
 
@@ -987,25 +1004,13 @@ static void ir_combine_if(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 							if_true->op1 = IR_UNUSED;
 
 							ctx->flags2 &= ~IR_SCCP_DONE;
-						} else {
-							ir_use_list_replace(ctx, end1_ref, merge_ref, if_false_ref);
-							ir_use_list_replace(ctx, end2_ref, merge_ref, if_true_ref);
-
-							MAKE_NOP(merge); CLEAR_USES(merge_ref);
-							MAKE_NOP(phi);   CLEAR_USES(phi_ref);
-							MAKE_NOP(cond);  CLEAR_USES(cond_ref);
-							MAKE_NOP(insn);  CLEAR_USES(ref);
-
-							if_false->optx = IR_OPTX(IR_BEGIN, IR_VOID, 1);
-							if_false->op1 = end1_ref;
-
-							if_true->optx = IR_OPTX(IR_BEGIN, IR_VOID, 1);
-							if_true->op1 = end2_ref;
 						}
 					} else {
 						ir_use_list_remove(ctx, merge_ref, phi_ref);
 						ir_use_list_remove(ctx, ref, if_true_ref);
-						ir_use_list_replace(ctx, phi->op3, phi_ref, insn->op2);
+						if (!IR_IS_CONST_REF(phi->op3)) {
+							ir_use_list_replace(ctx, phi->op3, phi_ref, insn->op2);
+						}
 						ir_use_list_replace(ctx, end1_ref, merge_ref, if_false_ref);
 						ir_use_list_replace(ctx, cond_ref, ref, end2_ref);
 						ir_use_list_add(ctx, end2_ref, if_true_ref);
