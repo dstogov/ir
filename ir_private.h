@@ -921,6 +921,11 @@ struct _ir_use_list {
 	ir_ref        count;
 };
 
+void ir_use_list_remove_all(ir_ctx *ctx, ir_ref from, ir_ref use);
+void ir_use_list_remove_one(ir_ctx *ctx, ir_ref from, ir_ref use);
+void ir_use_list_replace(ir_ctx *ctx, ir_ref ref, ir_ref use, ir_ref new_use);
+bool ir_use_list_add(ir_ctx *ctx, ir_ref to, ir_ref new_use);
+
 /*** IR Basic Blocks info ***/
 #define IR_IS_BB_START(op) \
 	((ir_op_flags[op] & IR_OP_FLAG_BB_START) != 0)

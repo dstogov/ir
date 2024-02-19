@@ -266,87 +266,6 @@ static bool ir_sccp_is_equal(ir_ctx *ctx, ir_insn *_values, ir_ref a, ir_ref b)
 	return v1->val.u64 == v2->val.u64;
 }
 
-static void ir_sccp_remove_from_use_list(ir_ctx *ctx, ir_ref from, ir_ref ref)
-{
-	ir_ref j, n, *p, *q, use;
-	ir_use_list *use_list = &ctx->use_lists[from];
-	ir_ref skip = 0;
-
-	n = use_list->count;
-	for (j = 0, p = q = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
-		use = *p;
-		if (use == ref) {
-			skip++;
-		} else {
-			if (p != q) {
-				*q = use;
-			}
-			q++;
-		}
-	}
-	use_list->count -= skip;
-#if IR_COMBO_COPY_PROPAGATION
-	if (skip) {
-		do {
-			*q = IR_UNUSED;
-			q++;
-		} while (--skip);
-	}
-#endif
-}
-
-static void ir_sccp_remove_from_use_list_1(ir_ctx *ctx, ir_ref from, ir_ref ref)
-{
-	ir_ref j, n, *p;
-	ir_use_list *use_list = &ctx->use_lists[from];
-
-	n = use_list->count;
-	j = 0;
-	p = &ctx->use_edges[use_list->refs];
-	while (j < n) {
-		if (*p == ref) {
-			break;
-		}
-		j++;
-	}
-
-	if (j < n) {
-		use_list->count--;
-		j++;
-		while (j < n) {
-			*p = *(p+1);
-			p++;
-			j++;
-		}
-#if IR_COMBO_COPY_PROPAGATION
-		*p = IR_UNUSED;
-#endif
-	}
-}
-
-#if IR_COMBO_COPY_PROPAGATION
-static int ir_sccp_add_to_use_list(ir_ctx *ctx, ir_ref to, ir_ref ref)
-{
-	ir_use_list *use_list = &ctx->use_lists[to];
-	ir_ref n = use_list->refs + use_list->count;
-
-	if (n < ctx->use_edges_count && ctx->use_edges[n] == IR_UNUSED) {
-		ctx->use_edges[n] = ref;
-		use_list->count++;
-		return 0;
-	} else {
-		/* Reallocate the whole edges buffer (this is inefficient) */
-		ctx->use_edges = ir_mem_realloc(ctx->use_edges, (ctx->use_edges_count + use_list->count + 1) * sizeof(ir_ref));
-		memcpy(ctx->use_edges + ctx->use_edges_count, ctx->use_edges + use_list->refs, use_list->count * sizeof(ir_ref));
-		use_list->refs = ctx->use_edges_count;
-		ctx->use_edges[use_list->refs + use_list->count] = ref;
-		use_list->count++;
-		ctx->use_edges_count += use_list->count;
-		return 1;
-	}
-}
-#endif
-
 static void ir_sccp_make_nop(ir_ctx *ctx, ir_ref ref)
 {
 	ir_ref j, n, *p;
@@ -380,7 +299,7 @@ static void ir_sccp_remove_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_bi
 		ir_ref input = *p;
 		*p = IR_UNUSED;
 		if (input > 0 && _values[input].op == IR_BOTTOM) {
-			ir_sccp_remove_from_use_list(ctx, input, ref);
+			ir_use_list_remove_all(ctx, input, ref);
 			/* schedule DCE */
 			if ((IR_IS_FOLDABLE_OP(ctx->ir_base[input].op) && ctx->use_lists[input].count == 0)
 			 || ((ir_op_flags[ctx->ir_base[input].op] & (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_MASK)) == (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_LOAD)
@@ -406,7 +325,7 @@ static void ir_sccp_replace_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_r
 		ir_ref input = *p;
 		*p = IR_UNUSED;
 		if (input > 0) {
-			ir_sccp_remove_from_use_list(ctx, input, ref);
+			ir_use_list_remove_all(ctx, input, ref);
 			/* schedule DCE */
 			if (worklist
 			 && ((IR_IS_FOLDABLE_OP(ctx->ir_base[input].op) && ctx->use_lists[input].count == 0)
@@ -431,7 +350,7 @@ static void ir_sccp_replace_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_r
 			}
 #if IR_COMBO_COPY_PROPAGATION
 			if (new_ref > 0 && IR_IS_BOTTOM(use)) {
-				if (ir_sccp_add_to_use_list(ctx, new_ref, use)) {
+				if (ir_use_list_add(ctx, new_ref, use)) {
 					/* restore after reallocation */
 					use_list = &ctx->use_lists[ref];
 					n = use_list->count;
@@ -489,26 +408,26 @@ restart:
 				insn->inputs_count = IR_INPUT_EDGES_COUNT(ir_op_flags[opt & IR_OPT_OP_MASK]);
 				if (insn->op1 != ctx->fold_insn.op1) {
 					if (!IR_IS_CONST_REF(insn->op1) && insn->op1 != ctx->fold_insn.op2 && insn->op1 != ctx->fold_insn.op3) {
-						ir_sccp_remove_from_use_list(ctx, insn->op1, ref);
+						ir_use_list_remove_all(ctx, insn->op1, ref);
 					}
 					if (!IR_IS_CONST_REF(ctx->fold_insn.op1) && ctx->fold_insn.op1 != insn->op2 && ctx->fold_insn.op1 != insn->op3) {
-						ir_sccp_add_to_use_list(ctx, ctx->fold_insn.op1, ref);
+						ir_use_list_add(ctx, ctx->fold_insn.op1, ref);
 					}
 				}
 				if (insn->op2 != ctx->fold_insn.op2) {
 					if (!IR_IS_CONST_REF(insn->op2) && insn->op2 != ctx->fold_insn.op1 && insn->op2 != ctx->fold_insn.op3) {
-						ir_sccp_remove_from_use_list(ctx, insn->op2, ref);
+						ir_use_list_remove_all(ctx, insn->op2, ref);
 					}
 					if (!IR_IS_CONST_REF(ctx->fold_insn.op2) && ctx->fold_insn.op2 != insn->op1 && ctx->fold_insn.op2 != insn->op3) {
-						ir_sccp_add_to_use_list(ctx, ctx->fold_insn.op2, ref);
+						ir_use_list_add(ctx, ctx->fold_insn.op2, ref);
 					}
 				}
 				if (insn->op3 != ctx->fold_insn.op3) {
 					if (!IR_IS_CONST_REF(insn->op3) && insn->op3 != ctx->fold_insn.op1 && insn->op3 != ctx->fold_insn.op2) {
-						ir_sccp_remove_from_use_list(ctx, insn->op3, ref);
+						ir_use_list_remove_all(ctx, insn->op3, ref);
 					}
 					if (!IR_IS_CONST_REF(ctx->fold_insn.op3) && ctx->fold_insn.op3 != insn->op1 && ctx->fold_insn.op3 != insn->op2) {
-						ir_sccp_add_to_use_list(ctx, ctx->fold_insn.op3, ref);
+						ir_use_list_add(ctx, ctx->fold_insn.op3, ref);
 					}
 				}
 				insn->op1 = ctx->fold_insn.op1;
@@ -539,20 +458,6 @@ restart:
 	}
 }
 
-static void ir_sccp_replace_use(ir_ctx *ctx, ir_ref ref, ir_ref use, ir_ref new_use)
-{
-	ir_use_list *use_list = &ctx->use_lists[ref];
-	ir_ref i, n, *p;
-
-	n = use_list->count;
-	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
-		if (*p == use) {
-			*p = new_use;
-			break;
-		}
-	}
-}
-
 static void ir_sccp_remove_if(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_ref dst)
 {
 	ir_ref j, n, *p, use, next;
@@ -568,7 +473,7 @@ static void ir_sccp_remove_if(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_ref 
 			next_insn = &ctx->ir_base[next];
 			/* remove IF and IF_TRUE/FALSE from double linked control list */
 			next_insn->op1 = insn->op1;
-			ir_sccp_replace_use(ctx, insn->op1, ref, next);
+			ir_use_list_replace(ctx, insn->op1, ref, next);
 			/* remove IF and IF_TRUE/FALSE instructions */
 			ir_sccp_make_nop(ctx, ref);
 			ir_sccp_make_nop(ctx, use);
@@ -618,7 +523,7 @@ static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values
 								} else {
 									IR_ASSERT(use_insn->op1 == ref);
 									use_insn->op1 = prev;
-									ir_sccp_add_to_use_list(ctx, prev, use);
+									ir_use_list_add(ctx, prev, use);
 									p = &ctx->use_edges[use_list->refs + k];
 								}
 							}
@@ -626,7 +531,7 @@ static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values
 						IR_ASSERT(prev && next);
 						/* remove MERGE and input END from double linked control list */
 						next_insn->op1 = prev;
-						ir_sccp_replace_use(ctx, prev, input, next);
+						ir_use_list_replace(ctx, prev, input, next);
 						/* remove MERGE and input END instructions */
 						ir_sccp_make_nop(ctx, ref);
 						ir_sccp_make_nop(ctx, input);
@@ -689,7 +594,7 @@ static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values
 							}
 							i++;
 						} else if (!IR_IS_CONST_REF(input)) {
-							ir_sccp_remove_from_use_list_1(ctx, input, use);
+							ir_use_list_remove_one(ctx, input, use);
 						}
 					}
 					while (i <= n) {
@@ -1031,7 +936,7 @@ int ir_sccp(ir_ctx *ctx)
 
 				/* remove LOAD from double linked control list */
 				ctx->ir_base[next].op1 = insn->op1;
-				ir_sccp_replace_use(ctx, insn->op1, i, next);
+				ir_use_list_replace(ctx, insn->op1, i, next);
 				insn->op1 = IR_UNUSED;
 				ir_sccp_remove_insn(ctx, _values, i, &worklist);
 			}
