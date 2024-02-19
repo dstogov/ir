@@ -1,0 +1,33 @@
+--TEST--
+004: Combine MIN/MAX
+--ARGS--
+-O2 --save
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	l_1 = START(l_12);
+	int32_t d_2 = PARAM(l_1, "x", 0);
+	int32_t d_3 = PARAM(l_1, "y", 1);
+	bool d_4 = GE(d_2, d_3);
+	l_5 = IF(l_1, d_4);
+	l_6 = IF_TRUE(l_5);
+	l_7 = END(l_6);
+	l_8 = IF_FALSE(l_5);
+	l_9 = END(l_8);
+	l_10 = MERGE(l_7, l_9);
+	int32_t d_11 = PHI(l_10, d_2, d_3);
+	l_12 = RETURN(l_10, d_11);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	l_1 = START(l_5);
+	int32_t d_2 = PARAM(l_1, "x", 0);
+	int32_t d_3 = PARAM(l_1, "y", 1);
+	int32_t d_4 = MAX(d_3, d_2);
+	l_5 = RETURN(l_1, d_4);
+}
