@@ -50,68 +50,6 @@ static void ir_get_true_false_refs(const ir_ctx *ctx, ir_ref if_ref, ir_ref *if_
 	}
 }
 
-static void ir_use_list_remove(ir_ctx *ctx, ir_ref from, ir_ref ref)
-{
-	ir_ref j, n, *p, *q, use;
-	ir_use_list *use_list = &ctx->use_lists[from];
-	ir_ref skip = 0;
-
-	n = use_list->count;
-	for (j = 0, p = q = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
-		use = *p;
-		if (use == ref) {
-			skip++;
-		} else {
-			if (p != q) {
-				*q = use;
-			}
-			q++;
-		}
-	}
-	use_list->count -= skip;
-	if (skip) {
-		do {
-			*q = IR_UNUSED;
-			q++;
-		} while (--skip);
-	}
-}
-
-static void ir_use_list_replace(ir_ctx *ctx, ir_ref ref, ir_ref use, ir_ref new_use)
-{
-	ir_use_list *use_list = &ctx->use_lists[ref];
-	ir_ref i, n, *p;
-
-	n = use_list->count;
-	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
-		if (*p == use) {
-			*p = new_use;
-			break;
-		}
-	}
-}
-
-static int ir_use_list_add(ir_ctx *ctx, ir_ref to, ir_ref ref)
-{
-	ir_use_list *use_list = &ctx->use_lists[to];
-	ir_ref n = use_list->refs + use_list->count;
-
-	if (n < ctx->use_edges_count && ctx->use_edges[n] == IR_UNUSED) {
-		ctx->use_edges[n] = ref;
-		use_list->count++;
-		return 0;
-	} else {
-		/* Reallocate the whole edges buffer (this is inefficient) */
-		ctx->use_edges = ir_mem_realloc(ctx->use_edges, (ctx->use_edges_count + use_list->count + 1) * sizeof(ir_ref));
-		memcpy(ctx->use_edges + ctx->use_edges_count, ctx->use_edges + use_list->refs, use_list->count * sizeof(ir_ref));
-		use_list->refs = ctx->use_edges_count;
-		ctx->use_edges[use_list->refs + use_list->count] = ref;
-		use_list->count++;
-		ctx->use_edges_count += use_list->count;
-		return 1;
-	}
-}
-
 static ir_ref _ir_merge_blocks(ir_ctx *ctx, ir_ref end, ir_ref begin)
 {
 	ir_ref prev, next;
@@ -204,7 +142,7 @@ static ir_ref ir_try_remove_empty_diamond(ir_ctx *ctx, ir_ref ref, ir_insn *insn
 
 		next->op1 = root->op1;
 		ir_use_list_replace(ctx, root->op1, root_ref, next_ref);
-		ir_use_list_remove(ctx, root->op2, root_ref);
+		ir_use_list_remove_all(ctx, root->op2, root_ref);
 
 		MAKE_NOP(root);   CLEAR_USES(root_ref);
 		MAKE_NOP(start1); CLEAR_USES(start1_ref);
@@ -250,7 +188,7 @@ static ir_ref ir_try_remove_empty_diamond(ir_ctx *ctx, ir_ref ref, ir_insn *insn
 
 		next->op1 = root->op1;
 		ir_use_list_replace(ctx, root->op1, root_ref, next_ref);
-		ir_use_list_remove(ctx, root->op2, root_ref);
+		ir_use_list_remove_all(ctx, root->op2, root_ref);
 
 		MAKE_NOP(root);   CLEAR_USES(root_ref);
 
@@ -360,12 +298,12 @@ static ir_ref ir_optimize_phi(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_
 
 					next->op1 = root->op1;
 					ir_use_list_replace(ctx, root->op1, root_ref, next_ref);
-					ir_use_list_remove(ctx, root->op2, root_ref);
+					ir_use_list_remove_all(ctx, root->op2, root_ref);
 					if (!IR_IS_CONST_REF(insn->op1)) {
-						ir_use_list_remove(ctx, insn->op1, cond_ref);
+						ir_use_list_remove_all(ctx, insn->op1, cond_ref);
 					}
 					if (!IR_IS_CONST_REF(insn->op2)) {
-						ir_use_list_remove(ctx, insn->op2, cond_ref);
+						ir_use_list_remove_all(ctx, insn->op2, cond_ref);
 					}
 
 					MAKE_NOP(cond);   CLEAR_USES(cond_ref);
@@ -419,7 +357,7 @@ static ir_ref ir_optimize_phi(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_
 					next->op1 = root->op1;
 					ir_use_list_replace(ctx, cond_ref, root_ref, ref);
 					ir_use_list_replace(ctx, root->op1, root_ref, next_ref);
-					ir_use_list_remove(ctx, root->op2, root_ref);
+					ir_use_list_remove_all(ctx, root->op2, root_ref);
 
 					MAKE_NOP(root);   CLEAR_USES(root_ref);
 					MAKE_NOP(start1); CLEAR_USES(start1_ref);
@@ -593,8 +531,8 @@ static ir_ref ir_try_split_if(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 				 *    IF_FALSE  |              MERGE
 				 *    |                        |
 				 */
-				ir_use_list_remove(ctx, merge_ref, cond_ref);
-				ir_use_list_remove(ctx, ref, if_true_ref);
+				ir_use_list_remove_all(ctx, merge_ref, cond_ref);
+				ir_use_list_remove_all(ctx, ref, if_true_ref);
 				ir_use_list_replace(ctx, cond->op3, cond_ref, end2_ref);
 				ir_use_list_replace(ctx, end1_ref, merge_ref, if_false_ref);
 				ir_use_list_add(ctx, end2_ref, if_true_ref);
@@ -781,8 +719,8 @@ static ir_ref ir_try_split_if_cmp(ir_ctx *ctx, ir_worklist *worklist, ir_ref ref
 						 *    |                        |
 						 */
 
-						ir_use_list_remove(ctx, merge_ref, phi_ref);
-						ir_use_list_remove(ctx, ref, if_true_ref);
+						ir_use_list_remove_all(ctx, merge_ref, phi_ref);
+						ir_use_list_remove_all(ctx, ref, if_true_ref);
 						if (!IR_IS_CONST_REF(phi->op3)) {
 							ir_use_list_replace(ctx, phi->op3, phi_ref, insn->op2);
 						}
@@ -1204,27 +1142,6 @@ static void ir_remove_predecessor(ir_ctx *ctx, ir_block *bb, uint32_t from)
 	bb->predecessors_count = n;
 }
 
-static void ir_remove_from_use_list(ir_ctx *ctx, ir_ref from, ir_ref ref)
-{
-	ir_ref j, n, *p, *q, use;
-	ir_use_list *use_list = &ctx->use_lists[from];
-	ir_ref skip = 0;
-
-	n = use_list->count;
-	for (j = 0, p = q = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
-		use = *p;
-		if (use == ref) {
-			skip++;
-		} else {
-			if (p != q) {
-				*q = use;
-			}
-			q++;
-		}
-	}
-	use_list->count -= skip;
-}
-
 static void ir_remove_merge_input(ir_ctx *ctx, ir_ref merge, ir_ref from)
 {
 	ir_ref i, j, n, k, *p, use;
@@ -1266,13 +1183,13 @@ static void ir_remove_merge_input(ir_ctx *ctx, ir_ref merge, ir_ref from)
 						if (ir_bitset_in(life_inputs, j - 1)) {
 							use_insn->op1 = ir_insn_op(use_insn, j);
 						} else if (input > 0) {
-							ir_remove_from_use_list(ctx, input, use);
+							ir_use_list_remove_all(ctx, input, use);
 						}
 					}
 					use_insn->op = IR_COPY;
 					use_insn->op2 = IR_UNUSED;
 					use_insn->op3 = IR_UNUSED;
-					ir_remove_from_use_list(ctx, merge, use);
+					ir_use_list_remove_all(ctx, merge, use);
 				}
 			}
 		}
@@ -1297,7 +1214,7 @@ static void ir_remove_merge_input(ir_ctx *ctx, ir_ref merge, ir_ref from)
 							}
 							i++;
 						} else if (input > 0) {
-							ir_remove_from_use_list(ctx, input, use);
+							ir_use_list_remove_all(ctx, input, use);
 						}
 					}
 				}
@@ -1305,7 +1222,7 @@ static void ir_remove_merge_input(ir_ctx *ctx, ir_ref merge, ir_ref from)
 		}
 	}
 	ir_mem_free(life_inputs);
-	ir_remove_from_use_list(ctx, from, merge);
+	ir_use_list_remove_all(ctx, from, merge);
 }
 
 /* CFG constructed after SCCP pass doesn't have unreachable BBs, otherwise they should be removed */
