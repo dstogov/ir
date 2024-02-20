@@ -142,7 +142,9 @@ static ir_ref ir_try_remove_empty_diamond(ir_ctx *ctx, ir_ref ref, ir_insn *insn
 
 		next->op1 = root->op1;
 		ir_use_list_replace(ctx, root->op1, root_ref, next_ref);
-		ir_use_list_remove_all(ctx, root->op2, root_ref);
+		if (!IR_IS_CONST_REF(root->op2)) {
+			ir_use_list_remove_all(ctx, root->op2, root_ref);
+		}
 
 		MAKE_NOP(root);   CLEAR_USES(root_ref);
 		MAKE_NOP(start1); CLEAR_USES(start1_ref);
@@ -1011,10 +1013,14 @@ next_successor:
 	/* SCCP already removed UNREACHABKE blocks, otherwise all blocks are marked as UNREACHABLE first */
 	bb_init_falgs = (ctx->flags2 & IR_SCCP_DONE) ? 0 : IR_BB_UNREACHABLE;
 	IR_BITSET_FOREACH(bb_starts, len, start) {
+		insn = &ctx->ir_base[start];
+		if (insn->op == IR_NOP) {
+			_blocks[start] = 0;
+			continue;
+		}
 		end = _blocks[start];
 		_blocks[start] = b;
 		_blocks[end] = b;
-		insn = &ctx->ir_base[start];
 		IR_ASSERT(IR_IS_BB_START(insn->op));
 		IR_ASSERT(end > start);
 		bb->start = start;
