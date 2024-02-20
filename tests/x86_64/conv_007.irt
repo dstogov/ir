@@ -13,5 +13,5 @@ x86_64
 }
 --EXPECT--
 test:
-	cvtss2si %xmm0, %rax
+	cvttss2si %xmm0, %rax
 	retq
