@@ -2086,9 +2086,9 @@ binop_fp:
 //		case IR_COND:
 		case IR_COPY:
 			if (IR_IS_TYPE_INT(insn->type)) {
-				return IR_COPY_INT;
+				return IR_COPY_INT | IR_MAY_REUSE;
 			} else {
-				return IR_COPY_FP;
+				return IR_COPY_FP | IR_MAY_REUSE;
 			}
 			break;
 		case IR_CALL:
@@ -2556,13 +2556,21 @@ store_int:
 			return insn->op;
 		case IR_SEXT:
 		case IR_ZEXT:
-		case IR_TRUNC:
-		case IR_BITCAST:
 		case IR_FP2INT:
 		case IR_FP2FP:
-		case IR_PROTO:
 			ir_match_fuse_load(ctx, insn->op1, ref);
 			return insn->op;
+		case IR_TRUNC:
+		case IR_PROTO:
+			ir_match_fuse_load(ctx, insn->op1, ref);
+			return insn->op | IR_MAY_REUSE;
+		case IR_BITCAST:
+			ir_match_fuse_load(ctx, insn->op1, ref);
+			if (IR_IS_TYPE_INT(insn->type) && IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)) {
+				return insn->op | IR_MAY_REUSE;
+			} else {
+				return insn->op;
+			}
 		case IR_CTLZ:
 		case IR_CTTZ:
 			ir_match_fuse_load(ctx, insn->op1, ref);

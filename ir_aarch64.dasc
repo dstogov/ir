@@ -880,11 +880,20 @@ binop_fp:
 //		case IR_COND:
 		case IR_COPY:
 			if (IR_IS_TYPE_INT(insn->type)) {
-				return IR_COPY_INT;
+				return IR_COPY_INT | IR_MAY_REUSE;
 			} else {
-				return IR_COPY_FP;
+				return IR_COPY_FP | IR_MAY_REUSE;
 			}
 			break;
+		case IR_TRUNC:
+		case IR_PROTO:
+			return insn->op | IR_MAY_REUSE;
+		case IR_BITCAST:
+			if (IR_IS_TYPE_INT(insn->type) && IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)) {
+				return insn->op | IR_MAY_REUSE;
+			} else {
+				return insn->op;
+			}
 		case IR_CALL:
 			ctx->flags2 |= IR_HAS_CALLS;
 			return IR_CALL;
