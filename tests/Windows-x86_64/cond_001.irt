@@ -16,10 +16,6 @@ Windows-x86_64
 --EXPECT--
 test:
 	testl %ecx, %ecx
-	je .L1
 	movl %edx, %eax
-	jmp .L2
-.L1:
-	movl %r8d, %eax
-.L2:
+	cmovel %r8d, %eax
 	retq
