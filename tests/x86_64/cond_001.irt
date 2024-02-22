@@ -16,10 +16,6 @@ x86_64
 --EXPECT--
 test:
 	testl %edi, %edi
-	je .L1
 	movl %esi, %eax
-	jmp .L2
-.L1:
-	movl %edx, %eax
-.L2:
+	cmovel %edx, %eax
 	retq

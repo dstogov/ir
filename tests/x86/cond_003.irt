@@ -16,16 +16,15 @@ x86
 --EXPECT--
 test:
 	subl $8, %esp
-	movl 0xc(%esp), %eax
-	movsd 0x10(%esp), %xmm0
-	movsd 0x18(%esp), %xmm1
-	testl %eax, %eax
+	cmpl $0, 0xc(%esp)
 	je .L1
+	movsd 0x10(%esp), %xmm0
 	jmp .L2
 .L1:
-	movapd %xmm1, %xmm0
+	movsd 0x18(%esp), %xmm0
 .L2:
 	movsd %xmm0, (%esp)
 	fldl (%esp)
 	addl $8, %esp
 	retl
+
