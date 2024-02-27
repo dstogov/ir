@@ -14,5 +14,5 @@ x86_64
 }
 --EXPECT--
 test:
-	xorq %rax, %rax
+	xorb %al, %al
 	retq

@@ -14,5 +14,5 @@ x86
 }
 --EXPECT--
 test:
-	xorl %eax, %eax
+	xorb %al, %al
 	retl

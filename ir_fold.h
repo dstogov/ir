@@ -1586,6 +1586,72 @@ IR_FOLD(SUB(C_I64, _))
 	IR_FOLD_NEXT;
 }
 
+IR_FOLD(UGE(_, C_U8))
+IR_FOLD(UGE(_, C_U16))
+IR_FOLD(UGE(_, C_U32))
+IR_FOLD(UGE(_, C_U64))
+IR_FOLD(UGE(_, C_I8))
+IR_FOLD(UGE(_, C_I16))
+IR_FOLD(UGE(_, C_I32))
+IR_FOLD(UGE(_, C_I64))
+IR_FOLD(UGE(_, C_ADDR))
+{
+	if (op2_insn->val.u64 == 0) {
+		IR_FOLD_COPY(IR_TRUE);
+	}
+	IR_FOLD_NEXT;
+}
+
+IR_FOLD(UGT(_, C_U8))
+IR_FOLD(UGT(_, C_U16))
+IR_FOLD(UGT(_, C_U32))
+IR_FOLD(UGT(_, C_U64))
+IR_FOLD(UGT(_, C_I8))
+IR_FOLD(UGT(_, C_I16))
+IR_FOLD(UGT(_, C_I32))
+IR_FOLD(UGT(_, C_I64))
+IR_FOLD(UGT(_, C_ADDR))
+{
+	if (op2_insn->val.u64 == 0) {
+		opt = IR_OPT(IR_NE, IR_BOOL);
+		IR_FOLD_RESTART;
+	}
+	IR_FOLD_NEXT;
+}
+
+IR_FOLD(ULT(_, C_U8))
+IR_FOLD(ULT(_, C_U16))
+IR_FOLD(ULT(_, C_U32))
+IR_FOLD(ULT(_, C_U64))
+IR_FOLD(ULT(_, C_I8))
+IR_FOLD(ULT(_, C_I16))
+IR_FOLD(ULT(_, C_I32))
+IR_FOLD(ULT(_, C_I64))
+IR_FOLD(ULT(_, C_ADDR))
+{
+	if (op2_insn->val.u64 == 0) {
+		IR_FOLD_COPY(IR_FALSE);
+	}
+	IR_FOLD_NEXT;
+}
+
+IR_FOLD(ULE(_, C_U8))
+IR_FOLD(ULE(_, C_U16))
+IR_FOLD(ULE(_, C_U32))
+IR_FOLD(ULE(_, C_U64))
+IR_FOLD(ULE(_, C_I8))
+IR_FOLD(ULE(_, C_I16))
+IR_FOLD(ULE(_, C_I32))
+IR_FOLD(ULE(_, C_I64))
+IR_FOLD(ULE(_, C_ADDR))
+{
+	if (op2_insn->val.u64 == 0) {
+		opt = IR_OPT(IR_EQ, IR_BOOL);
+		IR_FOLD_RESTART;
+	}
+	IR_FOLD_NEXT;
+}
+
 IR_FOLD(ADD(NEG, _))
 {
 	/* (-a) + b => b - a */
@@ -2336,7 +2402,7 @@ IR_FOLD(BITCAST(BITCAST))
 	IR_FOLD_NEXT;
 }
 
-//IR_FOLD(TRUNC(TRUNC))
+IR_FOLD(TRUNC(TRUNC))
 IR_FOLD(ZEXT(ZEXT))
 IR_FOLD(SEXT(SEXT))
 {
