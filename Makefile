@@ -20,7 +20,7 @@ LLK        = llk
 
 ifeq (debug, $(BUILD))
  override CFLAGS += -O0 -g -DIR_DEBUG=1
- override BUILD_CFLAGS += -O0 -g -DIR_DEBUG=1
+ override BUILD_CFLAGS += -O2 -g -DIR_DEBUG=1
  MINILUA_CFLAGS = -O0 -g
 endif
 ifeq (release, $(BUILD))
