@@ -1816,12 +1816,562 @@ next:
 	return 1;
 }
 
+/* A variation of "Bottom-up Positioning" algorithm described by
+ * Karl Pettis and Robert C. Hansen "Profile Guided Code Positioning"
+ */
+typedef struct _ir_edge_info {
+	uint32_t from;
+	uint32_t to;
+	float    freq;
+} ir_edge_info;
+
+typedef struct _ir_chain {
+	uint32_t head;
+	uint32_t next;
+	union {
+		uint32_t prev;
+		uint32_t tail;
+	};
+} ir_chain;
+
+static int ir_edge_info_cmp(const void *b1, const void *b2)
+{
+	ir_edge_info *e1 = (ir_edge_info*)b1;
+	ir_edge_info *e2 = (ir_edge_info*)b2;
+
+	if (e1->freq != e2->freq) {
+		return e1->freq < e2->freq ? 1 : -1;
+	}
+	// TODO: ???
+	if (e1->from != e2->from) {
+		return e1->from - e2->from;
+	} else {
+		return e1->to - e2->to;
+	}
+}
+
+static void ir_join_chains(ir_chain *chains, uint32_t src, uint32_t dst)
+{
+	uint32_t dst_tail = chains[dst].tail;
+	uint32_t src_tail = chains[src].tail;
+	uint32_t i = dst;
+
+	chains[dst_tail].next = src;
+	chains[dst].prev = src_tail;
+	chains[src_tail].next = dst;
+	chains[src].tail = dst_tail;
+	chains[i].head = src;
+
+	while (i != dst_tail) {
+		i = chains[i].next;
+		chains[i].head = src;
+	}
+}
+
+static void ir_insert_chain_before(ir_chain *chains, uint32_t c, uint32_t before)
+{
+	ir_chain *this = &chains[c];
+	ir_chain *next = &chains[before];
+
+	IR_ASSERT(chains[before].head != before);
+
+	this->head = next->head;
+	this->next = before;
+	this->prev = next->prev;
+	next->prev = c;
+	chains[this->prev].next = c;
+}
+
+static int ir_schedule_blocks_bottom_up(ir_ctx *ctx)
+{
+	uint32_t max_count = ctx->cfg_edges_count / 2;
+	uint32_t count = 0;
+	uint32_t b, i, loop_depth;
+	float *bb_freq, freq;
+	ir_block *bb;
+	ir_edge_info *edges, *e;
+	ir_chain *chains;
+	ir_bitqueue worklist;
+	ir_bitset visited;
+
+	edges = ir_mem_malloc(sizeof(ir_edge_info) * max_count);
+	bb_freq = ir_mem_calloc(ctx->cfg_blocks_count + 1, sizeof(float));
+
+	visited = ir_bitset_malloc(ctx->cfg_blocks_count + 1);
+	ir_bitqueue_init(&worklist, ctx->cfg_blocks_count + 1);
+	ir_bitqueue_add(&worklist, 1);
+	bb_freq[1] = 1.0f;
+
+	/* 1. Collect information about BB and EDGE freqeunces */
+	while ((b = ir_bitqueue_pop(&worklist)) != (uint32_t)-1) {
+restart:
+		bb = &ctx->cfg_blocks[b];
+		if (bb->predecessors_count) {
+			uint32_t n = bb->predecessors_count;
+			uint32_t *p = ctx->cfg_edges + bb->predecessors;
+			for (; n > 0; p++, n--) {
+				uint32_t predecessor = *p;
+				if (predecessor < b) {
+//				if (b != predecessor && ctx->cfg_blocks[predecessor].loop_header != b) {
+					/* Basic Blocks are ordered in a way that predecessors numbers are less then successors */
+					if (!ir_bitset_in(visited, predecessor)) {
+//						ir_bitqueue_add(&worklist, b);
+						b = predecessor;
+						goto restart;
+					}
+				} else if (b != predecessor && ctx->cfg_blocks[predecessor].loop_header != b) {
+					ir_dump_cfg(ctx, stderr);
+					IR_ASSERT(b == predecessor || ctx->cfg_blocks[predecessor].loop_header == b);
+				}
+			}
+		}
+
+		loop_depth = bb->loop_depth;
+		ir_bitset_incl(visited, b);
+		if (bb->flags & IR_BB_LOOP_HEADER) {
+			// TODO: loop iterations count
+			bb_freq[b] *= 10;
+		}
+
+		if (bb->successors_count) {
+			uint32_t n = bb->successors_count;
+			uint32_t *p = ctx->cfg_edges + bb->successors;
+
+			if (n == 1) {
+				uint32_t successor = *p;
+
+				IR_ASSERT(count < max_count);
+				freq = bb_freq[b];
+				edges[count].from = b;
+				edges[count].to = successor;
+				edges[count].freq = freq;
+				count++;
+//				if (b != successor && bb->loop_header != successor) {
+				if (successor > b) {
+					IR_ASSERT(!ir_bitset_in(visited, successor));
+					bb_freq[successor] += freq;
+					ir_bitqueue_add(&worklist, successor);
+				}
+			} else if (n == 2 && ctx->ir_base[bb->end].op == IR_IF) {
+				uint32_t successor1 = *p;
+				ir_block *successor1_bb = &ctx->cfg_blocks[successor1];
+				ir_insn *insn1 = &ctx->ir_base[successor1_bb->start];
+				uint32_t successor2 = *(p + 1);
+				ir_block *successor2_bb = &ctx->cfg_blocks[successor2];
+				ir_insn *insn2 = &ctx->ir_base[successor2_bb->start];
+				int prob1, prob2, probN = 100;
+
+				if (insn1->op2) {
+					prob1 = insn1->op2;
+					if (insn2->op2) {
+						prob2 = insn2->op2;
+						probN = prob1 + prob2;
+					} else {
+						if (prob1 > 99) {
+							prob1 = 99;
+						}
+						prob2 = 100 - prob1;
+					}
+
+				} else if (insn2->op2) {
+					prob2 = insn2->op2;
+					if (prob2 > 99) {
+						prob2 = 99;
+					}
+					prob1 = 100 - prob2;
+				} else if (successor1_bb->loop_depth >= loop_depth
+						&& successor2_bb->loop_depth < loop_depth) {
+					// TODO: loop level and iterations count
+					prob1 = 90;
+					prob2 = 10;
+				} else if (successor1_bb->loop_depth < loop_depth
+						&& successor2_bb->loop_depth >= loop_depth) {
+					// TODO: loop level and iterations count
+					prob1 = 10;
+					prob2 = 90;
+				} else if (successor2_bb->flags & IR_BB_EMPTY) {
+					// TODO: empty connector blocks
+					prob1 = 51;
+					prob2 = 49;
+				} else if (successor1_bb->flags & IR_BB_EMPTY) {
+					// TODO: empty connector blocks
+					prob1 = 49;
+					prob2 = 51;
+				} else {
+					prob1 = prob2 = 50;
+				}
+				IR_ASSERT(count < max_count);
+				freq = bb_freq[b] * (float)prob1 / (float)probN;
+				edges[count].from = b;
+				edges[count].to = successor1;
+				edges[count].freq = freq;
+				count++;
+//				if (b != successor1 && bb->loop_header != successor1) {
+				if (successor1 > b) {
+					IR_ASSERT(!ir_bitset_in(visited, successor1));
+					bb_freq[successor1] += freq;
+					ir_bitqueue_add(&worklist, successor1);
+				}
+				IR_ASSERT(count < max_count);
+				freq = bb_freq[b] * (float)prob2 / (float)probN;
+				edges[count].from = b;
+				edges[count].to = successor2;
+				edges[count].freq = freq;
+				count++;
+//				if (b != successor2 && bb->loop_header != successor2) {
+				if (successor2 > b) {
+					IR_ASSERT(!ir_bitset_in(visited, successor2));
+					bb_freq[successor2] += freq;
+					ir_bitqueue_add(&worklist, successor2);
+				}
+			} else {
+				int prob;
+
+				for (; n > 0; p++, n--) {
+					uint32_t successor = *p;
+					ir_block *successor_bb = &ctx->cfg_blocks[successor];
+					ir_insn *insn = &ctx->ir_base[successor_bb->start];
+
+					if (insn->op == IR_CASE_DEFAULT) {
+						prob = insn->op2;
+						if (!prob) {
+							prob = 100 / bb->successors_count;
+						}
+					} else if (insn->op == IR_CASE_VAL) {
+						prob = insn->op3;
+						if (!prob) {
+							prob = 100 / bb->successors_count;
+						}
+					} else if (insn->op == IR_ENTRY) {
+						if ((ctx->flags & IR_MERGE_EMPTY_ENTRIES) && (successor_bb->flags & IR_BB_EMPTY)) {
+							prob = 99; /* prefer empty ENTRY block to go first */
+						} else {
+							prob = 1;
+						}
+					} else {
+						prob = 100 / bb->successors_count;
+					}
+					IR_ASSERT(count < max_count);
+					freq = bb_freq[b] * (float)prob / 100.0f;
+					edges[count].from = b;
+					edges[count].to = successor;
+					edges[count].freq = freq;
+					count++;
+//					if (b != successor && bb->loop_header != successor) {
+					if (successor > b) {
+						IR_ASSERT(!ir_bitset_in(visited, successor));
+						bb_freq[successor] += freq;
+						ir_bitqueue_add(&worklist, successor);
+					}
+				}
+			}
+		}
+	}
+
+	/* 2. Sort EDGEs according to their frequensy */
+	qsort(edges, count, sizeof(ir_edge_info), ir_edge_info_cmp);
+
+#if 0
+	fprintf(stderr, "digraph {\n");
+	fprintf(stderr, "\trankdir=TB;\n");
+	for (b = 1; b <= ctx->cfg_blocks_count; b++) {
+		bb = &ctx->cfg_blocks[b];
+		fprintf(stderr, "\tBB%d [label=\"BB%d: %d%s,%0.3f\\n%s\\n%s\"]\n", b, b,
+			bb->loop_depth, ((bb->flags & IR_BB_EMPTY) ? ",E": ""), bb_freq[b],
+			ir_op_name[ctx->ir_base[bb->start].op], ir_op_name[ctx->ir_base[bb->end].op]);
+	}
+	fprintf(stderr, "\n");
+	for (b = 0; b < count; b++) {
+		fprintf(stderr, "\tBB%d -> BB%d [label=\"%0.3f\"]\n", edges[b].from, edges[b].to, edges[b].freq);
+	}
+	fprintf(stderr, "}\n");
+#endif
+
+    /* 3. Create initial chains for each BB */
+    chains = ir_mem_malloc(sizeof(ir_chain) * (ctx->cfg_blocks_count + 1));
+	for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
+		chains[b].head = b;
+		chains[b].next = b;
+		chains[b].prev = b;
+	}
+
+	/* 4. Process EDGEs according to their frequensies and form longer chains */
+	for (e = edges, i = count; i > 0; e++, i--) {
+#if 0
+		fprintf(stderr, "[BB%d->BB%d]\n", e->from, e->to);
+#endif
+		uint32_t src = chains[e->from].head;
+		uint32_t dst = chains[e->to].head;
+		if (src == dst) {
+			if (chains[src].tail == e->from
+			 && chains[src].head == e->to
+			 && ctx->ir_base[ctx->cfg_blocks[src].start].op == IR_LOOP_BEGIN
+			 && ctx->ir_base[ctx->cfg_blocks[src].end].op == IR_IF
+			 && ctx->ir_base[ctx->cfg_blocks[e->from].end].op == IR_LOOP_END) {
+				/* rotate loop moving the loop condition to the end */
+				uint32_t new_head = e->from;
+				uint32_t i = src;
+				uint32_t tail = chains[src].tail;
+
+				while (1) {
+					chains[i].head = new_head;
+					if (i == tail) break;
+					i = chains[i].next;
+				}
+			}
+		} else if (chains[src].tail == e->from && dst == e->to) {
+			/* join two chains connected by the edge */
+			ir_join_chains(chains, src, dst);
+		}
+#if 0
+		do {
+			bool first = 1;
+			for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
+				if (chains[b].head == b) {
+					uint32_t tail = chains[b].tail;
+					uint32_t i = b;
+					if (first) {
+						first = 0;
+					} else {
+						fprintf(stderr, ", ");
+					}
+					fprintf(stderr, "(BB%d", i);
+					while (i != tail) {
+						i = chains[i].next;
+						fprintf(stderr, ", BB%d", i);
+					}
+					fprintf(stderr, ")");
+				}
+			}
+			fprintf(stderr, "\n");
+		} while (0);
+#endif
+	}
+
+#if 0
+	do {
+		fprintf(stderr, "Chains:\n");
+		for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
+			if (chains[b].head == b) {
+				uint32_t tail = chains[b].tail;
+				uint32_t i = b;
+				fprintf(stderr, "(BB%d", i);
+				while (i != tail) {
+					i = chains[i].next;
+					fprintf(stderr, ", BB%d", i);
+				}
+				fprintf(stderr, ")\n");
+			}
+		}
+	} while (0);
+#endif
+#if 0
+	do {
+		uint8_t *colors = alloca(sizeof(uint8_t) * (ctx->cfg_blocks_count + 1));
+		uint32_t n = 0;
+
+		memset(colors, 0, sizeof(uint8_t) * (ctx->cfg_blocks_count + 1));
+		for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
+			if (chains[b].head == b) {
+				colors[b] = ++n;
+				if (n > 12) break;
+			}
+		}
+		fprintf(stderr, "digraph {\n");
+		fprintf(stderr, "\trankdir=TB;\n");
+		for (b = 1; b <= ctx->cfg_blocks_count; b++) {
+			bb = &ctx->cfg_blocks[b];
+
+			fprintf(stderr, "\tBB%d [label=\"BB%d: %d%s,%0.3f\\n%s\\n%s\",colorscheme=set312,style=filled,fillcolor=%d]\n", b, b,
+				bb->loop_depth, ((bb->flags & IR_BB_EMPTY) ? ",E": ""), bb_freq[b],
+				ir_op_name[ctx->ir_base[bb->start].op], ir_op_name[ctx->ir_base[bb->end].op],
+				colors[chains[b].head]);
+		}
+		fprintf(stderr, "\n");
+		for (b = 0; b < count; b++) {
+			fprintf(stderr, "\tBB%d -> BB%d [label=\"%0.3f\"]\n", edges[b].from, edges[b].to, edges[b].freq);
+		}
+		fprintf(stderr, "}\n");
+	} while (0);
+#endif
+
+#if 1
+	/* 5. Merge empty blocks */
+	bb = ctx->cfg_blocks + 2;
+	for (b = 2; b < ctx->cfg_blocks_count + 1; bb++, b++) {
+		if (bb->flags & IR_BB_EMPTY) {
+			if (chains[b].head == b && chains[b].tail == b) {
+				IR_ASSERT(bb->successors_count == 1);
+				uint32_t succ = ctx->cfg_edges[bb->successors];
+				IR_ASSERT(chains[succ].head != succ);
+				ir_insert_chain_before(chains, b, succ);
+			}
+		}
+	}
+#endif
+#if 0
+	do {
+		fprintf(stderr, "Chains:\n");
+		for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
+			if (chains[b].head == b) {
+				uint32_t tail = chains[b].tail;
+				uint32_t i = b;
+				fprintf(stderr, "(BB%d", i);
+				while (i != tail) {
+					i = chains[i].next;
+					fprintf(stderr, ", BB%d", i);
+				}
+				fprintf(stderr, ")\n");
+			}
+		}
+	} while (0);
+#endif
+
+    /* 5. Order chains accoring to their relations */
+#if 1
+#if 0
+	fprintf(stderr, "---\n");
+#endif
+	for (e = edges, i = count; i > 0; e++, i--) {
+		uint32_t src = chains[e->from].head;
+		uint32_t dst = chains[e->to].head;
+		if (src != dst) {
+			bb = &ctx->cfg_blocks[e->from];
+#if 0
+			fprintf(stderr, "[BB%d->BB%d: %0.3f] (BB%d->BB%d) %s\n", e->from, e->to, e->freq, src, dst,
+				ir_op_name[ctx->ir_base[bb->end].op]);
+#endif
+			if (ctx->ir_base[bb->end].op == IR_IF) {
+				IR_ASSERT(bb->successors_count == 2);
+				uint32_t other = ctx->cfg_edges[bb->successors];
+				if (other == e->to) {
+					other = ctx->cfg_edges[bb->successors + 1];
+				}
+				if (chains[other].head != src) {
+					if (src != 1) {
+						ir_join_chains(chains, dst, src);
+					}
+				} else {
+					if (dst != 1) {
+//						ir_join_chains(chains, src, dst);
+					}
+				}
+			} else {
+				if (dst != 1) {
+					ir_join_chains(chains, src, dst);
+				} else {
+					ir_join_chains(chains, dst, src);
+				}
+			}
+		}
+	}
+#endif
+#if 0
+	do {
+		fprintf(stderr, "Chains:\n");
+		for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
+			if (chains[b].head == b) {
+				uint32_t tail = chains[b].tail;
+				uint32_t i = b;
+				fprintf(stderr, "(BB%d", i);
+				while (i != tail) {
+					i = chains[i].next;
+					fprintf(stderr, ", BB%d", i);
+				}
+				fprintf(stderr, ")\n");
+			}
+		}
+	} while (0);
+#endif
+
+	/* X. ??? */
+	bool reorder;
+	uint32_t *list = ir_mem_malloc(sizeof(uint32_t) * (ctx->cfg_blocks_count + 1) * 2);
+	uint32_t *map = list + (ctx->cfg_blocks_count + 1);
+	uint32_t n = 0;
+
+	for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
+		if (chains[b].head == b) {
+			uint32_t tail = chains[b].tail;
+			uint32_t i = b;
+			while (1) {
+				n++;
+				list[n] = i;
+				map[i] = n;
+				if (i != n) reorder = 1;
+				if (i == tail) break;
+				i = chains[i].next;
+			}
+		}
+	}
+
+	/* X. Final reordering */
+	if (reorder) {
+		ir_block *cfg_blocks = ir_mem_malloc(sizeof(ir_block) * (ctx->cfg_blocks_count + 1));
+
+		memset(ctx->cfg_blocks, 0, sizeof(ir_block));
+		for (b = 1, bb = cfg_blocks + 1; b <= n; b++, bb++) {
+			*bb = ctx->cfg_blocks[list[b]];
+			if (bb->dom_parent > 0) {
+				bb->dom_parent = map[bb->dom_parent];
+			}
+			if (bb->dom_child > 0) {
+				bb->dom_child = map[bb->dom_child];
+			}
+			if (bb->dom_next_child > 0) {
+				bb->dom_next_child = map[bb->dom_next_child];
+			}
+			if (bb->loop_header > 0) {
+				bb->loop_header = map[bb->loop_header];
+			}
+		}
+		for (i = 0; i < ctx->cfg_edges_count; i++) {
+			if (ctx->cfg_edges[i] > 0) {
+				ctx->cfg_edges[i] = map[ctx->cfg_edges[i]];
+			}
+		}
+		ir_mem_free(ctx->cfg_blocks);
+		ctx->cfg_blocks = cfg_blocks;
+
+		if (ctx->osr_entry_loads) {
+			ir_list *list = (ir_list*)ctx->osr_entry_loads;
+			uint32_t pos = 0, count;
+
+			while (1) {
+				b = ir_list_at(list, pos);
+				if (b == 0) {
+					break;
+				}
+				ir_list_set(list, pos, map[b]);
+				pos++;
+				count = ir_list_at(list, pos);
+				pos += count + 1;
+			}
+		}
+
+		if (ctx->cfg_map) {
+			ir_ref i;
+
+			for (i = IR_UNUSED + 1; i < ctx->insns_count; i++) {
+				ctx->cfg_map[i] = map[ctx->cfg_map[i]];
+			}
+		}
+	}
+
+	ir_mem_free(list);
+	ir_mem_free(chains);
+	ir_mem_free(visited);
+	ir_bitqueue_free(&worklist);
+	ir_mem_free(bb_freq);
+	ir_mem_free(edges);
+
+	return 1;
+}
+
 /* A variation of "Top-down Positioning" algorithm described by
  * Karl Pettis and Robert C. Hansen "Profile Guided Code Positioning"
- *
- * TODO: Switch to "Bottom-up Positioning" algorithm
  */
-int ir_schedule_blocks(ir_ctx *ctx)
+static int ir_schedule_blocks_top_down(ir_ctx *ctx)
 {
 	ir_bitqueue blocks;
 	uint32_t b, best_successor, last_non_empty;
@@ -1951,6 +2501,17 @@ int ir_schedule_blocks(ir_ctx *ctx)
 	ir_bitqueue_free(&blocks);
 
 	return 1;
+}
+
+int ir_schedule_blocks(ir_ctx *ctx)
+{
+	if (ctx->cfg_blocks_count <= 2) {
+		return 1;
+	} else if (UNEXPECTED(ctx->flags2 & IR_IRREDUCIBLE_CFG)) {
+		return ir_schedule_blocks_top_down(ctx);
+	} else {
+		return ir_schedule_blocks_bottom_up(ctx);
+	}
 }
 
 /* JMP target optimisation */
