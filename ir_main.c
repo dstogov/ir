@@ -16,6 +16,27 @@
 # include <alloca.h>
 #endif
 
+#ifndef _WIN32
+# include <sys/time.h>
+static double ir_time(void)
+{
+	struct timeval tv;
+
+	gettimeofday(&tv, NULL);
+	return (double)tv.tv_sec + (double)tv.tv_usec / 1000000.0;
+}
+#else
+static double ir_time(void)
+{
+	FILETIME filetime;
+
+	GetSystemTimeAsFileTime(&filetime);
+	return (double)((((uint64_t)filetime.dwHighDateTime << 32) | (uint64_t)filetime.dwLowDateTime)/10) /
+		1000000.0;
+}
+
+#endif
+
 static void help(const char *cmd)
 {
 	printf(
@@ -48,6 +69,7 @@ static void help(const char *cmd)
 		"  --dump-after-all           - dump IR after each pass\n"
 		"  --dump-final               - dump IR after all pass\n"
 		"  --dump-size                - dump generated code size\n"
+		"  --dump-time                - dump compilation and execution time\n"
 		"  --dump-use-lists           - dump def->use lists\n"
 		"  --dump-cfg                 - dump CFG (Control Flow Graph)\n"
 		"  --dump-cfg-map             - dump CFG map (instruction to BB number)\n"
@@ -890,7 +912,7 @@ int main(int argc, char **argv)
 	char *input = NULL;
 	char *dump_file = NULL, *c_file = NULL, *llvm_file = 0;
 	FILE *f;
-	bool emit_c = 0, emit_llvm = 0, dump_size = 0, dump_asm = 0, run = 0;
+	bool emit_c = 0, emit_llvm = 0, dump_size = 0, dump_time = 0, dump_asm = 0, run = 0;
 	uint32_t dump = 0;
 	int opt_level = 2;
 	uint32_t flags = 0;
@@ -908,6 +930,7 @@ int main(int argc, char **argv)
 #endif
 	ir_main_loader loader;
 	int ret = 0;
+	double start;
 
 	ir_consistency_check();
 
@@ -992,6 +1015,8 @@ int main(int argc, char **argv)
 			dump |= IR_DUMP_FINAL;
 		} else if (strcmp(argv[i], "--dump-size") == 0) {
 			dump_size = 1;
+		} else if (strcmp(argv[i], "--dump-time") == 0) {
+			dump_time = 1;
 		} else if (strcmp(argv[i], "-S") == 0) {
 			dump_asm = 1;
 		} else if (strcmp(argv[i], "--run") == 0) {
@@ -1217,6 +1242,10 @@ int main(int argc, char **argv)
 	}
 #endif
 
+	if (dump_time) {
+		start = ir_time();
+	}
+
 #if HAVE_LLVM
 	if (load_llvm_bitcode) {
 		if (!ir_load_llvm_bitcode(&loader.loader, input)) {
@@ -1284,6 +1313,12 @@ finish:
 		fprintf(stderr, "\ncode size = %lld\n", (long long int)loader.size);
 	}
 
+	if (dump_time) {
+		double t = ir_time();
+		fprintf(stderr, "\ncompilation time = %0.6f\n", t - start);
+		start = t;
+	}
+
 	if (run && loader.main) {
 		int jit_argc = 1;
 		char **jit_argv;
@@ -1298,6 +1333,12 @@ finish:
 			jit_argv[i] = argv[run_args + i - 1];
 		}
 		ret = func(jit_argc, jit_argv);
+
+		if (dump_time) {
+			double t = ir_time();
+			fprintf(stderr, "\nexecution time = %0.6f\n", t - start);
+		}
+
 #ifndef _WIN32
 		ir_perf_jitdump_close();
 #endif
