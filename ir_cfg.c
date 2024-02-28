@@ -1850,22 +1850,26 @@ static int ir_edge_info_cmp(const void *b1, const void *b2)
 	}
 }
 
+static uint32_t ir_chain_head(ir_chain *chains, uint32_t src)
+{
+	uint32_t head = chains[src].head;
+	if (chains[head].head == head) {
+		return head;
+	} else {
+		return chains[head].head = ir_chain_head(chains, head);
+	}
+}
+
 static void ir_join_chains(ir_chain *chains, uint32_t src, uint32_t dst)
 {
 	uint32_t dst_tail = chains[dst].tail;
 	uint32_t src_tail = chains[src].tail;
-	uint32_t i = dst;
 
 	chains[dst_tail].next = src;
 	chains[dst].prev = src_tail;
 	chains[src_tail].next = dst;
 	chains[src].tail = dst_tail;
-	chains[i].head = src;
-
-	while (i != dst_tail) {
-		i = chains[i].next;
-		chains[i].head = src;
-	}
+	chains[dst].head = src;
 }
 
 static void ir_insert_chain_before(ir_chain *chains, uint32_t c, uint32_t before)
@@ -2100,24 +2104,18 @@ restart:
 #if 0
 		fprintf(stderr, "[BB%d->BB%d]\n", e->from, e->to);
 #endif
-		uint32_t src = chains[e->from].head;
-		uint32_t dst = chains[e->to].head;
+		uint32_t src = ir_chain_head(chains, e->from);
+		uint32_t dst = ir_chain_head(chains, e->to);
 		if (src == dst) {
 			if (chains[src].tail == e->from
-			 && chains[src].head == e->to
+			 && src == e->to
 			 && ctx->ir_base[ctx->cfg_blocks[src].start].op == IR_LOOP_BEGIN
 			 && ctx->ir_base[ctx->cfg_blocks[src].end].op == IR_IF
 			 && ctx->ir_base[ctx->cfg_blocks[e->from].end].op == IR_LOOP_END) {
 				/* rotate loop moving the loop condition to the end */
 				uint32_t new_head = e->from;
-				uint32_t i = src;
-				uint32_t tail = chains[src].tail;
-
-				while (1) {
-					chains[i].head = new_head;
-					if (i == tail) break;
-					i = chains[i].next;
-				}
+				chains[src].head = new_head;
+				chains[new_head].head = new_head;
 			}
 		} else if (chains[src].tail == e->from && dst == e->to) {
 			/* join two chains connected by the edge */
@@ -2185,7 +2183,7 @@ restart:
 			fprintf(stderr, "\tBB%d [label=\"BB%d: %d%s,%0.3f\\n%s\\n%s\",colorscheme=set312,style=filled,fillcolor=%d]\n", b, b,
 				bb->loop_depth, ((bb->flags & IR_BB_EMPTY) ? ",E": ""), bb_freq[b],
 				ir_op_name[ctx->ir_base[bb->start].op], ir_op_name[ctx->ir_base[bb->end].op],
-				colors[chains[b].head]);
+				colors[ir_chain_head(b));
 		}
 		fprintf(stderr, "\n");
 		for (b = 0; b < count; b++) {
@@ -2202,9 +2200,7 @@ restart:
 		if (bb->flags & IR_BB_EMPTY) {
 			if (chains[b].head == b && chains[b].tail == b) {
 				IR_ASSERT(bb->successors_count == 1);
-				uint32_t succ = ctx->cfg_edges[bb->successors];
-				IR_ASSERT(chains[succ].head != succ);
-				ir_insert_chain_before(chains, b, succ);
+				ir_insert_chain_before(chains, b, ctx->cfg_edges[bb->successors]);
 			}
 		}
 	}
@@ -2233,8 +2229,8 @@ restart:
 	fprintf(stderr, "---\n");
 #endif
 	for (e = edges, i = count; i > 0; e++, i--) {
-		uint32_t src = chains[e->from].head;
-		uint32_t dst = chains[e->to].head;
+		uint32_t src = ir_chain_head(chains, e->from);
+		uint32_t dst = ir_chain_head(chains, e->to);
 		if (src != dst) {
 			bb = &ctx->cfg_blocks[e->from];
 #if 0
@@ -2247,7 +2243,7 @@ restart:
 				if (other == e->to) {
 					other = ctx->cfg_edges[bb->successors + 1];
 				}
-				if (chains[other].head != src) {
+				if (ir_chain_head(chains, other) != src) {
 					if (src != 1) {
 						ir_join_chains(chains, dst, src);
 					}
