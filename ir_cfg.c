@@ -1856,8 +1856,9 @@ static IR_NEVER_INLINE uint32_t ir_chain_head_path_compress(ir_chain *chains, ui
 		head = chains[head].head;
 	} while (chains[head].head != head);
 	do {
+		uint32_t next = chains[src].head;
 		chains[src].head = head;
-		src = chains[src].head;
+		src = next;
 	} while (chains[src].head != head);
 	return head;
 }
@@ -2095,9 +2096,11 @@ restart:
 				IR_ASSERT(edges_count < max_edges_count);
 				freq = bb_freq[b] * (float)prob1 / (float)probN;
 				if (!IR_DEBUG_BB_SCHEDULE_GRAPH && prob1 > prob2) {
-					uint32_t src = ir_chain_head(chains, b);
-					uint32_t dst = ir_chain_head(chains, successor1);
-					ir_join_chains(chains, src, dst);
+					uint32_t src = chains[b].next;
+					IR_ASSERT(chains[src].head == src);
+					IR_ASSERT(src == ir_chain_head(chains, b));
+					IR_ASSERT(chains[successor1].head == successor1);
+					ir_join_chains(chains, src, successor1);
 				} else {
 					edges[edges_count].from = b;
 					edges[edges_count].to = successor1;
@@ -2113,9 +2116,11 @@ restart:
 				IR_ASSERT(edges_count < max_edges_count);
 				freq = bb_freq[b] * (float)prob2 / (float)probN;
 				if (!IR_DEBUG_BB_SCHEDULE_GRAPH && prob2 > prob1) {
-					uint32_t src = ir_chain_head(chains, b);
-					uint32_t dst = ir_chain_head(chains, successor2);
-					ir_join_chains(chains, src, dst);
+					uint32_t src = chains[b].next;
+					IR_ASSERT(chains[src].head == src);
+					IR_ASSERT(src == ir_chain_head(chains, b));
+					IR_ASSERT(chains[successor2].head == successor2);
+					ir_join_chains(chains, src, successor2);
 				} else {
 					edges[edges_count].from = b;
 					edges[edges_count].to = successor2;
@@ -2181,8 +2186,9 @@ restart:
 	for (e = edges, i = edges_count; i > 0; e++, i--) {
 		uint32_t dst = chains[e->to].head;
 		if (dst == e->to) {
-			uint32_t src = ir_chain_head(chains, e->from);
-			if (chains[src].tail == e->from) {
+			uint32_t src = chains[e->from].next;
+			if (chains[src].head == src) {
+				IR_ASSERT(src == ir_chain_head(chains, e->from) && chains[src].tail == e->from);
 				if (src != dst) {
 					ir_join_chains(chains, src, dst);
 				} else if (ctx->ir_base[ctx->cfg_blocks[src].start].op == IR_LOOP_BEGIN
