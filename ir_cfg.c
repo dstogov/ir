@@ -2199,6 +2199,9 @@ restart:
 					chains[src].head = new_head;
 					chains[new_head].head = new_head;
 				}
+#if !IR_DEBUG_BB_SCHEDULE_GRAPH
+				e->from = 0; /* reset "from" to avoid check on step #5 */
+#endif
 			}
 		}
 	}
@@ -2230,6 +2233,9 @@ restart:
 
 	/* 5. Group chains accoring to the more frequnt edges between them */
 	for (e = edges, i = edges_count; i > 0; e++, i--) {
+#if !IR_DEBUG_BB_SCHEDULE_GRAPH
+		if (!e->from) continue;
+#endif
 		uint32_t src = ir_chain_head(chains, e->from);
 		uint32_t dst = ir_chain_head(chains, e->to);
 		if (src != dst) {
