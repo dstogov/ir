@@ -1886,10 +1886,81 @@ static void ir_insert_chain_before(ir_chain *chains, uint32_t c, uint32_t before
 	chains[this->prev].next = c;
 }
 
+#ifndef IR_DEBUG_BB_SCHEDULE_GRAPH
+# define IR_DEBUG_BB_SCHEDULE_GRAPH 0
+#endif
+#ifndef IR_DEBUG_BB_SCHEDULE_CHAINS
+# define IR_DEBUG_BB_SCHEDULE_CHAINS 0
+#endif
+
+#if IR_DEBUG_BB_SCHEDULE_GRAPH
+static void ir_dump_cfg_freq_graph(ir_ctx *ctx, float *bb_freq, uint32_t edges_count, ir_edge_info *edges, ir_chain *chains)
+{
+	uint32_t b, i;
+	ir_block *bb;
+	uint8_t c, *colors;
+	uint32_t max_colors = 12;
+
+	colors = alloca(sizeof(uint8_t) * (ctx->cfg_blocks_count + 1));
+	memset(colors, 0, sizeof(uint8_t) * (ctx->cfg_blocks_count + 1));
+	i = 0;
+	for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
+		if (chains[b].head == b) {
+			colors[b] = ++i;
+			if (i > max_colors) break;
+		}
+	}
+
+	fprintf(stderr, "digraph {\n");
+	fprintf(stderr, "\trankdir=TB;\n");
+	for (b = 1; b <= ctx->cfg_blocks_count; b++) {
+		bb = &ctx->cfg_blocks[b];
+		c = colors[ir_chain_head(chains, b)];
+		if (c) {
+			fprintf(stderr, "\tBB%d [label=\"BB%d: %d%s,%0.3f\\n%s\\n%s\",colorscheme=set312,style=filled,fillcolor=%d]\n", b, b,
+				bb->loop_depth, ((bb->flags & IR_BB_EMPTY) ? ",E": ""), bb_freq[b],
+				ir_op_name[ctx->ir_base[bb->start].op], ir_op_name[ctx->ir_base[bb->end].op],
+				c);
+		} else {
+			fprintf(stderr, "\tBB%d [label=\"BB%d: %d%s,%0.3f\\n%s\\n%s\"]\n", b, b,
+				bb->loop_depth, ((bb->flags & IR_BB_EMPTY) ? ",E": ""), bb_freq[b],
+				ir_op_name[ctx->ir_base[bb->start].op], ir_op_name[ctx->ir_base[bb->end].op]);
+		}
+	}
+	fprintf(stderr, "\n");
+
+	for (i = 0; i < edges_count; i++) {
+		fprintf(stderr, "\tBB%d -> BB%d [label=\"%0.3f\"]\n", edges[i].from, edges[i].to, edges[i].freq);
+	}
+	fprintf(stderr, "}\n");
+}
+#endif
+
+#if IR_DEBUG_BB_SCHEDULE_CHAINS
+static void ir_dump_chains(ir_ctx *ctx, ir_chain *chains)
+{
+	uint32_t b, tail, i;
+
+	fprintf(stderr, "Chains:\n");
+	for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
+		if (chains[b].head == b) {
+			tail = chains[b].tail;
+			i = b;
+			fprintf(stderr, "(BB%d", i);
+			while (i != tail) {
+				i = chains[i].next;
+				fprintf(stderr, ", BB%d", i);
+			}
+			fprintf(stderr, ")\n");
+		}
+	}
+}
+#endif
+
 static int ir_schedule_blocks_bottom_up(ir_ctx *ctx)
 {
-	uint32_t max_count = ctx->cfg_edges_count / 2;
-	uint32_t count = 0;
+	uint32_t max_edges_count = ctx->cfg_edges_count / 2;
+	uint32_t edges_count = 0;
 	uint32_t b, i, loop_depth;
 	float *bb_freq, freq;
 	ir_block *bb;
@@ -1898,7 +1969,7 @@ static int ir_schedule_blocks_bottom_up(ir_ctx *ctx)
 	ir_bitqueue worklist;
 	ir_bitset visited;
 
-	edges = ir_mem_malloc(sizeof(ir_edge_info) * max_count);
+	edges = ir_mem_malloc(sizeof(ir_edge_info) * max_edges_count);
 	bb_freq = ir_mem_calloc(ctx->cfg_blocks_count + 1, sizeof(float));
 
 	visited = ir_bitset_malloc(ctx->cfg_blocks_count + 1);
@@ -1906,7 +1977,15 @@ static int ir_schedule_blocks_bottom_up(ir_ctx *ctx)
 	ir_bitqueue_add(&worklist, 1);
 	bb_freq[1] = 1.0f;
 
-	/* 1. Collect information about BB and EDGE freqeunces */
+	/* 1. Create initial chains for each BB */
+	chains = ir_mem_malloc(sizeof(ir_chain) * (ctx->cfg_blocks_count + 1));
+	for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
+		chains[b].head = b;
+		chains[b].next = b;
+		chains[b].prev = b;
+	}
+
+	/* 2. Collect information about BB and EDGE freqeunces */
 	while ((b = ir_bitqueue_pop(&worklist)) != (uint32_t)-1) {
 restart:
 		bb = &ctx->cfg_blocks[b];
@@ -1919,7 +1998,6 @@ restart:
 //				if (b != predecessor && ctx->cfg_blocks[predecessor].loop_header != b) {
 					/* Basic Blocks are ordered in a way that predecessors numbers are less then successors */
 					if (!ir_bitset_in(visited, predecessor)) {
-//						ir_bitqueue_add(&worklist, b);
 						b = predecessor;
 						goto restart;
 					}
@@ -1944,12 +2022,12 @@ restart:
 			if (n == 1) {
 				uint32_t successor = *p;
 
-				IR_ASSERT(count < max_count);
+				IR_ASSERT(edges_count < max_edges_count);
 				freq = bb_freq[b];
-				edges[count].from = b;
-				edges[count].to = successor;
-				edges[count].freq = freq;
-				count++;
+				edges[edges_count].from = b;
+				edges[edges_count].to = successor;
+				edges[edges_count].freq = freq;
+				edges_count++;
 //				if (b != successor && bb->loop_header != successor) {
 				if (successor > b) {
 					IR_ASSERT(!ir_bitset_in(visited, successor));
@@ -2004,24 +2082,36 @@ restart:
 				} else {
 					prob1 = prob2 = 50;
 				}
-				IR_ASSERT(count < max_count);
+				IR_ASSERT(edges_count < max_edges_count);
 				freq = bb_freq[b] * (float)prob1 / (float)probN;
-				edges[count].from = b;
-				edges[count].to = successor1;
-				edges[count].freq = freq;
-				count++;
+				if (!IR_DEBUG_BB_SCHEDULE_GRAPH && prob1 > prob2) {
+					uint32_t src = ir_chain_head(chains, b);
+					uint32_t dst = ir_chain_head(chains, successor1);
+					ir_join_chains(chains, src, dst);
+				} else {
+					edges[edges_count].from = b;
+					edges[edges_count].to = successor1;
+					edges[edges_count].freq = freq;
+					edges_count++;
+				}
 //				if (b != successor1 && bb->loop_header != successor1) {
 				if (successor1 > b) {
 					IR_ASSERT(!ir_bitset_in(visited, successor1));
 					bb_freq[successor1] += freq;
 					ir_bitqueue_add(&worklist, successor1);
 				}
-				IR_ASSERT(count < max_count);
+				IR_ASSERT(edges_count < max_edges_count);
 				freq = bb_freq[b] * (float)prob2 / (float)probN;
-				edges[count].from = b;
-				edges[count].to = successor2;
-				edges[count].freq = freq;
-				count++;
+				if (!IR_DEBUG_BB_SCHEDULE_GRAPH && prob2 > prob1) {
+					uint32_t src = ir_chain_head(chains, b);
+					uint32_t dst = ir_chain_head(chains, successor2);
+					ir_join_chains(chains, src, dst);
+				} else {
+					edges[edges_count].from = b;
+					edges[edges_count].to = successor2;
+					edges[edges_count].freq = freq;
+					edges_count++;
+				}
 //				if (b != successor2 && bb->loop_header != successor2) {
 				if (successor2 > b) {
 					IR_ASSERT(!ir_bitset_in(visited, successor2));
@@ -2055,12 +2145,12 @@ restart:
 					} else {
 						prob = 100 / bb->successors_count;
 					}
-					IR_ASSERT(count < max_count);
+					IR_ASSERT(edges_count < max_edges_count);
 					freq = bb_freq[b] * (float)prob / 100.0f;
-					edges[count].from = b;
-					edges[count].to = successor;
-					edges[count].freq = freq;
-					count++;
+					edges[edges_count].from = b;
+					edges[edges_count].to = successor;
+					edges[edges_count].freq = freq;
+					edges_count++;
 //					if (b != successor && bb->loop_header != successor) {
 					if (successor > b) {
 						IR_ASSERT(!ir_bitset_in(visited, successor));
@@ -2073,37 +2163,10 @@ restart:
 	}
 
 	/* 2. Sort EDGEs according to their frequensy */
-	qsort(edges, count, sizeof(ir_edge_info), ir_edge_info_cmp);
+	qsort(edges, edges_count, sizeof(ir_edge_info), ir_edge_info_cmp);
 
-#if 0
-	fprintf(stderr, "digraph {\n");
-	fprintf(stderr, "\trankdir=TB;\n");
-	for (b = 1; b <= ctx->cfg_blocks_count; b++) {
-		bb = &ctx->cfg_blocks[b];
-		fprintf(stderr, "\tBB%d [label=\"BB%d: %d%s,%0.3f\\n%s\\n%s\"]\n", b, b,
-			bb->loop_depth, ((bb->flags & IR_BB_EMPTY) ? ",E": ""), bb_freq[b],
-			ir_op_name[ctx->ir_base[bb->start].op], ir_op_name[ctx->ir_base[bb->end].op]);
-	}
-	fprintf(stderr, "\n");
-	for (b = 0; b < count; b++) {
-		fprintf(stderr, "\tBB%d -> BB%d [label=\"%0.3f\"]\n", edges[b].from, edges[b].to, edges[b].freq);
-	}
-	fprintf(stderr, "}\n");
-#endif
-
-    /* 3. Create initial chains for each BB */
-    chains = ir_mem_malloc(sizeof(ir_chain) * (ctx->cfg_blocks_count + 1));
-	for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
-		chains[b].head = b;
-		chains[b].next = b;
-		chains[b].prev = b;
-	}
-
-	/* 4. Process EDGEs according to their frequensies and form longer chains */
-	for (e = edges, i = count; i > 0; e++, i--) {
-#if 0
-		fprintf(stderr, "[BB%d->BB%d]\n", e->from, e->to);
-#endif
+	/* 3. Process EDGEs according to their frequensies and form longer chains */
+	for (e = edges, i = edges_count; i > 0; e++, i--) {
 		uint32_t src = ir_chain_head(chains, e->from);
 		uint32_t dst = ir_chain_head(chains, e->to);
 		if (src == dst) {
@@ -2121,80 +2184,17 @@ restart:
 			/* join two chains connected by the edge */
 			ir_join_chains(chains, src, dst);
 		}
-#if 0
-		do {
-			bool first = 1;
-			for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
-				if (chains[b].head == b) {
-					uint32_t tail = chains[b].tail;
-					uint32_t i = b;
-					if (first) {
-						first = 0;
-					} else {
-						fprintf(stderr, ", ");
-					}
-					fprintf(stderr, "(BB%d", i);
-					while (i != tail) {
-						i = chains[i].next;
-						fprintf(stderr, ", BB%d", i);
-					}
-					fprintf(stderr, ")");
-				}
-			}
-			fprintf(stderr, "\n");
-		} while (0);
-#endif
 	}
 
-#if 0
-	do {
-		fprintf(stderr, "Chains:\n");
-		for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
-			if (chains[b].head == b) {
-				uint32_t tail = chains[b].tail;
-				uint32_t i = b;
-				fprintf(stderr, "(BB%d", i);
-				while (i != tail) {
-					i = chains[i].next;
-					fprintf(stderr, ", BB%d", i);
-				}
-				fprintf(stderr, ")\n");
-			}
-		}
-	} while (0);
-#endif
-#if 0
-	do {
-		uint8_t *colors = alloca(sizeof(uint8_t) * (ctx->cfg_blocks_count + 1));
-		uint32_t n = 0;
-
-		memset(colors, 0, sizeof(uint8_t) * (ctx->cfg_blocks_count + 1));
-		for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
-			if (chains[b].head == b) {
-				colors[b] = ++n;
-				if (n > 12) break;
-			}
-		}
-		fprintf(stderr, "digraph {\n");
-		fprintf(stderr, "\trankdir=TB;\n");
-		for (b = 1; b <= ctx->cfg_blocks_count; b++) {
-			bb = &ctx->cfg_blocks[b];
-
-			fprintf(stderr, "\tBB%d [label=\"BB%d: %d%s,%0.3f\\n%s\\n%s\",colorscheme=set312,style=filled,fillcolor=%d]\n", b, b,
-				bb->loop_depth, ((bb->flags & IR_BB_EMPTY) ? ",E": ""), bb_freq[b],
-				ir_op_name[ctx->ir_base[bb->start].op], ir_op_name[ctx->ir_base[bb->end].op],
-				colors[ir_chain_head(b));
-		}
-		fprintf(stderr, "\n");
-		for (b = 0; b < count; b++) {
-			fprintf(stderr, "\tBB%d -> BB%d [label=\"%0.3f\"]\n", edges[b].from, edges[b].to, edges[b].freq);
-		}
-		fprintf(stderr, "}\n");
-	} while (0);
+#if IR_DEBUG_BB_SCHEDULE_GRAPH
+	ir_dump_cfg_freq_graph(ctx, bb_freq, edges_count, edges, chains);
 #endif
 
-#if 1
-	/* 5. Merge empty blocks */
+#if IR_DEBUG_BB_SCHEDULE_CHAINS
+	ir_dump_chains(ctx, chains);
+#endif
+
+	/* 4. Merge empty blocks */
 	bb = ctx->cfg_blocks + 2;
 	for (b = 2; b < ctx->cfg_blocks_count + 1; bb++, b++) {
 		if (bb->flags & IR_BB_EMPTY) {
@@ -2204,39 +2204,17 @@ restart:
 			}
 		}
 	}
-#endif
-#if 0
-	do {
-		fprintf(stderr, "Chains:\n");
-		for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
-			if (chains[b].head == b) {
-				uint32_t tail = chains[b].tail;
-				uint32_t i = b;
-				fprintf(stderr, "(BB%d", i);
-				while (i != tail) {
-					i = chains[i].next;
-					fprintf(stderr, ", BB%d", i);
-				}
-				fprintf(stderr, ")\n");
-			}
-		}
-	} while (0);
+
+#if IR_DEBUG_BB_SCHEDULE_CHAINS
+	ir_dump_chains(ctx, chains);
 #endif
 
-    /* 5. Order chains accoring to their relations */
-#if 1
-#if 0
-	fprintf(stderr, "---\n");
-#endif
-	for (e = edges, i = count; i > 0; e++, i--) {
+	/* 5. Order chains accoring to their relations */
+	for (e = edges, i = edges_count; i > 0; e++, i--) {
 		uint32_t src = ir_chain_head(chains, e->from);
 		uint32_t dst = ir_chain_head(chains, e->to);
 		if (src != dst) {
 			bb = &ctx->cfg_blocks[e->from];
-#if 0
-			fprintf(stderr, "[BB%d->BB%d: %0.3f] (BB%d->BB%d) %s\n", e->from, e->to, e->freq, src, dst,
-				ir_op_name[ctx->ir_base[bb->end].op]);
-#endif
 			if (ctx->ir_base[bb->end].op == IR_IF) {
 				IR_ASSERT(bb->successors_count == 2);
 				uint32_t other = ctx->cfg_edges[bb->successors];
@@ -2261,27 +2239,13 @@ restart:
 			}
 		}
 	}
-#endif
-#if 0
-	do {
-		fprintf(stderr, "Chains:\n");
-		for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
-			if (chains[b].head == b) {
-				uint32_t tail = chains[b].tail;
-				uint32_t i = b;
-				fprintf(stderr, "(BB%d", i);
-				while (i != tail) {
-					i = chains[i].next;
-					fprintf(stderr, ", BB%d", i);
-				}
-				fprintf(stderr, ")\n");
-			}
-		}
-	} while (0);
+
+#if IR_DEBUG_BB_SCHEDULE_CHAINS
+	ir_dump_chains(ctx, chains);
 #endif
 
-	/* X. ??? */
-	bool reorder;
+	/* 6. Form a final BB order  */
+	bool reorder = 0;
 	uint32_t *list = ir_mem_malloc(sizeof(uint32_t) * (ctx->cfg_blocks_count + 1) * 2);
 	uint32_t *map = list + (ctx->cfg_blocks_count + 1);
 	uint32_t n = 0;
@@ -2301,7 +2265,7 @@ restart:
 		}
 	}
 
-	/* X. Final reordering */
+	/* 7. Reconstruct CFG according to the BB order */
 	if (reorder) {
 		ir_block *cfg_blocks = ir_mem_malloc(sizeof(ir_block) * (ctx->cfg_blocks_count + 1));
 
@@ -2503,7 +2467,7 @@ int ir_schedule_blocks(ir_ctx *ctx)
 {
 	if (ctx->cfg_blocks_count <= 2) {
 		return 1;
-	} else if (UNEXPECTED(ctx->flags2 & IR_IRREDUCIBLE_CFG)) {
+	} else if (UNEXPECTED(ctx->flags2 & IR_IRREDUCIBLE_CFG) || ctx->cfg_blocks_count > 1000) {
 		return ir_schedule_blocks_top_down(ctx);
 	} else {
 		return ir_schedule_blocks_bottom_up(ctx);
