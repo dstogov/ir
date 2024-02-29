@@ -1977,7 +1977,7 @@ static int ir_schedule_blocks_bottom_up(ir_ctx *ctx)
 		chains[b].prev = b;
 	}
 
-	/* 2. Collect information about BB and EDGE freqeunces */
+	/* 2. Collect information about BB and EDGE freqeuncies */
 	edges = ir_mem_malloc(sizeof(ir_edge_info) * max_edges_count);
 	bb_freq = ir_mem_calloc(ctx->cfg_blocks_count + 1, sizeof(float));
 	bb_freq[1] = 1.0f;
@@ -2162,27 +2162,26 @@ restart:
 	ir_bitqueue_free(&worklist);
 	ir_mem_free(visited);
 
-	/* 2. Sort EDGEs according to their frequensy */
+	/* 2. Sort EDGEs according to their frequentcies */
 	qsort(edges, edges_count, sizeof(ir_edge_info), ir_edge_info_cmp);
 
-	/* 3. Process EDGEs according to their frequensies and form longer chains */
+	/* 3. Process EDGEs in the decrising frequentcy order and join the connected chains */
 	for (e = edges, i = edges_count; i > 0; e++, i--) {
-		uint32_t src = ir_chain_head(chains, e->from);
-		uint32_t dst = ir_chain_head(chains, e->to);
-		if (src == dst) {
-			if (chains[src].tail == e->from
-			 && src == e->to
-			 && ctx->ir_base[ctx->cfg_blocks[src].start].op == IR_LOOP_BEGIN
-			 && ctx->ir_base[ctx->cfg_blocks[src].end].op == IR_IF
-			 && ctx->ir_base[ctx->cfg_blocks[e->from].end].op == IR_LOOP_END) {
-				/* rotate loop moving the loop condition to the end */
-				uint32_t new_head = e->from;
-				chains[src].head = new_head;
-				chains[new_head].head = new_head;
+		uint32_t dst = chains[e->to].head;
+		if (dst == e->to) {
+			uint32_t src = ir_chain_head(chains, e->from);
+			if (chains[src].tail == e->from) {
+				if (src != dst) {
+					ir_join_chains(chains, src, dst);
+				} else if (ctx->ir_base[ctx->cfg_blocks[src].start].op == IR_LOOP_BEGIN
+				 && ctx->ir_base[ctx->cfg_blocks[src].end].op == IR_IF
+				 && ctx->ir_base[ctx->cfg_blocks[e->from].end].op == IR_LOOP_END) {
+					/* rotate loop moving the loop condition to the end */
+					uint32_t new_head = e->from;
+					chains[src].head = new_head;
+					chains[new_head].head = new_head;
+				}
 			}
-		} else if (chains[src].tail == e->from && dst == e->to) {
-			/* join two chains connected by the edge */
-			ir_join_chains(chains, src, dst);
 		}
 	}
 
@@ -2211,7 +2210,7 @@ restart:
 	ir_dump_chains(ctx, chains);
 #endif
 
-	/* 5. Order chains accoring to their relations */
+	/* 5. Group chains accoring to the more frequnt edges between them */
 	for (e = edges, i = edges_count; i > 0; e++, i--) {
 		uint32_t src = ir_chain_head(chains, e->from);
 		uint32_t dst = ir_chain_head(chains, e->to);
