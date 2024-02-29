@@ -1850,13 +1850,25 @@ static int ir_edge_info_cmp(const void *b1, const void *b2)
 	}
 }
 
-static uint32_t ir_chain_head(ir_chain *chains, uint32_t src)
+static IR_NEVER_INLINE uint32_t ir_chain_head_path_compress(ir_chain *chains, uint32_t src, uint32_t head)
+{
+	do {
+		head = chains[head].head;
+	} while (chains[head].head != head);
+	do {
+		chains[src].head = head;
+		src = chains[src].head;
+	} while (chains[src].head != head);
+	return head;
+}
+
+IR_ALWAYS_INLINE uint32_t ir_chain_head(ir_chain *chains, uint32_t src)
 {
 	uint32_t head = chains[src].head;
 	if (chains[head].head == head) {
 		return head;
 	} else {
-		return chains[head].head = ir_chain_head(chains, head);
+		return ir_chain_head_path_compress(chains, src, head);
 	}
 }
 
