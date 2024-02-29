@@ -1969,14 +1969,6 @@ static int ir_schedule_blocks_bottom_up(ir_ctx *ctx)
 	ir_bitqueue worklist;
 	ir_bitset visited;
 
-	edges = ir_mem_malloc(sizeof(ir_edge_info) * max_edges_count);
-	bb_freq = ir_mem_calloc(ctx->cfg_blocks_count + 1, sizeof(float));
-
-	visited = ir_bitset_malloc(ctx->cfg_blocks_count + 1);
-	ir_bitqueue_init(&worklist, ctx->cfg_blocks_count + 1);
-	ir_bitqueue_add(&worklist, 1);
-	bb_freq[1] = 1.0f;
-
 	/* 1. Create initial chains for each BB */
 	chains = ir_mem_malloc(sizeof(ir_chain) * (ctx->cfg_blocks_count + 1));
 	for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
@@ -1986,6 +1978,12 @@ static int ir_schedule_blocks_bottom_up(ir_ctx *ctx)
 	}
 
 	/* 2. Collect information about BB and EDGE freqeunces */
+	edges = ir_mem_malloc(sizeof(ir_edge_info) * max_edges_count);
+	bb_freq = ir_mem_calloc(ctx->cfg_blocks_count + 1, sizeof(float));
+	bb_freq[1] = 1.0f;
+	visited = ir_bitset_malloc(ctx->cfg_blocks_count + 1);
+	ir_bitqueue_init(&worklist, ctx->cfg_blocks_count + 1);
+	ir_bitqueue_add(&worklist, 1);
 	while ((b = ir_bitqueue_pop(&worklist)) != (uint32_t)-1) {
 restart:
 		bb = &ctx->cfg_blocks[b];
@@ -2161,6 +2159,8 @@ restart:
 			}
 		}
 	}
+	ir_bitqueue_free(&worklist);
+	ir_mem_free(visited);
 
 	/* 2. Sort EDGEs according to their frequensy */
 	qsort(edges, edges_count, sizeof(ir_edge_info), ir_edge_info_cmp);
@@ -2189,6 +2189,8 @@ restart:
 #if IR_DEBUG_BB_SCHEDULE_GRAPH
 	ir_dump_cfg_freq_graph(ctx, bb_freq, edges_count, edges, chains);
 #endif
+
+	ir_mem_free(bb_freq);
 
 #if IR_DEBUG_BB_SCHEDULE_CHAINS
 	ir_dump_chains(ctx, chains);
@@ -2319,11 +2321,8 @@ restart:
 	}
 
 	ir_mem_free(list);
-	ir_mem_free(chains);
-	ir_mem_free(visited);
-	ir_bitqueue_free(&worklist);
-	ir_mem_free(bb_freq);
 	ir_mem_free(edges);
+	ir_mem_free(chains);
 
 	return 1;
 }
