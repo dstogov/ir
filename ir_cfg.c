@@ -1890,9 +1890,12 @@ static void ir_insert_chain_before(ir_chain *chains, uint32_t c, uint32_t before
 	ir_chain *this = &chains[c];
 	ir_chain *next = &chains[before];
 
-	IR_ASSERT(chains[before].head != before);
-
-	this->head = next->head;
+	IR_ASSERT(chains[c].head == c);
+	if (chains[before].head != before) {
+		this->head = next->head;
+	} else {
+		next->head = c;
+	}
 	this->next = before;
 	this->prev = next->prev;
 	next->prev = c;
@@ -1912,6 +1915,7 @@ static void ir_dump_cfg_freq_graph(ir_ctx *ctx, float *bb_freq, uint32_t edges_c
 	uint32_t b, i;
 	ir_block *bb;
 	uint8_t c, *colors;
+	bool is_head, is_empty;
 	uint32_t max_colors = 12;
 
 	colors = alloca(sizeof(uint8_t) * (ctx->cfg_blocks_count + 1));
@@ -1929,15 +1933,21 @@ static void ir_dump_cfg_freq_graph(ir_ctx *ctx, float *bb_freq, uint32_t edges_c
 	for (b = 1; b <= ctx->cfg_blocks_count; b++) {
 		bb = &ctx->cfg_blocks[b];
 		c = colors[ir_chain_head(chains, b)];
+		is_head = chains[b].head == b;
+		is_empty = (bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY;
 		if (c) {
-			fprintf(stderr, "\tBB%d [label=\"BB%d: %d%s,%0.3f\\n%s\\n%s\",colorscheme=set312,style=filled,fillcolor=%d]\n", b, b,
-				bb->loop_depth, ((bb->flags & IR_BB_EMPTY) ? ",E": ""), bb_freq[b],
+			fprintf(stderr, "\tBB%d [label=\"BB%d: (%d),%0.3f\\n%s\\n%s\",colorscheme=set312,fillcolor=%d%s%s]\n", b, b,
+				bb->loop_depth, bb_freq[b],
 				ir_op_name[ctx->ir_base[bb->start].op], ir_op_name[ctx->ir_base[bb->end].op],
-				c);
+				c,
+				is_head ? ",penwidth=3" : "",
+				is_empty ? ",style=\"dotted,filled\"" : ",style=\"filled\"");
 		} else {
-			fprintf(stderr, "\tBB%d [label=\"BB%d: %d%s,%0.3f\\n%s\\n%s\"]\n", b, b,
-				bb->loop_depth, ((bb->flags & IR_BB_EMPTY) ? ",E": ""), bb_freq[b],
-				ir_op_name[ctx->ir_base[bb->start].op], ir_op_name[ctx->ir_base[bb->end].op]);
+			fprintf(stderr, "\tBB%d [label=\"BB%d: (%d),%0.3f\\n%s\\n%s\"%s%s]\n", b, b,
+				bb->loop_depth, bb_freq[b],
+				ir_op_name[ctx->ir_base[bb->start].op], ir_op_name[ctx->ir_base[bb->end].op],
+				is_head ? ",penwidth=3" : "",
+				is_empty ? ",style=\"dotted\"" : "");
 		}
 	}
 	fprintf(stderr, "\n");
@@ -2010,6 +2020,7 @@ restart:
 					/* Basic Blocks are ordered in a way that predecessors numbers are less then successors */
 					if (!ir_bitset_in(visited, predecessor)) {
 						b = predecessor;
+						ir_bitqueue_del(&worklist, b);
 						goto restart;
 					}
 				} else if (b != predecessor && ctx->cfg_blocks[predecessor].loop_header != b) {
@@ -2019,8 +2030,21 @@ restart:
 			}
 		}
 
-		loop_depth = bb->loop_depth;
 		ir_bitset_incl(visited, b);
+
+		if ((bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
+			uint32_t successor = ctx->cfg_edges[bb->successors];
+//			if (b != successor && bb->loop_header != successor) {
+			if (successor > b) {
+				b = successor;
+				ir_bitqueue_del(&worklist, b);
+				goto restart;
+			} else {
+				continue;
+			}
+		}
+
+		loop_depth = bb->loop_depth;
 		if (bb->flags & IR_BB_LOOP_HEADER) {
 			// TODO: loop iterations count
 			bb_freq[b] *= 10;
@@ -2032,19 +2056,25 @@ restart:
 
 			if (n == 1) {
 				uint32_t successor = *p;
+				ir_block *successor_bb;
 
 				IR_ASSERT(edges_count < max_edges_count);
 				freq = bb_freq[b];
-				edges[edges_count].from = b;
-				edges[edges_count].to = successor;
-				edges[edges_count].freq = freq;
-				edges_count++;
 //				if (b != successor && bb->loop_header != successor) {
 				if (successor > b) {
 					IR_ASSERT(!ir_bitset_in(visited, successor));
 					bb_freq[successor] += freq;
 					ir_bitqueue_add(&worklist, successor);
 				}
+				successor_bb = &ctx->cfg_blocks[successor];
+				while ((successor_bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
+					successor = ctx->cfg_edges[successor_bb->successors];
+					successor_bb = &ctx->cfg_blocks[successor];
+				}
+				edges[edges_count].from = b;
+				edges[edges_count].to = successor;
+				edges[edges_count].freq = freq;
+				edges_count++;
 			} else if (n == 2 && ctx->ir_base[bb->end].op == IR_IF) {
 				uint32_t successor1 = *p;
 				ir_block *successor1_bb = &ctx->cfg_blocks[successor1];
@@ -2095,44 +2125,58 @@ restart:
 				}
 				IR_ASSERT(edges_count < max_edges_count);
 				freq = bb_freq[b] * (float)prob1 / (float)probN;
-				if (!IR_DEBUG_BB_SCHEDULE_GRAPH && prob1 > prob2) {
-					uint32_t src = chains[b].next;
-					IR_ASSERT(chains[src].head == src);
-					IR_ASSERT(src == ir_chain_head(chains, b));
-					IR_ASSERT(chains[successor1].head == successor1);
-					ir_join_chains(chains, src, successor1);
-				} else {
-					edges[edges_count].from = b;
-					edges[edges_count].to = successor1;
-					edges[edges_count].freq = freq;
-					edges_count++;
-				}
 //				if (b != successor1 && bb->loop_header != successor1) {
 				if (successor1 > b) {
 					IR_ASSERT(!ir_bitset_in(visited, successor1));
 					bb_freq[successor1] += freq;
 					ir_bitqueue_add(&worklist, successor1);
 				}
-				IR_ASSERT(edges_count < max_edges_count);
-				freq = bb_freq[b] * (float)prob2 / (float)probN;
-				if (!IR_DEBUG_BB_SCHEDULE_GRAPH && prob2 > prob1) {
-					uint32_t src = chains[b].next;
-					IR_ASSERT(chains[src].head == src);
-					IR_ASSERT(src == ir_chain_head(chains, b));
-					IR_ASSERT(chains[successor2].head == successor2);
-					ir_join_chains(chains, src, successor2);
-				} else {
+				do {
+					if (prob1 > prob2
+					 && (successor1_bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) != IR_BB_EMPTY) {
+						uint32_t src = chains[b].next;
+						IR_ASSERT(chains[src].head == src);
+						IR_ASSERT(src == ir_chain_head(chains, b));
+						IR_ASSERT(chains[successor1].head == successor1);
+						ir_join_chains(chains, src, successor1);
+						if (!IR_DEBUG_BB_SCHEDULE_GRAPH) break;
+					}
+					while ((successor1_bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
+						successor1 = ctx->cfg_edges[successor1_bb->successors];
+						successor1_bb = &ctx->cfg_blocks[successor1];
+					}
 					edges[edges_count].from = b;
-					edges[edges_count].to = successor2;
+					edges[edges_count].to = successor1;
 					edges[edges_count].freq = freq;
 					edges_count++;
-				}
+				} while (0);
+				IR_ASSERT(edges_count < max_edges_count);
+				freq = bb_freq[b] * (float)prob2 / (float)probN;
 //				if (b != successor2 && bb->loop_header != successor2) {
 				if (successor2 > b) {
 					IR_ASSERT(!ir_bitset_in(visited, successor2));
 					bb_freq[successor2] += freq;
 					ir_bitqueue_add(&worklist, successor2);
 				}
+				do {
+					if (prob2 > prob1
+					 && (successor2_bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) != IR_BB_EMPTY) {
+						uint32_t src = chains[b].next;
+						IR_ASSERT(chains[src].head == src);
+						IR_ASSERT(src == ir_chain_head(chains, b));
+						IR_ASSERT(chains[successor2].head == successor2);
+						ir_join_chains(chains, src, successor2);
+						if (!IR_DEBUG_BB_SCHEDULE_GRAPH) break;
+					}
+					while ((successor2_bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
+						successor2 = ctx->cfg_edges[successor2_bb->successors];
+						successor2_bb = &ctx->cfg_blocks[successor2];
+					}
+					edges[edges_count].from = b;
+					edges[edges_count].to = successor2;
+					edges[edges_count].freq = freq;
+					edges_count++;
+				} while (0);
 			} else {
 				int prob;
 
@@ -2162,16 +2206,20 @@ restart:
 					}
 					IR_ASSERT(edges_count < max_edges_count);
 					freq = bb_freq[b] * (float)prob / 100.0f;
-					edges[edges_count].from = b;
-					edges[edges_count].to = successor;
-					edges[edges_count].freq = freq;
-					edges_count++;
 //					if (b != successor && bb->loop_header != successor) {
 					if (successor > b) {
 						IR_ASSERT(!ir_bitset_in(visited, successor));
 						bb_freq[successor] += freq;
 						ir_bitqueue_add(&worklist, successor);
 					}
+					while ((successor_bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
+						successor = ctx->cfg_edges[successor_bb->successors];
+						successor_bb = &ctx->cfg_blocks[successor];
+					}
+					edges[edges_count].from = b;
+					edges[edges_count].to = successor;
+					edges[edges_count].freq = freq;
+					edges_count++;
 				}
 			}
 		}
