@@ -1005,12 +1005,12 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 						ir_gen_dessa_moves(ctx, b, ir_emit_dessa_move);
 					}
 					target = ir_skip_empty_target_blocks(ctx, ctx->cfg_edges[bb->successors]);
-					if (target != ir_next_blocks(ctx, _b)) {
+					if (target != ir_next_block(ctx, _b)) {
 						fprintf(f, "\tgoto bb%d;\n", target);
 					}
 					break;
 				case IR_IF:
-					ir_emit_if(ctx, f, b, i, insn, ir_next_blocks(ctx, _b));
+					ir_emit_if(ctx, f, b, i, insn, ir_next_block(ctx, _b));
 					break;
 				case IR_SWITCH:
 					ir_emit_switch(ctx, f, b, i, insn);

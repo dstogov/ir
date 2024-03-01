@@ -1963,30 +1963,24 @@ uint32_t ir_skip_empty_target_blocks(const ir_ctx *ctx, uint32_t b)
 	return b;
 }
 
-uint32_t ir_next_blocks(const ir_ctx *ctx, uint32_t b)
+uint32_t ir_next_block(const ir_ctx *ctx, uint32_t b)
 {
 #if 0
 	return (ctx->cfg_schedule) ? ctx->cfg_schedule[b + 1] : b + 1;
 #else
 	ir_block *bb;
 
-	b++;
 	if (ctx->cfg_schedule) {
-		while (1) {
-			if (b > ctx->cfg_blocks_count) {
-				return 0;
-			}
+		uint32_t ret = ctx->cfg_schedule[++b];
 
-			bb = &ctx->cfg_blocks[ctx->cfg_schedule[b]];
-
-			if ((bb->flags & (IR_BB_START|IR_BB_EMPTY)) == IR_BB_EMPTY) {
-				b++;
-			} else {
-				break;
-			}
+		/* Check for empty ENTRY block */
+		while (ret && ((ctx->cfg_blocks[ret].flags & (IR_BB_START|IR_BB_EMPTY)) == IR_BB_EMPTY)) {
+			ret = ctx->cfg_schedule[++b];
 		}
-		return ctx->cfg_schedule[b];
+		return ret;
 	}
+
+	b++;
 	while (1) {
 		if (b > ctx->cfg_blocks_count) {
 			return 0;

@@ -9639,6 +9639,17 @@ void ir_fix_stack_frame(ir_ctx *ctx)
 
 static void* dasm_labels[ir_lb_MAX];
 
+static uint32_t _ir_next_block(ir_ctx *ctx, uint32_t _b)
+{
+	uint32_t b = ctx->cfg_schedule[++_b];
+
+	/* Check for empty ENTRY block */
+	while (b && ((ctx->cfg_blocks[b].flags & (IR_BB_START|IR_BB_EMPTY)) == IR_BB_EMPTY)) {
+		b = ctx->cfg_schedule[++_b];
+	}
+	return b;
+}
+
 void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 {
 	uint32_t b, n, target;
@@ -9716,14 +9727,17 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		ir_emit_load_params(ctx);
 	}
 
-//	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
+	if (UNEXPECTED(!ctx->cfg_schedule)) {
+		uint32_t *list = ctx->cfg_schedule = ir_mem_malloc(sizeof(uint32_t) * (ctx->cfg_blocks_count + 2));
+		for (b = 0; b <= ctx->cfg_blocks_count; b++) {
+			list[b] = b;
+		}
+		list[ctx->cfg_blocks_count + 1] = 0;
+	}
+
 	uint32_t _b;
 	for (_b = 1; _b <= ctx->cfg_blocks_count; _b++) {
-		if (ctx->cfg_schedule) {
-			b = ctx->cfg_schedule[_b];
-		} else {
-			b = _b;
-		}
+		b = ctx->cfg_schedule[_b];
 		bb = &ctx->cfg_blocks[b];
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		if ((bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
@@ -9874,13 +9888,13 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					ir_emit_copy_fp(ctx, i, insn);
 					break;
 				case IR_CMP_AND_BRANCH_INT:
-					ir_emit_cmp_and_branch_int(ctx, b, i, insn, ir_next_blocks(ctx, _b));
+					ir_emit_cmp_and_branch_int(ctx, b, i, insn, _ir_next_block(ctx, _b));
 					break;
 				case IR_CMP_AND_BRANCH_FP:
-					ir_emit_cmp_and_branch_fp(ctx, b, i, insn, ir_next_blocks(ctx, _b));
+					ir_emit_cmp_and_branch_fp(ctx, b, i, insn, _ir_next_block(ctx, _b));
 					break;
 				case IR_TEST_AND_BRANCH_INT:
-					ir_emit_test_and_branch_int(ctx, b, i, insn, ir_next_blocks(ctx, _b));
+					ir_emit_test_and_branch_int(ctx, b, i, insn, _ir_next_block(ctx, _b));
 					break;
 				case IR_JCC_INT:
 					{
@@ -9896,31 +9910,31 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 						} else {
 							IR_ASSERT(op >= IR_EQ && op <= IR_UGT);
 						}
-						ir_emit_jcc(ctx, b, i, insn, ir_next_blocks(ctx, _b), op, 1);
+						ir_emit_jcc(ctx, b, i, insn, _ir_next_block(ctx, _b), op, 1);
 					}
 					break;
 				case IR_GUARD_CMP_INT:
-					if (ir_emit_guard_cmp_int(ctx, b, i, insn, ir_next_blocks(ctx, _b))) {
+					if (ir_emit_guard_cmp_int(ctx, b, i, insn, _ir_next_block(ctx, _b))) {
 						goto next_block;
 					}
 					break;
 				case IR_GUARD_CMP_FP:
-					if (ir_emit_guard_cmp_fp(ctx, b, i, insn, ir_next_blocks(ctx, _b))) {
+					if (ir_emit_guard_cmp_fp(ctx, b, i, insn, _ir_next_block(ctx, _b))) {
 						goto next_block;
 					}
 					break;
 				case IR_GUARD_TEST_INT:
-					if (ir_emit_guard_test_int(ctx, b, i, insn, ir_next_blocks(ctx, _b))) {
+					if (ir_emit_guard_test_int(ctx, b, i, insn, _ir_next_block(ctx, _b))) {
 						goto next_block;
 					}
 					break;
 				case IR_GUARD_JCC_INT:
-					if (ir_emit_guard_jcc_int(ctx, b, i, insn, ir_next_blocks(ctx, _b))) {
+					if (ir_emit_guard_jcc_int(ctx, b, i, insn, _ir_next_block(ctx, _b))) {
 						goto next_block;
 					}
 					break;
 				case IR_IF_INT:
-					ir_emit_if_int(ctx, b, i, insn, ir_next_blocks(ctx, _b));
+					ir_emit_if_int(ctx, b, i, insn, _ir_next_block(ctx, _b));
 					break;
 				case IR_COND:
 					ir_emit_cond(ctx, i, insn);
@@ -9941,7 +9955,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					ir_emit_overflow(ctx, i, insn);
 					break;
 				case IR_OVERFLOW_AND_BRANCH:
-					ir_emit_overflow_and_branch(ctx, b, i, insn, ir_next_blocks(ctx, _b));
+					ir_emit_overflow_and_branch(ctx, b, i, insn, _ir_next_block(ctx, _b));
 					break;
 				case IR_END:
 				case IR_LOOP_END:
@@ -9964,7 +9978,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 							IR_ASSERT(bb->successors_count == 1);
 						}
 						target = ir_skip_empty_target_blocks(ctx, succ);
-						if (target != ir_next_blocks(ctx, _b)) {
+						if (target != _ir_next_block(ctx, _b)) {
 							|	jmp =>target
 						}
 					} while (0);
@@ -10062,7 +10076,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					break;
 				case IR_GUARD:
 				case IR_GUARD_NOT:
-					if (ir_emit_guard(ctx, b, i, insn, ir_next_blocks(ctx, _b))) {
+					if (ir_emit_guard(ctx, b, i, insn, _ir_next_block(ctx, _b))) {
 						goto next_block;
 					}
 					break;
