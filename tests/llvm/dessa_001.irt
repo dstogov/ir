@@ -24,12 +24,12 @@ DESSA 001
 --EXPECT--
 define i32 @test(i32 %d2, i32 %d3, i1 %d4)
 {
-	br i1 %d4, label %l2, label %l4
+	br i1 %d4, label %l2, label %l3
 l2:
-	br label %l3
-l3:
-	%d11 = phi i32 [%d3, %l2], [%d2, %l4]
-	ret i32 %d11
+	br label %l4
 l4:
-	br label %l3
+	%d11 = phi i32 [%d3, %l2], [%d2, %l3]
+	ret i32 %d11
+l3:
+	br label %l4
 }
