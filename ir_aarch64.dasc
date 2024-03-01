@@ -5674,7 +5674,15 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		ir_emit_load_params(ctx);
 	}
 
-	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
+//	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
+	uint32_t _b;
+	for (_b = 1; _b <= ctx->cfg_blocks_count; _b++) {
+		if (ctx->cfg_schedule) {
+			b = ctx->cfg_schedule[_b];
+		} else {
+			b = _b;
+		}
+		bb = &ctx->cfg_blocks[b];
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		if ((bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
 			continue;

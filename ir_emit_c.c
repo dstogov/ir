@@ -532,12 +532,12 @@ static void ir_emit_overflow_math(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, 
 	}
 }
 
-static void ir_emit_if(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn *insn)
+static void ir_emit_if(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn *insn, uint32_t next_block)
 {
-	uint32_t true_block = 0, false_block = 0, next_block;
+	uint32_t true_block = 0, false_block = 0;
 	bool short_true = 0, short_false = 0;
 
-	ir_get_true_false_blocks(ctx, b, &true_block, &false_block, &next_block);
+	ir_get_true_false_blocks(ctx, b, &true_block, &false_block);
 	if (true_block == next_block) {
 		short_false = 1;
 	} else if (false_block == next_block) {
@@ -819,7 +819,15 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	} IR_BITSET_FOREACH_END();
 	ir_mem_free(tmp_types);
 
-	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
+//	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
+	uint32_t _b;
+	for (_b = 1; _b <= ctx->cfg_blocks_count; _b++) {
+		if (ctx->cfg_schedule) {
+			b = ctx->cfg_schedule[_b];
+		} else {
+			b = _b;
+		}
+		bb = &ctx->cfg_blocks[b];
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		if ((bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
 			continue;
@@ -997,12 +1005,12 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 						ir_gen_dessa_moves(ctx, b, ir_emit_dessa_move);
 					}
 					target = ir_skip_empty_target_blocks(ctx, ctx->cfg_edges[bb->successors]);
-					if (b == ctx->cfg_blocks_count || target != ir_skip_empty_next_blocks(ctx, b + 1)) {
+					if (target != ir_next_blocks(ctx, _b)) {
 						fprintf(f, "\tgoto bb%d;\n", target);
 					}
 					break;
 				case IR_IF:
-					ir_emit_if(ctx, f, b, i, insn);
+					ir_emit_if(ctx, f, b, i, insn, ir_next_blocks(ctx, _b));
 					break;
 				case IR_SWITCH:
 					ir_emit_switch(ctx, f, b, i, insn);

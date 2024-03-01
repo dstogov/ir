@@ -592,9 +592,9 @@ static void ir_emit_abs(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, ir_bitset 
 static void ir_emit_if(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn *insn)
 {
 	ir_type type = ctx->ir_base[insn->op2].type;
-	uint32_t true_block = 0, false_block = 0, next_block;
+	uint32_t true_block = 0, false_block = 0;
 
-	ir_get_true_false_blocks(ctx, b, &true_block, &false_block, &next_block);
+	ir_get_true_false_blocks(ctx, b, &true_block, &false_block);
 
 	// TODO: i1 @llvm.expect.i1(i1 <val>, i1 <expected_val>) ???
 
