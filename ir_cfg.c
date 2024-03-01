@@ -2319,8 +2319,7 @@ restart:
 
 	/* 6. Form a final BB order  */
 	bool reorder = 0;
-	uint32_t *list = ir_mem_malloc(sizeof(uint32_t) * (ctx->cfg_blocks_count + 1) * 2);
-	uint32_t *map = list + (ctx->cfg_blocks_count + 1);
+	uint32_t *list = ir_mem_malloc(sizeof(uint32_t) * (ctx->cfg_blocks_count + 2));
 	uint32_t n = 0;
 
 	for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
@@ -2330,68 +2329,16 @@ restart:
 			while (1) {
 				n++;
 				list[n] = i;
-				map[i] = n;
-				if (i != n) reorder = 1;
 				if (i == tail) break;
 				i = chains[i].next;
 			}
 		}
 	}
 
-	/* 7. Reconstruct CFG according to the BB order */
-	if (reorder) {
-		ir_block *cfg_blocks = ir_mem_malloc(sizeof(ir_block) * (ctx->cfg_blocks_count + 1));
+	list[ctx->cfg_blocks_count + 1] = 0;
+	IR_ASSERT(n == ctx->cfg_blocks_count);
+	ctx->cfg_schedule = list;
 
-		memset(ctx->cfg_blocks, 0, sizeof(ir_block));
-		for (b = 1, bb = cfg_blocks + 1; b <= n; b++, bb++) {
-			*bb = ctx->cfg_blocks[list[b]];
-			if (bb->dom_parent > 0) {
-				bb->dom_parent = map[bb->dom_parent];
-			}
-			if (bb->dom_child > 0) {
-				bb->dom_child = map[bb->dom_child];
-			}
-			if (bb->dom_next_child > 0) {
-				bb->dom_next_child = map[bb->dom_next_child];
-			}
-			if (bb->loop_header > 0) {
-				bb->loop_header = map[bb->loop_header];
-			}
-		}
-		for (i = 0; i < ctx->cfg_edges_count; i++) {
-			if (ctx->cfg_edges[i] > 0) {
-				ctx->cfg_edges[i] = map[ctx->cfg_edges[i]];
-			}
-		}
-		ir_mem_free(ctx->cfg_blocks);
-		ctx->cfg_blocks = cfg_blocks;
-
-		if (ctx->osr_entry_loads) {
-			ir_list *list = (ir_list*)ctx->osr_entry_loads;
-			uint32_t pos = 0, count;
-
-			while (1) {
-				b = ir_list_at(list, pos);
-				if (b == 0) {
-					break;
-				}
-				ir_list_set(list, pos, map[b]);
-				pos++;
-				count = ir_list_at(list, pos);
-				pos += count + 1;
-			}
-		}
-
-		if (ctx->cfg_map) {
-			ir_ref i;
-
-			for (i = IR_UNUSED + 1; i < ctx->insns_count; i++) {
-				ctx->cfg_map[i] = map[ctx->cfg_map[i]];
-			}
-		}
-	}
-
-	ir_mem_free(list);
 	ir_mem_free(edges);
 	ir_mem_free(chains);
 
