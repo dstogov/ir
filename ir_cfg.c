@@ -1991,16 +1991,20 @@ static int ir_schedule_blocks_bottom_up(ir_ctx *ctx)
 	ir_chain *chains;
 	ir_bitqueue worklist;
 	ir_bitset visited;
+	uint32_t *empty, count, empty_count = 0;
+
+	ctx->cfg_schedule = ir_mem_malloc(sizeof(uint32_t) * (ctx->cfg_blocks_count + 2));
+	empty = ctx->cfg_schedule + ctx->cfg_blocks_count;
 
 	/* 1. Create initial chains for each BB */
 	chains = ir_mem_malloc(sizeof(ir_chain) * (ctx->cfg_blocks_count + 1));
-	for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
+	for (b = 1; b <= ctx->cfg_blocks_count; b++) {
 		chains[b].head = b;
 		chains[b].next = b;
 		chains[b].prev = b;
 	}
 
-	/* 2. Collect information about BB and EDGE freqeuncies */
+	/* 2. Collect information about BBs and EDGEs freqeuncies */
 	edges = ir_mem_malloc(sizeof(ir_edge_info) * max_edges_count);
 	bb_freq = ir_mem_calloc(ctx->cfg_blocks_count + 1, sizeof(float));
 	bb_freq[1] = 1.0f;
@@ -2034,6 +2038,14 @@ restart:
 
 		if ((bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
 			uint32_t successor = ctx->cfg_edges[bb->successors];
+
+			/* move empty blocks to the end */
+			IR_ASSERT(chains[b].head == b);
+			chains[b].head = 0;
+			empty_count++;
+			*empty = b;
+			empty--;
+
 //			if (b != successor && bb->loop_header != successor) {
 			if (successor > b) {
 				b = successor;
@@ -2264,13 +2276,19 @@ restart:
 	ir_dump_chains(ctx, chains);
 #endif
 
-	/* 4. Merge empty blocks */
-	bb = ctx->cfg_blocks + 2;
-	for (b = 2; b <= ctx->cfg_blocks_count; bb++, b++) {
-		if (bb->flags & IR_BB_EMPTY) {
-			if (chains[b].head == b && chains[b].tail == b) {
-				IR_ASSERT(bb->successors_count == 1);
-				ir_insert_chain_before(chains, b, ctx->cfg_edges[bb->successors]);
+	/* 4. Merge empty entry blocks */
+	if (ctx->flags & IR_MERGE_EMPTY_ENTRIES) {
+		bb = ctx->cfg_blocks + 2;
+		for (b = 2; b <= ctx->cfg_blocks_count; bb++, b++) {
+			if (UNEXPECTED(bb->flags & IR_BB_PREV_EMPTY_ENTRY)) {
+				/* Schedule the previous empty ENTRY block before this one */
+				uint32_t predecessor = b - 1;
+
+				if (chains[predecessor].head == predecessor
+				 && chains[predecessor].tail == predecessor
+				 && chains[b].head) {
+					ir_insert_chain_before(chains, predecessor, b);
+				}
 			}
 		}
 	}
@@ -2294,7 +2312,7 @@ restart:
 				if (other == e->to) {
 					other = ctx->cfg_edges[bb->successors + 1];
 				}
-				if (ir_chain_head(chains, other) != src) {
+				if (chains[other].head && ir_chain_head(chains, other) != src) {
 					if (src != 1) {
 						ir_join_chains(chains, dst, src);
 					}
@@ -2318,25 +2336,22 @@ restart:
 #endif
 
 	/* 6. Form a final BB order  */
-	uint32_t *list = ir_mem_malloc(sizeof(uint32_t) * (ctx->cfg_blocks_count + 2));
-	uint32_t n = 0;
-
+	count = 0;
 	for (b = 1; b <= ctx->cfg_blocks_count; b++) {
 		if (chains[b].head == b) {
 			uint32_t tail = chains[b].tail;
 			uint32_t i = b;
 			while (1) {
-				n++;
-				list[n] = i;
+				count++;
+				ctx->cfg_schedule[count] = i;
 				if (i == tail) break;
 				i = chains[i].next;
 			}
 		}
 	}
 
-	list[ctx->cfg_blocks_count + 1] = 0;
-	IR_ASSERT(n == ctx->cfg_blocks_count);
-	ctx->cfg_schedule = list;
+	IR_ASSERT(count + empty_count == ctx->cfg_blocks_count);
+	ctx->cfg_schedule[ctx->cfg_blocks_count + 1] = 0;
 
 	ir_mem_free(edges);
 	ir_mem_free(chains);
