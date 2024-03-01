@@ -33,20 +33,20 @@ SWITCH 001
 --EXPECT--
 define i32 @test(i32 %d2)
 {
-	switch i32 %d2, label %l6 [
+	switch i32 %d2, label %l5 [
 		i32 1, label %l2
-		i32 2, label %l4
-		i32 3, label %l5
+		i32 2, label %l3
+		i32 3, label %l4
 	]
 l2:
-	br label %l3
-l3:
-	%d14 = phi i32 [1, %l2], [2, %l4], [3, %l5], [4, %l6]
-	ret i32 %d14
-l4:
-	br label %l3
-l5:
-	br label %l3
+	br label %l6
 l6:
-	br label %l3
+	%d14 = phi i32 [1, %l2], [2, %l3], [3, %l4], [4, %l5]
+	ret i32 %d14
+l3:
+	br label %l6
+l4:
+	br label %l6
+l5:
+	br label %l6
 }

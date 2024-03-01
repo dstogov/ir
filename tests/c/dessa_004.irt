@@ -34,11 +34,11 @@ int32_t foo(int32_t cond, uintptr_t x, uintptr_t y)
 	int32_t tmp_i32;
 	d_4 = *((int32_t*)d_2);
 	d_5 = *((int32_t*)d_3);
-	if (d_1) goto bb3;
+	if (d_1) goto bb4;
 	tmp_i32 = d_4;
 	d_4 = d_5;
 	d_5 = tmp_i32;
-bb3:
+bb4:
 	d_6 = d_5 - d_4;
 	return d_6;
 }

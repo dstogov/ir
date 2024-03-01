@@ -592,9 +592,9 @@ static void ir_emit_abs(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, ir_bitset 
 static void ir_emit_if(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn *insn)
 {
 	ir_type type = ctx->ir_base[insn->op2].type;
-	uint32_t true_block = 0, false_block = 0, next_block;
+	uint32_t true_block = 0, false_block = 0;
 
-	ir_get_true_false_blocks(ctx, b, &true_block, &false_block, &next_block);
+	ir_get_true_false_blocks(ctx, b, &true_block, &false_block);
 
 	// TODO: i1 @llvm.expect.i1(i1 <val>, i1 <expected_val>) ???
 
@@ -870,7 +870,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	ir_insn *insn;
 	ir_use_list *use_list;
 	bool first;
-	uint32_t b, target;
+	uint32_t _b, b, target;
 	ir_block *bb;
 	ir_bitset_base_t used_intrinsics[IR_LLVM_INTRINSIC_BITSET_LEN];
 
@@ -911,7 +911,13 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	}
 	fprintf(f, ")\n{\n");
 
-	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
+	for (_b = 1; _b <= ctx->cfg_blocks_count; _b++) {
+		if (ctx->cfg_schedule) {
+			b = ctx->cfg_schedule[_b];
+		} else {
+			b = _b;
+		}
+		bb = &ctx->cfg_blocks[b];
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		if ((bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
 			continue;
