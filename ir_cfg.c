@@ -1816,6 +1816,19 @@ next:
 	return 1;
 }
 
+static uint32_t _ir_skip_empty_blocks(const ir_ctx *ctx, uint32_t b)
+{
+	while (1) {
+		ir_block *bb = &ctx->cfg_blocks[b];
+
+		if ((bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
+			b = ctx->cfg_edges[bb->successors];
+		} else {
+			return b;
+		}
+	}
+}
+
 /* A variation of "Bottom-up Positioning" algorithm described by
  * Karl Pettis and Robert C. Hansen "Profile Guided Code Positioning"
  */
@@ -2019,9 +2032,11 @@ restart:
 			uint32_t *p = ctx->cfg_edges + bb->predecessors;
 			for (; n > 0; p++, n--) {
 				uint32_t predecessor = *p;
+				/* Basic Blocks are ordered in a way that usual predecessors ids are less then successors.
+				 * So we may comapre blocks ids (predecessor < b) instead of a more expensive check for back edge
+				 * (b != predecessor && ctx->cfg_blocks[predecessor].loop_header != b)
+				 */
 				if (predecessor < b) {
-//				if (b != predecessor && ctx->cfg_blocks[predecessor].loop_header != b) {
-					/* Basic Blocks are ordered in a way that predecessors numbers are less then successors */
 					if (!ir_bitset_in(visited, predecessor)) {
 						b = predecessor;
 						ir_bitqueue_del(&worklist, b);
@@ -2046,7 +2061,6 @@ restart:
 			*empty = b;
 			empty--;
 
-//			if (b != successor && bb->loop_header != successor) {
 			if (successor > b) {
 				b = successor;
 				ir_bitqueue_del(&worklist, b);
@@ -2068,21 +2082,15 @@ restart:
 
 			if (n == 1) {
 				uint32_t successor = *p;
-				ir_block *successor_bb;
 
 				IR_ASSERT(edges_count < max_edges_count);
 				freq = bb_freq[b];
-//				if (b != successor && bb->loop_header != successor) {
 				if (successor > b) {
 					IR_ASSERT(!ir_bitset_in(visited, successor));
 					bb_freq[successor] += freq;
 					ir_bitqueue_add(&worklist, successor);
 				}
-				successor_bb = &ctx->cfg_blocks[successor];
-				while ((successor_bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
-					successor = ctx->cfg_edges[successor_bb->successors];
-					successor_bb = &ctx->cfg_blocks[successor];
-				}
+				successor = _ir_skip_empty_blocks(ctx, successor);
 				edges[edges_count].from = b;
 				edges[edges_count].to = successor;
 				edges[edges_count].freq = freq;
@@ -2102,34 +2110,30 @@ restart:
 						prob2 = insn2->op2;
 						probN = prob1 + prob2;
 					} else {
-						if (prob1 > 99) {
-							prob1 = 99;
+						if (prob1 > 100) {
+							prob1 = 100;
 						}
 						prob2 = 100 - prob1;
 					}
 
 				} else if (insn2->op2) {
 					prob2 = insn2->op2;
-					if (prob2 > 99) {
-						prob2 = 99;
+					if (prob2 > 100) {
+						prob2 = 100;
 					}
 					prob1 = 100 - prob2;
 				} else if (successor1_bb->loop_depth >= loop_depth
 						&& successor2_bb->loop_depth < loop_depth) {
-					// TODO: loop level and iterations count
 					prob1 = 90;
 					prob2 = 10;
 				} else if (successor1_bb->loop_depth < loop_depth
 						&& successor2_bb->loop_depth >= loop_depth) {
-					// TODO: loop level and iterations count
 					prob1 = 10;
 					prob2 = 90;
 				} else if (successor2_bb->flags & IR_BB_EMPTY) {
-					// TODO: empty connector blocks
 					prob1 = 51;
 					prob2 = 49;
 				} else if (successor1_bb->flags & IR_BB_EMPTY) {
-					// TODO: empty connector blocks
 					prob1 = 49;
 					prob2 = 51;
 				} else {
@@ -2137,13 +2141,13 @@ restart:
 				}
 				IR_ASSERT(edges_count < max_edges_count);
 				freq = bb_freq[b] * (float)prob1 / (float)probN;
-//				if (b != successor1 && bb->loop_header != successor1) {
 				if (successor1 > b) {
 					IR_ASSERT(!ir_bitset_in(visited, successor1));
 					bb_freq[successor1] += freq;
 					ir_bitqueue_add(&worklist, successor1);
 				}
 				do {
+					/* try to join edges early to reduce number of edges and the cost of their sorting */
 					if (prob1 > prob2
 					 && (successor1_bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) != IR_BB_EMPTY) {
 						uint32_t src = chains[b].next;
@@ -2153,10 +2157,7 @@ restart:
 						ir_join_chains(chains, src, successor1);
 						if (!IR_DEBUG_BB_SCHEDULE_GRAPH) break;
 					}
-					while ((successor1_bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
-						successor1 = ctx->cfg_edges[successor1_bb->successors];
-						successor1_bb = &ctx->cfg_blocks[successor1];
-					}
+					successor1 = _ir_skip_empty_blocks(ctx, successor1);
 					edges[edges_count].from = b;
 					edges[edges_count].to = successor1;
 					edges[edges_count].freq = freq;
@@ -2164,7 +2165,6 @@ restart:
 				} while (0);
 				IR_ASSERT(edges_count < max_edges_count);
 				freq = bb_freq[b] * (float)prob2 / (float)probN;
-//				if (b != successor2 && bb->loop_header != successor2) {
 				if (successor2 > b) {
 					IR_ASSERT(!ir_bitset_in(visited, successor2));
 					bb_freq[successor2] += freq;
@@ -2180,10 +2180,7 @@ restart:
 						ir_join_chains(chains, src, successor2);
 						if (!IR_DEBUG_BB_SCHEDULE_GRAPH) break;
 					}
-					while ((successor2_bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
-						successor2 = ctx->cfg_edges[successor2_bb->successors];
-						successor2_bb = &ctx->cfg_blocks[successor2];
-					}
+					successor2 = _ir_skip_empty_blocks(ctx, successor2);
 					edges[edges_count].from = b;
 					edges[edges_count].to = successor2;
 					edges[edges_count].freq = freq;
@@ -2218,16 +2215,12 @@ restart:
 					}
 					IR_ASSERT(edges_count < max_edges_count);
 					freq = bb_freq[b] * (float)prob / 100.0f;
-//					if (b != successor && bb->loop_header != successor) {
 					if (successor > b) {
 						IR_ASSERT(!ir_bitset_in(visited, successor));
 						bb_freq[successor] += freq;
 						ir_bitqueue_add(&worklist, successor);
 					}
-					while ((successor_bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
-						successor = ctx->cfg_edges[successor_bb->successors];
-						successor_bb = &ctx->cfg_blocks[successor];
-					}
+					successor = _ir_skip_empty_blocks(ctx, successor);
 					edges[edges_count].from = b;
 					edges[edges_count].to = successor;
 					edges[edges_count].freq = freq;
@@ -2277,17 +2270,22 @@ restart:
 #endif
 
 	/* 4. Merge empty entry blocks */
-	if (ctx->flags & IR_MERGE_EMPTY_ENTRIES) {
-		bb = ctx->cfg_blocks + 2;
-		for (b = 2; b <= ctx->cfg_blocks_count; bb++, b++) {
-			if (UNEXPECTED(bb->flags & IR_BB_PREV_EMPTY_ENTRY)) {
-				/* Schedule the previous empty ENTRY block before this one */
-				uint32_t predecessor = b - 1;
+	if ((ctx->flags & IR_MERGE_EMPTY_ENTRIES) && ctx->entries_count) {
+		for (i = 0; i < ctx->entries_count; i++) {
+			b = ctx->cfg_map[ctx->entries[i]];
+			if (chains[b].head == b && chains[b].tail == b) {
+				bb = &ctx->cfg_blocks[b];
+				IR_ASSERT(bb->flags & IR_BB_ENTRY);
+				if (bb->flags & IR_BB_EMPTY) {
+					uint32_t successor;
 
-				if (chains[predecessor].head == predecessor
-				 && chains[predecessor].tail == predecessor
-				 && chains[b].head) {
-					ir_insert_chain_before(chains, predecessor, b);
+					do {
+						IR_ASSERT(bb->successors_count == 1);
+						successor = ctx->cfg_edges[bb->successors];
+						bb = &ctx->cfg_blocks[successor];
+					} while ((bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY);
+					IR_ASSERT(chains[successor].head);
+					ir_insert_chain_before(chains, b, successor);
 				}
 			}
 		}
@@ -2312,7 +2310,10 @@ restart:
 				if (other == e->to) {
 					other = ctx->cfg_edges[bb->successors + 1];
 				}
-				if (chains[other].head && ir_chain_head(chains, other) != src) {
+				if (!chains[other].head) {
+					other = _ir_skip_empty_blocks(ctx, other);
+				}
+				if (ir_chain_head(chains, other) != src) {
 					if (src != 1) {
 						ir_join_chains(chains, dst, src);
 					}
@@ -2508,18 +2509,7 @@ int ir_schedule_blocks(ir_ctx *ctx)
 /* JMP target optimisation */
 uint32_t ir_skip_empty_target_blocks(const ir_ctx *ctx, uint32_t b)
 {
-	ir_block *bb;
-
-	while (1) {
-		bb = &ctx->cfg_blocks[b];
-
-		if ((bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
-			b = ctx->cfg_edges[bb->successors];
-		} else {
-			break;
-		}
-	}
-	return b;
+	return _ir_skip_empty_blocks(ctx, b);
 }
 
 uint32_t ir_next_block(const ir_ctx *ctx, uint32_t b)
