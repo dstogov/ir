@@ -9652,7 +9652,7 @@ static uint32_t _ir_next_block(ir_ctx *ctx, uint32_t _b)
 
 void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 {
-	uint32_t b, n, target;
+	uint32_t _b, b, n, target;
 	ir_block *bb;
 	ir_ref i;
 	ir_insn *insn;
@@ -9735,7 +9735,6 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 		list[ctx->cfg_blocks_count + 1] = 0;
 	}
 
-	uint32_t _b;
 	for (_b = 1; _b <= ctx->cfg_blocks_count; _b++) {
 		b = ctx->cfg_schedule[_b];
 		bb = &ctx->cfg_blocks[b];

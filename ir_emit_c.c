@@ -724,7 +724,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	ir_use_list *use_list;
 	bool first;
 	ir_bitset vars, tmp_types;
-	uint32_t b, target, prev = 0;
+	uint32_t _b, b, target, prev = 0;
 	ir_block *bb;
 
 	/* Emit function prototype */
@@ -819,8 +819,6 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	} IR_BITSET_FOREACH_END();
 	ir_mem_free(tmp_types);
 
-//	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
-	uint32_t _b;
 	for (_b = 1; _b <= ctx->cfg_blocks_count; _b++) {
 		if (ctx->cfg_schedule) {
 			b = ctx->cfg_schedule[_b];

@@ -1965,9 +1965,6 @@ uint32_t ir_skip_empty_target_blocks(const ir_ctx *ctx, uint32_t b)
 
 uint32_t ir_next_block(const ir_ctx *ctx, uint32_t b)
 {
-#if 0
-	return (ctx->cfg_schedule) ? ctx->cfg_schedule[b + 1] : b + 1;
-#else
 	ir_block *bb;
 
 	if (ctx->cfg_schedule) {
@@ -1995,7 +1992,6 @@ uint32_t ir_next_block(const ir_ctx *ctx, uint32_t b)
 		}
 	}
 	return b;
-#endif
 }
 
 void ir_get_true_false_blocks(const ir_ctx *ctx, uint32_t b, uint32_t *true_block, uint32_t *false_block)
