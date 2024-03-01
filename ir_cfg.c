@@ -2266,7 +2266,7 @@ restart:
 
 	/* 4. Merge empty blocks */
 	bb = ctx->cfg_blocks + 2;
-	for (b = 2; b < ctx->cfg_blocks_count + 1; bb++, b++) {
+	for (b = 2; b <= ctx->cfg_blocks_count; bb++, b++) {
 		if (bb->flags & IR_BB_EMPTY) {
 			if (chains[b].head == b && chains[b].tail == b) {
 				IR_ASSERT(bb->successors_count == 1);
@@ -2318,11 +2318,10 @@ restart:
 #endif
 
 	/* 6. Form a final BB order  */
-	bool reorder = 0;
 	uint32_t *list = ir_mem_malloc(sizeof(uint32_t) * (ctx->cfg_blocks_count + 2));
 	uint32_t n = 0;
 
-	for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
+	for (b = 1; b <= ctx->cfg_blocks_count; b++) {
 		if (chains[b].head == b) {
 			uint32_t tail = chains[b].tail;
 			uint32_t i = b;
