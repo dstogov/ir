@@ -1822,6 +1822,7 @@ static uint32_t _ir_skip_empty_blocks(const ir_ctx *ctx, uint32_t b)
 		ir_block *bb = &ctx->cfg_blocks[b];
 
 		if ((bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
+			IR_ASSERT(bb->successors_count == 1);
 			b = ctx->cfg_edges[bb->successors];
 		} else {
 			return b;
@@ -1918,6 +1919,9 @@ static void ir_insert_chain_before(ir_chain *chains, uint32_t c, uint32_t before
 #ifndef IR_DEBUG_BB_SCHEDULE_GRAPH
 # define IR_DEBUG_BB_SCHEDULE_GRAPH 0
 #endif
+#ifndef IR_DEBUG_BB_SCHEDULE_EDGES
+# define IR_DEBUG_BB_SCHEDULE_EDGES 0
+#endif
 #ifndef IR_DEBUG_BB_SCHEDULE_CHAINS
 # define IR_DEBUG_BB_SCHEDULE_CHAINS 0
 #endif
@@ -1936,9 +1940,8 @@ static void ir_dump_cfg_freq_graph(ir_ctx *ctx, float *bb_freq, uint32_t edges_c
 	i = 0;
 	for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
 		if (chains[b].head == b) {
+			colors[b] = (i % max_colors) + 1;
 			i++;
-			if (i > max_colors) break;
-			colors[b] = i;
 		}
 	}
 
@@ -1966,6 +1969,19 @@ static void ir_dump_cfg_freq_graph(ir_ctx *ctx, float *bb_freq, uint32_t edges_c
 	}
 	fprintf(stderr, "\n");
 
+	for (i = 0; i < edges_count; i++) {
+		fprintf(stderr, "\tBB%d -> BB%d [label=\"%0.3f\"]\n", edges[i].from, edges[i].to, edges[i].freq);
+	}
+	fprintf(stderr, "}\n");
+}
+#endif
+
+#if IR_DEBUG_BB_SCHEDULE_EDGES
+static void ir_dump_edges(ir_ctx *ctx, uint32_t edges_count, ir_edge_info *edges)
+{
+	uint32_t i;
+
+	fprintf(stderr, "Edges:\n");
 	for (i = 0; i < edges_count; i++) {
 		fprintf(stderr, "\tBB%d -> BB%d [label=\"%0.3f\"]\n", edges[i].from, edges[i].to, edges[i].freq);
 	}
@@ -2237,6 +2253,10 @@ restart:
 	/* 2. Sort EDGEs according to their frequentcies */
 	qsort(edges, edges_count, sizeof(ir_edge_info), ir_edge_info_cmp);
 
+#if IR_DEBUG_BB_SCHEDULE_EDGES
+	ir_dump_edges(ctx, edges_count, edges);
+#endif
+
 	/* 3. Process EDGEs in the decrising frequentcy order and join the connected chains */
 	for (e = edges, i = edges_count; i > 0; e++, i--) {
 		uint32_t dst = chains[e->to].head;
@@ -2275,7 +2295,7 @@ restart:
 	if ((ctx->flags & IR_MERGE_EMPTY_ENTRIES) && ctx->entries_count) {
 		for (i = 0; i < ctx->entries_count; i++) {
 			b = ctx->cfg_map[ctx->entries[i]];
-			if (chains[b].head == b && chains[b].tail == b) {
+			if (b && chains[b].head == b && chains[b].tail == b) {
 				bb = &ctx->cfg_blocks[b];
 				IR_ASSERT(bb->flags & IR_BB_ENTRY);
 				if (bb->flags & IR_BB_EMPTY) {
@@ -2291,11 +2311,11 @@ restart:
 				}
 			}
 		}
-	}
 
 #if IR_DEBUG_BB_SCHEDULE_CHAINS
-	ir_dump_chains(ctx, chains);
+		ir_dump_chains(ctx, chains);
 #endif
+	}
 
 	/* 5. Group chains accoring to the more frequnt edges between them */
 	for (e = edges, i = edges_count; i > 0; e++, i--) {
@@ -2305,30 +2325,28 @@ restart:
 		uint32_t src = ir_chain_head(chains, e->from);
 		uint32_t dst = ir_chain_head(chains, e->to);
 		if (src != dst) {
-			bb = &ctx->cfg_blocks[e->from];
-			if (ctx->ir_base[bb->end].op == IR_IF) {
-				IR_ASSERT(bb->successors_count == 2);
-				uint32_t other = ctx->cfg_edges[bb->successors];
-				if (other == e->to) {
-					other = ctx->cfg_edges[bb->successors + 1];
-				}
-				if (!chains[other].head) {
-					other = _ir_skip_empty_blocks(ctx, other);
-				}
-				if (ir_chain_head(chains, other) != src) {
-					if (src != 1) {
-						ir_join_chains(chains, dst, src);
-					}
-				} else {
-					if (dst != 1) {
-//						ir_join_chains(chains, src, dst);
-					}
-				}
+			if (src == 1) {
+				ir_join_chains(chains, src, dst);
+			} else if (dst == 1) {
+				ir_join_chains(chains, dst, src);
 			} else {
-				if (dst != 1) {
-					ir_join_chains(chains, src, dst);
+				bb = &ctx->cfg_blocks[e->from];
+				if (ctx->ir_base[bb->end].op == IR_IF) {
+					IR_ASSERT(bb->successors_count == 2);
+					uint32_t other = ctx->cfg_edges[bb->successors];
+					if (other == e->to) {
+						other = ctx->cfg_edges[bb->successors + 1];
+					}
+					if (!chains[other].head) {
+						other = _ir_skip_empty_blocks(ctx, other);
+					}
+					if (ir_chain_head(chains, other) != src) {
+						ir_join_chains(chains, dst, src);
+					} else {
+						ir_join_chains(chains, src, dst);
+					}
 				} else {
-					ir_join_chains(chains, dst, src);
+					ir_join_chains(chains, src, dst);
 				}
 			}
 		}
