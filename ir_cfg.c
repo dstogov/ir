@@ -1936,8 +1936,9 @@ static void ir_dump_cfg_freq_graph(ir_ctx *ctx, float *bb_freq, uint32_t edges_c
 	i = 0;
 	for (b = 1; b < ctx->cfg_blocks_count + 1; b++) {
 		if (chains[b].head == b) {
-			colors[b] = ++i;
+			i++;
 			if (i > max_colors) break;
+			colors[b] = i;
 		}
 	}
 
@@ -1945,7 +1946,7 @@ static void ir_dump_cfg_freq_graph(ir_ctx *ctx, float *bb_freq, uint32_t edges_c
 	fprintf(stderr, "\trankdir=TB;\n");
 	for (b = 1; b <= ctx->cfg_blocks_count; b++) {
 		bb = &ctx->cfg_blocks[b];
-		c = colors[ir_chain_head(chains, b)];
+		c = (chains[b].head) ? colors[ir_chain_head(chains, b)] : 0;
 		is_head = chains[b].head == b;
 		is_empty = (bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY;
 		if (c) {
@@ -2062,6 +2063,7 @@ restart:
 			empty--;
 
 			if (successor > b) {
+				bb_freq[successor] += bb_freq[b];
 				b = successor;
 				ir_bitqueue_del(&worklist, b);
 				goto restart;
