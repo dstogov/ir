@@ -70,18 +70,18 @@ main:
 	stp x19, x20, [x29, #0x10]
 	movz w19, #0x1
 	mov w0, wzr
+	b .L2
 .L1:
-	movz w1, #0x2710
-	cmp w19, w1
-	b.ge .L2
 	add w20, w19, w0
 	mov w1, w19
 	adr x0, .L3
 	bl printf
 	mov w0, w19
 	mov w19, w20
-	b .L1
 .L2:
+	movz w1, #0x2710
+	cmp w19, w1
+	b.lt .L1
 	mov w0, wzr
 	ldp x19, x20, [x29, #0x10]
 	ldp x29, x30, [sp], #0x20

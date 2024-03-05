@@ -147,18 +147,8 @@ test:
 	xorpd %xmm0, %xmm0
 	movsd %xmm0, 0x18(%rsp)
 	xorl %eax, %eax
+	jmp .L2
 .L1:
-	leal 1(%rax), %eax
-	movsd 0x18(%rsp), %xmm1
-	mulsd %xmm1, %xmm1
-	movsd 0x10(%rsp), %xmm0
-	mulsd %xmm0, %xmm0
-	movsd %xmm0, 0x20(%rsp)
-	addsd %xmm1, %xmm0
-	ucomisd .L5(%rip), %xmm0
-	ja .L2
-	cmpl $0x3e8, %eax
-	jg .L3
 	movsd 0x10(%rsp), %xmm0
 	mulsd 0x18(%rsp), %xmm0
 	subsd 0x20(%rsp), %xmm1
@@ -167,12 +157,22 @@ test:
 	addsd %xmm0, %xmm0
 	addsd (%rsp), %xmm0
 	movsd %xmm0, 0x10(%rsp)
-	jmp .L1
 .L2:
+	leal 1(%rax), %eax
+	movsd 0x18(%rsp), %xmm1
+	mulsd %xmm1, %xmm1
+	movsd 0x10(%rsp), %xmm0
+	mulsd %xmm0, %xmm0
+	movsd %xmm0, 0x20(%rsp)
+	addsd %xmm1, %xmm0
+	ucomisd .L5(%rip), %xmm0
+	ja .L3
+	cmpl $0x3e8, %eax
+	jle .L1
+	xorl %eax, %eax
 	addq $0x28, %rsp
 	retq
 .L3:
-	xorl %eax, %eax
 	addq $0x28, %rsp
 	retq
 .rodata

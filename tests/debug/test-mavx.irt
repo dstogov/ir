@@ -59,25 +59,25 @@ test:
 	vxorpd %xmm3, %xmm3, %xmm3
 	xorl %eax, %eax
 	vxorpd %xmm2, %xmm2, %xmm2
+	jmp .L2
 .L1:
-	leal 1(%rax), %eax
-	vmulsd %xmm2, %xmm2, %xmm4
-	vmulsd %xmm3, %xmm3, %xmm5
-	vaddsd %xmm4, %xmm5, %xmm6
-	vucomisd .L5(%rip), %xmm6
-	ja .L2
-	cmpl $0x3e8, %eax
-	jg .L3
 	vmulsd %xmm3, %xmm2, %xmm3
 	vsubsd %xmm5, %xmm4, %xmm2
 	vaddsd %xmm1, %xmm2, %xmm2
 	vaddsd %xmm3, %xmm3, %xmm3
 	vaddsd %xmm0, %xmm3, %xmm3
-	jmp .L1
 .L2:
+	leal 1(%rax), %eax
+	vmulsd %xmm2, %xmm2, %xmm4
+	vmulsd %xmm3, %xmm3, %xmm5
+	vaddsd %xmm4, %xmm5, %xmm6
+	vucomisd .L5(%rip), %xmm6
+	ja .L3
+	cmpl $0x3e8, %eax
+	jle .L1
+	xorl %eax, %eax
 	retq
 .L3:
-	xorl %eax, %eax
 	retq
 .rodata
 	.db 0x90, 0x90, 0x90
@@ -85,4 +85,3 @@ test:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f
 .L5:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x40
-

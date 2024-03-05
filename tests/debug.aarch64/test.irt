@@ -60,26 +60,26 @@ test:
 	fmov d3, xzr
 	mov w0, wzr
 	fmov d2, xzr
+	b .L2
 .L1:
+	fmul d3, d2, d3
+	fsub d2, d4, d5
+	fadd d2, d2, d1
+	fadd d3, d3, d3
+	fadd d3, d3, d0
+.L2:
 	add w0, w0, #1
 	fmul d4, d2, d2
 	fmul d5, d3, d3
 	fadd d6, d5, d4
 	ldr d7, .L5
 	fcmp d6, d7
-	b.gt .L2
-	cmp w0, #0x3e8
 	b.gt .L3
-	fmul d3, d2, d3
-	fsub d2, d4, d5
-	fadd d2, d2, d1
-	fadd d3, d3, d3
-	fadd d3, d3, d0
-	b .L1
-.L2:
+	cmp w0, #0x3e8
+	b.le .L1
+	mov w0, wzr
 	ret
 .L3:
-	mov w0, wzr
 	ret
 .rodata
 	.db 0x1f, 0x20, 0x03, 0xd5

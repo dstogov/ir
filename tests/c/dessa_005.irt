@@ -39,15 +39,15 @@ void test(double arg_1, double arg_2, double arg_3, double arg_4, double arg_5, 
 	double d_5 = arg_5;
 	bool d_6 = cond;
 	double tmp_d;
-bb2:
-	if (!d_6) goto bb4;
+	goto bb2;
+bb3:
 	d_3 = d_2;
 	d_2 = d_1;
 	tmp_d = d_4;
 	d_4 = d_5;
 	d_5 = tmp_d;
-	goto bb2;
-bb4:
+bb2:
+	if (d_6) goto bb3;
 	printf("%g %g %g %g %g\n", d_1, d_2, d_3, d_4, d_5);
 	return;
 }

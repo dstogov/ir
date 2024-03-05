@@ -24,12 +24,12 @@ x86_64
 }
 --EXPECT--
 test:
+	jmp .L2
 .L1:
+	movl %eax, %edi
+.L2:
 	movl %edi, %eax
 	addl $1, %eax
-	je .L2
-	movl %eax, %edi
-	jmp .L1
-.L2:
+	jne .L1
 	movl %edi, %eax
 	retq

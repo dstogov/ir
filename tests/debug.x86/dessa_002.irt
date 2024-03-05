@@ -25,11 +25,11 @@ x86
 --EXPECT--
 test:
 	movl 4(%esp), %eax
+	jmp .L2
 .L1:
+	movl %ecx, %eax
+.L2:
 	movl %eax, %ecx
 	addl $1, %ecx
-	je .L2
-	movl %ecx, %eax
-	jmp .L1
-.L2:
+	jne .L1
 	retl

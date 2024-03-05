@@ -59,7 +59,15 @@ test:
 	xorpd %xmm3, %xmm3
 	movabsq $0x200000000, %rax
 	xorpd %xmm2, %xmm2
+	jmp .L2
 .L1:
+	mulsd %xmm2, %xmm3
+	subsd %xmm5, %xmm4
+	movapd %xmm4, %xmm2
+	addsd %xmm1, %xmm2
+	addsd %xmm3, %xmm3
+	addsd %xmm0, %xmm3
+.L2:
 	leaq 1(%rax), %rax
 	movapd %xmm2, %xmm4
 	mulsd %xmm4, %xmm4
@@ -68,21 +76,13 @@ test:
 	movapd %xmm5, %xmm6
 	addsd %xmm4, %xmm6
 	ucomisd .L5(%rip), %xmm6
-	ja .L2
+	ja .L3
 	movabsq $0x2000003e8, %rcx
 	cmpq %rcx, %rax
-	jg .L3
-	mulsd %xmm2, %xmm3
-	subsd %xmm5, %xmm4
-	movapd %xmm4, %xmm2
-	addsd %xmm1, %xmm2
-	addsd %xmm3, %xmm3
-	addsd %xmm0, %xmm3
-	jmp .L1
-.L2:
+	jle .L1
+	movabsq $0x200000000, %rax
 	retq
 .L3:
-	movabsq $0x200000000, %rax
 	retq
 .rodata
 	.db 0x90, 0x90, 0x90
