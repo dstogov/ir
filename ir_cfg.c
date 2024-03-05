@@ -2021,7 +2021,10 @@ static int ir_schedule_blocks_bottom_up(ir_ctx *ctx)
 	ir_chain *chains;
 	ir_bitqueue worklist;
 	ir_bitset visited;
-	uint32_t *empty, count, empty_count = 0;
+	uint32_t *empty, count;
+#ifdef IR_DEBUG
+	uint32_t empty_count = 0;
+#endif
 
 	ctx->cfg_schedule = ir_mem_malloc(sizeof(uint32_t) * (ctx->cfg_blocks_count + 2));
 	empty = ctx->cfg_schedule + ctx->cfg_blocks_count;
@@ -2074,7 +2077,9 @@ restart:
 			/* move empty blocks to the end */
 			IR_ASSERT(chains[b].head == b);
 			chains[b].head = 0;
+#ifdef IR_DEBUG
 			empty_count++;
+#endif
 			*empty = b;
 			empty--;
 
