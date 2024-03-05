@@ -618,7 +618,9 @@ static ir_ref ir_try_split_if(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 				 */
 				ir_use_list_remove_all(ctx, merge_ref, cond_ref);
 				ir_use_list_remove_all(ctx, ref, if_true_ref);
-				ir_use_list_replace(ctx, cond->op3, cond_ref, end2_ref);
+				if (!IR_IS_CONST_REF(cond->op3)) {
+					ir_use_list_replace(ctx, cond->op3, cond_ref, end2_ref);
+				}
 				ir_use_list_replace(ctx, end1_ref, merge_ref, if_false_ref);
 				ir_use_list_add(ctx, end2_ref, if_true_ref);
 
