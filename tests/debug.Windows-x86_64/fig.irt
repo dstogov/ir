@@ -79,14 +79,22 @@ test:
 	movl %r8d, %esi
 	imull %edx, %esi
 	leal 4(%rsi), %edi
+	jmp .L3
 .L1:
-	testl %ebx, %ebx
-	je .L3
-	movl %r8d, %ecx
-	movl %edi, %eax
+	movl %ecx, %r10d
+	imull %edx, %r10d
+	leal 1(%r10), %r11d
+	movl %r8d, %r9d
 .L2:
 	testl %ebp, %ebp
-	jne .L1
+	je .L4
+.L3:
+	testl %ebx, %ebx
+	je .L1
+	movl %r8d, %ecx
+	movl %edi, %eax
+	jmp .L2
+.L4:
 	movl %ecx, %ebx
 	imull %edx, %ebx
 	addl %edx, %ecx
@@ -103,9 +111,3 @@ test:
 	movq (%rsp), %rdi
 	addq $0x20, %rsp
 	retq
-.L3:
-	movl %ecx, %r10d
-	imull %edx, %r10d
-	leal 1(%r10), %r11d
-	movl %r8d, %r9d
-	jmp .L2

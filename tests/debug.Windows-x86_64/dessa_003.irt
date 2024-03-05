@@ -37,10 +37,10 @@ test:
 	movl $0xc, %ecx
 	cltd
 	idivl %ecx
+	jmp .L2
 .L1:
-	testl %r8d, %r8d
-	je .L2
 	xchgl %eax, %r9d
-	jmp .L1
 .L2:
+	testl %r8d, %r8d
+	jne .L1
 	retq
