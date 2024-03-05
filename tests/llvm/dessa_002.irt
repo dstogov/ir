@@ -25,13 +25,13 @@ define i32 @test(i32 %d2)
 {
 l1:
 	br label %l2
+l3:
+	br label %l2
 l2:
 	%d5 = phi i32 [%d2, %l1], [%d6, %l3]
 	%d6 = add i32 %d5, 1
 	%t7 = icmp ne i32 %d6, 0
 	br i1 %t7, label %l3, label %l4
-l3:
-	br label %l2
 l4:
 	ret i32 %d5
 }

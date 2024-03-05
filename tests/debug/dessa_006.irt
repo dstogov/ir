@@ -63,12 +63,8 @@ test:
 	movsd %xmm3, 0x18(%rsp)
 	movsd %xmm4, 0x20(%rsp)
 	movb %dil, %bl
+	jmp .L2
 .L1:
-	leaq .L4(%rip), %rdi
-	movl $0, %eax
-	callq printf
-	testb %bl, %bl
-	je .L2
 	xorb %bl, %bl
 	movsd (%rsp), %xmm0
 	movsd %xmm0, 8(%rsp)
@@ -80,8 +76,12 @@ test:
 	movsd %xmm0, 0x18(%rsp)
 	movsd (%rsp), %xmm0
 	movsd %xmm0, 0x20(%rsp)
-	jmp .L1
 .L2:
+	leaq .L4(%rip), %rdi
+	movl $0, %eax
+	callq printf
+	testb %bl, %bl
+	jne .L1
 	leaq .L3(%rip), %rdi
 	movsd (%rsp), %xmm0
 	movsd 8(%rsp), %xmm1

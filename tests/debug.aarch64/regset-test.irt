@@ -159,20 +159,8 @@ test:
 	fmov d1, xzr
 	str d1, [sp, #0x18]
 	mov w0, wzr
+	b .L2
 .L1:
-	add w0, w0, #1
-	ldr d1, [sp, #0x18]
-	fmul d1, d1, d1
-	str d1, [sp, #0x20]
-	ldr d0, [sp, #0x10]
-	fmul d0, d0, d0
-	str d0, [sp, #0x28]
-	fadd d0, d0, d1
-	ldr d1, .L5
-	fcmp d0, d1
-	b.gt .L2
-	cmp w0, #0x3e8
-	b.gt .L3
 	ldr d1, [sp, #0x18]
 	ldr d0, [sp, #0x10]
 	fmul d0, d1, d0
@@ -188,12 +176,24 @@ test:
 	ldr d1, [sp]
 	fadd d0, d0, d1
 	str d0, [sp, #0x10]
-	b .L1
 .L2:
+	add w0, w0, #1
+	ldr d1, [sp, #0x18]
+	fmul d1, d1, d1
+	str d1, [sp, #0x20]
+	ldr d0, [sp, #0x10]
+	fmul d0, d0, d0
+	str d0, [sp, #0x28]
+	fadd d0, d0, d1
+	ldr d1, .L5
+	fcmp d0, d1
+	b.gt .L3
+	cmp w0, #0x3e8
+	b.le .L1
+	mov w0, wzr
 	add sp, sp, #0x38
 	ret
 .L3:
-	mov w0, wzr
 	add sp, sp, #0x38
 	ret
 .rodata

@@ -41,12 +41,12 @@ test:
 	movl $0xc, %ebp
 	cltd
 	idivl %ebp
+	jmp .L2
 .L1:
-	testl %ebx, %ebx
-	je .L2
 	xchgl %eax, %ecx
-	jmp .L1
 .L2:
+	testl %ebx, %ebx
+	jne .L1
 	movl 4(%esp), %ebx
 	movl (%esp), %ebp
 	addl $8, %esp

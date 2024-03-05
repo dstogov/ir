@@ -34,13 +34,13 @@ define i32 @test(i32 %d2, i32 %d3, i32 %d4)
 l1:
 	%d5 = sdiv i32 %d2, 12
 	br label %l2
+l3:
+	br label %l2
 l2:
 	%d8 = phi i32 [%d5, %l1], [%d9, %l3]
 	%d9 = phi i32 [%d3, %l1], [%d8, %l3]
 	%t10 = icmp ne i32 %d4, 0
 	br i1 %t10, label %l3, label %l4
-l3:
-	br label %l2
 l4:
 	ret i32 %d8
 }

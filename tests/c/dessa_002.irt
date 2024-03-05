@@ -25,11 +25,11 @@ int32_t test(int32_t x)
 {
 	int32_t d_1 = x;
 	int32_t d_2;
+	goto bb2;
+bb3:
+	d_1 = d_2;
 bb2:
 	d_2 = d_1 + 1;
-	if (!d_2) goto bb4;
-	d_1 = d_2;
-	goto bb2;
-bb4:
+	if (d_2) goto bb3;
 	return d_1;
 }

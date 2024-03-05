@@ -37,12 +37,12 @@ int32_t test(int32_t x, int32_t y, int32_t z)
 	int32_t d_4;
 	int32_t tmp_i32;
 	d_4 = d_1 / 12;
-bb2:
-	if (!d_3) goto bb4;
+	goto bb2;
+bb3:
 	tmp_i32 = d_2;
 	d_2 = d_4;
 	d_4 = tmp_i32;
-	goto bb2;
-bb4:
+bb2:
+	if (d_3) goto bb3;
 	return d_4;
 }

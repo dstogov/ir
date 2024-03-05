@@ -68,17 +68,17 @@ main:
 	movl %ebp, 0x14(%esp)
 	movl $1, %ebx
 	xorl %eax, %eax
+	jmp .L2
 .L1:
-	cmpl $0x2710, %ebx
-	jge .L2
 	leal (%ebx, %eax), %ebp
 	movl %ebx, 4(%esp)
 	movl $.L3, (%esp)
 	calll printf
 	movl %ebx, %eax
 	movl %ebp, %ebx
-	jmp .L1
 .L2:
+	cmpl $0x2710, %ebx
+	jl .L1
 	xorl %eax, %eax
 	movl 0x18(%esp), %ebx
 	movl 0x14(%esp), %ebp

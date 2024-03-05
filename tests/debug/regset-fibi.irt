@@ -70,9 +70,8 @@ main:
 	movq %rbp, 8(%rsp)
 	movl $1, %ebx
 	xorl %eax, %eax
+	jmp .L2
 .L1:
-	cmpl $0x2710, %ebx
-	jge .L2
 	leal (%rbx, %rax), %ebp
 	movl %ebx, %esi
 	leaq .L3(%rip), %rdi
@@ -80,8 +79,9 @@ main:
 	callq printf
 	movl %ebx, %eax
 	movl %ebp, %ebx
-	jmp .L1
 .L2:
+	cmpl $0x2710, %ebx
+	jl .L1
 	xorl %eax, %eax
 	movq 0x10(%rsp), %rbx
 	movq 8(%rsp), %rbp

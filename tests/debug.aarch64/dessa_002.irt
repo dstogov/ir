@@ -24,11 +24,11 @@ aarch64
 }
 --EXPECT--
 test:
+	b .L2
 .L1:
+	mov w0, w1
+.L2:
 	add w1, w0, #1
 	cmp w1, #0
-	b.eq .L2
-	mov w0, w1
-	b .L1
-.L2:
+	b.ne .L1
 	ret

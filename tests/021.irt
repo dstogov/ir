@@ -45,16 +45,6 @@ BB1:
 	successors(1) [BB2]
 	dom_depth=0
 	dom_children [BB2]
-BB2:
-	start=4
-	end=7
-	successors(2) [BB3, BB4]
-	predecessors(2) [BB1, BB3]
-	dom_parent=BB1
-	dom_depth=1
-	dom_children [BB3, BB4]
-	LOOP_HEADER
-	loop_depth=1
 BB3:
 	start=8
 	end=9
@@ -65,6 +55,16 @@ BB3:
 	loop_header=BB2
 	loop_depth=1
 	# DESSA MOV d_6 {R2} -> d_5 {R1}
+BB2:
+	start=4
+	end=7
+	successors(2) [BB3, BB4]
+	predecessors(2) [BB1, BB3]
+	dom_parent=BB1
+	dom_depth=1
+	dom_children [BB3, BB4]
+	LOOP_HEADER
+	loop_depth=1
 BB4:
 	start=10
 	end=11

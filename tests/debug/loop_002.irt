@@ -48,21 +48,22 @@ x86_64
 test:
 	xorl %ecx, %ecx
 	xorl %eax, %eax
+	jmp .L2
 .L1:
+	leal 1(%rcx), %ecx
+.L2:
 	cmpl $0xa, %ecx
 	jge .L5
 	xorl %edx, %edx
-.L2:
+	jmp .L4
+.L3:
+	leal 1(%rdx), %edx
+.L4:
 	cmpl $0xa, %edx
-	jge .L4
+	jge .L1
 	cmpl %ecx, %edx
 	je .L3
 	leal 1(%rax), %eax
-.L3:
-	leal 1(%rdx), %edx
-	jmp .L2
-.L4:
-	leal 1(%rcx), %ecx
-	jmp .L1
+	jmp .L3
 .L5:
 	retq

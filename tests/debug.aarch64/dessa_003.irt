@@ -34,12 +34,12 @@ aarch64
 test:
 	movz w3, #0xc
 	sdiv w0, w0, w3
+	b .L2
 .L1:
-	cmp w2, #0
-	b.eq .L2
 	mov w3, w0
 	mov w0, w1
 	mov w1, w3
-	b .L1
 .L2:
+	cmp w2, #0
+	b.ne .L1
 	ret

@@ -70,17 +70,17 @@ main:
 	movq %rbp, 0x28(%rsp)
 	movl $1, %ebx
 	xorl %eax, %eax
+	jmp .L2
 .L1:
-	cmpl $0x2710, %ebx
-	jge .L2
 	leal (%rbx, %rax), %ebp
 	movl %ebx, %edx
 	leaq .L3(%rip), %rcx
 	callq printf
 	movl %ebx, %eax
 	movl %ebp, %ebx
-	jmp .L1
 .L2:
+	cmpl $0x2710, %ebx
+	jl .L1
 	xorl %eax, %eax
 	movq 0x30(%rsp), %rbx
 	movq 0x28(%rsp), %rbp

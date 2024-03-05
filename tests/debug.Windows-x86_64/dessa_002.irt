@@ -24,12 +24,12 @@ Windows-x86_64
 }
 --EXPECT--
 test:
+	jmp .L2
 .L1:
+	movl %eax, %ecx
+.L2:
 	movl %ecx, %eax
 	addl $1, %eax
-	je .L2
-	movl %eax, %ecx
-	jmp .L1
-.L2:
+	jne .L1
 	movl %ecx, %eax
 	retq

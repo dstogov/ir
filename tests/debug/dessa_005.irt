@@ -54,9 +54,8 @@ func main(): int32_t
 --EXPECT--
 test:
 	subq $8, %rsp
+	jmp .L2
 .L1:
-	testb %dil, %dil
-	je .L2
 	xorb %dil, %dil
 	movapd %xmm3, %xmm1
 	movapd %xmm4, %xmm3
@@ -64,8 +63,9 @@ test:
 	movapd %xmm1, %xmm2
 	movapd %xmm0, %xmm1
 	movapd %xmm4, %xmm0
-	jmp .L1
 .L2:
+	testb %dil, %dil
+	jne .L1
 	leaq .L3(%rip), %rdi
 	movl $5, %eax
 	callq printf
