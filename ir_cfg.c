@@ -1856,7 +1856,7 @@ static int ir_edge_info_cmp(const void *b1, const void *b2)
 	if (e1->freq != e2->freq) {
 		return e1->freq < e2->freq ? 1 : -1;
 	}
-	// TODO: ???
+	/* In case of equal frequences prefer to keep the existing order */
 	if (e1->from != e2->from) {
 		return e1->from - e2->from;
 	} else {
@@ -2095,7 +2095,7 @@ restart:
 
 		loop_depth = bb->loop_depth;
 		if (bb->flags & IR_BB_LOOP_HEADER) {
-			// TODO: loop iterations count
+			// TODO: Estimate the loop iterations count
 			bb_freq[b] *= 10;
 		}
 
@@ -2322,7 +2322,8 @@ restart:
 #endif
 	}
 
-	/* 5. Group chains accoring to the more frequnt edges between them */
+	/* 5. Group chains accoring to the most frequnt edge between them */
+	// TODO: Try to find a better heuristc
 	for (e = edges, i = edges_count; i > 0; e++, i--) {
 #if !IR_DEBUG_BB_SCHEDULE_GRAPH
 		if (!e->from) continue;
@@ -2330,29 +2331,10 @@ restart:
 		uint32_t src = ir_chain_head(chains, e->from);
 		uint32_t dst = ir_chain_head(chains, e->to);
 		if (src != dst) {
-			if (src == 1) {
-				ir_join_chains(chains, src, dst);
-			} else if (dst == 1) {
+			if (dst == 1) {
 				ir_join_chains(chains, dst, src);
 			} else {
-				bb = &ctx->cfg_blocks[e->from];
-				if (ctx->ir_base[bb->end].op == IR_IF) {
-					IR_ASSERT(bb->successors_count == 2);
-					uint32_t other = ctx->cfg_edges[bb->successors];
-					if (other == e->to) {
-						other = ctx->cfg_edges[bb->successors + 1];
-					}
-					if (!chains[other].head) {
-						other = _ir_skip_empty_blocks(ctx, other);
-					}
-					if (ir_chain_head(chains, other) != src) {
-						ir_join_chains(chains, dst, src);
-					} else {
-						ir_join_chains(chains, src, dst);
-					}
-				} else {
-					ir_join_chains(chains, src, dst);
-				}
+				ir_join_chains(chains, src, dst);
 			}
 		}
 	}
@@ -2524,7 +2506,8 @@ int ir_schedule_blocks(ir_ctx *ctx)
 {
 	if (ctx->cfg_blocks_count <= 2) {
 		return 1;
-	} else if (UNEXPECTED(ctx->flags2 & IR_IRREDUCIBLE_CFG) || ctx->cfg_blocks_count > 1000) {
+	// TODO: make the choise between top-down and bottom-up algorithm configurable
+	} else if (UNEXPECTED(ctx->flags2 & IR_IRREDUCIBLE_CFG) || ctx->cfg_blocks_count > 256) {
 		return ir_schedule_blocks_top_down(ctx);
 	} else {
 		return ir_schedule_blocks_bottom_up(ctx);
