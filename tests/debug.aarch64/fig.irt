@@ -72,17 +72,17 @@ test:
 	add w10, w9, #4
 	b .L3
 .L1:
-	mul w6, w0, w1
-	add w7, w6, #1
-	mov w3, w2
+	mov w5, w10
+	mov w0, w2
 .L2:
 	cmp w8, #0
 	b.eq .L4
 .L3:
 	cmp w4, #0
-	b.eq .L1
-	mov w5, w10
-	mov w0, w2
+	b.ne .L1
+	mul w6, w0, w1
+	add w7, w6, #1
+	mov w3, w2
 	b .L2
 .L4:
 	mul w4, w0, w1

@@ -48,22 +48,21 @@ aarch64
 test:
 	mov w1, wzr
 	mov w0, wzr
-	b .L2
+	b .L4
 .L1:
-	add w1, w1, #1
+	cmp w2, w1
+	b.eq .L2
+	add w0, w0, #1
 .L2:
+	add w2, w2, #1
+.L3:
+	cmp w2, #0xa
+	b.lt .L1
+	add w1, w1, #1
+.L4:
 	cmp w1, #0xa
 	b.ge .L5
 	mov w2, wzr
-	b .L4
-.L3:
-	add w2, w2, #1
-.L4:
-	cmp w2, #0xa
-	b.ge .L1
-	cmp w2, w1
-	b.eq .L3
-	add w0, w0, #1
 	b .L3
 .L5:
 	ret

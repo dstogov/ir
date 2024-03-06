@@ -78,18 +78,18 @@ test:
 	leal 4(%rbx), %ebp
 	jmp .L3
 .L1:
-	movl %edi, %eax
-	imull %esi, %eax
-	leal 1(%rax), %r8d
-	movl %edx, %ecx
+	movl %ebp, %r9d
+	movl %edx, %edi
 .L2:
 	testl %r11d, %r11d
 	je .L4
 .L3:
 	testl %r10d, %r10d
-	je .L1
-	movl %ebp, %r9d
-	movl %edx, %edi
+	jne .L1
+	movl %edi, %eax
+	imull %esi, %eax
+	leal 1(%rax), %r8d
+	movl %edx, %ecx
 	jmp .L2
 .L4:
 	movl %edi, %r10d
