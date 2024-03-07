@@ -35,28 +35,28 @@ Windows-x86_64
 --EXPECT--
 test:
 	cmpl $3, %ecx
-	jg .L5
+	jg .L4
 	cmpl $1, %ecx
-	jl .L5
+	jl .L4
 	movslq %ecx, %rcx
 	leaq .L6(%rip), %rax
 	jmpq *-8(%rax, %rcx, 8)
 .L1:
 	movl $1, %eax
+	jmp .L5
 .L2:
-	retq
-.L3:
 	movl $2, %eax
-	jmp .L2
-.L4:
+	jmp .L5
+.L3:
 	movl $3, %eax
-	jmp .L2
-.L5:
+	jmp .L5
+.L4:
 	movl $4, %eax
-	jmp .L2
+.L5:
+	retq
 .rodata
 .align 8
 .L6:
 	.qword .L1
+	.qword .L2
 	.qword .L3
-	.qword .L4

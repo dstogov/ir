@@ -22,10 +22,10 @@ x86
 --EXPECT--
 test:
 	cmpl $0, 4(%esp)
-	je .L2
+	je .L1
 	xorl %eax, %eax
+	jmp .L2
 .L1:
-	retl
-.L2:
 	movl $0x2a, %eax
-	jmp .L1
+.L2:
+	retl

@@ -60,14 +60,14 @@ test:
 	br x2
 .L1:
 	movz w0, #0x1
+	b .L4
 .L2:
-	ret
-.L3:
 	movz w0, #0x2
-	b .L2
-.L4:
+	b .L4
+.L3:
 	movz w0, #0x3
-	b .L2
+.L4:
+	ret
 .L5:
 	cmp w1, #0
 	b.ne .L5
@@ -77,5 +77,5 @@ test:
 .align 8
 .L6:
 	.qword .L1
+	.qword .L2
 	.qword .L3
-	.qword .L4

@@ -61,14 +61,14 @@ test:
 	jmpl *.L6(%eax)
 .L1:
 	movl $1, %eax
+	jmp .L4
 .L2:
-	retl
-.L3:
 	movl $2, %eax
-	jmp .L2
-.L4:
+	jmp .L4
+.L3:
 	movl $3, %eax
-	jmp .L2
+.L4:
+	retl
 .L5:
 	testb %cl, %cl
 	jne .L5
@@ -78,5 +78,5 @@ test:
 .align 4
 .L6:
 	.dword .L1
+	.dword .L2
 	.dword .L3
-	.dword .L4

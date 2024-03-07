@@ -40,25 +40,25 @@ test:
 	movz x1, #0x1
 	movk x1, #0x2, lsl #32
 	cmp x0, x1
-	b.eq .L3
+	b.eq .L2
 	movz x1, #0x3ea
 	movk x1, #0x2, lsl #32
 	cmp x0, x1
-	b.eq .L4
-	b .L5
+	b.eq .L3
+	b .L4
 .L1:
 	movz x0, #0x2, lsl #32
+	b .L5
 .L2:
-	ret
-.L3:
 	movz x0, #0x1
 	movk x0, #0x2, lsl #32
-	b .L2
-.L4:
+	b .L5
+.L3:
 	movz x0, #0x3ea
 	movk x0, #0x2, lsl #32
-	b .L2
-.L5:
+	b .L5
+.L4:
 	movz x0, #0x3
 	movk x0, #0x2, lsl #32
-	b .L2
+.L5:
+	ret

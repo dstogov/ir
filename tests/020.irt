@@ -53,17 +53,17 @@ BB2:
 	dom_parent=BB1
 	dom_depth=1
 	# DESSA MOV d_3 {R2} -> d_11 {R1}
-BB4:
-	start=10
-	end=12
-	predecessors(2) [BB2, BB3]
-	dom_parent=BB1
-	dom_depth=1
 BB3:
 	start=8
 	end=9
 	successors(1) [BB4]
 	predecessors(1) [BB1]
+	dom_parent=BB1
+	dom_depth=1
+BB4:
+	start=10
+	end=12
+	predecessors(2) [BB2, BB3]
 	dom_parent=BB1
 	dom_depth=1
 }

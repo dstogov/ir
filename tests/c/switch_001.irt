@@ -43,8 +43,7 @@ int32_t test(int32_t z)
 	}
 bb2:
 	d_2 = 1;
-bb6:
-	return d_2;
+	goto bb6;
 bb3:
 	d_2 = 2;
 	goto bb6;
@@ -53,5 +52,6 @@ bb4:
 	goto bb6;
 bb5:
 	d_2 = 4;
-	goto bb6;
+bb6:
+	return d_2;
 }

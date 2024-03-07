@@ -40,13 +40,13 @@ define i32 @test(i32 %d2)
 	]
 l2:
 	br label %l6
-l6:
-	%d14 = phi i32 [1, %l2], [2, %l3], [3, %l4], [4, %l5]
-	ret i32 %d14
 l3:
 	br label %l6
 l4:
 	br label %l6
 l5:
 	br label %l6
+l6:
+	%d14 = phi i32 [1, %l2], [2, %l3], [3, %l4], [4, %l5]
+	ret i32 %d14
 }

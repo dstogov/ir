@@ -22,10 +22,10 @@ Windows-x86_64
 --EXPECT--
 test:
 	testl %ecx, %ecx
-	je .L2
+	je .L1
 	xorl %eax, %eax
+	jmp .L2
 .L1:
-	retq
-.L2:
 	movl $0x2a, %eax
-	jmp .L1
+.L2:
+	retq

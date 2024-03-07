@@ -60,14 +60,14 @@ test:
 	jmpq *-8(%rax, %rdi, 8)
 .L1:
 	movl $1, %eax
+	jmp .L4
 .L2:
-	retq
-.L3:
 	movl $2, %eax
-	jmp .L2
-.L4:
+	jmp .L4
+.L3:
 	movl $3, %eax
-	jmp .L2
+.L4:
+	retq
 .L5:
 	testb %sil, %sil
 	jne .L5
@@ -77,5 +77,5 @@ test:
 .align 8
 .L6:
 	.qword .L1
+	.qword .L2
 	.qword .L3
-	.qword .L4

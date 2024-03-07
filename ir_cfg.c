@@ -1856,9 +1856,15 @@ static int ir_edge_info_cmp(const void *b1, const void *b2)
 	if (e1->freq != e2->freq) {
 		return e1->freq < e2->freq ? 1 : -1;
 	}
-	/* In case of equal frequencies prefer to keep the existing order */
+	/* In case of equal frequencies, try to avoid penalization of one of the "equal" paths by
+	 * preferring the first RPO successor (in conditional branches) and the last RPO predecessor
+	 * (in merge points).
+	 *
+	 * See "Static Basic Block Reordering Heuristics for Implicit Control Flow in Baseline JITs"
+	 * Polito Guillermo, Ducasse Stephane, and Tesone Pablo (2021)
+	 */
 	if (e1->from != e2->from) {
-		return e1->from - e2->from;
+		return e2->from - e1->from;
 	} else {
 		return e1->to - e2->to;
 	}
@@ -2525,8 +2531,14 @@ int ir_schedule_blocks(ir_ctx *ctx)
 {
 	if (ctx->cfg_blocks_count <= 2) {
 		return 1;
-	// TODO: make the choice between top-down and bottom-up algorithm configurable
-	} else if (UNEXPECTED(ctx->flags2 & IR_IRREDUCIBLE_CFG) || ctx->cfg_blocks_count > 256) {
+	}
+
+	/* The bottom-up Pettis-Hansen algorithm is expensive - O(n^3),
+	 * use it only for relatively small functions.
+	 *
+	 * TODO: make the choice between top-down and bottom-up algorithm configurable
+	 */
+	if (UNEXPECTED(ctx->flags2 & IR_IRREDUCIBLE_CFG) || ctx->cfg_blocks_count > 256) {
 		return ir_schedule_blocks_top_down(ctx);
 	} else {
 		return ir_schedule_blocks_bottom_up(ctx);

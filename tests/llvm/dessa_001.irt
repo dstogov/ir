@@ -27,9 +27,9 @@ define i32 @test(i32 %d2, i32 %d3, i1 %d4)
 	br i1 %d4, label %l2, label %l3
 l2:
 	br label %l4
+l3:
+	br label %l4
 l4:
 	%d11 = phi i32 [%d3, %l2], [%d2, %l3]
 	ret i32 %d11
-l3:
-	br label %l4
 }

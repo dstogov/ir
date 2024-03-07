@@ -35,28 +35,28 @@ aarch64
 --EXPECT--
 test:
 	cmp w0, #3
-	b.gt .L5
+	b.gt .L4
 	subs w2, w0, #1
-	b.lt .L5
+	b.lt .L4
 	adr x1, .L6
 	ldr x1, [x1, x2, lsl #3]
 	br x1
 .L1:
 	movz w0, #0x1
+	b .L5
 .L2:
-	ret
-.L3:
 	movz w0, #0x2
-	b .L2
-.L4:
+	b .L5
+.L3:
 	movz w0, #0x3
-	b .L2
-.L5:
+	b .L5
+.L4:
 	movz w0, #0x4
-	b .L2
+.L5:
+	ret
 .rodata
 .align 8
 .L6:
 	.qword .L1
+	.qword .L2
 	.qword .L3
-	.qword .L4

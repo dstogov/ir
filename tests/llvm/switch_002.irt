@@ -42,9 +42,6 @@ define i32 @test(i32 %d2)
 l2:
 	%d6 = mul i32 %d2, 3
 	br label %l6
-l6:
-	%d17 = phi i32 [%d6, %l2], [%d9, %l3], [%d3, %l4], [%d3, %l5]
-	ret i32 %d17
 l3:
 	%d9 = add i32 %d2, 1
 	br label %l6
@@ -52,4 +49,7 @@ l4:
 	br label %l6
 l5:
 	br label %l6
+l6:
+	%d17 = phi i32 [%d6, %l2], [%d9, %l3], [%d3, %l4], [%d3, %l5]
+	ret i32 %d17
 }

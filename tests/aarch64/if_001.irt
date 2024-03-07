@@ -22,10 +22,10 @@ aarch64
 --EXPECT--
 test:
 	cmp w0, #0
-	b.eq .L2
+	b.eq .L1
 	mov w0, wzr
+	b .L2
 .L1:
-	ret
-.L2:
 	movz w0, #0x2a
-	b .L1
+.L2:
+	ret
