@@ -352,7 +352,7 @@ Install pre-requested libraries. PHP and their extensions may require different 
 JIT itself needs just **libcapstone** to produce disassembler output.
 
 ```
-sudo dbf install capstone-devel
+sudo dnf install capstone-devel
 ```
 
 Build PHP
