@@ -1554,6 +1554,10 @@ static bool ir_vregs_inside(ir_ctx *ctx, uint32_t parent, uint32_t child)
 	ir_live_interval *child_ival = ctx->live_intervals[child];
 	ir_live_interval *parent_ival = ctx->live_intervals[parent];
 
+	if ((child_ival->flags | parent_ival->flags) & IR_LIVE_INTERVAL_COALESCED) {
+		// TODO: Support valid cases with already coalesced "parent_ival
+		return 0;
+	}
 #if 0
 	if (child_ival->end >= parent_ival->end) {
 		return 0;
