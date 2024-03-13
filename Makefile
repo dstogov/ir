@@ -42,7 +42,7 @@ ifeq (x86, $(TARGET))
   DASM_FLAGS = -M
 endif
 ifeq (aarch64, $(TARGET))
-  CC= aarch64-linux-gnu-gcc --sysroot=$(HOME)/php/ARM64
+# CC= aarch64-linux-gnu-gcc --sysroot=$(HOME)/php/ARM64
   override CFLAGS += -DIR_TARGET_AARCH64
   override BUILD_CFLAGS += -DIR_TARGET_AARCH64
   DASM_ARCH  = aarch64
