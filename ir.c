@@ -926,7 +926,11 @@ restart:
 		uint32_t k = key & any;
 		uint32_t h = _ir_fold_hashkey(k);
 		uint32_t fh = _ir_fold_hash[h];
-		if (IR_FOLD_KEY(fh) == k /*|| (fh = _ir_fold_hash[h+1], (fh & 0x1fffff) == k)*/) {
+		if (IR_FOLD_KEY(fh) == k
+#ifdef IR_FOLD_SEMI_PERFECT_HASH
+		 || (fh = _ir_fold_hash[h+1], (fh & 0x1fffff) == k)
+#endif
+		) {
 			switch (IR_FOLD_RULE(fh)) {
 #include "ir_fold.h"
 				default:
