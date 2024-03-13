@@ -6,8 +6,8 @@ BUILD      = debug
 BUILD_DIR  = .
 SRC_DIR    = .
 HAVE_LLVM  = no
-EXAMPLES_SRC_DIR = $(SRC_DIR)/examples
-EXAMPLES_BUILD_DIR = $(BUILD_DIR)/examples
+
+PREFIX     = /usr/local
 
 CC         = gcc
 BUILD_CC   = gcc
@@ -76,22 +76,16 @@ OBJS_COMMON = $(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_strtab.o $(BUILD_DIR)/ir_cfg.o \
 	$(BUILD_DIR)/ir_disasm.o $(BUILD_DIR)/ir_gdb.o $(BUILD_DIR)/ir_perf.o $(BUILD_DIR)/ir_check.o \
 	$(BUILD_DIR)/ir_cpuinfo.o $(BUILD_DIR)/ir_emit_llvm.o
 OBJS_IR = $(BUILD_DIR)/ir_main.o $(LLVM_OBJS)
-EXAMPLE_EXES = $(EXAMPLES_BUILD_DIR)/mandelbrot \
-	$(EXAMPLES_BUILD_DIR)/0001-basic \
-	$(EXAMPLES_BUILD_DIR)/0002-while \
-	$(EXAMPLES_BUILD_DIR)/0003-pointer \
-	$(EXAMPLES_BUILD_DIR)/0004-func \
-	$(EXAMPLES_BUILD_DIR)/0005-basic-runner-func
 
 all: $(BUILD_DIR) $(BUILD_DIR)/ir $(BUILD_DIR)/tester
 
 $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
 
-$(EXAMPLES_BUILD_DIR):
-	@mkdir -p $(EXAMPLES_BUILD_DIR)
+$(BUILD_DIR)/libir.a: $(OBJS_COMMON)
+	ar r $@ $^
 
-$(BUILD_DIR)/ir: $(OBJS_COMMON) $(OBJS_IR)
+$(BUILD_DIR)/ir: $(OBJS_IR) $(BUILD_DIR)/libir.a
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LLVM_LIBS) -lcapstone
 
 $(OBJS_COMMON): $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h
@@ -121,9 +115,6 @@ $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h: $(SRC_DIR)/ir_$(DASM_ARCH).dasc $(SRC_DIR)/
 $(OBJS_COMMON) $(OBJS_IR): $(BUILD_DIR)/$(notdir %.o): $(SRC_DIR)/$(notdir %.c)
 	$(CC) $(CFLAGS) -I$(BUILD_DIR) -o $@ -c $<
 
-$(EXAMPLE_EXES): $(EXAMPLES_BUILD_DIR)/$(notdir %): $(EXAMPLES_SRC_DIR)/$(notdir %.c)
-	$(CC) $(CFLAGS) -I$(SRC_DIR) $< -o $@ $(OBJS_COMMON) $(LDFLAGS) -lcapstone
-
 $(BUILD_DIR)/tester: $(SRC_DIR)/tools/tester.c
 	$(CC) $(BUILD_CFLAGS) -o $@ $<
 
@@ -135,15 +126,23 @@ test-ci: $(BUILD_DIR)/ir $(BUILD_DIR)/tester
 	$(BUILD_DIR)/tester --test-cmd $(BUILD_DIR)/ir --target $(TARGET) --default-args "--save" \
 		--test-extension ".irt" --code-extension ".ir" --show-diff $(SRC_DIR)/tests
 
-examples: $(OBJS_COMMON) $(EXAMPLES_BUILD_DIR) $(EXAMPLE_EXES)
-
 clean:
-	rm -rf $(BUILD_DIR)/ir $(BUILD_DIR)/*.o \
+	rm -rf $(BUILD_DIR)/ir $(BUILD_DIR)/libir.a $(BUILD_DIR)/*.o \
 	$(BUILD_DIR)/minilua $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h \
 	$(BUILD_DIR)/ir_fold_hash.h $(BUILD_DIR)/gen_ir_fold_hash \
-	$(EXAMPLE_EXES) \
 	$(BUILD_DIR)/tester
 	find $(SRC_DIR)/tests -type f -name '*.diff' -delete
 	find $(SRC_DIR)/tests -type f -name '*.out' -delete
 	find $(SRC_DIR)/tests -type f -name '*.exp' -delete
 	find $(SRC_DIR)/tests -type f -name '*.ir' -delete
+
+install: $(BUILD_DIR)/ir $(BUILD_DIR)/libir.a
+	install -m a+rx $(BUILD_DIR)/ir $(PREFIX)/bin
+	install -m a+r $(BUILD_DIR)/libir.a $(PREFIX)/lib
+	install -m a+r $(SRC_DIR)/ir.h $(SRC_DIR)/ir_builder.h $(PREFIX)/include
+
+uninstall:
+	rm $(PREFIX)/bin/ir
+	rm $(PREFIX)/lib/libir.a
+	rm $(PREFIX)/include/ir.h
+	rm $(PREFIX)/include/ir_builder.h

@@ -7,9 +7,6 @@
 
 #include "ir.h"
 #include "ir_builder.h"
-#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
-# include "ir_x86.h"
-#endif
 #include <stdlib.h>
 #include <string.h>
 #ifndef _WIN32
