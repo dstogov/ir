@@ -1287,6 +1287,7 @@ void ir_use_list_remove_one(ir_ctx *ctx, ir_ref from, ir_ref ref)
 			*p = IR_UNUSED;
 			break;
 		}
+		p++;
 		j++;
 	}
 }
