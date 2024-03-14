@@ -1404,6 +1404,7 @@ op2_const:
 		case IR_TRUNC:
 		case IR_BITCAST:
 		case IR_PROTO:
+		case IR_FP2FP:
 			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
 			break;
 		case IR_ABS_INT:
