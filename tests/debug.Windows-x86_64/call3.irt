@@ -20,8 +20,8 @@ Windows-x86_64
 }
 --EXPECT--
 test:
-	subq $0x28, %rsp
-	movq %rbx, 0x20(%rsp)
+	pushq %rbx
+	subq $0x20, %rsp
 	movl %ecx, %ebx
 	movq 0x30(%rsp), %rax
 	movl %edx, %r10d
@@ -31,8 +31,8 @@ test:
 	leaq .L1(%rip), %rcx
 	callq *(%rax)
 	addl %ebx, %eax
-	movq 0x20(%rsp), %rbx
-	addq $0x28, %rsp
+	addq $0x20, %rsp
+	popq %rbx
 	retq
 .rodata
 	.db 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90

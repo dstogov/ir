@@ -25,6 +25,20 @@ Windows-x86_64
 --EXPECT--
 test:
 	jmp .L2
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
 .L1:
 	movl %eax, %ecx
 .L2:

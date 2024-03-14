@@ -38,6 +38,7 @@ test:
 	cltd
 	idivl %ecx
 	jmp .L2
+	nop
 .L1:
 	xchgl %eax, %r9d
 .L2:

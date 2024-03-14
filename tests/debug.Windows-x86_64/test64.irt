@@ -62,6 +62,17 @@ test:
 	movabsq $0x200000000, %rax
 	xorpd %xmm2, %xmm2
 	jmp .L2
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
 .L1:
 	mulsd %xmm2, %xmm3
 	subsd %xmm5, %xmm4
@@ -91,6 +102,7 @@ test:
 	addq $8, %rsp
 	retq
 .rodata
+	.db 0x90, 0x90, 0x90, 0x90, 0x90
 .L4:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f
 .L5:

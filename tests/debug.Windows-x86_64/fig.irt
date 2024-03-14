@@ -66,11 +66,10 @@ Windows-x86_64
 }
 --EXPECT--
 test:
-	subq $0x20, %rsp
-	movq %rbx, 0x18(%rsp)
-	movq %rbp, 0x10(%rsp)
-	movq %rsi, 8(%rsp)
-	movq %rdi, (%rsp)
+	pushq %rbx
+	pushq %rbp
+	pushq %rsi
+	pushq %rdi
 	movl 0x30(%rsp), %eax
 	movl 0x38(%rsp), %r10d
 	movl 0x40(%rsp), %r11d
@@ -80,6 +79,17 @@ test:
 	imull %edx, %esi
 	leal 4(%rsi), %edi
 	jmp .L3
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
 .L1:
 	movl %ecx, %r10d
 	imull %edx, %r10d
@@ -105,9 +115,8 @@ test:
 	addl %r10d, %eax
 	addl %r11d, %eax
 	leal 1(%rax, %rbx), %eax
-	movq 0x18(%rsp), %rbx
-	movq 0x10(%rsp), %rbp
-	movq 8(%rsp), %rsi
-	movq (%rsp), %rdi
-	addq $0x20, %rsp
+	popq %rdi
+	popq %rsi
+	popq %rbp
+	popq %rbx
 	retq

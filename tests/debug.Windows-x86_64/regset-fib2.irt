@@ -79,6 +79,14 @@ main:
 	movsd %xmm0, 0x20(%rsp)
 	xorpd %xmm0, %xmm0
 	jmp .L2
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
 .L1:
 	addsd %xmm0, %xmm1
 	movsd %xmm1, 0x20(%rsp)
