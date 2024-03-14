@@ -32,10 +32,9 @@ x86
 --EXPECT--
 test:
 	movl 4(%esp), %eax
-	leal 1(%eax), %eax
 	xorl %ecx, %ecx
 .L1:
-	addl %eax, %ecx
+	leal 1(%eax, %ecx), %ecx
 	cmpl $0xa, %ecx
 	jl .L1
 	leal (%ecx, %ecx), %eax
