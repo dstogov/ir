@@ -1771,7 +1771,7 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref)
 					} else if ((ir_type_size[insn->type] >= 4 && insn->op == IR_ADD && IR_IS_SIGNED_32BIT(op2_insn->val.i64)) ||
 							(ir_type_size[insn->type] >= 4 && insn->op == IR_SUB && IR_IS_SIGNED_NEG_32BIT(op2_insn->val.i64))) {
 lea:
-						if (ir_in_same_block(ctx, insn->op1) && ctx->use_lists[insn->op1].count == 1) {
+						if (ctx->use_lists[insn->op1].count == 1) {
 							uint32_t rule = ctx->rules[insn->op1];
 
 							if (!rule) {
@@ -1814,14 +1814,14 @@ lea:
 					}
 				} else if ((ctx->flags & IR_OPT_CODEGEN) && insn->op == IR_ADD && ir_type_size[insn->type] >= 4) {
 					if (insn->op1 != insn->op2) {
-						if (ir_in_same_block(ctx, insn->op1) && ctx->use_lists[insn->op1].count == 1) {
+						if (ctx->use_lists[insn->op1].count == 1) {
 							uint32_t rule =ctx->rules[insn->op1];
 							if (!rule) {
 								ctx->rules[insn->op1] = rule = ir_match_insn(ctx, insn->op1);
 							}
 							if (rule == IR_LEA_OB) {
 								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_OB;
-								if (ir_in_same_block(ctx, insn->op2) && ctx->use_lists[insn->op2].count == 1) {
+								if (ctx->use_lists[insn->op2].count == 1) {
 									rule = ctx->rules[insn->op2];
 									if (!rule) {
 										ctx->rules[insn->op2] = rule = ir_match_insn(ctx, insn->op2);
@@ -1836,7 +1836,7 @@ lea:
 								return IR_LEA_OB_I;
 							} else if (rule == IR_LEA_SI) {
 								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_SI;
-								if (ir_in_same_block(ctx, insn->op2) && ctx->use_lists[insn->op2].count == 1) {
+								if (ctx->use_lists[insn->op2].count == 1) {
 									rule = ctx->rules[insn->op2];
 									if (!rule) {
 										ctx->rules[insn->op2] = rule = ir_match_insn(ctx, insn->op2);
@@ -1851,7 +1851,7 @@ lea:
 								return IR_LEA_SI_B;
 							}
 						}
-						if (ir_in_same_block(ctx, insn->op2) && ctx->use_lists[insn->op2].count == 1) {
+						if (ctx->use_lists[insn->op2].count == 1) {
 							uint32_t rule = ctx->rules[insn->op2];
 							if (!rule) {
 								ctx->rules[insn->op2] = rule = ir_match_insn(ctx, insn->op2);
