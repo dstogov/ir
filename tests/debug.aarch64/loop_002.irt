@@ -49,6 +49,7 @@ test:
 	mov w1, wzr
 	mov w0, wzr
 	b .L4
+	nop
 .L1:
 	cmp w2, w1
 	b.eq .L2

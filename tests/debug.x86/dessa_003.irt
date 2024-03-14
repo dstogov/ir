@@ -32,9 +32,8 @@ x86
 }
 --EXPECT--
 test:
-	subl $8, %esp
-	movl %ebx, 4(%esp)
-	movl %ebp, (%esp)
+	pushl %ebx
+	pushl %ebp
 	movl 0x10(%esp), %ecx
 	movl 0x14(%esp), %ebx
 	movl 0xc(%esp), %eax
@@ -42,12 +41,19 @@ test:
 	cltd
 	idivl %ebp
 	jmp .L2
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
 .L1:
 	xchgl %eax, %ecx
 .L2:
 	testl %ebx, %ebx
 	jne .L1
-	movl 4(%esp), %ebx
-	movl (%esp), %ebp
-	addl $8, %esp
+	popl %ebp
+	popl %ebx
 	retl

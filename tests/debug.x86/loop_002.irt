@@ -49,6 +49,16 @@ test:
 	xorl %ecx, %ecx
 	xorl %eax, %eax
 	jmp .L4
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
 .L1:
 	cmpl %ecx, %edx
 	je .L2

@@ -25,6 +25,7 @@ aarch64
 --EXPECT--
 test:
 	b .L2
+	nop
 .L1:
 	mov w0, w1
 .L2:

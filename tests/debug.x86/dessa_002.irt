@@ -26,6 +26,16 @@ x86
 test:
 	movl 4(%esp), %eax
 	jmp .L2
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
 .L1:
 	movl %ecx, %eax
 .L2:

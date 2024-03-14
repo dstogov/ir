@@ -35,6 +35,7 @@ test:
 	movz w3, #0xc
 	sdiv w0, w0, w3
 	b .L2
+	nop
 .L1:
 	mov w3, w0
 	mov w0, w1

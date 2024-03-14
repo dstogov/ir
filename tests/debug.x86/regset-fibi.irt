@@ -63,12 +63,14 @@ R3 (d_9) [%ebp]: [9.2-13.0), DEF(9.2)!, PHI_USE(12.2, phi=d_5/3)
 [%SCRATCH] : [10.1-10.2)
 }
 main:
-	subl $0x1c, %esp
-	movl %ebx, 0x18(%esp)
-	movl %ebp, 0x14(%esp)
+	pushl %ebx
+	pushl %ebp
+	subl $0x14, %esp
 	movl $1, %ebx
 	xorl %eax, %eax
 	jmp .L2
+	nop
+	nop
 .L1:
 	leal (%ebx, %eax), %ebp
 	movl %ebx, 4(%esp)
@@ -80,12 +82,12 @@ main:
 	cmpl $0x2710, %ebx
 	jl .L1
 	xorl %eax, %eax
-	movl 0x18(%esp), %ebx
-	movl 0x14(%esp), %ebp
-	addl $0x1c, %esp
+	addl $0x14, %esp
+	popl %ebp
+	popl %ebx
 	retl
 .rodata
-	.db 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
+	.db 0x90
 .L3:
 	.db 0x25, 0x64, 0x0a, 0x00
 

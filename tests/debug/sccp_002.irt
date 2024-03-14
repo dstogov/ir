@@ -68,6 +68,10 @@ test:
 	movl $3, %eax
 .L4:
 	retq
+	nop
+	nop
+	nop
+	nop
 .L5:
 	testb %sil, %sil
 	jne .L5

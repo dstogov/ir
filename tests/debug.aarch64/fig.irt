@@ -71,6 +71,7 @@ test:
 	mul w9, w2, w1
 	add w10, w9, #4
 	b .L3
+	nop
 .L1:
 	mul w6, w0, w1
 	add w7, w6, #1

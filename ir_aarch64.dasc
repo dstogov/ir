@@ -11,7 +11,7 @@
 |.globals ir_lb
 |.section code, cold_code, rodata, jmp_table
 
-|.define IR_LOOP_ALIGNMENT, 16
+|.define IR_LOOP_ALIGNMENT, 8
 
 #ifdef IR_DEBUG
 typedef struct _ir_mem {uint64_t v;} ir_mem;

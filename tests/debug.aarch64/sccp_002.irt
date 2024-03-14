@@ -68,6 +68,7 @@ test:
 	movz w0, #0x3
 .L4:
 	ret
+	nop
 .L5:
 	cmp w1, #0
 	b.ne .L5

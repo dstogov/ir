@@ -79,6 +79,15 @@ main:
 	movsd .L4(%rip), %xmm0
 	movsd %xmm0, (%rsp)
 	jmp .L2
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
 .L1:
 	addsd %xmm1, %xmm0
 	movsd %xmm0, (%rsp)
@@ -102,6 +111,7 @@ main:
 	addq $0x18, %rsp
 	retq
 .rodata
+	.db 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
 .L4:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f
 .L5:

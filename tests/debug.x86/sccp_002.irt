@@ -69,6 +69,19 @@ test:
 	movl $3, %eax
 .L4:
 	retl
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
 .L5:
 	testb %cl, %cl
 	jne .L5

@@ -66,11 +66,11 @@ x86
 }
 --EXPECT--
 test:
-	subl $0x14, %esp
-	movl %ebx, 0x10(%esp)
-	movl %ebp, 0xc(%esp)
-	movl %esi, 8(%esp)
-	movl %edi, 4(%esp)
+	pushl %ebx
+	pushl %ebp
+	pushl %esi
+	pushl %edi
+	subl $4, %esp
 	movl 0x18(%esp), %eax
 	movl 0x1c(%esp), %ecx
 	movl 0x24(%esp), %ebx
@@ -80,6 +80,16 @@ test:
 	movl %edx, (%esp)
 	leal 4(%edx), %edx
 	jmp .L3
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
 .L1:
 	movl %eax, %esi
 	imull %ecx, %esi
@@ -111,9 +121,9 @@ test:
 	movl 0x34(%esp), %edi
 	addl %edi, %eax
 	leal 1(%eax, %esi), %eax
-	movl 0x10(%esp), %ebx
-	movl 0xc(%esp), %ebp
-	movl 8(%esp), %esi
-	movl 4(%esp), %edi
-	addl $0x14, %esp
+	addl $4, %esp
+	popl %edi
+	popl %esi
+	popl %ebp
+	popl %ebx
 	retl

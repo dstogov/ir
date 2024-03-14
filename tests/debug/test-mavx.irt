@@ -60,6 +60,18 @@ test:
 	xorl %eax, %eax
 	vxorpd %xmm2, %xmm2, %xmm2
 	jmp .L2
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
 .L1:
 	vmulsd %xmm3, %xmm2, %xmm3
 	vsubsd %xmm5, %xmm4, %xmm2
@@ -80,7 +92,7 @@ test:
 .L3:
 	retq
 .rodata
-	.db 0x90, 0x90, 0x90
+	.db 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
 .L4:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f
 .L5:

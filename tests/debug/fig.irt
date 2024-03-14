@@ -66,9 +66,8 @@ x86_64
 }
 --EXPECT--
 test:
-	subq $0x10, %rsp
-	movq %rbx, 8(%rsp)
-	movq %rbp, (%rsp)
+	pushq %rbx
+	pushq %rbp
 	movl 0x18(%rsp), %eax
 	movl 0x20(%rsp), %r8d
 	movl 0x28(%rsp), %r10d
@@ -77,6 +76,7 @@ test:
 	imull %esi, %ebx
 	leal 4(%rbx), %ebp
 	jmp .L3
+	nop
 .L1:
 	movl %edi, %eax
 	imull %esi, %eax
@@ -102,7 +102,6 @@ test:
 	addl %ecx, %eax
 	addl %r8d, %eax
 	leal 1(%rax, %r10), %eax
-	movq 8(%rsp), %rbx
-	movq (%rsp), %rbp
-	addq $0x10, %rsp
+	popq %rbp
+	popq %rbx
 	retq
