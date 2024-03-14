@@ -30,10 +30,10 @@ x86_64
 }
 --EXPECT--
 test:
-	xorl %ecx, %ecx
+	xorl %eax, %eax
 .L1:
-	leal 1(%rdi, %eax), %eax
+	leal 1(%rdi, %rax), %eax
 	cmpl $0xa, %eax
 	jl .L1
-	movl %eax, %eax
+	addl %eax, %eax
 	retq

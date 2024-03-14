@@ -33,7 +33,7 @@ x86_64
 test:
 	xorl %eax, %eax
 .L1:
-	leal 1(%rdi, %eax), %eax
+	leal 1(%rdi, %rax), %eax
 	cmpl $0xa, %eax
 	jl .L1
 	addl %eax, %eax
