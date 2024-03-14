@@ -14,8 +14,7 @@ x86
 --EXPECT--
 test:
 	subl $8, %esp
-	movss 0xc(%esp), %xmm0
-	cvtss2sd %xmm0, %xmm0
+	cvtss2sd 0xc(%esp), %xmm0
 	movsd %xmm0, (%esp)
 	fldl (%esp)
 	addl $8, %esp
