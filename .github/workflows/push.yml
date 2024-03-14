@@ -16,8 +16,7 @@ jobs:
       image: ubuntu:22.04
     env:
       CFLAGS: '-fsanitize=address,undefined'
-      ASAN_OPTIONS: exitcode=139
-      LSAN_OPTIONS: detect_leaks=0
+      ASAN_OPTIONS: detect_leaks=0
     steps:
       - uses: actions/checkout@v3
       - name: apt
