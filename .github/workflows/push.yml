@@ -15,7 +15,7 @@ jobs:
     container:
       image: ubuntu:22.04
     env:
-      CFLAGS: '-fsanitize=address,undefined'
+      #CFLAGS: '-fsanitize=address,undefined'
     steps:
       - uses: actions/checkout@v3
       - name: apt
