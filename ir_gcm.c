@@ -83,96 +83,93 @@ static uint32_t ir_gcm_find_lca(ir_ctx *ctx, uint32_t b1, uint32_t b2)
 static void ir_gcm_schedule_late(ir_ctx *ctx, ir_ref ref, uint32_t b)
 {
 	ir_ref n, *p, use;
-	ir_insn *insn;
 	ir_use_list *use_list;
+	uint32_t lca = 0;
+
+	IR_ASSERT(ctx->ir_base[ref].op != IR_PARAM && ctx->ir_base[ref].op != IR_VAR);
+	IR_ASSERT(ctx->ir_base[ref].op != IR_PHI && ctx->ir_base[ref].op != IR_PI);
 
 	IR_ASSERT(IR_GCM_IS_SCHEDULED_EARLY(b));
 	b = IR_GCM_EARLY_BLOCK(b);
 	ctx->cfg_map[ref] = b;
 	use_list = &ctx->use_lists[ref];
 	n = use_list->count;
-	if (n) {
-		uint32_t lca = 0;
 
-		insn = &ctx->ir_base[ref];
-		IR_ASSERT(insn->op != IR_PARAM && insn->op != IR_VAR);
-		IR_ASSERT(insn->op != IR_PHI && insn->op != IR_PI);
-
-		for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
-			use = *p;
+	for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
+		use = *p;
+		b = ctx->cfg_map[use];
+		if (IR_GCM_IS_SCHEDULED_EARLY(b)) {
+			ir_gcm_schedule_late(ctx, use, b);
 			b = ctx->cfg_map[use];
-			if (IR_GCM_IS_SCHEDULED_EARLY(b)) {
-				ir_gcm_schedule_late(ctx, use, b);
-				b = ctx->cfg_map[use];
-				IR_ASSERT(b != 0);
-			} else if (!b) {
-				continue;
-			}
-			insn = &ctx->ir_base[use];
-			if (insn->op == IR_PHI) {
-				ir_ref *p = insn->ops + 2; /* PHI data inputs */
-				ir_ref *q = ctx->ir_base[insn->op1].ops + 1; /* MERGE inputs */
-				ir_ref n = insn->inputs_count - 1;
+			IR_ASSERT(b != 0);
+		} else if (!b) {
+			continue;
+		} else if (ctx->ir_base[use].op == IR_PHI) {
+			ir_insn *insn = &ctx->ir_base[use];
+			ir_ref *p = insn->ops + 2; /* PHI data inputs */
+			ir_ref *q = ctx->ir_base[insn->op1].ops + 1; /* MERGE inputs */
+			ir_ref n = insn->inputs_count - 1;
 
-				for (;n > 0; p++, q++, n--) {
-					if (*p == ref) {
-						b = ctx->cfg_map[*q];
-						lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
-					}
+			for (;n > 0; p++, q++, n--) {
+				if (*p == ref) {
+					b = ctx->cfg_map[*q];
+					lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
 				}
+			}
+			continue;
+		}
+		lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
+	}
+
+	IR_ASSERT(lca != 0 && "No Common Ancestor");
+	b = lca;
+
+	if (b != ctx->cfg_map[ref]) {
+		ir_block *bb = &ctx->cfg_blocks[b];
+		uint32_t loop_depth = bb->loop_depth;
+
+		if (loop_depth) {
+			uint32_t flags;
+
+			use_list = &ctx->use_lists[ref];
+			if (use_list->count == 1) {
+				use = ctx->use_edges[use_list->refs];
+				ir_insn *insn = &ctx->ir_base[use];
+				if (insn->op == IR_IF || insn->op == IR_GUARD || insn->op == IR_GUARD_NOT) {
+					ctx->cfg_map[ref] = b;
+					return;
+				}
+			}
+
+			flags = (bb->flags & IR_BB_LOOP_HEADER) ? bb->flags : ctx->cfg_blocks[bb->loop_header].flags;
+			if ((flags & IR_BB_LOOP_WITH_ENTRY)
+			 && !(ctx->binding && ir_binding_find(ctx, ref))) {
+				/* Don't move loop invariant code across an OSR ENTRY if we can't restore it */
 			} else {
-				lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
+				do {
+					lca = bb->dom_parent;
+					bb = &ctx->cfg_blocks[lca];
+					if (bb->loop_depth < loop_depth) {
+						if (!bb->loop_depth) {
+							b = lca;
+							break;
+						}
+						flags = (bb->flags & IR_BB_LOOP_HEADER) ? bb->flags : ctx->cfg_blocks[bb->loop_header].flags;
+						if ((flags & IR_BB_LOOP_WITH_ENTRY)
+						 && !(ctx->binding && ir_binding_find(ctx, ref))) {
+							break;
+						}
+						loop_depth = bb->loop_depth;
+						b = lca;
+					}
+				} while (lca != ctx->cfg_map[ref]);
 			}
 		}
-		IR_ASSERT(lca != 0 && "No Common Ancestor");
-		b = lca;
 
-		if (b != ctx->cfg_map[ref]) {
-			ir_block *bb = &ctx->cfg_blocks[b];
-			uint32_t loop_depth = bb->loop_depth;
-
-			if (loop_depth) {
-				uint32_t flags;
-
-				use_list = &ctx->use_lists[ref];
-				if (use_list->count == 1) {
-					use = ctx->use_edges[use_list->refs];
-					insn = &ctx->ir_base[use];
-					if (insn->op == IR_IF || insn->op == IR_GUARD || insn->op == IR_GUARD_NOT) {
-						ctx->cfg_map[ref] = b;
-						return;
-					}
-				}
-
-				flags = (bb->flags & IR_BB_LOOP_HEADER) ? bb->flags : ctx->cfg_blocks[bb->loop_header].flags;
-				if ((flags & IR_BB_LOOP_WITH_ENTRY)
-				 && !(ctx->binding && ir_binding_find(ctx, ref))) {
-					/* Don't move loop invariant code across an OSR ENTRY if we can't restore it */
-				} else {
-					do {
-						lca = bb->dom_parent;
-						bb = &ctx->cfg_blocks[lca];
-						if (bb->loop_depth < loop_depth) {
-							if (!bb->loop_depth) {
-								b = lca;
-								break;
-							}
-							flags = (bb->flags & IR_BB_LOOP_HEADER) ? bb->flags : ctx->cfg_blocks[bb->loop_header].flags;
-							if ((flags & IR_BB_LOOP_WITH_ENTRY)
-							 && !(ctx->binding && ir_binding_find(ctx, ref))) {
-								break;
-							}
-							loop_depth = bb->loop_depth;
-							b = lca;
-						}
-					} while (lca != ctx->cfg_map[ref]);
-				}
-			}
-			ctx->cfg_map[ref] = b;
-			if (ctx->ir_base[ref + 1].op == IR_OVERFLOW) {
-				/* OVERFLOW is a projection and must be scheduled together with previous ADD/SUB/MUL_OV */
-				ctx->cfg_map[ref + 1] = b;
-			}
+		ctx->cfg_map[ref] = b;
+		if (ctx->ir_base[ref + 1].op == IR_OVERFLOW) {
+			/* OVERFLOW is a projection and must be scheduled together with previous ADD/SUB/MUL_OV */
+			ctx->cfg_map[ref + 1] = b;
 		}
 	}
 }
@@ -180,54 +177,50 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, ir_ref ref, uint32_t b)
 static void ir_gcm_schedule_rest(ir_ctx *ctx, ir_ref ref)
 {
 	ir_ref n, *p, use;
-	ir_insn *insn;
 	uint32_t b = ctx->cfg_map[ref];
+	uint32_t lca = 0;
+
+	IR_ASSERT(ctx->ir_base[ref].op != IR_PARAM && ctx->ir_base[ref].op != IR_VAR);
+	IR_ASSERT(ctx->ir_base[ref].op != IR_PHI && ctx->ir_base[ref].op != IR_PI);
 
 	IR_ASSERT(IR_GCM_IS_SCHEDULED_EARLY(b));
 	b = IR_GCM_EARLY_BLOCK(b);
 	ctx->cfg_map[ref] = b;
 	n = ctx->use_lists[ref].count;
-	if (n) {
-		uint32_t lca = 0;
 
-		insn = &ctx->ir_base[ref];
-		IR_ASSERT(insn->op != IR_PARAM && insn->op != IR_VAR);
-		IR_ASSERT(insn->op != IR_PHI && insn->op != IR_PI);
-
-		for (p = &ctx->use_edges[ctx->use_lists[ref].refs]; n > 0; p++, n--) {
-			use = *p;
+	for (p = &ctx->use_edges[ctx->use_lists[ref].refs]; n > 0; p++, n--) {
+		use = *p;
+		b = ctx->cfg_map[use];
+		if (IR_GCM_IS_SCHEDULED_EARLY(b)) {
+			ir_gcm_schedule_late(ctx, use, b);
 			b = ctx->cfg_map[use];
-			if (IR_GCM_IS_SCHEDULED_EARLY(b)) {
-				ir_gcm_schedule_late(ctx, use, b);
-				b = ctx->cfg_map[use];
-				IR_ASSERT(b != 0);
-			} else if (!b) {
-				continue;
-			}
-			insn = &ctx->ir_base[use];
-			if (insn->op == IR_PHI) {
-				ir_ref *p = insn->ops + 2; /* PHI data inputs */
-				ir_ref *q = ctx->ir_base[insn->op1].ops + 1; /* MERGE inputs */
+			IR_ASSERT(b != 0);
+		} else if (!b) {
+			continue;
+		} else if (ctx->ir_base[use].op == IR_PHI) {
+			ir_insn *insn = &ctx->ir_base[use];
+			ir_ref *p = insn->ops + 2; /* PHI data inputs */
+			ir_ref *q = ctx->ir_base[insn->op1].ops + 1; /* MERGE inputs */
+			ir_ref n = insn->inputs_count - 1;
 
-				ir_ref n = insn->inputs_count - 1;
-
-				for (;n > 0; p++, q++, n--) {
-					if (*p == ref) {
-						b = ctx->cfg_map[*q];
-						lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
-					}
+			for (;n > 0; p++, q++, n--) {
+				if (*p == ref) {
+					b = ctx->cfg_map[*q];
+					lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
 				}
-			} else {
-				lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
 			}
+			continue;
 		}
-		IR_ASSERT(lca != 0 && "No Common Ancestor");
-		b = lca;
-		ctx->cfg_map[ref] = b;
-		if (ctx->ir_base[ref + 1].op == IR_OVERFLOW) {
-			/* OVERFLOW is a projection and must be scheduled together with previous ADD/SUB/MUL_OV */
-			ctx->cfg_map[ref + 1] = b;
-		}
+		lca = !lca ? b : ir_gcm_find_lca(ctx, lca, b);
+	}
+
+	IR_ASSERT(lca != 0 && "No Common Ancestor");
+	b = lca;
+
+	ctx->cfg_map[ref] = b;
+	if (ctx->ir_base[ref + 1].op == IR_OVERFLOW) {
+		/* OVERFLOW is a projection and must be scheduled together with previous ADD/SUB/MUL_OV */
+		ctx->cfg_map[ref + 1] = b;
 	}
 }
 
