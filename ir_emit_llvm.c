@@ -1278,7 +1278,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				char c = str[j];
 
 				if (c < ' ' || c >= 127) {
-					char c1 = c >> 8;
+					char c1 = (c >> 4) & 15;
 					char c2 = c & 15;
 					c1 = (c1 < 10) ? (c1 + '0') : (c1 - 10 + 'A');
 					c2 = (c2 < 10) ? (c2 + '0') : (c2 - 10 + 'A');
