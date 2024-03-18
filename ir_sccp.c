@@ -637,7 +637,7 @@ static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values
 			}
 		}
 		j = i;
-		while (j < n) {
+		while (j <= n) {
 			ir_insn_set_op(insn, j, IR_UNUSED);
 			j++;
 		}
@@ -1258,11 +1258,13 @@ int ir_sccp(ir_ctx *ctx)
 						if (insn->type == IR_FLOAT) {
 							if (ir_may_promote_d2f(ctx, insn->op1)) {
 								ir_ref ref = ir_promote_d2f(ctx, insn->op1, i);
+								insn->op1 = ref;
 								ir_sccp_replace_insn2(ctx, i, ref, &worklist2);
 							}
 						} else {
 							if (ir_may_promote_f2d(ctx, insn->op1)) {
 								ir_ref ref = ir_promote_f2d(ctx, insn->op1, i);
+								insn->op1 = ref;
 								ir_sccp_replace_insn2(ctx, i, ref, &worklist2);
 							}
 						}
@@ -1281,6 +1283,7 @@ int ir_sccp(ir_ctx *ctx)
 					case IR_TRUNC:
 						if (ir_may_promote_i2i(ctx, insn->type, insn->op1)) {
 							ir_ref ref = ir_promote_i2i(ctx, insn->type, insn->op1, i);
+							insn->op1 = ref;
 							ir_sccp_replace_insn2(ctx, i, ref, &worklist2);
 						}
 						break;
