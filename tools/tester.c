@@ -81,7 +81,7 @@ static void print_color(const char *s, color c)
 	printf("%s", s);
 }
 
-static void init_console()
+static void init_console(void)
 {
 #ifdef _WIN32
 	if (colorize) {
