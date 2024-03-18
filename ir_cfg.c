@@ -268,7 +268,6 @@ static ir_ref ir_optimize_phi(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_
 
 					next->op1 = root->op1;
 					ir_use_list_replace_one(ctx, root->op1, root_ref, next_ref);
-					ir_use_list_remove_all(ctx, root->op2, root_ref);
 					if (!IR_IS_CONST_REF(insn->op1)) {
 						ir_use_list_remove_all(ctx, insn->op1, cond_ref);
 					}
@@ -349,7 +348,7 @@ static ir_ref ir_optimize_phi(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_
 
 					next->op1 = root->op1;
 					ir_use_list_replace_one(ctx, root->op1, root_ref, next_ref);
-					ir_use_list_remove_all(ctx, root->op2, root_ref);
+					ir_use_list_remove_one(ctx, insn->op1, neg_ref);
 					if (!IR_IS_CONST_REF(insn->op1)) {
 						ir_use_list_remove_all(ctx, insn->op1, cond_ref);
 					}
