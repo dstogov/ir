@@ -184,11 +184,16 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, FILE *dump_file, 
 		ir_build_def_use_lists(ctx);
 	}
 
+#ifdef IR_DEBUG
 	ir_check(ctx);
+#endif
 
 	/* Global Optimization */
 	if (opt_level > 1) {
 		ir_sccp(ctx);
+#ifdef IR_DEBUG
+		ir_check(ctx);
+#endif
 		if ((dump & (IR_DUMP_AFTER_SCCP|IR_DUMP_AFTER_ALL))
 		 && !_save(ctx, dump, IR_DUMP_AFTER_SCCP, dump_file, func_name)) {
 			return 0;
@@ -197,6 +202,9 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, FILE *dump_file, 
 
 	if (opt_level > 0 || (ctx->flags & (IR_GEN_NATIVE|IR_GEN_CODE))) {
 		ir_build_cfg(ctx);
+#ifdef IR_DEBUG
+		ir_check(ctx);
+#endif
 	}
 
 	/* Schedule */
@@ -209,6 +217,9 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, FILE *dump_file, 
 			return 0;
 		}
 		ir_schedule(ctx);
+#ifdef IR_DEBUG
+		ir_check(ctx);
+#endif
 		if ((dump & (IR_DUMP_AFTER_SCHEDULE|IR_DUMP_AFTER_ALL))
 		 && !_save(ctx, dump, IR_DUMP_AFTER_SCHEDULE, dump_file, func_name)) {
 			return 0;
@@ -250,7 +261,9 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, FILE *dump_file, 
 		return 0;
 	}
 
+#ifdef IR_DEBUG
 	ir_check(ctx);
+#endif
 
 	return 1;
 }
