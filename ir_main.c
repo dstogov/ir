@@ -81,6 +81,7 @@ static void help(const char *cmd)
 		"  --debug-ra                 - debug register allocator\n"
 		"  --debug-regset <bit-mask>  - restrict available register set\n"
 #endif
+		"  --disable-gdb              - disable JIT code registration in GDB\n"
 		"  --target                   - print JIT target\n"
 		"  --version\n"
 		"  --help\n",
@@ -291,6 +292,7 @@ typedef struct _ir_main_loader {
 	bool       dump_asm;
 	bool       dump_size;
 	bool       run;
+	bool       gdb;
 	size_t     size;
 	void      *main;
 	FILE      *dump_file;
@@ -624,7 +626,7 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 			ir_disasm_add_symbol(name, (uintptr_t)data, size);
 		}
 #ifndef _WIN32
-		if (l->run) {
+		if (l->gdb) {
 			ir_gdb_register(name, data, size, 0, 0);
 		}
 #endif
@@ -863,7 +865,7 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 		}
 		entry = ir_emit_code(ctx, &size);
 #ifndef _WIN32
-		if (l->run) {
+		if (l->gdb) {
 			if (!l->code_buffer.start) {
 				ir_mem_unprotect(entry, size);
 			}
@@ -929,7 +931,7 @@ int main(int argc, char **argv)
 	char *input = NULL;
 	char *dump_file = NULL, *c_file = NULL, *llvm_file = 0;
 	FILE *f;
-	bool emit_c = 0, emit_llvm = 0, dump_size = 0, dump_time = 0, dump_asm = 0, run = 0;
+	bool emit_c = 0, emit_llvm = 0, dump_size = 0, dump_time = 0, dump_asm = 0, run = 0, gdb = 1;
 	uint32_t dump = 0;
 	int opt_level = 2;
 	uint32_t flags = 0;
@@ -1089,6 +1091,8 @@ int main(int argc, char **argv)
 			load_llvm_asm = 1;
 			input = argv[++i];
 #endif
+		} else if (strcmp(argv[i], "--disable-gdb") == 0) {
+			gdb = 0;
 		} else if (argv[i][0] == '-') {
 			fprintf(stderr, "ERROR: Unknown option '%s' (use --help)\n", argv[i]);
 			return 1;
@@ -1179,6 +1183,7 @@ int main(int argc, char **argv)
 	loader.dump_asm = dump_asm;
 	loader.dump_size = dump_size;
 	loader.run = run;
+	loader.gdb = run && gdb;
 
 	ir_strtab_init(&loader.symtab, 16, 4096);
 	loader.sym = NULL;
