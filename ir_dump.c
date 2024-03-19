@@ -682,8 +682,14 @@ void ir_dump_codegen(const ir_ctx *ctx, FILE *f)
 				}
 			}
 			succ = ir_skip_empty_target_blocks(ctx, succ);
-			if (succ != b + 1) {
-				fprintf(f, "\t# GOTO BB%d\n", succ);
+			if (ctx->cfg_schedule) {
+				if (_b == ctx->cfg_blocks_count || succ != ctx->cfg_schedule[_b + 1]) {
+					fprintf(f, "\t# GOTO BB%d\n", succ);
+				}
+			} else {
+				if (succ != b + 1) {
+					fprintf(f, "\t# GOTO BB%d\n", succ);
+				}
 			}
 		} else if (insn->op == IR_IF) {
 			uint32_t true_block, false_block;
