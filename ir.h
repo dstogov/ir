@@ -156,11 +156,15 @@ typedef enum _ir_type {
 # define IR_SSIZE_T    IR_I64
 # define IR_UINTPTR_T  IR_U64
 # define IR_INTPTR_T   IR_I64
+# define IR_C_UINTPTR  IR_U64
+# define IR_C_INTPTR   IR_I64
 #else
 # define IR_SIZE_T     IR_U32
 # define IR_SSIZE_T    IR_I32
 # define IR_UINTPTR_T  IR_U32
 # define IR_INTPTR_T   IR_I32
+# define IR_C_UINTPTR  IR_U32
+# define IR_C_INTPTR   IR_I32
 #endif
 
 /* List of IR opcodes
