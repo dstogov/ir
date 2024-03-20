@@ -58,14 +58,23 @@ static void help(const char *cmd)
 		"  --emit-c [file-name]       - convert to C source\n"
 		"  --emit-llvm [file-name]    - convert to LLVM\n"
 		"  --save [file-name]         - save IR\n"
+		"  --save-cfg                 - save IR\n"
+		"  --save-cfg-map             - save IR\n"
+		"  --save-rules               - save IR\n"
+		"  --save-regs                - save IR\n"
+		"  --save-use_lists                - save IR\n"
 		"  --dot  [file-name]         - dump IR graph\n"
 		"  --dump [file-name]         - dump IR table\n"
 		"  --dump-after-load          - dump IR after load and local optimization\n"
 		"  --dump-after-sccp          - dump IR after SCCP optimization pass\n"
+		"  --dump-after-cfg           - dump IR after CFG construction\n"
+		"  --dump-after-dom           - dump IR after Dominators tree construction\n"
+		"  --dump-after-loop          - dump IR after Loop detection\n"
 		"  --dump-after-gcm           - dump IR after GCM optimization pass\n"
 		"  --dump-after-schedule      - dump IR after SCHEDULE pass\n"
 		"  --dump-after-live-ranges   - dump IR after live ranges identification\n"
 		"  --dump-after-coalescing    - dump IR after live ranges coalescing\n"
+		"  --dump-after-regalloc      - dump IR after register allocation\n"
 		"  --dump-after-all           - dump IR after each pass\n"
 		"  --dump-final               - dump IR after all pass\n"
 		"  --dump-size                - dump generated code size\n"
@@ -99,15 +108,19 @@ static void help(const char *cmd)
 
 #define IR_DUMP_AFTER_LOAD          (1<<16)
 #define IR_DUMP_AFTER_SCCP          (1<<17)
-#define IR_DUMP_AFTER_GCM           (1<<18)
-#define IR_DUMP_AFTER_SCHEDULE      (1<<19)
-#define IR_DUMP_AFTER_LIVE_RANGES   (1<<20)
-#define IR_DUMP_AFTER_COALESCING    (1<<21)
+#define IR_DUMP_AFTER_CFG           (1<<18)
+#define IR_DUMP_AFTER_DOM           (1<<19)
+#define IR_DUMP_AFTER_LOOP          (1<<20)
+#define IR_DUMP_AFTER_GCM           (1<<21)
+#define IR_DUMP_AFTER_SCHEDULE      (1<<22)
+#define IR_DUMP_AFTER_LIVE_RANGES   (1<<23)
+#define IR_DUMP_AFTER_COALESCING    (1<<24)
+#define IR_DUMP_AFTER_REGALLOC      (1<<25)
 
 #define IR_DUMP_AFTER_ALL           (1<<29)
 #define IR_DUMP_FINAL               (1<<30)
 
-static int _save(ir_ctx *ctx, uint32_t dump, uint32_t pass, FILE *f, const char *func_name)
+static int _save(ir_ctx *ctx, uint32_t save_flags, uint32_t dump, uint32_t pass, FILE *f, const char *func_name)
 {
 	char fn[4096];
 	bool close = 0;
@@ -118,19 +131,27 @@ static int _save(ir_ctx *ctx, uint32_t dump, uint32_t pass, FILE *f, const char 
 				snprintf(fn, sizeof(fn)-1, "01-load-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_SCCP) {
 				snprintf(fn, sizeof(fn)-1, "02-sccp-%s.ir", func_name);
+			} else if (pass == IR_DUMP_AFTER_CFG) {
+				snprintf(fn, sizeof(fn)-1, "03-cfg-%s.ir", func_name);
+			} else if (pass == IR_DUMP_AFTER_DOM) {
+				snprintf(fn, sizeof(fn)-1, "04-dom-%s.ir", func_name);
+			} else if (pass == IR_DUMP_AFTER_LOOP) {
+				snprintf(fn, sizeof(fn)-1, "05-loop-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_GCM) {
-				snprintf(fn, sizeof(fn)-1, "03-gcm-%s.ir", func_name);
+				snprintf(fn, sizeof(fn)-1, "06-gcm-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_SCHEDULE) {
-				snprintf(fn, sizeof(fn)-1, "04-schedule-%s.ir", func_name);
+				snprintf(fn, sizeof(fn)-1, "07-schedule-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_LIVE_RANGES) {
-				snprintf(fn, sizeof(fn)-1, "05-live-ranges-%s.ir", func_name);
+				snprintf(fn, sizeof(fn)-1, "08-live-ranges-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_COALESCING) {
-				snprintf(fn, sizeof(fn)-1, "06-coalescing-%s.ir", func_name);
+				snprintf(fn, sizeof(fn)-1, "09-coalescing-%s.ir", func_name);
+			} else if (pass == IR_DUMP_AFTER_REGALLOC) {
+				snprintf(fn, sizeof(fn)-1, "10-regalloc-%s.ir", func_name);
 			} else if (pass == IR_DUMP_FINAL) {
 				if (dump & IR_DUMP_CODEGEN) {
-					snprintf(fn, sizeof(fn)-1, "07-codegen-%s.ir", func_name);
+					snprintf(fn, sizeof(fn)-1, "11-codegen-%s.ir", func_name);
 				} else {
-					snprintf(fn, sizeof(fn)-1, "07-final-%s.ir", func_name);
+					snprintf(fn, sizeof(fn)-1, "11-final-%s.ir", func_name);
 				}
 			} else {
 				f = stderr; // TODO:
@@ -148,7 +169,7 @@ static int _save(ir_ctx *ctx, uint32_t dump, uint32_t pass, FILE *f, const char 
 	if (pass == IR_DUMP_FINAL && (dump & IR_DUMP_CODEGEN)) {
 		ir_dump_codegen(ctx, f);
 	} else if (dump & IR_DUMP_SAVE) {
-		ir_save(ctx, f);
+		ir_save(ctx, save_flags, f);
 	}
 	if (dump & IR_DUMP_DUMP) {
 		ir_dump(ctx, f);
@@ -174,10 +195,10 @@ static int _save(ir_ctx *ctx, uint32_t dump, uint32_t pass, FILE *f, const char 
 	return 1;
 }
 
-int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, FILE *dump_file, const char *func_name)
+int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t dump, FILE *dump_file, const char *func_name)
 {
 	if ((dump & (IR_DUMP_AFTER_LOAD|IR_DUMP_AFTER_ALL))
-	 && !_save(ctx, dump, IR_DUMP_AFTER_LOAD, dump_file, func_name)) {
+	 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_LOAD, dump_file, func_name)) {
 		return 0;
 	}
 
@@ -193,7 +214,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, FILE *dump_file, 
 	if (opt_level > 1) {
 		ir_sccp(ctx);
 		if ((dump & (IR_DUMP_AFTER_SCCP|IR_DUMP_AFTER_ALL))
-		 && !_save(ctx, dump, IR_DUMP_AFTER_SCCP, dump_file, func_name)) {
+		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_SCCP, dump_file, func_name)) {
 			return 0;
 		}
 #ifdef IR_DEBUG
@@ -203,6 +224,10 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, FILE *dump_file, 
 
 	if (opt_level > 0 || (ctx->flags & (IR_GEN_NATIVE|IR_GEN_CODE))) {
 		ir_build_cfg(ctx);
+		if ((dump & (IR_DUMP_AFTER_CFG|IR_DUMP_AFTER_ALL))
+		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_CFG, dump_file, func_name)) {
+			return 0;
+		}
 #ifdef IR_DEBUG
 		ir_check(ctx);
 #endif
@@ -211,10 +236,20 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, FILE *dump_file, 
 	/* Schedule */
 	if (opt_level > 0) {
 		ir_build_dominators_tree(ctx);
+		if ((dump & (IR_DUMP_AFTER_DOM|IR_DUMP_AFTER_ALL))
+		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_DOM, dump_file, func_name)) {
+			return 0;
+		}
+
 		ir_find_loops(ctx);
+		if ((dump & (IR_DUMP_AFTER_LOOP|IR_DUMP_AFTER_ALL))
+		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_LOOP, dump_file, func_name)) {
+			return 0;
+		}
+
 		ir_gcm(ctx);
 		if ((dump & (IR_DUMP_AFTER_GCM|IR_DUMP_AFTER_ALL))
-		 && !_save(ctx, dump, IR_DUMP_AFTER_GCM, dump_file, func_name)) {
+		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_GCM, dump_file, func_name)) {
 			return 0;
 		}
 #ifdef IR_DEBUG
@@ -223,7 +258,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, FILE *dump_file, 
 
 		ir_schedule(ctx);
 		if ((dump & (IR_DUMP_AFTER_SCHEDULE|IR_DUMP_AFTER_ALL))
-		 && !_save(ctx, dump, IR_DUMP_AFTER_SCHEDULE, dump_file, func_name)) {
+		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_SCHEDULE, dump_file, func_name)) {
 			return 0;
 		}
 #ifdef IR_DEBUG
@@ -240,19 +275,23 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, FILE *dump_file, 
 		ir_compute_live_ranges(ctx);
 
 		if ((dump & (IR_DUMP_AFTER_LIVE_RANGES|IR_DUMP_AFTER_ALL))
-		 && !_save(ctx, dump, IR_DUMP_AFTER_LIVE_RANGES, dump_file, func_name)) {
+		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_LIVE_RANGES, dump_file, func_name)) {
 			return 0;
 		}
 
 		ir_coalesce(ctx);
 
 		if ((dump & (IR_DUMP_AFTER_COALESCING|IR_DUMP_AFTER_ALL))
-		 && !_save(ctx, dump, IR_DUMP_AFTER_COALESCING, dump_file, func_name)) {
+		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_COALESCING, dump_file, func_name)) {
 			return 0;
 		}
 
 		if (ctx->flags & IR_GEN_NATIVE) {
 			ir_reg_alloc(ctx);
+			if ((dump & (IR_DUMP_AFTER_REGALLOC|IR_DUMP_AFTER_ALL))
+			 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_REGALLOC, dump_file, func_name)) {
+				return 0;
+			}
 		}
 
 		ir_schedule_blocks(ctx);
@@ -262,7 +301,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t dump, FILE *dump_file, 
 	}
 
 	if ((dump & (IR_DUMP_FINAL|IR_DUMP_AFTER_ALL|IR_DUMP_CODEGEN))
-	 && !_save(ctx, dump, IR_DUMP_FINAL, dump_file, func_name)) {
+	 && !_save(ctx, save_flags, dump, IR_DUMP_FINAL, dump_file, func_name)) {
 		return 0;
 	}
 
@@ -288,6 +327,7 @@ typedef struct _ir_main_loader {
 	int        opt_level;
 	uint32_t   mflags;
 	uint64_t   debug_regset;
+	uint32_t   save_flags;
 	uint32_t   dump;
 	bool       dump_asm;
 	bool       dump_size;
@@ -837,7 +877,7 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 		fprintf(l->dump_file, "\n");
 	}
 
-	if (!ir_compile_func(ctx, l->opt_level, l->dump, l->dump_file, name)) {
+	if (!ir_compile_func(ctx, l->opt_level, l->save_flags, l->dump, l->dump_file, name)) {
 		return 0;
 	}
 
@@ -932,6 +972,7 @@ int main(int argc, char **argv)
 	char *dump_file = NULL, *c_file = NULL, *llvm_file = 0;
 	FILE *f;
 	bool emit_c = 0, emit_llvm = 0, dump_size = 0, dump_time = 0, dump_asm = 0, run = 0, gdb = 1;
+	uint32_t save_flags = 0;
 	uint32_t dump = 0;
 	int opt_level = 2;
 	uint32_t flags = 0;
@@ -994,6 +1035,21 @@ int main(int argc, char **argv)
 				dump_file = argv[i + 1];
 				i++;
 			}
+		} else if (strcmp(argv[i], "--save-cfg") == 0) {
+			dump |= IR_DUMP_SAVE;
+			save_flags |= IR_SAVE_CFG;
+		} else if (strcmp(argv[i], "--save-cfg-map") == 0) {
+			dump |= IR_DUMP_SAVE;
+			save_flags |= IR_SAVE_CFG_MAP;
+		} else if (strcmp(argv[i], "--save-rules") == 0) {
+			dump |= IR_DUMP_SAVE;
+			save_flags |= IR_SAVE_RULES;
+		} else if (strcmp(argv[i], "--save-regs") == 0) {
+			dump |= IR_DUMP_SAVE;
+			save_flags |= IR_SAVE_REGS;
+		} else if (strcmp(argv[i], "--save-use-lists") == 0) {
+			dump |= IR_DUMP_SAVE;
+			save_flags |= IR_SAVE_USE_LISTS;
 		} else if (strcmp(argv[i], "--dot") == 0) {
 			dump |= IR_DUMP_DOT;
 			if (i + 1 < argc && argv[i + 1][0] != '-') {
@@ -1020,6 +1076,12 @@ int main(int argc, char **argv)
 			dump |= IR_DUMP_AFTER_LOAD;
 		} else if (strcmp(argv[i], "--dump-after-sccp") == 0) {
 			dump |= IR_DUMP_AFTER_SCCP;
+		} else if (strcmp(argv[i], "--dump-after-cfg") == 0) {
+			dump |= IR_DUMP_AFTER_CFG;
+		} else if (strcmp(argv[i], "--dump-after-dom") == 0) {
+			dump |= IR_DUMP_AFTER_DOM;
+		} else if (strcmp(argv[i], "--dump-after-loop") == 0) {
+			dump |= IR_DUMP_AFTER_LOOP;
 		} else if (strcmp(argv[i], "--dump-after-gcm") == 0) {
 			dump |= IR_DUMP_AFTER_GCM;
 		} else if (strcmp(argv[i], "--dump-after-schedule") == 0) {
@@ -1028,6 +1090,8 @@ int main(int argc, char **argv)
 			dump |= IR_DUMP_AFTER_LIVE_RANGES;
 		} else if (strcmp(argv[i], "--dump-after-coalescing") == 0) {
 			dump |= IR_DUMP_AFTER_COALESCING;
+		} else if (strcmp(argv[i], "--dump-after-regalloc") == 0) {
+			dump |= IR_DUMP_AFTER_REGALLOC;
 		} else if (strcmp(argv[i], "--dump-after-all") == 0) {
 			dump |= IR_DUMP_AFTER_ALL;
 		} else if (strcmp(argv[i], "--dump-final") == 0) {
@@ -1106,8 +1170,10 @@ int main(int argc, char **argv)
 	}
 
 	if (dump && !(dump & (IR_DUMP_AFTER_LOAD|IR_DUMP_AFTER_SCCP|
+		IR_DUMP_AFTER_CFG|IR_DUMP_AFTER_DOM|IR_DUMP_AFTER_LOOP|
 		IR_DUMP_AFTER_GCM|IR_DUMP_AFTER_SCHEDULE|
-		IR_DUMP_AFTER_LIVE_RANGES|IR_DUMP_AFTER_COALESCING|IR_DUMP_FINAL))) {
+		IR_DUMP_AFTER_LIVE_RANGES|IR_DUMP_AFTER_COALESCING|IR_DUMP_AFTER_REGALLOC|
+		IR_DUMP_FINAL))) {
 		dump |= IR_DUMP_FINAL;
 	}
 
@@ -1179,6 +1245,7 @@ int main(int argc, char **argv)
 	loader.opt_level = opt_level;
 	loader.mflags = mflags;
 	loader.debug_regset = debug_regset;
+	loader.save_flags = save_flags;
 	loader.dump = dump;
 	loader.dump_asm = dump_asm;
 	loader.dump_size = dump_size;

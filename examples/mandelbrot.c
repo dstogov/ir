@@ -160,7 +160,7 @@ int main(int argc, char **argv)
 	ctx.fixed_regset = ~debug_regset;
 	ctx.ret_type = IR_I32;
 	gen_mandelbrot(&ctx);
-//	ir_save(&ctx, stderr);
+//	ir_save(&ctx, 0, stderr);
 
 	ir_build_def_use_lists(&ctx);
 	if (opt_level > 1) {
@@ -186,7 +186,7 @@ int main(int argc, char **argv)
 
 	ir_truncate(&ctx);
 //	ir_dump(&ctx, stderr);
-	ir_save(&ctx, stderr);
+	ir_save(&ctx, 0, stderr);
 	ir_dump_live_ranges(&ctx, stderr);
 	f = fopen("mandelbrot.dot", "w+");
 	ir_dump_dot(&ctx, "mandelbrot", f);
