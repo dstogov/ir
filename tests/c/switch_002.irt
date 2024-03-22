@@ -35,18 +35,23 @@ int32_t test(int32_t z)
 {
 	int32_t d_1 = z;
 	int32_t d_2;
-	d_2 = d_1 - 2;
 	switch (d_1) {
 		case 0: goto bb2;
 		case 1: goto bb3;
-		case 2: goto bb6;
-		default: goto bb6;
+		case 2: goto bb4;
+		default: goto bb5;
 	}
 bb2:
 	d_2 = d_1 * 3;
 	goto bb6;
 bb3:
 	d_2 = d_1 + 1;
+	goto bb6;
+bb4:
+	d_2 = d_1 - 2;
+	goto bb6;
+bb5:
+	d_2 = d_1 - 2;
 bb6:
 	return d_2;
 }
