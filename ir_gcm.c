@@ -93,9 +93,6 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	b = IR_GCM_EARLY_BLOCK(b);
 	ctx->cfg_map[ref] = b;
 
-	use_list = &ctx->use_lists[ref];
-	n = 0;
-
 	for (n = 0; n < ctx->use_lists[ref].count; n++) {
 		use = ctx->use_edges[ctx->use_lists[ref].refs + n];
 		b = ctx->cfg_map[use];
