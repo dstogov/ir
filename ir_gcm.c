@@ -132,27 +132,41 @@ static uint32_t ir_gcm_select_best_block(ir_ctx *ctx, ir_ref ref, uint32_t lca)
  * See: https://codereview.chromium.org/899433005
  */
 
-static void _push_predecessors(ir_ctx *ctx, int32_t b, ir_bitset totally_useful, ir_bitqueue *worklist)
+typedef struct _ir_gcm_split_data {
+	ir_sparse_set totally_useful;
+} ir_gcm_split_data;
+
+#if USE_WORKLIST
+static void _push_predecessors(ir_ctx *ctx, int32_t b, ir_worklist *worklist)
+#else
+static void _push_predecessors(ir_ctx *ctx, int32_t b, ir_bitqueue *worklist)
+#endif
 {
+	ir_gcm_split_data *data = ctx->data;
 	ir_block *bb = &ctx->cfg_blocks[b];
 	uint32_t *p, i, n = bb->predecessors_count;
 
 	for (p = ctx->cfg_edges + bb->predecessors; n > 0; p++, n--) {
 		i = *p;
-		if (!ir_bitset_in(totally_useful, i)) {
+		if (!ir_sparse_set_in(&data->totally_useful, i)) {
+#if USE_WORKLIST
+			ir_worklist_push(worklist, i);
+#else
 			ir_bitqueue_add(worklist, i);
+#endif
 		}
 	}
 }
 
-static bool _check_successors(ir_ctx *ctx, int32_t b, ir_bitset totally_useful)
+static bool _check_successors(ir_ctx *ctx, int32_t b)
 {
+	ir_gcm_split_data *data = ctx->data;
 	ir_block *bb = &ctx->cfg_blocks[b];
 	uint32_t *p, i, n = bb->successors_count;
 
 	for (p = ctx->cfg_edges + bb->successors; n > 0; p++, n--) {
 		i = *p;
-		if (!ir_bitset_in(totally_useful, i)) {
+		if (!ir_sparse_set_in(&data->totally_useful, i)) {
 			return 0;
 		}
 	}
@@ -165,14 +179,14 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	ir_insn *insn;
 	ir_ref n, *p, use;
 	uint32_t i;
-	ir_bitqueue worklist;
-	ir_bitset totally_useful = ir_bitset_malloc(ctx->cfg_blocks_count + 1);
+	ir_gcm_split_data *data = ctx->data;
+
+	IR_ASSERT(b > 0 && b <= ctx->cfg_blocks_count);
 
 	/* 1. Find a set of blocks where the node is TOTALLY_USEFUL (not PARTIALLY_DEAD)
 	 * 1.1. Collect the blocks where the node is really USED.
 	 */
-	ir_bitqueue_init(&worklist, ctx->cfg_blocks_count + 1);
-	IR_ASSERT(b > 0 && b <= ctx->cfg_blocks_count);
+	ir_sparse_set_clear(&data->totally_useful);
 
 	use_list = &ctx->use_lists[ref];
 	n = use_list->count;
@@ -188,10 +202,9 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 				if (*p == ref) {
 					i = ctx->cfg_map[*q];
 					IR_ASSERT(i > 0 && i <= ctx->cfg_blocks_count);
-					if (!ir_bitset_in(totally_useful, i)) {
-						if (i == b) goto exit; /* node is totally-useful in the scheduled block */
-						ir_bitset_incl(totally_useful, i);
-						_push_predecessors(ctx, i, totally_useful, &worklist);
+					if (!ir_sparse_set_in(&data->totally_useful, i)) {
+						if (i == b) return 0; /* node is totally-useful in the scheduled block */
+						ir_sparse_set_add(&data->totally_useful, i);
 					}
 				}
 			}
@@ -201,10 +214,9 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 				continue;
 			}
 			IR_ASSERT(i > 0 && i <= ctx->cfg_blocks_count);
-			if (!ir_bitset_in(totally_useful, i)) {
-				ir_bitset_incl(totally_useful, i);
-				if (i == b) goto exit; /* node is totally-useful in the scheduled block */
-				_push_predecessors(ctx, i, totally_useful, &worklist);
+			if (!ir_sparse_set_in(&data->totally_useful, i)) {
+				if (i == b) return 0; /* node is totally-useful in the scheduled block */
+				ir_sparse_set_add(&data->totally_useful, i);
 			}
 		}
 	}
@@ -213,14 +225,14 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	if (ctx->flags & IR_DEBUG_GCM_SPLIT) {
 		bool first = 1;
 		fprintf(stderr, "*** Split partially dead node d_%d scheduled to BB%d\n", ref, b);
-		IR_BITSET_FOREACH(totally_useful, ir_bitset_len(ctx->cfg_blocks_count + 1), i) {
+		IR_SPARSE_SET_FOREACH(&data->totally_useful, i) {
 			if (first) {
 				fprintf(stderr, "\td_%d is USED in [BB%d", ref, i);
 				first = 0;
 			} else {
 				fprintf(stderr, ", BB%d", i);
 			}
-		} IR_BITSET_FOREACH_END();
+		} IR_SPARSE_SET_FOREACH_END();
 		fprintf(stderr, "]\n");
 	}
 #endif
@@ -228,28 +240,58 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	/* 1.2. Iteratively check the predecessors of already found TOTALLY_USEFUL blocks and
 	 *      add them into TOTALLY_USEFUL set if all of their sucessors are already there.
 	 */
+#if USE_WORKLIST
+	ir_worklist worklist;
+
+	ir_worklist_init(&worklist, ctx->cfg_blocks_count + 1);
+#else
+	ir_bitqueue worklist;
+
+	ir_bitqueue_init(&worklist, ctx->cfg_blocks_count + 1);
+#endif
+	IR_SPARSE_SET_FOREACH(&data->totally_useful, i) {
+		_push_predecessors(ctx, i, &worklist);
+	} IR_SPARSE_SET_FOREACH_END();
+#if USE_WORKLIST
+	while (ir_worklist_len(&worklist)) {
+		i = ir_worklist_pop(&worklist);
+#else
 	while ((i = ir_bitqueue_pop(&worklist)) != (uint32_t)-1) {
-		if (!ir_bitset_in(totally_useful, i)
-		 && _check_successors(ctx, i, totally_useful)) {
-			if (i == b) goto exit; /* node is TOTALLY_USEFUL in the scheduled block */
-			ir_bitset_incl(totally_useful, i);
-			_push_predecessors(ctx, i, totally_useful, &worklist);
+#endif
+		if (!ir_sparse_set_in(&data->totally_useful, i)
+		 && _check_successors(ctx, i)) {
+			if (i == b) {
+				/* node is TOTALLY_USEFUL in the scheduled block */
+#if USE_WORKLIST
+				ir_worklist_free(&worklist);
+#else
+				ir_bitqueue_free(&worklist);
+#endif
+				return 0;
+			}
+			ir_sparse_set_add(&data->totally_useful, i);
+			_push_predecessors(ctx, i, &worklist);
 		}
 	}
+#if USE_WORKLIST
+	ir_worklist_free(&worklist);
+#else
+	ir_bitqueue_free(&worklist);
+#endif
 
-	IR_ASSERT(!ir_bitset_in(totally_useful, b));
+	IR_ASSERT(!ir_sparse_set_in(&data->totally_useful, b));
 
 #ifdef IR_DEBUG
 	if (ctx->flags & IR_DEBUG_GCM_SPLIT) {
 		bool first = 1;
-		IR_BITSET_FOREACH(totally_useful, ir_bitset_len(ctx->cfg_blocks_count + 1), i) {
+		IR_SPARSE_SET_FOREACH(&data->totally_useful, i) {
 			if (first) {
 				fprintf(stderr, "\td_%d is TOTALLY_USEFUL in [BB%d", ref, i);
 				first = 0;
 			} else {
 				fprintf(stderr, ", BB%d", i);
 			}
-		} IR_BITSET_FOREACH_END();
+		} IR_SPARSE_SET_FOREACH_END();
 		fprintf(stderr, "]\n");
 	}
 #endif
@@ -288,7 +330,7 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 			for (;n > 0; p++, q++, n--) {
 				if (*p == ref) {
 					j = i = ctx->cfg_map[*q];
-					while (ir_bitset_in(totally_useful, ctx->cfg_blocks[j].idom)) {
+					while (ir_sparse_set_in(&data->totally_useful, ctx->cfg_blocks[j].idom)) {
 						j = ctx->cfg_blocks[j].idom;
 					}
 					clone = ir_hashtab_find(&hash, j);
@@ -309,7 +351,7 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 		} else {
 			j = i = ctx->cfg_map[use];
 			IR_ASSERT(i > 0);
-			while (ir_bitset_in(totally_useful, ctx->cfg_blocks[j].idom)) {
+			while (ir_sparse_set_in(&data->totally_useful, ctx->cfg_blocks[j].idom)) {
 				j = ctx->cfg_blocks[j].idom;
 			}
 			clone = ir_hashtab_find(&hash, j);
@@ -379,7 +421,7 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 					if (ir_insn_op(insn, k) == ref) {
 						if (insn->op == IR_PHI) {
 							j = ctx->cfg_map[ir_insn_op(&ctx->ir_base[insn->op1], k - 1)];
-							while (ir_bitset_in(totally_useful, ctx->cfg_blocks[j].idom)) {
+							while (ir_sparse_set_in(&data->totally_useful, ctx->cfg_blocks[j].idom)) {
 								j = ctx->cfg_blocks[j].idom;
 							}
 							if (j != clones[i].block) {
@@ -397,8 +439,6 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	ir_mem_free(uses);
 	ir_mem_free(clones);
 	ir_hashtab_free(&hash);
-	ir_mem_free(totally_useful);
-	ir_bitqueue_free(&worklist);
 
 #ifdef IR_DEBUG
 	if (ctx->flags & IR_DEBUG_GCM_SPLIT) {
@@ -407,11 +447,6 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 #endif
 
 	return 1;
-
-exit:
-	ir_mem_free(totally_useful);
-	ir_bitqueue_free(&worklist);
-	return 0;
 }
 #endif
 
@@ -610,6 +645,13 @@ int ir_gcm(ir_ctx *ctx)
 	}
 #endif
 
+#if IR_GCM_SPLIT
+	ir_gcm_split_data data;
+
+	ir_sparse_set_init(&data.totally_useful, ctx->cfg_blocks_count + 1);
+	ctx->data = &data;
+#endif
+
 	n = ir_list_len(&queue_late);
 	while (n > 0) {
 		n--;
@@ -619,6 +661,11 @@ int ir_gcm(ir_ctx *ctx)
 			ir_gcm_schedule_late(ctx, ref, b);
 		}
 	}
+
+#if IR_GCM_SPLIT
+	ir_sparse_set_free(&data.totally_useful);
+	ctx->data = NULL;
+#endif
 
 	ir_list_free(&queue_early);
 	ir_list_free(&queue_late);
