@@ -82,7 +82,7 @@ static uint32_t ir_gcm_find_lca(ir_ctx *ctx, uint32_t b1, uint32_t b2)
 
 static void ir_gcm_schedule_late(ir_ctx *ctx, ir_ref ref, uint32_t b)
 {
-	ir_ref n, *p, use;
+	ir_ref n, use;
 	ir_use_list *use_list;
 	uint32_t lca = 0;
 
@@ -92,11 +92,12 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	IR_ASSERT(IR_GCM_IS_SCHEDULED_EARLY(b));
 	b = IR_GCM_EARLY_BLOCK(b);
 	ctx->cfg_map[ref] = b;
-	use_list = &ctx->use_lists[ref];
-	n = use_list->count;
 
-	for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
-		use = *p;
+	use_list = &ctx->use_lists[ref];
+	n = 0;
+
+	for (n = 0; n < ctx->use_lists[ref].count; n++) {
+		use = ctx->use_edges[ctx->use_lists[ref].refs + n];
 		b = ctx->cfg_map[use];
 		if (IR_GCM_IS_SCHEDULED_EARLY(b)) {
 			ir_gcm_schedule_late(ctx, use, b);
@@ -176,7 +177,7 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, ir_ref ref, uint32_t b)
 
 static void ir_gcm_schedule_rest(ir_ctx *ctx, ir_ref ref)
 {
-	ir_ref n, *p, use;
+	ir_ref n, use;
 	uint32_t b = ctx->cfg_map[ref];
 	uint32_t lca = 0;
 
@@ -186,10 +187,9 @@ static void ir_gcm_schedule_rest(ir_ctx *ctx, ir_ref ref)
 	IR_ASSERT(IR_GCM_IS_SCHEDULED_EARLY(b));
 	b = IR_GCM_EARLY_BLOCK(b);
 	ctx->cfg_map[ref] = b;
-	n = ctx->use_lists[ref].count;
 
-	for (p = &ctx->use_edges[ctx->use_lists[ref].refs]; n > 0; p++, n--) {
-		use = *p;
+	for (n = 0; n < ctx->use_lists[ref].count; n++) {
+		use = ctx->use_edges[ctx->use_lists[ref].refs + n];
 		b = ctx->cfg_map[use];
 		if (IR_GCM_IS_SCHEDULED_EARLY(b)) {
 			ir_gcm_schedule_late(ctx, use, b);
@@ -377,13 +377,11 @@ int ir_gcm(ir_ctx *ctx)
 	while (n > 0) {
 		n--;
 		ref = ir_list_at(&queue_late, n);
-		use_list = &ctx->use_lists[ref];
-		k = use_list->count;
-		for (p = &ctx->use_edges[use_list->refs]; k > 0; p++, k--) {
-			ref = *p;
-			b = _blocks[ref];
+		for (k = 0; k < ctx->use_lists[ref].count; k++) {
+			ir_ref use = ctx->use_edges[ctx->use_lists[ref].refs + k];
+			b = ctx->cfg_map[use];
 			if (IR_GCM_IS_SCHEDULED_EARLY(b)) {
-				ir_gcm_schedule_late(ctx, ref, b);
+				ir_gcm_schedule_late(ctx, use, b);
 			}
 		}
 	}
