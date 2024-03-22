@@ -465,6 +465,7 @@ int ir_schedule(ir_ctx *ctx)
 	ir_ref i, j, k, n, *p, *q, ref, new_ref, prev_ref, insns_count, consts_count, use_edges_count;
 	ir_ref *_xlat;
 	ir_ref *edges;
+	ir_ref prev_b_end;
 	uint32_t b, prev_b;
 	uint32_t *_blocks = ctx->cfg_map;
 	ir_ref *_next = ir_mem_malloc(ctx->insns_count * sizeof(ir_ref));
@@ -475,14 +476,15 @@ int ir_schedule(ir_ctx *ctx)
 	ir_use_list *lists, *use_list, *new_list;
 
 	/* Create a double-linked list of nodes ordered by BB, respecting BB->start and BB->end */
-	prev_b = _blocks[1];
-	IR_ASSERT(prev_b);
+	IR_ASSERT(_blocks[1] == 1);
+	prev_b = 1;
+	prev_b_end = ctx->cfg_blocks[1].end;
 	_prev[1] = 0;
-	_prev[ctx->cfg_blocks[1].end] = 0;
+	_prev[prev_b_end] = 0;
 	for (i = 2, j = 1; i < ctx->insns_count; i++) {
 		b = _blocks[i];
 		IR_ASSERT((int32_t)b >= 0);
-		if (b == prev_b) {
+		if (b == prev_b && i <= prev_b_end) {
 			/* add to the end of the list */
 			_next[j] = i;
 			_prev[i] = j;
@@ -492,6 +494,7 @@ int ir_schedule(ir_ctx *ctx)
 			if (i == bb->start) {
 				IR_ASSERT(bb->end > bb->start);
 				prev_b = b;
+				prev_b_end = bb->end;
 				_prev[bb->end] = 0;
 				/* add to the end of the list */
 				_next[j] = i;
