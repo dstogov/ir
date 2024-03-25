@@ -80,6 +80,58 @@ static uint32_t ir_gcm_find_lca(ir_ctx *ctx, uint32_t b1, uint32_t b2)
 	return b2;
 }
 
+static uint32_t ir_gcm_select_best_block(ir_ctx *ctx, ir_ref ref, uint32_t lca)
+{
+	ir_block *bb = &ctx->cfg_blocks[lca];
+	uint32_t loop_depth = bb->loop_depth;
+	uint32_t flags, best, b;
+
+	if (!loop_depth) {
+		return lca;
+	}
+
+	if (ctx->ir_base[ref].op >= IR_EQ && ctx->ir_base[ref].op <= IR_UGT) {
+		ir_use_list *use_list = &ctx->use_lists[ref];
+
+		if (use_list->count == 1) {
+			ir_ref use = ctx->use_edges[use_list->refs];
+			ir_insn *insn = &ctx->ir_base[use];
+			if (insn->op == IR_IF || insn->op == IR_GUARD || insn->op == IR_GUARD_NOT) {
+				/* Don't hoist invariant comparison */
+				return lca;
+			}
+		}
+	}
+
+	flags = (bb->flags & IR_BB_LOOP_HEADER) ? bb->flags : ctx->cfg_blocks[bb->loop_header].flags;
+	if ((flags & IR_BB_LOOP_WITH_ENTRY)
+	 && !(ctx->binding && ir_binding_find(ctx, ref))) {
+		/* Don't move loop invariant code across an OSR ENTRY if we can't restore it */
+		return lca;
+	}
+
+	best = b = lca;
+	do {
+		b = bb->dom_parent;
+		bb = &ctx->cfg_blocks[b];
+		if (bb->loop_depth < loop_depth) {
+			if (!bb->loop_depth) {
+				best = b;
+				break;
+			}
+			flags = (bb->flags & IR_BB_LOOP_HEADER) ? bb->flags : ctx->cfg_blocks[bb->loop_header].flags;
+			if ((flags & IR_BB_LOOP_WITH_ENTRY)
+			 && !(ctx->binding && ir_binding_find(ctx, ref))) {
+				break;
+			}
+			loop_depth = bb->loop_depth;
+			best = b;
+		}
+	} while (b != ctx->cfg_map[ref]);
+
+	return best;
+}
+
 static void ir_gcm_schedule_late(ir_ctx *ctx, ir_ref ref, uint32_t b)
 {
 	ir_ref n, use;
@@ -122,50 +174,7 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	b = lca;
 
 	if (b != ctx->cfg_map[ref]) {
-		ir_block *bb = &ctx->cfg_blocks[b];
-		uint32_t loop_depth = bb->loop_depth;
-
-		if (loop_depth) {
-			uint32_t flags;
-
-			if (ctx->ir_base[ref].op >= IR_EQ && ctx->ir_base[ref].op <= IR_UGT) {
-				ir_use_list *use_list = &ctx->use_lists[ref];
-
-				if (use_list->count == 1) {
-					use = ctx->use_edges[use_list->refs];
-					ir_insn *insn = &ctx->ir_base[use];
-					if (insn->op == IR_IF || insn->op == IR_GUARD || insn->op == IR_GUARD_NOT) {
-						/* Don't hoist invariant comparison */
-						ctx->cfg_map[ref] = b;
-						return;
-					}
-				}
-			}
-
-			flags = (bb->flags & IR_BB_LOOP_HEADER) ? bb->flags : ctx->cfg_blocks[bb->loop_header].flags;
-			if ((flags & IR_BB_LOOP_WITH_ENTRY)
-			 && !(ctx->binding && ir_binding_find(ctx, ref))) {
-				/* Don't move loop invariant code across an OSR ENTRY if we can't restore it */
-			} else {
-				do {
-					lca = bb->dom_parent;
-					bb = &ctx->cfg_blocks[lca];
-					if (bb->loop_depth < loop_depth) {
-						if (!bb->loop_depth) {
-							b = lca;
-							break;
-						}
-						flags = (bb->flags & IR_BB_LOOP_HEADER) ? bb->flags : ctx->cfg_blocks[bb->loop_header].flags;
-						if ((flags & IR_BB_LOOP_WITH_ENTRY)
-						 && !(ctx->binding && ir_binding_find(ctx, ref))) {
-							break;
-						}
-						loop_depth = bb->loop_depth;
-						b = lca;
-					}
-				} while (lca != ctx->cfg_map[ref]);
-			}
-		}
+		b = ir_gcm_select_best_block(ctx, ref, b);
 
 		ctx->cfg_map[ref] = b;
 		if (ctx->ir_base[ref + 1].op == IR_OVERFLOW) {
