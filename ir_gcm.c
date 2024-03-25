@@ -136,8 +136,12 @@ typedef struct _ir_gcm_split_data {
 	ir_sparse_set totally_useful;
 } ir_gcm_split_data;
 
+#define USE_LIST 1
+
 #if USE_WORKLIST
 static void _push_predecessors(ir_ctx *ctx, int32_t b, ir_worklist *worklist)
+#elif USE_LIST
+static void _push_predecessors(ir_ctx *ctx, int32_t b, ir_list *worklist)
 #else
 static void _push_predecessors(ir_ctx *ctx, int32_t b, ir_bitqueue *worklist)
 #endif
@@ -151,6 +155,8 @@ static void _push_predecessors(ir_ctx *ctx, int32_t b, ir_bitqueue *worklist)
 		if (!ir_sparse_set_in(&data->totally_useful, i)) {
 #if USE_WORKLIST
 			ir_worklist_push(worklist, i);
+#elif USE_LIST
+			ir_list_push(worklist, i);
 #else
 			ir_bitqueue_add(worklist, i);
 #endif
@@ -244,6 +250,10 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	ir_worklist worklist;
 
 	ir_worklist_init(&worklist, ctx->cfg_blocks_count + 1);
+#elif USE_LIST
+	ir_list worklist;
+
+	ir_list_init(&worklist, ctx->cfg_blocks_count + 1);
 #else
 	ir_bitqueue worklist;
 
@@ -255,6 +265,10 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 #if USE_WORKLIST
 	while (ir_worklist_len(&worklist)) {
 		i = ir_worklist_pop(&worklist);
+		ir_bitset_excl(worklist.visited, i);
+#elif USE_LIST
+	while (ir_list_len(&worklist)) {
+		i = ir_list_pop(&worklist);
 #else
 	while ((i = ir_bitqueue_pop(&worklist)) != (uint32_t)-1) {
 #endif
@@ -264,6 +278,8 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 				/* node is TOTALLY_USEFUL in the scheduled block */
 #if USE_WORKLIST
 				ir_worklist_free(&worklist);
+#elif USE_LIST
+				ir_list_free(&worklist);
 #else
 				ir_bitqueue_free(&worklist);
 #endif
@@ -275,6 +291,8 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	}
 #if USE_WORKLIST
 	ir_worklist_free(&worklist);
+#elif USE_LIST
+	ir_list_free(&worklist);
 #else
 	ir_bitqueue_free(&worklist);
 #endif
