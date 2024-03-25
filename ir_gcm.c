@@ -83,7 +83,6 @@ static uint32_t ir_gcm_find_lca(ir_ctx *ctx, uint32_t b1, uint32_t b2)
 static void ir_gcm_schedule_late(ir_ctx *ctx, ir_ref ref, uint32_t b)
 {
 	ir_ref n, use;
-	ir_use_list *use_list;
 	uint32_t lca = 0;
 
 	IR_ASSERT(ctx->ir_base[ref].op != IR_PARAM && ctx->ir_base[ref].op != IR_VAR);
@@ -129,13 +128,17 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, ir_ref ref, uint32_t b)
 		if (loop_depth) {
 			uint32_t flags;
 
-			use_list = &ctx->use_lists[ref];
-			if (use_list->count == 1) {
-				use = ctx->use_edges[use_list->refs];
-				ir_insn *insn = &ctx->ir_base[use];
-				if (insn->op == IR_IF || insn->op == IR_GUARD || insn->op == IR_GUARD_NOT) {
-					ctx->cfg_map[ref] = b;
-					return;
+			if (ctx->ir_base[ref].op >= IR_EQ && ctx->ir_base[ref].op <= IR_UGT) {
+				ir_use_list *use_list = &ctx->use_lists[ref];
+
+				if (use_list->count == 1) {
+					use = ctx->use_edges[use_list->refs];
+					ir_insn *insn = &ctx->ir_base[use];
+					if (insn->op == IR_IF || insn->op == IR_GUARD || insn->op == IR_GUARD_NOT) {
+						/* Don't hoist invariant comparison */
+						ctx->cfg_map[ref] = b;
+						return;
+					}
 				}
 			}
 
