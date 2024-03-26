@@ -162,10 +162,9 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	}
 
 	IR_ASSERT(lca != 0 && "No Common Ancestor");
-	b = lca;
 
-	if (b != ctx->cfg_map[ref]) {
-		b = ir_gcm_select_best_block(ctx, ref, b);
+	if (lca != ctx->cfg_map[ref]) {
+		b = ir_gcm_select_best_block(ctx, ref, lca);
 
 		ctx->cfg_map[ref] = b;
 		if (ctx->ir_base[ref + 1].op == IR_OVERFLOW) {
