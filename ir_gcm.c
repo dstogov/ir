@@ -137,32 +137,41 @@ typedef struct _ir_gcm_split_data {
 	ir_list       worklist;
 } ir_gcm_split_data;
 
-static void _push_predecessors(ir_ctx *ctx, int32_t b)
+static void _push_predecessors(ir_ctx *ctx, ir_block *bb, ir_gcm_split_data *data)
 {
-	ir_gcm_split_data *data = ctx->data;
-	ir_block *bb = &ctx->cfg_blocks[b];
 	uint32_t *p, i, n = bb->predecessors_count;
 
-	for (p = ctx->cfg_edges + bb->predecessors; n > 0; p++, n--) {
+	IR_ASSERT(n > 0);
+	p = ctx->cfg_edges + bb->predecessors;
+	do {
 		i = *p;
 		if (!ir_sparse_set_in(&data->totally_useful, i)) {
 			ir_list_push(&data->worklist, i);
 		}
-	}
+		p++;
+		n--;
+	} while (n > 0);
 }
 
-static bool _check_successors(ir_ctx *ctx, int32_t b)
+static bool _check_successors(ir_ctx *ctx, ir_block *bb, ir_gcm_split_data *data)
 {
-	ir_gcm_split_data *data = ctx->data;
-	ir_block *bb = &ctx->cfg_blocks[b];
 	uint32_t *p, i, n = bb->successors_count;
 
-	for (p = ctx->cfg_edges + bb->successors; n > 0; p++, n--) {
+	if (n <= 1) {
+		IR_ASSERT(ir_sparse_set_in(&data->totally_useful, ctx->cfg_edges[bb->successors]));
+		return 1;
+	}
+
+	p = ctx->cfg_edges + bb->successors;
+	do {
 		i = *p;
 		if (!ir_sparse_set_in(&data->totally_useful, i)) {
 			return 0;
 		}
-	}
+		p++;
+		n--;
+	} while (n > 0);
+
 	return 1;
 }
 
@@ -234,20 +243,23 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	 *      add them into TOTALLY_USEFUL set if all of their sucessors are already there.
 	 */
 	IR_SPARSE_SET_FOREACH(&data->totally_useful, i) {
-		_push_predecessors(ctx, i);
+		_push_predecessors(ctx, &ctx->cfg_blocks[i], data);
 	} IR_SPARSE_SET_FOREACH_END();
 
 	while (ir_list_len(&data->worklist)) {
 		i = ir_list_pop(&data->worklist);
-		if (!ir_sparse_set_in(&data->totally_useful, i)
-		 && _check_successors(ctx, i)) {
-			if (i == b) {
-				/* node is TOTALLY_USEFUL in the scheduled block */
-				ir_list_clear(&data->worklist);
-				return 0;
+		if (!ir_sparse_set_in(&data->totally_useful, i)) {
+			ir_block *bb = &ctx->cfg_blocks[i];
+
+			if (_check_successors(ctx, bb, data)) {
+				if (i == b) {
+					/* node is TOTALLY_USEFUL in the scheduled block */
+					ir_list_clear(&data->worklist);
+					return 0;
+				}
+				ir_sparse_set_add(&data->totally_useful, i);
+				_push_predecessors(ctx, bb, data);
 			}
-			ir_sparse_set_add(&data->totally_useful, i);
-			_push_predecessors(ctx, i);
 		}
 	}
 
