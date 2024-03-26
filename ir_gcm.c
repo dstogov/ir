@@ -14,6 +14,8 @@
 #define IR_GCM_IS_SCHEDULED_EARLY(b) (((int32_t)(b)) < 0)
 #define IR_GCM_EARLY_BLOCK(b)        ((uint32_t)-((int32_t)(b)))
 
+#define IR_GCM_SPLIT 1
+
 static uint32_t ir_gcm_schedule_early(ir_ctx *ctx, ir_ref ref, ir_list *queue_late)
 {
 	ir_ref n, *p, input;
@@ -123,6 +125,316 @@ static uint32_t ir_gcm_select_best_block(ir_ctx *ctx, ir_ref ref, uint32_t lca)
 	return best;
 }
 
+#if IR_GCM_SPLIT
+/* Partially Dead Code Elimination through splitting the node and sunking the clones
+ *
+ * This code is based on the Benedikt Meurer's idea first implemented in V8.
+ * See: https://codereview.chromium.org/899433005
+ */
+
+typedef struct _ir_gcm_split_data {
+	ir_sparse_set totally_useful;
+	ir_list       worklist;
+} ir_gcm_split_data;
+
+static void _push_predecessors(ir_ctx *ctx, ir_block *bb, ir_gcm_split_data *data)
+{
+	uint32_t *p, i, n = bb->predecessors_count;
+
+	IR_ASSERT(n > 0);
+	p = ctx->cfg_edges + bb->predecessors;
+	do {
+		i = *p;
+		if (!ir_sparse_set_in(&data->totally_useful, i)) {
+			ir_list_push(&data->worklist, i);
+		}
+		p++;
+		n--;
+	} while (n > 0);
+}
+
+static bool _check_successors(ir_ctx *ctx, ir_block *bb, ir_gcm_split_data *data)
+{
+	uint32_t *p, i, n = bb->successors_count;
+
+	if (n <= 1) {
+		IR_ASSERT(ir_sparse_set_in(&data->totally_useful, ctx->cfg_edges[bb->successors]));
+		return 1;
+	}
+
+	p = ctx->cfg_edges + bb->successors;
+	do {
+		i = *p;
+		if (!ir_sparse_set_in(&data->totally_useful, i)) {
+			return 0;
+		}
+		p++;
+		n--;
+	} while (n > 0);
+
+	return 1;
+}
+
+static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
+{
+	ir_use_list *use_list;
+	ir_insn *insn;
+	ir_ref n, *p, use;
+	uint32_t i;
+	ir_gcm_split_data *data = ctx->data;
+
+	IR_ASSERT(b > 0 && b <= ctx->cfg_blocks_count);
+
+	/* 1. Find a set of blocks where the node is TOTALLY_USEFUL (not PARTIALLY_DEAD)
+	 * 1.1. Collect the blocks where the node is really USED.
+	 */
+	ir_sparse_set_clear(&data->totally_useful);
+
+	use_list = &ctx->use_lists[ref];
+	n = use_list->count;
+	for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
+		use = *p;
+		insn = &ctx->ir_base[use];
+		if (insn->op == IR_PHI) {
+			ir_ref *p = insn->ops + 2; /* PHI data inputs */
+			ir_ref *q = ctx->ir_base[insn->op1].ops + 1; /* MERGE inputs */
+			ir_ref n = insn->inputs_count - 1;
+
+			for (;n > 0; p++, q++, n--) {
+				if (*p == ref) {
+					i = ctx->cfg_map[*q];
+					IR_ASSERT(i > 0 && i <= ctx->cfg_blocks_count);
+					if (!ir_sparse_set_in(&data->totally_useful, i)) {
+						if (i == b) return 0; /* node is totally-useful in the scheduled block */
+						ir_sparse_set_add(&data->totally_useful, i);
+					}
+				}
+			}
+		} else {
+			i = ctx->cfg_map[use];
+			if (!i) {
+				continue;
+			}
+			IR_ASSERT(i > 0 && i <= ctx->cfg_blocks_count);
+			if (!ir_sparse_set_in(&data->totally_useful, i)) {
+				if (i == b) return 0; /* node is totally-useful in the scheduled block */
+				ir_sparse_set_add(&data->totally_useful, i);
+			}
+		}
+	}
+
+#ifdef IR_DEBUG
+	if (ctx->flags & IR_DEBUG_GCM_SPLIT) {
+		bool first = 1;
+		fprintf(stderr, "*** Split partially dead node d_%d scheduled to BB%d\n", ref, b);
+		IR_SPARSE_SET_FOREACH(&data->totally_useful, i) {
+			if (first) {
+				fprintf(stderr, "\td_%d is USED in [BB%d", ref, i);
+				first = 0;
+			} else {
+				fprintf(stderr, ", BB%d", i);
+			}
+		} IR_SPARSE_SET_FOREACH_END();
+		fprintf(stderr, "]\n");
+	}
+#endif
+
+	/* 1.2. Iteratively check the predecessors of already found TOTALLY_USEFUL blocks and
+	 *      add them into TOTALLY_USEFUL set if all of their sucessors are already there.
+	 */
+	IR_SPARSE_SET_FOREACH(&data->totally_useful, i) {
+		_push_predecessors(ctx, &ctx->cfg_blocks[i], data);
+	} IR_SPARSE_SET_FOREACH_END();
+
+	while (ir_list_len(&data->worklist)) {
+		i = ir_list_pop(&data->worklist);
+		if (!ir_sparse_set_in(&data->totally_useful, i)) {
+			ir_block *bb = &ctx->cfg_blocks[i];
+
+			if (_check_successors(ctx, bb, data)) {
+				if (i == b) {
+					/* node is TOTALLY_USEFUL in the scheduled block */
+					ir_list_clear(&data->worklist);
+					return 0;
+				}
+				ir_sparse_set_add(&data->totally_useful, i);
+				_push_predecessors(ctx, bb, data);
+			}
+		}
+	}
+
+	IR_ASSERT(!ir_sparse_set_in(&data->totally_useful, b));
+
+#ifdef IR_DEBUG
+	if (ctx->flags & IR_DEBUG_GCM_SPLIT) {
+		bool first = 1;
+		IR_SPARSE_SET_FOREACH(&data->totally_useful, i) {
+			if (first) {
+				fprintf(stderr, "\td_%d is TOTALLY_USEFUL in [BB%d", ref, i);
+				first = 0;
+			} else {
+				fprintf(stderr, ", BB%d", i);
+			}
+		} IR_SPARSE_SET_FOREACH_END();
+		fprintf(stderr, "]\n");
+	}
+#endif
+
+	/* 2. Split the USEs into partitions */
+	use_list = &ctx->use_lists[ref];
+	ir_hashtab hash;
+	uint32_t j, clone, clones_count = 0, uses_count = 0;
+	struct {
+		ir_ref   ref;
+		uint32_t block;
+		uint32_t use_count;
+		uint32_t use;
+	} *clones = ir_mem_malloc(sizeof(*clones) * use_list->count);
+	struct {
+		ir_ref   ref;
+		uint32_t block;
+		uint32_t next;
+	} *uses = ir_mem_malloc(sizeof(*uses) * use_list->count);
+
+	ir_hashtab_init(&hash, use_list->count);
+	n = use_list->count;
+	for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
+		use = *p;
+		insn = &ctx->ir_base[use];
+		if (insn->op == IR_PHI) {
+			ir_ref *p = insn->ops + 2; /* PHI data inputs */
+			ir_ref *q = ctx->ir_base[insn->op1].ops + 1; /* MERGE inputs */
+			ir_ref n = insn->inputs_count - 1;
+
+			/* PHIs must be processed once */
+			if (ir_hashtab_find(&hash, -use) != (ir_ref)IR_INVALID_VAL) {
+				continue;
+			}
+			ir_hashtab_add(&hash, -use, IR_NULL);
+			for (;n > 0; p++, q++, n--) {
+				if (*p == ref) {
+					j = i = ctx->cfg_map[*q];
+					while (ir_sparse_set_in(&data->totally_useful, ctx->cfg_blocks[j].idom)) {
+						j = ctx->cfg_blocks[j].idom;
+					}
+					clone = ir_hashtab_find(&hash, j);
+					if (clone == IR_INVALID_VAL) {
+						clone = clones_count++;
+						ir_hashtab_add(&hash, j, clone);
+						clones[clone].block = j;
+						clones[clone].use_count = 0;
+						clones[clone].use = (uint32_t)-1;
+					}
+					uses[uses_count].ref = use;
+					uses[uses_count].block = i;
+					uses[uses_count].next = clones[clone].use;
+					clones[clone].use_count++;
+					clones[clone].use = uses_count++;
+				}
+			}
+		} else {
+			j = i = ctx->cfg_map[use];
+			IR_ASSERT(i > 0);
+			while (ir_sparse_set_in(&data->totally_useful, ctx->cfg_blocks[j].idom)) {
+				j = ctx->cfg_blocks[j].idom;
+			}
+			clone = ir_hashtab_find(&hash, j);
+			if (clone == IR_INVALID_VAL) {
+				clone = clones_count++;
+				ir_hashtab_add(&hash, j, clone);
+				clones[clone].block = j;
+				clones[clone].use_count = 0;
+				clones[clone].use = -1;
+			}
+			uses[uses_count].ref = use;
+			uses[uses_count].block = i;
+			uses[uses_count].next = clones[clone].use;
+			clones[clone].use_count++;
+			clones[clone].use = uses_count++;
+		}
+	}
+
+#ifdef IR_DEBUG
+	if (ctx->flags & IR_DEBUG_GCM_SPLIT) {
+		for (i = 0; i < clones_count; i++) {
+			uint32_t u = clones[i].use;
+
+			fprintf(stderr, "\tCLONE #%d in BB%d USES(%d)=[d_%d/BB%d",
+				i, clones[i].block, clones[i].use_count, uses[u].ref, uses[u].block);
+			u = uses[u].next;
+			while (u != (uint32_t)-1) {
+				fprintf(stderr, ", d_%d/BB%d", uses[u].ref, uses[u].block);
+				u = uses[u].next;
+			}
+			fprintf(stderr, "]\n");
+		}
+	}
+#endif
+
+	/* Create Clones */
+	insn = &ctx->ir_base[ref];
+	clones[0].ref = ref;
+	for (i = 1; i < clones_count; i++) {
+		clones[i].ref = clone = ir_emit(ctx, insn->optx, insn->op1, insn->op2, insn->op3);
+		insn = &ctx->ir_base[ref];
+		if (insn->op1 > 0) ir_use_list_add(ctx, insn->op1, clone);
+		if (insn->op2 > 0) ir_use_list_add(ctx, insn->op2, clone);
+		if (insn->op3 > 0) ir_use_list_add(ctx, insn->op3, clone);
+	}
+
+	/* Reconstruct IR: Update DEF->USE lists, CFG mapping and etc */
+	ctx->use_lists = ir_mem_realloc(ctx->use_lists, ctx->insns_count * sizeof(ir_use_list));
+	ctx->cfg_map = ir_mem_realloc(ctx->cfg_map, ctx->insns_count * sizeof(uint32_t));
+	n = ctx->use_lists[ref].refs;
+	for (i = 0; i < clones_count; i++) {
+		clone = clones[i].ref;
+		ctx->cfg_map[clone] = clones[i].block;
+		ctx->use_lists[clone].count = clones[i].use_count;
+		ctx->use_lists[clone].refs = n;
+
+		uint32_t u = clones[i].use;
+		while (u != (uint32_t)-1) {
+			use = uses[u].ref;
+			ctx->use_edges[n++] = use;
+			u = uses[u].next;
+			if (i > 0) {
+				/* replace inputs */
+				ir_insn *insn = &ctx->ir_base[use];
+				ir_ref k, l = insn->inputs_count;
+
+				for (k = 1; k <= l; k++) {
+					if (ir_insn_op(insn, k) == ref) {
+						if (insn->op == IR_PHI) {
+							j = ctx->cfg_map[ir_insn_op(&ctx->ir_base[insn->op1], k - 1)];
+							while (ir_sparse_set_in(&data->totally_useful, ctx->cfg_blocks[j].idom)) {
+								j = ctx->cfg_blocks[j].idom;
+							}
+							if (j != clones[i].block) {
+								continue;
+							}
+						}
+						ir_insn_set_op(insn, k, clone);
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	ir_mem_free(uses);
+	ir_mem_free(clones);
+	ir_hashtab_free(&hash);
+
+#ifdef IR_DEBUG
+	if (ctx->flags & IR_DEBUG_GCM_SPLIT) {
+		ir_check(ctx);
+	}
+#endif
+
+	return 1;
+}
+#endif
+
 static void ir_gcm_schedule_late(ir_ctx *ctx, ir_ref ref, uint32_t b)
 {
 	ir_ref n, use;
@@ -162,6 +474,13 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	}
 
 	IR_ASSERT(lca != 0 && "No Common Ancestor");
+
+#if IR_GCM_SPLIT
+	if (ctx->use_lists[ref].count > 1
+	 && ir_split_partially_dead_node(ctx, ref, lca)) {
+		return;
+	}
+#endif
 
 	if (lca != ctx->cfg_map[ref]) {
 		b = ir_gcm_select_best_block(ctx, ref, lca);
@@ -311,6 +630,14 @@ int ir_gcm(ir_ctx *ctx)
 	}
 #endif
 
+#if IR_GCM_SPLIT
+	ir_gcm_split_data data;
+
+	ir_sparse_set_init(&data.totally_useful, ctx->cfg_blocks_count + 1);
+	ir_list_init(&data.worklist, ctx->cfg_blocks_count + 1);
+	ctx->data = &data;
+#endif
+
 	n = ir_list_len(&queue_late);
 	while (n > 0) {
 		n--;
@@ -320,6 +647,12 @@ int ir_gcm(ir_ctx *ctx)
 			ir_gcm_schedule_late(ctx, ref, b);
 		}
 	}
+
+#if IR_GCM_SPLIT
+	ir_list_free(&data.worklist);
+	ir_sparse_set_free(&data.totally_useful);
+	ctx->data = NULL;
+#endif
 
 	ir_list_free(&queue_early);
 	ir_list_free(&queue_late);
