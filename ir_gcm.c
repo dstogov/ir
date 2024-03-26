@@ -134,17 +134,10 @@ static uint32_t ir_gcm_select_best_block(ir_ctx *ctx, ir_ref ref, uint32_t lca)
 
 typedef struct _ir_gcm_split_data {
 	ir_sparse_set totally_useful;
+	ir_list       worklist;
 } ir_gcm_split_data;
 
-#define USE_LIST 1
-
-#if USE_WORKLIST
-static void _push_predecessors(ir_ctx *ctx, int32_t b, ir_worklist *worklist)
-#elif USE_LIST
-static void _push_predecessors(ir_ctx *ctx, int32_t b, ir_list *worklist)
-#else
-static void _push_predecessors(ir_ctx *ctx, int32_t b, ir_bitqueue *worklist)
-#endif
+static void _push_predecessors(ir_ctx *ctx, int32_t b)
 {
 	ir_gcm_split_data *data = ctx->data;
 	ir_block *bb = &ctx->cfg_blocks[b];
@@ -153,13 +146,7 @@ static void _push_predecessors(ir_ctx *ctx, int32_t b, ir_bitqueue *worklist)
 	for (p = ctx->cfg_edges + bb->predecessors; n > 0; p++, n--) {
 		i = *p;
 		if (!ir_sparse_set_in(&data->totally_useful, i)) {
-#if USE_WORKLIST
-			ir_worklist_push(worklist, i);
-#elif USE_LIST
-			ir_list_push(worklist, i);
-#else
-			ir_bitqueue_add(worklist, i);
-#endif
+			ir_list_push(&data->worklist, i);
 		}
 	}
 }
@@ -246,56 +233,23 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	/* 1.2. Iteratively check the predecessors of already found TOTALLY_USEFUL blocks and
 	 *      add them into TOTALLY_USEFUL set if all of their sucessors are already there.
 	 */
-#if USE_WORKLIST
-	ir_worklist worklist;
-
-	ir_worklist_init(&worklist, ctx->cfg_blocks_count + 1);
-#elif USE_LIST
-	ir_list worklist;
-
-	ir_list_init(&worklist, ctx->cfg_blocks_count + 1);
-#else
-	ir_bitqueue worklist;
-
-	ir_bitqueue_init(&worklist, ctx->cfg_blocks_count + 1);
-#endif
 	IR_SPARSE_SET_FOREACH(&data->totally_useful, i) {
-		_push_predecessors(ctx, i, &worklist);
+		_push_predecessors(ctx, i);
 	} IR_SPARSE_SET_FOREACH_END();
-#if USE_WORKLIST
-	while (ir_worklist_len(&worklist)) {
-		i = ir_worklist_pop(&worklist);
-		ir_bitset_excl(worklist.visited, i);
-#elif USE_LIST
-	while (ir_list_len(&worklist)) {
-		i = ir_list_pop(&worklist);
-#else
-	while ((i = ir_bitqueue_pop(&worklist)) != (uint32_t)-1) {
-#endif
+
+	while (ir_list_len(&data->worklist)) {
+		i = ir_list_pop(&data->worklist);
 		if (!ir_sparse_set_in(&data->totally_useful, i)
 		 && _check_successors(ctx, i)) {
 			if (i == b) {
 				/* node is TOTALLY_USEFUL in the scheduled block */
-#if USE_WORKLIST
-				ir_worklist_free(&worklist);
-#elif USE_LIST
-				ir_list_free(&worklist);
-#else
-				ir_bitqueue_free(&worklist);
-#endif
+				ir_list_clear(&data->worklist);
 				return 0;
 			}
 			ir_sparse_set_add(&data->totally_useful, i);
-			_push_predecessors(ctx, i, &worklist);
+			_push_predecessors(ctx, i);
 		}
 	}
-#if USE_WORKLIST
-	ir_worklist_free(&worklist);
-#elif USE_LIST
-	ir_list_free(&worklist);
-#else
-	ir_bitqueue_free(&worklist);
-#endif
 
 	IR_ASSERT(!ir_sparse_set_in(&data->totally_useful, b));
 
@@ -667,6 +621,7 @@ int ir_gcm(ir_ctx *ctx)
 	ir_gcm_split_data data;
 
 	ir_sparse_set_init(&data.totally_useful, ctx->cfg_blocks_count + 1);
+	ir_list_init(&data.worklist, ctx->cfg_blocks_count + 1);
 	ctx->data = &data;
 #endif
 
@@ -681,6 +636,7 @@ int ir_gcm(ir_ctx *ctx)
 	}
 
 #if IR_GCM_SPLIT
+	ir_list_free(&data.worklist);
 	ir_sparse_set_free(&data.totally_useful);
 	ctx->data = NULL;
 #endif
