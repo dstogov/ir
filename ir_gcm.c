@@ -531,6 +531,29 @@ int ir_schedule(ir_ctx *ctx)
 				insn = &ctx->ir_base[i];
 			}
 		}
+		if (bb->successors_count > 1) {
+			ir_ref input, j = bb->end;
+			ir_insn *end = &ctx->ir_base[j];
+
+			if (end->op == IR_IF) {
+				/* Move condition closer to IF */
+				input = end->op2;
+				if (input > 0 && _blocks[input] == b && !_xlat[input] && _prev[j] != input) {
+					if (input == i) {
+						i = _next[i];
+						insn = &ctx->ir_base[i];
+					}
+					/* remove "input" */
+					_prev[_next[input]] = _prev[input];
+					_next[_prev[input]] = _next[input];
+					/* insert before "j" */
+					_prev[input] = _prev[j];
+					_next[input] = j;
+					_next[_prev[j]] = input;
+					_prev[j] = input;
+				}
+			}
+		}
 		while (i != bb->end) {
 			ir_ref n, j, *p, input;
 
