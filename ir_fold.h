@@ -1352,6 +1352,24 @@ IR_FOLD(FP2FP(C_DOUBLE))
 	}
 }
 
+IR_FOLD(PI(C_BOOL, _))
+IR_FOLD(PI(C_U8, _))
+IR_FOLD(PI(C_U16, _))
+IR_FOLD(PI(C_U32, _))
+IR_FOLD(PI(C_U64, _))
+IR_FOLD(PI(C_ADDR, _))
+IR_FOLD(PI(C_CHAR, _))
+IR_FOLD(PI(C_I8, _))
+IR_FOLD(PI(C_I16, _))
+IR_FOLD(PI(C_I32, _))
+IR_FOLD(PI(C_I64, _))
+IR_FOLD(PI(C_DOUBLE, _))
+IR_FOLD(PI(C_FLOAT, _))
+IR_FOLD(PI(C_U64, _))
+{
+	IR_FOLD_COPY(op1);
+}
+
 // TODO: constant functions (e.g.  sin, cos)
 
 /* Copy Propagation */
@@ -1424,6 +1442,103 @@ IR_FOLD(BSWAP(BSWAP))
 {
 	/* f(f(y)) => y */
 	IR_FOLD_COPY(op1_insn->op1);
+}
+
+IR_FOLD(EQ(PI, C_BOOL))
+IR_FOLD(EQ(PI, C_U8))
+IR_FOLD(EQ(PI, C_U16))
+IR_FOLD(EQ(PI, C_U32))
+IR_FOLD(EQ(PI, C_U64))
+IR_FOLD(EQ(PI, C_ADDR))
+{
+	ir_insn *range_insn = &ctx->ir_base[op1_insn->op2];
+	IR_ASSERT(range_insn->op == IR_RANGE);
+	if (IR_IS_CONST_REF(range_insn->op1)) {
+		if (op2_insn->val.u64 < ctx->ir_base[range_insn->op1].val.u64) {
+			IR_FOLD_COPY(IR_FALSE);
+		}
+	}
+	if (IR_IS_CONST_REF(range_insn->op2)) {
+		if (op2_insn->val.u64 > ctx->ir_base[range_insn->op2].val.u64) {
+			IR_FOLD_COPY(IR_FALSE);
+		}
+	}
+	if (IR_IS_CONST_REF(range_insn->op1) && IR_IS_CONST_REF(range_insn->op2)) {
+		if (ctx->ir_base[range_insn->op1].val.u64 == ctx->ir_base[range_insn->op2].val.u64) {
+			IR_FOLD_COPY(IR_TRUE);
+		}
+	}
+	IR_FOLD_NEXT;
+}
+
+IR_FOLD(EQ(PI, C_CHAR))
+IR_FOLD(EQ(PI, C_I8))
+IR_FOLD(EQ(PI, C_I16))
+IR_FOLD(EQ(PI, C_I32))
+IR_FOLD(EQ(PI, C_I64))
+{
+	ir_insn *range_insn = &ctx->ir_base[op1_insn->op2];
+	IR_ASSERT(range_insn->op == IR_RANGE);
+	if (IR_IS_CONST_REF(range_insn->op1)) {
+		if (op2_insn->val.i64 < ctx->ir_base[range_insn->op1].val.i64) {
+			IR_FOLD_COPY(IR_FALSE);
+		}
+	}
+	if (IR_IS_CONST_REF(range_insn->op2)) {
+		if (op2_insn->val.i64 > ctx->ir_base[range_insn->op2].val.i64) {
+			IR_FOLD_COPY(IR_FALSE);
+		}
+	}
+	if (IR_IS_CONST_REF(range_insn->op1) && IR_IS_CONST_REF(range_insn->op2)) {
+		if (ctx->ir_base[range_insn->op1].val.i64 == ctx->ir_base[range_insn->op2].val.i64) {
+			IR_FOLD_COPY(IR_TRUE);
+		}
+	}
+	IR_FOLD_NEXT;
+}
+
+IR_FOLD(PI(_, C_DOUBLE))
+{
+	ir_insn *range_insn = &ctx->ir_base[op1_insn->op2];
+	IR_ASSERT(range_insn->op == IR_RANGE);
+	if (IR_IS_CONST_REF(range_insn->op1)) {
+		if (op2_insn->val.d < ctx->ir_base[range_insn->op1].val.d) {
+			IR_FOLD_COPY(IR_FALSE);
+		}
+	}
+	if (IR_IS_CONST_REF(range_insn->op2)) {
+		if (op2_insn->val.d > ctx->ir_base[range_insn->op2].val.d) {
+			IR_FOLD_COPY(IR_FALSE);
+		}
+	}
+	if (IR_IS_CONST_REF(range_insn->op1) && IR_IS_CONST_REF(range_insn->op2)) {
+		if (ctx->ir_base[range_insn->op1].val.d == ctx->ir_base[range_insn->op2].val.d) {
+			IR_FOLD_COPY(IR_TRUE);
+		}
+	}
+	IR_FOLD_NEXT;
+}
+
+IR_FOLD(PI(_, C_FLOAT))
+{
+	ir_insn *range_insn = &ctx->ir_base[op1_insn->op2];
+	IR_ASSERT(range_insn->op == IR_RANGE);
+	if (IR_IS_CONST_REF(range_insn->op1)) {
+		if (op2_insn->val.f < ctx->ir_base[range_insn->op1].val.f) {
+			IR_FOLD_COPY(IR_FALSE);
+		}
+	}
+	if (IR_IS_CONST_REF(range_insn->op2)) {
+		if (op2_insn->val.f > ctx->ir_base[range_insn->op2].val.f) {
+			IR_FOLD_COPY(IR_FALSE);
+		}
+	}
+	if (IR_IS_CONST_REF(range_insn->op1) && IR_IS_CONST_REF(range_insn->op2)) {
+		if (ctx->ir_base[range_insn->op1].val.f == ctx->ir_base[range_insn->op2].val.f) {
+			IR_FOLD_COPY(IR_TRUE);
+		}
+	}
+	IR_FOLD_NEXT;
 }
 
 IR_FOLD(EQ(_, C_BOOL))

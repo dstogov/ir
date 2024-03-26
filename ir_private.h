@@ -525,6 +525,7 @@ IR_ALWAYS_INLINE int ir_bitqueue_pop(ir_bitqueue *q)
 
 IR_ALWAYS_INLINE void ir_bitqueue_add(ir_bitqueue *q, uint32_t n)
 {
+	IR_ASSERT(n > 0);
 	uint32_t i = n / IR_BITSET_BITS;
 	q->set[i] |= IR_BITSET_ONE << (n % IR_BITSET_BITS);
 	if (i < q->pos) {

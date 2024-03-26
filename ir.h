@@ -296,10 +296,13 @@ typedef enum _ir_type {
 	\
 	/* data-flow and miscellaneous ops                                  */ \
 	_(PHI,          pN,   reg, def, def) /* SSA Phi function            */ \
+	_(PI,           d2,   def, def, ___) /* e-SSA Pi constraint         */ \
 	_(COPY,         d1X1, def, opt, ___) /* COPY (last foldable op)     */ \
-	_(PI,           p2,   reg, def, ___) /* e-SSA Pi constraint ???     */ \
 	_(FRAME_ADDR,   d0,   ___, ___, ___) /* function frame address      */ \
 	/* (USE, RENAME)                                                    */ \
+	\
+	/* PI range                                                         */ \
+	_(RANGE,        d2,   def, def, ___) /* [min, max]                  */ \
 	\
 	/* data ops                                                         */ \
 	_(PARAM,        p1X2, reg, str, num) /* incoming parameter proj.    */ \
@@ -749,6 +752,7 @@ void ir_build_prev_refs(ir_ctx *ctx);
 
 /* SCCP - Sparse Conditional Constant Propagation (implementation in ir_sccp.c) */
 int ir_sccp(ir_ctx *ctx);
+bool ir_remove_pis(ir_ctx *ctx);
 
 /* GCM - Global Code Motion and scheduling (implementation in ir_gcm.c) */
 int ir_gcm(ir_ctx *ctx);
@@ -908,7 +912,8 @@ IR_ALWAYS_INLINE void *ir_jit_compile(ir_ctx *ctx, int opt_level, size_t *size)
 
 		ir_build_def_use_lists(ctx);
 
-		if (!ir_build_cfg(ctx)
+		if (!ir_remove_pis(ctx)
+		 || !ir_build_cfg(ctx)
 		 || !ir_match(ctx)
 		 || !ir_assign_virtual_registers(ctx)
 		 || !ir_compute_dessa_moves(ctx)) {
@@ -930,7 +935,8 @@ IR_ALWAYS_INLINE void *ir_jit_compile(ir_ctx *ctx, int opt_level, size_t *size)
 			return NULL;
 		}
 
-		if (!ir_build_cfg(ctx)
+		if (!ir_remove_pis(ctx)
+		 || !ir_build_cfg(ctx)
 		 || !ir_build_dominators_tree(ctx)
 		 || !ir_find_loops(ctx)
 		 || !ir_gcm(ctx)

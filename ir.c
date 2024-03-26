@@ -1399,6 +1399,29 @@ bool ir_list_contains(const ir_list *l, ir_ref val)
 	return 0;
 }
 
+bool ir_remove_pis(ir_ctx *ctx)
+{
+	ir_ref n, i;
+	ir_insn *insn;
+
+	for (i = IR_UNUSED + 1, insn = ctx->ir_base + i; i < ctx->insns_count;) {
+		n = insn->inputs_count;
+
+		if (insn->op == IR_PI) {
+			ir_use_list_remove_all(ctx, insn->op2, i);
+			insn->op2 = IR_UNUSED;
+			insn->op = IR_COPY;
+			insn->inputs_count = 1;
+		}
+
+		n = ir_insn_inputs_to_len(n);
+		i += n;
+		insn += n;
+	}
+
+	return true;
+}
+
 static uint32_t ir_hashtab_hash_size(uint32_t size)
 {
 	size -= 1;

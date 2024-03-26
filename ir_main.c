@@ -222,6 +222,8 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 #endif
 	}
 
+	ir_remove_pis(ctx);
+
 	if (opt_level > 0 || (ctx->flags & (IR_GEN_NATIVE|IR_GEN_CODE))) {
 		ir_build_cfg(ctx);
 		if ((dump & (IR_DUMP_AFTER_CFG|IR_DUMP_AFTER_ALL))
