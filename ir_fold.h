@@ -1365,7 +1365,6 @@ IR_FOLD(PI(C_I32, _))
 IR_FOLD(PI(C_I64, _))
 IR_FOLD(PI(C_DOUBLE, _))
 IR_FOLD(PI(C_FLOAT, _))
-IR_FOLD(PI(C_U64, _))
 {
 	IR_FOLD_COPY(op1);
 }
@@ -1497,7 +1496,7 @@ IR_FOLD(EQ(PI, C_I64))
 	IR_FOLD_NEXT;
 }
 
-IR_FOLD(PI(_, C_DOUBLE))
+IR_FOLD(EQ(PI, C_DOUBLE))
 {
 	ir_insn *range_insn = &ctx->ir_base[op1_insn->op2];
 	IR_ASSERT(range_insn->op == IR_RANGE);
@@ -1519,7 +1518,7 @@ IR_FOLD(PI(_, C_DOUBLE))
 	IR_FOLD_NEXT;
 }
 
-IR_FOLD(PI(_, C_FLOAT))
+IR_FOLD(EQ(PI, C_FLOAT))
 {
 	ir_insn *range_insn = &ctx->ir_base[op1_insn->op2];
 	IR_ASSERT(range_insn->op == IR_RANGE);
