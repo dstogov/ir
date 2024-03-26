@@ -371,7 +371,7 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	}
 #endif
 
-    /* Create Clones */
+	/* Create Clones */
 	insn = &ctx->ir_base[ref];
 	clones[0].ref = ref;
 	for (i = 1; i < clones_count; i++) {
@@ -382,7 +382,7 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 		if (insn->op3 > 0) ir_use_list_add(ctx, insn->op3, clone);
 	}
 
-    /* Reconstruct IR: Update DEF->USE lists, CFG mapping and etc */
+	/* Reconstruct IR: Update DEF->USE lists, CFG mapping and etc */
 	ctx->use_lists = ir_mem_realloc(ctx->use_lists, ctx->insns_count * sizeof(ir_use_list));
 	ctx->cfg_map = ir_mem_realloc(ctx->cfg_map, ctx->insns_count * sizeof(uint32_t));
 	n = ctx->use_lists[ref].refs;
