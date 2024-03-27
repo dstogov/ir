@@ -407,7 +407,7 @@ static void ir_emit_bitcast(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 			fprintf(f, " = _u.d;}\n");
 		} else {
 			IR_ASSERT(insn->type == IR_FLOAT);
-			fprintf(f, "\t{union {float f; uint32_t bits;} _u; _u.buts = ");
+			fprintf(f, "\t{union {float f; uint32_t bits;} _u; _u.bits = ");
 			ir_emit_ref(ctx, f, insn->op1);
 			fprintf(f, "; ");
 			ir_emit_ref(ctx, f, def);
