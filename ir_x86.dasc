@@ -2776,8 +2776,8 @@ static void ir_emit_mov_imm_int(ir_ctx *ctx, ir_type type, ir_reg reg, int64_t v
 			|	mov Rd(reg), (uint32_t)val // zero extended load
 		} else if (IR_IS_SIGNED_32BIT(val)) {
 			|	mov Rq(reg), (int32_t)val // sign extended load
-//		} else if (type == IR_ADDR && IR_MAY_USE_32BIT_ADDR(ctx->code_buffer, (intptr_t)val)) {
-//			|	lea Ra(reg), [&val]
+		} else if (type == IR_ADDR && IR_MAY_USE_32BIT_ADDR(ctx->code_buffer, (intptr_t)val)) {
+			|	lea Ra(reg), [&val]
 		} else {
 			|	mov64 Ra(reg), val
 		}
