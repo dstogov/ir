@@ -376,13 +376,13 @@ The following table shows the comilation time relative to ``gcc -O2`` (the more 
 
 | Benhcmark       | Compilation time (relative to GCC -02) | 
 | --------------- | -------------------------------------- |
-| oggenc          |                                  26.42 |
-| minilua         |                                  18.00 |
-| AVERAGE         |                                  22.21 |
+| oggenc          |                                  35.22 |
+| minilua         |                                  32.40 |
+| AVERAGE         |                                  33.81 |
 
 This comparison is not completely fair, because GCC compiles C source, but IR takes precompiled LLVM asm
 
-Anyway, **IR framework provides code that is in average 5% slower, but does this ~20 times faster**.
+Anyway, **IR framework provides code that is in average 5% slower, but does this ~30 times faster**.
 
 ## PHP JIT based on IR
 
