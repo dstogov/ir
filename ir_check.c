@@ -191,6 +191,13 @@ bool ir_check(const ir_ctx *ctx)
 												i, j, use, use_insn->type, insn->type);
 											ok = 0;
 										}
+										if (insn->op == IR_PI) {
+											if (j == 2 && use_insn->op != IR_RANGE) {
+												fprintf(stderr, "ir_base[%d].ops[%d] (%d) op must be RANGE (%d)\n",
+													i, j, use_insn->op, IR_RANGE);
+												ok = 0;
+											}
+										}
 										break;
 								}
 							}

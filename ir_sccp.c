@@ -550,6 +550,24 @@ static void ir_sccp_remove_if(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_ref 
 	}
 }
 
+static void ir_sccp_remove_guard(ir_ctx *ctx, ir_ref ref, ir_ref dst)
+{
+	ir_ref use;
+	ir_insn *insn, *use_insn;
+	ir_use_list *use_list = &ctx->use_lists[ref];
+
+	insn = &ctx->ir_base[ref];
+	IR_ASSERT(use_list->count == 1);
+	use = ctx->use_edges[use_list->refs];
+	if (use == dst) {
+		use_insn = &ctx->ir_base[use];
+		use_insn->op1 = insn->op1;
+		ir_use_list_replace_one(ctx, insn->op1, ref, use);
+		/* remove GUARD/GUARD_NOT instruction */
+		ir_sccp_make_nop(ctx, ref);
+	}
+}
+
 static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_ref unfeasible_inputs)
 {
 	ir_ref i, j, n, k, *p, use;
@@ -1069,6 +1087,41 @@ int ir_sccp(ir_ctx *ctx)
 					continue;
 				}
 				IR_MAKE_BOTTOM(i);
+			} else if (insn->op == IR_GUARD || insn->op == IR_GUARD_NOT) {
+				if (IR_IS_TOP(insn->op2)) {
+					/* do backward propagaton only once */
+					if (!_values[insn->op2].op1) {
+						_values[insn->op2].op1 = 1;
+						ir_bitqueue_add(&worklist, insn->op2);
+					}
+					continue;
+				}
+				if (!IR_IS_BOTTOM(insn->op2)
+#if IR_COMBO_COPY_PROPAGATION
+				 && (IR_IS_CONST_REF(insn->op2) || _values[insn->op2].op != IR_COPY)
+#endif
+				) {
+					bool b = ir_sccp_is_true(ctx, _values, insn->op2);
+					use_list = &ctx->use_lists[i];
+					IR_ASSERT(use_list->count == 1);
+					p = &ctx->use_edges[use_list->refs];
+					use = *p;
+					use_insn = &ctx->ir_base[use];
+					if ((insn->op == IR_GUARD) != b) {
+						use = IR_UNUSED;
+					}
+					if (_values[i].optx == IR_TOP) {
+						_values[i].optx = IR_GUARD;
+						_values[i].op1 = use;
+					} else if (_values[i].optx != IR_GUARD || _values[i].op1 != use) {
+						IR_MAKE_BOTTOM(i);
+					}
+					if (use > 0 && !IR_IS_BOTTOM(use)) {
+						ir_bitqueue_add(&worklist, use);
+					}
+					continue;
+				}
+				IR_MAKE_BOTTOM(i);
 			} else if (insn->op == IR_SWITCH) {
 				if (IR_IS_TOP(insn->op2)) {
 					/* do backward propagaton only once */
@@ -1232,6 +1285,9 @@ int ir_sccp(ir_ctx *ctx)
 		} else if (value->op == IR_IF) {
 			/* remove one way IF/SWITCH */
 			ir_sccp_remove_if(ctx, _values, i, value->op1);
+		} else if (value->op == IR_GUARD) {
+			/* remove one way GUARD/GUARD_NOT */
+			ir_sccp_remove_guard(ctx, i, value->op1);
 		} else if (value->op == IR_MERGE) {
 			/* schedule merge to remove unfeasible MERGE inputs */
 			ir_bitqueue_add(&worklist, i);

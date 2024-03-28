@@ -1,0 +1,25 @@
+--TEST--
+015: FOLD: EQ(PI(A, [Y..Z]), Y) => EQ(_)
+--CODE--
+{
+	int32_t d_1 = 1;
+	int32_t d_2 = 2;
+	l_1 = START(l_6);
+	int32_t d_3 = PARAM(l_1, "x", 1);
+	int32_t d_4 = RANGE(d_1, d_2);
+	int32_t d_5 = PI(d_3, d_4);
+	bool d_6 = EQ(d_5, d_1);
+	l_6 = RETURN(l_1, d_6);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 1;
+	l_1 = START(l_5);
+	int32_t d_2 = PARAM(l_1, "x", 1);
+	int32_t d_3 = COPY(d_2);
+	bool d_4 = EQ(d_3, c_4);
+	l_5 = RETURN(l_1, d_4);
+}
