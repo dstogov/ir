@@ -994,6 +994,7 @@ const char *ir_reg_name(int8_t reg, ir_type type)
 	_(SHIFT_CONST)         \
 	_(COPY_INT)            \
 	_(COPY_FP)             \
+	_(CMP_AND_STORE_INT)   \
 	_(CMP_AND_BRANCH_INT)  \
 	_(CMP_AND_BRANCH_FP)   \
 	_(TEST_AND_BRANCH_INT) \
@@ -1273,6 +1274,7 @@ op2_const:
 		case IR_MEM_BINOP_INT:
 		case IR_MEM_SHIFT:
 		case IR_MEM_SHIFT_CONST:
+		case IR_CMP_AND_STORE_INT:
 			flags = IR_USE_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
 			insn = &ctx->ir_base[ref];
 			if (IR_IS_CONST_REF(insn->op2)) {
@@ -2271,6 +2273,10 @@ store_int:
 							ctx->rules[op_insn->op1] = IR_SKIPPED | load_op;
 							return IR_MEM_OP_INT;
 						}
+					} else if (rule == IR_CMP_INT && load_op == IR_LOAD) {
+						/* c = CMP(_, _) ... STORE(c) => SKIP_CMP ... CMP_AND_STORE_INT */
+						ctx->rules[insn->op3] = IR_FUSED | IR_CMP_INT;
+						return IR_CMP_AND_STORE_INT;
 					}
 				}
 				return store_rule;
@@ -5271,6 +5277,48 @@ static void _ir_emit_setcc_int(ir_ctx *ctx, uint8_t op, ir_reg def_reg)
 	}
 }
 
+static void _ir_emit_setcc_int_mem(ir_ctx *ctx, uint8_t op, ir_mem mem)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+
+
+	switch (op) {
+		default:
+			IR_ASSERT(0 && "NIY binary op");
+		case IR_EQ:
+			|	ASM_TMEM_OP sete, byte, mem
+			break;
+		case IR_NE:
+			|	ASM_TMEM_OP setne, byte, mem
+			break;
+		case IR_LT:
+			|	ASM_TMEM_OP setl, byte, mem
+			break;
+		case IR_GE:
+			|	ASM_TMEM_OP setge, byte, mem
+			break;
+		case IR_LE:
+			|	ASM_TMEM_OP setle, byte, mem
+			break;
+		case IR_GT:
+			|	ASM_TMEM_OP setg, byte, mem
+			break;
+		case IR_ULT:
+			|	ASM_TMEM_OP setb, byte, mem
+			break;
+		case IR_UGE:
+			|	ASM_TMEM_OP setae, byte, mem
+			break;
+		case IR_ULE:
+			|	ASM_TMEM_OP setbe, byte, mem
+			break;
+		case IR_UGT:
+			|	ASM_TMEM_OP seta, byte, mem
+			break;
+	}
+}
+
 static void ir_emit_cmp_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
@@ -7321,6 +7369,47 @@ static void ir_emit_store_int(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 		}
 		ir_emit_store_mem_int(ctx, type, mem, op3_reg);
 	}
+}
+
+static void ir_emit_cmp_and_store_int(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
+{
+	ir_reg addr_reg = ctx->regs[ref][2];
+	ir_mem mem;
+	ir_insn *cmp_insn = &ctx->ir_base[insn->op3];
+	ir_op op = cmp_insn->op;
+	ir_type type = ctx->ir_base[cmp_insn->op1].type;
+	ir_ref op1 = cmp_insn->op1;
+	ir_ref op2 = cmp_insn->op2;
+	ir_reg op1_reg = ctx->regs[insn->op3][1];
+	ir_reg op2_reg = ctx->regs[insn->op3][2];
+
+	if (addr_reg != IR_REG_NONE) {
+		if (IR_REG_SPILLED(addr_reg) || IR_IS_CONST_REF(insn->op2)) {
+			addr_reg = IR_REG_NUM(addr_reg);
+			IR_ASSERT(ctx->ir_base[insn->op2].type == IR_ADDR);
+			ir_emit_load(ctx, IR_ADDR, addr_reg, insn->op2);
+		}
+		mem = IR_MEM_B(addr_reg);
+	} else if (IR_IS_CONST_REF(insn->op2)) {
+		mem = ir_fuse_addr_const(ctx, insn->op2);
+	} else {
+		IR_ASSERT(ir_rule(ctx, insn->op2) & IR_FUSED);
+		mem = ir_fuse_addr(ctx, ref, insn->op2);
+	}
+
+	if (op1_reg != IR_REG_NONE && (IR_IS_CONST_REF(op1) || IR_REG_SPILLED(op1_reg))) {
+		op1_reg = IR_REG_NUM(op1_reg);
+		ir_emit_load(ctx, type, op1_reg, op1);
+	}
+	if (op2_reg != IR_REG_NONE && (IR_IS_CONST_REF(op2) || IR_REG_SPILLED(op2_reg))) {
+		op2_reg = IR_REG_NUM(op2_reg);
+		if (op1 != op2) {
+			ir_emit_load(ctx, type, op2_reg, op2);
+		}
+	}
+
+	ir_emit_cmp_int_common(ctx, type, ref, cmp_insn, op1_reg, op1, op2_reg, op2);
+	_ir_emit_setcc_int_mem(ctx, op, mem);
 }
 
 static void ir_emit_store_fp(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
@@ -9958,6 +10047,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					break;
 				case IR_COPY_FP:
 					ir_emit_copy_fp(ctx, i, insn);
+					break;
+				case IR_CMP_AND_STORE_INT:
+					ir_emit_cmp_and_store_int(ctx, i, insn);
 					break;
 				case IR_CMP_AND_BRANCH_INT:
 					ir_emit_cmp_and_branch_int(ctx, b, i, insn, _ir_next_block(ctx, _b));
