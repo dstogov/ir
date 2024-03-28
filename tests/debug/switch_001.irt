@@ -34,11 +34,10 @@ x86_64
 }
 --EXPECT--
 test:
-	cmpl $3, %edi
-	jg .L4
-	cmpl $1, %edi
-	jl .L4
 	movslq %edi, %rdi
+	leaq -1(%rdi), %rax
+	cmpq $2, %rax
+	ja .L4
 	leaq .L6(%rip), %rax
 	jmpq *-8(%rax, %rdi, 8)
 .L1:

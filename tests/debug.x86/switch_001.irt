@@ -35,12 +35,10 @@ x86
 --EXPECT--
 test:
 	movl 4(%esp), %eax
-	cmpl $3, %eax
-	jg .L4
-	cmpl $1, %eax
-	jl .L4
-	leal -4(, %eax, 4), %eax
-	jmpl *.L6(%eax)
+	leal -1(%eax), %ecx
+	cmpl $2, %ecx
+	ja .L4
+	jmpl *.L6(, %ecx, 4)
 .L1:
 	movl $1, %eax
 	jmp .L5
