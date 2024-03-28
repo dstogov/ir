@@ -53,12 +53,10 @@ x86
 test:
 	movl 4(%esp), %eax
 	movb 8(%esp), %cl
-	cmpl $3, %eax
-	jg .L5
-	cmpl $1, %eax
-	jl .L5
-	leal -4(, %eax, 4), %eax
-	jmpl *.L6(%eax)
+	leal -1(%eax), %edx
+	cmpl $2, %edx
+	ja .L5
+	jmpl *.L6(, %edx, 4)
 .L1:
 	movl $1, %eax
 	jmp .L4
@@ -69,14 +67,6 @@ test:
 	movl $3, %eax
 .L4:
 	retl
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
 	nop
 	nop
 	nop
