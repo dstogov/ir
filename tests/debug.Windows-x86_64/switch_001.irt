@@ -37,7 +37,7 @@ test:
 	movslq %ecx, %rcx
 	leaq -1(%rcx), %rax
 	cmpq $2, %rax
-	ja .L5
+	ja .L4
 	leaq .L6(%rip), %rax
 	jmpq *-8(%rax, %rcx, 8)
 .L1:
