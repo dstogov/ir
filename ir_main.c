@@ -47,6 +47,7 @@ static void help(const char *cmd)
 #endif
 		"Options:\n"
 		"  -O[012]                    - optimization level (default: 2)\n"
+		"  -fno-inline                - disable function inlining\n"
 		"  -S                         - dump final target assembler code\n"
 		"  --run ...                  - run the main() function of generated code\n"
 		"                               (the remaining arguments are passed to main)\n"
@@ -62,7 +63,7 @@ static void help(const char *cmd)
 		"  --save-cfg-map             - save IR\n"
 		"  --save-rules               - save IR\n"
 		"  --save-regs                - save IR\n"
-		"  --save-use_lists                - save IR\n"
+		"  --save-use_lists           - save IR\n"
 		"  --dot  [file-name]         - dump IR graph\n"
 		"  --dump [file-name]         - dump IR table\n"
 		"  --dump-after-load          - dump IR after load and local optimization\n"
@@ -973,6 +974,7 @@ int main(int argc, char **argv)
 	char *dump_file = NULL, *c_file = NULL, *llvm_file = 0;
 	FILE *f;
 	bool emit_c = 0, emit_llvm = 0, dump_size = 0, dump_time = 0, dump_asm = 0, run = 0, gdb = 1;
+	bool disable_inline = 0;
 	uint32_t save_flags = 0;
 	uint32_t dump = 0;
 	int opt_level = 2;
@@ -1119,6 +1121,8 @@ int main(int argc, char **argv)
 			flags |= IR_USE_FRAME_POINTER;
 		} else if (strcmp(argv[i], "-mfastcall") == 0) {
 			flags |= IR_FASTCALL_FUNC;
+		} else if (strcmp(argv[i], "-fno-inline") == 0) {
+			disable_inline = 1;
 #ifdef IR_DEBUG
 		} else if (strcmp(argv[i], "--debug-sccp") == 0) {
 			flags |= IR_DEBUG_SCCP;
@@ -1214,7 +1218,7 @@ int main(int argc, char **argv)
 	if (opt_level > 0) {
 		flags |= IR_OPT_FOLDING | IR_OPT_CFG | IR_OPT_CODEGEN;
 	}
-	if (opt_level > 1) {
+	if (opt_level > 1 && !disable_inline) {
 		flags |= IR_OPT_INLINE;
 	}
 	if (emit_c || emit_llvm) {
