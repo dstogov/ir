@@ -835,6 +835,32 @@ IR_ALWAYS_INLINE ir_mem IR_MEM(ir_reg base, int32_t offset, ir_reg index, int32_
 ||	}
 |.endmacro
 
+|.macro ASM_SSE2_REG_REG_TXT_OP, op, type, op1, op2, op3
+||	if (type == IR_DOUBLE) {
+|		op..d xmm(op1-IR_REG_FP_FIRST), xmm(op2-IR_REG_FP_FIRST), op3
+||	} else {
+||		IR_ASSERT(type == IR_FLOAT);
+|		op..s xmm(op1-IR_REG_FP_FIRST), xmm(op2-IR_REG_FP_FIRST), op3
+||	}
+|.endmacro
+
+|.macro ASM_SSE2_REG_REG_REG_TXT_OP, op, type, op1, op2, op3, op4
+||	if (type == IR_DOUBLE) {
+|		op..d xmm(op1-IR_REG_FP_FIRST), xmm(op2-IR_REG_FP_FIRST), xmm(op3-IR_REG_FP_FIRST), op4
+||	} else {
+||		IR_ASSERT(type == IR_FLOAT);
+|		op..s xmm(op1-IR_REG_FP_FIRST), xmm(op2-IR_REG_FP_FIRST), xmm(op3-IR_REG_FP_FIRST), op4
+||	}
+|.endmacro
+
+|.macro ASM_FP_REG_REG_TXT_OP, op, type, op1, op2, op3
+||	if (ctx->mflags & IR_X86_AVX) {
+|		ASM_SSE2_REG_REG_REG_TXT_OP v..op, type, op1, op2, op3
+||	} else {
+|		ASM_SSE2_REG_REG_TXT_OP op, type, op1, op2, op3
+||	}
+|.endmacro
+
 typedef struct _ir_backend_data {
     ir_reg_alloc_data  ra_data;
 	uint32_t           dessa_from_block;
@@ -1029,6 +1055,12 @@ const char *ir_reg_name(int8_t reg, ir_type type)
 	_(RETURN_INT)          \
 	_(RETURN_FP)           \
 	_(BIT_COUNT)           \
+	_(SSE_SQRT)            \
+	_(SSE_RINT)            \
+	_(SSE_FLOOR)           \
+	_(SSE_CEIL)            \
+	_(SSE_TRUNC)           \
+	_(SSE_NEARBYINT)       \
 
 #define IR_RULE_ENUM(name) IR_ ## name,
 
@@ -1710,6 +1742,40 @@ static void ir_match_fuse_load_cmp_fp_br(ir_ctx *ctx, ir_insn *insn, ir_ref root
 	}
 }
 
+
+#define IR_MATCH_FP_BUILIN(_name, _type, _rule) \
+	do { \
+		if (size == strlen(_name)  \
+		 && memcmp(name, _name, strlen(_name)) == 0 \
+		 && proto->params_count == 1 \
+		 && proto->param_types[0] == _type \
+		 && proto->ret_type == _type) { \
+			return _rule; \
+		} \
+	} while (0)
+
+static uint32_t ir_match_builtin_call(ir_ctx *ctx, const ir_insn *func)
+{
+	size_t size;
+	const ir_proto_t *proto = (const ir_proto_t *)ir_get_str(ctx, func->proto);
+	const char *name = ir_get_strl(ctx, func->val.name, &size);
+
+	IR_MATCH_FP_BUILIN("sqrt",       IR_DOUBLE, IR_SSE_SQRT);
+	IR_MATCH_FP_BUILIN("sqrtf",      IR_FLOAT,  IR_SSE_SQRT);
+	IR_MATCH_FP_BUILIN("rint",       IR_DOUBLE, IR_SSE_RINT);
+	IR_MATCH_FP_BUILIN("rintf",      IR_FLOAT,  IR_SSE_RINT);
+	IR_MATCH_FP_BUILIN("floor",      IR_DOUBLE, IR_SSE_FLOOR);
+	IR_MATCH_FP_BUILIN("floorf",     IR_FLOAT,  IR_SSE_FLOOR);
+	IR_MATCH_FP_BUILIN("ceil",       IR_DOUBLE, IR_SSE_CEIL);
+	IR_MATCH_FP_BUILIN("ceilf",      IR_FLOAT,  IR_SSE_CEIL);
+	IR_MATCH_FP_BUILIN("trunc",      IR_DOUBLE, IR_SSE_TRUNC);
+	IR_MATCH_FP_BUILIN("truncf",     IR_FLOAT,  IR_SSE_TRUNC);
+	IR_MATCH_FP_BUILIN("nearbyint",  IR_DOUBLE, IR_SSE_NEARBYINT);
+	IR_MATCH_FP_BUILIN("nearbyintf", IR_FLOAT,  IR_SSE_NEARBYINT);
+
+	return 0;
+}
+
 static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref)
 {
 	ir_insn *op2_insn;
@@ -2130,6 +2196,17 @@ binop_fp:
 			}
 			break;
 		case IR_CALL:
+			if (IR_IS_CONST_REF(insn->op2)) {
+				const ir_insn *func = &ctx->ir_base[insn->op2];
+
+				if (func->op == IR_FUNC && func->proto) {
+					uint32_t rule = ir_match_builtin_call(ctx, func);
+
+					if (rule) {
+						return rule;
+					}
+				}
+			}
 			ctx->flags2 |= IR_HAS_CALLS;
 #ifndef IR_REG_FP_RET1
 			if (IR_IS_TYPE_FP(insn->type)) {
@@ -9163,6 +9240,54 @@ static void ir_emit_tls(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
+static void ir_emit_sse_sqrt(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_reg op3_reg = ctx->regs[def][3];
+	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
+
+	IR_ASSERT(IR_IS_TYPE_FP(insn->type));
+	IR_ASSERT(def_reg != IR_REG_NONE && op3_reg != IR_REG_NONE);
+
+	if (IR_REG_SPILLED(op3_reg)) {
+		op3_reg = IR_REG_NUM(op3_reg);
+		ir_emit_load(ctx, IR_ADDR, op3_reg, insn->op3);
+	}
+
+	|	ASM_FP_REG_REG_OP sqrts, insn->type, def_reg, op3_reg
+
+	if (IR_REG_SPILLED(ctx->regs[def][0])) {
+		ir_emit_store(ctx, insn->type, def, def_reg);
+	}
+}
+
+static void ir_emit_sse_round(ir_ctx *ctx, ir_ref def, ir_insn *insn, int round_op)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_reg op3_reg = ctx->regs[def][3];
+	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
+
+	IR_ASSERT(IR_IS_TYPE_FP(insn->type));
+	IR_ASSERT(def_reg != IR_REG_NONE && op3_reg != IR_REG_NONE);
+
+	if (IR_REG_SPILLED(op3_reg)) {
+		op3_reg = IR_REG_NUM(op3_reg);
+		ir_emit_load(ctx, IR_ADDR, op3_reg, insn->op3);
+	}
+
+	if (ctx->mflags & IR_X86_AVX) {
+		|	ASM_SSE2_REG_REG_REG_TXT_OP vrounds, insn->type, def_reg, def_reg, op3_reg, round_op
+	} else {
+		|	ASM_SSE2_REG_REG_TXT_OP rounds, insn->type, def_reg, op3_reg, round_op
+	}
+
+	if (IR_REG_SPILLED(ctx->regs[def][0])) {
+		ir_emit_store(ctx, insn->type, def, def_reg);
+	}
+}
+
 static void ir_emit_exitcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
@@ -10248,6 +10373,24 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					if (ir_emit_guard_overflow(ctx, b, i, insn)) {
 						goto next_block;
 					}
+					break;
+				case IR_SSE_SQRT:
+					ir_emit_sse_sqrt(ctx, i, insn);
+					break;
+				case IR_SSE_RINT:
+					ir_emit_sse_round(ctx, i, insn, 4);
+					break;
+				case IR_SSE_FLOOR:
+					ir_emit_sse_round(ctx, i, insn, 9);
+					break;
+				case IR_SSE_CEIL:
+					ir_emit_sse_round(ctx, i, insn, 10);
+					break;
+				case IR_SSE_TRUNC:
+					ir_emit_sse_round(ctx, i, insn, 11);
+					break;
+				case IR_SSE_NEARBYINT:
+					ir_emit_sse_round(ctx, i, insn, 12);
 					break;
 				case IR_TLS:
 					ir_emit_tls(ctx, i, insn);
