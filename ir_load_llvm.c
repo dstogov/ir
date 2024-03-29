@@ -1116,6 +1116,32 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 	return IR_UNUSED;
 }
 
+static ir_ref llvm2ir_builtin(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftype, uint32_t count, const char *name, size_t name_len)
+{
+	ir_ref func;
+
+	if (STR_EQUAL(name, name_len, "abs")) {
+		if (count == 1 && llvm2ir_type(LLVMGetReturnType(ftype)) == IR_I32) {
+			return ir_ABS(IR_I32, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), IR_I32));
+		}
+	} else if (STR_EQUAL(name, name_len, "labs")) {
+		if (count == 1 && llvm2ir_type(LLVMGetReturnType(ftype)) == IR_I64) {
+			return ir_ABS(IR_I64, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), IR_I64));
+		}
+	} else if (STR_EQUAL(name, name_len, "sqrt")) {
+		if (count == 1 && llvm2ir_type(LLVMGetReturnType(ftype)) == IR_DOUBLE) {
+			func = BUILTIN_FUNC_1("sqrt", IR_DOUBLE, IR_DOUBLE);
+			return ir_CALL_1(IR_DOUBLE, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), IR_DOUBLE));
+		}
+	} else if (STR_EQUAL(name, name_len, "sqrtf")) {
+		if (count == 1 && llvm2ir_type(LLVMGetReturnType(ftype)) == IR_FLOAT) {
+			func = BUILTIN_FUNC_1("sqrtf", IR_FLOAT, IR_FLOAT);
+			return ir_CALL_1(IR_FLOAT, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), IR_FLOAT));
+		}
+	}
+	return IR_UNUSED;
+}
+
 static int llvm2ir_inline_cost(LLVMValueRef func)
 {
 	int count = 0;
@@ -1179,6 +1205,14 @@ static void llvm2ir_call(ir_ctx *ctx, LLVMValueRef insn, LLVMModuleRef module, L
 		name = LLVMGetValueName2(func, &name_len);
 		if (STR_START(name, name_len, "llvm.")) {
 			ref = llvm2ir_intrinsic(ctx, insn, ftype, count, name, name_len);
+			if (ref) {
+				if (ref != IR_NULL) {
+					ir_addrtab_set(ctx->binding, (uintptr_t)insn, ref);
+				}
+				return;
+			}
+		} else {
+			ref = llvm2ir_builtin(ctx, insn, ftype, count, name, name_len);
 			if (ref) {
 				if (ref != IR_NULL) {
 					ir_addrtab_set(ctx->binding, (uintptr_t)insn, ref);
