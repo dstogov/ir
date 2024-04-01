@@ -349,23 +349,23 @@ The fllowing table shows the benchmarks execution time in comparison to the same
 | Benhcmark       | Execution time (relative to GCC -02) | 
 | --------------- | ------------------------------------ |
 | array           |                                 0.86 |
-| binary-trees    |                                 0.97 |
-| funnkuch-reduce |                                 1.03 |
-| hash            |                                 1.13 |
-| hash2           |                                 0.88 |
-| heapsort        |                                 1.02 |
-| lists           |                                 0.95 |
+| binary-trees    |                                 0.96 |
+| funnkuch-reduce |                                 1.01 |
+| hash            |                                 1.21 |
+| hash2           |                                 0.86 |
+| heapsort        |                                 1.04 |
+| lists           |                                 0.98 |
 | matrix          |                                 1.10 |
-| method-call     |                                 0.92 |
+| method-call     |                                 1.00 |
 | mandelbrot      |                                 0.95 |
-| nbody           |                                 0.77 |
-| sieve           |                                 0.92 |
+| nbody           |                                 0.95 |
+| sieve           |                                 0.93 |
 | spectral-norm   |                                 0.94 |
 | strcat          |                                 0.96 |
-| oggenc          |                                 0.86 |
-| minilua         |                                 0.96 |
-| AVERAGE         |                                 0.95 |
-| GEOMEAN         |                                 0.95 |
+| oggenc          |                                 0.88 |
+| minilua         |                                 0.99 |
+| AVERAGE         |                                 0.98 |
+| GEOMEAN         |                                 0.97 |
 
 Most of the bechmarks a very simple (few screems of code), oggenc and minilua are real applications. As you can see, IR produces code that in average 5% slower than ``GCC -O2``, in worst case the code was ~25% slower, and on some benchmarks it even faster. The folloing chart shows the same data graphically.
 
