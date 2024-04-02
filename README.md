@@ -367,22 +367,27 @@ The fllowing table shows the benchmarks execution time in comparison to the same
 | AVERAGE         |                                 0.98 |
 | GEOMEAN         |                                 0.97 |
 
-Most of the bechmarks a very simple (few screems of code), oggenc and minilua are real applications. As you can see, IR produces code that in average 5% slower than ``GCC -O2``, in worst case the code was ~25% slower, and on some benchmarks it even faster. The folloing chart shows the same data graphically.
+Most of the bechmarks a very simple (few screens of code), oggenc and minilua are real applications.
+As you can see, IR produces code that in average 5% slower than ``GCC -O2``, in worst case the code was ~15% slower,
+and on some benchmarks it even faster. The chart shows the same data graphically.
 
 ![IR benchmark chart](https://dstogov.github.io/ir_bench.svg)
 
 
-The following table shows the comilation time relative to ``gcc -O2`` (the more the better)
+The next table shows the comilation time relative to ``gcc -O2`` (the more the better)
 
 | Benhcmark       | Compilation time (relative to GCC -02) | 
 | --------------- | -------------------------------------- |
 | oggenc          |                                  35.22 |
-| minilua         |                                  32.40 |
-| AVERAGE         |                                  33.81 |
+| minilua         |                                  40.50 |
+| gzip            |                                  37.50 |
+| bzip2           |                                  49.67 |
+| AVERAGE         |                                  40.69 |
+| GEOMEAN         |                                  40.34 |
 
 This comparison is not completely fair, because GCC compiles C source, but IR takes precompiled LLVM asm
 
-Anyway, **IR framework provides code that is in average 5% slower, but does this ~30 times faster**.
+Anyway, **IR framework provides code that is in average 5% slower, but does this up to ~40 times faster**.
 
 ## PHP JIT based on IR
 
