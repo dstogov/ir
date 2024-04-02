@@ -35,3 +35,58 @@ func test(int32_t, uintptr_t): void
 	l_20 = LOOP_END(l_18);
 }
 --EXPECT--
+test:
+	pushq %rbp
+	movq %rsp, %rbp
+	pushq %rbx
+	pushq %rsi
+	pushq %rdi
+	pushq %r12
+	pushq %r13
+	pushq %r14
+	movl %ecx, %ebx
+	movq %rdx, %rsi
+	leal (, %rbx, 4), %edi
+	xorl %r12d, %r12d
+	xorl %r13d, %r13d
+	jmp .L2
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+.L1:
+	movq %rsp, %r14
+	movl %edi, %ecx
+	addq $0xf, %rcx
+	andq $0xfffffffffffffff0, %rcx
+	subq %rcx, %rsp
+	movq %rsp, %rcx
+	subq $0x20, %rsp
+	callq *%rsi
+	addq $0x20, %rsp
+	addl %eax, %r12d
+	movq %r14, %rsp
+	leal 1(%r13), %r13d
+.L2:
+	cmpl %ebx, %r13d
+	jl .L1
+	leaq -0x30(%rbp), %rsp
+	popq %r14
+	popq %r13
+	popq %r12
+	popq %rdi
+	popq %rsi
+	popq %rbx
+	popq %rbp
+	retq
