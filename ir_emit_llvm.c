@@ -104,6 +104,8 @@ static const char *ir_type_llvm_name[IR_LAST_LLVM_TYPE] = {
 	_(MEMCPY,       IR_LLVM_MEMCPY_NAME,           VOID, 4, PTR, PTR, SSIZE_T, I1) \
 	_(MEMMOVE,      IR_LLVM_MEMMOVE_NAME,          VOID, 4, PTR, PTR, SSIZE_T, I1) \
 	_(FRAMEADDRESS, "llvm.frameaddress.p0",        PTR,  1, I32, ___, ___, ___) \
+	_(STACKSAVE,    "llvm.stacksave",              PTR,  0, ___, ___, ___, ___) \
+	_(STACKRESTORE, "llvm.stackrestore",           VOID, 1, PTR, ___, ___, ___) \
 	_(VA_START,     "llvm.va_start",               VOID, 1, PTR, ___, ___, ___) \
 	_(VA_END,       "llvm.va_end",                 VOID, 1, PTR, ___, ___, ___) \
 	_(VA_COPY,      "llvm.va_copy",                VOID, 2, PTR, PTR, ___, ___) \
@@ -1157,6 +1159,17 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_STORE:
 				case IR_VSTORE:
 					ir_emit_store(ctx, f, insn);
+					break;
+				case IR_BLOCK_BEGIN:
+					ir_emit_def_ref(ctx, f, i);
+					ir_bitset_incl(used_intrinsics, IR_LLVM_INTR_STACKSAVE);
+					fprintf(f, "\tcall ptr @llvm.stacksave()\n");
+					break;
+				case IR_BLOCK_END:
+					ir_bitset_incl(used_intrinsics, IR_LLVM_INTR_STACKRESTORE);
+					fprintf(f, "\tcall void @llvm.stackrestore(ptr ");
+					ir_emit_ref(ctx, f, insn->op2);
+					fprintf(f, ")\n");
 					break;
 				case IR_FRAME_ADDR:
 					ir_emit_def_ref(ctx, f, i);

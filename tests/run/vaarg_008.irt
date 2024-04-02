@@ -1,0 +1,67 @@
+--TEST--
+VA_ARG 008: va_arg(int)
+--ARGS--
+--run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func sum(int32_t, ...): int32_t
+{
+	int32_t c_4 = 32;
+	int32_t c_5 = 1;
+	int32_t c_6 = 0;
+	l_1 = START(l_25);
+	int32_t d_2 = PARAM(l_1, "arg_1", 1);
+	int32_t d_2_1 = PARAM(l_1, "arg_2", 2);
+	int32_t d_2_2 = PARAM(l_1, "arg_3", 3);
+	int32_t d_2_3 = PARAM(l_1, "arg_4", 4);
+	int32_t d_2_4 = PARAM(l_1, "arg_5", 5);
+	int32_t d_2_5 = PARAM(l_1, "arg_6", 6);
+	int32_t d_2_6 = PARAM(l_1, "arg_7", 7);
+	int32_t d_2_7 = PARAM(l_1, "arg_8", 8);
+	int32_t d_2_8 = PARAM(l_1, "arg_9", 9);
+	uintptr_t d_3, l_3 = ALLOCA(l_1, c_4);
+	l_4 = VA_START(l_3, d_3);
+	bool d_5 = GT(d_2, c_6);
+	l_6 = IF(l_4, d_5);
+	l_7 = IF_FALSE(l_6, 1);
+	l_8 = END(l_7);
+	l_9 = IF_TRUE(l_6);
+	l_10 = END(l_9);
+	l_11 = LOOP_BEGIN(l_10, l_19);
+	int32_t d_12 = PHI(l_11, d_2, d_16);
+	int32_t d_13 = PHI(l_11, c_6, d_15);
+	int32_t d_14, l_14 = VA_ARG(l_11, d_3);
+	int32_t d_15 = ADD(d_14, d_13);
+	int32_t d_16 = SUB(d_12, c_5);
+	l_17 = IF(l_14, d_16);
+	l_18 = IF_TRUE(l_17);
+	l_19 = LOOP_END(l_18);
+	l_20 = IF_FALSE(l_17);
+	l_21 = END(l_20);
+	l_22 = MERGE(l_8, l_21);
+	int32_t d_23 = PHI(l_22, c_6, d_15);
+	l_24 = VA_END(l_22, d_3);
+	l_25 = RETURN(l_24, d_23);
+}
+func main(void): int32_t
+{
+	int32_t c_4 = 7;
+	int32_t c_5 = 1;
+	int32_t c_6 = 2;
+	int32_t c_7 = 3;
+	int32_t c_8 = 4;
+	int32_t c_9 = 5;
+	int32_t c_10 = 6;
+	uintptr_t c_11 = func sum(int32_t, ...): int32_t;
+	uintptr_t c_12 = "sum %d\n";
+	uintptr_t c_13 = func printf(uintptr_t, ...): int32_t;
+	int32_t c_14 = 0;
+	int32_t c_15 = 8;
+	int32_t c_16 = 9;
+	l_1 = START(l_7);
+	int32_t d_2, l_2 = CALL/18(l_1, c_11, c_16, c_16, c_16, c_16, c_16, c_16, c_16, c_16, c_16, c_5, c_6, c_7, c_8, c_9, c_10, c_4, c_15, c_16);
+	int32_t d_5, l_5 = CALL/2(l_2, c_13, c_12, d_2);
+	l_7 = RETURN(l_5, c_14);
+}
+--EXPECT--
+sum 45

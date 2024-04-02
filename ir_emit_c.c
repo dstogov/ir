@@ -1037,6 +1037,12 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_STORE:
 					ir_emit_store(ctx, f, insn);
 					break;
+				case IR_BLOCK_BEGIN:
+					fprintf(f, "{\n");
+					break;
+				case IR_BLOCK_END:
+					fprintf(f, "}\n");
+					break;
 				case IR_FRAME_ADDR:
 					ir_emit_def_ref(ctx, f, i);
 					fprintf(f, "__builtin_frame_address(0);");

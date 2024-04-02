@@ -1,0 +1,62 @@
+--TEST--
+003: BLOCK_BEGIN/BLOCK_END
+--ARGS--
+--emit-c
+--CODE--
+func test(int32_t, uintptr_t): void
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 4;
+	int32_t c_5 = 1;
+	int32_t c_6 = 0;
+	l_1 = START(l_12);
+	int32_t d_2 = PARAM(l_1, "arg_1", 1);
+	uintptr_t d_3 = PARAM(l_1, "arg_2", 2);
+	int32_t d_4 = MUL(d_2, c_4);
+	l_5 = END(l_1);
+	l_6 = LOOP_BEGIN(l_5, l_20);
+	int32_t d_7 = PHI(l_6, c_6, d_19);
+	int32_t d_8 = PHI(l_6, c_6, d_17);
+	bool d_9 = LT(d_7, d_2);
+	l_10 = IF(l_6, d_9);
+	l_11 = IF_FALSE(l_10);
+	l_12 = RETURN(l_11, null);
+	l_13 = IF_TRUE(l_10);
+	uintptr_t d_14, l_14 = BLOCK_BEGIN(l_13);
+	uintptr_t d_15, l_15 = ALLOCA(l_14, d_4);
+	int32_t d_16, l_16 = CALL/1(l_15, d_3, d_15);
+	int32_t d_17 = ADD(d_16, d_8);
+	l_18 = BLOCK_END(l_16, d_14);
+	int32_t d_19 = ADD(d_7, c_5);
+	l_20 = LOOP_END(l_18);
+}
+--EXPECT--
+void test(int32_t arg_1, uintptr_t arg_2)
+{
+	int32_t d_1 = arg_1;
+	uintptr_t d_2 = arg_2;
+	int32_t d_3;
+	int32_t d_4;
+	int32_t d_5;
+	bool d_6;
+	uintptr_t d_7;
+	uintptr_t d_8;
+	int32_t d_9;
+	d_3 = d_1 * 4;
+	d_4 = 0;
+	d_5 = 0;
+	goto bb2;
+bb4:
+{
+	d_8 = (uintptr_t)alloca(d_3);
+	d_9 = d_2(d_8);
+	d_5 = d_9 + d_5;
+}
+	d_4 = d_4 + 1;
+bb2:
+	d_6 = d_4 < d_1;
+	if (d_6) goto bb4;
+	return;
+}

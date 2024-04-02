@@ -1,0 +1,64 @@
+--TEST--
+VA_ARG 007: va_arg(double)
+--ARGS--
+--run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func sum(int32_t, ...): double
+{
+	int32_t c_4 = 32;
+	int32_t c_5 = 1;
+	int32_t c_6 = 0;
+	double c_7 = 0;
+	l_1 = START(l_25);
+	int32_t d_2 = PARAM(l_1, "arg_1", 1);
+	int32_t d_2_1 = PARAM(l_1, "arg_2", 2);
+	int32_t d_2_2 = PARAM(l_1, "arg_3", 3);
+	uintptr_t d_3, l_3 = ALLOCA(l_1, c_4);
+	l_4 = VA_START(l_3, d_3);
+	bool d_5 = GT(d_2, c_6);
+	l_6 = IF(l_4, d_5);
+	l_7 = IF_FALSE(l_6, 1);
+	l_8 = END(l_7);
+	l_9 = IF_TRUE(l_6);
+	l_10 = END(l_9);
+	l_11 = LOOP_BEGIN(l_10, l_19);
+	int32_t d_12 = PHI(l_11, d_2, d_16);
+	double d_13 = PHI(l_11, c_7, d_15);
+	double d_14, l_14 = VA_ARG(l_11, d_3);
+	double d_15 = ADD(d_14, d_13);
+	int32_t d_16 = SUB(d_12, c_5);
+	l_17 = IF(l_14, d_16);
+	l_18 = IF_TRUE(l_17);
+	l_19 = LOOP_END(l_18);
+	l_20 = IF_FALSE(l_17);
+	l_21 = END(l_20);
+	l_22 = MERGE(l_8, l_21);
+	double d_23 = PHI(l_22, c_7, d_15);
+	l_24 = VA_END(l_22, d_3);
+	l_25 = RETURN(l_24, d_23);
+}
+func main(void): int32_t
+{
+	int32_t c_4 = 10;
+	double c_5 = 1.0;
+	double c_6 = 2.0;
+	double c_7 = 3.0;
+	double c_8 = 4.0;
+	double c_9 = 5.0;
+	double c_10 = 6.0;
+	double c_11 = 7.0;
+	double c_12 = 8.0;
+	double c_13 = 9.0;
+	double c_14 = 10.0;
+	uintptr_t sum = func sum(int32_t, ...): double;
+	uintptr_t str = "sum %g\n";
+	uintptr_t printf = func printf(uintptr_t, ...): int32_t;
+	int32_t ret = 0;
+	l_1 = START(l_7);
+	double d_2, l_2 = CALL/13(l_1, sum, c_4, c_4, c_4, c_5, c_6, c_7, c_8, c_9, c_10, c_11, c_12, c_13, c_14);
+	int32_t d_5, l_5 = CALL/2(l_2, printf, str, d_2);
+	l_7 = RETURN(l_5, ret);
+}
+--EXPECT--
+sum 55

@@ -1,0 +1,19 @@
+--TEST--
+002: alloca function
+--ARGS--
+--emit-c
+--CODE--
+{
+	l_1 = START(l_4);
+	int32_t x = PARAM(l_1, "x", 1);
+	uintptr_t ret, l_2 = ALLOCA(l_1, x);
+	l_4 = RETURN(l_2, ret);
+}
+--EXPECT--
+uintptr_t test(int32_t x)
+{
+	int32_t d_1 = x;
+	uintptr_t d_2;
+	d_2 = (uintptr_t)alloca(d_1);
+	return d_2;
+}

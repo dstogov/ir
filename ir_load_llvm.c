@@ -917,6 +917,13 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 		IR_ASSERT(LLVMGetValueKind(LLVMGetOperand(insn, 0)) == LLVMConstantIntValueKind);
 		IR_ASSERT(LLVMConstIntGetSExtValue(LLVMGetOperand(insn, 0)) == 0);
 		return ir_FRAME_ADDR();
+	} else if (STR_EQUAL(name, name_len, "llvm.stacksave")) {
+		IR_ASSERT(count == 0);
+		return ir_BLOCK_BEGIN();
+	} else if (STR_EQUAL(name, name_len, "llvm.stackrestore")) {
+		IR_ASSERT(count == 1);
+		ir_BLOCK_END(llvm2ir_op(ctx, LLVMGetOperand(insn, 0), IR_ADDR));
+		return ctx->control;
 	} else if (STR_EQUAL(name, name_len, "llvm.debugtrap")) {
 		ir_TRAP();
 		return ctx->control;

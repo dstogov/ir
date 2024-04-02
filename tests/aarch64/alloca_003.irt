@@ -1,0 +1,80 @@
+--TEST--
+003: BLOCK_BEGIN/BLOCK_END
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+func test(int32_t, uintptr_t): void
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 4;
+	uintptr_t c_5 = 0x4;
+	int32_t c_6 = 1;
+	int32_t c_7 = 0;
+	l_1 = START(l_12);
+	int32_t d_2 = PARAM(l_1, "arg_1", 1);
+	uintptr_t d_3 = PARAM(l_1, "arg_2", 2);
+	int32_t d_4 = MUL(d_2, c_4);
+	l_5 = END(l_1);
+	l_6 = LOOP_BEGIN(l_5, l_24);
+	int32_t d_7 = PHI(l_6, c_7, d_23);
+	int32_t d_8 = PHI(l_6, c_7, d_21);
+	bool d_9 = LT(d_7, d_2);
+	l_10 = IF(l_6, d_9);
+	l_11 = IF_FALSE(l_10);
+	l_12 = RETURN(l_11, null);
+	l_13 = IF_TRUE(l_10);
+	uintptr_t d_14, l_14 = BLOCK_BEGIN(l_13);
+	uintptr_t d_15, l_15 = ALLOCA(l_14, d_4);
+	int32_t d_16, l_16 = CALL/1(l_15, d_3, d_15);
+	int64_t d_17 = SEXT(d_16);
+	uintptr_t d_18 = MUL(d_17, c_5);
+	uintptr_t d_19 = ADD(d_18, d_15);
+	int32_t d_20, l_20 = LOAD(l_16, d_19);
+	int32_t d_21 = ADD(d_20, d_8);
+	l_22 = BLOCK_END(l_20, d_14);
+	int32_t d_23 = ADD(d_7, c_6);
+	l_24 = LOOP_END(l_22);
+}
+--EXPECT--
+test:
+	stp x29, x30, [sp, #-0x50]!
+	mov x29, sp
+	stp x19, x20, [x29, #0x40]
+	stp x21, x22, [x29, #0x30]
+	stp x23, x24, [x29, #0x20]
+	str x25, [x29, #0x18]
+	mov w19, w0
+	mov x20, x1
+	lsl w21, w19, #2
+	mov w22, wzr
+	mov w23, wzr
+	b .L2
+.L1:
+	mov x24, sp
+	add x25, x21, #0xf
+	and x25, x25, #0xfffffffffffffff0
+	sub sp, sp, x25
+	mov x25, sp
+	mov x0, x25
+	blr x20
+	sxtw x0, w0
+	lsl x0, x0, #2
+	add x0, x0, x25
+	ldr w0, [x0]
+	add w22, w0, w22
+	mov sp, x24
+	add w23, w23, #1
+.L2:
+	cmp w23, w19
+	b.lt .L1
+	ldp x19, x20, [x29, #0x40]
+	ldp x21, x22, [x29, #0x30]
+	ldp x23, x24, [x29, #0x20]
+	ldr x25, [x29, #0x18]
+	mov sp, x29
+	ldp x29, x30, [sp], #0x50
+	ret
