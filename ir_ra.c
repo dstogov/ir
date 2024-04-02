@@ -3916,7 +3916,7 @@ static void assign_regs(ir_ctx *ctx)
 										} else {
 											reg |= IR_REG_SPILL_LOAD;
 										}
-										if (ctx->ir_base[ref].op != IR_SNAPSHOT) {
+										if (ctx->ir_base[ref].op != IR_SNAPSHOT && !(use_pos->flags & IR_PHI_USE)) {
 											uint32_t use_b = ctx->cfg_map[ref];
 
 											if (ir_ival_covers(ival, IR_SAVE_LIVE_POS_FROM_REF(ctx->cfg_blocks[use_b].end))) {
