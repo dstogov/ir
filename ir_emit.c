@@ -830,7 +830,9 @@ static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_dessa_copy *copies, int count,
 		to = pred[to];
 		while (!IR_IS_CONST_REF(to) && ir_bitset_in(ready, to)) {
 			to = pred[to];
-			if (!IR_IS_CONST_REF(to) && ir_bitset_in(visited, to)) {
+			if (IR_IS_CONST_REF(to)) {
+				break;
+			} else if (ir_bitset_in(visited, to)) {
 				/* We found a cycle. Resolve it. */
 				ir_bitset_incl(visited, to);
 				type = types[to];
