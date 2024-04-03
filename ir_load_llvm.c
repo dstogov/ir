@@ -1168,6 +1168,12 @@ static bool llvm2ir_inline(ir_ctx *ctx, LLVMValueRef insn, LLVMValueRef func, LL
 	uint32_t i, count = LLVMGetNumArgOperands(insn);
 	ir_ref ref;
 
+	ref = ir_addrtab_find(ctx->binding, (uintptr_t)func);
+	if (ref == 1) {
+		return 0;
+	}
+	ir_addrtab_set(ctx->binding, (uintptr_t)func, 1);
+
 	IR_ASSERT(count == LLVMCountParams(func));
 	for (i = 0; i < count; i++) {
 		LLVMValueRef arg = LLVMGetOperand(insn, i);
@@ -1191,6 +1197,9 @@ static bool llvm2ir_inline(ir_ctx *ctx, LLVMValueRef insn, LLVMValueRef func, LL
 			ir_addrtab_set(ctx->binding, (uintptr_t)insn, ref);
 		}
 	}
+
+	ir_addrtab_set(ctx->binding, (uintptr_t)func, 0);
+
 	return 1;
 }
 
@@ -2021,7 +2030,7 @@ next:
 					llvm2ir_cond_op(ctx, insn);
 					break;
 				case LLVMCall:
-					llvm2ir_call(ctx, insn, module, func);
+					llvm2ir_call(ctx, insn, module, root_func);
 					break;
 				case LLVMGetElementPtr:
 					llvm2ir_element_ptr(ctx, insn);
