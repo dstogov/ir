@@ -1,13 +1,13 @@
 # IR - Lightweight JIT Compilation Framework
 
 IR Framework is a practical solution for implementing JIT in medium-size projects. 
-It defines Intermediate Representaion (IR), provides a simple API for IR construction and
+It defines Intermediate Representation (IR), provides a simple API for IR construction and
 a set of algorithms for optimization, scheduling, register allocation and code
 generation. The resulting generated in-memory code, may be directly executed.
 
 This is not a stable finished product yet. It’s still under active development.
 It was started as a base for development of the next generation JIT compiler for PHP-9,
-but it's completly PHP independent.
+but it's completely PHP independent.
 
 A presentation about IR framework design and implementation details is available at
 [researchgate](https://www.researchgate.net/publication/374470404_IR_JIT_Framework_a_base_for_the_next_generation_JIT_for_PHP).
@@ -30,7 +30,7 @@ in our IR, we don’t have any variables, their versions and name. Everything
 is represented by computation Nodes and Edges between them. Of course, we
 have special PHI Node that represents the Phi() function.
 
-Despite, our IR is graph based, internally, it’s represented as a plain
+Internally, our graph-based IR is represented as a plain
 two-way grow-able array of Nodes. Dependency Edge are represented as indexes
 of the other Node. This physical representation is almost completely repeats
 the LuaJIT IR designed by Mike Pall [3].
@@ -70,9 +70,9 @@ LuaJIT [3].
 
 This pass implements a classical algorithm originally designed by M. N. Wegman
 and F. K. Zadeck [4] for SSA form. Unification of data and control dependencies
-made its implementation even simple. Despite of constant propagation itself
+made its implementation even simpler. Despite of constant propagation itself
 this pass also performs global Copy Propagation and re-applies the folding rules.
-At the end all the “dead” instructions (instructions that result are not used)
+At the end all the “dead” instructions (those whose results go unused)
 are replaced with NOPs.
 
 ### Global Code Motion
@@ -121,7 +121,7 @@ and inserts the necessary spill load/store and SSA deconstruction code.
 ## Building and Playing with IR
 
 IR Framework is under active development and doesn't provide any stable libraries yet.
-In case you like to you IR, it's better to embed the necessary sources into your project
+In case you like to use IR, it's better to embed the necessary sources into your project
 (like [PHP]((https://github.com/php/php-src/tree/master/ext/opcache/jit)) does].
 
 However, we provide a simple driver that may be built to run tests and play with IR.
@@ -138,10 +138,10 @@ make test
 
 ## IR Example
 
-The complete described example may be found in [examples/mandelbrot.c](examples/mandelbrot.c))
+The complete described example may be found in [examples/mandelbrot.c](examples/mandelbrot.c)
 and built using ``make examples``.
 
-It generate the code for the following C function:
+It generates the code for the following C function:
 
 ```c
 int32_t mandelbrot(double x, double y)
@@ -210,6 +210,7 @@ void gen_mandelbrot(ir_ctx *ctx)
 	ir_PHI_SET_OP(i_1, 2, i_2);
 }
 ```
+
 The textual representation of the IR after system independent optimizations:
 
 ```
@@ -254,6 +255,7 @@ The textual representation of the IR after system independent optimizations:
 	l_29 = LOOP_END(l_23);
 }
 ```
+
 The visualized graph:
 
 ![IR example](https://dstogov.github.io/mandelbrot.svg)
@@ -304,7 +306,7 @@ test:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x40
 ```
 
-## LLVM interopability
+## LLVM interoperability
 
 IR is partially compatible with LLVM. It's possible to convert IR
 into LLVM and then compile it.
@@ -317,7 +319,7 @@ gcc mandelbrot.s
 ```
 
 It's also possible to read an LLVM file and convert it to IR, but this
-requres LLVM loader and therefore IR should be rebuilt with LLVM support.
+requires LLVM loader and therefore IR should be rebuilt with LLVM support.
 
 ```
 make clean
@@ -332,7 +334,7 @@ clang -O2 -fno-vectorize -fno-slp-vectorize -S -emit-llvm -o minilua.ll ./dynasm
 ./ir minilua.ir --run bench/mandelbrot.lua
 ```
 
-Note that the last comand above compiles and runs the Lua interpreter.
+Note that the last command above compiles and runs the Lua interpreter.
 
 Also note that the LLVM code produced by clang is already optimized.
 In case of benchmarking, it may be more honest to avoid LLVM optimizations.
@@ -342,11 +344,11 @@ clang -O -Xclang -disable-llvm-passes -c -emit-llvm -o tmp.bc ./dynasm/minilua.c
 opt tmp.bc --passes='function(mem2reg)' -S -o minilua.ll
 ```
 
-## Performace
+## Performance
  
-The fllowing table shows the benchmarks execution time in comparison to the same benchmarks compiled by ``gcc -O2`` (the more the better). The C benchmark were compiled by CLAG into LLVM code (without any LLVM optimizations, only SSA construction is necessary now) and then loaded, compiled and executed by IR framework.
+The following table shows the benchmarks execution time in comparison to the same benchmarks compiled by ``gcc -O2`` (the more the better). The C benchmarks were compiled by CLAG into LLVM code (without any LLVM optimizations, only SSA construction is necessary now) and then loaded, compiled and executed by IR framework.
 
-| Benhcmark       | Execution time (relative to GCC -02) | 
+| Benchmark       | Execution time (relative to GCC -02) |
 | --------------- | ------------------------------------ |
 | array           |                                 0.86 |
 | binary-trees    |                                 0.96 |
@@ -367,16 +369,16 @@ The fllowing table shows the benchmarks execution time in comparison to the same
 | AVERAGE         |                                 0.98 |
 | GEOMEAN         |                                 0.97 |
 
-Most of the bechmarks a very simple (few screens of code), oggenc and minilua are real applications.
-As you can see, IR produces code that in average 5% slower than ``GCC -O2``, in worst case the code was ~15% slower,
-and on some benchmarks it even faster. The chart shows the same data graphically.
+Most of the benchmarks are very simple (few screens of code), but oggenc and minilua are real applications.
+As you can see, IR produces code that is in average 5% slower than ``GCC -O2``, ~15% slower in the worst case,
+and on some benchmarks it's even faster. The chart shows the same data graphically.
 
 ![IR benchmark chart](https://dstogov.github.io/ir_bench.svg)
 
 
-The next table shows the comilation time relative to ``gcc -O2`` (the more the better)
+The next table shows the compilation time relative to ``gcc -O2`` (the more the better)
 
-| Benhcmark       | Compilation time (relative to GCC -02) | 
+| Benchmark       | Compilation time (relative to GCC -02) |
 | --------------- | -------------------------------------- |
 | oggenc          |                                  35.22 |
 | minilua         |                                  40.50 |
@@ -395,7 +397,7 @@ A new experimental JIT for PHP based on this project is developed at [master](ht
 
 ### Building and Testing PHP with JIT based on IR Framework
 
-Install pre-requested libraries. PHP and their extensions may require different libraries.
+Install required libraries. PHP and their extensions may require different libraries.
 JIT itself needs just **libcapstone** to produce disassembler output.
 
 ```
@@ -424,7 +426,7 @@ opcache.huge_code_pages=1
 EOL
 ```
 
-Check if opcache s loaded
+Check if opcache is loaded
 
 ```
 sapi/cli/php -v | grep -i opcache
