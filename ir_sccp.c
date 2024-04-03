@@ -528,25 +528,24 @@ restart:
 
 static void ir_sccp_remove_if(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_ref dst)
 {
-	ir_ref j, n, *p, use, next;
+	ir_ref next;
 	ir_insn *insn, *next_insn;
-	ir_use_list *use_list = &ctx->use_lists[ref];
 
 	insn = &ctx->ir_base[ref];
-	n = use_list->count;
-	for (j = 0, p = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
-		use = *p;
-		if (use == dst) {
-			next = ctx->use_edges[ctx->use_lists[use].refs];
-			next_insn = &ctx->ir_base[next];
-			/* remove IF and IF_TRUE/FALSE from double linked control list */
-			next_insn->op1 = insn->op1;
-			ir_use_list_replace_one(ctx, insn->op1, ref, next);
-			/* remove IF and IF_TRUE/FALSE instructions */
-			ir_sccp_make_nop(ctx, ref);
-			ir_sccp_make_nop(ctx, use);
-			break;
-		}
+	if (ctx->use_lists[dst].count == 1) {
+		next = ctx->use_edges[ctx->use_lists[dst].refs];
+		next_insn = &ctx->ir_base[next];
+		/* remove IF and IF_TRUE/FALSE from double linked control list */
+		next_insn->op1 = insn->op1;
+		ir_use_list_replace_one(ctx, insn->op1, ref, next);
+		/* remove IF and IF_TRUE/FALSE instructions */
+		ir_sccp_make_nop(ctx, ref);
+		ir_sccp_make_nop(ctx, dst);
+	} else {
+		insn->op2 = IR_UNUSED;
+		insn->optx = IR_OPTX(IR_END, IR_VOID, 1);
+		next_insn = &ctx->ir_base[dst];
+		next_insn->op = IR_BEGIN;
 	}
 }
 
