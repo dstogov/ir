@@ -1246,7 +1246,7 @@ int ir_sccp(ir_ctx *ctx)
 			/* remove unreachable instruction */
 			insn = &ctx->ir_base[i];
 			if (ir_op_flags[insn->op] & (IR_OP_FLAG_DATA|IR_OP_FLAG_MEM)) {
-				if (insn->op != IR_PARAM && insn->op != IR_VAR) {
+				if (insn->op != IR_PARAM && (insn->op != IR_VAR || _values[insn->op1].op == IR_TOP)) {
 					ir_sccp_remove_insn(ctx, _values, i, &worklist2);
 				}
 			} else {
