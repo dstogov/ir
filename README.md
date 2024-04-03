@@ -30,7 +30,7 @@ in our IR, we don’t have any variables, their versions and name. Everything
 is represented by computation Nodes and Edges between them. Of course, we
 have special PHI Node that represents the Phi() function.
 
-Internally, our IR is graph-based and represented as a plain
+Internally, our graph-based IR is represented as a plain
 two-way grow-able array of Nodes. Dependency Edge are represented as indexes
 of the other Node. This physical representation is almost completely repeats
 the LuaJIT IR designed by Mike Pall [3].
@@ -72,7 +72,7 @@ This pass implements a classical algorithm originally designed by M. N. Wegman
 and F. K. Zadeck [4] for SSA form. Unification of data and control dependencies
 made its implementation even simpler. Despite of constant propagation itself
 this pass also performs global Copy Propagation and re-applies the folding rules.
-At the end all the “dead” instructions (instructions that are not used)
+At the end all the “dead” instructions (those whose results go unused)
 are replaced with NOPs.
 
 ### Global Code Motion
