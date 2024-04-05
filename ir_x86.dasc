@@ -3047,6 +3047,7 @@ static void ir_emit_store_mem_int_const(ir_ctx *ctx, ir_type type, ir_mem mem, i
 			ir_emit_store_mem_imm(ctx, type, mem, val);
 		} else {
 			IR_ASSERT(tmp_reg != IR_REG_NONE);
+			tmp_reg = IR_REG_NUM(tmp_reg);
 			ir_emit_load_imm_int(ctx, type, tmp_reg, val);
 			ir_emit_store_mem_int(ctx, type, mem, tmp_reg);
 		}
@@ -3065,6 +3066,7 @@ static void ir_emit_store_mem_fp_const(ir_ctx *ctx, ir_type type, ir_mem mem, ir
 		ir_emit_load_imm_int(ctx, IR_U64, tmp_reg, val->i64);
 		ir_emit_store_mem_int(ctx, IR_U64, mem, tmp_reg);
 	} else {
+		tmp_fp_reg = IR_REG_NUM(tmp_fp_reg);
 		ir_emit_load(ctx, type, tmp_fp_reg, src);
 		ir_emit_store_mem_fp(ctx, IR_DOUBLE, mem, tmp_fp_reg);
 	}
@@ -3307,7 +3309,7 @@ static ir_mem ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 static ir_mem ir_fuse_mem(ir_ctx *ctx, ir_ref root, ir_ref ref, ir_insn *mem_insn, ir_reg reg)
 {
 	if (reg != IR_REG_NONE) {
-		if (IR_REG_SPILLED(reg) || IR_IS_CONST_REF(mem_insn->op2)) {
+		if (IR_REG_SPILLED(reg)) {
 			reg = IR_REG_NUM(reg);
 			ir_emit_load(ctx, IR_ADDR, reg, mem_insn->op2);
 		}
@@ -3563,7 +3565,7 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 
 	if (op2_reg != IR_REG_NONE) {
-		if (IR_REG_SPILLED(op2_reg) || IR_IS_CONST_REF(op2)) {
+		if (IR_REG_SPILLED(op2_reg)) {
 			op2_reg = IR_REG_NUM(op2_reg);
 			if (op1 != op2) {
 				ir_emit_load(ctx, type, op2_reg, op2);
@@ -3735,7 +3737,7 @@ static void ir_emit_min_max_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 	}
 
-	if (IR_REG_SPILLED(op2_reg) || IR_IS_CONST_REF(op2)) {
+	if (IR_REG_SPILLED(op2_reg)) {
 		op2_reg = IR_REG_NUM(op2_reg);
 		if (op1 != op2) {
 			ir_emit_load(ctx, type, op2_reg, op2);
@@ -3864,7 +3866,7 @@ static void ir_emit_mem_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 		}
 	} else {
-		if (IR_REG_SPILLED(op2_reg) || IR_IS_CONST_REF(op2)) {
+		if (IR_REG_SPILLED(op2_reg)) {
 			op2_reg = IR_REG_NUM(op2_reg);
 			ir_emit_load(ctx, type, op2_reg, op2);
 		}
@@ -3928,7 +3930,7 @@ static void ir_emit_reg_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 		}
 	} else {
-		if (IR_REG_SPILLED(op2_reg) || IR_IS_CONST_REF(op2)) {
+		if (IR_REG_SPILLED(op2_reg)) {
 			op2_reg = IR_REG_NUM(op2_reg);
 			ir_emit_load(ctx, type, op2_reg, op2);
 		}
@@ -3998,6 +4000,7 @@ static void ir_emit_mul_div_mod_pwr2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 ||		if (ir_type_size[type] == 8 && ctx->regs[def][2] != IR_REG_NONE) {
 ||			ir_reg op2_reg = ctx->regs[def][2];
 ||
+||			op2_reg = IR_REG_NUM(op2_reg);
 ||			ir_emit_load_imm_int(ctx, type, op2_reg, mask);
 			|	ASM_REG_REG_OP and, type, def_reg, op2_reg
 ||		} else {
@@ -4028,7 +4031,7 @@ static void ir_emit_sdiv_pwr2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	IR_ASSERT(!IR_IS_SYM_CONST(ctx->ir_base[insn->op2].op));
 	IR_ASSERT(op1_reg != IR_REG_NONE && def_reg != IR_REG_NONE && op1_reg != def_reg);
 
-	if (IR_REG_SPILLED(op1_reg) || IR_IS_CONST_REF(op1)) {
+	if (IR_REG_SPILLED(op1_reg)) {
 		op1_reg = IR_REG_NUM(op1_reg);
 		ir_emit_load(ctx, type, op1_reg, op1);
 	}
@@ -4053,6 +4056,7 @@ static void ir_emit_sdiv_pwr2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 ||			ir_reg op2_reg = ctx->regs[def][2];
 ||
 ||			if (op2_reg != IR_REG_NONE) {
+||				op2_reg =  IR_REG_NUM(op2_reg);
 ||				ir_emit_load_imm_int(ctx, type, op2_reg, offset);
 				|	lea Rq(def_reg), [Rq(op1_reg)+Rq(op2_reg)]
 ||			} else {
@@ -4119,6 +4123,7 @@ static void ir_emit_smod_pwr2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 ||	if (ir_type_size[type] == 8 && ctx->regs[def][2] != IR_REG_NONE) {
 ||		ir_reg op2_reg = ctx->regs[def][2];
 ||
+||		op2_reg = IR_REG_NUM(op2_reg);
 ||		ir_emit_load_imm_int(ctx, type, op2_reg, mask);
 		|	ASM_REG_REG_OP and, type, def_reg, op2_reg
 ||	} else {
@@ -4430,7 +4435,7 @@ static void ir_emit_bit_count(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	IR_ASSERT(def_reg != IR_REG_NONE);
 
 	if (op1_reg != IR_REG_NONE) {
-		if (IR_REG_SPILLED(op1_reg) || IR_IS_CONST_REF(op1)) {
+		if (IR_REG_SPILLED(op1_reg)) {
 			op1_reg = IR_REG_NUM(op1_reg);
 			ir_emit_load(ctx, type, op1_reg, op1);
 		}
@@ -4823,21 +4828,17 @@ static void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 	if (op2_reg == IR_REG_NONE && op1 == op2) {
 		op2_reg = IR_REG_RAX;
-	} else if (IR_IS_CONST_REF(op2)) {
-		if (insn->op == IR_MUL || insn->op == IR_MUL_OV) {
-			op2_reg = IR_REG_RDX;
-		} else {
-			IR_ASSERT(op2_reg != IR_REG_NONE);
-		}
+	} else if (op2_reg != IR_REG_NONE && IR_REG_SPILLED(op2_reg)) {
+		op2_reg = IR_REG_NUM(op2_reg);
+		ir_emit_load(ctx, type, op2_reg, op2);
+	} else if (IR_IS_CONST_REF(op2)
+	 && (insn->op == IR_MUL || insn->op == IR_MUL_OV)) {
+		op2_reg = IR_REG_RDX;
 		ir_emit_load(ctx, type, op2_reg, op2);
 	}
 	if (insn->op == IR_MUL || insn->op == IR_MUL_OV) {
 		if (IR_IS_TYPE_SIGNED(insn->type)) {
 			if (op2_reg != IR_REG_NONE) {
-				if (IR_REG_SPILLED(op2_reg)) {
-					op2_reg = IR_REG_NUM(op2_reg);
-					ir_emit_load(ctx, type, op2_reg, op2);
-				}
 				|	ASM_REG_OP imul, type, op2_reg
 			} else {
 				if (ir_rule(ctx, op2) & IR_FUSED) {
@@ -4849,10 +4850,6 @@ static void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 		} else {
 			if (op2_reg != IR_REG_NONE) {
-				if (IR_REG_SPILLED(op2_reg)) {
-					op2_reg = IR_REG_NUM(op2_reg);
-					ir_emit_load(ctx, type, op2_reg, op2);
-				}
 				|	ASM_REG_OP mul, type, op2_reg
 			} else {
 				if (ir_rule(ctx, op2) & IR_FUSED) {
@@ -4875,10 +4872,6 @@ static void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|	movsx ax, al
 			}
 			if (op2_reg != IR_REG_NONE) {
-				if (IR_REG_SPILLED(op2_reg)) {
-					op2_reg = IR_REG_NUM(op2_reg);
-					ir_emit_load(ctx, type, op2_reg, op2);
-				}
 				|	ASM_REG_OP idiv, type, op2_reg
 			} else {
 				if (ir_rule(ctx, op2) & IR_FUSED) {
@@ -4895,10 +4888,6 @@ static void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|	ASM_REG_REG_OP xor, type, IR_REG_RDX, IR_REG_RDX
 			}
 			if (op2_reg != IR_REG_NONE) {
-				if (IR_REG_SPILLED(op2_reg)) {
-					op2_reg = IR_REG_NUM(op2_reg);
-					ir_emit_load(ctx, type, op2_reg, op2);
-				}
 				|	ASM_REG_OP div, type, op2_reg
 			} else {
 				if (ir_rule(ctx, op2) & IR_FUSED) {
@@ -5086,7 +5075,7 @@ static void ir_emit_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 	}
 	if (op2_reg != IR_REG_NONE) {
-		if (IR_REG_SPILLED(op2_reg) || IR_IS_CONST_REF(op2)) {
+		if (IR_REG_SPILLED(op2_reg)) {
 			op2_reg = IR_REG_NUM(op2_reg);
 			if (op1 != op2) {
 				ir_emit_load(ctx, type, op2_reg, op2);
@@ -5188,12 +5177,12 @@ static void ir_emit_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	IR_ASSERT(def_reg != IR_REG_NONE && op1_reg != IR_REG_NONE);
 
-	if (IR_REG_SPILLED(op1_reg) || IR_IS_CONST_REF(op1)) {
+	if (IR_REG_SPILLED(op1_reg)) {
 		op1_reg = IR_REG_NUM(op1_reg);
 		ir_emit_load(ctx, type, op1_reg, op1);
 	}
 	if (op2_reg != IR_REG_NONE) {
-		if (IR_REG_SPILLED(op2_reg) || IR_IS_CONST_REF(op2)) {
+		if (IR_REG_SPILLED(op2_reg)) {
 			op2_reg = IR_REG_NUM(op2_reg);
 			if (op1 != op2) {
 				ir_emit_load(ctx, type, op2_reg, op2);
@@ -5333,11 +5322,11 @@ static void ir_emit_cmp_int_common2(ir_ctx *ctx, ir_ref root, ir_ref ref, ir_ins
 	ir_reg op1_reg = ctx->regs[ref][1];
 	ir_reg op2_reg = ctx->regs[ref][2];
 
-	if (op1_reg != IR_REG_NONE && (IR_IS_CONST_REF(op1) || IR_REG_SPILLED(op1_reg))) {
+	if (op1_reg != IR_REG_NONE && IR_REG_SPILLED(op1_reg)) {
 		op1_reg = IR_REG_NUM(op1_reg);
 		ir_emit_load(ctx, type, op1_reg, op1);
 	}
-	if (op2_reg != IR_REG_NONE && (IR_IS_CONST_REF(op2) || IR_REG_SPILLED(op2_reg))) {
+	if (op2_reg != IR_REG_NONE && IR_REG_SPILLED(op2_reg)) {
 		op2_reg = IR_REG_NUM(op2_reg);
 		if (op1 != op2) {
 			ir_emit_load(ctx, type, op2_reg, op2);
@@ -5443,11 +5432,11 @@ static void ir_emit_cmp_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg op2_reg = ctx->regs[def][2];
 
 	IR_ASSERT(def_reg != IR_REG_NONE);
-	if (op1_reg != IR_REG_NONE && (IR_IS_CONST_REF(op1) || IR_REG_SPILLED(op1_reg))) {
+	if (op1_reg != IR_REG_NONE && IR_REG_SPILLED(op1_reg)) {
 		op1_reg = IR_REG_NUM(op1_reg);
 		ir_emit_load(ctx, type, op1_reg, op1);
 	}
-	if (op2_reg != IR_REG_NONE && (IR_IS_CONST_REF(op2) || IR_REG_SPILLED(op2_reg))) {
+	if (op2_reg != IR_REG_NONE && IR_REG_SPILLED(op2_reg)) {
 		op2_reg = IR_REG_NUM(op2_reg);
 		if (op1 != op2) {
 			ir_emit_load(ctx, type, op2_reg, op2);
@@ -5499,7 +5488,7 @@ static void ir_emit_test_int_common(ir_ctx *ctx, ir_ref root, ir_ref ref, ir_op 
 			ir_emit_load(ctx, type, op1_reg, op1);
 		}
 		if (op2_reg != IR_REG_NONE) {
-			if (IR_REG_SPILLED(op2_reg) || IR_IS_CONST_REF(op2)) {
+			if (IR_REG_SPILLED(op2_reg)) {
 				op2_reg = IR_REG_NUM(op2_reg);
 				if (op1 != op2) {
 					ir_emit_load(ctx, type, op2_reg, op2);
@@ -5551,7 +5540,7 @@ static void ir_emit_test_int_common(ir_ctx *ctx, ir_ref root, ir_ref ref, ir_op 
 			mem = ir_ref_spill_slot(ctx, op1);
 		}
 		if (op2_reg != IR_REG_NONE) {
-			if (IR_REG_SPILLED(op2_reg) || IR_IS_CONST_REF(op2)) {
+			if (IR_REG_SPILLED(op2_reg)) {
 				op2_reg = IR_REG_NUM(op2_reg);
 				if (op1 != op2) {
 					ir_emit_load(ctx, type, op2_reg, op2);
@@ -5617,12 +5606,12 @@ static ir_op ir_emit_cmp_fp_common(ir_ctx *ctx, ir_ref root, ir_ref cmp_ref, ir_
 
 
 	IR_ASSERT(op1_reg != IR_REG_NONE);
-	if (IR_REG_SPILLED(op1_reg) || IR_IS_CONST_REF(op1)) {
+	if (IR_REG_SPILLED(op1_reg)) {
 		op1_reg = IR_REG_NUM(op1_reg);
 		ir_emit_load(ctx, type, op1_reg, op1);
 	}
 	if (op2_reg != IR_REG_NONE) {
-		if (IR_REG_SPILLED(op2_reg) || IR_IS_CONST_REF(op2)) {
+		if (IR_REG_SPILLED(op2_reg)) {
 			op2_reg = IR_REG_NUM(op2_reg);
 			if (op1 != op2) {
 				ir_emit_load(ctx, type, op2_reg, op2);
@@ -5860,11 +5849,11 @@ static void ir_emit_cmp_and_branch_int(ir_ctx *ctx, uint32_t b, ir_ref def, ir_i
 	ir_reg op1_reg = ctx->regs[insn->op2][1];
 	ir_reg op2_reg = ctx->regs[insn->op2][2];
 
-	if (op1_reg != IR_REG_NONE && (IR_IS_CONST_REF(op1) || IR_REG_SPILLED(op1_reg))) {
+	if (op1_reg != IR_REG_NONE && IR_REG_SPILLED(op1_reg)) {
 		op1_reg = IR_REG_NUM(op1_reg);
 		ir_emit_load(ctx, type, op1_reg, op1);
 	}
-	if (op2_reg != IR_REG_NONE && (IR_IS_CONST_REF(op2) || IR_REG_SPILLED(op2_reg))) {
+	if (op2_reg != IR_REG_NONE && IR_REG_SPILLED(op2_reg)) {
 		op2_reg = IR_REG_NUM(op2_reg);
 		if (op1 != op2) {
 			ir_emit_load(ctx, type, op2_reg, op2);
@@ -5981,7 +5970,7 @@ static void ir_emit_cond(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	IR_ASSERT(def_reg != IR_REG_NONE);
 
-	if (op2_reg != IR_REG_NONE && (IR_REG_SPILLED(op2_reg) || IR_IS_CONST_REF(op2))) {
+	if (op2_reg != IR_REG_NONE && IR_REG_SPILLED(op2_reg)) {
 		op2_reg = IR_REG_NUM(op2_reg);
 		ir_emit_load(ctx, type, op2_reg, op2);
 		if (op1 == op2) {
@@ -5991,14 +5980,14 @@ static void ir_emit_cond(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			op3_reg = op2_reg;
 		}
 	}
-	if (op3_reg != IR_REG_NONE && op3 != op2 && (IR_REG_SPILLED(op3_reg) || IR_IS_CONST_REF(op3))) {
+	if (op3_reg != IR_REG_NONE && op3 != op2 && IR_REG_SPILLED(op3_reg)) {
 		op3_reg = IR_REG_NUM(op3_reg);
 		ir_emit_load(ctx, type, op3_reg, op3);
 		if (op1 == op2) {
 			op1_reg = op3_reg;
 		}
 	}
-	if (op1_reg != IR_REG_NONE && op1 != op2 && op1 != op3 && (IR_REG_SPILLED(op1_reg) || IR_IS_CONST_REF(op1))) {
+	if (op1_reg != IR_REG_NONE && op1 != op2 && op1 != op3 && IR_REG_SPILLED(op1_reg)) {
 		op1_reg = IR_REG_NUM(op1_reg);
 		ir_emit_load(ctx, op1_type, op1_reg, op1);
 	}
@@ -6117,14 +6106,14 @@ static void ir_emit_cond_cmp_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg op3_reg = ctx->regs[def][3];
 	ir_op op;
 
-	if (op2_reg != IR_REG_NONE && (IR_REG_SPILLED(op2_reg) || IR_IS_CONST_REF(op2))) {
+	if (op2_reg != IR_REG_NONE && IR_REG_SPILLED(op2_reg)) {
 		op2_reg = IR_REG_NUM(op2_reg);
 		ir_emit_load(ctx, type, op2_reg, op2);
 		if (op3 == op2) {
 			op3_reg = op2_reg;
 		}
 	}
-	if (op3_reg != IR_REG_NONE && op3 != op2 && (IR_REG_SPILLED(op3_reg) || IR_IS_CONST_REF(op3))) {
+	if (op3_reg != IR_REG_NONE && op3 != op2 && IR_REG_SPILLED(op3_reg)) {
 		op3_reg = IR_REG_NUM(op3_reg);
 		ir_emit_load(ctx, type, op3_reg, op3);
 	}
@@ -6289,14 +6278,14 @@ static void ir_emit_cond_cmp_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg op3_reg = ctx->regs[def][3];
 	ir_op op;
 
-	if (op2_reg != IR_REG_NONE && (IR_REG_SPILLED(op2_reg) || IR_IS_CONST_REF(op2))) {
+	if (op2_reg != IR_REG_NONE && IR_REG_SPILLED(op2_reg)) {
 		op2_reg = IR_REG_NUM(op2_reg);
 		ir_emit_load(ctx, type, op2_reg, op2);
 		if (op3 == op2) {
 			op3_reg = op2_reg;
 		}
 	}
-	if (op3_reg != IR_REG_NONE && op3 != op2 && (IR_REG_SPILLED(op3_reg) || IR_IS_CONST_REF(op3))) {
+	if (op3_reg != IR_REG_NONE && op3 != op2 && IR_REG_SPILLED(op3_reg)) {
 		op3_reg = IR_REG_NUM(op3_reg);
 		ir_emit_load(ctx, type, op3_reg, op3);
 	}
@@ -6844,7 +6833,7 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (op1_reg != IR_REG_NONE) {
 		bool src64 = 0;
 
-		if (IR_REG_SPILLED(op1_reg) || IR_IS_CONST_REF(insn->op1)) {
+		if (IR_REG_SPILLED(op1_reg)) {
 			op1_reg = IR_REG_NUM(op1_reg);
 			ir_emit_load(ctx, src_type, op1_reg, insn->op1);
 		}
@@ -7375,7 +7364,7 @@ static void ir_emit_load_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 	IR_ASSERT(def_reg != IR_REG_NONE);
 	if (op2_reg != IR_REG_NONE) {
-		if (IR_REG_SPILLED(op2_reg) || IR_IS_CONST_REF(insn->op2)) {
+		if (IR_REG_SPILLED(op2_reg)) {
 			op2_reg = IR_REG_NUM(op2_reg);
 			IR_ASSERT(ctx->ir_base[insn->op2].type == IR_ADDR);
 			ir_emit_load(ctx, IR_ADDR, op2_reg, insn->op2);
@@ -7414,7 +7403,7 @@ static void ir_emit_load_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 	IR_ASSERT(def_reg != IR_REG_NONE);
 	if (op2_reg != IR_REG_NONE) {
-		if (IR_REG_SPILLED(op2_reg) || IR_IS_CONST_REF(insn->op2)) {
+		if (IR_REG_SPILLED(op2_reg)) {
 			op2_reg = IR_REG_NUM(op2_reg);
 			IR_ASSERT(ctx->ir_base[insn->op2].type == IR_ADDR);
 			ir_emit_load(ctx, IR_ADDR, op2_reg, insn->op2);
@@ -7449,7 +7438,7 @@ static void ir_emit_store_int(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 	ir_mem mem;
 
 	if (op2_reg != IR_REG_NONE) {
-		if (IR_REG_SPILLED(op2_reg) || IR_IS_CONST_REF(insn->op2)) {
+		if (IR_REG_SPILLED(op2_reg)) {
 			op2_reg = IR_REG_NUM(op2_reg);
 			IR_ASSERT(ctx->ir_base[insn->op2].type == IR_ADDR);
 			ir_emit_load(ctx, IR_ADDR, op2_reg, insn->op2);
@@ -7495,7 +7484,7 @@ static void ir_emit_cmp_and_store_int(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 	ir_reg op2_reg = ctx->regs[insn->op3][2];
 
 	if (addr_reg != IR_REG_NONE) {
-		if (IR_REG_SPILLED(addr_reg) || IR_IS_CONST_REF(insn->op2)) {
+		if (IR_REG_SPILLED(addr_reg)) {
 			addr_reg = IR_REG_NUM(addr_reg);
 			IR_ASSERT(ctx->ir_base[insn->op2].type == IR_ADDR);
 			ir_emit_load(ctx, IR_ADDR, addr_reg, insn->op2);
@@ -7508,11 +7497,11 @@ static void ir_emit_cmp_and_store_int(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 		mem = ir_fuse_addr(ctx, ref, insn->op2);
 	}
 
-	if (op1_reg != IR_REG_NONE && (IR_IS_CONST_REF(op1) || IR_REG_SPILLED(op1_reg))) {
+	if (op1_reg != IR_REG_NONE && IR_REG_SPILLED(op1_reg)) {
 		op1_reg = IR_REG_NUM(op1_reg);
 		ir_emit_load(ctx, type, op1_reg, op1);
 	}
-	if (op2_reg != IR_REG_NONE && (IR_IS_CONST_REF(op2) || IR_REG_SPILLED(op2_reg))) {
+	if (op2_reg != IR_REG_NONE && IR_REG_SPILLED(op2_reg)) {
 		op2_reg = IR_REG_NUM(op2_reg);
 		if (op1 != op2) {
 			ir_emit_load(ctx, type, op2_reg, op2);
@@ -7532,7 +7521,7 @@ static void ir_emit_store_fp(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 
 	IR_ASSERT(op3_reg != IR_REG_NONE);
 	if (op2_reg != IR_REG_NONE) {
-		if (IR_REG_SPILLED(op2_reg) || IR_IS_CONST_REF(insn->op2)) {
+		if (IR_REG_SPILLED(op2_reg)) {
 			op2_reg = IR_REG_NUM(op2_reg);
 			IR_ASSERT(ctx->ir_base[insn->op2].type == IR_ADDR);
 			ir_emit_load(ctx, IR_ADDR, op2_reg, insn->op2);
@@ -8053,8 +8042,6 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 	IR_ASSERT(op2_reg != IR_REG_NONE);
 	if (IR_REG_SPILLED(op2_reg)) {
 		op2_reg = IR_REG_NUM(op2_reg);
-		ir_emit_load(ctx, type, op2_reg, insn->op2);
-	} else if (IR_IS_CONST_REF(insn->op2)) {
 		ir_emit_load(ctx, type, op2_reg, insn->op2);
 	}
 
@@ -9100,11 +9087,11 @@ static bool ir_emit_guard_cmp_int(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *
 	ir_reg op2_reg = ctx->regs[insn->op2][2];
 	void *addr;
 
-	if (op1_reg != IR_REG_NONE && (IR_IS_CONST_REF(op1) || IR_REG_SPILLED(op1_reg))) {
+	if (op1_reg != IR_REG_NONE && IR_REG_SPILLED(op1_reg)) {
 		op1_reg = IR_REG_NUM(op1_reg);
 		ir_emit_load(ctx, type, op1_reg, op1);
 	}
-	if (op2_reg != IR_REG_NONE && (IR_IS_CONST_REF(op2) || IR_REG_SPILLED(op2_reg))) {
+	if (op2_reg != IR_REG_NONE && IR_REG_SPILLED(op2_reg)) {
 		op2_reg = IR_REG_NUM(op2_reg);
 		if (op1 != op2) {
 			ir_emit_load(ctx, type, op2_reg, op2);
@@ -9846,7 +9833,13 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 							n--;
 							if (constraints.tmp_regs[n].type) {
 								ir_reg reg = ir_get_free_reg(constraints.tmp_regs[n].type, available);
+								ir_ref *ops = insn->ops;
 								IR_REGSET_EXCL(available, reg);
+								if (constraints.tmp_regs[n].num > 0
+								 && IR_IS_CONST_REF(ops[constraints.tmp_regs[n].num])) {
+									/* rematerialization */
+									reg |= IR_REG_SPILL_LOAD;
+								}
 								ctx->regs[i][constraints.tmp_regs[n].num] = reg;
 							} else if (constraints.tmp_regs[n].reg == IR_REG_SCRATCH) {
 								available = IR_REGSET_DIFFERENCE(available, IR_REGSET_SCRATCH);

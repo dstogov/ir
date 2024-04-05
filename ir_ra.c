@@ -3994,7 +3994,19 @@ static void assign_regs(ir_ctx *ctx)
 		do {
 			IR_ASSERT(ival->reg != IR_REG_NONE);
 			IR_REGSET_INCL(used_regs, ival->reg);
-			ir_set_alocated_reg(ctx, ival->tmp_ref, ival->tmp_op_num, ival->reg);
+			reg = ival->reg;
+			if (ival->tmp_op_num > 0) {
+				ir_insn *insn = &ctx->ir_base[ival->tmp_ref];
+
+				if (ival->tmp_op_num <= insn->inputs_count) {
+					ir_ref *ops = insn->ops;
+					if (IR_IS_CONST_REF(ops[ival->tmp_op_num])) {
+						/* constant rematerialization */
+						reg |= IR_REG_SPILL_LOAD;
+					}
+				}
+			}
+			ir_set_alocated_reg(ctx, ival->tmp_ref, ival->tmp_op_num, reg);
 			ival = ival->next;
 		} while (ival);
 	}
