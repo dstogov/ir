@@ -4618,7 +4618,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 			fp_param++;
 		}
 		if (dst_reg != IR_REG_NONE) {
-			if (IR_IS_CONST_REF(arg) || src_reg == IR_REG_NONE) {
+			if (src_reg == IR_REG_NONE) {
 				/* delay CONST->REG and MEM->REG moves to third pass */
 				do_pass3 = 1;
 			} else {
@@ -4684,7 +4684,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 				fp_param++;
 			}
 			if (dst_reg != IR_REG_NONE) {
-				if (IR_IS_CONST_REF(arg) || src_reg == IR_REG_NONE) {
+				if (src_reg == IR_REG_NONE) {
 					if (IR_IS_CONST_REF(arg) && IR_IS_TYPE_INT(type)) {
 						if (ir_type_size[type] == 1) {
 							type = IR_ADDR;
@@ -4694,7 +4694,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 				}
 			} else {
 				if (IR_IS_TYPE_INT(type)) {
-					if (IR_IS_CONST_REF(arg) || src_reg == IR_REG_NONE) {
+					if (src_reg == IR_REG_NONE) {
 						IR_ASSERT(tmp_reg != IR_REG_NONE);
 						ir_emit_load(ctx, type, tmp_reg, arg);
 						if (IR_IS_CONST_REF(arg)) {
@@ -4707,10 +4707,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 						ir_emit_store_mem_int(ctx, type, IR_MEM_BO(IR_REG_STACK_POINTER, stack_offset), src_reg);
 					}
 				} else {
-					if (IR_IS_CONST_REF(arg)) {
-						ir_emit_load(ctx, type, tmp_fp_reg, arg);
-						ir_emit_store_mem_fp(ctx, IR_DOUBLE, IR_MEM_BO(IR_REG_STACK_POINTER, stack_offset), tmp_fp_reg);
-					} else if (src_reg == IR_REG_NONE) {
+					if (src_reg == IR_REG_NONE) {
 						IR_ASSERT(tmp_fp_reg != IR_REG_NONE);
 						ir_emit_load(ctx, type, tmp_fp_reg, arg);
 						ir_emit_store_mem_fp(ctx, IR_DOUBLE, IR_MEM_BO(IR_REG_STACK_POINTER, stack_offset), tmp_fp_reg);
