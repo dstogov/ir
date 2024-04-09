@@ -40,23 +40,18 @@ Windows-x86_64
 }
 --EXPECT--
 main:
-	pushq %rbp
-	movq %rsp, %rbp
-	subq $0x10, %rsp
-	movq %rsp, %rcx
-	movb $0x68, (%rcx)
-	movb $0x69, 1(%rcx)
-	movb $0x20, 2(%rcx)
-	movb $0x25, 3(%rcx)
-	movb $0x64, 4(%rcx)
-	movb $0xa, 5(%rcx)
-	movb $0, 6(%rcx)
-	subq $0x20, %rsp
+	subq $0x28, %rsp
+	movb $0x68, 0x20(%rsp)
+	movb $0x69, 0x21(%rsp)
+	movb $0x20, 0x22(%rsp)
+	movb $0x25, 0x23(%rsp)
+	movb $0x64, 0x24(%rsp)
+	movb $0xa, 0x25(%rsp)
+	movb $0, 0x26(%rsp)
+	leaq 0x20(%rsp), %rcx
 	movl $0x2a, %edx
 	callq printf
-	addq $0x20, %rsp
-	movq %rbp, %rsp
-	popq %rbp
+	addq $0x28, %rsp
 	retq
 
 hi 42
