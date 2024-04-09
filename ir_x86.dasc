@@ -6096,6 +6096,7 @@ static void ir_emit_if_int(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn, u
 		if (true_block != next_block) {
 			|	jmp =>true_block
 		}
+		return;
 	} else {
 		ir_mem mem;
 
