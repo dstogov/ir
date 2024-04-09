@@ -80,57 +80,51 @@ x86
 }
 --EXPECT--
 test:
-	pushl %ebp
-	movl %esp, %ebp
-	subl $0x38, %esp
-	movsd 8(%ebp), %xmm0
-	movsd 0x10(%ebp), %xmm1
+	subl $0x3c, %esp
+	movsd 0x40(%esp), %xmm0
+	movsd 0x48(%esp), %xmm1
 	subsd .L3, %xmm1
-	movsd %xmm1, -0x38(%ebp)
-	movsd %xmm0, -0x30(%ebp)
+	movsd %xmm1, (%esp)
+	movsd %xmm0, 8(%esp)
 	xorpd %xmm0, %xmm0
-	movsd %xmm0, -0x28(%ebp)
+	movsd %xmm0, 0x10(%esp)
 	xorpd %xmm0, %xmm0
-	movsd %xmm0, -0x20(%ebp)
-	subl $8, %esp
-	movl %esp, %eax
-	movl $0, (%eax)
+	movsd %xmm0, 0x18(%esp)
+	movl $0, 0x20(%esp)
 .L1:
-	addl $1, (%eax)
-	movsd -0x20(%ebp), %xmm0
-	movsd -0x28(%ebp), %xmm1
+	addl $1, 0x20(%esp)
+	movsd 0x18(%esp), %xmm0
+	movsd 0x10(%esp), %xmm1
 	movapd %xmm1, %xmm2
 	mulsd %xmm0, %xmm2
-	movsd %xmm2, -0x18(%ebp)
+	movsd %xmm2, 0x24(%esp)
 	mulsd %xmm0, %xmm0
-	movsd %xmm0, -0x10(%ebp)
+	movsd %xmm0, 0x2c(%esp)
 	mulsd %xmm1, %xmm1
-	movsd %xmm1, -8(%ebp)
-	movsd -0x10(%ebp), %xmm0
-	subsd -8(%ebp), %xmm0
-	addsd -0x38(%ebp), %xmm0
-	movsd %xmm0, -0x20(%ebp)
-	movsd -0x18(%ebp), %xmm0
+	movsd %xmm1, 0x34(%esp)
+	movsd 0x2c(%esp), %xmm0
+	subsd 0x34(%esp), %xmm0
+	addsd (%esp), %xmm0
+	movsd %xmm0, 0x18(%esp)
+	movsd 0x24(%esp), %xmm0
 	addsd %xmm0, %xmm0
-	addsd -0x30(%ebp), %xmm0
-	movsd %xmm0, -0x28(%ebp)
-	movsd -0x10(%ebp), %xmm0
-	addsd -8(%ebp), %xmm0
+	addsd 8(%esp), %xmm0
+	movsd %xmm0, 0x10(%esp)
+	movsd 0x2c(%esp), %xmm0
+	addsd 0x34(%esp), %xmm0
 	ucomisd .L4, %xmm0
 	ja .L2
-	cmpl $0x3e8, (%eax)
+	cmpl $0x3e8, 0x20(%esp)
 	jle .L1
 	xorl %eax, %eax
-	movl %ebp, %esp
-	popl %ebp
+	addl $0x3c, %esp
 	retl
 .L2:
-	movl (%eax), %eax
-	movl %ebp, %esp
-	popl %ebp
+	movl 0x20(%esp), %eax
+	addl $0x3c, %esp
 	retl
 .rodata
-	.db 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
+	.db 0x90, 0x90, 0x90, 0x90
 .L3:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f
 .L4:
