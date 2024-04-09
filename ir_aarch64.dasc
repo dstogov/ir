@@ -3777,7 +3777,7 @@ static ir_mem ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 		IR_ASSERT(!IR_IS_SYM_CONST(ctx->ir_base[addr_insn->op2].op));
 		if (ir_rule(ctx, addr_insn->op1) == IR_STATIC_ALLOCA) {
 			reg = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
-			offset = IR_SPILL_POS_TO_OFFSET(ctx->ir_base[ref].op3);
+			offset = IR_SPILL_POS_TO_OFFSET(ctx->ir_base[addr_insn->op1].op3);
 			offset += ctx->ir_base[addr_insn->op2].val.i32;
 			return IR_MEM_BO(reg, offset);
 		} else {
