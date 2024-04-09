@@ -13,10 +13,7 @@ x86_64
 }
 --EXPECT--
 test:
-	pushq %rbp
-	movq %rsp, %rbp
 	subq $0x10, %rsp
 	movq %rsp, %rax
-	movq %rbp, %rsp
-	popq %rbp
+	addq $0x10, %rsp
 	retq

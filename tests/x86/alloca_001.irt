@@ -13,10 +13,7 @@ x86
 }
 --EXPECT--
 test:
-	pushl %ebp
-	movl %esp, %ebp
 	subl $0x10, %esp
 	movl %esp, %eax
-	movl %ebp, %esp
-	popl %ebp
+	addl $0x10, %esp
 	retl

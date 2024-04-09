@@ -40,25 +40,19 @@ x86
 }
 --EXPECT--
 main:
-	pushl %ebp
-	movl %esp, %ebp
-	subl $8, %esp
-	subl $0x10, %esp
-	movl %esp, %eax
-	movb $0x68, (%eax)
-	movb $0x69, 1(%eax)
-	movb $0x20, 2(%eax)
-	movb $0x25, 3(%eax)
-	movb $0x64, 4(%eax)
-	movb $0xa, 5(%eax)
-	movb $0, 6(%eax)
-	subl $0x10, %esp
+	subl $0x1c, %esp
+	movb $0x68, 8(%esp)
+	movb $0x69, 9(%esp)
+	movb $0x20, 0xa(%esp)
+	movb $0x25, 0xb(%esp)
+	movb $0x64, 0xc(%esp)
+	movb $0xa, 0xd(%esp)
+	movb $0, 0xe(%esp)
+	leal 8(%esp), %eax
 	movl %eax, (%esp)
 	movl $0x2a, 4(%esp)
 	calll printf
-	addl $0x10, %esp
-	movl %ebp, %esp
-	popl %ebp
+	addl $0x1c, %esp
 	retl
 
 hi 42

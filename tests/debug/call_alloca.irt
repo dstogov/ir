@@ -40,22 +40,19 @@ x86_64
 }
 --EXPECT--
 main:
-	pushq %rbp
-	movq %rsp, %rbp
-	subq $0x10, %rsp
+	subq $8, %rsp
+	movb $0x68, (%rsp)
+	movb $0x69, 1(%rsp)
+	movb $0x20, 2(%rsp)
+	movb $0x25, 3(%rsp)
+	movb $0x64, 4(%rsp)
+	movb $0xa, 5(%rsp)
+	movb $0, 6(%rsp)
 	movq %rsp, %rdi
-	movb $0x68, (%rdi)
-	movb $0x69, 1(%rdi)
-	movb $0x20, 2(%rdi)
-	movb $0x25, 3(%rdi)
-	movb $0x64, 4(%rdi)
-	movb $0xa, 5(%rdi)
-	movb $0, 6(%rdi)
 	movl $0x2a, %esi
 	movl $0, %eax
 	callq printf
-	movq %rbp, %rsp
-	popq %rbp
+	addq $8, %rsp
 	retq
 
 hi 42
