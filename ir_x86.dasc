@@ -2241,7 +2241,7 @@ binop_fp:
 					}
 				}
 			}
-			ctx->flags2 |= IR_HAS_CALLS;
+			ctx->flags2 |= IR_HAS_CALLS | IR_16B_FRAME_ALIGNMENT;
 #ifndef IR_REG_FP_RET1
 			if (IR_IS_TYPE_FP(insn->type)) {
 				ctx->flags2 |= IR_HAS_FP_RET_SLOT;
@@ -7637,7 +7637,7 @@ static void ir_emit_alloca(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		IR_ASSERT(IR_IS_TYPE_UNSIGNED(val->type) || val->val.i64 >= 0);
 		IR_ASSERT(IR_IS_SIGNED_32BIT(val->val.i64));
 
-		if (ctx->flags2 & IR_HAS_CALLS) {
+		if (ctx->flags2 & IR_16B_FRAME_ALIGNMENT) {
 			/* Stack must be 16 byte aligned */
 			size = IR_ALIGNED_SIZE(size, 16);
 		} else {
@@ -7648,7 +7648,7 @@ static void ir_emit_alloca(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			ctx->call_stack_size += size;
 		}
 	} else {
-		int32_t alignment = (ctx->flags2 & IR_HAS_CALLS) ? 16 : 8;
+		int32_t alignment = (ctx->flags2 & IR_16B_FRAME_ALIGNMENT) ? 16 : 8;
 		ir_reg op2_reg = ctx->regs[def][2];
 		ir_type type = ctx->ir_base[insn->op2].type;
 
@@ -7695,7 +7695,7 @@ static void ir_emit_afree(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		IR_ASSERT(IR_IS_TYPE_UNSIGNED(val->type) || val->val.i64 > 0);
 		IR_ASSERT(IR_IS_SIGNED_32BIT(val->val.i64));
 
-		if (ctx->flags2 & IR_HAS_CALLS) {
+		if (ctx->flags2 & IR_16B_FRAME_ALIGNMENT) {
 			/* Stack must be 16 byte aligned */
 			size = IR_ALIGNED_SIZE(size, 16);
 		} else {
@@ -7706,7 +7706,7 @@ static void ir_emit_afree(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			ctx->call_stack_size -= size;
 		}
 	} else {
-//		int32_t alignment = (ctx->flags2 & IR_HAS_CALLS) ? 16 : 8;
+//		int32_t alignment = (ctx->flags2 & IR_16B_FRAME_ALIGNMENT) ? 16 : 8;
 		ir_reg op2_reg = ctx->regs[def][2];
 		ir_type type = ctx->ir_base[insn->op2].type;
 
@@ -9923,6 +9923,20 @@ void ir_fix_stack_frame(ir_ctx *ctx)
 
 	ctx->locals_area_size = ctx->stack_frame_size;
 
+#if defined(IR_TARGET_X64) && !defined(_WIN64)
+	if ((ctx->flags & IR_VARARG_FUNC) && (ctx->flags2 & IR_HAS_VA_START)) {
+		ctx->flags2 |= IR_16B_FRAME_ALIGNMENT;
+		ctx->stack_frame_size = IR_ALIGNED_SIZE(ctx->stack_frame_size, 16);
+		ctx->locals_area_size = ctx->stack_frame_size;
+		if ((ctx->flags2 & (IR_HAS_VA_ARG_GP|IR_HAS_VA_COPY)) && ctx->gp_reg_params < IR_REG_INT_ARGS) {
+			additional_size += sizeof(void*) * IR_REG_INT_ARGS;
+		}
+		if ((ctx->flags2 & (IR_HAS_VA_ARG_FP|IR_HAS_VA_COPY)) && ctx->fp_reg_params < IR_REG_FP_ARGS) {
+			additional_size += 16 * IR_REG_FP_ARGS;
+		}
+	}
+#endif
+
 	if (ctx->used_preserved_regs) {
 		ir_regset used_preserved_regs = (ir_regset)ctx->used_preserved_regs;
 		ir_reg reg;
@@ -9933,23 +9947,12 @@ void ir_fix_stack_frame(ir_ctx *ctx)
 		} IR_REGSET_FOREACH_END();
 	}
 
-#if defined(IR_TARGET_X64) && !defined(_WIN64)
-	if ((ctx->flags & IR_VARARG_FUNC) && (ctx->flags2 & IR_HAS_VA_START)) {
-		if ((ctx->flags2 & (IR_HAS_VA_ARG_GP|IR_HAS_VA_COPY)) && ctx->gp_reg_params < IR_REG_INT_ARGS) {
-			additional_size += sizeof(void*) * IR_REG_INT_ARGS;
-		}
-		if ((ctx->flags2 & (IR_HAS_VA_ARG_FP|IR_HAS_VA_COPY)) && ctx->fp_reg_params < IR_REG_FP_ARGS) {
-			additional_size += 16 * IR_REG_FP_ARGS;
-		}
-	}
-#endif
-
 	ctx->stack_frame_size = IR_ALIGNED_SIZE(ctx->stack_frame_size, sizeof(void*));
 	ctx->stack_frame_size += additional_size;
 	ctx->stack_frame_alignment = 0;
 	ctx->call_stack_size = 0;
 
-	if (ctx->flags2 & IR_HAS_CALLS) {
+	if (ctx->flags2 & IR_16B_FRAME_ALIGNMENT) {
 		/* Stack must be 16 byte aligned */
 		if (!(ctx->flags & IR_FUNCTION)) {
 			while (IR_ALIGNED_SIZE(ctx->stack_frame_size, 16) != ctx->stack_frame_size) {
