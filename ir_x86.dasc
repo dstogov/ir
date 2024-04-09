@@ -2865,9 +2865,6 @@ static ir_mem ir_ref_spill_slot(ir_ctx *ctx, ir_ref ref)
 
 static bool ir_is_same_spill_slot(ir_ctx *ctx, ir_ref ref, ir_mem mem)
 {
-	if (!ctx->vregs[ref]) {
-		return 0;
-	}
 	ir_mem m = ir_ref_spill_slot(ctx, ref);
 	return IR_MEM_VAL(m) == IR_MEM_VAL(mem);
 }
@@ -7559,7 +7556,10 @@ static void ir_emit_store_int(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 	} else {
 		IR_ASSERT(ir_rule(ctx, insn->op2) & IR_FUSED);
 		mem = ir_fuse_addr(ctx, ref, insn->op2);
-		if (!IR_IS_CONST_REF(insn->op3) && IR_REG_SPILLED(op3_reg) && ir_is_same_spill_slot(ctx, insn->op3, mem)) {
+		if (!IR_IS_CONST_REF(insn->op3)
+		 && IR_REG_SPILLED(op3_reg)
+		 && ir_rule(ctx, insn->op3) != IR_STATIC_ALLOCA
+		 && ir_is_same_spill_slot(ctx, insn->op3, mem)) {
 			if (!ir_may_avoid_spill_load(ctx, insn->op3, ref)) {
 				op3_reg = IR_REG_NUM(op3_reg);
 				ir_emit_load(ctx, type, op3_reg, insn->op3);
@@ -7642,7 +7642,10 @@ static void ir_emit_store_fp(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 	} else {
 		IR_ASSERT(ir_rule(ctx, insn->op2) & IR_FUSED);
 		mem = ir_fuse_addr(ctx, ref, insn->op2);
-		if (!IR_IS_CONST_REF(insn->op3) && IR_REG_SPILLED(op3_reg) && ir_is_same_spill_slot(ctx, insn->op3, mem)) {
+		if (!IR_IS_CONST_REF(insn->op3)
+		 && IR_REG_SPILLED(op3_reg)
+		 && ir_rule(ctx, insn->op3) != IR_STATIC_ALLOCA
+		 && ir_is_same_spill_slot(ctx, insn->op3, mem)) {
 			if (!ir_may_avoid_spill_load(ctx, insn->op3, ref)) {
 				op3_reg = IR_REG_NUM(op3_reg);
 				ir_emit_load(ctx, type, op3_reg, insn->op3);
