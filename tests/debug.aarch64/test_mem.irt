@@ -80,61 +80,57 @@ aarch64
 }
 --EXPECT--
 test:
-	stp x29, x30, [sp, #-0x48]!
-	mov x29, sp
+	sub sp, sp, #0x40
 	ldr d2, .L3
 	fsub d1, d1, d2
-	str d1, [x29, #0x10]
-	str d0, [x29, #0x18]
+	str d1, [sp]
+	str d0, [sp, #8]
 	fmov d0, xzr
-	str d0, [x29, #0x20]
+	str d0, [sp, #0x10]
 	fmov d0, xzr
-	str d0, [x29, #0x28]
-	sub sp, sp, #8
-	mov x0, sp
-	str wzr, [x0]
+	str d0, [sp, #0x18]
+	str wzr, [sp, #0x20]
 .L1:
-	ldr w1, [x0]
-	add w1, w1, #1
-	str w1, [x0]
-	ldr d0, [x29, #0x28]
-	ldr d1, [x29, #0x20]
+	ldr w0, [sp, #0x20]
+	add w0, w0, #1
+	str w0, [sp, #0x20]
+	ldr d0, [sp, #0x18]
+	ldr d1, [sp, #0x10]
 	fmul d2, d1, d0
-	str d2, [x29, #0x30]
+	str d2, [sp, #0x28]
 	fmul d0, d0, d0
-	str d0, [x29, #0x38]
+	str d0, [sp, #0x30]
 	fmul d0, d1, d1
-	str d0, [x29, #0x40]
-	ldr d0, [x29, #0x38]
-	ldr d1, [x29, #0x40]
+	str d0, [sp, #0x38]
+	ldr d0, [sp, #0x30]
+	ldr d1, [sp, #0x38]
 	fsub d0, d0, d1
-	ldr d1, [x29, #0x10]
+	ldr d1, [sp]
 	fadd d0, d1, d0
-	str d0, [x29, #0x28]
-	ldr d0, [x29, #0x30]
+	str d0, [sp, #0x18]
+	ldr d0, [sp, #0x28]
 	fadd d0, d0, d0
-	ldr d1, [x29, #0x18]
+	ldr d1, [sp, #8]
 	fadd d0, d1, d0
-	str d0, [x29, #0x20]
-	ldr d0, [x29, #0x40]
-	ldr d1, [x29, #0x38]
+	str d0, [sp, #0x10]
+	ldr d0, [sp, #0x38]
+	ldr d1, [sp, #0x30]
 	fadd d0, d1, d0
 	ldr d1, .L4
 	fcmp d0, d1
 	b.gt .L2
-	ldr w1, [x0]
-	cmp w1, #0x3e8
+	ldr w0, [sp, #0x20]
+	cmp w0, #0x3e8
 	b.le .L1
 	mov w0, wzr
-	mov sp, x29
-	ldp x29, x30, [sp], #0x48
+	add sp, sp, #0x40
 	ret
 .L2:
-	ldr w0, [x0]
-	mov sp, x29
-	ldp x29, x30, [sp], #0x48
+	ldr w0, [sp, #0x20]
+	add sp, sp, #0x40
 	ret
 .rodata
+	.db 0x1f, 0x20, 0x03, 0xd5
 .L3:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f
 .L4:
