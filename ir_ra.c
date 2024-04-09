@@ -1914,11 +1914,11 @@ int ir_coalesce(ir_ctx *ctx)
 			insn = &ctx->ir_base[use];
 			if (insn->op == IR_PHI) {
 				input = ir_insn_op(insn, k);
-				if (input > 0) {
+				if (input > 0 && ctx->vregs[input]) {
 					uint32_t v1 = ctx->vregs[input];
 					uint32_t v2 = ctx->vregs[use];
 
-					if (v1 == v2 || !v1) {
+					if (v1 == v2) {
 						/* already coalesced */
 					} else {
 						if (!ir_vregs_overlap(ctx, v1, v2)) {
