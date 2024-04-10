@@ -13,7 +13,7 @@ Windows-x86_64
 }
 --EXPECT--
 test:
-	subq $0x10, %rsp
+	subq $0x18, %rsp
 	movq %rsp, %rax
-	addq $0x10, %rsp
+	addq $0x18, %rsp
 	retq
