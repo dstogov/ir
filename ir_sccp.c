@@ -1325,6 +1325,8 @@ int ir_sccp(ir_ctx *ctx)
 							ir_sccp_replace_insn2(ctx, i, ref, &worklist2);
 						}
 						break;
+					case IR_PHI:
+						break;
 					default:
 						ir_sccp_fold2(ctx, i, &worklist2);
 						break;
