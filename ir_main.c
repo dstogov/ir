@@ -645,8 +645,16 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 
 		if (flags & IR_CONST) {
 			data = l->code_buffer.pos;
-			// TODO: alignment ???
-			//data = (void*)IR_ALIGNED_SIZE(((size_t)(data)), 16);
+			/* Data Alignment */
+			if (size > 8) {
+				data = (void*)IR_ALIGNED_SIZE(((size_t)(data)), 16);
+			} else if (size == 8) {
+				data = (void*)IR_ALIGNED_SIZE(((size_t)(data)), 8);
+			} else if (size >= 4) {
+				data = (void*)IR_ALIGNED_SIZE(((size_t)(data)), 4);
+			} else if (size >= 2) {
+				data = (void*)IR_ALIGNED_SIZE(((size_t)(data)), 2);
+			}
 			if (size > (size_t)((char*)l->code_buffer.end - (char*)data)) {
 				return 0;
 			}
