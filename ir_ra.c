@@ -2609,14 +2609,11 @@ static int32_t ir_allocate_big_spill_slot(ir_ctx *ctx, int32_t size, ir_reg_allo
 		return ir_allocate_small_spill_slot(ctx, size, data);
 	}
 
-	if (ctx->flags2 & IR_16B_FRAME_ALIGNMENT) {
-		/* Stack must be 16 byte aligned */
-		size = IR_ALIGNED_SIZE(size, 16);
-	} else {
-		size = IR_ALIGNED_SIZE(size, 8);
-	}
-	ret = ctx->stack_frame_size;
-	ctx->stack_frame_size += size;
+	/* Align stack allocated data to 16 byte */
+	ctx->flags2 |= IR_16B_FRAME_ALIGNMENT;
+	ret = IR_ALIGNED_SIZE(ctx->stack_frame_size, 16);
+	size = IR_ALIGNED_SIZE(size, 8);
+	ctx->stack_frame_size = ret + size;
 
 	return ret;
 }

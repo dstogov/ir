@@ -15,8 +15,8 @@ aarch64
 test:
 	stp x29, x30, [sp, #-0x10]!
 	mov x29, sp
-	add x0, x0, #7
-	and x0, x0, #0xfffffffffffffff8
+	add x0, x0, #0xf
+	and x0, x0, #0xfffffffffffffff0
 	sub sp, sp, x0
 	mov x0, sp
 	mov sp, x29

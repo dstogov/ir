@@ -15,9 +15,10 @@ x86
 test:
 	pushl %ebp
 	movl %esp, %ebp
+	subl $8, %esp
 	movl 8(%ebp), %eax
-	addl $7, %eax
-	andl $0xfffffff8, %eax
+	addl $0xf, %eax
+	andl $0xfffffff0, %eax
 	subl %eax, %esp
 	movl %esp, %eax
 	movl %ebp, %esp
