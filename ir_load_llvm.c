@@ -2492,8 +2492,8 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 				}
 				if (LLVMIsGlobalConstant(sym)) {
 					flags |= IR_CONST;
-                }
-				if (init) {
+				}
+				if (init && LLVMGetValueKind(init) != LLVMConstantAggregateZeroValueKind) {
 					has_data = 1;
 				}
 				if (!loader->sym_dcl(loader, name, flags, size, has_data)) {
