@@ -75,7 +75,7 @@ const char *ir_op_name[IR_LAST_OP] = {
 #endif
 };
 
-static void ir_print_escaped_str(const char *s, size_t len, FILE *f)
+void ir_print_escaped_str(const char *s, size_t len, FILE *f)
 {
 	char ch;
 
@@ -95,10 +95,10 @@ static void ir_print_escaped_str(const char *s, size_t len, FILE *f)
 			case '\v': fputs("\\v", f); break;
 			case '\?': fputs("\\?", f); break;
 			default:
-				if (ch < 32) {
+				if (ch >= 0 && ch < 32) {
 					fprintf(f, "\\%c%c%c",
-						'0' + ((ch >> 3) % 8),
 						'0' + ((ch >> 6) % 8),
+						'0' + ((ch >> 3) % 8),
 						'0' + (ch % 8));
 					break;
 				} else {

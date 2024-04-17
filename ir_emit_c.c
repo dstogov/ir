@@ -1126,7 +1126,7 @@ void ir_emit_c_func_decl(const char *name, uint32_t flags, ir_type ret_type, uin
 	fprintf(f, ");\n");
 }
 
-void ir_emit_c_sym_decl(const char *name, uint32_t flags, bool has_data, FILE *f)
+void ir_emit_c_sym_decl(const char *name, uint32_t flags, FILE *f)
 {
 	if (flags & IR_EXTERN) {
 		fprintf(f, "extern ");
@@ -1138,7 +1138,7 @@ void ir_emit_c_sym_decl(const char *name, uint32_t flags, bool has_data, FILE *f
 	}
 	// TODO: type
 	fprintf(f, "uintptr_t %s", name);
-	if (has_data) {
+	if (flags & IR_INITIALIZED) {
 		fprintf(f, " =\n");
 	} else {
 		fprintf(f, ";\n");

@@ -524,10 +524,10 @@ static bool ir_loader_external_sym_dcl(ir_loader *loader, const char *name, uint
 		fprintf(l->dump_file, "extern %s %s;\n", (flags & IR_CONST) ? "const" : "var", name);
 	}
 	if (l->c_file) {
-		ir_emit_c_sym_decl(name, flags | IR_EXTERN, 0, l->c_file);
+		ir_emit_c_sym_decl(name, flags | IR_EXTERN, l->c_file);
 	}
 	if (l->llvm_file) {
-		ir_emit_llvm_sym_decl(name, flags | IR_EXTERN, 0, l->llvm_file);
+		ir_emit_llvm_sym_decl(name, flags | IR_EXTERN, l->llvm_file);
 	}
 	if (l->dump_asm || l->dump_size || l->run) {
 		void *addr = ir_loader_resolve_sym_name(loader, name, 0);
@@ -631,7 +631,7 @@ static bool ir_loader_forward_func_dcl(ir_loader *loader, const char *name, uint
 	return 1;
 }
 
-static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flags, size_t size, bool has_data)
+static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flags, size_t size)
 {
 	ir_main_loader *l = (ir_main_loader*) loader;
 
@@ -642,13 +642,15 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 		if (flags & IR_STATIC) {
 			fprintf(l->dump_file, "static ");
 		}
-		fprintf(l->dump_file, "%s %s [%" PRIuPTR "]%s\n", (flags & IR_CONST) ? "const" : "var", name, size, has_data ? " = {" : ";");
+		fprintf(l->dump_file, "%s %s [%" PRIuPTR "]%s",
+			(flags & IR_CONST) ? "const" : "var", name, size,
+			(flags & IR_INITIALIZED) ? ((flags & IR_CONST_STRING) ? " = " : " = {\n") : ";\n");
 	}
 	if (l->c_file) {
-		ir_emit_c_sym_decl(name, flags, has_data, l->c_file);
+		ir_emit_c_sym_decl(name, flags, l->c_file);
 	}
 	if (l->llvm_file) {
-		ir_emit_llvm_sym_decl(name, flags, has_data, l->llvm_file);
+		ir_emit_llvm_sym_decl(name, flags, l->llvm_file);
 	}
 	if (l->dump_asm || l->dump_size || l->run) {
 		void *data;
@@ -679,7 +681,7 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 			return 0;
 		}
 		memset(data, 0, size);
-		if (has_data) {
+		if (flags & IR_INITIALIZED) {
 			l->data_start = data;
 		}
 		if (l->dump_asm) {
@@ -753,6 +755,29 @@ static bool ir_loader_sym_data(ir_loader *loader, ir_type type, uint32_t count, 
 	return 1;
 }
 
+static bool ir_loader_sym_data_str(ir_loader *loader, const char *str, size_t len)
+{
+	ir_main_loader *l = (ir_main_loader*) loader;
+
+	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
+		fprintf(l->dump_file, "\"");
+		ir_print_escaped_str(str, len, l->dump_file);
+		fprintf(l->dump_file, "\"");
+	}
+	if (l->c_file) {
+		// TODO:
+	}
+	if (l->llvm_file) {
+		// TODO:
+	}
+	if (l->dump_asm || l->dump_size || l->run) {
+		IR_ASSERT(l->data_start);
+		memcpy((char*)l->data_start + l->data_pos, str, len);
+	}
+	l->data_pos += len;
+	return 1;
+}
+
 static bool ir_loader_sym_data_pad(ir_loader *loader, size_t offset)
 {
 	ir_main_loader *l = (ir_main_loader*) loader;
@@ -814,12 +839,16 @@ static bool ir_loader_sym_data_ref(ir_loader *loader, ir_op op, const char *ref,
 	return 1;
 }
 
-static bool ir_loader_sym_data_end(ir_loader *loader)
+static bool ir_loader_sym_data_end(ir_loader *loader, uint32_t flags)
 {
 	ir_main_loader *l = (ir_main_loader*) loader;
 
 	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
-		fprintf(l->dump_file, "};\n");
+		if (flags & IR_CONST_STRING) {
+			fprintf(l->dump_file, ";\n");
+		} else {
+			fprintf(l->dump_file, "};\n");
+		}
 	}
 	if (l->c_file) {
 		// TODO:
@@ -1258,6 +1287,7 @@ int main(int argc, char **argv)
 	loader.loader.forward_func_dcl   = ir_loader_forward_func_dcl;
 	loader.loader.sym_dcl            = ir_loader_sym_dcl;
 	loader.loader.sym_data           = ir_loader_sym_data;
+	loader.loader.sym_data_str       = ir_loader_sym_data_str;
 	loader.loader.sym_data_pad       = ir_loader_sym_data_pad;
 	loader.loader.sym_data_ref       = ir_loader_sym_data_ref;
 	loader.loader.sym_data_end       = ir_loader_sym_data_end;

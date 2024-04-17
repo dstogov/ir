@@ -123,10 +123,10 @@ static void yy_error(const char *msg);
 static void yy_error_sym(const char *msg, int sym);
 static void yy_error_str(const char *msg, const char *str);
 
-static ir_ref ir_make_const_str(ir_ctx *ctx, const char *str, size_t len)
+static size_t yy_unescape_str(char*buf, const char *str, size_t len)
 {
-	char *buf = alloca(len + 1);
 	char *p = buf;
+	char ch;
 
 	while (len > 0) {
 		if (*str != '\\') {
@@ -140,6 +140,7 @@ static ir_ref ir_make_const_str(ir_ctx *ctx, const char *str, size_t len)
 				case '\'': *p = '\''; break;
 				case '"':  *p = '"';  break;
 				case 'a':  *p = '\a'; break;
+				case 'b':  *p = '\b'; break;
 				case 'e':  *p = 27;   break; /* '\e'; */
 				case 'f':  *p = '\f'; break;
 				case 'n':  *p = '\n'; break;
@@ -147,6 +148,30 @@ static ir_ref ir_make_const_str(ir_ctx *ctx, const char *str, size_t len)
 				case 't':  *p = '\t'; break;
 				case 'v':  *p = '\v'; break;
 				case '?':  *p = 0x3f; break;
+				case '0':
+				case '1':
+				case '2':
+				case '3':
+				case '4':
+				case '5':
+				case '6':
+				case '7':
+					ch = *str - '0';
+					str++;
+					len--;
+					if (*str >= '0' && *str <= '7') {
+						ch = ch * 8 + (*str - '0');
+						str++;
+						len--;
+						if (*str >= '0' && *str <= '7') {
+							ch = ch * 8 + (*str - '0');
+							str++;
+							len--;
+						}
+				   }
+				   *p = ch;
+				   p++;
+				   continue;
 				default:
 					yy_error("unsupported escape sequence");
 			}
@@ -156,7 +181,23 @@ static ir_ref ir_make_const_str(ir_ctx *ctx, const char *str, size_t len)
 		len--;
 	}
 	*p = 0;
-	return ir_const_str(ctx, ir_strl(ctx, buf, p - buf));
+	return p - buf;
+}
+
+static ir_ref ir_make_const_str(ir_ctx *ctx, const char *str, size_t len)
+{
+	char *buf = alloca(len + 1);
+
+	len = yy_unescape_str(buf, str, len);
+	return ir_const_str(ctx, ir_strl(ctx, buf, len));
+}
+
+static bool ir_loader_sym_data_str(ir_loader *loader, const char *str, size_t len)
+{
+	char *buf = alloca(len + 1);
+
+	len = yy_unescape_str(buf, str, len);
+	return loader->sym_data_str(loader, buf, len);
 }
 
 %}
@@ -171,6 +212,8 @@ ir(ir_loader *loader):
 	{uint32_t params_count;}
 	{uint8_t param_types[256];}
 	{p.ctx = &ctx;}
+	{const char *str;}
+	{size_t len;}
 	(
 		(
 			"extern"
@@ -206,20 +249,37 @@ ir(ir_loader *loader):
 				ir_sym(name, &flags) ir_sym_size(&size)
 				(
 					{
-						if (loader->sym_dcl && !loader->sym_dcl(loader, name, flags, size, 0)) {
+						if (loader->sym_dcl && !loader->sym_dcl(loader, name, flags, size)) {
 							yy_error("sym_dcl error");
 						}
 					}
 					";"
 				|
 					{
-						if (loader->sym_dcl && !loader->sym_dcl(loader, name, flags, size, 1)) {
+						flags |= IR_INITIALIZED;
+						if (loader->sym_dcl && !loader->sym_dcl(loader, name, flags, size)) {
 							yy_error("sym_dcl error");
 						}
 					}
 					"=" "{" ir_sym_data(loader) ("," ir_sym_data(loader))* ","? "}" ";"
 					{
-						if (loader->sym_data_end && !loader->sym_data_end(loader)) {
+						if (loader->sym_data_end && !loader->sym_data_end(loader, flags)) {
+							yy_error("sym_data_end error");
+						}
+					}
+				|
+					{
+						flags |= IR_INITIALIZED | IR_CONST_STRING;
+						if (loader->sym_dcl && !loader->sym_dcl(loader, name, flags, size)) {
+							yy_error("sym_dcl error");
+						}
+					}
+					"=" STRING(&str, &len) ";"
+					{
+						if (loader->sym_data_str && !ir_loader_sym_data_str(loader, str, len)) {
+							yy_error("sym_data_str error");
+						}
+						if (loader->sym_data_end && !loader->sym_data_end(loader, flags)) {
 							yy_error("sym_data_end error");
 						}
 					}

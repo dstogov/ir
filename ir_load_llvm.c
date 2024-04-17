@@ -2477,7 +2477,6 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 			if (loader->sym_dcl) {
 				LLVMTypeRef type;
 				size_t size;
-				bool has_data = 0;
 				char buf[256];
 
 				type = LLVMGlobalGetValueType(sym);
@@ -2494,15 +2493,27 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 					flags |= IR_CONST;
 				}
 				if (init && LLVMGetValueKind(init) != LLVMConstantAggregateZeroValueKind) {
-					has_data = 1;
+					flags |= IR_INITIALIZED;
+					if (LLVMIsConstantString(init)) {
+						flags |= IR_CONST_STRING;
+					}
 				}
-				if (!loader->sym_dcl(loader, name, flags, size, has_data)) {
+				if (!loader->sym_dcl(loader, name, flags, size)) {
 					fprintf(stderr, "Cannot compile LLVM symbol \"%s\"\n", name);
 					return 0;
 				}
-				if (has_data) {
+				if (flags & IR_CONST_STRING) {
+					size_t len;
+					const char *str = LLVMGetAsString(init, &len);
+
+					if (!loader->sym_data_str(loader, str, len)
+					 || !loader->sym_data_end(loader, flags)) {
+						fprintf(stderr, "Cannot compile LLVM symbol \"%s\"\n", name);
+						return 0;
+					}
+				} else if (flags & IR_INITIALIZED) {
 					if (!llvm2ir_data(loader, target_data, type, init, 0)
-					 || !loader->sym_data_end(loader)) {
+					 || !loader->sym_data_end(loader, flags)) {
 						fprintf(stderr, "Cannot compile LLVM symbol \"%s\"\n", name);
 						return 0;
 					}
