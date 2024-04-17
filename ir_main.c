@@ -34,8 +34,18 @@ static double ir_time(void)
 	return (double)((((uint64_t)filetime.dwHighDateTime << 32) | (uint64_t)filetime.dwLowDateTime)/10) /
 		1000000.0;
 }
-
 #endif
+
+static double ir_atexit_start = 0.0;
+
+static void ir_atexit(void)
+{
+	if (ir_atexit_start) {
+		double t = ir_time();
+		fprintf(stderr, "\nexecution time = %0.6f\n", t - ir_atexit_start);
+		ir_atexit_start = 0.0;
+	}
+}
 
 static void help(const char *cmd)
 {
@@ -1428,6 +1438,11 @@ finish:
 		char **jit_argv;
 		int (*func)(int, char**) = loader.main;
 
+		if (dump_time) {
+			ir_atexit_start = start;
+			atexit(ir_atexit);
+		}
+
 		if (run_args && argc > run_args) {
 			jit_argc = argc - run_args + 1;
 		}
@@ -1441,6 +1456,7 @@ finish:
 		if (dump_time) {
 			double t = ir_time();
 			fprintf(stderr, "\nexecution time = %0.6f\n", t - start);
+			ir_atexit_start = 0.0;
 		}
 
 #ifndef _WIN32
