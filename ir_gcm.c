@@ -14,8 +14,138 @@
 #define IR_GCM_IS_SCHEDULED_EARLY(b) (((int32_t)(b)) < 0)
 #define IR_GCM_EARLY_BLOCK(b)        ((uint32_t)-((int32_t)(b)))
 
+#define IR_GCM_REASSOCIATE_INVARINATS 1
 #define IR_GCM_SPLIT 1
 #define IR_SCHEDULE_SWAP_OPS 1
+
+#if IR_GCM_REASSOCIATE_INVARINATS
+IR_ALWAYS_INLINE bool ir_gcm_is_associative(ir_insn *insn)
+{
+	if (IR_IS_TYPE_INT(insn->type)) {
+		switch (insn->op) {
+			case IR_ADD:
+			case IR_MUL:
+			case IR_AND:
+			case IR_OR:
+			case IR_XOR:
+			case IR_MIN:
+			case IR_MAX:
+				return 1;
+			default:
+				break;
+		}
+	}
+	return 0;
+}
+
+IR_ALWAYS_INLINE ir_ref ir_gcm_loop_invariant(ir_ctx *ctx, int32_t loop, ir_ref ref)
+{
+	int32_t b;
+	uint32_t loop_depth;
+
+	if (IR_IS_CONST_REF(ref)) {
+		return ref;
+	}
+	b = ctx->cfg_map[ref];
+	loop_depth = ctx->cfg_blocks[loop].loop_depth;
+	if (IR_GCM_IS_SCHEDULED_EARLY(b)) {
+		b = IR_GCM_EARLY_BLOCK(b);
+	}
+	if (ctx->cfg_blocks[b].loop_depth < loop_depth) {
+		return ref;
+	}
+	if (!(ctx->cfg_blocks[b].flags & IR_BB_LOOP_HEADER)) {
+		b = ctx->cfg_blocks[b].loop_header;
+	}
+	loop_depth = ctx->cfg_blocks[b].loop_depth - loop_depth;
+	while (loop_depth) {
+		b = ctx->cfg_blocks[b].loop_header;
+		loop_depth--;
+	}
+	return (b == loop) ? IR_UNUSED : ref;
+}
+
+static void ir_gcm_try_reassociate_invariants(ir_ctx *ctx, ir_ref ref, ir_insn *insn, int32_t b)
+{
+	IR_ASSERT(b > 0);
+	IR_ASSERT(ctx->cfg_blocks[b].loop_depth > 0);
+
+	if ((!IR_IS_CONST_REF(insn->op1)
+	  && ctx->ir_base[insn->op1].op == insn->op
+	  && ctx->use_lists[insn->op1].count == 1)
+	 || (!IR_IS_CONST_REF(insn->op2)
+	  && ctx->ir_base[insn->op2].op == insn->op
+	  && ctx->use_lists[insn->op2].count == 1)) {
+
+		ir_ref loop = (ctx->cfg_blocks[b].flags & IR_BB_LOOP_HEADER) ? b : (int32_t)ctx->cfg_blocks[b].loop_header;
+		ir_ref inv1 = ir_gcm_loop_invariant(ctx, loop, insn->op1);
+		ir_ref inv2 = ir_gcm_loop_invariant(ctx, loop, insn->op2);
+
+		if (inv1 && !inv2) {
+			SWAP_REFS(insn->op1, insn->op2);
+			inv2 = inv1;
+			inv1 = IR_UNUSED;
+		}
+		if (inv2 && !inv1 && !IR_IS_CONST_REF(insn->op1)) {
+			ir_insn *insn1 = &ctx->ir_base[insn->op1];
+
+			if (insn1->op == insn->op && ctx->use_lists[insn->op1].count == 1) {
+				ir_ref inv3 = ir_gcm_loop_invariant(ctx, loop, insn1->op1);
+				ir_ref inv4 = ir_gcm_loop_invariant(ctx, loop, insn1->op2);
+
+				if (inv3 && !inv4) {
+					SWAP_REFS(insn1->op1, insn1->op2);
+					inv4 = inv3;
+					inv3 = IR_UNUSED;
+				}
+				if (inv4 && !inv3) {
+					uint32_t dom_depth;
+
+					/* (x + inv4) + inv2 => x + (inv2 + inv4) */
+					if (!IR_IS_CONST_REF(insn1->op1)) {
+						ir_use_list_replace_one(ctx, insn1->op1, insn->op1, ref);
+					}
+					if (!IR_IS_CONST_REF(inv2)) {
+						ir_use_list_replace_one(ctx, inv2, ref, insn->op1);
+					}
+					SWAP_REFS(insn1->op1, insn->op2);
+					SWAP_REFS(insn->op1, insn->op2);
+					b = 1;
+					dom_depth = 0;
+					if (!IR_IS_CONST_REF(insn1->op1)) {
+
+						int32_t b1 = ctx->cfg_map[insn1->op1];
+						if (IR_GCM_IS_SCHEDULED_EARLY(b1)) {
+							b1 = IR_GCM_EARLY_BLOCK(b1);
+						}
+						if (dom_depth < ctx->cfg_blocks[b1].dom_depth) {
+							dom_depth = ctx->cfg_blocks[b1].dom_depth;
+							b = b1;
+						}
+					}
+					if (!IR_IS_CONST_REF(insn1->op2)) {
+						int32_t b2 = ctx->cfg_map[insn1->op2];
+
+						if (IR_GCM_IS_SCHEDULED_EARLY(b2)) {
+							b2 = IR_GCM_EARLY_BLOCK(b2);
+						}
+						if (dom_depth < ctx->cfg_blocks[b2].dom_depth) {
+							b = b2;
+						}
+					}
+					ctx->cfg_map[insn->op2] = IR_GCM_EARLY_BLOCK(b);
+					if (IR_IS_CONST_REF(insn1->op1) && !IR_IS_CONST_REF(insn1->op2)) {
+						SWAP_REFS(insn1->op1, insn1->op2);
+					}
+					if (ctx->cfg_blocks[b].loop_depth > 0) {
+						ir_gcm_try_reassociate_invariants(ctx, insn->op2, insn1, b);
+					}
+				}
+			}
+		}
+	}
+}
+#endif
 
 static uint32_t ir_gcm_schedule_early(ir_ctx *ctx, ir_ref ref, ir_list *queue_late)
 {
@@ -51,6 +181,14 @@ static uint32_t ir_gcm_schedule_early(ir_ctx *ctx, ir_ref ref, ir_list *queue_la
 
 	ctx->cfg_map[ref] = IR_GCM_EARLY_BLOCK(result);
 	ir_list_push_unchecked(queue_late, ref);
+
+#if IR_GCM_REASSOCIATE_INVARINATS
+	if (ctx->cfg_blocks[result].loop_depth > 0
+	 && ir_gcm_is_associative(insn)) {
+		ir_gcm_try_reassociate_invariants(ctx, ref, insn, result);
+	}
+#endif
+
 	return result;
 }
 
