@@ -24,6 +24,7 @@ IR_ALWAYS_INLINE bool ir_gcm_is_associative(ir_insn *insn)
 	if (IR_IS_TYPE_INT(insn->type)) {
 		switch (insn->op) {
 			case IR_ADD:
+			case IR_SUB:
 			case IR_MUL:
 			case IR_AND:
 			case IR_OR:
@@ -67,82 +68,240 @@ IR_ALWAYS_INLINE ir_ref ir_gcm_loop_invariant(ir_ctx *ctx, int32_t loop, ir_ref 
 
 static void ir_gcm_try_reassociate_invariants(ir_ctx *ctx, ir_ref ref, ir_insn *insn, int32_t b)
 {
+	ir_insn *insn1;
+	uint32_t dom_depth;
+
 	IR_ASSERT(b > 0);
 	IR_ASSERT(ctx->cfg_blocks[b].loop_depth > 0);
 
 	if ((!IR_IS_CONST_REF(insn->op1)
-	  && ctx->ir_base[insn->op1].op == insn->op
+	  && (ctx->ir_base[insn->op1].op == insn->op
+	   || (insn->op == IR_ADD && ctx->ir_base[insn->op1].op == IR_SUB)
+	   || (insn->op == IR_SUB && ctx->ir_base[insn->op1].op == IR_ADD))
 	  && ctx->use_lists[insn->op1].count == 1)
 	 || (!IR_IS_CONST_REF(insn->op2)
-	  && ctx->ir_base[insn->op2].op == insn->op
+	  && (ctx->ir_base[insn->op2].op == insn->op
+	   || (insn->op == IR_ADD && ctx->ir_base[insn->op2].op == IR_SUB)
+	   || (insn->op == IR_SUB && ctx->ir_base[insn->op2].op == IR_ADD))
 	  && ctx->use_lists[insn->op2].count == 1)) {
 
 		ir_ref loop = (ctx->cfg_blocks[b].flags & IR_BB_LOOP_HEADER) ? b : (int32_t)ctx->cfg_blocks[b].loop_header;
 		ir_ref inv1 = ir_gcm_loop_invariant(ctx, loop, insn->op1);
 		ir_ref inv2 = ir_gcm_loop_invariant(ctx, loop, insn->op2);
 
-		if (inv1 && !inv2) {
-			SWAP_REFS(insn->op1, insn->op2);
-			inv2 = inv1;
-			inv1 = IR_UNUSED;
-		}
-		if (inv2 && !inv1 && !IR_IS_CONST_REF(insn->op1)) {
-			ir_insn *insn1 = &ctx->ir_base[insn->op1];
+		if (insn->op != IR_SUB) {
+			if (inv1 && !inv2) {
+				SWAP_REFS(insn->op1, insn->op2);
+				inv2 = inv1;
+				inv1 = IR_UNUSED;
+			}
+			if (inv2 && !inv1 && !IR_IS_CONST_REF(insn->op1)) {
+				insn1 = &ctx->ir_base[insn->op1];
+				if (insn1->op == insn->op && ctx->use_lists[insn->op1].count == 1) {
+					ir_ref inv3 = ir_gcm_loop_invariant(ctx, loop, insn1->op1);
+					ir_ref inv4 = ir_gcm_loop_invariant(ctx, loop, insn1->op2);
 
-			if (insn1->op == insn->op && ctx->use_lists[insn->op1].count == 1) {
-				ir_ref inv3 = ir_gcm_loop_invariant(ctx, loop, insn1->op1);
-				ir_ref inv4 = ir_gcm_loop_invariant(ctx, loop, insn1->op2);
-
-				if (inv3 && !inv4) {
-					SWAP_REFS(insn1->op1, insn1->op2);
-					inv4 = inv3;
-					inv3 = IR_UNUSED;
-				}
-				if (inv4 && !inv3) {
-					uint32_t dom_depth;
-
-					/* (x + inv4) + inv2 => x + (inv2 + inv4) */
-					if (!IR_IS_CONST_REF(insn1->op1)) {
-						ir_use_list_replace_one(ctx, insn1->op1, insn->op1, ref);
-					}
-					if (!IR_IS_CONST_REF(inv2)) {
-						ir_use_list_replace_one(ctx, inv2, ref, insn->op1);
-					}
-					SWAP_REFS(insn1->op1, insn->op2);
-					SWAP_REFS(insn->op1, insn->op2);
-					b = 1;
-					dom_depth = 0;
-					if (!IR_IS_CONST_REF(insn1->op1)) {
-
-						int32_t b1 = ctx->cfg_map[insn1->op1];
-						if (IR_GCM_IS_SCHEDULED_EARLY(b1)) {
-							b1 = IR_GCM_EARLY_BLOCK(b1);
-						}
-						if (dom_depth < ctx->cfg_blocks[b1].dom_depth) {
-							dom_depth = ctx->cfg_blocks[b1].dom_depth;
-							b = b1;
-						}
-					}
-					if (!IR_IS_CONST_REF(insn1->op2)) {
-						int32_t b2 = ctx->cfg_map[insn1->op2];
-
-						if (IR_GCM_IS_SCHEDULED_EARLY(b2)) {
-							b2 = IR_GCM_EARLY_BLOCK(b2);
-						}
-						if (dom_depth < ctx->cfg_blocks[b2].dom_depth) {
-							b = b2;
-						}
-					}
-					ctx->cfg_map[insn->op2] = IR_GCM_EARLY_BLOCK(b);
-					if (IR_IS_CONST_REF(insn1->op1) && !IR_IS_CONST_REF(insn1->op2)) {
+					if (inv3 && !inv4) {
 						SWAP_REFS(insn1->op1, insn1->op2);
+						inv4 = inv3;
+						inv3 = IR_UNUSED;
 					}
-					if (ctx->cfg_blocks[b].loop_depth > 0) {
-						ir_gcm_try_reassociate_invariants(ctx, insn->op2, insn1, b);
+					if (inv4 && !inv3) {
+						/* (x + inv4) + inv2 => x + (inv2 + inv4) */
+						if (!IR_IS_CONST_REF(insn1->op1)) {
+							ir_use_list_replace_one(ctx, insn1->op1, insn->op1, ref);
+						}
+						if (!IR_IS_CONST_REF(inv2)) {
+							ir_use_list_replace_one(ctx, inv2, ref, insn->op1);
+						}
+						SWAP_REFS(insn1->op1, insn->op2);
+						SWAP_REFS(insn->op1, insn->op2);
+						ref = insn->op2;
+						goto finish_update;
+					}
+				} else if (insn->op == IR_ADD && insn1->op == IR_SUB && ctx->use_lists[insn->op1].count == 1) {
+					ir_ref inv3 = ir_gcm_loop_invariant(ctx, loop, insn1->op1);
+					ir_ref inv4 = ir_gcm_loop_invariant(ctx, loop, insn1->op2);
+
+					if (inv4 && !inv3) {
+						/* (x - inv4) + inv2 => x + (inv2 - inv4) */
+						if (!IR_IS_CONST_REF(insn1->op1)) {
+							ir_use_list_replace_one(ctx, insn1->op1, insn->op1, ref);
+						}
+						if (!IR_IS_CONST_REF(inv2)) {
+							ir_use_list_replace_one(ctx, inv2, ref, insn->op1);
+						}
+						SWAP_REFS(insn1->op1, insn->op2);
+						SWAP_REFS(insn->op1, insn->op2);
+						ref = insn->op2;
+						goto finish_update;
+					} else if (inv3 && !inv4) {
+						/* (inv3 - x) + inv2 => (inv3 + inv2) - x */
+						if (!IR_IS_CONST_REF(insn1->op2)) {
+							ir_use_list_replace_one(ctx, insn1->op2, insn->op1, ref);
+						}
+						if (!IR_IS_CONST_REF(inv2)) {
+							ir_use_list_replace_one(ctx, inv2, ref, insn->op1);
+						}
+						SWAP_REFS(insn1->op2, insn->op2);
+						insn1->op = IR_ADD;
+						insn->op = IR_SUB;
+						ref = insn->op1;
+						goto finish_update;
+					}
+				}
+			}
+		} else {
+			IR_ASSERT(insn->op == IR_SUB);
+			if (inv2 && !inv1 && !IR_IS_CONST_REF(insn->op1)) {
+				insn1 = &ctx->ir_base[insn->op1];
+				if (insn1->op == IR_ADD && ctx->use_lists[insn->op1].count == 1) {
+					ir_ref inv3 = ir_gcm_loop_invariant(ctx, loop, insn1->op1);
+					ir_ref inv4 = ir_gcm_loop_invariant(ctx, loop, insn1->op2);
+
+					if (inv3 && !inv4) {
+						SWAP_REFS(insn1->op1, insn1->op2);
+						inv4 = inv3;
+						inv3 = IR_UNUSED;
+					}
+					if (inv4 && !inv3) {
+						/* (x + inv4) - inv2 => x + (inv4 - inv2) */
+						if (!IR_IS_CONST_REF(insn1->op1)) {
+							ir_use_list_replace_one(ctx, insn1->op1, insn->op1, ref);
+						}
+						if (!IR_IS_CONST_REF(inv2)) {
+							ir_use_list_replace_one(ctx, inv2, ref, insn->op1);
+						}
+						SWAP_REFS(insn1->op1, insn->op2);
+						SWAP_REFS(insn->op1, insn->op2);
+						SWAP_REFS(insn1->op1, insn1->op2);
+						insn1->op = IR_SUB;
+						insn->op = IR_ADD;
+						ref = insn->op2;
+						goto finish_update;
+					}
+				} else if (insn1->op == IR_SUB && ctx->use_lists[insn->op1].count == 1) {
+					ir_ref inv3 = ir_gcm_loop_invariant(ctx, loop, insn1->op1);
+					ir_ref inv4 = ir_gcm_loop_invariant(ctx, loop, insn1->op2);
+
+					if (inv4 && !inv3) {
+						/* (x - inv4) - inv2 => x - (inv2 + inv4) */
+						if (!IR_IS_CONST_REF(insn1->op1)) {
+							ir_use_list_replace_one(ctx, insn1->op1, insn->op1, ref);
+						}
+						if (!IR_IS_CONST_REF(inv2)) {
+							ir_use_list_replace_one(ctx, inv2, ref, insn->op1);
+						}
+						SWAP_REFS(insn1->op1, insn->op2);
+						SWAP_REFS(insn->op1, insn->op2);
+						insn1->op = IR_ADD;
+						ref = insn->op2;
+						goto finish_update;
+					} else if (inv3 && !inv4) {
+						/* (inv3 - x) - inv2 => (inv3 - inv2) - x */
+						if (!IR_IS_CONST_REF(insn1->op2)) {
+							ir_use_list_replace_one(ctx, insn1->op2, insn->op1, ref);
+						}
+						if (!IR_IS_CONST_REF(inv2)) {
+							ir_use_list_replace_one(ctx, inv2, ref, insn->op1);
+						}
+						SWAP_REFS(insn1->op2, insn->op2);
+						ref = insn->op1;
+						goto finish_update;
+					}
+				}
+			} else if (inv1 && !inv2 && !IR_IS_CONST_REF(insn->op2)) {
+				insn1 = &ctx->ir_base[insn->op2];
+				if (insn1->op == IR_ADD && ctx->use_lists[insn->op2].count == 1) {
+					ir_ref inv3 = ir_gcm_loop_invariant(ctx, loop, insn1->op1);
+					ir_ref inv4 = ir_gcm_loop_invariant(ctx, loop, insn1->op2);
+
+					if (inv3 && !inv4) {
+						SWAP_REFS(insn1->op1, insn1->op2);
+						inv4 = inv3;
+						inv3 = IR_UNUSED;
+					}
+					if (inv4 && !inv3) {
+						/* inv1 - (x + inv4) => (inv1 - inv4) - x */
+						if (!IR_IS_CONST_REF(insn1->op1)) {
+							ir_use_list_replace_one(ctx, insn1->op1, insn->op2, ref);
+						}
+						if (!IR_IS_CONST_REF(inv1)) {
+							ir_use_list_replace_one(ctx, inv1, ref, insn->op2);
+						}
+						SWAP_REFS(insn1->op1, insn->op1);
+						SWAP_REFS(insn->op1, insn->op2);
+						insn1->op = IR_SUB;
+						ref = insn->op1;
+						goto finish_update;
+					}
+				} else if (insn1->op == IR_SUB && ctx->use_lists[insn->op2].count == 1) {
+					ir_ref inv3 = ir_gcm_loop_invariant(ctx, loop, insn1->op1);
+					ir_ref inv4 = ir_gcm_loop_invariant(ctx, loop, insn1->op2);
+
+					if (inv4 && !inv3) {
+						/* inv1 - (x - inv4) => (inv1 + inv4) - x */
+						if (!IR_IS_CONST_REF(insn1->op1)) {
+							ir_use_list_replace_one(ctx, insn1->op1, insn->op2, ref);
+						}
+						if (!IR_IS_CONST_REF(inv1)) {
+							ir_use_list_replace_one(ctx, inv1, ref, insn->op2);
+						}
+						SWAP_REFS(insn1->op1, insn->op1);
+						SWAP_REFS(insn->op1, insn->op2);
+						insn1->op = IR_ADD;
+						ref = insn->op1;
+						goto finish_update;
+					} else if (inv3 && !inv4) {
+						/* inv1 - (inv3 - x) => x + (inv1 - inv3) */
+						if (!IR_IS_CONST_REF(insn1->op2)) {
+							ir_use_list_replace_one(ctx, insn1->op2, insn->op2, ref);
+						}
+						if (!IR_IS_CONST_REF(inv1)) {
+							ir_use_list_replace_one(ctx, inv1, ref, insn->op2);
+						}
+						SWAP_REFS(insn1->op2, insn->op1);
+						SWAP_REFS(insn1->op1, insn1->op2);
+						insn->op = IR_ADD;
+						ref = insn->op2;
+						goto finish_update;
 					}
 				}
 			}
 		}
+	}
+	return;
+
+finish_update:
+	if (insn1->op != IR_SUB && IR_IS_CONST_REF(insn1->op1) && !IR_IS_CONST_REF(insn1->op2)) {
+		SWAP_REFS(insn1->op1, insn1->op2);
+	}
+	b = 1;
+	dom_depth = 0;
+	if (!IR_IS_CONST_REF(insn1->op1)) {
+		int32_t b1 = ctx->cfg_map[insn1->op1];
+
+		if (IR_GCM_IS_SCHEDULED_EARLY(b1)) {
+			b1 = IR_GCM_EARLY_BLOCK(b1);
+		}
+		if (dom_depth < ctx->cfg_blocks[b1].dom_depth) {
+			dom_depth = ctx->cfg_blocks[b1].dom_depth;
+			b = b1;
+		}
+	}
+	if (!IR_IS_CONST_REF(insn1->op2)) {
+		int32_t b2 = ctx->cfg_map[insn1->op2];
+
+		if (IR_GCM_IS_SCHEDULED_EARLY(b2)) {
+			b2 = IR_GCM_EARLY_BLOCK(b2);
+		}
+		if (dom_depth < ctx->cfg_blocks[b2].dom_depth) {
+			b = b2;
+		}
+	}
+	ctx->cfg_map[ref] = IR_GCM_EARLY_BLOCK(b);
+	if (ctx->cfg_blocks[b].loop_depth > 0) {
+		ir_gcm_try_reassociate_invariants(ctx, ref, insn1, b);
 	}
 }
 #endif
