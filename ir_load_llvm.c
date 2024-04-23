@@ -1102,14 +1102,28 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 		return ir_CALL_1(type, func, llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type));
 	} else if (STR_START(name, name_len, "llvm.fmuladd.")
 			|| STR_START(name, name_len, "llvm.fma.")) {
+		ir_ref op1, op2;
+
 		IR_ASSERT(count == 3);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
 		IR_ASSERT(IR_IS_TYPE_FP(type));
-		return ir_fold2(ctx, IR_OPT(IR_ADD, type),
-			ir_fold2(ctx, IR_OPT(IR_MUL, type),
-				llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type),
-				llvm2ir_op(ctx, LLVMGetOperand(insn, 1), type)),
-			llvm2ir_op(ctx, LLVMGetOperand(insn, 2), type));
+		op1 = llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type);
+		op2 = llvm2ir_op(ctx, LLVMGetOperand(insn, 1), type);
+		if (ctx->ir_base[op1].op == IR_NEG) {
+			op1 = ctx->ir_base[op1].op1;
+			return ir_fold2(ctx, IR_OPT(IR_SUB, type),
+				llvm2ir_op(ctx, LLVMGetOperand(insn, 2), type),
+				ir_fold2(ctx, IR_OPT(IR_MUL, type), op1, op2));
+		} else if (ctx->ir_base[op2].op == IR_NEG) {
+			op2 = ctx->ir_base[op2].op1;
+			return ir_fold2(ctx, IR_OPT(IR_SUB, type),
+				llvm2ir_op(ctx, LLVMGetOperand(insn, 2), type),
+				ir_fold2(ctx, IR_OPT(IR_MUL, type), op1, op2));
+		} else {
+			return ir_fold2(ctx, IR_OPT(IR_ADD, type),
+				ir_fold2(ctx, IR_OPT(IR_MUL, type), op1, op2),
+				llvm2ir_op(ctx, LLVMGetOperand(insn, 2), type));
+		}
 	} else if (STR_EQUAL(name, name_len, "llvm.bitreverse.i1")) {
 		IR_ASSERT(count == 1);
 		return llvm2ir_op(ctx, LLVMGetOperand(insn, 0), IR_BOOL);
@@ -1404,13 +1418,22 @@ static void llvm2ir_element_ptr(ir_ctx *ctx, LLVMValueRef insn)
 		index = LLVMConstIntGetSExtValue(op);
 		offset += index * LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, type);
 	} else {
+		ir_ref idx = llvm2ir_op(ctx, op, IR_ADDR);
+
 		size = LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, type);
 		if (size == 1) {
-			ref = ir_ADD_A(ref, llvm2ir_op(ctx, op, IR_ADDR));
+			ref = ir_ADD_A(ref, idx);
 		} else {
-			ref = ir_ADD_A(ref, ir_MUL_A(
-				llvm2ir_op(ctx, op, IR_ADDR),
-				ir_const_addr(ctx, LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, type))));
+			if (ctx->ir_base[idx].op == IR_NEG) {
+				idx = ctx->ir_base[idx].op1;
+				ref = ir_SUB_A(ref, ir_MUL_A(
+					idx,
+					ir_const_addr(ctx, LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, type))));
+			} else {
+				ref = ir_ADD_A(ref, ir_MUL_A(
+					idx,
+					ir_const_addr(ctx, LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, type))));
+			}
 		}
 	}
 
@@ -1433,17 +1456,27 @@ static void llvm2ir_element_ptr(ir_ctx *ctx, LLVMValueRef insn)
 					index = LLVMConstIntGetSExtValue(op);
 					offset += index * LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, type);
 				} else {
+					ir_ref idx;
+
 					if (offset) {
 						ref = ir_ADD_A(ref, ir_const_addr(ctx, (uintptr_t)offset));
 						offset = 0;
 					}
+					idx = llvm2ir_op(ctx, op, IR_ADDR);
 					size = LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, type);
 					if (size == 1) {
-						ref = ir_ADD_A(ref, llvm2ir_op(ctx, op, IR_ADDR));
+						ref = ir_ADD_A(ref, idx);
 					} else {
-						ref = ir_ADD_A(ref, ir_MUL_A(
-							llvm2ir_op(ctx, op, IR_ADDR),
-							ir_const_addr(ctx, LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, type))));
+						if (ctx->ir_base[idx].op == IR_NEG) {
+							idx = ctx->ir_base[idx].op1;
+							ref = ir_SUB_A(ref, ir_MUL_A(
+								idx,
+								ir_const_addr(ctx, LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, type))));
+						} else {
+							ref = ir_ADD_A(ref, ir_MUL_A(
+								idx,
+								ir_const_addr(ctx, LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, type))));
+						}
 					}
 				}
 				break;
