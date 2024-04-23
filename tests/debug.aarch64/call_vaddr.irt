@@ -42,20 +42,20 @@ aarch64
 main:
 	stp x29, x30, [sp, #-0x20]!
 	mov x29, sp
+	movz w0, #0x68
+	strb w0, [x29, #0x10]
+	movz w0, #0x69
+	strb w0, [x29, #0x11]
+	movz w0, #0x20
+	strb w0, [x29, #0x12]
+	movz w0, #0x25
+	strb w0, [x29, #0x13]
+	movz w0, #0x64
+	strb w0, [x29, #0x14]
+	movz w0, #0xa
+	strb w0, [x29, #0x15]
+	strb wzr, [x29, #0x16]
 	add x0, x29, #0x10
-	movz w1, #0x68
-	strb w1, [x0]
-	movz w1, #0x69
-	strb w1, [x0, #1]
-	movz w1, #0x20
-	strb w1, [x0, #2]
-	movz w1, #0x25
-	strb w1, [x0, #3]
-	movz w1, #0x64
-	strb w1, [x0, #4]
-	movz w1, #0xa
-	strb w1, [x0, #5]
-	strb wzr, [x0, #6]
 	movz w1, #0x2a
 	bl printf
 	ldp x29, x30, [sp], #0x20
