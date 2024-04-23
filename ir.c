@@ -95,7 +95,11 @@ void ir_print_escaped_str(const char *s, size_t len, FILE *f)
 			case '\v': fputs("\\v", f); break;
 			case '\?': fputs("\\?", f); break;
 			default:
+#ifdef __aarch64__
+				if (ch < 32) {
+#else
 				if (ch >= 0 && ch < 32) {
+#endif
 					fprintf(f, "\\%c%c%c",
 						'0' + ((ch >> 6) % 8),
 						'0' + ((ch >> 3) % 8),
