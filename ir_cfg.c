@@ -561,6 +561,85 @@ static ir_ref ir_try_split_if(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 				if_true = &ctx->ir_base[if_true_ref];
 				if_false = &ctx->ir_base[if_false_ref];
 
+				if (IR_IS_CONST_REF(cond->op3) && !IR_IS_SYM_CONST(ctx->ir_base[cond->op3].op)) {
+					if (ir_const_is_true(&ctx->ir_base[cond->op3]) ^ (op == IR_IF_TRUE)) {
+						/* Simple IF Split
+						 *
+						 *    |        |               |        |
+						 *    |        END             |        END
+						 *    END     /                END       \
+						 *    |  +---+                 |          +
+						 *    | /                      |          |
+						 *    MERGE                    |          |
+						 *    | \                      |          |
+						 *    |  PHI(false, true)      |          |
+						 *    | /                      |          |
+						 *    IF                   =>  |          |
+						 *    | \                      |          |
+						 *    |  +------+              |          |
+						 *    |         IF_TRUE        |          BEGIN
+						 *    IF_FALSE  |              BEGIN
+						 *    |                        |
+						 */
+						ir_use_list_replace_one(ctx, end1_ref, merge_ref, if_false_ref);
+						ir_use_list_replace_one(ctx, end2_ref, merge_ref, if_true_ref);
+
+						MAKE_NOP(merge); CLEAR_USES(merge_ref);
+						MAKE_NOP(cond);  CLEAR_USES(cond_ref);
+						MAKE_NOP(insn);  CLEAR_USES(ref);
+
+						if_false->optx = IR_OPTX(IR_BEGIN, IR_VOID, 1);
+						if_false->op1 = end1_ref;
+
+						if_true->optx = IR_OPTX(IR_BEGIN, IR_VOID, 1);
+						if_true->op1 = end2_ref;
+
+//						ir_worklist_push(worklist, end1_ref);
+//						ir_worklist_push(worklist, end2_ref);
+
+						return IR_NULL;
+					} else {
+						/* Simple IF Split
+						 *
+						 *    |        |               |        |
+						 *    |        END             |        END
+						 *    END     /                END      |
+						 *    |  +---+                 |        |
+						 *    | /                      |        |
+						 *    MERGE                    |        +
+						 *    | \                      |       /
+						 *    |  PHI(false, false      |      /
+						 *    | /                      |     /
+						 *    IF                   =>  |    /
+						 *    | \                      |   /
+						 *    |  +------+              |  /
+						 *    |         IF_TRUE        | /        BEGIN(unreachable)
+						 *    IF_FALSE  |              MERGE
+						 *    |                        |
+						 */
+						ir_use_list_replace_one(ctx, end1_ref, merge_ref, if_false_ref);
+						ir_use_list_replace_one(ctx, end2_ref, merge_ref, if_false_ref);
+
+						MAKE_NOP(merge); CLEAR_USES(merge_ref);
+						MAKE_NOP(cond);  CLEAR_USES(cond_ref);
+						MAKE_NOP(insn);  CLEAR_USES(ref);
+
+						if_false->optx = IR_OPTX(IR_MERGE, IR_VOID, 2);
+						if_false->op1 = end1_ref;
+						if_false->op2 = end2_ref;
+
+						if_true->optx = IR_BEGIN;
+						if_true->op1 = IR_UNUSED;
+
+						ctx->flags2 &= ~IR_SCCP_DONE;
+
+//						ir_worklist_push(worklist, end1_ref);
+//						ir_worklist_push(worklist, end2_ref);
+
+						return IR_NULL;
+					}
+				}
+
 				/* Simple IF Split
 				 *
 				 *    |        |               |        |
