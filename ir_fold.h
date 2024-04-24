@@ -2405,9 +2405,22 @@ IR_FOLD(TRUNC(SEXT))
 IR_FOLD(TRUNC(BITCAST))
 IR_FOLD(ZEXT(BITCAST))
 IR_FOLD(SEXT(BITCAST))
+{
+	if (IR_IS_TYPE_INT(ctx->ir_base[op1_insn->op1].type)) {
+		op1 = op1_insn->op1;
+		IR_FOLD_RESTART;
+	}
+	IR_FOLD_NEXT;
+}
+
 IR_FOLD(BITCAST(BITCAST))
 {
-	if (IR_IS_TYPE_INT(op1_insn->type)) {
+	ir_type dst_type = IR_OPT_TYPE(opt);
+	ir_type src_type = ctx->ir_base[op1_insn->op1].type;
+
+	if (src_type == dst_type) {
+		IR_FOLD_COPY(op1_insn->op1);
+	} else if (IR_IS_TYPE_INT(src_type) == IR_IS_TYPE_INT(dst_type)) {
 		op1 = op1_insn->op1;
 		IR_FOLD_RESTART;
 	}
