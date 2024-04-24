@@ -1005,8 +1005,29 @@ static ir_ref ir_ext_const(ir_ctx *ctx, ir_insn *val_insn, ir_op op, ir_type typ
 
 static ir_ref ir_ext_ref(ir_ctx *ctx, ir_ref var_ref, ir_ref src_ref, ir_op op, ir_type type)
 {
-	ir_ref new_ext_ref = ir_emit1(ctx, IR_OPTX(op, type, 1), src_ref);
+	uint32_t optx = IR_OPTX(op, type, 1);
+	ir_ref new_ext_ref;
 
+	if (!IR_IS_CONST_REF(src_ref)) {
+		ir_use_list *use_list = &ctx->use_lists[src_ref];
+		ir_ref *p, n = use_list->count;
+
+		for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
+			ir_ref use = *p;
+			ir_insn *use_insn = &ctx->ir_base[use];
+
+			if (use_insn->optx == optx) {
+				IR_ASSERT(use_insn->op1 == src_ref);
+				ir_use_list_add(ctx, use, var_ref);
+				if (!IR_IS_CONST_REF(src_ref)) {
+					ir_use_list_replace_one(ctx, src_ref, var_ref, use);
+				}
+				return use;
+			}
+		}
+	}
+
+	new_ext_ref = ir_emit1(ctx, optx, src_ref);
 	ctx->use_lists = ir_mem_realloc(ctx->use_lists, ctx->insns_count * sizeof(ir_use_list));
 	ctx->use_lists[new_ext_ref].count = 0;
 	ctx->use_lists[new_ext_ref].refs = IR_UNUSED;
