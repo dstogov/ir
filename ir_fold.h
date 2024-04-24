@@ -2871,9 +2871,7 @@ IR_FOLD(MUL(_, _))
 IR_FOLD_NAMED(swap_ops)
 {
 	if (op1 < op2) {  /* move lower ref to op2 */
-		ir_ref tmp = op1;
-		op1 = op2;
-		op2 = tmp;
+		SWAP_REFS(op1, op2);
 		IR_FOLD_RESTART;
 	}
     IR_FOLD_NEXT;
@@ -2883,9 +2881,7 @@ IR_FOLD(ADD_OV(_, _))
 IR_FOLD(MUL_OV(_, _))
 {
 	if (op1 < op2) {  /* move lower ref to op2 */
-		ir_ref tmp = op1;
-		op1 = op2;
-		op2 = tmp;
+		SWAP_REFS(op1, op2);
 		IR_FOLD_RESTART;
 	}
 	/* skip CSE ??? */
@@ -2954,9 +2950,7 @@ IR_FOLD(GT(_, _))
 			IR_FOLD_BOOL((opt ^ (opt >> 1)) & 1);
 		}
 	} else if (op1 < op2) {  /* move lower ref to op2 */
-		ir_ref tmp = op1;
-		op1 = op2;
-		op2 = tmp;
+		SWAP_REFS(op1, op2);
 		opt ^= 3; /* [U]LT <-> [U]GT, [U]LE <-> [U]GE */
 		IR_FOLD_RESTART;
 	}
@@ -2972,9 +2966,7 @@ IR_FOLD(UGT(_, _))
 		/* a >= a => true (two low bits are differ) */
 		IR_FOLD_BOOL((opt ^ (opt >> 1)) & 1);
 	} else if (op1 < op2) {  /* move lower ref to op2 */
-		ir_ref tmp = op1;
-		op1 = op2;
-		op2 = tmp;
+		SWAP_REFS(op1, op2);
 		opt ^= 3; /* [U]LT <-> [U]GT, [U]LE <-> [U]GE */
 	}
 	IR_FOLD_NEXT;
