@@ -2658,8 +2658,49 @@ static int ir_schedule_blocks_top_down(ir_ctx *ctx)
 
 int ir_schedule_blocks(ir_ctx *ctx)
 {
+	ir_ref ref;
+
 	if (ctx->cfg_blocks_count <= 2) {
 		return 1;
+	}
+
+	/* Mark "stop" blocks termintated with UNREACHABLE as "unexpected" */
+	ref = ctx->ir_base[1].op1;
+	while (ref) {
+		ir_insn *insn = &ctx->ir_base[ref];
+
+		if (insn->op == IR_UNREACHABLE && ctx->ir_base[insn->op1].op != IR_TAILCALL) {
+			ir_block *bb = &ctx->cfg_blocks[ctx->cfg_map[ref]];
+			uint32_t n = bb->predecessors_count;
+
+			if (n == 1) {
+				ir_insn *start_insn = &ctx->ir_base[bb->start];
+				if (start_insn->op == IR_IF_TRUE
+				 || start_insn->op == IR_IF_FALSE
+				 || start_insn->op == IR_CASE_DEFAULT) {
+					if (!start_insn->op2) start_insn->op2 = 1;
+				} else if (start_insn->op == IR_CASE_VAL) {
+					if (!start_insn->op3) start_insn->op3 = 1;
+				}
+			} else if (n > 1) {
+				uint32_t *p = &ctx->cfg_edges[bb->predecessors];
+
+				for (; n > 0; p++, n--) {
+					bb = &ctx->cfg_blocks[*p];
+					if (bb->predecessors_count == 1) {
+						ir_insn *start_insn = &ctx->ir_base[bb->start];
+						if (start_insn->op == IR_IF_TRUE
+						 || start_insn->op == IR_IF_FALSE
+						 || start_insn->op == IR_CASE_DEFAULT) {
+							if (!start_insn->op2) start_insn->op2 = 1;
+						} else if (start_insn->op == IR_CASE_VAL) {
+							if (!start_insn->op3) start_insn->op3 = 1;
+						}
+					}
+				}
+			}
+		}
+		ref = insn->op3;
 	}
 
 	/* The bottom-up Pettis-Hansen algorithm is expensive - O(n^3),
