@@ -34,7 +34,7 @@ test:
 	add w0, w0, #1
 	mov w1, wzr
 .L1:
-	add w1, w0, w1
+	add w1, w1, w0
 	cmp w1, #0xa
 	b.lt .L1
 	add w0, w1, w1

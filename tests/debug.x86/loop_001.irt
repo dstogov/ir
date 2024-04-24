@@ -33,7 +33,7 @@ test:
 	movl 4(%esp), %eax
 	xorl %ecx, %ecx
 .L1:
-	leal 1(%eax, %ecx), %ecx
+	leal 1(%ecx, %eax), %ecx
 	cmpl $0xa, %ecx
 	jl .L1
 	leal (%ecx, %ecx), %eax

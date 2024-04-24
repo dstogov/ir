@@ -39,7 +39,7 @@
 	l_4 = END(l_1);
 	l_5 = LOOP_BEGIN(l_4, l_11);
 	int32_t d_6 = PHI(l_5, c_6, d_7);
-	int32_t d_7 = ADD(d_3, d_6);
+	int32_t d_7 = ADD(d_6, d_3);
 	bool d_8 = LT(d_7, c_4);
 	l_9 = IF(l_5, d_8);
 	l_10 = IF_TRUE(l_9);
