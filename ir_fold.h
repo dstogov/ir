@@ -2435,6 +2435,13 @@ IR_FOLD(SEXT(SEXT))
 	IR_FOLD_RESTART;
 }
 
+IR_FOLD(SEXT(ZEXT))
+{
+	op1 = op1_insn->op1;
+	opt = IR_OPT(IR_ZEXT, IR_OPT_TYPE(opt));
+	IR_FOLD_RESTART;
+}
+
 IR_FOLD(TRUNC(AND))
 {
 	if (IR_IS_CONST_REF(op1_insn->op2)) {
