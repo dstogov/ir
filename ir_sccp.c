@@ -1020,7 +1020,7 @@ static ir_ref ir_ext_ref(ir_ctx *ctx, ir_ref var_ref, ir_ref src_ref, ir_op op, 
 				IR_ASSERT(use_insn->op1 == src_ref);
 				ir_use_list_add(ctx, use, var_ref);
 				if (!IR_IS_CONST_REF(src_ref)) {
-					ir_use_list_replace_one(ctx, src_ref, var_ref, use);
+					ir_use_list_remove_one(ctx, src_ref, var_ref);
 				}
 				return use;
 			}
