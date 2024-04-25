@@ -587,7 +587,7 @@ static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values
 									IR_ASSERT(!next);
 									next = use;
 									next_insn = use_insn;
-								} else {
+								} else if (use_insn->op != IR_NOP) {
 									IR_ASSERT(use_insn->op1 == ref);
 									use_insn->op1 = prev;
 									ir_use_list_add(ctx, prev, use);
@@ -1154,13 +1154,13 @@ int ir_sccp(ir_ctx *ctx)
 		insn = &ctx->ir_base[i];
 		flags = ir_op_flags[insn->op];
 		if (flags & IR_OP_FLAG_DATA) {
-			if (insn->op == IR_PHI) {
+			if (ctx->use_lists[i].count == 0) {
+				/* dead code */
+				continue;
+			} else if (insn->op == IR_PHI) {
 				if (!ir_sccp_meet_phi(ctx, _values, i, insn, &worklist)) {
 					continue;
 				}
-			} else if (ctx->use_lists[i].count == 0) {
-				/* dead code */
-				continue;
 			} else if (EXPECTED(IR_IS_FOLDABLE_OP(insn->op))) {
 				bool may_benefit = 0;
 				bool has_top = 0;
