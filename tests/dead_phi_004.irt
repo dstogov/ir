@@ -1,0 +1,49 @@
+--TEST--
+004: Dead phi
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 0;
+	uintptr_t c_5 = 0x4;
+	l_1 = START(l_28);
+	int32_t d_2 = PARAM(l_1, "arg_1", 1);
+	int32_t d_3 = PARAM(l_1, "arg_2", 2);
+	int32_t d_4 = PARAM(l_1, "arg_3", 3);
+	int32_t d_5 = PARAM(l_1, "arg_4", 4);
+	int32_t d_6 = PARAM(l_1, "arg_5", 5);
+	uintptr_t d_7 = PARAM(l_1, "arg_6", 6);
+	bool d_8 = GT(d_2, c_4);
+	l_9 = IF(l_1, d_8);
+	l_10 = IF_FALSE(l_9);
+	l_11 = END(l_10);
+	l_12 = IF_TRUE(l_9);
+	l_13 = END(l_12);
+	l_14 = MERGE(l_11, l_13);
+	int32_t d_15 = PHI(l_14, d_4, d_3);
+	bool d_16 = GT(d_5, c_4);
+	l_17 = IF(l_14, d_16);
+	l_18 = IF_FALSE(l_17);
+	l_19 = END(l_18);
+	l_20 = IF_TRUE(l_17);
+	l_21 = END(l_20);
+	l_22 = MERGE(l_19, l_21);
+	int32_t d_23 = PHI(l_22, d_6, d_15);
+	l_28 = RETURN(l_22, c_4);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 0;
+	l_1 = START(l_8);
+	int32_t d_2 = PARAM(l_1, "arg_1", 1);
+	int32_t d_3 = PARAM(l_1, "arg_2", 2);
+	int32_t d_4 = PARAM(l_1, "arg_3", 3);
+	int32_t d_5 = PARAM(l_1, "arg_4", 4);
+	int32_t d_6 = PARAM(l_1, "arg_5", 5);
+	uintptr_t d_7 = PARAM(l_1, "arg_6", 6);
+	l_8 = RETURN(l_1, c_4);
+}
