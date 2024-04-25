@@ -1,5 +1,7 @@
 --TEST--
 004: dead loads
+--TARGET--
+x86_64
 --CODE--
 {
 	uintptr_t c_1 = 0;
