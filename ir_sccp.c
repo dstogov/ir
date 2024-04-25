@@ -1058,8 +1058,7 @@ static bool ir_try_promote_ext(ir_ctx *ctx, ir_ref ext_ref, ir_insn *insn, ir_bi
 	op_ref = phi_insn->op3;
 	op_insn = &ctx->ir_base[op_ref];
 	if ((op_insn->op != IR_ADD && op_insn->op != IR_SUB && op_insn->op != IR_MUL)
-	 || op_insn->op1 != ref
-	 || op_insn->op2 == ref
+	 || (op_insn->op1 != ref && op_insn->op2 != ref)
 	 || ctx->use_lists[op_ref].count != 1) {
 		return 0;
 	}
@@ -1075,8 +1074,7 @@ static bool ir_try_promote_ext(ir_ctx *ctx, ir_ref ext_ref, ir_insn *insn, ir_bi
 			ir_insn *use_insn = &ctx->ir_base[use];
 
 			if ((use_insn->op >= IR_EQ && use_insn->op <= IR_UGT)
-			 && use_insn->op1 == ref
-			 && use_insn->op2 != ref) {
+			 && (use_insn->op1 == ref || use_insn->op2 == ref)) {
 				continue;
 			} else if (use_insn->op == IR_IF) {
 				continue;
@@ -1103,13 +1101,22 @@ static bool ir_try_promote_ext(ir_ctx *ctx, ir_ref ext_ref, ir_insn *insn, ir_bi
 			}
 			IR_ASSERT(((use_insn->op >= IR_EQ && use_insn->op <= IR_UGT)
 			  || use_insn->op == IR_ADD || use_insn->op == IR_SUB || use_insn->op == IR_MUL)
-			 && use_insn->op1 == ref
-			 && use_insn->op2 != ref);
-			if (IR_IS_CONST_REF(use_insn->op2)
-			 && !IR_IS_SYM_CONST(ctx->ir_base[use_insn->op2].op)) {
-				ctx->ir_base[use].op2 = ir_ext_const(ctx, &ctx->ir_base[use_insn->op2], op, type);
-			} else {
-				ctx->ir_base[use].op2 = ir_ext_ref(ctx, use, use_insn->op2, op, type);
+			 && (use_insn->op1 == ref || use_insn->op2 == ref));
+			if (use_insn->op1 != ref) {
+				if (IR_IS_CONST_REF(use_insn->op1)
+				 && !IR_IS_SYM_CONST(ctx->ir_base[use_insn->op1].op)) {
+					ctx->ir_base[use].op1 = ir_ext_const(ctx, &ctx->ir_base[use_insn->op1], op, type);
+				} else {
+					ctx->ir_base[use].op1 = ir_ext_ref(ctx, use, use_insn->op1, op, type);
+				}
+			}
+			if (use_insn->op2 != ref) {
+				if (IR_IS_CONST_REF(use_insn->op2)
+				 && !IR_IS_SYM_CONST(ctx->ir_base[use_insn->op2].op)) {
+					ctx->ir_base[use].op2 = ir_ext_const(ctx, &ctx->ir_base[use_insn->op2], op, type);
+				} else {
+					ctx->ir_base[use].op2 = ir_ext_ref(ctx, use, use_insn->op2, op, type);
+				}
 			}
 		}
 	}
