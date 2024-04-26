@@ -1067,7 +1067,7 @@ static ir_ref ir_ext_const(ir_ctx *ctx, ir_insn *val_insn, ir_op op, ir_type typ
 	return ir_const(ctx, new_val, type);
 }
 
-static ir_ref ir_ext_ref(ir_ctx *ctx, ir_ref var_ref, ir_ref src_ref, ir_op op, ir_type type)
+static ir_ref ir_ext_ref(ir_ctx *ctx, ir_ref var_ref, ir_ref src_ref, ir_op op, ir_type type, ir_bitqueue *worklist)
 {
 	uint32_t optx = IR_OPTX(op, type, 1);
 	ir_ref ref;
@@ -1079,6 +1079,7 @@ static ir_ref ir_ext_ref(ir_ctx *ctx, ir_ref var_ref, ir_ref src_ref, ir_op op, 
 			if (!IR_IS_CONST_REF(src_ref)) {
 				ir_use_list_remove_one(ctx, src_ref, var_ref);
 			}
+			ir_bitqueue_add(worklist, ref);
 			return ref;
 		}
 	}
@@ -1091,6 +1092,8 @@ static ir_ref ir_ext_ref(ir_ctx *ctx, ir_ref var_ref, ir_ref src_ref, ir_op op, 
 	if (!IR_IS_CONST_REF(src_ref)) {
 		ir_use_list_replace_one(ctx, src_ref, var_ref, ref);
 	}
+	ir_bitqueue_grow(worklist, ref + 1);
+	ir_bitqueue_add(worklist, ref);
 	return ref;
 }
 
@@ -1143,10 +1146,9 @@ static bool ir_try_promote_ext(ir_ctx *ctx, ir_ref ext_ref, ir_insn *insn, ir_bi
 	phi_insn->type = insn->type;
 	op_insn->type = insn->type;
 
-	use_list = &ctx->use_lists[ref];
-	n = use_list->count;
-	for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
-		use = *p;
+	for (n = 0; n < ctx->use_lists[ref].count; n++) {
+		/* "use_lists" may be reallocated by ir_ext_ref() */
+		use = ctx->use_edges[ctx->use_lists[ref].refs + n];
 		if (use == ext_ref) {
 			continue;
 		} else {
@@ -1163,8 +1165,7 @@ static bool ir_try_promote_ext(ir_ctx *ctx, ir_ref ext_ref, ir_insn *insn, ir_bi
 				 && !IR_IS_SYM_CONST(ctx->ir_base[use_insn->op1].op)) {
 					ctx->ir_base[use].op1 = ir_ext_const(ctx, &ctx->ir_base[use_insn->op1], op, type);
 				} else {
-					ctx->ir_base[use].op1 = ir_ext_ref(ctx, use, use_insn->op1, op, type);
-					ir_bitqueue_add(worklist, ctx->ir_base[use].op1);
+					ctx->ir_base[use].op1 = ir_ext_ref(ctx, use, use_insn->op1, op, type, worklist);
 				}
 			}
 			if (use_insn->op2 != ref) {
@@ -1172,8 +1173,7 @@ static bool ir_try_promote_ext(ir_ctx *ctx, ir_ref ext_ref, ir_insn *insn, ir_bi
 				 && !IR_IS_SYM_CONST(ctx->ir_base[use_insn->op2].op)) {
 					ctx->ir_base[use].op2 = ir_ext_const(ctx, &ctx->ir_base[use_insn->op2], op, type);
 				} else {
-					ctx->ir_base[use].op2 = ir_ext_ref(ctx, use, use_insn->op2, op, type);
-					ir_bitqueue_add(worklist, ctx->ir_base[use].op2);
+					ctx->ir_base[use].op2 = ir_ext_ref(ctx, use, use_insn->op2, op, type, worklist);
 				}
 			}
 		}
@@ -1186,8 +1186,7 @@ static bool ir_try_promote_ext(ir_ctx *ctx, ir_ref ext_ref, ir_insn *insn, ir_bi
 	 && !IR_IS_SYM_CONST(ctx->ir_base[phi_insn->op2].op)) {
 		ctx->ir_base[ref].op2 = ir_ext_const(ctx, &ctx->ir_base[phi_insn->op2], op, type);
 	} else {
-		ctx->ir_base[ref].op2 = ir_ext_ref(ctx, ref, phi_insn->op2, op, type);
-		ir_bitqueue_add(worklist, ctx->ir_base[ref].op2);
+		ctx->ir_base[ref].op2 = ir_ext_ref(ctx, ref, phi_insn->op2, op, type, worklist);
 	}
 
 	return 1;
