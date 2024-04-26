@@ -863,6 +863,7 @@ static ir_ref ir_promote_f2d(ir_ctx *ctx, ir_ref ref, ir_ref use)
 {
 	ir_insn *insn = &ctx->ir_base[ref];
 	uint32_t count;
+	ir_ref old_ref;
 
 	IR_ASSERT(insn->type == IR_FLOAT);
 	if (IR_IS_CONST_REF(ref)) {
@@ -893,6 +894,15 @@ static ir_ref ir_promote_f2d(ir_ctx *ctx, ir_ref ref, ir_ref use)
 				}
 				return insn->op1;
 			case IR_INT2FP:
+				old_ref = ir_find1(ctx, IR_OPTX(IR_INT2FP, IR_DOUBLE, 1), insn->op1);
+				if (old_ref) {
+					IR_ASSERT(ctx->use_lists[ref].count == 1);
+					ir_use_list_remove_one(ctx, insn->op1, ref);
+					CLEAR_USES(ref);
+					MAKE_NOP(insn);
+					ir_use_list_add(ctx, old_ref, use);
+					return old_ref;
+				}
 				insn->type = IR_DOUBLE;
 				return ref;
 			case IR_NEG:
