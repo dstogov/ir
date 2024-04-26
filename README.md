@@ -350,27 +350,29 @@ The following table shows the benchmarks execution time in comparison to the sam
 
 | Benchmark       | Execution time (relative to GCC -02) |
 | --------------- | ------------------------------------ |
-| array           |                                 0.86 |
-| binary-trees    |                                 0.96 |
+| array           |                                 0.93 |
+| binary-trees    |                                 0.99 |
 | funnkuch-reduce |                                 1.01 |
-| hash            |                                 1.21 |
-| hash2           |                                 0.86 |
-| heapsort        |                                 1.04 |
+| hash            |                                 1.13 |
+| hash2           |                                 0.87 |
+| heapsort        |                                 1.03 |
 | lists           |                                 0.98 |
-| matrix          |                                 1.10 |
+| matrix          |                                 1.12 |
 | method-call     |                                 1.00 |
 | mandelbrot      |                                 0.95 |
-| nbody           |                                 0.95 |
+| nbody           |                                 0.98 |
 | sieve           |                                 0.93 |
 | spectral-norm   |                                 0.94 |
-| strcat          |                                 0.96 |
+| strcat          |                                 0.97 |
 | oggenc          |                                 0.88 |
 | minilua         |                                 0.99 |
-| AVERAGE         |                                 0.98 |
-| GEOMEAN         |                                 0.97 |
+| gzip            |                                 0.80 |
+| bzip2           |                                 0.81 |
+| AVERAGE         |                                 0.96 |
+| GEOMEAN         |                                 0.96 |
 
-Most of the benchmarks are very simple (few screens of code), but oggenc and minilua are real applications.
-As you can see, IR produces code that is in average 5% slower than ``GCC -O2``, ~15% slower in the worst case,
+Most of the benchmarks are very simple (few screens of code), but oggenc, minilua gzip and bzip2 are real applications.
+As you can see, IR produces code that is in average 5% slower than ``GCC -O2``, ~20% slower in the worst case,
 and on some benchmarks it's even faster. The chart shows the same data graphically.
 
 ![IR benchmark chart](https://dstogov.github.io/ir_bench.svg)
