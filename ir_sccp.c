@@ -347,7 +347,8 @@ static void ir_sccp_remove_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_bi
 	for (j = 1, p = insn->ops + j; j <= n; j++, p++) {
 		ir_ref input = *p;
 		*p = IR_UNUSED;
-		if (input > 0 && _values[input].op == IR_BOTTOM) {
+		/* we may skip nodes that are going to be removed by SCCP (TOP, CONST and COPY) */
+		if (input > 0 && _values[input].op > IR_COPY) {
 			ir_use_list_remove_all(ctx, input, ref);
 			if (ir_is_dead(ctx, input)) {
 				/* schedule DCE */
@@ -396,13 +397,12 @@ static void ir_sccp_replace_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_r
 	for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
 		ir_ref input = *p;
 		*p = IR_UNUSED;
-		if (input > 0) {
+		/* we may skip nodes that are going to be removed by SCCP (TOP, CONST and COPY) */
+		if (input > 0 && _values[input].op > IR_COPY) {
 			ir_use_list_remove_all(ctx, input, ref);
-			if (_values[input].op == IR_BOTTOM) {
-				if (ir_is_dead(ctx, input)) {
-					/* schedule DCE */
-					ir_bitqueue_add(worklist, input);
-				}
+			if (ir_is_dead(ctx, input)) {
+				/* schedule DCE */
+				ir_bitqueue_add(worklist, input);
 			}
 		}
 	}
@@ -429,8 +429,9 @@ static void ir_sccp_replace_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_r
 				}
 			}
 #endif
-			/* schedule folding */
-			if (worklist && _values[use].op == IR_BOTTOM) {
+			/* we may skip nodes that are going to be removed by SCCP (TOP, CONST and COPY) */
+			if (worklist && _values[use].op > IR_COPY) {
+				/* schedule folding */
 				ir_bitqueue_add(worklist, use);
 			}
 		}
