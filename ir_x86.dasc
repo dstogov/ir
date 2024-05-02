@@ -2497,7 +2497,7 @@ store_int:
 				return IR_RETURN_FP;
 			}
 		case IR_IF:
-			if (ctx->use_lists[insn->op2].count == 1) {
+			if (!IR_IS_CONST_REF(insn->op2) && ctx->use_lists[insn->op2].count == 1) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT) {
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
@@ -2624,7 +2624,7 @@ store_int:
 				break;
 			}
 		case IR_COND:
-			if (ctx->use_lists[insn->op1].count == 1) {
+			if (!IR_IS_CONST_REF(insn->op1) && ctx->use_lists[insn->op1].count == 1) {
 				ir_insn *op1_insn = &ctx->ir_base[insn->op1];
 
 				if (op1_insn->op >= IR_EQ && op1_insn->op <= IR_UGT) {
@@ -2642,7 +2642,7 @@ store_int:
 			return IR_COND;
 		case IR_GUARD:
 		case IR_GUARD_NOT:
-			if (ctx->use_lists[insn->op2].count == 1) {
+			if (!IR_IS_CONST_REF(insn->op2) && ctx->use_lists[insn->op2].count == 1) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT
 					// TODO: register allocator may clobber operands of CMP before they are used in the GUARD_CMP
