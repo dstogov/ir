@@ -84,6 +84,7 @@ static uint32_t ir_gcm_select_best_block(ir_ctx *ctx, ir_ref ref, uint32_t lca)
 		return lca;
 	}
 
+#if 0 /* This is not necessary anymore. Conditions may be fused with IF across BBs. */
 	if (ctx->ir_base[ref].op >= IR_EQ && ctx->ir_base[ref].op <= IR_UGT) {
 		ir_use_list *use_list = &ctx->use_lists[ref];
 
@@ -96,6 +97,7 @@ static uint32_t ir_gcm_select_best_block(ir_ctx *ctx, ir_ref ref, uint32_t lca)
 			}
 		}
 	}
+#endif
 
 	flags = (bb->flags & IR_BB_LOOP_HEADER) ? bb->flags : ctx->cfg_blocks[bb->loop_header].flags;
 	if ((flags & IR_BB_LOOP_WITH_ENTRY)

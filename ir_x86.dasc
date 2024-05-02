@@ -2497,7 +2497,7 @@ store_int:
 				return IR_RETURN_FP;
 			}
 		case IR_IF:
-			if (ir_in_same_block(ctx, insn->op2) && ctx->use_lists[insn->op2].count == 1) {
+			if (ctx->use_lists[insn->op2].count == 1) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT) {
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
@@ -2545,15 +2545,14 @@ store_int:
 					ir_match_fuse_load_test_int(ctx, op2_insn, ref);
 					ctx->rules[insn->op2] = IR_FUSED | IR_TEST_INT;
 					return IR_TEST_AND_BRANCH_INT;
-				} else if (op2_insn->op == IR_OVERFLOW) {
+				} else if (op2_insn->op == IR_OVERFLOW && ir_in_same_block(ctx, insn->op2)) {
 					/* c = OVERFLOW(_) ... IF(c) => SKIP_OVERFLOW ... OVERFLOW_AND_BRANCH */
 					ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_OVERFLOW;
 					return IR_OVERFLOW_AND_BRANCH;
 				}
 			}
 			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
-				if (insn->op2 == ref - 1 /* previous instruction */
-				 && ir_in_same_block(ctx, insn->op2)) {
+				if (insn->op2 == ref - 1) { /* previous instruction */
 					op2_insn = &ctx->ir_base[insn->op2];
 					if (op2_insn->op == IR_ADD ||
 					    op2_insn->op == IR_SUB ||
@@ -2575,7 +2574,6 @@ store_int:
 				} else if ((ctx->flags & IR_OPT_CODEGEN)
 				 && insn->op1 == ref - 1 /* previous instruction */
 				 && insn->op2 == ref - 2 /* previous instruction */
-				 && ir_in_same_block(ctx, insn->op2)
 				 && ctx->use_lists[insn->op2].count == 2
 				 && IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
 					ir_insn *store_insn = &ctx->ir_base[insn->op1];
@@ -2626,7 +2624,7 @@ store_int:
 				break;
 			}
 		case IR_COND:
-			if (ir_in_same_block(ctx, insn->op1) && ctx->use_lists[insn->op1].count == 1) {
+			if (ctx->use_lists[insn->op1].count == 1) {
 				ir_insn *op1_insn = &ctx->ir_base[insn->op1];
 
 				if (op1_insn->op >= IR_EQ && op1_insn->op <= IR_UGT) {
@@ -2644,7 +2642,7 @@ store_int:
 			return IR_COND;
 		case IR_GUARD:
 		case IR_GUARD_NOT:
-			if (ir_in_same_block(ctx, insn->op2) && ctx->use_lists[insn->op2].count == 1) {
+			if (ctx->use_lists[insn->op2].count == 1) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UGT
 					// TODO: register allocator may clobber operands of CMP before they are used in the GUARD_CMP
@@ -2734,7 +2732,7 @@ store_int:
 					ir_match_fuse_load_test_int(ctx, op2_insn, ref);
 					ctx->rules[insn->op2] = IR_FUSED | IR_TEST_INT;
 					return IR_GUARD_TEST_INT;
-				} else if (op2_insn->op == IR_OVERFLOW) {
+				} else if (op2_insn->op == IR_OVERFLOW && ir_in_same_block(ctx, insn->op2)) {
 					/* c = OVERFLOW(_) ... GUARD(c) => SKIP_OVERFLOW ... GUARD_OVERFLOW */
 					ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_OVERFLOW;
 					return IR_GUARD_OVERFLOW;
