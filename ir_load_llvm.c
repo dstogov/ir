@@ -19,7 +19,7 @@
 #define LLVMAttrInlineHint     12
 #define LLVMAttrNoInline       26
 
-#define LLVM2IR_INLINE_MAX_HINT_BLOCKS 5
+#define LLVM2IR_INLINE_MAX_HINT_BLOCKS 10
 #define LLVM2IR_INLINE_MAX_HINT_COST   50
 #define LLVM2IR_INLINE_MAX_BLOCKS      5
 #define LLVM2IR_INLINE_MAX_COST        30
