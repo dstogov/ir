@@ -101,6 +101,7 @@ static void help(const char *cmd)
 		"  --debug-schedule           - debug SCHEDULE optimization pass\n"
 		"  --debug-ra                 - debug register allocator\n"
 		"  --debug-regset <bit-mask>  - restrict available register set\n"
+		"  --debug-bb-schedule        - debug BB PLCEMENT optimization pass\n"
 #endif
 		"  --disable-gdb              - disable JIT code registration in GDB\n"
 		"  --target                   - print JIT target\n"
@@ -1181,6 +1182,8 @@ int main(int argc, char **argv)
 			flags |= IR_DEBUG_SCHEDULE;
 		} else if (strcmp(argv[i], "--debug-ra") == 0) {
 			flags |= IR_DEBUG_RA;
+		} else if (strcmp(argv[i], "--debug-bb-schedule") == 0) {
+			flags |= IR_DEBUG_BB_SCHEDULE;
 #endif
 		} else if (strcmp(argv[i], "--debug-regset") == 0) {
 			if (i + 1 == argc || argv[i + 1][0] == '-') {
