@@ -2410,6 +2410,50 @@ IR_FOLD(TRUNC(AND))
 	IR_FOLD_NEXT;
 }
 
+IR_FOLD(AND(SHR, C_I8))
+IR_FOLD(AND(SHR, C_U8))
+{
+	if (IR_IS_CONST_REF(op1_insn->op2)) {
+		if (((uint8_t)-1) >> ctx->ir_base[op1_insn->op2].val.u8 == op2_insn->val.u8) {
+			IR_FOLD_COPY(op1);
+		}
+	}
+	IR_FOLD_NEXT;
+}
+
+IR_FOLD(AND(SHR, C_I16))
+IR_FOLD(AND(SHR, C_U16))
+{
+	if (IR_IS_CONST_REF(op1_insn->op2)) {
+		if (((uint16_t)-1) >> ctx->ir_base[op1_insn->op2].val.u16 == op2_insn->val.u16) {
+			IR_FOLD_COPY(op1);
+		}
+	}
+	IR_FOLD_NEXT;
+}
+
+IR_FOLD(AND(SHR, C_I32))
+IR_FOLD(AND(SHR, C_U32))
+{
+	if (IR_IS_CONST_REF(op1_insn->op2)) {
+		if (((uint32_t)-1) >> ctx->ir_base[op1_insn->op2].val.u32 == op2_insn->val.u32) {
+			IR_FOLD_COPY(op1);
+		}
+	}
+	IR_FOLD_NEXT;
+}
+
+IR_FOLD(AND(SHR, C_I64))
+IR_FOLD(AND(SHR, C_U64))
+{
+	if (IR_IS_CONST_REF(op1_insn->op2)) {
+		if (((uint64_t)-1) >> ctx->ir_base[op1_insn->op2].val.u64 == op2_insn->val.u64) {
+			IR_FOLD_COPY(op1);
+		}
+	}
+	IR_FOLD_NEXT;
+}
+
 IR_FOLD(EQ(FP2FP, C_DOUBLE))
 IR_FOLD(NE(FP2FP, C_DOUBLE))
 IR_FOLD(LT(FP2FP, C_DOUBLE))
