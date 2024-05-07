@@ -2838,6 +2838,46 @@ IR_FOLD(XOR(XOR, _))
 	IR_FOLD_NEXT;
 }
 
+/* ROL/ROR */
+IR_FOLD(OR(SHL, SHR))
+IR_FOLD(OR(SHR, SHL))
+IR_FOLD(ADD(SHL, SHR))
+IR_FOLD(ADD(SHR, SHL))
+{
+	if (op1_insn->op1 == op2_insn->op1) {
+		if (IR_IS_CONST_REF(op1_insn->op2) && IR_IS_CONST_REF(op2_insn->op2)) {
+			if (ctx->ir_base[op1_insn->op2].val.u64 + ctx->ir_base[op2_insn->op2].val.u64 ==
+					ir_type_size[IR_OPT_TYPE(opt)] * 8) {
+				/* (x << c) | (x >> (32 - c)) -> ROL(x, c) */
+				op1 = op1_insn->op1;
+				op2 = op1_insn->op2;
+				opt = op1_insn->opt + 3; /* SHL -> ROL, SHR -> ROR */
+				IR_FOLD_RESTART;
+			}
+		} else if (ctx->ir_base[op2_insn->op2].op == IR_SUB
+				&& IR_IS_CONST_REF(ctx->ir_base[op2_insn->op2].op1)
+				&& ctx->ir_base[op2_insn->op2].op2 == op1_insn->op2
+				&& ctx->ir_base[ctx->ir_base[op2_insn->op2].op1].val.u64 == ir_type_size[IR_OPT_TYPE(opt)] * 8) {
+			/* (x << y) | (x >> (32 - y)) -> ROL(x, y) */
+			op1 = op1_insn->op1;
+			op2 = op1_insn->op2;
+			opt = op1_insn->opt + 3; /* SHL -> ROL, SHR -> ROR */
+			IR_FOLD_RESTART;
+		} else if (ctx->ir_base[op1_insn->op2].op == IR_SUB
+				&& IR_IS_CONST_REF(ctx->ir_base[op1_insn->op2].op1)
+				&& ctx->ir_base[op1_insn->op2].op2 == op2_insn->op2
+				&& ctx->ir_base[ctx->ir_base[op1_insn->op2].op1].val.u64 == ir_type_size[IR_OPT_TYPE(opt)] * 8) {
+			/* (x << (32 - y)) | (x >> y) -> ROR(x, y) */
+			op1 = op2_insn->op1;
+			op2 = op2_insn->op2;
+			opt = op2_insn->opt + 3; /* SHL -> ROL, SHR -> ROR */
+			IR_FOLD_RESTART;
+		}
+	}
+	IR_FOLD_NEXT;
+}
+
+
 /* Swap operands (move lower ref to op2) for better CSE */
 IR_FOLD(ADD(_, _))
 IR_FOLD(MUL(_, _))

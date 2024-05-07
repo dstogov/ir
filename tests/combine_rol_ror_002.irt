@@ -1,0 +1,30 @@
+--TEST--
+001: Combine ROL/ROR
+--ARGS--
+-O2 --save
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 32;
+	l_1 = START(l_12);
+	int32_t d_2 = PARAM(l_1, "x", 0);
+	int32_t d_3 = PARAM(l_1, "y", 1);
+	int32_t d_4 = SUB(c_4, d_3);
+	int32_t d_5 = SHL(d_2, d_4);
+	int32_t d_6 = SHR(d_2, d_3);
+	int32_t d_7 = OR(d_5, d_6);
+	l_12 = RETURN(l_1, d_7);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	l_1 = START(l_5);
+	int32_t d_2 = PARAM(l_1, "x", 0);
+	int32_t d_3 = PARAM(l_1, "y", 1);
+	int32_t d_4 = ROR(d_2, d_3);
+	l_5 = RETURN(l_1, d_4);
+}
