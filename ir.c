@@ -2715,7 +2715,53 @@ ir_ref _ir_VLOAD(ir_ctx *ctx, ir_type type, ir_ref var)
 
 void _ir_VSTORE(ir_ctx *ctx, ir_ref var, ir_ref val)
 {
+	ir_ref limit = var;
+	ir_ref ref = ctx->control;
+	ir_ref prev = IR_UNUSED;
+	ir_insn *insn;
+	bool guarded = 0;
+
+	if (!IR_IS_CONST_REF(val)) {
+		insn = &ctx->ir_base[val];
+		if (insn->op == IR_BITCAST
+		 && !IR_IS_CONST_REF(insn->op1)
+		 && ir_type_size[insn->type] == ir_type_size[ctx->ir_base[insn->op1].type]) {
+			/* skip BITCAST */
+			val = insn->op1;
+		}
+	}
+
 	IR_ASSERT(ctx->control);
+	while (ref > limit) {
+		insn = &ctx->ir_base[ref];
+		if (insn->op == IR_VSTORE) {
+			if (insn->op2 == var) {
+				if (insn->op3 == val) {
+					return;
+				} else {
+					if (!guarded) {
+						if (prev) {
+							ctx->ir_base[prev].op1 = insn->op1;
+						} else {
+							ctx->control = insn->op1;
+						}
+						MAKE_NOP(insn);
+					}
+					break;
+				}
+			}
+		} else if (insn->op == IR_VLOAD) {
+			if (insn->op2 == var) {
+				break;
+			}
+		} else if (insn->op == IR_GUARD || insn->op == IR_GUARD_NOT) {
+			guarded = 1;
+		} else if (insn->op >= IR_START || insn->op == IR_CALL || insn->op == IR_LOAD || insn->op == IR_STORE) {
+			break;
+		}
+		prev = ref;
+		ref = insn->op1;
+	}
 	ctx->control = ir_emit3(ctx, IR_VSTORE, ctx->control, var, val);
 }
 
