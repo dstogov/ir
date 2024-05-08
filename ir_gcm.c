@@ -391,6 +391,13 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	n = ctx->use_lists[ref].refs;
 	for (i = 0; i < clones_count; i++) {
 		clone = clones[i].ref;
+		if (clones[i].use_count == 1) {
+			/* TOTALLY_USEFUL block may be a head of a diamond above the real usage.
+			 * Sink it down to the real usage block.
+			 * Clones with few uses we be sunk into the LCA block.
+			 */
+			clones[i].block = uses[clones[i].use].block;
+		}
 		ctx->cfg_map[clone] = clones[i].block;
 		ctx->use_lists[clone].count = clones[i].use_count;
 		ctx->use_lists[clone].refs = n;
