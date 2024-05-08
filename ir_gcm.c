@@ -405,19 +405,29 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 				ir_insn *insn = &ctx->ir_base[use];
 				ir_ref k, l = insn->inputs_count;
 
-				for (k = 1; k <= l; k++) {
-					if (ir_insn_op(insn, k) == ref) {
-						if (insn->op == IR_PHI) {
+				if (insn->op == IR_PHI) {
+					for (k = 1; k <= l; k++) {
+						if (ir_insn_op(insn, k) == ref) {
 							j = ctx->cfg_map[ir_insn_op(&ctx->ir_base[insn->op1], k - 1)];
-							while (ir_sparse_set_in(&data->totally_useful, ctx->cfg_blocks[j].idom)) {
-								j = ctx->cfg_blocks[j].idom;
-							}
 							if (j != clones[i].block) {
-								continue;
+								uint32_t dom_depth = ctx->cfg_blocks[clones[i].block].dom_depth;
+								while (ctx->cfg_blocks[j].dom_depth > dom_depth) {
+									j = ctx->cfg_blocks[j].dom_parent;
+								}
+								if (j != clones[i].block) {
+									continue;
+								}
 							}
+							ir_insn_set_op(insn, k, clone);
+							break;
 						}
-						ir_insn_set_op(insn, k, clone);
-						break;
+					}
+				} else {
+					for (k = 1; k <= l; k++) {
+						if (ir_insn_op(insn, k) == ref) {
+							ir_insn_set_op(insn, k, clone);
+							break;
+						}
 					}
 				}
 			}
