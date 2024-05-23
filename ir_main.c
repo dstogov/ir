@@ -1447,7 +1447,7 @@ finish:
 
 	if (!ir_loader_fix_relocs(&loader)) {
 		if (run && loader.main) {
-			fprintf(stderr, "ERROR: Cannot run program with undefined sumbols\n");
+			fprintf(stderr, "ERROR: Cannot run program with undefined symbols\n");
 			ret = 1;
 			goto exit;
 		}
