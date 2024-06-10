@@ -365,7 +365,7 @@ int ir_disasm(const char    *name,
 	}
 #  endif
 	cs_option(cs, CS_OPT_DETAIL, CS_OPT_ON);
-#  if DISASM_INTEL_SYNTAX
+#  ifdef DISASM_INTEL_SYNTAX
 	cs_option(cs, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
 #  else
 	cs_option(cs, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
