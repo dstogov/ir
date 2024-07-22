@@ -112,7 +112,7 @@ jobs:
             gmake test-ci
 
   MACOS_x86_64:
-    runs-on: macos-11
+    runs-on: macos-13
     env:
       CFLAGS: '-fsanitize=address,undefined'
     steps:
