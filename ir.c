@@ -2910,6 +2910,10 @@ void _ir_STORE(ir_ctx *ctx, ir_ref addr, ir_ref val)
 			}
 		} else if (insn->op == IR_LOAD) {
 			if (insn->op2 == addr) {
+				if (ref == val) {
+					/* dead STORE */
+					return;
+				}
 				break;
 			}
 			type2 = insn->type;
