@@ -2820,6 +2820,10 @@ void _ir_VSTORE(ir_ctx *ctx, ir_ref var, ir_ref val)
 			}
 		} else if (insn->op == IR_VLOAD) {
 			if (insn->op2 == var) {
+				if (ref == val) {
+					/* dead STORE */
+					return;
+				}
 				break;
 			}
 		} else if (insn->op == IR_GUARD || insn->op == IR_GUARD_NOT) {
