@@ -505,10 +505,12 @@ static void llvm2ir_alloca(ir_ctx *ctx, LLVMValueRef insn)
 		} else {
 			ref = ir_ALLOCA(ir_MUL_I32(llvm2ir_op(ctx, op0, IR_I32),
 				ir_const_i32(ctx, LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, LLVMGetAllocatedType(insn)))));
+			ctx->flags2 |= IR_HAS_ALLOCA;
 		}
 	} else {
 		ref = ir_ALLOCA(ir_MUL_I32(llvm2ir_op(ctx, op0, IR_I32),
 			ir_const_i32(ctx, LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, LLVMGetAllocatedType(insn)))));
+		ctx->flags2 |= IR_HAS_ALLOCA;
 	}
 	ir_addrtab_set(ctx->binding, (uintptr_t)insn, ref);
 }
@@ -1179,6 +1181,51 @@ static int llvm2ir_inline_cost(LLVMValueRef func)
 	return count;
 }
 
+static ir_ref llvm2ir_insert_block_begin(ir_ctx *ctx, ir_ref start)
+{
+	ir_ref i = start;
+	ir_insn *insn = &ctx->ir_base[i];
+	uint32_t n, flags = ir_op_flags[insn->op];;
+
+	if (!(flags & IR_OP_FLAG_CONTROL)) {
+		while (1) {
+			IR_ASSERT(i <= ctx->control);
+			flags = ir_op_flags[insn->op];
+			if (flags & IR_OP_FLAG_CONTROL) {
+				ir_ref begin = ir_emit1(ctx, IR_OPT(IR_BLOCK_BEGIN, IR_ADDR), insn->op1);
+				ctx->ir_base[i].op1 = begin;
+				return begin;
+			}
+			if (UNEXPECTED(IR_OP_HAS_VAR_INPUTS(flags))) {
+				n = insn->inputs_count;
+			} else {
+				n = insn->inputs_count = IR_INPUT_EDGES_COUNT(flags);
+			}
+			n = ir_insn_inputs_to_len(n);
+			i += n;
+			insn += n;
+		}
+	} else {
+		while (1) {
+			if (UNEXPECTED(IR_OP_HAS_VAR_INPUTS(flags))) {
+				n = insn->inputs_count;
+			} else {
+				n = insn->inputs_count = IR_INPUT_EDGES_COUNT(flags);
+			}
+			n = ir_insn_inputs_to_len(n);
+			i += n;
+			insn += n;
+			IR_ASSERT(i <= ctx->control);
+			flags = ir_op_flags[insn->op];
+			if ((flags & IR_OP_FLAG_CONTROL) && insn->op1 == start) {
+				ir_ref begin = ir_emit1(ctx, IR_OPT(IR_BLOCK_BEGIN, IR_ADDR), start);
+				ctx->ir_base[i].op1 = begin;
+				return begin;
+			}
+		}
+	}
+}
+
 static bool llvm2ir_inline(ir_ctx *ctx, LLVMValueRef insn, LLVMValueRef func, LLVMModuleRef module, LLVMValueRef root_func)
 {
 	uint32_t i, count = LLVMGetNumArgOperands(insn);
@@ -1197,7 +1244,15 @@ static bool llvm2ir_inline(ir_ctx *ctx, LLVMValueRef insn, LLVMValueRef func, LL
 		ref = llvm2ir_op(ctx, arg, type);
 		ir_addrtab_set(ctx->binding, (uintptr_t)LLVMGetParam(func, i), ref);
 	}
+	ir_ref start = ctx->control;
+	uint32_t orig_flags2 = ctx->flags2;
+	ctx->flags2 &= ~IR_HAS_ALLOCA;
 	ref = llvm2ir_func_ex(ctx, func, module, root_func);
+	if (ref && ctx->control && (ctx->flags2 & IR_HAS_ALLOCA)) {
+		ir_ref begin = llvm2ir_insert_block_begin(ctx, start);
+		ir_BLOCK_END(begin);
+	}
+	ctx->flags2 = orig_flags2;
 	if (!ref) {
 		return 0;
 	} else if (ref != 1) {
@@ -1733,6 +1788,7 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMValueRef func, LLVMModuleRef module)
 
 	ret = llvm2ir_func_ex(ctx, func, module, func);
 
+	ctx->flags2 &= ~IR_HAS_ALLOCA;
 	ir_addrtab_free(ctx->binding);
 	ir_mem_free(ctx->binding);
 	ctx->binding = NULL;

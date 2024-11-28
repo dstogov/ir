@@ -255,7 +255,7 @@ static bool ir_is_dead_load_ex(ir_ctx *ctx, ir_ref ref, uint32_t flags, ir_insn 
 {
 	if ((flags & (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_MASK)) == (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_LOAD)) {
 		return ctx->use_lists[ref].count == 1;
-	} else if (insn->op == IR_ALLOCA) {
+	} else if (insn->op == IR_ALLOCA || insn->op == IR_BLOCK_BEGIN) {
 		return ctx->use_lists[ref].count == 1;
 	}
 	return 0;
