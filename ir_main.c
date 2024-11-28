@@ -77,6 +77,8 @@ static void help(const char *cmd)
 		"  --dot  [file-name]         - dump IR graph\n"
 		"  --dump [file-name]         - dump IR table\n"
 		"  --dump-after-load          - dump IR after load and local optimization\n"
+		"  --dump-after-use-lists     - dump IR after USE-LISTS construction\n"
+		"  --dump-after-mem2ssa       - dump IR after MEM2SSA pass\n"
 		"  --dump-after-sccp          - dump IR after SCCP optimization pass\n"
 		"  --dump-after-cfg           - dump IR after CFG construction\n"
 		"  --dump-after-dom           - dump IR after Dominators tree construction\n"
@@ -120,15 +122,17 @@ static void help(const char *cmd)
 #define IR_DUMP_CODEGEN             (1<<7)
 
 #define IR_DUMP_AFTER_LOAD          (1<<16)
-#define IR_DUMP_AFTER_SCCP          (1<<17)
-#define IR_DUMP_AFTER_CFG           (1<<18)
-#define IR_DUMP_AFTER_DOM           (1<<19)
-#define IR_DUMP_AFTER_LOOP          (1<<20)
-#define IR_DUMP_AFTER_GCM           (1<<21)
-#define IR_DUMP_AFTER_SCHEDULE      (1<<22)
-#define IR_DUMP_AFTER_LIVE_RANGES   (1<<23)
-#define IR_DUMP_AFTER_COALESCING    (1<<24)
-#define IR_DUMP_AFTER_REGALLOC      (1<<25)
+#define IR_DUMP_AFTER_USE_LISTS     (1<<17)
+#define IR_DUMP_AFTER_MEM2SSA       (1<<18)
+#define IR_DUMP_AFTER_SCCP          (1<<19)
+#define IR_DUMP_AFTER_CFG           (1<<20)
+#define IR_DUMP_AFTER_DOM           (1<<21)
+#define IR_DUMP_AFTER_LOOP          (1<<22)
+#define IR_DUMP_AFTER_GCM           (1<<23)
+#define IR_DUMP_AFTER_SCHEDULE      (1<<24)
+#define IR_DUMP_AFTER_LIVE_RANGES   (1<<25)
+#define IR_DUMP_AFTER_COALESCING    (1<<26)
+#define IR_DUMP_AFTER_REGALLOC      (1<<27)
 
 #define IR_DUMP_AFTER_ALL           (1<<29)
 #define IR_DUMP_FINAL               (1<<30)
@@ -144,29 +148,33 @@ static int _save(ir_ctx *ctx, uint32_t save_flags, uint32_t dump, uint32_t pass,
 		if (dump & IR_DUMP_AFTER_ALL) {
 			if (pass == IR_DUMP_AFTER_LOAD) {
 				snprintf(fn, sizeof(fn)-1, "01-load-%s.ir", func_name);
+			} else if (pass == IR_DUMP_AFTER_USE_LISTS) {
+				snprintf(fn, sizeof(fn)-1, "02-use-lists-%s.ir", func_name);
+			} else if (pass == IR_DUMP_AFTER_MEM2SSA) {
+				snprintf(fn, sizeof(fn)-1, "03-mem2ssa-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_SCCP) {
-				snprintf(fn, sizeof(fn)-1, "02-sccp-%s.ir", func_name);
+				snprintf(fn, sizeof(fn)-1, "04-sccp-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_CFG) {
-				snprintf(fn, sizeof(fn)-1, "03-cfg-%s.ir", func_name);
+				snprintf(fn, sizeof(fn)-1, "05-cfg-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_DOM) {
-				snprintf(fn, sizeof(fn)-1, "04-dom-%s.ir", func_name);
+				snprintf(fn, sizeof(fn)-1, "06-dom-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_LOOP) {
-				snprintf(fn, sizeof(fn)-1, "05-loop-%s.ir", func_name);
+				snprintf(fn, sizeof(fn)-1, "07-loop-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_GCM) {
-				snprintf(fn, sizeof(fn)-1, "06-gcm-%s.ir", func_name);
+				snprintf(fn, sizeof(fn)-1, "08-gcm-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_SCHEDULE) {
-				snprintf(fn, sizeof(fn)-1, "07-schedule-%s.ir", func_name);
+				snprintf(fn, sizeof(fn)-1, "09-schedule-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_LIVE_RANGES) {
-				snprintf(fn, sizeof(fn)-1, "08-live-ranges-%s.ir", func_name);
+				snprintf(fn, sizeof(fn)-1, "10-live-ranges-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_COALESCING) {
-				snprintf(fn, sizeof(fn)-1, "09-coalescing-%s.ir", func_name);
+				snprintf(fn, sizeof(fn)-1, "11-coalescing-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_REGALLOC) {
-				snprintf(fn, sizeof(fn)-1, "10-regalloc-%s.ir", func_name);
+				snprintf(fn, sizeof(fn)-1, "12-regalloc-%s.ir", func_name);
 			} else if (pass == IR_DUMP_FINAL) {
 				if (dump & IR_DUMP_CODEGEN) {
-					snprintf(fn, sizeof(fn)-1, "11-codegen-%s.ir", func_name);
+					snprintf(fn, sizeof(fn)-1, "13-codegen-%s.ir", func_name);
 				} else {
-					snprintf(fn, sizeof(fn)-1, "11-final-%s.ir", func_name);
+					snprintf(fn, sizeof(fn)-1, "13-final-%s.ir", func_name);
 				}
 			} else {
 				f = stderr; // TODO:
@@ -219,6 +227,10 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 
 	if (opt_level > 0 || (ctx->flags & (IR_GEN_NATIVE|IR_GEN_CODE))) {
 		ir_build_def_use_lists(ctx);
+		if ((dump & (IR_DUMP_AFTER_USE_LISTS|IR_DUMP_AFTER_ALL))
+		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_USE_LISTS, dump_file, func_name)) {
+			return 0;
+		}
 	}
 
 #ifdef IR_DEBUG
@@ -227,6 +239,15 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 
 	/* Global Optimization */
 	if (opt_level > 1) {
+		ir_mem2ssa(ctx);
+		if ((dump & (IR_DUMP_AFTER_MEM2SSA|IR_DUMP_AFTER_ALL))
+		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_MEM2SSA, dump_file, func_name)) {
+			return 0;
+		}
+#ifdef IR_DEBUG
+		ir_check(ctx);
+#endif
+
 		ir_sccp(ctx);
 		if ((dump & (IR_DUMP_AFTER_SCCP|IR_DUMP_AFTER_ALL))
 		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_SCCP, dump_file, func_name)) {
@@ -1127,6 +1148,10 @@ int main(int argc, char **argv)
 			dump |= IR_DUMP_CODEGEN;
 		} else if (strcmp(argv[i], "--dump-after-load") == 0) {
 			dump |= IR_DUMP_AFTER_LOAD;
+		} else if (strcmp(argv[i], "--dump-after-use-lists") == 0) {
+			dump |= IR_DUMP_AFTER_USE_LISTS;
+		} else if (strcmp(argv[i], "--dump-after-mem2ssa") == 0) {
+			dump |= IR_DUMP_AFTER_MEM2SSA;
 		} else if (strcmp(argv[i], "--dump-after-sccp") == 0) {
 			dump |= IR_DUMP_AFTER_SCCP;
 		} else if (strcmp(argv[i], "--dump-after-cfg") == 0) {
@@ -1228,7 +1253,8 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (dump && !(dump & (IR_DUMP_AFTER_LOAD|IR_DUMP_AFTER_SCCP|
+	if (dump && !(dump & (IR_DUMP_AFTER_LOAD|IR_DUMP_AFTER_USE_LISTS|
+		IR_DUMP_AFTER_MEM2SSA|IR_DUMP_AFTER_SCCP|
 		IR_DUMP_AFTER_CFG|IR_DUMP_AFTER_DOM|IR_DUMP_AFTER_LOOP|
 		IR_DUMP_AFTER_GCM|IR_DUMP_AFTER_SCHEDULE|
 		IR_DUMP_AFTER_LIVE_RANGES|IR_DUMP_AFTER_COALESCING|IR_DUMP_AFTER_REGALLOC|
