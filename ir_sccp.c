@@ -2165,9 +2165,13 @@ static void ir_optimize_merge(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_
 
 			ir_ref next_ref = ctx->use_edges[use_list->refs + 1];
 			ir_insn *next = &ctx->ir_base[next_ref];
-			IR_ASSERT(next->op != IR_PHI);
 
-			if (phi->op == IR_PHI) {
+			if (next->op == IR_PHI) {
+				SWAP_REFS(phi_ref, next_ref);
+				SWAP_INSNS(phi, next);
+			}
+
+			if (phi->op == IR_PHI && next->op != IR_PHI) {
 				if (next->op == IR_IF && next->op1 == merge_ref && ctx->use_lists[phi_ref].count == 1) {
 					if (next->op2 == phi_ref) {
 						if (ir_try_split_if(ctx, next_ref, next, worklist)) {
