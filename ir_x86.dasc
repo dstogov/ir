@@ -1149,8 +1149,10 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 			} else {
 				flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 			}
-			if (IR_IS_CONST_REF(insn->op2) && insn->op1 != insn->op2) {
-				n = ir_add_const_tmp_reg(ctx, insn->op2, 2, n, constraints);
+			if (IR_IS_CONST_REF(insn->op2)) {
+				if (insn->op1 != insn->op2) {
+					n = ir_add_const_tmp_reg(ctx, insn->op2, 2, n, constraints);
+				}
 			} else if (ir_rule(ctx, insn->op2) == IR_STATIC_ALLOCA) {
 				constraints->tmp_regs[n] = IR_TMP_REG(2, IR_ADDR, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 				n++;
@@ -1223,9 +1225,11 @@ op2_const:
 			} else if (ir_rule(ctx, insn->op1) & IR_FUSED) {
 				flags = IR_USE_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
 			}
-			if (IR_IS_CONST_REF(insn->op2) && insn->op1 != insn->op2) {
-				flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
-				n = ir_add_const_tmp_reg(ctx, insn->op2, 2, n, constraints);
+			if (IR_IS_CONST_REF(insn->op2)) {
+				if (insn->op1 != insn->op2) {
+					flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
+					n = ir_add_const_tmp_reg(ctx, insn->op2, 2, n, constraints);
+				}
 			} else if (ir_rule(ctx, insn->op2) == IR_STATIC_ALLOCA) {
 				constraints->tmp_regs[n] = IR_TMP_REG(2, IR_ADDR, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 				n++;
