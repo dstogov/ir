@@ -1110,11 +1110,13 @@ ir_ref ir_get_op(ir_ctx *ctx, ir_ref ref, int32_t n)
 
 ir_ref ir_param(ir_ctx *ctx, ir_type type, ir_ref region, const char *name, int pos)
 {
+	IR_ASSERT(ctx->ir_base[region].op == IR_START);
 	return ir_emit(ctx, IR_OPT(IR_PARAM, type), region, ir_str(ctx, name), pos);
 }
 
 ir_ref ir_var(ir_ctx *ctx, ir_type type, ir_ref region, const char *name)
 {
+	IR_ASSERT(IR_IS_BB_START(ctx->ir_base[region].op));
 	return ir_emit(ctx, IR_OPT(IR_VAR, type), region, ir_str(ctx, name), IR_UNUSED);
 }
 

@@ -480,7 +480,9 @@ static void llvm2ir_alloca(ir_ctx *ctx, LLVMValueRef insn)
 	LLVMValueRef op0 = LLVMGetOperand(insn, 0);
 	ir_ref ref;
 
-	if (LLVMGetValueKind(op0) == LLVMConstantIntValueKind && LLVMConstIntGetZExtValue(op0) == 1) {
+	if (IR_IS_BB_START(ctx->ir_base[ctx->control].op)
+	 && LLVMGetValueKind(op0) == LLVMConstantIntValueKind
+	 && LLVMConstIntGetZExtValue(op0) == 1) {
 		LLVMTypeKind type_kind = LLVMGetTypeKind(LLVMGetAllocatedType(insn));
 
 		if (type_kind == LLVMIntegerTypeKind
