@@ -748,6 +748,9 @@ ir_ref ir_bind(ir_ctx *ctx, ir_ref var, ir_ref def);
 /* Def -> Use lists */
 void ir_build_def_use_lists(ir_ctx *ctx);
 
+/* SSA Construction */
+int ir_mem2ssa(ir_ctx *ctx);
+
 /* CFG - Control Flow Graph (implementation in ir_cfg.c) */
 int ir_build_cfg(ir_ctx *ctx);
 int ir_remove_unreachable_blocks(ir_ctx *ctx);
@@ -934,6 +937,11 @@ IR_ALWAYS_INLINE void *ir_jit_compile(ir_ctx *ctx, int opt_level, size_t *size)
 		ctx->flags |= IR_OPT_CFG | IR_OPT_CODEGEN;
 
 		ir_build_def_use_lists(ctx);
+
+		if (opt_level == 2
+		 && !ir_mem2ssa(ctx)) {
+			return NULL;
+		}
 
 		if (opt_level == 2
 		 && !ir_sccp(ctx)) {
