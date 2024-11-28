@@ -1965,7 +1965,7 @@ ir_ref _ir_VAR(ir_ctx *ctx, ir_type type, const char* name)
 	ir_ref ref = ctx->control;
 
 	while (1) {
-		IR_ASSERT(ctx->control);
+		IR_ASSERT(ref);
 		if (IR_IS_BB_START(ctx->ir_base[ref].op)) {
 			break;
 		}
