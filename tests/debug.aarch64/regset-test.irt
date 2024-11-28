@@ -68,53 +68,53 @@ aarch64
 	double d_2 = PARAM(l_1, "x", 0);
 	double d_3 = PARAM(l_1, "y", 1);
 	double d_4 = VAR(l_1, "cr");
-	double d_5 = SUB(d_3, c_4);
-	double d_6 = VAR(l_1, "ci");
-	double d_7 = VAR(l_1, "zi");
-	double d_8 = VAR(l_1, "zr");
-	int32_t d_9 = VAR(l_1, "i");
+	double d_5 = VAR(l_1, "ci");
+	double d_6 = VAR(l_1, "zi");
+	double d_7 = VAR(l_1, "zr");
+	int32_t d_8 = VAR(l_1, "i");
+	double d_9 = SUB(d_3, c_4);
 	l_10 = END(l_1);
 	l_11 = LOOP_BEGIN(l_10, l_37);
 	double d_12 = PHI(l_11, c_5, d_36);
 	double d_13 = PHI(l_11, c_5, d_34);
-	int32_t d_14 = PHI(l_11, c_6, d_15);
-	int32_t d_15 = ADD(d_14, c_7);
-	double d_16 = VAR(l_11, "temp");
-	double d_17 = VAR(l_11, "zr2");
-	double d_18 = MUL(d_13, d_13);
-	double d_19 = VAR(l_11, "zi2");
+	int32_t d_14 = PHI(l_11, c_6, d_18);
+	double d_15 = VAR(l_11, "temp");
+	double d_16 = VAR(l_11, "zr2");
+	double d_17 = VAR(l_11, "zi2");
+	int32_t d_18 = ADD(d_14, c_7);
+	double d_19 = MUL(d_13, d_13);
 	double d_20 = MUL(d_12, d_12);
-	double d_21 = ADD(d_20, d_18);
+	double d_21 = ADD(d_20, d_19);
 	bool d_22 = GT(d_21, c_8);
 	l_23 = IF(l_11, d_22);
 	l_24 = IF_TRUE(l_23);
-	l_25 = RETURN(l_24, d_15);
+	l_25 = RETURN(l_24, d_18);
 	l_26 = IF_FALSE(l_23);
-	bool d_27 = GT(d_15, c_9);
+	bool d_27 = GT(d_18, c_9);
 	l_28 = IF(l_26, d_27);
 	l_29 = IF_TRUE(l_28);
 	l_30 = RETURN(l_29, c_6, l_25);
 	l_31 = IF_FALSE(l_28);
 	double d_32 = MUL(d_13, d_12);
-	double d_33 = SUB(d_18, d_20);
-	double d_34 = ADD(d_33, d_5);
+	double d_33 = SUB(d_19, d_20);
+	double d_34 = ADD(d_33, d_9);
 	double d_35 = ADD(d_32, d_32);
 	double d_36 = ADD(d_35, d_2);
 	l_37 = LOOP_END(l_31);
 }
 { # LIVE-RANGES (vregs_count=12)
 TMP
-	[%d0]: [5.0-5.2)/2
+	[%d0]: [9.0-9.2)/2
 	[%d1]: [10.1-10.3)/1
 	[%w0]: [10.1-10.3)/0
 	[%d1]: [23.0-23.2)/22.2
 R1 (d_2) [SPILL=0x0]
-	[%d0]: [2.3-5.0), DEF(2.3, hint=%d0)
-	: [5.0-24.0), [26.0-29.0), [31.0-36.0)
+	[%d0]: [2.3-9.0), DEF(2.3, hint=%d0)
+	: [9.0-24.0), [26.0-29.0), [31.0-36.0)
 	[%d1]: [36.0-38.0), USE(36.1/2)!
-R2 (d_3) [%d1]: [3.3-5.1), DEF(3.3, hint=%d1), USE(5.1/1)!
-R3 (d_5) [SPILL=0x8]
-	[%d0]: [5.2-10.2), DEF(5.2)!
+R2 (d_3) [%d1]: [3.3-9.1), DEF(3.3, hint=%d1), USE(9.1/1)!
+R3 (d_9) [SPILL=0x8]
+	[%d0]: [9.2-10.2), DEF(9.2)!
 	: [10.2-24.0), [26.0-29.0), [31.0-34.0)
 	[%d1]: [34.0-34.1), USE(34.1/2)!
 	: [34.1-38.0)
@@ -123,14 +123,14 @@ R4 (d_12, d_36) [SPILL=0x10]
 	: [20.2-24.0), [26.0-29.0), [31.0-32.0)
 	[%d0]: [32.0-32.1), [36.2-38.0), USE(32.1/2)!, DEF(36.2)!, PHI_USE(37.2, phi=d_12/3)
 R5 (d_13, d_34) [SPILL=0x18]
-	[%d1]: [11.0-18.2), DEF(13.2), USE(18.1/1)!, USE(18.1/2)!
-	: [18.2-24.0), [26.0-29.0), [31.0-32.0)
+	[%d1]: [11.0-19.2), DEF(13.2), USE(19.1/1)!, USE(19.1/2)!
+	: [19.2-24.0), [26.0-29.0), [31.0-32.0)
 	[%d1]: [32.0-32.1), [34.2-36.0), USE(32.1/1)!, DEF(34.2)!
 	: [36.0-37.1)
 	: [37.1-38.0), PHI_USE(37.2, phi=d_13/3)
-R6 (d_14, d_15) [%w0]: [11.0-15.1), [15.2-25.0), [26.0-29.0), [31.0-38.0), DEF(14.2), USE(15.1/1)!, DEF(15.2)!, USE(25.0/2, hint=%w0), USE(28.1/27.1)!, PHI_USE(37.2, phi=d_14/3)
-R7 (d_18) [SPILL=0x20]
-	[%d1]: [18.2-23.0), DEF(18.2)!, USE(21.1/2)!
+R6 (d_14, d_18) [%w0]: [11.0-18.1), [18.2-25.0), [26.0-29.0), [31.0-38.0), DEF(14.2), USE(18.1/1)!, DEF(18.2)!, USE(25.0/2, hint=%w0), USE(28.1/27.1)!, PHI_USE(37.2, phi=d_14/3)
+R7 (d_19) [SPILL=0x20]
+	[%d1]: [19.2-23.0), DEF(19.2)!, USE(21.1/2)!
 	: [23.0-24.0), [26.0-29.0), [31.0-33.0)
 	[%d0]: [33.0-33.1), USE(33.1/1)!
 R8 (d_20) [SPILL=0x28]

@@ -68,36 +68,36 @@ x86
 	double d_2 = PARAM(l_1, "x", 0);
 	double d_3 = PARAM(l_1, "y", 1);
 	double d_4 = VAR(l_1, "cr");
-	double d_5 = SUB(d_3, c_4);
-	double d_6 = VAR(l_1, "ci");
-	double d_7 = VAR(l_1, "zi");
-	double d_8 = VAR(l_1, "zr");
-	int32_t d_9 = VAR(l_1, "i");
+	double d_5 = VAR(l_1, "ci");
+	double d_6 = VAR(l_1, "zi");
+	double d_7 = VAR(l_1, "zr");
+	int32_t d_8 = VAR(l_1, "i");
+	double d_9 = SUB(d_3, c_4);
 	l_10 = END(l_1);
 	l_11 = LOOP_BEGIN(l_10, l_37);
 	double d_12 = PHI(l_11, c_5, d_36);
 	double d_13 = PHI(l_11, c_5, d_34);
-	int32_t d_14 = PHI(l_11, c_6, d_15);
-	int32_t d_15 = ADD(d_14, c_7);
-	double d_16 = VAR(l_11, "temp");
-	double d_17 = VAR(l_11, "zr2");
-	double d_18 = MUL(d_13, d_13);
-	double d_19 = VAR(l_11, "zi2");
+	int32_t d_14 = PHI(l_11, c_6, d_18);
+	double d_15 = VAR(l_11, "temp");
+	double d_16 = VAR(l_11, "zr2");
+	double d_17 = VAR(l_11, "zi2");
+	int32_t d_18 = ADD(d_14, c_7);
+	double d_19 = MUL(d_13, d_13);
 	double d_20 = MUL(d_12, d_12);
-	double d_21 = ADD(d_20, d_18);
+	double d_21 = ADD(d_20, d_19);
 	bool d_22 = GT(d_21, c_8);
 	l_23 = IF(l_11, d_22);
 	l_24 = IF_TRUE(l_23);
-	l_25 = RETURN(l_24, d_15);
+	l_25 = RETURN(l_24, d_18);
 	l_26 = IF_FALSE(l_23);
-	bool d_27 = GT(d_15, c_9);
+	bool d_27 = GT(d_18, c_9);
 	l_28 = IF(l_26, d_27);
 	l_29 = IF_TRUE(l_28);
 	l_30 = RETURN(l_29, c_6, l_25);
 	l_31 = IF_FALSE(l_28);
 	double d_32 = MUL(d_12, d_13);
-	double d_33 = SUB(d_18, d_20);
-	double d_34 = ADD(d_33, d_5);
+	double d_33 = SUB(d_19, d_20);
+	double d_34 = ADD(d_33, d_9);
 	double d_35 = ADD(d_32, d_32);
 	double d_36 = ADD(d_35, d_2);
 	l_37 = LOOP_END(l_31);
@@ -110,21 +110,21 @@ R1 (d_2) [SPILL=0x24]
 	[%xmm0]: [2.2-10.1), DEF(2.2)
 	: [10.1-24.0), [26.0-29.0), [31.0-36.0)
 	: [36.0-38.0), USE(36.1/2)
-R2 (d_3) [SPILL=0x2c]: [3.2-5.0), DEF(3.2), USE(5.0/1, hint=R3)
-R3 (d_5) [SPILL=0x0]
-	[%xmm1]: [5.0-10.2), DEF(5.0, hint=R2)!
+R2 (d_3) [SPILL=0x2c]: [3.2-9.0), DEF(3.2), USE(9.0/1, hint=R3)
+R3 (d_9) [SPILL=0x0]
+	[%xmm1]: [9.0-10.2), DEF(9.0, hint=R2)!
 	: [10.2-24.0), [26.0-29.0), [31.0-34.0)
 	: [34.0-38.0), USE(34.1/2)
 R4 (d_12, d_36) [SPILL=0x8]
 	: [11.0-24.0), [26.0-29.0), [31.0-32.0), DEF(12.2), USE(20.0/1, hint=R8), USE(20.0/2), USE(32.0/1)
 	[%xmm0]: [36.0-38.0), DEF(36.0, hint=R12)!, PHI_USE(37.2, phi=d_12/3)
 R5 (d_13, d_34) [SPILL=0x10]
-	[%xmm0]: [11.0-20.0), DEF(13.2), USE(18.0/1, hint=R7), USE(18.0/2)
+	[%xmm0]: [11.0-20.0), DEF(13.2), USE(19.0/1, hint=R7), USE(19.0/2)
 	: [20.0-24.0), [26.0-29.0), [31.0-32.0)
 	: [32.0-32.1), USE(32.1/2, hint=R10)
 	[%xmm1]: [34.0-38.0), DEF(34.0, hint=R11)!, PHI_USE(37.2, phi=d_13/3)
-R6 (d_14, d_15) [%eax]: [11.0-15.1), [15.2-25.0), [26.0-29.0), [31.0-38.0), DEF(14.2), USE(15.1/1)!, DEF(15.2)!, USE(25.0/2, hint=%eax), USE(28.1/27.1), PHI_USE(37.2, phi=d_14/3)
-R7 (d_18) [%xmm1]: [18.0-24.0), [26.0-29.0), [31.0-33.0), DEF(18.0, hint=R5)!, USE(21.1/2), USE(33.0/1, hint=R11)
+R6 (d_14, d_18) [%eax]: [11.0-18.1), [18.2-25.0), [26.0-29.0), [31.0-38.0), DEF(14.2), USE(18.1/1)!, DEF(18.2)!, USE(25.0/2, hint=%eax), USE(28.1/27.1), PHI_USE(37.2, phi=d_14/3)
+R7 (d_19) [%xmm1]: [19.0-24.0), [26.0-29.0), [31.0-33.0), DEF(19.0, hint=R5)!, USE(21.1/2), USE(33.0/1, hint=R11)
 R8 (d_20) [SPILL=0x18]
 	[%xmm0]: [20.0-21.0), DEF(20.0, hint=R4)!, USE(21.0/1, hint=R9)
 	: [21.0-24.0), [26.0-29.0), [31.0-33.0)
