@@ -1245,6 +1245,22 @@ static void ir_merge_blocks(ir_ctx *ctx, ir_ref end, ir_ref begin, ir_bitqueue *
 	}
 }
 
+static void ir_remove_unused_vars(ir_ctx *ctx, ir_ref start, ir_ref end)
+{
+	ir_use_list *use_list = &ctx->use_lists[start];
+	ir_ref *p, use, n = use_list->count;
+
+	for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
+		use = *p;
+		if (use != end) {
+			ir_insn *use_insn = &ctx->ir_base[use];
+			IR_ASSERT(use_insn->op == IR_VAR);
+			IR_ASSERT(ctx->use_lists[use].count == 0);
+			MAKE_NOP(use_insn);
+		}
+	}
+}
+
 static bool ir_try_remove_empty_diamond(ir_ctx *ctx, ir_ref ref, ir_insn *insn, ir_bitqueue *worklist)
 {
 	if (insn->inputs_count == 2) {
@@ -1294,8 +1310,12 @@ static bool ir_try_remove_empty_diamond(ir_ctx *ctx, ir_ref ref, ir_insn *insn, 
 		ir_ref next_ref = ctx->use_edges[ctx->use_lists[ref].refs];
 		ir_insn *next = &ctx->ir_base[next_ref];
 
-		IR_ASSERT(ctx->use_lists[start1_ref].count == 1);
-		IR_ASSERT(ctx->use_lists[start2_ref].count == 1);
+		if (ctx->use_lists[start1_ref].count != 1) {
+			ir_remove_unused_vars(ctx, start1_ref, end1_ref);
+		}
+		if (ctx->use_lists[start2_ref].count != 1) {
+			ir_remove_unused_vars(ctx, start2_ref, end2_ref);
+		}
 
 		next->op1 = root->op1;
 		ir_use_list_replace_one(ctx, root->op1, root_ref, next_ref);
@@ -1336,7 +1356,9 @@ static bool ir_try_remove_empty_diamond(ir_ctx *ctx, ir_ref ref, ir_insn *insn, 
 			if (start->op != IR_CASE_VAL && start->op != IR_CASE_DEFAULT) {
 				return 0;
 			}
-			IR_ASSERT(ctx->use_lists[start_ref].count == 1);
+			if (ctx->use_lists[start_ref].count != 1) {
+				ir_remove_unused_vars(ctx, start_ref, end_ref);
+			}
 			if (!root_ref) {
 				root_ref = start->op1;
 				if (ctx->use_lists[root_ref].count != count) {
@@ -1459,8 +1481,12 @@ static bool ir_optimize_phi(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_re
 					}
 					next = &ctx->ir_base[next_ref];
 
-					IR_ASSERT(ctx->use_lists[start1_ref].count == 1);
-					IR_ASSERT(ctx->use_lists[start2_ref].count == 1);
+					if (ctx->use_lists[start1_ref].count != 1) {
+						ir_remove_unused_vars(ctx, start1_ref, end1_ref);
+					}
+					if (ctx->use_lists[start2_ref].count != 1) {
+						ir_remove_unused_vars(ctx, start2_ref, end2_ref);
+					}
 
 					insn->op = (
 						(is_less ? cond->op1 : cond->op2)
@@ -1545,8 +1571,12 @@ static bool ir_optimize_phi(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_re
 					}
 					next = &ctx->ir_base[next_ref];
 
-					IR_ASSERT(ctx->use_lists[start1_ref].count == 1);
-					IR_ASSERT(ctx->use_lists[start2_ref].count == 1);
+					if (ctx->use_lists[start1_ref].count != 1) {
+						ir_remove_unused_vars(ctx, start1_ref, end1_ref);
+					}
+					if (ctx->use_lists[start2_ref].count != 1) {
+						ir_remove_unused_vars(ctx, start2_ref, end2_ref);
+					}
 
 					insn->op = IR_ABS;
 					insn->inputs_count = 1;
@@ -1610,8 +1640,12 @@ static bool ir_optimize_phi(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_re
 					}
 					next = &ctx->ir_base[next_ref];
 
-					IR_ASSERT(ctx->use_lists[start1_ref].count == 1);
-					IR_ASSERT(ctx->use_lists[start2_ref].count == 1);
+					if (ctx->use_lists[start1_ref].count != 1) {
+						ir_remove_unused_vars(ctx, start1_ref, end1_ref);
+					}
+					if (ctx->use_lists[start2_ref].count != 1) {
+						ir_remove_unused_vars(ctx, start2_ref, end2_ref);
+					}
 
 					insn->op = IR_COND;
 					insn->inputs_count = 3;
