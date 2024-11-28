@@ -644,8 +644,13 @@ static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values
 									next_insn = use_insn;
 								} else if (use_insn->op != IR_NOP) {
 									IR_ASSERT(use_insn->op1 == ref);
-									use_insn->op1 = prev;
-									ir_use_list_add(ctx, prev, use);
+									IR_ASSERT(use_insn->op == IR_VAR);
+									ir_ref region = prev;
+									while (!IR_IS_BB_START(ctx->ir_base[region].op)) {
+										region = ctx->ir_base[region].op1;
+									}
+									use_insn->op1 = region;
+									ir_use_list_add(ctx, region, use);
 									p = &ctx->use_edges[use_list->refs + k];
 								}
 							}
