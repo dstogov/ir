@@ -330,6 +330,7 @@ static ir_ref ir_next_const(ir_ctx *ctx)
 
 static void ir_grow_top(ir_ctx *ctx)
 {
+	ir_ref old_insns_limit = ctx->insns_limit;
 	ir_insn *buf = ctx->ir_base - ctx->consts_limit;
 
 	if (ctx->insns_limit < 1024 * 4) {
@@ -344,6 +345,8 @@ static void ir_grow_top(ir_ctx *ctx)
 
 	if (ctx->use_lists) {
 		ctx->use_lists = ir_mem_realloc(ctx->use_lists, ctx->insns_limit * sizeof(ir_use_list));
+		memset(ctx->use_lists + old_insns_limit, 0,
+			(ctx->insns_limit - old_insns_limit) * sizeof(ir_use_list));
 	}
 }
 
