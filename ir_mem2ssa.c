@@ -36,12 +36,12 @@ static void ir_replace_insn(ir_ctx *ctx, ir_ref ref, ir_ref new_ref)
 	}
 }
 
-static void ir_ssa_set_var(ir_ctx *ctx, ir_ref *ssa_vars, ir_ref ref, ir_ref var, ir_ref val)
+static void ir_ssa_set_var(ir_ctx *ctx, ir_ref *ssa_vars, ir_ref var, ir_ref ref, ir_ref val)
 {
 	ssa_vars[ref] = val;
 }
 
-static ir_ref ir_ssa_get_var(ir_ctx *ctx, ir_ref *ssa_vars, ir_ref ref, ir_ref var)
+static ir_ref ir_ssa_get_var(ir_ctx *ctx, ir_ref *ssa_vars, ir_ref var, ir_ref ref)
 {
 	ir_ref ctrl, val;
 	ir_insn *ctrl_insn;
@@ -51,7 +51,7 @@ static ir_ref ir_ssa_get_var(ir_ctx *ctx, ir_ref *ssa_vars, ir_ref ref, ir_ref v
 	while (1) {
 		val = ssa_vars[ctrl];
 		if (val) {
-			ir_ssa_set_var(ctx, ssa_vars, ref, var, val);
+			ir_ssa_set_var(ctx, ssa_vars, var, ref, val);
 			return val;
 		}
 		ctrl_insn = &ctx->ir_base[ctrl];
@@ -82,12 +82,12 @@ static ir_ref ir_ssa_get_var(ir_ctx *ctx, ir_ref *ssa_vars, ir_ref ref, ir_ref v
 		val = ir_emit_N(ctx, IR_OPT(IR_PHI, type), n + 1);
 		ir_set_op(ctx, val, 1, ctrl);
 		ir_use_list_add(ctx, ctrl, val);
-		ir_ssa_set_var(ctx, ssa_vars, ctrl, var, val);
-		ir_ssa_set_var(ctx, ssa_vars, ref, var, val);
+		ir_ssa_set_var(ctx, ssa_vars, var, ctrl, val);
+		ir_ssa_set_var(ctx, ssa_vars, var, ref, val);
 		for (i = 1; i <= n; i++) {
 			ir_ref end = ir_get_op(ctx, ctrl, i);
 			IR_ASSERT(end);
-			ir_ref op = ir_ssa_get_var(ctx, ssa_vars, end, var);
+			ir_ref op = ir_ssa_get_var(ctx, ssa_vars, var, end);
 			ir_set_op(ctx, val, i + 1, op);
 			if (!IR_IS_CONST_REF(op)) {
 				ir_use_list_add(ctx, op, val);
@@ -95,7 +95,7 @@ static ir_ref ir_ssa_get_var(ir_ctx *ctx, ir_ref *ssa_vars, ir_ref ref, ir_ref v
 		}
 //		val = jit_ssa_try_remove_trivial_phi(jit, val);
 	} else if (ctrl_insn->op != IR_START && ctrl_insn->op1) {
-		val = ir_ssa_get_var(ctx, ssa_vars, ctrl_insn->op1, var);
+		val = ir_ssa_get_var(ctx, ssa_vars, var, ctrl_insn->op1);
 	} else {
 		/* read of uninitialized variable (use 0) */
 		ir_val c;
@@ -111,7 +111,7 @@ static ir_ref ir_ssa_get_var(ir_ctx *ctx, ir_ref *ssa_vars, ir_ref ref, ir_ref v
 		c.i64 = 0;
 		val = ir_const(ctx, c, type);
 	}
-	ir_ssa_set_var(ctx, ssa_vars, ref, var, val);
+	ir_ssa_set_var(ctx, ssa_vars, var, ref, val);
 	return val;
 }
 
@@ -144,7 +144,7 @@ static void ir_mem2ssa_convert(ir_ctx *ctx, ir_ref *ssa_vars, ir_ref var)
 				ir_use_list_remove_one(ctx, use_insn->op3, use);
 			}
 
-			ir_ssa_set_var(ctx, ssa_vars, next, var, use_insn->op3);
+			ir_ssa_set_var(ctx, ssa_vars, var, next, use_insn->op3);
 
 			MAKE_NOP(use_insn);
 			CLEAR_USES(use);
@@ -164,7 +164,7 @@ static void ir_mem2ssa_convert(ir_ctx *ctx, ir_ref *ssa_vars, ir_ref var)
 			ir_use_list_remove_one(ctx, use, prev);
 			ir_use_list_replace_one(ctx, prev, use, next);
 
-			ir_ref val = ir_ssa_get_var(ctx, ssa_vars, use, var);
+			ir_ref val = ir_ssa_get_var(ctx, ssa_vars, var, use);
 			ir_replace_insn(ctx, use, val);
 
 			use_insn = &ctx->ir_base[use];
