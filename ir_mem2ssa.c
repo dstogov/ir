@@ -290,6 +290,7 @@ int ir_mem2ssa(ir_ctx *ctx)
 
 				ir_mem2ssa_convert(ctx, ssa_vars, i);
 
+				insn = &ctx->ir_base[i];
 				MAKE_NOP(insn);
 				CLEAR_USES(i);
 			}
@@ -306,6 +307,7 @@ int ir_mem2ssa(ir_ctx *ctx)
 
 				ir_mem2ssa_convert(ctx, ssa_vars, i);
 
+				insn = &ctx->ir_base[i];
 				MAKE_NOP(insn);
 				CLEAR_USES(i);
 			}
