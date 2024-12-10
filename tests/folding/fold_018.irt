@@ -1,0 +1,21 @@
+--TEST--
+018: FOLD: EQ(PI(A, [X..X]), X) => TRUE
+--CODE--
+{
+	int32_t d_0 = 0;
+	l_1 = START(l_6);
+	int32_t d_1 = PARAM(l_1, "x", 1);
+	int32_t d_2 = RANGE(d_0, d_0);
+	int32_t d_3 = PI(d_1, d_2);
+	bool d_4 = EQ(d_3, d_0);
+	l_6 = RETURN(l_1, d_4);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	l_1 = START(l_3);
+	int32_t d_2 = PARAM(l_1, "x", 1);
+	l_3 = RETURN(l_1, c_3);
+}
