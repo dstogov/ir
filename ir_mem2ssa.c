@@ -23,6 +23,33 @@ static void ir_replace_insn(ir_ctx *ctx, ir_ref ref, ir_ref new_ref)
 	n = ctx->use_lists[ref].count;
 	for (j = 0; j < n; j++) {
 		use = ctx->use_edges[ctx->use_lists[ref].refs + j];
+		IR_ASSERT(use != ref);
+		insn = &ctx->ir_base[use];
+		l = insn->inputs_count;
+		for (k = 1; k <= l; k++) {
+			if (ir_insn_op(insn, k) == ref) {
+				ir_insn_set_op(insn, k, new_ref);
+				if (!IR_IS_CONST_REF(new_ref)) {
+					ir_use_list_add(ctx, new_ref, use);
+				}
+			}
+		}
+	}
+}
+
+static void ir_replace_phi_insn(ir_ctx *ctx, ir_ref ref, ir_ref new_ref)
+{
+	ir_ref j, n, use, k, l;
+	ir_insn *insn;
+
+	IR_ASSERT(ref != new_ref);
+
+	n = ctx->use_lists[ref].count;
+	for (j = 0; j < n; j++) {
+		use = ctx->use_edges[ctx->use_lists[ref].refs + j];
+		if (use == ref) {
+			continue;
+		}
 		insn = &ctx->ir_base[use];
 		l = insn->inputs_count;
 		for (k = 1; k <= l; k++) {
@@ -48,6 +75,54 @@ static ir_ref ir_uninitialized(ir_ctx *ctx, ir_type type)
 static void ir_ssa_set_var(ir_ctx *ctx, ir_ref *ssa_vars, ir_ref var, ir_ref ref, ir_ref val)
 {
 	ssa_vars[ref] = val;
+}
+
+static ir_ref ir_ssa_try_remove_trivial_phi(ir_ctx *ctx, ir_ref *ssa_vars, ir_ref var, ir_ref ref)
+{
+	ir_insn *insn = &ctx->ir_base[ref];
+	ir_ref n, *p, op, same = IR_UNUSED;
+
+	IR_ASSERT(insn->op == IR_PHI);
+	n = insn->inputs_count - 1;
+	p = insn->ops + 2;
+	for (; n > 0; p++, n--) {
+		op = *p;
+		if (op == same || op == ref) {
+			continue;
+		}
+		if (same != IR_UNUSED) {
+			return ref;
+		}
+		same = op;
+	}
+
+	IR_ASSERT(same != IR_UNUSED);
+	ir_replace_phi_insn(ctx, ref, same);
+
+	ir_use_list_remove_one(ctx, insn->op1, ref);
+	if (!IR_IS_CONST_REF(same)) {
+		ir_use_list_remove_all(ctx, same, ref);
+	}
+
+	n = insn->inputs_count;
+//	if (ref + (int)ir_insn_inputs_to_len(n) == ctx->insns_count) {
+//		ctx->insns_count = ref;
+//	} else {
+		p = insn->ops + 1;
+		insn->optx = IR_NOP;
+		for (; n > 0; p++, n--) {
+			*p = IR_UNUSED;
+		}
+//	}
+	CLEAR_USES(ref);
+
+	ir_ssa_set_var(ctx, ssa_vars, ref, var, same);
+
+	if (ctx->ir_base[same].op == IR_PHI) {
+//		same = ir_ssa_try_remove_trivial_phi(ctx, same);
+	}
+
+	return same;
 }
 
 static ir_ref ir_ssa_get_var(ir_ctx *ctx, ir_ref *ssa_vars, ir_ref var, ir_type type, ir_ref ref)
@@ -93,7 +168,7 @@ static ir_ref ir_ssa_get_var(ir_ctx *ctx, ir_ref *ssa_vars, ir_ref var, ir_type 
 				ir_use_list_add(ctx, op, val);
 			}
 		}
-//		val = jit_ssa_try_remove_trivial_phi(jit, val);
+//		val = ir_ssa_try_remove_trivial_phi(ctx, ssa_vars, var, val);
 	} else if (ctrl_insn->op != IR_START && ctrl_insn->op1) {
 		val = ir_ssa_get_var(ctx, ssa_vars, var, type, ctrl_insn->op1);
 	} else {
