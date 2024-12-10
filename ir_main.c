@@ -133,6 +133,8 @@ static void help(const char *cmd)
 #define IR_DUMP_AFTER_ALL           (1<<29)
 #define IR_DUMP_FINAL               (1<<30)
 
+#define IR_UNKNOWN_SIZE             1
+
 static int _save(ir_ctx *ctx, uint32_t save_flags, uint32_t dump, uint32_t pass, FILE *f, const char *func_name)
 {
 	char fn[4096];
@@ -537,7 +539,7 @@ static bool ir_loader_external_sym_dcl(ir_loader *loader, const char *name, uint
 			return 0;
 		}
 		if (l->dump_asm) {
-			ir_disasm_add_symbol(name, (uintptr_t)addr, sizeof(void*));
+			ir_disasm_add_symbol(name, (uintptr_t)addr, IR_UNKNOWN_SIZE);
 		}
 	} else {
 		ir_loader_add_sym(loader, name, NULL);
@@ -604,7 +606,7 @@ static bool ir_loader_external_func_dcl(ir_loader *loader, const char *name, uin
 			return 1;
 		}
 		if (l->dump_asm) {
-			ir_disasm_add_symbol(name, (uintptr_t)addr, sizeof(void*));
+			ir_disasm_add_symbol(name, (uintptr_t)addr, IR_UNKNOWN_SIZE);
 		}
 	} else {
 		ir_loader_add_sym(loader, name, NULL);
@@ -989,7 +991,7 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 						void *addr = ir_loader_resolve_sym_name(loader, name, 0);
 
 						IR_ASSERT(addr);
-						ir_disasm_add_symbol(name, (uintptr_t)addr, sizeof(void*));
+						ir_disasm_add_symbol(name, (uintptr_t)addr, IR_UNKNOWN_SIZE);
 //TODO:					} else if (insn->op == IR_SYM) {
 					}
 				}
