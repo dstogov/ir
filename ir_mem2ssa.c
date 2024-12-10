@@ -36,16 +36,24 @@ static void ir_replace_insn(ir_ctx *ctx, ir_ref ref, ir_ref new_ref)
 	}
 }
 
+static ir_ref ir_uninitialized(ir_ctx *ctx, ir_type type)
+{
+	/* read of uninitialized variable (use 0) */
+	ir_val c;
+
+	c.i64 = 0;
+	return ir_const(ctx, c, type);
+}
+
 static void ir_ssa_set_var(ir_ctx *ctx, ir_ref *ssa_vars, ir_ref var, ir_ref ref, ir_ref val)
 {
 	ssa_vars[ref] = val;
 }
 
-static ir_ref ir_ssa_get_var(ir_ctx *ctx, ir_ref *ssa_vars, ir_ref var, ir_ref ref)
+static ir_ref ir_ssa_get_var(ir_ctx *ctx, ir_ref *ssa_vars, ir_ref var, ir_type type, ir_ref ref)
 {
 	ir_ref ctrl, val;
 	ir_insn *ctrl_insn;
-	ir_type type;
 
 	ctrl = ref;
 	while (1) {
@@ -71,14 +79,6 @@ static ir_ref ir_ssa_get_var(ir_ctx *ctx, ir_ref *ssa_vars, ir_ref var, ir_ref r
 	if (ctrl_insn->op == IR_MERGE || ctrl_insn->op == IR_LOOP_BEGIN) {
 		uint32_t i, n = ctrl_insn->inputs_count;
 
-		if (ctx->ir_base[var].op == IR_VAR) {
-			type = ctx->ir_base[var].type;
-		} else if (ctx->ir_base[ref].op == IR_LOAD) {
-			type = ctx->ir_base[var].type;
-		} else {
-			IR_ASSERT(0);
-			type = IR_VOID;
-		}
 		val = ir_emit_N(ctx, IR_OPT(IR_PHI, type), n + 1);
 		ir_set_op(ctx, val, 1, ctrl);
 		ir_use_list_add(ctx, ctrl, val);
@@ -87,7 +87,7 @@ static ir_ref ir_ssa_get_var(ir_ctx *ctx, ir_ref *ssa_vars, ir_ref var, ir_ref r
 		for (i = 1; i <= n; i++) {
 			ir_ref end = ir_get_op(ctx, ctrl, i);
 			IR_ASSERT(end);
-			ir_ref op = ir_ssa_get_var(ctx, ssa_vars, var, end);
+			ir_ref op = ir_ssa_get_var(ctx, ssa_vars, var, type, end);
 			ir_set_op(ctx, val, i + 1, op);
 			if (!IR_IS_CONST_REF(op)) {
 				ir_use_list_add(ctx, op, val);
@@ -95,21 +95,10 @@ static ir_ref ir_ssa_get_var(ir_ctx *ctx, ir_ref *ssa_vars, ir_ref var, ir_ref r
 		}
 //		val = jit_ssa_try_remove_trivial_phi(jit, val);
 	} else if (ctrl_insn->op != IR_START && ctrl_insn->op1) {
-		val = ir_ssa_get_var(ctx, ssa_vars, var, ctrl_insn->op1);
+		val = ir_ssa_get_var(ctx, ssa_vars, var, type, ctrl_insn->op1);
 	} else {
-		/* read of uninitialized variable (use 0) */
-		ir_val c;
-
-		if (ctx->ir_base[var].op == IR_VAR) {
-			type = ctx->ir_base[var].type;
-		} else if (ctx->ir_base[ref].op == IR_LOAD) {
-			type = ctx->ir_base[ref].type;
-		} else {
-			IR_ASSERT(0);
-			type = IR_VOID;
-		}
-		c.i64 = 0;
-		val = ir_const(ctx, c, type);
+		/* read of uninitialized variable */
+		val = ir_uninitialized(ctx, type);
 	}
 	ir_ssa_set_var(ctx, ssa_vars, var, ref, val);
 	return val;
@@ -164,7 +153,7 @@ static void ir_mem2ssa_convert(ir_ctx *ctx, ir_ref *ssa_vars, ir_ref var)
 			ir_use_list_remove_one(ctx, use, prev);
 			ir_use_list_replace_one(ctx, prev, use, next);
 
-			ir_ref val = ir_ssa_get_var(ctx, ssa_vars, var, use);
+			ir_ref val = ir_ssa_get_var(ctx, ssa_vars, var, use_insn->type, use);
 			ir_replace_insn(ctx, use, val);
 
 			use_insn = &ctx->ir_base[use];
@@ -293,14 +282,13 @@ int ir_mem2ssa(ir_ctx *ctx)
 					memset(ssa_vars, 0, ssa_vars_len * sizeof(ir_ref));
 				}
 
-				ir_mem2ssa_convert(ctx, ssa_vars, i);
-
 				/* remove from control list */
-				insn = &ctx->ir_base[i];
 				ir_ref prev = insn->op1;
 				ir_ref next = ir_next_control(ctx, i);
 				ctx->ir_base[next].op1 = prev;
 				ir_use_list_replace_one(ctx, prev, i, next);
+
+				ir_mem2ssa_convert(ctx, ssa_vars, i);
 
 				MAKE_NOP(insn);
 				CLEAR_USES(i);
@@ -314,10 +302,10 @@ int ir_mem2ssa(ir_ctx *ctx)
 					memset(ssa_vars, 0, ssa_vars_len * sizeof(ir_ref));
 				}
 
+				ir_use_list_remove_one(ctx, insn->op1, i);
+
 				ir_mem2ssa_convert(ctx, ssa_vars, i);
 
-				insn = &ctx->ir_base[i];
-				ir_use_list_remove_one(ctx, insn->op1, i);
 				MAKE_NOP(insn);
 				CLEAR_USES(i);
 			}
