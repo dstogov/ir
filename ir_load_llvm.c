@@ -864,15 +864,18 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 		return ir_ROR(type,
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 0), type),
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 2), type));
-	} else if (STR_EQUAL(name, name_len, "llvm.va_start")) {
+	} else if (STR_EQUAL(name, name_len, "llvm.va_start")
+			|| STR_START(name, name_len, "llvm.va_start.")) {
 		IR_ASSERT(count == 1);
 		ir_VA_START(llvm2ir_op(ctx, LLVMGetOperand(insn, 0), IR_ADDR));
 		return IR_NULL;
-	} else if (STR_EQUAL(name, name_len, "llvm.va_end")) {
+	} else if (STR_EQUAL(name, name_len, "llvm.va_end")
+			|| STR_START(name, name_len, "llvm.va_end.")) {
 		IR_ASSERT(count == 1);
 		ir_VA_END(llvm2ir_op(ctx, LLVMGetOperand(insn, 0), IR_ADDR));
 		return IR_NULL;
-	} else if (STR_EQUAL(name, name_len, "llvm.va_copy")) {
+	} else if (STR_EQUAL(name, name_len, "llvm.va_copy")
+			|| STR_START(name, name_len, "llvm.va_copy.")) {
 		IR_ASSERT(count == 2);
 		ir_VA_COPY(
 			llvm2ir_op(ctx, LLVMGetOperand(insn, 0), IR_ADDR),
@@ -920,10 +923,12 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 		IR_ASSERT(LLVMGetValueKind(LLVMGetOperand(insn, 0)) == LLVMConstantIntValueKind);
 		IR_ASSERT(LLVMConstIntGetSExtValue(LLVMGetOperand(insn, 0)) == 0);
 		return ir_FRAME_ADDR();
-	} else if (STR_EQUAL(name, name_len, "llvm.stacksave")) {
+	} else if (STR_EQUAL(name, name_len, "llvm.stacksave")
+			|| STR_START(name, name_len, "llvm.stacksave.")) {
 		IR_ASSERT(count == 0);
 		return ir_BLOCK_BEGIN();
-	} else if (STR_EQUAL(name, name_len, "llvm.stackrestore")) {
+	} else if (STR_EQUAL(name, name_len, "llvm.stackrestore")
+			|| STR_START(name, name_len, "llvm.stackrestore.")) {
 		IR_ASSERT(count == 1);
 		ir_BLOCK_END(llvm2ir_op(ctx, LLVMGetOperand(insn, 0), IR_ADDR));
 		return ctx->control;
