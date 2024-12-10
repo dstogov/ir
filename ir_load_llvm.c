@@ -1883,7 +1883,7 @@ next:
 	}
 
 	predecessor_edges = ir_mem_malloc(sizeof(uint32_t) * predecessor_edges_count);
-	predecessor_refs = ir_mem_calloc(sizeof(ir_ref), predecessor_edges_count);
+	predecessor_refs = ir_mem_calloc(predecessor_edges_count, sizeof(ir_ref));
 	inputs = ir_mem_malloc(sizeof(ir_ref) * max_inputs_count);
 	i = post_order_count;
 	while (i > 0) {
