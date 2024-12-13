@@ -11031,7 +11031,8 @@ void ir_fix_thunk(void *thunk_entry, void *addr)
 		addr_ptr = (void**)(code + 6 + *offset_ptr);
 		*addr_ptr = addr;
 	} else {
-		int32_t *addr_ptr;
+		typedef IR_SET_ALIGNED(1, int32_t unaligned_int32_t);
+		unaligned_int32_t *addr_ptr;
 
 		code[0] = 0xe9;
 		addr_ptr = (int32_t*)(code + 1);
