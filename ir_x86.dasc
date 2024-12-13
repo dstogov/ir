@@ -1461,6 +1461,17 @@ op2_const:
 		case IR_FP2FP:
 			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
 			break;
+		case IR_FP2INT:
+			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
+			break;
+		case IR_INT2FP:
+			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
+			insn = &ctx->ir_base[ref];
+			if (IR_IS_CONST_REF(insn->op1)) {
+				constraints->tmp_regs[0] = IR_TMP_REG(1, ctx->ir_base[insn->op1].type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n = 1;
+			}
+			break;
 		case IR_ABS_INT:
 			flags = IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;
 			break;
@@ -7117,6 +7128,8 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 |.endif
 		}
+	} else if (IR_IS_CONST_REF(insn->op1)) {
+		IR_ASSERT(0);
 	} else {
 		ir_mem mem;
 		bool src64 = ir_type_size[src_type] == 8;
