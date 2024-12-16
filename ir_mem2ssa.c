@@ -280,28 +280,32 @@ static void ir_mem2ssa_convert2(ir_ctx *ctx, ir_ref *idom, ir_ref *live_in, ir_l
 			IR_ASSERT(use_insn->op == IR_VLOAD || use_insn->op == IR_LOAD);
 			IR_ASSERT(use_insn->op2 == var);
 			end = idom[use];
-			if (!ir_bitset_in(def, end)) {
-				live_in[use] = 0;
+			if (ir_bitset_in(def, end)) {
+				/* LOAD is going to be replaced by the value from the last STORE from the same BB */
+				live_in[use] = live_in[end];
+			 } else {
+				live_in[use] = 0; /* replacement of LOAD is not known yet */
 				start = idom[end];
 				if (live_in[start] != var) {
-					/* Mark VAR as alive at the start of BB */
-					live_in[start] = var;
-					ir_list_push(queue, end);
+					live_in[start] = var;     /* mark VAR as alive at the start of BB */
+					ir_list_push(queue, end); /* schedule BB for backward path exploration on the next step */
 				}
-			} else {
-				/* Replace result of the LOAD by the value used in the last STORE from the same BB */
-				live_in[use] = live_in[end];
 			}
 		}
 	}
 
-	/* Calculate BBs where VAR is alive at start exploring paths from "uses" to "definitions" */
+	/* Find all MERGEs where VAR is alive, exploring paths backward from "uses" to "definitions".
+	 *
+	 * See algorithms 6 and 7 from "Computing Liveness Sets for SSA-Form Programs"
+	 * by Florian Brandner, Benoit Boissinot, Alain Darte, Benoit Dupont de Dinechin,
+	 * Fabrice Rastello. TR Inria RR-7503, 2011
+	 */
 	while (ir_list_len(queue)) {
 		end = ir_list_pop(queue);
 		start = idom[end];
 		start_insn = &ctx->ir_base[start];
 		if (start_insn->op == IR_MERGE || start_insn->op == IR_LOOP_BEGIN) {
-			ir_bitset_incl(merges, end);
+			ir_bitset_incl(merges, end); /* collect all MERGEs for the next step */
 			n = start_insn->inputs_count;
 			for (p = start_insn->ops + 1; n > 0; p++, n--) {
 				end = *p; // BB_END
@@ -325,7 +329,9 @@ static void ir_mem2ssa_convert2(ir_ctx *ctx, ir_ref *idom, ir_ref *live_in, ir_l
 		}
 	}
 
-	/* Insert PHI nodes */
+	/* Insert PHI nodes into Domintar Frontiers where VAR is alive.
+	 * Find the DFs on-the-fly using the algoritm (Figure 5) from
+	 * "A Simple, Fast Dominance Algorithm" by Cooper, Harvey and Kennedy. */
 	bool changed;
 	do {
 		changed = 0;
@@ -351,7 +357,6 @@ static void ir_mem2ssa_convert2(ir_ctx *ctx, ir_ref *idom, ir_ref *live_in, ir_l
 				}
 			}
 			if (need_phi) {
-//fprintf(stderr, "Add PHI for var d_%d at d_%d\n", var, start);
 				ir_ref phi = ir_emit_N(ctx, IR_OPT(IR_PHI, type), start_insn->inputs_count + 1);
 				ir_set_op(ctx, phi, 1, start);
 				ir_use_list_add(ctx, start, phi);
@@ -369,7 +374,7 @@ static void ir_mem2ssa_convert2(ir_ctx *ctx, ir_ref *idom, ir_ref *live_in, ir_l
 		} IR_BITSET_FOREACH_END();
 	} while (changed);
 
-	/* Renaming: remove STROREs and LOADs */
+	/* Renaming: remove STROREs and replace LOADs by last STOREed values or by PHIs */
 	n = ctx->use_lists[var].count;
 	for (i = 0; i < n; i++) {
 		use = ctx->use_edges[ctx->use_lists[var].refs + i];
