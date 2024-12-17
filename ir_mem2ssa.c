@@ -41,13 +41,11 @@ static ir_ref ir_uninitialized(ir_ctx *ctx, ir_type type)
 	return ir_const(ctx, c, type);
 }
 
-static void ir_mem2ssa_convert(ir_ctx *ctx, ir_ref *idom, ir_ref *live_in, ir_list *queue, ir_ref var, ir_type type)
+static void ir_mem2ssa_convert(ir_ctx *ctx, ir_ref *ssa_vars, ir_list *queue, ir_bitset defs, ir_bitset merges, ir_ref var, ir_type type)
 {
-	ir_ref *p, i, n, use, start, end;
-	ir_insn *use_insn, *start_insn;
-	uint32_t len = ir_bitset_len(ctx->insns_count);
-	ir_bitset def = ir_mem_calloc(len * 2, IR_BITSET_BITS / 8);
-	ir_bitset merges = def + len;
+	ir_ref *p, i, n, use;
+	ir_insn *use_insn;
+	uint32_t b, *q;
 
 	/* For each usage of VAR */
 	n = ctx->use_lists[var].count;
@@ -56,26 +54,19 @@ static void ir_mem2ssa_convert(ir_ctx *ctx, ir_ref *idom, ir_ref *live_in, ir_li
 		use_insn = &ctx->ir_base[use];
 		if (use_insn->op == IR_VSTORE || use_insn->op == IR_STORE) {
 			IR_ASSERT(use_insn->op2 == var && use_insn->op3 != var);
-			end = idom[use];
-			/* Mark VAR as defined and alive at the end of BB */
-			ir_bitset_incl(def, end);
-			/* The value of the VAR at the end of the BB is defined by this STORE */
-			live_in[use] = use_insn->op3;
-			live_in[end] = use;
+			b = ctx->cfg_map[use];
+			if (EXPECTED(b)) {
+				/* Mark VAR as defined and alive at the end of BB */
+				ir_bitset_incl(defs, b);
+				ssa_vars[b] = var;
+			}
 		} else {
 			IR_ASSERT(use_insn->op == IR_VLOAD || use_insn->op == IR_LOAD);
 			IR_ASSERT(use_insn->op2 == var);
-			end = idom[use];
-			if (ir_bitset_in(def, end)) {
-				/* LOAD is going to be replaced by the value from the last STORE from the same BB */
-				live_in[use] = live_in[end];
-			 } else {
-				live_in[use] = 0; /* replacement of LOAD is not known yet */
-				start = idom[end];
-				if (live_in[start] != var) {
-					live_in[start] = var;     /* mark VAR as alive at the start of BB */
-					ir_list_push(queue, end); /* schedule BB for backward path exploration on the next step */
-				}
+			b = ctx->cfg_map[use];
+			if (EXPECTED(b) && ssa_vars[b] != var) {
+				ssa_vars[b] = var;  /* mark VAR as alive at start of BB */
+				ir_list_push(queue, b); /* schedule BB for backward path exploration on the next step */
 			}
 		}
 	}
@@ -87,30 +78,26 @@ static void ir_mem2ssa_convert(ir_ctx *ctx, ir_ref *idom, ir_ref *live_in, ir_li
 	 * Fabrice Rastello. TR Inria RR-7503, 2011
 	 */
 	while (ir_list_len(queue)) {
-		end = ir_list_pop(queue);
-		start = idom[end];
-		start_insn = &ctx->ir_base[start];
-		if (start_insn->op == IR_MERGE || start_insn->op == IR_LOOP_BEGIN) {
-			ir_bitset_incl(merges, end); /* collect all MERGEs for the next step */
-			n = start_insn->inputs_count;
-			for (p = start_insn->ops + 1; n > 0; p++, n--) {
-				end = *p; // BB_END
-				if (!ir_bitset_in(def, end)) {
-					start = idom[end];
-					if (live_in[start] != var) {
-						live_in[start] = var;
-						ir_list_push(queue, end);
-					}
+		b = ir_list_pop(queue);
+		ir_block *bb = &ctx->cfg_blocks[b];
+		if (bb->predecessors_count > 1) {
+			IR_ASSERT(ctx->ir_base[bb->start].op == IR_MERGE || ctx->ir_base[bb->start].op == IR_LOOP_BEGIN);
+			ir_bitset_incl(merges, b); /* collect all MERGEs for the next step */
+			n = bb->predecessors_count;
+
+			for (q = ctx->cfg_edges + bb->predecessors; n > 0; q++, n--) {
+				int pred = *q;
+				if (ssa_vars[pred] != var) {
+					ssa_vars[pred] = var;
+					ir_list_push(queue, pred);
 				}
 			}
-		} else if (start_insn->op != IR_START && start_insn->op1) {
-			end = start_insn->op1;
-			if (!ir_bitset_in(def, end)) {
-				start = idom[end];
-				if (live_in[start] != var) {
-					live_in[start] = var;
-					ir_list_push(queue, end);
-				}
+		} else if (bb->predecessors_count == 1) {
+			IR_ASSERT(ctx->ir_base[bb->start].op != IR_START && ctx->ir_base[bb->start].op1);
+			int pred = ctx->cfg_edges[bb->predecessors];
+			if (ssa_vars[pred] != var) {
+				ssa_vars[pred] = var;
+				ir_list_push(queue, pred);
 			}
 		}
 	}
@@ -121,39 +108,36 @@ static void ir_mem2ssa_convert(ir_ctx *ctx, ir_ref *idom, ir_ref *live_in, ir_li
 	bool changed;
 	do {
 		changed = 0;
-		IR_BITSET_FOREACH(merges, len, end) {
-			ir_ref dom;
+		IR_BITSET_FOREACH(merges, ir_bitset_len(ctx->cfg_blocks_count + 1), b) {
+			uint32_t dom;
 			bool need_phi = 0;
 
-			start = idom[end];
-			live_in[start] = 0;
-			dom = idom[start]; // dominator
-			start_insn = &ctx->ir_base[start];
-			IR_ASSERT(start_insn->op == IR_MERGE || start_insn->op == IR_LOOP_BEGIN);
-			n = start_insn->inputs_count;
-			for (p = start_insn->ops + 1; n > 0; p++, n--) {
-				ir_ref runner = *p;
+			ir_block *bb = &ctx->cfg_blocks[b];
+			ir_ref start = bb->start;
+			dom = bb->idom;
+			IR_ASSERT(ctx->ir_base[start].op == IR_MERGE || ctx->ir_base[start].op == IR_LOOP_BEGIN);
+			n = bb->predecessors_count;
+			for (q = ctx->cfg_edges + bb->predecessors; n > 0; q++, n--) {
+				uint32_t runner = *q;
 				while (runner != dom) {
-					if (ir_bitset_in(def, runner)) {
+					if (ir_bitset_in(defs, runner)) {
 						need_phi = 1;
 						break;
 					}
-					runner = idom[idom[runner]];
-					if (!runner) break;
+					runner = ctx->cfg_blocks[runner].idom;
+					IR_ASSERT(runner);
 				}
 			}
 			if (need_phi) {
-				ir_ref phi = ir_emit_N(ctx, IR_OPT(IR_PHI, type), start_insn->inputs_count + 1);
+				ir_ref phi = ir_emit_N(ctx, IR_OPT(IR_PHI, type), bb->predecessors_count + 1);
 				ir_set_op(ctx, phi, 1, start);
 				ir_use_list_add(ctx, start, phi);
-				ir_bitset_excl(merges, end);
+				ir_bitset_excl(merges, b);
 				ir_list_push(queue, phi);
-				ir_bitset_incl(def, start);
-				live_in[start] = phi;
-				if (!ir_bitset_in(def, end)) {
+				ssa_vars[b] = phi;
+				if (!ir_bitset_in(defs, b)) {
 					/* Mark VAR as defined and alive at the end of BB */
-					ir_bitset_incl(def, end);
-					live_in[end] = phi;
+					ir_bitset_incl(defs, b);
 					changed = 1;
 				}
 			}
@@ -184,6 +168,11 @@ static void ir_mem2ssa_convert(ir_ctx *ctx, ir_ref *idom, ir_ref *live_in, ir_li
 				ir_use_list_remove_one(ctx, use_insn->op3, use);
 			}
 
+			b = ctx->cfg_map[use];
+			if (EXPECTED(b)) {
+				ssa_vars[b] = use_insn->op3;
+			}
+
 			MAKE_NOP(use_insn);
 			CLEAR_USES(use);
 		} else if (use_insn->op == IR_VLOAD || use_insn->op == IR_LOAD) {
@@ -196,35 +185,25 @@ static void ir_mem2ssa_convert(ir_ctx *ctx, ir_ref *idom, ir_ref *live_in, ir_li
 			 *
 			 */
 
+			ir_ref val;
 			ir_ref prev = use_insn->op1;
 			ir_ref next = ir_next_control(ctx, use);
 			ctx->ir_base[next].op1 = prev;
 			ir_use_list_remove_one(ctx, use, prev);
 			ir_use_list_replace_one(ctx, prev, use, next);
 
-			ir_ref val;
-			if (live_in[use]) {
-				val = live_in[use];
-				while (!IR_IS_CONST_REF(val) && ctx->ir_base[val].op != IR_PHI && live_in[val]) {
-					val = live_in[val];
+			b = ctx->cfg_map[use];
+			while (1) {
+				if (!b) {
+					val = ir_uninitialized(ctx, type);
+					break;
 				}
-			} else {
-				end = idom[use];
-				while (1) {
-					end = idom[end];
-					if (!end) {
-						val = ir_uninitialized(ctx, type);
-						break;
-					} else if (ir_bitset_in(def, end)) {
-						val = live_in[end];
-						while (!IR_IS_CONST_REF(val) && ctx->ir_base[val].op != IR_PHI && live_in[val]) {
-							val = live_in[val];
-						}
-						break;
-				    }
+				val = ssa_vars[b];
+				if (val != var) {
+					break;
 				}
+				b = ctx->cfg_blocks[b].idom;
 			}
-			live_in[use] = val;
 			ir_replace_insn(ctx, use, val);
 
 			use_insn = &ctx->ir_base[use];
@@ -239,27 +218,23 @@ static void ir_mem2ssa_convert(ir_ctx *ctx, ir_ref *idom, ir_ref *live_in, ir_li
 		ir_insn *phi_insn = &ctx->ir_base[phi];
 
 		IR_ASSERT(phi_insn->op == IR_PHI);
-		start = phi_insn->op1;
-		start_insn = &ctx->ir_base[start];
+		ir_ref start = phi_insn->op1;
+		ir_insn *start_insn = &ctx->ir_base[start];
 		IR_ASSERT(start_insn->op == IR_MERGE || start_insn->op == IR_LOOP_BEGIN);
 		n = start_insn->inputs_count;
 		for (i = 0, p = start_insn->ops + 1; i < n; p++, i++) {
 			ir_ref val;
 
-			end = *p;
-			while (1) {
-				if (ir_bitset_in(def, end)) {
-					val = live_in[end];
-					while (!IR_IS_CONST_REF(val) && ctx->ir_base[val].op != IR_PHI && live_in[val]) {
-						val = live_in[val];
-					}
-					break;
-				}
-				end = idom[end];
-				if (!end) {
+			ir_ref end = *p;
+			b = ctx->cfg_map[end];
+			val = ssa_vars[b];
+			while (val == var) {
+				b = ctx->cfg_blocks[b].idom;
+				if (!b) {
 					val = ir_uninitialized(ctx, type);
 					break;
 			    }
+				val = ssa_vars[b];
 			}
 			ir_set_op(ctx, phi, i + 2, val);
 			if (!IR_IS_CONST_REF(val)) {
@@ -267,8 +242,6 @@ static void ir_mem2ssa_convert(ir_ctx *ctx, ir_ref *idom, ir_ref *live_in, ir_li
 			}
 		}
 	}
-
-	ir_mem_free(def);
 }
 
 static bool ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_insn *insn, ir_type *type_ptr)
@@ -371,201 +344,66 @@ static bool ir_mem2ssa_may_convert_var(ir_ctx *ctx, ir_ref var, ir_insn *insn)
 	return 1;
 }
 
-/*
-   idom[BB_END node] -> BB_START node of the same BB
-   idom[BB_START node] -> BB_END node of immediate dominator
- */
-static void ir_calc_idom_tree(ir_ctx *ctx, ir_ref *idom)
-{
-	ir_ref ref, end, start, n, *p;
-	ir_insn *insn;
-	ir_use_list *use_list;
-	ir_worklist worklist;
-	bool changed;
-	uint32_t len = ir_bitset_len(ctx->insns_count);
-	ir_bitset bb_starts = ir_mem_calloc(len * 3, IR_BITSET_BITS / 8);
-	ir_bitset bb_leaks = bb_starts + len;
-	ir_bitset merges = bb_leaks + len;
-
-	ir_worklist_init(&worklist, ctx->insns_count);
-
-	/* First try to perform backward DFS search starting from "stop" nodes */
-
-	/* Add all "stop" nodes */
-	ref = ctx->ir_base[1].op1;
-	while (ref) {
-		ir_worklist_push(&worklist, ref);
-		ref = ctx->ir_base[ref].op3;
-	}
-
-	while (ir_worklist_len(&worklist)) {
-		ref = ir_worklist_pop(&worklist);
-		insn = &ctx->ir_base[ref];
-		IR_ASSERT(IR_IS_BB_END(insn->op));
-		/* Remember BB end */
-		end = ref;
-		/* Some successors of IF and SWITCH nodes may be inaccessible by backward DFS */
-		use_list = &ctx->use_lists[end];
-		n = use_list->count;
-		if (n > 1 || (n == 1 && (ir_op_flags[insn->op] & IR_OP_FLAG_TERMINATOR) != 0)) {
-			for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
-				/* Remember possible inaccessible successors */
-				ir_bitset_incl(bb_leaks, *p);
-			}
-		}
-
-		/* Skip control nodes untill BB start */
-		ref = insn->op1;
-		while (1) {
-			insn = &ctx->ir_base[ref];
-			if (IR_IS_BB_START(insn->op)) {
-				break;
-			}
-			idom[ref] = end; // link inner-block control nodes to BB_END
-			ref = insn->op1; // follow connected control nodes untill BB start
-		}
-		idom[end] = ref; // link BB_END to BB_START
-		/* Mark BB Start */
-		ir_bitset_incl(bb_starts, ref);
-		/* Add predecessors */
-		if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
-			ir_ref *p, n = insn->inputs_count;
-
-			ir_bitset_incl(merges, ref); // find dominator later
-			for (p = insn->ops + 1; n > 0; p++, n--) {
-				ir_ref input = *p;
-				IR_ASSERT(input);
-				ir_worklist_push(&worklist, input);
-			}
-		} else if (insn->op != IR_START && EXPECTED(insn->op1 != IR_UNUSED)) {
-			idom[ref] = insn->op1; // link BB_START to single predeessor BB_END (immediate dominator)
-			ir_worklist_push(&worklist, insn->op1);
-		}
-	}
-
-	/* Backward DFS way miss some branches ending by infinite loops.  */
-	/* Try forward DFS. (in most cases all nodes are already proceed). */
-
-	/* START node may be inaccessible from "stop" nodes */
-	ir_bitset_incl(bb_leaks, 1);
-
-	/* Add not processed START and successor of IF and SWITCH */
-	IR_BITSET_FOREACH_DIFFERENCE(bb_leaks, bb_starts, len, start) {
-		ir_worklist_push(&worklist, start);
-	} IR_BITSET_FOREACH_END();
-
-	if (ir_worklist_len(&worklist)) {
-		ir_bitset_union(worklist.visited, bb_starts, len);
-		do {
-			ref = ir_worklist_pop(&worklist);
-			insn = &ctx->ir_base[ref];
-
-			IR_ASSERT(IR_IS_BB_START(insn->op));
-			if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
-				ir_bitset_incl(merges, ref); // find dominator later
-			} else if (insn->op != IR_START && EXPECTED(insn->op1 != IR_UNUSED)) {
-				idom[ref] = insn->op1; // link BB_START to single predeessor BB_END (immediate dominator)
-			}
-			/* Remember BB start */
-			start = ref;
-			/* Skip control nodes untill BB end */
-			while (1) {
-				ref = ir_next_control(ctx, ref);
-				insn = &ctx->ir_base[ref];
-				if (IR_IS_BB_END(insn->op)) {
-					break;
-				}
-			}
-			/* Mark BB Start */
-			idom[ref] = start; // link BB_END to BB_START
-			ir_bitset_incl(bb_starts, start);
-			ir_ref t = ctx->ir_base[ref].op1;
-			while (t != start) {
-				idom[t] = ref; // link inner-block control nodes to BB_END
-				t = ctx->ir_base[t].op1;
-			}
-			/* Add successors */
-			use_list = &ctx->use_lists[ref];
-			n = use_list->count;
-
-			if (n < 2) {
-				if (n == 1) {
-					ir_ref use = ctx->use_edges[use_list->refs];
-					IR_ASSERT(ir_op_flags[ctx->ir_base[use].op] & IR_OP_FLAG_CONTROL);
-					ir_worklist_push(&worklist, use);
-				}
-			} else {
-				p = &ctx->use_edges[use_list->refs];
-				if (n == 2) {
-					ir_ref use = *p;
-					IR_ASSERT(ir_op_flags[ctx->ir_base[use].op] & IR_OP_FLAG_CONTROL);
-					ir_worklist_push(&worklist, use);
-					use = *(p + 1);
-					IR_ASSERT(ir_op_flags[ctx->ir_base[use].op] & IR_OP_FLAG_CONTROL);
-					ir_worklist_push(&worklist, use);
-				} else {
-					for (; n > 0; p++, n--) {
-						ir_ref use = *p;
-						IR_ASSERT(ir_op_flags[ctx->ir_base[use].op] & IR_OP_FLAG_CONTROL);
-						ir_worklist_push(&worklist, use);
-					}
-				}
-			}
-		} while (ir_worklist_len(&worklist));
-	}
-
-	/* Iteratively find diminators of MERGE nodes */
-	do {
-		changed = 0;
-		IR_BITSET_FOREACH(merges, len, ref) {
-			ir_ref *p, n;
-			ir_ref dom;
-
-			dom = idom[ref];
-			insn = &ctx->ir_base[ref];
-			n = insn->inputs_count;
-			for (p = insn->ops + 1; n > 0; p++, n--) {
-				ir_ref input = *p;
-				IR_ASSERT(input);
-				if (!dom) {
-					dom = input;
-				} else {
-					ir_ref dom2 = input;
-					while (dom != dom2) {
-						while (dom2 > dom) dom2 = idom[dom2];
-						if (!dom2) {
-							break;
-						}
-						while (dom > dom2) dom = idom[dom];
-						if (!dom) {
-							dom = dom2;
-							break;
-						}
-					}
-				}
-			}
-			if (dom != idom[ref]) {
-				idom[ref] = dom;
-				changed = 1;
-			}
-		} IR_BITSET_FOREACH_END();
-	} while (changed);
-
-	ir_mem_free(bb_starts);
-	ir_worklist_free(&worklist);
-}
-
 int ir_mem2ssa(ir_ctx *ctx)
 {
-	ir_ref i, n;
-	ir_insn *insn;
+	uint32_t b;
+	ir_block *bb;
 	ir_ref *ssa_vars = NULL;
-	ir_ref *idom = NULL;
-	size_t ssa_vars_len = 0;
 	ir_list queue;
+	ir_bitset defs;
 
 	IR_ASSERT(ctx->use_lists);
+	IR_ASSERT(!ctx->cfg_blocks);
+	ir_build_cfg(ctx);
+	ir_build_dominators_tree(ctx);
 
+	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; bb++, b++) {
+		ir_ref ref = bb->end;
+
+		IR_ASSERT(ctx->cfg_map[ref] == b);
+		ref = ctx->ir_base[ref].op1;
+		while (ref != bb->start) {
+			ctx->cfg_map[ref] = b;
+			ref = ctx->ir_base[ref].op1;
+		}
+		IR_ASSERT(ctx->cfg_map[ref] == b);
+	}
+
+	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; bb++, b++) {
+		ir_ref start = bb->start;
+		ir_ref i, n = ctx->use_lists[start].count;
+
+		if (n > 1) { /* BB start node is used at least next control or BB end node */
+			for (i = 0; i < ctx->use_lists[start].count;) {
+				ir_ref use = ctx->use_edges[ctx->use_lists[start].refs + i];
+				ir_insn *insn = &ctx->ir_base[use];
+
+				if (insn->op == IR_VAR && ir_mem2ssa_may_convert_var(ctx, use, insn)) {
+					uint32_t len = ir_bitset_len(ctx->cfg_blocks_count + 1);
+
+					if (!ssa_vars) {
+						ssa_vars = ir_mem_calloc(ctx->cfg_blocks_count + 1, sizeof(ir_ref));
+						ir_list_init(&queue, ctx->cfg_blocks_count);
+						defs = ir_mem_calloc(len * 2, IR_BITSET_BITS / 8);
+					} else {
+						memset(defs, 0, len * 2 * IR_BITSET_BITS / 8);
+					}
+
+					ir_use_list_remove_one(ctx, start, use);
+
+					ir_mem2ssa_convert(ctx, ssa_vars, &queue, defs, defs + len, use, insn->type);
+
+					insn = &ctx->ir_base[use];
+					MAKE_NOP(insn);
+					CLEAR_USES(use);
+				} else {
+					i++;
+				}
+			}
+		}
+	}
+
+#if 0
 	for (i = IR_UNUSED + 1; i < ctx->insns_count;) {
 		insn = &ctx->ir_base[i];
 		if (insn->op == IR_ALLOCA) {
@@ -575,8 +413,6 @@ int ir_mem2ssa(ir_ctx *ctx)
 				if (!ssa_vars) {
 					ssa_vars_len = ctx->insns_count;
 					ssa_vars = ir_mem_calloc(ssa_vars_len, sizeof(ir_ref));
-					idom = ir_mem_calloc(ssa_vars_len, sizeof(ir_ref));
-					ir_calc_idom_tree(ctx, idom);
 					ir_list_init(&queue, 256);
 				}
 
@@ -586,7 +422,7 @@ int ir_mem2ssa(ir_ctx *ctx)
 				ctx->ir_base[next].op1 = prev;
 				ir_use_list_replace_one(ctx, prev, i, next);
 
-				ir_mem2ssa_convert(ctx, idom, ssa_vars, &queue, i, type);
+				ir_mem2ssa_convert(ctx, ssa_vars, &queue, i, type);
 
 				insn = &ctx->ir_base[i];
 				MAKE_NOP(insn);
@@ -597,14 +433,12 @@ int ir_mem2ssa(ir_ctx *ctx)
 				if (!ssa_vars) {
 					ssa_vars_len = ctx->insns_count;
 					ssa_vars = ir_mem_calloc(ssa_vars_len, sizeof(ir_ref));
-					idom = ir_mem_calloc(ssa_vars_len, sizeof(ir_ref));
-					ir_calc_idom_tree(ctx, idom);
 					ir_list_init(&queue, 256);
 				}
 
 				ir_use_list_remove_one(ctx, insn->op1, i);
 
-				ir_mem2ssa_convert(ctx, idom, ssa_vars, &queue, i, insn->type);
+				ir_mem2ssa_convert(ctx, ssa_vars, &queue, i, insn->type);
 
 				insn = &ctx->ir_base[i];
 				MAKE_NOP(insn);
@@ -614,12 +448,21 @@ int ir_mem2ssa(ir_ctx *ctx)
 		n = ir_insn_len(insn);
 		i += n;
 	}
+#endif
 
 	if (ssa_vars) {
+		ir_mem_free(defs);
 		ir_list_free(&queue);
-		ir_mem_free(idom);
 		ir_mem_free(ssa_vars);
 	}
+	ir_mem_free(ctx->cfg_blocks);
+	ir_mem_free(ctx->cfg_edges);
+	ir_mem_free(ctx->cfg_map);
+	ctx->cfg_blocks_count = 0;
+	ctx->cfg_edges_count = 0;
+	ctx->cfg_blocks = NULL;
+	ctx->cfg_edges = NULL;
+	ctx->cfg_map = NULL;
 
 	return 1;
 }
