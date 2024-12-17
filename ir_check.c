@@ -362,7 +362,7 @@ bool ir_check(const ir_ctx *ctx)
 									break;
 								}
 							}
-							if (count == 0 && insn->op == IR_END) {
+							if (count == 0 && (insn->op == IR_END || insn->op == IR_LOOP_END)) {
 								/* Dead block */
 								break;
 							}
