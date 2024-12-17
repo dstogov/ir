@@ -356,9 +356,11 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 			}
 		} else {
 			j = i = ctx->cfg_map[use];
-			IR_ASSERT(i > 0);
-			while (ir_sparse_set_in(&data->totally_useful, ctx->cfg_blocks[j].idom)) {
-				j = ctx->cfg_blocks[j].idom;
+			if (i) {
+				IR_ASSERT(i > 0);
+				while (ir_sparse_set_in(&data->totally_useful, ctx->cfg_blocks[j].idom)) {
+					j = ctx->cfg_blocks[j].idom;
+				}
 			}
 			clone = ir_hashtab_find(&hash, j);
 			if (clone == IR_INVALID_VAL) {
