@@ -1456,10 +1456,17 @@ op2_const:
 		case IR_SEXT:
 		case IR_ZEXT:
 		case IR_TRUNC:
-		case IR_BITCAST:
 		case IR_PROTO:
 		case IR_FP2FP:
 			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
+			break;
+		case IR_BITCAST:
+			insn = &ctx->ir_base[ref];
+			if (IR_IS_TYPE_INT(insn->type) && IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)) {
+				flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
+			} else {
+				flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
+			}
 			break;
 		case IR_FP2INT:
 			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
