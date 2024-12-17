@@ -5605,7 +5605,8 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 						} else if (def_flags & IR_USE_MUST_BE_IN_REG) {
 							if (insn->op == IR_VLOAD
 							 && ctx->live_intervals[ctx->vregs[i]]
-							 && ctx->live_intervals[ctx->vregs[i]]->stack_spill_pos != -1) {
+							 && ctx->live_intervals[ctx->vregs[i]]->stack_spill_pos != -1
+							 && ir_is_same_mem_var(ctx, i, ctx->ir_base[insn->op2].op3)) {
 								/* pass */
 							} else if (insn->op != IR_PARAM) {
 								reg = ir_get_free_reg(insn->type, available);
