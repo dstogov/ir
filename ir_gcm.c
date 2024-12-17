@@ -941,9 +941,9 @@ int ir_schedule(ir_ctx *ctx)
 
 				for (p = &ctx->use_edges[use_list->refs]; count > 0; p++, count--) {
 					ir_ref use = *p;
-					if (!_xlat[use]) {
-						IR_ASSERT(_blocks[use] == b);
-						ir_insn *use_insn = &ctx->ir_base[use];
+					ir_insn *use_insn = &ctx->ir_base[use];
+					if (!_xlat[use] && (_blocks[use] || use_insn->op == IR_PARAM)) {
+						IR_ASSERT(_blocks[use] == b || use_insn->op == IR_PARAM);
 						if (use_insn->op == IR_PARAM
 						 || use_insn->op == IR_VAR
 						 || use_insn->op == IR_PI
