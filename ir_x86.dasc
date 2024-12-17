@@ -6721,7 +6721,19 @@ static void ir_emit_sext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |.endif
 		}
 	} else if (IR_IS_CONST_REF(insn->op1)) {
-		IR_ASSERT(0);
+		int64_t val;
+
+		if (ir_type_size[src_type] == 1) {
+			val = ctx->ir_base[insn->op1].val.i8;
+		} else if (ir_type_size[src_type] == 2) {
+			val = ctx->ir_base[insn->op1].val.i16;
+		} else if (ir_type_size[src_type] == 4) {
+			val = ctx->ir_base[insn->op1].val.i32;
+		} else {
+			IR_ASSERT(ir_type_size[src_type] == 8);
+			val = ctx->ir_base[insn->op1].val.i64;
+		}
+		ir_emit_mov_imm_int(ctx, dst_type, def_reg, val);
 	} else {
 		ir_mem mem;
 
@@ -6820,7 +6832,19 @@ static void ir_emit_zext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |.endif
 		}
 	} else if (IR_IS_CONST_REF(insn->op1)) {
-		IR_ASSERT(0);
+		uint64_t val;
+
+		if (ir_type_size[src_type] == 1)  {
+			val = ctx->ir_base[insn->op1].val.u8;
+		} else if (ir_type_size[src_type] == 2) {
+			val = ctx->ir_base[insn->op1].val.u16;
+		} else if (ir_type_size[src_type] == 4) {
+			val = ctx->ir_base[insn->op1].val.u32;
+		} else {
+			IR_ASSERT(ir_type_size[src_type] == 8);
+			val = ctx->ir_base[insn->op1].val.u64;
+		}
+		ir_emit_mov_imm_int(ctx, dst_type, def_reg, val);
 	} else {
 		ir_mem mem;
 
