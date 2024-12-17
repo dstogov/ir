@@ -378,9 +378,10 @@ static void ir_remove_merge_input(ir_ctx *ctx, ir_ref merge, ir_ref from)
 							}
 							i++;
 						} else if (input > 0) {
-							ir_use_list_remove_all(ctx, input, use);
+							ir_use_list_remove_one(ctx, input, use);
 						}
 					}
+					use_insn->inputs_count = i - 1;
 				}
 			}
 		}
