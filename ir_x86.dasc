@@ -2896,6 +2896,8 @@ store_int:
 				}
 			}
 			return IR_SKIPPED | IR_NOP;
+		case IR_NOP:
+			return IR_SKIPPED | IR_NOP;
 		default:
 			break;
 	}
