@@ -9572,7 +9572,7 @@ static void ir_emit_sse_sqrt(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	if (IR_REG_SPILLED(op3_reg)) {
 		op3_reg = IR_REG_NUM(op3_reg);
-		ir_emit_load(ctx, IR_ADDR, op3_reg, insn->op3);
+		ir_emit_load(ctx, insn->type, op3_reg, insn->op3);
 	}
 
 	|	ASM_FP_REG_REG_OP sqrts, insn->type, def_reg, op3_reg
@@ -9594,7 +9594,7 @@ static void ir_emit_sse_round(ir_ctx *ctx, ir_ref def, ir_insn *insn, int round_
 
 	if (IR_REG_SPILLED(op3_reg)) {
 		op3_reg = IR_REG_NUM(op3_reg);
-		ir_emit_load(ctx, IR_ADDR, op3_reg, insn->op3);
+		ir_emit_load(ctx, insn->type, op3_reg, insn->op3);
 	}
 
 	if (ctx->mflags & IR_X86_AVX) {
