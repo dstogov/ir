@@ -223,9 +223,7 @@ static void ir_mem2ssa_convert(ir_ctx *ctx, ir_ref *ssa_vars, ir_list *queue, ir
 		IR_ASSERT(start_insn->op == IR_MERGE || start_insn->op == IR_LOOP_BEGIN);
 		n = start_insn->inputs_count;
 		for (i = 0, p = start_insn->ops + 1; i < n; p++, i++) {
-			ir_ref val;
-
-			ir_ref end = *p;
+			ir_ref val, end = *p;
 			b = ctx->cfg_map[end];
 			val = ssa_vars[b];
 			while (val == var) {
@@ -244,7 +242,7 @@ static void ir_mem2ssa_convert(ir_ctx *ctx, ir_ref *ssa_vars, ir_list *queue, ir
 	}
 }
 
-static bool ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_insn *insn, ir_type *type_ptr)
+static bool ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, ir_insn *insn, ir_type *type_ptr)
 {
 	ir_ref n, *p, use;
 	ir_insn *use_insn;
@@ -267,14 +265,13 @@ static bool ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_insn *insn
 
 	use_list = &ctx->use_lists[var];
 	n = use_list->count;
-	if (!n) {
-		return 0;
-	}
 
 	p = &ctx->use_edges[use_list->refs];
 	use = *p;
 	use_insn = &ctx->ir_base[use];
-	if (use_insn->op == IR_LOAD) {
+	if (use == next) {
+		next = IR_UNUSED; /* skip control link */
+	} else if (use_insn->op == IR_LOAD) {
 		type = use_insn->type;
 		if (use_insn->op2 != var || ir_type_size[type] != size) {
 			return 0;
@@ -370,14 +367,15 @@ int ir_mem2ssa(ir_ctx *ctx)
 	}
 
 	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; bb++, b++) {
-		ir_ref start = bb->start;
+		ir_ref ref, next, start = bb->start;
 		ir_ref i, n = ctx->use_lists[start].count;
+		ir_insn *insn;
 
 		if (n > 1) { /* BB start node is used at least next control or BB end node */
 			for (i = 0; i < ctx->use_lists[start].count;) {
 				ir_ref use = ctx->use_edges[ctx->use_lists[start].refs + i];
-				ir_insn *insn = &ctx->ir_base[use];
 
+				insn = &ctx->ir_base[use];
 				if (insn->op == IR_VAR && ir_mem2ssa_may_convert_var(ctx, use, insn)) {
 					uint32_t len = ir_bitset_len(ctx->cfg_blocks_count + 1);
 
@@ -400,6 +398,31 @@ int ir_mem2ssa(ir_ctx *ctx)
 					i++;
 				}
 			}
+		}
+
+		ref = bb->end;
+		insn = &ctx->ir_base[ref];
+		next = ref;
+		ref = insn->op1;
+		while (ref != start) {
+			insn = &ctx->ir_base[ref];
+			if (insn->op == IR_ALLOCA) {
+				ir_type type;
+
+				if (ctx->use_lists[ref].count == 1) {
+					ir_ref prev = insn->op1;
+					ctx->ir_base[next].op1 = prev;
+					ir_use_list_replace_one(ctx, prev, ref, next);
+					MAKE_NOP(insn);
+					CLEAR_USES(ref);
+					ref = prev;
+					continue;
+				} else if (ir_mem2ssa_may_convert_alloca(ctx, ref, next, insn, &type)) {
+					IR_ASSERT(0 && "NIY");
+				}
+			}
+			next = ref;
+			ref = insn->op1;
 		}
 	}
 
