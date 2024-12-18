@@ -1,0 +1,28 @@
+--TEST--
+001: Dead guard
+--CODE--
+{
+	int32_t d_1 = 0;
+	uintptr_t d_2 = 0;
+	uintptr_t d_3 = 1;
+	l_1 = START(l_12);
+	int32_t d_4 = PARAM(l_1, "x", 0);
+	bool d_5 = EQ(d_4, d_2);
+	l_4 = GUARD(l_1, d_4, d_1);
+	int32_t d_6 = RANGE(d_2, d_2);
+	int32_t d_7 = PI(d_4, d_6);
+	bool d_8 = EQ(d_7, d_2);
+	l_5 = GUARD(l_4, d_8, d_1);
+	l_12 = RETURN(l_5);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 0;
+	l_1 = START(l_4);
+	int32_t d_2 = PARAM(l_1, "x", 0);
+	l_3 = GUARD(l_1, d_2, c_4);
+	l_4 = RETURN(l_3, null);
+}

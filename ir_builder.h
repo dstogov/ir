@@ -471,6 +471,12 @@ extern "C" {
 #define ir_PHI_N(type, _n, _inputs)       _ir_PHI_N(_ir_CTX, type, (_n), (_inputs))
 #define ir_PHI_SET_OP(_ref, _pos, _src)   _ir_PHI_SET_OP(_ir_CTX, (_ref), (_pos), (_src))
 
+// TODO: typed builders
+#define ir_PI(_type, _ref, _range)        ir_BINARY_OP(IR_PI, (_type), (_ref), (_range))
+
+// TODO: typed builders
+#define ir_RANGE(_type, _min, _max)       ir_BINARY_OP(IR_PI, (_type), (_min), (_max))
+
 #define ir_COPY(_type, _op1)              ir_UNARY_OP(IR_COPY, (_type), (_op1))
 #define ir_COPY_B(_op1)                   ir_UNARY_OP_B(IR_COPY, (_op1))
 #define ir_COPY_U8(_op1)                  ir_UNARY_OP_U8(IR_COPY, (_op1))
