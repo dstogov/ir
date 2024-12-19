@@ -9,21 +9,17 @@ aarch64
 	int32_t c = 0x80;
 	l_1 = START(l_5);
 	int32_t y = PARAM(l_1, "y", 1);
-	int32_t v = VAR(l_1, "_spill_");
-	l_2 = VSTORE(l_1, v, y);
-	int32_t z, l_3 = VLOAD(l_2, v);
+	uintptr_t v = PARAM(l_1, "ptr", 2);
+	int32_t z, l_3 = LOAD(l_1, v);
 	int32_t y2 = ADD(y, y);
 	int32_t ret = AND(y2, z);
-	l_4 = VSTORE(l_3, v, ret);
+	l_4 = STORE(l_3, v, ret);
 	l_5 = RETURN(l_4);
 }
 --EXPECT--
 test:
-	sub sp, sp, #8
-	str w0, [sp]
-	ldr w1, [sp]
+	ldr w2, [x1]
 	add w0, w0, w0
-	and w0, w0, w1
-	str w0, [sp]
-	add sp, sp, #8
+	and w0, w0, w2
+	str w0, [x1]
 	ret

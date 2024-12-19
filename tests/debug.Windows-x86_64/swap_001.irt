@@ -8,12 +8,10 @@ Windows-x86_64
 {
 	l_1 = START(l_5);
 	double x = PARAM(l_1, "x", 1);
-	double y = PARAM(l_1, "y", 2);
-	double v = VAR(l_1, "_spill_");
-	l_2 = VSTORE(l_1, v, y);
-	double z, l_3 = VLOAD(l_2, v);
+	uintptr_t v = PARAM(l_1, "ptr", 3);
+	double z, l_3 = LOAD(l_1, v);
 	double ret = ADD(z, x);
-	l_4 = VSTORE(l_3, v, ret);
+	l_4 = STORE(l_3, v, ret);
 	l_5 = RETURN(l_4);
 }
 --EXPECT--
