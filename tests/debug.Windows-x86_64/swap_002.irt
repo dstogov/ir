@@ -17,7 +17,7 @@ Windows-x86_64
 }
 --EXPECT--
 test:
-	andl (%rsi), %edi
-	leal (%rdi, %rdi), %eax
-	movl %eax, (%rsi)
+	andl (%rdx), %ecx
+	leal (%rcx, %rcx), %eax
+	movl %eax, (%rdx)
 	retq

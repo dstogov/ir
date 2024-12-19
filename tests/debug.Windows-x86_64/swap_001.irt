@@ -16,9 +16,6 @@ Windows-x86_64
 }
 --EXPECT--
 test:
-	subq $8, %rsp
-	movsd %xmm1, (%rsp)
-	addsd (%rsp), %xmm0
-	movsd %xmm0, (%rsp)
-	addq $8, %rsp
+	addsd (%rdx), %xmm0
+	movsd %xmm0, (%rdx)
 	retq

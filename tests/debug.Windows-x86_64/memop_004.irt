@@ -17,8 +17,5 @@ Windows-x86_64
 }
 --EXPECT--
 test:
-	subq $8, %rsp
-	movb %cl, (%rsp)
-	incb (%rsp)
-	addq $8, %rsp
+	incb (%rdx)
 	retq
