@@ -4,15 +4,24 @@
 --emit-llvm
 --CODE--
 {
-	l_1 = START(l_3);
-	int32_t d_2 = VAR(l_1, "v");
-	int32_t d_3, l_2 = VLOAD(l_1, d_2); 
-	l_3 = RETURN(l_2, d_3);
+	memcpy = func memcmp(uintptr_t, uintptr_t, uint32_t): void;
+	int32_t c_4 = 4;
+	l_1 = START(l_8);
+	int32_t d_2 = PARAM(l_1, "x", 1);
+	uintptr_t d_3 = PARAM(l_1, "ptr", 2);
+	int32_t d_4 = VAR(l_1, "v");
+	uintptr_t d_5 = VADDR(d_4);
+	l_6 = CALL/3(l_1, memcpy, d_5, d_3, c_4);  
+	int32_t d_7, l_7 = VLOAD(l_6, d_4);
+	l_8 = RETURN(l_7, d_7);
 }
 --EXPECT--
-define i32 @test()
+define i32 @test(i32 %d2, ptr %d3)
 {
-	%d2 = alloca i32
-	%d3 = load i32, ptr %d2
-	ret i32 %d3
+	%d4 = alloca i32
+	%d5 = bitcast ptr %d4 to ptr
+	call void @memcmp(ptr %d5, ptr %d3, i32 4)
+	%d8 = load i32, ptr %d4
+	ret i32 %d8
 }
+declare void @memcmp(ptr, ptr, i32)
