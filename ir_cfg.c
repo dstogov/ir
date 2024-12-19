@@ -8,6 +8,8 @@
 #include "ir.h"
 #include "ir_private.h"
 
+static int ir_remove_unreachable_blocks(ir_ctx *ctx);
+
 IR_ALWAYS_INLINE void _ir_add_successors(const ir_ctx *ctx, ir_ref ref, ir_worklist *worklist)
 {
 	ir_use_list *use_list = &ctx->use_lists[ref];
@@ -53,6 +55,24 @@ IR_ALWAYS_INLINE void _ir_add_predecessors(const ir_insn *insn, ir_worklist *wor
 	} else if (insn->op != IR_START) {
 		if (EXPECTED(insn->op1)) {
 			ir_worklist_push(worklist, insn->op1);
+		}
+	}
+}
+
+void ir_reset_cfg(ir_ctx *ctx)
+{
+	ctx->cfg_blocks_count = 0;
+	ctx->cfg_edges_count = 0;
+	if (ctx->cfg_blocks) {
+		ir_mem_free(ctx->cfg_blocks);
+		ctx->cfg_blocks = NULL;
+		if (ctx->cfg_edges) {
+			ir_mem_free(ctx->cfg_edges);
+			ctx->cfg_edges = NULL;
+		}
+		if (ctx->cfg_map) {
+			ir_mem_free(ctx->cfg_map);
+			ctx->cfg_map = NULL;
 		}
 	}
 }
@@ -400,7 +420,7 @@ static void ir_remove_merge_input(ir_ctx *ctx, ir_ref merge, ir_ref from)
 }
 
 /* CFG constructed after SCCP pass doesn't have unreachable BBs, otherwise they should be removed */
-int ir_remove_unreachable_blocks(ir_ctx *ctx)
+static int ir_remove_unreachable_blocks(ir_ctx *ctx)
 {
 	uint32_t b, *p, i;
 	uint32_t unreachable_count = 0;
