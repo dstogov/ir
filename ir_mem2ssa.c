@@ -380,11 +380,7 @@ int ir_mem2ssa(ir_ctx *ctx)
 	ir_list queue;
 	ir_bitset defs;
 
-	IR_ASSERT(ctx->use_lists);
-	IR_ASSERT(!ctx->cfg_blocks);
-	ir_build_cfg(ctx);
-	ir_build_dominators_tree(ctx);
-
+	IR_ASSERT(ctx->use_lists && ctx->cfg_blocks);
 	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; bb++, b++) {
 		ir_ref ref = bb->end;
 
@@ -484,14 +480,6 @@ int ir_mem2ssa(ir_ctx *ctx)
 		ir_list_free(&queue);
 		ir_mem_free(ssa_vars);
 	}
-	ir_mem_free(ctx->cfg_blocks);
-	ir_mem_free(ctx->cfg_edges);
-	ir_mem_free(ctx->cfg_map);
-	ctx->cfg_blocks_count = 0;
-	ctx->cfg_edges_count = 0;
-	ctx->cfg_blocks = NULL;
-	ctx->cfg_edges = NULL;
-	ctx->cfg_map = NULL;
 
 	return 1;
 }

@@ -58,6 +58,7 @@ static void help(const char *cmd)
 		"Options:\n"
 		"  -O[012]                    - optimization level (default: 2)\n"
 		"  -fno-inline                - disable function inlining\n"
+		"  -fno-mem2ssa               - disable mem2ssa\n"
 		"  -S                         - dump final target assembler code\n"
 		"  --run ...                  - run the main() function of generated code\n"
 		"                               (the remaining arguments are passed to main)\n"
@@ -237,8 +238,22 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 	ir_check(ctx);
 #endif
 
-	/* Global Optimization */
-	if (opt_level > 1) {
+	if (opt_level > 0 && (ctx->flags & IR_OPT_MEM2SSA)) {
+		ir_build_cfg(ctx);
+		if ((dump & (IR_DUMP_AFTER_CFG|IR_DUMP_AFTER_ALL))
+		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_CFG, dump_file, func_name)) {
+			return 0;
+		}
+#ifdef IR_DEBUG
+		ir_check(ctx);
+#endif
+
+		ir_build_dominators_tree(ctx);
+		if ((dump & (IR_DUMP_AFTER_DOM|IR_DUMP_AFTER_ALL))
+		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_DOM, dump_file, func_name)) {
+			return 0;
+		}
+
 		ir_mem2ssa(ctx);
 		if ((dump & (IR_DUMP_AFTER_MEM2SSA|IR_DUMP_AFTER_ALL))
 		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_MEM2SSA, dump_file, func_name)) {
@@ -247,7 +262,13 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 #ifdef IR_DEBUG
 		ir_check(ctx);
 #endif
+	}
 
+	/* Global Optimization */
+	if (opt_level > 1) {
+		if (ctx->cfg_blocks) {
+			ir_reset_cfg(ctx);
+		}
 		ir_sccp(ctx);
 		if ((dump & (IR_DUMP_AFTER_SCCP|IR_DUMP_AFTER_ALL))
 		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_SCCP, dump_file, func_name)) {
@@ -258,7 +279,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 #endif
 	}
 
-	if (opt_level > 0 || (ctx->flags & (IR_GEN_NATIVE|IR_GEN_CODE))) {
+	if ((opt_level > 0 || (ctx->flags & (IR_GEN_NATIVE|IR_GEN_CODE))) && !ctx->cfg_blocks) {
 		ir_build_cfg(ctx);
 		if ((dump & (IR_DUMP_AFTER_CFG|IR_DUMP_AFTER_ALL))
 		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_CFG, dump_file, func_name)) {
@@ -267,16 +288,18 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 #ifdef IR_DEBUG
 		ir_check(ctx);
 #endif
+
+		if (opt_level > 0) {
+			ir_build_dominators_tree(ctx);
+			if ((dump & (IR_DUMP_AFTER_DOM|IR_DUMP_AFTER_ALL))
+			 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_DOM, dump_file, func_name)) {
+				return 0;
+			}
+		}
 	}
 
 	/* Schedule */
 	if (opt_level > 0) {
-		ir_build_dominators_tree(ctx);
-		if ((dump & (IR_DUMP_AFTER_DOM|IR_DUMP_AFTER_ALL))
-		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_DOM, dump_file, func_name)) {
-			return 0;
-		}
-
 		ir_find_loops(ctx);
 		if ((dump & (IR_DUMP_AFTER_LOOP|IR_DUMP_AFTER_ALL))
 		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_LOOP, dump_file, func_name)) {
@@ -1046,6 +1069,7 @@ int main(int argc, char **argv)
 	FILE *f;
 	bool emit_c = 0, emit_llvm = 0, dump_size = 0, dump_time = 0, dump_asm = 0, run = 0, gdb = 1;
 	bool disable_inline = 0;
+	bool disable_mem2ssa = 0;
 	uint32_t save_flags = 0;
 	uint32_t dump = 0;
 	int opt_level = 2;
@@ -1198,6 +1222,8 @@ int main(int argc, char **argv)
 			flags |= IR_FASTCALL_FUNC;
 		} else if (strcmp(argv[i], "-fno-inline") == 0) {
 			disable_inline = 1;
+		} else if (strcmp(argv[i], "-fno-mem2ssa") == 0) {
+			disable_mem2ssa = 1;
 #ifdef IR_DEBUG
 		} else if (strcmp(argv[i], "--debug-sccp") == 0) {
 			flags |= IR_DEBUG_SCCP;
@@ -1298,6 +1324,9 @@ int main(int argc, char **argv)
 	}
 	if (opt_level > 1 && !disable_inline) {
 		flags |= IR_OPT_INLINE;
+	}
+	if (opt_level > 1 && !disable_mem2ssa) {
+		flags |= IR_OPT_MEM2SSA;
 	}
 	if (emit_c || emit_llvm) {
 		flags |= IR_GEN_CODE;
