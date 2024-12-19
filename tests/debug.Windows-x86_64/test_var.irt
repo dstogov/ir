@@ -3,7 +3,7 @@ Mandelbrot Test (var)
 --TARGET--
 Windows-x86_64
 --ARGS--
--S
+-S -fno-mem2ssa
 --CODE--
 {
 	uintptr_t c_1 = 0;
