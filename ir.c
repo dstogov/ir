@@ -2010,18 +2010,22 @@ ir_ref _ir_PHI_N(ir_ctx *ctx, ir_type type, ir_ref n, ir_ref *inputs)
 		return inputs[0];
 	} else {
 	    ir_ref i;
-		ir_ref ref = inputs[0];
+		ir_ref ref;
 
-		IR_ASSERT(ctx->ir_base[ctx->control].op == IR_MERGE || ctx->ir_base[ctx->control].op == IR_LOOP_BEGIN);
-		if (ref != IR_UNUSED) {
-			for (i = 1; i < n; i++) {
-				if (inputs[i] != ref) {
-					break;
+		if (UNEXPECTED(!(ctx->flags & IR_OPT_FOLDING))) {
+			IR_ASSERT(ctx->ir_base[ctx->control].op == IR_MERGE
+				|| ctx->ir_base[ctx->control].op == IR_LOOP_BEGIN);
+			ref = inputs[0];
+			if (ref != IR_UNUSED) {
+				for (i = 1; i < n; i++) {
+					if (inputs[i] != ref) {
+						break;
+					}
 				}
-			}
-			if (i == n) {
-				/* all the same */
-				return ref;
+				if (i == n) {
+					/* all the same */
+					return ref;
+				}
 			}
 		}
 
@@ -2066,7 +2070,8 @@ void _ir_ENTRY(ir_ctx *ctx, ir_ref src, ir_ref num)
 void _ir_BEGIN(ir_ctx *ctx, ir_ref src)
 {
 	IR_ASSERT(!ctx->control);
-	if (src
+	if (UNEXPECTED(!(ctx->flags & IR_OPT_FOLDING))
+	 && src
 	 && src + 1 == ctx->insns_count
 	 && ctx->ir_base[src].op == IR_END) {
 		/* merge with the last END */
@@ -2095,8 +2100,14 @@ ir_ref _ir_IF(ir_ctx *ctx, ir_ref condition)
 {
 	ir_ref if_ref;
 
-	condition = _ir_fold_condition(ctx, condition);
 	IR_ASSERT(ctx->control);
+	if (UNEXPECTED(!(ctx->flags & IR_OPT_FOLDING))) {
+		if_ref = ir_emit2(ctx, IR_IF, ctx->control, condition);
+		ctx->control = IR_UNUSED;
+		return if_ref;
+	}
+
+	condition = _ir_fold_condition(ctx, condition);
 	if (IR_IS_CONST_REF(condition)) {
 		condition = ir_ref_is_true(ctx, condition) ? IR_TRUE : IR_FALSE;
 	} else {
@@ -2649,7 +2660,7 @@ void _ir_GUARD(ir_ctx *ctx, ir_ref condition, ir_ref addr)
 			return;
 		}
 		condition = IR_FALSE;
-	} else {
+	} else if (UNEXPECTED(!(ctx->flags & IR_OPT_FOLDING))) {
 		ir_insn *prev = NULL;
 		ir_ref ref = ctx->control;
 		ir_insn *insn;
@@ -2695,7 +2706,7 @@ void _ir_GUARD_NOT(ir_ctx *ctx, ir_ref condition, ir_ref addr)
 			return;
 		}
 		condition = IR_TRUE;
-	} else {
+	} else if (UNEXPECTED(!(ctx->flags & IR_OPT_FOLDING))) {
 		ir_insn *prev = NULL;
 		ir_ref ref = ctx->control;
 		ir_insn *insn;
@@ -2779,6 +2790,10 @@ ir_ref _ir_VLOAD(ir_ctx *ctx, ir_type type, ir_ref var)
 	ir_ref ref = ctx->control;
 	ir_insn *insn;
 
+	if (UNEXPECTED(!(ctx->flags & IR_OPT_FOLDING))) {
+		IR_ASSERT(ctx->control);
+		return ctx->control = ir_emit2(ctx, IR_OPT(IR_VLOAD, type), ctx->control, var);
+	}
 	while (ref > var) {
 		insn = &ctx->ir_base[ref];
 		if (insn->op == IR_VLOAD) {
@@ -2824,6 +2839,12 @@ void _ir_VSTORE(ir_ctx *ctx, ir_ref var, ir_ref val)
 	ir_ref prev = IR_UNUSED;
 	ir_insn *insn;
 	bool guarded = 0;
+
+	if (UNEXPECTED(!(ctx->flags & IR_OPT_FOLDING))) {
+		IR_ASSERT(ctx->control);
+		ctx->control = ir_emit3(ctx, IR_VSTORE, ctx->control, var, val);
+		return;
+	}
 
 	if (!IR_IS_CONST_REF(val)) {
 		insn = &ctx->ir_base[val];
@@ -2893,9 +2914,12 @@ void _ir_RSTORE(ir_ctx *ctx, ir_ref reg, ir_ref val)
 
 ir_ref _ir_LOAD(ir_ctx *ctx, ir_type type, ir_ref addr)
 {
-	ir_ref ref = ir_find_aliasing_load(ctx, ctx->control, type, addr);
+	ir_ref ref = IR_UNUSED;
 
 	IR_ASSERT(ctx->control);
+	if (EXPECTED(!(ctx->flags & IR_OPT_FOLDING))) {
+		ref = ir_find_aliasing_load(ctx, ctx->control, type, addr);
+	}
 	if (!ref) {
 		ctx->control = ref = ir_emit2(ctx, IR_OPT(IR_LOAD, type), ctx->control, addr);
 	}
@@ -2912,6 +2936,12 @@ void _ir_STORE(ir_ctx *ctx, ir_ref addr, ir_ref val)
 	ir_type type2;
 	bool guarded = 0;
 
+	IR_ASSERT(ctx->control);
+	if (UNEXPECTED(!(ctx->flags & IR_OPT_FOLDING))) {
+		ctx->control = ir_emit3(ctx, IR_STORE, ctx->control, addr, val);
+		return;
+	}
+
 	if (!IR_IS_CONST_REF(val)) {
 		insn = &ctx->ir_base[val];
 		if (insn->op == IR_BITCAST
@@ -2922,7 +2952,6 @@ void _ir_STORE(ir_ctx *ctx, ir_ref addr, ir_ref val)
 		}
 	}
 
-	IR_ASSERT(ctx->control);
 	while (ref > limit) {
 		insn = &ctx->ir_base[ref];
 		if (insn->op == IR_STORE) {
