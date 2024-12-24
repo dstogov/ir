@@ -1385,6 +1385,22 @@ bool ir_use_list_add(ir_ctx *ctx, ir_ref to, ir_ref ref)
 	}
 }
 
+static int ir_ref_cmp(const void *p1, const void *p2)
+{
+	return *(ir_ref*)p1 - *(ir_ref*)p2;
+}
+
+void ir_use_list_sort(ir_ctx *ctx, ir_ref ref)
+{
+	ir_use_list *use_list = &ctx->use_lists[ref];
+	uint32_t n = use_list->count;
+	ir_ref *refs = ctx->use_edges + use_list->refs;
+
+	if (n > 1) {
+		qsort(refs, n, sizeof(ir_ref), ir_ref_cmp);
+	}
+}
+
 /* Helper Data Types */
 void ir_array_grow(ir_array *a, uint32_t size)
 {
