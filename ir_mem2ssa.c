@@ -32,6 +32,22 @@ static void ir_replace_insn(ir_ctx *ctx, ir_ref ref, ir_ref new_ref)
 	}
 }
 
+static int ir_ref_cmp(const void *p1, const void *p2)
+{
+	return *(ir_ref*)p1 - *(ir_ref*)p2;
+}
+
+static void ir_use_list_sort(ir_ctx *ctx, ir_ref ref)
+{
+	ir_use_list *use_list = &ctx->use_lists[ref];
+	uint32_t n = use_list->count;
+	ir_ref *refs = ctx->use_edges + use_list->refs;
+
+	if (n > 1) {
+		qsort(refs, n, sizeof(ir_ref), ir_ref_cmp);
+	}
+}
+
 static ir_ref ir_uninitialized(ir_ctx *ctx, ir_type type)
 {
 	/* read of uninitialized variable (use 0) */
@@ -54,7 +70,7 @@ static void ir_mem2ssa_convert(ir_ctx    *ctx,
 	ir_insn *use_insn;
 	uint32_t b, *q;
 
-	/* For each usage of VAR */
+	/* For each usage of VAR (use list must be sorted) */
 	next_ctrl = next;
 	n = ctx->use_lists[var].count;
 	for (p = ctx->use_edges + ctx->use_lists[var].refs; n > 0; p++, n--) {
@@ -267,6 +283,8 @@ static bool ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, 
 	ir_use_list *use_list;
 	ir_type type = IR_VOID;
 	size_t size;
+	ir_ref last_use;
+	bool needs_sorting = 0;
 
 	if (!IR_IS_CONST_REF(insn->op2)) {
 		return 0;
@@ -297,6 +315,7 @@ static bool ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, 
 		use = *p;
 		IR_ASSERT(use);
 	}
+	last_use = use;
 	use_insn = &ctx->ir_base[use];
 	if (use_insn->op == IR_LOAD) {
 		type = use_insn->type;
@@ -319,6 +338,10 @@ static bool ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, 
 		if (use == next) {
 			continue; /* skip control link */
 		}
+		if (use < last_use) {
+			needs_sorting = 1;
+		}
+		last_use = use;
 		use_insn = &ctx->ir_base[use];
 		if (use_insn->op == IR_LOAD) {
 			if (use_insn->op2 != var || use_insn->type != type) {
@@ -334,6 +357,11 @@ static bool ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, 
 	}
 
 	*type_ptr = type;
+
+	if (needs_sorting) {
+		ir_use_list_sort(ctx, var);
+	}
+
 	return 1;
 }
 
@@ -343,6 +371,8 @@ static bool ir_mem2ssa_may_convert_var(ir_ctx *ctx, ir_ref var, ir_insn *insn)
 	ir_insn *use_insn;
 	ir_use_list *use_list;
 	ir_type type;
+	ir_ref last_use = IR_UNUSED;
+	bool needs_sorting = 0;
 
 	use_list = &ctx->use_lists[var];
 	n = use_list->count;
@@ -354,6 +384,11 @@ static bool ir_mem2ssa_may_convert_var(ir_ctx *ctx, ir_ref var, ir_insn *insn)
 	type = insn->type;
 	do {
 		use = *p;
+		IR_ASSERT(use);
+		if (use < last_use) {
+			needs_sorting = 1;
+		}
+		last_use = use;
 		use_insn = &ctx->ir_base[use];
 		if (use_insn->op == IR_VLOAD) {
 			if (use_insn->op2 != var || use_insn->type != type) {
@@ -368,6 +403,10 @@ static bool ir_mem2ssa_may_convert_var(ir_ctx *ctx, ir_ref var, ir_insn *insn)
 		}
 		p++;
 	} while (--n > 0);
+
+	if (needs_sorting) {
+		ir_use_list_sort(ctx, var);
+	}
 
 	return 1;
 }
