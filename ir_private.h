@@ -701,7 +701,7 @@ typedef struct _ir_list {
 	uint32_t len;
 } ir_list;
 
-bool ir_list_contains(const ir_list *l, ir_ref val);
+uint32_t ir_list_find(const ir_list *l, ir_ref val);
 void ir_list_insert(ir_list *l, uint32_t i, ir_ref val);
 void ir_list_remove(ir_list *l, uint32_t i);
 
@@ -764,6 +764,19 @@ IR_ALWAYS_INLINE void ir_list_set(ir_list *l, uint32_t i, ir_ref val)
 {
 	IR_ASSERT(i < l->len);
 	ir_array_set_unchecked(&l->a, i, val);
+}
+
+/* Doesn't preserve order */
+IR_ALWAYS_INLINE void ir_list_del(ir_list *l, uint32_t i)
+{
+	IR_ASSERT(i < l->len);
+	l->len--;
+	ir_array_set_unchecked(&l->a, i, ir_array_at(&l->a, l->len));
+}
+
+IR_ALWAYS_INLINE bool ir_list_contains(const ir_list *l, ir_ref val)
+{
+	return ir_list_find(l, val) != (uint32_t)-1;
 }
 
 /* Worklist (unique list) */

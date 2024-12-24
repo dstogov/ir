@@ -1428,16 +1428,16 @@ void ir_list_remove(ir_list *l, uint32_t i)
 	l->len--;
 }
 
-bool ir_list_contains(const ir_list *l, ir_ref val)
+uint32_t ir_list_find(const ir_list *l, ir_ref val)
 {
 	uint32_t i;
 
 	for (i = 0; i < l->len; i++) {
 		if (ir_array_at(&l->a, i) == val) {
-			return 1;
+			return i;
 		}
 	}
-	return 0;
+	return (uint32_t)-1;
 }
 
 static uint32_t ir_hashtab_hash_size(uint32_t size)
