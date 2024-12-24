@@ -8,30 +8,6 @@
 #include "ir.h"
 #include "ir_private.h"
 
-static void ir_replace_insn(ir_ctx *ctx, ir_ref ref, ir_ref new_ref)
-{
-	ir_ref j, n, use, k, l;
-	ir_insn *insn;
-
-	IR_ASSERT(ref != new_ref);
-
-	n = ctx->use_lists[ref].count;
-	for (j = 0; j < n; j++) {
-		use = ctx->use_edges[ctx->use_lists[ref].refs + j];
-		IR_ASSERT(use != ref);
-		insn = &ctx->ir_base[use];
-		l = insn->inputs_count;
-		for (k = 1; k <= l; k++) {
-			if (ir_insn_op(insn, k) == ref) {
-				ir_insn_set_op(insn, k, new_ref);
-				if (!IR_IS_CONST_REF(new_ref)) {
-					ir_use_list_add(ctx, new_ref, use);
-				}
-			}
-		}
-	}
-}
-
 static ir_ref ir_uninitialized(ir_ctx *ctx, ir_type type)
 {
 	/* read of uninitialized variable (use 0) */
@@ -180,7 +156,7 @@ static void ir_mem2ssa_convert(ir_ctx    *ctx,
 			ir_ref prev = use_insn->op1;
 			ir_ref next = ir_next_control(ctx, use);
 			ctx->ir_base[next].op1 = prev;
-			ir_use_list_remove_one(ctx, use, prev);
+//			ir_use_list_remove_one(ctx, use, next);
 			ir_use_list_replace_one(ctx, prev, use, next);
 			if (!IR_IS_CONST_REF(use_insn->op3)) {
 				ir_use_list_remove_one(ctx, use_insn->op3, use);
@@ -206,8 +182,9 @@ static void ir_mem2ssa_convert(ir_ctx    *ctx,
 			ir_ref val;
 			ir_ref prev = use_insn->op1;
 			ir_ref next = ir_next_control(ctx, use);
+
 			ctx->ir_base[next].op1 = prev;
-			ir_use_list_remove_one(ctx, use, prev);
+			ir_use_list_remove_one(ctx, use, next);
 			ir_use_list_replace_one(ctx, prev, use, next);
 
 			b = ctx->cfg_map[use];
@@ -222,7 +199,7 @@ static void ir_mem2ssa_convert(ir_ctx    *ctx,
 				}
 				b = ctx->cfg_blocks[b].idom;
 			}
-			ir_replace_insn(ctx, use, val);
+			ir_replace(ctx, use, val);
 
 			use_insn = &ctx->ir_base[use];
 			MAKE_NOP(use_insn);

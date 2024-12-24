@@ -1283,9 +1283,11 @@ void ir_build_def_use_lists(ir_ctx *ctx)
 void ir_use_list_remove_all(ir_ctx *ctx, ir_ref from, ir_ref ref)
 {
 	ir_ref j, n, *p, *q, use;
-	ir_use_list *use_list = &ctx->use_lists[from];
+	ir_use_list *use_list;
 	ir_ref skip = 0;
 
+	IR_ASSERT(from > 0);
+	use_list = &ctx->use_lists[from];
 	n = use_list->count;
 	for (j = 0, p = q = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
 		use = *p;
@@ -1310,8 +1312,10 @@ void ir_use_list_remove_all(ir_ctx *ctx, ir_ref from, ir_ref ref)
 void ir_use_list_remove_one(ir_ctx *ctx, ir_ref from, ir_ref ref)
 {
 	ir_ref j, n, *p;
-	ir_use_list *use_list = &ctx->use_lists[from];
+	ir_use_list *use_list;
 
+	IR_ASSERT(from > 0);
+	use_list = &ctx->use_lists[from];
 	n = use_list->count;
 	j = 0;
 	p = &ctx->use_edges[use_list->refs];
@@ -1334,9 +1338,11 @@ void ir_use_list_remove_one(ir_ctx *ctx, ir_ref from, ir_ref ref)
 
 void ir_use_list_replace_one(ir_ctx *ctx, ir_ref ref, ir_ref use, ir_ref new_use)
 {
-	ir_use_list *use_list = &ctx->use_lists[ref];
+	ir_use_list *use_list;
 	ir_ref i, n, *p;
 
+	IR_ASSERT(ref > 0);
+	use_list = &ctx->use_lists[ref];
 	n = use_list->count;
 	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
 		if (*p == use) {
@@ -1348,9 +1354,11 @@ void ir_use_list_replace_one(ir_ctx *ctx, ir_ref ref, ir_ref use, ir_ref new_use
 
 void ir_use_list_replace_all(ir_ctx *ctx, ir_ref ref, ir_ref use, ir_ref new_use)
 {
-	ir_use_list *use_list = &ctx->use_lists[ref];
+	ir_use_list *use_list;
 	ir_ref i, n, *p;
 
+	IR_ASSERT(ref > 0);
+	use_list = &ctx->use_lists[ref];
 	n = use_list->count;
 	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
 		if (*p == use) {
@@ -1361,9 +1369,12 @@ void ir_use_list_replace_all(ir_ctx *ctx, ir_ref ref, ir_ref use, ir_ref new_use
 
 bool ir_use_list_add(ir_ctx *ctx, ir_ref to, ir_ref ref)
 {
-	ir_use_list *use_list = &ctx->use_lists[to];
-	ir_ref n = use_list->refs + use_list->count;
+	ir_use_list *use_list;
+	ir_ref n;
 
+	IR_ASSERT(to > 0);
+	use_list = &ctx->use_lists[to];
+	n = use_list->refs + use_list->count;
 	if (n < ctx->use_edges_count && ctx->use_edges[n] == IR_UNUSED) {
 		ctx->use_edges[n] = ref;
 		use_list->count++;
@@ -1392,12 +1403,49 @@ static int ir_ref_cmp(const void *p1, const void *p2)
 
 void ir_use_list_sort(ir_ctx *ctx, ir_ref ref)
 {
-	ir_use_list *use_list = &ctx->use_lists[ref];
-	uint32_t n = use_list->count;
-	ir_ref *refs = ctx->use_edges + use_list->refs;
+	ir_use_list *use_list;
+	uint32_t n;
 
+	IR_ASSERT(ref > 0);
+	use_list = &ctx->use_lists[ref];
+	n = use_list->count;
 	if (n > 1) {
-		qsort(refs, n, sizeof(ir_ref), ir_ref_cmp);
+		qsort(ctx->use_edges + use_list->refs, n, sizeof(ir_ref), ir_ref_cmp);
+	}
+}
+
+void ir_replace(ir_ctx *ctx, ir_ref ref, ir_ref new_ref)
+{
+	int i, j, n, use;
+	ir_insn *insn;
+
+	IR_ASSERT(ref != new_ref);
+	n = ctx->use_lists[ref].count;
+	for (i = 0; i < n; i++) {
+		use = ctx->use_edges[ctx->use_lists[ref].refs + i];
+		IR_ASSERT(use != ref);
+		insn = &ctx->ir_base[use];
+		j = ir_insn_find_op(insn, ref);
+		IR_ASSERT(j > 0);
+		ir_insn_set_op(insn, j, new_ref);
+		if (!IR_IS_CONST_REF(new_ref)) {
+			ir_use_list_add(ctx, new_ref, use);
+		}
+	}
+}
+
+void ir_update_op(ir_ctx *ctx, ir_ref ref, uint32_t idx, ir_ref new_val)
+{
+	ir_insn *insn = &ctx->ir_base[ref];
+	ir_ref old_val = ir_insn_op(insn, idx);
+
+	IR_ASSERT(old_val != new_val);
+	if (new_val > 0) {
+		ir_use_list_add(ctx, new_val, ref);
+	}
+	ir_insn_set_op(insn, idx, new_val);
+	if (old_val > 0) {
+		ir_use_list_remove_one(ctx, old_val, ref);
 	}
 }
 

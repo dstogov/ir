@@ -1032,12 +1032,12 @@ struct _ir_use_list {
 	ir_ref        count;
 };
 
-void ir_use_list_remove_all(ir_ctx *ctx, ir_ref from, ir_ref use);
-void ir_use_list_remove_one(ir_ctx *ctx, ir_ref from, ir_ref use);
-void ir_use_list_replace_all(ir_ctx *ctx, ir_ref ref, ir_ref use, ir_ref new_use);
-void ir_use_list_replace_one(ir_ctx *ctx, ir_ref ref, ir_ref use, ir_ref new_use);
-bool ir_use_list_add(ir_ctx *ctx, ir_ref to, ir_ref new_use);
-void ir_use_list_sort(ir_ctx *ctx, ir_ref ref);
+void ir_use_list_remove_all(ir_ctx *ctx, ir_ref def, ir_ref use);
+void ir_use_list_remove_one(ir_ctx *ctx, ir_ref def, ir_ref use);
+void ir_use_list_replace_all(ir_ctx *ctx, ir_ref def, ir_ref use, ir_ref new_use);
+void ir_use_list_replace_one(ir_ctx *ctx, ir_ref def, ir_ref use, ir_ref new_use);
+bool ir_use_list_add(ir_ctx *ctx, ir_ref def, ir_ref use);
+void ir_use_list_sort(ir_ctx *ctx, ir_ref def);
 
 IR_ALWAYS_INLINE ir_ref ir_next_control(const ir_ctx *ctx, ir_ref ref)
 {
@@ -1081,6 +1081,9 @@ IR_ALWAYS_INLINE ir_ref ir_next_control(const ir_ctx *ctx, ir_ref ref)
 		_insn1 = _insn2; \
 		_insn2 = _tmp; \
 	} while (0)
+
+void ir_replace(ir_ctx *ctx, ir_ref ref, ir_ref new_ref);
+void ir_update_op(ir_ctx *ctx, ir_ref ref, uint32_t idx, ir_ref new_val);
 
 /*** IR Basic Blocks info ***/
 #define IR_IS_BB_START(op) \
