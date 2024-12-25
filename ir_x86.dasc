@@ -9528,7 +9528,15 @@ static void ir_emit_lea(ir_ctx *ctx, ir_ref def, ir_type type)
 		 && IR_MEM_BASE(mem) != IR_REG_NONE) {
 			ir_reg reg = IR_MEM_BASE(mem);
 			|	add Rd(def_reg), Rd(reg)
+		} else if (IR_MEM_INDEX(mem) == def_reg
+		 && IR_MEM_OFFSET(mem) == 0
+		 && IR_MEM_SCALE(mem) == 2
+		 && IR_MEM_BASE(mem) == IR_REG_NONE) {
+			|	add Rd(def_reg), Rd(def_reg)
 		} else {
+			if (IR_MEM_SCALE(mem) == 2 && IR_MEM_BASE(mem) == IR_REG_NONE) {
+				mem = IR_MEM(IR_MEM_INDEX(mem), IR_MEM_OFFSET(mem), IR_MEM_INDEX(mem), 1);
+			}
 			|	ASM_TXT_TMEM_OP lea, Rd(def_reg), dword, mem
 		}
 	} else {
@@ -9544,7 +9552,15 @@ static void ir_emit_lea(ir_ctx *ctx, ir_ref def, ir_type type)
 		 && IR_MEM_BASE(mem) != IR_REG_NONE) {
 			ir_reg reg = IR_MEM_BASE(mem);
 			|	add Ra(def_reg), Ra(reg)
+		} else if (IR_MEM_INDEX(mem) == def_reg
+		 && IR_MEM_OFFSET(mem) == 0
+		 && IR_MEM_SCALE(mem) == 2
+		 && IR_MEM_BASE(mem) == IR_REG_NONE) {
+			|	add Ra(def_reg), Ra(def_reg)
 		} else {
+			if (IR_MEM_SCALE(mem) == 2 && IR_MEM_BASE(mem) == IR_REG_NONE) {
+				mem = IR_MEM(IR_MEM_INDEX(mem), IR_MEM_OFFSET(mem), IR_MEM_INDEX(mem), 1);
+			}
 			|	ASM_TXT_TMEM_OP lea, Ra(def_reg), aword, mem
 		}
 	}
