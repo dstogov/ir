@@ -1001,6 +1001,8 @@ const char *ir_reg_name(int8_t reg, ir_type type)
 	_(LEA_SI_OB)           \
 	_(LEA_B_SI)            \
 	_(LEA_SI_B)            \
+	_(LEA_B_SI_O)          \
+	_(LEA_SI_B_O)          \
 	_(INC)                 \
 	_(DEC)                 \
 	_(MUL_PWR2)            \
@@ -1581,7 +1583,7 @@ static void ir_match_fuse_addr(ir_ctx *ctx, ir_ref addr_ref)
 		if (!rule) {
 			ctx->rules[addr_ref] = rule = ir_match_insn(ctx, addr_ref);
 		}
-		if (rule >= IR_LEA_OB && rule <= IR_LEA_SI_B) {
+		if (rule >= IR_LEA_OB && rule <= IR_LEA_SI_B_O) {
 			ir_use_list *use_list;
 			ir_ref j;
 
@@ -1990,14 +1992,20 @@ lea:
 								/* z = MUL(Y, 2|4|8) ... ADD(z, imm32) => SKIP ... LEA [Y*2|4|8+im32] */
 								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_SI;
 								return IR_LEA_SI_O;
-							} else if (rule == IR_LEA_SIB) {
+							} else if (rule == IR_LEA_SIB || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_SIB)) {
 								/* z = ADD(X, MUL(Y, 2|4|8)) ... ADD(z, imm32) => SKIP ... LEA [X+Y*2|4|8+im32] */
 								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_SIB;
 								return IR_LEA_SIB_O;
-							} else if (rule == IR_LEA_IB) {
+							} else if (rule == IR_LEA_IB || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_IB)) {
 								/* z = ADD(X, Y) ... ADD(z, imm32) => SKIP ... LEA [X+Y+im32] */
 								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_IB;
 								return IR_LEA_IB_O;
+							} else if (rule == IR_LEA_B_SI || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_B_SI)) {
+								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_B_SI;
+								return IR_LEA_B_SI_O;
+							} else if (rule == IR_LEA_SI_B || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_SI_B)) {
+								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_SI_B;
+								return IR_LEA_SI_B_O;
 							}
 						}
 						/* ADD(X, imm32) => LEA [X+imm32] */
@@ -2050,7 +2058,7 @@ lea:
 									if (!rule) {
 										ctx->rules[insn->op2] = rule = ir_match_insn(ctx, insn->op2);
 									}
-									if (rule == IR_LEA_OB) {
+									if (rule == IR_LEA_OB || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_OB)) {
 										/* x = ADD(X, imm32) ... y = MUL(Y, 2|4|8) ... ADD(y, x) => SKIP ... SKIP ... LEA */
 										ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_LEA_OB;
 										return IR_LEA_SI_OB;
@@ -2065,7 +2073,7 @@ lea:
 							if (!rule) {
 								ctx->rules[insn->op2] = rule = ir_match_insn(ctx, insn->op2);
 							}
-							if (rule == IR_LEA_OB) {
+							if (rule == IR_LEA_OB || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_OB)) {
 								ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_LEA_OB;
 								/* x = ADD(X, imm32) ... ADD(Y, x) => SKIP ... LEA */
 								return IR_LEA_I_OB;
@@ -3286,7 +3294,7 @@ static ir_mem ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 	int32_t offset = 0, scale;
 
 	IR_ASSERT(((rule & IR_RULE_MASK) >= IR_LEA_OB &&
-			(rule & IR_RULE_MASK) <= IR_LEA_SI_B) ||
+			(rule & IR_RULE_MASK) <= IR_LEA_SI_B_O) ||
 		rule == IR_STATIC_ALLOCA);
 	switch (rule & IR_RULE_MASK) {
 		default:
@@ -3455,6 +3463,22 @@ static ir_mem ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 			op1_insn = &ctx->ir_base[insn->op1];
 			scale = ctx->ir_base[op1_insn->op2].val.i32;
 			offset_insn = NULL;
+			break;
+		case IR_LEA_B_SI_O:
+			offset_insn = insn;
+			op1_insn = &ctx->ir_base[insn->op1];
+			base_reg_ref = insn->op1 * sizeof(ir_ref) + 1;
+			index_reg_ref = op1_insn->op2 * sizeof(ir_ref) + 1;
+			op2_insn = &ctx->ir_base[op1_insn->op2];
+			scale = ctx->ir_base[op2_insn->op2].val.i32;
+			break;
+		case IR_LEA_SI_B_O:
+			offset_insn = insn;
+			op1_insn = &ctx->ir_base[insn->op1];
+			index_reg_ref = op1_insn->op1 * sizeof(ir_ref) + 1;
+			base_reg_ref = insn->op1 * sizeof(ir_ref) + 2;
+			op1_insn = &ctx->ir_base[op1_insn->op1];
+			scale = ctx->ir_base[op1_insn->op2].val.i32;
 			break;
 		case IR_ALLOCA:
 			offset = IR_SPILL_POS_TO_OFFSET(insn->op3);
@@ -10469,6 +10493,8 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_LEA_SI_OB:
 				case IR_LEA_B_SI:
 				case IR_LEA_SI_B:
+				case IR_LEA_B_SI_O:
+				case IR_LEA_SI_B_O:
 					ir_emit_lea(ctx, i, insn->type);
 					break;
 				case IR_MUL_PWR2:
