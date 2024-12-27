@@ -42,7 +42,7 @@
 	int32_t d_5 = PHI(l_4, c_7, d_7);
 	int32_t d_6 = ADD(d_2, c_6);
 	int32_t d_7 = ADD(d_6, d_5);
-	int32_t d_8 = ADD(d_7, d_7);
+	int32_t d_8 = MUL(d_7, c_5);
 	bool d_9 = LT(d_7, c_4);
 	l_10 = IF(l_4, d_9);
 	l_11 = IF_TRUE(l_10);
