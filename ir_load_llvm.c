@@ -1179,6 +1179,26 @@ static int llvm2ir_inline_cost(LLVMValueRef func)
 
 	for (bb = LLVMGetFirstBasicBlock(func); bb; bb = LLVMGetNextBasicBlock(bb)) {
 		for (insn = LLVMGetFirstInstruction(bb); insn; insn = LLVMGetNextInstruction(insn)) {
+			LLVMOpcode opcode = LLVMGetInstructionOpcode(insn);
+
+			/* Skip SSA related instuctions */
+			if (opcode == LLVMPHI
+			 || opcode == LLVMAlloca
+			 || (opcode == LLVMStore && LLVMGetInstructionOpcode(LLVMGetOperand(insn, 1)) == LLVMAlloca)
+			 || (opcode == LLVMLoad && LLVMGetInstructionOpcode(LLVMGetOperand(insn, 0)) == LLVMAlloca)) {
+				continue;
+			} else if (opcode == LLVMCall) {
+				LLVMValueRef f = LLVMGetCalledValue(insn);
+				if (LLVMGetValueKind(f) == LLVMFunctionValueKind) {
+					size_t name_len;
+					const char *name;
+
+					name = LLVMGetValueName2(f, &name_len);
+					if (STR_START(name, name_len, "llvm.lifetime.")) {
+						continue;
+					}
+				}
+			}
 			count++;
 		}
 	}
