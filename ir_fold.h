@@ -394,7 +394,7 @@ IR_FOLD(SUB(C_I16, C_I16))
 IR_FOLD(SUB(C_I32, C_I32))
 {
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
-	IR_FOLD_CONST_I((int32_t)(op1_insn->val.u64 - op2_insn->val.u64));
+	IR_FOLD_CONST_I((int32_t)(op1_insn->val.u32 - op2_insn->val.u32));
 }
 
 IR_FOLD(SUB(C_I64, C_I64))
