@@ -75,7 +75,7 @@ aarch64
 }
 --EXPECT--
 test:
-	sub sp, sp, #0x68
+	sub sp, sp, #0x70
 	str d0, [sp]
 	str d1, [sp, #8]
 	ldr d2, [sp, #8]
@@ -128,14 +128,14 @@ test:
 	fcmp d1, d0
 	b.le .L2
 	ldr w0, [sp, #0x30]
-	add sp, sp, #0x68
+	add sp, sp, #0x70
 	ret
 .L2:
 	ldr w0, [sp, #0x30]
 	cmp w0, #0x3e8
 	b.le .L1
 	mov w0, wzr
-	add sp, sp, #0x68
+	add sp, sp, #0x70
 	ret
 .rodata
 .L3:

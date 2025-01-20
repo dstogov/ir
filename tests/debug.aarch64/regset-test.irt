@@ -149,7 +149,7 @@ R12 (d_35) [%d0]: [35.2-36.1), DEF(35.2)!, USE(36.1/1)!
 [%d1] : [1.0-3.3)
 }
 test:
-	sub sp, sp, #0x38
+	sub sp, sp, #0x40
 	str d0, [sp]
 	ldr d0, .L4
 	fsub d0, d1, d0
@@ -192,10 +192,10 @@ test:
 	cmp w0, #0x3e8
 	b.le .L1
 	mov w0, wzr
-	add sp, sp, #0x38
+	add sp, sp, #0x40
 	ret
 .L3:
-	add sp, sp, #0x38
+	add sp, sp, #0x40
 	ret
 .rodata
 	.db 0x1f, 0x20, 0x03, 0xd5

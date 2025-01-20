@@ -1,0 +1,27 @@
+--TEST--
+GH-100: incorrect stack alignment with VAR on aarch64
+--TARGET--
+aarch64
+--ARGS--
+-O0 -S --run
+--CODE--
+{
+        int32_t c_1 = 42;
+        l_1 = START(l_4);
+        int32_t p = PARAM(l_1, "p", 1);
+        int32_t v = VAR(l_1, "v");
+        l_2 = VSTORE(l_1, v, c_1);
+        int32_t d_3, l_3 = VLOAD(l_2, v);
+        l_4 = RETURN(l_3, d_3);
+}
+--EXPECT--
+main:
+	sub sp, sp, #0x10
+	movz w0, #0x2a
+	str w0, [sp]
+	ldr w0, [sp]
+	add sp, sp, #0x10
+	ret
+
+
+exit code = 42
