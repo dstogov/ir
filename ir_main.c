@@ -255,6 +255,9 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 		}
 
 		ir_mem2ssa(ctx);
+		if (opt_level > 1) {
+			ir_reset_cfg(ctx);
+		}
 		if ((dump & (IR_DUMP_AFTER_MEM2SSA|IR_DUMP_AFTER_ALL))
 		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_MEM2SSA, dump_file, func_name)) {
 			return 0;
@@ -266,9 +269,6 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 
 	/* Global Optimization */
 	if (opt_level > 1) {
-		if (ctx->cfg_blocks) {
-			ir_reset_cfg(ctx);
-		}
 		ir_sccp(ctx);
 		if ((dump & (IR_DUMP_AFTER_SCCP|IR_DUMP_AFTER_ALL))
 		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_SCCP, dump_file, func_name)) {
@@ -1325,7 +1325,7 @@ int main(int argc, char **argv)
 	if (opt_level > 1 && !disable_inline) {
 		flags |= IR_OPT_INLINE;
 	}
-	if (opt_level > 1 && !disable_mem2ssa) {
+	if (opt_level > 0 && !disable_mem2ssa) {
 		flags |= IR_OPT_MEM2SSA;
 	}
 	if (emit_c || emit_llvm) {
