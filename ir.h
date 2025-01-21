@@ -29,7 +29,9 @@ extern "C" {
 # endif
 /* Only supported is little endian for any arch on Windows,
    so just fake the same for all. */
-# define __ORDER_LITTLE_ENDIAN__ 1
+# ifndef __ORDER_LITTLE_ENDIAN__
+#  define __ORDER_LITTLE_ENDIAN__ 1
+# endif
 # define __BYTE_ORDER__ __ORDER_LITTLE_ENDIAN__
 # ifndef __has_builtin
 #  define __has_builtin(arg) (0)
