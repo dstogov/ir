@@ -1059,7 +1059,7 @@ restart:
 	if (ctx->flags & IR_DEBUG_SCHEDULE) {
 		fprintf(stderr, "After Schedule\n");
 		for (i = 1; i != 0; i = _next[i]) {
-			fprintf(stderr, "%d -> %d\n", i, _blocks[i]);
+			fprintf(stderr, "%d -> %d (%d)\n", i, _blocks[i], _xlat[i]);
 		}
 	}
 #endif

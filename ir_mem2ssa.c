@@ -169,6 +169,7 @@ static void ir_mem2ssa_convert(ir_ctx    *ctx,
 
 			MAKE_NOP(use_insn);
 			CLEAR_USES(use);
+			ctx->cfg_map[use] = 0;
 		} else if (use_insn->op == IR_VLOAD || use_insn->op == IR_LOAD) {
 			/*
 			 *  prev    VAR      prev   ssa_val
@@ -204,6 +205,7 @@ static void ir_mem2ssa_convert(ir_ctx    *ctx,
 			use_insn = &ctx->ir_base[use];
 			MAKE_NOP(use_insn);
 			CLEAR_USES(use);
+			ctx->cfg_map[use] = 0;
 		}
 	}
 
@@ -441,6 +443,7 @@ int ir_mem2ssa(ir_ctx *ctx)
 					ir_use_list_replace_one(ctx, prev, ref, next);
 					MAKE_NOP(insn);
 					CLEAR_USES(ref);
+					ctx->cfg_map[ref] = 0;
 					ref = prev;
 					continue;
 				} else if (ir_mem2ssa_may_convert_alloca(ctx, ref, next, insn, &type)) {
@@ -464,6 +467,7 @@ int ir_mem2ssa(ir_ctx *ctx)
 					ir_use_list_replace_one(ctx, prev, ref, next);
 					MAKE_NOP(insn);
 					CLEAR_USES(ref);
+					ctx->cfg_map[ref] = 0;
 					ref = prev;
 					continue;
 				}
