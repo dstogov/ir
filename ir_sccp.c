@@ -40,6 +40,12 @@ IR_ALWAYS_INLINE ir_ref ir_sccp_identity(ir_insn *_values, ir_ref a)
 	}
 	return a;
 }
+
+static void ir_sccp_add_identity(ir_insn *_values, ir_ref src, ir_ref dst, ir_type type)
+{
+	_values[dst].optx = IR_OPT(IR_COPY, type);
+	_values[dst].op1 = src;
+}
 #endif
 
 static ir_ref ir_sccp_fold(ir_ctx *ctx, ir_insn *_values, ir_ref res, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
@@ -76,20 +82,24 @@ restart:
 			if (IR_IS_CONST_OP(insn->op)) {
 				/* pass */
 #if IR_COMBO_COPY_PROPAGATION
-			} else if (_values[res].optx == IR_TOP) {
-				_values[res].optx = IR_OPT(IR_COPY, insn->type);
-				_values[res].op1 = op1;
-				return 1;
-			} else if (_values[res].op == IR_COPY && _values[res].op1 == op1) {
-				return 0; /* not changed */
 			} else {
-				IR_ASSERT(_values[res].optx != IR_BOTTOM);
-				/* we don't check for widening */
-				_values[res].optx = IR_OPT(IR_COPY, insn->type);
-				_values[res].op1 = op1;
+				if (_values[res].optx == IR_TOP) {
+					/* pass to new copy */
+				} else if (_values[res].op == IR_COPY) {
+					if (_values[res].op1 == op1) {
+						return 0; /* not changed */
+					} else {
+						IR_MAKE_BOTTOM(res);
+						return 1;
+					}
+				} else {
+					IR_ASSERT(_values[res].optx != IR_BOTTOM);
+					/* we don't check for widening */
+				}
+				/* create new COPY */
+				ir_sccp_add_identity(_values, op1, res, insn->type);
 				return 1;
 #else
-			} else {
 				IR_MAKE_BOTTOM(res);
 				return 1;
 #endif
@@ -241,8 +251,7 @@ next:
 		} else {
 			IR_ASSERT(_values[i].optx != IR_BOTTOM);
 			/* we don't check for widening */
-			_values[i].optx = IR_OPT(IR_COPY, ctx->ir_base[new_copy].type);
-			_values[i].op1 = new_copy;
+			ir_sccp_add_identity(_values, new_copy, i, insn->type);
 			return 1;
 		}
 	}
