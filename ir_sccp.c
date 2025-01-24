@@ -12,6 +12,8 @@
 #include "ir.h"
 #include "ir_private.h"
 
+#define IR_COMBO_COPY_PROPAGATION 1
+
 #define IR_TOP                  IR_UNUSED
 #define IR_BOTTOM               IR_LAST_OP
 
@@ -20,9 +22,14 @@
 
 #define IR_IS_TOP(ref)          (ref >= 0 && _values[ref].optx == IR_TOP)
 #define IR_IS_BOTTOM(ref)       (ref >= 0 && _values[ref].optx == IR_BOTTOM)
-#define IR_IS_FEASIBLE(ref)     (ref >= 0 && _values[ref].optx != IR_TOP)
+#define IR_IS_REACHABLE(ref)    _ir_is_reachable_ctrl(ctx, _values, ref)
 
-#define IR_COMBO_COPY_PROPAGATION 1
+IR_ALWAYS_INLINE bool _ir_is_reachable_ctrl(ir_ctx *ctx, ir_insn *_values, ir_ref ref)
+{
+	IR_ASSERT(!IR_IS_CONST_REF(ref));
+	IR_ASSERT(ir_op_flags[ctx->ir_base[ref].op] & IR_OP_FLAG_CONTROL);
+	return _values[ref].optx != IR_TOP; /* BOTTOM, IF or MERGE */
+}
 
 #if IR_COMBO_COPY_PROPAGATION
 IR_ALWAYS_INLINE ir_ref ir_sccp_identity(ir_insn *_values, ir_ref a)
@@ -115,7 +122,7 @@ static bool ir_sccp_meet_phi(ir_ctx *ctx, ir_insn *_values, ir_ref i, ir_insn *i
 	ir_ref new_copy;
 #endif
 
-	if (!IR_IS_FEASIBLE(insn->op1)) {
+	if (!IR_IS_REACHABLE(insn->op1)) {
 		return 0;
 	}
 	n = insn->inputs_count;
@@ -129,7 +136,7 @@ static bool ir_sccp_meet_phi(ir_ctx *ctx, ir_insn *_values, ir_ref i, ir_insn *i
 	merge_input = ctx->ir_base[insn->op1].ops + 1;
 	for (; --n > 0; p++, merge_input++) {
 		IR_ASSERT(*merge_input > 0);
-		if (_values[*merge_input].optx == IR_TOP) {
+		if (!IR_IS_REACHABLE(*merge_input)) {
 			continue;
 		}
 
@@ -177,7 +184,7 @@ next:
 	/* for all live merge inputs */
 	for (; --n > 0; p++, merge_input++) {
 		IR_ASSERT(*merge_input > 0);
-		if (_values[*merge_input].optx == IR_TOP) {
+		if (!IR_IS_REACHABLE(*merge_input)) {
 			continue;
 		}
 
@@ -387,25 +394,25 @@ static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 				for (p = insn->ops + 1; n > 0; p++, n--) {
 					ir_ref input = *p;
 					IR_ASSERT(input > 0);
-					if (_values[input].optx == IR_TOP) {
+					if (!IR_IS_REACHABLE(input)) {
 						unfeasible_inputs++;
 					}
 				}
 				if (unfeasible_inputs == 0) {
 					IR_MAKE_BOTTOM(i);
-				} else if (_values[i].op1 != unfeasible_inputs) {
+				} else if (_values[i].optx != IR_MERGE || _values[i].op1 != unfeasible_inputs) {
 					_values[i].optx = IR_MERGE;
 					_values[i].op1 = unfeasible_inputs;
 				} else {
 					continue;
 				}
 			} else {
-				IR_ASSERT(insn->op == IR_START || IR_IS_FEASIBLE(insn->op1));
+				IR_ASSERT(insn->op == IR_START || IR_IS_REACHABLE(insn->op1));
 				IR_MAKE_BOTTOM(i);
 			}
 		} else {
 			IR_ASSERT(insn->op1 > 0);
-			if (_values[insn->op1].optx == IR_TOP) {
+			if (!IR_IS_REACHABLE(insn->op1)) {
 				/* control inpt is not feasible */
 				continue;
 			}
@@ -437,13 +444,11 @@ static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 					if (_values[i].optx == IR_TOP) {
 						_values[i].optx = IR_IF;
 						_values[i].op1 = use;
-					} else if (_values[i].optx != IR_IF || _values[i].op1 != use) {
-						IR_MAKE_BOTTOM(i);
-					}
-					if (!IR_IS_BOTTOM(use)) {
 						ir_bitqueue_add(worklist, use);
+						continue;
+					} else if (_values[i].optx == IR_IF && _values[i].op1 == use) {
+						continue;
 					}
-					continue;
 				}
 				IR_MAKE_BOTTOM(i);
 			} else if (insn->op == IR_SWITCH) {
@@ -482,15 +487,11 @@ static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 						if (_values[i].optx == IR_TOP) {
 							_values[i].optx = IR_IF;
 							_values[i].op1 = use_case;
-						} else if (_values[i].optx != IR_IF || _values[i].op1 != use_case) {
-							IR_MAKE_BOTTOM(i);
-						}
-						if (!IR_IS_BOTTOM(use_case)) {
 							ir_bitqueue_add(worklist, use_case);
+							continue;
+						} else if (_values[i].optx == IR_IF || _values[i].op1 == use_case) {
+							continue;
 						}
-					}
-					if (!IR_IS_BOTTOM(i)) {
-						continue;
 					}
 				}
 				IR_MAKE_BOTTOM(i);
@@ -708,7 +709,7 @@ static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values
 		/* remove MERGE completely */
 		for (j = 1; j <= n; j++) {
 			ir_ref input = ir_insn_op(insn, j);
-			if (input && IR_IS_FEASIBLE(input)) {
+			if (input && IR_IS_REACHABLE(input)) {
 				ir_insn *input_insn = &ctx->ir_base[input];
 
 				IR_ASSERT(input_insn->op == IR_END || input_insn->op == IR_LOOP_END||
