@@ -170,7 +170,9 @@ static bool ir_sccp_meet_phi(ir_ctx *ctx, ir_insn *_values, ir_ref i, ir_insn *i
 #endif
 			}
 		}
+#if IR_COMBO_COPY_PROPAGATION
 		new_copy = IR_UNUSED;
+#endif
 		new_const = v;
 		goto next;
 	}
@@ -715,38 +717,65 @@ static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values
 				IR_ASSERT(input_insn->op == IR_END || input_insn->op == IR_LOOP_END||
 					input_insn->op == IR_IJMP || input_insn->op == IR_UNREACHABLE);
 				if (input_insn->op == IR_END || input_insn->op == IR_LOOP_END) {
-					if (input < ref) {
-						ir_ref prev, next = IR_UNUSED;
-						ir_insn *next_insn = NULL;
+					ir_ref prev, next = IR_UNUSED;
+					ir_insn *next_insn = NULL;
 
-						prev = input_insn->op1;
-						use_list = &ctx->use_lists[ref];
-						if (use_list->count == 1) {
-							next = ctx->use_edges[use_list->refs];
-							next_insn = &ctx->ir_base[next];
-						} else {
-							for (k = 0, p = &ctx->use_edges[use_list->refs]; k < use_list->count; k++, p++) {
-								use = *p;
-								use_insn = &ctx->ir_base[use];
-								IR_ASSERT((use_insn->op != IR_PHI) && "PHI must be already removed");
-								if (ir_op_flags[use_insn->op] & IR_OP_FLAG_CONTROL) {
-									IR_ASSERT(!next);
-									next = use;
-									next_insn = use_insn;
-								} else if (use_insn->op != IR_NOP) {
-									IR_ASSERT(use_insn->op1 == ref);
-									IR_ASSERT(use_insn->op == IR_VAR);
-									ir_ref region = prev;
-									while (!IR_IS_BB_START(ctx->ir_base[region].op)) {
-										region = ctx->ir_base[region].op1;
+					prev = input_insn->op1;
+					use_list = &ctx->use_lists[ref];
+					if (use_list->count == 1) {
+						next = ctx->use_edges[use_list->refs];
+						next_insn = &ctx->ir_base[next];
+					} else {
+						k = 0;
+						p = &ctx->use_edges[use_list->refs];
+						while (k < use_list->count) {
+							use = *p;
+							use_insn = &ctx->ir_base[use];
+#if IR_COMBO_COPY_PROPAGATION
+							IR_ASSERT((use_insn->op != IR_PHI) && "PHI must be already removed");
+#else
+							if (use_insn->op == IR_PHI) {
+								/* Convert PHI into COPY */
+								ir_ref i, n = use_insn->inputs_count;
+
+								for (i = 2; i <= n; i++) {
+									if (i != j + 1) {
+										ir_ref from = ir_insn_op(use_insn, i);
+										if (from > 0) {
+											ir_use_list_remove_one(ctx, from, use);
+										}
+										ir_insn_set_op(use_insn, i, IR_UNUSED);
 									}
-									use_insn->op1 = region;
-									ir_use_list_add(ctx, region, use);
-									p = &ctx->use_edges[use_list->refs + k];
 								}
+								use_insn->optx = IR_OPTX(IR_COPY, use_insn->type, 1);
+								use_insn->op1 = ir_insn_op(use_insn, j + 1);
+								ir_insn_set_op(use_insn, j + 1, IR_UNUSED);
+								ir_use_list_remove_one(ctx, ref, use);
+								p = &ctx->use_edges[use_list->refs + k];
+								continue;
 							}
+#endif
+							if (ir_op_flags[use_insn->op] & IR_OP_FLAG_CONTROL) {
+								IR_ASSERT(!next);
+								next = use;
+								next_insn = use_insn;
+							} else if (use_insn->op != IR_NOP) {
+								IR_ASSERT(use_insn->op1 == ref);
+								IR_ASSERT(use_insn->op == IR_VAR);
+								ir_ref region = prev;
+								while (!IR_IS_BB_START(ctx->ir_base[region].op)) {
+									region = ctx->ir_base[region].op1;
+								}
+								use_insn->op1 = region;
+								ir_use_list_add(ctx, region, use);
+								p = &ctx->use_edges[use_list->refs + k];
+							}
+							k++;
+							p++;
 						}
-						IR_ASSERT(prev && next);
+					}
+					IR_ASSERT(prev && next);
+					if (prev < next) {
 						/* remove MERGE and input END from double linked control list */
 						next_insn->op1 = prev;
 						ir_use_list_replace_one(ctx, prev, input, next);
