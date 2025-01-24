@@ -1014,7 +1014,6 @@ IR_ALWAYS_INLINE uint32_t ir_insn_len(const ir_insn *insn)
 #define IR_16B_FRAME_ALIGNMENT (1<<11)
 
 /* Temporary: SCCP -> CFG */
-#define IR_SCCP_DONE           (1<<25)
 #define IR_CFG_REACHABLE       (1<<26)
 
 /* Temporary: Dominators -> Loops */
