@@ -285,25 +285,6 @@ static bool ir_is_dead(ir_ctx *ctx, ir_ref ref)
 	return 0;
 }
 
-static ir_ref ir_find1(ir_ctx *ctx, uint32_t optx, ir_ref op1)
-{
-	IR_ASSERT(!IR_IS_CONST_REF(op1));
-
-	ir_use_list *use_list = &ctx->use_lists[op1];
-	ir_ref *p, n = use_list->count;
-
-	for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
-		ir_ref use = *p;
-		ir_insn *use_insn = &ctx->ir_base[use];
-
-		if (use_insn->optx == optx) {
-			IR_ASSERT(use_insn->op1 == op1);
-			return use;
-		}
-	}
-	return IR_UNUSED;
-}
-
 static bool ir_sccp_is_true(ir_ctx *ctx, ir_insn *_values, ir_ref a)
 {
 	ir_insn *v = IR_IS_CONST_REF(a) ? &ctx->ir_base[a] : &_values[a];
@@ -320,6 +301,271 @@ static bool ir_sccp_is_equal(ir_ctx *ctx, ir_insn *_values, ir_ref a, ir_ref b)
 	IR_ASSERT(!IR_IS_SYM_CONST(v2->op));
 	return v1->val.u64 == v2->val.u64;
 }
+
+static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_bitqueue *iter_worklist)
+{
+	ir_ref i, j, n, *p, use;
+	ir_use_list *use_list;
+	ir_insn *insn, *use_insn;
+	uint32_t flags;
+
+	/* A bit modified SCCP algorithm of M. N. Wegman and F. K. Zadeck */
+	worklist->pos = 0;
+	ir_bitset_incl(worklist->set, 1);
+	while ((i = ir_bitqueue_pop(worklist)) >= 0) {
+		insn = &ctx->ir_base[i];
+		flags = ir_op_flags[insn->op];
+		if (flags & IR_OP_FLAG_DATA) {
+			if (ctx->use_lists[i].count == 0) {
+				/* dead code */
+				continue;
+			} else if (insn->op == IR_PHI) {
+				if (!ir_sccp_meet_phi(ctx, _values, i, insn, worklist)) {
+					continue;
+				}
+			} else if (EXPECTED(IR_IS_FOLDABLE_OP(insn->op))) {
+				bool may_benefit = 0;
+				bool has_top = 0;
+
+				IR_ASSERT(!IR_OP_HAS_VAR_INPUTS(flags));
+				n = IR_INPUT_EDGES_COUNT(flags);
+				for (p = insn->ops + 1; n > 0; p++, n--) {
+					ir_ref input = *p;
+					if (input > 0) {
+						if (_values[input].optx == IR_TOP) {
+							has_top = 1;
+							/* do backward propagaton only once */
+							if (!_values[input].op1) {
+								_values[input].op1 = 1;
+								ir_bitqueue_add(worklist, input);
+							}
+						} else if (_values[input].optx != IR_BOTTOM) {
+							/* Perform folding only if some of direct inputs
+							 * is going to be replaced by a constant or copy.
+							 * This approach may miss some folding optimizations
+							 * dependent on indirect inputs. e.g. reassociation.
+							 */
+							may_benefit = 1;
+						}
+					}
+				}
+				if (has_top) {
+					continue;
+				}
+				if (!may_benefit) {
+					IR_MAKE_BOTTOM(i);
+					if (insn->op == IR_FP2FP || insn->op == IR_FP2INT || insn->op == IR_TRUNC
+					 || insn->op == IR_ZEXT || insn->op == IR_SEXT || insn->op == IR_EQ || insn->op == IR_NE) {
+						ir_bitqueue_add(iter_worklist, i);
+					}
+				} else if (!ir_sccp_fold(ctx, _values, i, insn->opt, insn->op1, insn->op2, insn->op3)) {
+					/* not changed */
+					continue;
+				} else if (_values[i].optx == IR_BOTTOM) {
+					insn = &ctx->ir_base[i];
+					if (insn->op == IR_FP2FP || insn->op == IR_FP2INT || insn->op == IR_TRUNC
+					 || insn->op == IR_ZEXT || insn->op == IR_SEXT || insn->op == IR_EQ || insn->op == IR_NE) {
+						ir_bitqueue_add(iter_worklist, i);
+					}
+				}
+			} else {
+				IR_MAKE_BOTTOM(i);
+			}
+		} else if (flags & IR_OP_FLAG_BB_START) {
+			if (insn->op == IR_MERGE || insn->op == IR_BEGIN) {
+				ir_bitqueue_add(iter_worklist, i);
+			}
+			if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
+				ir_ref unfeasible_inputs = 0;
+
+				n = insn->inputs_count;
+				if (n > 3 && _values[i].optx == IR_TOP) {
+					for (j = 0; j < (n>>2); j++) {
+						_values[i+j+1].optx = IR_BOTTOM; /* keep the tail of a long multislot instruction */
+					}
+				}
+				for (p = insn->ops + 1; n > 0; p++, n--) {
+					ir_ref input = *p;
+					IR_ASSERT(input > 0);
+					if (_values[input].optx == IR_TOP) {
+						unfeasible_inputs++;
+					}
+				}
+				if (unfeasible_inputs == 0) {
+					IR_MAKE_BOTTOM(i);
+				} else if (_values[i].op1 != unfeasible_inputs) {
+					_values[i].optx = IR_MERGE;
+					_values[i].op1 = unfeasible_inputs;
+				} else {
+					continue;
+				}
+			} else {
+				IR_ASSERT(insn->op == IR_START || IR_IS_FEASIBLE(insn->op1));
+				IR_MAKE_BOTTOM(i);
+			}
+		} else {
+			IR_ASSERT(insn->op1 > 0);
+			if (_values[insn->op1].optx == IR_TOP) {
+				/* control inpt is not feasible */
+				continue;
+			}
+			if (insn->op == IR_IF) {
+				if (IR_IS_TOP(insn->op2)) {
+					/* do backward propagaton only once */
+					if (!_values[insn->op2].op1) {
+						_values[insn->op2].op1 = 1;
+						ir_bitqueue_add(worklist, insn->op2);
+					}
+					continue;
+				}
+				if (!IR_IS_BOTTOM(insn->op2)
+#if IR_COMBO_COPY_PROPAGATION
+				 && (IR_IS_CONST_REF(insn->op2) || _values[insn->op2].op != IR_COPY)
+#endif
+				) {
+					bool b = ir_sccp_is_true(ctx, _values, insn->op2);
+					use_list = &ctx->use_lists[i];
+					IR_ASSERT(use_list->count == 2);
+					p = &ctx->use_edges[use_list->refs];
+					use = *p;
+					use_insn = &ctx->ir_base[use];
+					IR_ASSERT(use_insn->op == IR_IF_TRUE || use_insn->op == IR_IF_FALSE);
+					if ((use_insn->op == IR_IF_TRUE) != b) {
+						use = *(p+1);
+						IR_ASSERT(ctx->ir_base[use].op == IR_IF_TRUE || ctx->ir_base[use].op == IR_IF_FALSE);
+					}
+					if (_values[i].optx == IR_TOP) {
+						_values[i].optx = IR_IF;
+						_values[i].op1 = use;
+					} else if (_values[i].optx != IR_IF || _values[i].op1 != use) {
+						IR_MAKE_BOTTOM(i);
+					}
+					if (!IR_IS_BOTTOM(use)) {
+						ir_bitqueue_add(worklist, use);
+					}
+					continue;
+				}
+				IR_MAKE_BOTTOM(i);
+			} else if (insn->op == IR_SWITCH) {
+				if (IR_IS_TOP(insn->op2)) {
+					/* do backward propagaton only once */
+					if (!_values[insn->op2].op1) {
+						_values[insn->op2].op1 = 1;
+						ir_bitqueue_add(worklist, insn->op2);
+					}
+					continue;
+				}
+				if (!IR_IS_BOTTOM(insn->op2)
+#if IR_COMBO_COPY_PROPAGATION
+				 && (IR_IS_CONST_REF(insn->op2) || _values[insn->op2].op != IR_COPY)
+#endif
+				) {
+					ir_ref use_case = IR_UNUSED;
+
+					use_list = &ctx->use_lists[i];
+					n = use_list->count;
+					for (j = 0, p = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
+						use = *p;
+						IR_ASSERT(use > 0);
+						use_insn = &ctx->ir_base[use];
+						if (use_insn->op == IR_CASE_VAL) {
+							if (ir_sccp_is_equal(ctx, _values, insn->op2, use_insn->op2)) {
+								use_case = use;
+								break;
+							}
+						} else if (use_insn->op == IR_CASE_DEFAULT) {
+							use_case = use;
+						}
+					}
+					if (use_case) {
+						use_insn = &ctx->ir_base[use_case];
+						if (_values[i].optx == IR_TOP) {
+							_values[i].optx = IR_IF;
+							_values[i].op1 = use_case;
+						} else if (_values[i].optx != IR_IF || _values[i].op1 != use_case) {
+							IR_MAKE_BOTTOM(i);
+						}
+						if (!IR_IS_BOTTOM(use_case)) {
+							ir_bitqueue_add(worklist, use_case);
+						}
+					}
+					if (!IR_IS_BOTTOM(i)) {
+						continue;
+					}
+				}
+				IR_MAKE_BOTTOM(i);
+			} else if (ir_is_dead_load_ex(ctx, i, flags, insn)) {
+				/* dead load */
+				_values[i].optx = IR_LOAD;
+			} else {
+				IR_MAKE_BOTTOM(i);
+
+				/* control, call, load and store instructions may have unprocessed inputs */
+				n = IR_INPUT_EDGES_COUNT(flags);
+				if (IR_OP_HAS_VAR_INPUTS(flags) && (n = insn->inputs_count) > 3) {
+					for (j = 0; j < (n>>2); j++) {
+						_values[i+j+1].optx = IR_BOTTOM; /* keep the tail of a long multislot instruction */
+					}
+					for (j = 2, p = insn->ops + j; j <= n; j++, p++) {
+						IR_ASSERT(IR_OPND_KIND(flags, j) == IR_OPND_DATA);
+						use = *p;
+						if (use > 0 && UNEXPECTED(_values[use].optx == IR_TOP)) {
+							ir_bitqueue_add(worklist, use);
+						}
+					}
+				} else if (n >= 2) {
+					IR_ASSERT(IR_OPND_KIND(flags, 2) == IR_OPND_DATA);
+					use = insn->op2;
+					if (use > 0 && UNEXPECTED(_values[use].optx == IR_TOP)) {
+						ir_bitqueue_add(worklist, use);
+					}
+					if (n > 2) {
+						IR_ASSERT(n == 3);
+						IR_ASSERT(IR_OPND_KIND(flags, 3) == IR_OPND_DATA);
+						use = insn->op3;
+						if (use > 0 && UNEXPECTED(_values[use].optx == IR_TOP)) {
+							ir_bitqueue_add(worklist, use);
+						}
+					}
+				}
+			}
+		}
+		use_list = &ctx->use_lists[i];
+		n = use_list->count;
+		for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
+			use = *p;
+			if (_values[use].optx != IR_BOTTOM) {
+				ir_bitqueue_add(worklist, use);
+			}
+		}
+	}
+
+#ifdef IR_DEBUG
+	if (ctx->flags & IR_DEBUG_SCCP) {
+		if (IR_IS_CONST_OP(_values[i].op) || IR_IS_SYM_CONST(_values[i].op)) {
+			fprintf(stderr, "%d. CONST(", i);
+			ir_print_const(ctx, &_values[i], stderr, true);
+			fprintf(stderr, ")\n");
+#if IR_COMBO_COPY_PROPAGATION
+		} else if (_values[i].op == IR_COPY) {
+			fprintf(stderr, "%d. COPY(%d)\n", i, _values[i].op1);
+#endif
+		} else if (IR_IS_TOP(i)) {
+			fprintf(stderr, "%d. TOP\n", i);
+		} else if (_values[i].op == IR_IF) {
+			fprintf(stderr, "%d. IF(%d)\n", i, _values[i].op1);
+		} else if (_values[i].op == IR_MERGE) {
+			fprintf(stderr, "%d. MERGE(%d)\n", i, _values[i].op1);
+		} else if (!IR_IS_BOTTOM(i)) {
+			fprintf(stderr, "%d. %d\n", i, _values[i].op);
+		}
+	}
+#endif
+}
+
+/**********************/
+/* SCCP trasformation */
+/**********************/
 
 static void ir_sccp_make_nop(ir_ctx *ctx, ir_ref ref)
 {
@@ -353,31 +599,6 @@ static void ir_sccp_remove_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_bi
 			if (ir_is_dead(ctx, input)) {
 				/* schedule DCE */
 				ir_bitqueue_add(worklist, input);
-			}
-		}
-	}
-}
-
-static void ir_iter_remove_insn(ir_ctx *ctx, ir_ref ref, ir_bitqueue *worklist)
-{
-	ir_ref j, n, *p;
-	ir_insn *insn;
-
-	CLEAR_USES(ref);
-	insn = &ctx->ir_base[ref];
-	n = insn->inputs_count;
-	insn->opt = IR_NOP; /* keep "inputs_count" */
-	for (j = 1, p = insn->ops + j; j <= n; j++, p++) {
-		ir_ref input = *p;
-		*p = IR_UNUSED;
-		if (input > 0) {
-			ir_use_list_remove_all(ctx, input, ref);
-			if (ir_is_dead(ctx, input)) {
-				/* schedule DCE */
-				ir_bitqueue_add(worklist, input);
-			} else if (ctx->ir_base[input].op == IR_PHI && ctx->use_lists[input].count == 1) {
-				/* try to optimize PHI into ABS/MIN/MAX/COND */
-				ir_bitqueue_add(worklist, ctx->ir_base[input].op1);
 			}
 		}
 	}
@@ -446,155 +667,6 @@ static void ir_sccp_replace_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_r
 		}
 	}
 	CLEAR_USES(ref);
-}
-
-static void ir_iter_replace_insn(ir_ctx *ctx, ir_ref ref, ir_ref new_ref, ir_bitqueue *worklist)
-{
-	ir_ref i, j, n, *p, use;
-	ir_insn *insn;
-	ir_use_list *use_list;
-
-	IR_ASSERT(ref != new_ref);
-
-	insn = &ctx->ir_base[ref];
-	n = insn->inputs_count;
-	insn->opt = IR_NOP; /* keep "inputs_count" */
-	for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
-		ir_ref input = *p;
-		*p = IR_UNUSED;
-		if (input > 0) {
-			ir_use_list_remove_all(ctx, input, ref);
-			if (ir_is_dead(ctx, input)) {
-				/* schedule DCE */
-				ir_bitqueue_add(worklist, input);
-			} else if (ctx->ir_base[input].op == IR_PHI && ctx->use_lists[input].count == 1) {
-				/* try to optimize PHI into ABS/MIN/MAX/COND */
-				ir_bitqueue_add(worklist, input);
-			}
-		}
-	}
-
-	use_list = &ctx->use_lists[ref];
-	n = use_list->count;
-	p = &ctx->use_edges[use_list->refs];
-	if (new_ref <= 0) {
-		/* constant or IR_UNUSED */
-		for (; n; p++, n--) {
-			use = *p;
-			IR_ASSERT(use != ref);
-			insn = &ctx->ir_base[use];
-			i = ir_insn_find_op(insn, ref);
-			IR_ASSERT(i > 0);
-			ir_insn_set_op(insn, i, new_ref);
-			/* schedule folding */
-			ir_bitqueue_add(worklist, use);
-		}
-	} else {
-		for (j = 0; j < n; j++, p++) {
-			use = *p;
-			IR_ASSERT(use != ref);
-			insn = &ctx->ir_base[use];
-			i = ir_insn_find_op(insn, ref);
-			IR_ASSERT(i > 0);
-			ir_insn_set_op(insn, i, new_ref);
-			if (ir_use_list_add(ctx, new_ref, use)) {
-				/* restore after reallocation */
-				use_list = &ctx->use_lists[ref];
-				n = use_list->count;
-				p = &ctx->use_edges[use_list->refs + j];
-			}
-			/* schedule folding */
-			ir_bitqueue_add(worklist, use);
-		}
-	}
-	CLEAR_USES(ref);
-}
-
-static void ir_iter_fold(ir_ctx *ctx, ir_ref ref, ir_bitqueue *worklist)
-{
-	uint32_t opt;
-	ir_ref op1, op2, op3;
-	ir_insn *op1_insn, *op2_insn, *op3_insn, *insn;
-
-	insn = &ctx->ir_base[ref];
-	opt = insn->opt;
-	op1 = insn->op1;
-	op2 = insn->op2;
-	op3 = insn->op3;
-
-restart:
-	op1_insn = ctx->ir_base + op1;
-	op2_insn = ctx->ir_base + op2;
-	op3_insn = ctx->ir_base + op3;
-
-	switch (ir_folding(ctx, opt, op1, op2, op3, op1_insn, op2_insn, op3_insn)) {
-		case IR_FOLD_DO_RESTART:
-			opt = ctx->fold_insn.optx;
-			op1 = ctx->fold_insn.op1;
-			op2 = ctx->fold_insn.op2;
-			op3 = ctx->fold_insn.op3;
-			goto restart;
-		case IR_FOLD_DO_EMIT:
-			insn = &ctx->ir_base[ref];
-			if (insn->opt != ctx->fold_insn.opt
-			 || insn->op1 != ctx->fold_insn.op1
-			 || insn->op2 != ctx->fold_insn.op2
-			 || insn->op3 != ctx->fold_insn.op3) {
-
-				ir_use_list *use_list;
-				ir_ref n, j, *p, use;
-
-				insn->optx = ctx->fold_insn.opt;
-				IR_ASSERT(!IR_OP_HAS_VAR_INPUTS(ir_op_flags[opt & IR_OPT_OP_MASK]));
-				insn->inputs_count = IR_INPUT_EDGES_COUNT(ir_op_flags[opt & IR_OPT_OP_MASK]);
-				if (insn->op1 != ctx->fold_insn.op1) {
-					if (insn->op1 > 0) {
-						ir_use_list_remove_one(ctx, insn->op1, ref);
-					}
-					if (ctx->fold_insn.op1 > 0) {
-						ir_use_list_add(ctx, ctx->fold_insn.op1, ref);
-					}
-				}
-				if (insn->op2 != ctx->fold_insn.op2) {
-					if (insn->op2 > 0) {
-						ir_use_list_remove_one(ctx, insn->op2, ref);
-					}
-					if (ctx->fold_insn.op2 > 0) {
-						ir_use_list_add(ctx, ctx->fold_insn.op2, ref);
-					}
-				}
-				if (insn->op3 != ctx->fold_insn.op3) {
-					if (insn->op3 > 0) {
-						ir_use_list_remove_one(ctx, insn->op3, ref);
-					}
-					if (ctx->fold_insn.op3 > 0) {
-						ir_use_list_add(ctx, ctx->fold_insn.op3, ref);
-					}
-				}
-				insn->op1 = ctx->fold_insn.op1;
-				insn->op2 = ctx->fold_insn.op2;
-				insn->op3 = ctx->fold_insn.op3;
-
-				use_list = &ctx->use_lists[ref];
-				n = use_list->count;
-				for (j = 0, p = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
-					use = *p;
-					ir_bitqueue_add(worklist, use);
-				}
-			}
-			break;
-		case IR_FOLD_DO_COPY:
-			op1 = ctx->fold_insn.op1;
-			ir_iter_replace_insn(ctx, ref, op1, worklist);
-			break;
-		case IR_FOLD_DO_CONST:
-			op1 = ir_const(ctx, ctx->fold_insn.val, ctx->fold_insn.type);
-			ir_iter_replace_insn(ctx, ref, op1, worklist);
-			break;
-		default:
-			IR_ASSERT(0);
-			break;
-	}
 }
 
 static void ir_sccp_remove_if(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_ref dst)
@@ -749,6 +821,269 @@ static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values
 			}
 		}
 		ir_mem_free(life_inputs);
+	}
+}
+
+static void ir_sccp_transform(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_bitqueue *iter_worklist)
+{
+	ir_ref i, j;
+	ir_insn *value;
+
+	for (i = 1, value = _values + i; i < ctx->insns_count; value++, i++) {
+		if (value->op == IR_BOTTOM) {
+			continue;
+		} else if (IR_IS_CONST_OP(value->op)) {
+			/* replace instruction by constant */
+			j = ir_const(ctx, value->val, value->type);
+			ir_sccp_replace_insn(ctx, _values, i, j, iter_worklist);
+		} else if (IR_IS_SYM_CONST(value->op)) {
+			/* replace instruction by constant */
+			j = ir_const_ex(ctx, value->val, value->type, value->optx);
+			ir_sccp_replace_insn(ctx, _values, i, j, iter_worklist);
+#if IR_COMBO_COPY_PROPAGATION
+		} else if (value->op == IR_COPY) {
+			ir_sccp_replace_insn(ctx, _values, i, value->op1, iter_worklist);
+#endif
+		} else if (value->op == IR_TOP) {
+			/* remove unreachable instruction */
+			ir_insn *insn = &ctx->ir_base[i];
+
+			if (insn->op == IR_NOP) {
+				/* already removed */
+			} else if (ir_op_flags[insn->op] & (IR_OP_FLAG_DATA|IR_OP_FLAG_MEM)) {
+				if (insn->op != IR_PARAM && (insn->op != IR_VAR || _values[insn->op1].op == IR_TOP)) {
+					ir_sccp_remove_insn(ctx, _values, i, iter_worklist);
+				}
+			} else {
+				if (ir_op_flags[insn->op] & IR_OP_FLAG_TERMINATOR) {
+					/* remove from terminators list */
+					ir_ref prev = ctx->ir_base[1].op1;
+					if (prev == i) {
+						ctx->ir_base[1].op1 = insn->op3;
+					} else {
+						while (prev) {
+							if (ctx->ir_base[prev].op3 == i) {
+								ctx->ir_base[prev].op3 = insn->op3;
+								break;
+							}
+							prev = ctx->ir_base[prev].op3;
+						}
+					}
+				}
+				ir_sccp_replace_insn(ctx, _values, i, IR_UNUSED, iter_worklist);
+			}
+		} else if (value->op == IR_IF) {
+			/* remove one way IF/SWITCH */
+			ir_sccp_remove_if(ctx, _values, i, value->op1);
+		} else if (value->op == IR_MERGE) {
+			/* schedule merge to remove unfeasible MERGE inputs */
+			ir_bitqueue_add(worklist, i);
+		} else if (value->op == IR_LOAD) {
+			/* schedule dead load elimination */
+			ir_bitqueue_add(iter_worklist, i);
+		}
+	}
+
+	while ((i = ir_bitqueue_pop(worklist)) >= 0) {
+		IR_ASSERT(_values[i].op == IR_MERGE);
+		ir_sccp_remove_unfeasible_merge_inputs(ctx, _values, i, _values[i].op1);
+	}
+}
+
+/***************************/
+/* Iterative Optimizations */
+/***************************/
+
+static ir_ref ir_find1(ir_ctx *ctx, uint32_t optx, ir_ref op1)
+{
+	IR_ASSERT(!IR_IS_CONST_REF(op1));
+
+	ir_use_list *use_list = &ctx->use_lists[op1];
+	ir_ref *p, n = use_list->count;
+
+	for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
+		ir_ref use = *p;
+		ir_insn *use_insn = &ctx->ir_base[use];
+
+		if (use_insn->optx == optx) {
+			IR_ASSERT(use_insn->op1 == op1);
+			return use;
+		}
+	}
+	return IR_UNUSED;
+}
+
+static void ir_iter_remove_insn(ir_ctx *ctx, ir_ref ref, ir_bitqueue *worklist)
+{
+	ir_ref j, n, *p;
+	ir_insn *insn;
+
+	CLEAR_USES(ref);
+	insn = &ctx->ir_base[ref];
+	n = insn->inputs_count;
+	insn->opt = IR_NOP; /* keep "inputs_count" */
+	for (j = 1, p = insn->ops + j; j <= n; j++, p++) {
+		ir_ref input = *p;
+		*p = IR_UNUSED;
+		if (input > 0) {
+			ir_use_list_remove_all(ctx, input, ref);
+			if (ir_is_dead(ctx, input)) {
+				/* schedule DCE */
+				ir_bitqueue_add(worklist, input);
+			} else if (ctx->ir_base[input].op == IR_PHI && ctx->use_lists[input].count == 1) {
+				/* try to optimize PHI into ABS/MIN/MAX/COND */
+				ir_bitqueue_add(worklist, ctx->ir_base[input].op1);
+			}
+		}
+	}
+}
+
+static void ir_iter_replace_insn(ir_ctx *ctx, ir_ref ref, ir_ref new_ref, ir_bitqueue *worklist)
+{
+	ir_ref i, j, n, *p, use;
+	ir_insn *insn;
+	ir_use_list *use_list;
+
+	IR_ASSERT(ref != new_ref);
+
+	insn = &ctx->ir_base[ref];
+	n = insn->inputs_count;
+	insn->opt = IR_NOP; /* keep "inputs_count" */
+	for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
+		ir_ref input = *p;
+		*p = IR_UNUSED;
+		if (input > 0) {
+			ir_use_list_remove_all(ctx, input, ref);
+			if (ir_is_dead(ctx, input)) {
+				/* schedule DCE */
+				ir_bitqueue_add(worklist, input);
+			} else if (ctx->ir_base[input].op == IR_PHI && ctx->use_lists[input].count == 1) {
+				/* try to optimize PHI into ABS/MIN/MAX/COND */
+				ir_bitqueue_add(worklist, input);
+			}
+		}
+	}
+
+	use_list = &ctx->use_lists[ref];
+	n = use_list->count;
+	p = &ctx->use_edges[use_list->refs];
+	if (new_ref <= 0) {
+		/* constant or IR_UNUSED */
+		for (; n; p++, n--) {
+			use = *p;
+			IR_ASSERT(use != ref);
+			insn = &ctx->ir_base[use];
+			i = ir_insn_find_op(insn, ref);
+			IR_ASSERT(i > 0);
+			ir_insn_set_op(insn, i, new_ref);
+			/* schedule folding */
+			ir_bitqueue_add(worklist, use);
+		}
+	} else {
+		for (j = 0; j < n; j++, p++) {
+			use = *p;
+			IR_ASSERT(use != ref);
+			insn = &ctx->ir_base[use];
+			i = ir_insn_find_op(insn, ref);
+			IR_ASSERT(i > 0);
+			ir_insn_set_op(insn, i, new_ref);
+			if (ir_use_list_add(ctx, new_ref, use)) {
+				/* restore after reallocation */
+				use_list = &ctx->use_lists[ref];
+				n = use_list->count;
+				p = &ctx->use_edges[use_list->refs + j];
+			}
+			/* schedule folding */
+			ir_bitqueue_add(worklist, use);
+		}
+	}
+	CLEAR_USES(ref);
+}
+
+static void ir_iter_fold(ir_ctx *ctx, ir_ref ref, ir_bitqueue *worklist)
+{
+	uint32_t opt;
+	ir_ref op1, op2, op3;
+	ir_insn *op1_insn, *op2_insn, *op3_insn, *insn;
+
+	insn = &ctx->ir_base[ref];
+	opt = insn->opt;
+	op1 = insn->op1;
+	op2 = insn->op2;
+	op3 = insn->op3;
+
+restart:
+	op1_insn = ctx->ir_base + op1;
+	op2_insn = ctx->ir_base + op2;
+	op3_insn = ctx->ir_base + op3;
+
+	switch (ir_folding(ctx, opt, op1, op2, op3, op1_insn, op2_insn, op3_insn)) {
+		case IR_FOLD_DO_RESTART:
+			opt = ctx->fold_insn.optx;
+			op1 = ctx->fold_insn.op1;
+			op2 = ctx->fold_insn.op2;
+			op3 = ctx->fold_insn.op3;
+			goto restart;
+		case IR_FOLD_DO_EMIT:
+			insn = &ctx->ir_base[ref];
+			if (insn->opt != ctx->fold_insn.opt
+			 || insn->op1 != ctx->fold_insn.op1
+			 || insn->op2 != ctx->fold_insn.op2
+			 || insn->op3 != ctx->fold_insn.op3) {
+
+				ir_use_list *use_list;
+				ir_ref n, j, *p, use;
+
+				insn->optx = ctx->fold_insn.opt;
+				IR_ASSERT(!IR_OP_HAS_VAR_INPUTS(ir_op_flags[opt & IR_OPT_OP_MASK]));
+				insn->inputs_count = IR_INPUT_EDGES_COUNT(ir_op_flags[opt & IR_OPT_OP_MASK]);
+				if (insn->op1 != ctx->fold_insn.op1) {
+					if (insn->op1 > 0) {
+						ir_use_list_remove_one(ctx, insn->op1, ref);
+					}
+					if (ctx->fold_insn.op1 > 0) {
+						ir_use_list_add(ctx, ctx->fold_insn.op1, ref);
+					}
+				}
+				if (insn->op2 != ctx->fold_insn.op2) {
+					if (insn->op2 > 0) {
+						ir_use_list_remove_one(ctx, insn->op2, ref);
+					}
+					if (ctx->fold_insn.op2 > 0) {
+						ir_use_list_add(ctx, ctx->fold_insn.op2, ref);
+					}
+				}
+				if (insn->op3 != ctx->fold_insn.op3) {
+					if (insn->op3 > 0) {
+						ir_use_list_remove_one(ctx, insn->op3, ref);
+					}
+					if (ctx->fold_insn.op3 > 0) {
+						ir_use_list_add(ctx, ctx->fold_insn.op3, ref);
+					}
+				}
+				insn->op1 = ctx->fold_insn.op1;
+				insn->op2 = ctx->fold_insn.op2;
+				insn->op3 = ctx->fold_insn.op3;
+
+				use_list = &ctx->use_lists[ref];
+				n = use_list->count;
+				for (j = 0, p = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
+					use = *p;
+					ir_bitqueue_add(worklist, use);
+				}
+			}
+			break;
+		case IR_FOLD_DO_COPY:
+			op1 = ctx->fold_insn.op1;
+			ir_iter_replace_insn(ctx, ref, op1, worklist);
+			break;
+		case IR_FOLD_DO_CONST:
+			op1 = ir_const(ctx, ctx->fold_insn.val, ctx->fold_insn.type);
+			ir_iter_replace_insn(ctx, ref, op1, worklist);
+			break;
+		default:
+			IR_ASSERT(0);
+			break;
 	}
 }
 
@@ -2213,338 +2548,6 @@ static void ir_optimize_merge(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_
 	}
 }
 
-static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_bitqueue *iter_worklist)
-{
-	ir_ref i, j, n, *p, use;
-	ir_use_list *use_list;
-	ir_insn *insn, *use_insn;
-	uint32_t flags;
-
-	/* A bit modified SCCP algorithm of M. N. Wegman and F. K. Zadeck */
-	worklist->pos = 0;
-	ir_bitset_incl(worklist->set, 1);
-	while ((i = ir_bitqueue_pop(worklist)) >= 0) {
-		insn = &ctx->ir_base[i];
-		flags = ir_op_flags[insn->op];
-		if (flags & IR_OP_FLAG_DATA) {
-			if (ctx->use_lists[i].count == 0) {
-				/* dead code */
-				continue;
-			} else if (insn->op == IR_PHI) {
-				if (!ir_sccp_meet_phi(ctx, _values, i, insn, worklist)) {
-					continue;
-				}
-			} else if (EXPECTED(IR_IS_FOLDABLE_OP(insn->op))) {
-				bool may_benefit = 0;
-				bool has_top = 0;
-
-				IR_ASSERT(!IR_OP_HAS_VAR_INPUTS(flags));
-				n = IR_INPUT_EDGES_COUNT(flags);
-				for (p = insn->ops + 1; n > 0; p++, n--) {
-					ir_ref input = *p;
-					if (input > 0) {
-						if (_values[input].optx == IR_TOP) {
-							has_top = 1;
-							/* do backward propagaton only once */
-							if (!_values[input].op1) {
-								_values[input].op1 = 1;
-								ir_bitqueue_add(worklist, input);
-							}
-						} else if (_values[input].optx != IR_BOTTOM) {
-							/* Perform folding only if some of direct inputs
-							 * is going to be replaced by a constant or copy.
-							 * This approach may miss some folding optimizations
-							 * dependent on indirect inputs. e.g. reassociation.
-							 */
-							may_benefit = 1;
-						}
-					}
-				}
-				if (has_top) {
-					continue;
-				}
-				if (!may_benefit) {
-					IR_MAKE_BOTTOM(i);
-					if (insn->op == IR_FP2FP || insn->op == IR_FP2INT || insn->op == IR_TRUNC
-					 || insn->op == IR_ZEXT || insn->op == IR_SEXT || insn->op == IR_EQ || insn->op == IR_NE) {
-						ir_bitqueue_add(iter_worklist, i);
-					}
-				} else if (!ir_sccp_fold(ctx, _values, i, insn->opt, insn->op1, insn->op2, insn->op3)) {
-					/* not changed */
-					continue;
-				} else if (_values[i].optx == IR_BOTTOM) {
-					insn = &ctx->ir_base[i];
-					if (insn->op == IR_FP2FP || insn->op == IR_FP2INT || insn->op == IR_TRUNC
-					 || insn->op == IR_ZEXT || insn->op == IR_SEXT || insn->op == IR_EQ || insn->op == IR_NE) {
-						ir_bitqueue_add(iter_worklist, i);
-					}
-				}
-			} else {
-				IR_MAKE_BOTTOM(i);
-			}
-		} else if (flags & IR_OP_FLAG_BB_START) {
-			if (insn->op == IR_MERGE || insn->op == IR_BEGIN) {
-				ir_bitqueue_add(iter_worklist, i);
-			}
-			if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
-				ir_ref unfeasible_inputs = 0;
-
-				n = insn->inputs_count;
-				if (n > 3 && _values[i].optx == IR_TOP) {
-					for (j = 0; j < (n>>2); j++) {
-						_values[i+j+1].optx = IR_BOTTOM; /* keep the tail of a long multislot instruction */
-					}
-				}
-				for (p = insn->ops + 1; n > 0; p++, n--) {
-					ir_ref input = *p;
-					IR_ASSERT(input > 0);
-					if (_values[input].optx == IR_TOP) {
-						unfeasible_inputs++;
-					}
-				}
-				if (unfeasible_inputs == 0) {
-					IR_MAKE_BOTTOM(i);
-				} else if (_values[i].op1 != unfeasible_inputs) {
-					_values[i].optx = IR_MERGE;
-					_values[i].op1 = unfeasible_inputs;
-				} else {
-					continue;
-				}
-			} else {
-				IR_ASSERT(insn->op == IR_START || IR_IS_FEASIBLE(insn->op1));
-				IR_MAKE_BOTTOM(i);
-			}
-		} else {
-			IR_ASSERT(insn->op1 > 0);
-			if (_values[insn->op1].optx == IR_TOP) {
-				/* control inpt is not feasible */
-				continue;
-			}
-			if (insn->op == IR_IF) {
-				if (IR_IS_TOP(insn->op2)) {
-					/* do backward propagaton only once */
-					if (!_values[insn->op2].op1) {
-						_values[insn->op2].op1 = 1;
-						ir_bitqueue_add(worklist, insn->op2);
-					}
-					continue;
-				}
-				if (!IR_IS_BOTTOM(insn->op2)
-#if IR_COMBO_COPY_PROPAGATION
-				 && (IR_IS_CONST_REF(insn->op2) || _values[insn->op2].op != IR_COPY)
-#endif
-				) {
-					bool b = ir_sccp_is_true(ctx, _values, insn->op2);
-					use_list = &ctx->use_lists[i];
-					IR_ASSERT(use_list->count == 2);
-					p = &ctx->use_edges[use_list->refs];
-					use = *p;
-					use_insn = &ctx->ir_base[use];
-					IR_ASSERT(use_insn->op == IR_IF_TRUE || use_insn->op == IR_IF_FALSE);
-					if ((use_insn->op == IR_IF_TRUE) != b) {
-						use = *(p+1);
-						IR_ASSERT(ctx->ir_base[use].op == IR_IF_TRUE || ctx->ir_base[use].op == IR_IF_FALSE);
-					}
-					if (_values[i].optx == IR_TOP) {
-						_values[i].optx = IR_IF;
-						_values[i].op1 = use;
-					} else if (_values[i].optx != IR_IF || _values[i].op1 != use) {
-						IR_MAKE_BOTTOM(i);
-					}
-					if (!IR_IS_BOTTOM(use)) {
-						ir_bitqueue_add(worklist, use);
-					}
-					continue;
-				}
-				IR_MAKE_BOTTOM(i);
-			} else if (insn->op == IR_SWITCH) {
-				if (IR_IS_TOP(insn->op2)) {
-					/* do backward propagaton only once */
-					if (!_values[insn->op2].op1) {
-						_values[insn->op2].op1 = 1;
-						ir_bitqueue_add(worklist, insn->op2);
-					}
-					continue;
-				}
-				if (!IR_IS_BOTTOM(insn->op2)
-#if IR_COMBO_COPY_PROPAGATION
-				 && (IR_IS_CONST_REF(insn->op2) || _values[insn->op2].op != IR_COPY)
-#endif
-				) {
-					ir_ref use_case = IR_UNUSED;
-
-					use_list = &ctx->use_lists[i];
-					n = use_list->count;
-					for (j = 0, p = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
-						use = *p;
-						IR_ASSERT(use > 0);
-						use_insn = &ctx->ir_base[use];
-						if (use_insn->op == IR_CASE_VAL) {
-							if (ir_sccp_is_equal(ctx, _values, insn->op2, use_insn->op2)) {
-								use_case = use;
-								break;
-							}
-						} else if (use_insn->op == IR_CASE_DEFAULT) {
-							use_case = use;
-						}
-					}
-					if (use_case) {
-						use_insn = &ctx->ir_base[use_case];
-						if (_values[i].optx == IR_TOP) {
-							_values[i].optx = IR_IF;
-							_values[i].op1 = use_case;
-						} else if (_values[i].optx != IR_IF || _values[i].op1 != use_case) {
-							IR_MAKE_BOTTOM(i);
-						}
-						if (!IR_IS_BOTTOM(use_case)) {
-							ir_bitqueue_add(worklist, use_case);
-						}
-					}
-					if (!IR_IS_BOTTOM(i)) {
-						continue;
-					}
-				}
-				IR_MAKE_BOTTOM(i);
-			} else if (ir_is_dead_load_ex(ctx, i, flags, insn)) {
-				/* dead load */
-				_values[i].optx = IR_LOAD;
-			} else {
-				IR_MAKE_BOTTOM(i);
-
-				/* control, call, load and store instructions may have unprocessed inputs */
-				n = IR_INPUT_EDGES_COUNT(flags);
-				if (IR_OP_HAS_VAR_INPUTS(flags) && (n = insn->inputs_count) > 3) {
-					for (j = 0; j < (n>>2); j++) {
-						_values[i+j+1].optx = IR_BOTTOM; /* keep the tail of a long multislot instruction */
-					}
-					for (j = 2, p = insn->ops + j; j <= n; j++, p++) {
-						IR_ASSERT(IR_OPND_KIND(flags, j) == IR_OPND_DATA);
-						use = *p;
-						if (use > 0 && UNEXPECTED(_values[use].optx == IR_TOP)) {
-							ir_bitqueue_add(worklist, use);
-						}
-					}
-				} else if (n >= 2) {
-					IR_ASSERT(IR_OPND_KIND(flags, 2) == IR_OPND_DATA);
-					use = insn->op2;
-					if (use > 0 && UNEXPECTED(_values[use].optx == IR_TOP)) {
-						ir_bitqueue_add(worklist, use);
-					}
-					if (n > 2) {
-						IR_ASSERT(n == 3);
-						IR_ASSERT(IR_OPND_KIND(flags, 3) == IR_OPND_DATA);
-						use = insn->op3;
-						if (use > 0 && UNEXPECTED(_values[use].optx == IR_TOP)) {
-							ir_bitqueue_add(worklist, use);
-						}
-					}
-				}
-			}
-		}
-		use_list = &ctx->use_lists[i];
-		n = use_list->count;
-		for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
-			use = *p;
-			if (_values[use].optx != IR_BOTTOM) {
-				ir_bitqueue_add(worklist, use);
-			}
-		}
-	}
-}
-
-#ifdef IR_DEBUG
-static void ir_sccp_dump(ir_ctx *ctx, ir_insn *_values)
-{
-	ir_ref i;
-
-	for (i = 1; i < ctx->insns_count; i++) {
-		if (IR_IS_CONST_OP(_values[i].op) || IR_IS_SYM_CONST(_values[i].op)) {
-			fprintf(stderr, "%d. CONST(", i);
-			ir_print_const(ctx, &_values[i], stderr, true);
-			fprintf(stderr, ")\n");
-#if IR_COMBO_COPY_PROPAGATION
-		} else if (_values[i].op == IR_COPY) {
-			fprintf(stderr, "%d. COPY(%d)\n", i, _values[i].op1);
-#endif
-		} else if (IR_IS_TOP(i)) {
-			fprintf(stderr, "%d. TOP\n", i);
-		} else if (_values[i].op == IR_IF) {
-			fprintf(stderr, "%d. IF(%d)\n", i, _values[i].op1);
-		} else if (_values[i].op == IR_MERGE) {
-			fprintf(stderr, "%d. MERGE(%d)\n", i, _values[i].op1);
-		} else if (!IR_IS_BOTTOM(i)) {
-			fprintf(stderr, "%d. %d\n", i, _values[i].op);
-		}
-	}
-}
-#endif
-
-static void ir_sccp_transform(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_bitqueue *iter_worklist)
-{
-	ir_ref i, j;
-	ir_insn *value;
-
-	for (i = 1, value = _values + i; i < ctx->insns_count; value++, i++) {
-		if (value->op == IR_BOTTOM) {
-			continue;
-		} else if (IR_IS_CONST_OP(value->op)) {
-			/* replace instruction by constant */
-			j = ir_const(ctx, value->val, value->type);
-			ir_sccp_replace_insn(ctx, _values, i, j, iter_worklist);
-		} else if (IR_IS_SYM_CONST(value->op)) {
-			/* replace instruction by constant */
-			j = ir_const_ex(ctx, value->val, value->type, value->optx);
-			ir_sccp_replace_insn(ctx, _values, i, j, iter_worklist);
-#if IR_COMBO_COPY_PROPAGATION
-		} else if (value->op == IR_COPY) {
-			ir_sccp_replace_insn(ctx, _values, i, value->op1, iter_worklist);
-#endif
-		} else if (value->op == IR_TOP) {
-			/* remove unreachable instruction */
-			ir_insn *insn = &ctx->ir_base[i];
-
-			if (insn->op == IR_NOP) {
-				/* already removed */
-			} else if (ir_op_flags[insn->op] & (IR_OP_FLAG_DATA|IR_OP_FLAG_MEM)) {
-				if (insn->op != IR_PARAM && (insn->op != IR_VAR || _values[insn->op1].op == IR_TOP)) {
-					ir_sccp_remove_insn(ctx, _values, i, iter_worklist);
-				}
-			} else {
-				if (ir_op_flags[insn->op] & IR_OP_FLAG_TERMINATOR) {
-					/* remove from terminators list */
-					ir_ref prev = ctx->ir_base[1].op1;
-					if (prev == i) {
-						ctx->ir_base[1].op1 = insn->op3;
-					} else {
-						while (prev) {
-							if (ctx->ir_base[prev].op3 == i) {
-								ctx->ir_base[prev].op3 = insn->op3;
-								break;
-							}
-							prev = ctx->ir_base[prev].op3;
-						}
-					}
-				}
-				ir_sccp_replace_insn(ctx, _values, i, IR_UNUSED, iter_worklist);
-			}
-		} else if (value->op == IR_IF) {
-			/* remove one way IF/SWITCH */
-			ir_sccp_remove_if(ctx, _values, i, value->op1);
-		} else if (value->op == IR_MERGE) {
-			/* schedule merge to remove unfeasible MERGE inputs */
-			ir_bitqueue_add(worklist, i);
-		} else if (value->op == IR_LOAD) {
-			/* schedule dead load elimination */
-			ir_bitqueue_add(iter_worklist, i);
-		}
-	}
-
-	while ((i = ir_bitqueue_pop(worklist)) >= 0) {
-		IR_ASSERT(_values[i].op == IR_MERGE);
-		ir_sccp_remove_unfeasible_merge_inputs(ctx, _values, i, _values[i].op1);
-	}
-}
-
 static void ir_iter_opt(ir_ctx *ctx, ir_bitqueue *worklist)
 {
 	ir_ref i;
@@ -2645,13 +2648,6 @@ int ir_sccp(ir_ctx *ctx)
 	_values = ir_mem_calloc(ctx->insns_count, sizeof(ir_insn));
 
 	ir_sccp_analyze(ctx, _values, &sccp_worklist, &iter_worklist);
-
-#ifdef IR_DEBUG
-	if (ctx->flags & IR_DEBUG_SCCP) {
-		ir_sccp_dump(ctx, _values);
-    }
-#endif
-
 	ir_sccp_transform(ctx, _values, &sccp_worklist, &iter_worklist);
 
 	ir_mem_free(_values);
