@@ -542,22 +542,24 @@ static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 
 #ifdef IR_DEBUG
 	if (ctx->flags & IR_DEBUG_SCCP) {
-		if (IR_IS_CONST_OP(_values[i].op) || IR_IS_SYM_CONST(_values[i].op)) {
-			fprintf(stderr, "%d. CONST(", i);
-			ir_print_const(ctx, &_values[i], stderr, true);
-			fprintf(stderr, ")\n");
+		for (i = 1; i < ctx->insns_count; i++) {
+			if (IR_IS_CONST_OP(_values[i].op) || IR_IS_SYM_CONST(_values[i].op)) {
+				fprintf(stderr, "%d. CONST(", i);
+				ir_print_const(ctx, &_values[i], stderr, true);
+				fprintf(stderr, ")\n");
 #if IR_COMBO_COPY_PROPAGATION
-		} else if (_values[i].op == IR_COPY) {
-			fprintf(stderr, "%d. COPY(%d)\n", i, _values[i].op1);
+			} else if (_values[i].op == IR_COPY) {
+				fprintf(stderr, "%d. COPY(%d)\n", i, _values[i].op1);
 #endif
-		} else if (IR_IS_TOP(i)) {
-			fprintf(stderr, "%d. TOP\n", i);
-		} else if (_values[i].op == IR_IF) {
-			fprintf(stderr, "%d. IF(%d)\n", i, _values[i].op1);
-		} else if (_values[i].op == IR_MERGE) {
-			fprintf(stderr, "%d. MERGE(%d)\n", i, _values[i].op1);
-		} else if (!IR_IS_BOTTOM(i)) {
-			fprintf(stderr, "%d. %d\n", i, _values[i].op);
+			} else if (IR_IS_TOP(i)) {
+				fprintf(stderr, "%d. TOP\n", i);
+			} else if (_values[i].op == IR_IF) {
+				fprintf(stderr, "%d. IF(%d)\n", i, _values[i].op1);
+			} else if (_values[i].op == IR_MERGE) {
+				fprintf(stderr, "%d. MERGE(%d)\n", i, _values[i].op1);
+			} else if (!IR_IS_BOTTOM(i)) {
+				fprintf(stderr, "%d. %d\n", i, _values[i].op);
+			}
 		}
 	}
 #endif
