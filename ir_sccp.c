@@ -80,8 +80,8 @@ restart:
 			insn = (op1 > 0 && IR_IS_CONST_OP(_values[op1].op)) ? _values + op1 : ctx->ir_base + op1;
 			if (IR_IS_CONST_OP(insn->op)) {
 				/* pass */
-#if IR_COMBO_COPY_PROPAGATION
 			} else {
+#if IR_COMBO_COPY_PROPAGATION
 				if (_values[res].optx == IR_TOP) {
 					/* pass to new copy */
 				} else if (_values[res].op == IR_COPY) {
