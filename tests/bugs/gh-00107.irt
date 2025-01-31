@@ -29,7 +29,7 @@ func main(): int32_t
 	bool c_3 = 1;
 	int32_t c_4 = 0;
 	int32_t c_5 = 999;
-	uint64_t c_6 = 4;
+	uintptr_t c_6 = 4;
 	uintptr_t c_7 = func print_i32(int32_t): void;
 	l_1 = START(l_16);
 	int32_t d_2 = VAR(l_1, "$ret");
@@ -39,7 +39,7 @@ func main(): int32_t
 	uintptr_t d_6 = VADDR(d_4);
 	uintptr_t d_7 = VAR(l_1, "px");
 	l_8 = VSTORE(l_5, d_7, d_6);
-	uint64_t d_9 = MUL(c_6, c_4);               // result d_9 is 0
+	uintptr_t d_9 = MUL(c_6, c_4);               // result d_9 is 0
 	uintptr_t d_10, l_10 = VLOAD(l_8, d_7);     // reload the value in "px"
 	uintptr_t d_11 = ADD(d_10, d_9);            // add 0 to it
 	int32_t d_12, l_12 = LOAD(l_10, d_11);      // load from that address
