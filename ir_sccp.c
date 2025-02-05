@@ -44,6 +44,7 @@ IR_ALWAYS_INLINE ir_ref ir_sccp_identity(ir_insn *_values, ir_ref a)
 
 static void ir_sccp_add_identity(ir_insn *_values, ir_ref src, ir_ref dst, ir_type type)
 {
+	IR_ASSERT(_values[dst].op != IR_BOTTOM && _values[dst].op != IR_COPY);
 	_values[dst].optx = IR_OPT(IR_COPY, type);
 	_values[dst].op1 = src;
 }
@@ -314,6 +315,47 @@ static bool ir_sccp_is_equal(ir_ctx *ctx, ir_insn *_values, ir_ref a, ir_ref b)
 	return v1->val.u64 == v2->val.u64;
 }
 
+#ifdef IR_SCCP_TRACE
+static void ir_sccp_trace_val(ir_ctx *ctx, ir_insn *_values, ir_ref i)
+{
+	if (IR_IS_BOTTOM(i)) {
+		fprintf(stderr, "BOTTOM");
+	} else if (IR_IS_CONST_OP(_values[i].op) || IR_IS_SYM_CONST(_values[i].op)) {
+		fprintf(stderr, "CONST(");
+		ir_print_const(ctx, &_values[i], stderr, true);
+		fprintf(stderr, ")");
+#if IR_COMBO_COPY_PROPAGATION
+	} else if (_values[i].op == IR_COPY) {
+		fprintf(stderr, "COPY(%d)", _values[i].op1);
+#endif
+	} else if (IR_IS_TOP(i)) {
+		fprintf(stderr, "TOP");
+	} else if (_values[i].op == IR_IF) {
+		fprintf(stderr, "IF(%d)", _values[i].op1);
+	} else if (_values[i].op == IR_MERGE) {
+		fprintf(stderr, "MERGE(%d)", _values[i].op1);
+	} else {
+		fprintf(stderr, "%d", _values[i].op);
+	}
+}
+
+static void ir_sccp_trace_start(ir_ctx *ctx, ir_insn *_values, ir_ref i)
+{
+	fprintf(stderr, "%d. ", i);
+	ir_sccp_trace_val(ctx, _values, i);
+}
+
+static void ir_sccp_trace_end(ir_ctx *ctx, ir_insn *_values, ir_ref i)
+{
+	fprintf(stderr, " -> ");
+	ir_sccp_trace_val(ctx, _values, i);
+	fprintf(stderr, "\n");
+}
+#else
+# define ir_sccp_trace_start(c, v, i)
+# define ir_sccp_trace_end(c, v, i)
+#endif
+
 static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_bitqueue *iter_worklist)
 {
 	ir_ref i, j, n, *p, use;
@@ -324,7 +366,8 @@ static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 	/* A bit modified SCCP algorithm of M. N. Wegman and F. K. Zadeck */
 	worklist->pos = 0;
 	ir_bitset_incl(worklist->set, 1);
-	while ((i = ir_bitqueue_pop(worklist)) >= 0) {
+	for (; (i = ir_bitqueue_pop(worklist)) >= 0; ir_sccp_trace_end(ctx, _values, i)) {
+		ir_sccp_trace_start(ctx, _values, i);
 		insn = &ctx->ir_base[i];
 		flags = ir_op_flags[insn->op];
 		if (flags & IR_OP_FLAG_DATA) {
