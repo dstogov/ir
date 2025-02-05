@@ -400,6 +400,9 @@ static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 				bool may_benefit = 0;
 				bool has_top = 0;
 
+				if (ctx->flags2 & IR_MEM2SSA_VARS) {
+				}
+
 				IR_ASSERT(!IR_OP_HAS_VAR_INPUTS(flags));
 				n = IR_INPUT_EDGES_COUNT(flags);
 				for (p = insn->ops + 1; n > 0; p++, n--) {

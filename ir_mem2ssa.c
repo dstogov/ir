@@ -382,6 +382,7 @@ int ir_mem2ssa(ir_ctx *ctx)
 	ir_list queue;
 	ir_bitset defs;
 
+	ctx->flags2 &= ~IR_MEM2SSA_VARS;
 	IR_ASSERT(ctx->use_lists && ctx->cfg_blocks);
 	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; bb++, b++) {
 		ir_ref ref = bb->end;
@@ -422,6 +423,7 @@ int ir_mem2ssa(ir_ctx *ctx)
 					ir_use_list_remove_one(ctx, start, use);
 					MAKE_NOP(insn);
 					CLEAR_USES(use);
+					ctx->flags2 |= IR_MEM2SSA_VARS;
 				} else {
 					i++;
 				}
@@ -469,6 +471,7 @@ int ir_mem2ssa(ir_ctx *ctx)
 					CLEAR_USES(ref);
 					ctx->cfg_map[ref] = 0;
 					ref = prev;
+					ctx->flags2 |= IR_MEM2SSA_VARS;
 					continue;
 				}
 			}
