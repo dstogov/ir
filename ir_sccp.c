@@ -500,8 +500,9 @@ static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 				}
 				IR_MAKE_BOTTOM(i);
 			} else if (ir_is_dead_load_ex(ctx, i, flags, insn)) {
-				/* dead load */
-				_values[i].optx = IR_LOAD;
+				/* schedule dead load elimination */
+				ir_bitqueue_add(iter_worklist, i);
+				IR_MAKE_BOTTOM(i);
 			} else {
 				IR_MAKE_BOTTOM(i);
 
@@ -912,9 +913,6 @@ static void ir_sccp_transform(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *workli
 		} else if (value->op == IR_MERGE) {
 			/* schedule merge to remove unfeasible MERGE inputs */
 			ir_bitqueue_add(worklist, i);
-		} else if (value->op == IR_LOAD) {
-			/* schedule dead load elimination */
-			ir_bitqueue_add(iter_worklist, i);
 		}
 	}
 
