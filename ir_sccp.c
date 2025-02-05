@@ -33,18 +33,24 @@ IR_ALWAYS_INLINE bool _ir_is_reachable_ctrl(ir_ctx *ctx, ir_insn *_values, ir_re
 }
 
 #if IR_COMBO_COPY_PROPAGATION
-IR_ALWAYS_INLINE ir_ref ir_sccp_identity(ir_insn *_values, ir_ref a)
+IR_ALWAYS_INLINE ir_ref ir_sccp_identity(ir_ctx *ctx, ir_insn *_values, ir_ref a)
 {
 	if (a > 0 && _values[a].op == IR_COPY) {
-		a = _values[a].op1;
-		IR_ASSERT(a < 0 || _values[a].op != IR_COPY); /* this may be a copy of symbolic constant */
+		do {
+			a = _values[a].op1;
+		} while (a > 0 && _values[a].op == IR_COPY);
+		IR_ASSERT(a < 0 || _values[a].op == IR_BOTTOM);
+		IR_ASSERT(a > 0 || IR_IS_SYM_CONST(ctx->ir_base[a].op));
 	}
 	return a;
 }
 
-static void ir_sccp_add_identity(ir_insn *_values, ir_ref src, ir_ref dst, ir_type type)
+static void ir_sccp_add_identity(ir_ctx *ctx, ir_insn *_values, ir_ref src, ir_ref dst, ir_type type)
 {
-	IR_ASSERT(_values[dst].op != IR_BOTTOM && _values[dst].op != IR_COPY);
+	IR_ASSERT(dst > 0 && _values[dst].op != IR_BOTTOM && _values[dst].op != IR_COPY);
+	IR_ASSERT((src > 0 && (_values[src].op == IR_BOTTOM || _values[src].op == IR_COPY))
+		|| (src < 0 && IR_IS_SYM_CONST(ctx->ir_base[src].op)));
+	IR_ASSERT(ir_sccp_identity(ctx, _values, src) != dst);
 	_values[dst].optx = IR_OPT(IR_COPY, type);
 	_values[dst].op1 = src;
 }
@@ -55,9 +61,9 @@ static ir_ref ir_sccp_fold(ir_ctx *ctx, ir_insn *_values, ir_ref res, uint32_t o
 	ir_insn *op1_insn, *op2_insn, *op3_insn, *insn;
 
 #if IR_COMBO_COPY_PROPAGATION
-	op1 = ir_sccp_identity(_values, op1);
-	op2 = ir_sccp_identity(_values, op2);
-	op3 = ir_sccp_identity(_values, op3);
+	op1 = ir_sccp_identity(ctx, _values, op1);
+	op2 = ir_sccp_identity(ctx, _values, op2);
+	op3 = ir_sccp_identity(ctx, _values, op3);
 #endif
 
 restart:
@@ -76,9 +82,6 @@ restart:
 			goto make_bottom;
 		case IR_FOLD_DO_COPY:
 			op1 = ctx->fold_insn.op1;
-#if IR_COMBO_COPY_PROPAGATION
-			op1 = ir_sccp_identity(_values, op1);
-#endif
 			insn = (op1 > 0 && IR_IS_CONST_OP(_values[op1].op)) ? _values + op1 : ctx->ir_base + op1;
 			if (IR_IS_CONST_OP(insn->op)) {
 				/* pass */
@@ -87,7 +90,7 @@ restart:
 				if (_values[res].op == IR_TOP) {
 					/* pass to new copy */
 				} else if (_values[res].op == IR_COPY) {
-					if (_values[res].op1 == op1) {
+					if (ir_sccp_identity(ctx, _values, _values[res].op1) == ir_sccp_identity(ctx, _values, op1)) {
 						return 0; /* not changed */
 					} else {
 						goto make_bottom;
@@ -97,7 +100,7 @@ restart:
 					/* we don't check for widening */
 				}
 				/* create new COPY */
-				ir_sccp_add_identity(_values, op1, res, insn->type);
+				ir_sccp_add_identity(ctx, _values, op1, res, insn->type);
 				return 1;
 #else
 				goto make_bottom;
@@ -131,6 +134,8 @@ static bool ir_sccp_meet_phi(ir_ctx *ctx, ir_insn *_values, ir_ref i, ir_insn *i
 	ir_insn *v, *new_const = NULL;
 #if IR_COMBO_COPY_PROPAGATION
 	ir_ref new_copy = IR_UNUSED;
+	ir_ref new_copy_identity = IR_UNUSED;
+	ir_ref phi_identity = ir_sccp_identity(ctx, _values, i);
 #endif
 
 	if (!IR_IS_REACHABLE(insn->op1)) {
@@ -168,14 +173,22 @@ static bool ir_sccp_meet_phi(ir_ctx *ctx, ir_insn *_values, ir_ref i, ir_insn *i
 #if IR_COMBO_COPY_PROPAGATION
 			} else if (v->op == IR_COPY) {
 				input = v->op1;
-				IR_ASSERT(input < 0 || _values[input].op != IR_COPY);
+				new_copy_identity = ir_sccp_identity(ctx, _values, input);
+				if (new_copy_identity == phi_identity) {
+					new_copy_identity = IR_UNUSED;
+					continue;
+				}
 				new_copy = input;
 				goto next;
+#endif
 			} else if (v->op == IR_BOTTOM) {
-				new_copy = input;
+#if IR_COMBO_COPY_PROPAGATION
+				if (input == phi_identity) {
+					continue;
+				}
+				new_copy = new_copy_identity = input;
 				goto next;
 #else
-			} else if (v->op == IR_BOTTOM) {
 				goto make_bottom;
 #endif
 			}
@@ -184,7 +197,6 @@ static bool ir_sccp_meet_phi(ir_ctx *ctx, ir_insn *_values, ir_ref i, ir_insn *i
 		goto next;
 	}
 
-	IR_ASSERT(_values[i].op == IR_TOP);
 	return 0;
 
 next:
@@ -199,6 +211,11 @@ next:
 
 		input = *p;
 		if (IR_IS_CONST_REF(input)) {
+#if IR_COMBO_COPY_PROPAGATION
+			if (new_copy) {
+				goto make_bottom;
+			}
+#endif
 			v = &ctx->ir_base[input];
 		} else if (input == i) {
 			continue;
@@ -213,16 +230,16 @@ next:
 				continue;
 #if IR_COMBO_COPY_PROPAGATION
 			} else if (v->op == IR_COPY) {
-				input = v->op1;
-				IR_ASSERT(input < 0 || _values[input].op != IR_COPY);
-				if (new_copy == input) {
+				ir_ref identity = ir_sccp_identity(ctx, _values, v->op1);
+
+				if (identity == phi_identity || identity == new_copy_identity) {
 					continue;
 				}
 				goto make_bottom;
 #endif
 			} else if (v->op == IR_BOTTOM) {
 #if IR_COMBO_COPY_PROPAGATION
-				if (new_copy == input) {
+				if (input  == phi_identity || input == new_copy_identity) {
 					continue;
 				}
 #endif
@@ -237,7 +254,7 @@ next:
 #if IR_COMBO_COPY_PROPAGATION
 	if (new_copy) {
 		if (_values[i].op == IR_COPY) {
-			if (_values[i].op1 == new_copy) {
+			if (phi_identity == new_copy_identity) {
 				return 0; /* not changed */
 			} else {
 				goto make_bottom;
@@ -245,7 +262,7 @@ next:
 		} else {
 			IR_ASSERT(_values[i].op != IR_BOTTOM);
 			/* we don't check for widening */
-			ir_sccp_add_identity(_values, new_copy, i, insn->type);
+			ir_sccp_add_identity(ctx, _values, new_copy, i, insn->type);
 			return 1;
 		}
 	}
@@ -367,6 +384,7 @@ static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 	worklist->pos = 0;
 	ir_bitset_incl(worklist->set, 1);
 	for (; (i = ir_bitqueue_pop(worklist)) >= 0; ir_sccp_trace_end(ctx, _values, i)) {
+		IR_ASSERT(_values[i].op != IR_BOTTOM);
 		ir_sccp_trace_start(ctx, _values, i);
 		insn = &ctx->ir_base[i];
 		flags = ir_op_flags[insn->op];
