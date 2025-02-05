@@ -23,6 +23,7 @@
 #define IR_IS_TOP(ref)          (ref >= 0 && _values[ref].op == IR_TOP)
 #define IR_IS_BOTTOM(ref)       (ref >= 0 && _values[ref].op == IR_BOTTOM)
 #define IR_IS_REACHABLE(ref)    _ir_is_reachable_ctrl(ctx, _values, ref)
+#define IR_IS_CONST(ref)        (IR_IS_CONST_REF(ref) || IR_IS_CONST_OP(_values[ref].op))
 
 IR_ALWAYS_INLINE bool _ir_is_reachable_ctrl(ir_ctx *ctx, ir_insn *_values, ir_ref ref)
 {
@@ -429,11 +430,7 @@ static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 					}
 					continue;
 				}
-				if (!IR_IS_BOTTOM(insn->op2)
-#if IR_COMBO_COPY_PROPAGATION
-				 && (IR_IS_CONST_REF(insn->op2) || _values[insn->op2].op != IR_COPY)
-#endif
-				) {
+				if (IR_IS_CONST(insn->op2)) {
 					bool b = ir_sccp_is_true(ctx, _values, insn->op2);
 					use_list = &ctx->use_lists[i];
 					IR_ASSERT(use_list->count == 2);
@@ -464,11 +461,7 @@ static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 					}
 					continue;
 				}
-				if (!IR_IS_BOTTOM(insn->op2)
-#if IR_COMBO_COPY_PROPAGATION
-				 && (IR_IS_CONST_REF(insn->op2) || _values[insn->op2].op != IR_COPY)
-#endif
-				) {
+				if (IR_IS_CONST(insn->op2)) {
 					ir_ref use_case = IR_UNUSED;
 
 					use_list = &ctx->use_lists[i];
