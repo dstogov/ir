@@ -563,36 +563,68 @@ static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 				ir_bitqueue_add(iter_worklist, i);
 				IR_MAKE_BOTTOM(i);
 			} else {
-				IR_MAKE_BOTTOM(i);
+				if (_values[i].op == IR_TOP) {
+					bool has_top = 0;
 
-				/* control, call, load and store instructions may have unprocessed inputs */
-				n = IR_INPUT_EDGES_COUNT(flags);
-				if (IR_OP_HAS_VAR_INPUTS(flags) && (n = insn->inputs_count) > 3) {
-					for (j = 0; j < (n>>2); j++) {
-						_values[i+j+1].optx = IR_BOTTOM; /* keep the tail of a long multislot instruction */
-					}
-					for (j = 2, p = insn->ops + j; j <= n; j++, p++) {
-						IR_ASSERT(IR_OPND_KIND(flags, j) == IR_OPND_DATA);
-						use = *p;
-						if (use > 0 && UNEXPECTED(_values[use].op == IR_TOP)) {
-							ir_bitqueue_add(worklist, use);
+					/* control, call, load and store instructions may have unprocessed inputs */
+					n = IR_INPUT_EDGES_COUNT(flags);
+					if (IR_OP_HAS_VAR_INPUTS(flags) && (n = insn->inputs_count) > 3) {
+						for (j = 0; j < (n>>2); j++) {
+							_values[i+j+1].optx = IR_BOTTOM; /* keep the tail of a long multislot instruction */
+						}
+						for (j = 2, p = insn->ops + j; j <= n; j++, p++) {
+							IR_ASSERT(IR_OPND_KIND(flags, j) == IR_OPND_DATA);
+							use = *p;
+							if (use > 0 && _values[use].op == IR_TOP) {
+								has_top = 1;
+								/* do backward propagaton only once */
+								if (!_values[use].op1) {
+									_values[use].op1 = 1;
+									ir_bitqueue_add(worklist, use);
+								}
+							}
+						}
+					} else if (n >= 2) {
+						IR_ASSERT(IR_OPND_KIND(flags, 2) == IR_OPND_DATA);
+						use = insn->op2;
+						if (use > 0 && _values[use].op == IR_TOP) {
+							has_top = 1;
+							/* do backward propagaton only once */
+							if (!_values[use].op1) {
+								_values[use].op1 = 1;
+								ir_bitqueue_add(worklist, use);
+							}
+						}
+						if (n > 2) {
+							IR_ASSERT(n == 3);
+							IR_ASSERT(IR_OPND_KIND(flags, 3) == IR_OPND_DATA);
+							use = insn->op3;
+							if (use > 0 && _values[use].op == IR_TOP) {
+								has_top = 1;
+								/* do backward propagaton only once */
+								if (!_values[use].op1) {
+									_values[use].op1 = 1;
+									ir_bitqueue_add(worklist, use);
+								}
+							}
 						}
 					}
-				} else if (n >= 2) {
-					IR_ASSERT(IR_OPND_KIND(flags, 2) == IR_OPND_DATA);
-					use = insn->op2;
-					if (use > 0 && UNEXPECTED(_values[use].op == IR_TOP)) {
-						ir_bitqueue_add(worklist, use);
-					}
-					if (n > 2) {
-						IR_ASSERT(n == 3);
-						IR_ASSERT(IR_OPND_KIND(flags, 3) == IR_OPND_DATA);
-						use = insn->op3;
-						if (use > 0 && UNEXPECTED(_values[use].op == IR_TOP)) {
-							ir_bitqueue_add(worklist, use);
+
+					if (has_top && !(flags & IR_OP_FLAG_BB_END)) {
+						use = ir_next_control(ctx, i);
+						if (_values[use].op == IR_TOP) {
+							has_top = 1;
+							/* do forward control propagaton only once */
+							if (!_values[use].op1) {
+								_values[use].op1 = 1;
+								ir_bitqueue_add(worklist, use);
+							}
 						}
+						continue;
 					}
 				}
+
+				IR_MAKE_BOTTOM(i);
 			}
 		}
 		use_list = &ctx->use_lists[i];
