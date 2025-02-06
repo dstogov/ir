@@ -935,7 +935,7 @@ static void ir_sccp_transform(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *workli
 			ir_sccp_replace_insn(ctx, _values, i, j, iter_worklist);
 #if IR_COMBO_COPY_PROPAGATION
 		} else if (value->op == IR_COPY) {
-			ir_sccp_replace_insn(ctx, _values, i, value->op1, iter_worklist);
+			ir_sccp_replace_insn(ctx, _values, i, ir_sccp_identity(ctx, _values, value->op1), iter_worklist);
 #endif
 		} else if (value->op == IR_TOP) {
 			/* remove unreachable instruction */
