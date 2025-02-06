@@ -112,11 +112,7 @@ static bool ir_sccp_meet(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_ref val)
 	return ir_sccp_meet_const(ctx, _values, ref, val_insn);
 }
 
-#if IR_COMBO_GVN
-static ir_ref ir_sccp_fold(ir_ctx *ctx, ir_insn *_values, ir_gvn_hash *gvn_hash, ir_ref res, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
-#else
 static ir_ref ir_sccp_fold(ir_ctx *ctx, ir_insn *_values, ir_ref res, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
-#endif
 {
 	ir_insn *op1_insn, *op2_insn, *op3_insn;
 
@@ -141,9 +137,6 @@ restart:
 			return 1;
 		case IR_FOLD_DO_COPY:
 			op1 = ctx->fold_insn.op1;
-#if IR_COMBO_GVN
-ir_fold_copy:
-#endif
 			return ir_sccp_meet(ctx, _values, res, op1);
 		case IR_FOLD_DO_CONST:
 			return ir_sccp_meet_const(ctx, _values, res, &ctx->fold_insn);
@@ -443,11 +436,7 @@ static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 					 || insn->op == IR_ZEXT || insn->op == IR_SEXT || insn->op == IR_EQ || insn->op == IR_NE) {
 						ir_bitqueue_add(iter_worklist, i);
 					}
-#if IR_COMBO_GVN
-				} else if (!ir_sccp_fold(ctx, _values, gvn_hash, i, insn->opt, insn->op1, insn->op2, insn->op3)) {
-#else
 				} else if (!ir_sccp_fold(ctx, _values, i, insn->opt, insn->op1, insn->op2, insn->op3)) {
-#endif
 					/* not changed */
 					continue;
 				} else if (_values[i].op == IR_BOTTOM) {
