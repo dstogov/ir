@@ -182,7 +182,7 @@ void ir_sccp_make_bottom_ex(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 # define IR_MAKE_BOTTOM_EX(ref) ir_sccp_make_bottom_ex(ctx, _values, worklist, ref)
 #else
 # define ir_sccp_identity(_ctx, _values, ref) (ref)
-# define IR_MAKE_BOTTOM_EX(ref) IR_SCCP_MAKE_BOITTOM(ref)
+# define IR_MAKE_BOTTOM_EX(ref) IR_MAKE_BOTTOM(ref)
 #endif
 
 static bool ir_sccp_meet_const(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_ref ref, ir_insn *val_insn)
