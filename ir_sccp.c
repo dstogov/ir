@@ -32,6 +32,33 @@ IR_ALWAYS_INLINE bool _ir_is_reachable_ctrl(ir_ctx *ctx, ir_insn *_values, ir_re
 	return _values[ref].op != IR_TOP; /* BOTTOM, IF or MERGE */
 }
 
+static void ir_sccp_add_uses(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_ref ref)
+{
+	ir_use_list *use_list;
+	ir_ref n, *p, use;
+
+	IR_ASSERT(!IR_IS_CONST_REF(ref));
+	use_list = &ctx->use_lists[ref];
+	n = use_list->count;
+	for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
+		use = *p;
+		if (_values[use].op != IR_BOTTOM) {
+			ir_bitqueue_add(worklist, use);
+		}
+	}
+}
+
+static void ir_sccp_add_input(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_ref ref)
+{
+	IR_ASSERT(!IR_IS_CONST_REF(ref));
+	IR_ASSERT(_values[ref].op == IR_TOP);
+	/* do backward propagaton only once */
+	if (!_values[ref].op1) {
+		_values[ref].op1 = 1;
+		ir_bitqueue_add(worklist, ref);
+	}
+}
+
 #if IR_COMBO_COPY_PROPAGATION
 IR_ALWAYS_INLINE ir_ref ir_sccp_identity(ir_ctx *ctx, ir_insn *_values, ir_ref a)
 {
@@ -182,11 +209,7 @@ static bool ir_sccp_analyze_phi(ir_ctx *ctx, ir_insn *_values, ir_ref i, ir_insn
 		} else {
 			v = &_values[input];
 			if (v->op == IR_TOP) {
-				/* do backward propagaton only once */
-				if (!v->op1) {
-					v->op1 = 1;
-					ir_bitqueue_add(worklist, input);
-				}
+				ir_sccp_add_input(ctx, _values, worklist, input);
 				continue;
 #if IR_COMBO_COPY_PROPAGATION
 			} else if (v->op == IR_COPY) {
@@ -240,11 +263,7 @@ next:
 		} else {
 			v = &_values[input];
 			if (v->op == IR_TOP) {
-				/* do backward propagaton only once */
-				if (!v->op1) {
-					v->op1 = 1;
-					ir_bitqueue_add(worklist, input);
-				}
+				ir_sccp_add_input(ctx, _values, worklist, input);
 				continue;
 #if IR_COMBO_COPY_PROPAGATION
 			} else if (v->op == IR_COPY) {
@@ -412,11 +431,7 @@ static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 					if (input > 0) {
 						if (_values[input].op == IR_TOP) {
 							has_top = 1;
-							/* do backward propagaton only once */
-							if (!_values[input].op1) {
-								_values[input].op1 = 1;
-								ir_bitqueue_add(worklist, input);
-							}
+							ir_sccp_add_input(ctx, _values, worklist, input);
 						} else if (_values[input].op != IR_BOTTOM) {
 							/* Perform folding only if some of direct inputs
 							 * is going to be replaced by a constant or copy.
@@ -489,11 +504,7 @@ static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 			}
 			if (insn->op == IR_IF) {
 				if (IR_IS_TOP(insn->op2)) {
-					/* do backward propagaton only once */
-					if (!_values[insn->op2].op1) {
-						_values[insn->op2].op1 = 1;
-						ir_bitqueue_add(worklist, insn->op2);
-					}
+					ir_sccp_add_input(ctx, _values, worklist, insn->op2);
 					continue;
 				}
 				if (IR_IS_CONST(insn->op2)) {
@@ -520,11 +531,7 @@ static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 				IR_MAKE_BOTTOM(i);
 			} else if (insn->op == IR_SWITCH) {
 				if (IR_IS_TOP(insn->op2)) {
-					/* do backward propagaton only once */
-					if (!_values[insn->op2].op1) {
-						_values[insn->op2].op1 = 1;
-						ir_bitqueue_add(worklist, insn->op2);
-					}
+					ir_sccp_add_input(ctx, _values, worklist, insn->op2);
 					continue;
 				}
 				if (IR_IS_CONST(insn->op2)) {
@@ -577,11 +584,7 @@ static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 							use = *p;
 							if (use > 0 && _values[use].op == IR_TOP) {
 								has_top = 1;
-								/* do backward propagaton only once */
-								if (!_values[use].op1) {
-									_values[use].op1 = 1;
-									ir_bitqueue_add(worklist, use);
-								}
+								ir_sccp_add_input(ctx, _values, worklist, use);
 							}
 						}
 					} else if (n >= 2) {
@@ -589,11 +592,7 @@ static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 						use = insn->op2;
 						if (use > 0 && _values[use].op == IR_TOP) {
 							has_top = 1;
-							/* do backward propagaton only once */
-							if (!_values[use].op1) {
-								_values[use].op1 = 1;
-								ir_bitqueue_add(worklist, use);
-							}
+							ir_sccp_add_input(ctx, _values, worklist, use);
 						}
 						if (n > 2) {
 							IR_ASSERT(n == 3);
@@ -601,11 +600,7 @@ static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 							use = insn->op3;
 							if (use > 0 && _values[use].op == IR_TOP) {
 								has_top = 1;
-								/* do backward propagaton only once */
-								if (!_values[use].op1) {
-									_values[use].op1 = 1;
-									ir_bitqueue_add(worklist, use);
-								}
+								ir_sccp_add_input(ctx, _values, worklist, use);
 							}
 						}
 					}
@@ -627,14 +622,7 @@ static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 				IR_MAKE_BOTTOM(i);
 			}
 		}
-		use_list = &ctx->use_lists[i];
-		n = use_list->count;
-		for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
-			use = *p;
-			if (_values[use].op != IR_BOTTOM) {
-				ir_bitqueue_add(worklist, use);
-			}
-		}
+		ir_sccp_add_uses(ctx, _values, worklist, i);
 	}
 
 #ifdef IR_DEBUG
