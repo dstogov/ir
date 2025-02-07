@@ -173,7 +173,7 @@ restart:
 	}
 }
 
-static bool ir_sccp_analyze_phi(ir_ctx *ctx, ir_insn *_values, ir_ref i, ir_insn *insn, ir_bitqueue *worklist)
+static bool ir_sccp_analyze_phi(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_ref i, ir_insn *insn)
 {
 	ir_ref j, n, input, *merge_input, *p;
 	ir_insn *v, *new_const = NULL;
@@ -413,7 +413,7 @@ static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 				/* dead code */
 				continue;
 			} else if (insn->op == IR_PHI) {
-				if (!ir_sccp_analyze_phi(ctx, _values, i, insn, worklist)) {
+				if (!ir_sccp_analyze_phi(ctx, _values, worklist, i, insn)) {
 					continue;
 				}
 			} else if (EXPECTED(IR_IS_FOLDABLE_OP(insn->op))) {
