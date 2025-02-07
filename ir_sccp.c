@@ -13,6 +13,7 @@
 #include "ir_private.h"
 
 #define IR_COMBO_COPY_PROPAGATION 1
+#define IR_COMBO_GVN              1
 
 #define IR_TOP                  IR_UNUSED
 #define IR_BOTTOM               IR_LAST_OP
@@ -185,6 +186,94 @@ IR_ALWAYS_INLINE void ir_sccp_make_bottom_ex(ir_ctx *ctx, ir_insn *_values, ir_b
 # define IR_MAKE_BOTTOM_EX(ref) IR_MAKE_BOTTOM(ref)
 #endif
 
+typedef struct _ir_gvn_hash {
+	uint32_t  mask;
+	ir_ref   *hash;
+	ir_ref   *chain;
+} ir_gvn_hash;
+
+#if IR_COMBO_GVN
+static void ir_gvn_hash_init(ir_ctx *ctx, ir_gvn_hash *gvn_hash)
+{
+	uint32_t mask = ctx->insns_limit - 1;
+	mask |= (mask >> 1);
+	mask |= (mask >> 2);
+	mask |= (mask >> 4);
+	mask |= (mask >> 8);
+	mask |= (mask >> 16);
+	gvn_hash->mask = mask;
+	gvn_hash->hash = ir_mem_calloc(mask + 1, sizeof(ir_ref));
+	gvn_hash->chain = ir_mem_calloc(ctx->insns_limit, sizeof(ir_ref));
+}
+
+static void ir_gvn_hash_free(ir_gvn_hash *gvn_hash)
+{
+	ir_mem_free(gvn_hash->hash);
+	ir_mem_free(gvn_hash->chain);
+}
+
+static ir_ref ir_gvn_lookup(ir_ctx *ctx, ir_gvn_hash *gvn_hash, ir_ref ref)
+{
+	ir_ref old;
+	ir_insn *insn = &ctx->ir_base[ref];
+	uint32_t hash;
+
+	hash = insn->opt;
+	hash = hash ^ (hash << 17) ^ (hash >> 13) ^ insn->op1;
+	hash = hash ^ (hash << 17) ^ (hash >> 13) ^ insn->op2;
+	hash = hash ^ (hash << 17) ^ (hash >> 13) ^ insn->op3;
+	hash &= gvn_hash->mask;
+
+	old = gvn_hash->hash[hash];
+	while (old) {
+		ir_insn *old_insn = &ctx->ir_base[old];
+
+		if (old == ref) {
+			return IR_UNUSED;
+		} else if (insn->opt == old_insn->opt
+		 && insn->op1 == old_insn->op1
+		 && insn->op2 == old_insn->op2
+		 && insn->op3 == old_insn->op3) {
+			return old;
+		} else {
+			old = gvn_hash->chain[old];
+		}
+	}
+
+	gvn_hash->chain[ref] = gvn_hash->hash[hash];
+	gvn_hash->hash[hash] = ref;
+
+	if (insn->opt == ctx->fold_insn.opt
+	 && insn->op1 == ctx->fold_insn.op1
+	 && insn->op2 == ctx->fold_insn.op2
+	 && insn->op3 == ctx->fold_insn.op3) {
+		return IR_UNUSED;
+	}
+
+	hash = ctx->fold_insn.opt;
+	hash = hash ^ (hash << 17) ^ (hash >> 13) ^ ctx->fold_insn.op1;
+	hash = hash ^ (hash << 17) ^ (hash >> 13) ^ ctx->fold_insn.op2;
+	hash = hash ^ (hash << 17) ^ (hash >> 13) ^ ctx->fold_insn.op3;
+	hash &= gvn_hash->mask;
+
+	old = gvn_hash->hash[hash];
+	while (old) {
+		ir_insn *old_insn = &ctx->ir_base[old];
+
+		if (ctx->fold_insn.opt == old_insn->opt
+		 && ctx->fold_insn.op1 == old_insn->op1
+		 && ctx->fold_insn.op2 == old_insn->op2
+		 && ctx->fold_insn.op3 == old_insn->op3) {
+			return old;
+		} else {
+			old = gvn_hash->chain[old];
+		}
+	}
+
+	return IR_UNUSED;
+}
+#endif
+
 IR_ALWAYS_INLINE bool ir_sccp_meet_const(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_ref ref, ir_insn *val_insn)
 {
 	IR_ASSERT(IR_IS_CONST_OP(val_insn->op) || IR_IS_SYM_CONST(val_insn->op));
@@ -242,7 +331,7 @@ IR_ALWAYS_INLINE bool ir_sccp_meet(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *w
 	return ir_sccp_meet_const(ctx, _values, worklist, ref, val_insn);
 }
 
-static ir_ref ir_sccp_fold(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_ref res, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
+static ir_ref ir_sccp_fold(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_gvn_hash *gvn_hash, ir_ref res, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
 {
 	ir_insn *op1_insn, *op2_insn, *op3_insn;
 
@@ -262,11 +351,27 @@ restart:
 			op2 = ctx->fold_insn.op2;
 			op3 = ctx->fold_insn.op3;
 			goto restart;
+		case IR_FOLD_DO_CSE:
+#if IR_COMBO_GVN
+			if (gvn_hash) {
+				op1 = ir_gvn_lookup(ctx, gvn_hash, res);
+				if (op1) {
+					if (op1 == res) {
+						return 0; /* not changed */
+					}
+					goto ir_fold_copy;
+				}
+			}
+			IR_FALLTHROUGH;
+#endif
 		case IR_FOLD_DO_EMIT:
 			IR_MAKE_BOTTOM_EX(res);
 			return 1;
 		case IR_FOLD_DO_COPY:
 			op1 = ctx->fold_insn.op1;
+#if IR_COMBO_GVN
+ir_fold_copy:
+#endif
 			return ir_sccp_meet(ctx, _values, worklist, res, op1);
 		case IR_FOLD_DO_CONST:
 			return ir_sccp_meet_const(ctx, _values, worklist, res, &ctx->fold_insn);
@@ -496,7 +601,7 @@ static void ir_sccp_trace_end(ir_ctx *ctx, ir_insn *_values, ir_ref i)
 # define ir_sccp_trace_end(c, v, i)
 #endif
 
-static IR_NEVER_INLINE void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_bitqueue *iter_worklist)
+static IR_NEVER_INLINE void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_gvn_hash *gvn_hash, ir_bitqueue *iter_worklist)
 {
 	ir_ref i, j, n, *p, use;
 	ir_use_list *use_list;
@@ -554,7 +659,7 @@ static IR_NEVER_INLINE void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bi
 					 || insn->op == IR_ZEXT || insn->op == IR_SEXT || insn->op == IR_EQ || insn->op == IR_NE) {
 						ir_bitqueue_add(iter_worklist, i);
 					}
-				} else if (!ir_sccp_fold(ctx, _values, worklist, i, insn->opt, insn->op1, insn->op2, insn->op3)) {
+				} else if (!ir_sccp_fold(ctx, _values, worklist, gvn_hash, i, insn->opt, insn->op1, insn->op2, insn->op3)) {
 					/* not changed */
 					continue;
 				} else if (_values[i].op == IR_BOTTOM) {
@@ -1238,6 +1343,7 @@ restart:
 			op2 = ctx->fold_insn.op2;
 			op3 = ctx->fold_insn.op3;
 			goto restart;
+		case IR_FOLD_DO_CSE:
 		case IR_FOLD_DO_EMIT:
 			insn = &ctx->ir_base[ref];
 			if (insn->opt != ctx->fold_insn.opt
@@ -2855,17 +2961,32 @@ int ir_sccp(ir_ctx *ctx)
 {
 	ir_bitqueue sccp_worklist, iter_worklist;
 	ir_insn *_values;
+	ir_gvn_hash *gvn_hash = NULL;
+#if IR_COMBO_GVN
+	ir_gvn_hash gvn_hash_holder;
+#endif
 
 	ctx->flags2 |= IR_OPT_IN_SCCP;
+#if IR_COMBO_GVN
+	if (ctx->flags2 & IR_MEM2SSA_VARS) {
+		ir_gvn_hash_init(ctx, &gvn_hash_holder);
+		gvn_hash = &gvn_hash_holder;
+	}
+#endif
 	ir_bitqueue_init(&iter_worklist, ctx->insns_count);
 	ir_bitqueue_init(&sccp_worklist, ctx->insns_count);
 	_values = ir_mem_calloc(ctx->insns_count, sizeof(ir_insn));
 
-	ir_sccp_analyze(ctx, _values, &sccp_worklist, &iter_worklist);
+	ir_sccp_analyze(ctx, _values, &sccp_worklist, gvn_hash, &iter_worklist);
 	ir_sccp_transform(ctx, _values, &sccp_worklist, &iter_worklist);
 
 	ir_mem_free(_values);
 	ir_bitqueue_free(&sccp_worklist);
+#if IR_COMBO_GVN
+	if (gvn_hash) {
+		ir_gvn_hash_free(gvn_hash);
+	}
+#endif
 
 	ctx->flags2 |= IR_CFG_REACHABLE;
 

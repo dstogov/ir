@@ -1009,6 +1009,12 @@ ir_fold_cse:
 		ctx->prev_insn_chain[op] = ref;
 
 		return ref;
+	} else {
+		ctx->fold_insn.optx = opt;
+		ctx->fold_insn.op1 = op1;
+		ctx->fold_insn.op2 = op2;
+		ctx->fold_insn.op3 = op3;
+		return IR_FOLD_DO_CSE;
 	}
 ir_fold_emit:
 	if (!(ctx->flags2 & IR_OPT_IN_SCCP)) {
