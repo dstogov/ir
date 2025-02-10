@@ -32,7 +32,7 @@ IR_ALWAYS_INLINE bool _ir_is_reachable_ctrl(ir_ctx *ctx, ir_insn *_values, ir_re
 	return _values[ref].op != IR_TOP; /* BOTTOM, IF or MERGE */
 }
 
-static void ir_sccp_add_uses(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_ref ref)
+IR_ALWAYS_INLINE void ir_sccp_add_uses(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_ref ref)
 {
 	ir_use_list *use_list;
 	ir_ref n, *p, use;
@@ -48,7 +48,7 @@ static void ir_sccp_add_uses(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklis
 	}
 }
 
-static void ir_sccp_add_input(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_ref ref)
+IR_ALWAYS_INLINE void ir_sccp_add_input(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_ref ref)
 {
 	IR_ASSERT(!IR_IS_CONST_REF(ref));
 	IR_ASSERT(_values[ref].op == IR_TOP);
@@ -170,7 +170,7 @@ static void ir_sccp_split_partition(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *
 	CHECK_LIST(_values, ref);
 }
 
-void ir_sccp_make_bottom_ex(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_ref ref)
+IR_ALWAYS_INLINE void ir_sccp_make_bottom_ex(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_ref ref)
 {
 	if (_values[ref].op == IR_COPY) {
 		ir_sccp_split_partition(ctx, _values, worklist, ref);
@@ -185,7 +185,7 @@ void ir_sccp_make_bottom_ex(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist
 # define IR_MAKE_BOTTOM_EX(ref) IR_MAKE_BOTTOM(ref)
 #endif
 
-static bool ir_sccp_meet_const(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_ref ref, ir_insn *val_insn)
+IR_ALWAYS_INLINE bool ir_sccp_meet_const(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_ref ref, ir_insn *val_insn)
 {
 	IR_ASSERT(IR_IS_CONST_OP(val_insn->op) || IR_IS_SYM_CONST(val_insn->op));
 
@@ -205,7 +205,7 @@ static bool ir_sccp_meet_const(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *workl
 	return 1;
 }
 
-static bool ir_sccp_meet(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_ref ref, ir_ref val)
+IR_ALWAYS_INLINE bool ir_sccp_meet(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_ref ref, ir_ref val)
 {
 	ir_ref val_identity = ir_sccp_identity(ctx, _values, val);
 	ir_insn *val_insn;
@@ -496,7 +496,7 @@ static void ir_sccp_trace_end(ir_ctx *ctx, ir_insn *_values, ir_ref i)
 # define ir_sccp_trace_end(c, v, i)
 #endif
 
-static void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_bitqueue *iter_worklist)
+static IR_NEVER_INLINE void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_bitqueue *iter_worklist)
 {
 	ir_ref i, j, n, *p, use;
 	ir_use_list *use_list;
@@ -1041,7 +1041,7 @@ static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values
 	}
 }
 
-static void ir_sccp_transform(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_bitqueue *iter_worklist)
+static IR_NEVER_INLINE void ir_sccp_transform(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_bitqueue *iter_worklist)
 {
 	ir_ref i, j;
 	ir_insn *value;
@@ -2762,7 +2762,7 @@ static void ir_optimize_merge(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_
 	}
 }
 
-static void ir_iter_opt(ir_ctx *ctx, ir_bitqueue *worklist)
+static IR_NEVER_INLINE void ir_iter_opt(ir_ctx *ctx, ir_bitqueue *worklist)
 {
 	ir_ref i;
 	ir_insn *insn;
