@@ -1171,6 +1171,20 @@ typedef enum _ir_fold_action {
 
 ir_ref ir_folding(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3, ir_insn *op1_insn, ir_insn *op2_insn, ir_insn *op3_insn);
 
+/*** Alias Analyzes (see ir.c) ***/
+typedef enum _ir_alias {
+	IR_MAY_ALIAS  = -1,
+	IR_NO_ALIAS   =  0,
+	IR_MUST_ALIAS =  1,
+} ir_alias;
+
+ir_alias ir_check_partial_aliasing(const ir_ctx *ctx, ir_ref addr1, ir_ref addr2, ir_type type1, ir_type type2);
+
+ir_ref ir_find_aliasing_load(ir_ctx *ctx, ir_ref ref, ir_type type, ir_ref addr);
+ir_ref ir_find_aliasing_vload(ir_ctx *ctx, ir_ref ref, ir_type type, ir_ref var);
+ir_ref ir_find_aliasing_store(ir_ctx *ctx, ir_ref ref, ir_ref addr, ir_ref val);
+ir_ref ir_find_aliasing_vstore(ir_ctx *ctx, ir_ref ref, ir_ref addr, ir_ref val);
+
 /*** IR Live Info ***/
 typedef ir_ref                   ir_live_pos;
 typedef struct _ir_use_pos       ir_use_pos;

@@ -509,6 +509,91 @@ make_bottom:
 	return 1;
 }
 
+#if IR_COMBO_COPY_PROPAGATION
+static ir_ref ir_sccp_find_aliasing_load(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_type type, ir_ref addr)
+{
+	ir_ref limit = (addr > 0) ? addr : 1;
+	ir_insn *insn;
+	uint32_t modified_regset = 0;
+
+	while (ref > limit) {
+		insn = &ctx->ir_base[ref];
+		if (insn->op == IR_LOAD) {
+			ir_ref load_addr = ir_sccp_identity(ctx, _values, insn->op2);
+
+			if (load_addr == addr) {
+				if (insn->type == type) {
+					return ref; /* load forwarding (L2L) */
+//				} else if (!allow_casting) {
+//					/* pass */
+//				} else if (ir_type_size[insn->type] == ir_type_size[type]) {
+//					return ir_fold1(ctx, IR_OPT(IR_BITCAST, type), ref); /* load forwarding with bitcast (L2L) */
+//				} else if (ir_type_size[insn->type] > ir_type_size[type]
+//						&& IR_IS_TYPE_INT(type) && IR_IS_TYPE_INT(insn->type)) {
+//					return ir_fold1(ctx, IR_OPT(IR_TRUNC, type), ref); /* partial load forwarding (L2L) */
+				}
+			}
+		} else if (insn->op == IR_STORE) {
+			ir_type type2 = ctx->ir_base[insn->op3].type;
+			ir_ref store_addr = ir_sccp_identity(ctx, _values, insn->op2);
+
+			if (store_addr == addr) {
+				if (ctx->ir_base[insn->op3].op == IR_RLOAD
+				 && (modified_regset & (1 << ctx->ir_base[insn->op3].op2))) {
+					/* anti-dependency */
+					return IR_UNUSED;
+				} else if (type2 == type) {
+					return insn->op3; /* store forwarding (S2L) */
+//				} else if (!allow_casting) {
+//					return  IR_UNUSED;
+//				} else if (ir_type_size[type2] == ir_type_size[type]) {
+//					return ir_fold1(ctx, IR_OPT(IR_BITCAST, type), insn->op3); /* store forwarding with bitcast (S2L) */
+//				} else if (ir_type_size[type2] > ir_type_size[type]
+//						&& IR_IS_TYPE_INT(type) && IR_IS_TYPE_INT(type2)) {
+//					return ir_fold1(ctx, IR_OPT(IR_TRUNC, type), insn->op3); /* partial store forwarding (S2L) */
+				} else {
+					return IR_UNUSED;
+				}
+			} else if (ir_check_partial_aliasing(ctx, addr, store_addr, type, type2) != IR_NO_ALIAS) {
+				return IR_UNUSED;
+			}
+		} else if (insn->op == IR_RSTORE) {
+			modified_regset |= (1 << insn->op3);
+		} else if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN || insn->op == IR_CALL || insn->op == IR_VSTORE) {
+			return IR_UNUSED;
+		}
+		ref = insn->op1;
+	}
+
+	return IR_UNUSED;
+}
+
+static bool ir_sccp_analyze_load(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_ref ref, ir_insn *insn)
+{
+	ir_ref addr = ir_sccp_identity(ctx, _values, insn->op2);
+	ir_ref val = ir_sccp_find_aliasing_load(ctx, _values, insn->op1, insn->type, addr);
+
+	if (val) {
+		return ir_sccp_meet(ctx, _values, worklist, ref, val);
+	}
+
+	IR_MAKE_BOTTOM_EX(ref);
+	return 1;
+}
+
+static bool ir_sccp_analyze_vload(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_ref ref, ir_insn *insn)
+{
+	ir_ref val = ir_find_aliasing_vload(ctx, insn->op1, insn->type, insn->op2);
+
+	if (val) {
+		return ir_sccp_meet(ctx, _values, worklist, ref, val);
+	}
+
+	IR_MAKE_BOTTOM_EX(ref);
+	return 1;
+}
+#endif
+
 static bool ir_is_dead_load_ex(ir_ctx *ctx, ir_ref ref, uint32_t flags, ir_insn *insn)
 {
 	if ((flags & (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_MASK)) == (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_LOAD)) {
@@ -827,7 +912,29 @@ static IR_NEVER_INLINE void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bi
 					}
 				}
 
+#if IR_COMBO_COPY_PROPAGATION
+				if (ctx->flags2 & IR_MEM2SSA_VARS) {
+					if (insn->op == IR_LOAD) {
+						if (!ir_sccp_analyze_load(ctx, _values, worklist, i, insn)) {
+							continue; /* not changed */
+						}
+					} else if (insn->op == IR_VLOAD) {
+						if (!ir_sccp_analyze_vload(ctx, _values, worklist, i, insn)) {
+							continue; /* not changed */
+						}
+					} else {
+						if (insn->op == IR_STORE || insn->op == IR_VSTORE) {
+							/* schedule dead store check */
+							ir_bitqueue_add(iter_worklist, i);
+						}
+						IR_MAKE_BOTTOM(i);
+					}
+				} else {
+					IR_MAKE_BOTTOM(i);
+				}
+#else
 				IR_MAKE_BOTTOM(i);
+#endif
 			}
 		}
 		ir_sccp_add_uses(ctx, _values, worklist, i);
@@ -908,6 +1015,19 @@ static void ir_sccp_replace_insn(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_r
 	IR_ASSERT(ref != new_ref);
 
 	insn = &ctx->ir_base[ref];
+
+#if IR_COMBO_COPY_PROPAGATION
+	if ((ir_op_flags[insn->op] & IR_OP_FLAG_MEM) && IR_IS_REACHABLE(insn->op1)) {
+		/* remove from control list */
+		ir_ref prev = insn->op1;
+		ir_ref next = ir_next_control(ctx, ref);
+		ctx->ir_base[next].op1 = prev;
+		ir_use_list_remove_one(ctx, ref, next);
+		ir_use_list_replace_one(ctx, prev, ref, next);
+		insn->op1 = IR_UNUSED;
+	}
+#endif
+
 	n = insn->inputs_count;
 	insn->opt = IR_NOP; /* keep "inputs_count" */
 	for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
@@ -2946,13 +3066,24 @@ folding:
 				ir_optimize_merge(ctx, i, insn, worklist);
 			}
 		} else if (ir_is_dead_load(ctx, i)) {
-			ir_ref next = ctx->use_edges[ctx->use_lists[i].refs];
+			ir_ref next;
 
 			/* remove LOAD from double linked control list */
+remove_mem_insn:
+			next = ctx->use_edges[ctx->use_lists[i].refs];
+			IR_ASSERT(ctx->use_lists[i].count == 1);
 			ctx->ir_base[next].op1 = insn->op1;
 			ir_use_list_replace_one(ctx, insn->op1, i, next);
 			insn->op1 = IR_UNUSED;
 			ir_iter_remove_insn(ctx, i, worklist);
+		} else if (insn->op == IR_STORE) {
+			if (ir_find_aliasing_store(ctx, insn->op1, insn->op2, insn->op3)) {
+				goto remove_mem_insn;
+			}
+		} else if (insn->op == IR_VSTORE) {
+			if (ir_find_aliasing_vstore(ctx, insn->op1, insn->op2, insn->op3)) {
+				goto remove_mem_insn;
+			}
 		}
 	}
 }
