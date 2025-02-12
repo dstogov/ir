@@ -212,10 +212,9 @@ static void ir_gvn_hash_free(ir_gvn_hash *gvn_hash)
 	ir_mem_free(gvn_hash->chain);
 }
 
-static ir_ref ir_gvn_lookup(ir_ctx *ctx, ir_gvn_hash *gvn_hash, ir_ref ref)
+static ir_ref ir_gvn_lookup(ir_ctx *ctx, ir_gvn_hash *gvn_hash, ir_ref ref, ir_insn *insn)
 {
 	ir_ref old;
-	ir_insn *insn = &ctx->ir_base[ref];
 	uint32_t hash;
 
 	hash = insn->opt;
@@ -331,13 +330,15 @@ IR_ALWAYS_INLINE bool ir_sccp_meet(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *w
 	return ir_sccp_meet_const(ctx, _values, worklist, ref, val_insn);
 }
 
-static ir_ref ir_sccp_fold(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_gvn_hash *gvn_hash, ir_ref res, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
+static ir_ref ir_sccp_fold(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_gvn_hash *gvn_hash, ir_ref ref, ir_insn *insn)
 {
 	ir_insn *op1_insn, *op2_insn, *op3_insn;
+	ir_ref op1, op2, op3, copy;
+	uint32_t opt = insn->opt;
 
-	op1 = ir_sccp_identity(ctx, _values, op1);
-	op2 = ir_sccp_identity(ctx, _values, op2);
-	op3 = ir_sccp_identity(ctx, _values, op3);
+	op1 = ir_sccp_identity(ctx, _values, insn->op1);
+	op2 = ir_sccp_identity(ctx, _values, insn->op2);
+	op3 = ir_sccp_identity(ctx, _values, insn->op3);
 
 restart:
 	op1_insn = (op1 > 0 && IR_IS_CONST_OP(_values[op1].op)) ? _values + op1 : ctx->ir_base + op1;
@@ -354,27 +355,24 @@ restart:
 		case IR_FOLD_DO_CSE:
 #if IR_COMBO_GVN
 			if (gvn_hash) {
-				op1 = ir_gvn_lookup(ctx, gvn_hash, res);
-				if (op1) {
-					if (op1 == res) {
-						return 0; /* not changed */
-					}
+				copy = ir_gvn_lookup(ctx, gvn_hash, ref, insn);
+				if (copy && copy != ref) {
 					goto ir_fold_copy;
 				}
 			}
 			IR_FALLTHROUGH;
 #endif
 		case IR_FOLD_DO_EMIT:
-			IR_MAKE_BOTTOM_EX(res);
+			IR_MAKE_BOTTOM_EX(ref);
 			return 1;
 		case IR_FOLD_DO_COPY:
-			op1 = ctx->fold_insn.op1;
+			copy = ctx->fold_insn.op1;
 #if IR_COMBO_GVN
 ir_fold_copy:
 #endif
-			return ir_sccp_meet(ctx, _values, worklist, res, op1);
+			return ir_sccp_meet(ctx, _values, worklist, ref, copy);
 		case IR_FOLD_DO_CONST:
-			return ir_sccp_meet_const(ctx, _values, worklist, res, &ctx->fold_insn);
+			return ir_sccp_meet_const(ctx, _values, worklist, ref, &ctx->fold_insn);
 		default:
 			IR_ASSERT(0);
 			return 0;
@@ -744,7 +742,7 @@ static IR_NEVER_INLINE void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bi
 					 || insn->op == IR_ZEXT || insn->op == IR_SEXT || insn->op == IR_EQ || insn->op == IR_NE) {
 						ir_bitqueue_add(iter_worklist, i);
 					}
-				} else if (!ir_sccp_fold(ctx, _values, worklist, gvn_hash, i, insn->opt, insn->op1, insn->op2, insn->op3)) {
+				} else if (!ir_sccp_fold(ctx, _values, worklist, gvn_hash, i, insn)) {
 					/* not changed */
 					continue;
 				} else if (_values[i].op == IR_BOTTOM) {
