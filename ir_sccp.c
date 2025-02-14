@@ -783,6 +783,27 @@ static IR_NEVER_INLINE void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bi
 				} else {
 					continue;
 				}
+				if (ctx->flags2 & IR_MEM2SSA_VARS) {
+					/* MEM2SSA puts new PHI at the bottom, but we like to process them now */
+					use_list = &ctx->use_lists[i];
+					n = use_list->count;
+					for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
+						use = *p;
+						if (_values[use].op != IR_BOTTOM) {
+							if (ctx->ir_base[use].op == IR_PHI) {
+								ir_bitqueue_del(worklist, use);
+								if (ctx->use_lists[use].count != 0) {
+									if (ir_sccp_analyze_phi(ctx, _values, worklist, use, &ctx->ir_base[use])) {
+										ir_sccp_add_uses(ctx, _values, worklist, use);
+									}
+								}
+							} else {
+								ir_bitqueue_add(worklist, use);
+							}
+						}
+					}
+					continue;
+				}
 			} else {
 				IR_ASSERT(insn->op == IR_START || IR_IS_REACHABLE(insn->op1));
 				IR_MAKE_BOTTOM(i);
