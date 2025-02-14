@@ -116,59 +116,83 @@ static void ir_sccp_add_identity(ir_ctx *ctx, ir_insn *_values, ir_ref src, ir_r
 	CHECK_LIST(_values, dst);
 }
 
+static ir_ref ir_sccp_select_new_leader(ir_ctx *ctx, ir_insn *_values, ir_ref member, ir_ref old_leader)
+{
+	ir_ref best = 0x7fffffff;
+	ir_ref ret = 0x7fffffff;
+	ir_ref next = member;
+
+	next = member;
+	do {
+		if (_values[next].op1 == old_leader) {
+			if (ctx->ir_base[next].op == IR_PHI) {
+				if (ctx->ir_base[next].op1 < best) {
+					best = ctx->ir_base[next].op1;
+					ret = next;
+				} else if (ctx->ir_base[next].op1 == best && next < ret) {
+					ret = next;
+				}
+			} else if (next < best) {
+				best = next;
+				ret = next;
+			}
+		}
+		next = _values[next].op2;
+	} while (next != member);
+
+	IR_ASSERT(ret != 0x7fffffff);
+	return ret;
+}
+
 static void ir_sccp_split_partition(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_ref ref)
 {
-	ir_ref member, head, tail, next, prev;
+	ir_ref leader = ir_sccp_identity(ctx, _values, ref);
+	ir_ref next = _values[ref].op2;
+	ir_ref prev = _values[ref].op3;
+	ir_ref member;
+
+	/* the list contains more than one member */
+	IR_ASSERT(next != ref);
 
 	CHECK_LIST(_values, ref);
 	IR_MAKE_BOTTOM(ref);
 	_values[ref].op1 = ref;
+	_values[ref].op2 = ref;
+	_values[ref].op3 = ref;
 
-	member = _values[ref].op2;
-	head = tail = IR_UNUSED;
-	while (member != ref) {
-		if (_values[member].op != IR_BOTTOM) {
-			ir_bitqueue_add(worklist, member);
-		}
-		ir_sccp_add_uses(ctx, _values, worklist, member);
-
-		next = _values[member].op2;
-		if (ir_sccp_identity(ctx, _values, member) == ref) {
-			/* remove "member" from the old circular double-linked list */
-			prev = _values[member].op3;
-			_values[prev].op2 = next;
-			_values[next].op3 = prev;
-
-			/* insert "member" into the new double-linked list */
-			if (!head) {
-				head = tail = member;
-			} else {
-				_values[tail].op2 = member;
-				_values[member].op3 = tail;
-				tail = member;
-			}
-		}
-		member = next;
-	}
-
-	/* remove "ref" from the old circular double-linked list */
-	next = _values[ref].op2;
-	prev = _values[ref].op3;
-	_values[prev].op2 = next;
-	_values[next].op3 = prev;
-	CHECK_LIST(_values, next);
-
-	/* close the new circle */
-	if (head) {
-		_values[ref].op2 = head;
-		_values[ref].op3 = tail;
-		_values[tail].op2 = ref;
-		_values[head].op3 = ref;
+	if (next == prev) {
+		/* only one reminding member */
+		IR_MAKE_BOTTOM(next);
+		_values[next].op1 = next;
+		_values[next].op2 = next;
+		_values[next].op3 = next;
+		ir_sccp_add_uses(ctx, _values, worklist, next);
 	} else {
-		_values[ref].op2 = ref;
-		_values[ref].op3 = ref;
+		/* remove "ref" from the circular double-linked list */
+		_values[prev].op2 = next;
+		_values[next].op3 = prev;
+
+		if (leader == ref) {
+			leader = ir_sccp_select_new_leader(ctx, _values, next, ref);
+			IR_MAKE_BOTTOM(leader);
+			_values[leader].op1 = leader;
+			_values[leader].op2 = leader;
+			_values[leader].op3 = leader;
+			ir_sccp_add_uses(ctx, _values, worklist, leader);
+		}
+
+		member = _values[leader].op2;
+		do {
+			if (_values[member].op1 == ref) {
+				_values[member].op1 = leader;
+			}
+			if (_values[member].op != IR_BOTTOM) {
+				ir_bitqueue_add(worklist, member);
+			}
+			member = _values[member].op2;
+		} while (member != leader);
+		CHECK_LIST(_values, leader);
 	}
-	CHECK_LIST(_values, ref);
 }
 
 IR_ALWAYS_INLINE void ir_sccp_make_bottom_ex(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_ref ref)
