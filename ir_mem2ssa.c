@@ -17,14 +17,15 @@ static ir_ref ir_uninitialized(ir_ctx *ctx, ir_type type)
 	return ir_const(ctx, c, type);
 }
 
-static void ir_mem2ssa_convert(ir_ctx    *ctx,
-                               ir_ref    *ssa_vars,
-                               ir_list   *queue,
-                               ir_bitset  defs,
-                               ir_bitset  merges,
-                               ir_ref     var,
-                               ir_ref     next,
-                               ir_type    type)
+static void ir_mem2ssa_convert(ir_ctx      *ctx,
+                               ir_ref      *ssa_vars,
+                               ir_list     *queue,
+                               ir_bitset    defs,
+                               ir_bitset    merges,
+                               ir_bitqueue *iter_worklist,
+                               ir_ref       var,
+                               ir_ref       next,
+                               ir_type      type)
 {
 	ir_ref *p, i, n, use, next_ctrl;
 	ir_insn *use_insn;
@@ -133,6 +134,8 @@ static void ir_mem2ssa_convert(ir_ctx    *ctx,
 		} IR_BITSET_FOREACH_END();
 	} while (changed);
 
+	ir_bitqueue_grow(iter_worklist, ctx->insns_count);
+
 	/* Renaming: remove STROREs and replace LOADs by last STOREed values or by PHIs */
 	next_ctrl = next;
 	n = ctx->use_lists[var].count;
@@ -200,7 +203,7 @@ static void ir_mem2ssa_convert(ir_ctx    *ctx,
 				}
 				b = ctx->cfg_blocks[b].idom;
 			}
-			ir_replace(ctx, use, val);
+			ir_iter_replace(ctx, use, val, iter_worklist);
 
 			use_insn = &ctx->ir_base[use];
 			MAKE_NOP(use_insn);
@@ -381,6 +384,7 @@ int ir_mem2ssa(ir_ctx *ctx)
 	ir_ref *ssa_vars = NULL;
 	ir_list queue;
 	ir_bitset defs;
+	ir_bitqueue iter_worklist;
 
 	ctx->flags2 &= ~IR_MEM2SSA_VARS;
 	IR_ASSERT(ctx->use_lists && ctx->cfg_blocks);
@@ -415,6 +419,7 @@ int ir_mem2ssa(ir_ctx *ctx)
 						uint32_t len = ir_bitset_len(ctx->cfg_blocks_count + 1);
 
 						if (!ssa_vars) {
+							ir_bitqueue_init(&iter_worklist, ctx->insns_count);
 							ssa_vars = ir_mem_calloc(ctx->cfg_blocks_count + 1, sizeof(ir_ref));
 							ir_list_init(&queue, ctx->cfg_blocks_count);
 							defs = ir_mem_calloc(len * 2, IR_BITSET_BITS / 8);
@@ -422,7 +427,7 @@ int ir_mem2ssa(ir_ctx *ctx)
 							memset(defs, 0, len * 2 * IR_BITSET_BITS / 8);
 						}
 
-						ir_mem2ssa_convert(ctx, ssa_vars, &queue, defs, defs + len, use, IR_UNUSED, insn->type);
+						ir_mem2ssa_convert(ctx, ssa_vars, &queue, defs, defs + len, &iter_worklist, use, IR_UNUSED, insn->type);
 
 						insn = &ctx->ir_base[use];
 						ir_use_list_remove_one(ctx, start, use);
@@ -459,6 +464,7 @@ int ir_mem2ssa(ir_ctx *ctx)
 					ir_ref prev;
 
 					if (!ssa_vars) {
+						ir_bitqueue_init(&iter_worklist, ctx->insns_count);
 						ssa_vars = ir_mem_calloc(ctx->cfg_blocks_count + 1, sizeof(ir_ref));
 						ir_list_init(&queue, ctx->cfg_blocks_count);
 						defs = ir_mem_calloc(len * 2, IR_BITSET_BITS / 8);
@@ -466,7 +472,7 @@ int ir_mem2ssa(ir_ctx *ctx)
 						memset(defs, 0, len * 2 * IR_BITSET_BITS / 8);
 					}
 
-					ir_mem2ssa_convert(ctx, ssa_vars, &queue, defs, defs + len, ref, next, type);
+					ir_mem2ssa_convert(ctx, ssa_vars, &queue, defs, defs + len, &iter_worklist, ref, next, type);
 
 					insn = &ctx->ir_base[ref];
 					prev = insn->op1;
@@ -480,18 +486,31 @@ int ir_mem2ssa(ir_ctx *ctx)
 					ctx->flags2 |= IR_MEM2SSA_VARS;
 					continue;
 				}
+			} else if (ssa_vars
+					&& (insn->op == IR_LOAD
+					 || insn->op == IR_STORE
+					 || insn->op == IR_VLOAD
+					 || insn->op == IR_VSTORE)) {
+				/* After removing SSA related LOADs and STOREs unrelated LOADs and STOREs may become redundand */
+				ir_bitqueue_add(&iter_worklist, ref);
 			}
 			next = ref;
 			ref = insn->op1;
 		}
 	}
 
-	// TODO: remove BOLCK_BEGIN and BLOCK_END without ALLOCAs between them
-
 	if (ssa_vars) {
 		ir_mem_free(defs);
 		ir_list_free(&queue);
 		ir_mem_free(ssa_vars);
+
+		// TODO: remove BOLCK_BEGIN and BLOCK_END without ALLOCAs between them
+		ctx->flags2 |= IR_OPT_IN_SCCP;
+		ir_bitqueue_grow(&iter_worklist, ctx->insns_count);
+		ir_iter_opt(ctx, &iter_worklist);
+		ctx->flags2 &= ~IR_OPT_IN_SCCP;
+
+		ir_bitqueue_free(&iter_worklist);
 	}
 
 	return 1;

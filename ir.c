@@ -1879,6 +1879,12 @@ int ir_mem_flush(void *ptr, size_t size)
 #endif
 
 /* Alias Analyses */
+typedef enum _ir_alias {
+	IR_MAY_ALIAS  = -1,
+	IR_NO_ALIAS   =  0,
+	IR_MUST_ALIAS =  1,
+} ir_alias;
+
 #if 0
 static ir_alias ir_check_aliasing(ir_ctx *ctx, ir_ref addr1, ir_ref addr2)
 {
@@ -2009,9 +2015,8 @@ ir_alias ir_check_partial_aliasing(const ir_ctx *ctx, ir_ref addr1, ir_ref addr2
 	return IR_MAY_ALIAS;
 }
 
-IR_ALWAYS_INLINE ir_ref ir_find_aliasing_load_i(ir_ctx *ctx, ir_ref ref, ir_type type, ir_ref addr, bool allow_casting)
+IR_ALWAYS_INLINE ir_ref ir_find_aliasing_load_i(ir_ctx *ctx, ir_ref ref, ir_type type, ir_ref addr, ir_ref limit, bool allow_casting)
 {
-	ir_ref limit = (addr > 0) ? addr : 1;
 	ir_insn *insn;
 	uint32_t modified_regset = 0;
 
@@ -2066,7 +2071,7 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_load_i(ir_ctx *ctx, ir_ref ref, ir_type
 
 ir_ref ir_find_aliasing_load(ir_ctx *ctx, ir_ref ref, ir_type type, ir_ref addr)
 {
-	return ir_find_aliasing_load_i(ctx, ref, type, addr, 0);
+	return ir_find_aliasing_load_i(ctx, ref, type, addr, (addr > 0 && addr < ref) ? addr : 1, 0);
 }
 
 IR_ALWAYS_INLINE ir_ref ir_find_aliasing_vload_i(ir_ctx *ctx, ir_ref ref, ir_type type, ir_ref var, bool allow_casting)
@@ -2119,9 +2124,8 @@ ir_ref ir_find_aliasing_vload(ir_ctx *ctx, ir_ref ref, ir_type type, ir_ref var)
 	return ir_find_aliasing_vload_i(ctx, ref, type, var, 0);
 }
 
-IR_ALWAYS_INLINE ir_ref ir_find_aliasing_store_i(ir_ctx *ctx, ir_ref ref, ir_ref addr, ir_ref val)
+IR_ALWAYS_INLINE ir_ref ir_find_aliasing_store_i(ir_ctx *ctx, ir_ref ref, ir_ref addr, ir_ref val, ir_ref limit)
 {
-	ir_ref limit = (addr > 0) ? addr : 1;
 	ir_ref next = IR_UNUSED;
 	ir_insn *insn;
 	ir_type type = ctx->ir_base[val].type;
@@ -2211,7 +2215,7 @@ check_aliasing:
 
 ir_ref ir_find_aliasing_store(ir_ctx *ctx, ir_ref ref, ir_ref addr, ir_ref val)
 {
-	return ir_find_aliasing_store_i(ctx, ref, addr, val);
+	return ir_find_aliasing_store_i(ctx, ref, addr, val, (addr > 0 && addr < ref) ? addr : 1);
 }
 
 IR_ALWAYS_INLINE ir_ref ir_find_aliasing_vstore_i(ir_ctx *ctx, ir_ref ref, ir_ref var, ir_ref val)
@@ -3164,7 +3168,7 @@ ir_ref _ir_LOAD(ir_ctx *ctx, ir_type type, ir_ref addr)
 
 	IR_ASSERT(ctx->control);
 	if (EXPECTED(ctx->flags & IR_OPT_FOLDING)) {
-		ref = ir_find_aliasing_load_i(ctx, ctx->control, type, addr, 1);
+		ref = ir_find_aliasing_load_i(ctx, ctx->control, type, addr, (addr > 0) ? addr : 1, 1);
 	}
 	if (!ref) {
 		ctx->control = ref = ir_emit2(ctx, IR_OPT(IR_LOAD, type), ctx->control, addr);
@@ -3176,7 +3180,7 @@ void _ir_STORE(ir_ctx *ctx, ir_ref addr, ir_ref val)
 {
 	IR_ASSERT(ctx->control);
 	if (EXPECTED(ctx->flags & IR_OPT_FOLDING)) {
-		if (ir_find_aliasing_store_i(ctx, ctx->control, addr, val)) {
+		if (ir_find_aliasing_store_i(ctx, ctx->control, addr, val, (addr > 0) ? addr : 1)) {
 			/* dead STORE */
 			return;
 		}
