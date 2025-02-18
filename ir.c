@@ -1442,7 +1442,7 @@ void ir_replace(ir_ctx *ctx, ir_ref ref, ir_ref new_ref)
 	n = use_list->count;
 	p = ctx->use_edges + use_list->refs;
 
-	if (new_ref < 0) {
+	if (new_ref <= 0) {
 		/* constant or IR_UNUSED */
 		for (; n; p++, n--) {
 			use = *p;
