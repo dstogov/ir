@@ -1188,31 +1188,13 @@ static void ir_iter_remove_insn(ir_ctx *ctx, ir_ref ref, ir_bitqueue *worklist)
 	}
 }
 
-static void ir_iter_replace_insn(ir_ctx *ctx, ir_ref ref, ir_ref new_ref, ir_bitqueue *worklist)
+static void ir_iter_replace(ir_ctx *ctx, ir_ref ref, ir_ref new_ref, ir_bitqueue *worklist)
 {
 	ir_ref i, j, n, *p, use;
 	ir_insn *insn;
 	ir_use_list *use_list;
 
 	IR_ASSERT(ref != new_ref);
-
-	insn = &ctx->ir_base[ref];
-	n = insn->inputs_count;
-	insn->opt = IR_NOP; /* keep "inputs_count" */
-	for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
-		ir_ref input = *p;
-		*p = IR_UNUSED;
-		if (input > 0) {
-			ir_use_list_remove_all(ctx, input, ref);
-			if (ir_is_dead(ctx, input)) {
-				/* schedule DCE */
-				ir_bitqueue_add(worklist, input);
-			} else if (ctx->ir_base[input].op == IR_PHI && ctx->use_lists[input].count == 1) {
-				/* try to optimize PHI into ABS/MIN/MAX/COND */
-				ir_bitqueue_add(worklist, input);
-			}
-		}
-	}
 
 	use_list = &ctx->use_lists[ref];
 	n = use_list->count;
@@ -1247,6 +1229,33 @@ static void ir_iter_replace_insn(ir_ctx *ctx, ir_ref ref, ir_ref new_ref, ir_bit
 			ir_bitqueue_add(worklist, use);
 		}
 	}
+}
+
+static void ir_iter_replace_insn(ir_ctx *ctx, ir_ref ref, ir_ref new_ref, ir_bitqueue *worklist)
+{
+	ir_ref j, n, *p;
+	ir_insn *insn;
+
+	insn = &ctx->ir_base[ref];
+	n = insn->inputs_count;
+	insn->opt = IR_NOP; /* keep "inputs_count" */
+	for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
+		ir_ref input = *p;
+		*p = IR_UNUSED;
+		if (input > 0) {
+			ir_use_list_remove_all(ctx, input, ref);
+			if (ir_is_dead(ctx, input)) {
+				/* schedule DCE */
+				ir_bitqueue_add(worklist, input);
+			} else if (ctx->ir_base[input].op == IR_PHI && ctx->use_lists[input].count == 1) {
+				/* try to optimize PHI into ABS/MIN/MAX/COND */
+				ir_bitqueue_add(worklist, input);
+			}
+		}
+	}
+
+	ir_iter_replace(ctx, ref, new_ref, worklist);
+
 	CLEAR_USES(ref);
 }
 
