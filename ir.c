@@ -3168,6 +3168,9 @@ ir_ref _ir_LOAD(ir_ctx *ctx, ir_type type, ir_ref addr)
 
 	IR_ASSERT(ctx->control);
 	if (EXPECTED(ctx->flags & IR_OPT_FOLDING)) {
+		if (ctx->ir_base[addr].op == IR_VADDR) {
+			return _ir_VLOAD(ctx, type, ctx->ir_base[addr].op1);
+		}
 		ref = ir_find_aliasing_load_i(ctx, ctx->control, type, addr, (addr > 0) ? addr : 1, 1);
 	}
 	if (!ref) {
@@ -3180,6 +3183,10 @@ void _ir_STORE(ir_ctx *ctx, ir_ref addr, ir_ref val)
 {
 	IR_ASSERT(ctx->control);
 	if (EXPECTED(ctx->flags & IR_OPT_FOLDING)) {
+		if (ctx->ir_base[addr].op == IR_VADDR) {
+			_ir_VSTORE(ctx, ctx->ir_base[addr].op1, val);
+			return;
+		}
 		if (ir_find_aliasing_store_i(ctx, ctx->control, addr, val, (addr > 0) ? addr : 1)) {
 			/* dead STORE */
 			return;
