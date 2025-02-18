@@ -3009,9 +3009,11 @@ remove_mem_insn:
 		} else if (insn->op == IR_LOAD) {
 			val = ir_find_aliasing_load(ctx, insn->op1, insn->type, insn->op2);
 			if (val) {
+				ir_ref prev, next;
+
 remove_load:
-				ir_ref prev = insn->op1;
-				ir_ref next = ir_next_control(ctx, i);
+				prev = insn->op1;
+				next = ir_next_control(ctx, i);
 				ctx->ir_base[next].op1 = prev;
 				ir_use_list_remove_one(ctx, i, next);
 				ir_use_list_replace_one(ctx, prev, i, next);
