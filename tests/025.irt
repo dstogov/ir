@@ -1,7 +1,7 @@
 --TEST--
 025: SCCP+DCE (Removing RETURN nodes)
 --ARGS--
---save
+--save -fno-mem2ssa
 --CODE--
 {
 	uintptr_t c_1 = 0;

@@ -406,27 +406,33 @@ int ir_mem2ssa(ir_ctx *ctx)
 				ir_ref use = ctx->use_edges[ctx->use_lists[start].refs + i];
 
 				insn = &ctx->ir_base[use];
-				if (insn->op == IR_VAR && ir_mem2ssa_may_convert_var(ctx, use, insn)) {
-					uint32_t len = ir_bitset_len(ctx->cfg_blocks_count + 1);
+				if (insn->op == IR_VAR) {
+					if (ctx->use_lists[use].count == 0) {
+						ir_use_list_remove_one(ctx, start, use);
+						MAKE_NOP(insn);
+						continue;
+					} else if (ir_mem2ssa_may_convert_var(ctx, use, insn)) {
+						uint32_t len = ir_bitset_len(ctx->cfg_blocks_count + 1);
 
-					if (!ssa_vars) {
-						ssa_vars = ir_mem_calloc(ctx->cfg_blocks_count + 1, sizeof(ir_ref));
-						ir_list_init(&queue, ctx->cfg_blocks_count);
-						defs = ir_mem_calloc(len * 2, IR_BITSET_BITS / 8);
-					} else {
-						memset(defs, 0, len * 2 * IR_BITSET_BITS / 8);
+						if (!ssa_vars) {
+							ssa_vars = ir_mem_calloc(ctx->cfg_blocks_count + 1, sizeof(ir_ref));
+							ir_list_init(&queue, ctx->cfg_blocks_count);
+							defs = ir_mem_calloc(len * 2, IR_BITSET_BITS / 8);
+						} else {
+							memset(defs, 0, len * 2 * IR_BITSET_BITS / 8);
+						}
+
+						ir_mem2ssa_convert(ctx, ssa_vars, &queue, defs, defs + len, use, IR_UNUSED, insn->type);
+
+						insn = &ctx->ir_base[use];
+						ir_use_list_remove_one(ctx, start, use);
+						MAKE_NOP(insn);
+						CLEAR_USES(use);
+						ctx->flags2 |= IR_MEM2SSA_VARS;
+						continue;
 					}
-
-					ir_mem2ssa_convert(ctx, ssa_vars, &queue, defs, defs + len, use, IR_UNUSED, insn->type);
-
-					insn = &ctx->ir_base[use];
-					ir_use_list_remove_one(ctx, start, use);
-					MAKE_NOP(insn);
-					CLEAR_USES(use);
-					ctx->flags2 |= IR_MEM2SSA_VARS;
-				} else {
-					i++;
 				}
+				i++;
 			}
 		}
 

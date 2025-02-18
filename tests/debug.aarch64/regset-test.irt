@@ -3,7 +3,7 @@ Test
 --TARGET--
 aarch64
 --ARGS--
---debug-regset 0x3ffffffff --save --dump-live-ranges -S
+-fno-mem2ssa --debug-regset 0x3ffffffff --save --dump-live-ranges -S
 --CODE--
 {
 	uintptr_t c_1 = 0;
