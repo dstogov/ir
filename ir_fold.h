@@ -1586,6 +1586,24 @@ IR_FOLD(SUB_OV(_, C_ADDR))
 	IR_FOLD_NEXT;
 }
 
+/* This rule is useful for ADD(0, SYM) => SYM */
+IR_FOLD(ADD(C_U8, _))
+IR_FOLD(ADD(C_U16, _))
+IR_FOLD(ADD(C_U32, _))
+IR_FOLD(ADD(C_U64, _))
+IR_FOLD(ADD(C_I8, _))
+IR_FOLD(ADD(C_I16, _))
+IR_FOLD(ADD(C_I32, _))
+IR_FOLD(ADD(C_I64, _))
+IR_FOLD(ADD(C_ADDR, _))
+{
+	if (op1_insn->val.u64 == 0) {
+		/* 0 + a => a */
+		IR_FOLD_COPY(op2);
+	}
+	IR_FOLD_NEXT;
+}
+
 IR_FOLD(SUB(C_I8, _))
 IR_FOLD(SUB(C_I16, _))
 IR_FOLD(SUB(C_I32, _))
