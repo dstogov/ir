@@ -255,9 +255,8 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 		}
 
 		ir_mem2ssa(ctx);
-		if (opt_level > 1) {
-			ir_reset_cfg(ctx);
-		}
+		ir_reset_cfg(ctx);
+
 		if ((dump & (IR_DUMP_AFTER_MEM2SSA|IR_DUMP_AFTER_ALL))
 		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_MEM2SSA, dump_file, func_name)) {
 			return 0;
