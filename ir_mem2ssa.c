@@ -405,6 +405,14 @@ int ir_mem2ssa(ir_ctx *ctx)
 		ir_ref i, n = ctx->use_lists[start].count;
 		ir_insn *insn;
 
+		if (ssa_vars
+		 && (ctx->ir_base[start].op == IR_MERGE
+		  || (ctx->ir_base[start].op == IR_BEGIN
+		   && ctx->ir_base[ctx->ir_base[start].op1].op == IR_END))) {
+			/* CFG reduction may open oportunities for more redundand LOADs and STOREs elimination */
+			ir_bitqueue_add(&iter_worklist, start);
+		}
+
 		if (n > 1) { /* BB start node is used at least next control or BB end node */
 			for (i = 0; i < ctx->use_lists[start].count;) {
 				ir_ref use = ctx->use_edges[ctx->use_lists[start].refs + i];
