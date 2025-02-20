@@ -513,10 +513,8 @@ int ir_mem2ssa(ir_ctx *ctx)
 		ir_mem_free(ssa_vars);
 
 		// TODO: remove BOLCK_BEGIN and BLOCK_END without ALLOCAs between them
-		ctx->flags2 |= IR_OPT_IN_SCCP;
 		ir_bitqueue_grow(&iter_worklist, ctx->insns_count);
 		ir_iter_opt(ctx, &iter_worklist);
-		ctx->flags2 &= ~IR_OPT_IN_SCCP;
 
 		ir_bitqueue_free(&iter_worklist);
 	}

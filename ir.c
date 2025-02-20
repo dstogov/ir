@@ -974,7 +974,7 @@ restart:
 	} while (1);
 
 ir_fold_restart:
-	if (!(ctx->flags2 & IR_OPT_IN_SCCP)) {
+	if (!ctx->use_lists) {
 		op1_insn = ctx->ir_base + op1;
 		op2_insn = ctx->ir_base + op2;
 		op3_insn = ctx->ir_base + op3;
@@ -987,7 +987,7 @@ ir_fold_restart:
 		return IR_FOLD_DO_RESTART;
 	}
 ir_fold_cse:
-	if (!(ctx->flags2 & IR_OPT_IN_SCCP)) {
+	if (!ctx->use_lists) {
 		/* Local CSE */
 		ref = _ir_fold_cse(ctx, opt, op1, op2, op3);
 		if (ref) {
@@ -1017,7 +1017,7 @@ ir_fold_cse:
 		return IR_FOLD_DO_CSE;
 	}
 ir_fold_emit:
-	if (!(ctx->flags2 & IR_OPT_IN_SCCP)) {
+	if (!ctx->use_lists) {
 		return ir_emit(ctx, opt, op1, op2, op3);
 	} else {
 		ctx->fold_insn.optx = opt;
@@ -1027,14 +1027,14 @@ ir_fold_emit:
 		return IR_FOLD_DO_EMIT;
 	}
 ir_fold_copy:
-	if (!(ctx->flags2 & IR_OPT_IN_SCCP)) {
+	if (!ctx->use_lists) {
 		return ref;
 	} else {
 		ctx->fold_insn.op1 = ref;
 		return IR_FOLD_DO_COPY;
 	}
 ir_fold_const:
-	if (!(ctx->flags2 & IR_OPT_IN_SCCP)) {
+	if (!ctx->use_lists) {
 		return ir_const(ctx, val, IR_OPT_TYPE(opt));
 	} else {
 		ctx->fold_insn.opt = IR_OPT(IR_OPT_TYPE(opt), IR_OPT_TYPE(opt));

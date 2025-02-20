@@ -3104,13 +3104,14 @@ int ir_sccp(ir_ctx *ctx)
 	ir_bitqueue sccp_worklist, iter_worklist;
 	ir_insn *_values;
 
-	ctx->flags2 |= IR_OPT_IN_SCCP;
 	ir_bitqueue_init(&iter_worklist, ctx->insns_count);
 	ir_bitqueue_init(&sccp_worklist, ctx->insns_count);
 	_values = ir_mem_calloc(ctx->insns_count, sizeof(ir_insn));
 
+	ctx->flags2 |= IR_OPT_IN_SCCP;
 	ir_sccp_analyze(ctx, _values, &sccp_worklist, &iter_worklist);
 	ir_sccp_transform(ctx, _values, &sccp_worklist, &iter_worklist);
+	ctx->flags2 &= ~IR_OPT_IN_SCCP;
 
 	ir_mem_free(_values);
 	ir_bitqueue_free(&sccp_worklist);
@@ -3120,8 +3121,6 @@ int ir_sccp(ir_ctx *ctx)
 	ir_iter_opt(ctx, &iter_worklist);
 
 	ir_bitqueue_free(&iter_worklist);
-
-	ctx->flags2 &= ~IR_OPT_IN_SCCP;
 
 	return 1;
 }
