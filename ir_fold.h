@@ -1469,6 +1469,27 @@ IR_FOLD(EQ(SEXT, C_ADDR))
 		op1 = op1_insn->op1;
 		op2 = IR_UNUSED;
 		IR_FOLD_RESTART;
+	} else {
+		ir_type type = ctx->ir_base[op1_insn->op1].type;
+
+		if (IR_IS_TYPE_SIGNED(type)) {
+			switch (ir_type_size[type]) {
+				case 1:  val.i64 = op2_insn->val.i8;  break;
+				case 2:  val.i64 = op2_insn->val.i16; break;
+				case 4:  val.i64 = op2_insn->val.i32; break;
+				default: val.u64 = op2_insn->val.u64; break;
+			 }
+	    } else {
+			switch (ir_type_size[type]) {
+				case 1:  val.u64 = op2_insn->val.u8;  break;
+				case 2:  val.u64 = op2_insn->val.u16; break;
+				case 4:  val.u64 = op2_insn->val.u32; break;
+				default: val.u64 = op2_insn->val.u64; break;
+			 }
+		}
+		op1 = op1_insn->op1;
+		op2 = ir_const(ctx, val, type);
+		IR_FOLD_RESTART;
 	}
 	IR_FOLD_NEXT;
 }
@@ -1490,6 +1511,27 @@ IR_FOLD(NE(SEXT, C_ADDR))
 {
 	if (op2_insn->val.u64 == 0 && ctx->ir_base[op1_insn->op1].type == IR_BOOL) {
 		IR_FOLD_COPY(op1_insn->op1);
+	} else {
+		ir_type type = ctx->ir_base[op1_insn->op1].type;
+
+		if (IR_IS_TYPE_SIGNED(type)) {
+			switch (ir_type_size[type]) {
+				case 1:  val.i64 = op2_insn->val.i8;  break;
+				case 2:  val.i64 = op2_insn->val.i16; break;
+				case 4:  val.i64 = op2_insn->val.i32; break;
+				default: val.u64 = op2_insn->val.u64; break;
+			 }
+	    } else {
+			switch (ir_type_size[type]) {
+				case 1:  val.u64 = op2_insn->val.u8;  break;
+				case 2:  val.u64 = op2_insn->val.u16; break;
+				case 4:  val.u64 = op2_insn->val.u32; break;
+				default: val.u64 = op2_insn->val.u64; break;
+			 }
+		}
+		op1 = op1_insn->op1;
+		op2 = ir_const(ctx, val, type);
+		IR_FOLD_RESTART;
 	}
 	IR_FOLD_NEXT;
 }
