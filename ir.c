@@ -2415,9 +2415,17 @@ ir_ref _ir_fold_condition(ir_ctx *ctx, ir_ref ref)
 		ir_insn *op2_insn = &ctx->ir_base[insn->op2];
 
 		if (IR_IS_TYPE_INT(op2_insn->type) && op2_insn->val.u64 == 0) {
-			return insn->op1;
+			ref = insn->op1;
+			insn = &ctx->ir_base[ref];
 		}
+	} else if (insn->op == IR_EQ && insn->op2 == IR_TRUE) {
+		ref = insn->op1;
+		insn = &ctx->ir_base[ref];
 	}
+//	while (insn->op == IR_SEXT || insn->op == IR_ZEXT || insn->op == IR_BITCAST) {
+//		ref = insn->op1;
+//		insn = &ctx->ir_base[ref];
+//	}
 	return ref;
 }
 
@@ -2990,6 +2998,7 @@ void _ir_GUARD(ir_ctx *ctx, ir_ref condition, ir_ref addr)
 		ir_ref ref = ctx->control;
 		ir_insn *insn;
 
+		condition = _ir_fold_condition(ctx, condition);
 		while (ref > condition) {
 			insn = &ctx->ir_base[ref];
 			if (insn->op == IR_GUARD) {
@@ -3036,6 +3045,7 @@ void _ir_GUARD_NOT(ir_ctx *ctx, ir_ref condition, ir_ref addr)
 		ir_ref ref = ctx->control;
 		ir_insn *insn;
 
+		condition = _ir_fold_condition(ctx, condition);
 		while (ref > condition) {
 			insn = &ctx->ir_base[ref];
 			if (insn->op == IR_GUARD_NOT) {
