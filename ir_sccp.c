@@ -1144,6 +1144,35 @@ static IR_NEVER_INLINE void ir_sccp_transform(ir_ctx *ctx, ir_insn *_values, ir_
 /* Iterative Optimizations */
 /***************************/
 
+/* Modification of some instruction may open new optimization oprtunities for other
+ * instructions that use this one.
+ *
+ * For example, let "a = ADD(x, y)" became "a = ADD(x, C1)". In case we also have
+ * "b = ADD(a, C2)" we may optimize it into "b = ADD(x, C1 + C2)" and then might
+ * also remove "a".
+ *
+ * This implementation supports only few optimization of combinations from ir_fold.h
+ *
+ * TODO: Think abput a more general solution ???
+ */
+static void ir_iter_add_related_uses(ir_ctx *ctx, ir_ref ref, ir_bitqueue *worklist)
+{
+	ir_insn *insn = &ctx->ir_base[ref];
+
+	if (insn->op == IR_ADD || insn->op == IR_SUB) {
+		ir_use_list *use_list = &ctx->use_lists[ref];
+
+		if (use_list->count == 1) {
+			ir_ref use = ctx->use_edges[use_list->refs];
+			ir_insn *use_insn = &ctx->ir_base[ref];
+
+			if (use_insn->op == IR_ADD || use_insn->op == IR_SUB) {
+				ir_bitqueue_add(worklist, use);
+			}
+		}
+	}
+}
+
 static void ir_iter_remove_insn(ir_ctx *ctx, ir_ref ref, ir_bitqueue *worklist)
 {
 	ir_ref j, n, *p;
@@ -1191,6 +1220,7 @@ void ir_iter_replace(ir_ctx *ctx, ir_ref ref, ir_ref new_ref, ir_bitqueue *workl
 			ir_insn_set_op(insn, i, new_ref);
 			/* schedule folding */
 			ir_bitqueue_add(worklist, use);
+			ir_iter_add_related_uses(ctx, use, worklist);
 		}
 	} else {
 		for (j = 0; j < n; j++, p++) {
