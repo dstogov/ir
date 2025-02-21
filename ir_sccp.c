@@ -3147,9 +3147,6 @@ remove_bitcast:
 				condition_ref = condition_insn->op1;
 				condition_insn = &ctx->ir_base[condition_ref];
 			}
-			if (insn->op2 != condition_ref) {
-				ir_iter_update_op(ctx, i, 2, condition_ref, worklist);
-			}
 			if (swap) {
 				if (insn->op == IR_IF) {
 					ir_use_list *use_list = &ctx->use_lists[i];
@@ -3172,6 +3169,10 @@ remove_bitcast:
 				} else {
 					insn->op = IR_GUARD;
 				}
+			}
+//			TODO: condition_ref = ir_check_dominating_predicates(ctx, insn->op1, condition_ref);
+			if (insn->op2 != condition_ref) {
+				ir_iter_update_op(ctx, i, 2, condition_ref, worklist);
 			}
 		}
 	}

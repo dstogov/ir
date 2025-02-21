@@ -2407,7 +2407,7 @@ void _ir_BEGIN(ir_ctx *ctx, ir_ref src)
 	}
 }
 
-ir_ref _ir_fold_condition(ir_ctx *ctx, ir_ref ref)
+static ir_ref _ir_fold_condition(ir_ctx *ctx, ir_ref ref)
 {
 	ir_insn *insn = &ctx->ir_base[ref];
 
@@ -2429,6 +2429,45 @@ ir_ref _ir_fold_condition(ir_ctx *ctx, ir_ref ref)
 	return ref;
 }
 
+IR_ALWAYS_INLINE ir_ref ir_check_dominating_predicates_i(ir_ctx *ctx, ir_ref ref, ir_ref condition, ir_ref limit)
+{
+	ir_insn *prev = NULL;
+	ir_insn *insn;
+
+	while (ref > limit) {
+		insn = &ctx->ir_base[ref];
+		if (insn->op == IR_GUARD_NOT) {
+			if (insn->op2 == condition) {
+				return IR_FALSE;
+			}
+		} else if (insn->op == IR_GUARD) {
+			if (insn->op2 == condition) {
+				return IR_TRUE;
+			}
+		} else if (insn->op == IR_IF) {
+			if (insn->op2 == condition) {
+				if (prev->op == IR_IF_TRUE) {
+					return IR_TRUE;
+				} else if (prev->op == IR_IF_FALSE) {
+					return IR_FALSE;
+				}
+			}
+		} else if (insn->op == IR_START || insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
+			break;
+		}
+		prev = insn;
+		ref = insn->op1;
+	}
+
+	return condition;
+}
+
+ir_ref ir_check_dominating_predicates(ir_ctx *ctx, ir_ref ref, ir_ref condition)
+{
+	IR_ASSERT(!IR_IS_CONST_REF(condition));
+	return ir_check_dominating_predicates_i(ctx, ref, condition, (condition < ref) ? condition : 1);
+}
+
 ir_ref _ir_IF(ir_ctx *ctx, ir_ref condition)
 {
 	ir_ref if_ref;
@@ -2444,38 +2483,7 @@ ir_ref _ir_IF(ir_ctx *ctx, ir_ref condition)
 	if (IR_IS_CONST_REF(condition)) {
 		condition = ir_ref_is_true(ctx, condition) ? IR_TRUE : IR_FALSE;
 	} else {
-		ir_insn *prev = NULL;
-		ir_ref ref = ctx->control;
-		ir_insn *insn;
-
-		while (ref > condition) {
-			insn = &ctx->ir_base[ref];
-			if (insn->op == IR_GUARD_NOT) {
-				if (insn->op2 == condition) {
-					condition = IR_FALSE;
-					break;
-				}
-			} else if (insn->op == IR_GUARD) {
-				if (insn->op2 == condition) {
-					condition = IR_TRUE;
-					break;
-				}
-			} else if (insn->op == IR_IF) {
-				if (insn->op2 == condition) {
-					if (prev->op == IR_IF_TRUE) {
-						condition = IR_TRUE;
-						break;
-					} else if (prev->op == IR_IF_FALSE) {
-						condition = IR_FALSE;
-						break;
-					}
-				}
-			} else if (insn->op == IR_START || insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
-				break;
-			}
-			prev = insn;
-			ref = insn->op1;
-		}
+		condition = ir_check_dominating_predicates_i(ctx, ctx->control, condition, condition);
 	}
 	if_ref = ir_emit2(ctx, IR_IF, ctx->control, condition);
 	ctx->control = IR_UNUSED;
@@ -2994,36 +3002,9 @@ void _ir_GUARD(ir_ctx *ctx, ir_ref condition, ir_ref addr)
 		}
 		condition = IR_FALSE;
 	} else if (EXPECTED(ctx->flags & IR_OPT_FOLDING)) {
-		ir_insn *prev = NULL;
-		ir_ref ref = ctx->control;
-		ir_insn *insn;
-
-		condition = _ir_fold_condition(ctx, condition);
-		while (ref > condition) {
-			insn = &ctx->ir_base[ref];
-			if (insn->op == IR_GUARD) {
-				if (insn->op2 == condition) {
-					return;
-				}
-			} else if (insn->op == IR_GUARD_NOT) {
-				if (insn->op2 == condition) {
-					condition = IR_FALSE;
-					break;
-				}
-			} else if (insn->op == IR_IF) {
-				if (insn->op2 == condition) {
-					if (prev->op == IR_IF_TRUE) {
-						return;
-					} else if (prev->op == IR_IF_FALSE) {
-						condition = IR_FALSE;
-						break;
-					}
-				}
-			} else if (insn->op == IR_START || insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
-				break;
-			}
-			prev = insn;
-			ref = insn->op1;
+		condition = ir_check_dominating_predicates_i(ctx, ctx->control, condition, condition);
+		if (condition == IR_TRUE) {
+			return;
 		}
 	}
 	if (ctx->snapshot_create) {
@@ -3041,36 +3022,9 @@ void _ir_GUARD_NOT(ir_ctx *ctx, ir_ref condition, ir_ref addr)
 		}
 		condition = IR_TRUE;
 	} else if (EXPECTED(ctx->flags & IR_OPT_FOLDING)) {
-		ir_insn *prev = NULL;
-		ir_ref ref = ctx->control;
-		ir_insn *insn;
-
-		condition = _ir_fold_condition(ctx, condition);
-		while (ref > condition) {
-			insn = &ctx->ir_base[ref];
-			if (insn->op == IR_GUARD_NOT) {
-				if (insn->op2 == condition) {
-					return;
-				}
-			} else if (insn->op == IR_GUARD) {
-				if (insn->op2 == condition) {
-					condition = IR_TRUE;
-					break;
-				}
-			} else if (insn->op == IR_IF) {
-				if (insn->op2 == condition) {
-					if (prev->op == IR_IF_TRUE) {
-						condition = IR_TRUE;
-						break;
-					} else if (prev->op == IR_IF_FALSE) {
-						return;
-					}
-				}
-			} else if (insn->op == IR_START || insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
-				break;
-			}
-			prev = insn;
-			ref = insn->op1;
+		condition = ir_check_dominating_predicates_i(ctx, ctx->control, condition, condition);
+		if (condition == IR_FALSE) {
+			return;
 		}
 	}
 	if (ctx->snapshot_create) {
