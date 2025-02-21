@@ -1812,9 +1812,6 @@ static ir_ref ir_ext_ref(ir_ctx *ctx, ir_ref var_ref, ir_ref src_ref, ir_op op, 
 	}
 
 	ref = ir_emit1(ctx, optx, src_ref);
-	ctx->use_lists = ir_mem_realloc(ctx->use_lists, ctx->insns_count * sizeof(ir_use_list));
-	ctx->use_lists[ref].count = 0;
-	ctx->use_lists[ref].refs = IR_UNUSED;
 	ir_use_list_add(ctx, ref, var_ref);
 	if (!IR_IS_CONST_REF(src_ref)) {
 		ir_use_list_replace_one(ctx, src_ref, var_ref, ref);
@@ -1894,6 +1891,7 @@ static bool ir_try_promote_ext(ir_ctx *ctx, ir_ref ext_ref, ir_insn *insn, ir_bi
 				} else {
 					ctx->ir_base[use].op1 = ir_ext_ref(ctx, use, use_insn->op1, op, type, worklist);
 				}
+				ir_bitqueue_add(worklist, use);
 			}
 			if (use_insn->op2 != ref) {
 				if (IR_IS_CONST_REF(use_insn->op2)
@@ -1902,6 +1900,7 @@ static bool ir_try_promote_ext(ir_ctx *ctx, ir_ref ext_ref, ir_insn *insn, ir_bi
 				} else {
 					ctx->ir_base[use].op2 = ir_ext_ref(ctx, use, use_insn->op2, op, type, worklist);
 				}
+				ir_bitqueue_add(worklist, use);
 			}
 		}
 	}
