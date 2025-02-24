@@ -3170,8 +3170,44 @@ remove_bitcast:
 					insn->op = IR_GUARD;
 				}
 			}
-//			TODO: condition_ref = ir_check_dominating_predicates(ctx, insn->op1, condition_ref);
-			if (insn->op2 != condition_ref) {
+			if (!IR_IS_CONST_REF(condition_ref)) {
+				condition_ref = ir_check_dominating_predicates(ctx, insn->op1, condition_ref);
+			}
+			if (IR_IS_CONST_REF(condition_ref)) {
+				/*
+				 *    |                        |
+				 *    IF(TRUE)             =>  END
+				 *    | \                      |
+				 *    |  +------+              |
+				 *    |         IF_TRUE        |        BEGIN(unreachable)
+				 *    IF_FALSE  |              BEGIN
+				 *    |                        |
+				 */
+				ir_ref if_true_ref, if_false_ref;
+				ir_insn *if_true, *if_false;
+
+				insn->optx = IR_OPTX(IR_END, IR_VOID, 1);
+				if (!IR_IS_CONST_REF(insn->op2)) {
+					ir_use_list_remove_one(ctx, insn->op2, i);
+				}
+				insn->op2 = IR_UNUSED;
+
+				ir_get_true_false_refs(ctx, i, &if_true_ref, &if_false_ref);
+				if_true = &ctx->ir_base[if_true_ref];
+				if_false = &ctx->ir_base[if_false_ref];
+				if_true->op = IR_BEGIN;
+				if_false->op = IR_BEGIN;
+				if (ir_ref_is_true(ctx, condition_ref)) {
+					if_false->op1 = IR_UNUSED;
+					ir_use_list_remove_one(ctx, i, if_false_ref);
+					ir_bitqueue_add(worklist, if_true_ref);
+				} else {
+					if_true->op1 = IR_UNUSED;
+					ir_use_list_remove_one(ctx, i, if_true_ref);
+					ir_bitqueue_add(worklist, if_false_ref);
+				}
+				ctx->flags2 &= ~IR_CFG_REACHABLE;
+			} else if (insn->op2 != condition_ref) {
 				ir_iter_update_op(ctx, i, 2, condition_ref, worklist);
 			}
 		}
