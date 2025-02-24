@@ -3170,7 +3170,7 @@ remove_bitcast:
 					insn->op = IR_GUARD;
 				}
 			}
-			if (!IR_IS_CONST_REF(condition_ref)) {
+			if (!IR_IS_CONST_REF(condition_ref) && ctx->use_lists[condition_ref].count > 1) {
 				condition_ref = ir_check_dominating_predicates(ctx, insn->op1, condition_ref);
 			}
 			if (IR_IS_CONST_REF(condition_ref)) {
