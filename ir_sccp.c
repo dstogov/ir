@@ -2903,7 +2903,7 @@ static bool ir_try_split_if_cmp(ir_ctx *ctx, ir_ref ref, ir_insn *insn, ir_bitqu
 	return 0;
 }
 
-static void ir_optimize_merge(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_bitqueue *worklist)
+static void ir_iter_optimize_merge(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_bitqueue *worklist)
 {
 	ir_use_list *use_list = &ctx->use_lists[merge_ref];
 
@@ -2945,6 +2945,171 @@ static void ir_optimize_merge(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_
 				ir_optimize_phi(ctx, merge_ref, merge, phi_ref, phi, worklist);
 			}
 		}
+	}
+}
+
+static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref condition, bool *swap)
+{
+	ir_insn *condition_insn = &ctx->ir_base[condition];
+
+	if (condition_insn->opt == IR_OPT(IR_NOT, IR_BOOL)) {
+		*swap = 1;
+		condition = condition_insn->op1;
+		condition_insn = &ctx->ir_base[condition];
+	}
+
+	if (condition_insn->op == IR_NE && IR_IS_CONST_REF(condition_insn->op2)) {
+		ir_insn *val_insn = &ctx->ir_base[condition_insn->op2];
+
+		if (IR_IS_TYPE_INT(val_insn->type) && val_insn->val.u64 == 0) {
+			condition = condition_insn->op1;
+			condition_insn = &ctx->ir_base[condition];
+		}
+	} else if (condition_insn->op == IR_EQ && IR_IS_CONST_REF(condition_insn->op2)) {
+		ir_insn *val_insn = &ctx->ir_base[condition_insn->op2];
+
+		if (condition_insn->op2 == IR_TRUE) {
+			condition = condition_insn->op1;
+			condition_insn = &ctx->ir_base[condition];
+		} else if (IR_IS_TYPE_INT(val_insn->type) && val_insn->val.u64 == 0) {
+			condition = condition_insn->op1;
+			condition_insn = &ctx->ir_base[condition];
+			*swap = !*swap;
+		}
+	}
+
+	while ((condition_insn->op == IR_BITCAST
+	  || condition_insn->op == IR_ZEXT
+	  || condition_insn->op == IR_SEXT)
+	 && ctx->use_lists[condition].count == 1) {
+		condition = condition_insn->op1;
+		condition_insn = &ctx->ir_base[condition];
+	}
+
+	if (!IR_IS_CONST_REF(condition) && ctx->use_lists[condition].count > 1) {
+		condition = ir_check_dominating_predicates(ctx, control, condition);
+	}
+
+	return condition;
+}
+
+static void ir_iter_optimize_if(ir_ctx *ctx, ir_ref ref, ir_insn *insn, ir_bitqueue *worklist)
+{
+	bool swap = 0;
+	ir_ref condition = ir_iter_optimize_condition(ctx, insn->op1, insn->op2, &swap);
+
+	if (swap) {
+		ir_use_list *use_list = &ctx->use_lists[ref];
+		ir_ref *p, use;
+
+		IR_ASSERT(use_list->count == 2);
+		p = ctx->use_edges + use_list->refs;
+		use = *p;
+		if (ctx->ir_base[use].op == IR_IF_TRUE) {
+			ctx->ir_base[use].op = IR_IF_FALSE;
+			use = *(p+1);
+			ctx->ir_base[use].op = IR_IF_TRUE;
+		} else {
+			ctx->ir_base[use].op = IR_IF_TRUE;
+			use = *(p+1);
+			ctx->ir_base[use].op = IR_IF_FALSE;
+		}
+	}
+
+	if (IR_IS_CONST_REF(condition)) {
+		/*
+		 *    |                        |
+		 *    IF(TRUE)             =>  END
+		 *    | \                      |
+		 *    |  +------+              |
+		 *    |         IF_TRUE        |        BEGIN(unreachable)
+		 *    IF_FALSE  |              BEGIN
+		 *    |                        |
+		 */
+		ir_ref if_true_ref, if_false_ref;
+		ir_insn *if_true, *if_false;
+
+		insn->optx = IR_OPTX(IR_END, IR_VOID, 1);
+		if (!IR_IS_CONST_REF(insn->op2)) {
+			ir_use_list_remove_one(ctx, insn->op2, ref);
+		}
+		insn->op2 = IR_UNUSED;
+
+		ir_get_true_false_refs(ctx, ref, &if_true_ref, &if_false_ref);
+		if_true = &ctx->ir_base[if_true_ref];
+		if_false = &ctx->ir_base[if_false_ref];
+		if_true->op = IR_BEGIN;
+		if_false->op = IR_BEGIN;
+		if (ir_ref_is_true(ctx, condition)) {
+			if_false->op1 = IR_UNUSED;
+			ir_use_list_remove_one(ctx, ref, if_false_ref);
+			ir_bitqueue_add(worklist, if_true_ref);
+		} else {
+			if_true->op1 = IR_UNUSED;
+			ir_use_list_remove_one(ctx, ref, if_true_ref);
+			ir_bitqueue_add(worklist, if_false_ref);
+		}
+		ctx->flags2 &= ~IR_CFG_REACHABLE;
+	} else if (insn->op2 != condition) {
+		ir_iter_update_op(ctx, ref, 2, condition, worklist);
+	}
+}
+
+static void ir_iter_optimize_guard(ir_ctx *ctx, ir_ref ref, ir_insn *insn, ir_bitqueue *worklist)
+{
+	bool swap;
+	ir_ref condition = ir_iter_optimize_condition(ctx, insn->op1, insn->op2, &swap);
+
+	if (swap) {
+		if (insn->op == IR_GUARD) {
+			insn->op = IR_GUARD_NOT;
+		} else {
+			insn->op = IR_GUARD;
+		}
+	}
+
+	if (IR_IS_CONST_REF(condition)) {
+		if (insn->op == IR_GUARD) {
+			if (ir_ref_is_true(ctx, condition)) {
+				ir_ref prev, next;
+
+remove_guard:
+				prev = insn->op1;
+				next = ir_next_control(ctx, ref);
+				ctx->ir_base[next].op1 = prev;
+				ir_use_list_remove_one(ctx, ref, next);
+				ir_use_list_replace_one(ctx, prev, ref, next);
+				insn->op1 = IR_UNUSED;
+
+				if (!IR_IS_CONST_REF(insn->op2)) {
+					ir_use_list_remove_one(ctx, insn->op2, ref);
+					if (ir_is_dead(ctx, insn->op2)) {
+						/* schedule DCE */
+						ir_bitqueue_add(worklist, insn->op2);
+					}
+				}
+
+				if (insn->op3) {
+					/* SNAPSHOT */
+					ir_iter_remove_insn(ctx, insn->op3, worklist);
+				}
+
+				MAKE_NOP(insn);
+				return;
+			} else {
+				condition = IR_FALSE;
+			}
+		} else {
+			if (ir_ref_is_true(ctx, condition)) {
+				condition = IR_TRUE;
+			} else {
+				goto remove_guard;
+			}
+		}
+	}
+
+	if (insn->op2 != condition) {
+		ir_iter_update_op(ctx, ref, 2, condition, worklist);
 	}
 }
 
@@ -3023,7 +3188,7 @@ folding:
 					ir_merge_blocks(ctx, insn->op1, i, worklist);
 				}
 			} else if (insn->op == IR_MERGE) {
-				ir_optimize_merge(ctx, i, insn, worklist);
+				ir_iter_optimize_merge(ctx, i, insn, worklist);
 			}
 		} else if (ir_is_dead_load(ctx, i)) {
 			ir_ref next;
@@ -3111,142 +3276,10 @@ remove_bitcast:
 			} else {
 				goto remove_bitcast;
 			}
-		} else if (insn->op == IR_IF || insn->op == IR_GUARD || insn->op == IR_GUARD_NOT) {
-			ir_ref  condition_ref = insn->op2;
-			ir_insn *condition_insn = &ctx->ir_base[condition_ref];
-			bool swap = 0;
-
-			if (condition_insn->opt == IR_OPT(IR_NOT, IR_BOOL)) {
-				swap = 1;
-				condition_ref = condition_insn->op1;
-				condition_insn = &ctx->ir_base[condition_ref];
-			}
-			if (condition_insn->op == IR_NE && IR_IS_CONST_REF(condition_insn->op2)) {
-				ir_insn *val_insn = &ctx->ir_base[condition_insn->op2];
-
-				if (IR_IS_TYPE_INT(val_insn->type) && val_insn->val.u64 == 0) {
-					condition_ref = condition_insn->op1;
-					condition_insn = &ctx->ir_base[condition_ref];
-				}
-			} else if (condition_insn->op == IR_EQ && IR_IS_CONST_REF(condition_insn->op2)) {
-				ir_insn *val_insn = &ctx->ir_base[condition_insn->op2];
-
-				if (condition_insn->op2 == IR_TRUE) {
-					condition_ref = condition_insn->op1;
-					condition_insn = &ctx->ir_base[condition_ref];
-				} else if (IR_IS_TYPE_INT(val_insn->type) && val_insn->val.u64 == 0) {
-					condition_ref = condition_insn->op1;
-					condition_insn = &ctx->ir_base[condition_ref];
-					swap = !swap;
-				}
-			}
-			while ((condition_insn->op == IR_BITCAST
-			  || condition_insn->op == IR_ZEXT
-			  || condition_insn->op == IR_SEXT)
-			 && ctx->use_lists[condition_ref].count == 1) {
-				condition_ref = condition_insn->op1;
-				condition_insn = &ctx->ir_base[condition_ref];
-			}
-			if (swap) {
-				if (insn->op == IR_IF) {
-					ir_use_list *use_list = &ctx->use_lists[i];
-					ir_ref *p, use;
-
-					IR_ASSERT(use_list->count == 2);
-					p = ctx->use_edges + use_list->refs;
-					use = *p;
-					if (ctx->ir_base[use].op == IR_IF_TRUE) {
-						ctx->ir_base[use].op = IR_IF_FALSE;
-						use = *(p+1);
-						ctx->ir_base[use].op = IR_IF_TRUE;
-					} else {
-						ctx->ir_base[use].op = IR_IF_TRUE;
-						use = *(p+1);
-						ctx->ir_base[use].op = IR_IF_FALSE;
-					}
-				} else if (insn->op == IR_GUARD) {
-					insn->op = IR_GUARD_NOT;
-				} else {
-					insn->op = IR_GUARD;
-				}
-			}
-			if (!IR_IS_CONST_REF(condition_ref) && ctx->use_lists[condition_ref].count > 1) {
-				condition_ref = ir_check_dominating_predicates(ctx, insn->op1, condition_ref);
-			}
-			if (IR_IS_CONST_REF(condition_ref)) {
-				if (insn->op == IR_IF) {
-					/*
-					 *    |                        |
-					 *    IF(TRUE)             =>  END
-					 *    | \                      |
-					 *    |  +------+              |
-					 *    |         IF_TRUE        |        BEGIN(unreachable)
-					 *    IF_FALSE  |              BEGIN
-					 *    |                        |
-					 */
-					ir_ref if_true_ref, if_false_ref;
-					ir_insn *if_true, *if_false;
-
-					insn->optx = IR_OPTX(IR_END, IR_VOID, 1);
-					if (!IR_IS_CONST_REF(insn->op2)) {
-						ir_use_list_remove_one(ctx, insn->op2, i);
-					}
-					insn->op2 = IR_UNUSED;
-
-					ir_get_true_false_refs(ctx, i, &if_true_ref, &if_false_ref);
-					if_true = &ctx->ir_base[if_true_ref];
-					if_false = &ctx->ir_base[if_false_ref];
-					if_true->op = IR_BEGIN;
-					if_false->op = IR_BEGIN;
-					if (ir_ref_is_true(ctx, condition_ref)) {
-						if_false->op1 = IR_UNUSED;
-						ir_use_list_remove_one(ctx, i, if_false_ref);
-						ir_bitqueue_add(worklist, if_true_ref);
-					} else {
-						if_true->op1 = IR_UNUSED;
-							ir_use_list_remove_one(ctx, i, if_true_ref);
-						ir_bitqueue_add(worklist, if_false_ref);
-					}
-					ctx->flags2 &= ~IR_CFG_REACHABLE;
-				} else if (insn->op == IR_GUARD) {
-					if (ir_ref_is_true(ctx, condition_ref)) {
-						ir_ref prev, next;
-
-remove_guard:
-						prev = insn->op1;
-						next = ir_next_control(ctx, i);
-						ctx->ir_base[next].op1 = prev;
-						ir_use_list_remove_one(ctx, i, next);
-						ir_use_list_replace_one(ctx, prev, i, next);
-						insn->op1 = IR_UNUSED;
-
-						if (!IR_IS_CONST_REF(insn->op2)) {
-							ir_use_list_remove_one(ctx, insn->op2, i);
-							if (ir_is_dead(ctx, insn->op2)) {
-								/* schedule DCE */
-								ir_bitqueue_add(worklist, insn->op2);
-							}
-						}
-
-						if (insn->op3) {
-							/* SNAPSHOT */
-							ir_iter_remove_insn(ctx, insn->op3, worklist);
-						}
-
-						MAKE_NOP(insn);
-					} else {
-						condition_ref = IR_FALSE;
-					}
-				} else {
-					if (ir_ref_is_true(ctx, condition_ref)) {
-						condition_ref = IR_TRUE;
-					} else {
-						goto remove_guard;
-					}
-				}
-			} else if (insn->op2 != condition_ref) {
-				ir_iter_update_op(ctx, i, 2, condition_ref, worklist);
-			}
+		} else if (insn->op == IR_IF) {
+			ir_iter_optimize_if(ctx, i, insn, worklist);
+		} else if (insn->op == IR_GUARD || insn->op == IR_GUARD_NOT) {
+			ir_iter_optimize_guard(ctx, i, insn, worklist);
 		}
 	}
 }
