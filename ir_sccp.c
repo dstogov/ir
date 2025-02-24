@@ -2182,7 +2182,7 @@ static bool ir_optimize_phi(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_re
 			ir_ref root_ref = start1->op1;
 			ir_insn *root = &ctx->ir_base[root_ref];
 
-			if (root->op == IR_IF && ctx->use_lists[root->op2].count == 1) {
+			if (root->op == IR_IF && !IR_IS_CONST_REF(root->op2) && ctx->use_lists[root->op2].count == 1) {
 				ir_ref cond_ref = root->op2;
 				ir_insn *cond = &ctx->ir_base[cond_ref];
 				ir_type type = insn->type;
