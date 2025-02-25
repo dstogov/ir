@@ -402,7 +402,7 @@ int ir_mem2ssa(ir_ctx *ctx)
 
 	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; bb++, b++) {
 		ir_ref ref, next, start = bb->start;
-		ir_ref i, n = ctx->use_lists[start].count;
+		ir_ref i, j, n = ctx->use_lists[start].count;
 		ir_insn *insn;
 
 		if (ssa_vars
@@ -414,13 +414,14 @@ int ir_mem2ssa(ir_ctx *ctx)
 		}
 
 		if (n > 1) { /* BB start node is used at least next control or BB end node */
-			for (i = 0; i < ctx->use_lists[start].count;) {
-				ir_ref use = ctx->use_edges[ctx->use_lists[start].refs + i];
+			ir_use_list *use_list = &ctx->use_lists[start];
+
+			for (i = 0, j = 0; i < use_list->count; i++) {
+				ir_ref use = ctx->use_edges[use_list->refs + i];
 
 				insn = &ctx->ir_base[use];
 				if (insn->op == IR_VAR) {
 					if (ctx->use_lists[use].count == 0) {
-						ir_use_list_remove_one(ctx, start, use);
 						MAKE_NOP(insn);
 						continue;
 					} else if (ir_mem2ssa_may_convert_var(ctx, use, insn)) {
@@ -438,15 +439,25 @@ int ir_mem2ssa(ir_ctx *ctx)
 						ir_mem2ssa_convert(ctx, ssa_vars, &queue, defs, defs + len, &iter_worklist, use, IR_UNUSED, insn->type);
 
 						insn = &ctx->ir_base[use];
-						ir_use_list_remove_one(ctx, start, use);
 						MAKE_NOP(insn);
 						CLEAR_USES(use);
 						ctx->flags2 |= IR_MEM2SSA_VARS;
+
+						use_list = &ctx->use_lists[start]; /* reload */
 						continue;
 					}
 				}
-				i++;
+
+				/* compact use list */
+				if (i != j) {
+					ctx->use_edges[use_list->refs + j] = use;
+				}
+				j++;
 			}
+			for (i = j; i < use_list->count; i++) {
+				ctx->use_edges[use_list->refs + i] = IR_UNUSED; /* clenu-op the removed tail */
+			}
+			use_list->count = j;
 		}
 
 		ref = bb->end;
