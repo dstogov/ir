@@ -667,7 +667,7 @@ static IR_NEVER_INLINE void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bi
 
 					use_list = &ctx->use_lists[i];
 					n = use_list->count;
-					for (j = 0, p = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
+					for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
 						use = *p;
 						IR_ASSERT(use > 0);
 						use_insn = &ctx->ir_base[use];
@@ -1048,7 +1048,7 @@ static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values
 		n++;
 		use_list = &ctx->use_lists[ref];
 		if (use_list->count > 1) {
-			for (k = 0, p = &ctx->use_edges[use_list->refs]; k < use_list->count; k++, p++) {
+			for (k = use_list->count, p = &ctx->use_edges[use_list->refs]; k > 0; p++, k--) {
 				use = *p;
 				use_insn = &ctx->ir_base[use];
 				if (use_insn->op == IR_PHI) {

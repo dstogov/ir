@@ -359,7 +359,7 @@ static void ir_remove_merge_input(ir_ctx *ctx, ir_ref merge, ir_ref from)
 		use_list = &ctx->use_lists[merge];
 		if (use_list->count > 1) {
 			n++;
-			for (k = 0, p = q = &ctx->use_edges[use_list->refs]; k < use_list->count; p++, k++) {
+			for (k = use_list->count, p = q = &ctx->use_edges[use_list->refs]; k > 0; p++, k--) {
 				use = *p;
 				use_insn = &ctx->ir_base[use];
 				if (use_insn->op == IR_PHI) {
@@ -389,11 +389,13 @@ static void ir_remove_merge_input(ir_ctx *ctx, ir_ref merge, ir_ref from)
 				q++;
 			}
 
-			k -= (p - q);
-			for (i = k; i < use_list->count; q++, i++) {
-				*q = IR_UNUSED; /* clenu-op the removed tail */
+			if (p != q) {
+				use_list->count -= (p - q);
+				do {
+					*q = IR_UNUSED; /* clenu-op the removed tail */
+					q++;
+				} while (p != q);
 			}
-			use_list->count = k;
 		}
 	} else {
 		insn->inputs_count = i;
@@ -401,7 +403,7 @@ static void ir_remove_merge_input(ir_ctx *ctx, ir_ref merge, ir_ref from)
 		use_list = &ctx->use_lists[merge];
 		if (use_list->count > 1) {
 			n++;
-			for (k = 0, p = &ctx->use_edges[use_list->refs]; k < use_list->count; k++, p++) {
+			for (k = use_list->count, p = &ctx->use_edges[use_list->refs]; k > 0; p++, k--) {
 				use = *p;
 				use_insn = &ctx->ir_base[use];
 				if (use_insn->op == IR_PHI) {

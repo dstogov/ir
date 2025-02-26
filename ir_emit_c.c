@@ -484,10 +484,10 @@ static void ir_emit_overflow_math(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, 
 {
 	ir_type type = insn->type;
 	ir_use_list *use_list = &ctx->use_lists[def];
-	ir_ref i, n, *p, overflow = IR_UNUSED;
+	ir_ref n, *p, overflow = IR_UNUSED;
 
 	n = use_list->count;
-	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
+	for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
 		ir_insn *use_insn = &ctx->ir_base[*p];
 		if (use_insn->op == IR_OVERFLOW) {
 			overflow = *p;
@@ -736,7 +736,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	use_list = &ctx->use_lists[1];
 	n = use_list->count;
 	first = 1;
-	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
+	for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
 		insn = &ctx->ir_base[*p];
 		if (insn->op == IR_PARAM) {
 			if (first) {

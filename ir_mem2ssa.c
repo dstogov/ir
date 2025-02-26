@@ -454,10 +454,13 @@ int ir_mem2ssa(ir_ctx *ctx)
 				}
 				j++;
 			}
-			for (i = j; i < use_list->count; i++) {
-				ctx->use_edges[use_list->refs + i] = IR_UNUSED; /* clenu-op the removed tail */
+			if (i != j) {
+				use_list->count = j;
+				do {
+					ctx->use_edges[use_list->refs + j] = IR_UNUSED; /* clenu-op the removed tail */
+					j++;
+				} while (j != i);
 			}
-			use_list->count = j;
 		}
 
 		ref = bb->end;

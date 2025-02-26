@@ -851,11 +851,11 @@ static bool may_be_used_by_phi(ir_ctx *ctx, ir_block *bb)
 		bb = &ctx->cfg_blocks[ctx->cfg_edges[bb->successors]];
 		if (bb->predecessors_count > 1) {
 			ir_use_list *use_list = &ctx->use_lists[bb->start];
-			ir_ref i, n, *p;
+			ir_ref n, *p;
 
 			n = use_list->count;
 			if (n > 1) {
-				for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
+				for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
 					if (ctx->ir_base[*p].op == IR_PHI) {
 						return 1;
 					}
@@ -891,7 +891,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	use_list = &ctx->use_lists[1];
 	n = use_list->count;
 	first = 1;
-	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
+	for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
 		use = *p;
 		insn = &ctx->ir_base[use];
 		if (insn->op == IR_PARAM) {
