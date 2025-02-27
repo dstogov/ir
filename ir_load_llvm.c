@@ -1862,7 +1862,13 @@ next:
 		opcode = LLVMGetInstructionOpcode(insn);
 		if (opcode == LLVMBr || opcode == LLVMSwitch) {
 			n = LLVMGetNumSuccessors(insn);
-			for (j = 0; j < n; j++) {
+			/*
+			 * LLVM BB Successors are not aspecially ordered, but processing them in reverse order
+			 * leads to the better result (closer to the original and keeping loop blocks together).
+			 */
+			j = n;
+			while (j > 0) {
+				j--;
 				succ = ir_addrtab_find(&bb_hash, (uintptr_t)LLVMGetSuccessor(insn, j));
 				IR_ASSERT(succ < bb_count);
 				if (ir_worklist_push(&worklist, succ)) {
