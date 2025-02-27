@@ -1715,6 +1715,7 @@ static bool ir_may_promote_i2i(ir_ctx *ctx, ir_type type, ir_ref ref)
 			case IR_OR:
 			case IR_AND:
 			case IR_XOR:
+			case IR_SHL:
 				return ctx->use_lists[ref].count == 1 &&
 					ir_may_promote_i2i(ctx, type, insn->op1) &&
 					ir_may_promote_i2i(ctx, type, insn->op2);
@@ -1773,6 +1774,7 @@ static ir_ref ir_promote_i2i(ir_ctx *ctx, ir_type type, ir_ref ref, ir_ref use)
 			case IR_OR:
 			case IR_AND:
 			case IR_XOR:
+			case IR_SHL:
 				if (insn->op1 == insn->op2) {
 					insn->op2 = insn->op1 = ir_promote_i2i(ctx, type, insn->op1, ref);
 				} else {
