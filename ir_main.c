@@ -57,7 +57,7 @@ static void help(const char *cmd)
 #endif
 		"Options:\n"
 		"  -O[012]                    - optimization level (default: 2)\n"
-		"  -fno-inline                - disable function inlining\n"
+		"  -f[no-]inline              - disable/enable function inlining\n"
 		"  -fno-mem2ssa               - disable mem2ssa\n"
 		"  -S                         - dump final target assembler code\n"
 		"  --run ...                  - run the main() function of generated code\n"
@@ -1068,6 +1068,7 @@ int main(int argc, char **argv)
 	FILE *f;
 	bool emit_c = 0, emit_llvm = 0, dump_size = 0, dump_time = 0, dump_asm = 0, run = 0, gdb = 1;
 	bool disable_inline = 0;
+	bool force_inline = 0;
 	bool disable_mem2ssa = 0;
 	uint32_t save_flags = 0;
 	uint32_t dump = 0;
@@ -1221,6 +1222,8 @@ int main(int argc, char **argv)
 			flags |= IR_FASTCALL_FUNC;
 		} else if (strcmp(argv[i], "-fno-inline") == 0) {
 			disable_inline = 1;
+		} else if (strcmp(argv[i], "-finline") == 0) {
+			force_inline = 1;
 		} else if (strcmp(argv[i], "-fno-mem2ssa") == 0) {
 			disable_mem2ssa = 1;
 #ifdef IR_DEBUG
@@ -1321,7 +1324,7 @@ int main(int argc, char **argv)
 	if (opt_level > 0) {
 		flags |= IR_OPT_FOLDING | IR_OPT_CFG | IR_OPT_CODEGEN;
 	}
-	if (opt_level > 1 && !disable_inline) {
+	if ((opt_level > 1 && !disable_inline) || force_inline) {
 		flags |= IR_OPT_INLINE;
 	}
 	if (opt_level > 0 && !disable_mem2ssa) {
