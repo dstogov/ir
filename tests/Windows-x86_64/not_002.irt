@@ -13,6 +13,6 @@ Windows-x86_64
 }
 --EXPECT--
 test:
-	testb %cl, %cl
-	sete %al
+	movb %cl, %al
+	xorb $1, %al
 	retq

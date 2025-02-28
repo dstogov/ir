@@ -13,6 +13,6 @@ x86_64
 }
 --EXPECT--
 test:
-	testb %dil, %dil
-	sete %al
+	movb %dil, %al
+	xorb $1, %al
 	retq
