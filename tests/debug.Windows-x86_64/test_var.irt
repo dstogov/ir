@@ -111,7 +111,6 @@ test:
 	addq $0x40, %rsp
 	retq
 .L2:
-	movl 0x20(%rsp), %eax
 	addq $0x40, %rsp
 	retq
 .rodata
