@@ -12,6 +12,7 @@
 
 #include "ir.h"
 #include "ir_private.h"
+#include "ir_builder.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,6 +37,9 @@ typedef struct _ir_parser_ctx {
 static ir_strtab type_tab;
 static ir_strtab op_tab;
 
+#define IR_UNRESOLVED_MASK            0xc0000000
+#define IR_UNRESOLVED_LIST_END        ((ir_ref)IR_UNRESOLVED_MASK)
+
 #define IR_IS_UNRESOLVED(ref) \
 	((ref) < (ir_ref)0xc0000000)
 #define IR_ENCODE_UNRESOLVED_REF(ref, op) \
@@ -53,7 +57,7 @@ static ir_ref ir_use_var(ir_parser_ctx *p, uint32_t n, const char *str, size_t l
 	if (!ref) {
 		p->undef_count++;
 		/* create a linked list of unresolved references with header in "var_tab" */
-		ref = IR_UNUSED; /* list terminator */
+		ref = IR_UNRESOLVED_LIST_END; /* list terminator */
 		ir_strtab_lookup(&p->var_tab, str, len32, IR_ENCODE_UNRESOLVED_REF(p->curr_ref, n));
 	} else if (IR_IS_UNRESOLVED(ref)) {
 		/* keep the linked list of unresolved references with header in "var_tab" */
@@ -72,13 +76,14 @@ static void ir_define_var(ir_parser_ctx *p, const char *str, size_t len, ir_ref 
 	old_ref = ir_strtab_lookup(&p->var_tab, str, len32, ref);
 	if (ref != old_ref) {
 		if (IR_IS_UNRESOLVED(old_ref)) {
+			IR_ASSERT(old_ref != IR_UNRESOLVED_LIST_END);
 			p->undef_count--;
 			/* update the linked list of unresolved references */
 			do {
 				ir_ref *ptr = ((ir_ref*)(p->ctx->ir_base)) + IR_DECODE_UNRESOLVED_REF(old_ref);
 				old_ref = *ptr;
 				*ptr = ref;
-			} while (old_ref != IR_UNUSED);
+			} while (old_ref != IR_UNRESOLVED_LIST_END);
 			ir_strtab_update(&p->var_tab, str, len32, ref);
 		} else {
 			fprintf(stderr, "ERROR: Redefined variable `%.*s` on line %d\n", (int)len32, str, yy_line);
@@ -1402,6 +1407,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 	ir_ref op2 = IR_UNUSED;
 	ir_ref op3 = IR_UNUSED;
 	ir_ref ref = IR_UNUSED;
+	ir_ref ref2 = IR_UNUSED;
 	ir_val val;
 	ir_val count;
 	int32_t n;
@@ -1512,7 +1518,7 @@ _yy_state_88:
 				if (op == IR_PHI || op == IR_SNAPSHOT) count.i32++;
 				if (op == IR_CALL || op == IR_TAILCALL) count.i32+=2;
 				if (count.i32 < 0 || count.i32 > 255) yy_error("bad number of operands");
-				ref = ir_emit_N(p->ctx, IR_OPT(op, t), count.i32);
+				ref = ref2 = ir_emit_N(p->ctx, IR_OPT(op, t), count.i32);
 				if (sym == YY__LPAREN) {
 					sym = get_sym();
 					if (YY_IN_SET(sym, (YY_ID,YY_STRING,YY_DECNUMBER,YY_NULL,YY_FUNC), "\000\000\001\142\004")) {
@@ -1563,6 +1569,67 @@ _yy_state_88:
 				 && !IR_IS_UNRESOLVED(op2)
 				 && !IR_IS_UNRESOLVED(op3)) {
 					ref = ir_fold(p->ctx, IR_OPT(op, t), op1, op2, op3);
+				/* Folding for control and memory instructions */
+#if 0
+				} else if (op == IR_BEGIN
+				 && !IR_IS_UNRESOLVED(op1)) {
+					p->ctx->control = IR_UNUSED;
+					_ir_BEGIN(p->ctx, op1);
+					ref = p->ctx->control;
+					p->ctx->control = IR_UNUSED;
+#endif
+				} else if (op == IR_IF
+				 && !IR_IS_UNRESOLVED(op1)
+				 && !IR_IS_UNRESOLVED(op2)) {
+					p->ctx->control = op1;
+					ref = _ir_IF(p->ctx, op2);
+					p->ctx->control = IR_UNUSED;
+				} else if (op == IR_GUARD
+				 && !IR_IS_UNRESOLVED(op1)
+				 && !IR_IS_UNRESOLVED(op2)
+				 && !IR_IS_UNRESOLVED(op3)) {
+					p->ctx->control = op1;
+					_ir_GUARD(p->ctx, op2, op3);
+					ref = p->ctx->control;
+					p->ctx->control = IR_UNUSED;
+				} else if (op == IR_GUARD_NOT
+				 && !IR_IS_UNRESOLVED(op1)
+				 && !IR_IS_UNRESOLVED(op2)
+				 && !IR_IS_UNRESOLVED(op3)) {
+					p->ctx->control = op1;
+					_ir_GUARD_NOT(p->ctx, op2, op3);
+					ref = p->ctx->control;
+					p->ctx->control = IR_UNUSED;
+				} else if (op == IR_VLOAD
+				 && !IR_IS_UNRESOLVED(op1)
+				 && !IR_IS_UNRESOLVED(op2)) {
+					p->ctx->control = op1;
+					ref = _ir_VLOAD(p->ctx, t, op2);
+					ref2 = p->ctx->control;
+					p->ctx->control = IR_UNUSED;
+				} else if (op == IR_VSTORE
+				 && !IR_IS_UNRESOLVED(op1)
+				 && !IR_IS_UNRESOLVED(op2)
+				 && !IR_IS_UNRESOLVED(op3)) {
+					p->ctx->control = op1;
+					_ir_VSTORE(p->ctx, op2, op3);
+					ref = p->ctx->control;
+					p->ctx->control = IR_UNUSED;
+				} else if (op == IR_LOAD
+				 && !IR_IS_UNRESOLVED(op1)
+				 && !IR_IS_UNRESOLVED(op2)) {
+					p->ctx->control = op1;
+					ref = _ir_LOAD(p->ctx, t, op2);
+					ref2 = p->ctx->control;
+					p->ctx->control = IR_UNUSED;
+				} else if (op == IR_STORE
+				 && !IR_IS_UNRESOLVED(op1)
+				 && !IR_IS_UNRESOLVED(op2)
+				 && !IR_IS_UNRESOLVED(op3)) {
+					p->ctx->control = op1;
+					_ir_STORE(p->ctx, op2, op3);
+					ref = p->ctx->control;
+					p->ctx->control = IR_UNUSED;
 				} else {
 					uint32_t opt;
 
@@ -1571,7 +1638,7 @@ _yy_state_88:
 					} else {
 						opt = IR_OPTX(op, t, n);
 					}
-					ref = ir_emit(p->ctx, opt, op1, op2, op3);
+					ref = ref2 = ir_emit(p->ctx, opt, op1, op2, op3);
 				}
 			} else {
 				yy_error_sym("unexpected", sym);
@@ -1581,7 +1648,7 @@ _yy_state_88:
 			yy_error_sym("unexpected", sym);
 	}
 	ir_define_var(p, str, len, ref);
-	if (str2) ir_define_var(p, str2, len2, ref);
+	if (str2) ir_define_var(p, str2, len2, ref2);
 	return sym;
 }
 

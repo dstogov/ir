@@ -96,36 +96,30 @@ test:
 	str d2, [sp, #0x28]
 	fmul d0, d0, d0
 	str d0, [sp, #0x30]
-	fmul d0, d1, d1
-	str d0, [sp, #0x38]
-	ldr d0, [sp, #0x30]
-	ldr d1, [sp, #0x38]
-	fsub d0, d0, d1
-	ldr d1, [sp]
-	fadd d0, d1, d0
-	str d0, [sp, #0x18]
-	ldr d0, [sp, #0x28]
-	fadd d0, d0, d0
-	ldr d1, [sp, #8]
-	fadd d0, d1, d0
-	str d0, [sp, #0x10]
-	ldr d0, [sp, #0x38]
-	ldr d1, [sp, #0x30]
+	fmul d1, d1, d1
+	str d1, [sp, #0x38]
+	fsub d3, d0, d1
+	ldr d4, [sp]
+	fadd d3, d4, d3
+	str d3, [sp, #0x18]
+	fadd d2, d2, d2
+	ldr d3, [sp, #8]
+	fadd d2, d3, d2
+	str d2, [sp, #0x10]
 	fadd d0, d1, d0
 	ldr d1, .L4
 	fcmp d0, d1
 	b.gt .L2
-	ldr w0, [sp, #0x20]
 	cmp w0, #0x3e8
 	b.le .L1
 	mov w0, wzr
 	add sp, sp, #0x40
 	ret
 .L2:
-	ldr w0, [sp, #0x20]
 	add sp, sp, #0x40
 	ret
 .rodata
+	.db 0x1f, 0x20, 0x03, 0xd5
 .L3:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f
 .L4:
