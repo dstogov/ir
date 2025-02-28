@@ -2954,6 +2954,14 @@ static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref con
 {
 	ir_insn *condition_insn = &ctx->ir_base[condition];
 
+	while ((condition_insn->op == IR_BITCAST
+	  || condition_insn->op == IR_ZEXT
+	  || condition_insn->op == IR_SEXT)
+	 && ctx->use_lists[condition].count == 1) {
+		condition = condition_insn->op1;
+		condition_insn = &ctx->ir_base[condition];
+	}
+
 	if (condition_insn->opt == IR_OPT(IR_NOT, IR_BOOL)) {
 		*swap = 1;
 		condition = condition_insn->op1;
