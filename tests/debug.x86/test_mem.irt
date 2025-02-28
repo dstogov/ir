@@ -102,17 +102,15 @@ test:
 	movsd %xmm0, 0x2c(%esp)
 	mulsd %xmm1, %xmm1
 	movsd %xmm1, 0x34(%esp)
-	movsd 0x2c(%esp), %xmm0
-	subsd 0x34(%esp), %xmm0
-	addsd (%esp), %xmm0
-	movsd %xmm0, 0x18(%esp)
-	movsd 0x24(%esp), %xmm0
-	addsd %xmm0, %xmm0
-	addsd 8(%esp), %xmm0
-	movsd %xmm0, 0x10(%esp)
-	movsd 0x2c(%esp), %xmm0
-	addsd 0x34(%esp), %xmm0
-	ucomisd .L4, %xmm0
+	movapd %xmm0, %xmm3
+	subsd %xmm1, %xmm3
+	addsd (%esp), %xmm3
+	movsd %xmm3, 0x18(%esp)
+	addsd %xmm2, %xmm2
+	addsd 8(%esp), %xmm2
+	movsd %xmm2, 0x10(%esp)
+	addsd %xmm0, %xmm1
+	ucomisd .L4, %xmm1
 	ja .L2
 	cmpl $0x3e8, 0x20(%esp)
 	jle .L1
@@ -124,7 +122,7 @@ test:
 	addl $0x3c, %esp
 	retl
 .rodata
-	.db 0x90, 0x90, 0x90, 0x90
+	.db 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
 .L3:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f
 .L4:
