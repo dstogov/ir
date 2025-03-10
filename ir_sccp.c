@@ -1690,9 +1690,10 @@ static ir_ref ir_promote_f2d(ir_ctx *ctx, ir_ref ref, ir_ref use)
 	return ref;
 }
 
-static bool ir_may_promote_i2i(ir_ctx *ctx, ir_type type, ir_ref ref)
+static bool ir_may_promote_trunc(ir_ctx *ctx, ir_type type, ir_ref ref)
 {
 	ir_insn *insn = &ctx->ir_base[ref];
+	ir_ref *p, n, input;
 
 	if (IR_IS_CONST_REF(ref)) {
 		return !IR_IS_SYM_CONST(insn->op);
@@ -1700,16 +1701,16 @@ static bool ir_may_promote_i2i(ir_ctx *ctx, ir_type type, ir_ref ref)
 		switch (insn->op) {
 			case IR_ZEXT:
 			case IR_SEXT:
-				return ctx->ir_base[insn->op1].type == type;
+			case IR_TRUNC:
+				return ctx->ir_base[insn->op1].type == type || ctx->use_lists[ref].count == 1;
 			case IR_NEG:
 			case IR_ABS:
 			case IR_NOT:
 				return ctx->use_lists[ref].count == 1 &&
-					ir_may_promote_i2i(ctx, type, insn->op1);
+					ir_may_promote_trunc(ctx, type, insn->op1);
 			case IR_ADD:
 			case IR_SUB:
 			case IR_MUL:
-//			case IR_DIV:
 			case IR_MIN:
 			case IR_MAX:
 			case IR_OR:
@@ -1717,8 +1718,41 @@ static bool ir_may_promote_i2i(ir_ctx *ctx, ir_type type, ir_ref ref)
 			case IR_XOR:
 			case IR_SHL:
 				return ctx->use_lists[ref].count == 1 &&
-					ir_may_promote_i2i(ctx, type, insn->op1) &&
-					ir_may_promote_i2i(ctx, type, insn->op2);
+					ir_may_promote_trunc(ctx, type, insn->op1) &&
+					ir_may_promote_trunc(ctx, type, insn->op2);
+//			case IR_SHR:
+//			case IR_SAR:
+//			case IR_DIV:
+//			case IR_MOD:
+//			case IR_FP2INT:
+//				TODO: ???
+			case IR_COND:
+				return ctx->use_lists[ref].count == 1 &&
+					ir_may_promote_trunc(ctx, type, insn->op2) &&
+					ir_may_promote_trunc(ctx, type, insn->op3);
+			case IR_PHI:
+				if (ctx->use_lists[ref].count != 1) {
+					ir_use_list *use_list = &ctx->use_lists[ref];
+					ir_ref count = 0;
+
+					for (p = &ctx->use_edges[use_list->refs], n = use_list->count; n > 0; p++, n--) {
+						if (*p != ref) {
+							if (count) {
+								return 0;
+							}
+							count = 1;
+						}
+					}
+				}
+				for (p = insn->ops + 1, n = insn->inputs_count - 1; n > 0; p++, n--) {
+					input = *p;
+					if (input != ref) {
+						if (!ir_may_promote_trunc(ctx, type, input)) {
+							return 0;
+						}
+					}
+				}
+				return 1;
 			default:
 				break;
 		}
@@ -1730,6 +1764,7 @@ static ir_ref ir_promote_i2i(ir_ctx *ctx, ir_type type, ir_ref ref, ir_ref use)
 {
 	ir_insn *insn = &ctx->ir_base[ref];
 	uint32_t count;
+	ir_ref *p, n, input;
 
 	if (IR_IS_CONST_REF(ref)) {
 		return ir_const(ctx, insn->val, type);
@@ -1737,6 +1772,22 @@ static ir_ref ir_promote_i2i(ir_ctx *ctx, ir_type type, ir_ref ref, ir_ref use)
 		switch (insn->op) {
 			case IR_ZEXT:
 			case IR_SEXT:
+			case IR_TRUNC:
+				if (ctx->ir_base[insn->op1].type != type) {
+					ir_type src_type = ctx->ir_base[insn->op1].type;
+					if (ir_type_size[src_type] == ir_type_size[type]) {
+						insn->op = IR_BITCAST;
+					} else if (ir_type_size[src_type] > ir_type_size[type]) {
+						insn->op = IR_TRUNC;
+					} else {
+						if (insn->op != IR_SEXT && insn->op != IR_ZEXT) {
+							insn->op = IR_IS_TYPE_SIGNED(type) ? IR_SEXT : IR_ZEXT;
+						}
+					}
+					insn->type = type;
+					return ref;
+				}
+
 				count = ctx->use_lists[ref].count;
 				ir_use_list_remove_all(ctx, ref, use);
 				if (ctx->use_lists[ref].count == 0) {
@@ -1768,7 +1819,6 @@ static ir_ref ir_promote_i2i(ir_ctx *ctx, ir_type type, ir_ref ref, ir_ref use)
 			case IR_ADD:
 			case IR_SUB:
 			case IR_MUL:
-//			case IR_DIV:
 			case IR_MIN:
 			case IR_MAX:
 			case IR_OR:
@@ -1780,6 +1830,30 @@ static ir_ref ir_promote_i2i(ir_ctx *ctx, ir_type type, ir_ref ref, ir_ref use)
 				} else {
 					insn->op1 = ir_promote_i2i(ctx, type, insn->op1, ref);
 					insn->op2 = ir_promote_i2i(ctx, type, insn->op2, ref);
+				}
+				insn->type = type;
+				return ref;
+//			case IR_DIV:
+//			case IR_MOD:
+//			case IR_SHR:
+//			case IR_SAR:
+//			case IR_FP2INT:
+//				TODO: ???
+			case IR_COND:
+				if (insn->op2 == insn->op3) {
+					insn->op3 = insn->op2 = ir_promote_i2i(ctx, type, insn->op2, ref);
+				} else {
+					insn->op2 = ir_promote_i2i(ctx, type, insn->op2, ref);
+					insn->op3 = ir_promote_i2i(ctx, type, insn->op3, ref);
+				}
+				insn->type = type;
+				return ref;
+			case IR_PHI:
+				for (p = insn->ops + 1, n = insn->inputs_count - 1; n > 0; p++, n--) {
+					input = *p;
+					if (input != ref) {
+						*p = ir_promote_i2i(ctx, type, input, ref);
+					}
 				}
 				insn->type = type;
 				return ref;
@@ -3168,7 +3242,7 @@ void ir_iter_opt(ir_ctx *ctx, ir_bitqueue *worklist)
 						}
 						goto folding;
 					case IR_TRUNC:
-						if (ir_may_promote_i2i(ctx, insn->type, insn->op1)) {
+						if (ir_may_promote_trunc(ctx, insn->type, insn->op1)) {
 							ir_ref ref = ir_promote_i2i(ctx, insn->type, insn->op1, i);
 							insn->op1 = ref;
 							ir_iter_replace_insn(ctx, i, ref, worklist);
