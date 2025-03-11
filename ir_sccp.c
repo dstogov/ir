@@ -553,8 +553,7 @@ static IR_NEVER_INLINE void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bi
 				}
 				if (!may_benefit) {
 					IR_MAKE_BOTTOM_EX(i);
-					if (insn->op == IR_FP2FP || insn->op == IR_FP2INT || insn->op == IR_TRUNC
-					 || insn->op == IR_ZEXT || insn->op == IR_SEXT) {
+					if (insn->op == IR_FP2FP || insn->op == IR_FP2INT || insn->op == IR_TRUNC) {
 						ir_bitqueue_add(iter_worklist, i);
 					}
 				} else if (!ir_sccp_fold(ctx, _values, worklist, i, insn)) {
@@ -562,8 +561,7 @@ static IR_NEVER_INLINE void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bi
 					continue;
 				} else if (_values[i].op == IR_BOTTOM) {
 					insn = &ctx->ir_base[i];
-					if (insn->op == IR_FP2FP || insn->op == IR_FP2INT || insn->op == IR_TRUNC
-					 || insn->op == IR_ZEXT || insn->op == IR_SEXT) {
+					if (insn->op == IR_FP2FP || insn->op == IR_FP2INT || insn->op == IR_TRUNC) {
 						ir_bitqueue_add(iter_worklist, i);
 					}
 				}
@@ -571,7 +569,7 @@ static IR_NEVER_INLINE void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bi
 				IR_MAKE_BOTTOM_EX(i);
 			}
 		} else if (flags & IR_OP_FLAG_BB_START) {
-			if (insn->op == IR_MERGE || insn->op == IR_BEGIN) {
+			if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN || insn->op == IR_BEGIN) {
 				ir_bitqueue_add(iter_worklist, i);
 			}
 			if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
@@ -1928,58 +1926,163 @@ static ir_ref ir_ext_ref(ir_ctx *ctx, ir_ref var_ref, ir_ref src_ref, ir_op op, 
 	return ref;
 }
 
-static bool ir_try_promote_ext(ir_ctx *ctx, ir_ref ext_ref, ir_insn *insn, ir_bitqueue *worklist)
+static uint32_t _ir_estimated_control(ir_ctx *ctx, ir_ref val)
 {
-	ir_type type = insn->type;
-	ir_op op = insn->op;
-	ir_ref ref = insn->op1;
-	ir_insn *phi_insn = &ctx->ir_base[ref];
-	ir_insn *op_insn;
+	ir_insn *insn;
+	ir_ref n, *p, input, result, ctrl;
+
+	if (IR_IS_CONST_REF(val)) {
+		return 1; /* IR_START */
+	}
+
+	insn = &ctx->ir_base[val];
+	if (ir_op_flags[insn->op] & (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM)) {
+		return val;
+	}
+
+	IR_ASSERT(ir_op_flags[insn->op] & IR_OP_FLAG_DATA);
+	if (IR_OPND_KIND(ir_op_flags[insn->op], 1) & IR_OPND_CONTROL_DEP) {
+		return insn->op1;
+	}
+
+	n = insn->inputs_count;
+	p = insn->ops + 1;
+
+	result = 1;
+	for (; n > 0; p++, n--) {
+		input = *p;
+		ctrl = _ir_estimated_control(ctx, input);
+		if (ctrl > result) { // TODO: check dominance depth instead of order
+			result = ctrl;
+		}
+	}
+	return result;
+}
+
+static bool ir_is_loop_invariant(ir_ctx *ctx, ir_ref ref, ir_ref loop)
+{
+	ref = _ir_estimated_control(ctx, ref);
+	return ref < loop; // TODO: check dominance instead of order
+}
+
+static bool ir_is_cheaper_ext(ir_ctx *ctx, ir_ref ref, ir_ref loop, ir_ref ext_ref, ir_op op)
+{
+	if (IR_IS_CONST_REF(ref)) {
+		return 1;
+	} else {
+		ir_insn *insn = &ctx->ir_base[ref];
+
+		if (insn->op == IR_LOAD) {
+			if (ir_is_loop_invariant(ctx, ref, loop)) {
+				return 1;
+			} else {
+				/* ZEXT(LOAD(_, _)) costs the same as LOAD(_, _) */
+				if (ctx->use_lists[ref].count == 2) {
+					return 1;
+				} else if (ctx->use_lists[ref].count == 3) {
+					ir_use_list *use_list = &ctx->use_lists[ref];
+					ir_ref *p, n, use;
+
+					for (p = &ctx->use_edges[use_list->refs], n = use_list->count; n > 0; p++, n--) {
+						use = *p;
+						if (use != ext_ref) {
+							ir_insn *use_insn = &ctx->ir_base[use];
+
+							if (use_insn->op != op
+							 && (!(ir_op_flags[use_insn->op] & (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM))
+							  || use_insn->op1 != ref)) {
+								return 0;
+							}
+						}
+					}
+					return 1;
+				}
+			}
+			return 0;
+		} else {
+			return ir_is_loop_invariant(ctx, ref, loop);
+		}
+	}
+}
+
+static bool ir_try_promote_induction_var_ext(ir_ctx *ctx, ir_ref ext_ref, ir_ref phi_ref, ir_ref op_ref, ir_bitqueue *worklist)
+{
+	ir_op op = ctx->ir_base[ext_ref].op;
+	ir_type type = ctx->ir_base[ext_ref].type;
+	ir_insn *phi_insn;
 	ir_use_list *use_list;
-	ir_ref n, *p, use, op_ref;
-
-	/* Check for simple induction variable in the form: x2 = PHI(loop, x1, x3); x3 = ADD(x2, _); */
-	if (phi_insn->op != IR_PHI
-	 || phi_insn->inputs_count != 3 /* (2 values) */
-	 || ctx->ir_base[phi_insn->op1].op != IR_LOOP_BEGIN) {
-		return 0;
-	}
-
-	op_ref = phi_insn->op3;
-	op_insn = &ctx->ir_base[op_ref];
-	if ((op_insn->op != IR_ADD && op_insn->op != IR_SUB && op_insn->op != IR_MUL)
-	 || (op_insn->op1 != ref && op_insn->op2 != ref)
-	 || ctx->use_lists[op_ref].count != 1) {
-		return 0;
-	}
+	ir_ref n, *p, use, ext_ref_2 = IR_UNUSED;
 
 	/* Check if we may change the type of the induction variable */
-	use_list = &ctx->use_lists[ref];
+	use_list = &ctx->use_lists[phi_ref];
 	n = use_list->count;
-	for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
-		use = *p;
-		if (use == op_ref || use == ext_ref) {
-			continue;
-		} else {
-			ir_insn *use_insn = &ctx->ir_base[use];
-
-			if ((use_insn->op >= IR_EQ && use_insn->op <= IR_UGT)
-			 && (use_insn->op1 == ref || use_insn->op2 == ref)) {
-				continue;
-			} else if (use_insn->op == IR_IF) {
+	if (n > 1) {
+		for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
+			use = *p;
+			if (use == op_ref || use == ext_ref) {
 				continue;
 			} else {
-				return 0;
+				ir_insn *use_insn = &ctx->ir_base[use];
+
+				if (use_insn->op >= IR_EQ && use_insn->op <= IR_UGT) {
+					if (use_insn->op1 == phi_ref) {
+						if (ir_is_cheaper_ext(ctx, use_insn->op2, ctx->ir_base[phi_ref].op1, ext_ref, op)) {
+							continue;
+					    }
+					} else if (use_insn->op2 == phi_ref) {
+						if (ir_is_cheaper_ext(ctx, use_insn->op1, ctx->ir_base[phi_ref].op1, ext_ref, op)) {
+							continue;
+					    }
+					}
+					return 0;
+				} else if (use_insn->op == IR_IF) {
+					continue;
+				} else if (!ext_ref_2 && use_insn->op == op && use_insn->type == type) {
+					ext_ref_2 = use;
+					continue;
+				} else {
+					return 0;
+				}
 			}
 		}
 	}
 
-	phi_insn->type = insn->type;
-	op_insn->type = insn->type;
+	use_list = &ctx->use_lists[op_ref];
+	n = use_list->count;
+	if (n > 1) {
+		for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
+			use = *p;
+			if (use == phi_ref || use == ext_ref) {
+				continue;
+			} else {
+				ir_insn *use_insn = &ctx->ir_base[use];
 
-	for (n = 0; n < ctx->use_lists[ref].count; n++) {
+				if (use_insn->op >= IR_EQ && use_insn->op <= IR_UGT) {
+					if (use_insn->op1 == phi_ref) {
+						if (ir_is_cheaper_ext(ctx, use_insn->op2, ctx->ir_base[phi_ref].op1, ext_ref, op)) {
+							continue;
+					    }
+					} else if (use_insn->op2 == phi_ref) {
+						if (ir_is_cheaper_ext(ctx, use_insn->op1, ctx->ir_base[phi_ref].op1, ext_ref, op)) {
+							continue;
+					    }
+					}
+					return 0;
+				} else if (use_insn->op == IR_IF) {
+					continue;
+				} else if (!ext_ref_2 && use_insn->op == op && use_insn->type == type) {
+					ext_ref_2 = use;
+					continue;
+				} else {
+					return 0;
+				}
+			}
+		}
+	}
+
+	for (n = 0; n < ctx->use_lists[phi_ref].count; n++) {
 		/* "use_lists" may be reallocated by ir_ext_ref() */
-		use = ctx->use_edges[ctx->use_lists[ref].refs + n];
+		use = ctx->use_edges[ctx->use_lists[phi_ref].refs + n];
 		if (use == ext_ref) {
 			continue;
 		} else {
@@ -1987,11 +2090,14 @@ static bool ir_try_promote_ext(ir_ctx *ctx, ir_ref ext_ref, ir_insn *insn, ir_bi
 
 			if (use_insn->op == IR_IF) {
 				continue;
+			} else if (use_insn->op == op) {
+				IR_ASSERT(ext_ref_2 == use);
+				continue;
 			}
 			IR_ASSERT(((use_insn->op >= IR_EQ && use_insn->op <= IR_UGT)
 			  || use_insn->op == IR_ADD || use_insn->op == IR_SUB || use_insn->op == IR_MUL)
-			 && (use_insn->op1 == ref || use_insn->op2 == ref));
-			if (use_insn->op1 != ref) {
+			 && (use_insn->op1 == phi_ref || use_insn->op2 == phi_ref));
+			if (use_insn->op1 != phi_ref) {
 				if (IR_IS_CONST_REF(use_insn->op1)
 				 && !IR_IS_SYM_CONST(ctx->ir_base[use_insn->op1].op)) {
 					ctx->ir_base[use].op1 = ir_ext_const(ctx, &ctx->ir_base[use_insn->op1], op, type);
@@ -2000,7 +2106,7 @@ static bool ir_try_promote_ext(ir_ctx *ctx, ir_ref ext_ref, ir_insn *insn, ir_bi
 				}
 				ir_bitqueue_add(worklist, use);
 			}
-			if (use_insn->op2 != ref) {
+			if (use_insn->op2 != phi_ref) {
 				if (IR_IS_CONST_REF(use_insn->op2)
 				 && !IR_IS_SYM_CONST(ctx->ir_base[use_insn->op2].op)) {
 					ctx->ir_base[use].op2 = ir_ext_const(ctx, &ctx->ir_base[use_insn->op2], op, type);
@@ -2012,17 +2118,106 @@ static bool ir_try_promote_ext(ir_ctx *ctx, ir_ref ext_ref, ir_insn *insn, ir_bi
 		}
 	}
 
-	ir_iter_replace_insn(ctx, ext_ref, ref, worklist);
+	if (ctx->use_lists[op_ref].count > 1) {
+		for (n = 0; n < ctx->use_lists[op_ref].count; n++) {
+			/* "use_lists" may be reallocated by ir_ext_ref() */
+			use = ctx->use_edges[ctx->use_lists[op_ref].refs + n];
+			if (use == ext_ref || use == phi_ref) {
+				continue;
+			} else {
+				ir_insn *use_insn = &ctx->ir_base[use];
 
-	phi_insn = &ctx->ir_base[ref];
+				if (use_insn->op == IR_IF) {
+					continue;
+				} else if (use_insn->op == op) {
+					IR_ASSERT(ext_ref_2 == use);
+					continue;
+				}
+				IR_ASSERT(use_insn->op >= IR_EQ && use_insn->op <= IR_UGT);
+				if (use_insn->op1 != op_ref) {
+					if (IR_IS_CONST_REF(use_insn->op1)
+					 && !IR_IS_SYM_CONST(ctx->ir_base[use_insn->op1].op)) {
+						ctx->ir_base[use].op1 = ir_ext_const(ctx, &ctx->ir_base[use_insn->op1], op, type);
+					} else {
+						ctx->ir_base[use].op1 = ir_ext_ref(ctx, use, use_insn->op1, op, type, worklist);
+					}
+					ir_bitqueue_add(worklist, use);
+				}
+				if (use_insn->op2 != op_ref) {
+					if (IR_IS_CONST_REF(use_insn->op2)
+					 && !IR_IS_SYM_CONST(ctx->ir_base[use_insn->op2].op)) {
+						ctx->ir_base[use].op2 = ir_ext_const(ctx, &ctx->ir_base[use_insn->op2], op, type);
+					} else {
+						ctx->ir_base[use].op2 = ir_ext_ref(ctx, use, use_insn->op2, op, type, worklist);
+					}
+					ir_bitqueue_add(worklist, use);
+				}
+			}
+		}
+	}
+
+	ir_iter_replace_insn(ctx, ext_ref, ctx->ir_base[ext_ref].op1, worklist);
+
+	if (ext_ref_2) {
+		ir_iter_replace_insn(ctx, ext_ref_2, ctx->ir_base[ext_ref_2].op1, worklist);
+	}
+
+	ctx->ir_base[op_ref].type = type;
+
+	phi_insn = &ctx->ir_base[phi_ref];
+	phi_insn->type = type;
 	if (IR_IS_CONST_REF(phi_insn->op2)
 	 && !IR_IS_SYM_CONST(ctx->ir_base[phi_insn->op2].op)) {
-		ctx->ir_base[ref].op2 = ir_ext_const(ctx, &ctx->ir_base[phi_insn->op2], op, type);
+		ctx->ir_base[phi_ref].op2 = ir_ext_const(ctx, &ctx->ir_base[phi_insn->op2], op, type);
 	} else {
-		ctx->ir_base[ref].op2 = ir_ext_ref(ctx, ref, phi_insn->op2, op, type, worklist);
+		ctx->ir_base[phi_ref].op2 = ir_ext_ref(ctx, phi_ref, phi_insn->op2, op, type, worklist);
 	}
 
 	return 1;
+}
+
+static bool ir_try_promote_ext(ir_ctx *ctx, ir_ref ext_ref, ir_insn *insn, ir_bitqueue *worklist)
+ {
+	ir_ref ref = insn->op1;
+
+	/* Check for simple induction variable in the form: x2 = PHI(loop, x1, x3); x3 = ADD(x2, _); */
+	insn = &ctx->ir_base[ref];
+	if (insn->op == IR_PHI
+	 && insn->inputs_count == 3 /* (2 values) */
+	 && ctx->ir_base[insn->op1].op == IR_LOOP_BEGIN) {
+		ir_ref op_ref = insn->op3;
+		ir_insn *op_insn = &ctx->ir_base[op_ref];
+
+		if (op_insn->op == IR_ADD || op_insn->op == IR_SUB || op_insn->op == IR_MUL) {
+			if (op_insn->op1 == ref) {
+				if (ir_is_loop_invariant(ctx, op_insn->op2, insn->op1)) {
+					return ir_try_promote_induction_var_ext(ctx, ext_ref, ref, op_ref, worklist);
+				}
+			} else if (op_insn->op2 == ref) {
+				if (ir_is_loop_invariant(ctx, op_insn->op1, insn->op1)) {
+					return ir_try_promote_induction_var_ext(ctx, ext_ref, ref, op_ref, worklist);
+				}
+			}
+		}
+	} else if (insn->op == IR_ADD || insn->op == IR_SUB || insn->op == IR_MUL) {
+		if (!IR_IS_CONST_REF(insn->op1)
+		 && ctx->ir_base[insn->op1].op == IR_PHI
+		 && ctx->ir_base[insn->op1].inputs_count == 3 /* (2 values) */
+		 && ctx->ir_base[insn->op1].op3 == ref
+		 && ctx->ir_base[ctx->ir_base[insn->op1].op1].op == IR_LOOP_BEGIN
+		 && ir_is_loop_invariant(ctx, insn->op2, ctx->ir_base[insn->op1].op1)) {
+			return ir_try_promote_induction_var_ext(ctx, ext_ref, insn->op1, ref, worklist);
+		} else if (!IR_IS_CONST_REF(insn->op2)
+		 && ctx->ir_base[insn->op2].op == IR_PHI
+		 && ctx->ir_base[insn->op2].inputs_count == 3 /* (2 values) */
+		 && ctx->ir_base[insn->op2].op3 == ref
+		 && ctx->ir_base[ctx->ir_base[insn->op2].op1].op == IR_LOOP_BEGIN
+		 && ir_is_loop_invariant(ctx, insn->op1, ctx->ir_base[insn->op2].op1)) {
+			return ir_try_promote_induction_var_ext(ctx, ext_ref, insn->op2, ref, worklist);
+		}
+	}
+
+	return 0;
 }
 
 static void ir_get_true_false_refs(const ir_ctx *ctx, ir_ref if_ref, ir_ref *if_true_ref, ir_ref *if_false_ref)
@@ -3024,6 +3219,68 @@ static void ir_iter_optimize_merge(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge
 	}
 }
 
+static ir_ref ir_find_ext_use(ir_ctx *ctx, ir_ref ref)
+{
+	ir_use_list *use_list = &ctx->use_lists[ref];
+	ir_ref *p, n, use;
+	ir_insn *use_insn;
+
+	for (p = &ctx->use_edges[use_list->refs], n = use_list->count; n > 0; p++, n--) {
+		use = *p;
+		use_insn = &ctx->ir_base[use];
+		if (use_insn->op == IR_SEXT || use_insn->op == IR_ZEXT) {
+			return use;
+		}
+	}
+	return IR_UNUSED;
+}
+
+static void ir_iter_optimize_induction_var(ir_ctx *ctx, ir_ref phi_ref, ir_ref op_ref, ir_bitqueue *worklist)
+{
+	ir_ref ext_ref;
+
+	ext_ref = ir_find_ext_use(ctx, phi_ref);
+	if (!ext_ref) {
+		ext_ref = ir_find_ext_use(ctx, op_ref);
+	}
+	if (ext_ref) {
+		ir_try_promote_induction_var_ext(ctx, ext_ref, phi_ref, op_ref, worklist);
+	}
+}
+
+static void ir_iter_optimize_loop(ir_ctx *ctx, ir_ref loop_ref, ir_insn *loop, ir_bitqueue *worklist)
+{
+	ir_ref n;
+
+	if (loop->inputs_count != 2 || ctx->use_lists[loop_ref].count <= 1) {
+		return;
+	}
+
+	/* Check for simple induction variable in the form: x2 = PHI(loop, x1, x3); x3 = ADD(x2, _); */
+	for (n = 0; n < ctx->use_lists[loop_ref].count; n++) {
+		/* "use_lists" may be reallocated by ir_ext_ref() */
+		ir_ref use = ctx->use_edges[ctx->use_lists[loop_ref].refs + n];
+		ir_insn *use_insn = &ctx->ir_base[use];
+
+		if (use_insn->op == IR_PHI) {
+			ir_ref op_ref = use_insn->op3;
+			ir_insn *op_insn = &ctx->ir_base[op_ref];
+
+			if (op_insn->op == IR_ADD || op_insn->op == IR_SUB || op_insn->op == IR_MUL) {
+				if (op_insn->op1 == use) {
+					if (ir_is_loop_invariant(ctx, op_insn->op2, loop_ref)) {
+						ir_iter_optimize_induction_var(ctx, use, op_ref, worklist);
+					}
+				} else if (op_insn->op2 == use) {
+					if (ir_is_loop_invariant(ctx, op_insn->op1, loop_ref)) {
+						ir_iter_optimize_induction_var(ctx, use, op_ref, worklist);
+					}
+				}
+		    }
+		}
+	}
+}
+
 static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref condition, bool *swap)
 {
 	ir_insn *condition_insn = &ctx->ir_base[condition];
@@ -3273,6 +3530,8 @@ folding:
 				}
 			} else if (insn->op == IR_MERGE) {
 				ir_iter_optimize_merge(ctx, i, insn, worklist);
+			} else if (insn->op == IR_LOOP_BEGIN) {
+				ir_iter_optimize_loop(ctx, i, insn, worklist);
 			}
 		} else if (ir_is_dead_load(ctx, i)) {
 			ir_ref next;
