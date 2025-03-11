@@ -554,7 +554,7 @@ static IR_NEVER_INLINE void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bi
 				if (!may_benefit) {
 					IR_MAKE_BOTTOM_EX(i);
 					if (insn->op == IR_FP2FP || insn->op == IR_FP2INT || insn->op == IR_TRUNC
-					 || insn->op == IR_ZEXT || insn->op == IR_SEXT || insn->op == IR_EQ || insn->op == IR_NE) {
+					 || insn->op == IR_ZEXT || insn->op == IR_SEXT) {
 						ir_bitqueue_add(iter_worklist, i);
 					}
 				} else if (!ir_sccp_fold(ctx, _values, worklist, i, insn)) {
@@ -563,7 +563,7 @@ static IR_NEVER_INLINE void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bi
 				} else if (_values[i].op == IR_BOTTOM) {
 					insn = &ctx->ir_base[i];
 					if (insn->op == IR_FP2FP || insn->op == IR_FP2INT || insn->op == IR_TRUNC
-					 || insn->op == IR_ZEXT || insn->op == IR_SEXT || insn->op == IR_EQ || insn->op == IR_NE) {
+					 || insn->op == IR_ZEXT || insn->op == IR_SEXT) {
 						ir_bitqueue_add(iter_worklist, i);
 					}
 				}
