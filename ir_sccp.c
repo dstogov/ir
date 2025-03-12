@@ -3373,6 +3373,7 @@ static void ir_iter_optimize_if(ir_ctx *ctx, ir_ref ref, ir_insn *insn, ir_bitqu
 		insn->optx = IR_OPTX(IR_END, IR_VOID, 1);
 		if (!IR_IS_CONST_REF(insn->op2)) {
 			ir_use_list_remove_one(ctx, insn->op2, ref);
+			ir_bitqueue_add(worklist, insn->op2);
 		}
 		insn->op2 = IR_UNUSED;
 
