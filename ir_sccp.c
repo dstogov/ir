@@ -1103,7 +1103,7 @@ static IR_NEVER_INLINE void ir_sccp_transform(ir_ctx *ctx, ir_insn *_values, ir_
 			if (insn->op == IR_NOP) {
 				/* already removed */
 			} else if (ir_op_flags[insn->op] & (IR_OP_FLAG_DATA|IR_OP_FLAG_MEM)) {
-				if (insn->op != IR_PARAM && (insn->op != IR_VAR || _values[insn->op1].op == IR_TOP)) {
+				if (insn->op != IR_PARAM) {
 					ir_sccp_remove_insn(ctx, _values, i, iter_worklist);
 				}
 			} else {
