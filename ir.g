@@ -739,13 +739,19 @@ const(uint8_t t, ir_val *val):
 		DECNUMBER(t, val)
 	|	HEXNUMBER(t, val)
 	|	FLOATNUMBER(t, val)
-	|	CHARACTER(val)
+	|	CHARACTER(t, val)
 	|	"inf"
-		{if (t == IR_DOUBLE) val->d = INFINITY; else {val->f = INFINITY; val->u32_hi = 0;}}
+		{if (t == IR_DOUBLE) val->d = INFINITY;
+		else if (t == IR_FLOAT) {val->f = INFINITY; val->u32_hi = 0;}
+		else yy_error("Unexpected \"inf\"");}
 	|	"nan"
-		{if (t == IR_DOUBLE) val->d = NAN; else {val->f = NAN; val->u32_hi = 0;}}
+		{if (t == IR_DOUBLE) val->d = NAN;
+		else if (t == IR_FLOAT) {val->f = NAN; val->u32_hi = 0;}
+		else yy_error("Unexpected \"nan\"");}
 	|	"-" "inf"
-		{if (t == IR_DOUBLE) val->d = -INFINITY; else {val->f = -INFINITY; val->u32_hi = 0;}}
+		{if (t == IR_DOUBLE) val->d = -INFINITY;
+		else if (t == IR_FLOAT) {val->f = -INFINITY; val->u32_hi = 0;}
+		else yy_error("Unexpected \"-inf\"");}
 ;
 
 /* scanner rules */
@@ -768,12 +774,15 @@ HEXNUMBER(uint32_t t, ir_val *val):
 
 FLOATNUMBER(uint32_t t, ir_val *val):
 	/[\-]?([0-9]*\.[0-9]+([Ee][\+\-]?[0-9]+)?|[0-9]+\.([Ee][\+\-]?[0-9]+)?|[0-9]+[Ee][\+\-]?[0-9]+)/
-	{if (t == IR_DOUBLE) val->d = atof((const char*)yy_text); else {val->f = strtof((const char*)yy_text, NULL); val->u32_hi = 0;}}
+	{if (t == IR_DOUBLE) val->d = atof((const char*)yy_text);
+	else if (t == IR_FLOAT) {val->f = strtof((const char*)yy_text, NULL); val->u32_hi = 0;}
+	else yy_error("Unexpected <FLOATNUMBER>");}
 ;
 
-CHARACTER(ir_val *val):
+CHARACTER(uint32_t t, ir_val *val):
 	/'([^'\\]|\\.)*'/
 	{
+		if (!IR_IS_TYPE_INT(t)) yy_error("Unexpected <CHARACTER>");
 		if ((char)yy_text[1] != '\\') {
 			val->i64 = (char)yy_text[1];
 		} else if ((char)yy_text[2] == '\\') {

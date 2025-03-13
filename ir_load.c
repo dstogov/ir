@@ -404,7 +404,7 @@ static int parse_ID(int sym, const char **str, size_t *len);
 static int parse_DECNUMBER(int sym, uint32_t t, ir_val *val);
 static int parse_HEXNUMBER(int sym, uint32_t t, ir_val *val);
 static int parse_FLOATNUMBER(int sym, uint32_t t, ir_val *val);
-static int parse_CHARACTER(int sym, ir_val *val);
+static int parse_CHARACTER(int sym, uint32_t t, ir_val *val);
 static int parse_STRING(int sym, const char **str, size_t *len);
 
 static int get_skip_sym(void) {
@@ -1781,15 +1781,19 @@ static int parse_const(int sym, uint8_t t, ir_val *val) {
 			sym = parse_FLOATNUMBER(sym, t, val);
 			break;
 		case YY_CHARACTER:
-			sym = parse_CHARACTER(sym, val);
+			sym = parse_CHARACTER(sym, t, val);
 			break;
 		case YY_INF:
 			sym = get_sym();
-			if (t == IR_DOUBLE) val->d = INFINITY; else {val->f = INFINITY; val->u32_hi = 0;}
+			if (t == IR_DOUBLE) val->d = INFINITY;
+		else if (t == IR_FLOAT) {val->f = INFINITY; val->u32_hi = 0;}
+		else yy_error("Unexpected \"inf\"");
 			break;
 		case YY_NAN:
 			sym = get_sym();
-			if (t == IR_DOUBLE) val->d = NAN; else {val->f = NAN; val->u32_hi = 0;}
+			if (t == IR_DOUBLE) val->d = NAN;
+		else if (t == IR_FLOAT) {val->f = NAN; val->u32_hi = 0;}
+		else yy_error("Unexpected \"nan\"");
 			break;
 		case YY__MINUS:
 			sym = get_sym();
@@ -1797,7 +1801,9 @@ static int parse_const(int sym, uint8_t t, ir_val *val) {
 				yy_error_sym("'inf' expected, got", sym);
 			}
 			sym = get_sym();
-			if (t == IR_DOUBLE) val->d = -INFINITY; else {val->f = -INFINITY; val->u32_hi = 0;}
+			if (t == IR_DOUBLE) val->d = -INFINITY;
+		else if (t == IR_FLOAT) {val->f = -INFINITY; val->u32_hi = 0;}
+		else yy_error("Unexpected \"-inf\"");
 			break;
 		default:
 			yy_error_sym("unexpected", sym);
@@ -1838,16 +1844,19 @@ static int parse_FLOATNUMBER(int sym, uint32_t t, ir_val *val) {
 	if (sym != YY_FLOATNUMBER) {
 		yy_error_sym("<FLOATNUMBER> expected, got", sym);
 	}
-	if (t == IR_DOUBLE) val->d = atof((const char*)yy_text); else {val->f = strtof((const char*)yy_text, NULL); val->u32_hi = 0;}
+	if (t == IR_DOUBLE) val->d = atof((const char*)yy_text);
+	else if (t == IR_FLOAT) {val->f = strtof((const char*)yy_text, NULL); val->u32_hi = 0;}
+	else yy_error("Unexpected <FLOATNUMBER>");
 	sym = get_sym();
 	return sym;
 }
 
-static int parse_CHARACTER(int sym, ir_val *val) {
+static int parse_CHARACTER(int sym, uint32_t t, ir_val *val) {
 	if (sym != YY_CHARACTER) {
 		yy_error_sym("<CHARACTER> expected, got", sym);
 	}
-	if ((char)yy_text[1] != '\\') {
+	if (!IR_IS_TYPE_INT(t)) yy_error("Unexpected <CHARACTER>");
+		if ((char)yy_text[1] != '\\') {
 			val->i64 = (char)yy_text[1];
 		} else if ((char)yy_text[2] == '\\') {
 			val->i64 = '\\';
