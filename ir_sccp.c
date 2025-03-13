@@ -917,163 +917,128 @@ static void ir_sccp_remove_if(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_ref 
 	}
 }
 
-static void ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_insn *_values, ir_ref ref, ir_ref unfeasible_inputs)
+static bool ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_ref ref, ir_insn *insn, ir_bitqueue *worklist)
 {
-	ir_ref i, j, n, k, *p, use;
-	ir_insn *insn, *use_insn;
+	ir_ref old_merge_inputs, new_merge_inputs, i, *p;
 	ir_use_list *use_list;
 	ir_bitset life_inputs;
+	ir_bitset_base_t holder = 0;
 
-	insn = &ctx->ir_base[ref];
 	IR_ASSERT(insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN);
-	n = insn->inputs_count;
-	if (n - unfeasible_inputs == 1) {
-		/* remove MERGE completely */
-		for (j = 1; j <= n; j++) {
-			ir_ref input = ir_insn_op(insn, j);
-			if (input && IR_IS_REACHABLE(input)) {
-				ir_insn *input_insn = &ctx->ir_base[input];
+	old_merge_inputs = insn->inputs_count;
+	new_merge_inputs = 0;
+	life_inputs = (old_merge_inputs - IR_BITSET_BITS) ? &holder : ir_bitset_malloc(old_merge_inputs + 1);
 
-				IR_ASSERT(input_insn->op == IR_END || input_insn->op == IR_LOOP_END||
-					input_insn->op == IR_IJMP || input_insn->op == IR_UNREACHABLE);
-				if (input_insn->op == IR_END || input_insn->op == IR_LOOP_END) {
-					ir_ref prev, next = IR_UNUSED;
-					ir_insn *next_insn = NULL;
+	for (i = 1; i <= old_merge_inputs; i++) {
+		ir_ref input = ir_insn_op(insn, i);
 
-					prev = input_insn->op1;
-					use_list = &ctx->use_lists[ref];
-					if (use_list->count == 1) {
-						next = ctx->use_edges[use_list->refs];
-						next_insn = &ctx->ir_base[next];
-					} else {
-						k = 0;
-						p = &ctx->use_edges[use_list->refs];
-						while (k < use_list->count) {
-							use = *p;
-							use_insn = &ctx->ir_base[use];
-#if IR_COMBO_COPY_PROPAGATION
-							IR_ASSERT((use_insn->op != IR_PHI) && "PHI must be already removed");
-#else
-							if (use_insn->op == IR_PHI) {
-								/* Convert PHI into COPY */
-								ir_ref i, n = use_insn->inputs_count;
+		if (input) {
+			new_merge_inputs++;
+			if (new_merge_inputs != i) {
+				ir_insn_set_op(insn, new_merge_inputs, input);
+			}
+			ir_bitset_incl(life_inputs, i);
+		}
+	}
 
-								for (i = 2; i <= n; i++) {
-									if (i != j + 1) {
-										ir_ref from = ir_insn_op(use_insn, i);
-										if (from > 0) {
-											ir_use_list_remove_one(ctx, from, use);
-										}
-										ir_insn_set_op(use_insn, i, IR_UNUSED);
-									}
-								}
-								use_insn->optx = IR_OPTX(IR_COPY, use_insn->type, 1);
-								use_insn->op1 = ir_insn_op(use_insn, j + 1);
-								ir_insn_set_op(use_insn, j + 1, IR_UNUSED);
-								ir_use_list_remove_one(ctx, ref, use);
-								p = &ctx->use_edges[use_list->refs + k];
-								continue;
-							}
+	if (new_merge_inputs == old_merge_inputs) {
+		/* All inputs are feasible */
+		if (life_inputs != &holder) {
+			ir_mem_free(life_inputs);
+		}
+		return 0;
+	}
+
+	for (i = new_merge_inputs + 1; i <= old_merge_inputs; i++) {
+		ir_insn_set_op(insn, i, IR_UNUSED);
+	}
+
+	if (new_merge_inputs <= 1) {
+#if 0
+		if (new_merge_inputs == 1
+		 && insn->op == IR_LOOP_BEGIN
+		 && insn->op1 > ref) { // TODO: check dominance instead of order
+			/* dead loop */
+			ir_use_list_remove_one(ctx, insn->op1, ref);
+			insn->op1 = IR_UNUSED;
+			new_merge_inputs = 0;
+		}
 #endif
-							if (ir_op_flags[use_insn->op] & IR_OP_FLAG_CONTROL) {
-								IR_ASSERT(!next);
-								next = use;
-								next_insn = use_insn;
-							} else if (use_insn->op != IR_NOP) {
-								IR_ASSERT(use_insn->op1 == ref);
-								IR_ASSERT(use_insn->op == IR_VAR);
-								ir_ref region = prev;
-								while (!IR_IS_BB_START(ctx->ir_base[region].op)) {
-									region = ctx->ir_base[region].op1;
-								}
-								use_insn->op1 = region;
-								ir_use_list_add(ctx, region, use);
-								p = &ctx->use_edges[use_list->refs + k];
-							}
-							k++;
-							p++;
-						}
-					}
-					IR_ASSERT(prev && next);
-					if (prev < next) {
-						/* remove MERGE and input END from double linked control list */
-						next_insn->op1 = prev;
-						ir_use_list_replace_one(ctx, prev, input, next);
-						/* remove MERGE and input END instructions */
-						ir_sccp_make_nop(ctx, ref);
-						ir_sccp_make_nop(ctx, input);
-					} else {
-						for (i = 2; i <= n; i++) {
-							ir_insn_set_op(insn, i, IR_UNUSED);
-						}
-						insn->op = IR_BEGIN;
-						insn->op1 = input;
-						input_insn->op = IR_END;
-					}
-					break;
-				} else {
-					for (i = 2; i <= n; i++) {
-						ir_insn_set_op(insn, i, IR_UNUSED);
-					}
-					insn->op = IR_BEGIN;
-					insn->op1 = input;
-				}
-			}
-		}
+		insn->optx = IR_OPTX(IR_BEGIN, IR_VOID, 1);
+		ir_bitqueue_add(worklist, ref);
 	} else {
-		n = insn->inputs_count;
-		i = 1;
-		life_inputs = ir_bitset_malloc(n + 1);
-		for (j = 1; j <= n; j++) {
-			ir_ref input = ir_insn_op(insn, j);
+		insn->inputs_count = new_merge_inputs;
+	}
 
-			if (input) {
-				if (i != j) {
-					ir_insn_set_op(insn, i, input);
-				}
-				ir_bitset_incl(life_inputs, j);
-				i++;
-			}
-		}
-		j = i;
-		while (j <= n) {
-			ir_insn_set_op(insn, j, IR_UNUSED);
-			j++;
-		}
-		i--;
-		insn->inputs_count = i;
+	/* Update PHIs */
+	use_list = &ctx->use_lists[ref];
+	if (use_list->count > 1) {
+		ir_ref use_count = 0;
+		ir_ref *q;
 
-		n++;
-		use_list = &ctx->use_lists[ref];
-		if (use_list->count > 1) {
-			for (k = use_list->count, p = &ctx->use_edges[use_list->refs]; k > 0; p++, k--) {
-				use = *p;
-				use_insn = &ctx->ir_base[use];
-				if (use_insn->op == IR_PHI) {
-				    i = 2;
-					for (j = 2; j <= n; j++) {
-						ir_ref input = ir_insn_op(use_insn, j);
+		for (i = 0, p = q = &ctx->use_edges[use_list->refs]; i < use_list->count; p++, i++) {
+			ir_ref use = *p;
+			ir_insn *use_insn = &ctx->ir_base[use];
 
-						if (ir_bitset_in(life_inputs, j - 1)) {
-							IR_ASSERT(input);
-							if (i != j) {
-								ir_insn_set_op(use_insn, i, input);
-							}
-							i++;
-						} else if (!IR_IS_CONST_REF(input)) {
-							ir_use_list_remove_one(ctx, input, use);
+			if (use_insn->op == IR_PHI) {
+				ir_ref j, k;
+
+				/* compress PHI */
+				for (j = k = 1; j <= old_merge_inputs; j++) {
+					ir_ref input = ir_insn_op(use_insn, j + 1);
+
+					if (ir_bitset_in(life_inputs, j)) {
+						IR_ASSERT(input);
+						if (k != j) {
+							ir_insn_set_op(use_insn, k + 1, input);
 						}
+						k++;
+					} else if (input > 0) {
+						ir_use_list_remove_one(ctx, input, use);
 					}
-					while (i <= n) {
-						ir_insn_set_op(use_insn, i, IR_UNUSED);
-						i++;
-					}
-					use_insn->inputs_count = insn->inputs_count + 1;
+				}
+				while (k <= old_merge_inputs) {
+					k++;
+					ir_insn_set_op(use_insn, k, IR_UNUSED);
+				}
+
+				if (new_merge_inputs == 0) {
+					/* remove PHI */
+#if 0
+					use_insn->op1 = IR_UNUSED;
+					ir_iter_remove_insn(ctx, use, worklist);
+#else
+					IR_ASSERT(0);
+#endif
+					continue;
+				} else if (new_merge_inputs == 1) {
+					/* replace PHI by COPY */
+					use_insn->optx = IR_OPTX(IR_COPY, use_insn->type, 1);
+					use_insn->op1 = use_insn->op2;
+					use_insn->op2 = IR_UNUSED;
+					ir_bitqueue_add(worklist, use);
+					continue;
+				} else {
+					use_insn->inputs_count = new_merge_inputs + 1;
 				}
 			}
+			if (p != q) {
+				*q = use;
+			}
+			q++;
+			use_count++;
 		}
+		for (i = use_count; i < use_list->count; q++, i++) {
+			*q = IR_UNUSED;
+		}
+		use_list->count = use_count;
+	}
+
+	if (life_inputs != &holder) {
 		ir_mem_free(life_inputs);
 	}
+
+	return 1;
 }
 
 static IR_NEVER_INLINE void ir_sccp_transform(ir_ctx *ctx, ir_insn *_values, ir_bitqueue *worklist, ir_bitqueue *iter_worklist)
@@ -1135,7 +1100,7 @@ static IR_NEVER_INLINE void ir_sccp_transform(ir_ctx *ctx, ir_insn *_values, ir_
 
 	while ((i = ir_bitqueue_pop(worklist)) >= 0) {
 		IR_ASSERT(_values[i].op == IR_MERGE);
-		ir_sccp_remove_unfeasible_merge_inputs(ctx, _values, i, _values[i].op1);
+		ir_sccp_remove_unfeasible_merge_inputs(ctx, i, &ctx->ir_base[i], iter_worklist);
 	}
 }
 
@@ -1259,7 +1224,7 @@ static void ir_iter_replace_insn(ir_ctx *ctx, ir_ref ref, ir_ref new_ref, ir_bit
 				ir_bitqueue_add(worklist, input);
 			} else if (ctx->ir_base[input].op == IR_PHI && ctx->use_lists[input].count == 1) {
 				/* try to optimize PHI into ABS/MIN/MAX/COND */
-				ir_bitqueue_add(worklist, input);
+				ir_bitqueue_add(worklist, ctx->ir_base[input].op1);
 			}
 		}
 	}
@@ -2238,10 +2203,46 @@ static void ir_get_true_false_refs(const ir_ctx *ctx, ir_ref if_ref, ir_ref *if_
 	}
 }
 
-static void ir_merge_blocks(ir_ctx *ctx, ir_ref end, ir_ref begin, ir_bitqueue *worklist2)
+static void ir_merge_blocks(ir_ctx *ctx, ir_ref end, ir_ref begin, ir_bitqueue *worklist)
 {
 	ir_ref prev, next;
 	ir_use_list *use_list;
+
+	if (ctx->use_lists[begin].count > 1) {
+		ir_ref *p, n, i, use;
+		ir_insn *use_insn;
+		ir_ref region = end;
+		ir_ref next = IR_UNUSED;
+
+		while (!IR_IS_BB_START(ctx->ir_base[region].op)) {
+			region = ctx->ir_base[region].op1;
+		}
+
+		use_list = &ctx->use_lists[begin];
+		n = use_list->count;
+		for (p = &ctx->use_edges[use_list->refs], i = 0; i < n; p++, i++) {
+			use = *p;
+			use_insn = &ctx->ir_base[use];
+			if (ir_op_flags[use_insn->op] & IR_OP_FLAG_CONTROL) {
+				IR_ASSERT(!next);
+				next = use;
+			} else {
+				IR_ASSERT(use_insn->op == IR_VAR);
+				IR_ASSERT(use_insn->op1 == begin);
+				use_insn->op1 = region;
+				if (ir_use_list_add(ctx, region, use)) {
+					/* restore after reallocation */
+					use_list = &ctx->use_lists[begin];
+					n = use_list->count;
+					p = &ctx->use_edges[use_list->refs + i];
+				}
+			}
+		}
+
+		IR_ASSERT(next);
+		ctx->use_edges[use_list->refs] = next;
+		use_list->count = 1;
+	}
 
 	IR_ASSERT(ctx->ir_base[begin].op == IR_BEGIN);
 	IR_ASSERT(ctx->ir_base[end].op == IR_END);
@@ -2263,7 +2264,7 @@ static void ir_merge_blocks(ir_ctx *ctx, ir_ref end, ir_ref begin, ir_bitqueue *
 	ir_use_list_replace_one(ctx, prev, end, next);
 
 	if (ctx->ir_base[prev].op == IR_BEGIN || ctx->ir_base[prev].op == IR_MERGE) {
-		ir_bitqueue_add(worklist2, prev);
+		ir_bitqueue_add(worklist, prev);
 	}
 }
 
@@ -3525,8 +3526,7 @@ folding:
 			if (!(ctx->flags & IR_OPT_CFG)) {
 				/* pass */
 			} else if (insn->op == IR_BEGIN) {
-				if (ctx->ir_base[insn->op1].op == IR_END
-				 && ctx->use_lists[i].count == 1) {
+				if (insn->op1 && ctx->ir_base[insn->op1].op == IR_END) {
 					ir_merge_blocks(ctx, insn->op1, i, worklist);
 				}
 			} else if (insn->op == IR_MERGE) {
