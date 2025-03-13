@@ -205,7 +205,7 @@ static uint64_t read_dec(const char *p, const char *e)
 		ret = (ret * 10) + (ch - '0');
 	}
 	if (neg) {
-		ret = (uint64_t) -(int64_t)ret;
+		ret = ~ret + 1;
 	}
 	return ret;
 }
