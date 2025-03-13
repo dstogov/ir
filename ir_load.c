@@ -649,7 +649,7 @@ _yy_state_start:
 		case '-':
 			ch = *++YYPOS;
 			accept = YY__MINUS;
-			accept_pos = yy_pos;
+			accept_pos = YYPOS;
 			if ((ch >= '0' && ch <= '9')) {
 				goto _yy_state_20;
 			} else if (ch == '.') {
@@ -713,7 +713,7 @@ _yy_state_start:
 		case '/':
 			ch = *++YYPOS;
 			accept = YY__SLASH;
-			accept_pos = yy_pos;
+			accept_pos = YYPOS;
 			if (ch == '*') {
 				goto _yy_state_61;
 			} else if (ch == '/') {
@@ -766,7 +766,7 @@ _yy_state_20:
 	ch = *++YYPOS;
 _yy_tunnel_20:
 	accept = YY_DECNUMBER;
-	accept_pos = yy_pos;
+	accept_pos = YYPOS;
 	if ((ch >= '0' && ch <= '9')) {
 		goto _yy_state_20;
 	} else if (ch == 'E' || ch == 'e') {
@@ -859,7 +859,7 @@ _yy_state_33:
 _yy_state_49:
 	ch = *++YYPOS;
 	accept = YY_FLOATNUMBER;
-	accept_pos = yy_pos;
+	accept_pos = YYPOS;
 	if ((ch >= '0' && ch <= '9')) {
 		goto _yy_state_49;
 	} else if (ch == 'E' || ch == 'e') {
