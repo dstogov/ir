@@ -205,6 +205,56 @@ static bool ir_loader_sym_data_str(ir_loader *loader, const char *str, size_t le
 	return loader->sym_data_str(loader, buf, len);
 }
 
+static uint64_t read_dec(const char *p, const char *e)
+{
+	uint64_t ret;
+	int neg = 0;
+	char ch = *p;
+
+	if (ch == '-') {
+		ch = *(++p);
+		neg = 1;
+	}
+	IR_ASSERT(ch >= '0' && ch <= '9');
+	ret = ch - '0';
+	while (++p < e) {
+		ch = *p;
+		IR_ASSERT(ch >= '0' && ch <= '9');
+		ret = (ret * 10) + (ch - '0');
+	}
+	if (neg) {
+		ret = (uint64_t) -(int64_t)ret;
+	}
+	return ret;
+}
+
+static uint64_t read_hex(const char *p, const char *e)
+{
+	uint64_t ret = 0;
+	char ch = *p;
+
+	if (ch >= '0' && ch <= '9') {
+		ret = ch - '0';
+	} else if (ch >= 'a' && ch <= 'f') {
+		ret = ch - 'a' + 10;
+	} else {
+		IR_ASSERT(ch >= 'A' && ch <= 'F');
+		ret = ch - 'A' + 10;
+	}
+	while (++p < e) {
+		ch = *p;
+		if (ch >= '0' && ch <= '9') {
+			ret = (ret << 4) | (ch - '0');
+		} else if (ch >= 'a' && ch <= 'f') {
+			ret = (ret << 4) | (ch - 'a' + 10);
+		} else {
+			IR_ASSERT(ch >= 'A' && ch <= 'F');
+			ret = (ret << 4) | (ch - 'A' + 10);
+		}
+	}
+	return ret;
+}
+
 %}
 
 ir(ir_loader *loader):
@@ -708,13 +758,12 @@ DECNUMBER(uint32_t t, ir_val *val):
 	/[\-]?[0-9]+/
 	{if (t == IR_DOUBLE) val->d = atof((const char*)yy_text);
 	else if (t == IR_FLOAT) {val->f = strtof((const char*)yy_text, NULL); val->u32_hi = 0;}
-	else if (IR_IS_TYPE_SIGNED(t)) val->i64 = atoll((const char*)yy_text);
-	else val->u64 = strtoull((const char*)yy_text, NULL, 10);}
+	else val->u64 = read_dec((const char*)yy_text, (const char*)yy_pos);}
 ;
 
 HEXNUMBER(uint32_t t, ir_val *val):
 	/0x[0-9A-Fa-f]+/
-	{val->u64 = strtoull((const char*)yy_text + 2, NULL, 16);}
+	{val->u64 = read_hex((const char*)yy_text + 2, (const char*)yy_pos);}
 ;
 
 FLOATNUMBER(uint32_t t, ir_val *val):
