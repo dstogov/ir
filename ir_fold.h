@@ -2490,6 +2490,44 @@ IR_FOLD(TRUNC(AND))
 	IR_FOLD_NEXT;
 }
 
+IR_FOLD(AND(ZEXT, C_I16))
+IR_FOLD(AND(ZEXT, C_U16))
+IR_FOLD(AND(ZEXT, C_I32))
+IR_FOLD(AND(ZEXT, C_U32))
+IR_FOLD(AND(ZEXT, C_I64))
+IR_FOLD(AND(ZEXT, C_U64))
+IR_FOLD(AND(ZEXT, C_ADDR))
+{
+	ir_type src_size = ir_type_size[ctx->ir_base[op1_insn->op1].type];
+
+	if ((src_size == 1 && op2_insn->val.u64 == 0xff)
+	 || (src_size == 2 && op2_insn->val.u64 == 0xffff)
+	 || (src_size == 4 && op2_insn->val.u64 == 0xffffffff)) {
+		IR_FOLD_COPY(op1);
+	}
+	IR_FOLD_NEXT;
+}
+
+IR_FOLD(AND(SEXT, C_I16))
+IR_FOLD(AND(SEXT, C_U16))
+IR_FOLD(AND(SEXT, C_I32))
+IR_FOLD(AND(SEXT, C_U32))
+IR_FOLD(AND(SEXT, C_I64))
+IR_FOLD(AND(SEXT, C_U64))
+IR_FOLD(AND(SEXT, C_ADDR))
+{
+	ir_type src_size = ir_type_size[ctx->ir_base[op1_insn->op1].type];
+
+	if ((src_size == 1 && op2_insn->val.u64 == 0xff)
+	 || (src_size == 2 && op2_insn->val.u64 == 0xffff)
+	 || (src_size == 4 && op2_insn->val.u64 == 0xffffffff)) {
+		opt = IR_OPT(IR_ZEXT, IR_OPT_TYPE(opt));
+		op1 = op1_insn->op1;
+		op2 = IR_UNUSED;
+		IR_FOLD_RESTART;
+	}
+	IR_FOLD_NEXT;
+}
 IR_FOLD(AND(SHR, C_I8))
 IR_FOLD(AND(SHR, C_U8))
 {
