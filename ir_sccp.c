@@ -3328,6 +3328,10 @@ static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref con
 		condition_insn = &ctx->ir_base[condition];
 	}
 
+	if (condition_insn->op == IR_ALLOCA || condition_insn->op == IR_VADDR) {
+		return IR_TRUE;
+	}
+
 	if (!IR_IS_CONST_REF(condition) && ctx->use_lists[condition].count > 1) {
 		condition = ir_check_dominating_predicates(ctx, control, condition);
 	}
