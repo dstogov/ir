@@ -2468,6 +2468,17 @@ IR_FOLD(SEXT(AND))
 	IR_FOLD_NEXT;
 }
 
+IR_FOLD(SEXT(SHR))
+{
+	if (IR_IS_CONST_REF(op1_insn->op2)
+	 && !IR_IS_SYM_CONST(ctx->ir_base[op1_insn->op2].op)
+	 && ctx->ir_base[op1_insn->op2].val.u64 != 0) {
+		opt = IR_OPT(IR_ZEXT, IR_OPT_TYPE(opt));
+		IR_FOLD_RESTART;
+	}
+	IR_FOLD_NEXT;
+}
+
 IR_FOLD(TRUNC(AND))
 {
 	if (IR_IS_CONST_REF(op1_insn->op2)) {
