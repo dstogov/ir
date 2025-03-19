@@ -927,7 +927,7 @@ static bool ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_ref ref, ir_i
 	IR_ASSERT(insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN);
 	old_merge_inputs = insn->inputs_count;
 	new_merge_inputs = 0;
-	life_inputs = (old_merge_inputs - IR_BITSET_BITS) ? &holder : ir_bitset_malloc(old_merge_inputs + 1);
+	life_inputs = (old_merge_inputs < IR_BITSET_BITS) ? &holder : ir_bitset_malloc(old_merge_inputs + 1);
 
 	for (i = 1; i <= old_merge_inputs; i++) {
 		ir_ref input = ir_insn_op(insn, i);
