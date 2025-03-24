@@ -3264,7 +3264,11 @@ static void ir_emit_mov_ext(ir_ctx *ctx, ir_type type, ir_reg dst, ir_reg src)
 		|	ASM_REG_REG_OP mov, type, dst, src
 	} else if (ir_type_size[type] == 2) {
 		if (IR_IS_TYPE_SIGNED(type)) {
-			|	movsx Rd(dst), Rw(src)
+			if (dst == IR_REG_RAX && src == IR_REG_RAX) {
+				|	cwde
+			} else {
+				|	movsx Rd(dst), Rw(src)
+			}
 		} else {
 			|	movzx Rd(dst), Rw(src)
 		}
@@ -5186,7 +5190,7 @@ static void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			} else if (ir_type_size[type] == 2) {
 				|	cwd
 			} else {
-				|	movsx ax, al
+				|	cbw
 			}
 			if (op2_reg != IR_REG_NONE) {
 				|	ASM_REG_OP idiv, type, op2_reg
@@ -6813,7 +6817,11 @@ static void ir_emit_sext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 		if (ir_type_size[src_type] == 1) {
 			if (ir_type_size[dst_type] == 2) {
-				|	movsx Rw(def_reg), Rb(op1_reg)
+				if (def_reg == IR_REG_RAX && op1_reg == IR_REG_RAX) {
+					|	cbw
+				} else {
+					|	movsx Rw(def_reg), Rb(op1_reg)
+				}
 			} else if (ir_type_size[dst_type] == 4) {
 				|	movsx Rd(def_reg), Rb(op1_reg)
 			} else {
@@ -6825,7 +6833,11 @@ static void ir_emit_sext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 		} else if (ir_type_size[src_type] == 2) {
 			if (ir_type_size[dst_type] == 4) {
-				|	movsx Rd(def_reg), Rw(op1_reg)
+				if (def_reg == IR_REG_RAX && op1_reg == IR_REG_RAX) {
+					|	cwde
+				} else {
+					|	movsx Rd(def_reg), Rw(op1_reg)
+				}
 			} else {
 				IR_ASSERT(ir_type_size[dst_type] == 8);
 				IR_ASSERT(sizeof(void*) == 8);
@@ -6838,7 +6850,11 @@ static void ir_emit_sext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			IR_ASSERT(ir_type_size[dst_type] == 8);
 			IR_ASSERT(sizeof(void*) == 8);
 |.if X64
-			|	movsxd Rq(def_reg), Rd(op1_reg)
+			if (def_reg == IR_REG_RAX && op1_reg == IR_REG_RAX) {
+				|	cdqe
+			} else {
+				|	movsxd Rq(def_reg), Rd(op1_reg)
+			}
 |.endif
 		}
 	} else if (IR_IS_CONST_REF(insn->op1)) {
@@ -7203,6 +7219,8 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |.else
 ||				if (ir_type_size[src_type] == 1) {
 					| movsx Rd(op1_reg), Rb(op1_reg)
+||				} else if (op1_reg == IR_REG_RAX) {
+					| cwde
 ||				} else {
 					| movsx Rd(op1_reg), Rw(op1_reg)
 ||				}
@@ -8502,7 +8520,11 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 			case 4:
 |.if X64
 				if (IR_IS_TYPE_SIGNED(type)) {
-					|	movsxd Ra(op2_reg), Rd(op2_reg)
+					if (op2_reg == IR_REG_RAX) {
+						|	cdqe
+					} else {
+						|	movsxd Ra(op2_reg), Rd(op2_reg)
+					}
 				} else {
 					|	mov Rd(op2_reg), Rd(op2_reg)
 				}
