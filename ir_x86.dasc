@@ -1003,6 +1003,8 @@ const char *ir_reg_name(int8_t reg, ir_type type)
 	_(LEA_SI_B)            \
 	_(LEA_B_SI_O)          \
 	_(LEA_SI_B_O)          \
+	_(LEA_SYM_O)           \
+	_(LEA_O_SYM)           \
 	_(INC)                 \
 	_(DEC)                 \
 	_(MUL_PWR2)            \
@@ -1064,6 +1066,9 @@ const char *ir_reg_name(int8_t reg, ir_type type)
 	_(SSE_CEIL)            \
 	_(SSE_TRUNC)           \
 	_(SSE_NEARBYINT)       \
+
+#define IR_LEA_FIRST IR_LEA_OB
+#define IR_LEA_LAST  IR_LEA_O_SYM
 
 #define IR_RULE_ENUM(name) IR_ ## name,
 
@@ -1584,7 +1589,7 @@ static void ir_match_fuse_addr(ir_ctx *ctx, ir_ref addr_ref)
 		if (!rule) {
 			ctx->rules[addr_ref] = rule = ir_match_insn(ctx, addr_ref);
 		}
-		if (rule >= IR_LEA_OB && rule <= IR_LEA_SI_B_O) {
+		if (rule >= IR_LEA_FIRST && rule <= IR_LEA_LAST) {
 			ir_use_list *use_list;
 			ir_ref j;
 
@@ -1972,6 +1977,19 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref)
 				if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
 					op2_insn = &ctx->ir_base[insn->op2];
 					if (IR_IS_CONST_REF(insn->op1)) {
+						ir_insn *op1_insn = &ctx->ir_base[insn->op1];
+
+						if (insn->op == IR_ADD
+						 && IR_IS_SYM_CONST(op1_insn->op)
+						 && !IR_IS_SYM_CONST(op2_insn->op)
+						 && IR_IS_SIGNED_32BIT((intptr_t)ir_sym_val(ctx, op1_insn) + (intptr_t)op2_insn->val.i64)) {
+							return IR_LEA_SYM_O;
+						} else if (insn->op == IR_ADD
+						 && IR_IS_SYM_CONST(op2_insn->op)
+						 && !IR_IS_SYM_CONST(op1_insn->op)
+						 && IR_IS_SIGNED_32BIT((intptr_t)ir_sym_val(ctx, op2_insn) + (intptr_t)op1_insn->val.i64)) {
+							return IR_LEA_O_SYM;
+						}
 						// const
 						// TODO: add support for sym+offset ???
 					} else if (IR_IS_SYM_CONST(op2_insn->op)) {
@@ -3315,8 +3333,8 @@ static ir_mem ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 	ir_reg base_reg = IR_REG_NONE, index_reg;
 	int32_t offset = 0, scale;
 
-	IR_ASSERT(((rule & IR_RULE_MASK) >= IR_LEA_OB &&
-			(rule & IR_RULE_MASK) <= IR_LEA_SI_B_O) ||
+	IR_ASSERT(((rule & IR_RULE_MASK) >= IR_LEA_FIRST &&
+			(rule & IR_RULE_MASK) <= IR_LEA_LAST) ||
 		rule == IR_STATIC_ALLOCA);
 	switch (rule & IR_RULE_MASK) {
 		default:
@@ -3501,6 +3519,22 @@ static ir_mem ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 			base_reg_ref = insn->op1 * sizeof(ir_ref) + 2;
 			op1_insn = &ctx->ir_base[op1_insn->op1];
 			scale = ctx->ir_base[op1_insn->op2].val.i32;
+			break;
+		case IR_LEA_SYM_O:
+			op1_insn = &ctx->ir_base[insn->op1];
+			op2_insn = &ctx->ir_base[insn->op2];
+			offset = (intptr_t)ir_sym_val(ctx, op1_insn) + (intptr_t)op2_insn->val.i64;
+			base_reg_ref = index_reg_ref = IR_UNUSED;
+			scale = 1;
+			offset_insn = NULL;
+			break;
+		case IR_LEA_O_SYM:
+			op1_insn = &ctx->ir_base[insn->op1];
+			op2_insn = &ctx->ir_base[insn->op2];
+			offset = (intptr_t)ir_sym_val(ctx, op2_insn) + (intptr_t)op1_insn->val.i64;
+			base_reg_ref = index_reg_ref = IR_UNUSED;
+			scale = 1;
+			offset_insn = NULL;
 			break;
 		case IR_ALLOCA:
 			offset = IR_SPILL_POS_TO_OFFSET(insn->op3);
@@ -10625,6 +10659,8 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_LEA_SI_B:
 				case IR_LEA_B_SI_O:
 				case IR_LEA_SI_B_O:
+				case IR_LEA_SYM_O:
+				case IR_LEA_O_SYM:
 					ir_emit_lea(ctx, i, insn->type);
 					break;
 				case IR_MUL_PWR2:
