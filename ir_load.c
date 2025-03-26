@@ -408,11 +408,6 @@ const char *yy_escape_string(char *buf, size_t size, const unsigned char *str, s
 	return buf;
 }
 
-static int skip_EOL(int sym);
-static int skip_WS(int sym);
-static int skip_ONE_LINE_COMMENT(int sym);
-static int skip_COMMENT(int sym);
-static int get_sym(void);
 static int parse_ir(int sym, ir_loader *loader);
 static int parse_ir_sym(int sym, char *buf, uint32_t *flags);
 static int parse_ir_sym_size(int sym, size_t *size);
@@ -432,7 +427,7 @@ static int parse_FLOATNUMBER(int sym, uint32_t t, ir_val *val);
 static int parse_CHARACTER(int sym, uint32_t t, ir_val *val);
 static int parse_STRING(int sym, const char **str, size_t *len);
 
-static int get_skip_sym(void) {
+static int get_sym(void) {
 	char buf[64];
 	int ch;
 	int ret;
@@ -892,17 +887,14 @@ _yy_state_start:
 			if (ch == '\n') {
 				yy_line++;
 				YYPOS++;
-				ret = YY_EOL;
-				goto _yy_fin;
+				goto _yy_state_start;
 			} else {
-				ret = YY_EOL;
-				goto _yy_fin;
+				goto _yy_state_start;
 			}
 		case '\n':
 			yy_line++;
 			YYPOS++;
-			ret = YY_EOL;
-			goto _yy_fin;
+			goto _yy_state_start;
 		case ' ':
 		case '\t':
 		case '\f':
@@ -995,8 +987,7 @@ _yy_state_35:
 	if (ch == '\t' || ch == '\v' || ch == '\f' || ch == ' ') {
 		goto _yy_state_35;
 	} else {
-		ret = YY_WS;
-		goto _yy_fin;
+		goto _yy_state_start;
 	}
 _yy_state_36:
 	ch = *++YYPOS;
@@ -1005,17 +996,14 @@ _yy_state_36:
 		if (ch == '\n') {
 			yy_line++;
 			YYPOS++;
-			ret = YY_ONE_LINE_COMMENT;
-			goto _yy_fin;
+			goto _yy_state_start;
 		} else {
-			ret = YY_ONE_LINE_COMMENT;
-			goto _yy_fin;
+			goto _yy_state_start;
 		}
 	} else if (ch == '\n') {
 		yy_line++;
 		YYPOS++;
-		ret = YY_ONE_LINE_COMMENT;
-		goto _yy_fin;
+		goto _yy_state_start;
 	} else if (YYPOS < YYEND && (ch <= '\t' || ch == '\v' || ch == '\f' || ch >= '\016')) {
 		goto _yy_state_36;
 	} else {
@@ -1054,8 +1042,7 @@ _yy_tunnel_69:
 		ch = *++YYPOS;
 		if (ch != '/') goto _yy_tunnel_69;
 		YYPOS++;
-		ret = YY_COMMENT;
-		goto _yy_fin;
+		goto _yy_state_start;
 	} else if (YYPOS < YYEND && (ch <= ')' || ch >= '+')) {
 		if (ch == '\n') {
 			yy_line++;
@@ -1104,55 +1091,6 @@ _yy_state_error:
 _yy_fin:
 	yy_pos = YYPOS;
 	return ret;
-}
-
-static int skip_EOL(int sym) {
-	if (sym != YY_EOL) {
-		yy_error_sym("<EOL> expected, got", sym);
-	}
-	sym = get_skip_sym();
-	return sym;
-}
-
-static int skip_WS(int sym) {
-	if (sym != YY_WS) {
-		yy_error_sym("<WS> expected, got", sym);
-	}
-	sym = get_skip_sym();
-	return sym;
-}
-
-static int skip_ONE_LINE_COMMENT(int sym) {
-	if (sym != YY_ONE_LINE_COMMENT) {
-		yy_error_sym("<ONE_LINE_COMMENT> expected, got", sym);
-	}
-	sym = get_skip_sym();
-	return sym;
-}
-
-static int skip_COMMENT(int sym) {
-	if (sym != YY_COMMENT) {
-		yy_error_sym("<COMMENT> expected, got", sym);
-	}
-	sym = get_skip_sym();
-	return sym;
-}
-
-static int get_sym(void) {
-	int sym;
-	sym = get_skip_sym();
-	while (sym == YY_EOL || sym == YY_WS || sym == YY_ONE_LINE_COMMENT || sym == YY_COMMENT) {
-		if (sym == YY_EOL) {
-			sym = skip_EOL(sym);
-		} else if (sym == YY_WS) {
-			sym = skip_WS(sym);
-		} else if (sym == YY_ONE_LINE_COMMENT) {
-			sym = skip_ONE_LINE_COMMENT(sym);
-		} else {
-			sym = skip_COMMENT(sym);
-		}
-	}
-	return sym;
 }
 
 static int parse_ir(int sym, ir_loader *loader) {
