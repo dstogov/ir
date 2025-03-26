@@ -52,7 +52,6 @@ typedef struct _ir_parser_ctx {
 	ir_strtab  var_tab;
 } ir_parser_ctx;
 
-static ir_strtab type_tab;
 static ir_strtab op_tab;
 
 #define IR_UNRESOLVED_MASK            0xc0000000
@@ -685,14 +684,20 @@ ir_insn(ir_parser_ctx *p):
 ;
 
 type(uint8_t *t):
-	{const char *str;}
-	{size_t len;}
-	{ir_ref ref;}
-	ID(&str, &len)
-	{IR_ASSERT(len <= 0xffffffff);}
-	{ref = ir_strtab_find(&type_tab, str, (uint32_t)len);}
-	{if (!ref) yy_error("invalid type");}
-	{*t = ref;}
+	(	"bool"      {*t = IR_BOOL;}
+	|	"uint8_t"   {*t = IR_U8;}
+	|	"uint16_t"  {*t = IR_U16;}
+	|	"uint32_t"  {*t = IR_U32;}
+	|	"uint64_t"  {*t = IR_U64;}
+	|	"uintptr_t" {*t = IR_ADDR;}
+	|	"char"      {*t = IR_CHAR;}
+	|	"int8_t"    {*t = IR_I8;}
+	|	"int16_t"   {*t = IR_I16;}
+	|	"int32_t"   {*t = IR_I32;}
+	|	"int64_t"   {*t = IR_I64;}
+	|	"double"    {*t = IR_DOUBLE;}
+	|	"float"     {*t = IR_FLOAT;}
+	)
 ;
 
 func(uint8_t *op):
@@ -855,11 +860,6 @@ void ir_loader_init(void)
 {
 	ir_ref i;
 
-	ir_strtab_init(&type_tab, IR_LAST_OP, 0);
-	for (i = 1; i < IR_LAST_TYPE; i++) {
-		ir_strtab_lookup(&type_tab, ir_type_cname[i], (uint32_t)strlen(ir_type_cname[i]), i);
-	}
-
 	ir_strtab_init(&op_tab, IR_LAST_OP, 0);
 	for (i = 0; i < IR_LAST_OP; i++) {
 		ir_strtab_lookup(&op_tab, ir_op_name[i], (uint32_t)strlen(ir_op_name[i]), i + 1);
@@ -868,6 +868,5 @@ void ir_loader_init(void)
 
 void ir_loader_free(void)
 {
-	ir_strtab_free(&type_tab);
 	ir_strtab_free(&op_tab);
 }
