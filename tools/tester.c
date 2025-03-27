@@ -318,6 +318,9 @@ static int run_test(const char *filename, test *t, int show_diff)
 			f = fopen(out_filename, "a+");
 			fprintf(f, "\ntermsig = %d\n", ret);
 			fclose(f);
+			if (ret == SIGINT || ret == SIGQUIT) {
+				kill(getpid(), ret);
+			}
 		}
 #endif
 
