@@ -1709,7 +1709,7 @@ static bool ir_may_promote_trunc(ir_ctx *ctx, ir_type type, ir_ref ref)
 						}
 					}
 				}
-				for (p = insn->ops + 1, n = insn->inputs_count - 1; n > 0; p++, n--) {
+				for (p = insn->ops + 2, n = insn->inputs_count - 1; n > 0; p++, n--) {
 					input = *p;
 					if (input != ref) {
 						if (!ir_may_promote_trunc(ctx, type, input)) {
@@ -1815,7 +1815,7 @@ static ir_ref ir_promote_i2i(ir_ctx *ctx, ir_type type, ir_ref ref, ir_ref use, 
 				insn->type = type;
 				return ref;
 			case IR_PHI:
-				for (p = insn->ops + 1, n = insn->inputs_count - 1; n > 0; p++, n--) {
+				for (p = insn->ops + 2, n = insn->inputs_count - 1; n > 0; p++, n--) {
 					input = *p;
 					if (input != ref) {
 						*p = ir_promote_i2i(ctx, type, input, ref, worklist);
