@@ -163,6 +163,13 @@ static void ir_mem2ssa_convert(ir_ctx      *ctx,
 			ir_use_list_replace_one(ctx, prev, use, next);
 			if (!IR_IS_CONST_REF(use_insn->op3)) {
 				ir_use_list_remove_one(ctx, use_insn->op3, use);
+				/* op3 may became dead */
+				if (ctx->use_lists[use_insn->op3].count == 0
+				 || (ctx->use_lists[use_insn->op3].count == 1
+				  && (ir_op_flags[ctx->ir_base[use_insn->op3].op] & IR_OP_FLAG_MEM)
+				  && (ir_op_flags[ctx->ir_base[use_insn->op3].op] & (IR_OP_FLAG_MEM_LOAD|IR_OP_FLAG_MEM_ALLOC)))) {
+					ir_bitqueue_add(iter_worklist, use_insn->op3);
+				}
 			}
 
 			b = ctx->cfg_map[use];
