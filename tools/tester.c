@@ -25,6 +25,7 @@
 # include <sys/wait.h>
 # include <dirent.h>
 # include <unistd.h>
+# include <signal.h>
 # if defined(__linux__) || defined(__sun)
 #  include <alloca.h>
 # endif
