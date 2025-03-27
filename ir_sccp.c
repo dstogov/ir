@@ -1909,7 +1909,7 @@ static uint32_t _ir_estimated_control(ir_ctx *ctx, ir_ref val)
 	}
 
 	IR_ASSERT(ir_op_flags[insn->op] & IR_OP_FLAG_DATA);
-	if (IR_OPND_KIND(ir_op_flags[insn->op], 1) & IR_OPND_CONTROL_DEP) {
+	if (IR_OPND_KIND(ir_op_flags[insn->op], 1) == IR_OPND_CONTROL_DEP) {
 		return insn->op1;
 	}
 
