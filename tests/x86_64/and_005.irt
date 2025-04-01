@@ -15,6 +15,6 @@ x86_64
 --EXPECT--
 test:
 	movq %rdi, %rax
-	movabsq $18446730879570018303, %rcx
+	movabsq $0xfffff3ffffffffff, %rcx
 	andq %rcx, %rax
 	retq
