@@ -816,7 +816,7 @@ WS: /[ \t\f\v]+/;
 ONE_LINE_COMMENT: /(\/\/|#)[^\r\n]*(\r\n|\r|\n)/;
 COMMENT: /\/\*([^\*]|\*+[^\*\/])*\*+\//;
 
-SKIP: ( EOL | WS | ONE_LINE_COMMENT | COMMENT )*;
+IGNORE: EOL | WS | ONE_LINE_COMMENT | COMMENT;
 
 %%
 
