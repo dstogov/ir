@@ -1,0 +1,20 @@
+--TEST--
+003: or function
+--TARGET--
+x86_64
+--ARGS--
+-S
+--CODE--
+{
+	uint64_t c = 0x40000000001; /* (1<<42) | 1 */
+	l_1 = START(l_4);
+	uint64_t x = PARAM(l_1, "x", 1);
+	uint64_t ret = OR(x, c);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	movq %rdi, %rax
+	movabsq $0x40000000001, %rcx
+	orq %rcx, %rax
+	retq
