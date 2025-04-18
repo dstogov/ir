@@ -283,7 +283,7 @@ IR_ALWAYS_INLINE void* ir_arena_checkpoint(ir_arena *arena)
 	return arena->ptr;
 }
 
-IR_ALWAYS_INLINE void ir_release(ir_arena **arena_ptr, void *checkpoint)
+IR_ALWAYS_INLINE void ir_arena_release(ir_arena **arena_ptr, void *checkpoint)
 {
 	ir_arena *arena = *arena_ptr;
 
