@@ -348,10 +348,7 @@ static const char * sym_name[] = {
 	NULL
 };
 
-#define YY_IN_SET(sym, set, bitset) \
-	(bitset[sym>>3] & (1 << (sym & 0x7)))
-
-size_t yy_escape(char *buf, unsigned char ch)
+size_t yy_escape(char *buf, int ch)
 {
 	switch (ch) {
 		case '\\': buf[0] = '\\'; buf[1] = '\\'; return 2;
@@ -380,7 +377,7 @@ size_t yy_escape(char *buf, unsigned char ch)
 	}
 }
 
-const char *yy_escape_char(char *buf, unsigned char ch)
+const char *yy_escape_char(char *buf, int ch)
 {
 	size_t len = yy_escape(buf, ch);
 	buf[len] = 0;
@@ -407,6 +404,9 @@ const char *yy_escape_string(char *buf, size_t size, const unsigned char *str, s
 	buf[pos] = 0;
 	return buf;
 }
+
+#define YY_IN_SET(sym, set, bitset) \
+	(bitset[sym>>3] & (1 << (sym & 0x7)))
 
 static int parse_ir(int sym, ir_loader *loader);
 static int parse_ir_sym(int sym, char *buf, uint32_t *flags);
@@ -1097,7 +1097,7 @@ static int parse_ir(int sym, ir_loader *loader) {
 	int   sym2;
 	const unsigned char *save_pos;
 	const unsigned char *save_text;
-	int   save_line;
+	int save_line;
 	int alt13;
 	int alt9;
 	ir_parser_ctx p;
@@ -1453,7 +1453,7 @@ static int parse_ir_func_proto(int sym, ir_parser_ctx *p, uint32_t *flags, uint8
 	int   sym2;
 	const unsigned char *save_pos;
 	const unsigned char *save_text;
-	int   save_line;
+	int save_line;
 	int alt87;
 	uint8_t t = 0;
 	uint32_t n = 0;
