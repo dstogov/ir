@@ -1485,6 +1485,18 @@ void ir_update_op(ir_ctx *ctx, ir_ref ref, uint32_t idx, ir_ref new_val)
 void ir_array_grow(ir_array *a, uint32_t size)
 {
 	IR_ASSERT(size > a->size);
+	if (size >= 256) {
+		size = IR_ALIGNED_SIZE(size, 256);
+	} else {
+		/* Use big enough power of 2 */
+		size -= 1;
+		size |= (size >> 1);
+		size |= (size >> 2);
+		size |= (size >> 4);
+//		size |= (size >> 8);
+//		size |= (size >> 16);
+		size += 1;
+	}
 	a->refs = ir_mem_realloc(a->refs, size * sizeof(ir_ref));
 	a->size = size;
 }
