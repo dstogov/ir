@@ -154,19 +154,27 @@ typedef enum _ir_type {
 } ir_type;
 
 #ifdef IR_64
-# define IR_SIZE_T     IR_U64
-# define IR_SSIZE_T    IR_I64
-# define IR_UINTPTR_T  IR_U64
-# define IR_INTPTR_T   IR_I64
-# define IR_C_UINTPTR  IR_U64
-# define IR_C_INTPTR   IR_I64
+# define IR_SIZE_T          IR_U64
+# define IR_SSIZE_T         IR_I64
+# define IR_UINTPTR_T       IR_U64
+# define IR_INTPTR_T        IR_I64
+# define IR_C_UINTPTR       IR_U64
+# define IR_C_INTPTR        IR_I64
+# define ir_const_size_t    ir_const_u64
+# define ir_const_ssize_t   ir_const_i64
+# define ir_const_uintptr_t ir_const_u64
+# define ir_const_intptr_t  ir_const_i64
 #else
-# define IR_SIZE_T     IR_U32
-# define IR_SSIZE_T    IR_I32
-# define IR_UINTPTR_T  IR_U32
-# define IR_INTPTR_T   IR_I32
-# define IR_C_UINTPTR  IR_U32
-# define IR_C_INTPTR   IR_I32
+# define IR_SIZE_T          IR_U32
+# define IR_SSIZE_T         IR_I32
+# define IR_UINTPTR_T       IR_U32
+# define IR_INTPTR_T        IR_I32
+# define IR_C_UINTPTR       IR_U32
+# define IR_C_INTPTR        IR_I32
+# define ir_const_size_t    ir_const_u32
+# define ir_const_ssize_t   ir_const_i32
+# define ir_const_uintptr_t ir_const_u32
+# define ir_const_intptr_t  ir_const_i32
 #endif
 
 /* List of IR opcodes
