@@ -3570,11 +3570,12 @@ remove_aliased_load:
 				if (val_insn->type == insn->type) {
 					ir_iter_replace_insn(ctx, i, val, worklist);
 				} else {
-					IR_ASSERT(!IR_IS_CONST_REF(insn->op2));
-					ir_use_list_remove_one(ctx, insn->op2, i);
-					if (ir_is_dead(ctx, insn->op2)) {
-						/* schedule DCE */
-						ir_bitqueue_add(worklist, insn->op2);
+					if (!IR_IS_CONST_REF(insn->op2)) {
+						ir_use_list_remove_one(ctx, insn->op2, i);
+						if (ir_is_dead(ctx, insn->op2)) {
+							/* schedule DCE */
+							ir_bitqueue_add(worklist, insn->op2);
+						}
 					}
 					if (!IR_IS_CONST_REF(val)) {
 						ir_use_list_add(ctx, val, i);
