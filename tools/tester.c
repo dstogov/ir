@@ -97,7 +97,7 @@ static void init_console(void)
 static test *parse_file(const char *filename, int id)
 {
 	test *t;
-	char *buf, **section;
+	char *buf, **section, **last_section = NULL;
 	int fd;
 	size_t start, i, size;
 	struct stat stat_buf;
@@ -143,14 +143,22 @@ static test *parse_file(const char *filename, int id)
 			while (i < size && (buf[i] == '\r' || buf[i] == '\n')) i++;
 		}
 		if (section) {
-			while (start > 0 && (buf[start - 1] == '\r' || buf[start - 1] == '\n')) start--;
+			if (!last_section || last_section != &t->code) {
+				while (start > 0 && (buf[start - 1] == '\r' || buf[start - 1] == '\n')) start--;
+			}
 			buf[start] = 0;
 			if (*section) {
 				free(t);
 				return NULL;
 			}
-			while (i < size && (buf[i] == '\r' || buf[i] == '\n')) i++;
+			if (section == &t->code) {
+				if (i < size && buf[i] == '\r') i++;
+				if (i < size && buf[i] == '\n') i++;
+			} else {
+				while (i < size && (buf[i] == '\r' || buf[i] == '\n')) i++;
+			}
 			*section = buf + i;
+			last_section = section;
 		}
 	}
 	if (!t->name || !t->code || !t->expect) {
