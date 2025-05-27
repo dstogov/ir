@@ -409,6 +409,13 @@ typedef int32_t ir_ref;
 #define IR_CONSTS_LIMIT_MIN (-(IR_TRUE - 1))
 #define IR_INSNS_LIMIT_MIN (IR_UNUSED + 1)
 
+/* ADDR_MEMBER is neccessary to workaround MSVC C preprocessor bug */
+#ifndef IR_64
+# define ADDR_MEMBER            uintptr_t                  addr; \
+								void                      *ptr;
+#else
+# define ADDR_MEMBER
+#endif
 typedef union _ir_val {
 	double                             d;
 	uint64_t                           u64;
@@ -422,10 +429,7 @@ typedef union _ir_val {
 			uint32_t                   u32;
 			int32_t                    i32;
 			float                      f;
-#ifndef IR_64
-			uintptr_t                  addr;
-			void                      *ptr;
-#endif
+			ADDR_MEMBER
 			ir_ref                     name;
 			ir_ref                     str;
 			IR_STRUCT_LOHI(
@@ -448,6 +452,7 @@ typedef union _ir_val {
 		uint32_t                       u32_hi
 	);
 } ir_val;
+#undef ADDR_MEMBER
 
 /* IR Instruction */
 typedef struct _ir_insn {
