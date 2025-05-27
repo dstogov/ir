@@ -409,24 +409,23 @@ typedef int32_t ir_ref;
 #define IR_CONSTS_LIMIT_MIN (-(IR_TRUE - 1))
 #define IR_INSNS_LIMIT_MIN (IR_UNUSED + 1)
 
-#ifndef IR_64
-# define ADDR_MEMBER            uintptr_t                  addr;
-#else
-# define ADDR_MEMBER
-#endif
 typedef union _ir_val {
 	double                             d;
 	uint64_t                           u64;
 	int64_t                            i64;
 #ifdef IR_64
 	uintptr_t                          addr;
+	void                              *ptr;
 #endif
 	IR_STRUCT_LOHI(
 		union {
 			uint32_t                   u32;
 			int32_t                    i32;
 			float                      f;
-			ADDR_MEMBER
+#ifndef IR_64
+			uintptr_t                  addr;
+			void                      *ptr;
+#endif
 			ir_ref                     name;
 			ir_ref                     str;
 			IR_STRUCT_LOHI(
@@ -449,7 +448,6 @@ typedef union _ir_val {
 		uint32_t                       u32_hi
 	);
 } ir_val;
-#undef ADDR_MEMBER
 
 /* IR Instruction */
 typedef struct _ir_insn {
@@ -474,6 +472,7 @@ typedef struct _ir_insn {
 		},
 		union {
 			ir_ref                     op1;
+			ir_ref                     ref;
 			ir_ref                     prev_const;
 		}
 	);
