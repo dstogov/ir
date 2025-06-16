@@ -1075,6 +1075,9 @@ next:
 				bb->flags |= IR_BB_LOOP_HEADER;
 				ctx->flags2 |= IR_CFG_HAS_LOOPS;
 				bb->loop_depth = 1;
+				if (ctx->ir_base[bb->start].op == IR_MERGE) {
+					ctx->ir_base[bb->start].op = IR_LOOP_BEGIN;
+				}
 				while (ir_worklist_len(&work)) {
 					j = ir_worklist_pop(&work);
 					while (blocks[j].loop_header > 0) {
