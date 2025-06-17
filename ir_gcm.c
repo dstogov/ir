@@ -818,27 +818,47 @@ int ir_schedule(ir_ctx *ctx)
 		} else if (b > prev_b) {
 			bb = &ctx->cfg_blocks[b];
 			if (i == bb->start) {
-				IR_ASSERT(bb->end > bb->start);
-				prev_b = b;
-				prev_b_end = bb->end;
-				_prev[bb->end] = 0;
+				if (bb->end > bb->start) {
+					prev_b = b;
+					prev_b_end = bb->end;
+					/* add to the end of the list */
+					_next[j] = i;
+					_prev[i] = j;
+					j = i;
+				} else {
+					prev_b = 0;
+					prev_b_end = 0;
+					k = bb->end;
+					while (_blocks[_prev[k]] == b) {
+						k = _prev[k];
+					}
+					/* insert before "k" */
+					_prev[i] = _prev[k];
+					_next[i] = k;
+					_next[_prev[k]] = i;
+					_prev[k] = i;
+				}
+			} else if (i != bb->end) {
+				/* move down late (see the following loop) */
+				_next[i] = _move_down;
+				_move_down = i;
+			} else {
+				IR_ASSERT(bb->start > bb->end);
+				prev_b = 0;
+				prev_b_end = 0;
 				/* add to the end of the list */
 				_next[j] = i;
 				_prev[i] = j;
 				j = i;
-			} else {
-				IR_ASSERT(i != bb->end);
-				/* move down late (see the following loop) */
-				_next[i] = _move_down;
-				_move_down = i;
 			}
 		} else if (b) {
 			bb = &ctx->cfg_blocks[b];
 			IR_ASSERT(i != bb->start);
-			if (_prev[bb->end]) {
+			if (i > bb->end) {
 				/* move up, insert before the end of the already scheduled BB */
 				k = bb->end;
 			} else {
+				IR_ASSERT(i > bb->start);
 				/* move up, insert at the end of the block */
 				k = ctx->cfg_blocks[b + 1].start;
 			}

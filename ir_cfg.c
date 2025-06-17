@@ -244,7 +244,6 @@ int ir_build_cfg(ir_ctx *ctx)
 		_blocks[start] = b;
 		_blocks[end] = b;
 		IR_ASSERT(IR_IS_BB_START(insn->op));
-		IR_ASSERT(end > start);
 		bb->start = start;
 		bb->end = end;
 		bb->successors = count;
