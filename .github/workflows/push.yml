@@ -128,7 +128,7 @@ jobs:
     strategy:
       matrix:
         arch: [x86, amd64]
-    runs-on: windows-2019
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v3
       - uses: ilammy/msvc-dev-cmd@v1
