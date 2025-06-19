@@ -965,7 +965,7 @@ static bool ir_dominates(const ir_block *blocks, uint32_t b1, uint32_t b2)
 
 int ir_find_loops(ir_ctx *ctx)
 {
-	uint32_t i, j, n, count;
+	uint32_t b, j, n, count;
 	uint32_t *entry_times, *exit_times, *sorted_blocks, time = 1;
 	ir_block *blocks = ctx->cfg_blocks;
 	uint32_t *edges = ctx->cfg_edges;
@@ -990,13 +990,13 @@ int ir_find_loops(ir_ctx *ctx)
 		int child;
 
 next:
-		i = ir_worklist_peek(&work);
-		if (!entry_times[i]) {
-			entry_times[i] = time++;
+		b = ir_worklist_peek(&work);
+		if (!entry_times[b]) {
+			entry_times[b] = time++;
 		}
 
-		/* Visit blocks immediately dominated by i. */
-		bb = &blocks[i];
+		/* Visit blocks immediately dominated by "b". */
+		bb = &blocks[b];
 		for (child = bb->dom_child; child > 0; child = blocks[child].dom_next_child) {
 			if (ir_worklist_push(&work, child)) {
 				goto next;
@@ -1006,17 +1006,17 @@ next:
 		/* Visit join edges. */
 		if (bb->successors_count) {
 			uint32_t *p = edges + bb->successors;
-			for (j = 0; j < bb->successors_count; j++,p++) {
+			for (j = 0; j < bb->successors_count; j++, p++) {
 				uint32_t succ = *p;
 
-				if (blocks[succ].idom == i) {
+				if (blocks[succ].idom == b) {
 					continue;
 				} else if (ir_worklist_push(&work, succ)) {
 					goto next;
 				}
 			}
 		}
-		exit_times[i] = time++;
+		exit_times[b] = time++;
 		ir_worklist_pop(&work);
 	}
 
@@ -1025,7 +1025,7 @@ next:
 	j = 1;
 	n = 2;
 	while (j != n) {
-		i = j;
+		uint32_t i = j;
 		j = n;
 		for (; i < j; i++) {
 			int child;
@@ -1038,8 +1038,8 @@ next:
 
 	/* Identify loops. See Sreedhar et al, "Identifying Loops Using DJ Graphs". */
 	while (n > 1) {
-		i = sorted_blocks[--n];
-		ir_block *bb = &blocks[i];
+		b = sorted_blocks[--n];
+		ir_block *bb = &blocks[b];
 
 		if (bb->predecessors_count > 1) {
 			bool irreducible = 0;
@@ -1054,7 +1054,7 @@ next:
 				if (bb->idom != pred) {
 					/* In a loop back-edge (back-join edge), the successor dominates
 					   the predecessor.  */
-					if (ir_dominates(blocks, i, pred)) {
+					if (ir_dominates(blocks, b, pred)) {
 						if (!ir_worklist_len(&work)) {
 							ir_bitset_clear(work.visited, ir_bitset_len(ir_worklist_capasity(&work)));
 						}
@@ -1063,7 +1063,7 @@ next:
 					} else {
 						/* Otherwise it's a cross-join edge.  See if it's a branch
 						   to an ancestor on the DJ spanning tree.  */
-						if (entry_times[pred] > entry_times[i] && exit_times[pred] < exit_times[i]) {
+						if (entry_times[pred] > entry_times[b] && exit_times[pred] < exit_times[b]) {
 							irreducible = 1;
 						}
 					}
@@ -1079,6 +1079,9 @@ next:
 					ir_worklist_pop(&work);
 				}
 			} else if (ir_worklist_len(&work)) {
+				/* collect members of the reducible loop */
+				uint32_t hdr = b;
+
 				bb->flags |= IR_BB_LOOP_HEADER;
 				ctx->flags2 |= IR_CFG_HAS_LOOPS;
 				bb->loop_depth = 1;
@@ -1086,24 +1089,23 @@ next:
 					ctx->ir_base[bb->start].op = IR_LOOP_BEGIN;
 				}
 				while (ir_worklist_len(&work)) {
-					j = ir_worklist_pop(&work);
-					while (blocks[j].loop_header > 0) {
-						j = blocks[j].loop_header;
-					}
-					if (j != i) {
-						ir_block *bb = &blocks[j];
-						if (bb->idom == 0 && j != 1) {
-							/* Ignore blocks that are unreachable or only abnormally reachable. */
-							continue;
-						}
-						bb->loop_header = i;
+					b = ir_worklist_pop(&work);
+					if (b != hdr) {
+						ir_block *bb = &blocks[b];
+						bb->loop_header = hdr;
 						if (bb->predecessors_count) {
 							uint32_t *p = &edges[bb->predecessors];
-							j = bb->predecessors_count;
+							uint32_t n = bb->predecessors_count;
 							do {
-								ir_worklist_push(&work, *p);
+								uint32_t pred = *p;
+								while (blocks[pred].loop_header > 0) {
+									pred = blocks[pred].loop_header;
+								}
+								if (pred != hdr) {
+									ir_worklist_push(&work, pred);
+								}
 								p++;
-							} while (--j);
+							} while (--n);
 						}
 					}
 				}
@@ -1113,8 +1115,8 @@ next:
 
 	if (ctx->flags2 & IR_CFG_HAS_LOOPS) {
 		for (n = 1; n < count; n++) {
-			i = sorted_blocks[n];
-			ir_block *bb = &blocks[i];
+			b = sorted_blocks[n];
+			ir_block *bb = &blocks[b];
 			if (bb->loop_header > 0) {
 				ir_block *loop = &blocks[bb->loop_header];
 				uint32_t loop_depth = loop->loop_depth;
