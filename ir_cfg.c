@@ -1480,10 +1480,6 @@ restart:
 					}
 				} else if (b != predecessor && ctx->cfg_blocks[predecessor].loop_header != b) {
 					/* not a loop back-edge */
-#ifdef IR_DEBUG
-					ctx->cfg_schedule = NULL; /* reset incomplete schedule */
-					ir_dump_cfg(ctx, stderr);
-#endif
 					IR_ASSERT(b == predecessor || ctx->cfg_blocks[predecessor].loop_header == b);
 				}
 			}

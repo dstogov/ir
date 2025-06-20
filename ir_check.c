@@ -214,7 +214,6 @@ bool ir_check(const ir_ctx *ctx)
 								}
 							}
 							if ((ctx->flags2 & IR_LINEAR)
-							 && !(ctx->flags2 & IR_IRREDUCIBLE_CFG) // TODO: fix irreducible LOOPs handling???
 							 && use >= i
 							 && !(insn->op == IR_LOOP_BEGIN)) {
 								fprintf(stderr, "ir_base[%d].ops[%d] invalid forward reference (%d)\n", i, j, use);
