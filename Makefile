@@ -14,9 +14,7 @@ BUILD_CC   = gcc
 override CFLAGS += -Wall -Wextra -Wno-unused-parameter
 override BUILD_CFLAGS += -Wall -Wextra -Wno-unused-parameter
 LDFLAGS    = -lm -ldl
-PHP        = php
 LLK        = llk
-#LLK        = $(PHP) $(HOME)/php/llk/llk.php
 
 ifeq (debug, $(BUILD))
  override CFLAGS += -O0 -g -DIR_DEBUG=1
