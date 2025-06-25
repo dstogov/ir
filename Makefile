@@ -137,10 +137,11 @@ clean:
 install: $(BUILD_DIR)/ir $(BUILD_DIR)/libir.a
 	install -m a+rx $(BUILD_DIR)/ir $(PREFIX)/bin
 	install -m a+r $(BUILD_DIR)/libir.a $(PREFIX)/lib
-	install -m a+r $(SRC_DIR)/ir.h $(SRC_DIR)/ir_builder.h $(PREFIX)/include
+	install -m a+r $(SRC_DIR)/ir.h $(SRC_DIR)/ir_builder.h $(SRC_DIR)/ir_private.h $(PREFIX)/include
 
 uninstall:
 	rm $(PREFIX)/bin/ir
 	rm $(PREFIX)/lib/libir.a
 	rm $(PREFIX)/include/ir.h
 	rm $(PREFIX)/include/ir_builder.h
+	rm $(PREFIX)/include/ir_private.h
