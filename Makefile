@@ -2,7 +2,7 @@
 TARGET     = x86_64
 OS         = $(shell uname -s)
 # BUILD can be "debug" or "release"
-BUILD      = debug
+BUILD      = release
 BUILD_DIR  = .
 SRC_DIR    = .
 HAVE_LLVM  = no
