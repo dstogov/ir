@@ -1,0 +1,25 @@
+--TEST--
+001: tailcall: epilogue does not override op2
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	uintptr_t f = PARAM(l_1, "p", 1);
+	l_2 = CALL(l_1, f);
+	l_3 = TAILCALL(l_2, f);
+	l_4 = UNREACHABLE(l_3);
+}
+--EXPECT--
+test:
+	stp x29, x30, [sp, #-0x20]!
+	mov x29, sp
+	str x19, [x29, #0x18]
+	mov x19, x0
+	blr x19
+	mov x17, x19
+	ldr x19, [x29, #0x18]
+	ldp x29, x30, [sp], #0x20
+	br x17
