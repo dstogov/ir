@@ -530,7 +530,7 @@ static bool ir_loader_has_sym(ir_loader *loader, const char *name)
 	return val != 0;
 }
 
-static void* ir_loader_resolve_sym_name(ir_loader *loader, const char *name, bool add_thunk)
+static void* ir_loader_resolve_sym_name(ir_loader *loader, const char *name, uint32_t flags)
 {
 	ir_main_loader *l = (ir_main_loader*)loader;
 	uint32_t len = (uint32_t)strlen(name);
@@ -541,7 +541,7 @@ static void* ir_loader_resolve_sym_name(ir_loader *loader, const char *name, boo
 		if (l->sym[val].addr) {
 			return l->sym[val].addr;
 		}
-		if (!l->sym[val].thunk_addr && add_thunk) {
+		if (!l->sym[val].thunk_addr && (flags & IR_RESOLVE_SYM_ADD_THUNK)) {
 			/* Undefined declaration */
 			// TODO: Add thunk or relocation ???
 			size_t size;
@@ -554,6 +554,9 @@ static void* ir_loader_resolve_sym_name(ir_loader *loader, const char *name, boo
 	addr = ir_resolve_sym_name(name);
 	if (addr) {
 		ir_loader_add_sym(loader, name, addr); /* cache */
+	}
+	if (!addr && !(flags && IR_RESOLVE_SYM_SILENT)) {
+		fprintf(stderr, "Undefined symbol: %s\n", name);
 	}
 	return addr;
 }
