@@ -6868,7 +6868,24 @@ static void ir_emit_return_fp(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
-	if (op2_reg == IR_REG_NONE || IR_REG_SPILLED(op2_reg)) {
+	if (IR_IS_CONST_REF(insn->op2)) {
+		ir_insn *value = &ctx->ir_base[insn->op2];
+
+		if ((type == IR_FLOAT && value->val.f == 0.0) || (type == IR_DOUBLE && value->val.d == 0.0)) {
+			|	fldz
+		} else if ((type == IR_FLOAT && value->val.f == 1.0) || (type == IR_DOUBLE && value->val.d == 1.0)) {
+			|	fld1
+		} else {
+			int label = ir_const_label(ctx, insn->op2);
+
+			if (type == IR_DOUBLE) {
+				|	fld qword [=>label]
+			} else {
+				IR_ASSERT(type == IR_FLOAT);
+				|	fld dword [=>label]
+			}
+		}
+	} else if (op2_reg == IR_REG_NONE || IR_REG_SPILLED(op2_reg)) {
 		ir_reg fp;
 		int32_t offset = ir_ref_spill_slot_offset(ctx, insn->op2, &fp);
 
