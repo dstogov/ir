@@ -579,7 +579,7 @@ static bool ir_loader_external_sym_dcl(ir_loader *loader, const char *name, uint
 		ir_emit_llvm_sym_decl(name, flags | IR_EXTERN, l->llvm_file);
 	}
 	if (l->dump_asm || l->dump_size || l->run) {
-		void *addr = ir_loader_resolve_sym_name(loader, name, 0);
+		void *addr = ir_loader_resolve_sym_name(loader, name, IR_RESOLVE_SYM_SILENT);
 
 		if (!addr) {
 			return 0;
@@ -644,7 +644,7 @@ static bool ir_loader_external_func_dcl(ir_loader *loader, const char *name, uin
 		ir_emit_llvm_func_decl(name, flags | IR_EXTERN, ret_type,  params_count, param_types, l->llvm_file);
 	}
 	if (l->dump_asm || l->dump_size || l->run) {
-		void *addr = ir_loader_resolve_sym_name(loader, name, 0);
+		void *addr = ir_loader_resolve_sym_name(loader, name, IR_RESOLVE_SYM_SILENT);
 
 		if (!addr) {
 			/* Unresolved external function */
@@ -875,7 +875,7 @@ static bool ir_loader_sym_data_ref(ir_loader *loader, ir_op op, const char *ref,
 	}
 	if (l->dump_asm || l->dump_size || l->run) {
 		void *data = (char*)l->data_start + l->data_pos;
-		void *addr = ir_loader_resolve_sym_name(loader, ref, 0);
+		void *addr = ir_loader_resolve_sym_name(loader, ref, IR_RESOLVE_SYM_SILENT);
 
 		if (!addr) {
 			ir_loader_add_reloc(l, ref, data);
