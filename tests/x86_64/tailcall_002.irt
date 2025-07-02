@@ -21,7 +21,7 @@ test:
 	movq %rbx, (%rsp)
 	callq *%rbx
 	movq %rbx, %rdi
+	movq (%rsp), %rax
 	addq $0x10, %rsp
 	popq %rbx
-	jmpq *(%rsp)
-
+	jmpq *%rax
