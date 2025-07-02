@@ -9262,7 +9262,7 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				op2_reg = IR_REG_RAX;
 
 				ir_type type = ctx->ir_base[insn->op2].type;
-				| ASM_REG_MEM_OP, mov, type, op2_reg, mem
+				ir_emit_load_mem_int(ctx, type, op2_reg, mem);
 			}
 		}
 	}
