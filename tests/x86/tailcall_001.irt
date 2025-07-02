@@ -1,0 +1,24 @@
+--TEST--
+001: tailcall: epilogue does not override op2
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	uintptr_t f = PARAM(l_1, "p", 1);
+	l_2 = CALL(l_1, f);
+	l_3 = TAILCALL(l_2, f);
+	l_4 = UNREACHABLE(l_3);
+}
+--EXPECT--
+test:
+	pushl %ebx
+	subl $8, %esp
+	movl 0x10(%esp), %ebx
+	calll *%ebx
+	movl %ebx, %eax
+	addl $8, %esp
+	popl %ebx
+	jmpl *%eax

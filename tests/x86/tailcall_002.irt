@@ -1,0 +1,30 @@
+--TEST--
+002: tailcall: epilogue does not override op2: spill slot
+--TARGET--
+x86
+--ARGS--
+-S --debug-regset 0x00000088
+--CODE--
+# debug-regset: EBX, EDI
+{
+	l_1 = START(l_4);
+	uintptr_t f = PARAM(l_1, "p", 1);
+	uintptr_t f2 = PROTO/2(f, func(void):void __fastcall);
+	l_2 = CALL(l_1, f2);
+	l_3 = TAILCALL/1(l_2, f2, f2);
+	l_4 = UNREACHABLE(l_3);
+}
+--EXPECT--
+test:
+	pushl %ebx
+	pushl %edi
+	subl $4, %esp
+	movl 0x10(%esp), %ebx
+	calll *%ebx
+	movl %ebx, %ecx
+	movl %ebx, %eax
+	addl $4, %esp
+	popl %edi
+	popl %ebx
+	jmpl *%eax
+

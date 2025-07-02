@@ -1,0 +1,38 @@
+--TEST--
+005: tailcall: epilogue does not override op2: spilled preserved reg
+--TARGET--
+x86
+--ARGS--
+-S --debug-regset 0x00000008
+--CODE--
+# debug-regset: EBX
+func test(uintptr_t):uintptr_t __fastcall {
+	l_1 = START(l_13);
+	uintptr_t d_2 = PARAM(l_1, "p", 1);
+	uintptr_t d_3 = ADD(d_2,d_2);
+	l_4 = IF(l_1, d_3);
+	l_5 = IF_TRUE(l_4);
+		uintptr_t d_1, l_6 = TAILCALL/0(l_5, d_2);
+		l_7 = UNREACHABLE(l_6);
+	l_9 = IF_FALSE(l_4);
+		l_13 = RETURN(l_9, d_2);
+}
+--EXPECT--
+test:
+	pushl %ebx
+	subl $4, %esp
+	movl %ecx, %ebx
+	movl %ebx, (%esp)
+	addl %ebx, %ebx
+	testl %ebx, %ebx
+	je .L1
+	movl (%esp), %eax
+	addl $4, %esp
+	popl %ebx
+	jmpl *%eax
+.L1:
+	movl (%esp), %eax
+	addl $4, %esp
+	popl %ebx
+	retl
+

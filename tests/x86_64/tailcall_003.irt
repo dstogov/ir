@@ -1,0 +1,20 @@
+--TEST--
+003: tailcall: epilogue does not override op2: fuse load
+--TARGET--
+x86_64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_30);
+	uintptr_t d_1, l_2 = RLOAD(l_1, 3);
+	uintptr_t d_2, l_3 = LOAD(l_2, d_1);
+	l_4 = TAILCALL/0(l_3, d_2);
+	l_30 = UNREACHABLE(l_4);
+}
+--EXPECT--
+test:
+	pushq %rbx
+	movq (%rbx), %rax
+	popq %rbx
+	jmpq *%rax

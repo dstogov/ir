@@ -1,0 +1,27 @@
+--TEST--
+002: tailcall: epilogue does not override op2: spill slot
+--TARGET--
+x86_64
+--ARGS--
+-S --debug-regset 0x00000088
+--CODE--
+# debug-regset: RBX, RDI
+{
+	l_1 = START(l_4);
+	uintptr_t f = PARAM(l_1, "p", 1);
+	l_2 = CALL(l_1, f);
+	l_3 = TAILCALL/1(l_2, f, f);
+	l_4 = UNREACHABLE(l_3);
+}
+--EXPECT--
+test:
+	pushq %rbx
+	subq $0x10, %rsp
+	movq %rdi, %rbx
+	movq %rbx, (%rsp)
+	callq *%rbx
+	movq %rbx, %rdi
+	movq (%rsp), %rax
+	addq $0x10, %rsp
+	popq %rbx
+	jmpq *%rax
