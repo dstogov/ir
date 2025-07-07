@@ -1,0 +1,37 @@
+--TEST--
+003: tailcall: epilogue does not override op2: spilled preserved reg
+--TARGET--
+aarch64
+--ARGS--
+-S --debug-regset 0x00080000
+--CODE--
+# debug-regset: X19
+{
+	l_1 = START(l_13);
+	uintptr_t d_2 = PARAM(l_1, "p", 1);
+	uintptr_t d_3 = ADD(d_2,d_2);
+	l_4 = IF(l_1, d_3);
+	l_5 = IF_TRUE(l_4);
+		uintptr_t d_1, l_6 = TAILCALL/0(l_5, d_2);
+		l_7 = UNREACHABLE(l_6);
+	l_9 = IF_FALSE(l_4);
+		l_13 = RETURN(l_9, d_2);
+}
+--EXPECT--
+test:
+	sub sp, sp, #0x10
+	str x19, [sp, #8]
+	mov x19, x0
+	str x19, [sp]
+	add x19, x19, x19
+	cmp x19, #0
+	b.eq .L1
+	ldr x17, [sp]
+	ldr x19, [sp, #8]
+	add sp, sp, #0x10
+	br x17
+.L1:
+	ldr x0, [sp]
+	ldr x19, [sp, #8]
+	add sp, sp, #0x10
+	ret
