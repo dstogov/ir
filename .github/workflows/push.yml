@@ -27,9 +27,9 @@ jobs:
             libcapstone4 \
             make
       - name: make
-        run: make TARGET=x86_64 all
+        run: make TARGET=x86_64 BUILD=debug all
       - name: test
-        run: make TARGET=x86_64 test-ci
+        run: make TARGET=x86_64 BUILD=debug test-ci
   Linux_i386:
     name: 'Linux i386'
     runs-on: ubuntu-22.04
@@ -60,9 +60,9 @@ jobs:
           cd ..
           rm -rf capstone-4.0.2 capstone.tar.gz
       - name: make
-        run: make TARGET=x86 all
+        run: make TARGET=x86 BUILD=debug all
       - name: test
-        run: make TARGET=x86 test-ci
+        run: make TARGET=x86 BUILD=debug test-ci
   Linux_aarch64:
     name: 'Linux aarch64'
     runs-on: ubuntu-22.04
@@ -84,9 +84,9 @@ jobs:
               libcapstone4 \
               make
           run: |
-            make CC=gcc TARGET=aarch64 all
+            make CC=gcc TARGET=aarch64 BUILD=debug all
             # FIXME: For some reason some of the object files are rebuilt
-            make CC=gcc TARGET=aarch64 test-ci
+            make CC=gcc TARGET=aarch64 BUILD=debug test-ci
 
   FreeBSD_amd_64:
     name: 'FreeBSD amd64'
@@ -120,9 +120,9 @@ jobs:
       - name: brew
         run: brew install capstone
       - name: make
-        run: make TARGET=x86_64 all
+        run: make TARGET=x86_64 BUILD=debug all
       - name: test
-        run: make TARGET=x86_64 test-ci
+        run: make TARGET=x86_64 BUILD=debug test-ci
 
   Windows:
     strategy:
