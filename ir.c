@@ -810,12 +810,12 @@ ir_ref ir_proto(ir_ctx *ctx, uint8_t flags, ir_type ret_type, uint32_t params_co
 }
 
 /* IR construction */
-ir_ref ir_emit(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
+ir_ref ir_emit(ir_ctx *ctx, uint32_t optx, ir_ref op1, ir_ref op2, ir_ref op3)
 {
 	ir_ref   ref = ir_next_insn(ctx);
 	ir_insn *insn = &ctx->ir_base[ref];
 
-	insn->optx = opt;
+	insn->optx = optx;
 	insn->op1 = op1;
 	insn->op2 = op2;
 	insn->op3 = op3;
@@ -823,24 +823,24 @@ ir_ref ir_emit(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
 	return ref;
 }
 
-ir_ref ir_emit0(ir_ctx *ctx, uint32_t opt)
+ir_ref ir_emit0(ir_ctx *ctx, uint32_t optx)
 {
-	return ir_emit(ctx, opt, IR_UNUSED, IR_UNUSED, IR_UNUSED);
+	return ir_emit(ctx, optx, IR_UNUSED, IR_UNUSED, IR_UNUSED);
 }
 
-ir_ref ir_emit1(ir_ctx *ctx, uint32_t opt, ir_ref op1)
+ir_ref ir_emit1(ir_ctx *ctx, uint32_t optx, ir_ref op1)
 {
-	return ir_emit(ctx, opt, op1, IR_UNUSED, IR_UNUSED);
+	return ir_emit(ctx, optx, op1, IR_UNUSED, IR_UNUSED);
 }
 
-ir_ref ir_emit2(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2)
+ir_ref ir_emit2(ir_ctx *ctx, uint32_t optx, ir_ref op1, ir_ref op2)
 {
-	return ir_emit(ctx, opt, op1, op2, IR_UNUSED);
+	return ir_emit(ctx, optx, op1, op2, IR_UNUSED);
 }
 
-ir_ref ir_emit3(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
+ir_ref ir_emit3(ir_ctx *ctx, uint32_t optx, ir_ref op1, ir_ref op2, ir_ref op3)
 {
-	return ir_emit(ctx, opt, op1, op2, op3);
+	return ir_emit(ctx, optx, op1, op2, op3);
 }
 
 static ir_ref _ir_fold_cse(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
@@ -1076,20 +1076,29 @@ ir_ref ir_fold3(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3)
 	return ir_fold(ctx, opt, op1, op2, op3);
 }
 
-ir_ref ir_emit_N(ir_ctx *ctx, uint32_t opt, int32_t count)
+ir_ref ir_emit_N(ir_ctx *ctx, uint16_t opt, uint16_t count)
 {
 	int i;
 	ir_ref *p, ref = ctx->insns_count;
 	ir_insn *insn;
 
-	IR_ASSERT(count >= 0);
+	// IR_ASSERT(count >= 0);
 	while (UNEXPECTED(ref + count/4 >= ctx->insns_limit)) {
 		ir_grow_top(ctx);
 	}
+
+	// Per ir_insn{} definition, one ir_insn structure can hold
+	// either 1 optx and 3 ops, or simply 4 ops without optx.
+	//
+	// 1: Hold instruction optx and 3 ops
+	// count/4: Reserve ir_insns for extra ops (4 ops per ir_insn{})
 	ctx->insns_count = ref + 1 + count/4;
 
 	insn = &ctx->ir_base[ref];
-	insn->optx = opt | (count << IR_OPT_INPUTS_SHIFT);
+	insn->optx = IR_OPTX_2(opt, count);
+
+	// count|3: Round up to closest 4x integer in order to
+	//          clear the last whole ir_insn structure
 	for (i = 1, p = insn->ops + i; i <= (count|3); i++, p++) {
 		*p = IR_UNUSED;
 	}
@@ -2302,12 +2311,12 @@ ir_ref ir_find_aliasing_vstore(ir_ctx *ctx, ir_ref ref, ir_ref var, ir_ref val)
 
 /* IR Construction API */
 
-ir_ref _ir_PARAM(ir_ctx *ctx, ir_type type, const char* name, ir_ref num)
+ir_ref _ir_PARAM(ir_ctx *ctx, ir_type type, const char* name, int pos)
 {
 	IR_ASSERT(ctx->control);
 	IR_ASSERT(ctx->ir_base[ctx->control].op == IR_START);
-	IR_ASSERT(ctx->insns_count == num + 1);
-	return ir_param(ctx, type, ctx->control, name, num);
+	IR_ASSERT(ctx->insns_count == pos + 1);
+	return ir_param(ctx, type, ctx->control, name, pos);
 }
 
 ir_ref _ir_VAR(ir_ctx *ctx, ir_type type, const char* name)
@@ -2558,7 +2567,7 @@ void _ir_MERGE_2(ir_ctx *ctx, ir_ref src1, ir_ref src2)
 	ctx->control = ir_emit2(ctx, IR_OPTX(IR_MERGE, IR_VOID, 2), src1, src2);
 }
 
-void _ir_MERGE_N(ir_ctx *ctx, ir_ref n, ir_ref *inputs)
+void _ir_MERGE_N(ir_ctx *ctx, uint16_t n, ir_ref *inputs)
 {
 	IR_ASSERT(!ctx->control);
 	IR_ASSERT(n > 0);
@@ -2576,7 +2585,7 @@ void _ir_MERGE_N(ir_ctx *ctx, ir_ref n, ir_ref *inputs)
 	}
 }
 
-void _ir_MERGE_SET_OP(ir_ctx *ctx, ir_ref merge, ir_ref pos, ir_ref src)
+void _ir_MERGE_SET_OP(ir_ctx *ctx, ir_ref merge, uint16_t pos, ir_ref src)
 {
 	ir_insn *insn = &ctx->ir_base[merge];
 	ir_ref *ops = insn->ops;
@@ -2687,7 +2696,7 @@ ir_ref _ir_PHI_LIST(ir_ctx *ctx, ir_ref list)
 ir_ref _ir_LOOP_BEGIN(ir_ctx *ctx, ir_ref src1)
 {
 	IR_ASSERT(!ctx->control);
-	ctx->control = ir_emit2(ctx, IR_OPTX(IR_LOOP_BEGIN, IR_VOID, 2), src1, IR_UNUSED);
+	ctx->control = ir_emit1(ctx, IR_OPTX(IR_LOOP_BEGIN, IR_VOID, 2), src1);
 	return ctx->control;
 }
 
