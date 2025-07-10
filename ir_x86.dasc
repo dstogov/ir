@@ -1569,6 +1569,20 @@ op2_const:
 			constraints->tmp_regs[0] = IR_TMP_REG(1, IR_ADDR, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 			n = 1;
 			break;
+		case IR_SSE_SQRT:
+		case IR_SSE_RINT:
+		case IR_SSE_FLOOR:
+		case IR_SSE_CEIL:
+		case IR_SSE_TRUNC:
+		case IR_SSE_NEARBYINT:
+			insn = &ctx->ir_base[ref];
+			flags = IR_USE_MUST_BE_IN_REG | IR_OP3_MUST_BE_IN_REG;
+			if (IR_IS_CONST_REF(insn->op3)) {
+				const ir_insn *val_insn = &ctx->ir_base[insn->op3];
+				constraints->tmp_regs[n] = IR_TMP_REG(3, val_insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n = 1;
+			}
+			break;
 	}
 	constraints->tmps_count = n;
 
