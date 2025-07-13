@@ -390,8 +390,16 @@ typedef enum _ir_op {
 #define IR_OPT_TYPE_SHIFT    8
 #define IR_OPT_INPUTS_SHIFT  16
 
-#define IR_OPT(op, type)     ((uint16_t)(op) | ((uint16_t)(type) << IR_OPT_TYPE_SHIFT))
-#define IR_OPTX(op, type, n) ((uint32_t)(op) | ((uint32_t)(type) << IR_OPT_TYPE_SHIFT) | ((uint32_t)(n) << IR_OPT_INPUTS_SHIFT))
+/* OPT Construction Macro - see ir_insn::opt definition */
+#define IR_OPT(op, type)         (uint16_t)(((op) & IR_OPT_OP_MASK) | (((type) << IR_OPT_TYPE_SHIFT) & IR_OPT_TYPE_MASK))
+
+/* OPTX Construction Macro - see ir_insn::optx definition */
+#define IR_OPTX_2(opt, n)        (uint32_t)((opt) | ((n) << IR_OPT_INPUTS_SHIFT))
+#define IR_OPTX_3(op, type, n)   (uint32_t)(IR_OPTX_2((IR_OPT((op), (type))), (n)))
+/* Shorthand for IR_OPTX_3 */
+#define IR_OPTX	IR_OPTX_3
+
+/* Extract type from opt/optx */
 #define IR_OPT_TYPE(opt)     (((opt) & IR_OPT_TYPE_MASK) >> IR_OPT_TYPE_SHIFT)
 
 /* IR References */
@@ -710,14 +718,14 @@ ir_ref ir_proto_5(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_t
                                                                 ir_type t4, ir_type t5);
 ir_ref ir_proto(ir_ctx *ctx, uint8_t flags, ir_type ret_type, uint32_t params_counts, uint8_t *param_types);
 
-ir_ref ir_emit(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
+ir_ref ir_emit(ir_ctx *ctx, uint32_t optx, ir_ref op1, ir_ref op2, ir_ref op3);
 
-ir_ref ir_emit0(ir_ctx *ctx, uint32_t opt);
-ir_ref ir_emit1(ir_ctx *ctx, uint32_t opt, ir_ref op1);
-ir_ref ir_emit2(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2);
-ir_ref ir_emit3(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
+ir_ref ir_emit0(ir_ctx *ctx, uint32_t optx);
+ir_ref ir_emit1(ir_ctx *ctx, uint32_t optx, ir_ref op1);
+ir_ref ir_emit2(ir_ctx *ctx, uint32_t optx, ir_ref op1, ir_ref op2);
+ir_ref ir_emit3(ir_ctx *ctx, uint32_t optx, ir_ref op1, ir_ref op2, ir_ref op3);
 
-ir_ref ir_emit_N(ir_ctx *ctx, uint32_t opt, int32_t count);
+ir_ref ir_emit_N(ir_ctx *ctx, uint16_t opt, uint16_t count);
 void   ir_set_op(ir_ctx *ctx, ir_ref ref, int32_t n, ir_ref val);
 ir_ref ir_get_op(ir_ctx *ctx, ir_ref ref, int32_t n);
 
