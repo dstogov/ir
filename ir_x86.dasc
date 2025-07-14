@@ -8822,7 +8822,7 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 					|	jb >1
 				}
 				val = &ctx->ir_base[use_insn->op3];
-				IR_ASSERT(!IR_IS_SYM_CONST(val->o3));
+				IR_ASSERT(!IR_IS_SYM_CONST(val->op3));
 				label = ir_skip_empty_target_blocks(ctx, use_block);
 				if (IR_IS_32BIT(type, val->val)) {
 					|	ASM_REG_IMM_OP cmp, type, op2_reg, val->val.i32

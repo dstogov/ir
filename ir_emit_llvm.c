@@ -683,7 +683,7 @@ static void ir_emit_switch(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn
 			ir_emit_ref(ctx, f, use_insn->op2);
 			fprintf(f, ", label %%l%d\n", ir_skip_empty_target_blocks(ctx, use_block));
 		} else if (use_insn->op == IR_CASE_RANGE) {
-			IR_ASSERT(0 && "IR_CASE_RANGE NIY")
+			IR_ASSERT(0 && "IR_CASE_RANGE NIY");
 		} else {
 			IR_ASSERT(use_insn->op == IR_CASE_DEFAULT);
 		}
