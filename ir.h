@@ -359,6 +359,7 @@ typedef enum _ir_type {
 	_(IF_TRUE,      S1X1, src, prb, ___) /* IF TRUE proj.               */ \
 	_(IF_FALSE,     S1X1, src, prb, ___) /* IF FALSE proj.              */ \
 	_(CASE_VAL,     S2X1, src, def, prb) /* switch proj.                */ \
+	_(CASE_RANGE,   S3,   src, def, def) /* switch proj.                */ \
 	_(CASE_DEFAULT, S1X1, src, prb, ___) /* switch proj.                */ \
 	_(MERGE,        SN,   src, src, src) /* control merge               */ \
 	_(LOOP_BEGIN,   SN,   src, src, src) /* loop start                  */ \

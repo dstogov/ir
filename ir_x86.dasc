@@ -2644,6 +2644,7 @@ store_int:
 		case IR_IF_TRUE:
 		case IR_IF_FALSE:
 		case IR_CASE_VAL:
+		case IR_CASE_RANGE:
 		case IR_CASE_DEFAULT:
 		case IR_MERGE:
 		case IR_LOOP_BEGIN:
@@ -8580,6 +8581,7 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 	ir_val min, max;
 	ir_reg op2_reg = ctx->regs[def][2];
 	ir_reg tmp_reg = ctx->regs[def][3];
+	bool has_case_range = 0;
 
 	type = ctx->ir_base[insn->op2].type;
 	IR_ASSERT(tmp_reg != IR_REG_NONE);
@@ -8609,6 +8611,21 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 				max.u64 = (int64_t)IR_MAX(max.u64, val->val.u64);
 			}
 			count++;
+		} else if (use_insn->op == IR_CASE_RANGE) {
+			has_case_range = 1;
+			val = &ctx->ir_base[use_insn->op2];
+			IR_ASSERT(!IR_IS_SYM_CONST(val->op));
+			ir_insn *val2 = &ctx->ir_base[use_insn->op3];
+			IR_ASSERT(!IR_IS_SYM_CONST(val2->op));
+			if (IR_IS_TYPE_SIGNED(type)) {
+				IR_ASSERT(IR_IS_TYPE_SIGNED(val->type));
+				min.i64 = IR_MIN(min.i64, val->val.i64);
+				max.i64 = IR_MAX(max.i64, val2->val.i64);
+			} else {
+				IR_ASSERT(!IR_IS_TYPE_SIGNED(val->type));
+				min.u64 = (int64_t)IR_MIN(min.u64, val->val.u64);
+				max.u64 = (int64_t)IR_MAX(max.u64, val2->val.u64);
+			}
 		} else {
 			IR_ASSERT(use_insn->op == IR_CASE_DEFAULT);
 			default_label = ir_skip_empty_target_blocks(ctx, use_block);
@@ -8622,7 +8639,7 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 	}
 
 	/* Generate a table jmp or a seqence of calls */
-	if (count > 2 && (max.i64-min.i64) < count * 8) {
+	if (!has_case_range && count > 2 && (max.i64-min.i64) < count * 8) {
 		int *labels = ir_mem_malloc(sizeof(int) * (size_t)(max.i64 - min.i64 + 1));
 
 		for (i = 0; i <= (max.i64 - min.i64); i++) {
@@ -8786,6 +8803,42 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 |.endif
 				}
 				|	je =>label
+			} else if (use_insn->op == IR_CASE_RANGE) {
+				val = &ctx->ir_base[use_insn->op2];
+				IR_ASSERT(!IR_IS_SYM_CONST(val->op));
+				label = ir_skip_empty_target_blocks(ctx, use_block);
+				if (IR_IS_32BIT(type, val->val)) {
+					|	ASM_REG_IMM_OP cmp, type, op2_reg, val->val.i32
+				} else {
+					IR_ASSERT(sizeof(void*) == 8);
+|.if X64
+					|	mov64 Ra(tmp_reg), val->val.i64
+					|	ASM_REG_REG_OP cmp, type, op2_reg, tmp_reg
+|.endif
+				}
+				if (IR_IS_TYPE_SIGNED(type)) {
+					|	jl >1
+				} else {
+					|	jb >1
+				}
+				val = &ctx->ir_base[use_insn->op3];
+				IR_ASSERT(!IR_IS_SYM_CONST(val->o3));
+				label = ir_skip_empty_target_blocks(ctx, use_block);
+				if (IR_IS_32BIT(type, val->val)) {
+					|	ASM_REG_IMM_OP cmp, type, op2_reg, val->val.i32
+				} else {
+					IR_ASSERT(sizeof(void*) == 8);
+|.if X64
+					|	mov64 Ra(tmp_reg), val->val.i64
+					|	ASM_REG_REG_OP cmp, type, op2_reg, tmp_reg
+|.endif
+				}
+				if (IR_IS_TYPE_SIGNED(type)) {
+					|	jle =>label
+				} else {
+					|	jbe =>label
+				}
+				|1:
 			}
 		}
 		if (default_label) {
@@ -10393,6 +10446,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 				case IR_IF_TRUE:
 				case IR_IF_FALSE:
 				case IR_CASE_VAL:
+				case IR_CASE_RANGE:
 				case IR_CASE_DEFAULT:
 				case IR_MERGE:
 				case IR_LOOP_BEGIN:

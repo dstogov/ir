@@ -247,6 +247,7 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted
 #define ir_op_flag_S1X1    (ir_op_flag_S | 1 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_S2      (ir_op_flag_S | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_S2X1    (ir_op_flag_S | 2 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_S3      (ir_op_flag_S | 3 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_SN      (ir_op_flag_S | IR_OP_FLAG_VAR_INPUTS)
 #define ir_op_flag_E       (IR_OP_FLAG_CONTROL|IR_OP_FLAG_BB_END)
 #define ir_op_flag_E1      (ir_op_flag_E | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
@@ -1082,7 +1083,7 @@ ir_ref ir_emit_N(ir_ctx *ctx, uint32_t opt, int32_t count)
 	ir_ref *p, ref = ctx->insns_count;
 	ir_insn *insn;
 
-	IR_ASSERT(count >= 0);
+	IR_ASSERT(count >= 0 && count < 65536);
 	while (UNEXPECTED(ref + count/4 >= ctx->insns_limit)) {
 		ir_grow_top(ctx);
 	}
@@ -2973,6 +2974,12 @@ void _ir_CASE_VAL(ir_ctx *ctx, ir_ref switch_ref, ir_ref val)
 {
 	IR_ASSERT(!ctx->control);
 	ctx->control = ir_emit2(ctx, IR_CASE_VAL, switch_ref, val);
+}
+
+void _ir_CASE_RANGE(ir_ctx *ctx, ir_ref switch_ref, ir_ref v1, ir_ref v2)
+{
+	IR_ASSERT(!ctx->control);
+	ctx->control = ir_emit3(ctx, IR_CASE_RANGE, switch_ref, v1, v2);
 }
 
 void _ir_CASE_DEFAULT(ir_ctx *ctx, ir_ref switch_ref)

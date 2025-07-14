@@ -1065,6 +1065,11 @@ int ir_schedule(ir_ctx *ctx)
 		if (insn->op == IR_CASE_VAL) {
 			IR_ASSERT(insn->op2 < IR_TRUE);
 			consts_count += ir_count_constant(_xlat, insn->op2);
+		} else if (insn->op == IR_CASE_RANGE) {
+			IR_ASSERT(insn->op2 < IR_TRUE);
+			consts_count += ir_count_constant(_xlat, insn->op2);
+			IR_ASSERT(insn->op3 < IR_TRUE);
+			consts_count += ir_count_constant(_xlat, insn->op3);
 		}
 		n = insn->inputs_count;
 		insns_count += ir_insn_inputs_to_len(n);

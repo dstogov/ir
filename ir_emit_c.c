@@ -579,6 +579,12 @@ static void ir_emit_switch(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn
 			fprintf(f, "\t\tcase ");
 			ir_emit_ref(ctx, f, use_insn->op2);
 			fprintf(f, ": goto bb%d;\n", ir_skip_empty_target_blocks(ctx, use_block));
+		} else if (use_insn->op == IR_CASE_RANGE) {
+			fprintf(f, "\t\tcase ");
+			ir_emit_ref(ctx, f, use_insn->op2);
+			fprintf(f, " ... ");
+			ir_emit_ref(ctx, f, use_insn->op3);
+			fprintf(f, ": goto bb%d;\n", ir_skip_empty_target_blocks(ctx, use_block));
 		} else {
 			IR_ASSERT(use_insn->op == IR_CASE_DEFAULT);
 			fprintf(f, "\t\tdefault: goto bb%d;\n", ir_skip_empty_target_blocks(ctx, use_block));
@@ -833,6 +839,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 		if (bb->predecessors_count > 1
 		 || (bb->predecessors_count == 1 && ctx->cfg_edges[bb->predecessors] != prev)
 		 || ctx->ir_base[bb->start].op == IR_CASE_VAL
+		 || ctx->ir_base[bb->start].op == IR_CASE_RANGE
 		 || ctx->ir_base[bb->start].op == IR_CASE_DEFAULT) {
 			fprintf(f, "bb%d:\n", b);
 		}
@@ -844,6 +851,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_IF_TRUE:
 				case IR_IF_FALSE:
 				case IR_CASE_VAL:
+				case IR_CASE_RANGE:
 				case IR_CASE_DEFAULT:
 				case IR_MERGE:
 				case IR_LOOP_BEGIN:

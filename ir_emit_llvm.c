@@ -670,7 +670,7 @@ static void ir_emit_switch(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn
 			fprintf(f, ", label %%l%d", ir_skip_empty_target_blocks(ctx, use_block));
 			break;
 		} else {
-			IR_ASSERT(use_insn->op == IR_CASE_VAL);
+			IR_ASSERT(use_insn->op == IR_CASE_VAL || use_insn->op == IR_CASE_RANGE);
 		}
 	}
 	fprintf(f, " [\n");
@@ -682,6 +682,8 @@ static void ir_emit_switch(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn
 			fprintf(f, "\t\t%s ", ir_type_llvm_name[type]);
 			ir_emit_ref(ctx, f, use_insn->op2);
 			fprintf(f, ", label %%l%d\n", ir_skip_empty_target_blocks(ctx, use_block));
+		} else if (use_insn->op == IR_CASE_RANGE) {
+			IR_ASSERT(0 && "IR_CASE_RANGE NIY")
 		} else {
 			IR_ASSERT(use_insn->op == IR_CASE_DEFAULT);
 		}
@@ -934,6 +936,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_IF_TRUE:
 				case IR_IF_FALSE:
 				case IR_CASE_VAL:
+				case IR_CASE_RANGE:
 				case IR_CASE_DEFAULT:
 				case IR_MERGE:
 				case IR_LOOP_BEGIN:
