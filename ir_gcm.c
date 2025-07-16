@@ -980,13 +980,24 @@ int ir_schedule(ir_ctx *ctx)
 				_next[i] = _move_down;
 				_move_down = i;
 			} else {
-				IR_ASSERT(bb->start > bb->end);
 				prev_b = 0;
 				prev_b_end = 0;
-				/* add to the end of the list */
-				_next[j] = i;
-				_prev[i] = j;
-				j = i;
+				if (bb->start > bb->end) {
+					/* add to the end of the list */
+					_next[j] = i;
+					_prev[i] = j;
+					j = i;
+				} else {
+					k = bb->start;
+					while (_blocks[_next[k]] == b) {
+						k = _next[k];
+					}
+					/* insert after "k" */
+					_next[i] = _next[k];
+					_prev[i] = k;
+					_prev[_next[k]] = i;
+					_next[k] = i;
+				}
 			}
 		} else if (b) {
 			bb = &ctx->cfg_blocks[b];
