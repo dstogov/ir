@@ -694,7 +694,7 @@ static int ir_build_dominators_tree_slow(ir_ctx *ctx)
 		uint32_t idom = bb->idom;
 		ir_block *idom_bb = &blocks[idom];
 
-		bb->dom_depth = idom_bb->dom_depth + 1;
+		bb->dom_depth = 0;
 		/* Sort by block number to traverse children in pre-order */
 		if (idom_bb->dom_child == 0) {
 			idom_bb->dom_child = b;
@@ -712,6 +712,22 @@ static int ir_build_dominators_tree_slow(ir_ctx *ctx)
 			bb->dom_next_child = child_bb->dom_next_child;
 			child_bb->dom_next_child = b;
 		}
+	}
+
+	/* Recalculate dom_depth for all blocks */
+	for (b = 2, bb = &blocks[2]; b <= blocks_count; b++, bb++) {
+		uint32_t idom = bb->idom;
+		uint32_t dom_depth = 0;
+		while (idom) {
+			dom_depth++;
+			if (blocks[idom].dom_depth > 0) {
+				dom_depth += blocks[idom].dom_depth;
+				break;
+			} else {
+				idom = blocks[idom].idom;
+			}
+		}
+		bb->dom_depth = dom_depth;
 	}
 
 	return 1;
