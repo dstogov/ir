@@ -532,6 +532,7 @@ _yy_state_start:
 		case 'x':
 		case 'y':
 		case 'z':
+		case '$':
 			goto _yy_state_4;
 		case 'N':
 			ch = *++YYPOS;
@@ -913,7 +914,7 @@ _yy_state_start:
 _yy_state_4:
 	ch = *++YYPOS;
 _yy_tunnel_4:
-	if ((ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z') || ch == '_' || (ch >= 'a' && ch <= 'z')) {
+	if (ch == '$' || ch == '.' || (ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z') || ch == '_' || (ch >= 'a' && ch <= 'z')) {
 		goto _yy_state_4;
 	} else {
 		ret = YY_ID;
@@ -1069,7 +1070,7 @@ _yy_state_98:
 	}
 _yy_state_177:
 	ch = *++YYPOS;
-	if ((ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z') || ch == '_' || (ch >= 'a' && ch <= 'z')) {
+	if (ch == '$' || ch == '.' || (ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z') || ch == '_' || (ch >= 'a' && ch <= 'z')) {
 		goto _yy_state_4;
 	} else {
 		goto _yy_fin;

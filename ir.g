@@ -761,7 +761,7 @@ const(uint8_t t, ir_val *val):
 
 /* scanner rules */
 ID(const char **str, size_t *len):
-	/[A-Za-z_][A-Za-z_0-9]*/
+	/[A-Za-z_$][A-Za-z_$\.0-9]*/
 	{*str = (const char*)yy_text; *len = yy_pos - yy_text;}
 ;
 
