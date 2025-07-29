@@ -9,6 +9,7 @@
 #define IR_PRIVATE_H
 #include <string.h>
 #include <stdlib.h>
+#include <stddef.h>
 
 #ifdef IR_DEBUG
 # include <assert.h>
