@@ -555,7 +555,7 @@ static void* ir_loader_resolve_sym_name(ir_loader *loader, const char *name, uin
 	if (addr) {
 		ir_loader_add_sym(loader, name, addr); /* cache */
 	}
-	if (!addr && !(flags && IR_RESOLVE_SYM_SILENT)) {
+	if (!addr && !(flags & IR_RESOLVE_SYM_SILENT)) {
 		fprintf(stderr, "Undefined symbol: %s\n", name);
 	}
 	return addr;
