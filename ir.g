@@ -58,7 +58,7 @@ static ir_strtab op_tab;
 #define IR_UNRESOLVED_LIST_END        ((ir_ref)IR_UNRESOLVED_MASK)
 
 #define IR_IS_UNRESOLVED(ref) \
-	((ref) < (ir_ref)0xc0000000)
+	((ref) <= (ir_ref)0xc0000000)
 #define IR_ENCODE_UNRESOLVED_REF(ref, op) \
 	((ir_ref)0xc0000000 - ((ref) * sizeof(ir_ref) + (op)))
 #define IR_DECODE_UNRESOLVED_REF(ref) \
@@ -278,7 +278,7 @@ ir(ir_loader *loader):
 				{
 					if (loader->external_sym_dcl
 					 && !loader->external_sym_dcl(loader, name, flags)) {
-						yy_error("extenral_sym_dcl error");
+						yy_error_str("Unresolved extrnal symbol", name);
 					}
 				}
 			|
@@ -289,7 +289,7 @@ ir(ir_loader *loader):
 				{
 					if (loader->external_func_dcl
 					 && !loader->external_func_dcl(loader, name, flags, ret_type, params_count, param_types)) {
-						yy_error("extenral_func_dcl error");
+						yy_error_str("Unresolved extenral function", name);
 					}
 				}
 			)
