@@ -172,7 +172,7 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted
 			} else if (insn->val.c == '\0') {
 				fprintf(f, "'\\0'");
 			} else {
-				fprintf(f, "%u", insn->val.c);
+				fprintf(f, "%u", (unsigned char)insn->val.c);
 			}
 			break;
 		case IR_I8:
