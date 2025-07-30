@@ -888,11 +888,12 @@ int ir_load_llvm_bitcode(ir_loader *loader, const char *filename);
 int ir_load_llvm_asm(ir_loader *loader, const char *filename);
 
 /* IR save API (implementation in ir_save.c) */
-#define IR_SAVE_CFG       (1<<0) /* add info about CFG */
-#define IR_SAVE_CFG_MAP   (1<<1) /* add info about CFG block assignment */
-#define IR_SAVE_USE_LISTS (1<<2) /* add info about def->use lists */
-#define IR_SAVE_RULES     (1<<3) /* add info about selected code-generation rules */
-#define IR_SAVE_REGS      (1<<4) /* add info about selected registers */
+#define IR_SAVE_CFG        (1<<0) /* add info about CFG */
+#define IR_SAVE_CFG_MAP    (1<<1) /* add info about CFG block assignment */
+#define IR_SAVE_USE_LISTS  (1<<2) /* add info about def->use lists */
+#define IR_SAVE_RULES      (1<<3) /* add info about selected code-generation rules */
+#define IR_SAVE_REGS       (1<<4) /* add info about selected registers */
+#define IR_SAVE_SAFE_NAMES (1<<5) /* add '@' prefix to symbol names */
 
 void ir_print_proto(const ir_ctx *ctx, ir_ref proto, FILE *f);
 void ir_save(const ir_ctx *ctx, uint32_t save_flags, FILE *f);

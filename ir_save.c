@@ -97,10 +97,14 @@ void ir_save(const ir_ctx *ctx, uint32_t save_flags, FILE *f)
 	for (i = IR_UNUSED + 1, insn = ctx->ir_base - i; i < ctx->consts_count; i++, insn--) {
 		fprintf(f, "\t%s c_%d = ", ir_type_cname[insn->type], i);
 		if (insn->op == IR_FUNC) {
-			fprintf(f, "func %s", ir_get_str(ctx, insn->val.name));
+			fprintf(f, "func %s%s",
+				(save_flags & IR_SAVE_SAFE_NAMES) ? "@" : "",
+				ir_get_str(ctx, insn->val.name));
 			ir_print_proto(ctx, insn->proto, f);
 		} else if (insn->op == IR_SYM) {
-			fprintf(f, "sym(%s)", ir_get_str(ctx, insn->val.name));
+			fprintf(f, "sym(%s%s)",
+				(save_flags & IR_SAVE_SAFE_NAMES) ? "@" : "",
+				ir_get_str(ctx, insn->val.name));
 		} else if (insn->op == IR_FUNC_ADDR) {
 			fprintf(f, "func *");
 			ir_print_const(ctx, insn, f, true);
