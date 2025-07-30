@@ -1201,44 +1201,46 @@ _yy_state_9:
 							yy_error_sym("'{' expected, got", sym);
 						}
 						sym = get_sym();
-						sym = parse_ir_sym_data(sym, loader);
-						while (1) {
-							save_pos  = yy_pos;
-							save_text = yy_text;
-							save_line = yy_line;
-							alt13 = -2;
-							sym2 = sym;
-							if (sym2 == YY__COMMA) {
-								sym2 = get_sym();
-								goto _yy_state_13_1;
-							} else if (sym2 == YY__RBRACE) {
-								alt13 = 17;
-								goto _yy_state_13;
-							} else {
-								yy_error_sym("unexpected", sym2);
-							}
-_yy_state_13_1:
-							if (YY_IN_SET(sym2, (YY_BOOL,YY_UINT8_T,YY_UINT16_T,YY_UINT32_T,YY_UINT64_T,YY_UINTPTR_T,YY_CHAR,YY_INT8_T,YY_INT16_T,YY_INT32_T,YY_INT64_T,YY_DOUBLE,YY_FLOAT), "\000\000\000\376\077\000\000")) {
-								alt13 = 14;
-								goto _yy_state_13;
-							} else if (sym2 == YY__RBRACE) {
-								alt13 = 16;
-								goto _yy_state_13;
-							} else {
-								yy_error_sym("unexpected", sym2);
-							}
-_yy_state_13:
-							yy_pos  = save_pos;
-							yy_text = save_text;
-							yy_line = save_line;
-							if (alt13 != 14) {
-								break;
-							}
-							sym = get_sym();
+						if (YY_IN_SET(sym, (YY_BOOL,YY_UINT8_T,YY_UINT16_T,YY_UINT32_T,YY_UINT64_T,YY_UINTPTR_T,YY_CHAR,YY_INT8_T,YY_INT16_T,YY_INT32_T,YY_INT64_T,YY_DOUBLE,YY_FLOAT), "\000\000\000\376\077\000\000")) {
 							sym = parse_ir_sym_data(sym, loader);
-						}
-						if (alt13 == 16) {
-							sym = get_sym();
+							while (1) {
+								save_pos  = yy_pos;
+								save_text = yy_text;
+								save_line = yy_line;
+								alt13 = -2;
+								sym2 = sym;
+								if (sym2 == YY__COMMA) {
+									sym2 = get_sym();
+									goto _yy_state_13_1;
+								} else if (sym2 == YY__RBRACE) {
+									alt13 = 17;
+									goto _yy_state_13;
+								} else {
+									yy_error_sym("unexpected", sym2);
+								}
+_yy_state_13_1:
+								if (YY_IN_SET(sym2, (YY_BOOL,YY_UINT8_T,YY_UINT16_T,YY_UINT32_T,YY_UINT64_T,YY_UINTPTR_T,YY_CHAR,YY_INT8_T,YY_INT16_T,YY_INT32_T,YY_INT64_T,YY_DOUBLE,YY_FLOAT), "\000\000\000\376\077\000\000")) {
+									alt13 = 14;
+									goto _yy_state_13;
+								} else if (sym2 == YY__RBRACE) {
+									alt13 = 16;
+									goto _yy_state_13;
+								} else {
+									yy_error_sym("unexpected", sym2);
+								}
+_yy_state_13:
+								yy_pos  = save_pos;
+								yy_text = save_text;
+								yy_line = save_line;
+								if (alt13 != 14) {
+									break;
+								}
+								sym = get_sym();
+								sym = parse_ir_sym_data(sym, loader);
+							}
+							if (alt13 == 16) {
+								sym = get_sym();
+							}
 						}
 						if (sym != YY__RBRACE) {
 							yy_error_sym("'}' expected, got", sym);

@@ -315,7 +315,7 @@ ir(ir_loader *loader):
 							yy_error("sym_dcl error");
 						}
 					}
-					"=" "{" ir_sym_data(loader) ("," ir_sym_data(loader))* ","? "}" ";"
+					"=" "{" ( ir_sym_data(loader) ("," ir_sym_data(loader))* ","? )? "}" ";"
 					{
 						if (loader->sym_data_end && !loader->sym_data_end(loader, flags)) {
 							yy_error("sym_data_end error");
