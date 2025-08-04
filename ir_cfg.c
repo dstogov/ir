@@ -1090,7 +1090,7 @@ next:
 						}
 						p++;
 					} while (--j);
-					IR_ASSERT(ir_worklist_len(&work) != 0);
+					if (ir_worklist_len(&work) == 0) continue;
 
 					/* collect members of the irreducible loop */
 					while (ir_worklist_len(&work)) {
@@ -1169,6 +1169,7 @@ next:
 				 */
 				if (!prev_irreducible) {
 					prev_irreducible = n;
+					prev_dom_depth = bb->dom_depth;
 				}
 				ir_list_clear(&work.l);
 			} else if (ir_worklist_len(&work)) {
