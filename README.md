@@ -5,12 +5,12 @@ It defines Intermediate Representation (IR), provides a simple API for IR constr
 a set of algorithms for optimization, scheduling, register allocation and code
 generation. The resulting generated in-memory code, may be directly executed.
 
-This is not a stable finished product yet. It’s still under active development.
-It was started as a base for development of the next generation JIT compiler for PHP-9,
-but it's completely PHP independent.
-
 A presentation about IR framework design and implementation details is available at
 [researchgate](https://www.researchgate.net/publication/374470404_IR_JIT_Framework_a_base_for_the_next_generation_JIT_for_PHP).
+
+IR is used as a base for PHP JIT since PHP-8.4. It's also used as a back-end for experemental [Rationl C Compiler](http://github.com/dstogov/rcc).
+
+Anyway, this is not a stable finished product yet. It’s still under development.
 
 ## IR - Intermediate Representation
 
@@ -394,50 +394,11 @@ Anyway, **IR framework provides code that is in average 5% slower, but does this
 
 ## PHP JIT based on IR
 
-A new experimental JIT for PHP based on this project is developed at [master](https://github.com/php/php-src/tree/master/ext/opcache/jit) php-src branch.
-
-### Building and Testing PHP with JIT based on IR Framework
-
-Install required libraries. PHP and their extensions may require different libraries.
-JIT itself needs just **libcapstone** to produce disassembler output.
+IR based JIT integrated into PHP-8.4.0 and above. See JIT in action
 
 ```
-sudo dnf install capstone-devel
-```
-
-Build PHP
-
-```
-git clone https://github.com/php/php-src.git
-cd php-src
-./buildconf --force
-mkdir install
-./configure --with-capstone --prefix=`pwd`/install --with-config-file-path=`pwd`/install/etc
-make
-make install
-mkdir install/etc
-cat > install/etc/php.ini <<EOL
-zend_extension=opcache.so
-opcache.enable=1
-opcache.enable_cli=1
-opcache.optimization_level=-1
-opcache.jit_buffer_size=32M
-opcache.jit=tracing
-opcache.huge_code_pages=1
-EOL
-```
-
-Check if opcache is loaded
-
-```
-sapi/cli/php -v | grep -i opcache
-```
-
-See JIT in action
-
-```
-sapi/cli/php -d opcache.jit=tracing -d opcache.jit_debug=1 Zend/bench.php
-sapi/cli/php -d opcache.jit=function -d opcache.jit_debug=1 Zend/bench.php
+php -d opcache.jit=tracing -d opcache.jit_debug=1 Zend/bench.php
+php -d opcache.jit=function -d opcache.jit_debug=1 Zend/bench.php
 ```
 
 ## References
