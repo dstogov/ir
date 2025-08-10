@@ -8,7 +8,7 @@ generation. The resulting generated in-memory code, may be directly executed.
 A presentation about IR framework design and implementation details is available at
 [researchgate](https://www.researchgate.net/publication/374470404_IR_JIT_Framework_a_base_for_the_next_generation_JIT_for_PHP).
 
-IR is used as a base for PHP JIT since PHP-8.4. It's also used as a back-end for experemental [Rationl C Compiler](http://github.com/dstogov/rcc).
+IR is used as a base for PHP JIT since PHP-8.4. It's also used as a back-end for experimental [Rational C Compiler](http://github.com/dstogov/rcc).
 
 Anyway, this is not a stable finished product yet. It’s still under development.
 
@@ -394,7 +394,7 @@ Anyway, **IR framework provides code that is in average 5% slower, but does this
 
 ## PHP JIT based on IR
 
-IR based JIT integrated into PHP-8.4.0 and above. See JIT in action
+IR-based JIT integrated into PHP-8.4.0 and above. See JIT in action
 
 ```
 php -d opcache.jit=tracing -d opcache.jit_debug=1 Zend/bench.php
