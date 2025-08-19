@@ -924,7 +924,7 @@ IR_FOLD(SHL(C_CHAR, C_CHAR))
 IR_FOLD(SHL(C_I8, C_I8))
 {
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
-	IR_FOLD_CONST_I(op1_insn->val.i8 << op2_insn->val.i8);
+	IR_FOLD_CONST_I((int8_t)(op1_insn->val.u8 << op2_insn->val.u8));
 }
 
 IR_FOLD(SHL(C_U16, C_U16))
@@ -936,7 +936,7 @@ IR_FOLD(SHL(C_U16, C_U16))
 IR_FOLD(SHL(C_I16, C_I16))
 {
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
-	IR_FOLD_CONST_I(op1_insn->val.i16 << op2_insn->val.i16);
+	IR_FOLD_CONST_I((int16_t)(op1_insn->val.u16 << op2_insn->val.u16));
 }
 
 IR_FOLD(SHL(C_U32, C_U32))
@@ -948,7 +948,7 @@ IR_FOLD(SHL(C_U32, C_U32))
 IR_FOLD(SHL(C_I32, C_I32))
 {
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
-	IR_FOLD_CONST_I(op1_insn->val.i32 << op2_insn->val.i32);
+	IR_FOLD_CONST_I((int32_t)(op1_insn->val.u32 << op2_insn->val.u32));
 }
 
 IR_FOLD(SHL(C_U64, C_U64))
@@ -980,7 +980,7 @@ IR_FOLD(SHR(C_U16, C_U16))
 IR_FOLD(SHR(C_I16, C_I16))
 {
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
-	IR_FOLD_CONST_U((int16_t)(op1_insn->val.u16 >> op2_insn->val.u16));
+	IR_FOLD_CONST_I((int16_t)(op1_insn->val.u16 >> op2_insn->val.u16));
 }
 
 IR_FOLD(SHR(C_U32, C_U32))
@@ -992,7 +992,7 @@ IR_FOLD(SHR(C_U32, C_U32))
 IR_FOLD(SHR(C_I32, C_I32))
 {
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
-	IR_FOLD_CONST_U((int32_t)(op1_insn->val.u32 >> op2_insn->val.u32));
+	IR_FOLD_CONST_I((int32_t)(op1_insn->val.u32 >> op2_insn->val.u32));
 }
 
 IR_FOLD(SHR(C_U64, C_U64))
