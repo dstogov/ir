@@ -1419,14 +1419,10 @@ restart:
 				break;
 			case 1:
 				new_insn->op1 = _xlat[insn->op1];
-				if (new_insn->op == IR_PARAM || insn->op == IR_VAR) {
+				if (new_insn->op == IR_PARAM || new_insn->op == IR_VAR || new_insn->op == IR_PROTO) {
 					size_t len;
-					const char *name = ir_get_strl(ctx, insn->op2, &len);
-					new_insn->op2 = ir_strl(&new_ctx, name, len);
-				} else if (new_insn->op == IR_PROTO) {
-					size_t len;
-					const char *proto = ir_get_strl(ctx, insn->op2, &len);
-					new_insn->op2 = ir_strl(&new_ctx, proto, len);
+					const char *str = ir_get_strl(ctx, insn->op2, &len);
+					new_insn->op2 = ir_strl(&new_ctx, str, len);
 				} else {
 					new_insn->op2 = insn->op2;
 				}
