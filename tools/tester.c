@@ -547,9 +547,10 @@ int main(int argc, char **argv)
 	int skipped = 0;
 	int passed = 0;
 	int xfailed = 0, xfailed_limit = 0;
+	int warned = 0, warned_limit = 0;
 	int failed = 0, failed_limit = 0;
 	int broken = 0, broken_limit = 0;
-	test *t, **xfailed_tests = NULL, **failed_tests = NULL;
+	test *t, **xfailed_tests = NULL, **warned_tests = NULL, **failed_tests = NULL;
 	char **broken_tests = NULL;
 
 	for (i = 1; i < argc; i++) {
@@ -641,10 +642,20 @@ int main(int argc, char **argv)
 			free(t);
 		} else if (run_test(files[i], t, show_diff)) {
 			printf("\r");
-			print_color("PASS", GREEN);
-			printf(": %s [%s]\n", t->name, files[i]);
 			passed++;
-			free(t);
+			if (t->xfail) {
+				print_color("WARN", YELLOW);
+				printf(": %s [%s] (warn: XFAIL section but test passes)\n", t->name, files[i]);
+				if (warned >= warned_limit) {
+					warned_limit += 1024;
+					warned_tests = realloc(warned_tests, sizeof(test*) * warned_limit);
+				}
+				warned_tests[warned++] = t;
+			} else {
+				print_color("PASS", GREEN);
+				printf(": %s [%s]\n", t->name, files[i]);
+				free(t);
+			}
 		} else if (t->xfail) {
 			printf("\r");
 			print_color("XFAIL", RED);
@@ -674,6 +685,7 @@ int main(int argc, char **argv)
 	printf("Passed: %d\n", passed);
 	printf("Skipped: %d\n", skipped);
 	printf("Expected fail: %d\n", xfailed);
+	printf("Warned: %d\n", warned);
 	printf("Failed: %d\n", failed);
 	if (broken) {
 		printf("Broken: %d\n", broken);
@@ -688,6 +700,17 @@ int main(int argc, char **argv)
 			free(t);
 		}
 		free(xfailed_tests);
+	}
+	if (warned > 0) {
+		printf("-------------------------------\n");
+		printf("WARNED TESTS\n");
+		printf("-------------------------------\n");
+		for (i = 0; i < warned; i++) {
+			t = warned_tests[i];
+			printf("%s [%s] WARN: XFAIL reason \"%s\" but test passes\n", t->name, files[t->id], t->xfail);
+			free(t);
+		}
+		free(warned_tests);
 	}
 	if (failed > 0) {
 		printf("-------------------------------\n");
