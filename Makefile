@@ -6,6 +6,7 @@ BUILD      = release
 BUILD_DIR  = .
 SRC_DIR    = .
 HAVE_LLVM  = no
+TESTS      = $(SRC_DIR)/tests
 
 PREFIX     = /usr/local
 
@@ -118,11 +119,11 @@ $(BUILD_DIR)/tester: $(SRC_DIR)/tools/tester.c
 
 test: $(BUILD_DIR)/ir $(BUILD_DIR)/tester
 	$(BUILD_DIR)/tester --test-cmd $(BUILD_DIR)/ir --target $(TARGET) --default-args "--save" \
-		--test-extension ".irt" --code-extension ".ir" $(SRC_DIR)/tests
+		--test-extension ".irt" --code-extension ".ir" $(TESTS)
 
 test-ci: $(BUILD_DIR)/ir $(BUILD_DIR)/tester
 	$(BUILD_DIR)/tester --test-cmd $(BUILD_DIR)/ir --target $(TARGET) --default-args "--save" \
-		--test-extension ".irt" --code-extension ".ir" --show-diff $(SRC_DIR)/tests
+		--test-extension ".irt" --code-extension ".ir" --show-diff $(TESTS)
 
 clean:
 	rm -rf $(BUILD_DIR)/ir $(BUILD_DIR)/libir.a $(BUILD_DIR)/*.o \
