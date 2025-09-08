@@ -5530,7 +5530,8 @@ static void ir_emit_load_params(ir_ctx *ctx)
 	int32_t stack_offset = 0;
 
 	if (ctx->flags & IR_USE_FRAME_POINTER) {
-		stack_offset = sizeof(void*) * 2; /* skip old frame pointer and return address */
+		/* skip old frame pointer and return address */
+		stack_offset = sizeof(void*) * 2 + ctx->stack_frame_size + ctx->call_stack_size;
 	} else {
 		stack_offset = ctx->stack_frame_size + ctx->call_stack_size;
 	}
