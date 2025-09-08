@@ -397,6 +397,15 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 				n++;
 			}
 			break;
+		case IR_INT2FP:
+		case IR_FP2INT:
+			insn = &ctx->ir_base[ref];
+			n = 0;
+			if (IR_IS_CONST_REF(insn->op1)) {
+				constraints->tmp_regs[n] = IR_TMP_REG(1, ctx->ir_base[insn->op1].type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n++;
+			}
+			break;
 		case IR_MUL_PWR2:
 		case IR_DIV_PWR2:
 		case IR_MOD_PWR2:
@@ -404,8 +413,6 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 		case IR_SHIFT_CONST:
 		case IR_OP_INT:
 		case IR_OP_FP:
-		case IR_INT2FP:
-		case IR_FP2INT:
 		case IR_FP2FP:
 			insn = &ctx->ir_base[ref];
 			n = 0;
