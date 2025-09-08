@@ -1587,19 +1587,31 @@ static void ir_emit_prologue(ir_ctx *ctx)
 		offset = -(ctx->stack_frame_size+16);
 		if (aarch64_may_encode_imm7_addr_offset(offset, 8)) {
 			|	stp x29, x30, [sp, #offset]!
-		} else {
+		} else if (aarch64_may_encode_imm12(ctx->stack_frame_size+16)) {
 			|	sub sp, sp, #(ctx->stack_frame_size+16)
+			|	stp x29, x30, [sp]
+		} else {
+			ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, ctx->stack_frame_size+16);
+			|	sub sp, sp, Rx(IR_REG_INT_TMP)
 			|	stp x29, x30, [sp]
 		}
 		|	mov x29, sp
 		if (ctx->call_stack_size) {
-			| sub sp, sp, #(ctx->call_stack_size)
+			if (aarch64_may_encode_imm12(ctx->call_stack_size)) {
+				|	sub sp, sp, #(ctx->call_stack_size)
+			} else {
+				ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, ctx->call_stack_size);
+				|	sub sp, sp, Rx(IR_REG_INT_TMP)
+			}
 		}
 	} else if (ctx->stack_frame_size + ctx->call_stack_size) {
 		if (ctx->fixed_stack_red_zone) {
 			IR_ASSERT(ctx->stack_frame_size + ctx->call_stack_size <= ctx->fixed_stack_red_zone);
+		} else if (aarch64_may_encode_imm12(ctx->stack_frame_size + ctx->call_stack_size)) {
+			|	sub sp, sp, #(ctx->stack_frame_size + ctx->call_stack_size)
 		} else {
-			| sub sp, sp, #(ctx->stack_frame_size + ctx->call_stack_size)
+			ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, ctx->stack_frame_size + ctx->call_stack_size);
+			|	sub sp, sp, Rx(IR_REG_INT_TMP)
 		}
 	}
 	if (ctx->used_preserved_regs) {
@@ -1782,15 +1794,22 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 		}
 		if (aarch64_may_encode_imm7_addr_offset(ctx->stack_frame_size+16, 8)) {
 			|	ldp x29, x30, [sp], #(ctx->stack_frame_size+16)
-		} else {
+		} else if (aarch64_may_encode_imm12(ctx->stack_frame_size+16)) {
 			|	ldp x29, x30, [sp]
 			|	add sp, sp, #(ctx->stack_frame_size+16)
+		} else {
+			ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, ctx->stack_frame_size+16);
+			|	ldp x29, x30, [sp]
+			|	add sp, sp, Rx(IR_REG_INT_TMP)
 		}
 	} else if (ctx->stack_frame_size + ctx->call_stack_size) {
 		if (ctx->fixed_stack_red_zone) {
 			IR_ASSERT(ctx->stack_frame_size + ctx->call_stack_size <= ctx->fixed_stack_red_zone);
-		} else {
+		} else if (aarch64_may_encode_imm12(ctx->stack_frame_size + ctx->call_stack_size)) {
 			| add sp, sp, #(ctx->stack_frame_size + ctx->call_stack_size)
+		} else {
+			ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, ctx->stack_frame_size + ctx->call_stack_size);
+			| add sp, sp, Rx(IR_REG_INT_TMP)
 		}
 	}
 }
