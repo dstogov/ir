@@ -1635,26 +1635,41 @@ static void ir_emit_prologue(ir_ctx *ctx)
 					offset -= sizeof(void*) * 2;
 					if (aarch64_may_encode_imm7_addr_offset(offset, 8)) {
 						|	stp Rx(prev), Rx(i), [Rx(fp), #offset]
-					} else {
-						IR_ASSERT(aarch64_may_encode_addr_offset(offset, 8));
+					} else if (aarch64_may_encode_addr_offset(offset + 8, 8)) {
 						|	str Rx(prev), [Rx(fp), #offset]
 						|	str Rx(i), [Rx(fp), #(offset+8)]
+					} else {
+						ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset);
+						|	str Rx(prev), [Rx(fp), Rx(IR_REG_INT_TMP)]
+						|	add Rx(IR_REG_INT_TMP), Rx(IR_REG_INT_TMP), #8
+						|	str Rx(i), [Rx(fp), Rx(IR_REG_INT_TMP)]
 					}
 					prev = IR_REG_NONE;
 				} else {
 					if (prev < IR_REG_FP_FIRST) {
 						offset -= sizeof(void*);
-						|	str Rx(prev), [Rx(fp), #offset]
-						offset -= sizeof(void*);
-						|	str Rd(i-IR_REG_FP_FIRST), [Rx(fp), #offset]
+						if (aarch64_may_encode_addr_offset(offset, 8)) {
+							|	str Rx(prev), [Rx(fp), #offset]
+							offset -= sizeof(void*);
+							|	str Rd(i-IR_REG_FP_FIRST), [Rx(fp), #offset]
+						} else {
+							ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset);
+							|	str Rx(prev), [Rx(fp), Rx(IR_REG_INT_TMP)]
+							|	sub Rx(IR_REG_INT_TMP), Rx(IR_REG_INT_TMP), #8
+							|	str Rd(i-IR_REG_FP_FIRST), [Rx(fp), Rx(IR_REG_INT_TMP)]
+						}
 					} else {
 						offset -= sizeof(void*) * 2;
 						if (aarch64_may_encode_imm7_addr_offset(offset, 8)) {
 							|	stp Rd(prev-IR_REG_FP_FIRST), Rd(i-IR_REG_FP_FIRST), [Rx(fp), #offset]
-						} else {
-							IR_ASSERT(aarch64_may_encode_addr_offset(offset, 8));
+						} else if (aarch64_may_encode_addr_offset(offset + 8, 8)) {
 							|	str Rd(prev-IR_REG_FP_FIRST), [Rx(fp), #offset]
 							|	str Rd(i-IR_REG_FP_FIRST), [Rx(fp), #(offset+8)]
+						} else {
+							ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset);
+							|	str Rd(prev-IR_REG_FP_FIRST), [Rx(fp), Rx(IR_REG_INT_TMP)]
+							|	add Rx(IR_REG_INT_TMP), Rx(IR_REG_INT_TMP), #8
+							|	str Rd(i-IR_REG_FP_FIRST), [Rx(fp), Rx(IR_REG_INT_TMP)]
 						}
 					}
 					prev = IR_REG_NONE;
@@ -1664,10 +1679,20 @@ static void ir_emit_prologue(ir_ctx *ctx)
 	    if (prev != IR_REG_NONE) {
 			if (prev < IR_REG_FP_FIRST) {
 				offset -= sizeof(void*);
-				|	str Rx(prev), [Rx(fp), #offset]
+				if (aarch64_may_encode_addr_offset(offset, 8)) {
+					|	str Rx(prev), [Rx(fp), #offset]
+				} else {
+					ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset);
+					|	str Rx(prev), [Rx(fp), Rx(IR_REG_INT_TMP)]
+				}
 			} else {
 				offset -= sizeof(void*);
-				|	str Rd(prev-IR_REG_FP_FIRST), [Rx(fp), #offset]
+				if (aarch64_may_encode_addr_offset(offset, 8)) {
+					|	str Rd(prev-IR_REG_FP_FIRST), [Rx(fp), #offset]
+				} else {
+					ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset);
+					|	str Rd(prev-IR_REG_FP_FIRST), [Rx(fp), Rx(IR_REG_INT_TMP)]
+				}
 			}
 		}
 	}
@@ -1697,10 +1722,14 @@ static void ir_emit_prologue(ir_ctx *ctx)
 				if (prev != IR_REG_NONE) {
 					if (aarch64_may_encode_imm7_addr_offset(offset, 8)) {
 						|	stp Rx(prev), Rx(int_reg_params[i]), [Rx(fp), #offset]
-					} else {
-						IR_ASSERT(aarch64_may_encode_addr_offset(offset, 8));
+					} else if (aarch64_may_encode_addr_offset(offset + 8, 8)) {
 						|	str Rx(prev), [Rx(fp), #offset]
 						|	str Rx(int_reg_params[i]), [Rx(fp), #(offset+8)]
+					} else {
+						ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset);
+						|	str Rx(prev), [Rx(fp), Rx(IR_REG_INT_TMP)]
+						|	add Rx(IR_REG_INT_TMP), Rx(IR_REG_INT_TMP), #8
+						|	str Rx(int_reg_params[i]), [Rx(fp), Rx(IR_REG_INT_TMP)]
 					}
 					prev = IR_REG_NONE;
 					offset += sizeof(void*) * 2;
@@ -1709,7 +1738,12 @@ static void ir_emit_prologue(ir_ctx *ctx)
 				}
 			}
 			if (prev != IR_REG_NONE) {
-				|	str Rx(prev), [Rx(fp), #offset]
+				if (aarch64_may_encode_addr_offset(offset + 8, 8)) {
+					|	str Rx(prev), [Rx(fp), #offset]
+				} else {
+					ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset);
+					|	str Rx(prev), [Rx(fp), Rx(IR_REG_INT_TMP)]
+				}
 				offset += sizeof(void*);
 			}
 		}
