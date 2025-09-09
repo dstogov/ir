@@ -789,7 +789,7 @@ CHARACTER(uint32_t t, ir_val *val):
 	{
 		if (!IR_IS_TYPE_INT(t)) yy_error("Unexpected <CHARACTER>");
 		if ((char)yy_text[1] != '\\') {
-			val->i64 = (char)yy_text[1];
+			val->i64 = (signed char)yy_text[1];
 		} else if ((char)yy_text[2] == '\\') {
 			val->i64 = '\\';
 		} else if ((char)yy_text[2] == 'r') {

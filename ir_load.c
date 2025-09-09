@@ -1987,21 +1987,21 @@ static int parse_CHARACTER(int sym, uint32_t t, ir_val *val) {
 		yy_error_sym("<CHARACTER> expected, got", sym);
 	}
 	if (!IR_IS_TYPE_INT(t)) yy_error("Unexpected <CHARACTER>");
-		if ((char)yy_text[1] != '\\') {
-			val->i64 = (char)yy_text[1];
-		} else if ((char)yy_text[2] == '\\') {
-			val->i64 = '\\';
-		} else if ((char)yy_text[2] == 'r') {
-			val->i64 = '\r';
-		} else if ((char)yy_text[2] == 'n') {
-			val->i64 = '\n';
-		} else if ((char)yy_text[2] == 't') {
-			val->i64 = '\t';
-		} else if ((char)yy_text[2] == '0') {
-			val->i64 = '\0';
-		} else {
-			IR_ASSERT(0);
-		}
+	if ((char)yy_text[1] != '\\') {
+		val->i64 = (signed char)yy_text[1];
+	} else if ((char)yy_text[2] == '\\') {
+		val->i64 = '\\';
+	} else if ((char)yy_text[2] == 'r') {
+		val->i64 = '\r';
+	} else if ((char)yy_text[2] == 'n') {
+		val->i64 = '\n';
+	} else if ((char)yy_text[2] == 't') {
+		val->i64 = '\t';
+	} else if ((char)yy_text[2] == '0') {
+		val->i64 = '\0';
+	} else {
+		IR_ASSERT(0);
+	}
 	sym = get_sym();
 	return sym;
 }
