@@ -1405,7 +1405,7 @@ static void ir_load_local_addr(ir_ctx *ctx, ir_reg reg, ir_ref src)
 		|	add Rx(reg), Rx(base), #offset
 	} else {
 		ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset);
-		|	add sp, sp, Rx(IR_REG_INT_TMP)
+		|	add Rx(reg), sp, Rx(IR_REG_INT_TMP)
 	}
 }
 
