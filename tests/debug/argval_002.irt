@@ -15,12 +15,12 @@ func @main(): int32_t
 	uintptr_t c_1 = 0;
 	bool c_2 = 0;
 	bool c_3 = 1;
-	uint64_t c_4 = 24;
-	int64_t c_5 = 1;
-	uint64_t c_6 = 8;
-	int64_t c_7 = 2;
-	uint64_t c_8 = 16;
-	int64_t c_9 = 3;
+	uintptr_t c_4 = 24;
+	int32_t c_5 = 1;
+	uintptr_t c_6 = 8;
+	int32_t c_7 = 2;
+	uintptr_t c_8 = 16;
+	int32_t c_9 = 3;
 	uintptr_t c_10 = func @test(uintptr_t, ...): int32_t;
 	uintptr_t c_11 = sym(@str.1);
 	uintptr_t c_12 = func @printf(uintptr_t, ...): void;
@@ -36,13 +36,12 @@ func @main(): int32_t
 	l_7 = STORE(l_5, d_6, c_9);
 	uintptr_t d_8 = ARGVAL(d_2, 24, 8);
 	int32_t d_9, l_9 = CALL/2(l_7, c_10, c_11, d_8);
-	int64_t d_11, l_11 = LOAD(l_9, d_2);
-	int64_t d_12, l_12 = LOAD(l_11, d_4);
-	int64_t d_13 = ADD(d_12, d_11);
-	int64_t d_14, l_14 = LOAD(l_12, d_6);
-	int64_t d_15 = ADD(d_14, d_13);
-	int32_t d_16 = TRUNC(d_15);
-	l_17 = CALL/3(l_14, c_12, c_13, d_9, d_16);
+	int32_t d_11, l_11 = LOAD(l_9, d_2);
+	int32_t d_12, l_12 = LOAD(l_11, d_4);
+	int32_t d_13 = ADD(d_12, d_11);
+	int32_t d_14, l_14 = LOAD(l_12, d_6);
+	int32_t d_15 = ADD(d_14, d_13);
+	l_17 = CALL/3(l_14, c_12, c_13, d_9, d_15);
 	l_19 = RETURN(l_17, c_14);
 }
 func @test(uintptr_t, ...): int32_t
@@ -50,13 +49,13 @@ func @test(uintptr_t, ...): int32_t
 	uintptr_t c_1 = 0;
 	bool c_2 = 0;
 	bool c_3 = 1;
-	uint64_t c_4 = 24;
+	uintptr_t c_4 = 24;
 	int32_t c_5 = 0;
-	uintptr_t c_6 = func @memset(uintptr_t, int32_t, uint64_t): uintptr_t;
-	uintptr_t c_7 = func @memcpy(uintptr_t, uintptr_t, uint64_t): uintptr_t;
-	uint64_t c_8 = 8;
-	uint64_t c_9 = 16;
-	int64_t c_10 = 42;
+	uintptr_t c_6 = func @memset(uintptr_t, int32_t, uintptr_t): uintptr_t;
+	uintptr_t c_7 = func @memcpy(uintptr_t, uintptr_t, uintptr_t): uintptr_t;
+	uintptr_t c_8 = 8;
+	uintptr_t c_9 = 16;
+	int32_t c_10 = 42;
 #BB1: end=l_20
 	l_1 = START(l_20);
 	uintptr_t d_2 = PARAM(l_1, "s", 1);
@@ -64,18 +63,17 @@ func @test(uintptr_t, ...): int32_t
 	l_4 = VA_START(l_3, d_3);
 	uintptr_t d_5, l_5 = ALLOCA(l_4, c_4);
 	l_6 = CALL/3(l_5, c_6, d_5, c_5, c_4);
-	uintptr_t d_8, l_8 = VA_ARG(l_6, d_3, 24);
+	uintptr_t d_8, l_8 = VA_ARG(l_6, d_3, 195); # 195 = ((24) << 3) | log2(8) ; 24 - size, 8 - align
 	l_9 = CALL/3(l_8, c_7, d_5, d_8, c_4);
 	uintptr_t d_11 = ADD(d_5, c_8);
-	int64_t d_12, l_12 = LOAD(l_9, d_5);
-	int64_t d_13, l_13 = LOAD(l_12, d_11);
-	int64_t d_14 = ADD(d_13, d_12);
+	int32_t d_12, l_12 = LOAD(l_9, d_5);
+	int32_t d_13, l_13 = LOAD(l_12, d_11);
+	int32_t d_14 = ADD(d_13, d_12);
 	uintptr_t d_15 = ADD(d_5, c_9);
-	int64_t d_16, l_16 = LOAD(l_13, d_15);
-	int64_t d_17 = ADD(d_16, d_14);
-	int32_t d_18 = TRUNC(d_17);
+	int32_t d_16, l_16 = LOAD(l_13, d_15);
+	int32_t d_17 = ADD(d_16, d_14);
 	l_19 = STORE(l_16, d_11, c_10);
-	l_20 = RETURN(l_19, d_18);
+	l_20 = RETURN(l_19, d_17);
 }
 --EXPECT--
 6 6
