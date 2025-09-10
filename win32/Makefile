@@ -7,6 +7,7 @@ BUILD=release
 BUILD_DIR=win32\build_$(VSCMD_ARG_TGT_ARCH)_$(BUILD)
 !endif
 SRC_DIR=.
+TESTS=$(SRC_DIR)\tests
 
 EXAMPLES_SRC_DIR=$(SRC_DIR)\examples
 EXAMPLES_BUILD_DIR=$(BUILD_DIR)\examples
@@ -152,12 +153,12 @@ $(BUILD_DIR)\tester.exe: $(SRC_DIR)/tools/tester.c
 test: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\tester.exe
 	$(BUILD_DIR)\tester.exe --test-cmd $(BUILD_DIR)\ir.exe --target $(TEST_TARGET) --default-args "--save" \
 	    --additional-args "--no-abort-fault" \
-		--test-extension ".irt" --code-extension ".ir" $(SRC_DIR)\tests
+		--test-extension ".irt" --code-extension ".ir" $(TESTS)
 
 test-ci: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\tester.exe
 	$(BUILD_DIR)\tester.exe --test-cmd $(BUILD_DIR)\ir.exe --target $(TEST_TARGET) --default-args "--save" \
 	    --additional-args "--no-abort-fault" --diff-cmd "diff --strip-trailing-cr -u" \
-		--test-extension ".irt" --code-extension ".ir" --show-diff $(SRC_DIR)\tests
+		--test-extension ".irt" --code-extension ".ir" --show-diff $(TESTS)
 
 examples: $(OBJS_COMMON) $(EXAMPLES_BUILD_DIR) $(EXAMPLE_EXES)
 
