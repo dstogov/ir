@@ -8525,7 +8525,7 @@ static void ir_emit_va_arg(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		int align = 1U << (insn->op3 & 0x7);
 		int size = (uint32_t)insn->op3 >> 3;
 
-		if (align > sizeof(void*)) {
+		if (align > (int)sizeof(void*)) {
 			|	add Ra(tmp_reg), (align-1)
 			|	and Ra(tmp_reg), ~(align-1)
 		}
@@ -8565,9 +8565,16 @@ static void ir_emit_va_arg(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (insn->op3) {
 		/* long struct arguemnt */
 		IR_ASSERT(type == IR_ADDR);
+		int align = 1U << (insn->op3 & 0x7);
+		int size = (uint32_t)insn->op3 >> 3;
+
 		|	mov Ra(tmp_reg), aword [Ra(op2_reg)+(offset+offsetof(ir_va_list, overflow_arg_area))]
+		if (align > (int)sizeof(void*)) {
+			|	add Ra(tmp_reg), (align-1)
+			|	and Ra(tmp_reg), ~(align-1)
+		}
 		|	mov Ra(def_reg), Ra(tmp_reg)
-		|	add Ra(tmp_reg), IR_ALIGNED_SIZE(insn->op3, sizeof(void*))
+		|	add Ra(tmp_reg), IR_ALIGNED_SIZE(size, sizeof(void*))
 		|	mov aword [Ra(op2_reg)+(offset+offsetof(ir_va_list, overflow_arg_area))], Ra(tmp_reg)
 	} else if (IR_IS_TYPE_INT(type)) {
 		|	mov Rd(tmp_reg), dword [Ra(op2_reg)+(offset+offsetof(ir_va_list, gp_offset))]
