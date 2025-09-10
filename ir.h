@@ -346,7 +346,7 @@ typedef enum _ir_type {
 	_(VA_END,       x2,   src, def, ___) /* va_end(va_list)             */ \
 	_(VA_COPY,      x3,   src, def, def) /* va_copy(dst, stc)           */ \
 	_(VA_ARG,       x2X1, src, def, opt) /* va_arg(va_list)             */ \
-	                                     /* op3 - struct size, align??? */ \
+	                                     /* op3 - (size<<3)+log2(align) */ \
 	\
 	/* guards                                                           */ \
 	_(GUARD,        c3,   src, def, def) /* IF without second successor */ \

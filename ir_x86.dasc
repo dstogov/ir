@@ -8522,8 +8522,15 @@ static void ir_emit_va_arg(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		|	add Ra(tmp_reg), IR_MAX(ir_type_size[type], sizeof(void*))
 	} else {
 		IR_ASSERT(type == IR_ADDR);
+		int align = 1U << (insn->op3 & 0x7);
+		int size = (uint32_t)insn->op3 >> 3;
+
+		if (align > sizeof(void*)) {
+			|	add Ra(tmp_reg), (align-1)
+			|	and Ra(tmp_reg), ~(align-1)
+		}
 		|	mov Ra(def_reg), Ra(tmp_reg)
-		|	add Ra(tmp_reg), IR_ALIGNED_SIZE(insn->op3, sizeof(void*))
+		|	add Ra(tmp_reg), IR_ALIGNED_SIZE(size, sizeof(void*))
 	}
 	|	mov aword [Ra(op2_reg)+offset], Ra(tmp_reg)
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
