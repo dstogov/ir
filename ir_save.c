@@ -280,6 +280,12 @@ void ir_save(const ir_ctx *ctx, uint32_t save_flags, FILE *f)
 		}
 		if (first) {
 			fprintf(f, ";");
+		} else if (ctx->value_params
+		 && insn->op == IR_PARAM
+		 && ctx->value_params[insn->op3 - 1].align) {
+			fprintf(f, ") ByVal(%d, %d);",
+				ctx->value_params[insn->op3 - 1].size,
+				ctx->value_params[insn->op3 - 1].align);
 		} else {
 			fprintf(f, ");");
 		}

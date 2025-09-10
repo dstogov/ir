@@ -48,6 +48,7 @@ uint32_t yy_line;
 typedef struct _ir_parser_ctx {
 	ir_ctx    *ctx;
 	uint32_t   undef_count;
+	uint32_t   value_params_count;
 	ir_ref     curr_ref;
 	ir_strtab  var_tab;
 } ir_parser_ctx;
@@ -449,9 +450,20 @@ ir_sym_data(ir_loader *loader):
 ir_func(ir_parser_ctx *p):
 	{p->undef_count = 0;}
 	{ir_strtab_init(&p->var_tab, 256, 4096);}
-	"{" ( ("NOP" | ir_insn(p) ) ";")* "}"
+	"{" ( ("NOP" | ir_insn(p) ir_modifier(p)? ) ";" )* "}"
 	{if (p->undef_count) ir_check_indefined_vars(p);}
 	{ir_strtab_free(&p->var_tab);}
+	{
+		if (p->ctx->value_params) {
+			uint32_t param_num = 1;
+			while (p->ctx->ir_base[param_num + 2].op == IR_PARAM) param_num++;
+			if (param_num != p->value_params_count) {
+				p->ctx->value_params = ir_mem_realloc(p->ctx->value_params, param_num * sizeof(ir_value_param));
+				memset(p->ctx->value_params + p->value_params_count, 0,
+					(param_num - p->value_params_count) * sizeof(ir_value_param));
+			}
+		}
+	}
 ;
 
 ir_func_name(char *buf):
@@ -681,6 +693,28 @@ ir_insn(ir_parser_ctx *p):
 	)
 	{ir_define_var(p, str, len, ref);}
 	{if (str2) ir_define_var(p, str2, len2, ref2);}
+;
+
+ir_modifier(ir_parser_ctx *p):
+	{ir_val size, align;}
+	"ByVal" "(" const(IR_I32, &size) "," const(IR_I32, &align) ")"
+	{
+		ir_ref param_ref = p->ctx->insns_count - 1;
+		ir_ref param_num = param_ref - 1;
+
+		if (p->ctx->ir_base[param_ref].op != IR_PARAM) yy_error("unexpected ByVal modifier");
+		IR_ASSERT(param_num == p->ctx->ir_base[param_ref].op3);
+		if (!p->ctx->value_params) {
+			p->ctx->value_params = ir_mem_calloc(param_num, sizeof(ir_value_param));
+		} else {
+			p->ctx->value_params = ir_mem_realloc(p->ctx->value_params, param_num * sizeof(ir_value_param));
+			memset(p->ctx->value_params + p->value_params_count, 0,
+				(param_num - p->value_params_count) * sizeof(ir_value_param));
+		}
+		p->value_params_count = param_num;
+		p->ctx->value_params[param_num - 1].size = size.i32;
+		p->ctx->value_params[param_num - 1].align = align.i32 ? align.i32 : 1;
+	}
 ;
 
 type(uint8_t *t):

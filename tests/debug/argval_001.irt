@@ -1,0 +1,69 @@
+--TEST--
+001: ARGVAL:
+--ARGS--
+--run
+--CODE--
+extern func @memcpy(uintptr_t, uintptr_t, uint64_t): uintptr_t;
+extern func @memset(uintptr_t, int32_t, uint64_t): uintptr_t;
+func @main(): int32_t;
+extern func @printf(uintptr_t, ...): void;
+func @test(uintptr_t): int32_t;
+static const @str.1[7] = "%d %d\n\000";
+func @main(): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uint64_t c_4 = 24;
+	int64_t c_5 = 1;
+	uint64_t c_6 = 8;
+	int64_t c_7 = 2;
+	uint64_t c_8 = 16;
+	int64_t c_9 = 3;
+	uintptr_t c_10 = func @test(uintptr_t): int32_t;
+	uintptr_t c_11 = func @printf(uintptr_t, ...): void;
+	uintptr_t c_12 = sym(@str.1);
+	int32_t c_13 = 0;
+#BB1: end=l_18
+	l_1 = START(l_18);
+	uintptr_t d_2, l_2 = ALLOCA(l_1, c_4);
+	l_3 = STORE(l_2, d_2, c_5);
+	uintptr_t d_4 = ADD(d_2, c_6);
+	l_5 = STORE(l_3, d_4, c_7);
+	uintptr_t d_6 = ADD(d_2, c_8);
+	l_7 = STORE(l_5, d_6, c_9);
+	uintptr_t d_8 = ARGVAL(d_2, 24, 8);
+	int32_t d_9, l_9 = CALL/1(l_7, c_10, d_8);
+	int64_t d_10, l_10 = LOAD(l_9, d_2);
+	int64_t d_11, l_11 = LOAD(l_10, d_4);
+	int64_t d_12 = ADD(d_11, d_10);
+	int64_t d_13, l_13 = LOAD(l_11, d_6);
+	int64_t d_14 = ADD(d_13, d_12);
+	int32_t d_15 = TRUNC(d_14);
+	l_16 = CALL/3(l_13, c_11, c_12, d_9, d_15);
+	l_18 = RETURN(l_16, c_13);
+}
+func @test(uintptr_t): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uint64_t c_4 = 8;
+	uint64_t c_5 = 16;
+	int64_t c_6 = 42;
+#BB1: end=l_12
+	l_1 = START(l_12);
+	uintptr_t d_2 = PARAM(l_1, "t", 1) ByVal(24, 8);
+	uintptr_t d_3 = ADD(d_2, c_4);
+	int64_t d_4, l_4 = LOAD(l_1, d_2);
+	int64_t d_5, l_5 = LOAD(l_4, d_3);
+	int64_t d_6 = ADD(d_5, d_4);
+	uintptr_t d_7 = ADD(d_2, c_5);
+	int64_t d_8, l_8 = LOAD(l_5, d_7);
+	int64_t d_9 = ADD(d_8, d_6);
+	int32_t d_10 = TRUNC(d_9);
+	l_11 = STORE(l_8, d_3, c_6);
+	l_12 = RETURN(l_11, d_10);
+}
+--EXPECT--
+6 6

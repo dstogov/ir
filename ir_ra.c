@@ -1193,7 +1193,7 @@ static void ir_add_fusion_ranges(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_block
 		n = IR_INPUT_EDGES_COUNT(flags);
 		j = 1;
 		p = insn->ops + j;
-		if (flags & IR_OP_FLAG_CONTROL) {
+		if (flags & (IR_OP_FLAG_CONTROL|IR_OP_FLAG_PINNED)) {
 			j++;
 			p++;
 		}
@@ -1340,7 +1340,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					  || (ctx->rules[ref] & IR_RULE_MASK) == IR_ALLOCA)
 					 && ctx->use_lists[ref].count > 0) {
 						insn = &ctx->ir_base[ref];
-						if (insn->op != IR_VADDR) {
+						if (insn->op != IR_VADDR && insn->op != IR_PARAM) {
 							insn->op3 = ctx->vars;
 							ctx->vars = ref;
 						}

@@ -1,0 +1,31 @@
+--TEST--
+003: ARGVAL:
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+func test(uintptr_t): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uintptr_t c_4 = 0x4;
+	uintptr_t c_5 = 0x8;
+	l_1 = START(l_10);
+	uintptr_t d_2 = PARAM(l_1, "arg_1", 1) ByVal(12, 4);
+	int32_t d_3, l_3 = LOAD(l_1, d_2);
+	uintptr_t d_4 = ADD(d_2, c_4);
+	int32_t d_5, l_5 = LOAD(l_3, d_4);
+	int32_t d_6 = ADD(d_5, d_3);
+	uintptr_t d_7 = ADD(d_2, c_5);
+	int32_t d_8, l_8 = LOAD(l_5, d_7);
+	int32_t d_9 = ADD(d_8, d_6);
+	l_10 = RETURN(l_8, d_9);
+}
+--EXPECT--
+test:
+	movl 8(%esp), %eax
+	addl 4(%esp), %eax
+	addl 0xc(%esp), %eax
+	retl

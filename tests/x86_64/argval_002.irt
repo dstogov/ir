@@ -1,0 +1,50 @@
+--TEST--
+002: ARGVAL:
+--TARGET--
+x86_64
+--ARGS--
+-S
+--CODE--
+extern func @test(uintptr_t, ...): int32_t;
+static const @str.1[1] = "\000";
+func @main(): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uint64_t c_4 = 24;
+	int64_t c_5 = 1;
+	uint64_t c_6 = 8;
+	int64_t c_7 = 2;
+	uint64_t c_8 = 16;
+	int64_t c_9 = 3;
+	uintptr_t c_10 = func @test(uintptr_t, ...): int32_t;
+	uintptr_t c_11 = sym(@str.1);
+	l_1 = START(l_11);
+	uintptr_t d_2, l_2 = ALLOCA(l_1, c_4);
+	l_3 = STORE(l_2, d_2, c_5);
+	uintptr_t d_4 = ADD(d_2, c_6);
+	l_5 = STORE(l_3, d_4, c_7);
+	uintptr_t d_6 = ADD(d_2, c_8);
+	l_7 = STORE(l_5, d_6, c_9);
+	uintptr_t d_8 = ARGVAL(d_2, 24, 8);
+	int32_t d_9, l_9 = CALL/2(l_7, c_10, c_11, d_8);
+	l_11 = RETURN(l_9, d_9);
+}
+--EXPECT--
+main:
+	subq $0x38, %rsp
+	movq $1, 0x18(%rsp)
+	movq $2, 0x20(%rsp)
+	movq $3, 0x28(%rsp)
+	leaq 0x18(%rsp), %rsi
+	movq %rsp, %rdi
+	movq $0x18, %rcx
+	rep movsb (%rsi), (%rdi)
+	leaq str.1(%rip), %rdi
+	movl $0, %eax
+	callq test
+	addq $0x38, %rsp
+	retq
+
+Undefined symbol: test
