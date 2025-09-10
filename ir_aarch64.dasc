@@ -4797,7 +4797,8 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn, int32_t *copy_stac
 		}
 	}
 
-	*copy_stack_ptr = IR_ALIGNED_SIZE(copy_stack, 16);
+	copy_stack = IR_ALIGNED_SIZE(copy_stack, 16);
+	*copy_stack_ptr = copy_stack;
 	return used_stack + copy_stack;
 }
 
