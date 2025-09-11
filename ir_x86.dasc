@@ -2437,9 +2437,11 @@ binop_fp:
 		case IR_VAR:
 			return IR_SKIPPED | IR_VAR;
 		case IR_PARAM:
+#ifndef _WIN64
 			if (ctx->value_params && ctx->value_params[insn->op3 - 1].align) {
 				return IR_STATIC_ALLOCA;
 			}
+#endif
 			return ctx->use_lists[ref].count > 0 ? IR_PARAM : IR_SKIPPED | IR_PARAM;
 		case IR_ALLOCA:
 			/* alloca() may be used only in functions */
@@ -8517,6 +8519,10 @@ static void ir_emit_va_arg(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		offset = ir_local_offset(ctx, &ctx->ir_base[insn->op2]);
 	}
 	|	mov Ra(tmp_reg), aword [Ra(op2_reg)+offset]
+#ifdef _WIN64
+	ir_emit_load_mem(ctx, type, def_reg, IR_MEM_B(tmp_reg));
+	|	add Ra(tmp_reg), IR_MAX(ir_type_size[type], sizeof(void*))
+#else
 	if (!insn->op3) {
 		ir_emit_load_mem(ctx, type, def_reg, IR_MEM_B(tmp_reg));
 		|	add Ra(tmp_reg), IR_MAX(ir_type_size[type], sizeof(void*))
@@ -8532,6 +8538,7 @@ static void ir_emit_va_arg(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		|	mov Ra(def_reg), Ra(tmp_reg)
 		|	add Ra(tmp_reg), IR_ALIGNED_SIZE(size, sizeof(void*))
 	}
+#endif
 	|	mov aword [Ra(op2_reg)+offset], Ra(tmp_reg)
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, type, def, def_reg);
@@ -8895,7 +8902,7 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 	}
 }
 
-static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn)
+static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn, int *copy_stack_ptr)
 {
 	int j, n;
 	ir_type type;
@@ -8904,6 +8911,9 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn)
 	int int_reg_params_count = IR_REG_INT_ARGS;
 	int fp_reg_params_count = IR_REG_FP_ARGS;
 	int32_t used_stack = 0;
+#ifdef _WIN64
+	int32_t copy_stack = 0;
+#endif
 
 #ifdef IR_HAVE_FASTCALL
 	if (sizeof(void*) == 4 && ir_is_fastcall(ctx, insn)) {
@@ -8920,11 +8930,19 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn)
 			if (arg->op == IR_ARGVAL) {
 				int size = arg->op2;
 				int align = arg->op3;
+
+#ifdef _WIN64
+				copy_stack += size;
+				align = IR_MAX((int)sizeof(void*), align);
+				copy_stack = IR_ALIGNED_SIZE(copy_stack, align);
+				type = IR_ADDR;
+#else
 				align = IR_MAX((int)sizeof(void*), align);
 				used_stack = IR_ALIGNED_SIZE(used_stack, align);
 				used_stack += size;
 				used_stack = IR_ALIGNED_SIZE(used_stack, sizeof(void*));
 				continue;
+#endif
 			}
 			if (int_param >= int_reg_params_count) {
 				used_stack += IR_MAX(sizeof(void*), ir_type_size[type]);
@@ -8950,6 +8968,14 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn)
 	/* Reserved "home space" or "shadow store" for register arguments (used in Windows64 ABI) */
 	used_stack += IR_SHADOW_ARGS;
 
+#ifdef _WIN64
+	copy_stack = IR_ALIGNED_SIZE(copy_stack, 16);
+	used_stack += copy_stack;
+	*copy_stack_ptr = copy_stack;
+#else
+	*copy_stack_ptr = 0;
+#endif
+
 	return used_stack;
 }
 
@@ -8969,7 +8995,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 	int fp_reg_params_count = IR_REG_FP_ARGS;
 	const int8_t *int_reg_params = _ir_int_reg_params;
 	const int8_t *fp_reg_params = _ir_fp_reg_params;
-	int32_t used_stack, stack_offset = IR_SHADOW_ARGS;
+	int32_t used_stack, copy_stack = 0, stack_offset = IR_SHADOW_ARGS;
 	ir_copy *copies;
 	bool do_pass3 = 0;
 	/* For temporaries we may use any scratch registers except for registers used for parameters */
@@ -9000,9 +9026,11 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 #endif
 	) {
 		// TODO: support for preallocated stack
-		used_stack = 0;
+#ifdef _WIN64
+		used_stack = ir_call_used_stack(ctx, insn, &copy_stack);
+#endif
 	} else {
-		used_stack = ir_call_used_stack(ctx, insn);
+		used_stack = ir_call_used_stack(ctx, insn, &copy_stack);
 		if (IR_SHADOW_ARGS
 		 && insn->op == IR_TAILCALL
 		 && used_stack == IR_SHADOW_ARGS) {
@@ -9025,6 +9053,46 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 		}
 	}
 
+#ifdef _WIN64
+|.if X64
+	if (copy_stack) {
+		/* Copy struct arguments */
+		int copy_stack_offset = 0;
+
+		for (j = 3; j <= n; j++) {
+			arg = ir_insn_op(insn, j);
+			src_reg = ir_get_alocated_reg(ctx, def, j);
+			arg_insn = &ctx->ir_base[arg];
+			type = arg_insn->type;
+
+			if (arg_insn->op == IR_ARGVAL) {
+				/* make a stack copy */
+				int size = arg_insn->op2;
+				int align = arg_insn->op3;
+
+				copy_stack_offset += size;
+				align = IR_MAX((int)sizeof(void*), align);
+				copy_stack_offset = IR_ALIGNED_SIZE(copy_stack_offset, align);
+				src_reg = ctx->regs[arg][1];
+
+				|	lea	rdi, [rsp + (used_stack - copy_stack_offset)]
+				if (src_reg != IR_REG_NONE) {
+					if (IR_REG_SPILLED(src_reg)) {
+						src_reg = IR_REG_NUM(src_reg);
+						ir_emit_load(ctx, IR_ADDR, src_reg, arg_insn->op1);
+					}
+					|	mov rsi, Ra(src_reg)
+				} else {
+					ir_emit_load(ctx, IR_ADDR, IR_REG_RSI, arg_insn->op1);
+				}
+				ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_RCX, size);
+				|	rep; movsb
+			}
+		}
+	}
+|.endif
+#endif
+
 	/* 1. move all register arguments that should be passed through stack
 	 *    and collect arguments that should be passed through registers */
 	copies = ir_mem_malloc((n - 2) * sizeof(ir_copy));
@@ -9034,6 +9102,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 		arg_insn = &ctx->ir_base[arg];
 		type = arg_insn->type;
 		if (IR_IS_TYPE_INT(type)) {
+#ifndef _WIN64
 			if (arg_insn->op == IR_ARGVAL) {
 				int size = arg_insn->op2;
 				int align = arg_insn->op3;
@@ -9065,7 +9134,9 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 				stack_offset += size;
 				stack_offset = IR_ALIGNED_SIZE(stack_offset, sizeof(void*));
 				continue;
-			} else if (int_param < int_reg_params_count) {
+			}
+#endif
+			if (int_param < int_reg_params_count) {
 				dst_reg = int_reg_params[int_param];
 			} else {
 				dst_reg = IR_REG_NONE; /* pass argument through stack */
@@ -9074,6 +9145,10 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 #ifdef _WIN64
 			/* WIN64 calling convention use common couter for int and fp registers */
 			fp_param++;
+			if (arg_insn->op == IR_ARGVAL) {
+				do_pass3 = 3;
+				continue;
+			}
 #endif
 		} else {
 			IR_ASSERT(IR_IS_TYPE_FP(type));
@@ -9126,6 +9201,10 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 
 	/* 3. move the remaining memory and immediate values */
 	if (do_pass3) {
+#ifdef _WIN64
+		int copy_stack_offset = 0;
+#endif
+
 		stack_offset = IR_SHADOW_ARGS;
 		int_param = 0;
 		fp_param = 0;
@@ -9138,12 +9217,35 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 				if (arg_insn->op == IR_ARGVAL) {
 					int size = arg_insn->op2;
 					int align = arg_insn->op3;
+
+#ifndef _WIN64
 					align = IR_MAX((int)sizeof(void*), align);
 					stack_offset = IR_ALIGNED_SIZE(stack_offset, align);
 					stack_offset += size;
 					stack_offset = IR_ALIGNED_SIZE(stack_offset, sizeof(void*));
 					continue;
-				} else if (int_param < int_reg_params_count) {
+#else
+|.if X64
+					/* pass pointer to the copy on stack */
+					copy_stack_offset += size;
+					align = IR_MAX((int)sizeof(void*), align);
+					copy_stack_offset = IR_ALIGNED_SIZE(copy_stack_offset, align);
+					if (int_param < int_reg_params_count) {
+						dst_reg = int_reg_params[int_param];
+						|	lea Ra(dst_reg), [rsp + (used_stack - copy_stack_offset)]
+					} else {
+						|	lea Ra(tmp_reg), [rsp + (used_stack - copy_stack_offset)]
+						ir_emit_store_mem_int(ctx, IR_ADDR, IR_MEM_BO(IR_REG_STACK_POINTER, stack_offset), tmp_reg);
+						stack_offset += sizeof(void*);
+					}
+					int_param++;
+					/* WIN64 calling convention use common couter for int and fp registers */
+					fp_param++;
+					continue;
+|.endif
+#endif
+				}
+				if (int_param < int_reg_params_count) {
 					dst_reg = int_reg_params[int_param];
 				} else {
 					dst_reg = IR_REG_NONE; /* argument already passed through stack */
@@ -9257,6 +9359,9 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 |.endif
 			}
 		}
+	}
+	if (insn->op == IR_CALL && (ctx->flags & IR_PREALLOCATED_STACK)) {
+		used_stack = 0;
 	}
 #endif
 #ifdef IR_REG_VARARG_FP_REGS
@@ -10464,6 +10569,7 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 		insn = &ctx->ir_base[use];
 		if (insn->op == IR_PARAM) {
 			if (IR_IS_TYPE_INT(insn->type)) {
+#ifndef _WIN64
 				if (ctx->value_params && ctx->value_params[insn->op3 - 1].align) {
 					/* struct passed by value on stack */
 					size_t align = ctx->value_params[insn->op3 - 1].align;
@@ -10474,7 +10580,9 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 					stack_offset += ctx->value_params[insn->op3 - 1].size;
 					stack_offset = IR_ALIGNED_SIZE(stack_offset, sizeof(void*));
 					continue;
-				} else if (int_param_num < int_reg_params_count) {
+				}
+#endif
+				if (int_param_num < int_reg_params_count) {
 					src_reg = int_reg_params[int_param_num];
 				} else {
 					src_reg = IR_REG_NONE;
@@ -10734,13 +10842,13 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 
 static void ir_preallocate_call_stack(ir_ctx *ctx)
 {
-	int call_stack_size, peak_call_stack_size = 0;
+	int call_stack_size, copy_stack, peak_call_stack_size = 0;
 	ir_ref i, n;
 	ir_insn *insn;
 
 	for (i = 1, insn = ctx->ir_base + 1; i < ctx->insns_count;) {
 		if (insn->op == IR_CALL) {
-			call_stack_size = ir_call_used_stack(ctx, insn);
+			call_stack_size = ir_call_used_stack(ctx, insn, &copy_stack);
 			if (call_stack_size > peak_call_stack_size
 #ifdef IR_HAVE_FASTCALL
 			 && !ir_is_fastcall(ctx, insn) /* fast call functions restore stack pointer */
