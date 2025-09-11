@@ -9028,6 +9028,8 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 		// TODO: support for preallocated stack
 #ifdef _WIN64
 		used_stack = ir_call_used_stack(ctx, insn, &copy_stack);
+#else
+		used_stack = 0;
 #endif
 	} else {
 		used_stack = ir_call_used_stack(ctx, insn, &copy_stack);
