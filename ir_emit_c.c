@@ -614,7 +614,11 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 		if (j != 3) {
 			fprintf(f, ", ");
 		}
-		ir_emit_ref(ctx, f, ir_insn_op(insn, j));
+		ir_ref arg = ir_insn_op(insn, j);
+		if (ctx->ir_base[arg].op == IR_ARGVAL) {
+			arg = ctx->ir_base[arg].op1;
+		}
+		ir_emit_ref(ctx, f, arg);
 	}
 	fprintf(f, ");\n");
 }
@@ -861,6 +865,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_PHI:
 				case IR_PI:
 				case IR_VLOAD:
+				case IR_ARGVAL:
 					/* skip */
 					break;
 				case IR_EQ:

@@ -600,28 +600,8 @@ static void ir_dump_func_dcl(const char *name, uint32_t flags, ir_type ret_type,
 	} else if (flags & IR_STATIC) {
 		fprintf(f, "static ");
 	}
-	fprintf(f, "func %s(", name);
-	if (params_count) {
-		const uint8_t *p = param_types;
-
-		fprintf(f, "%s", ir_type_cname[*p]);
-		p++;
-		while (--params_count) {
-			fprintf(f, ", %s", ir_type_cname[*p]);
-			p++;
-		}
-		if (flags & IR_VARARG_FUNC) {
-			fprintf(f, ", ...");
-		}
-	} else if (flags & IR_VARARG_FUNC) {
-		fprintf(f, "...");
-	}
-	fprintf(f, "): %s", ir_type_cname[ret_type]);
-	if (flags & IR_FASTCALL_FUNC) {
-		fprintf(f, " __fastcall");
-	} else if (flags & IR_BUILTIN_FUNC) {
-		fprintf(f, " __builtin");
-	}
+	fprintf(f, "func %s", name);
+	ir_print_proto_ex(ret_type, flags, params_count, param_types, f);
 	fprintf(f, ";\n");
 }
 

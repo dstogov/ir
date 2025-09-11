@@ -781,6 +781,10 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn, ir_bit
 		}
 		k = ir_insn_op(insn, j);
 		fprintf(f, "%s ", ir_type_llvm_name[ctx->ir_base[k].type]);
+		if (ctx->ir_base[k].op == IR_ARGVAL) {
+			fprintf(f, "byval({[%d x i8]}) align %d ", ctx->ir_base[k].op2, ctx->ir_base[k].op3);
+			k = ctx->ir_base[k].op1;
+		}
 		ir_emit_ref(ctx, f, k);
 	}
 	if (last_arg) {
@@ -941,6 +945,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_MERGE:
 				case IR_LOOP_BEGIN:
 				case IR_PARAM:
+				case IR_ARGVAL:
 					/* skip */
 					break;
 				case IR_PHI:
