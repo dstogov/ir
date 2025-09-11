@@ -18,6 +18,8 @@
 #define LLVMAttrAlwaysInline    3
 #define LLVMAttrInlineHint     12
 #define LLVMAttrNoInline       26
+#define LLVMAttrByVal          76
+#define LLVMAttrAlignment      81
 
 #define LLVM2IR_INLINE_MAX_HINT_BLOCKS 10
 #define LLVM2IR_INLINE_MAX_HINT_COST   50
@@ -1367,6 +1369,22 @@ static void llvm2ir_call(ir_ctx *ctx, LLVMValueRef insn, LLVMModuleRef module, L
 		type = llvm2ir_type(LLVMTypeOf(arg));
 		args[i] = llvm2ir_op(ctx, arg, type);
 	}
+	for (i = 0; i < count; i++) {
+		LLVMAttributeRef attr;
+		LLVMTypeRef val_type;
+
+		arg = LLVMGetOperand(insn, i);
+		if ((attr = LLVMGetCallSiteEnumAttribute(insn, i + 1, LLVMAttrByVal))
+		 && (val_type = LLVMGetTypeAttributeValue(attr))) {
+			size_t size, align = 0;
+
+			if ((attr = LLVMGetCallSiteEnumAttribute(insn, i + 1, LLVMAttrAlignment))) {
+				align = LLVMGetEnumAttributeValue(attr);
+			}
+			size = LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, val_type);
+			args[i] = ir_emit3(ctx, IR_OPT(IR_ARGVAL, IR_ADDR), args[i], size, align);
+		}
+	}
 	do {
 		if (LLVMIsTailCall(insn)) {
 			LLVMValueRef next_insn = LLVMGetNextInstruction(insn);
@@ -1762,7 +1780,7 @@ static void llvm2ir_patch_merge(ir_ctx *ctx, ir_ref merge, ir_ref ref, uint32_t 
 
 static int llvm2ir_func(ir_ctx *ctx, LLVMValueRef func, LLVMModuleRef module)
 {
-	uint32_t i, cconv;
+	uint32_t i, params_count, cconv;
 	LLVMValueRef param;
 	LLVMTypeRef ftype;
 	ir_type type;
@@ -1791,7 +1809,8 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMValueRef func, LLVMModuleRef module)
 	ir_addrtab_init(ctx->binding, 256);
 
 	ir_START();
-	for (i = 0; i < LLVMCountParams(func); i++) {
+	params_count = LLVMCountParams(func);
+	for (i = 0; i < params_count; i++) {
 		size_t name_len;
 		const char *name;
 		char buf[32];
@@ -1800,6 +1819,25 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMValueRef func, LLVMModuleRef module)
 		type = llvm2ir_type(LLVMTypeOf(param));
 		if (type == IR_BAD_TYPE) {
 			return 0;
+		}
+		if (type == IR_ADDR) {
+			LLVMAttributeRef attr;
+			LLVMTypeRef val_type;
+
+			if ((attr = LLVMGetEnumAttributeAtIndex(func, i + 1, LLVMAttrByVal))
+			 && (val_type = LLVMGetTypeAttributeValue(attr))) {
+				size_t size, align = 0;
+
+				if ((attr = LLVMGetEnumAttributeAtIndex(func, i + 1, LLVMAttrAlignment))) {
+					align = LLVMGetEnumAttributeValue(attr);
+				}
+				size = LLVMABISizeOfType((LLVMTargetDataRef)ctx->rules, val_type);
+				if (!ctx->value_params) {
+					ctx->value_params = ir_mem_calloc(params_count, sizeof(ir_value_param));
+				}
+				ctx->value_params[i].size = size;
+				ctx->value_params[i].align = align ? align : 1;
+			}
 		}
 		name = LLVMGetValueName2(param, &name_len);
 		if (!name || !name_len) {

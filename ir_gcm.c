@@ -1274,6 +1274,7 @@ restart:
 	new_ctx.insns_count = insns_count;
 	new_ctx.flags2 = ctx->flags2;
 	new_ctx.ret_type = ctx->ret_type;
+	new_ctx.value_params = ctx->value_params;
 	new_ctx.mflags = ctx->mflags;
 	new_ctx.spill_base = ctx->spill_base;
 	new_ctx.fixed_stack_red_zone = ctx->fixed_stack_red_zone;
@@ -1511,6 +1512,7 @@ restart:
 	new_ctx.cfg_edges = ctx->cfg_edges;
 	ctx->cfg_blocks = NULL;
 	ctx->cfg_edges = NULL;
+	ctx->value_params = NULL;
 	ir_code_buffer *saved_code_buffer = ctx->code_buffer;
 
 	ir_free(ctx);

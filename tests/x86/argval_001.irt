@@ -1,0 +1,47 @@
+--TEST--
+001: ARGVAL:
+--TARGET--
+x86
+--ARGS--
+-S
+--CODE--
+extern func @test(uintptr_t): int32_t;
+func @main(): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uint32_t c_4 = 12;
+	int32_t c_5 = 1;
+	uint32_t c_6 = 4;
+	int32_t c_7 = 2;
+	uint32_t c_8 = 8;
+	int32_t c_9 = 3;
+	uintptr_t c_10 = func @test(uintptr_t): int32_t;
+#BB1: end=l_9
+	l_1 = START(l_10);
+	uintptr_t d_2, l_2 = ALLOCA(l_1, c_4);
+	l_3 = STORE(l_2, d_2, c_5);
+	uintptr_t d_4 = ADD(d_2, c_6);
+	l_5 = STORE(l_3, d_4, c_7);
+	uintptr_t d_6 = ADD(d_2, c_8);
+	l_7 = STORE(l_5, d_6, c_9);
+	uintptr_t d_8 = ARGVAL(d_2, 12, 4);
+	int32_t d_9, l_9 = CALL/1(l_7, c_10, d_8);
+	l_10 = RETURN(l_9, d_9);
+}
+--EXPECT--
+main:
+	subl $0x1c, %esp
+	movl $1, 0xc(%esp)
+	movl $2, 0x10(%esp)
+	movl $3, 0x14(%esp)
+	leal 0xc(%esp), %esi
+	movl %esp, %edi
+	movl $0xc, %ecx
+	rep movsb (%esi), %es:(%edi)
+	calll test
+	addl $0x1c, %esp
+	retl
+
+Undefined symbol: test

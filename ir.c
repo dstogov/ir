@@ -227,6 +227,7 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted
 #define ir_op_flag_d0      ir_op_flag_d
 #define ir_op_flag_d1      (ir_op_flag_d | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_d1X1    (ir_op_flag_d | 1 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_d1X2    (ir_op_flag_d | 1 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_d2      (ir_op_flag_d | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_d2C     (ir_op_flag_d | IR_OP_FLAG_COMMUTATIVE | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_d3      (ir_op_flag_d | 3 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
@@ -270,6 +271,7 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted
 #define ir_op_flag_s3      (ir_op_flag_s | 3 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_x1      (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_CALL | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_x2      (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_CALL | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_x2X1    (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_CALL | 2 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_x3      (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_CALL | 3 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_xN      (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_CALL | IR_OP_FLAG_VAR_INPUTS)
 #define ir_op_flag_a1      (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_ALLOC | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
@@ -414,6 +416,9 @@ void ir_free(ir_ctx *ctx)
 {
 	ir_insn *buf = ctx->ir_base - ctx->consts_limit;
 	ir_mem_free(buf);
+	if (ctx->value_params) {
+		ir_mem_free(ctx->value_params);
+	}
 	if (ctx->strtab.data) {
 		ir_strtab_free(&ctx->strtab);
 	}
@@ -3212,6 +3217,13 @@ ir_ref _ir_VA_ARG(ir_ctx *ctx, ir_type type, ir_ref list)
 {
 	IR_ASSERT(ctx->control);
 	return ctx->control = ir_emit2(ctx, IR_OPT(IR_VA_ARG, type), ctx->control, list);
+}
+
+ir_ref _ir_VA_ARG_EX(ir_ctx *ctx, ir_type type, ir_ref list, size_t size)
+{
+	IR_ASSERT(ctx->control);
+	IR_ASSERT(size <= 0x7fffffff);
+	return ctx->control = ir_emit3(ctx, IR_OPT(IR_VA_ARG, type), ctx->control, list, (ir_ref)size);
 }
 
 ir_ref _ir_BLOCK_BEGIN(ir_ctx *ctx)
