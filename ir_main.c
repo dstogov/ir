@@ -601,7 +601,7 @@ static void ir_dump_func_dcl(const char *name, uint32_t flags, ir_type ret_type,
 		fprintf(f, "static ");
 	}
 	fprintf(f, "func %s", name);
-	ir_print_proto_ex(ret_type, flags, params_count, param_types, f);
+	ir_print_proto_ex(flags, ret_type, params_count, param_types, f);
 	fprintf(f, ";\n");
 }
 
