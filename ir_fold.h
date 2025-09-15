@@ -1703,6 +1703,11 @@ IR_FOLD(SUB_OV(_, C_ADDR))
 {
 	if (op2_insn->val.u64 == 0) {
 		/* a +/- 0 => a */
+		if (op1_insn->type != IR_OPT_TYPE(opt)) {
+			opt = IR_BITCAST | (opt & IR_OPT_TYPE_MASK);
+			op2 = IR_UNUSED;
+			IR_FOLD_RESTART;
+		}
 		IR_FOLD_COPY(op1);
 	}
 	IR_FOLD_NEXT;
@@ -1721,6 +1726,12 @@ IR_FOLD(ADD(C_ADDR, _))
 {
 	if (op1_insn->val.u64 == 0) {
 		/* 0 + a => a */
+		if (op2_insn->type != IR_OPT_TYPE(opt)) {
+			opt = IR_BITCAST | (opt & IR_OPT_TYPE_MASK);
+			op1 = op2;
+			op2 = IR_UNUSED;
+			IR_FOLD_RESTART;
+		}
 		IR_FOLD_COPY(op2);
 	}
 	IR_FOLD_NEXT;
