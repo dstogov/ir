@@ -1928,7 +1928,7 @@ static ir_ref ir_ext_ref(ir_ctx *ctx, ir_ref var_ref, ir_ref src_ref, ir_op op, 
 	return ref;
 }
 
-static uint32_t _ir_estimated_control(ir_ctx *ctx, ir_ref val)
+static uint32_t _ir_estimated_control(ir_ctx *ctx, ir_ref val, ir_ref loop)
 {
 	ir_insn *insn;
 	ir_ref n, *p, input, result, ctrl;
@@ -1953,7 +1953,8 @@ static uint32_t _ir_estimated_control(ir_ctx *ctx, ir_ref val)
 	result = 1;
 	for (; n > 0; p++, n--) {
 		input = *p;
-		ctrl = _ir_estimated_control(ctx, input);
+		ctrl = _ir_estimated_control(ctx, input, loop);
+		if (ctrl >= loop) return ctrl;
 		if (ctrl > result) { // TODO: check dominance depth instead of order
 			result = ctrl;
 		}
@@ -1963,7 +1964,7 @@ static uint32_t _ir_estimated_control(ir_ctx *ctx, ir_ref val)
 
 static bool ir_is_loop_invariant(ir_ctx *ctx, ir_ref ref, ir_ref loop)
 {
-	ref = _ir_estimated_control(ctx, ref);
+	ref = _ir_estimated_control(ctx, ref, loop);
 	return ref < loop; // TODO: check dominance instead of order
 }
 
