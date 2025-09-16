@@ -769,6 +769,7 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 			ctx->flags2 &= ~IR_NO_LOOPS;
 //			IR_ASSERT(k > 1 && "Wrong blocks order: BB is before its single predecessor");
 			if (UNEXPECTED(k <= 1)) {
+slow_case:
 				ir_list_free(&worklist);
 				return ir_build_dominators_tree_slow(ctx);
 			}
@@ -780,7 +781,9 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 				if (idom < b) {
 					break;
 				}
-				IR_ASSERT(k > 0);
+				if (UNEXPECTED(k == 0)) {
+					goto slow_case;
+				}
 				ir_list_push(&worklist, idom);
 			}
 		}
