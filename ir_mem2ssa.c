@@ -482,6 +482,9 @@ int ir_mem2ssa(ir_ctx *ctx)
 				if (ctx->use_lists[ref].count == 1) {
 					ir_ref prev = insn->op1;
 					ctx->ir_base[next].op1 = prev;
+					if (!IR_IS_CONST_REF(insn->op2)) {
+						ir_use_list_remove_one(ctx, insn->op2, ref);
+					}
 					ir_use_list_replace_one(ctx, prev, ref, next);
 					MAKE_NOP(insn);
 					CLEAR_USES(ref);
@@ -507,6 +510,9 @@ int ir_mem2ssa(ir_ctx *ctx)
 					prev = insn->op1;
 					next = ir_next_control(ctx, ref);
 					ctx->ir_base[next].op1 = prev;
+					if (!IR_IS_CONST_REF(insn->op2)) {
+						ir_use_list_remove_one(ctx, insn->op2, ref);
+					}
 					ir_use_list_replace_one(ctx, prev, ref, next);
 					MAKE_NOP(insn);
 					CLEAR_USES(ref);
