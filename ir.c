@@ -2097,10 +2097,10 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_vload_i(ir_ctx *ctx, ir_ref ref, ir_typ
 				if (insn->type == type) {
 					return ref; /* load forwarding (L2L) */
 				} else if (ir_type_size[insn->type] == ir_type_size[type]) {
-					return ir_fold1(ctx, IR_OPT(IR_BITCAST, type), ref); /* load forwarding with bitcast (L2L) */
+					return ref; /* load forwarding with bitcast (L2L) */
 				} else if (ir_type_size[insn->type] > ir_type_size[type]
 						&& IR_IS_TYPE_INT(type) && IR_IS_TYPE_INT(insn->type)) {
-					return ir_fold1(ctx, IR_OPT(IR_TRUNC, type), ref); /* partial load forwarding (L2L) */
+					return ref; /* partial load forwarding (L2L) */
 				}
 			}
 		} else if (insn->op == IR_VSTORE) {
@@ -2110,10 +2110,10 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_vload_i(ir_ctx *ctx, ir_ref ref, ir_typ
 				if (type2 == type) {
 					return insn->op3; /* store forwarding (S2L) */
 				} else if (ir_type_size[type2] == ir_type_size[type]) {
-					return ir_fold1(ctx, IR_OPT(IR_BITCAST, type), insn->op3); /* store forwarding with bitcast (S2L) */
+					return insn->op3; /* store forwarding with bitcast (S2L) */
 				} else if (ir_type_size[type2] > ir_type_size[type]
 						&& IR_IS_TYPE_INT(type) && IR_IS_TYPE_INT(type2)) {
-					return ir_fold1(ctx, IR_OPT(IR_TRUNC, type), insn->op3); /* partial store forwarding (S2L) */
+					return insn->op3; /* partial store forwarding (S2L) */
 				} else {
 					break;
 				}
