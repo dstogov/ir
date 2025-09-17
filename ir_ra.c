@@ -1630,6 +1630,10 @@ static void ir_vregs_join(ir_ctx *ctx, uint32_t r1, uint32_t r2)
 	if (ctx->ir_base[IR_LIVE_POS_TO_REF(ctx->live_intervals[r1]->use_pos->pos)].op != IR_VLOAD) {
 		ctx->live_intervals[r1]->flags &= ~IR_LIVE_INTERVAL_MEM_LOAD;
 	}
+	if (ival->flags & IR_LIVE_INTERVAL_MEM_PARAM) {
+		IR_ASSERT(!(ctx->live_intervals[r1]->flags & IR_LIVE_INTERVAL_MEM_PARAM));
+		ctx->live_intervals[r1]->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
+	}
 	ctx->live_intervals[r2] = NULL;
 
 	// TODO: remember to reuse ???
