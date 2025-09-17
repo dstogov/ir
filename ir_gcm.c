@@ -797,16 +797,21 @@ IR_ALWAYS_INLINE bool ir_is_good_bb_order(ir_ctx *ctx, uint32_t b, ir_block *bb,
 		IR_ASSERT(n > 1);
 		for (; n > 0; p++, n--) {
 			ir_ref input = *p;
-			if (input < start) {
-				/* ordered */
-			} else if ((bb->flags & IR_BB_LOOP_HEADER)
-			  && (ctx->cfg_map[input] == b || ctx->cfg_blocks[ctx->cfg_map[input]].loop_header == b)) {
-				/* back-edge of reducible loop */
-			} else if ((bb->flags & IR_BB_IRREDUCIBLE_LOOP)
-			  && (ctx->cfg_blocks[ctx->cfg_map[input]].loop_header == ctx->cfg_blocks[b].loop_header)) {
-				/* closing edge of irreducible loop */
-			} else {
-				return 0;
+
+			if (!IR_IS_CONST_REF(input)) {
+				uint32_t input_b = ctx->cfg_map[input];
+
+				if (input_b < b) {
+					/* ordered */
+				} else if ((bb->flags & IR_BB_LOOP_HEADER)
+				  && (input_b == b || ctx->cfg_blocks[input_b].loop_header == b)) {
+					/* back-edge of reducible loop */
+				} else if ((bb->flags & IR_BB_IRREDUCIBLE_LOOP)
+				  && (ctx->cfg_blocks[input_b].loop_header == bb->loop_header)) {
+					/* closing edge of irreducible loop */
+				} else {
+					return 0;
+				}
 			}
 		}
 		return 1;
