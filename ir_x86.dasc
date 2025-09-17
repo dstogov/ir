@@ -9111,7 +9111,18 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 				align = IR_MAX((int)sizeof(void*), align);
 				stack_offset = IR_ALIGNED_SIZE(stack_offset, align);
 				if (size) {
-					ir_emit_load(ctx, IR_ADDR, IR_REG_RSI, arg_insn->op1);
+					src_reg = ctx->regs[arg][1];
+					if (src_reg != IR_REG_NONE) {
+						if (IR_REG_SPILLED(src_reg)) {
+							src_reg = IR_REG_NUM(src_reg);
+							ir_emit_load(ctx, IR_ADDR, src_reg, arg_insn->op1);
+						}
+						if (src_reg != IR_REG_RSI) {
+							|	mov rsi, Ra(src_reg)
+						}
+					} else {
+						ir_emit_load(ctx, IR_ADDR, IR_REG_RSI, arg_insn->op1);
+					}
 					if (stack_offset == 0) {
 						|.if X64
 						|	mov	rdi, rsp
