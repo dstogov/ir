@@ -9118,7 +9118,11 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 							ir_emit_load(ctx, IR_ADDR, src_reg, arg_insn->op1);
 						}
 						if (src_reg != IR_REG_RSI) {
+							|.if X64
 							|	mov rsi, Ra(src_reg)
+							|.else
+							|	mov	esi, Ra(src_reg)
+							|.endif
 						}
 					} else {
 						ir_emit_load(ctx, IR_ADDR, IR_REG_RSI, arg_insn->op1);
