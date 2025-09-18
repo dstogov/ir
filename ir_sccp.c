@@ -1875,6 +1875,7 @@ static ir_ref ir_ext_const(ir_ctx *ctx, ir_insn *val_insn, ir_op op, ir_type typ
 		case IR_I8:
 		case IR_U8:
 		case IR_BOOL:
+		case IR_CHAR:
 			if (op == IR_SEXT) {
 				new_val.i64 = (int64_t)val_insn->val.i8;
 			} else {
