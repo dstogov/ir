@@ -542,6 +542,7 @@ ir_ref ir_const_ex(ir_ctx *ctx, ir_val val, uint8_t type, uint32_t optx)
 
 	if ((uintptr_t)ctx->consts_count > ctx->const_hash_mask) {
 		ir_const_hash_rehash(ctx);
+		hash = ir_const_hash(val, optx) & ctx->const_hash_mask;
 	}
 
 	prev = ctx->const_hash[hash];
