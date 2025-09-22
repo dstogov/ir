@@ -530,13 +530,11 @@ ir_ref ir_const_ex(ir_ctx *ctx, ir_val val, uint8_t type, uint32_t optx)
 	while (ref) {
 		insn = &ctx->ir_base[ref];
 		if (UNEXPECTED(insn->val.u64 >= val.u64)) {
-			if (insn->val.u64 == val.u64) {
-				if (insn->optx == optx) {
-					return ref;
-				}
-			} else {
-				break;
+			if (insn->val.u64 == val.u64 && insn->optx == optx) {
+				return ref;
 			}
+		} else {
+			break;
 		}
 		prev_insn = insn;
 		ref = insn->prev_const;
