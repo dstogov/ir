@@ -605,7 +605,7 @@ static void compute_postnum(const ir_ctx *ctx, uint32_t *cur, uint32_t b)
 
 /* Computes dominator tree using algorithm from "A Simple, Fast Dominance Algorithm" by
  * Cooper, Harvey and Kennedy. */
-static int ir_build_dominators_tree_slow(ir_ctx *ctx)
+static IR_NEVER_INLINE int ir_build_dominators_tree_slow(ir_ctx *ctx)
 {
 	uint32_t blocks_count, b, postnum;
 	ir_block *blocks, *bb;
@@ -690,28 +690,13 @@ static int ir_build_dominators_tree_slow(ir_ctx *ctx)
 	/* Build dominators tree */
 	blocks[1].idom = 0;
 	blocks[1].dom_depth = 0;
-	for (b = 2, bb = &blocks[2]; b <= blocks_count; b++, bb++) {
-		uint32_t idom = bb->idom;
-		ir_block *idom_bb = &blocks[idom];
 
+	/* Construct children lists sorted by block number */
+	for (b = blocks_count, bb = &blocks[b]; b >= 2; b--, bb--) {
+		ir_block *idom_bb = &blocks[bb->idom];
 		bb->dom_depth = 0;
-		/* Sort by block number to traverse children in pre-order */
-		if (idom_bb->dom_child == 0) {
-			idom_bb->dom_child = b;
-		} else if (b < idom_bb->dom_child) {
-			bb->dom_next_child = idom_bb->dom_child;
-			idom_bb->dom_child = b;
-		} else {
-			int child = idom_bb->dom_child;
-			ir_block *child_bb = &blocks[child];
-
-			while (child_bb->dom_next_child > 0 && b > child_bb->dom_next_child) {
-				child = child_bb->dom_next_child;
-				child_bb = &blocks[child];
-			}
-			bb->dom_next_child = child_bb->dom_next_child;
-			child_bb->dom_next_child = b;
-		}
+		bb->dom_next_child = idom_bb->dom_child;
+		idom_bb->dom_child = b;
 	}
 
 	/* Recalculate dom_depth for all blocks */
@@ -811,25 +796,14 @@ slow_case:
 		}
 		bb->idom = idom;
 		idom_bb = &blocks[idom];
-
 		bb->dom_depth = idom_bb->dom_depth + 1;
-		/* Sort by block number to traverse children in pre-order */
-		if (idom_bb->dom_child == 0) {
-			idom_bb->dom_child = b;
-		} else if (b < idom_bb->dom_child) {
-			bb->dom_next_child = idom_bb->dom_child;
-			idom_bb->dom_child = b;
-		} else {
-			int child = idom_bb->dom_child;
-			ir_block *child_bb = &blocks[child];
+	}
 
-			while (child_bb->dom_next_child > 0 && b > child_bb->dom_next_child) {
-				child = child_bb->dom_next_child;
-				child_bb = &blocks[child];
-			}
-			bb->dom_next_child = child_bb->dom_next_child;
-			child_bb->dom_next_child = b;
-		}
+	/* Construct children lists sorted by block number */
+	for (b = blocks_count, bb = &blocks[b]; b >= 2; b--, bb--) {
+		ir_block *idom_bb = &blocks[bb->idom];
+		bb->dom_next_child = idom_bb->dom_child;
+		idom_bb->dom_child = b;
 	}
 
 	blocks[1].idom = 0;
@@ -948,23 +922,13 @@ static int ir_build_dominators_tree_iterative(ir_ctx *ctx)
 		ir_block *idom_bb = &blocks[idom];
 
 		bb->dom_depth = idom_bb->dom_depth + 1;
-		/* Sort by block number to traverse children in pre-order */
-		if (idom_bb->dom_child == 0) {
-			idom_bb->dom_child = b;
-		} else if (b < idom_bb->dom_child) {
-			bb->dom_next_child = idom_bb->dom_child;
-			idom_bb->dom_child = b;
-		} else {
-			int child = idom_bb->dom_child;
-			ir_block *child_bb = &blocks[child];
+	}
 
-			while (child_bb->dom_next_child > 0 && b > child_bb->dom_next_child) {
-				child = child_bb->dom_next_child;
-				child_bb = &blocks[child];
-			}
-			bb->dom_next_child = child_bb->dom_next_child;
-			child_bb->dom_next_child = b;
-		}
+	/* Construct children lists sorted by block number */
+	for (b = blocks_count, bb = &blocks[b]; b >= 2; b--, bb--) {
+		ir_block *idom_bb = &blocks[bb->idom];
+		bb->dom_next_child = idom_bb->dom_child;
+		idom_bb->dom_child = b;
 	}
 
 	return 1;
