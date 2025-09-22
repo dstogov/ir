@@ -592,12 +592,16 @@ typedef struct {
 	int   offset;
 } ir_value_param;
 
+#define IR_CONST_HASH_SIZE 64
+
 struct _ir_ctx {
 	ir_insn           *ir_base;                 /* two directional array - instructions grow down, constants grow up */
 	ir_ref             insns_count;             /* number of instructions stored in instructions buffer */
 	ir_ref             insns_limit;             /* size of allocated instructions buffer (it's extended when overflow) */
 	ir_ref             consts_count;            /* number of constants stored in constants buffer */
 	ir_ref             consts_limit;            /* size of allocated constants buffer (it's extended when overflow) */
+	uintptr_t          const_hash_mask;
+	ir_ref            *const_hash;
 	uint32_t           flags;                   /* IR context flags (see IR_* defines above) */
 	uint32_t           flags2;                  /* IR context private flags (see IR_* defines in ir_private.h) */
 	ir_type            ret_type;                /* Function return type */
@@ -665,7 +669,7 @@ struct _ir_ctx {
 	ir_loader         *loader;
 	ir_strtab          strtab;
 	ir_ref             prev_insn_chain[IR_LAST_FOLDABLE_OP + 1];
-	ir_ref             prev_const_chain[IR_LAST_TYPE];
+	ir_ref             _const_hash[IR_CONST_HASH_SIZE];
 };
 
 /* Basic IR Construction API (implementation in ir.c) */

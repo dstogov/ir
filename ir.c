@@ -394,6 +394,8 @@ void ir_init(ir_ctx *ctx, uint32_t flags, ir_ref consts_limit, ir_ref insns_limi
 	ctx->insns_limit = insns_limit;
 	ctx->consts_count = -(IR_TRUE - 1);
 	ctx->consts_limit = consts_limit;
+	ctx->const_hash = ctx->_const_hash;
+	ctx->const_hash_mask = IR_CONST_HASH_SIZE - 1;
 	ctx->fold_cse_limit = IR_UNUSED + 1;
 	ctx->flags = flags;
 
@@ -473,6 +475,10 @@ void ir_free(ir_ctx *ctx)
 		ir_list_free((ir_list*)ctx->osr_entry_loads);
 		ir_mem_free(ctx->osr_entry_loads);
 	}
+
+	if (ctx->const_hash_mask != IR_CONST_HASH_SIZE - 1) {
+		ir_mem_free(ctx->const_hash);
+	}
 }
 
 ir_ref ir_unique_const_addr(ir_ctx *ctx, uintptr_t addr)
@@ -484,69 +490,62 @@ ir_ref ir_unique_const_addr(ir_ctx *ctx, uintptr_t addr)
 	insn->val.u64 = addr;
 	/* don't insert into constants chain */
 	insn->prev_const = IR_UNUSED;
-#if 0
-	insn->prev_const = ctx->prev_const_chain[IR_ADDR];
-	ctx->prev_const_chain[IR_ADDR] = ref;
-#endif
-#if 0
-	ir_insn *prev_insn, *next_insn;
-	ir_ref next;
-
-	prev_insn = NULL;
-	next = ctx->prev_const_chain[IR_ADDR];
-	while (next) {
-		next_insn = &ctx->ir_base[next];
-		if (UNEXPECTED(next_insn->val.u64 >= addr)) {
-			break;
-		}
-		prev_insn = next_insn;
-		next = next_insn->prev_const;
-	}
-
-	if (prev_insn) {
-		insn->prev_const = prev_insn->prev_const;
-		prev_insn->prev_const = ref;
-	} else {
-		insn->prev_const = ctx->prev_const_chain[IR_ADDR];
-		ctx->prev_const_chain[IR_ADDR] = ref;
-	}
-#endif
 
 	return ref;
 }
 
+IR_ALWAYS_INLINE uintptr_t ir_const_hash(ir_val val, uint32_t optx)
+{
+	return (val.u64 ^ (val.u64 >> 32) ^ optx);
+}
+
+static IR_NEVER_INLINE void ir_const_hash_rehash(ir_ctx *ctx)
+{
+	ir_insn *insn;
+	ir_ref ref;
+	uintptr_t hash;
+
+	if (ctx->const_hash_mask != IR_CONST_HASH_SIZE - 1) {
+		ir_mem_free(ctx->const_hash);
+	}
+	ctx->const_hash_mask = (ctx->const_hash_mask + 1) * 2 - 1;
+	ctx->const_hash = ir_mem_calloc(ctx->const_hash_mask + 1, sizeof(ir_ref));
+	for (ref = IR_TRUE - 1; ref > -ctx->consts_count; ref--) {
+		insn = &ctx->ir_base[ref];
+		hash = ir_const_hash(insn->val, insn->optx) & ctx->const_hash_mask;
+		insn->prev_const = ctx->const_hash[hash];
+		ctx->const_hash[hash] = ref;
+	}
+}
+
 ir_ref ir_const_ex(ir_ctx *ctx, ir_val val, uint8_t type, uint32_t optx)
 {
-	ir_insn *insn, *prev_insn;
+	ir_insn *insn;
 	ir_ref ref, prev;
+	uintptr_t hash;
 
 	if (type == IR_BOOL) {
 		return val.u64 ? IR_TRUE : IR_FALSE;
 	} else if (type == IR_ADDR && val.u64 == 0) {
 		return IR_NULL;
 	}
-	prev_insn = NULL;
-	ref = ctx->prev_const_chain[type];
+
+	hash = ir_const_hash(val, optx) & ctx->const_hash_mask;
+	ref = ctx->const_hash[hash];
 	while (ref) {
 		insn = &ctx->ir_base[ref];
-		if (UNEXPECTED(insn->val.u64 >= val.u64)) {
-			if (insn->val.u64 == val.u64 && insn->optx == optx) {
-				return ref;
-			}
-		} else {
-			break;
+		if (insn->val.u64 == val.u64 && insn->optx == optx) {
+			return ref;
 		}
-		prev_insn = insn;
 		ref = insn->prev_const;
 	}
 
-	if (prev_insn) {
-		prev = prev_insn->prev_const;
-		prev_insn->prev_const = -ctx->consts_count;
-	} else {
-		prev = ctx->prev_const_chain[type];
-		ctx->prev_const_chain[type] = -ctx->consts_count;
+	if ((uintptr_t)ctx->consts_count > ctx->const_hash_mask) {
+		ir_const_hash_rehash(ctx);
 	}
+
+	prev = ctx->const_hash[hash];
+	ctx->const_hash[hash] = -ctx->consts_count;
 
 	ref = ir_next_const(ctx);
 	insn = &ctx->ir_base[ref];
