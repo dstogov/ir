@@ -583,6 +583,15 @@ static IR_NEVER_INLINE void ir_sccp_analyze(ir_ctx *ctx, ir_insn *_values, ir_bi
 				}
 			} else {
 				IR_MAKE_BOTTOM_EX(i);
+				n = IR_INPUT_EDGES_COUNT(flags);
+				for (p = insn->ops + 1; n > 0; p++, n--) {
+					ir_ref input = *p;
+					if (input > 0) {
+						if (_values[input].op == IR_TOP) {
+							ir_sccp_add_input(ctx, _values, worklist, input);
+						}
+					}
+				}
 			}
 		} else if (flags & IR_OP_FLAG_BB_START) {
 			if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN || insn->op == IR_BEGIN) {
