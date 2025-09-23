@@ -1334,8 +1334,8 @@ static ir_ref ir_iter_find_cse(ir_ctx *ctx, ir_ref ref, uint32_t opt, ir_ref op1
 			}
 		}
 	 } else if (n < 2) {
-		IR_ASSERT(n == 1);
-		if (!IR_IS_CONST_REF(op1)) {
+		if (op1 > 0) {
+			IR_ASSERT(n == 1);
 			use_list = &ctx->use_lists[op1];
 			n = use_list->count;
 			for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
