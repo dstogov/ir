@@ -1841,6 +1841,12 @@ IR_FOLD(ADD(SUB, _))
 	if (IR_IS_TYPE_INT(IR_OPT_TYPE(opt))) {
 		if (op1_insn->op2 == op2) {
 			/* (a - b) + b => a */
+			if (ctx->ir_base[op1_insn->op1].type != IR_OPT_TYPE(opt)) {
+				opt = IR_BITCAST | (opt & IR_OPT_TYPE_MASK);
+				op1 = op1_insn->op1;
+				op2 = IR_UNUSED;
+				IR_FOLD_RESTART;
+			}
 			IR_FOLD_COPY(op1_insn->op1);
 		}
 	}
@@ -1852,6 +1858,12 @@ IR_FOLD(ADD(_, SUB))
 	if (IR_IS_TYPE_INT(IR_OPT_TYPE(opt))) {
 		if (op2_insn->op2 == op1) {
 			/* a + (b - a) => b */
+			if (ctx->ir_base[op2_insn->op1].type != IR_OPT_TYPE(opt)) {
+				opt = IR_BITCAST | (opt & IR_OPT_TYPE_MASK);
+				op1 = op2_insn->op1;
+				op2 = IR_UNUSED;
+				IR_FOLD_RESTART;
+			}
 			IR_FOLD_COPY(op2_insn->op1);
 		}
 	}
@@ -1863,9 +1875,21 @@ IR_FOLD(SUB(ADD, _))
 	if (IR_IS_TYPE_INT(IR_OPT_TYPE(opt))) {
 		if (op1_insn->op1 == op2) {
 			/* (a + b) - a => b */
+			if (ctx->ir_base[op1_insn->op2].type != IR_OPT_TYPE(opt)) {
+				opt = IR_BITCAST | (opt & IR_OPT_TYPE_MASK);
+				op1 = op1_insn->op2;
+				op2 = IR_UNUSED;
+				IR_FOLD_RESTART;
+			}
 			IR_FOLD_COPY(op1_insn->op2);
 		} else if (op1_insn->op2 == op2) {
 			/* (a + b) - a => b */
+			if (ctx->ir_base[op1_insn->op1].type != IR_OPT_TYPE(opt)) {
+				opt = IR_BITCAST | (opt & IR_OPT_TYPE_MASK);
+				op1 = op1_insn->op1;
+				op2 = IR_UNUSED;
+				IR_FOLD_RESTART;
+			}
 			IR_FOLD_COPY(op1_insn->op1);
 		}
 	}
@@ -1911,6 +1935,12 @@ IR_FOLD(SUB(_, SUB))
 	if (IR_IS_TYPE_INT(IR_OPT_TYPE(opt))) {
 		if (op2_insn->op1 == op1) {
 			/* a - (a - b) => b */
+			if (ctx->ir_base[op2_insn->op2].type != IR_OPT_TYPE(opt)) {
+				opt = IR_BITCAST | (opt & IR_OPT_TYPE_MASK);
+				op1 = op2_insn->op2;
+				op2 = IR_UNUSED;
+				IR_FOLD_RESTART;
+			}
 			IR_FOLD_COPY(op2_insn->op2);
 		}
 	}
