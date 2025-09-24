@@ -1238,6 +1238,9 @@ op2_const:
 			if (IR_IS_CONST_REF(insn->op2) && insn->op1 != insn->op2) {
 				constraints->tmp_regs[n] = IR_TMP_REG(2, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 				n++;
+			} else if (ir_rule(ctx, insn->op2) == IR_STATIC_ALLOCA) {
+				constraints->tmp_regs[n] = IR_TMP_REG(2, IR_ADDR, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n = 1;
 			}
 			break;
 		case IR_CMP_INT:
