@@ -8618,7 +8618,11 @@ static void ir_emit_va_arg(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		|	add Ra(tmp_reg), sizeof(void*)
 		|	mov aword [Ra(op2_reg)+(offset+offsetof(ir_va_list, overflow_arg_area))], Ra(tmp_reg)
 		|2:
-		|	mov Ra(def_reg), aword [Ra(tmp_reg)-sizeof(void*)]
+		if (ir_type_size[type] == 8) {
+			|	mov Rq(def_reg), qword [Ra(tmp_reg)-sizeof(void*)]
+		} else {
+			|	mov Rd(def_reg), dword [Ra(tmp_reg)-sizeof(void*)]
+		}
 	} else {
 		|	mov Rd(tmp_reg), dword [Ra(op2_reg)+(offset+offsetof(ir_va_list, fp_offset))]
 		|	cmp Rd(tmp_reg), sizeof(void*) * IR_REG_INT_ARGS + 16 * IR_REG_FP_ARGS
