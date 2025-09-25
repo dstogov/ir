@@ -6546,7 +6546,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 
 	ret = dasm_link(&data.dasm_state, size_ptr);
 	if (ret != DASM_S_OK) {
-		IR_ASSERT(0);
+		IR_ASSERT(ret == DASM_S_NOMEM);
 		dasm_free(&data.dasm_state);
 		ctx->data = NULL;
 		ctx->status = IR_ERROR_LINK;
