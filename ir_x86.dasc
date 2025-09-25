@@ -11045,6 +11045,14 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	dasm_setup(&data.dasm_state, dasm_actions);
 	/* labels for each block + for each constant + rodata label + jmp_table label + for each entry */
 	dasm_growpc(&data.dasm_state, ctx->cfg_blocks_count + 1 + ctx->consts_count + 1 + 1 + 1 + ctx->entries_count);
+	if (data.dasm_state->status != DASM_S_OK) {
+		IR_ASSERT(data.dasm_state->status == DASM_S_NOMEM);
+		dasm_free(&data.dasm_state);
+		ctx->data = NULL;
+		ctx->status = IR_ERROR_TOO_LARGE;
+		return NULL;
+	}
+
 	data.emit_constants = ir_bitset_malloc(ctx->consts_count);
 
 	if ((ctx->flags & IR_GEN_ENDBR) && (ctx->flags & IR_START_BR_TARGET)) {
@@ -11541,9 +11549,17 @@ next_block:;
 		return NULL;
 	}
 
+	if (data.dasm_state->status != DASM_S_OK) {
+		IR_ASSERT(data.dasm_state->status == DASM_S_NOMEM);
+		dasm_free(&data.dasm_state);
+		ctx->data = NULL;
+		ctx->status = IR_ERROR_TOO_LARGE;
+		return NULL;
+	}
+
 	ret = dasm_link(&data.dasm_state, size_ptr);
 	if (ret != DASM_S_OK) {
-		IR_ASSERT(0);
+		IR_ASSERT(ret == DASM_S_NOMEM);
 		dasm_free(&data.dasm_state);
 		ctx->data = NULL;
 		ctx->status = IR_ERROR_LINK;
