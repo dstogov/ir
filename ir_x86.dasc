@@ -11562,7 +11562,7 @@ next_block:;
 		IR_ASSERT(ret == DASM_S_NOMEM);
 		dasm_free(&data.dasm_state);
 		ctx->data = NULL;
-		ctx->status = IR_ERROR_LINK;
+		ctx->status = (ret == DASM_S_NOMEM) ? IR_ERROR_TOO_LARGE : IR_ERROR_LINK;
 		return NULL;
 	}
 	size = *size_ptr;
