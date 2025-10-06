@@ -3595,7 +3595,13 @@ static ir_mem ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 		case IR_LEA_B_SI_O:
 			offset_insn = insn;
 			op1_insn = &ctx->ir_base[insn->op1];
-			base_reg_ref = insn->op1 * sizeof(ir_ref) + 1;
+			if (ir_rule(ctx, op1_insn->op1) == IR_STATIC_ALLOCA) {
+				offset = ir_local_offset(ctx, &ctx->ir_base[op1_insn->op1]);
+				base_reg = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
+				base_reg_ref = IR_UNUSED;
+			} else {
+				base_reg_ref = insn->op1 * sizeof(ir_ref) + 1;
+			}
 			index_reg_ref = op1_insn->op2 * sizeof(ir_ref) + 1;
 			op2_insn = &ctx->ir_base[op1_insn->op2];
 			scale = ctx->ir_base[op2_insn->op2].val.i32;
@@ -3604,7 +3610,13 @@ static ir_mem ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 			offset_insn = insn;
 			op1_insn = &ctx->ir_base[insn->op1];
 			index_reg_ref = op1_insn->op1 * sizeof(ir_ref) + 1;
-			base_reg_ref = insn->op1 * sizeof(ir_ref) + 2;
+			if (ir_rule(ctx, op1_insn->op2) == IR_STATIC_ALLOCA) {
+				offset = ir_local_offset(ctx, &ctx->ir_base[op1_insn->op2]);
+				base_reg = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
+				base_reg_ref = IR_UNUSED;
+			} else {
+				base_reg_ref = insn->op1 * sizeof(ir_ref) + 2;
+			}
 			op1_insn = &ctx->ir_base[op1_insn->op1];
 			scale = ctx->ir_base[op1_insn->op2].val.i32;
 			break;
@@ -3642,7 +3654,7 @@ static ir_mem ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 			offset += (int64_t)(intptr_t)(addr);
 		} else {
 			if (offset_insn->op == IR_SUB) {
-				offset = -addr_insn->val.i32;
+				offset -= addr_insn->val.i32;
 			} else {
 				offset += addr_insn->val.i32;
 			}
