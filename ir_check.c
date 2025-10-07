@@ -107,7 +107,7 @@ static bool ir_check_input_list(ir_check_ctx *check_ctx, const ir_ctx *ctx, ir_r
 				ir_bitset_len(ctx->insns_count) * sizeof(ir_bitset_base_t));
 			memset(set, 0, ir_bitset_len(ctx->insns_count) * sizeof(ir_bitset_base_t));
 			for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
-				ir_bitset_incl(set, *p);
+				if (*p > 0) ir_bitset_incl(set, *p);
 			}
 		}
 		return ir_bitset_in(set, from);
