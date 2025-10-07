@@ -181,6 +181,8 @@ static void ir_mem2ssa_convert(ir_ctx      *ctx,
 			CLEAR_USES(use);
 			ctx->cfg_map[use] = 0;
 		} else if (use_insn->op == IR_VLOAD || use_insn->op == IR_LOAD) {
+			uint32_t b0;
+
 			/*
 			 *  prev    VAR      prev   ssa_val
 			 *      \  /          |     |
@@ -198,7 +200,7 @@ static void ir_mem2ssa_convert(ir_ctx      *ctx,
 			ir_use_list_remove_one(ctx, use, next);
 			ir_use_list_replace_one(ctx, prev, use, next);
 
-			b = ctx->cfg_map[use];
+			b0 = b = ctx->cfg_map[use];
 			while (1) {
 				if (!b) {
 					val = ir_uninitialized(ctx, type);
@@ -206,6 +208,11 @@ static void ir_mem2ssa_convert(ir_ctx      *ctx,
 				}
 				val = ssa_vars[b];
 				if (val != var) {
+					/* compress the descovered dominance path */
+					while (b0 != b) {
+						ssa_vars[b0] = val;
+						b0 = ctx->cfg_blocks[b0].idom;
+					}
 					break;
 				}
 				b = ctx->cfg_blocks[b].idom;
