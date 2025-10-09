@@ -420,11 +420,12 @@ static bool ir_is_dead_load_ex(ir_ctx *ctx, ir_ref ref, uint32_t flags, ir_insn 
 static bool ir_is_dead_load(ir_ctx *ctx, ir_ref ref)
 {
 	if (ctx->use_lists[ref].count == 1) {
-		uint32_t flags = ir_op_flags[ctx->ir_base[ref].op];
+		ir_insn *insn = &ctx->ir_base[ref];
+		uint32_t flags = ir_op_flags[insn->op];
 
 		if ((flags & (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_MASK)) == (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_LOAD)) {
 			return 1;
-		} else if (ctx->ir_base[ref].op == IR_ALLOCA) {
+		} else if (insn->op == IR_ALLOCA || insn->op == IR_BLOCK_BEGIN) {
 			return 1;
 		}
 	}
