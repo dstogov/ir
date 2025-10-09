@@ -866,7 +866,6 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_PI:
 				case IR_VLOAD:
 				case IR_ARGVAL:
-				case IR_MARK:
 					/* skip */
 					break;
 				case IR_EQ:

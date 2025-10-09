@@ -339,7 +339,6 @@ typedef enum _ir_type {
 	_(STORE,        s3,   src, ref, def) /* store to memory             */ \
 	_(TLS,          l1X2, src, num, num) /* thread local variable       */ \
 	_(TRAP,         x1,   src, ___, ___) /* DebugBreak                  */ \
-	_(MARK,         x1,   src, ___, ___) /* Marker (NOP with control)   */ \
 	/* memory reference ops (A, H, U, S, TMP, STR, NEW, X, V) ???       */ \
 	\
 	/* va_args                                                          */ \

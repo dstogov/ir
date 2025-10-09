@@ -11134,7 +11134,6 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_PHI:
 				case IR_SNAPSHOT:
 				case IR_VA_END:
-				case IR_MARK:
 					break;
 				case IR_LEA_OB:
 				case IR_LEA_SI:
