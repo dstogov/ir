@@ -274,6 +274,46 @@ IR_FOLD(UGT(C_FLOAT, C_FLOAT))
 	IR_FOLD_BOOL(!(op1_insn->val.f <= op2_insn->val.f));
 }
 
+IR_FOLD(EQ(_, C_FLOAT))
+IR_FOLD(LT(_, C_FLOAT))
+IR_FOLD(GE(_, C_FLOAT))
+IR_FOLD(LE(_, C_FLOAT))
+IR_FOLD(GT(_, C_FLOAT))
+{
+	if (isnanf(op2_insn->val.f)) {
+		IR_FOLD_COPY(IR_FALSE);
+	}
+	IR_FOLD_NEXT;
+}
+
+IR_FOLD(NE(_, C_FLOAT))
+{
+	if (isnanf(op2_insn->val.f)) {
+		IR_FOLD_COPY(IR_TRUE);
+	}
+	IR_FOLD_NEXT;
+}
+
+IR_FOLD(EQ(_, C_DOUBLE))
+IR_FOLD(LT(_, C_DOUBLE))
+IR_FOLD(GE(_, C_DOUBLE))
+IR_FOLD(LE(_, C_DOUBLE))
+IR_FOLD(GT(_, C_DOUBLE))
+{
+	if (isnan(op2_insn->val.d)) {
+		IR_FOLD_COPY(IR_FALSE);
+	}
+	IR_FOLD_NEXT;
+}
+
+IR_FOLD(NE(_, C_DOUBLE))
+{
+	if (isnan(op2_insn->val.d)) {
+		IR_FOLD_COPY(IR_TRUE);
+	}
+	IR_FOLD_NEXT;
+}
+
 IR_FOLD(ADD(C_U8, C_U8))
 {
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
