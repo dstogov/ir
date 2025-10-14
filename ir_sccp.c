@@ -3485,9 +3485,18 @@ static void ir_iter_optimize_guard(ir_ctx *ctx, ir_ref ref, ir_insn *insn, ir_bi
 remove_guard:
 				prev = insn->op1;
 				next = ir_next_control(ctx, ref);
+				if (ctx->ir_base[prev].op == IR_SNAPSHOT) {
+					ir_ref snapshot = prev;
+					prev = ctx->ir_base[prev].op1;
+					ir_use_list_remove_one(ctx, snapshot, ref);
+					ir_use_list_remove_one(ctx, ref, next);
+					ir_use_list_replace_one(ctx, prev, snapshot, next);
+					ir_iter_remove_insn(ctx, snapshot, worklist);
+				} else {
+					ir_use_list_remove_one(ctx, ref, next);
+					ir_use_list_replace_one(ctx, prev, ref, next);
+				}
 				ctx->ir_base[next].op1 = prev;
-				ir_use_list_remove_one(ctx, ref, next);
-				ir_use_list_replace_one(ctx, prev, ref, next);
 				insn->op1 = IR_UNUSED;
 
 				if (!IR_IS_CONST_REF(insn->op2)) {
@@ -3498,9 +3507,12 @@ remove_guard:
 					}
 				}
 
-				if (insn->op3) {
-					/* SNAPSHOT */
-					ir_iter_remove_insn(ctx, insn->op3, worklist);
+				if (!IR_IS_CONST_REF(insn->op3)) {
+					ir_use_list_remove_one(ctx, insn->op3, ref);
+					if (ir_is_dead(ctx, insn->op3)) {
+						/* schedule DCE */
+						ir_bitqueue_add(worklist, insn->op3);
+					}
 				}
 
 				MAKE_NOP(insn);
