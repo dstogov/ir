@@ -8563,11 +8563,7 @@ static void ir_emit_va_arg(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg tmp_reg = ctx->regs[def][3];
 	int32_t offset;
 
-	if (ctx->use_lists[def].count == 1) {
-		/* dead load */
-		return;
-	}
-	IR_ASSERT(def_reg != IR_REG_NONE && tmp_reg != IR_REG_NONE);
+	IR_ASSERT((def_reg != IR_REG_NONE || ctx->use_lists[def].count == 1) && tmp_reg != IR_REG_NONE);
 	if (op2_reg != IR_REG_NONE) {
 		if (IR_REG_SPILLED(op2_reg)) {
 			op2_reg = IR_REG_NUM(op2_reg);
@@ -8581,27 +8577,33 @@ static void ir_emit_va_arg(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 	|	mov Ra(tmp_reg), aword [Ra(op2_reg)+offset]
 #ifdef _WIN64
-	ir_emit_load_mem(ctx, type, def_reg, IR_MEM_B(tmp_reg));
+	if (def_reg != IR_REG_NONE) {
+		ir_emit_load_mem(ctx, type, def_reg, IR_MEM_B(tmp_reg));
+	}
 	|	add Ra(tmp_reg), IR_MAX(ir_type_size[type], sizeof(void*))
 #else
 	if (!insn->op3) {
-		ir_emit_load_mem(ctx, type, def_reg, IR_MEM_B(tmp_reg));
+		if (def_reg != IR_REG_NONE) {
+			ir_emit_load_mem(ctx, type, def_reg, IR_MEM_B(tmp_reg));
+		}
 		|	add Ra(tmp_reg), IR_MAX(ir_type_size[type], sizeof(void*))
 	} else {
-		IR_ASSERT(type == IR_ADDR);
-		int align = 1U << (insn->op3 & 0x7);
-		int size = (uint32_t)insn->op3 >> 3;
+		if (def_reg != IR_REG_NONE) {
+			IR_ASSERT(type == IR_ADDR);
+			int align = 1U << (insn->op3 & 0x7);
+			int size = (uint32_t)insn->op3 >> 3;
 
-		if (align > (int)sizeof(void*)) {
-			|	add Ra(tmp_reg), (align-1)
-			|	and Ra(tmp_reg), ~(align-1)
+			if (align > (int)sizeof(void*)) {
+				|	add Ra(tmp_reg), (align-1)
+				|	and Ra(tmp_reg), ~(align-1)
+			}
+			|	mov Ra(def_reg), Ra(tmp_reg)
 		}
-		|	mov Ra(def_reg), Ra(tmp_reg)
 		|	add Ra(tmp_reg), IR_ALIGNED_SIZE(size, sizeof(void*))
 	}
 #endif
 	|	mov aword [Ra(op2_reg)+offset], Ra(tmp_reg)
-	if (IR_REG_SPILLED(ctx->regs[def][0])) {
+	if (def_reg && IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, type, def, def_reg);
 	}
 #elif defined(IR_TARGET_X64)
@@ -8614,11 +8616,7 @@ static void ir_emit_va_arg(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg tmp_reg = ctx->regs[def][3];
 	int32_t offset;
 
-	if (ctx->use_lists[def].count == 1) {
-		/* dead load */
-		return;
-	}
-	IR_ASSERT(def_reg != IR_REG_NONE&& tmp_reg != IR_REG_NONE);
+	IR_ASSERT((def_reg != IR_REG_NONE || ctx->use_lists[def].count == 1) && tmp_reg != IR_REG_NONE);
 	if (op2_reg != IR_REG_NONE) {
 		if (IR_REG_SPILLED(op2_reg)) {
 			op2_reg = IR_REG_NUM(op2_reg);
@@ -8641,7 +8639,9 @@ static void ir_emit_va_arg(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			|	add Ra(tmp_reg), (align-1)
 			|	and Ra(tmp_reg), ~(align-1)
 		}
-		|	mov Ra(def_reg), Ra(tmp_reg)
+		if (def_reg != IR_REG_NONE) {
+			|	mov Ra(def_reg), Ra(tmp_reg)
+		}
 		|	add Ra(tmp_reg), IR_ALIGNED_SIZE(size, sizeof(void*))
 		|	mov aword [Ra(op2_reg)+(offset+offsetof(ir_va_list, overflow_arg_area))], Ra(tmp_reg)
 	} else if (IR_IS_TYPE_INT(type)) {
@@ -8657,10 +8657,12 @@ static void ir_emit_va_arg(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		|	add Ra(tmp_reg), sizeof(void*)
 		|	mov aword [Ra(op2_reg)+(offset+offsetof(ir_va_list, overflow_arg_area))], Ra(tmp_reg)
 		|2:
-		if (ir_type_size[type] == 8) {
-			|	mov Rq(def_reg), qword [Ra(tmp_reg)-sizeof(void*)]
-		} else {
-			|	mov Rd(def_reg), dword [Ra(tmp_reg)-sizeof(void*)]
+		if (def_reg != IR_REG_NONE) {
+			if (ir_type_size[type] == 8) {
+				|	mov Rq(def_reg), qword [Ra(tmp_reg)-sizeof(void*)]
+			} else {
+				|	mov Rd(def_reg), dword [Ra(tmp_reg)-sizeof(void*)]
+			}
 		}
 	} else {
 		|	mov Rd(tmp_reg), dword [Ra(op2_reg)+(offset+offsetof(ir_va_list, fp_offset))]
@@ -8669,16 +8671,20 @@ static void ir_emit_va_arg(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		|	add Rd(tmp_reg), 16
 		|	mov dword [Ra(op2_reg)+(offset+offsetof(ir_va_list, fp_offset))], Rd(tmp_reg)
 		|	add Ra(tmp_reg), aword [Ra(op2_reg)+(offset+offsetof(ir_va_list, reg_save_area))]
-		ir_emit_load_mem_fp(ctx, type, def_reg, IR_MEM_BO(tmp_reg, -16));
+		if (def_reg != IR_REG_NONE) {
+			ir_emit_load_mem_fp(ctx, type, def_reg, IR_MEM_BO(tmp_reg, -16));
+		}
 		|	jmp >2
 		|1:
 		|	mov Ra(tmp_reg), aword [Ra(op2_reg)+(offset+offsetof(ir_va_list, overflow_arg_area))]
-		ir_emit_load_mem_fp(ctx, type, def_reg, IR_MEM_BO(tmp_reg, 0));
+		if (def_reg != IR_REG_NONE) {
+			ir_emit_load_mem_fp(ctx, type, def_reg, IR_MEM_BO(tmp_reg, 0));
+		}
 		|	add Ra(tmp_reg), 8
 		|	mov aword [Ra(op2_reg)+(offset+offsetof(ir_va_list, overflow_arg_area))], Ra(tmp_reg)
 		|2:
 	}
-	if (IR_REG_SPILLED(ctx->regs[def][0])) {
+	if (def_reg != IR_REG_NONE && IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, type, def, def_reg);
 	}
 |.endif
