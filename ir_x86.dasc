@@ -2999,6 +2999,9 @@ store_int:
 						ctx->flags2 |= IR_HAS_VA_ARG_GP|IR_HAS_VA_ARG_FP;
 					}
 				}
+			} else {
+				/* va_list may escape */
+				ctx->flags2 |= IR_HAS_VA_ARG_GP|IR_HAS_VA_ARG_FP;
 			}
 			return IR_VA_START;
 		case IR_VA_END:
