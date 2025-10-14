@@ -1,0 +1,18 @@
+--TEST--
+001: UNORDERED
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	float c = 0;
+	l_1 = START(l_4);
+	float x = PARAM(l_1, "x", 1);
+	bool ret = UNORDERED(x, c);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+define i1 @test(float %d2)
+{
+	%d3 = fcmp uno float %d2, %d2
+	ret i1 %d3
+}

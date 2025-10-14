@@ -987,6 +987,12 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_UGT:
 					ir_emit_binary_op(ctx, f, i, insn, "icmp ugt", NULL, "fcmp ugt");
 					break;
+				case IR_ORDERED:
+					ir_emit_binary_op(ctx, f, i, insn, "icmp ???", NULL, "fcmp ord");
+					break;
+				case IR_UNORDERED:
+					ir_emit_binary_op(ctx, f, i, insn, "icmp ???", NULL, "fcmp uno");
+					break;
 				case IR_ADD:
 					ir_emit_binary_op(ctx, f, i, insn, "add", NULL, "fadd");
 					break;

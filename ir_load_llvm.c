@@ -406,32 +406,6 @@ static ir_ref llvm2ir_icmp_op(ir_ctx *ctx, LLVMValueRef expr)
 	return ref;
 }
 
-static ir_ref llvm2ir_fcmp_op_isnan(ir_ctx *ctx, LLVMValueRef expr, ir_type type,
-                                    LLVMRealPredicate predicate, LLVMValueRef op0, LLVMValueRef op1)
-{
-	ir_ref func, ref;
-
-	if (type == IR_DOUBLE) {
-		func = BUILTIN_FUNC_1("isnan", IR_BOOL, IR_DOUBLE);
-	} else {
-		func = BUILTIN_FUNC_1("isnanf", IR_BOOL, IR_FLOAT);
-	}
-	if (LLVMGetValueKind(op0) == LLVMConstantFPValueKind) {
-		ref = ir_CALL_1(IR_BOOL, func, llvm2ir_op(ctx, op1, type));
-	} else if (LLVMGetValueKind(op1) == LLVMConstantFPValueKind) {
-		ref = ir_CALL_1(IR_BOOL, func, llvm2ir_op(ctx, op0, type));
-	} else {
-		ref = ir_OR_B(
-			ir_CALL_1(IR_BOOL, func, llvm2ir_op(ctx, op0, type)),
-			ir_CALL_1(IR_BOOL, func, llvm2ir_op(ctx, op1, type)));
-	}
-	if (predicate == LLVMRealORD) {
-		ref = ir_NOT_B(ref);
-	}
-	ir_addrtab_set(ctx->binding, (uintptr_t)expr, ref);
-	return ref;
-}
-
 static ir_ref llvm2ir_fcmp_op(ir_ctx *ctx, LLVMValueRef expr)
 {
 	LLVMValueRef op0 = LLVMGetOperand(expr, 0);
@@ -454,9 +428,8 @@ static ir_ref llvm2ir_fcmp_op(ir_ctx *ctx, LLVMValueRef expr)
 		case LLVMRealOGE: op = IR_GE;  break;
 		case LLVMRealOLT: op = IR_LT;  break;
 		case LLVMRealOLE: op = IR_LE;  break;
-		case LLVMRealUNO:
-		case LLVMRealORD:
-			return llvm2ir_fcmp_op_isnan(ctx, expr, type, predicate, op0, op1);
+		case LLVMRealUNO: op = IR_UNORDERED; break;
+		case LLVMRealORD: op = IR_ORDERED;   break;
 		default: IR_ASSERT(0); return 0;
 	}
 	ref = ir_fold2(ctx, IR_OPT(op, IR_BOOL), llvm2ir_op(ctx, op0, type), llvm2ir_op(ctx, op1, type));

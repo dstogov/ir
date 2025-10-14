@@ -1,0 +1,19 @@
+--TEST--
+001: UNORDERED
+--TARGET--
+x86_64
+--ARGS--
+-S
+--CODE--
+{
+	float c = 0;
+	l_1 = START(l_4);
+	float x = PARAM(l_1, "x", 1);
+	bool ret = UNORDERED(x, c);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	ucomiss %xmm0, %xmm0
+	setp %al
+	retq

@@ -12,6 +12,8 @@
 #include "ir.h"
 #include "ir_private.h"
 
+#include <math.h>
+
 #define IR_COMBO_COPY_PROPAGATION 1
 
 #define IR_TOP                  IR_UNUSED
@@ -2809,6 +2811,10 @@ static bool ir_cmp_is_true(ir_op op, ir_insn *op1, ir_insn *op2)
 			return !(op1->val.d > op2->val.d);
 		} else if (op == IR_UGT) {
 			return !(op1->val.d <= op2->val.d);
+		} else if (op == IR_ORDERED) {
+			return !isnan(op1->val.d) && !isnan(op2->val.d);
+		} else if (op == IR_UNORDERED) {
+			return isnan(op1->val.d) || isnan(op2->val.d);
 		} else {
 			IR_ASSERT(0);
 			return 0;
@@ -2835,6 +2841,10 @@ static bool ir_cmp_is_true(ir_op op, ir_insn *op1, ir_insn *op2)
 			return !(op1->val.f > op2->val.f);
 		} else if (op == IR_UGT) {
 			return !(op1->val.f <= op2->val.f);
+		} else if (op == IR_ORDERED) {
+			return !isnanf(op1->val.f) && !isnanf(op2->val.f);
+		} else if (op == IR_UNORDERED) {
+			return isnanf(op1->val.f) || isnanf(op2->val.f);
 		} else {
 			IR_ASSERT(0);
 			return 0;

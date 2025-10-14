@@ -1,0 +1,20 @@
+--TEST--
+001: ORDERED
+--ARGS--
+--emit-c
+--CODE--
+{
+	double c = 0;
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	bool ret = ORDERED(x, c);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+bool test(double x)
+{
+	double d_1 = x;
+	bool d_2;
+	d_2 = !__builtin_isunordered(d_1, d_1);
+	return d_2;
+}

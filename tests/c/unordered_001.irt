@@ -1,0 +1,20 @@
+--TEST--
+001: UNORDERED
+--ARGS--
+--emit-c
+--CODE--
+{
+	float c = 0;
+	l_1 = START(l_4);
+	float x = PARAM(l_1, "x", 1);
+	bool ret = UNORDERED(x, c);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+bool test(float x)
+{
+	float d_1 = x;
+	bool d_2;
+	d_2 = __builtin_isunordered(d_1, d_1);
+	return d_2;
+}

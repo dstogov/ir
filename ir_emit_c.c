@@ -200,6 +200,19 @@ static void ir_emit_unsigned_comparison_op(ir_ctx *ctx, FILE *f, int def, ir_ins
 	fprintf(f, ";\n");
 }
 
+static void ir_emit_unordered(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
+{
+	ir_emit_def_ref(ctx, f, def);
+	if (insn->op == IR_ORDERED) {
+		fprintf(f, "!");
+	}
+	fprintf(f, "__builtin_isunordered(");
+	ir_emit_ref(ctx, f, insn->op1);
+	fprintf(f, ", ");
+	ir_emit_ref(ctx, f, insn->op2);
+	fprintf(f, ");\n");
+}
+
 static void ir_emit_rol_ror(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *op1, const char *op2)
 {
 	uint8_t t1 = ctx->ir_base[insn->op1].type;
@@ -897,6 +910,10 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					break;
 				case IR_UGT:
 					ir_emit_unsigned_comparison_op(ctx, f, i, insn, ">", "<=");
+					break;
+				case IR_ORDERED:
+				case IR_UNORDERED:
+					ir_emit_unordered(ctx, f, i, insn);
 					break;
 				case IR_ADD:
 					ir_emit_binary_op(ctx, f, i, insn, "+");
