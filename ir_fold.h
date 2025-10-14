@@ -276,7 +276,7 @@ IR_FOLD(UGT(C_FLOAT, C_FLOAT))
 
 IR_FOLD(ORDERED(C_FLOAT, C_FLOAT))
 {
-	IR_FOLD_BOOL(!isnanf(op1_insn->val.f) && !isnanf(op2_insn->val.f));
+	IR_FOLD_BOOL(!isnan(op1_insn->val.f) && !isnan(op2_insn->val.f));
 }
 
 IR_FOLD(ORDERED(C_DOUBLE, C_DOUBLE))
@@ -286,7 +286,7 @@ IR_FOLD(ORDERED(C_DOUBLE, C_DOUBLE))
 
 IR_FOLD(UNORDERED(C_FLOAT, C_FLOAT))
 {
-	IR_FOLD_BOOL(isnanf(op1_insn->val.f) || isnanf(op2_insn->val.f));
+	IR_FOLD_BOOL(isnan(op1_insn->val.f) || isnan(op2_insn->val.f));
 }
 
 IR_FOLD(UNORDERED(C_DOUBLE, C_DOUBLE))
@@ -300,7 +300,7 @@ IR_FOLD(GE(_, C_FLOAT))
 IR_FOLD(LE(_, C_FLOAT))
 IR_FOLD(GT(_, C_FLOAT))
 {
-	if (isnanf(op2_insn->val.f)) {
+	if (isnan(op2_insn->val.f)) {
 		IR_FOLD_COPY(IR_FALSE);
 	}
 	IR_FOLD_NEXT;
@@ -308,7 +308,7 @@ IR_FOLD(GT(_, C_FLOAT))
 
 IR_FOLD(NE(_, C_FLOAT))
 {
-	if (isnanf(op2_insn->val.f)) {
+	if (isnan(op2_insn->val.f)) {
 		IR_FOLD_COPY(IR_TRUE);
 	}
 	IR_FOLD_NEXT;
@@ -316,7 +316,7 @@ IR_FOLD(NE(_, C_FLOAT))
 
 IR_FOLD(ORDERED(_, C_FLOAT))
 {
-	if (isnanf(op2_insn->val.f)) {
+	if (isnan(op2_insn->val.f)) {
 		IR_FOLD_COPY(IR_FALSE);
 	} else {
 		op2 = op1;
@@ -326,7 +326,7 @@ IR_FOLD(ORDERED(_, C_FLOAT))
 
 IR_FOLD(UNORDERED(_, C_FLOAT))
 {
-	if (isnanf(op2_insn->val.f)) {
+	if (isnan(op2_insn->val.f)) {
 		IR_FOLD_COPY(IR_TRUE);
 	} else {
 		op2 = op1;

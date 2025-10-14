@@ -2842,9 +2842,9 @@ static bool ir_cmp_is_true(ir_op op, ir_insn *op1, ir_insn *op2)
 		} else if (op == IR_UGT) {
 			return !(op1->val.f <= op2->val.f);
 		} else if (op == IR_ORDERED) {
-			return !isnanf(op1->val.f) && !isnanf(op2->val.f);
+			return !isnan(op1->val.f) && !isnan(op2->val.f);
 		} else if (op == IR_UNORDERED) {
-			return isnanf(op1->val.f) || isnanf(op2->val.f);
+			return isnan(op1->val.f) || isnan(op2->val.f);
 		} else {
 			IR_ASSERT(0);
 			return 0;
