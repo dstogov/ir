@@ -313,63 +313,41 @@ static bool ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, 
 	n = use_list->count;
 
 	p = &ctx->use_edges[use_list->refs];
-	use = *p;
-	IR_ASSERT(use);
-	if (use == next) {
-		/* skip control link */
-		next = IR_UNUSED;
-		if (--n == 0) {
-			return 1; /* dead ALLOCA */
-		}
-		p++;
+	do {
 		use = *p;
 		IR_ASSERT(use);
-	}
-	last_use = use;
-	use_insn = &ctx->ir_base[use];
-	if (use_insn->op == IR_LOAD) {
-		type = use_insn->type;
-		if (use_insn->op2 != var || ir_type_size[type] != size) {
-			return 0;
-		}
-	} else if (use_insn->op == IR_STORE) {
-		type = ctx->ir_base[use_insn->op3].type;
-		if (use_insn->op2 != var || use_insn->op3 == var || ir_type_size[type] != size) {
-			return 0;
-		}
-	} else {
-		return 0;
-	}
-
-	while (--n) {
-		p++;
-		use = *p;
-		IR_ASSERT(use);
-		if (use == next) {
-			continue; /* skip control link */
-		}
 		if (use < last_use) {
 			needs_sorting = 1;
 		}
 		last_use = use;
 		use_insn = &ctx->ir_base[use];
+		if (use == next && use_insn->op1 == var) {
+			next = IR_UNUSED;
+			p++;
+			continue; /* skip control link */
+		}
 		if (use_insn->op == IR_LOAD) {
 			if (use_insn->op2 != var
-			 || (use_insn->type != type
-			  && ir_type_size[use_insn->type] != size)) {
+			 || ir_type_size[use_insn->type] != size) {
 				return 0;
+			}
+			if (!type) {
+				type = use_insn->type;
 			}
 		} else if (use_insn->op == IR_STORE) {
 			if (use_insn->op2 != var
 			 || use_insn->op3 == var
-			 || (ctx->ir_base[use_insn->op3].type != type
-			  && ir_type_size[ctx->ir_base[use_insn->op3].type] != size)) {
+			 || ir_type_size[ctx->ir_base[use_insn->op3].type] != size) {
 				return 0;
+			}
+			if (!type) {
+				type = ctx->ir_base[use_insn->op3].type;
 			}
 		} else {
 			return 0;
 		}
-	}
+		p++;
+	} while (--n > 0);
 
 	*type_ptr = type;
 
@@ -467,7 +445,7 @@ int ir_mem2ssa(ir_ctx *ctx)
 			ir_bitqueue_add(&iter_worklist, start);
 		}
 
-		if (n > 1) { /* BB start node is used at least next control or BB end node */
+		if (n > 1) { /* BB start node is used at least by next control or by BB end node */
 			ir_use_list *use_list = &ctx->use_lists[start];
 
 			for (i = 0, j = 0; i < use_list->count; i++) {
