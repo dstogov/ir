@@ -321,7 +321,7 @@ static bool ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, 
 		}
 		last_use = use;
 		use_insn = &ctx->ir_base[use];
-		if (use == next && use_insn->op1 == var) {
+		if (use == next) {
 			next = IR_UNUSED;
 			p++;
 			continue; /* skip control link */
