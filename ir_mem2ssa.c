@@ -156,29 +156,48 @@ static void ir_mem2ssa_convert(ir_ctx      *ctx,
 			 *
 			 */
 
+
 			ir_ref prev = use_insn->op1;
 			ir_ref next = ir_next_control(ctx, use);
 			ctx->ir_base[next].op1 = prev;
-//			ir_use_list_remove_one(ctx, use, next);
 			ir_use_list_replace_one(ctx, prev, use, next);
-			if (!IR_IS_CONST_REF(use_insn->op3)) {
-				ir_use_list_remove_one(ctx, use_insn->op3, use);
-				/* op3 may became dead */
-				if (ctx->use_lists[use_insn->op3].count == 0
-				 || (ctx->use_lists[use_insn->op3].count == 1
-				  && (ir_op_flags[ctx->ir_base[use_insn->op3].op] & IR_OP_FLAG_MEM)
-				  && (ir_op_flags[ctx->ir_base[use_insn->op3].op] & (IR_OP_FLAG_MEM_LOAD|IR_OP_FLAG_MEM_ALLOC)))) {
-					ir_bitqueue_add(iter_worklist, use_insn->op3);
+
+			if (ctx->ir_base[use_insn->op3].type == type) {
+//				ir_use_list_remove_one(ctx, use, next);
+				if (!IR_IS_CONST_REF(use_insn->op3)) {
+					ir_use_list_remove_one(ctx, use_insn->op3, use);
+					/* op3 may became dead */
+					if (ctx->use_lists[use_insn->op3].count == 0
+					 || (ctx->use_lists[use_insn->op3].count == 1
+					  && (ir_op_flags[ctx->ir_base[use_insn->op3].op] & IR_OP_FLAG_MEM)
+					  && (ir_op_flags[ctx->ir_base[use_insn->op3].op] & (IR_OP_FLAG_MEM_LOAD|IR_OP_FLAG_MEM_ALLOC)))) {
+						ir_bitqueue_add(iter_worklist, use_insn->op3);
+					}
+				}
+
+				b = ctx->cfg_map[use];
+				if (EXPECTED(b)) {
+					ssa_vars[b] = use_insn->op3;
+				}
+
+				MAKE_NOP(use_insn);
+				CLEAR_USES(use);
+			} else {
+				ir_use_list_remove_one(ctx, use, next);
+
+				use_insn->opt = IR_OPT(IR_BITCAST, type);
+				use_insn->inputs_count = 1;
+				use_insn->op1 = use_insn->op3;
+				use_insn->op2 = IR_UNUSED;
+				use_insn->op3 = IR_UNUSED;
+
+				ir_bitqueue_add(iter_worklist, use);
+
+				b = ctx->cfg_map[use];
+				if (EXPECTED(b)) {
+					ssa_vars[b] = use;
 				}
 			}
-
-			b = ctx->cfg_map[use];
-			if (EXPECTED(b)) {
-				ssa_vars[b] = use_insn->op3;
-			}
-
-			MAKE_NOP(use_insn);
-			CLEAR_USES(use);
 			ctx->cfg_map[use] = 0;
 		} else if (use_insn->op == IR_VLOAD || use_insn->op == IR_LOAD) {
 			uint32_t b0;
@@ -217,11 +236,22 @@ static void ir_mem2ssa_convert(ir_ctx      *ctx,
 				}
 				b = ctx->cfg_blocks[b].idom;
 			}
-			ir_iter_replace(ctx, use, val, iter_worklist);
+			IR_ASSERT(ctx->ir_base[val].type == type);
+			if (use_insn->type == type) {
+				ir_iter_replace(ctx, use, val, iter_worklist);
 
-			use_insn = &ctx->ir_base[use];
-			MAKE_NOP(use_insn);
-			CLEAR_USES(use);
+				use_insn = &ctx->ir_base[use];
+				MAKE_NOP(use_insn);
+				CLEAR_USES(use);
+			} else {
+				use_insn->op = IR_BITCAST;
+				use_insn->inputs_count = 1;
+				use_insn->op1 = val;
+				use_insn->op2 = IR_UNUSED;
+				if (val > 0) {
+					ir_use_list_add(ctx, val, use);
+				}
+			}
 			ctx->cfg_map[use] = 0;
 		}
 	}
@@ -269,8 +299,8 @@ static bool ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, 
 	if (!IR_IS_CONST_REF(insn->op2)) {
 		return 0;
 	}
-	if (!(ctx->ir_base[insn->op2].type >= IR_U8 && ctx->ir_base[insn->op2].type >= IR_U64)
-	 && !(ctx->ir_base[insn->op2].type >= IR_I8 && ctx->ir_base[insn->op2].type >= IR_I64)) {
+	if (!(ctx->ir_base[insn->op2].type >= IR_U8 && ctx->ir_base[insn->op2].type <= IR_U64)
+	 && !(ctx->ir_base[insn->op2].type >= IR_I8 && ctx->ir_base[insn->op2].type <= IR_I64)) {
 		return 0;
 	}
 
@@ -324,11 +354,16 @@ static bool ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, 
 		last_use = use;
 		use_insn = &ctx->ir_base[use];
 		if (use_insn->op == IR_LOAD) {
-			if (use_insn->op2 != var || use_insn->type != type) {
+			if (use_insn->op2 != var
+			 || (use_insn->type != type
+			  && ir_type_size[use_insn->type] != size)) {
 				return 0;
 			}
 		} else if (use_insn->op == IR_STORE) {
-			if (use_insn->op2 != var || use_insn->op3 == var || ctx->ir_base[use_insn->op3].type != type) {
+			if (use_insn->op2 != var
+			 || use_insn->op3 == var
+			 || (ctx->ir_base[use_insn->op3].type != type
+			  && ir_type_size[ctx->ir_base[use_insn->op3].type] != size)) {
 				return 0;
 			}
 		} else {
@@ -371,11 +406,16 @@ static bool ir_mem2ssa_may_convert_var(ir_ctx *ctx, ir_ref var, ir_insn *insn)
 		last_use = use;
 		use_insn = &ctx->ir_base[use];
 		if (use_insn->op == IR_VLOAD) {
-			if (use_insn->op2 != var || use_insn->type != type) {
+			if (use_insn->op2 != var
+			 || (use_insn->type != type
+			  && ir_type_size[use_insn->type] != ir_type_size[type])) {
 				return 0;
 			}
 		} else if (use_insn->op == IR_VSTORE) {
-			if (use_insn->op2 != var || use_insn->op3 == var || ctx->ir_base[use_insn->op3].type != type) {
+			if (use_insn->op2 != var
+			 || use_insn->op3 == var
+			 || (ctx->ir_base[use_insn->op3].type != type
+			  && ir_type_size[ctx->ir_base[use_insn->op3].type] != ir_type_size[type])) {
 				return 0;
 			}
 		} else {
