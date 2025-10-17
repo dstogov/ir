@@ -68,9 +68,11 @@ static void ir_mem2ssa_convert(ir_ctx      *ctx,
 	 * Fabrice Rastello. TR Inria RR-7503, 2011
 	 */
 	while (ir_list_len(queue)) {
+		ir_block *bb;
+
 		b = ir_list_pop(queue);
 next:
-		ir_block *bb = &ctx->cfg_blocks[b];
+		bb = &ctx->cfg_blocks[b];
 		if (bb->predecessors_count > 1) {
 			IR_ASSERT(ctx->ir_base[bb->start].op == IR_MERGE || ctx->ir_base[bb->start].op == IR_LOOP_BEGIN);
 			ir_bitset_incl(merges, b); /* collect all MERGEs for the next step */
