@@ -104,7 +104,6 @@ next:
 		changed = 0;
 		IR_BITSET_FOREACH(merges, ir_bitset_len(ctx->cfg_blocks_count + 1), b) {
 			uint32_t dom;
-			bool need_phi = 0;
 
 			ir_block *bb = &ctx->cfg_blocks[b];
 			ir_ref start = bb->start;
@@ -115,15 +114,17 @@ next:
 				uint32_t runner = *q;
 				while (runner != dom) {
 					if (ir_bitset_in(defs, runner)) {
-						need_phi = 1;
-						break;
+						goto create_phi;
 					}
 					runner = ctx->cfg_blocks[runner].idom;
 					IR_ASSERT(runner);
 				}
 			}
-			if (need_phi) {
-				ir_ref phi = ir_emit_N(ctx, IR_OPT(IR_PHI, type), bb->predecessors_count + 1);
+			if (0) {
+				ir_ref phi;
+
+create_phi:
+				phi = ir_emit_N(ctx, IR_OPT(IR_PHI, type), bb->predecessors_count + 1);
 				ir_set_op(ctx, phi, 1, start);
 				ir_use_list_add(ctx, start, phi);
 				ir_bitset_excl(merges, b);
