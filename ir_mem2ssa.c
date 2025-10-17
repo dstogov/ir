@@ -69,6 +69,7 @@ static void ir_mem2ssa_convert(ir_ctx      *ctx,
 	 */
 	while (ir_list_len(queue)) {
 		b = ir_list_pop(queue);
+next:
 		ir_block *bb = &ctx->cfg_blocks[b];
 		if (bb->predecessors_count > 1) {
 			IR_ASSERT(ctx->ir_base[bb->start].op == IR_MERGE || ctx->ir_base[bb->start].op == IR_LOOP_BEGIN);
@@ -76,18 +77,19 @@ static void ir_mem2ssa_convert(ir_ctx      *ctx,
 			n = bb->predecessors_count;
 
 			for (q = ctx->cfg_edges + bb->predecessors; n > 0; q++, n--) {
-				int pred = *q;
-				if (ssa_vars[pred] != var) {
-					ssa_vars[pred] = var;
-					ir_list_push(queue, pred);
+				b = *q;
+				if (ssa_vars[b] != var) {
+					ssa_vars[b] = var;
+					if (n == 1) goto next;
+					ir_list_push(queue, b);
 				}
 			}
 		} else if (bb->predecessors_count == 1) {
 			IR_ASSERT(ctx->ir_base[bb->start].op != IR_START && ctx->ir_base[bb->start].op1);
-			int pred = ctx->cfg_edges[bb->predecessors];
-			if (ssa_vars[pred] != var) {
-				ssa_vars[pred] = var;
-				ir_list_push(queue, pred);
+			b = ctx->cfg_edges[bb->predecessors];
+			if (ssa_vars[b] != var) {
+				ssa_vars[b] = var;
+				goto next;
 			}
 		}
 	}
