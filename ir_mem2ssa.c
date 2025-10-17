@@ -293,7 +293,7 @@ static bool ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, 
 	ir_use_list *use_list;
 	ir_type type = IR_VOID;
 	size_t size;
-	ir_ref last_use;
+	ir_ref last_use = IR_UNUSED;
 	bool needs_sorting = 0;
 
 	if (!IR_IS_CONST_REF(insn->op2)) {
