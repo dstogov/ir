@@ -755,8 +755,35 @@ IR_FOLD(NEG(C_FLOAT))
 }
 
 IR_FOLD(ABS(C_I8))
+{
+	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
+	if (op1_insn->val.i64 >= 0) {
+		IR_FOLD_COPY(op1);
+	} else {
+		IR_FOLD_CONST_I(-op1_insn->val.i8);
+	}
+}
+
 IR_FOLD(ABS(C_I16))
+{
+	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
+	if (op1_insn->val.i64 >= 0) {
+		IR_FOLD_COPY(op1);
+	} else {
+		IR_FOLD_CONST_I(-op1_insn->val.i16);
+	}
+}
+
 IR_FOLD(ABS(C_I32))
+{
+	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
+	if (op1_insn->val.i64 >= 0) {
+		IR_FOLD_COPY(op1);
+	} else {
+		IR_FOLD_CONST_I((int32_t)-op1_insn->val.u32);
+	}
+}
+
 IR_FOLD(ABS(C_I64))
 {
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
