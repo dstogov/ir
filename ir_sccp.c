@@ -1508,8 +1508,8 @@ static bool ir_may_promote_f2d(ir_ctx *ctx, ir_ref ref)
 		switch (insn->op) {
 			case IR_FP2FP:
 				return 1;
-			case IR_INT2FP:
-				return ctx->use_lists[ref].count == 1;
+//			case IR_INT2FP:
+//				return ctx->use_lists[ref].count == 1;
 			case IR_NEG:
 			case IR_ABS:
 				return ctx->use_lists[ref].count == 1 &&
