@@ -2075,23 +2075,23 @@ IR_FOLD(SUB(ADD, ADD))
 			IR_FOLD_CONST_U(0);
 		} else if (op1_insn->op1 == op2_insn->op1) {
 			/* (a + b) - (a + c) => b - c */
-			op1 = op1_insn->op2;
-			op2 = op2_insn->op2;
+			op1 = _ir_fold_cast(ctx, op1_insn->op2, IR_OPT_TYPE(opt));
+			op2 = _ir_fold_cast(ctx, op2_insn->op2, IR_OPT_TYPE(opt));
 			IR_FOLD_RESTART;
 		} else if (op1_insn->op1 == op2_insn->op2) {
 			/* (a + b) - (c + a) => b - c */
-			op1 = op1_insn->op2;
-			op2 = op2_insn->op1;
+			op1 = _ir_fold_cast(ctx, op1_insn->op2, IR_OPT_TYPE(opt));
+			op2 = _ir_fold_cast(ctx, op2_insn->op1, IR_OPT_TYPE(opt));
 			IR_FOLD_RESTART;
 		} else if (op1_insn->op2 == op2_insn->op1) {
 			/* (a + b) - (b + c) => a - c */
-			op1 = op1_insn->op1;
-			op2 = op2_insn->op2;
+			op1 = _ir_fold_cast(ctx, op1_insn->op1, IR_OPT_TYPE(opt));
+			op2 = _ir_fold_cast(ctx, op2_insn->op2, IR_OPT_TYPE(opt));
 			IR_FOLD_RESTART;
 		} else if (op1_insn->op2 == op2_insn->op2) {
 			/* (a + b) - (c + b) => a - c */
-			op1 = op1_insn->op1;
-			op2 = op2_insn->op1;
+			op1 = _ir_fold_cast(ctx, op1_insn->op1, IR_OPT_TYPE(opt));
+			op2 = _ir_fold_cast(ctx, op2_insn->op1, IR_OPT_TYPE(opt));
 			IR_FOLD_RESTART;
 		}
 	}

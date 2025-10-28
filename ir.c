@@ -879,6 +879,17 @@ static ir_ref _ir_fold_cse(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir
 	return IR_UNUSED;
 }
 
+IR_ALWAYS_INLINE ir_ref _ir_fold_cast(ir_ctx *ctx, ir_ref ref, ir_type type)
+{
+	if (ctx->ir_base[ref].type == type) {
+		return ref;
+	} else if (IR_IS_CONST_REF(ref) && !IR_IS_SYM_CONST(ctx->ir_base[ref].op)) {
+		return ir_const(ctx, ctx->ir_base[ref].val, type);
+	} else {
+		return ir_emit1(ctx, IR_OPT(IR_BITCAST, type), ref);
+	}
+}
+
 #define IR_FOLD(X)        IR_FOLD1(X, __LINE__)
 #define IR_FOLD1(X, Y)    IR_FOLD2(X, Y)
 #define IR_FOLD2(X, Y)    case IR_RULE_ ## Y:
