@@ -2081,7 +2081,23 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_load_i(ir_ctx *ctx, ir_ref ref, ir_type
 			}
 		} else if (insn->op == IR_RSTORE) {
 			modified_regset |= (1 << insn->op3);
-		} else if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN || insn->op == IR_CALL || insn->op == IR_VSTORE) {
+		} else if (insn->op == IR_CALL) {
+			ir_insn *func = &ctx->ir_base[insn->op2];
+			ir_ref func_proto;
+			const ir_proto_t *proto;
+
+			if (func->op == IR_FUNC || func->op == IR_FUNC_ADDR) {
+				func_proto = func->proto;
+			} else if (func->op == IR_PROTO) {
+				func_proto = func->op2;
+			} else {
+				break;
+			}
+			proto = (const ir_proto_t *)ir_get_str(ctx, func_proto);
+			if (!(proto->flags & (IR_CONST_FUNC|IR_PURE_FUNC))) {
+				break;
+			}
+		} else if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN || insn->op == IR_VSTORE) {
 			return IR_UNUSED;
 		}
 		ref = insn->op1;
@@ -2127,7 +2143,23 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_vload_i(ir_ctx *ctx, ir_ref ref, ir_typ
 					break;
 				}
 			}
-		} else if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN || insn->op == IR_CALL || insn->op == IR_STORE) {
+		} else if (insn->op == IR_CALL) {
+			ir_insn *func = &ctx->ir_base[insn->op2];
+			ir_ref func_proto;
+			const ir_proto_t *proto;
+
+			if (func->op == IR_FUNC || func->op == IR_FUNC_ADDR) {
+				func_proto = func->proto;
+			} else if (func->op == IR_PROTO) {
+				func_proto = func->op2;
+			} else {
+				break;
+			}
+			proto = (const ir_proto_t *)ir_get_str(ctx, func_proto);
+			if (!(proto->flags & (IR_CONST_FUNC|IR_PURE_FUNC))) {
+				break;
+			}
+		} else if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN || insn->op == IR_STORE) {
 			break;
 		}
 		ref = insn->op1;

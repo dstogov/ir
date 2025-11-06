@@ -952,6 +952,11 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 		if (ctx->flags & IR_FASTCALL_FUNC) {
 			fprintf(l->dump_file, " __fastcall");
 		}
+		if (ctx->flags & IR_CONST_FUNC) {
+			fprintf(l->dump_file, " __const");
+		} else if (ctx->flags & IR_PURE_FUNC) {
+			fprintf(l->dump_file, " __pure");
+		}
 		fprintf(l->dump_file, "\n");
 	}
 

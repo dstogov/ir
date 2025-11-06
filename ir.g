@@ -516,6 +516,13 @@ ir_func_proto(ir_parser_ctx *p, uint32_t *flags, uint8_t *ret_type, uint32_t *pa
 		"__builtin"
 		{*flags |= IR_BUILTIN_FUNC;}
 	)?
+	(
+		"__pure"
+		{*flags |= IR_PURE_FUNC;}
+	|
+		"__const"
+		{*flags |= IR_CONST_FUNC;}
+	)?
 	{*params_count = n;}
 ;
 

@@ -541,6 +541,9 @@ void ir_strtab_free(ir_strtab *strtab);
 #define IR_EXTERN              (1<<5)
 #define IR_CONST               (1<<6)
 
+#define IR_CONST_FUNC          (1<<6)
+#define IR_PURE_FUNC           (1<<7)
+
 #define IR_INITIALIZED         (1<<7) /* sym data flag: constant or an initialized variable */
 #define IR_CONST_STRING        (1<<8) /* sym data flag: constant string */
 

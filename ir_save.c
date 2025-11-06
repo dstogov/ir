@@ -40,6 +40,11 @@ void ir_print_proto_ex(uint8_t flags, ir_type ret_type, uint32_t params_count, c
 	} else if (flags & IR_BUILTIN_FUNC) {
 		fprintf(f, " __builtin");
 	}
+	if (flags & IR_CONST_FUNC) {
+		fprintf(f, " __const");
+	} else if (flags & IR_PURE_FUNC) {
+		fprintf(f, " __pure");
+	}
 }
 
 static void ir_save_dessa_moves(const ir_ctx *ctx, int b, ir_block *bb, FILE *f)
