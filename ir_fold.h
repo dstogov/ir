@@ -1572,7 +1572,7 @@ IR_FOLD(FP2FP(C_DOUBLE))
 IR_FOLD(COPY(_))
 {
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
-	if (!op2) {
+	if (!(op2 & IR_COPY_HARD)) {
 		IR_FOLD_COPY(op1);
 	}
 	/* skip CSE */

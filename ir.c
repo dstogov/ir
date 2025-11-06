@@ -1169,7 +1169,7 @@ ir_ref ir_bind(ir_ctx *ctx, ir_ref var, ir_ref def)
 	IR_ASSERT(var < 0);
 	if (!ir_hashtab_add(ctx->binding, def, var)) {
 		/* Add a copy with different binding */
-		def = ir_emit2(ctx, IR_OPT(IR_COPY, ctx->ir_base[def].type), def, 1);
+		def = ir_emit2(ctx, IR_OPT(IR_COPY, ctx->ir_base[def].type), def, IR_COPY_HARD);
 		ir_hashtab_add(ctx->binding, def, var);
 	}
 	return def;
@@ -3228,11 +3228,13 @@ ir_ref _ir_VA_ARG(ir_ctx *ctx, ir_type type, ir_ref list)
 	return ctx->control = ir_emit2(ctx, IR_OPT(IR_VA_ARG, type), ctx->control, list);
 }
 
-ir_ref _ir_VA_ARG_EX(ir_ctx *ctx, ir_type type, ir_ref list, size_t size)
+ir_ref _ir_VA_ARG_EX(ir_ctx *ctx, ir_type type, ir_ref list, size_t size, size_t align)
 {
 	IR_ASSERT(ctx->control);
-	IR_ASSERT(size <= 0x7fffffff);
-	return ctx->control = ir_emit3(ctx, IR_OPT(IR_VA_ARG, type), ctx->control, list, (ir_ref)size);
+	IR_ASSERT(size <= 0x0fffffff);
+	IR_ASSERT(align != 0 && ((align & (align - 1)) == 0) && align <= 128);
+	return ctx->control = ir_emit3(ctx, IR_OPT(IR_VA_ARG, type), ctx->control, list,
+		(ir_ref)IR_VA_ARG_OP3(size, align));
 }
 
 ir_ref _ir_BLOCK_BEGIN(ir_ctx *ctx)

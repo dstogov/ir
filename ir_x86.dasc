@@ -8181,7 +8181,7 @@ static void ir_emit_rload(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			/* op3 is used as a flag that the value is already stored in memory.
 			 * If op3 is set we don't have to store the value once again (in case of spilling)
 			 */
-			if (!insn->op3 || !ir_is_same_spill_slot(ctx, def, IR_MEM_BO(ctx->spill_base, insn->op3))) {
+			if (!(insn->op3 & IR_RLOAD_STORED) || !ir_is_same_spill_slot(ctx, def, IR_MEM_BO(ctx->spill_base, insn->op3))) {
 				ir_emit_store(ctx, type, def, src_reg);
 			}
 		} else {
@@ -8194,7 +8194,7 @@ static void ir_emit_rload(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 			}
 			if (IR_REG_SPILLED(ctx->regs[def][0])
-			 && (!insn->op3 || !ir_is_same_spill_slot(ctx, def,  IR_MEM_BO(ctx->spill_base, insn->op3)))) {
+			 && (!(insn->op3 & IR_RLOAD_STORED) || !ir_is_same_spill_slot(ctx, def,  IR_MEM_BO(ctx->spill_base, insn->op3)))) {
 				ir_emit_store(ctx, type, def, def_reg);
 			}
 		}
@@ -8588,11 +8588,11 @@ static void ir_emit_va_arg(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 		|	add Ra(tmp_reg), IR_MAX(ir_type_size[type], sizeof(void*))
 	} else {
-		int size = (uint32_t)insn->op3 >> 3;
+		int size = IR_VA_ARG_SIZE(insn->op3);
 
 		if (def_reg != IR_REG_NONE) {
 			IR_ASSERT(type == IR_ADDR);
-			int align = 1U << (insn->op3 & 0x7);
+			int align = IR_VA_ARG_ALIGN(insn->op3);
 
 			if (align > (int)sizeof(void*)) {
 				|	add Ra(tmp_reg), (align-1)
@@ -8632,8 +8632,8 @@ static void ir_emit_va_arg(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (insn->op3) {
 		/* long struct arguemnt */
 		IR_ASSERT(type == IR_ADDR);
-		int align = 1U << (insn->op3 & 0x7);
-		int size = (uint32_t)insn->op3 >> 3;
+		int align = IR_VA_ARG_ALIGN(insn->op3);
+		int size = IR_VA_ARG_SIZE(insn->op3);
 
 		|	mov Ra(tmp_reg), aword [Ra(op2_reg)+(offset+offsetof(ir_va_list, overflow_arg_area))]
 		if (align > (int)sizeof(void*)) {
