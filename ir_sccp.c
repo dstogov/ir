@@ -2251,42 +2251,6 @@ static void ir_merge_blocks(ir_ctx *ctx, ir_ref end, ir_ref begin, ir_bitqueue *
 	ir_ref prev, next;
 	ir_use_list *use_list;
 
-	if (ctx->use_lists[begin].count > 1) {
-		ir_ref *p, n, i, use;
-		ir_insn *use_insn;
-		ir_ref region = end;
-		ir_ref next = IR_UNUSED;
-
-		while (!IR_IS_BB_START(ctx->ir_base[region].op)) {
-			region = ctx->ir_base[region].op1;
-		}
-
-		use_list = &ctx->use_lists[begin];
-		n = use_list->count;
-		for (p = &ctx->use_edges[use_list->refs], i = 0; i < n; p++, i++) {
-			use = *p;
-			use_insn = &ctx->ir_base[use];
-			if (ir_op_flags[use_insn->op] & IR_OP_FLAG_CONTROL) {
-				IR_ASSERT(!next);
-				next = use;
-			} else {
-				IR_ASSERT(use_insn->op == IR_VAR);
-				IR_ASSERT(use_insn->op1 == begin);
-				use_insn->op1 = region;
-				if (ir_use_list_add(ctx, region, use)) {
-					/* restore after reallocation */
-					use_list = &ctx->use_lists[begin];
-					n = use_list->count;
-					p = &ctx->use_edges[use_list->refs + i];
-				}
-			}
-		}
-
-		IR_ASSERT(next);
-		ctx->use_edges[use_list->refs] = next;
-		use_list->count = 1;
-	}
-
 	IR_ASSERT(ctx->ir_base[begin].op == IR_BEGIN);
 	IR_ASSERT(ctx->ir_base[end].op == IR_END);
 	IR_ASSERT(ctx->ir_base[begin].op1 == end);
@@ -3595,7 +3559,9 @@ folding:
 			if (!(ctx->flags & IR_OPT_CFG)) {
 				/* pass */
 			} else if (insn->op == IR_BEGIN) {
-				if (insn->op1 && ctx->ir_base[insn->op1].op == IR_END) {
+				if (insn->op1
+				 && ctx->use_lists[i].count == 1
+				 && ctx->ir_base[insn->op1].op == IR_END) {
 					ir_merge_blocks(ctx, insn->op1, i, worklist);
 				}
 			} else if (insn->op == IR_MERGE) {
