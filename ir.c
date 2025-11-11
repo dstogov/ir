@@ -2093,6 +2093,9 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_load_i(ir_ctx *ctx, ir_ref ref, ir_type
 			} else {
 				break;
 			}
+			if (!func_proto) {
+				break;
+			}
 			proto = (const ir_proto_t *)ir_get_str(ctx, func_proto);
 			if (!(proto->flags & (IR_CONST_FUNC|IR_PURE_FUNC))) {
 				break;
@@ -2153,6 +2156,9 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_vload_i(ir_ctx *ctx, ir_ref ref, ir_typ
 			} else if (func->op == IR_PROTO) {
 				func_proto = func->op2;
 			} else {
+				break;
+			}
+			if (!func_proto) {
 				break;
 			}
 			proto = (const ir_proto_t *)ir_get_str(ctx, func_proto);
