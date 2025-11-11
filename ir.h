@@ -402,7 +402,6 @@ typedef enum _ir_op {
 
 /* "opt" modifiers */
 #define IR_COPY_HARD         (1<<0)
-#define IR_RLOAD_STORED      (1<<0)
 
 #define IR_VA_ARG_SIZE(op3)  (((uint32_t)(op3) >> 3))
 #define IR_VA_ARG_ALIGN(op3) (1U << ((uint32_t)(op3) & 0x7))

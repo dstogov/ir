@@ -4107,7 +4107,7 @@ static void ir_emit_rload(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			/* op3 is used as a flag that the value is already stored in memory.
 			 * If op3 is set we don't have to store the value once again (in case of spilling)
 			 */
-			if (!(insn->op3 & IR_RLOAD_STORED) || !ir_is_same_spill_slot(ctx, def, IR_MEM_BO(ctx->spill_base, insn->op3))) {
+			if (!insn->op3 || !ir_is_same_spill_slot(ctx, def, IR_MEM_BO(ctx->spill_base, insn->op3))) {
 				ir_emit_store(ctx, type, def, src_reg);
 			}
 		} else {
@@ -4120,7 +4120,7 @@ static void ir_emit_rload(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 			}
 			if (IR_REG_SPILLED(ctx->regs[def][0])
-			 && (!(insn->op3 & IR_RLOAD_STORED) || !ir_is_same_spill_slot(ctx, def, IR_MEM_BO(ctx->spill_base, insn->op3)))) {
+			 && (!insn->op3 || !ir_is_same_spill_slot(ctx, def, IR_MEM_BO(ctx->spill_base, insn->op3)))) {
 				ir_emit_store(ctx, type, def, def_reg);
 			}
 		}
