@@ -1752,7 +1752,7 @@ static bool ir_match_has_mem_deps(ir_ctx *ctx, ir_ref ref, ir_ref root)
 		do {
 			ir_insn *insn = &ctx->ir_base[pos];
 
-			if (insn->op == IR_STORE) {
+			if (insn->op == IR_STORE || insn->op == IR_VSTORE) {
 				// TODO: check if LOAD and STORE addresses may alias
 				return 1;
 			} else if (insn->op == IR_CALL) {
@@ -1767,7 +1767,7 @@ static bool ir_match_has_mem_deps(ir_ctx *ctx, ir_ref ref, ir_ref root)
 static void ir_match_fuse_load(ir_ctx *ctx, ir_ref ref, ir_ref root)
 {
 	if (ir_in_same_block(ctx, ref)
-	 && ctx->ir_base[ref].op == IR_LOAD) {
+	 && (ctx->ir_base[ref].op == IR_LOAD || ctx->ir_base[ref].op == IR_VLOAD)) {
 		if (ctx->use_lists[ref].count == 2
 		 && !ir_match_has_mem_deps(ctx, ref, root)) {
 			ir_ref addr_ref = ctx->ir_base[ref].op2;
@@ -1792,7 +1792,7 @@ static bool ir_match_try_fuse_load(ir_ctx *ctx, ir_ref ref, ir_ref root)
 	ir_insn *insn = &ctx->ir_base[ref];
 
 	if (ir_in_same_block(ctx, ref)
-	 && insn->op == IR_LOAD) {
+	 && (insn->op == IR_LOAD || ctx->ir_base[ref].op == IR_VLOAD)) {
 		if (ctx->use_lists[ref].count == 2
 		 && !ir_match_has_mem_deps(ctx, ref, root)) {
 			ir_ref addr_ref = ctx->ir_base[ref].op2;
@@ -1814,8 +1814,6 @@ static bool ir_match_try_fuse_load(ir_ctx *ctx, ir_ref ref, ir_ref root)
 		 && ir_get_param_reg(ctx, ref) == IR_REG_NONE) {
 			return 1;
 		}
-	} else if (ctx->ir_base[ref].op == IR_VLOAD) {
-		return 1;
 	}
 	return 0;
 }
@@ -2463,7 +2461,7 @@ binop_fp:
 			ir_match_fuse_load(ctx, insn->op2, ref);
 			return insn->op;
 		case IR_VAR:
-			return IR_SKIPPED | IR_VAR;
+			return IR_STATIC_ALLOCA;
 		case IR_PARAM:
 #ifndef _WIN64
 			if (ctx->value_params && ctx->value_params[insn->op3 - 1].align) {
@@ -3726,7 +3724,7 @@ static ir_mem ir_fuse_load(ir_ctx *ctx, ir_ref root, ir_ref ref)
 	ir_insn *load_insn = &ctx->ir_base[ref];
 	ir_reg reg;
 
-	IR_ASSERT(load_insn->op == IR_LOAD);
+	IR_ASSERT(load_insn->op == IR_LOAD || load_insn->op == IR_VLOAD);
 	if (UNEXPECTED(ctx->rules[ref] & IR_FUSED_REG)) {
 		reg = ir_get_fused_reg(ctx, root, ref * sizeof(ir_ref) + 2);
 	} else {

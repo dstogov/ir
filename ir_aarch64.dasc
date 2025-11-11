@@ -961,7 +961,7 @@ binop_fp:
 			ctx->flags2 |= IR_HAS_CALLS;
 			return IR_CALL;
 		case IR_VAR:
-			return IR_SKIPPED | IR_VAR;
+			return IR_STATIC_ALLOCA;
 		case IR_PARAM:
 			return ctx->use_lists[ref].count > 0 ? IR_PARAM : IR_SKIPPED | IR_PARAM;
 		case IR_ALLOCA:

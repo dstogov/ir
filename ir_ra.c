@@ -776,9 +776,6 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						if (insn->op == IR_PARAM) {
 							/* We may reuse parameter stack slot for spilling */
 							ctx->live_intervals[v]->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
-						} else if (insn->op == IR_VLOAD) {
-							/* Load may be fused into the usage instruction */
-							ctx->live_intervals[v]->flags |= IR_LIVE_INTERVAL_MEM_LOAD;
 						}
 						def_pos = IR_DEF_LIVE_POS_FROM_REF(ref);
 					}
@@ -1396,9 +1393,6 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						if (insn->op == IR_PARAM) {
 							/* We may reuse parameter stack slot for spilling */
 							ctx->live_intervals[v]->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
-						} else if (insn->op == IR_VLOAD) {
-							/* Load may be fused into the usage instruction */
-							ctx->live_intervals[v]->flags |= IR_LIVE_INTERVAL_MEM_LOAD;
 						}
 						def_pos = IR_DEF_LIVE_POS_FROM_REF(ref);
 					}
@@ -1627,9 +1621,6 @@ static void ir_vregs_join(ir_ctx *ctx, uint32_t r1, uint32_t r2)
 
 	ctx->live_intervals[r1]->flags |=
 		IR_LIVE_INTERVAL_COALESCED | (ival->flags & (IR_LIVE_INTERVAL_HAS_HINT_REGS|IR_LIVE_INTERVAL_HAS_HINT_REFS));
-	if (ctx->ir_base[IR_LIVE_POS_TO_REF(ctx->live_intervals[r1]->use_pos->pos)].op != IR_VLOAD) {
-		ctx->live_intervals[r1]->flags &= ~IR_LIVE_INTERVAL_MEM_LOAD;
-	}
 	if (ival->flags & IR_LIVE_INTERVAL_MEM_PARAM) {
 		IR_ASSERT(!(ctx->live_intervals[r1]->flags & IR_LIVE_INTERVAL_MEM_PARAM));
 		ctx->live_intervals[r1]->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
@@ -3400,12 +3391,13 @@ static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 static bool ir_ival_spill_for_fuse_load(ir_ctx *ctx, ir_live_interval *ival, ir_reg_alloc_data *data)
 {
 	ir_use_pos *use_pos = ival->use_pos;
-	ir_insn *insn;
 
 	if (ival->flags & IR_LIVE_INTERVAL_MEM_PARAM) {
 		IR_ASSERT(!ival->next && use_pos && use_pos->op_num == 0);
-		insn = &ctx->ir_base[IR_LIVE_POS_TO_REF(use_pos->pos)];
+#if IR_DEBUG
+		ir_insn *insn = &ctx->ir_base[IR_LIVE_POS_TO_REF(use_pos->pos)];
 		IR_ASSERT(insn->op == IR_PARAM);
+#endif
 		use_pos = use_pos->next;
 		if (use_pos && (use_pos->next || (use_pos->flags & IR_USE_MUST_BE_IN_REG))) {
 			return 0;
@@ -3417,38 +3409,6 @@ static bool ir_ival_spill_for_fuse_load(ir_ctx *ctx, ir_live_interval *ival, ir_
 				return 0;
 			}
 		}
-
-		return 1;
-	} else if (ival->flags & IR_LIVE_INTERVAL_MEM_LOAD) {
-		insn = &ctx->ir_base[IR_LIVE_POS_TO_REF(use_pos->pos)];
-		IR_ASSERT(insn->op == IR_VLOAD);
-		IR_ASSERT(ctx->ir_base[insn->op2].op == IR_VAR);
-		use_pos = use_pos->next;
-		if (use_pos && (use_pos->next || (use_pos->flags & IR_USE_MUST_BE_IN_REG))) {
-			return 0;
-		}
-
-		if (use_pos) {
-			ir_block *bb = ir_block_from_live_pos(ctx, use_pos->pos);
-			if (bb->loop_depth && bb != ir_block_from_live_pos(ctx, ival->use_pos->pos)) {
-				return 0;
-			}
-			/* check if VAR may be clobbered between VLOAD and use */
-			ir_use_list *use_list = &ctx->use_lists[insn->op2];
-			ir_ref n = use_list->count;
-			ir_ref *p = &ctx->use_edges[use_list->refs];
-			for (; n > 0; p++, n--) {
-				ir_ref use = *p;
-				if (ctx->ir_base[use].op == IR_VSTORE) {
-					if (use > IR_LIVE_POS_TO_REF(ival->use_pos->pos) && use < IR_LIVE_POS_TO_REF(use_pos->pos)) {
-						return 0;
-					}
-				} else if (ctx->ir_base[use].op == IR_VADDR) {
-					return 0;
-				}
-			}
-		}
-		ival->stack_spill_pos = ctx->ir_base[insn->op2].op3;
 
 		return 1;
 	}
@@ -3554,7 +3514,7 @@ static int ir_linear_scan(ir_ctx *ctx)
 	for (j = ctx->vregs_count; j != 0; j--) {
 		ival = ctx->live_intervals[j];
 		if (ival) {
-			if (!(ival->flags & (IR_LIVE_INTERVAL_MEM_PARAM|IR_LIVE_INTERVAL_MEM_LOAD))
+			if (!(ival->flags & IR_LIVE_INTERVAL_MEM_PARAM)
 					|| !ir_ival_spill_for_fuse_load(ctx, ival, &data)) {
 				ir_add_to_unhandled(&unhandled, ival);
 			}
