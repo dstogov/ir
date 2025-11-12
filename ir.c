@@ -1847,8 +1847,49 @@ int ir_mem_flush(void *ptr, size_t size)
 	return 1;
 }
 #else
+
+#if defined(__linux__) && defined(__x86_64__) && defined(PKEY_DISABLE_WRITE)
+# define HAVE_PKEY_MPROTECT 1
+#endif
+
+#ifdef HAVE_PKEY_MPROTECT
+
+#ifndef PKEY_DISABLE_EXECUTE
+# define PKEY_DISABLE_EXECUTE 0
+#endif
+
+int pkey_mprotect(void* addr, size_t len, int prot, int pkey) __attribute__((weak));
+int pkey_alloc(unsigned int, unsigned int) __attribute__((weak));
+int pkey_free(int) __attribute__((weak));
+int pkey_set(int, unsigned) __attribute__((weak));
+
+static int ir_pkey = 0;
+#endif
+
 void *ir_mem_mmap(size_t size)
 {
+#ifdef HAVE_PKEY_MPROTECT
+	if (!ir_pkey && pkey_mprotect) {
+		int key = pkey_alloc(0, PKEY_DISABLE_WRITE);
+		if (key > 0) {
+			ir_pkey = key;
+		}
+	}
+	if (ir_pkey > 0) {
+		void *ret = mmap(NULL, size, PROT_EXEC|PROT_READ|PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+		if (ret == MAP_FAILED) {
+			return NULL;
+		}
+		if (pkey_mprotect(ret, size, PROT_EXEC|PROT_READ|PROT_WRITE, ir_pkey) != 0) {
+#ifdef IR_DEBUG
+			fprintf(stderr, "pkey_mprotect() failed\n");
+#endif
+			munmap(ret, size);
+			return NULL;
+		}
+		return ret;
+	}
+#endif
 	int prot_flags = PROT_EXEC;
 #if defined(__NetBSD__)
 	prot_flags |= PROT_MPROTECT(PROT_READ|PROT_WRITE);
@@ -1863,11 +1904,28 @@ void *ir_mem_mmap(size_t size)
 int ir_mem_unmap(void *ptr, size_t size)
 {
 	munmap(ptr, size);
+#ifdef HAVE_PKEY_MPROTECT
+//	if (ir_pkey > 0) {
+//		pkey_free(ir_pkey);
+//		ir_pkey = 0;
+//	}
+#endif
 	return 1;
 }
 
 int ir_mem_protect(void *ptr, size_t size)
 {
+#ifdef HAVE_PKEY_MPROTECT
+	if (ir_pkey > 0) {
+		if (pkey_set(ir_pkey, PKEY_DISABLE_WRITE)) {
+#ifdef IR_DEBUG
+			fprintf(stderr, "mprotect() failed\n");
+#endif
+			return 0;
+		}
+		return 1;
+	}
+#endif
 	if (mprotect(ptr, size, PROT_READ | PROT_EXEC) != 0) {
 #ifdef IR_DEBUG
 		fprintf(stderr, "mprotect() failed\n");
@@ -1879,6 +1937,17 @@ int ir_mem_protect(void *ptr, size_t size)
 
 int ir_mem_unprotect(void *ptr, size_t size)
 {
+#ifdef HAVE_PKEY_MPROTECT
+	if (ir_pkey > 0) {
+		if (pkey_set(ir_pkey, PKEY_DISABLE_EXECUTE)) {
+#ifdef IR_DEBUG
+			fprintf(stderr, "mprotect() failed\n");
+#endif
+			return 0;
+		}
+		return 1;
+	}
+#endif
 	if (mprotect(ptr, size, PROT_READ | PROT_WRITE) != 0) {
 #ifdef IR_DEBUG
 		fprintf(stderr, "mprotect() failed\n");
