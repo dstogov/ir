@@ -544,6 +544,8 @@ extern "C" {
 #define ir_VLOAD_D(_var)                  _ir_VLOAD(_ir_CTX, IR_DOUBLE, (_var))
 #define ir_VLOAD_F(_var)                  _ir_VLOAD(_ir_CTX, IR_FLOAT, (_var))
 #define ir_VSTORE(_var, _val)             _ir_VSTORE(_ir_CTX, (_var), (_val))
+#define ir_VLOAD_v(_type, _var)           _ir_VLOAD_v(_ir_CTX, (_type), (_var))
+#define ir_VSTORE_v(_var, _val)           _ir_VSTORE_v(_ir_CTX, (_var), (_val))
 #define ir_RLOAD(_type, _reg)             _ir_RLOAD(_ir_CTX, (_type), (_reg))
 #define ir_RLOAD_B(_reg)                  _ir_RLOAD(_ir_CTX, IR_BOOL, (_reg))
 #define ir_RLOAD_U8(_reg)                 _ir_RLOAD(_ir_CTX, IR_U8, (_reg))
@@ -574,6 +576,8 @@ extern "C" {
 #define ir_LOAD_D(_addr)                  _ir_LOAD(_ir_CTX, IR_DOUBLE, (_addr))
 #define ir_LOAD_F(_addr)                  _ir_LOAD(_ir_CTX, IR_FLOAT, (_addr))
 #define ir_STORE(_addr, _val)             _ir_STORE(_ir_CTX, (_addr), (_val))
+#define ir_LOAD_v(_type, _addr)           _ir_LOAD_v(_ir_CTX, (_type), (_addr))
+#define ir_STORE_v(_addr, _val)           _ir_STORE_v(_ir_CTX, (_addr), (_val))
 #define ir_TLS(_index, _offset)           _ir_TLS(_ir_CTX, (_index), (_offset))
 #define ir_TRAP()                         do {_ir_CTX->control = ir_emit1(_ir_CTX, IR_TRAP, _ir_CTX->control);} while (0)
 
@@ -654,10 +658,14 @@ ir_ref _ir_ALLOCA(ir_ctx *ctx, ir_ref size);
 void   _ir_AFREE(ir_ctx *ctx, ir_ref size);
 ir_ref _ir_VLOAD(ir_ctx *ctx, ir_type type, ir_ref var);
 void   _ir_VSTORE(ir_ctx *ctx, ir_ref var, ir_ref val);
+ir_ref _ir_VLOAD_v(ir_ctx *ctx, ir_type type, ir_ref var);
+void   _ir_VSTORE_v(ir_ctx *ctx, ir_ref var, ir_ref val);
 ir_ref _ir_RLOAD(ir_ctx *ctx, ir_type type, ir_ref reg);
 void   _ir_RSTORE(ir_ctx *ctx, ir_ref reg, ir_ref val);
 ir_ref _ir_LOAD(ir_ctx *ctx, ir_type type, ir_ref addr);
 void   _ir_STORE(ir_ctx *ctx, ir_ref addr, ir_ref val);
+ir_ref _ir_LOAD_v(ir_ctx *ctx, ir_type type, ir_ref addr);
+void   _ir_STORE_v(ir_ctx *ctx, ir_ref addr, ir_ref val);
 void   _ir_VA_START(ir_ctx *ctx, ir_ref list);
 void   _ir_VA_END(ir_ctx *ctx, ir_ref list);
 void   _ir_VA_COPY(ir_ctx *ctx, ir_ref dst, ir_ref src);

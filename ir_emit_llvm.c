@@ -835,7 +835,11 @@ static void ir_emit_vaddr(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 static void ir_emit_load(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 {
 	ir_emit_def_ref(ctx, f, def);
-	fprintf(f, "load %s, ptr ", ir_type_llvm_name[insn->type]);
+	if (insn->op == IR_LOAD_v || insn->op == IR_VLOAD_v) {
+		fprintf(f, "load volatile %s, ptr ", ir_type_llvm_name[insn->type]);
+	} else {
+		fprintf(f, "load %s, ptr ", ir_type_llvm_name[insn->type]);
+	}
 	ir_emit_ref(ctx, f, insn->op2);
 	fprintf(f, "\n");
 }
@@ -844,7 +848,11 @@ static void ir_emit_store(ir_ctx *ctx, FILE *f, ir_insn *insn)
 {
 	ir_type type = ctx->ir_base[insn->op3].type;
 
-	fprintf(f, "\tstore %s ", ir_type_llvm_name[type]);
+	if (insn->op == IR_STORE_v || insn->op == IR_VSTORE_v) {
+		fprintf(f, "\tstore volatile %s ", ir_type_llvm_name[type]);
+	} else {
+		fprintf(f, "\tstore %s ", ir_type_llvm_name[type]);
+	}
 	ir_emit_ref(ctx, f, insn->op3);
 	fprintf(f, ", ptr ");
 	ir_emit_ref(ctx, f, insn->op2);
@@ -1167,11 +1175,15 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					ir_emit_vaddr(ctx, f, i, insn);
 					break;
 				case IR_LOAD:
+				case IR_LOAD_v:
 				case IR_VLOAD:
+				case IR_VLOAD_v:
 					ir_emit_load(ctx, f, i, insn);
 					break;
 				case IR_STORE:
+				case IR_STORE_v:
 				case IR_VSTORE:
+				case IR_VSTORE_v:
 					ir_emit_store(ctx, f, insn);
 					break;
 				case IR_BLOCK_BEGIN:

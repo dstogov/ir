@@ -334,11 +334,15 @@ typedef enum _ir_type {
 	_(BLOCK_BEGIN,  a1,   src, ___, ___) /* stacksave                   */ \
 	_(BLOCK_END,    a2,   src, def, ___) /* stackrestore                */ \
 	_(VLOAD,        l2,   src, var, ___) /* load value of local var     */ \
+	_(VLOAD_v,      l2,   src, var, ___) /* volatile variant of VLOAD   */ \
 	_(VSTORE,       s3,   src, var, def) /* store value to local var    */ \
+	_(VSTORE_v,     s3,   src, var, def) /* volatile variant of VSTORE  */ \
 	_(RLOAD,        l1X2, src, num, opt) /* load value from register    */ \
 	_(RSTORE,       s2X1, src, def, num) /* store value into register   */ \
 	_(LOAD,         l2,   src, ref, ___) /* load from memory            */ \
+	_(LOAD_v,       l2,   src, ref, ___) /* volatile variant of VLOAD   */ \
 	_(STORE,        s3,   src, ref, def) /* store to memory             */ \
+	_(STORE_v,      s3,   src, ref, def) /* volatile variant of VSTORE  */ \
 	_(TLS,          l1X2, src, num, num) /* thread local variable       */ \
 	_(TRAP,         x1,   src, ___, ___) /* DebugBreak                  */ \
 	/* memory reference ops (A, H, U, S, TMP, STR, NEW, X, V) ???       */ \

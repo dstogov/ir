@@ -51,7 +51,7 @@ static void ir_emit_ref(ir_ctx *ctx, FILE *f, ir_ref ref)
 		ir_print_const(ctx, &ctx->ir_base[ref], f, true);
 	} else {
 		ir_insn *insn = &ctx->ir_base[ref];
-		if (insn->op == IR_VLOAD) {
+		if (insn->op == IR_VLOAD || insn->op == IR_VLOAD_v) {
 			ir_insn *var = &ctx->ir_base[insn->op2];
 
 			IR_ASSERT(var->op == IR_VAR/* || var->op == IR_PARAM*/);
@@ -69,7 +69,7 @@ static void ir_emit_def_ref(ir_ctx *ctx, FILE *f, ir_ref def)
 		ir_ref use = ctx->use_edges[use_list->refs];
 		ir_insn *insn = &ctx->ir_base[use];
 
-		if (insn->op == IR_VSTORE) {
+		if (insn->op == IR_VSTORE || insn->op == IR_VSTORE_v) {
 			ir_insn *var = &ctx->ir_base[insn->op2];
 
 			IR_ASSERT(var->op == IR_VAR/* || var->op == IR_PARAM*/);
@@ -818,8 +818,10 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 								/* skip */
 							}
 						} else if ((insn->op == IR_VLOAD)
+						 || (insn->op == IR_VLOAD_v)
 						 || (use_list->count == 1
-						  && ctx->ir_base[ctx->use_edges[use_list->refs]].op == IR_VSTORE)) {
+						  && (ctx->ir_base[ctx->use_edges[use_list->refs]].op == IR_VSTORE
+						   || ctx->ir_base[ctx->use_edges[use_list->refs]].op == IR_VSTORE_v))) {
 							/* skip, we use variable name instead */
 						} else {
 							fprintf(f, "\t%s d_%d;\n", ir_type_cname[insn->type], ctx->vregs[i]);
@@ -878,6 +880,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_PHI:
 				case IR_PI:
 				case IR_VLOAD:
+				case IR_VLOAD_v:
 				case IR_ARGVAL:
 					/* skip */
 					break;
@@ -1059,12 +1062,15 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					ir_emit_vaddr(ctx, f, i, insn);
 					break;
 				case IR_VSTORE:
+				case IR_VSTORE_v:
 					ir_emit_vstore(ctx, f, insn);
 					break;
 				case IR_LOAD:
+				case IR_LOAD_v:
 					ir_emit_load(ctx, f, i, insn);
 					break;
 				case IR_STORE:
+				case IR_STORE_v:
 					ir_emit_store(ctx, f, insn);
 					break;
 				case IR_BLOCK_BEGIN:

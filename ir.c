@@ -3184,6 +3184,18 @@ void _ir_VSTORE(ir_ctx *ctx, ir_ref var, ir_ref val)
 	ctx->control = ir_emit3(ctx, IR_VSTORE, ctx->control, var, val);
 }
 
+ir_ref _ir_VLOAD_v(ir_ctx *ctx, ir_type type, ir_ref var)
+{
+	IR_ASSERT(ctx->control);
+	return ctx->control = ir_emit2(ctx, IR_OPT(IR_VLOAD_v, type), ctx->control, var);
+}
+
+void _ir_VSTORE_v(ir_ctx *ctx, ir_ref var, ir_ref val)
+{
+	IR_ASSERT(ctx->control);
+	ctx->control = ir_emit3(ctx, IR_VSTORE_v, ctx->control, var, val);
+}
+
 ir_ref _ir_TLS(ir_ctx *ctx, ir_ref index, ir_ref offset)
 {
 	IR_ASSERT(ctx->control);
@@ -3240,6 +3252,18 @@ void _ir_STORE(ir_ctx *ctx, ir_ref addr, ir_ref val)
 		}
 	}
 	ctx->control = ir_emit3(ctx, IR_STORE, ctx->control, addr, val);
+}
+
+ir_ref _ir_LOAD_v(ir_ctx *ctx, ir_type type, ir_ref addr)
+{
+	IR_ASSERT(ctx->control);
+	return ctx->control = ir_emit2(ctx, IR_OPT(IR_LOAD_v, type), ctx->control, addr);
+}
+
+void _ir_STORE_v(ir_ctx *ctx, ir_ref addr, ir_ref val)
+{
+	IR_ASSERT(ctx->control);
+	ctx->control = ir_emit3(ctx, IR_STORE_v, ctx->control, addr, val);
 }
 
 void _ir_VA_START(ir_ctx *ctx, ir_ref list)

@@ -498,16 +498,28 @@ static void llvm2ir_load(ir_ctx *ctx, LLVMValueRef insn)
 	if (LLVMGetValueKind(op0) == LLVMInstructionValueKind) {
 		ref = ir_addrtab_find(ctx->binding, (uintptr_t)op0);
 		if (ctx->ir_base[ref].op == IR_VAR) {
-			ref = ir_VLOAD(type, ref);
+			if (LLVMGetVolatile(insn)) {
+				ref = ctx->control = ir_emit2(ctx, IR_OPT(IR_VLOAD_v, type), ctx->control, ref);
+			} else {
+				ref = ir_VLOAD(type, ref);
+			}
 		} else {
 			if (ctx->ir_base[ref].type != IR_ADDR) {
 				ref = llvm2ir_auto_cast(ctx, ref, ctx->ir_base[ref].type, IR_ADDR);
 			}
-			ref = ir_LOAD(type, ref);
+			if (LLVMGetVolatile(insn)) {
+				ref = ctx->control = ir_emit2(ctx, IR_OPT(IR_LOAD_v, type), ctx->control, ref);
+			} else {
+				ref = ir_LOAD(type, ref);
+			}
 		}
 	} else {
 		ref = llvm2ir_op(ctx, op0, IR_ADDR);
-		ref = ir_LOAD(type, ref);
+		if (LLVMGetVolatile(insn)) {
+			ref = ctx->control = ir_emit2(ctx, IR_OPT(IR_LOAD_v, type), ctx->control, ref);
+		} else {
+			ref = ir_LOAD(type, ref);
+		}
 	}
 	ir_addrtab_set(ctx->binding, (uintptr_t)insn, ref);
 }
@@ -523,16 +535,28 @@ static void llvm2ir_store(ir_ctx *ctx, LLVMValueRef insn)
 	if (LLVMGetValueKind(op1) == LLVMInstructionValueKind) {
 		ref = ir_addrtab_find(ctx->binding, (uintptr_t)op1);
 		if (ctx->ir_base[ref].op == IR_VAR) {
-			ir_VSTORE(ref, val);
+			if (LLVMGetVolatile(insn)) {
+				ref = ctx->control = ir_emit(ctx, IR_VSTORE_v, ctx->control, ref, val);
+			} else {
+				ir_VSTORE(ref, val);
+			}
 		} else {
 			if (ctx->ir_base[ref].type != IR_ADDR) {
 				ref = llvm2ir_auto_cast(ctx, ref, ctx->ir_base[ref].type, IR_ADDR);
 			}
-			ir_STORE(ref, val);
+			if (LLVMGetVolatile(insn)) {
+				ref = ctx->control = ir_emit(ctx, IR_STORE_v, ctx->control, ref, val);
+			} else {
+				ir_STORE(ref, val);
+			}
 		}
 	} else {
 		ref = llvm2ir_op(ctx, op1, IR_ADDR);
-		ir_STORE(ref, val);
+		if (LLVMGetVolatile(insn)) {
+			ref = ctx->control = ir_emit(ctx, IR_STORE_v, ctx->control, ref, val);
+		} else {
+			ir_STORE(ref, val);
+		}
 	}
 	ir_addrtab_set(ctx->binding, (uintptr_t)insn, ctx->control);
 }

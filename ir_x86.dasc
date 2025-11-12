@@ -1669,7 +1669,9 @@ static void ir_match_fuse_addr(ir_ctx *ctx, ir_ref addr_ref)
 
 				do {
 					ir_insn *insn = &ctx->ir_base[*p];
-					if (insn->op != IR_LOAD && (insn->op != IR_STORE || insn->op3 == addr_ref)) {
+					if (insn->op != IR_LOAD
+					 && insn->op != IR_LOAD_v
+					 && ((insn->op != IR_STORE && insn->op != IR_STORE_v) || insn->op3 == addr_ref)) {
 						return;
 					}
 					p++;
@@ -1752,7 +1754,7 @@ static bool ir_match_has_mem_deps(ir_ctx *ctx, ir_ref ref, ir_ref root)
 		do {
 			ir_insn *insn = &ctx->ir_base[pos];
 
-			if (insn->op == IR_STORE || insn->op == IR_VSTORE) {
+			if (insn->op == IR_STORE || insn->op == IR_STORE_v || insn->op == IR_VSTORE || insn->op == IR_VSTORE_v) {
 				// TODO: check if LOAD and STORE addresses may alias
 				return 1;
 			} else if (insn->op == IR_CALL) {
@@ -1766,8 +1768,9 @@ static bool ir_match_has_mem_deps(ir_ctx *ctx, ir_ref ref, ir_ref root)
 
 static void ir_match_fuse_load(ir_ctx *ctx, ir_ref ref, ir_ref root)
 {
-	if (ir_in_same_block(ctx, ref)
-	 && (ctx->ir_base[ref].op == IR_LOAD || ctx->ir_base[ref].op == IR_VLOAD)) {
+	if (ir_in_same_block(ctx, ref) &&
+	    (ctx->ir_base[ref].op == IR_LOAD || ctx->ir_base[ref].op == IR_LOAD_v ||
+	     ctx->ir_base[ref].op == IR_VLOAD || ctx->ir_base[ref].op == IR_VLOAD_v)) {
 		if (ctx->use_lists[ref].count == 2
 		 && !ir_match_has_mem_deps(ctx, ref, root)) {
 			ir_ref addr_ref = ctx->ir_base[ref].op2;
@@ -1792,7 +1795,7 @@ static bool ir_match_try_fuse_load(ir_ctx *ctx, ir_ref ref, ir_ref root)
 	ir_insn *insn = &ctx->ir_base[ref];
 
 	if (ir_in_same_block(ctx, ref)
-	 && (insn->op == IR_LOAD || ctx->ir_base[ref].op == IR_VLOAD)) {
+	 && (insn->op == IR_LOAD || insn->op == IR_LOAD_v || insn->op == IR_VLOAD || insn->op == IR_VLOAD_v)) {
 		if (ctx->use_lists[ref].count == 2
 		 && !ir_match_has_mem_deps(ctx, ref, root)) {
 			ir_ref addr_ref = ctx->ir_base[ref].op2;
@@ -2615,7 +2618,15 @@ store_int:
 				return IR_VSTORE_FP;
 			}
 			break;
+		case IR_VSTORE_v:
+			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op3].type)) {
+				return IR_VSTORE_INT;
+			} else {
+				return IR_VSTORE_FP;
+			}
+			break;
 		case IR_LOAD:
+		case IR_LOAD_v:
 			ir_match_fuse_addr(ctx, insn->op2);
 			if (IR_IS_TYPE_INT(insn->type)) {
 				return IR_LOAD_INT;
@@ -2629,6 +2640,14 @@ store_int:
 				store_rule = IR_STORE_INT;
 				load_op = IR_LOAD;
 				goto store_int;
+			} else {
+				return IR_STORE_FP;
+			}
+			break;
+		case IR_STORE_v:
+			ir_match_fuse_addr(ctx, insn->op2);
+			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op3].type)) {
+				return IR_STORE_INT;
 			} else {
 				return IR_STORE_FP;
 			}
@@ -3724,7 +3743,8 @@ static ir_mem ir_fuse_load(ir_ctx *ctx, ir_ref root, ir_ref ref)
 	ir_insn *load_insn = &ctx->ir_base[ref];
 	ir_reg reg;
 
-	IR_ASSERT(load_insn->op == IR_LOAD || load_insn->op == IR_VLOAD);
+	IR_ASSERT(load_insn->op == IR_LOAD || load_insn->op == IR_LOAD_v ||
+		load_insn->op == IR_VLOAD || load_insn->op == IR_VLOAD_v);
 	if (UNEXPECTED(ctx->rules[ref] & IR_FUSED_REG)) {
 		reg = ir_get_fused_reg(ctx, root, ref * sizeof(ir_ref) + 2);
 	} else {
@@ -10808,7 +10828,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 							IR_REGSET_EXCL(available, reg);
 							ctx->regs[i][0] = reg | IR_REG_SPILL_STORE;
 						} else if (def_flags & IR_USE_MUST_BE_IN_REG) {
-							if (insn->op == IR_VLOAD
+							if ((insn->op == IR_VLOAD || insn->op == IR_VLOAD_v)
 							 && ctx->live_intervals[ctx->vregs[i]]
 							 && ctx->live_intervals[ctx->vregs[i]]->stack_spill_pos != -1
 							 && ir_is_same_mem_var(ctx, i, ctx->ir_base[insn->op2].op3)) {
@@ -10848,7 +10868,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 							for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
 								use = *p;
 								use_insn = &ctx->ir_base[use];
-								if (use_insn->op == IR_VLOAD) {
+								if (use_insn->op == IR_VLOAD || use_insn->op == IR_VLOAD_v) {
 									if (ctx->vregs[use]
 									 && !ctx->live_intervals[ctx->vregs[use]]) {
 										ir_live_interval *ival = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
@@ -10859,7 +10879,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 										ival->vreg = ctx->vregs[use];
 										ival->stack_spill_pos = stack_spill_pos;
 									}
-								} else if (use_insn->op == IR_VSTORE) {
+								} else if (use_insn->op == IR_VSTORE || use_insn->op == IR_VSTORE_v) {
 									if (!IR_IS_CONST_REF(use_insn->op3)
 									 && ctx->vregs[use_insn->op3]
 									 && !ctx->live_intervals[ctx->vregs[use_insn->op3]]) {
@@ -11447,6 +11467,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					ir_emit_vaddr(ctx, i, insn);
 					break;
 				case IR_VLOAD:
+				case IR_VLOAD_v:
 					ir_emit_vload(ctx, i, insn);
 					break;
 				case IR_VSTORE_INT:
