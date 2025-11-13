@@ -2110,7 +2110,9 @@ static bool ir_try_promote_induction_var_ext(ir_ctx *ctx, ir_ref ext_ref, ir_ref
 				 && !IR_IS_SYM_CONST(ctx->ir_base[use_insn->op1].op)) {
 					ctx->ir_base[use].op1 = ir_ext_const(ctx, &ctx->ir_base[use_insn->op1], op, type);
 				} else {
-					ctx->ir_base[use].op1 = ir_ext_ref(ctx, use, use_insn->op1, op, type, worklist);
+					ir_ref tmp = ir_ext_ref(ctx, use, use_insn->op1, op, type, worklist);
+					use_insn = &ctx->ir_base[use];
+					use_insn->op1 = tmp;
 				}
 				ir_bitqueue_add(worklist, use);
 			}
@@ -2119,7 +2121,9 @@ static bool ir_try_promote_induction_var_ext(ir_ctx *ctx, ir_ref ext_ref, ir_ref
 				 && !IR_IS_SYM_CONST(ctx->ir_base[use_insn->op2].op)) {
 					ctx->ir_base[use].op2 = ir_ext_const(ctx, &ctx->ir_base[use_insn->op2], op, type);
 				} else {
-					ctx->ir_base[use].op2 = ir_ext_ref(ctx, use, use_insn->op2, op, type, worklist);
+					ir_ref tmp = ir_ext_ref(ctx, use, use_insn->op2, op, type, worklist);
+					use_insn = &ctx->ir_base[use];
+					use_insn->op2 = tmp;
 				}
 				ir_bitqueue_add(worklist, use);
 			}
@@ -2147,7 +2151,9 @@ static bool ir_try_promote_induction_var_ext(ir_ctx *ctx, ir_ref ext_ref, ir_ref
 					 && !IR_IS_SYM_CONST(ctx->ir_base[use_insn->op1].op)) {
 						ctx->ir_base[use].op1 = ir_ext_const(ctx, &ctx->ir_base[use_insn->op1], op, type);
 					} else {
-						ctx->ir_base[use].op1 = ir_ext_ref(ctx, use, use_insn->op1, op, type, worklist);
+						ir_ref tmp = ir_ext_ref(ctx, use, use_insn->op1, op, type, worklist);
+						use_insn = &ctx->ir_base[use];
+						use_insn->op1 = tmp;
 					}
 					ir_bitqueue_add(worklist, use);
 				}
@@ -2156,7 +2162,9 @@ static bool ir_try_promote_induction_var_ext(ir_ctx *ctx, ir_ref ext_ref, ir_ref
 					 && !IR_IS_SYM_CONST(ctx->ir_base[use_insn->op2].op)) {
 						ctx->ir_base[use].op2 = ir_ext_const(ctx, &ctx->ir_base[use_insn->op2], op, type);
 					} else {
-						ctx->ir_base[use].op2 = ir_ext_ref(ctx, use, use_insn->op2, op, type, worklist);
+						ir_ref tmp = ir_ext_ref(ctx, use, use_insn->op2, op, type, worklist);
+						use_insn = &ctx->ir_base[use];
+						use_insn->op2 = tmp;
 					}
 					ir_bitqueue_add(worklist, use);
 				}
@@ -2178,7 +2186,8 @@ static bool ir_try_promote_induction_var_ext(ir_ctx *ctx, ir_ref ext_ref, ir_ref
 	 && !IR_IS_SYM_CONST(ctx->ir_base[phi_insn->op2].op)) {
 		ctx->ir_base[phi_ref].op2 = ir_ext_const(ctx, &ctx->ir_base[phi_insn->op2], op, type);
 	} else {
-		ctx->ir_base[phi_ref].op2 = ir_ext_ref(ctx, phi_ref, phi_insn->op2, op, type, worklist);
+		ir_ref tmp = ir_ext_ref(ctx, phi_ref, phi_insn->op2, op, type, worklist);
+		ctx->ir_base[phi_ref].op2 = tmp;
 	}
 
 	return 1;
