@@ -666,7 +666,7 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 			}
 			break;
 		case IR_VA_ARG:
-			flags = IR_USE_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+			flags = IR_USE_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG | IR_DEF_CONFLICTS_WITH_INPUT_REGS;
 			constraints->tmp_regs[0] = IR_TMP_REG(3, IR_ADDR, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 			n = 1;
 			insn = &ctx->ir_base[ref];
@@ -4389,7 +4389,7 @@ static void ir_emit_va_start(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if ((ctx->flags2 & (IR_HAS_VA_ARG_FP|IR_HAS_VA_COPY)) && ctx->fp_reg_params < IR_REG_FP_ARGS) {
 		reg_save_area_offset += 16 * IR_REG_FP_ARGS;
 		/* Set va_list.vr_top */
-		if (overflow_arg_area_offset != reg_save_area_offset) {
+		if (overflow_arg_area_offset != reg_save_area_offset || ctx->gp_reg_params < IR_REG_INT_ARGS) {
 			|	add Rx(tmp_reg), Rx(fp), #reg_save_area_offset
 		}
 		|	str Rx(tmp_reg), [Rx(op2_reg), #(offset+offsetof(ir_va_list, vr_top))]

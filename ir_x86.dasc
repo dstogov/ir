@@ -1574,7 +1574,7 @@ op2_const:
 			}
 			break;
 		case IR_VA_ARG:
-			flags = IR_USE_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+			flags = IR_USE_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG | IR_DEF_CONFLICTS_WITH_INPUT_REGS;
 			constraints->tmp_regs[0] = IR_TMP_REG(3, IR_ADDR, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 			n = 1;
 			insn = &ctx->ir_base[ref];
