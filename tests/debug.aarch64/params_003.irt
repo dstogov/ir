@@ -37,9 +37,9 @@ test:
 	mov w2, w1
 	mov w1, w0
 	adr x0, .L1
-	ldr w16, [x29, #0x20]
+	ldr w16, [x29, #0x10]
 	str w16, [sp, #8]
-	ldr w16, [x29, #0x28]
+	ldr w16, [x29, #0x18]
 	str w16, [sp, #0x10]
 	bl printf
 	add sp, sp, #0x20
