@@ -1832,10 +1832,14 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 					offset -= sizeof(void*) * 2;
 					if (aarch64_may_encode_imm7_addr_offset(offset, 8)) {
 						|	ldp Rx(prev), Rx(i), [Rx(fp), #offset]
-					} else {
-						IR_ASSERT(aarch64_may_encode_addr_offset(offset, 8));
+					} else if (aarch64_may_encode_addr_offset(offset + 8, 8)) {
 						|	ldr Rx(prev), [Rx(fp), #offset]
 						|	ldr Rx(i), [Rx(fp), #(offset+8)]
+					} else {
+						ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset);
+						|	ldr Rx(prev), [Rx(fp), Rx(IR_REG_INT_TMP)]
+						|	add Rx(IR_REG_INT_TMP), Rx(IR_REG_INT_TMP), #8
+						|	ldr Rx(i), [Rx(fp), Rx(IR_REG_INT_TMP)]
 					}
 					prev = IR_REG_NONE;
 				} else {
@@ -1848,10 +1852,14 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 						offset -= sizeof(void*) * 2;
 						if (aarch64_may_encode_imm7_addr_offset(offset, 8)) {
 							|	ldp Rd(prev-IR_REG_FP_FIRST), Rd(i-IR_REG_FP_FIRST), [Rx(fp), #offset]
-						} else {
-							IR_ASSERT(aarch64_may_encode_addr_offset(offset, 8));
+						} else if (aarch64_may_encode_addr_offset(offset + 8, 8)) {
 							|	ldr Rd(prev-IR_REG_FP_FIRST), [Rx(fp), #offset]
 							|	ldr Rd(i-IR_REG_FP_FIRST), [Rx(fp), #(offset+8)]
+						} else {
+							ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset);
+							|	ldr Rx(prev-IR_REG_FP_FIRST), [Rx(fp), Rx(IR_REG_INT_TMP)]
+							|	add Rx(IR_REG_INT_TMP), Rx(IR_REG_INT_TMP), #8
+							|	ldr Rx(i-IR_REG_FP_FIRST), [Rx(fp), Rx(IR_REG_INT_TMP)]
 						}
 					}
 					prev = IR_REG_NONE;
