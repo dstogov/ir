@@ -842,11 +842,17 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							ival = ctx->live_intervals[v];
 						}
 						ir_add_use(ctx, ival, j, use_pos, reg, IR_USE_FLAGS(def_flags, j), hint_ref);
-					} else if (ctx->rules) {
-						if (ctx->rules[input] & IR_FUSED) {
-						    ir_add_fusion_ranges(ctx, ref, input, bb, live);
-						} else if (ctx->rules[input] == (IR_SKIPPED|IR_RLOAD)) {
-							ir_set_alocated_reg(ctx, ref, j, ctx->ir_base[input].op2);
+					} else {
+						if (ctx->rules) {
+							if ((ctx->rules[input] & (IR_FUSED|IR_SKIPPED)) == IR_FUSED) {
+								ir_add_fusion_ranges(ctx, ref, input, bb, live);
+							} else if (ctx->rules[input] == (IR_SKIPPED|IR_RLOAD)) {
+								ir_set_alocated_reg(ctx, ref, j, ctx->ir_base[input].op2);
+							}
+						}
+						if (reg != IR_REG_NONE) {
+							use_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
+							ir_add_fixed_live_range(ctx, reg, use_pos, use_pos + IR_USE_SUB_REF);
 						}
 					}
 				} else if (reg != IR_REG_NONE) {
@@ -1459,17 +1465,17 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							ival = ctx->live_intervals[v];
 						}
 						ir_add_use(ctx, ival, j, use_pos, reg, IR_USE_FLAGS(def_flags, j), hint_ref);
-					} else if (ctx->rules) {
-						if (ctx->rules[input] & IR_FUSED) {
-						    ir_add_fusion_ranges(ctx, ref, input, bb, live_in_block, b);
-						} else {
-							if (ctx->rules[input] == (IR_SKIPPED|IR_RLOAD)) {
+					} else {
+						if (ctx->rules) {
+							if ((ctx->rules[input] & (IR_FUSED|IR_SKIPPED)) == IR_FUSED) {
+								ir_add_fusion_ranges(ctx, ref, input, bb, live_in_block, b);
+							} else if (ctx->rules[input] == (IR_SKIPPED|IR_RLOAD)) {
 								ir_set_alocated_reg(ctx, ref, j, ctx->ir_base[input].op2);
 							}
-							if (reg != IR_REG_NONE) {
-								use_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
-								ir_add_fixed_live_range(ctx, reg, use_pos, use_pos + IR_USE_SUB_REF);
-							}
+						}
+						if (reg != IR_REG_NONE) {
+							use_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
+							ir_add_fixed_live_range(ctx, reg, use_pos, use_pos + IR_USE_SUB_REF);
 						}
 					}
 				} else if (reg != IR_REG_NONE) {
