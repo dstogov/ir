@@ -1,4 +1,3 @@
--  Volatile variants of LOAD and STORE
 ?  Passing and returning stuctures by value
 	+ in memory
 	- in several registers
