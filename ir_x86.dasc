@@ -3192,7 +3192,7 @@ static void ir_emit_load_imm_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref sr
 			|	xorpd xmm(reg-IR_REG_FP_FIRST), xmm(reg-IR_REG_FP_FIRST)
 		}
 	} else {
-		label = ir_const_label(ctx, src);
+		label = ir_get_const_label(ctx, src);
 		|	ASM_FP_REG_TXT_OP movs, type, reg, [=>label]
 	}
 }
@@ -3258,7 +3258,7 @@ static void ir_emit_load(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref src)
 			} else if (insn->op == IR_STR) {
 				ir_backend_data *data = ctx->data;
 				dasm_State **Dst = &data->dasm_state;
-				int label = ir_const_label(ctx, src);
+				int label = ir_get_const_label(ctx, src);
 
 				|	lea Ra(reg), aword [=>label]
 			} else {
@@ -3306,7 +3306,7 @@ static void ir_emit_store_mem_int_const(ir_ctx *ctx, ir_type type, ir_mem mem, i
 
 	IR_ASSERT(IR_IS_CONST_REF(src));
 	if (val_insn->op == IR_STR) {
-		int label = ir_const_label(ctx, src);
+		int label = ir_get_const_label(ctx, src);
 
 		IR_ASSERT(tmp_reg != IR_REG_NONE);
 |.if X64
@@ -3780,7 +3780,7 @@ static void ir_emit_load_ex(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref src, i
 			} else if (insn->op == IR_STR) {
 				ir_backend_data *data = ctx->data;
 				dasm_State **Dst = &data->dasm_state;
-				int label = ir_const_label(ctx, src);
+				int label = ir_get_const_label(ctx, src);
 
 				|	lea Ra(reg), aword [=>label]
 			} else {
@@ -5625,7 +5625,7 @@ static void ir_emit_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 		}
 	} else if (IR_IS_CONST_REF(op2)) {
-		int label = ir_const_label(ctx, op2);
+		int label = ir_get_const_label(ctx, op2);
 
 		switch (insn->op) {
 			default:
@@ -5732,7 +5732,7 @@ static void ir_emit_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 		}
 	} else if (IR_IS_CONST_REF(op2)) {
-		int label = ir_const_label(ctx, op2);
+		int label = ir_get_const_label(ctx, op2);
 
 		switch (insn->op) {
 			default:
@@ -6144,7 +6144,7 @@ static ir_op ir_emit_cmp_fp_common(ir_ctx *ctx, ir_ref root, ir_ref cmp_ref, ir_
 		}
 		|	ASM_FP_REG_REG_OP ucomis, type, op1_reg, op2_reg
 	} else if (IR_IS_CONST_REF(op2)) {
-		int label = ir_const_label(ctx, op2);
+		int label = ir_get_const_label(ctx, op2);
 
 		|	ASM_FP_REG_TXT_OP ucomis, type, op1_reg, [=>label]
 	} else {
@@ -6993,7 +6993,7 @@ static void ir_emit_return_fp(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 		} else if ((type == IR_FLOAT && value->val.f == 1.0) || (type == IR_DOUBLE && value->val.d == 1.0)) {
 			|	fld1
 		} else {
-			int label = ir_const_label(ctx, insn->op2);
+			int label = ir_get_const_label(ctx, insn->op2);
 
 			if (type == IR_DOUBLE) {
 				|	fld qword [=>label]
@@ -7403,7 +7403,7 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 			}
 		} else if (IR_IS_CONST_REF(insn->op1)) {
-			int label = ir_const_label(ctx, insn->op1);
+			int label = ir_get_const_label(ctx, insn->op1);
 
 			|	ASM_FP_REG_TXT_OP movs, dst_type, def_reg, [=>label]
 		} else {
@@ -7643,7 +7643,7 @@ static void ir_emit_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |.endif
 		}
 	} else if (IR_IS_CONST_REF(insn->op1)) {
-		int label = ir_const_label(ctx, insn->op1);
+		int label = ir_get_const_label(ctx, insn->op1);
 
 		if (!dst64) {
 			if (src_type == IR_DOUBLE) {
@@ -7764,7 +7764,7 @@ static void ir_emit_fp2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 		}
 	} else if (IR_IS_CONST_REF(insn->op1)) {
-		int label = ir_const_label(ctx, insn->op1);
+		int label = ir_get_const_label(ctx, insn->op1);
 
 		if (src_type == IR_DOUBLE) {
 			if (ctx->mflags & IR_X86_AVX) {

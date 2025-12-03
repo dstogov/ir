@@ -426,7 +426,7 @@ typedef struct _ir_common_backend_data {
 	ir_bitset          emit_constants;
 } ir_common_backend_data;
 
-static int ir_const_label(ir_ctx *ctx, ir_ref ref)
+static int ir_get_const_label(ir_ctx *ctx, ir_ref ref)
 {
 	ir_common_backend_data *data = ctx->data;
 	int label = ctx->cfg_blocks_count - ref;
