@@ -361,20 +361,20 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 				while (ir_sparse_set_in(&data->totally_useful, ctx->cfg_blocks[j].idom)) {
 					j = ctx->cfg_blocks[j].idom;
 				}
+				clone = ir_hashtab_find(&hash, j);
+				if (clone == IR_INVALID_VAL) {
+					clone = clones_count++;
+					ir_hashtab_add(&hash, j, clone);
+					clones[clone].block = j;
+					clones[clone].use_count = 0;
+					clones[clone].use = -1;
+				}
+				uses[uses_count].ref = use;
+				uses[uses_count].block = i;
+				uses[uses_count].next = clones[clone].use;
+				clones[clone].use_count++;
+				clones[clone].use = uses_count++;
 			}
-			clone = ir_hashtab_find(&hash, j);
-			if (clone == IR_INVALID_VAL) {
-				clone = clones_count++;
-				ir_hashtab_add(&hash, j, clone);
-				clones[clone].block = j;
-				clones[clone].use_count = 0;
-				clones[clone].use = -1;
-			}
-			uses[uses_count].ref = use;
-			uses[uses_count].block = i;
-			uses[uses_count].next = clones[clone].use;
-			clones[clone].use_count++;
-			clones[clone].use = uses_count++;
 		}
 	}
 
