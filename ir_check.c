@@ -412,6 +412,8 @@ bool ir_check(const ir_ctx *ctx)
 							ok = 0;
 						}
 						break;
+					case IR_IGOTO:
+						break;
 					default:
 						/* skip data references */
 						count = n = use_list->count;

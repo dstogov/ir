@@ -574,6 +574,8 @@ ir_insn(ir_parser_ctx *p):
 		)
 	|	"sym" "(" ID(&func, &func_len) ")"
 		{ref = ir_const_sym(p->ctx, ir_strl(p->ctx, func, func_len));}
+	|	"label" "(" ID(&func, &func_len) ")"
+		{ref = ir_const_label(p->ctx, ir_strl(p->ctx, func, func_len));}
 	|   STRING(&func, &func_len)
 		{ref = ir_make_const_str(p->ctx, func, func_len);}
 	|	func(&op)

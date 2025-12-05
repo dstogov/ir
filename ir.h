@@ -216,6 +216,7 @@ typedef enum _ir_type {
  * prb - branch probability 1-99 (0 - unspecified): (IF_TRUE, IF_FALSE, CASE_VAL, CASE_DEFAULT)
  * opt - optional number
  * pro - function prototype
+ * lbl - label used as value (a reference to constant): (BEGIN)
  *
  * The order of IR opcodes is carefully selected for efficient folding.
  * - foldable instruction go first
@@ -322,6 +323,7 @@ typedef enum _ir_type {
 	_(FUNC_ADDR,    r0,   ___, ___, ___) /* constant func ref           */ \
 	_(FUNC,         r0,   ___, ___, ___) /* constant func ref           */ \
 	_(SYM,          r0,   ___, ___, ___) /* constant symbol ref         */ \
+	_(LABEL,        r0,   ___, ___, ___) /* label address ref           */ \
 	_(STR,          r0,   ___, ___, ___) /* constant str ref            */ \
 	\
 	/* call ops                                                         */ \
@@ -364,7 +366,7 @@ typedef enum _ir_type {
 	/* control-flow nodes                                               */ \
 	_(START,        S0X1, ret, ___, ___) /* function start              */ \
 	_(ENTRY,        S1X1, src, num, ___) /* entry with a fake src edge  */ \
-	_(BEGIN,        S1,   src, ___, ___) /* block start                 */ \
+	_(BEGIN,        S1X1, src, lbl, ___) /* block start, optional &&lbl */ \
 	_(IF_TRUE,      S1X1, src, prb, ___) /* IF TRUE proj.               */ \
 	_(IF_FALSE,     S1X1, src, prb, ___) /* IF FALSE proj.              */ \
 	_(CASE_VAL,     S2X1, src, def, prb) /* switch proj.                */ \
@@ -376,8 +378,9 @@ typedef enum _ir_type {
 	_(LOOP_END,     E1,   src, ___, ___) /* loop end                    */ \
 	_(IF,           E2,   src, def, ___) /* conditional control split   */ \
 	_(SWITCH,       E2,   src, def, ___) /* multi-way control split     */ \
+	_(IGOTO,        E2,   src, def, ___) /* computed goto (internal)    */ \
+	_(IJMP,         T2X1, src, def, ret) /* computed goto (terminating) */ \
 	_(RETURN,       T2X1, src, def, ret) /* function return             */ \
-	_(IJMP,         T2X1, src, def, ret) /* computed goto               */ \
 	_(UNREACHABLE,  T1X2, src, ___, ret) /* unreachable (tailcall, etc) */ \
 	\
 	/* deoptimization helper                                            */ \
@@ -712,6 +715,7 @@ ir_ref ir_const_func_addr(ir_ctx *ctx, uintptr_t c, ir_ref proto);
 ir_ref ir_const_func(ir_ctx *ctx, ir_ref str, ir_ref proto);
 ir_ref ir_const_sym(ir_ctx *ctx, ir_ref str);
 ir_ref ir_const_str(ir_ctx *ctx, ir_ref str);
+ir_ref ir_const_label(ir_ctx *ctx, ir_ref str);
 
 ir_ref ir_unique_const_addr(ir_ctx *ctx, uintptr_t c);
 
@@ -907,6 +911,7 @@ struct _ir_loader {
 	void*(*resolve_sym_name)  (ir_loader *loader, const char *name, uint32_t flags);
 	bool (*has_sym)           (ir_loader *loader, const char *name);
 	bool (*add_sym)           (ir_loader *loader, const char *name, void *addr);
+	bool (*add_label)         (ir_loader *loader, const char *name, void *addr);
 };
 
 void ir_loader_init(void);

@@ -133,6 +133,14 @@ static const char *llvm2ir_sym_name(char *buf, const char *name, size_t name_len
 	return buf;
 }
 
+static const char *llvm2ir_label_name(char *buf, size_t buf_len, LLVMValueRef func, LLVMBasicBlockRef bb)
+{
+	size_t name_len;
+	const char *name = LLVMGetValueName2(func, &name_len);
+	snprintf(buf, buf_len, ".label.%s.%s", name, LLVMGetBasicBlockName(bb));
+	return buf;
+}
+
 static ir_ref llvm2ir_proto(ir_ctx *ctx, uint32_t cconv, LLVMTypeRef ftype)
 {
 	uint8_t flags = 0;
@@ -247,6 +255,10 @@ static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 			// TODO: ???
 			val.u64 = 0;
 			return ir_const(ctx, val, type);
+		case LLVMBlockAddressValueKind:
+			name = llvm2ir_label_name(buf, sizeof(buf), LLVMGetBlockAddressFunction(op), LLVMGetBlockAddressBasicBlock(op));
+			IR_ASSERT(name);
+			return ir_const_label(ctx, ir_str(ctx, name));
 		default:
 			fprintf(stderr, "Unsupported LLVM value kind: %d\n", kind);
 			IR_ASSERT(0);
@@ -1691,7 +1703,7 @@ static ir_ref llvm2ir_auto_cast(ir_ctx *ctx, ir_ref ref, ir_type src_type, ir_ty
 	return ref;
 }
 
-static void llvm2ir_bb_start(ir_ctx *ctx, LLVMBasicBlockRef bb, LLVMBasicBlockRef pred_bb)
+static void llvm2ir_bb_start(ir_ctx *ctx, LLVMBasicBlockRef bb, LLVMBasicBlockRef pred_bb, LLVMValueRef func)
 {
 	LLVMValueRef insn = LLVMGetLastInstruction(pred_bb);
 	LLVMOpcode opcode = LLVMGetInstructionOpcode(insn);
@@ -1736,6 +1748,13 @@ static void llvm2ir_bb_start(ir_ctx *ctx, LLVMBasicBlockRef bb, LLVMBasicBlockRe
 				}
 			}
 		}
+	} else if (opcode == LLVMIndirectBr) {
+		char buf[256];
+		ir_ref ref = ir_addrtab_find(ctx->binding, (uintptr_t)insn);
+		const char *name = llvm2ir_label_name(buf, sizeof(buf), func, bb);
+
+		IR_ASSERT(name);
+		ctx->control = ir_emit2(ctx, IR_BEGIN, ref, ir_const_label(ctx, ir_str(ctx, name)));
 	} else {
 		IR_ASSERT(0);
 	}
@@ -1895,7 +1914,7 @@ next:
 		bb = bbs[b];
 		insn = LLVMGetLastInstruction(bb);
 		opcode = LLVMGetInstructionOpcode(insn);
-		if (opcode == LLVMBr || opcode == LLVMSwitch) {
+		if (opcode == LLVMBr || opcode == LLVMSwitch || opcode == LLVMIndirectBr) {
 			n = LLVMGetNumSuccessors(insn);
 			/*
 			 * LLVM BB Successors are not aspecially ordered, but processing them in reverse order
@@ -1924,7 +1943,7 @@ next:
 		bb = bbs[b];
 		insn = LLVMGetLastInstruction(bb);
 		opcode = LLVMGetInstructionOpcode(insn);
-		if (opcode == LLVMBr || opcode == LLVMSwitch) {
+		if (opcode == LLVMBr || opcode == LLVMSwitch || opcode == LLVMIndirectBr) {
 			count = LLVMGetNumSuccessors(insn);
 			for (j = 0; j < count; j++) {
 				succ = ir_addrtab_find(&bb_hash, (uintptr_t)LLVMGetSuccessor(insn, j));
@@ -1958,7 +1977,7 @@ next:
 		bb = bbs[b];
 		insn = LLVMGetLastInstruction(bb);
 		opcode = LLVMGetInstructionOpcode(insn);
-		if (opcode == LLVMBr || opcode == LLVMSwitch) {
+		if (opcode == LLVMBr || opcode == LLVMSwitch || opcode == LLVMIndirectBr) {
 			count = LLVMGetNumSuccessors(insn);
 			for (j = 0; j < count; j++) {
 				succ = ir_addrtab_find(&bb_hash, (uintptr_t)LLVMGetSuccessor(insn, j));
@@ -1980,7 +1999,7 @@ next:
 		bb = bbs[i];
 		count = predecessors[i].count;
 		if (count == 1) {
-			llvm2ir_bb_start(ctx, bb, bbs[predecessor_edges[predecessors[i].refs]]);
+			llvm2ir_bb_start(ctx, bb, bbs[predecessor_edges[predecessors[i].refs]], func);
 			if (!ctx->control) {
 				/* eliminte unreachable CASE_DEFAULT block */
 				continue;
@@ -2082,8 +2101,8 @@ next:
 					}
 					break;
 				case LLVMIndirectBr:
-					// TODO:
-					IR_ASSERT(0 && "NIY LLVMIndirectBr");
+					ir_addrtab_set(ctx->binding, (uintptr_t)insn,
+						ir_IGOTO(llvm2ir_op(ctx, LLVMGetOperand(insn, 0), IR_ADDR)));
 					break;
 				case LLVMUnreachable:
 					ir_UNREACHABLE();
@@ -2501,6 +2520,13 @@ static int llvm2ir_data(ir_loader *loader, LLVMTargetDataRef target_data, LLVMTy
 				val.i64 = 0;
 				return loader->sym_data(loader, t, 1, &val.i64);
 			}
+		case LLVMBlockAddressValueKind:
+			name = llvm2ir_label_name(buf, sizeof(buf), LLVMGetBlockAddressFunction(op), LLVMGetBlockAddressBasicBlock(op));
+			IR_ASSERT(name);
+			/* disable inlining */
+			LLVMAddAttributeAtIndex(LLVMGetBlockAddressFunction(op), LLVMAttributeFunctionIndex,
+				LLVMCreateEnumAttribute(LLVMGetGlobalContext(), LLVMAttrNoInline, 1));
+			return loader->sym_data_ref(loader, IR_SYM, name, 0);
 		default:
 			fprintf(stderr, "Unsupported LLVM value kind: %d\n", kind);
 			IR_ASSERT(0);

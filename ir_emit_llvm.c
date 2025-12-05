@@ -252,6 +252,26 @@ static const struct {
 	IR_BUILTINS(IR_LLVM_BUILTIN_DESC)
 };
 
+typedef struct _ir_llvm_backend_data {
+	const char        *func_name;
+	bool               resolved_label_syms;
+} ir_llvm_backend_data;
+
+static void ir_resolve_label_syms(ir_ctx *ctx)
+{
+	uint32_t b;
+	ir_block *bb;
+
+	for (b = 1, bb = &ctx->cfg_blocks[b]; b <= ctx->cfg_blocks_count; bb++, b++) {
+		ir_insn *insn = &ctx->ir_base[bb->start];
+
+		if (insn->op == IR_BEGIN && insn->op2) {
+			IR_ASSERT(ctx->ir_base[insn->op2].op == IR_LABEL);
+			ctx->ir_base[insn->op2].val.u32_hi = b;
+		}
+	}
+}
+
 static void ir_emit_ref(ir_ctx *ctx, FILE *f, ir_ref ref)
 {
 	if (IR_IS_CONST_REF(ref)) {
@@ -302,6 +322,14 @@ static void ir_emit_ref(ir_ctx *ctx, FILE *f, ir_ref ref)
 					}
 				}
 			}
+		} else if (insn->op == IR_LABEL) {
+			ir_llvm_backend_data *data = ctx->data;
+
+			if (!data->resolved_label_syms) {
+				data->resolved_label_syms = 1;
+				ir_resolve_label_syms(ctx);
+			}
+			fprintf(f, "blockaddress(@%s, %%l%d)", data->func_name, insn->val.u32_hi);
 		} else {
 			ir_print_const(ctx, &ctx->ir_base[ref], f, true);
 		}
@@ -805,7 +833,7 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn, ir_bit
 	}
 }
 
-static void ir_emit_ijmp(ir_ctx *ctx, FILE *f, ir_insn *insn)
+static void ir_emit_ijmp(ir_ctx *ctx, FILE *f, uint32_t b, ir_insn *insn)
 {
 	fprintf(f, "\tindirectbr ptr ");
 	if (IR_IS_CONST_REF(insn->op2) && ctx->ir_base[insn->op2].op == IR_ADDR) {
@@ -813,7 +841,23 @@ static void ir_emit_ijmp(ir_ctx *ctx, FILE *f, ir_insn *insn)
 	} else {
 		ir_emit_ref(ctx, f, insn->op2);
 	}
-	fprintf(f, ", []\n");
+	if (insn->op == IR_IGOTO) {
+		ir_block *bb = &ctx->cfg_blocks[b];
+
+		fprintf(f, ", [");
+		if (bb->successors_count) {
+			uint32_t n = bb->successors_count;
+			uint32_t *p = ctx->cfg_edges + bb->successors;
+
+			fprintf(f, "label %%l%d", *p++);
+			while (--n > 0) {
+				fprintf(f, ", label %%l%d", *p++);
+			}
+		}
+		fprintf(f, "]\n");
+	} else {
+		fprintf(f, ", []\n");
+	}
 }
 
 static void ir_emit_alloca(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
@@ -889,6 +933,11 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	uint32_t _b, b, target;
 	ir_block *bb;
 	ir_bitset_base_t used_intrinsics[IR_LLVM_INTRINSIC_BITSET_LEN];
+	ir_llvm_backend_data data;
+
+	data.func_name = name;
+	data.resolved_label_syms = 0;
+	ctx->data = &data;
 
 	memset(used_intrinsics, 0, sizeof(used_intrinsics));
 
@@ -1165,8 +1214,9 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 						continue;
 					}
 					break;
+				case IR_IGOTO:
 				case IR_IJMP:
-					ir_emit_ijmp(ctx, f, insn);
+					ir_emit_ijmp(ctx, f, b, insn);
 					break;
 				case IR_ALLOCA:
 					ir_emit_alloca(ctx, f, i, insn);
@@ -1245,6 +1295,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				default:
 					IR_ASSERT(0 && "NIY instruction");
 					ctx->status = IR_ERROR_UNSUPPORTED_CODE_RULE;
+					ctx->data = NULL;
 					return 0;
 			}
 			n = ir_insn_len(insn);
@@ -1330,6 +1381,17 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 		}
 	}
 
+	if (data.resolved_label_syms) {
+		for (b = 1, bb = &ctx->cfg_blocks[b]; b <= ctx->cfg_blocks_count; bb++, b++) {
+			ir_insn *insn = &ctx->ir_base[bb->start];
+
+			if (insn->op == IR_BEGIN && insn->op2) {
+				IR_ASSERT(ctx->ir_base[insn->op2].op == IR_LABEL);
+				ctx->ir_base[insn->op2].val.u32_hi = 0;
+			}
+		}
+	}
+	ctx->data = NULL;
 	return 1;
 }
 

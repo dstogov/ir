@@ -1346,6 +1346,7 @@ int main(int argc, char **argv)
 	loader.loader.resolve_sym_name   = ir_loader_resolve_sym_name;
 	loader.loader.has_sym            = ir_loader_has_sym;
 	loader.loader.add_sym            = ir_loader_add_sym;
+	loader.loader.add_label          = ir_loader_add_sym;
 
 	loader.opt_level = opt_level;
 	loader.mflags = mflags;

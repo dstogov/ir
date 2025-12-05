@@ -218,6 +218,7 @@ typedef struct _ir_backend_data {
 	dasm_State        *dasm_state;
 	ir_bitset          emit_constants;
 	int                rodata_label, jmp_table_label;
+	bool               resolved_label_syms;
 } ir_backend_data;
 
 #define IR_GP_REG_NAME(code, name64, name32) \
@@ -1455,6 +1456,37 @@ static void ir_load_local_addr(ir_ctx *ctx, ir_reg reg, ir_ref src)
 	}
 }
 
+static void ir_resolve_label_syms(ir_ctx *ctx)
+{
+	uint32_t b;
+	ir_block *bb;
+
+	for (b = 1, bb = &ctx->cfg_blocks[b]; b <= ctx->cfg_blocks_count; bb++, b++) {
+		ir_insn *insn = &ctx->ir_base[bb->start];
+
+		if (insn->op == IR_BEGIN && insn->op2) {
+			IR_ASSERT(ctx->ir_base[insn->op2].op == IR_LABEL);
+			ctx->ir_base[insn->op2].val.u32_hi = b;
+		}
+	}
+}
+
+static void ir_emit_load_label_addr(ir_ctx *ctx, ir_reg reg, ir_insn *label)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+
+	if (!data->resolved_label_syms) {
+		data->resolved_label_syms = 1;
+		ir_resolve_label_syms(ctx);
+	}
+
+	IR_ASSERT(label->op == IR_LABEL);
+	int b = label->val.u32_hi;
+
+	b = ir_skip_empty_target_blocks(ctx, b);
+	|	adr Rx(reg), =>b
+}
 
 static void ir_emit_load(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref src)
 {
@@ -1472,6 +1504,8 @@ static void ir_emit_load(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref src)
 				int label = ir_get_const_label(ctx, src);
 
 				|	adr Rx(reg), =>label
+			} else if (insn->op == IR_LABEL) {
+				ir_emit_load_label_addr(ctx, reg, insn);
 			} else {
 				ir_emit_load_imm_int(ctx, type, reg, insn->val.i64);
 			}
@@ -5366,6 +5400,19 @@ static void ir_emit_ijmp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 		|	br Rx(op2_reg)
 	} else if (IR_IS_CONST_REF(insn->op2)) {
+		if (ctx->ir_base[insn->op2].op == IR_LABEL) {
+			if (!data->resolved_label_syms) {
+				data->resolved_label_syms = 1;
+				ir_resolve_label_syms(ctx);
+			}
+
+			uint32_t target = ctx->ir_base[insn->op2].val.u32_hi;
+			target = ir_skip_empty_target_blocks(ctx, target);
+
+			|	b =>target
+			return;
+		}
+
 		void *addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op2]);
 
 		if (aarch64_may_use_b(ctx->code_buffer, addr)) {
@@ -6266,6 +6313,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	data.ra_data.handled = NULL;
 	data.rodata_label = 0;
 	data.jmp_table_label = 0;
+	data.resolved_label_syms = 0;
 	ctx->data = &data;
 
 	if (!ctx->live_intervals) {
@@ -6502,6 +6550,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_TAILCALL:
 					ir_emit_tailcall(ctx, i, insn);
 					break;
+				case IR_IGOTO:
 				case IR_IJMP:
 					ir_emit_ijmp(ctx, i, insn);
 					break;
@@ -6761,6 +6810,28 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 			uint32_t offset = dasm_getpclabel(&data.dasm_state, ctx->cfg_blocks_count + ctx->consts_count + 4 + insn->op3);
 			insn->op3 = offset;
 		} while (i != 0);
+	}
+
+	if ((ctx->flags2 & IR_HAS_BLOCK_ADDR) && ctx->loader && ctx->loader->add_label) {
+		for (b = 1, bb = &ctx->cfg_blocks[b]; b <= ctx->cfg_blocks_count; bb++, b++) {
+			ir_insn *insn = &ctx->ir_base[bb->start];
+
+			if (insn->op == IR_BEGIN && insn->op2) {
+				IR_ASSERT(ctx->ir_base[insn->op2].op == IR_LABEL);
+				ctx->ir_base[insn->op2].val.u32_hi = 0;
+				ctx->loader->add_label(ctx->loader, ir_get_str(ctx, ctx->ir_base[insn->op2].val.str),
+					(char*)entry + dasm_getpclabel(&data.dasm_state, ir_skip_empty_target_blocks(ctx, b)));
+			}
+		}
+	} else if (data.resolved_label_syms) {
+		for (b = 1, bb = &ctx->cfg_blocks[b]; b <= ctx->cfg_blocks_count; bb++, b++) {
+			ir_insn *insn = &ctx->ir_base[bb->start];
+
+			if (insn->op == IR_BEGIN && insn->op2) {
+				IR_ASSERT(ctx->ir_base[insn->op2].op == IR_LABEL);
+				ctx->ir_base[insn->op2].val.u32_hi = 0;
+			}
+		}
 	}
 
 	dasm_free(&data.dasm_state);

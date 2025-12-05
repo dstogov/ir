@@ -118,7 +118,7 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted
 {
 	char buf[128];
 
-	if (insn->op == IR_FUNC || insn->op == IR_SYM) {
+	if (insn->op == IR_FUNC || insn->op == IR_SYM || insn->op == IR_LABEL) {
 		fprintf(f, "%s", ir_get_str(ctx, insn->val.name));
 		return;
 	} else if (insn->op == IR_STR) {
@@ -290,6 +290,7 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted
 #define ir_op_kind_prb     IR_OPND_PROB
 #define ir_op_kind_opt     IR_OPND_PROB
 #define ir_op_kind_pro     IR_OPND_PROTO
+#define ir_op_kind_lbl     IR_OPND_LABEL_REF
 
 #define _IR_OP_FLAGS(name, flags, op1, op2, op3) \
 	IR_OP_FLAGS(ir_op_flag_ ## flags, ir_op_kind_ ## op1, ir_op_kind_ ## op2, ir_op_kind_ ## op3),
@@ -687,6 +688,13 @@ ir_ref ir_const_str(ir_ctx *ctx, ir_ref str)
 	ir_val val;
 	val.u64 = str;
 	return ir_const_ex(ctx, val, IR_ADDR, IR_OPTX(IR_STR, IR_ADDR, 0));
+}
+
+ir_ref ir_const_label(ir_ctx *ctx, ir_ref str)
+{
+	ir_val val;
+	val.u64 = str;
+	return ir_const_ex(ctx, val, IR_ADDR, IR_OPTX(IR_LABEL, IR_ADDR, 0));
 }
 
 ir_ref ir_str(ir_ctx *ctx, const char *s)
@@ -3129,6 +3137,16 @@ void _ir_IJMP(ir_ctx *ctx, ir_ref addr)
 	ctx->control = ir_emit3(ctx, IR_IJMP, ctx->control, addr, ctx->ir_base[1].op1);
 	ctx->ir_base[1].op1 = ctx->control;
 	ctx->control = IR_UNUSED;
+}
+
+ir_ref _ir_IGOTO(ir_ctx *ctx, ir_ref addr)
+{
+	ir_ref ref;
+
+	IR_ASSERT(ctx->control);
+	ctx->control = ref = ir_emit2(ctx, IR_IGOTO, ctx->control, addr);
+	ctx->control = IR_UNUSED;
+	return ref;
 }
 
 ir_ref _ir_ADD_OFFSET(ir_ctx *ctx, ir_ref addr, uintptr_t offset)

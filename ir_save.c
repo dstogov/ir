@@ -114,6 +114,10 @@ void ir_save(const ir_ctx *ctx, uint32_t save_flags, FILE *f)
 			fprintf(f, "sym(%s%s)",
 				(save_flags & IR_SAVE_SAFE_NAMES) ? "@" : "",
 				ir_get_str(ctx, insn->val.name));
+		} else if (insn->op == IR_LABEL) {
+			fprintf(f, "label(%s%s)",
+				(save_flags & IR_SAVE_SAFE_NAMES) ? "@" : "",
+				ir_get_str(ctx, insn->val.name));
 		} else if (insn->op == IR_FUNC_ADDR) {
 			fprintf(f, "func *");
 			ir_print_const(ctx, insn, f, true);
@@ -276,6 +280,13 @@ void ir_save(const ir_ctx *ctx, uint32_t save_flags, FILE *f)
 					case IR_OPND_NUM:
 						fprintf(f, "%s%d", first ? "(" : ", ", ref);
 						first = 0;
+						break;
+					case IR_OPND_LABEL_REF:
+						if (ref) {
+							IR_ASSERT(IR_IS_CONST_REF(ref));
+							fprintf(f, "%sc_%d", first ? "(" : ", ", -ref);
+							first = 0;
+						}
 						break;
 				}
 			} else if (opnd_kind == IR_OPND_NUM) {

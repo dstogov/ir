@@ -892,6 +892,7 @@ typedef struct _ir_backend_data {
 	bool               double_abs_const;
 	bool               float_abs_const;
 	bool               double_zero_const;
+	bool               resolved_label_syms;
 } ir_backend_data;
 
 #define IR_GP_REG_NAME(code, name64, name32, name16, name8, name8h) \
@@ -1542,6 +1543,7 @@ op2_const:
 		case IR_GUARD_NOT:
 			flags = IR_OP2_SHOULD_BE_IN_REG;
 			break;
+		case IR_IGOTO:
 		case IR_IJMP:
 			flags = IR_OP2_SHOULD_BE_IN_REG;
 			break;
@@ -2460,6 +2462,7 @@ binop_fp:
 #endif
 			IR_FALLTHROUGH;
 		case IR_TAILCALL:
+		case IR_IGOTO:
 		case IR_IJMP:
 			ir_match_fuse_load(ctx, insn->op2, ref);
 			return insn->op;
@@ -3246,6 +3249,38 @@ static void ir_load_local_addr(ir_ctx *ctx, ir_reg reg, ir_ref src)
 	}
 }
 
+static void ir_resolve_label_syms(ir_ctx *ctx)
+{
+	uint32_t b;
+	ir_block *bb;
+
+	for (b = 1, bb = &ctx->cfg_blocks[b]; b <= ctx->cfg_blocks_count; bb++, b++) {
+		ir_insn *insn = &ctx->ir_base[bb->start];
+
+		if (insn->op == IR_BEGIN && insn->op2) {
+			IR_ASSERT(ctx->ir_base[insn->op2].op == IR_LABEL);
+			ctx->ir_base[insn->op2].val.u32_hi = b;
+		}
+	}
+}
+
+static void ir_emit_load_label_addr(ir_ctx *ctx, ir_reg reg, ir_insn *label)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+
+	if (!data->resolved_label_syms) {
+		data->resolved_label_syms = 1;
+		ir_resolve_label_syms(ctx);
+	}
+
+	IR_ASSERT(label->op == IR_LABEL);
+	int b = label->val.u32_hi;
+
+	b = ir_skip_empty_target_blocks(ctx, b);
+	|	lea Ra(reg), aword [=>b]
+}
+
 static void ir_emit_load(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref src)
 {
 	if (IR_IS_CONST_REF(src)) {
@@ -3261,6 +3296,8 @@ static void ir_emit_load(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref src)
 				int label = ir_get_const_label(ctx, src);
 
 				|	lea Ra(reg), aword [=>label]
+			} else if (insn->op == IR_LABEL) {
+				ir_emit_load_label_addr(ctx, reg, insn);
 			} else {
 				ir_emit_load_imm_int(ctx, type, reg, insn->val.i64);
 			}
@@ -3315,6 +3352,11 @@ static void ir_emit_store_mem_int_const(ir_ctx *ctx, ir_type type, ir_mem mem, i
 |.else
 		|	ASM_TMEM_TXT_OP mov, aword, mem, =>label
 |.endif
+	} else if (val_insn->op == IR_LABEL) {
+		IR_ASSERT(tmp_reg != IR_REG_NONE);
+		tmp_reg = IR_REG_NUM(tmp_reg);
+		ir_emit_load_label_addr(ctx, tmp_reg, val_insn);
+		ir_emit_store_mem_int(ctx, type, mem, tmp_reg);
 	} else {
 		int64_t val = val_insn->val.i64;
 
@@ -3783,6 +3825,8 @@ static void ir_emit_load_ex(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref src, i
 				int label = ir_get_const_label(ctx, src);
 
 				|	lea Ra(reg), aword [=>label]
+			} else if (insn->op == IR_LABEL) {
+				ir_emit_load_label_addr(ctx, reg, insn);
 			} else {
 				ir_emit_load_imm_int(ctx, type, reg, insn->val.i64);
 			}
@@ -9719,6 +9763,19 @@ static void ir_emit_ijmp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg op2_reg = ctx->regs[def][2];
 
 	if (IR_IS_CONST_REF(insn->op2)) {
+		if (ctx->ir_base[insn->op2].op == IR_LABEL) {
+			if (!data->resolved_label_syms) {
+				data->resolved_label_syms = 1;
+				ir_resolve_label_syms(ctx);
+			}
+
+			uint32_t target = ctx->ir_base[insn->op2].val.u32_hi;
+			target = ir_skip_empty_target_blocks(ctx, target);
+
+			|	jmp =>target
+			return;
+		}
+
 		void *addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op2]);
 
 		if (sizeof(void*) == 4 || IR_MAY_USE_32BIT_ADDR(ctx->code_buffer, addr)) {
@@ -11088,6 +11145,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	data.double_abs_const = 0;
 	data.float_abs_const = 0;
 	data.double_zero_const = 0;
+	data.resolved_label_syms = 0;
 	ctx->data = &data;
 
 	if (!ctx->live_intervals) {
@@ -11435,6 +11493,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_TAILCALL:
 					ir_emit_tailcall(ctx, i, insn);
 					break;
+				case IR_IGOTO:
 				case IR_IJMP:
 					ir_emit_ijmp(ctx, i, insn);
 					break;
@@ -11705,6 +11764,28 @@ next_block:;
 			uint32_t offset = dasm_getpclabel(&data.dasm_state, ctx->cfg_blocks_count + ctx->consts_count + 4 + insn->op3);
 			insn->op3 = offset;
 		} while (i != 0);
+	}
+
+	if ((ctx->flags2 & IR_HAS_BLOCK_ADDR) && ctx->loader && ctx->loader->add_label) {
+		for (b = 1, bb = &ctx->cfg_blocks[b]; b <= ctx->cfg_blocks_count; bb++, b++) {
+			ir_insn *insn = &ctx->ir_base[bb->start];
+
+			if (insn->op == IR_BEGIN && insn->op2) {
+				IR_ASSERT(ctx->ir_base[insn->op2].op == IR_LABEL);
+				ctx->ir_base[insn->op2].val.u32_hi = 0;
+				ctx->loader->add_label(ctx->loader, ir_get_str(ctx, ctx->ir_base[insn->op2].val.str),
+					(char*)entry + dasm_getpclabel(&data.dasm_state, ir_skip_empty_target_blocks(ctx, b)));
+			}
+		}
+	} else if (data.resolved_label_syms) {
+		for (b = 1, bb = &ctx->cfg_blocks[b]; b <= ctx->cfg_blocks_count; bb++, b++) {
+			ir_insn *insn = &ctx->ir_base[bb->start];
+
+			if (insn->op == IR_BEGIN && insn->op2) {
+				IR_ASSERT(ctx->ir_base[insn->op2].op == IR_LABEL);
+				ctx->ir_base[insn->op2].val.u32_hi = 0;
+			}
+		}
 	}
 
 	dasm_free(&data.dasm_state);

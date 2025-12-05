@@ -611,6 +611,7 @@ extern "C" {
 #define ir_CASE_RANGE(_switch, _v1, _v2)  _ir_CASE_RANGE(_ir_CTX, (_switch), (_v1), (_v2))
 #define ir_CASE_DEFAULT(_switch)          _ir_CASE_DEFAULT(_ir_CTX, (_switch))
 #define ir_RETURN(_val)                   _ir_RETURN(_ir_CTX, (_val))
+#define ir_IGOTO(_addr)                   _ir_IGOTO(_ir_CTX, (_addr))
 #define ir_IJMP(_addr)                    _ir_IJMP(_ir_CTX, (_addr))
 #define ir_UNREACHABLE()                  _ir_UNREACHABLE(_ir_CTX)
 
@@ -696,6 +697,7 @@ void   _ir_CASE_VAL(ir_ctx *ctx, ir_ref switch_ref, ir_ref val);
 void   _ir_CASE_RANGE(ir_ctx *ctx, ir_ref switch_ref, ir_ref v1, ir_ref v2);
 void   _ir_CASE_DEFAULT(ir_ctx *ctx, ir_ref switch_ref);
 void   _ir_RETURN(ir_ctx *ctx, ir_ref val);
+ir_ref _ir_IGOTO(ir_ctx *ctx, ir_ref addr);
 void   _ir_IJMP(ir_ctx *ctx, ir_ref addr);
 void   _ir_GUARD(ir_ctx *ctx, ir_ref condition, ir_ref addr);
 void   _ir_GUARD_NOT(ir_ctx *ctx, ir_ref condition, ir_ref addr);

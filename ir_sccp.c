@@ -3569,6 +3569,7 @@ folding:
 				/* pass */
 			} else if (insn->op == IR_BEGIN) {
 				if (insn->op1
+				 && !insn->op2 /* no computed goto label */
 				 && ctx->use_lists[i].count == 1
 				 && ctx->ir_base[insn->op1].op == IR_END) {
 					ir_merge_blocks(ctx, insn->op1, i, worklist);

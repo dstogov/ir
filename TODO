@@ -2,7 +2,6 @@
 	+ in memory
 	- in several registers
 	- full ABI conformance
--  Support for computed goto (like LLVM blockaddress)
 -  MEMCPY, MEMSET
 -  Consider IR cleanup (VAR -> ALLOCA, VLOAD -> LOAD, VSTORE -> STORE, LOOP_END -> END, LOOP_BEGIN -> MERGE, PI)
 -  long constants

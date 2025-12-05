@@ -1013,6 +1013,9 @@ int ir_match(ir_ctx *ctx)
 			entries_count++;
 		}
 		ctx->rules[start] = IR_SKIPPED | IR_NOP;
+		if (ctx->ir_base[start].op == IR_BEGIN && ctx->ir_base[start].op2) {
+			ctx->flags2 |= IR_HAS_BLOCK_ADDR;
+		}
 		ref = bb->end;
 		if (bb->successors_count == 1) {
 			insn = &ctx->ir_base[ref];

@@ -15,6 +15,11 @@ static const char *ir_type_tname[IR_LAST_TYPE] = {
 	IR_TYPES(IR_TYPE_TNAME)
 };
 
+typedef struct _ir_c_backend_data {
+	const char        *func_name;
+	bool               resolved_label_syms;
+} ir_c_backend_data;
+
 static int ir_add_tmp_type(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 {
 	if (from == 0) {
@@ -23,6 +28,39 @@ static int ir_add_tmp_type(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 		ir_bitset_incl(tmp_types, type);
 	}
 	return 1;
+}
+
+static void ir_resolve_label_syms(ir_ctx *ctx)
+{
+	uint32_t b;
+	ir_block *bb;
+
+	for (b = 1, bb = &ctx->cfg_blocks[b]; b <= ctx->cfg_blocks_count; bb++, b++) {
+		ir_insn *insn = &ctx->ir_base[bb->start];
+
+		if (insn->op == IR_BEGIN && insn->op2) {
+			IR_ASSERT(ctx->ir_base[insn->op2].op == IR_LABEL);
+			ctx->ir_base[insn->op2].val.u32_hi = b;
+		}
+	}
+}
+
+static void ir_emit_c_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
+{
+	if (insn->op == IR_LABEL) {
+		ir_c_backend_data *data = ctx->data;
+
+		if (!data->resolved_label_syms) {
+			data->resolved_label_syms = 1;
+			ir_resolve_label_syms(ctx);
+		}
+		fprintf(f, "&&bb%d", insn->val.u32_hi);
+	} else {
+		if (insn->op == IR_SYM) {
+			fprintf(f, "&");
+		}
+		ir_print_const(ctx, insn, f, true);
+	}
 }
 
 static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
@@ -35,7 +73,7 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 		fprintf(f, "\ttmp_%s = ", ir_type_tname[type]);
 	}
 	if (IR_IS_CONST_REF(from)) {
-		ir_print_const(ctx, &ctx->ir_base[from], f, true);
+		ir_emit_c_const(ctx, &ctx->ir_base[from], f);
 		fprintf(f, ";\n");
 	} else if (from) {
 		fprintf(f, "d_%d;\n", ctx->vregs[from]);
@@ -48,7 +86,7 @@ static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
 static void ir_emit_ref(ir_ctx *ctx, FILE *f, ir_ref ref)
 {
 	if (IR_IS_CONST_REF(ref)) {
-		ir_print_const(ctx, &ctx->ir_base[ref], f, true);
+		ir_emit_c_const(ctx, &ctx->ir_base[ref], f);
 	} else {
 		ir_insn *insn = &ctx->ir_base[ref];
 		if (insn->op == IR_VLOAD || insn->op == IR_VLOAD_v) {
@@ -710,12 +748,7 @@ static void ir_emit_load(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 	ir_emit_def_ref(ctx, f, def);
 	fprintf(f, "*((%s*)", ir_type_cname[insn->type]);
 	if (IR_IS_CONST_REF(insn->op2)) {
-		ir_insn *const_insn = &ctx->ir_base[insn->op2];
-
-		if (const_insn->op == IR_SYM) {
-			fprintf(f, "&");
-		}
-		ir_print_const(ctx, const_insn, f, true);
+		ir_emit_c_const(ctx, &ctx->ir_base[insn->op2], f);
 	} else {
 		fprintf(f, "d_%d", ctx->vregs[insn->op2]);
 	}
@@ -728,10 +761,7 @@ static void ir_emit_store(ir_ctx *ctx, FILE *f, ir_insn *insn)
 
 	fprintf(f, "\t*((%s*)", ir_type_cname[type]);
 	if (IR_IS_CONST_REF(insn->op2)) {
-		if (insn->op == IR_SYM) {
-			fprintf(f, "&");
-		}
-		ir_print_const(ctx, &ctx->ir_base[insn->op2], f, true);
+		ir_emit_c_const(ctx, &ctx->ir_base[insn->op2], f);
 	} else {
 		fprintf(f, "d_%d", ctx->vregs[insn->op2]);
 	}
@@ -749,6 +779,11 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	ir_bitset vars, tmp_types;
 	uint32_t _b, b, target, prev = 0;
 	ir_block *bb;
+	ir_c_backend_data data;
+
+	data.func_name = name;
+	data.resolved_label_syms = 0;
+	ctx->data = &data;
 
 	/* Emit function prototype */
 	if (ctx->flags & IR_STATIC) {
@@ -829,6 +864,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					}
 				} else if (insn->op == IR_PARAM) {
 					IR_ASSERT(0 && "unexpected PARAM");
+					ctx->data = NULL;
 					return 0;
 				}
 			}
@@ -859,7 +895,8 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 		 || (bb->predecessors_count == 1 && ctx->cfg_edges[bb->predecessors] != prev)
 		 || ctx->ir_base[bb->start].op == IR_CASE_VAL
 		 || ctx->ir_base[bb->start].op == IR_CASE_RANGE
-		 || ctx->ir_base[bb->start].op == IR_CASE_DEFAULT) {
+		 || ctx->ir_base[bb->start].op == IR_CASE_DEFAULT
+		 || (ctx->ir_base[bb->start].op == IR_BEGIN && ctx->ir_base[bb->start].op2)) {
 			fprintf(f, "bb%d:\n", b);
 		}
 		prev = b;
@@ -1052,6 +1089,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_TAILCALL:
 					ir_emit_tailcall(ctx, f, insn);
 					break;
+				case IR_IGOTO:
 				case IR_IJMP:
 					ir_emit_ijmp(ctx, f, insn);
 					break;
@@ -1112,6 +1150,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				default:
 					IR_ASSERT(0 && "NIY instruction");
 					ctx->status = IR_ERROR_UNSUPPORTED_CODE_RULE;
+					ctx->data = NULL;
 					return 0;
 			}
 			n = ir_insn_len(insn);
@@ -1122,6 +1161,17 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 
 	fprintf(f, "}\n");
 
+	if (data.resolved_label_syms) {
+		for (b = 1, bb = &ctx->cfg_blocks[b]; b <= ctx->cfg_blocks_count; bb++, b++) {
+			ir_insn *insn = &ctx->ir_base[bb->start];
+
+			if (insn->op == IR_BEGIN && insn->op2) {
+				IR_ASSERT(ctx->ir_base[insn->op2].op == IR_LABEL);
+				ctx->ir_base[insn->op2].val.u32_hi = 0;
+			}
+		}
+	}
+	ctx->data = NULL;
 	return 1;
 }
 
