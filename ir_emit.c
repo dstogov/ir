@@ -1020,7 +1020,9 @@ int ir_match(ir_ctx *ctx)
 		if (bb->successors_count == 1) {
 			insn = &ctx->ir_base[ref];
 			if (insn->op == IR_END || insn->op == IR_LOOP_END) {
-				ctx->rules[ref] = insn->op;
+				if (!ctx->rules[ref]) {
+					ctx->rules[ref] = insn->op;
+				}
 				ref = prev_ref[ref];
 				if (ref == start && ctx->cfg_edges[bb->successors] != b) {
 					if (EXPECTED(!(bb->flags & IR_BB_ENTRY))) {
