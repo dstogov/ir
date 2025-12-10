@@ -1129,7 +1129,7 @@ static bool ir_may_fuse_addr(ir_ctx *ctx, const ir_insn *addr_insn)
 static bool ir_may_fuse_imm(ir_ctx *ctx, const ir_insn *val_insn)
 {
 	if (val_insn->type == IR_ADDR) {
-		if (sizeof(void*) == 4) {
+		if (sizeof(void*) == 4 && val_insn->op != IR_LABEL) {
 			return 1;
 		} else if (IR_IS_SYM_CONST(val_insn->op)) {
 			void *addr = ir_sym_addr(ctx, val_insn);
