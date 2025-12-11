@@ -1112,35 +1112,24 @@ const char *ir_rule_name[IR_LAST_OP] = {
 
 static bool ir_may_fuse_addr(ir_ctx *ctx, const ir_insn *addr_insn)
 {
-	if (sizeof(void*) == 4) {
-		return 1;
+	if (addr_insn->op == IR_LABEL) {
+		return 0;
 	} else if (IR_IS_SYM_CONST(addr_insn->op)) {
 		void *addr = ir_sym_addr(ctx, addr_insn);
 
 		if (!addr) {
 			return 0;
 		}
-		return IR_IS_SIGNED_32BIT((int64_t)(intptr_t)addr);
+		return (sizeof(void*) == 4) || IR_IS_SIGNED_32BIT((int64_t)(intptr_t)addr);
 	} else {
-		return IR_IS_SIGNED_32BIT(addr_insn->val.i64);
+		return (sizeof(void*) == 4) || IR_IS_SIGNED_32BIT(addr_insn->val.i64);
 	}
 }
 
 static bool ir_may_fuse_imm(ir_ctx *ctx, const ir_insn *val_insn)
 {
 	if (val_insn->type == IR_ADDR) {
-		if (sizeof(void*) == 4 && val_insn->op != IR_LABEL) {
-			return 1;
-		} else if (IR_IS_SYM_CONST(val_insn->op)) {
-			void *addr = ir_sym_addr(ctx, val_insn);
-
-			if (!addr) {
-				return 0;
-			}
-			return IR_IS_SIGNED_32BIT((intptr_t)addr);
-		} else {
-			return IR_IS_SIGNED_32BIT(val_insn->val.i64);
-		}
+		return ir_may_fuse_addr(ctx, val_insn);
 	} else {
 		return (ir_type_size[val_insn->type] <= 4 || IR_IS_SIGNED_32BIT(val_insn->val.i64));
 	}
