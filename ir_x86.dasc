@@ -7324,7 +7324,20 @@ static void ir_emit_trunc(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			ir_emit_load(ctx, src_type, op1_reg, insn->op1);
 		}
 		if (op1_reg != def_reg) {
+#ifdef IR_TARGET_X86
+			if (ir_type_size[dst_type] == 1
+			 && (op1_reg == IR_REG_RBP || op1_reg == IR_REG_RSI || op1_reg == IR_REG_RDI)) {
+				ir_backend_data *data = ctx->data;
+				dasm_State **Dst = &data->dasm_state;
+
+				ir_emit_mov(ctx, src_type, def_reg, op1_reg);
+				|	and	Rb(def_reg), 0xff
+			} else {
+				ir_emit_mov(ctx, dst_type, def_reg, op1_reg);
+			}
+#else
 			ir_emit_mov(ctx, dst_type, def_reg, op1_reg);
+#endif
 		}
 	} else {
 		ir_emit_load_ex(ctx, dst_type, def_reg, insn->op1, def);
