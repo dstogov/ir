@@ -45,8 +45,8 @@ test:
 	movl 0xc(%ebp), %esi
 	movl 8(%ebp), %ebx
 	leal (, %ebx, 4), %edi
+	movl $0, -0x18(%ebp)
 	movl $0, -0x14(%ebp)
-	movl $0, -0x10(%ebp)
 	jmp .L2
 	nop
 	nop
@@ -69,15 +69,15 @@ test:
 	movl %eax, (%esp)
 	calll *%esi
 	addl $0x10, %esp
-	movl -0x10(%ebp), %ecx
-	addl %eax, %ecx
-	movl %ecx, -0x10(%ebp)
-	movl %ebx, %esp
-	movl -0x14(%ebp), %eax
-	leal 1(%eax), %eax
-	movl %eax, -0x14(%ebp)
-.L2:
 	movl -0x14(%ebp), %ecx
+	addl %eax, %ecx
+	movl %ecx, -0x14(%ebp)
+	movl %ebx, %esp
+	movl -0x18(%ebp), %eax
+	leal 1(%eax), %eax
+	movl %eax, -0x18(%ebp)
+.L2:
+	movl -0x18(%ebp), %ecx
 	cmpl 8(%ebp), %ecx
 	jl .L1
 	leal -0xc(%ebp), %esp
