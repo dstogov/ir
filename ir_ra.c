@@ -1605,7 +1605,7 @@ static void ir_vregs_join(ir_ctx *ctx, uint32_t r1, uint32_t r2)
 		}
 		while (*prev && ((*prev)->pos < use_pos->pos ||
 			((*prev)->pos == use_pos->pos &&
-				(use_pos->op_num == 0 || (*prev)->op_num < use_pos->op_num)))) {
+				(use_pos->op_num == 0 || ((*prev)->op_num != 0 && (*prev)->op_num < use_pos->op_num))))) {
 			if ((*prev)->hint_ref > 0 && ctx->vregs[(*prev)->hint_ref] == r2) {
 				(*prev)->hint_ref = 0;
 			}
