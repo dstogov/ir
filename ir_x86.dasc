@@ -892,6 +892,8 @@ typedef struct _ir_backend_data {
 	bool               double_abs_const;
 	bool               float_abs_const;
 	bool               double_zero_const;
+	bool               u2d_const;
+	bool               u2f_const;
 	bool               resolved_label_syms;
 } ir_backend_data;
 
@@ -1507,6 +1509,11 @@ op2_const:
 			if (IR_IS_CONST_REF(insn->op1)) {
 				constraints->tmp_regs[0] = IR_TMP_REG(1, ctx->ir_base[insn->op1].type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 				n = 1;
+			}
+			if (IR_IS_TYPE_UNSIGNED(ctx->ir_base[insn->op1].type)
+			 && ir_type_size[ctx->ir_base[insn->op1].type] >= sizeof(void*)) {
+				constraints->tmp_regs[n] = IR_TMP_REG(2, ctx->ir_base[insn->op1].type, IR_USE_SUB_REF, IR_DEF_SUB_REF);
+				n++;
 			}
 			break;
 		case IR_ABS_INT:
@@ -7494,13 +7501,80 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	IR_ASSERT(IR_IS_TYPE_INT(src_type));
 	IR_ASSERT(IR_IS_TYPE_FP(dst_type));
 	IR_ASSERT(def_reg != IR_REG_NONE);
+
+	if (op1_reg != IR_REG_NONE && IR_REG_SPILLED(op1_reg)) {
+		op1_reg = IR_REG_NUM(op1_reg);
+		ir_emit_load(ctx, src_type, op1_reg, insn->op1);
+	}
+
+	if (IR_IS_TYPE_UNSIGNED(src_type) && ir_type_size[src_type] >= sizeof(void*)) {
+		ir_reg tmp_reg = ctx->regs[def][2];
+
+		IR_ASSERT(tmp_reg != IR_REG_NONE);
+		if (op1_reg == IR_REG_NONE) {
+			if (IR_IS_CONST_REF(insn->op1)) {
+				IR_ASSERT(0);
+			} else {
+				ir_mem mem;
+
+				if (ir_rule(ctx, insn->op1) & IR_FUSED) {
+					mem = ir_fuse_load(ctx, def, insn->op1);
+				} else {
+					mem = ir_ref_spill_slot(ctx, insn->op1);
+				}
+				ir_emit_load_mem_int(ctx, src_type, tmp_reg, mem);
+				op1_reg = tmp_reg;
+			}
+		}
+		if (sizeof(void*) == 4) {
+			if (tmp_reg == op1_reg) {
+				| add Rd(op1_reg), 0x80000000
+			} else {
+				| lea Rd(tmp_reg), dword [Rd(op1_reg)+0x80000000]
+				op1_reg = tmp_reg;
+			}
+		} else {
+|.if X64
+			|	test Rq(op1_reg), Rq(op1_reg)
+			|	js >1
+			|.cold_code
+			|1:
+			if (tmp_reg != op1_reg) {
+				| mov Rq(tmp_reg), Rq(op1_reg)
+			}
+			|	shr	Rq(tmp_reg), 1
+			|	adc Rq(tmp_reg), 0
+			if (dst_type == IR_DOUBLE) {
+				if (ctx->mflags & IR_X86_AVX) {
+					|	vxorps xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
+					|	vcvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), Rq(tmp_reg)
+					|	vaddsd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
+				} else {
+					|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
+					|	cvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), Rq(tmp_reg)
+					|	addsd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
+				}
+			} else {
+				IR_ASSERT(dst_type == IR_FLOAT);
+				if (ctx->mflags & IR_X86_AVX) {
+					|	vxorps xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
+					|	vcvtsi2ss xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), Rq(tmp_reg)
+					|	vaddss xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
+				} else {
+					|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
+					|	cvtsi2ss xmm(def_reg-IR_REG_FP_FIRST), Rq(tmp_reg)
+					|	addss xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
+				}
+			}
+			|	jmp >2
+			|.code
+|.endif
+		}
+	}
+
 	if (op1_reg != IR_REG_NONE) {
 		bool src64 = 0;
 
-		if (IR_REG_SPILLED(op1_reg)) {
-			op1_reg = IR_REG_NUM(op1_reg);
-			ir_emit_load(ctx, src_type, op1_reg, insn->op1);
-		}
 		if (IR_IS_TYPE_SIGNED(src_type)) {
 			if (ir_type_size[src_type] < 4) {
 |.if X64
@@ -7539,7 +7613,6 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 ||				}
 |.endif
 			} else {
-				// TODO: uint64_t -> double
 				src64 = 1;
 			}
 		}
@@ -7584,6 +7657,40 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 			}
 |.endif
+		}
+		|2:
+		if (sizeof(void*) == 4 && IR_IS_TYPE_UNSIGNED(src_type) && ir_type_size[src_type] >= sizeof(void*)) {
+			if (dst_type == IR_DOUBLE) {
+				uint32_t c = (sizeof(void*) == 4) ? 0x41e00000 : 0x43e00000;
+				if (!data->u2d_const) {
+					data->u2d_const = 1;
+					ir_rodata(ctx);
+					|.align 8
+					|->u2d_const:
+					|.dword 0, c
+					|.code
+				}
+				if (ctx->mflags & IR_X86_AVX) {
+					|	vaddsd	xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), qword [->u2d_const]
+				} else {
+					|	addsd	xmm(def_reg-IR_REG_FP_FIRST), qword [->u2d_const]
+				}
+			} else {
+				uint32_t c = (sizeof(void*) == 4) ? 0x4f000000 : 0x5f000000;
+				if (!data->u2f_const) {
+					data->u2f_const = 1;
+					ir_rodata(ctx);
+					|.align 4
+					|->u2f_const:
+					|.dword c
+					|.code
+				}
+				if (ctx->mflags & IR_X86_AVX) {
+					|	vaddss	xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), dword [->u2f_const]
+				} else {
+					|	addss	xmm(def_reg-IR_REG_FP_FIRST), dword [->u2f_const]
+				}
+			}
 		}
 	} else if (IR_IS_CONST_REF(insn->op1)) {
 		IR_ASSERT(0);
@@ -11163,6 +11270,8 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	data.double_abs_const = 0;
 	data.float_abs_const = 0;
 	data.double_zero_const = 0;
+	data.u2d_const = 0;
+	data.u2f_const = 0;
 	data.resolved_label_syms = 0;
 	ctx->data = &data;
 
