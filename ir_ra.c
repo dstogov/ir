@@ -2340,16 +2340,6 @@ static ir_live_pos ir_first_use_pos_after(ir_live_interval *ival, ir_live_pos po
 	return p ? p->pos : 0x7fffffff;
 }
 
-static ir_live_pos ir_first_use_pos(ir_live_interval *ival, uint8_t flags)
-{
-	ir_use_pos *p = ival->use_pos;
-
-	while (p && !(p->flags & flags)) {
-		p = p->next;
-	}
-	return p ? p->pos : 0x7fffffff;
-}
-
 static ir_block *ir_block_from_live_pos(ir_ctx *ctx, ir_live_pos pos)
 {
 	ir_ref ref = IR_LIVE_POS_TO_REF(pos);
@@ -3191,7 +3181,6 @@ select_register:
 		/* split current before its first use position that requires a register */
 		ir_live_pos split_pos;
 
-spill_current:
 		if (next_use_pos == ival->range.start) {
 			IR_ASSERT(ival->use_pos && ival->use_pos->op_num == 0);
 			/* split right after definition */
@@ -3225,7 +3214,6 @@ spill_current:
 			return IR_REG_NONE;
 		}
 		if (split_pos >= blockPos[reg]) {
-try_next_available_register:
 			IR_REGSET_EXCL(available, reg);
 			if (IR_REGSET_IS_EMPTY(available)) {
 				fprintf(stderr, "LSRA Internal Error: Unsolvable conflict. Allocation is not possible\n");
@@ -3271,23 +3259,6 @@ try_next_available_register:
 					}
 					IR_LOG_LSRA("      ---- Finish", other, "");
 				} else {
-					if (ir_first_use_pos(other, IR_USE_MUST_BE_IN_REG) <= other->end) {
-						if (!(ival->flags & IR_LIVE_INTERVAL_TEMP)) {
-							next_use_pos = ir_first_use_pos(ival, IR_USE_MUST_BE_IN_REG);
-							if (next_use_pos == ival->range.start) {
-								IR_ASSERT(ival->use_pos && ival->use_pos->op_num == 0);
-								/* split right after definition */
-								split_pos = next_use_pos + 1;
-							} else {
-								split_pos = ir_find_optimal_split_position(ctx, ival, ival->range.start, next_use_pos - 1, 1);
-							}
-
-							if (split_pos > ival->range.start) {
-								goto spill_current;
-							}
-						}
-						goto try_next_available_register;
-					}
 					child = other;
 					other->reg = IR_REG_NONE;
 					if (prev) {
