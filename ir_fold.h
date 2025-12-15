@@ -1419,6 +1419,9 @@ IR_FOLD(TRUNC(C_U64))
 			IR_FOLD_CONST_U(op1_insn->val.u16);
 		case IR_U32:
 			IR_FOLD_CONST_U(op1_insn->val.u32);
+		case IR_ADDR:
+			IR_ASSERT(sizeof(void*) == 4);
+			IR_FOLD_CONST_U(op1_insn->val.u32);
 	}
 }
 
