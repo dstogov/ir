@@ -9104,7 +9104,9 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 				val = &ctx->ir_base[use_insn->op2];
 				IR_ASSERT(!IR_IS_SYM_CONST(val->op));
 				label = ir_skip_empty_target_blocks(ctx, use_block);
-				if (IR_IS_32BIT(type, val->val)) {
+				if (val->val.u64 == 0) {
+					|	ASM_REG_REG_OP test, type, op2_reg, op2_reg
+				} else if (IR_IS_32BIT(type, val->val)) {
 					|	ASM_REG_IMM_OP cmp, type, op2_reg, val->val.i32
 				} else {
 					IR_ASSERT(sizeof(void*) == 8);
@@ -9641,7 +9643,11 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_reg 
 	/* set hidden argument to specify the number of vector registers used */
 	if (ir_is_vararg(ctx, insn)) {
 		fp_param = IR_MIN(fp_param, fp_reg_params_count);
-		|	mov Rd(IR_REG_VARARG_FP_REGS), fp_param
+		if (fp_param) {
+			|	mov Rd(IR_REG_VARARG_FP_REGS), fp_param
+		} else {
+			|	xor Rd(IR_REG_VARARG_FP_REGS), Rd(IR_REG_VARARG_FP_REGS)
+		}
 	}
 #endif
 

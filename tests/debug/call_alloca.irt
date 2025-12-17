@@ -50,7 +50,7 @@ main:
 	movb $0, 6(%rsp)
 	movq %rsp, %rdi
 	movl $0x2a, %esi
-	movl $0, %eax
+	xorl %eax, %eax
 	callq printf
 	addq $8, %rsp
 	retq

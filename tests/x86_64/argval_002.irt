@@ -42,7 +42,7 @@ main:
 	movq $0x18, %rcx
 	rep movsb (%rsi), (%rdi)
 	leaq str.1(%rip), %rdi
-	movl $0, %eax
+	xorl %eax, %eax
 	callq test
 	addq $0x38, %rsp
 	retq
