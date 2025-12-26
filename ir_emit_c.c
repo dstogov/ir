@@ -20,10 +20,10 @@ typedef struct _ir_c_backend_data {
 	bool               resolved_label_syms;
 } ir_c_backend_data;
 
-static int ir_add_tmp_type(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
+static int ir_add_tmp_type(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to, void *data)
 {
 	if (from == 0) {
-		ir_bitset tmp_types = ctx->data;
+		ir_bitset tmp_types = data;
 
 		ir_bitset_incl(tmp_types, type);
 	}
@@ -63,9 +63,9 @@ static void ir_emit_c_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 	}
 }
 
-static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
+static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to, void *data)
 {
-	FILE *f = ctx->data;
+	FILE *f = data;
 
 	if (to) {
 		fprintf(f, "\td_%d = ", ctx->vregs[to]);
@@ -834,8 +834,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 			bb->flags |= IR_BB_EMPTY;
 		}
 		if (bb->flags & IR_BB_DESSA_MOVES) {
-			ctx->data = tmp_types;
-			ir_gen_dessa_moves(ctx, b, ir_add_tmp_type);
+			ir_gen_dessa_moves(ctx, b, ir_add_tmp_type, tmp_types);
 		}
 		for (i = bb->start, insn = ctx->ir_base + i; i <= bb->end;) {
 			if (ctx->vregs[i]) {
@@ -1069,8 +1068,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_LOOP_END:
 					IR_ASSERT(bb->successors_count == 1);
 					if (bb->flags & IR_BB_DESSA_MOVES) {
-						ctx->data = f;
-						ir_gen_dessa_moves(ctx, b, ir_emit_dessa_move);
+						ir_gen_dessa_moves(ctx, b, ir_emit_dessa_move, f);
 					}
 					target = ir_skip_empty_target_blocks(ctx, ctx->cfg_edges[bb->successors]);
 					if (target != ir_next_block(ctx, _b)) {
