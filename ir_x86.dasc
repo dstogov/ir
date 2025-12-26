@@ -1106,8 +1106,8 @@ const ir_call_conv_dsc ir_call_conv_x86_fastcall = {
 	IR_REG_RAX,  /* int_ret_reg             */
 	IR_REG_NONE, /* fp_ret_reg              */
 	IR_REG_NONE, /* fp_varargs_reg          */
-	(const int8_t[4]){IR_REG_RCX, IR_REG_RDX},
 	IR_REG_SCRATCH_X86,
+	(const int8_t[4]){IR_REG_RCX, IR_REG_RDX},
 	NULL,
 	IR_REGSET(IR_REG_RBX) | IR_REGSET(IR_REG_RBP) | IR_REGSET(IR_REG_RSI) | IR_REGSET(IR_REG_RDI),
 };

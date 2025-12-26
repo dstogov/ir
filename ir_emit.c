@@ -82,7 +82,7 @@ static const ir_proto_t *ir_call_proto(const ir_ctx *ctx, const ir_insn *insn)
 #ifdef IR_TARGET_X86
 bool ir_is_fastcall(const ir_ctx *ctx, const ir_insn *insn)
 {
-	ir_proto_t *proto = ir_call_proto(ctx, insn);
+	const ir_proto_t *proto = ir_call_proto(ctx, insn);
 	return proto && (proto->call_conv == IR_CC_X86_FASTCALL || (proto->flags & IR_FASTCALL_FUNC));
 }
 #else
