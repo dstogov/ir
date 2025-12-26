@@ -735,6 +735,7 @@ ir_ref ir_proto_0(ir_ctx *ctx, uint8_t flags, ir_type ret_type)
 	ir_proto_t proto;
 
 	proto.flags = flags;
+	proto.call_conv = IR_CC_DEFAULT;
 	proto.ret_type = ret_type;
 	proto.params_count = 0;
 	return ir_strl(ctx, (const char *)&proto, offsetof(ir_proto_t, param_types) + 0);
@@ -745,6 +746,7 @@ ir_ref ir_proto_1(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1)
 	ir_proto_t proto;
 
 	proto.flags = flags;
+	proto.call_conv = IR_CC_DEFAULT;
 	proto.ret_type = ret_type;
 	proto.params_count = 1;
 	proto.param_types[0] = t1;
@@ -756,6 +758,7 @@ ir_ref ir_proto_2(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_t
 	ir_proto_t proto;
 
 	proto.flags = flags;
+	proto.call_conv = IR_CC_DEFAULT;
 	proto.ret_type = ret_type;
 	proto.params_count = 2;
 	proto.param_types[0] = t1;
@@ -768,6 +771,7 @@ ir_ref ir_proto_3(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_t
 	ir_proto_t proto;
 
 	proto.flags = flags;
+	proto.call_conv = IR_CC_DEFAULT;
 	proto.ret_type = ret_type;
 	proto.params_count = 3;
 	proto.param_types[0] = t1;
@@ -782,6 +786,7 @@ ir_ref ir_proto_4(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_t
 	ir_proto_t proto;
 
 	proto.flags = flags;
+	proto.call_conv = IR_CC_DEFAULT;
 	proto.ret_type = ret_type;
 	proto.params_count = 4;
 	proto.param_types[0] = t1;
@@ -797,6 +802,7 @@ ir_ref ir_proto_5(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_t
 	ir_proto_t proto;
 
 	proto.flags = flags;
+	proto.call_conv = IR_CC_DEFAULT;
 	proto.ret_type = ret_type;
 	proto.params_count = 5;
 	proto.param_types[0] = t1;
@@ -813,6 +819,22 @@ ir_ref ir_proto(ir_ctx *ctx, uint8_t flags, ir_type ret_type, uint32_t params_co
 
 	IR_ASSERT(params_count <= IR_MAX_PROTO_PARAMS);
 	proto->flags = flags;
+	proto->call_conv = IR_CC_DEFAULT;
+	proto->ret_type = ret_type;
+	proto->params_count = params_count;
+	if (params_count) {
+		memcpy(proto->param_types, param_types, params_count);
+	}
+	return ir_strl(ctx, (const char *)proto, offsetof(ir_proto_t, param_types) + params_count);
+}
+
+ir_ref ir_proto_cc(ir_ctx *ctx, uint8_t flags, ir_call_conv call_conv, ir_type ret_type, uint32_t params_count, uint8_t *param_types)
+{
+	ir_proto_t *proto = alloca(offsetof(ir_proto_t, param_types) + params_count);
+
+	IR_ASSERT(params_count <= IR_MAX_PROTO_PARAMS);
+	proto->flags = flags;
+	proto->call_conv = call_conv;
 	proto->ret_type = ret_type;
 	proto->params_count = params_count;
 	if (params_count) {

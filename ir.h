@@ -541,6 +541,7 @@ void ir_strtab_free(ir_strtab *strtab);
 /* IR Context Flags */
 #define IR_FUNCTION            (1<<0) /* Generate a function. */
 #define IR_FASTCALL_FUNC       (1<<1) /* Generate a function with fastcall calling convention, x86 32-bit only. */
+                                      /* Deprecated!!! Use IR_CC_X86_FASTCALL calling convention instead. */
 #define IR_VARARG_FUNC         (1<<2)
 #define IR_BUILTIN_FUNC        (1<<3)
 #define IR_STATIC              (1<<4)
@@ -611,6 +612,21 @@ typedef struct {
 	int   offset;
 } ir_value_param;
 
+typedef enum {
+	IR_CC_DEFAULT,
+#if defined(IR_TARGET_X86)
+	IR_CC_X86,
+	IR_CC_X86_FASTCALL,
+#elif defined(IR_TARGET_X64)
+	IR_CC_X86_64_SYSV,
+	IR_CC_X86_64_MS,
+	IR_CC_X86_64_PRESERVE_NONE,
+#elif defined(IR_TARGET_AARCH64)
+	IR_CC_AARCH64_SYSV,
+	IR_CC_AARCH64_DARWIN,
+#endif
+} ir_call_conv;
+
 #define IR_CONST_HASH_SIZE 64
 
 struct _ir_ctx {
@@ -623,6 +639,7 @@ struct _ir_ctx {
 	ir_ref            *const_hash;
 	uint32_t           flags;                   /* IR context flags (see IR_* defines above) */
 	uint32_t           flags2;                  /* IR context private flags (see IR_* defines in ir_private.h) */
+	ir_call_conv       call_conv;               /* calling convention */
 	ir_type            ret_type;                /* Function return type */
 	uint32_t           mflags;                  /* CPU specific flags (see IR_X86_... macros below) */
 	int32_t            status;                  /* non-zero error code (see IR_ERROR_... macros), app may use negative codes */
@@ -729,6 +746,7 @@ const char *ir_get_strl(const ir_ctx *ctx, ir_ref idx, size_t *len);
 
 typedef struct _ir_proto_t {
 	uint8_t flags;
+	uint8_t call_conv;
 	uint8_t ret_type;
 	uint8_t params_count;
 	uint8_t param_types[5];
@@ -743,6 +761,8 @@ ir_ref ir_proto_4(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_t
 ir_ref ir_proto_5(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2, ir_type t3,
                                                                 ir_type t4, ir_type t5);
 ir_ref ir_proto(ir_ctx *ctx, uint8_t flags, ir_type ret_type, uint32_t params_counts, uint8_t *param_types);
+ir_ref ir_proto_cc(ir_ctx *ctx, uint8_t flags, ir_call_conv call_conv,
+                   ir_type ret_type, uint32_t params_counts, uint8_t *param_types);
 
 ir_ref ir_emit(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
 

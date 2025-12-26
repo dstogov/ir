@@ -1217,6 +1217,7 @@ restart:
 	ir_init(&new_ctx, ctx->flags, consts_count, insns_count);
 	new_ctx.insns_count = insns_count;
 	new_ctx.flags2 = ctx->flags2;
+	new_ctx.call_conv = ctx->call_conv;
 	new_ctx.ret_type = ctx->ret_type;
 	new_ctx.value_params = ctx->value_params;
 	new_ctx.mflags = ctx->mflags;
