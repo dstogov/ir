@@ -1367,6 +1367,7 @@ _yy_state_13:
 					} else if (sym == YY__LBRACE) {
 						if (!loader->func_init(loader, &ctx, name)) yy_error("init_func error");
 						ctx.flags |= flags;
+						ctx.call_conv = cc;
 						ctx.ret_type = ret_type;
 						sym = parse_ir_func(sym, &p);
 						if (!loader->func_process(loader, &ctx, name)) yy_error("process_func error");
@@ -1641,7 +1642,7 @@ _yy_state_87:
 	if (sym == YY___FASTCALL || sym == YY___PRESERVE_NONE || sym == YY___BUILTIN) {
 		if (sym == YY___FASTCALL) {
 			sym = get_sym();
-			/* *cc = IR_CC_FASTCALL;*/
+			*cc = IR_CC_FASTCALL;
 		} else if (sym == YY___PRESERVE_NONE) {
 			sym = get_sym();
 			*cc = IR_CC_PRESERVE_NONE;

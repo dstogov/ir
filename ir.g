@@ -355,6 +355,7 @@ ir(ir_loader *loader):
 				|
 					{if (!loader->func_init(loader, &ctx, name)) yy_error("init_func error");}
 					{ctx.flags |= flags;}
+					{ctx.call_conv = cc;}
 					{ctx.ret_type = ret_type;}
 					ir_func(&p)
 					{if (!loader->func_process(loader, &ctx, name)) yy_error("process_func error");}
@@ -514,7 +515,7 @@ ir_func_proto(ir_parser_ctx *p, uint32_t *flags, ir_call_conv *cc, uint8_t *ret_
 	{*cc = IR_CC_DEFAULT;}
 	(
 		"__fastcall"
-		{/* *cc = IR_CC_FASTCALL;*/}
+		{*cc = IR_CC_FASTCALL;}
 	|
 		"__preserve_none"
 		{*cc = IR_CC_PRESERVE_NONE;}
