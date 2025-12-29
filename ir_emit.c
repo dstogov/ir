@@ -984,7 +984,7 @@ int32_t ir_get_spill_slot_offset(ir_ctx *ctx, ir_ref ref)
 const ir_call_conv_dsc *ir_get_call_conv_dsc(ir_call_conv call_conv)
 {
 #ifdef IR_TARGET_X86
-	if (conv == IR_CC_FASTCALL) {
+	if (call_conv == IR_CC_FASTCALL) {
 		return &ir_call_conv_x86_fastcall;
 	}
 #elif defined(IR_TARGET_X64)
@@ -993,14 +993,14 @@ const ir_call_conv_dsc *ir_get_call_conv_dsc(ir_call_conv call_conv)
 		case IR_CC_PRESERVE_NONE:        return &ir_call_conv_x86_64_preserve_none;
 		case IR_CC_X86_64_SYSV:          return &ir_call_conv_x86_64_sysv;
 		case IR_CC_X86_64_MS:            return &ir_call_conv_x86_64_ms;
-		default:
+		default: break;
 	}
 #elif defined(IR_TARGET_AARCH64)
 	switch (call_conv) {
 		case IR_CC_DEFAULT:              return &ir_call_conv_default;
 		case IR_CC_AARCH64_SYSV:         return &ir_call_conv_aarch64_sysv;
 		case IR_CC_AARCH64_DARWIN:       return &ir_call_conv_aarch64_darwin;
-		default:
+		default: break;
 	}
 #endif
 	IR_ASSERT(call_conv == IR_CC_DEFAULT);

@@ -11074,7 +11074,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 					if (ctx->ret_slot == -1
 					 && (insn->type == IR_FLOAT || insn->type == IR_DOUBLE)) {
 						const ir_proto_t *proto = ir_call_proto(ctx, insn);
-						const ir_call_conv_dsc *cc = ir_insn_call_conv_dsc(proto ? proto->call_conv : IR_CC_DEFAULT);
+						const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(proto ? proto->call_conv : IR_CC_DEFAULT);
 
 						if (cc->fp_ret_reg == IR_REG_NONE) {
 							ctx->ret_slot = ir_allocate_spill_slot(ctx, IR_DOUBLE);

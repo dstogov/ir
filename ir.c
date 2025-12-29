@@ -855,7 +855,7 @@ ir_ref ir_proto(ir_ctx *ctx, uint8_t flags, ir_type ret_type, uint32_t params_co
 	proto->params_count = params_count;
 #ifdef IR_TARGET_X86
 	if (flags & IR_FASTCALL_FUNC) {
-		proto.call_conv = IR_CC_FASTCALL;
+		proto->call_conv = IR_CC_FASTCALL;
 	}
 #endif
 	if (params_count) {
