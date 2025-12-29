@@ -12,13 +12,42 @@ void ir_print_proto(const ir_ctx *ctx, ir_ref func_proto, FILE *f)
 {
 	if (func_proto) {
 		const ir_proto_t *proto = (const ir_proto_t *)ir_get_str(ctx, func_proto);
-		ir_print_proto_ex(proto->flags, proto->ret_type, proto->params_count, proto->param_types, f);
+		ir_print_proto_ex(proto->flags, proto->call_conv, proto->ret_type, proto->params_count, proto->param_types, f);
 	} else {
 		fprintf(f, "(): int32_t");
 	}
 }
 
-void ir_print_proto_ex(uint8_t flags, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, FILE *f)
+void ir_print_call_conv(ir_call_conv cc, FILE *f)
+{
+	switch (cc) {
+		case IR_CC_FASTCALL:
+			fprintf(f, " __fastcall");
+			break;
+		case IR_CC_PRESERVE_NONE:
+			fprintf(f, " __preserve_none");
+			break;
+#if defined(IR_TARGET_X64)
+		case IR_CC_X86_64_SYSV:
+			fprintf(f, " __sysv");
+			break;
+		case IR_CC_X86_64_MS:
+			fprintf(f, " __win64");
+			break;
+#elif defined(IR_TARGET_AARCH64)
+		case IR_CC_AARCH64_SYSV:
+			fprintf(f, " __sysv");
+			break;
+		case IR_CC_AARCH64_DARWIN:
+			fprintf(f, " __darwin");
+			break;
+#endif
+		default:
+			IR_ASSERT(0);
+	}
+}
+
+void ir_print_proto_ex(uint8_t flags, ir_call_conv cc, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, FILE *f)
 {
 	uint32_t j;
 
@@ -35,10 +64,11 @@ void ir_print_proto_ex(uint8_t flags, ir_type ret_type, uint32_t params_count, c
 		fprintf(f, "...");
 	}
 	fprintf(f, "): %s", ir_type_cname[ret_type]);
-	if (flags & IR_FASTCALL_FUNC) {
-		fprintf(f, " __fastcall");
-	} else if (flags & IR_BUILTIN_FUNC) {
+	if (flags & IR_BUILTIN_FUNC) {
 		fprintf(f, " __builtin");
+	}
+	if (cc) {
+		ir_print_call_conv(cc, f);
 	}
 	if (flags & IR_CONST_FUNC) {
 		fprintf(f, " __const");

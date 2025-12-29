@@ -770,6 +770,33 @@ static void ir_emit_store(ir_ctx *ctx, FILE *f, ir_insn *insn)
 	fprintf(f, ";\n");
 }
 
+static void ir_emit_c_call_conv(FILE *f, ir_call_conv call_conv)
+{
+	switch (call_conv) {
+		case IR_CC_FASTCALL:
+			fprintf(f, " __fastcall");
+			break;
+		case IR_CC_PRESERVE_NONE:
+			fprintf(f, " __attriute__((preserve_none))");
+			break;
+#if defined(IR_TARGET_X64)
+		case IR_CC_X86_64_SYSV:
+			fprintf(f, " __attriute__((sysv_abi))");
+			break;
+		case IR_CC_X86_64_MS:
+			fprintf(f, " __attriute__((ms_abi))");
+			break;
+#elif defined(IR_TARGET_AARCH64)
+		case IR_CC_AARCH64_SYSV:
+			break;
+		case IR_CC_AARCH64_DARWIN:
+			break;
+#endif
+		default:
+			IR_ASSERT(call_conv == IR_CC_DEFAULT);
+	}
+}
+
 static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 {
 	ir_ref i, n, *p;
@@ -789,8 +816,10 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	if (ctx->flags & IR_STATIC) {
 		fprintf(f, "static ");
 	}
-	fprintf(f, "%s %s%s(", ir_type_cname[ctx->ret_type != (ir_type)-1 ? ctx->ret_type : IR_VOID],
-		(ctx->flags & IR_FASTCALL_FUNC) ? "__fastcall " : "", name);
+	if (ctx->call_conv) {
+		ir_emit_c_call_conv(f, ctx->call_conv);
+	}
+	fprintf(f, "%s %s(", ir_type_cname[ctx->ret_type != (ir_type)-1 ? ctx->ret_type : IR_VOID], name);
 	use_list = &ctx->use_lists[1];
 	n = use_list->count;
 	first = 1;
@@ -1178,7 +1207,7 @@ int ir_emit_c(ir_ctx *ctx, const char *name, FILE *f)
 	return ir_emit_func(ctx, name, f);
 }
 
-void ir_emit_c_func_decl(const char *name, uint32_t flags, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, FILE *f)
+void ir_emit_c_func_decl(const char *name, uint32_t flags, ir_call_conv cc, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, FILE *f)
 {
 	if (flags & IR_EXTERN) {
 		fprintf(f, "extern ");
@@ -1186,8 +1215,8 @@ void ir_emit_c_func_decl(const char *name, uint32_t flags, ir_type ret_type, uin
 		fprintf(f, "static ");
 	}
 	fprintf(f, "%s ", ir_type_cname[ret_type]);
-	if (flags & IR_FASTCALL_FUNC) {
-		fprintf(f, "__fastcall ");
+	if (cc) {
+		ir_emit_c_call_conv(f, cc);
 	}
 	fprintf(f, "%s(", name);
 	if (params_count) {

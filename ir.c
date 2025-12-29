@@ -400,6 +400,12 @@ void ir_init(ir_ctx *ctx, uint32_t flags, ir_ref consts_limit, ir_ref insns_limi
 	ctx->fold_cse_limit = IR_UNUSED + 1;
 	ctx->flags = flags;
 
+#ifdef IR_TARGET_X86
+	if (flags & IR_FASTCALL_FUNC) {
+		ctx->call_conv = IR_CC_FASTCALL;
+	}
+#endif
+
 	ctx->spill_base = -1;
 	ctx->fixed_stack_frame_size = -1;
 
@@ -738,6 +744,11 @@ ir_ref ir_proto_0(ir_ctx *ctx, uint8_t flags, ir_type ret_type)
 	proto.call_conv = IR_CC_DEFAULT;
 	proto.ret_type = ret_type;
 	proto.params_count = 0;
+#ifdef IR_TARGET_X86
+	if (flags & IR_FASTCALL_FUNC) {
+		proto.call_conv = IR_CC_FASTCALL;
+	}
+#endif
 	return ir_strl(ctx, (const char *)&proto, offsetof(ir_proto_t, param_types) + 0);
 }
 
@@ -763,6 +774,11 @@ ir_ref ir_proto_2(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_t
 	proto.params_count = 2;
 	proto.param_types[0] = t1;
 	proto.param_types[1] = t2;
+#ifdef IR_TARGET_X86
+	if (flags & IR_FASTCALL_FUNC) {
+		proto.call_conv = IR_CC_FASTCALL;
+	}
+#endif
 	return ir_strl(ctx, (const char *)&proto, offsetof(ir_proto_t, param_types) + 2);
 }
 
@@ -777,6 +793,11 @@ ir_ref ir_proto_3(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_t
 	proto.param_types[0] = t1;
 	proto.param_types[1] = t2;
 	proto.param_types[2] = t3;
+#ifdef IR_TARGET_X86
+	if (flags & IR_FASTCALL_FUNC) {
+		proto.call_conv = IR_CC_FASTCALL;
+	}
+#endif
 	return ir_strl(ctx, (const char *)&proto, offsetof(ir_proto_t, param_types) + 3);
 }
 
@@ -793,6 +814,11 @@ ir_ref ir_proto_4(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_t
 	proto.param_types[1] = t2;
 	proto.param_types[2] = t3;
 	proto.param_types[3] = t4;
+#ifdef IR_TARGET_X86
+	if (flags & IR_FASTCALL_FUNC) {
+		proto.call_conv = IR_CC_FASTCALL;
+	}
+#endif
 	return ir_strl(ctx, (const char *)&proto, offsetof(ir_proto_t, param_types) + 4);
 }
 
@@ -810,6 +836,11 @@ ir_ref ir_proto_5(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_t
 	proto.param_types[2] = t3;
 	proto.param_types[3] = t4;
 	proto.param_types[4] = t5;
+#ifdef IR_TARGET_X86
+	if (flags & IR_FASTCALL_FUNC) {
+		proto.call_conv = IR_CC_FASTCALL;
+	}
+#endif
 	return ir_strl(ctx, (const char *)&proto, offsetof(ir_proto_t, param_types) + 5);
 }
 
@@ -822,6 +853,11 @@ ir_ref ir_proto(ir_ctx *ctx, uint8_t flags, ir_type ret_type, uint32_t params_co
 	proto->call_conv = IR_CC_DEFAULT;
 	proto->ret_type = ret_type;
 	proto->params_count = params_count;
+#ifdef IR_TARGET_X86
+	if (flags & IR_FASTCALL_FUNC) {
+		proto.call_conv = IR_CC_FASTCALL;
+	}
+#endif
 	if (params_count) {
 		memcpy(proto->param_types, param_types, params_count);
 	}

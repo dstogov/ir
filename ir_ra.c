@@ -4022,7 +4022,7 @@ int ir_reg_alloc(ir_ctx *ctx)
 	ir_reg_alloc_data data;
 	ir_ref vars = ctx->vars;
 
-	data.cc = ir_func_call_conv_dsc(ctx);
+	data.cc = ir_get_call_conv_dsc(ctx->call_conv);
 	data.unused_slot_4 = 0;
 	data.unused_slot_2 = 0;
 	data.unused_slot_1 = 0;

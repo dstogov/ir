@@ -21,6 +21,9 @@
 #define LLVMAttrByVal          76
 #define LLVMAttrAlignment      81
 
+// The numbers from <LLVM/IR/CallingConv.inc>
+#define LLVMPreserveNone       21
+
 #define LLVM2IR_INLINE_MAX_HINT_BLOCKS 10
 #define LLVM2IR_INLINE_MAX_HINT_COST   50
 #define LLVM2IR_INLINE_MAX_BLOCKS      5
@@ -144,15 +147,24 @@ static const char *llvm2ir_label_name(char *buf, size_t buf_len, LLVMValueRef fu
 static ir_ref llvm2ir_proto(ir_ctx *ctx, uint32_t cconv, LLVMTypeRef ftype)
 {
 	uint8_t flags = 0;
+	ir_call_conv cc;
 	ir_type ret_type;
 	uint8_t *arg_types;
 	uint32_t i, num_args;
 	LLVMTypeRef *types;
 
 	if (cconv == LLVMCCallConv || cconv == LLVMFastCallConv) {
-		/* skip */
+		cc = IR_CC_DEFAULT;
 	} else if (cconv == LLVMX86FastcallCallConv) {
-		flags |= IR_FASTCALL_FUNC;
+		cc = IR_CC_FASTCALL;
+	} else if (cconv == LLVMPreserveNone) {
+		cc = IR_CC_PRESERVE_NONE;
+#if defined(IR_TARGET_X64)
+	} else if (cconv == LLVMX8664SysVCallConv) {
+		cc = IR_CC_X86_64_SYSV;
+	} else if (cconv == LLVMWin64CallConv) {
+		cc = IR_CC_X86_64_SYSV;
+#endif
 	} else {
 		fprintf(stderr, "Unsupported Calling Convention: %d\n", cconv);
 		IR_ASSERT(0);
@@ -169,7 +181,7 @@ static ir_ref llvm2ir_proto(ir_ctx *ctx, uint32_t cconv, LLVMTypeRef ftype)
 	for (i = 0; i < num_args; i++) {
 		arg_types[i] = llvm2ir_type(types[i]);
 	}
-	return ir_proto(ctx, flags, ret_type, num_args, arg_types);
+	return ir_proto_cc(ctx, flags, cc, ret_type, num_args, arg_types);
 }
 
 static bool llvm2ir_is_static(LLVMValueRef op)
@@ -1807,9 +1819,17 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMValueRef func, LLVMModuleRef module)
 	ftype = LLVMGlobalGetValueType(func);
 	cconv = LLVMGetFunctionCallConv(func);
 	if (cconv == LLVMCCallConv || cconv == LLVMFastCallConv) {
-		/* skip */
+		ctx->call_conv = IR_CC_DEFAULT;
 	} else if (cconv == LLVMX86FastcallCallConv) {
-		ctx->flags |= IR_FASTCALL_FUNC;
+		ctx->call_conv = IR_CC_FASTCALL;
+	} else if (cconv == LLVMPreserveNone) {
+		ctx->call_conv = IR_CC_PRESERVE_NONE;
+#if defined(IR_TARGET_X64)
+	} else if (cconv == LLVMX8664SysVCallConv) {
+		ctx->call_conv = IR_CC_X86_64_SYSV;
+	} else if (cconv == LLVMWin64CallConv) {
+		ctx->call_conv = IR_CC_X86_64_SYSV;
+#endif
 	} else {
 		fprintf(stderr, "Unsupported Calling Convention: %d\n", cconv);
 		IR_ASSERT(0);
@@ -2283,6 +2303,7 @@ next:
 static int llvm2ir_external_func(ir_loader *loader, const char *name, LLVMValueRef func)
 {
 	uint32_t i, count, cconv, flags = 0;
+	ir_call_conv cc = IR_CC_DEFAULT;
 	LLVMTypeRef ftype;
 	ir_type ret_type;
 	uint8_t *param_types;
@@ -2292,7 +2313,15 @@ static int llvm2ir_external_func(ir_loader *loader, const char *name, LLVMValueR
 	if (cconv == LLVMCCallConv || cconv == LLVMFastCallConv) {
 		/* skip */
 	} else if (cconv == LLVMX86FastcallCallConv) {
-		flags |= IR_FASTCALL_FUNC;
+		cc = IR_CC_FASTCALL;
+	} else if (cconv == LLVMPreserveNone) {
+		cc = IR_CC_PRESERVE_NONE;
+#if defined(IR_TARGET_X64)
+	} else if (cconv == LLVMX8664SysVCallConv) {
+		cc = IR_CC_X86_64_SYSV;
+	} else if (cconv == LLVMWin64CallConv) {
+		cc = IR_CC_X86_64_SYSV;
+#endif
 	} else {
 		fprintf(stderr, "Unsupported Calling Convention: %d\n", cconv);
 		IR_ASSERT(0);
@@ -2309,12 +2338,13 @@ static int llvm2ir_external_func(ir_loader *loader, const char *name, LLVMValueR
 		param_types[i] = llvm2ir_type(LLVMTypeOf(LLVMGetParam(func, i)));
 	}
 
-	return loader->external_func_dcl(loader, name, flags, ret_type, count, param_types);
+	return loader->external_func_dcl(loader, name, flags, cc, ret_type, count, param_types);
 }
 
 static int llvm2ir_forward_func(ir_loader *loader, const char *name, LLVMValueRef func, LLVMBool is_static)
 {
 	uint32_t i, count, cconv, flags = 0;
+	ir_call_conv cc;
 	LLVMTypeRef ftype;
 	ir_type ret_type;
 	uint8_t *param_types;
@@ -2322,9 +2352,17 @@ static int llvm2ir_forward_func(ir_loader *loader, const char *name, LLVMValueRe
 	ftype = LLVMGlobalGetValueType(func);
 	cconv = LLVMGetFunctionCallConv(func);
 	if (cconv == LLVMCCallConv || cconv == LLVMFastCallConv) {
-		/* skip */
+		cc = IR_CC_DEFAULT;
 	} else if (cconv == LLVMX86FastcallCallConv) {
-		flags |= IR_FASTCALL_FUNC;
+		cc = IR_CC_FASTCALL;
+	} else if (cconv == LLVMPreserveNone) {
+		cc = IR_CC_PRESERVE_NONE;
+#if defined(IR_TARGET_X64)
+	} else if (cconv == LLVMX8664SysVCallConv) {
+		cc = IR_CC_X86_64_SYSV;
+	} else if (cconv == LLVMWin64CallConv) {
+		cc = IR_CC_X86_64_SYSV;
+#endif
 	} else {
 		fprintf(stderr, "Unsupported Calling Convention: %d\n", cconv);
 		IR_ASSERT(0);
@@ -2344,7 +2382,7 @@ static int llvm2ir_forward_func(ir_loader *loader, const char *name, LLVMValueRe
 		param_types[i] = llvm2ir_type(LLVMTypeOf(LLVMGetParam(func, i)));
 	}
 
-	return loader->forward_func_dcl(loader, name, flags, ret_type, count, param_types);
+	return loader->forward_func_dcl(loader, name, flags, cc, ret_type, count, param_types);
 }
 
 static int llvm2ir_data(ir_loader *loader, LLVMTargetDataRef target_data, LLVMTypeRef type, LLVMValueRef op, size_t pos)

@@ -1388,7 +1388,7 @@ extern const ir_regset ir_scratch_regset[];
 
 typedef struct _ir_call_conv_dsc ir_call_conv_dsc;
 
-const ir_call_conv_dsc *ir_func_call_conv_dsc(const ir_ctx *ctx);
+const ir_call_conv_dsc *ir_get_call_conv_dsc(ir_call_conv call_conv);
 
 /*** IR Register Allocation ***/
 /* Flags for ctx->regs[][] (low bits are used for register number itself) */
@@ -1467,8 +1467,8 @@ void ir_fix_stack_frame(ir_ctx *ctx);
 
 /* Utility */
 ir_type ir_get_return_type(ir_ctx *ctx);
-bool ir_is_fastcall(const ir_ctx *ctx, const ir_insn *insn);
-bool ir_is_vararg(const ir_ctx *ctx, ir_insn *insn);
+const ir_proto_t *ir_call_proto(const ir_ctx *ctx, const ir_insn *insn);
+void ir_print_call_conv(ir_call_conv cc, FILE *f);
 
 //#define IR_BITSET_LIVENESS
 
