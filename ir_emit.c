@@ -990,6 +990,7 @@ const ir_call_conv_dsc *ir_get_call_conv_dsc(uint32_t flags)
 #elif defined(IR_TARGET_X64)
 	switch (flags & IR_CALL_CONV_MASK) {
 		case IR_CC_DEFAULT:              return &ir_call_conv_default;
+		case IR_CC_FASTCALL:             return &ir_call_conv_default;
 		case IR_CC_PRESERVE_NONE:        return &ir_call_conv_x86_64_preserve_none;
 		case IR_CC_X86_64_SYSV:          return &ir_call_conv_x86_64_sysv;
 		case IR_CC_X86_64_MS:            return &ir_call_conv_x86_64_ms;
@@ -998,6 +999,7 @@ const ir_call_conv_dsc *ir_get_call_conv_dsc(uint32_t flags)
 #elif defined(IR_TARGET_AARCH64)
 	switch (flags & IR_CALL_CONV_MASK) {
 		case IR_CC_DEFAULT:              return &ir_call_conv_default;
+		case IR_CC_FASTCALL:             return &ir_call_conv_default;
 		case IR_CC_AARCH64_SYSV:         return &ir_call_conv_aarch64_sysv;
 		case IR_CC_AARCH64_DARWIN:       return &ir_call_conv_aarch64_darwin;
 		default: break;
