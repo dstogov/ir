@@ -734,7 +734,7 @@ ir_ref ir_proto_0(ir_ctx *ctx, uint32_t flags, ir_type ret_type)
 {
 	ir_proto_t proto;
 
-	proto.flags = flags & 0xfff;
+	proto.flags = flags & (0xff | IR_CALL_CONV_MASK);
 	proto.ret_type = ret_type;
 	proto.params_count = 0;
 	return ir_strl(ctx, (const char *)&proto, offsetof(ir_proto_t, param_types) + 0);
@@ -744,7 +744,7 @@ ir_ref ir_proto_1(ir_ctx *ctx, uint32_t flags, ir_type ret_type, ir_type t1)
 {
 	ir_proto_t proto;
 
-	proto.flags = flags & 0xfff;
+	proto.flags = flags & (0xff | IR_CALL_CONV_MASK);
 	proto.ret_type = ret_type;
 	proto.params_count = 1;
 	proto.param_types[0] = t1;
@@ -755,7 +755,7 @@ ir_ref ir_proto_2(ir_ctx *ctx, uint32_t flags, ir_type ret_type, ir_type t1, ir_
 {
 	ir_proto_t proto;
 
-	proto.flags = flags & 0xfff;
+	proto.flags = flags & (0xff | IR_CALL_CONV_MASK);
 	proto.ret_type = ret_type;
 	proto.params_count = 2;
 	proto.param_types[0] = t1;
@@ -767,7 +767,7 @@ ir_ref ir_proto_3(ir_ctx *ctx, uint32_t flags, ir_type ret_type, ir_type t1, ir_
 {
 	ir_proto_t proto;
 
-	proto.flags = flags & 0xffff;
+	proto.flags = flags & (0xff | IR_CALL_CONV_MASK);
 	proto.ret_type = ret_type;
 	proto.params_count = 3;
 	proto.param_types[0] = t1;
@@ -781,7 +781,7 @@ ir_ref ir_proto_4(ir_ctx *ctx, uint32_t flags, ir_type ret_type, ir_type t1, ir_
 {
 	ir_proto_t proto;
 
-	proto.flags = flags & 0xfff;
+	proto.flags = flags & (0xff | IR_CALL_CONV_MASK);
 	proto.ret_type = ret_type;
 	proto.params_count = 4;
 	proto.param_types[0] = t1;
@@ -796,7 +796,7 @@ ir_ref ir_proto_5(ir_ctx *ctx, uint32_t flags, ir_type ret_type, ir_type t1, ir_
 {
 	ir_proto_t proto;
 
-	proto.flags = flags = 0xfff;
+	proto.flags = flags & (0xff | IR_CALL_CONV_MASK);
 	proto.ret_type = ret_type;
 	proto.params_count = 5;
 	proto.param_types[0] = t1;
@@ -812,7 +812,7 @@ ir_ref ir_proto(ir_ctx *ctx, uint32_t flags, ir_type ret_type, uint32_t params_c
 	ir_proto_t *proto = alloca(offsetof(ir_proto_t, param_types) + params_count);
 
 	IR_ASSERT(params_count <= IR_MAX_PROTO_PARAMS);
-	proto->flags = flags & 0xfff;
+	proto->flags = flags & (0xff | IR_CALL_CONV_MASK);
 	proto->ret_type = ret_type;
 	proto->params_count = params_count;
 	if (params_count) {
