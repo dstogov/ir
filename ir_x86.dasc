@@ -10697,7 +10697,11 @@ static void ir_emit_sse_round(ir_ctx *ctx, ir_ref def, ir_insn *insn, int round_
 static void ir_emit_exitcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
-	const ir_call_conv_dsc *cc = data->ra_data.cc;
+#ifdef IR_TARGET_X86
+	const ir_call_conv_dsc *cc = &ir_call_conv_x86_fastcall;
+#else
+	const ir_call_conv_dsc *cc = &ir_call_conv_default;
+#endif
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 

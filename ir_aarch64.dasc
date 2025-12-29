@@ -5803,7 +5803,7 @@ static void ir_emit_tls(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 static void ir_emit_exitcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
-	const ir_call_conv_dsc *cc = data->ra_data.cc;
+	const ir_call_conv_dsc *cc = &ir_call_conv_default;
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 
