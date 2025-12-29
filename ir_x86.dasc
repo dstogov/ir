@@ -4043,21 +4043,22 @@ static void ir_emit_prologue(ir_ctx *ctx)
 
 		if (cc->shadow_store_size) {
 			ir_reg fp;
-			int offset;
+			int shadow_store;
+			int offset = 0;
 			int n = 0;
 
 			if (ctx->flags & IR_USE_FRAME_POINTER) {
 				fp = IR_REG_FRAME_POINTER;
-				offset = sizeof(void*) * 2;
+				shadow_store = sizeof(void*) * 2;
 			} else {
 				fp = IR_REG_STACK_POINTER;
-				offset = ctx->stack_frame_size + ctx->call_stack_size + sizeof(void*);
+				shadow_store = ctx->stack_frame_size + ctx->call_stack_size + sizeof(void*);
 			}
 
 			while (offset < cc->shadow_store_size && n < cc->int_param_regs_count) {
-				|	mov [Ra(fp)+offset], Ra(cc->int_param_regs[n])
+				|	mov [Ra(fp)+shadow_store+offset], Ra(cc->int_param_regs[n])
 				n++;
-				offset += sizeof(void);
+				offset += sizeof(void*);
 			}
 		}
 
