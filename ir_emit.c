@@ -99,7 +99,7 @@ static ir_reg ir_get_param_reg(const ir_ctx *ctx, ir_ref ref)
 	ir_insn *insn;
 	int int_param = 0;
 	int fp_param = 0;
-	const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(ctx->call_conv);
+	const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(ctx->flags);
 
 	for (i = use_list->count, p = &ctx->use_edges[use_list->refs]; i > 0; p++, i--) {
 		use = *p;
@@ -981,14 +981,14 @@ int32_t ir_get_spill_slot_offset(ir_ctx *ctx, ir_ref ref)
 	return IR_SPILL_POS_TO_OFFSET(offset);
 }
 
-const ir_call_conv_dsc *ir_get_call_conv_dsc(ir_call_conv call_conv)
+const ir_call_conv_dsc *ir_get_call_conv_dsc(uint32_t flags)
 {
 #ifdef IR_TARGET_X86
-	if (call_conv == IR_CC_FASTCALL) {
+	if ((flags & IR_CALL_CONV_MASK) == IR_CC_FASTCALL) {
 		return &ir_call_conv_x86_fastcall;
 	}
 #elif defined(IR_TARGET_X64)
-	switch (call_conv) {
+	switch (flags & IR_CALL_CONV_MASK) {
 		case IR_CC_DEFAULT:              return &ir_call_conv_default;
 		case IR_CC_PRESERVE_NONE:        return &ir_call_conv_x86_64_preserve_none;
 		case IR_CC_X86_64_SYSV:          return &ir_call_conv_x86_64_sysv;
@@ -996,13 +996,13 @@ const ir_call_conv_dsc *ir_get_call_conv_dsc(ir_call_conv call_conv)
 		default: break;
 	}
 #elif defined(IR_TARGET_AARCH64)
-	switch (call_conv) {
+	switch (flags & IR_CALL_CONV_MASK) {
 		case IR_CC_DEFAULT:              return &ir_call_conv_default;
 		case IR_CC_AARCH64_SYSV:         return &ir_call_conv_aarch64_sysv;
 		case IR_CC_AARCH64_DARWIN:       return &ir_call_conv_aarch64_darwin;
 		default: break;
 	}
 #endif
-	IR_ASSERT(call_conv == IR_CC_DEFAULT);
+	IR_ASSERT((flags & IR_CALL_CONV_MASK) == IR_CC_DEFAULT || (flags & IR_CALL_CONV_MASK) == IR_CC_BUILTIN);
 	return &ir_call_conv_default;
 }

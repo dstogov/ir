@@ -1508,7 +1508,7 @@ op2_const:
 		case IR_CALL:
 			insn = &ctx->ir_base[ref];
 			proto = ir_call_proto(ctx, insn);
-			cc = ir_get_call_conv_dsc(proto ? proto->call_conv : IR_CC_DEFAULT);
+			cc = ir_get_call_conv_dsc(proto ? proto->flags : IR_CC_DEFAULT);
 			if (insn->type != IR_VOID) {
 				if (IR_IS_TYPE_INT(insn->type)) {
 					constraints->def_reg = cc->int_ret_reg;
@@ -1539,7 +1539,7 @@ op2_const:
 		case IR_TAILCALL:
 			insn = &ctx->ir_base[ref];
 			proto = ir_call_proto(ctx, insn);
-			cc = ir_get_call_conv_dsc(proto ? proto->call_conv : IR_CC_DEFAULT);
+			cc = ir_get_call_conv_dsc(proto ? proto->flags : IR_CC_DEFAULT);
 			if (!IR_IS_CONST_REF(insn->op2)
 			 && proto && (proto->flags & IR_VARARG_FUNC) && cc->fp_varargs_reg != IR_REG_NONE) {
 				constraints->tmp_regs[n] = IR_SCRATCH_REG(cc->fp_varargs_reg, IR_LOAD_SUB_REF, IR_USE_SUB_REF);
@@ -1676,7 +1676,7 @@ get_arg_hints:
 			break;
 		case IR_EXITCALL:
 			flags = IR_USE_MUST_BE_IN_REG;
-			cc = ir_get_call_conv_dsc(ctx->call_conv);
+			cc = ir_get_call_conv_dsc(ctx->flags);
 			constraints->def_reg = cc->int_ret_reg;
 			break;
 		case IR_IF_INT:
@@ -1692,13 +1692,13 @@ get_arg_hints:
 			flags = IR_OP3_SHOULD_BE_IN_REG;
 			break;
 		case IR_RETURN_INT:
-			cc = ir_get_call_conv_dsc(ctx->call_conv);
+			cc = ir_get_call_conv_dsc(ctx->flags);
 			flags = IR_OP2_SHOULD_BE_IN_REG;
 			constraints->hints[2] = cc->int_ret_reg;
 			constraints->hints_count = 3;
 			break;
 		case IR_RETURN_FP:
-			cc = ir_get_call_conv_dsc(ctx->call_conv);
+			cc = ir_get_call_conv_dsc(ctx->flags);
 #ifdef IR_TARGET_X86
 			if (cc->fp_ret_reg != IR_REG_NONE)
 #endif
@@ -2075,7 +2075,7 @@ static uint32_t ir_match_builtin_call(ir_ctx *ctx, const ir_insn *func)
 {
 	const ir_proto_t *proto = (const ir_proto_t *)ir_get_str(ctx, func->proto);
 
-	if (proto->flags & IR_BUILTIN_FUNC) {
+	if ((proto->flags & IR_CALL_CONV_MASK) == IR_CC_BUILTIN) {
 		size_t name_len;
 		const char *name = ir_get_strl(ctx, func->val.name, &name_len);
 
@@ -2636,7 +2636,7 @@ binop_fp:
 			return IR_STATIC_ALLOCA;
 		case IR_PARAM:
 			if (ctx->value_params && ctx->value_params[insn->op3 - 1].align) {
-				const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(ctx->call_conv);
+				const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(ctx->flags);
 				if (cc->pass_struct_by_val) {
 					return IR_STATIC_ALLOCA;
 				}
@@ -9414,7 +9414,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 	}
 
 	if (insn->op == IR_CALL
-	 && (ctx->flags & IR_PREALLOCATED_STACK)
+	 && (ctx->flags2 & IR_PREALLOCATED_STACK)
 	 && !cc->cleanup_stack_by_callee) {
 		if (!cc->pass_struct_by_val) {
 			used_stack = ir_call_used_stack(ctx, insn, cc, &copy_stack);
@@ -9754,7 +9754,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 		}
 	}
 
-	if (insn->op == IR_CALL && (ctx->flags & IR_PREALLOCATED_STACK)) {
+	if (insn->op == IR_CALL && (ctx->flags2 & IR_PREALLOCATED_STACK)) {
 		used_stack = 0;
 	}
 
@@ -9903,7 +9903,7 @@ static void ir_emit_call_ex(ir_ctx *ctx, ir_ref def, ir_insn *insn, const ir_pro
 static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	const ir_proto_t *proto = ir_call_proto(ctx, insn);
-	const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(proto ? proto->call_conv : IR_CC_DEFAULT);
+	const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(proto ? proto->flags : IR_CC_DEFAULT);
 	int32_t used_stack = ir_emit_arguments(ctx, def, insn, proto, cc, ctx->regs[def][1]);
 	ir_emit_call_ex(ctx, def, insn, proto, cc, used_stack);
 }
@@ -9913,7 +9913,7 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	const ir_proto_t *proto = ir_call_proto(ctx, insn);
-	const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(proto ? proto->call_conv : IR_CC_DEFAULT);
+	const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(proto ? proto->flags : IR_CC_DEFAULT);
 	int32_t used_stack = ir_emit_arguments(ctx, def, insn, proto, cc, ctx->regs[def][1]);
 	ir_ref func = insn->op2;
 
@@ -11095,7 +11095,7 @@ static void ir_allocate_unique_spill_slots(ir_ctx *ctx)
 					if (ctx->ret_slot == -1
 					 && (insn->type == IR_FLOAT || insn->type == IR_DOUBLE)) {
 						const ir_proto_t *proto = ir_call_proto(ctx, insn);
-						const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(proto ? proto->call_conv : IR_CC_DEFAULT);
+						const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(proto ? proto->flags : IR_CC_DEFAULT);
 
 						if (cc->fp_ret_reg == IR_REG_NONE) {
 							ctx->ret_slot = ir_allocate_spill_slot(ctx, IR_DOUBLE);
@@ -11268,7 +11268,7 @@ static void ir_preallocate_call_stack(ir_ctx *ctx)
 	for (i = 1, insn = ctx->ir_base + 1; i < ctx->insns_count;) {
 		if (insn->op == IR_CALL) {
 			const ir_proto_t *proto = ir_call_proto(ctx, insn);
-			const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(proto ? proto->call_conv : IR_CC_DEFAULT);
+			const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(proto ? proto->flags : IR_CC_DEFAULT);
 
 			call_stack_size = ir_call_used_stack(ctx, insn, cc, &copy_stack);
 			if (call_stack_size > peak_call_stack_size
@@ -11282,7 +11282,7 @@ static void ir_preallocate_call_stack(ir_ctx *ctx)
 	}
 	if (peak_call_stack_size) {
 		ctx->call_stack_size = peak_call_stack_size;
-		ctx->flags |= IR_PREALLOCATED_STACK;
+		ctx->flags2 |= IR_PREALLOCATED_STACK;
 	}
 }
 
@@ -11375,7 +11375,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	ir_ref igoto_dup_ref = IR_UNUSED;
 	uint32_t igoto_dup_block = 0;
 
-	data.ra_data.cc = ir_get_call_conv_dsc(ctx->call_conv);
+	data.ra_data.cc = ir_get_call_conv_dsc(ctx->flags);
 	data.ra_data.unused_slot_4 = 0;
 	data.ra_data.unused_slot_2 = 0;
 	data.ra_data.unused_slot_1 = 0;

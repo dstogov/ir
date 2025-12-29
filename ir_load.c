@@ -425,7 +425,7 @@ static int parse_ir_sym_size(int sym, size_t *size);
 static int parse_ir_sym_data(int sym, ir_loader *loader);
 static int parse_ir_func(int sym, ir_parser_ctx *p);
 static int parse_ir_func_name(int sym, char *buf);
-static int parse_ir_func_proto(int sym, ir_parser_ctx *p, uint32_t *flags, ir_call_conv *cc, uint8_t *ret_type, uint32_t *params_count, uint8_t *param_types);
+static int parse_ir_func_proto(int sym, ir_parser_ctx *p, uint32_t *flags, uint8_t *ret_type, uint32_t *params_count, uint8_t *param_types);
 static int parse_ir_insn(int sym, ir_parser_ctx *p);
 static int parse_ir_modifier(int sym, ir_parser_ctx *p);
 static int parse_type(int sym, uint8_t *t);
@@ -1193,7 +1193,6 @@ static int parse_ir(int sym, ir_loader *loader) {
 	uint8_t ret_type;
 	char name[256];
 	uint32_t flags = 0;
-	ir_call_conv cc = IR_CC_DEFAULT;
 	size_t size;
 	uint32_t params_count;
 	uint8_t param_types[256];
@@ -1217,15 +1216,14 @@ static int parse_ir(int sym, ir_loader *loader) {
 					}
 				} else if (sym == YY_FUNC) {
 					flags = 0;
-					cc = IR_CC_DEFAULT;
 					sym = parse_ir_func_name(sym, name);
-					sym = parse_ir_func_proto(sym, &p, &flags, &cc, &ret_type, &params_count, param_types);
+					sym = parse_ir_func_proto(sym, &p, &flags, &ret_type, &params_count, param_types);
 					if (sym != YY__SEMICOLON) {
 						yy_error_sym("';' expected, got", sym);
 					}
 					sym = get_sym();
 					if (loader->external_func_dcl
-					 && !loader->external_func_dcl(loader, name, flags, cc, ret_type, params_count, param_types)) {
+					 && !loader->external_func_dcl(loader, name, flags, ret_type, params_count, param_types)) {
 						yy_error_str("Unresolved extenral function", name);
 					}
 				} else {
@@ -1357,17 +1355,16 @@ _yy_state_13:
 					}
 				} else if (sym == YY_FUNC) {
 					sym = parse_ir_func_name(sym, name);
-					sym = parse_ir_func_proto(sym, &p, &flags, &cc, &ret_type, &params_count, param_types);
+					sym = parse_ir_func_proto(sym, &p, &flags, &ret_type, &params_count, param_types);
 					if (sym == YY__SEMICOLON) {
 						sym = get_sym();
 						if (loader->forward_func_dcl
-						 && !loader->forward_func_dcl(loader, name, flags, cc, ret_type, params_count, param_types)) {
+						 && !loader->forward_func_dcl(loader, name, flags, ret_type, params_count, param_types)) {
 							yy_error("forward_func_decl error");
 						}
 					} else if (sym == YY__LBRACE) {
 						if (!loader->func_init(loader, &ctx, name)) yy_error("init_func error");
 						ctx.flags |= flags;
-						ctx.call_conv = cc;
 						ctx.ret_type = ret_type;
 						sym = parse_ir_func(sym, &p);
 						if (!loader->func_process(loader, &ctx, name)) yy_error("process_func error");
@@ -1554,7 +1551,7 @@ static int parse_ir_func_name(int sym, char *buf) {
 	return sym;
 }
 
-static int parse_ir_func_proto(int sym, ir_parser_ctx *p, uint32_t *flags, ir_call_conv *cc, uint8_t *ret_type, uint32_t *params_count, uint8_t *param_types) {
+static int parse_ir_func_proto(int sym, ir_parser_ctx *p, uint32_t *flags, uint8_t *ret_type, uint32_t *params_count, uint8_t *param_types) {
 	int   sym2;
 	const unsigned char *save_pos;
 	const unsigned char *save_text;
@@ -1638,17 +1635,16 @@ _yy_state_87:
 	} else {
 		yy_error_sym("unexpected", sym);
 	}
-	*cc = IR_CC_DEFAULT;
 	if (sym == YY___FASTCALL || sym == YY___PRESERVE_NONE || sym == YY___BUILTIN) {
 		if (sym == YY___FASTCALL) {
 			sym = get_sym();
-			*cc = IR_CC_FASTCALL;
+			*flags |= IR_CC_FASTCALL;
 		} else if (sym == YY___PRESERVE_NONE) {
 			sym = get_sym();
-			*cc = IR_CC_PRESERVE_NONE;
+			*flags |= IR_CC_PRESERVE_NONE;
 		} else {
 			sym = get_sym();
-			*flags |= IR_BUILTIN_FUNC;
+			*flags |= IR_CC_BUILTIN;
 		}
 	}
 	if (sym == YY___PURE || sym == YY___CONST) {
@@ -1679,7 +1675,6 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 	int32_t n;
 	uint8_t ret_type;
 	uint32_t flags;
-	ir_call_conv cc;
 	uint32_t params_count;
 	uint8_t param_types[256];
 	if (YY_IN_SET(sym, (YY_BOOL,YY_UINT8_T,YY_UINT16_T,YY_UINT32_T,YY_UINT64_T,YY_UINTPTR_T,YY_CHAR,YY_INT8_T,YY_INT16_T,YY_INT32_T,YY_INT64_T,YY_DOUBLE,YY_FLOAT), "\000\000\000\300\377\007\000\000")) {
@@ -1715,8 +1710,8 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 			if (sym == YY_ID) {
 				sym = parse_ID(sym, &func, &func_len);
 				flags = 0;
-				sym = parse_ir_func_proto(sym, p, &flags, &cc, &ret_type, &params_count, param_types);
-				ref = ir_proto_cc(p->ctx, flags, cc, ret_type, params_count, param_types);
+				sym = parse_ir_func_proto(sym, p, &flags, &ret_type, &params_count, param_types);
+				ref = ir_proto(p->ctx, flags, ret_type, params_count, param_types);
 				ref = ir_const_func(p->ctx, ir_strl(p->ctx, func, func_len), ref);
 			} else if (sym == YY__STAR) {
 				sym = get_sym();
@@ -1728,8 +1723,8 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 					yy_error_sym("unexpected", sym);
 				}
 				flags = 0;
-				sym = parse_ir_func_proto(sym, p, &flags, &cc, &ret_type, &params_count, param_types);
-				ref = ir_proto_cc(p->ctx, flags, cc, ret_type, params_count, param_types);
+				sym = parse_ir_func_proto(sym, p, &flags, &ret_type, &params_count, param_types);
+				ref = ir_proto(p->ctx, flags, ret_type, params_count, param_types);
 				ref = ir_const_func_addr(p->ctx, val.addr, ref);
 			} else {
 				yy_error_sym("unexpected", sym);
@@ -2024,7 +2019,6 @@ static int parse_val(int sym, ir_parser_ctx *p, uint8_t op, uint32_t n, ir_ref *
 	uint32_t kind = IR_OPND_KIND(ir_op_flags[op], n);
 	uint8_t ret_type;
 	uint32_t flags;
-	ir_call_conv cc;
 	uint32_t params_count;
 	uint8_t param_types[256];
 	switch (sym) {
@@ -2052,8 +2046,8 @@ static int parse_val(int sym, ir_parser_ctx *p, uint8_t op, uint32_t n, ir_ref *
 			sym = get_sym();
 			if (kind != IR_OPND_PROTO) yy_error("unexpected function prototype");
 			flags = 0;
-			sym = parse_ir_func_proto(sym, p, &flags, &cc, &ret_type, &params_count, param_types);
-			*ref = ir_proto_cc(p->ctx, flags, cc, ret_type, params_count, param_types);
+			sym = parse_ir_func_proto(sym, p, &flags, &ret_type, &params_count, param_types);
+			*ref = ir_proto(p->ctx, flags, ret_type, params_count, param_types);
 			break;
 		default:
 			yy_error_sym("unexpected", sym);

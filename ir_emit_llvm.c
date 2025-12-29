@@ -739,9 +739,9 @@ static int ir_builtin_func(const char *name)
 	return -1;
 }
 
-static void ir_emit_llvm_call_conv(FILE *f, ir_call_conv call_conv)
+static void ir_emit_llvm_call_conv(FILE *f, uint32_t flags)
 {
-	switch (call_conv) {
+	switch (flags & IR_CALL_CONV_MASK) {
 		case IR_CC_FASTCALL:
 			fprintf(f, "x86_fastcallcc ");
 			break;
@@ -762,7 +762,7 @@ static void ir_emit_llvm_call_conv(FILE *f, ir_call_conv call_conv)
 			break;
 #endif
 		default:
-			IR_ASSERT(call_conv == IR_CC_DEFAULT);
+			IR_ASSERT((flags & IR_CALL_CONV_MASK) == IR_CC_DEFAULT || (flags & IR_CALL_CONV_MASK) == IR_CC_BUILTIN);
 	}
 }
 
@@ -780,7 +780,7 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn, ir_bit
 		if (func->proto) {
 			const ir_proto_t *proto = (const ir_proto_t *)ir_get_str(ctx, func->proto);
 
-			if (proto->flags & IR_BUILTIN_FUNC) {
+			if ((proto->flags & IR_CALL_CONV_MASK) == IR_CC_BUILTIN) {
 				int n = ir_builtin_func(name);
 				if (n >= 0) {
 					ir_llvm_intrinsic_id id = ir_llvm_builtin_map[n].id;
@@ -816,7 +816,7 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn, ir_bit
 
 	const ir_proto_t *proto = ir_call_proto(ctx, insn);
 	if (proto) {
-		ir_emit_llvm_call_conv(f, proto->call_conv);
+		ir_emit_llvm_call_conv(f, proto->flags);
 	}
 	fprintf(f, "%s ", ir_type_llvm_name[insn->type]);
 	if (proto && (proto->flags & IR_VARARG_FUNC)) {
@@ -975,7 +975,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	if (ctx->flags & IR_STATIC) {
 		fprintf(f, "internal ");
 	}
-	ir_emit_llvm_call_conv(f, ctx->call_conv);
+	ir_emit_llvm_call_conv(f, ctx->flags);
 	fprintf(f, "%s", ir_type_llvm_name[ctx->ret_type != (ir_type)-1 ? ctx->ret_type : IR_VOID]);
 	fprintf(f, " @%s(", name);
 	use_list = &ctx->use_lists[1];
@@ -1336,7 +1336,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	IR_BITSET_FOREACH(used_intrinsics, IR_LLVM_INTRINSIC_BITSET_LEN, i) {
 		const char *name = ir_llvm_intrinsic_desc[i].name;
 		if (!ctx->loader || !ctx->loader->has_sym || !ctx->loader->has_sym(ctx->loader, name)) {
-			ir_emit_llvm_func_decl(name, 0, IR_CC_DEFAULT, ir_llvm_intrinsic_desc[i].ret_type,
+			ir_emit_llvm_func_decl(name, 0, ir_llvm_intrinsic_desc[i].ret_type,
 				ir_llvm_intrinsic_desc[i].params_count, ir_llvm_intrinsic_desc[i].param_types, f);
 			if (ctx->loader->add_sym) {
 				ctx->loader->add_sym(ctx->loader, name, NULL);
@@ -1352,7 +1352,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 			if (insn->proto) {
 				const ir_proto_t *proto = (const ir_proto_t *)ir_get_str(ctx, insn->proto);
 
-				if (proto->flags & IR_BUILTIN_FUNC) {
+				if ((proto->flags & IR_CALL_CONV_MASK) == IR_CC_BUILTIN) {
 					n = ir_builtin_func(name);
 					if (n >= 0) {
 						ir_llvm_intrinsic_id id = ir_llvm_builtin_map[n].id;
@@ -1364,7 +1364,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					}
 				}
 				if (!ctx->loader || !ctx->loader->has_sym || !ctx->loader->has_sym(ctx->loader, name)) {
-					ir_emit_llvm_func_decl(name, proto->flags, proto->call_conv, proto->ret_type,
+					ir_emit_llvm_func_decl(name, proto->flags, proto->ret_type,
 						proto->params_count, proto->param_types, f);
 					if (ctx->loader->add_sym) {
 						ctx->loader->add_sym(ctx->loader, name, NULL);
@@ -1428,11 +1428,11 @@ int ir_emit_llvm(ir_ctx *ctx, const char *name, FILE *f)
 	return ir_emit_func(ctx, name, f);
 }
 
-void ir_emit_llvm_func_decl(const char *name, uint32_t flags, ir_call_conv cc, ir_type ret_type,
+void ir_emit_llvm_func_decl(const char *name, uint32_t flags, ir_type ret_type,
 	uint32_t params_count, const uint8_t *param_types, FILE *f)
 {
 	fprintf(f, "declare ");
-	ir_emit_llvm_call_conv(f, cc);
+	ir_emit_llvm_call_conv(f, flags);
 	fprintf(f, "%s @%s(", ir_type_llvm_name[ret_type], name);
 	if (params_count) {
 		const uint8_t *p = param_types;

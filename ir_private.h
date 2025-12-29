@@ -1015,6 +1015,8 @@ IR_ALWAYS_INLINE uint32_t ir_insn_len(const ir_insn *insn)
 #define IR_HAS_FP_RET_SLOT     (1<<10)
 #define IR_16B_FRAME_ALIGNMENT (1<<11)
 #define IR_HAS_BLOCK_ADDR      (1<<12)
+#define IR_PREALLOCATED_STACK  (1<<13)
+
 
 /* Temporary: MEM2SSA -> SCCP */
 #define IR_MEM2SSA_VARS        (1<<25)
@@ -1388,7 +1390,7 @@ extern const ir_regset ir_scratch_regset[];
 
 typedef struct _ir_call_conv_dsc ir_call_conv_dsc;
 
-const ir_call_conv_dsc *ir_get_call_conv_dsc(ir_call_conv call_conv);
+const ir_call_conv_dsc *ir_get_call_conv_dsc(uint32_t flags);
 
 /*** IR Register Allocation ***/
 /* Flags for ctx->regs[][] (low bits are used for register number itself) */
@@ -1468,7 +1470,7 @@ void ir_fix_stack_frame(ir_ctx *ctx);
 /* Utility */
 ir_type ir_get_return_type(ir_ctx *ctx);
 const ir_proto_t *ir_call_proto(const ir_ctx *ctx, const ir_insn *insn);
-void ir_print_call_conv(ir_call_conv cc, FILE *f);
+void ir_print_call_conv(uint32_t flags, FILE *f);
 
 //#define IR_BITSET_LIVENESS
 

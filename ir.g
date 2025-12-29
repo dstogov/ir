@@ -263,7 +263,6 @@ ir(ir_loader *loader):
 	{uint8_t ret_type;}
 	{char name[256];}
 	{uint32_t flags = 0;}
-	{ir_call_conv cc = IR_CC_DEFAULT;}
 	{size_t size;}
 	{uint32_t params_count;}
 	{uint8_t param_types[256];}
@@ -285,13 +284,12 @@ ir(ir_loader *loader):
 				}
 			|
 				{flags = 0;}
-				{cc = IR_CC_DEFAULT;}
 				ir_func_name(name)
-				ir_func_proto(&p, &flags, &cc, &ret_type, &params_count, param_types)
+				ir_func_proto(&p, &flags, &ret_type, &params_count, param_types)
 				";"
 				{
 					if (loader->external_func_dcl
-					 && !loader->external_func_dcl(loader, name, flags, cc, ret_type, params_count, param_types)) {
+					 && !loader->external_func_dcl(loader, name, flags, ret_type, params_count, param_types)) {
 						yy_error_str("Unresolved extenral function", name);
 					}
 				}
@@ -343,19 +341,18 @@ ir(ir_loader *loader):
 				)
 			|
 				ir_func_name(name)
-				ir_func_proto(&p, &flags, &cc, &ret_type, &params_count, param_types)
+				ir_func_proto(&p, &flags, &ret_type, &params_count, param_types)
 				(
 					";"
 					{
 						if (loader->forward_func_dcl
-						 && !loader->forward_func_dcl(loader, name, flags, cc, ret_type, params_count, param_types)) {
+						 && !loader->forward_func_dcl(loader, name, flags, ret_type, params_count, param_types)) {
 							yy_error("forward_func_decl error");
 						}
 					}
 				|
 					{if (!loader->func_init(loader, &ctx, name)) yy_error("init_func error");}
 					{ctx.flags |= flags;}
-					{ctx.call_conv = cc;}
 					{ctx.ret_type = ret_type;}
 					ir_func(&p)
 					{if (!loader->func_process(loader, &ctx, name)) yy_error("process_func error");}
@@ -478,7 +475,7 @@ ir_func_name(char *buf):
 	{buf[len] = 0;}
 ;
 
-ir_func_proto(ir_parser_ctx *p, uint32_t *flags, ir_call_conv *cc, uint8_t *ret_type, uint32_t *params_count, uint8_t *param_types):
+ir_func_proto(ir_parser_ctx *p, uint32_t *flags, uint8_t *ret_type, uint32_t *params_count, uint8_t *param_types):
 	{uint8_t t = 0;}
 	{uint32_t n = 0;}
 	"("
@@ -512,16 +509,15 @@ ir_func_proto(ir_parser_ctx *p, uint32_t *flags, ir_call_conv *cc, uint8_t *ret_
 		"void"
 		{*ret_type = IR_VOID;}
 	)
-	{*cc = IR_CC_DEFAULT;}
 	(
 		"__fastcall"
-		{*cc = IR_CC_FASTCALL;}
+		{*flags |= IR_CC_FASTCALL;}
 	|
 		"__preserve_none"
-		{*cc = IR_CC_PRESERVE_NONE;}
+		{*flags |= IR_CC_PRESERVE_NONE;}
 	|
 		"__builtin"
-		{*flags |= IR_BUILTIN_FUNC;}
+		{*flags |= IR_CC_BUILTIN;}
 	)?
 	(
 		"__pure"
@@ -548,7 +544,6 @@ ir_insn(ir_parser_ctx *p):
 	{int32_t n;}
 	{uint8_t ret_type;}
 	{uint32_t flags;}
-	{ir_call_conv cc;}
 	{uint32_t params_count;}
 	{uint8_t param_types[256];}
 	(
@@ -568,16 +563,16 @@ ir_insn(ir_parser_ctx *p):
 	|	"func"
 		(	ID(&func, &func_len)
 			{flags = 0;}
-			ir_func_proto(p, &flags, &cc, &ret_type, &params_count, param_types)
-			{ref = ir_proto_cc(p->ctx, flags, cc, ret_type, params_count, param_types);}
+			ir_func_proto(p, &flags, &ret_type, &params_count, param_types)
+			{ref = ir_proto(p->ctx, flags, ret_type, params_count, param_types);}
 			{ref = ir_const_func(p->ctx, ir_strl(p->ctx, func, func_len), ref);}
 		|	"*"
 			(	DECNUMBER(IR_ADDR, &val)
 			|	HEXNUMBER(IR_ADDR, &val)
 			)
 			{flags = 0;}
-			ir_func_proto(p, &flags, &cc, &ret_type, &params_count, param_types)
-			{ref = ir_proto_cc(p->ctx, flags, cc, ret_type, params_count, param_types);}
+			ir_func_proto(p, &flags, &ret_type, &params_count, param_types)
+			{ref = ir_proto(p->ctx, flags, ret_type, params_count, param_types);}
 			{ref = ir_const_func_addr(p->ctx, val.addr, ref);}
 		)
 	|	"sym" "(" ID(&func, &func_len) ")"
@@ -769,7 +764,6 @@ val(ir_parser_ctx *p, uint8_t op, uint32_t n, ir_ref *ref):
 	{uint32_t kind = IR_OPND_KIND(ir_op_flags[op], n);}
 	{uint8_t ret_type;}
 	{uint32_t flags;}
-	{ir_call_conv cc;}
 	{uint32_t params_count;}
 	{uint8_t param_types[256];}
 	(	ID(&str, &len)
@@ -787,8 +781,8 @@ val(ir_parser_ctx *p, uint8_t op, uint32_t n, ir_ref *ref):
 	|   "func"
 		{if (kind != IR_OPND_PROTO) yy_error("unexpected function prototype");}
 		{flags = 0;}
-		ir_func_proto(p, &flags, &cc, &ret_type, &params_count, param_types)
-		{*ref = ir_proto_cc(p->ctx, flags, cc, ret_type, params_count, param_types);}
+		ir_func_proto(p, &flags, &ret_type, &params_count, param_types)
+		{*ref = ir_proto(p->ctx, flags, ret_type, params_count, param_types);}
 	)
 ;
 
