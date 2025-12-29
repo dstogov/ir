@@ -379,7 +379,7 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 	const ir_insn *insn;
 	int n = 0;
 	int flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG | IR_OP3_MUST_BE_IN_REG;
-	const proto_t *proto;
+	const ir_proto_t *proto;
 	const ir_call_conv_dsc *cc;
 
 	constraints->def_reg = IR_REG_NONE;
@@ -5398,7 +5398,7 @@ static void ir_emit_call_ex(ir_ctx *ctx, ir_ref def, ir_insn *insn, const ir_cal
 
 static void ir_emit_call(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
-	const proto_t *proto = ir_call_proto(ctx, insn);
+	const ir_proto_t *proto = ir_call_proto(ctx, insn);
 	const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(proto ? proto->call_conv : IR_CC_DEFAULT);
 	int32_t used_stack = ir_emit_arguments(ctx, def, insn, cc, ctx->regs[def][1]);
 	ir_emit_call_ex(ctx, def, insn, cc, used_stack);
@@ -5408,7 +5408,7 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-	const proto_t *proto = ir_call_proto(ctx, insn);
+	const ir_proto_t *proto = ir_call_proto(ctx, insn);
 	const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(proto ? proto->call_conv : IR_CC_DEFAULT);
 	int32_t used_stack = ir_emit_arguments(ctx, def, insn, cc, ctx->regs[def][1]);
 
@@ -6259,7 +6259,7 @@ static void ir_preallocate_call_stack(ir_ctx *ctx)
 
 	for (i = 1, insn = ctx->ir_base + 1; i < ctx->insns_count;) {
 		if (insn->op == IR_CALL) {
-			const proto_t *proto = ir_call_proto(ctx, insn);
+			const ir_proto_t *proto = ir_call_proto(ctx, insn);
 			const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(proto ? proto->call_conv : IR_CC_DEFAULT);
 			int32_t copy_stack;
 
