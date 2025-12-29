@@ -5022,10 +5022,16 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn, const ir_call_conv
 	int int_param = 0;
 	int fp_param = 0;
 	int32_t used_stack = 0, copy_stack = 0;
-#ifdef __APPLE__
-	const ir_proto_t *proto = ir_call_proto(ctx, insn);
-	int last_named_input = (proto && (proto->flags & IR_VARARG_FUNC)) ? proto->params_count + 2 : insn->inputs_count;
-#endif
+
+	/* On APPLE "unnamed" arguments always passed through stack */
+	int last_named_input;
+
+	if (!cc->sysv_varargs) {
+		const ir_proto_t *proto = ir_call_proto(ctx, insn);
+		last_named_input = (proto && (proto->flags & IR_VARARG_FUNC)) ? proto->params_count + 2 : insn->inputs_count;
+	} else {
+		last_named_input = insn->inputs_count;
+	}
 
 	n = insn->inputs_count;
 	for (j = 3; j <= n; j++) {
@@ -5039,12 +5045,9 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn, const ir_call_conv
 			copy_stack = IR_ALIGNED_SIZE(copy_stack, align);
 			type = IR_ADDR;
 		}
-#ifdef __APPLE__
 		if (j > last_named_input) {
 			used_stack += IR_MAX(sizeof(void*), ir_type_size[type]);
-		} else
-#endif
-		if (IR_IS_TYPE_INT(type)) {
+		} else if (IR_IS_TYPE_INT(type)) {
 			if (int_param >= cc->int_param_regs_count) {
 				used_stack += IR_MAX(sizeof(void*), ir_type_size[type]);
 			}
@@ -5112,10 +5115,15 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 		}
 	}
 
-#ifdef __APPLE__
-	const ir_proto_t *proto = ir_call_proto(ctx, insn);
-	int last_named_input = (proto && (proto->flags & IR_VARARG_FUNC)) ? proto->params_count + 2 : insn->inputs_count;
-#endif
+	/* On APPLE "unnamed" arguments always passed through stack */
+	int last_named_input;
+
+	if (!cc->sysv_varargs) {
+		const ir_proto_t *proto = ir_call_proto(ctx, insn);
+		last_named_input = (proto && (proto->flags & IR_VARARG_FUNC)) ? proto->params_count + 2 : insn->inputs_count;
+	} else {
+		last_named_input = insn->inputs_count;
+	}
 
 	if (copy_stack) {
 		/* Copy struct arguments */
@@ -5168,16 +5176,13 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 		arg_insn = &ctx->ir_base[arg];
 		type = arg_insn->type;
 
-#ifdef __APPLE__
 		if (j > last_named_input) {
 			if (arg_insn->op == IR_ARGVAL) {
 				do_pass3 = 1;
 				continue;
 			}
 			dst_reg = IR_REG_NONE; /* pass argument through stack */
-		} else
-#endif
-		if (IR_IS_TYPE_INT(type)) {
+		} else if (IR_IS_TYPE_INT(type)) {
 			if (int_param < cc->int_param_regs_count) {
 				dst_reg = cc->int_param_regs[int_param];
 			} else {
@@ -5252,13 +5257,10 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 				copy_stack_offset += size;
 				align = IR_MAX((int)sizeof(void*), align);
 				copy_stack_offset = IR_ALIGNED_SIZE(copy_stack_offset, align);
-#ifdef __APPLE__
 				if (j > last_named_input) {
 					|	add Rx(tmp_reg), sp, #(used_stack - copy_stack_offset)
 					ir_emit_store_mem_int(ctx, IR_ADDR, IR_MEM_BO(IR_REG_STACK_POINTER, stack_offset), tmp_reg);
-				} else
-#endif
-				if (int_param < cc->int_param_regs_count) {
+				} else if (int_param < cc->int_param_regs_count) {
 					dst_reg = cc->int_param_regs[int_param];
 					|	add Rx(dst_reg), sp, #(used_stack - copy_stack_offset)
 				} else {
@@ -5269,12 +5271,9 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 				int_param++;
 				continue;
 			}
-#ifdef __APPLE__
 			if (j > last_named_input) {
 				dst_reg = IR_REG_NONE; /* pass argument through stack */
-			} else
-#endif
-			if (IR_IS_TYPE_INT(type)) {
+			} else if (IR_IS_TYPE_INT(type)) {
 				if (int_param < cc->int_param_regs_count) {
 					dst_reg = cc->int_param_regs[int_param];
 				} else {
