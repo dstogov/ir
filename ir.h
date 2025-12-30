@@ -539,19 +539,20 @@ void ir_strtab_apply(const ir_strtab *strtab, ir_strtab_apply_t func);
 void ir_strtab_free(ir_strtab *strtab);
 
 /* IR Context Flags */
-#define IR_FUNCTION            (1<<0) /* Generate a function. */
-#define IR_VARARG_FUNC         (1<<1)
-#define IR_STATIC              (1<<2)
-#define IR_EXTERN              (1<<3)
+#define IR_PROTO_MASK          0xff
+#define IR_CALL_CONV_MASK      0x0f
 
-#define IR_CONST_FUNC          (1<<4)
-#define IR_PURE_FUNC           (1<<5)
+#define IR_VARARG_FUNC         (1<<4)
+#define IR_CONST_FUNC          (1<<5)
+#define IR_PURE_FUNC           (1<<6)
 
-#define IR_CONST               (1<<4)
-#define IR_INITIALIZED         (1<<5) /* sym data flag: constant or an initialized variable */
-#define IR_CONST_STRING        (1<<6) /* sym data flag: constant string */
+#define IR_CONST               (1<<5)
+#define IR_INITIALIZED         (1<<6) /* sym data flag: constant or an initialized variable */
+#define IR_CONST_STRING        (1<<7) /* sym data flag: constant string */
 
-#define IR_CALL_CONV_MASK      (0xf<<7)
+#define IR_FUNCTION            (1<<8) /* Generate a function. */
+#define IR_STATIC              (1<<9)
+#define IR_EXTERN              (1<<10)
 
 #define IR_USE_FRAME_POINTER   (1<<11)
 #define IR_NO_STACK_COMBINE    (1<<12)
@@ -582,17 +583,17 @@ void ir_strtab_free(ir_strtab *strtab);
 #endif
 
 /* Calling Conventions */
-#define IR_CC_DEFAULT          (0x0<<7)
-#define IR_CC_BUILTIN          (0x1<<7)
-#define IR_CC_FASTCALL         (0x2<<7)
-#define	IR_CC_PRESERVE_NONE    (0x3<<7)
+#define IR_CC_DEFAULT          0x00
+#define IR_CC_BUILTIN          0x01
+#define IR_CC_FASTCALL         0x02
+#define	IR_CC_PRESERVE_NONE    0x03
 
 #if defined(IR_TARGET_X64)
-# define IR_CC_X86_64_SYSV     (0x8<<7)
-# define IR_CC_X86_64_MS       (0x9<<7)
+# define IR_CC_X86_64_SYSV     0x08
+# define IR_CC_X86_64_MS       0x09
 #elif defined(IR_TARGET_AARCH64)
-# define IR_CC_AARCH64_SYSV    (0x8<<7)
-# define IR_CC_AARCH64_DARWIN  (0x9<<7)
+# define IR_CC_AARCH64_SYSV    0x08
+# define IR_CC_AARCH64_DARWIN  0x09
 #endif
 
 /* Deprecated constants */
@@ -745,7 +746,7 @@ const char *ir_get_strl(const ir_ctx *ctx, ir_ref idx, size_t *len);
 #define IR_MAX_PROTO_PARAMS 255
 
 typedef struct _ir_proto_t {
-	uint16_t flags;
+	uint8_t flags;
 	uint8_t ret_type;
 	uint8_t params_count;
 	uint8_t param_types[5];

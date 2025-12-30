@@ -156,16 +156,14 @@ ir_ref ir_strtab_lookup(ir_strtab *strtab, const char *str, uint32_t len, ir_ref
 	}
 
 	if (strtab->buf) {
-		uint32_t size = IR_ALIGNED_SIZE(len + 1, 2);
-
-		if (UNEXPECTED(strtab->buf_size - strtab->buf_top < size)) {
-			ir_strtab_grow_buf(strtab, size);
+		if (UNEXPECTED(strtab->buf_size - strtab->buf_top < len + 1)) {
+			ir_strtab_grow_buf(strtab, len + 1);
 		}
 
 		memcpy(strtab->buf + strtab->buf_top, str, len);
 		strtab->buf[strtab->buf_top + len] = 0;
 		str = (const char*)strtab->buf + strtab->buf_top;
-		strtab->buf_top += size;
+		strtab->buf_top += len + 1;
 	}
 
 	pos = strtab->pos;
