@@ -763,7 +763,7 @@ ir_ref ir_proto_2(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_t
 	return ir_strl(ctx, (const char *)&proto, offsetof(ir_proto_t, param_types) + 2);
 }
 
-ir_ref ir_proto_3(ir_ctx *ctx, uint6_t flags, ir_type ret_type, ir_type t1, ir_type t2, ir_type t3)
+ir_ref ir_proto_3(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2, ir_type t3)
 {
 	ir_proto_t proto;
 
