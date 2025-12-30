@@ -50,7 +50,7 @@ void ir_print_call_conv(uint32_t flags, FILE *f)
 	}
 }
 
-void ir_print_proto_ex(uint32_t flags, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, FILE *f)
+void ir_print_proto_ex(uint8_t flags, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, FILE *f)
 {
 	uint32_t j;
 
