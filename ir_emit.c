@@ -1000,6 +1000,7 @@ const ir_call_conv_dsc *ir_get_call_conv_dsc(uint32_t flags)
 	switch (flags & IR_CALL_CONV_MASK) {
 		case IR_CC_DEFAULT:              return &ir_call_conv_default;
 		case IR_CC_FASTCALL:             return &ir_call_conv_default;
+		case IR_CC_PRESERVE_NONE:        return &ir_call_conv_aarch64_preserve_none;
 		case IR_CC_AARCH64_SYSV:         return &ir_call_conv_aarch64_sysv;
 		case IR_CC_AARCH64_DARWIN:       return &ir_call_conv_aarch64_darwin;
 		default: break;
