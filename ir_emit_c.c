@@ -20,10 +20,10 @@ typedef struct _ir_c_backend_data {
 	bool               resolved_label_syms;
 } ir_c_backend_data;
 
-static int ir_add_tmp_type(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
+static int ir_add_tmp_type(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to, void *data)
 {
 	if (from == 0) {
-		ir_bitset tmp_types = ctx->data;
+		ir_bitset tmp_types = data;
 
 		ir_bitset_incl(tmp_types, type);
 	}
@@ -63,9 +63,9 @@ static void ir_emit_c_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 	}
 }
 
-static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to)
+static int ir_emit_dessa_move(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to, void *data)
 {
-	FILE *f = ctx->data;
+	FILE *f = data;
 
 	if (to) {
 		fprintf(f, "\td_%d = ", ctx->vregs[to]);
@@ -770,6 +770,33 @@ static void ir_emit_store(ir_ctx *ctx, FILE *f, ir_insn *insn)
 	fprintf(f, ";\n");
 }
 
+static void ir_emit_c_call_conv(FILE *f, uint32_t flags)
+{
+	switch (flags & IR_CALL_CONV_MASK) {
+		case IR_CC_FASTCALL:
+			fprintf(f, " __fastcall");
+			break;
+		case IR_CC_PRESERVE_NONE:
+			fprintf(f, " __attriute__((preserve_none))");
+			break;
+#if defined(IR_TARGET_X64)
+		case IR_CC_X86_64_SYSV:
+			fprintf(f, " __attriute__((sysv_abi))");
+			break;
+		case IR_CC_X86_64_MS:
+			fprintf(f, " __attriute__((ms_abi))");
+			break;
+#elif defined(IR_TARGET_AARCH64)
+		case IR_CC_AARCH64_SYSV:
+			break;
+		case IR_CC_AARCH64_DARWIN:
+			break;
+#endif
+		default:
+			IR_ASSERT((flags & IR_CALL_CONV_MASK) == IR_CC_DEFAULT || (flags & IR_CALL_CONV_MASK) == IR_CC_BUILTIN);
+	}
+}
+
 static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 {
 	ir_ref i, n, *p;
@@ -789,8 +816,8 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 	if (ctx->flags & IR_STATIC) {
 		fprintf(f, "static ");
 	}
-	fprintf(f, "%s %s%s(", ir_type_cname[ctx->ret_type != (ir_type)-1 ? ctx->ret_type : IR_VOID],
-		(ctx->flags & IR_FASTCALL_FUNC) ? "__fastcall " : "", name);
+	ir_emit_c_call_conv(f, ctx->flags);
+	fprintf(f, "%s %s(", ir_type_cname[ctx->ret_type != (ir_type)-1 ? ctx->ret_type : IR_VOID], name);
 	use_list = &ctx->use_lists[1];
 	n = use_list->count;
 	first = 1;
@@ -834,8 +861,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 			bb->flags |= IR_BB_EMPTY;
 		}
 		if (bb->flags & IR_BB_DESSA_MOVES) {
-			ctx->data = tmp_types;
-			ir_gen_dessa_moves(ctx, b, ir_add_tmp_type);
+			ir_gen_dessa_moves(ctx, b, ir_add_tmp_type, tmp_types);
 		}
 		for (i = bb->start, insn = ctx->ir_base + i; i <= bb->end;) {
 			if (ctx->vregs[i]) {
@@ -1069,8 +1095,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_LOOP_END:
 					IR_ASSERT(bb->successors_count == 1);
 					if (bb->flags & IR_BB_DESSA_MOVES) {
-						ctx->data = f;
-						ir_gen_dessa_moves(ctx, b, ir_emit_dessa_move);
+						ir_gen_dessa_moves(ctx, b, ir_emit_dessa_move, f);
 					}
 					target = ir_skip_empty_target_blocks(ctx, ctx->cfg_edges[bb->successors]);
 					if (target != ir_next_block(ctx, _b)) {
@@ -1188,9 +1213,7 @@ void ir_emit_c_func_decl(const char *name, uint32_t flags, ir_type ret_type, uin
 		fprintf(f, "static ");
 	}
 	fprintf(f, "%s ", ir_type_cname[ret_type]);
-	if (flags & IR_FASTCALL_FUNC) {
-		fprintf(f, "__fastcall ");
-	}
+	ir_emit_c_call_conv(f, flags);
 	fprintf(f, "%s(", name);
 	if (params_count) {
 		const uint8_t *p = param_types;

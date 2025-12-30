@@ -949,9 +949,7 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 			fprintf(l->dump_file, "...");
 		}
 		fprintf(l->dump_file, "): %s", ir_type_cname[ctx->ret_type != (ir_type)-1 ? ctx->ret_type : IR_VOID]);
-		if (ctx->flags & IR_FASTCALL_FUNC) {
-			fprintf(l->dump_file, " __fastcall");
-		}
+		ir_print_call_conv(ctx->flags, l->dump_file);
 		if (ctx->flags & IR_CONST_FUNC) {
 			fprintf(l->dump_file, " __const");
 		} else if (ctx->flags & IR_PURE_FUNC) {
@@ -1207,7 +1205,7 @@ int main(int argc, char **argv)
 		} else if (strcmp(argv[i], "-muse-fp") == 0) {
 			flags |= IR_USE_FRAME_POINTER;
 		} else if (strcmp(argv[i], "-mfastcall") == 0) {
-			flags |= IR_FASTCALL_FUNC;
+			flags |= IR_CC_FASTCALL;
 		} else if (strcmp(argv[i], "-fno-inline") == 0) {
 			disable_inline = 1;
 		} else if (strcmp(argv[i], "-finline") == 0) {

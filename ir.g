@@ -511,10 +511,13 @@ ir_func_proto(ir_parser_ctx *p, uint32_t *flags, uint8_t *ret_type, uint32_t *pa
 	)
 	(
 		"__fastcall"
-		{*flags |= IR_FASTCALL_FUNC;}
+		{*flags |= IR_CC_FASTCALL;}
+	|
+		"__preserve_none"
+		{*flags |= IR_CC_PRESERVE_NONE;}
 	|
 		"__builtin"
-		{*flags |= IR_BUILTIN_FUNC;}
+		{*flags |= IR_CC_BUILTIN;}
 	)?
 	(
 		"__pure"

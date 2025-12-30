@@ -21,6 +21,9 @@
 #define LLVMAttrByVal          76
 #define LLVMAttrAlignment      81
 
+// The numbers from <LLVM/IR/CallingConv.inc>
+#define LLVMPreserveNone       21
+
 #define LLVM2IR_INLINE_MAX_HINT_BLOCKS 10
 #define LLVM2IR_INLINE_MAX_HINT_COST   50
 #define LLVM2IR_INLINE_MAX_BLOCKS      5
@@ -31,15 +34,15 @@
 #define BUILTIN_FUNC_1(name, ret_type, arg1_type) \
 	ir_const_func(ctx, \
 		ir_strl(ctx, name, strlen(name)), \
-		ir_proto_1(ctx, IR_BUILTIN_FUNC, ret_type, arg1_type))
+		ir_proto_1(ctx, IR_CC_BUILTIN, ret_type, arg1_type))
 #define BUILTIN_FUNC_2(name, ret_type, arg1_type, arg2_type) \
 	ir_const_func(ctx, \
 		ir_strl(ctx, name, strlen(name)), \
-		ir_proto_2(ctx, IR_BUILTIN_FUNC, ret_type, arg1_type, arg2_type))
+		ir_proto_2(ctx, IR_CC_BUILTIN, ret_type, arg1_type, arg2_type))
 #define BUILTIN_FUNC_3(name, ret_type, arg1_type, arg2_type, arg3_type) \
 	ir_const_func(ctx, \
 		ir_strl(ctx, name, strlen(name)), \
-		ir_proto_3(ctx, IR_BUILTIN_FUNC, ret_type, arg1_type, arg2_type, arg3_type))
+		ir_proto_3(ctx, IR_CC_BUILTIN, ret_type, arg1_type, arg2_type, arg3_type))
 
 static ir_ref llvm2ir_const_expr(ir_ctx *ctx, LLVMValueRef expr);
 static ir_ref llvm2ir_auto_cast(ir_ctx *ctx, ir_ref ref, ir_type src_type, ir_type type);
@@ -141,23 +144,36 @@ static const char *llvm2ir_label_name(char *buf, size_t buf_len, LLVMValueRef fu
 	return buf;
 }
 
-static ir_ref llvm2ir_proto(ir_ctx *ctx, uint32_t cconv, LLVMTypeRef ftype)
+static uint32_t llvm2ir_call_conv(uint32_t cconv)
 {
-	uint8_t flags = 0;
-	ir_type ret_type;
-	uint8_t *arg_types;
-	uint32_t i, num_args;
-	LLVMTypeRef *types;
-
 	if (cconv == LLVMCCallConv || cconv == LLVMFastCallConv) {
-		/* skip */
+		return IR_CC_DEFAULT;
 	} else if (cconv == LLVMX86FastcallCallConv) {
-		flags |= IR_FASTCALL_FUNC;
+		return IR_CC_FASTCALL;
+	} else if (cconv == LLVMPreserveNone) {
+		return IR_CC_PRESERVE_NONE;
+#if defined(IR_TARGET_X64)
+	} else if (cconv == LLVMX8664SysVCallConv) {
+		return IR_CC_X86_64_SYSV;
+	} else if (cconv == LLVMWin64CallConv) {
+		return IR_CC_X86_64_SYSV;
+#endif
 	} else {
 		fprintf(stderr, "Unsupported Calling Convention: %d\n", cconv);
 		IR_ASSERT(0);
 		return 0;
 	}
+}
+
+static ir_ref llvm2ir_proto(ir_ctx *ctx, uint32_t cconv, LLVMTypeRef ftype)
+{
+	uint32_t flags = 0;
+	ir_type ret_type;
+	uint8_t *arg_types;
+	uint32_t i, num_args;
+	LLVMTypeRef *types;
+
+	flags |= llvm2ir_call_conv(cconv);
 	if (LLVMIsFunctionVarArg(ftype)) {
 		flags |= IR_VARARG_FUNC;
 	}
@@ -1806,15 +1822,7 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMValueRef func, LLVMModuleRef module)
 	// TODO: function prototype
 	ftype = LLVMGlobalGetValueType(func);
 	cconv = LLVMGetFunctionCallConv(func);
-	if (cconv == LLVMCCallConv || cconv == LLVMFastCallConv) {
-		/* skip */
-	} else if (cconv == LLVMX86FastcallCallConv) {
-		ctx->flags |= IR_FASTCALL_FUNC;
-	} else {
-		fprintf(stderr, "Unsupported Calling Convention: %d\n", cconv);
-		IR_ASSERT(0);
-		return 0;
-	}
+	ctx->flags |= llvm2ir_call_conv(cconv);
 	if (LLVMIsFunctionVarArg(ftype)) {
 		ctx->flags |= IR_VARARG_FUNC;
 	}
@@ -2289,15 +2297,7 @@ static int llvm2ir_external_func(ir_loader *loader, const char *name, LLVMValueR
 
 	ftype = LLVMGlobalGetValueType(func);
 	cconv = LLVMGetFunctionCallConv(func);
-	if (cconv == LLVMCCallConv || cconv == LLVMFastCallConv) {
-		/* skip */
-	} else if (cconv == LLVMX86FastcallCallConv) {
-		flags |= IR_FASTCALL_FUNC;
-	} else {
-		fprintf(stderr, "Unsupported Calling Convention: %d\n", cconv);
-		IR_ASSERT(0);
-		return 0;
-	}
+	flags |= llvm2ir_call_conv(cconv);
 	if (LLVMIsFunctionVarArg(ftype)) {
 		flags |= IR_VARARG_FUNC;
 	}
@@ -2321,15 +2321,7 @@ static int llvm2ir_forward_func(ir_loader *loader, const char *name, LLVMValueRe
 
 	ftype = LLVMGlobalGetValueType(func);
 	cconv = LLVMGetFunctionCallConv(func);
-	if (cconv == LLVMCCallConv || cconv == LLVMFastCallConv) {
-		/* skip */
-	} else if (cconv == LLVMX86FastcallCallConv) {
-		flags |= IR_FASTCALL_FUNC;
-	} else {
-		fprintf(stderr, "Unsupported Calling Convention: %d\n", cconv);
-		IR_ASSERT(0);
-		return 0;
-	}
+	flags |= llvm2ir_call_conv(cconv);
 	if (LLVMIsFunctionVarArg(ftype)) {
 		flags |= IR_VARARG_FUNC;
 	}
