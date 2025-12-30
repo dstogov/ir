@@ -746,21 +746,21 @@ const char *ir_get_strl(const ir_ctx *ctx, ir_ref idx, size_t *len);
 #define IR_MAX_PROTO_PARAMS 255
 
 typedef struct _ir_proto_t {
-	uint8_t flags;
+	uint8_t flags; /* first 8 bits of ir_ctx.flags */
 	uint8_t ret_type;
 	uint8_t params_count;
 	uint8_t param_types[5];
 } ir_proto_t;
 
-ir_ref ir_proto_0(ir_ctx *ctx, uint32_t flags, ir_type ret_type);
-ir_ref ir_proto_1(ir_ctx *ctx, uint32_t flags, ir_type ret_type, ir_type t1);
-ir_ref ir_proto_2(ir_ctx *ctx, uint32_t flags, ir_type ret_type, ir_type t1, ir_type t2);
-ir_ref ir_proto_3(ir_ctx *ctx, uint32_t flags, ir_type ret_type, ir_type t1, ir_type t2, ir_type t3);
-ir_ref ir_proto_4(ir_ctx *ctx, uint32_t flags, ir_type ret_type, ir_type t1, ir_type t2, ir_type t3,
+ir_ref ir_proto_0(ir_ctx *ctx, uint8_t flags, ir_type ret_type);
+ir_ref ir_proto_1(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1);
+ir_ref ir_proto_2(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2);
+ir_ref ir_proto_3(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2, ir_type t3);
+ir_ref ir_proto_4(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2, ir_type t3,
                                                                 ir_type t4);
-ir_ref ir_proto_5(ir_ctx *ctx, uint32_t flags, ir_type ret_type, ir_type t1, ir_type t2, ir_type t3,
+ir_ref ir_proto_5(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2, ir_type t3,
                                                                 ir_type t4, ir_type t5);
-ir_ref ir_proto(ir_ctx *ctx, uint32_t flags, ir_type ret_type, uint32_t params_counts, uint8_t *param_types);
+ir_ref ir_proto(ir_ctx *ctx, uint8_t flags, ir_type ret_type, uint32_t params_counts, uint8_t *param_types);
 
 ir_ref ir_emit(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
 
