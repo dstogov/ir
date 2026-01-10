@@ -2037,20 +2037,12 @@ static void ir_match_fuse_load_cmp_fp(ir_ctx *ctx, ir_insn *insn, ir_ref root)
 	}
 }
 
-static void ir_match_fuse_load_cmp_fp_br(ir_ctx *ctx, ir_insn *insn, ir_ref root, bool direct)
+static void ir_match_fuse_load_cmp_fp_br(ir_ctx *ctx, ir_insn *insn, ir_ref root)
 {
-	if (direct) {
-		if (insn->op == IR_LT || insn->op == IR_LE) {
-			/* swap operands to avoid P flag check */
-			ir_swap_ops(insn);
-			insn->op ^= 3;
-		}
-	} else {
-		if (insn->op == IR_LT || insn->op == IR_LE) {
-			/* swap operands to avoid P flag check */
-			ir_swap_ops(insn);
-			insn->op ^= 3;
-		}
+	if (insn->op == IR_LT || insn->op == IR_LE) {
+		/* swap operands to avoid P flag check */
+		ir_swap_ops(insn);
+		insn->op ^= 3;
 	}
 	if (IR_IS_CONST_REF(insn->op2) && !IR_IS_FP_ZERO(ctx->ir_base[insn->op2])) {
 		/* pass */
@@ -2925,7 +2917,7 @@ store_int:
 						return IR_CMP_AND_BRANCH_INT;
 					} else {
 						/* c = CMP(_, _) ... IF(c) => SKIP_CMP ... CMP_AND_BRANCH */
-						ir_match_fuse_load_cmp_fp_br(ctx, op2_insn, ref, 1);
+						ir_match_fuse_load_cmp_fp_br(ctx, op2_insn, ref);
 						ctx->rules[insn->op2] = IR_FUSED | IR_CMP_FP;
 						return IR_CMP_AND_BRANCH_FP;
 					}
@@ -3022,7 +3014,7 @@ store_int:
 						ctx->rules[insn->op1] = IR_FUSED | IR_CMP_INT;
 						return IR_COND_CMP_INT;
 					} else {
-						ir_match_fuse_load_cmp_fp_br(ctx, op1_insn, ref, 1);
+						ir_match_fuse_load_cmp_fp_br(ctx, op1_insn, ref);
 						ctx->rules[insn->op1] = IR_FUSED | IR_CMP_FP;
 						return IR_COND_CMP_FP;
 					}
@@ -3114,7 +3106,7 @@ store_int:
 						return IR_GUARD_CMP_INT;
 					} else {
 						/* c = CMP(_, _) ... GUARD(c) => SKIP_CMP ... GUARD_CMP */
-						ir_match_fuse_load_cmp_fp_br(ctx, op2_insn, ref, insn->op == IR_GUARD_NOT);
+						ir_match_fuse_load_cmp_fp_br(ctx, op2_insn, ref);
 						ctx->rules[insn->op2] = IR_FUSED | IR_CMP_FP;
 						return IR_GUARD_CMP_FP;
 					}
