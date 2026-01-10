@@ -5,10 +5,12 @@ x86_64
 --ARGS--
 -S
 --CODE--
+extern func @test(): void;
+func guard(double, double): int32_t
 {
 	int32_t c_1 = 0;
 	l_1 = START(l_50);
-	uintptr_t addr = func exit(): void;
+	uintptr_t addr = func @test(): void;
 	double d_1 = PARAM(l_1, "x", 1);
 	double d_2 = PARAM(l_1, "y", 2);
 	l_2 = LE(d_1, d_2);
@@ -26,21 +28,23 @@ x86_64
 	l_50 = RETURN(l_14, c_1);
 }
 --EXPECT--
-test:
+guard:
 	ucomisd %xmm0, %xmm1
-	jb exit
+	jb test
 	ucomisd %xmm0, %xmm1
-	jbe exit
+	jbe test
 	ucomisd %xmm1, %xmm0
-	jb exit
+	jb test
 	ucomisd %xmm1, %xmm0
-	jbe exit
+	jbe test
 	ucomisd %xmm0, %xmm1
-	jne exit
-	jp exit
+	jne test
+	jp test
 	ucomisd %xmm0, %xmm1
 	jp .L1
-	je exit
+	je test
 .L1:
 	xorl %eax, %eax
 	retq
+
+Undefined symbol: test
