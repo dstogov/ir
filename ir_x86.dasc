@@ -2046,7 +2046,7 @@ static void ir_match_fuse_load_cmp_fp_br(ir_ctx *ctx, ir_insn *insn, ir_ref root
 			insn->op ^= 3;
 		}
 	} else {
-		if (insn->op == IR_GT || insn->op == IR_GE) {
+		if (insn->op == IR_LT || insn->op == IR_LE) {
 			/* swap operands to avoid P flag check */
 			ir_swap_ops(insn);
 			insn->op ^= 3;
@@ -10060,7 +10060,7 @@ static void ir_emit_ijmp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
-static bool ir_emit_guard_jcc(ir_ctx *ctx, uint32_t b, ir_ref def, uint32_t next_block, uint8_t op, void *addr, bool int_cmp, bool after_op)
+static bool ir_emit_guard_jcc(ir_ctx *ctx, uint32_t b, ir_ref def, uint32_t next_block, uint8_t op, void *addr, bool int_cmp, bool after_op, bool fp_cmp_inv)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
@@ -10139,17 +10139,27 @@ static bool ir_emit_guard_jcc(ir_ctx *ctx, uint32_t b, ir_ref def, uint32_t next
 							|	je =>target
 							break;
 						case IR_LT:
+							if (!fp_cmp_inv) {
+								|	jp &addr
+							}
 							|	jae =>target
 							break;
 						case IR_GE:
-							|	jp &addr
+							if (fp_cmp_inv) {
+								|	jp &addr
+							}
 							|	jb =>target
 							break;
 						case IR_LE:
+							if (!fp_cmp_inv) {
+								|	jp &addr
+							}
 							|	ja =>target
 							break;
 						case IR_GT:
-							|	jp &addr
+							if (fp_cmp_inv) {
+								|	jp &addr
+							}
 							|	jbe =>target
 							break;
 						case IR_ORDERED:
@@ -10224,17 +10234,27 @@ static bool ir_emit_guard_jcc(ir_ctx *ctx, uint32_t b, ir_ref def, uint32_t next
 						|	je &target_addr
 						break;
 					case IR_LT:
+						if (!fp_cmp_inv) {
+							|	jp &addr
+						}
 						|	jae &target_addr
 						break;
 					case IR_GE:
-						|	jp &addr
+						if (fp_cmp_inv) {
+							|	jp &addr
+						}
 						|	jb &target_addr
 						break;
 					case IR_LE:
+						if (!fp_cmp_inv) {
+							|	jp &addr
+						}
 						|	ja &target_addr
 						break;
 					case IR_GT:
-						|	jp &addr
+						if (fp_cmp_inv) {
+							|	jp &addr
+						}
 						|	jbe &target_addr
 						break;
 					case IR_ORDERED:
@@ -10307,19 +10327,33 @@ static bool ir_emit_guard_jcc(ir_ctx *ctx, uint32_t b, ir_ref def, uint32_t next
 				|	jp &addr
 				break;
 			case IR_LT:
-				|	jp >1
-				|	jb &addr
-				|1:
+				if (fp_cmp_inv) {
+					|	jb &addr
+				} else {
+					|	jp >1
+					|	jb &addr
+					|1:
+				}
 				break;
 			case IR_GE:
+				if (fp_cmp_inv) {
+					|	jp &addr
+				}
 				|	jae &addr
 				break;
 			case IR_LE:
-				|	jp >1
-				|	jbe &addr
-				|1:
+				if (fp_cmp_inv) {
+					|	jbe &addr
+				} else {
+					|	jp >1
+					|	jbe &addr
+					|1:
+				}
 				break;
 			case IR_GT:
+				if (fp_cmp_inv) {
+					|	jp &addr
+				}
 				|	ja &addr
 				break;
 			case IR_ORDERED:
@@ -10393,7 +10427,7 @@ static bool ir_emit_guard(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn, ui
 		} else {
 			op = IR_NE;
 		}
-		return ir_emit_guard_jcc(ctx, b, def, next_block, op, addr, 1, 0);
+		return ir_emit_guard_jcc(ctx, b, def, next_block, op, addr, 1, 0, 0);
 	} else {
 |.if X64
 		if (insn->op == IR_GUARD) {
@@ -10471,7 +10505,7 @@ static bool ir_emit_guard_cmp_int(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *
 		op ^= 1; // reverse
 	}
 
-	return ir_emit_guard_jcc(ctx, b, def, next_block, op, addr, 1, 0);
+	return ir_emit_guard_jcc(ctx, b, def, next_block, op, addr, 1, 0, 0);
 }
 
 static bool ir_emit_guard_cmp_fp(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn, uint32_t next_block)
@@ -10482,7 +10516,7 @@ static bool ir_emit_guard_cmp_fp(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *i
 	if (insn->op == IR_GUARD) {
 		op ^= 1; // reverse
 	}
-	return ir_emit_guard_jcc(ctx, b, def, next_block, op, addr, 0, 0);
+	return ir_emit_guard_jcc(ctx, b, def, next_block, op, addr, 0, 0, insn->op == IR_GUARD);
 }
 
 static bool ir_emit_guard_test_int(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn, uint32_t next_block)
@@ -10491,7 +10525,7 @@ static bool ir_emit_guard_test_int(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn 
 	ir_op op = (insn->op == IR_GUARD) ? IR_EQ : IR_NE;
 
 	ir_emit_test_int_common(ctx, def, insn->op2, op);
-	return ir_emit_guard_jcc(ctx, b, def, next_block, op, addr, 1, 0);
+	return ir_emit_guard_jcc(ctx, b, def, next_block, op, addr, 1, 0, 0);
 }
 
 static bool ir_emit_guard_jcc_int(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn, uint32_t next_block)
@@ -10502,7 +10536,7 @@ static bool ir_emit_guard_jcc_int(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *
 	if (insn->op == IR_GUARD) {
 		op ^= 1; // reverse
 	}
-	return ir_emit_guard_jcc(ctx, b, def, next_block, op, addr, 1, 1);
+	return ir_emit_guard_jcc(ctx, b, def, next_block, op, addr, 1, 1, 0);
 }
 
 static bool ir_emit_guard_overflow(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)

@@ -1,0 +1,46 @@
+--TEST--
+001: Guard jump condition code generation
+--TARGET--
+x86_64
+--ARGS--
+-S
+--CODE--
+{
+	int32_t c_1 = 0;
+	l_1 = START(l_50);
+	uintptr_t addr = func exit(): void;
+	double d_1 = PARAM(l_1, "x", 1);
+	double d_2 = PARAM(l_1, "y", 2);
+	l_2 = LE(d_1, d_2);
+	l_4 = GUARD(l_1, l_2, addr);
+	l_5 = LT(d_1, d_2);
+	l_6 = GUARD(l_4, l_5, addr);
+	l_7 = GE(d_1, d_2);
+	l_8 = GUARD(l_6, l_7, addr);
+	l_9 = GT(d_1, d_2);
+	l_10 = GUARD(l_8, l_9, addr);
+	l_11 = EQ(d_1, d_2);
+	l_12 = GUARD(l_10, l_11, addr);
+	l_13 = NE(d_1, d_2);
+	l_14 = GUARD(l_12, l_13, addr);
+	l_50 = RETURN(l_14, c_1);
+}
+--EXPECT--
+test:
+	ucomisd %xmm0, %xmm1
+	jb exit
+	ucomisd %xmm0, %xmm1
+	jbe exit
+	ucomisd %xmm1, %xmm0
+	jb exit
+	ucomisd %xmm1, %xmm0
+	jbe exit
+	ucomisd %xmm0, %xmm1
+	jne exit
+	jp exit
+	ucomisd %xmm0, %xmm1
+	jp .L1
+	je exit
+.L1:
+	xorl %eax, %eax
+	retq
