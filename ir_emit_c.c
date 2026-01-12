@@ -611,6 +611,20 @@ static void ir_emit_if(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn *in
 	}
 }
 
+static void ir_emit_guard(ir_ctx *ctx, FILE *f, ir_insn *insn)
+{
+	fprintf(f, "\tif (");
+	if (insn->op == IR_GUARD) {
+		fprintf(f, "!");
+	}
+	ir_emit_ref(ctx, f, insn->op2);
+	fprintf(f, ") return ");
+	// Treat guard as a function with the same return type and no arguments
+	fprintf(f, "((%s (*)(void))(", ir_type_cname[ctx->ret_type]);
+	ir_emit_ref(ctx, f, insn->op3);
+	fprintf(f, "))();\n");
+}
+
 static void ir_emit_switch(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn *insn)
 {
 	ir_block *bb;
@@ -1171,6 +1185,10 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					break;
 				case IR_TRAP:
 					fprintf(f, "\t__builtin_debugtrap();\n");
+					break;
+				case IR_GUARD:
+				case IR_GUARD_NOT:
+					ir_emit_guard(ctx, f, insn);
 					break;
 				default:
 					IR_ASSERT(0 && "NIY instruction");
