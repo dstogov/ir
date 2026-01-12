@@ -3334,10 +3334,6 @@ static void ir_emit_jcc(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn, uint
 				break;
 			case IR_UNORDERED:
 				|	bvs =>true_block
-//			case IR_ULT: fprintf(stderr, "\tjb .LL%d\n", true_block); break;
-//			case IR_UGE: fprintf(stderr, "\tjae .LL%d\n", true_block); break;
-//			case IR_ULE: fprintf(stderr, "\tjbe .LL%d\n", true_block); break;
-//			case IR_UGT: fprintf(stderr, "\tja .LL%d\n", true_block); break;
 		}
 	}
 	if (false_block) {
@@ -5656,15 +5652,23 @@ static void ir_emit_guard_jcc(ir_ctx *ctx, uint8_t op, void *addr, bool int_cmp)
 			case IR_GT:
 				|	bgt &addr
 				break;
+			case IR_ULT:
+				|	blt &addr
+				break;
+			case IR_UGE:
+				|	bhs &addr
+				break;
+			case IR_ULE:
+				|	ble &addr
+				break;
+			case IR_UGT:
+				|	bhi &addr
+				break;
 			case IR_ORDERED:
 				|	bvc &addr
 				break;
 			case IR_UNORDERED:
 				|	bvs &addr
-//			case IR_ULT: fprintf(stderr, "\tjb .LL%d\n", true_block); break;
-//			case IR_UGE: fprintf(stderr, "\tjae .LL%d\n", true_block); break;
-//			case IR_ULE: fprintf(stderr, "\tjbe .LL%d\n", true_block); break;
-//			case IR_UGT: fprintf(stderr, "\tja .LL%d\n", true_block); break;
 		}
 	}
 }
@@ -5738,7 +5742,11 @@ static void ir_emit_guard_cmp_fp(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *i
 	void *addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op3]);
 
 	if (insn->op == IR_GUARD) {
-		op ^= 1; // reverse
+		if (op == IR_EQ || op == IR_NE || op == IR_ORDERED || op == IR_UNORDERED) {
+			op ^= 1; // reverse
+		} else {
+			op ^= 5; // reverse
+		}
 	}
 	ir_emit_guard_jcc(ctx, op, addr, 0);
 }
