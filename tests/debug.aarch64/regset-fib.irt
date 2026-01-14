@@ -91,10 +91,10 @@ main:
 	adr x0, .L5
 	bl printf
 .L2:
-	ldr d0, .L4
 	ldr d1, [x29, #0x18]
-	fcmp d0, d1
-	b.gt .L1
+	ldr d0, .L4
+	fcmp d1, d0
+	b.mi .L1
 	mov w0, wzr
 	ldp x29, x30, [sp], #0x20
 	ret
