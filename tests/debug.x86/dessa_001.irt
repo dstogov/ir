@@ -3,7 +3,7 @@ DESSA 001
 --TARGET--
 x86
 --ARGS--
--S
+-O1 -S
 --CODE--
 # Figure 1 from "Translating Out of Static Single Assignment Form" by Sreedhar
 {
