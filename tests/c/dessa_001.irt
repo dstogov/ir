@@ -1,7 +1,7 @@
 --TEST--
 DESSA 001
 --ARGS--
---emit-c
+-O1 --emit-c
 --CODE--
 # Figure 1 from "Translating Out of Static Single Assignment Form" by Sreedhar
 {

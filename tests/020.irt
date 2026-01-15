@@ -1,7 +1,7 @@
 --TEST--
 020: Translation out of SSA (Figure 1 from "Translating Out of Static Single Assignment Form" by Sreedhar)
 --ARGS--
---save --dump-live-ranges --dump-cfg
+-O1 --save --dump-live-ranges --dump-cfg
 --CODE--
 {
 	uintptr_t c_1 = 0;

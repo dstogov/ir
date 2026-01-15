@@ -3,7 +3,7 @@
 --TARGET--
 Windows-x86_64
 --ARGS--
--S
+-O1 -S
 --CODE--
 {
 	int32_t c1 = 0;
