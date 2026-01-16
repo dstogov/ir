@@ -58,6 +58,7 @@ static void help(const char *cmd)
 		"General Options:\n"
 		"  --run ...                  - run the main() function of generated code\n"
 		"                               (the remaining arguments are passed to main)\n"
+		"  --emit-ir [file-name]      - save optimize IR code\n"
 		"  -S                         - show generated assembler code\n"
 		"Optimization Options:\n"
 		"  -O[012]                    - optimization level (default: -O2)\n"
@@ -1127,7 +1128,7 @@ int main(int argc, char **argv)
 				llvm_file = argv[i + 1];
 				i++;
 			}
-		} else if (strcmp(argv[i], "--save") == 0) {
+		} else if (strcmp(argv[i], "--save") == 0 || strcmp(argv[i], "--emit-ir") == 0) {
 			// TODO: check save/dot/dump/... conflicts
 			dump |= IR_DUMP_SAVE;
 			if (i + 1 < argc && argv[i + 1][0] != '-') {
