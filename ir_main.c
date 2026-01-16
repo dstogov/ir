@@ -132,7 +132,6 @@ static void help(const char *cmd)
 #define IR_DUMP_DOT                 (1<<2)
 #define IR_DUMP_CFG                 (1<<3)
 #define IR_DUMP_LIVE_RANGES         (1<<4)
-#define IR_DUMP_CODEGEN             (1<<5)
 
 #define IR_DUMP_AFTER_LOAD          (1<<16)
 #define IR_DUMP_AFTER_USE_LISTS     (1<<17)
@@ -146,9 +145,12 @@ static void help(const char *cmd)
 #define IR_DUMP_AFTER_LIVE_RANGES   (1<<25)
 #define IR_DUMP_AFTER_COALESCING    (1<<26)
 #define IR_DUMP_AFTER_REGALLOC      (1<<27)
+#define IR_DUMP_CODEGEN             (1<<28)
 
 #define IR_DUMP_AFTER_ALL           (1<<29)
 #define IR_DUMP_FINAL               (1<<30)
+
+#define IR_DUMP_ALL                 0x7fff0000
 
 #define IR_UNKNOWN_SIZE             1
 
@@ -156,6 +158,7 @@ static int _save(ir_ctx *ctx, uint32_t save_flags, uint32_t dump, uint32_t pass,
 {
 	char fn[4096];
 	bool close = 0;
+	const char *comments = NULL;
 
 	if (!f) {
 		if (dump & IR_DUMP_AFTER_ALL) {
@@ -202,17 +205,9 @@ static int _save(ir_ctx *ctx, uint32_t save_flags, uint32_t dump, uint32_t pass,
 		}
 		close = 1;
 	}
-	if (pass == IR_DUMP_FINAL && (dump & IR_DUMP_CODEGEN)) {
-		ir_dump_codegen(ctx, f);
-	} else if (dump & IR_DUMP_SAVE) {
-		ir_save(ctx, save_flags, f);
-	}
-	if (dump & IR_DUMP_DUMP) {
-		ir_dump(ctx, f);
-	}
-	if (dump & IR_DUMP_DOT) {
-		const char *comments = NULL;
-
+	if ((dump & IR_DUMP_DOT)
+	 || ((dump & (IR_DUMP_SAVE|IR_DUMP_CODEGEN|IR_DUMP_DUMP|IR_DUMP_CFG|IR_DUMP_LIVE_RANGES))
+	  && !IR_IS_POWER_OF_TWO(dump & IR_DUMP_ALL))) {
 		if (pass == IR_DUMP_AFTER_LOAD) {
 			comments = "(after load)";
 		} else if (pass == IR_DUMP_AFTER_USE_LISTS) {
@@ -241,15 +236,31 @@ static int _save(ir_ctx *ctx, uint32_t save_flags, uint32_t dump, uint32_t pass,
 		} else if (pass == IR_DUMP_FINAL) {
 			if (dump & IR_DUMP_CODEGEN) {
 				comments = "(codegen)";
+			} else if (!(dump & IR_DUMP_DOT)) {
+				comments = "(final)";
 			}
 		}
+	}
+	if (dump & IR_DUMP_DOT) {
 		ir_dump_dot(ctx, func_name, comments, f);
-	}
-	if (dump & IR_DUMP_CFG) {
-		ir_dump_cfg(ctx, f);
-	}
-	if (dump & IR_DUMP_LIVE_RANGES) {
-		ir_dump_live_ranges(ctx, f);
+	} else {
+		if (comments) {
+			fprintf(f, "# %s\n", comments);
+		}
+		if (pass == IR_DUMP_FINAL && (dump & IR_DUMP_CODEGEN)) {
+			ir_dump_codegen(ctx, f);
+		} else if (dump & IR_DUMP_SAVE) {
+			ir_save(ctx, save_flags, f);
+		}
+		if (dump & IR_DUMP_DUMP) {
+			ir_dump(ctx, f);
+		}
+		if (dump & IR_DUMP_CFG) {
+			ir_dump_cfg(ctx, f);
+		}
+		if (dump & IR_DUMP_LIVE_RANGES) {
+			ir_dump_live_ranges(ctx, f);
+		}
 	}
 	if (close) {
 		fclose(f);
@@ -967,7 +978,7 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 
 	if (name == NULL) {
 		name = (l->run) ? "main" : "test";
-	} else if ((l->dump & IR_DUMP_SAVE) && l->dump_file) {
+	} else if ((l->dump & (IR_DUMP_SAVE|IR_DUMP_CODEGEN|IR_DUMP_DUMP|IR_DUMP_CFG|IR_DUMP_LIVE_RANGES)) && l->dump_file) {
 		ir_print_func_proto(ctx, name, l->dump_file);
 		fprintf(l->dump_file, "\n");
 	}
