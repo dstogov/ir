@@ -74,7 +74,7 @@ static void help(const char *cmd)
 		"  --save-cfg-map             - save IR\n"
 		"  --save-rules               - save IR\n"
 		"  --save-regs                - save IR\n"
-		"  --save-use_lists           - save IR\n"
+		"  --save-use-lists           - save IR\n"
 		"  --dot  [file-name]         - dump IR graph\n"
 		"  --dump [file-name]         - dump IR table\n"
 		"  --dump-after-load          - dump IR after load and local optimization\n"
