@@ -72,6 +72,11 @@ static void help(const char *cmd)
 #ifndef _WIN32
 		"Debugguing Options:\n"
 		"  -g                         - produce debugging information (through JITGDB)\n"
+		"  -p                         - provide information about JIT-ed code to Linux Perf\n"
+		"                               the example usage:\n"
+		"                                 $ perf record -k 1 ir -p bench.ir --run\n"
+		"                                 $ perf inject -j -i perf.data -o perf.data.jitted\n"
+		"                                 $ perf report -i perf.data.jitted\n"
 #endif
 		"IR Debugging Options:\n"
 		"  --save [file-name]         - save IR\n"
@@ -391,6 +396,7 @@ typedef struct _ir_main_loader {
 	bool       dump_size;
 	bool       run;
 	bool       gdb;
+	bool       perf;
 	size_t     size;
 	void      *main;
 	FILE      *dump_file;
@@ -1029,8 +1035,10 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 			}
 			if (l->run) {
 #ifndef _WIN32
-				ir_perf_map_register(name, entry, size);
-				ir_perf_jitdump_register(name, entry, size);
+				if (l->perf) {
+					ir_perf_map_register(name, entry, size);
+					ir_perf_jitdump_register(name, entry, size);
+				}
 #endif
 				if (strcmp(name, "main") == 0) {
 					l->main = entry;
@@ -1052,7 +1060,7 @@ int main(int argc, char **argv)
 	char *input = NULL;
 	char *dump_file = NULL, *c_file = NULL, *llvm_file = 0;
 	FILE *f;
-	bool emit_c = 0, emit_llvm = 0, dump_size = 0, dump_time = 0, dump_asm = 0, run = 0, gdb = 0;
+	bool emit_c = 0, emit_llvm = 0, dump_size = 0, dump_time = 0, dump_asm = 0, run = 0, gdb = 0, perf = 0;
 	bool disable_inline = 0;
 	bool force_inline = 0;
 	bool disable_mem2ssa = 0;
@@ -1251,6 +1259,8 @@ int main(int argc, char **argv)
 #endif
 		} else if (strcmp(argv[i], "-g") == 0) {
 			gdb = 1;
+		} else if (strcmp(argv[i], "-p") == 0) {
+			perf = 1;
 		} else if (argv[i][0] == '-') {
 			fprintf(stderr, "ERROR: Unknown option '%s' (use --help)\n", argv[i]);
 			return 1;
@@ -1351,6 +1361,7 @@ int main(int argc, char **argv)
 	loader.dump_size = dump_size;
 	loader.run = run;
 	loader.gdb = run && gdb;
+	loader.perf = run && perf;
 
 	ir_strtab_init(&loader.symtab, 16, 4096);
 	loader.sym = NULL;
@@ -1426,7 +1437,7 @@ int main(int argc, char **argv)
 	}
 
 #ifndef _WIN32
-	if (run) {
+	if (run && perf) {
 		ir_perf_jitdump_open();
 	}
 #endif
@@ -1535,7 +1546,9 @@ finish:
 		}
 
 #ifndef _WIN32
-		ir_perf_jitdump_close();
+		if (perf) {
+			ir_perf_jitdump_close();
+		}
 #endif
 	}
 
