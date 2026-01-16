@@ -935,32 +935,7 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 	if (name == NULL) {
 		name = (l->run) ? "main" : "test";
 	} else if ((l->dump & IR_DUMP_SAVE) && l->dump_file) {
-		if (ctx->flags & IR_STATIC) {
-			fprintf(l->dump_file, "static ");
-		}
-		fprintf(l->dump_file, "func %s(", name);
-		if (ctx->ir_base[2].op == IR_PARAM) {
-			ir_insn *insn = &ctx->ir_base[2];
-
-			fprintf(l->dump_file, "%s", ir_type_cname[insn->type]);
-			insn++;
-			while (insn->op == IR_PARAM) {
-				fprintf(l->dump_file, ", %s", ir_type_cname[insn->type]);
-				insn++;;
-			}
-			if (ctx->flags & IR_VARARG_FUNC) {
-				fprintf(l->dump_file, ", ...");
-			}
-		} else if (ctx->flags & IR_VARARG_FUNC) {
-			fprintf(l->dump_file, "...");
-		}
-		fprintf(l->dump_file, "): %s", ir_type_cname[ctx->ret_type != (ir_type)-1 ? ctx->ret_type : IR_VOID]);
-		ir_print_call_conv(ctx->flags, l->dump_file);
-		if (ctx->flags & IR_CONST_FUNC) {
-			fprintf(l->dump_file, " __const");
-		} else if (ctx->flags & IR_PURE_FUNC) {
-			fprintf(l->dump_file, " __pure");
-		}
+		ir_print_func_proto(ctx, name, l->dump_file);
 		fprintf(l->dump_file, "\n");
 	}
 

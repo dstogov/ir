@@ -1470,7 +1470,6 @@ void ir_fix_stack_frame(ir_ctx *ctx);
 /* Utility */
 ir_type ir_get_return_type(ir_ctx *ctx);
 const ir_proto_t *ir_call_proto(const ir_ctx *ctx, const ir_insn *insn);
-void ir_print_call_conv(uint32_t flags, FILE *f);
 
 //#define IR_BITSET_LIVENESS
 

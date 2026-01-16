@@ -70,6 +70,10 @@ void ir_dump_dot(const ir_ctx *ctx, const char *name, FILE *f)
 	uint32_t flags;
 
 	fprintf(f, "digraph %s {\n", name);
+	fprintf(f, "\tlabelloc=t;\n");
+	fprintf(f, "\tlabel=\"");
+	ir_print_func_proto(ctx, name, f);
+	fprintf(f, "\"\n");
 	fprintf(f, "\trankdir=TB;\n");
 	for (i = 1 - ctx->consts_count, insn = ctx->ir_base + i; i < IR_UNUSED; i++, insn++) {
 		fprintf(f, "\tc%d [label=\"C%d: CONST %s(", -i, -i, ir_type_name[insn->type]);
