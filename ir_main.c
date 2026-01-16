@@ -69,6 +69,10 @@ static void help(const char *cmd)
 		"  -mno-bmi1                  - disable BMI1 instruction set\n"
 #endif
 		"  -muse-fp                   - use base frame pointer register\n"
+#ifndef _WIN32
+		"Debugguing Options:\n"
+		"  -g                         - produce debugging information (through JITGDB)\n"
+#endif
 		"IR Debugging Options:\n"
 		"  --save [file-name]         - save IR\n"
 		"  --save-cfg                 - extend saved IR with information about CFG\n"
@@ -106,7 +110,6 @@ static void help(const char *cmd)
 		"  --debug-regset <bit-mask>  - restrict available register set\n"
 		"  --debug-bb-scheduling      - debug BB PLCEMENT optimization pass\n"
 #endif
-		"  --disable-gdb              - disable JIT code registration in GDB\n"
 		"Utility Options\n"
 		"  --emit-c [file-name]       - convert final IR to C source (implementation is incomplete)\n"
 		"  --emit-llvm [file-name]    - convert final IR to LLVM code (implementation is incomplete)\n"
@@ -1049,7 +1052,7 @@ int main(int argc, char **argv)
 	char *input = NULL;
 	char *dump_file = NULL, *c_file = NULL, *llvm_file = 0;
 	FILE *f;
-	bool emit_c = 0, emit_llvm = 0, dump_size = 0, dump_time = 0, dump_asm = 0, run = 0, gdb = 1;
+	bool emit_c = 0, emit_llvm = 0, dump_size = 0, dump_time = 0, dump_asm = 0, run = 0, gdb = 0;
 	bool disable_inline = 0;
 	bool force_inline = 0;
 	bool disable_mem2ssa = 0;
@@ -1246,8 +1249,8 @@ int main(int argc, char **argv)
 			load_llvm_asm = 1;
 			input = argv[++i];
 #endif
-		} else if (strcmp(argv[i], "--disable-gdb") == 0) {
-			gdb = 0;
+		} else if (strcmp(argv[i], "-g") == 0) {
+			gdb = 1;
 		} else if (argv[i][0] == '-') {
 			fprintf(stderr, "ERROR: Unknown option '%s' (use --help)\n", argv[i]);
 			return 1;
