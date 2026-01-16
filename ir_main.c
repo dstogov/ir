@@ -97,11 +97,11 @@ static void help(const char *cmd)
 		"  --dump-after-live-ranges   - dump IR after live ranges identification\n"
 		"  --dump-after-coalescing    - dump IR after live ranges coalescing\n"
 		"  --dump-after-regalloc      - dump IR after register allocation\n"
-		"  --dump-after-all           - dump IR after each pass\n"
+		"  --dump-codegen             - dump scheduled IR with selected rules and assigned CPU registers\n"
 		"  --dump-final               - dump IR after all pass\n"
+		"  --dump-after-each-pass     - dump IR after each pass\n"
 		"  --dump-cfg                 - dump CFG (Control Flow Graph)\n"
 		"  --dump-live-ranges         - dump live ranges\n"
-		"  --dump-codegen             - dump scheduled IR with selected rules and assigned CPU registers\n"
 		"  --dot [file-name]          - print IR in .DOT format (affects all --save-ir-...)\n"
 		"                               the output may be converted into multi-page PDF using pipe: \n"
 		"                                 $ ir ... 2>&1 | dot -Tps:cairo:cairo | ps2pdf - > out.pdf\n"
@@ -210,7 +210,39 @@ static int _save(ir_ctx *ctx, uint32_t save_flags, uint32_t dump, uint32_t pass,
 		ir_dump(ctx, f);
 	}
 	if (dump & IR_DUMP_DOT) {
-		ir_dump_dot(ctx, func_name, f);
+		const char *comments = NULL;
+
+		if (pass == IR_DUMP_AFTER_LOAD) {
+			comments = "(after load)";
+		} else if (pass == IR_DUMP_AFTER_USE_LISTS) {
+			comments = "(after use lists)";
+		} else if (pass == IR_DUMP_AFTER_MEM2SSA) {
+			comments = "(after mem2ssa)";
+		} else if (pass == IR_DUMP_AFTER_SCCP) {
+			comments = "(after sccp)";
+		} else if (pass == IR_DUMP_AFTER_CFG) {
+			comments = "(after cfg)";
+		} else if (pass == IR_DUMP_AFTER_DOM) {
+			comments = "(after dom)";
+		} else if (pass == IR_DUMP_AFTER_LOOP) {
+			comments = "(after loop)";
+		} else if (pass == IR_DUMP_AFTER_GCM) {
+			comments = "(after gcm)";
+		} else if (pass == IR_DUMP_AFTER_SCHEDULING) {
+			comments = "(after scheduling)";
+
+		} else if (pass == IR_DUMP_AFTER_LIVE_RANGES) {
+			comments = "(after live ranges)";
+		} else if (pass == IR_DUMP_AFTER_COALESCING) {
+			comments = "(after coalesing)";
+		} else if (pass == IR_DUMP_AFTER_REGALLOC) {
+			comments = "(after regalloc)";
+		} else if (pass == IR_DUMP_FINAL) {
+			if (dump & IR_DUMP_CODEGEN) {
+				comments = "(codegen)";
+			}
+		}
+		ir_dump_dot(ctx, func_name, comments, f);
 	}
 	if (dump & IR_DUMP_CFG) {
 		ir_dump_cfg(ctx, f);
@@ -1159,7 +1191,7 @@ int main(int argc, char **argv)
 			dump |= IR_DUMP_AFTER_COALESCING;
 		} else if (strcmp(argv[i], "--dump-after-regalloc") == 0) {
 			dump |= IR_DUMP_AFTER_REGALLOC;
-		} else if (strcmp(argv[i], "--dump-after-all") == 0) {
+		} else if (strcmp(argv[i], "--dump-after-each-pass") == 0) {
 			dump |= IR_DUMP_AFTER_ALL;
 		} else if (strcmp(argv[i], "--dump-final") == 0) {
 			dump |= IR_DUMP_FINAL;

@@ -60,7 +60,7 @@ void ir_dump(const ir_ctx *ctx, FILE *f)
 	}
 }
 
-void ir_dump_dot(const ir_ctx *ctx, const char *name, FILE *f)
+void ir_dump_dot(const ir_ctx *ctx, const char *name, const char *comments, FILE *f)
 {
 	int DATA_WEIGHT    = 0;
 	int CONTROL_WEIGHT = 5;
@@ -73,6 +73,9 @@ void ir_dump_dot(const ir_ctx *ctx, const char *name, FILE *f)
 	fprintf(f, "\tlabelloc=t;\n");
 	fprintf(f, "\tlabel=\"");
 	ir_print_func_proto(ctx, name, f);
+	if (comments) {
+		fprintf(f, " # %s", comments);
+	}
 	fprintf(f, "\"\n");
 	fprintf(f, "\trankdir=TB;\n");
 	for (i = 1 - ctx->consts_count, insn = ctx->ir_base + i; i < IR_UNUSED; i++, insn++) {
