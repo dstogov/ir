@@ -70,11 +70,11 @@ static void help(const char *cmd)
 		"  --emit-c [file-name]       - convert to C source\n"
 		"  --emit-llvm [file-name]    - convert to LLVM\n"
 		"  --save [file-name]         - save IR\n"
-		"  --save-cfg                 - save IR\n"
-		"  --save-cfg-map             - save IR\n"
-		"  --save-rules               - save IR\n"
-		"  --save-regs                - save IR\n"
-		"  --save-use-lists           - save IR\n"
+		"  --save-cfg                 - extend saved IR with information about CFG\n"
+		"  --save-cfg-map             - extend saved IR with information about assigned basic-locks\n"
+		"  --save-rules               - extend saved IR with information selectd code-generation \n"
+		"  --save-regs                - extend saved IR with information about assigned CPU register\n"
+		"  --save-use-lists           - extend saved IR with def->use chains\n"
 		"  --dot  [file-name]         - dump IR graph\n"
 		"  --dump [file-name]         - dump IR table\n"
 		"  --dump-after-load          - dump IR after load and local optimization\n"
@@ -93,10 +93,9 @@ static void help(const char *cmd)
 		"  --dump-final               - dump IR after all pass\n"
 		"  --dump-size                - dump generated code size\n"
 		"  --dump-time                - dump compilation and execution time\n"
-		"  --dump-use-lists           - dump def->use lists\n"
 		"  --dump-cfg                 - dump CFG (Control Flow Graph)\n"
-		"  --dump-cfg-map             - dump CFG map (instruction to BB number)\n"
 		"  --dump-live-ranges         - dump live ranges\n"
+		"  --dump-codegen             - dump scheduled IR with selected rules and assigned CPU registers\n"
 #ifdef IR_DEBUG
 		"  --debug-sccp               - debug SCCP optimization pass\n"
 		"  --debug-gcm                - debug GCM optimization pass\n"
@@ -116,11 +115,9 @@ static void help(const char *cmd)
 #define IR_DUMP_SAVE                (1<<0)
 #define IR_DUMP_DUMP                (1<<1)
 #define IR_DUMP_DOT                 (1<<2)
-#define IR_DUMP_USE_LISTS           (1<<3)
-#define IR_DUMP_CFG                 (1<<4)
-#define IR_DUMP_CFG_MAP             (1<<5)
-#define IR_DUMP_LIVE_RANGES         (1<<6)
-#define IR_DUMP_CODEGEN             (1<<7)
+#define IR_DUMP_CFG                 (1<<3)
+#define IR_DUMP_LIVE_RANGES         (1<<4)
+#define IR_DUMP_CODEGEN             (1<<5)
 
 #define IR_DUMP_AFTER_LOAD          (1<<16)
 #define IR_DUMP_AFTER_USE_LISTS     (1<<17)
@@ -201,14 +198,8 @@ static int _save(ir_ctx *ctx, uint32_t save_flags, uint32_t dump, uint32_t pass,
 	if (dump & IR_DUMP_DOT) {
 		ir_dump_dot(ctx, func_name, f);
 	}
-	if (dump & IR_DUMP_USE_LISTS) {
-		ir_dump_use_lists(ctx, f);
-	}
 	if (dump & IR_DUMP_CFG) {
 		ir_dump_cfg(ctx, f);
-	}
-	if (dump & IR_DUMP_CFG_MAP) {
-		ir_dump_cfg_map(ctx, f);
 	}
 	if (dump & IR_DUMP_LIVE_RANGES) {
 		ir_dump_live_ranges(ctx, f);
@@ -1124,7 +1115,7 @@ int main(int argc, char **argv)
 			save_flags |= IR_SAVE_CFG;
 		} else if (strcmp(argv[i], "--save-cfg-map") == 0) {
 			dump |= IR_DUMP_SAVE;
-			save_flags |= IR_SAVE_CFG_MAP;
+			save_flags |= IR_SAVE_CFG | IR_SAVE_CFG_MAP;
 		} else if (strcmp(argv[i], "--save-rules") == 0) {
 			dump |= IR_DUMP_SAVE;
 			save_flags |= IR_SAVE_RULES;
@@ -1146,12 +1137,8 @@ int main(int argc, char **argv)
 				dump_file = argv[i + 1];
 				i++;
 			}
-		} else if (strcmp(argv[i], "--dump-use-lists") == 0) {
-			dump |= IR_DUMP_USE_LISTS;
 		} else if (strcmp(argv[i], "--dump-cfg") == 0) {
 			dump |= IR_DUMP_CFG;
-		} else if (strcmp(argv[i], "--dump-cfg-map") == 0) {
-			dump |= IR_DUMP_CFG_MAP;
 		} else if (strcmp(argv[i], "--dump-live-ranges") == 0) {
 			dump |= IR_DUMP_LIVE_RANGES;
 		} else if (strcmp(argv[i], "--dump-codegen") == 0) {

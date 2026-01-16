@@ -1,7 +1,7 @@
 --TEST--
 013: SCCP+GVN (Figure 3.11 from "Combining Analyses, Combining Optimization" by C.Click)
 --ARGS--
---dump-use-lists --dump-cfg-map --save --dump-after-gcm
+--save --save-use-lists --save-cfg-map --dump-after-gcm
 --CODE--
 {
 	uintptr_t c_1 = 0;
@@ -50,11 +50,13 @@
 	bool c_3 = 1;
 	int32_t c_4 = 1;
 	int32_t c_5 = 2;
-	l_1 = START(l_29);
-	bool d_2 = PARAM(l_1, "cond", 0);
-	int32_t d_3 = PARAM(l_1, "z", 1);
-	l_4 = END(l_1);
-	l_5 = LOOP_BEGIN(l_4, l_27);
+#BB1: end=l_4, succ(1)=[BB2]
+	l_1 = START(l_29); # BLOCK=BB1; USE_LIST(3)=[00002, 00003, 00004];
+	bool d_2 = PARAM(l_1, "cond", 0); # BLOCK=BB1; USE_LIST(1)=[00025];
+	int32_t d_3 = PARAM(l_1, "z", 1); # BLOCK=BB1;
+	l_4 = END(l_1); # BLOCK=BB1; USE_LIST(1)=[00005];
+#BB2: end=l_25, idom=BB1(1), loop=HDR(1), pred(2)=[BB1, BB3], succ(2)=[BB3, BB4]
+	l_5 = LOOP_BEGIN(l_4, l_27); # BLOCK=BB2; USE_LIST(1)=[00025];
 	NOP;
 	NOP;
 	NOP;
@@ -74,50 +76,11 @@
 	NOP;
 	NOP;
 	NOP;
-	l_25 = IF(l_5, d_2);
-	l_26 = IF_TRUE(l_25);
-	l_27 = LOOP_END(l_26);
-	l_28 = IF_FALSE(l_25);
-	l_29 = RETURN(l_28, c_4);
-}
-{ # Use Lists
-00001(3): [00002, 00003, 00004]
-00002(1): [00025]
-00004(1): [00005]
-00005(1): [00025]
-00025(2): [00026, 00028]
-00026(1): [00027]
-00027(1): [00005]
-00028(1): [00029]
-}
-{ # CFG map (insn -> bb)
-1 -> 1
-2 -> 1
-3 -> 1
-4 -> 1
-5 -> 2
-6 -> 0
-7 -> 0
-8 -> 0
-9 -> 0
-10 -> 0
-11 -> 0
-12 -> 0
-13 -> 0
-14 -> 0
-15 -> 0
-16 -> 0
-17 -> 0
-18 -> 0
-19 -> 0
-20 -> 0
-21 -> 0
-22 -> 0
-23 -> 0
-24 -> 0
-25 -> 2
-26 -> 3
-27 -> 3
-28 -> 4
-29 -> 4
+	l_25 = IF(l_5, d_2); # BLOCK=BB2; USE_LIST(2)=[00026, 00028];
+#BB3: end=l_27, idom=BB2(2), loop=BB2(1), pred(1)=[BB2], succ(1)=[BB2]
+	l_26 = IF_TRUE(l_25); # BLOCK=BB3; USE_LIST(1)=[00027];
+	l_27 = LOOP_END(l_26); # BLOCK=BB3; USE_LIST(1)=[00005];
+#BB4: end=l_29, idom=BB2(2), pred(1)=[BB2]
+	l_28 = IF_FALSE(l_25); # BLOCK=BB4; USE_LIST(1)=[00029];
+	l_29 = RETURN(l_28, c_4); # BLOCK=BB4;
 }

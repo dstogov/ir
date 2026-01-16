@@ -1,7 +1,7 @@
 --TEST--
 007: GCM for simple loop (Figure 7 from "Global Code Motion Global Value Numbering" by Cliff Click)
 --ARGS--
---dump-cfg-map --save --dump-after-gcm
+--save --save-cfg-map --dump-after-gcm
 --CODE--
 {
 	uintptr_t c_1 = 0;
@@ -35,34 +35,22 @@
 	int32_t c_5 = 2;
 	int32_t c_6 = 1;
 	int32_t c_7 = 0;
-	l_1 = START(l_14);
-	int32_t d_2 = PARAM(l_1, "x", 0);
-	l_3 = END(l_1);
-	l_4 = LOOP_BEGIN(l_3, l_12);
-	int32_t d_5 = PHI(l_4, c_7, d_7);
-	int32_t d_6 = ADD(d_2, c_6);
-	int32_t d_7 = ADD(d_6, d_5);
-	int32_t d_8 = MUL(d_7, c_5);
-	bool d_9 = LT(d_7, c_4);
-	l_10 = IF(l_4, d_9);
-	l_11 = IF_TRUE(l_10);
-	l_12 = LOOP_END(l_11);
-	l_13 = IF_FALSE(l_10);
-	l_14 = RETURN(l_13, d_8);
-}
-{ # CFG map (insn -> bb)
-1 -> 1
-2 -> 1
-3 -> 1
-4 -> 2
-5 -> 2
-6 -> 1
-7 -> 2
-8 -> 4
-9 -> 2
-10 -> 2
-11 -> 3
-12 -> 3
-13 -> 4
-14 -> 4
+#BB1: end=l_3, succ(1)=[BB2]
+	l_1 = START(l_14); # BLOCK=BB1;
+	int32_t d_2 = PARAM(l_1, "x", 0); # BLOCK=BB1;
+	l_3 = END(l_1); # BLOCK=BB1;
+#BB2: end=l_10, idom=BB1(1), loop=HDR(1), pred(2)=[BB1, BB3], succ(2)=[BB3, BB4]
+	l_4 = LOOP_BEGIN(l_3, l_12); # BLOCK=BB2;
+	int32_t d_5 = PHI(l_4, c_7, d_7); # BLOCK=BB2;
+	int32_t d_6 = ADD(d_2, c_6); # BLOCK=BB1;
+	int32_t d_7 = ADD(d_6, d_5); # BLOCK=BB2;
+	int32_t d_8 = MUL(d_7, c_5); # BLOCK=BB4;
+	bool d_9 = LT(d_7, c_4); # BLOCK=BB2;
+	l_10 = IF(l_4, d_9); # BLOCK=BB2;
+#BB3: end=l_12, idom=BB2(2), loop=BB2(1), pred(1)=[BB2], succ(1)=[BB2]
+	l_11 = IF_TRUE(l_10); # BLOCK=BB3;
+	l_12 = LOOP_END(l_11); # BLOCK=BB3;
+#BB4: end=l_14, idom=BB2(2), pred(1)=[BB2]
+	l_13 = IF_FALSE(l_10); # BLOCK=BB4;
+	l_14 = RETURN(l_13, d_8); # BLOCK=BB4;
 }

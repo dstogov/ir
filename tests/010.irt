@@ -1,7 +1,7 @@
 --TEST--
 010: SCCP (Figure 3.9 from "Combining Analyses, Combining Optimization" by C.Click)
 --ARGS--
---dump-use-lists --dump-cfg-map --save --dump-after-gcm
+--save --save-use-lists --save-cfg-map --dump-after-gcm
 --CODE--
 {
 	uintptr_t c_1 = 0;
@@ -37,10 +37,12 @@
 	bool c_3 = 1;
 	int32_t c_4 = 1;
 	int32_t c_5 = 2;
-	l_1 = START(l_18);
-	bool d_2 = PARAM(l_1, "cond", 0);
-	l_3 = END(l_1);
-	l_4 = LOOP_BEGIN(l_3, l_16);
+#BB1: end=l_3, succ(1)=[BB2]
+	l_1 = START(l_18); # BLOCK=BB1; USE_LIST(2)=[00002, 00003];
+	bool d_2 = PARAM(l_1, "cond", 0); # BLOCK=BB1; USE_LIST(1)=[00014];
+	l_3 = END(l_1); # BLOCK=BB1; USE_LIST(1)=[00004];
+#BB2: end=l_14, idom=BB1(1), loop=HDR(1), pred(2)=[BB1, BB3], succ(2)=[BB3, BB4]
+	l_4 = LOOP_BEGIN(l_3, l_16); # BLOCK=BB2; USE_LIST(1)=[00014];
 	NOP;
 	NOP;
 	NOP;
@@ -50,39 +52,11 @@
 	NOP;
 	NOP;
 	NOP;
-	l_14 = IF(l_4, d_2);
-	l_15 = IF_TRUE(l_14);
-	l_16 = LOOP_END(l_15);
-	l_17 = IF_FALSE(l_14);
-	l_18 = RETURN(l_17, c_4);
-}
-{ # Use Lists
-00001(2): [00002, 00003]
-00002(1): [00014]
-00003(1): [00004]
-00004(1): [00014]
-00014(2): [00015, 00017]
-00015(1): [00016]
-00016(1): [00004]
-00017(1): [00018]
-}
-{ # CFG map (insn -> bb)
-1 -> 1
-2 -> 1
-3 -> 1
-4 -> 2
-5 -> 0
-6 -> 0
-7 -> 0
-8 -> 0
-9 -> 0
-10 -> 0
-11 -> 0
-12 -> 0
-13 -> 0
-14 -> 2
-15 -> 3
-16 -> 3
-17 -> 4
-18 -> 4
+	l_14 = IF(l_4, d_2); # BLOCK=BB2; USE_LIST(2)=[00015, 00017];
+#BB3: end=l_16, idom=BB2(2), loop=BB2(1), pred(1)=[BB2], succ(1)=[BB2]
+	l_15 = IF_TRUE(l_14); # BLOCK=BB3; USE_LIST(1)=[00016];
+	l_16 = LOOP_END(l_15); # BLOCK=BB3; USE_LIST(1)=[00004];
+#BB4: end=l_18, idom=BB2(2), pred(1)=[BB2]
+	l_17 = IF_FALSE(l_14); # BLOCK=BB4; USE_LIST(1)=[00018];
+	l_18 = RETURN(l_17, c_4); # BLOCK=BB4;
 }
