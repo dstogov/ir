@@ -3,7 +3,7 @@ FibI
 --TARGET--
 aarch64
 --ARGS--
---save --dump-live-ranges -S --run
+--save --save-live-ranges -S --run
 --CODE--
 {
 	int32_t c_0 = 0;

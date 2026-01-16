@@ -1,7 +1,7 @@
 --TEST--
 008: CFG for a larger loop (Figure 8 from "Global Code Motion Global Value Numbering" by Cliff Click)
 --ARGS--
---dump-cfg --dump-after-gcm
+--save --save-cfg --save-ir-after-gcm
 --CODE--
 {
 	uintptr_t c_1 = 0;
@@ -63,64 +63,65 @@
 	l_54 = RETURN(l_43, d_51);
 }
 --EXPECT--
-{ # CFG
-BB1:
-	start=1
-	end=12
-	successors(1) [BB2]
-	dom_depth=0
-	dom_children [BB2]
-BB2:
-	start=13
-	end=19
-	successors(2) [BB3, BB4]
-	predecessors(2) [BB1, BB6]
-	dom_parent=BB1
-	dom_depth=1
-	dom_children [BB3, BB4, BB5]
-	LOOP_HEADER
-	loop_depth=1
-BB3:
-	start=20
-	end=23
-	successors(1) [BB5]
-	predecessors(1) [BB2]
-	dom_parent=BB2
-	dom_depth=2
-	loop_header=BB2
-	loop_depth=1
-BB4:
-	start=24
-	end=27
-	successors(1) [BB5]
-	predecessors(1) [BB2]
-	dom_parent=BB2
-	dom_depth=2
-	loop_header=BB2
-	loop_depth=1
-BB5:
-	start=28
-	end=36
-	successors(2) [BB6, BB7]
-	predecessors(2) [BB3, BB4]
-	dom_parent=BB2
-	dom_depth=2
-	dom_children [BB6, BB7]
-	loop_header=BB2
-	loop_depth=1
-BB6:
-	start=37
-	end=38
-	successors(1) [BB2]
-	predecessors(1) [BB5]
-	dom_parent=BB5
-	dom_depth=3
-	loop_header=BB2
-	loop_depth=1
-BB7:
-	start=39
-	end=48
-	predecessors(1) [BB5]
-	dom_parent=BB5
-	dom_depth=3
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 1;
+	int32_t c_5 = 4;
+#BB1: end=l_12, succ(1)=[BB2]
+	l_1 = START(l_48);
+	int32_t d_2 = PARAM(l_1, "a", 0);
+	int32_t d_3 = PARAM(l_1, "b", 1);
+	int32_t d_4 = PARAM(l_1, "c", 2);
+	int32_t d_5 = PARAM(l_1, "d", 3);
+	int32_t d_6 = PARAM(l_1, "l", 4);
+	int32_t d_7 = PARAM(l_1, "m", 5);
+	int32_t d_8 = PARAM(l_1, "s", 6);
+	int32_t d_9 = PARAM(l_1, "t", 7);
+	int32_t d_10 = PARAM(l_1, "cond1", 8);
+	int32_t d_11 = PARAM(l_1, "cond2", 9);
+	l_12 = END(l_1);
+#BB2: end=l_19, idom=BB1(1), loop=HDR(1), pred(2)=[BB1, BB6], succ(2)=[BB3, BB4]
+	l_13 = LOOP_BEGIN(l_12, l_38);
+	int32_t d_14 = PHI(l_13, d_2, d_29);
+	int32_t d_15 = PHI(l_13, d_5, d_30);
+	int32_t d_16 = PHI(l_13, d_7, d_31);
+	int32_t d_17 = PHI(l_13, d_8, d_32);
+	int32_t d_18 = PHI(l_13, d_9, d_33);
+	l_19 = IF(l_13, d_10);
+#BB3: end=l_23, idom=BB2(2), loop=BB2(1), pred(1)=[BB2], succ(1)=[BB5]
+	l_20 = IF_TRUE(l_19);
+	int32_t d_21 = MUL(d_4, d_3);
+	int32_t d_22 = ADD(d_21, c_5);
+	l_23 = END(l_20);
+#BB4: end=l_27, idom=BB2(2), loop=BB2(1), pred(1)=[BB2], succ(1)=[BB5]
+	l_24 = IF_FALSE(l_19);
+	int32_t d_25 = MUL(d_14, d_3);
+	int32_t d_26 = ADD(d_25, c_4);
+	l_27 = END(l_24);
+#BB5: end=l_36, idom=BB2(2), loop=BB2(1), pred(2)=[BB3, BB4], succ(2)=[BB6, BB7]
+	l_28 = MERGE(l_23, l_27);
+	int32_t d_29 = PHI(l_28, d_4, d_14);
+	int32_t d_30 = PHI(l_28, d_15, d_4);
+	int32_t d_31 = PHI(l_28, d_22, d_16);
+	int32_t d_32 = PHI(l_28, d_17, d_25);
+	int32_t d_33 = PHI(l_28, d_18, d_26);
+	int32_t d_34 = MUL(d_29, d_3);
+	int32_t d_35 = ADD(d_34, c_4);
+	l_36 = IF(l_28, d_11);
+#BB6: end=l_38, idom=BB5(3), loop=BB2(1), pred(1)=[BB5], succ(1)=[BB2]
+	l_37 = IF_TRUE(l_36);
+	l_38 = LOOP_END(l_37);
+#BB7: end=l_48, idom=BB5(3), pred(1)=[BB5]
+	l_39 = IF_FALSE(l_36);
+	int32_t d_40 = ADD(d_29, d_3);
+	int32_t d_41 = ADD(d_40, d_4);
+	int32_t d_42 = ADD(d_41, d_30);
+	int32_t d_43 = ADD(d_42, d_21);
+	int32_t d_44 = ADD(d_43, d_31);
+	int32_t d_45 = ADD(d_44, d_32);
+	int32_t d_46 = ADD(d_45, d_33);
+	int32_t d_47 = ADD(d_46, d_35);
+	l_48 = RETURN(l_39, d_47);
 }

@@ -1,7 +1,7 @@
 --TEST--
 009: GCM for a larger loop (Figure 9 from "Global Code Motion Global Value Numbering" by Cliff Click)
 --ARGS--
---save --save-cfg-map --dump-after-gcm
+--save --save-cfg-map --save-ir-after-gcm
 --CODE--
 {
 	uintptr_t c_1 = 0;

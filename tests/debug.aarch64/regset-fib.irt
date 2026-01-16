@@ -3,7 +3,7 @@ Fib
 --TARGET--
 aarch64
 --ARGS--
---debug-regset 0x3ffffffff --save --dump-live-ranges -S --run
+--debug-regset 0x3ffffffff --save --save-live-ranges -S --run
 --CODE--
 {
 	int32_t zero = 0;

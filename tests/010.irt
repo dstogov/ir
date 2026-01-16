@@ -1,7 +1,7 @@
 --TEST--
 010: SCCP (Figure 3.9 from "Combining Analyses, Combining Optimization" by C.Click)
 --ARGS--
---save --save-use-lists --save-cfg-map --dump-after-gcm
+--save --save-use-lists --save-cfg-map --save-ir-after-gcm
 --CODE--
 {
 	uintptr_t c_1 = 0;

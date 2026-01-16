@@ -1,7 +1,7 @@
 --TEST--
 012: SCCP with long multislot instructions
 --ARGS--
---save --dump-after-gcm
+--save --save-ir-after-gcm
 --CODE--
 {
 	uintptr_t c_1 = 0;

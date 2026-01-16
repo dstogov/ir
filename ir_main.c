@@ -60,6 +60,7 @@ static void help(const char *cmd)
 		"                               (the remaining arguments are passed to main)\n"
 		"  --emit-ir [file-name]      - save optimize IR code\n"
 		"  -S                         - show generated assembler code\n"
+		"  -o <file-name>             - put primary output into the specified file\n"
 		"Optimization Options:\n"
 		"  -O[012]                    - optimization level (default: -O2)\n"
 		"  -f[no-]inline              - enable/disable function inlining (default: enabled at -O1)\n"
@@ -81,44 +82,43 @@ static void help(const char *cmd)
 #endif
 		"IR Debugging Options:\n"
 		"  --save [file-name]         - save IR\n"
-		"  --save-cfg                 - extend saved IR with information about CFG\n"
-		"  --save-cfg-map             - extend saved IR with information about assigned basic-locks\n"
-		"  --save-rules               - extend saved IR with information selectd code-generation \n"
-		"  --save-regs                - extend saved IR with information about assigned CPU register\n"
-		"  --save-use-lists           - extend saved IR with def->use chains\n"
-		"  --dump-after-load          - dump IR after load and local optimization\n"
-		"  --dump-after-use-lists     - dump IR after USE-LISTS construction\n"
-		"  --dump-after-mem2ssa       - dump IR after MEM2SSA pass\n"
-		"  --dump-after-sccp          - dump IR after SCCP optimization pass\n"
-		"  --dump-after-cfg           - dump IR after CFG construction\n"
-		"  --dump-after-dom           - dump IR after Dominators tree construction\n"
-		"  --dump-after-loop          - dump IR after Loop detection\n"
-		"  --dump-after-gcm           - dump IR after GCM optimization pass\n"
-		"  --dump-after-scheduling    - dump IR after SCHEDULE pass\n"
-		"  --dump-after-live-ranges   - dump IR after live ranges identification\n"
-		"  --dump-after-coalescing    - dump IR after live ranges coalescing\n"
-		"  --dump-after-regalloc      - dump IR after register allocation\n"
-		"  --dump-codegen             - dump scheduled IR with selected rules and assigned CPU registers\n"
-		"  --dump-final               - dump IR after all pass\n"
-		"  --dump-after-each-pass     - dump IR after each pass\n"
-		"  --dump-cfg                 - dump CFG (Control Flow Graph)\n"
-		"  --dump-live-ranges         - dump live ranges\n"
-		"  --dot [file-name]          - print IR in .DOT format (affects all --save-ir-...)\n"
+		"  --save-cfg                 - save IR with information about CFG\n"
+		"  --save-cfg-map             - save IR with information about assigned basic-locks\n"
+		"  --save-rules               - save IR with information selectd code-generation \n"
+		"  --save-regs                - save IR with information about assigned CPU register\n"
+		"  --save-use-lists           - save IR with def->use chains\n"
+		"  --save-ir-after-load       - save IR after load and local optimization\n"
+		"  --save-ir-after-use-lists  - save IR after USE-LISTS construction\n"
+		"  --save-ir-after-mem2ssa    - save IR after MEM2SSA pass\n"
+		"  --save-ir-after-sccp       - save IR after SCCP optimization pass\n"
+		"  --save-ir-after-cfg        - save IR after CFG construction\n"
+		"  --save-ir-after-dom        - save IR after Dominators tree construction\n"
+		"  --save-ir-after-loop       - save IR after Loop detection\n"
+		"  --save-ir-after-gcm        - save IR after GCM optimization pass\n"
+		"  --save-ir-after-scheduling - save IR after SCHEDULE pass\n"
+		"  --save-ir-after-matching   - save IR after code selection\n"
+		"  --save-ir-after-live-ranges - save IR after live ranges identification\n"
+		"  --save-ir-after-coalescing - save IR after live ranges coalescing\n"
+		"  --save-ir-after-regalloc   - save IR after register allocation\n"
+		"  --save-ir-codegen          - save scheduled IR with selected rules and assigned CPU registers\n"
+		"  --save-ir-final            - save IR after all passes\n"
+		"  --save-ir-after-each-pass  - save IR after each pass\n"
+		"  --save-live-ranges         - save info about live ranges (use with --save-ir-after-live-ranges)\n"
+		"  --save-dot [file-name]     - save IR in .DOT format (affects all --save-ir-...)\n"
 		"                               the output may be converted into multi-page PDF using pipe: \n"
 		"                                 $ ir ... 2>&1 | dot -Tps:cairo:cairo | ps2pdf - > out.pdf\n"
-		"  --dump [file-name]         - dump IR table\n"
 #ifdef IR_DEBUG
 		"  --debug-sccp               - debug SCCP optimization pass\n"
 		"  --debug-gcm                - debug GCM optimization pass\n"
 		"  --debug-gcm-split          - debug floating node splitting\n"
 		"  --debug-scheduling         - debug SCHEDULE optimization pass\n"
-		"  --debug-ra                 - debug register allocator\n"
+		"  --debug-regalloc           - debug register allocator\n"
 		"  --debug-regset <bit-mask>  - restrict available register set\n"
 		"  --debug-bb-scheduling      - debug BB PLCEMENT optimization pass\n"
 #endif
 		"Utility Options\n"
-		"  --emit-c [file-name]       - convert final IR to C source (implementation is incomplete)\n"
-		"  --emit-llvm [file-name]    - convert final IR to LLVM code (implementation is incomplete)\n"
+		"  --emit-c                   - convert final IR to C source (implementation is incomplete)\n"
+		"  --emit-llvm                - convert final IR to LLVM code (implementation is incomplete)\n"
 		"  --dump-size                - dump generated code size\n"
 		"  --dump-time                - dump compilation and execution time\n"
 		"  --target                   - print JIT target\n"
@@ -127,11 +127,14 @@ static void help(const char *cmd)
 		cmd);
 }
 
-#define IR_DUMP_SAVE                (1<<0)
-#define IR_DUMP_DUMP                (1<<1)
+#define IR_DUMP_IR                  (1<<0)
+#define IR_DUMP_LIVE_RANGES         (1<<1)
 #define IR_DUMP_DOT                 (1<<2)
-#define IR_DUMP_CFG                 (1<<3)
-#define IR_DUMP_LIVE_RANGES         (1<<4)
+
+#define IR_DUMP_C                   (1<<3)
+#define IR_DUMP_LLVM                (1<<4)
+#define IR_DUMP_ASM                 (1<<5)
+#define IR_DUMP_SIZE                (1<<6)
 
 #define IR_DUMP_AFTER_LOAD          (1<<16)
 #define IR_DUMP_AFTER_USE_LISTS     (1<<17)
@@ -142,25 +145,28 @@ static void help(const char *cmd)
 #define IR_DUMP_AFTER_LOOP          (1<<22)
 #define IR_DUMP_AFTER_GCM           (1<<23)
 #define IR_DUMP_AFTER_SCHEDULING    (1<<24)
-#define IR_DUMP_AFTER_LIVE_RANGES   (1<<25)
-#define IR_DUMP_AFTER_COALESCING    (1<<26)
-#define IR_DUMP_AFTER_REGALLOC      (1<<27)
-#define IR_DUMP_CODEGEN             (1<<28)
+#define IR_DUMP_AFTER_CODE_MATCHING (1<<25)
+#define IR_DUMP_AFTER_LIVE_RANGES   (1<<26)
+#define IR_DUMP_AFTER_COALESCING    (1<<27)
+#define IR_DUMP_AFTER_REGALLOC      (1<<28)
+#define IR_DUMP_FINAL               (1<<29)
 
-#define IR_DUMP_AFTER_ALL           (1<<29)
-#define IR_DUMP_FINAL               (1<<30)
+#define IR_DUMP_CODEGEN             (1<<30)
 
-#define IR_DUMP_ALL                 0x7fff0000
+#define IR_DUMP_AFTER_ALL           0x3fff0000
 
 #define IR_UNKNOWN_SIZE             1
 
 static int _save(ir_ctx *ctx, uint32_t save_flags, uint32_t dump, uint32_t pass, FILE *f, const char *func_name)
 {
-	char fn[4096];
-	bool close = 0;
 	const char *comments = NULL;
 
+#if 0
+	bool close = 0;
+
 	if (!f) {
+		char fn[4096];
+
 		if (dump & IR_DUMP_AFTER_ALL) {
 			if (pass == IR_DUMP_AFTER_LOAD) {
 				snprintf(fn, sizeof(fn)-1, "01-load-%s.ir", func_name);
@@ -205,9 +211,11 @@ static int _save(ir_ctx *ctx, uint32_t save_flags, uint32_t dump, uint32_t pass,
 		}
 		close = 1;
 	}
+#endif
+
 	if ((dump & IR_DUMP_DOT)
-	 || ((dump & (IR_DUMP_SAVE|IR_DUMP_CODEGEN|IR_DUMP_DUMP|IR_DUMP_CFG|IR_DUMP_LIVE_RANGES))
-	  && !IR_IS_POWER_OF_TWO(dump & IR_DUMP_ALL))) {
+	 || ((dump & (IR_DUMP_IR|IR_DUMP_CODEGEN|IR_DUMP_LIVE_RANGES))
+	  && !IR_IS_POWER_OF_TWO(dump & (IR_DUMP_AFTER_ALL|IR_DUMP_CODEGEN)))) {
 		if (pass == IR_DUMP_AFTER_LOAD) {
 			comments = "(after load)";
 		} else if (pass == IR_DUMP_AFTER_USE_LISTS) {
@@ -226,7 +234,8 @@ static int _save(ir_ctx *ctx, uint32_t save_flags, uint32_t dump, uint32_t pass,
 			comments = "(after gcm)";
 		} else if (pass == IR_DUMP_AFTER_SCHEDULING) {
 			comments = "(after scheduling)";
-
+		} else if (pass == IR_DUMP_AFTER_CODE_MATCHING) {
+			comments = "(after code mathing)";
 		} else if (pass == IR_DUMP_AFTER_LIVE_RANGES) {
 			comments = "(after live ranges)";
 		} else if (pass == IR_DUMP_AFTER_COALESCING) {
@@ -249,35 +258,33 @@ static int _save(ir_ctx *ctx, uint32_t save_flags, uint32_t dump, uint32_t pass,
 		}
 		if (pass == IR_DUMP_FINAL && (dump & IR_DUMP_CODEGEN)) {
 			ir_dump_codegen(ctx, f);
-		} else if (dump & IR_DUMP_SAVE) {
+		} else if (dump & IR_DUMP_IR) {
 			ir_save(ctx, save_flags, f);
-		}
-		if (dump & IR_DUMP_DUMP) {
-			ir_dump(ctx, f);
-		}
-		if (dump & IR_DUMP_CFG) {
-			ir_dump_cfg(ctx, f);
 		}
 		if (dump & IR_DUMP_LIVE_RANGES) {
 			ir_dump_live_ranges(ctx, f);
 		}
 	}
+
+#if 0
 	if (close) {
 		fclose(f);
 	}
+#endif
+
 	return 1;
 }
 
 int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t dump, FILE *dump_file, const char *func_name)
 {
-	if ((dump & (IR_DUMP_AFTER_LOAD|IR_DUMP_AFTER_ALL))
+	if ((dump & IR_DUMP_AFTER_LOAD)
 	 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_LOAD, dump_file, func_name)) {
 		return 0;
 	}
 
 	if (opt_level > 0 || (ctx->flags & (IR_GEN_NATIVE|IR_GEN_CODE))) {
 		ir_build_def_use_lists(ctx);
-		if ((dump & (IR_DUMP_AFTER_USE_LISTS|IR_DUMP_AFTER_ALL))
+		if ((dump & IR_DUMP_AFTER_USE_LISTS)
 		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_USE_LISTS, dump_file, func_name)) {
 			return 0;
 		}
@@ -289,7 +296,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 
 	if (opt_level > 0 && (ctx->flags & IR_OPT_MEM2SSA)) {
 		ir_build_cfg(ctx);
-		if ((dump & (IR_DUMP_AFTER_CFG|IR_DUMP_AFTER_ALL))
+		if ((dump & IR_DUMP_AFTER_CFG)
 		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_CFG, dump_file, func_name)) {
 			return 0;
 		}
@@ -298,7 +305,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 #endif
 
 		ir_build_dominators_tree(ctx);
-		if ((dump & (IR_DUMP_AFTER_DOM|IR_DUMP_AFTER_ALL))
+		if ((dump & IR_DUMP_AFTER_DOM)
 		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_DOM, dump_file, func_name)) {
 			return 0;
 		}
@@ -306,7 +313,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 		ir_mem2ssa(ctx);
 		ir_reset_cfg(ctx);
 
-		if ((dump & (IR_DUMP_AFTER_MEM2SSA|IR_DUMP_AFTER_ALL))
+		if ((dump & IR_DUMP_AFTER_MEM2SSA)
 		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_MEM2SSA, dump_file, func_name)) {
 			return 0;
 		}
@@ -318,7 +325,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 	/* Global Optimization */
 	if (opt_level > 1) {
 		ir_sccp(ctx);
-		if ((dump & (IR_DUMP_AFTER_SCCP|IR_DUMP_AFTER_ALL))
+		if ((dump & IR_DUMP_AFTER_SCCP)
 		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_SCCP, dump_file, func_name)) {
 			return 0;
 		}
@@ -329,7 +336,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 
 	if ((opt_level > 0 || (ctx->flags & (IR_GEN_NATIVE|IR_GEN_CODE))) && !ctx->cfg_blocks) {
 		ir_build_cfg(ctx);
-		if ((dump & (IR_DUMP_AFTER_CFG|IR_DUMP_AFTER_ALL))
+		if ((dump & IR_DUMP_AFTER_CFG)
 		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_CFG, dump_file, func_name)) {
 			return 0;
 		}
@@ -339,7 +346,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 
 		if (opt_level > 0) {
 			ir_build_dominators_tree(ctx);
-			if ((dump & (IR_DUMP_AFTER_DOM|IR_DUMP_AFTER_ALL))
+			if ((dump & IR_DUMP_AFTER_DOM)
 			 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_DOM, dump_file, func_name)) {
 				return 0;
 			}
@@ -349,13 +356,13 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 	/* Schedule */
 	if (opt_level > 0) {
 		ir_find_loops(ctx);
-		if ((dump & (IR_DUMP_AFTER_LOOP|IR_DUMP_AFTER_ALL))
+		if ((dump & IR_DUMP_AFTER_LOOP)
 		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_LOOP, dump_file, func_name)) {
 			return 0;
 		}
 
 		ir_gcm(ctx);
-		if ((dump & (IR_DUMP_AFTER_GCM|IR_DUMP_AFTER_ALL))
+		if ((dump & IR_DUMP_AFTER_GCM)
 		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_GCM, dump_file, func_name)) {
 			return 0;
 		}
@@ -364,7 +371,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 #endif
 
 		ir_schedule(ctx);
-		if ((dump & (IR_DUMP_AFTER_SCHEDULING|IR_DUMP_AFTER_ALL))
+		if ((dump & IR_DUMP_AFTER_SCHEDULING)
 		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_SCHEDULING, dump_file, func_name)) {
 			return 0;
 		}
@@ -375,27 +382,32 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 
 	if (ctx->flags & IR_GEN_NATIVE) {
 		ir_match(ctx);
+
+		if ((dump & IR_DUMP_AFTER_CODE_MATCHING)
+		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_CODE_MATCHING, dump_file, func_name)) {
+			return 0;
+		}
 	}
 
 	if (opt_level > 0) {
 		ir_assign_virtual_registers(ctx);
 		ir_compute_live_ranges(ctx);
 
-		if ((dump & (IR_DUMP_AFTER_LIVE_RANGES|IR_DUMP_AFTER_ALL))
+		if ((dump & IR_DUMP_AFTER_LIVE_RANGES)
 		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_LIVE_RANGES, dump_file, func_name)) {
 			return 0;
 		}
 
 		ir_coalesce(ctx);
 
-		if ((dump & (IR_DUMP_AFTER_COALESCING|IR_DUMP_AFTER_ALL))
+		if ((dump & IR_DUMP_AFTER_COALESCING)
 		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_COALESCING, dump_file, func_name)) {
 			return 0;
 		}
 
 		if (ctx->flags & IR_GEN_NATIVE) {
 			ir_reg_alloc(ctx);
-			if ((dump & (IR_DUMP_AFTER_REGALLOC|IR_DUMP_AFTER_ALL))
+			if ((dump & IR_DUMP_AFTER_REGALLOC)
 			 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_REGALLOC, dump_file, func_name)) {
 				return 0;
 			}
@@ -407,7 +419,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 		ir_compute_dessa_moves(ctx);
 	}
 
-	if ((dump & (IR_DUMP_FINAL|IR_DUMP_AFTER_ALL|IR_DUMP_CODEGEN))
+	if ((dump & (IR_DUMP_FINAL|IR_DUMP_CODEGEN))
 	 && !_save(ctx, save_flags, dump, IR_DUMP_FINAL, dump_file, func_name)) {
 		return 0;
 	}
@@ -436,16 +448,13 @@ typedef struct _ir_main_loader {
 	uint64_t   debug_regset;
 	uint32_t   save_flags;
 	uint32_t   dump;
-	bool       dump_asm;
-	bool       dump_size;
 	bool       run;
 	bool       gdb;
 	bool       perf;
 	size_t     size;
 	void      *main;
 	FILE      *dump_file;
-	FILE      *c_file;
-	FILE      *llvm_file;
+	FILE      *out_file;
 	ir_strtab  symtab;
 	ir_sym    *sym;
 	ir_reloc  *reloc;
@@ -619,22 +628,22 @@ static bool ir_loader_external_sym_dcl(ir_loader *loader, const char *name, uint
 		return 1;
 	}
 
-	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
+	if ((l->dump & IR_DUMP_IR) && (l->dump_file)) {
 		fprintf(l->dump_file, "extern %s %s;\n", (flags & IR_CONST) ? "const" : "var", name);
 	}
-	if (l->c_file) {
-		ir_emit_c_sym_decl(name, flags | IR_EXTERN, l->c_file);
+	if (l->dump & IR_DUMP_C) {
+		ir_emit_c_sym_decl(name, flags | IR_EXTERN, l->out_file);
 	}
-	if (l->llvm_file) {
-		ir_emit_llvm_sym_decl(name, flags | IR_EXTERN, l->llvm_file);
+	if (l->dump & IR_DUMP_LLVM) {
+		ir_emit_llvm_sym_decl(name, flags | IR_EXTERN, l->out_file);
 	}
-	if (l->dump_asm || l->dump_size || l->run) {
+	if ((l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || l->run) {
 		void *addr = ir_loader_resolve_sym_name(loader, name, IR_RESOLVE_SYM_SILENT);
 
 		if (!addr) {
 			return 0;
 		}
-		if (l->dump_asm) {
+		if (l->dump & IR_DUMP_ASM) {
 			ir_disasm_add_symbol(name, (uintptr_t)addr, IR_UNKNOWN_SIZE);
 		}
 	} else {
@@ -664,16 +673,16 @@ static bool ir_loader_external_func_dcl(ir_loader *loader, const char *name, uin
 		return 1;
 	}
 
-	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
+	if ((l->dump & IR_DUMP_IR) && (l->dump_file)) {
 		ir_dump_func_dcl(name, flags | IR_EXTERN, ret_type, params_count, param_types, l->dump_file);
 	}
-	if (l->c_file) {
-		ir_emit_c_func_decl(name, flags | IR_EXTERN, ret_type,  params_count, param_types, l->c_file);
+	if (l->dump & IR_DUMP_C) {
+		ir_emit_c_func_decl(name, flags | IR_EXTERN, ret_type,  params_count, param_types, l->out_file);
 	}
-	if (l->llvm_file) {
-		ir_emit_llvm_func_decl(name, flags | IR_EXTERN, ret_type,  params_count, param_types, l->llvm_file);
+	if (l->dump & IR_DUMP_LLVM) {
+		ir_emit_llvm_func_decl(name, flags | IR_EXTERN, ret_type,  params_count, param_types, l->out_file);
 	}
-	if (l->dump_asm || l->dump_size || l->run) {
+	if ((l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || l->run) {
 		void *addr = ir_loader_resolve_sym_name(loader, name, IR_RESOLVE_SYM_SILENT);
 
 		if (!addr) {
@@ -681,7 +690,7 @@ static bool ir_loader_external_func_dcl(ir_loader *loader, const char *name, uin
 			ir_loader_add_sym(loader, name, NULL);
 			return 1;
 		}
-		if (l->dump_asm) {
+		if (l->dump & IR_DUMP_ASM) {
 			ir_disasm_add_symbol(name, (uintptr_t)addr, IR_UNKNOWN_SIZE);
 		}
 	} else {
@@ -699,11 +708,11 @@ static bool ir_loader_forward_func_dcl(ir_loader *loader, const char *name, uint
 		return 1;
 	}
 
-	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
+	if ((l->dump & IR_DUMP_IR) && (l->dump_file)) {
 		ir_dump_func_dcl(name, flags, ret_type, params_count, param_types, l->dump_file);
 	}
-	if (l->c_file) {
-		ir_emit_c_func_decl(name, flags, ret_type,  params_count, param_types, l->c_file);
+	if (l->dump & IR_DUMP_C) {
+		ir_emit_c_func_decl(name, flags, ret_type,  params_count, param_types, l->out_file);
 	}
 
 	ir_loader_add_sym(loader, name, NULL);
@@ -717,7 +726,7 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 	l->data_start = NULL;
 	l->data_pos = 0;
 
-	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
+	if ((l->dump & IR_DUMP_IR) && (l->dump_file)) {
 		if (flags & IR_STATIC) {
 			fprintf(l->dump_file, "static ");
 		}
@@ -725,13 +734,13 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 			(flags & IR_CONST) ? "const" : "var", name, size,
 			(flags & IR_INITIALIZED) ? ((flags & IR_CONST_STRING) ? " = " : " = {\n") : ";\n");
 	}
-	if (l->c_file) {
-		ir_emit_c_sym_decl(name, flags, l->c_file);
+	if (l->dump & IR_DUMP_C) {
+		ir_emit_c_sym_decl(name, flags, l->out_file);
 	}
-	if (l->llvm_file) {
-		ir_emit_llvm_sym_decl(name, flags, l->llvm_file);
+	if (l->dump & IR_DUMP_LLVM) {
+		ir_emit_llvm_sym_decl(name, flags, l->out_file);
 	}
-	if (l->dump_asm || l->dump_size || l->run) {
+	if ((l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || l->run) {
 		void *data;
 
 		if (flags & IR_CONST) {
@@ -763,7 +772,7 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 		if (flags & IR_INITIALIZED) {
 			l->data_start = data;
 		}
-		if (l->dump_asm) {
+		if (l->dump & IR_DUMP_ASM) {
 			ir_disasm_add_symbol(name, (uintptr_t)data, size);
 		}
 #ifndef _WIN32
@@ -782,7 +791,7 @@ static bool ir_loader_sym_data(ir_loader *loader, ir_type type, uint32_t count, 
 	ir_main_loader *l = (ir_main_loader*) loader;
 	size_t size = ir_type_size[type];
 
-	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
+	if ((l->dump & IR_DUMP_IR) && (l->dump_file)) {
 		const void *p = data;
 		uint32_t i;
 
@@ -809,13 +818,13 @@ static bool ir_loader_sym_data(ir_loader *loader, ir_type type, uint32_t count, 
 				break;
 		}
 	}
-	if (l->c_file) {
+	if (l->dump & IR_DUMP_C) {
 		// TODO:
 	}
-	if (l->llvm_file) {
+	if (l->dump & IR_DUMP_LLVM) {
 		// TODO:
 	}
-	if (l->dump_asm || l->dump_size || l->run) {
+	if ((l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || l->run) {
 		IR_ASSERT(l->data_start);
 		if (count == 1) {
 			memcpy((char*)l->data_start + l->data_pos, data, size);
@@ -838,18 +847,18 @@ static bool ir_loader_sym_data_str(ir_loader *loader, const char *str, size_t le
 {
 	ir_main_loader *l = (ir_main_loader*) loader;
 
-	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
+	if ((l->dump & IR_DUMP_IR) && (l->dump_file)) {
 		fprintf(l->dump_file, "\"");
 		ir_print_escaped_str(str, len, l->dump_file);
 		fprintf(l->dump_file, "\"");
 	}
-	if (l->c_file) {
+	if (l->dump & IR_DUMP_C) {
 		// TODO:
 	}
-	if (l->llvm_file) {
+	if (l->dump & IR_DUMP_LLVM) {
 		// TODO:
 	}
-	if (l->dump_asm || l->dump_size || l->run) {
+	if ((l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || l->run) {
 		IR_ASSERT(l->data_start);
 		memcpy((char*)l->data_start + l->data_pos, str, len);
 	}
@@ -865,18 +874,18 @@ static bool ir_loader_sym_data_pad(ir_loader *loader, size_t offset)
 	IR_ASSERT(offset >= l->data_pos);
 	offset -= l->data_pos;
 	if (offset) {
-		if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
+		if ((l->dump & IR_DUMP_IR) && (l->dump_file)) {
 			for (i = 0; i < offset; i++) {
 				fprintf(l->dump_file, "\tuint8_t 0x00,\n");
 			}
 		}
-		if (l->c_file) {
+		if (l->dump & IR_DUMP_C) {
 			// TODO:
 		}
-		if (l->llvm_file) {
+		if (l->dump & IR_DUMP_LLVM) {
 			// TODO:
 		}
-		if (l->dump_asm || l->dump_size || l->run) {
+		if ((l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || l->run) {
 			IR_ASSERT(l->data_start);
 			memset((char*)l->data_start + l->data_pos, 0, offset);
 		}
@@ -890,20 +899,20 @@ static bool ir_loader_sym_data_ref(ir_loader *loader, ir_op op, const char *ref,
 	ir_main_loader *l = (ir_main_loader*) loader;
 
 	IR_ASSERT(op == IR_FUNC || op == IR_SYM);
-	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
+	if ((l->dump & IR_DUMP_IR) && (l->dump_file)) {
 		if (!offset) {
 			fprintf(l->dump_file, "\t%s %s(%s),\n", ir_type_cname[IR_ADDR], op == IR_FUNC ? "func" : "sym", ref);
 		} else {
 			fprintf(l->dump_file, "\t%s %s(%s)+0x%" PRIxPTR ",\n", ir_type_cname[IR_ADDR], op == IR_FUNC ? "func" : "sym", ref, offset);
 		}
 	}
-	if (l->c_file) {
+	if (l->dump & IR_DUMP_C) {
 		// TODO:
 	}
-	if (l->llvm_file) {
+	if (l->dump & IR_DUMP_LLVM) {
 		// TODO:
 	}
-	if (l->dump_asm || l->dump_size || l->run) {
+	if ((l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || l->run) {
 		void *data = (char*)l->data_start + l->data_pos;
 		void *addr = ir_loader_resolve_sym_name(loader, ref, IR_RESOLVE_SYM_SILENT);
 
@@ -922,20 +931,20 @@ static bool ir_loader_sym_data_end(ir_loader *loader, uint32_t flags)
 {
 	ir_main_loader *l = (ir_main_loader*) loader;
 
-	if ((l->dump & IR_DUMP_SAVE) && (l->dump_file)) {
+	if ((l->dump & IR_DUMP_IR) && (l->dump_file)) {
 		if (flags & IR_CONST_STRING) {
 			fprintf(l->dump_file, ";\n");
 		} else {
 			fprintf(l->dump_file, "};\n");
 		}
 	}
-	if (l->c_file) {
+	if (l->dump & IR_DUMP_C) {
 		// TODO:
 	}
-	if (l->llvm_file) {
+	if (l->dump & IR_DUMP_LLVM) {
 		// TODO:
 	}
-	if (l->dump_asm || l->dump_size || l->run) {
+	if ((l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || l->run) {
 		if ((char*)l->data_start >= (char*)l->code_buffer.start
 		 && (char*)l->data_start < (char*)l->code_buffer.end) {
 			ir_mem_protect(l->code_buffer.start, (char*)l->code_buffer.end - (char*)l->code_buffer.start);
@@ -978,7 +987,7 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 
 	if (name == NULL) {
 		name = (l->run) ? "main" : "test";
-	} else if ((l->dump & (IR_DUMP_SAVE|IR_DUMP_CODEGEN|IR_DUMP_DUMP|IR_DUMP_CFG|IR_DUMP_LIVE_RANGES)) && l->dump_file) {
+	} else if ((l->dump & (IR_DUMP_IR|IR_DUMP_CODEGEN|IR_DUMP_LIVE_RANGES)) && l->dump_file) {
 		ir_print_func_proto(ctx, name, l->dump_file);
 		fprintf(l->dump_file, "\n");
 	}
@@ -987,21 +996,21 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 		return 0;
 	}
 
-	if (l->c_file) {
-		if (!ir_emit_c(ctx, name, l->c_file)) {
+	if (l->dump & IR_DUMP_C) {
+		if (!ir_emit_c(ctx, name, l->out_file)) {
 			fprintf(stderr, "\nERROR: %d\n", ctx->status);
 			return 0;
 		}
 	}
 
-	if (l->llvm_file) {
-		if (!ir_emit_llvm(ctx, name, l->llvm_file)) {
+	if (l->dump & IR_DUMP_LLVM) {
+		if (!ir_emit_llvm(ctx, name, l->out_file)) {
 			fprintf(stderr, "\nERROR: %d\n", ctx->status);
 			return 0;
 		}
 	}
 
-	if (l->dump_asm || l->dump_size || l->run) {
+	if ((l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || l->run) {
 		size_t size;
 		void *entry;
 
@@ -1033,7 +1042,7 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 				fprintf(stderr, "\nERROR: Symbol redefinition: %s\n", name);
 				return 0;
 			}
-			if (l->dump_asm) {
+			if (l->dump & IR_DUMP_ASM) {
 				ir_ref i;
 				ir_insn *insn;
 
@@ -1050,7 +1059,7 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 					}
 				}
 
-				ir_disasm(name, entry, size, 0, ctx, stderr);
+				ir_disasm(name, entry, size, 0, ctx, l->out_file);
 			}
 			if (l->run) {
 #ifndef _WIN32
@@ -1077,9 +1086,9 @@ int main(int argc, char **argv)
 {
 	int i, run_args = 0;
 	char *input = NULL;
-	char *dump_file = NULL, *c_file = NULL, *llvm_file = 0;
+	char *dump_file = NULL, *out_file = 0;
 	FILE *f;
-	bool emit_c = 0, emit_llvm = 0, dump_size = 0, dump_time = 0, dump_asm = 0, run = 0, gdb = 0, perf = 0;
+	bool dump_time = 0, run = 0, gdb = 0, perf = 0;
 	bool disable_inline = 0;
 	bool force_inline = 0;
 	bool disable_mem2ssa = 0;
@@ -1127,92 +1136,87 @@ int main(int argc, char **argv)
 				fprintf(stderr, "ERROR: Invalid usage' (use --help)\n");
 				return 1;
 			}
+		} else if (argv[i][0] == '-' && argv[i][1] == 'o') {
+			if (argv[i][2] == 0) {
+				if (i + 1 == argc || (argv[i+1][0] == '-' && argv[i+1][1] != 0)) {
+					fprintf(stderr, "ERROR: missing filename after \"-%c\"\n", argv[i][1]);
+					goto exit;
+				}
+				out_file = argv[i+1];
+				i++;
+			} else {
+				out_file = argv[i] + 2;
+			}
 		} else if (strcmp(argv[i], "--emit-c") == 0) {
-			emit_c = 1;
-			if (i + 1 < argc && argv[i + 1][0] != '-') {
-				c_file = argv[i + 1];
-				i++;
-			}
+			dump |= IR_DUMP_C;
 		} else if (strcmp(argv[i], "--emit-llvm") == 0) {
-			emit_llvm = 1;
-			if (i + 1 < argc && argv[i + 1][0] != '-') {
-				llvm_file = argv[i + 1];
-				i++;
-			}
+			dump |= IR_DUMP_LLVM;
 		} else if (strcmp(argv[i], "--save") == 0 || strcmp(argv[i], "--emit-ir") == 0) {
 			// TODO: check save/dot/dump/... conflicts
-			dump |= IR_DUMP_SAVE;
+			dump |= IR_DUMP_IR;
 			if (i + 1 < argc && argv[i + 1][0] != '-') {
 				dump_file = argv[i + 1];
 				i++;
 			}
 		} else if (strcmp(argv[i], "--save-cfg") == 0) {
-			dump |= IR_DUMP_SAVE;
+			dump |= IR_DUMP_IR;
 			save_flags |= IR_SAVE_CFG;
 		} else if (strcmp(argv[i], "--save-cfg-map") == 0) {
-			dump |= IR_DUMP_SAVE;
+			dump |= IR_DUMP_IR;
 			save_flags |= IR_SAVE_CFG | IR_SAVE_CFG_MAP;
 		} else if (strcmp(argv[i], "--save-rules") == 0) {
-			dump |= IR_DUMP_SAVE;
+			dump |= IR_DUMP_IR;
 			save_flags |= IR_SAVE_RULES;
 		} else if (strcmp(argv[i], "--save-regs") == 0) {
-			dump |= IR_DUMP_SAVE;
+			dump |= IR_DUMP_IR;
 			save_flags |= IR_SAVE_REGS;
 		} else if (strcmp(argv[i], "--save-use-lists") == 0) {
-			dump |= IR_DUMP_SAVE;
+			dump |= IR_DUMP_IR;
 			save_flags |= IR_SAVE_USE_LISTS;
-		} else if (strcmp(argv[i], "--dot") == 0) {
+		} else if (strcmp(argv[i], "--save-dot") == 0) {
 			dump |= IR_DUMP_DOT;
 			if (i + 1 < argc && argv[i + 1][0] != '-') {
 				dump_file = argv[i + 1];
 				i++;
 			}
-		} else if (strcmp(argv[i], "--dump") == 0) {
-			dump |= IR_DUMP_DUMP;
-			if (i + 1 < argc && argv[i + 1][0] != '-') {
-				dump_file = argv[i + 1];
-				i++;
-			}
-		} else if (strcmp(argv[i], "--dump-cfg") == 0) {
-			dump |= IR_DUMP_CFG;
-		} else if (strcmp(argv[i], "--dump-live-ranges") == 0) {
+		} else if (strcmp(argv[i], "--save-live-ranges") == 0) {
 			dump |= IR_DUMP_LIVE_RANGES;
-		} else if (strcmp(argv[i], "--dump-codegen") == 0) {
+		} else if (strcmp(argv[i], "--save-ir-codegen") == 0) {
 			dump |= IR_DUMP_CODEGEN;
-		} else if (strcmp(argv[i], "--dump-after-load") == 0) {
+		} else if (strcmp(argv[i], "--save-ir-after-load") == 0) {
 			dump |= IR_DUMP_AFTER_LOAD;
-		} else if (strcmp(argv[i], "--dump-after-use-lists") == 0) {
+		} else if (strcmp(argv[i], "--save-ir-after-use-lists") == 0) {
 			dump |= IR_DUMP_AFTER_USE_LISTS;
-		} else if (strcmp(argv[i], "--dump-after-mem2ssa") == 0) {
+		} else if (strcmp(argv[i], "--save-ir-after-mem2ssa") == 0) {
 			dump |= IR_DUMP_AFTER_MEM2SSA;
-		} else if (strcmp(argv[i], "--dump-after-sccp") == 0) {
+		} else if (strcmp(argv[i], "--save-ir-after-sccp") == 0) {
 			dump |= IR_DUMP_AFTER_SCCP;
-		} else if (strcmp(argv[i], "--dump-after-cfg") == 0) {
+		} else if (strcmp(argv[i], "--save-ir-after-cfg") == 0) {
 			dump |= IR_DUMP_AFTER_CFG;
-		} else if (strcmp(argv[i], "--dump-after-dom") == 0) {
+		} else if (strcmp(argv[i], "--save-ir-after-dom") == 0) {
 			dump |= IR_DUMP_AFTER_DOM;
-		} else if (strcmp(argv[i], "--dump-after-loop") == 0) {
+		} else if (strcmp(argv[i], "--save-ir-after-loop") == 0) {
 			dump |= IR_DUMP_AFTER_LOOP;
-		} else if (strcmp(argv[i], "--dump-after-gcm") == 0) {
+		} else if (strcmp(argv[i], "--save-ir-after-gcm") == 0) {
 			dump |= IR_DUMP_AFTER_GCM;
-		} else if (strcmp(argv[i], "--dump-after-scheduling") == 0) {
+		} else if (strcmp(argv[i], "--save-ir-after-scheduling") == 0) {
 			dump |= IR_DUMP_AFTER_SCHEDULING;
-		} else if (strcmp(argv[i], "--dump-after-live-ranges") == 0) {
+		} else if (strcmp(argv[i], "--save-ir-after-live-ranges") == 0) {
 			dump |= IR_DUMP_AFTER_LIVE_RANGES;
-		} else if (strcmp(argv[i], "--dump-after-coalescing") == 0) {
+		} else if (strcmp(argv[i], "--save-ir-after-coalescing") == 0) {
 			dump |= IR_DUMP_AFTER_COALESCING;
-		} else if (strcmp(argv[i], "--dump-after-regalloc") == 0) {
+		} else if (strcmp(argv[i], "--save-ir-after-regalloc") == 0) {
 			dump |= IR_DUMP_AFTER_REGALLOC;
-		} else if (strcmp(argv[i], "--dump-after-each-pass") == 0) {
+		} else if (strcmp(argv[i], "--save-ir-after-each-pass") == 0) {
 			dump |= IR_DUMP_AFTER_ALL;
-		} else if (strcmp(argv[i], "--dump-final") == 0) {
+		} else if (strcmp(argv[i], "--save-ir-final") == 0) {
 			dump |= IR_DUMP_FINAL;
 		} else if (strcmp(argv[i], "--dump-size") == 0) {
-			dump_size = 1;
+			dump |= IR_DUMP_SIZE;
 		} else if (strcmp(argv[i], "--dump-time") == 0) {
 			dump_time = 1;
 		} else if (strcmp(argv[i], "-S") == 0) {
-			dump_asm = 1;
+			dump |= IR_DUMP_ASM;
 		} else if (strcmp(argv[i], "--run") == 0) {
 			run = 1;
 			if (i + 1 < argc) {
@@ -1244,7 +1248,7 @@ int main(int argc, char **argv)
 			flags |= IR_DEBUG_GCM_SPLIT;
 		} else if (strcmp(argv[i], "--debug-scheduling") == 0) {
 			flags |= IR_DEBUG_SCHEDULE;
-		} else if (strcmp(argv[i], "--debug-ra") == 0) {
+		} else if (strcmp(argv[i], "--debug-regalloc") == 0) {
 			flags |= IR_DEBUG_RA;
 		} else if (strcmp(argv[i], "--debug-bb-scheduling") == 0) {
 			flags |= IR_DEBUG_BB_SCHEDULE;
@@ -1292,12 +1296,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (dump && !(dump & (IR_DUMP_AFTER_LOAD|IR_DUMP_AFTER_USE_LISTS|
-		IR_DUMP_AFTER_MEM2SSA|IR_DUMP_AFTER_SCCP|
-		IR_DUMP_AFTER_CFG|IR_DUMP_AFTER_DOM|IR_DUMP_AFTER_LOOP|
-		IR_DUMP_AFTER_GCM|IR_DUMP_AFTER_SCHEDULING|
-		IR_DUMP_AFTER_LIVE_RANGES|IR_DUMP_AFTER_COALESCING|IR_DUMP_AFTER_REGALLOC|
-		IR_DUMP_FINAL))) {
+	if ((dump & (IR_DUMP_IR|IR_DUMP_LIVE_RANGES)) && !(dump & (IR_DUMP_AFTER_ALL|IR_DUMP_CODEGEN))) {
 		dump |= IR_DUMP_FINAL;
 	}
 
@@ -1341,12 +1340,15 @@ int main(int argc, char **argv)
 	if (opt_level > 0 && !disable_mem2ssa) {
 		flags |= IR_OPT_MEM2SSA;
 	}
-	if (emit_c || emit_llvm) {
+	if (dump & (IR_DUMP_C|IR_DUMP_LLVM)) {
+		if ((dump & (IR_DUMP_C|IR_DUMP_LLVM)) == (IR_DUMP_C|IR_DUMP_LLVM)) {
+			fprintf(stderr, "ERROR: --emit-c and --emit-llvm are incompatible\n");
+		}
 		flags |= IR_GEN_CODE;
 	}
-	if (dump_asm || dump_size || run) {
+	if ((dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || run) {
 		flags |= IR_GEN_NATIVE;
-		if (emit_c || emit_llvm) {
+		if (dump & (IR_DUMP_C|IR_DUMP_LLVM)) {
 			fprintf(stderr, "ERROR: --emit-c and --emit-llvm are incompatible with native code generator (-S, --dump-size, --run)\n");
 			return 1;
 		}
@@ -1376,8 +1378,6 @@ int main(int argc, char **argv)
 	loader.debug_regset = debug_regset;
 	loader.save_flags = save_flags;
 	loader.dump = dump;
-	loader.dump_asm = dump_asm;
-	loader.dump_size = dump_size;
 	loader.run = run;
 	loader.gdb = run && gdb;
 	loader.perf = run && perf;
@@ -1398,32 +1398,22 @@ int main(int argc, char **argv)
 	} else {
 		loader.dump_file = stderr;
 	}
-	if (emit_c) {
-		if (c_file) {
-			loader.c_file = fopen(c_file, "w+");
-			if (!loader.c_file) {
-				fprintf(stderr, "ERROR: Cannot create file '%s'\n", c_file);
+	if (dump & (IR_DUMP_C|IR_DUMP_LLVM|IR_DUMP_ASM)) {
+		if (!out_file) {
+			loader.out_file = stderr;
+		} else if (strcmp(out_file, "-") == 0) {
+			loader.out_file = stdout;
+		} else {
+			loader.out_file = fopen(out_file, "w+");
+			if (!loader.out_file) {
+				fprintf(stderr, "ERROR: Cannot create file '%s'\n", out_file);
 				ret = 1;
 				goto exit;
 			}
-		} else {
-			loader.c_file = stderr;
-		}
-	}
-	if (emit_llvm) {
-		if (llvm_file) {
-			loader.llvm_file = fopen(llvm_file, "w+");
-			if (!loader.llvm_file) {
-				fprintf(stderr, "ERROR: Cannot create file '%s'\n", llvm_file);
-				ret = 1;
-				goto exit;
-			}
-		} else {
-			loader.llvm_file = stderr;
 		}
 	}
 
-	if (dump_asm || dump_size || run) {
+	if ((dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || run) {
 		/* Preallocate 2MB JIT code buffer. It may be necessary to generate veneers and thunks. */
 		size_t size = 2 * 1024 * 1024;
 		void *entry;
@@ -1507,14 +1497,11 @@ int main(int argc, char **argv)
 finish:
 #endif
 
-	if (loader.dump_file && loader.dump_file != stderr) {
+	if (loader.dump_file && loader.dump_file != stderr && loader.dump_file != stdout) {
 		fclose(loader.dump_file);
 	}
-	if (loader.c_file && loader.c_file != stderr) {
-		fclose(loader.c_file);
-	}
-	if (loader.llvm_file && loader.llvm_file != stderr) {
-		fclose(loader.llvm_file);
+	if (loader.out_file && loader.out_file != stderr && loader.out_file != stdout) {
+		fclose(loader.out_file);
 	}
 
 	if (!ir_loader_fix_relocs(&loader)) {
@@ -1525,7 +1512,7 @@ finish:
 		}
 	}
 
-	if (dump_size) {
+	if (dump & IR_DUMP_SIZE) {
 		if (loader.code_buffer.start) {
 			loader.size = (char*)loader.code_buffer.pos - (char*)loader.code_buffer.start;
 		}

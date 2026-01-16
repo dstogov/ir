@@ -1,7 +1,7 @@
 --TEST--
 021: Translation out of SSA (Figure 7 from "Translating Out of Static Single Assignment Form" by Sreedhar)
 --ARGS--
---save --dump-live-ranges --dump-cfg
+--save --save-live-ranges --save-cfg
 --CODE--
 {
 	uintptr_t c_1 = 0;
@@ -26,51 +26,21 @@
 	bool c_2 = 0;
 	bool c_3 = 1;
 	int32_t c_4 = 1;
+#BB1: end=l_3, succ(1)=[BB2]
 	l_1 = START(l_11);
 	int32_t d_2 = PARAM(l_1, "x", 0);
 	l_3 = END(l_1);
+#BB2: end=l_7, idom=BB1(1), loop=HDR(1), pred(2)=[BB1, BB3], succ(2)=[BB3, BB4]
 	l_4 = LOOP_BEGIN(l_3, l_9);
 	int32_t d_5 = PHI(l_4, d_2, d_6);
 	int32_t d_6 = ADD(d_5, c_4);
 	l_7 = IF(l_4, d_6);
+#BB3: end=l_9, idom=BB2(2), loop=BB2(1), pred(1)=[BB2], succ(1)=[BB2]
 	l_8 = IF_TRUE(l_7);
 	l_9 = LOOP_END(l_8);
+#BB4: end=l_11, idom=BB2(2), pred(1)=[BB2]
 	l_10 = IF_FALSE(l_7);
 	l_11 = RETURN(l_10, d_5);
-}
-{ # CFG
-BB1:
-	start=1
-	end=3
-	successors(1) [BB2]
-	dom_depth=0
-	dom_children [BB2]
-BB3:
-	start=8
-	end=9
-	successors(1) [BB2]
-	predecessors(1) [BB2]
-	dom_parent=BB2
-	dom_depth=2
-	loop_header=BB2
-	loop_depth=1
-	# DESSA MOV d_6 {R2} -> d_5 {R1}
-BB2:
-	start=4
-	end=7
-	successors(2) [BB3, BB4]
-	predecessors(2) [BB1, BB3]
-	dom_parent=BB1
-	dom_depth=1
-	dom_children [BB3, BB4]
-	LOOP_HEADER
-	loop_depth=1
-BB4:
-	start=10
-	end=11
-	predecessors(1) [BB2]
-	dom_parent=BB2
-	dom_depth=2
 }
 { # LIVE-RANGES (vregs_count=2)
 R1 (d_2, d_5): [2.2-8.0), [10.0-11.1), DEF(2.2), PHI_USE(3.2, phi=d_5/2), DEF(5.2), USE(6.1/1), USE(11.1/2)

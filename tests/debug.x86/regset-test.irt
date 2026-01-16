@@ -3,7 +3,7 @@ Test
 --TARGET--
 x86
 --ARGS--
---debug-regset 0x3ff --save --dump-live-ranges -S
+--debug-regset 0x3ff --save --save-live-ranges -S
 --CODE--
 {
 	uintptr_t c_1 = 0;

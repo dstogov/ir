@@ -3,7 +3,7 @@ Fib2
 --TARGET--
 Windows-x86_64
 --ARGS--
---debug-regset 0x3ffff --save --dump-live-ranges -S --run
+--debug-regset 0x3ffff --save --save-live-ranges -S --run
 --CODE--
 {
 	int32_t zero = 0;

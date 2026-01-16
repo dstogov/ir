@@ -1,7 +1,7 @@
 --TEST--
 003: Constant Folding
 --ARGS--
---save --dump-after-load
+--save --save-ir-after-load
 --CODE--
 {
 	int32_t c_4 = 1;

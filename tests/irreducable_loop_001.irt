@@ -1,7 +1,7 @@
 --TEST--
 001: irreducabe loop
 --ARGS--
---save --save-cfg --dump-after-loop
+--save --save-cfg --save-ir-after-loop
 --CODE--
 {
 	uintptr_t c_1 = 0;
