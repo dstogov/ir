@@ -55,28 +55,27 @@ static void help(const char *cmd)
 #else
 		"Usage: %s [options] input-file...\n"
 #endif
-		"Options:\n"
-		"  -O[012]                    - optimization level (default: 2)\n"
-		"  -f[no-]inline              - disable/enable function inlining\n"
-		"  -fno-mem2ssa               - disable mem2ssa\n"
-		"  -S                         - dump final target assembler code\n"
+		"General Options:\n"
 		"  --run ...                  - run the main() function of generated code\n"
 		"                               (the remaining arguments are passed to main)\n"
+		"  -S                         - show generated assembler code\n"
+		"Optimization Options:\n"
+		"  -O[012]                    - optimization level (default: -O2)\n"
+		"  -f[no-]inline              - enable/disable function inlining (default: enabled at -O1)\n"
+		"  -fno-mem2ssa               - disable MEM2SSA pass (default: enabled at -O1)\n"
+		"Code Generation Options:\n"
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 		"  -mavx                      - use AVX instruction set\n"
 		"  -mno-bmi1                  - disable BMI1 instruction set\n"
 #endif
 		"  -muse-fp                   - use base frame pointer register\n"
-		"  --emit-c [file-name]       - convert to C source\n"
-		"  --emit-llvm [file-name]    - convert to LLVM\n"
+		"IR Debugging Options:\n"
 		"  --save [file-name]         - save IR\n"
 		"  --save-cfg                 - extend saved IR with information about CFG\n"
 		"  --save-cfg-map             - extend saved IR with information about assigned basic-locks\n"
 		"  --save-rules               - extend saved IR with information selectd code-generation \n"
 		"  --save-regs                - extend saved IR with information about assigned CPU register\n"
 		"  --save-use-lists           - extend saved IR with def->use chains\n"
-		"  --dot  [file-name]         - dump IR graph\n"
-		"  --dump [file-name]         - dump IR table\n"
 		"  --dump-after-load          - dump IR after load and local optimization\n"
 		"  --dump-after-use-lists     - dump IR after USE-LISTS construction\n"
 		"  --dump-after-mem2ssa       - dump IR after MEM2SSA pass\n"
@@ -85,27 +84,34 @@ static void help(const char *cmd)
 		"  --dump-after-dom           - dump IR after Dominators tree construction\n"
 		"  --dump-after-loop          - dump IR after Loop detection\n"
 		"  --dump-after-gcm           - dump IR after GCM optimization pass\n"
-		"  --dump-after-schedule      - dump IR after SCHEDULE pass\n"
+		"  --dump-after-scheduling    - dump IR after SCHEDULE pass\n"
 		"  --dump-after-live-ranges   - dump IR after live ranges identification\n"
 		"  --dump-after-coalescing    - dump IR after live ranges coalescing\n"
 		"  --dump-after-regalloc      - dump IR after register allocation\n"
 		"  --dump-after-all           - dump IR after each pass\n"
 		"  --dump-final               - dump IR after all pass\n"
-		"  --dump-size                - dump generated code size\n"
-		"  --dump-time                - dump compilation and execution time\n"
 		"  --dump-cfg                 - dump CFG (Control Flow Graph)\n"
 		"  --dump-live-ranges         - dump live ranges\n"
 		"  --dump-codegen             - dump scheduled IR with selected rules and assigned CPU registers\n"
+		"  --dot [file-name]          - print IR in .DOT format (affects all --save-ir-...)\n"
+		"                               the output may be converted into multi-page PDF using pipe: \n"
+		"                                 $ ir ... 2>&1 | dot -Tps:cairo:cairo | ps2pdf - > out.pdf\n"
+		"  --dump [file-name]         - dump IR table\n"
 #ifdef IR_DEBUG
 		"  --debug-sccp               - debug SCCP optimization pass\n"
 		"  --debug-gcm                - debug GCM optimization pass\n"
 		"  --debug-gcm-split          - debug floating node splitting\n"
-		"  --debug-schedule           - debug SCHEDULE optimization pass\n"
+		"  --debug-scheduling         - debug SCHEDULE optimization pass\n"
 		"  --debug-ra                 - debug register allocator\n"
 		"  --debug-regset <bit-mask>  - restrict available register set\n"
-		"  --debug-bb-schedule        - debug BB PLCEMENT optimization pass\n"
+		"  --debug-bb-scheduling      - debug BB PLCEMENT optimization pass\n"
 #endif
 		"  --disable-gdb              - disable JIT code registration in GDB\n"
+		"Utility Options\n"
+		"  --emit-c [file-name]       - convert final IR to C source (implementation is incomplete)\n"
+		"  --emit-llvm [file-name]    - convert final IR to LLVM code (implementation is incomplete)\n"
+		"  --dump-size                - dump generated code size\n"
+		"  --dump-time                - dump compilation and execution time\n"
 		"  --target                   - print JIT target\n"
 		"  --version\n"
 		"  --help\n",
@@ -127,7 +133,7 @@ static void help(const char *cmd)
 #define IR_DUMP_AFTER_DOM           (1<<21)
 #define IR_DUMP_AFTER_LOOP          (1<<22)
 #define IR_DUMP_AFTER_GCM           (1<<23)
-#define IR_DUMP_AFTER_SCHEDULE      (1<<24)
+#define IR_DUMP_AFTER_SCHEDULING    (1<<24)
 #define IR_DUMP_AFTER_LIVE_RANGES   (1<<25)
 #define IR_DUMP_AFTER_COALESCING    (1<<26)
 #define IR_DUMP_AFTER_REGALLOC      (1<<27)
@@ -160,8 +166,8 @@ static int _save(ir_ctx *ctx, uint32_t save_flags, uint32_t dump, uint32_t pass,
 				snprintf(fn, sizeof(fn)-1, "07-loop-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_GCM) {
 				snprintf(fn, sizeof(fn)-1, "08-gcm-%s.ir", func_name);
-			} else if (pass == IR_DUMP_AFTER_SCHEDULE) {
-				snprintf(fn, sizeof(fn)-1, "09-schedule-%s.ir", func_name);
+			} else if (pass == IR_DUMP_AFTER_SCHEDULING) {
+				snprintf(fn, sizeof(fn)-1, "09-scheduling-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_LIVE_RANGES) {
 				snprintf(fn, sizeof(fn)-1, "10-live-ranges-%s.ir", func_name);
 			} else if (pass == IR_DUMP_AFTER_COALESCING) {
@@ -306,8 +312,8 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 #endif
 
 		ir_schedule(ctx);
-		if ((dump & (IR_DUMP_AFTER_SCHEDULE|IR_DUMP_AFTER_ALL))
-		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_SCHEDULE, dump_file, func_name)) {
+		if ((dump & (IR_DUMP_AFTER_SCHEDULING|IR_DUMP_AFTER_ALL))
+		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_SCHEDULING, dump_file, func_name)) {
 			return 0;
 		}
 #ifdef IR_DEBUG
@@ -1159,8 +1165,8 @@ int main(int argc, char **argv)
 			dump |= IR_DUMP_AFTER_LOOP;
 		} else if (strcmp(argv[i], "--dump-after-gcm") == 0) {
 			dump |= IR_DUMP_AFTER_GCM;
-		} else if (strcmp(argv[i], "--dump-after-schedule") == 0) {
-			dump |= IR_DUMP_AFTER_SCHEDULE;
+		} else if (strcmp(argv[i], "--dump-after-scheduling") == 0) {
+			dump |= IR_DUMP_AFTER_SCHEDULING;
 		} else if (strcmp(argv[i], "--dump-after-live-ranges") == 0) {
 			dump |= IR_DUMP_AFTER_LIVE_RANGES;
 		} else if (strcmp(argv[i], "--dump-after-coalescing") == 0) {
@@ -1206,11 +1212,11 @@ int main(int argc, char **argv)
 			flags |= IR_DEBUG_GCM;
 		} else if (strcmp(argv[i], "--debug-gcm-split") == 0) {
 			flags |= IR_DEBUG_GCM_SPLIT;
-		} else if (strcmp(argv[i], "--debug-schedule") == 0) {
+		} else if (strcmp(argv[i], "--debug-scheduling") == 0) {
 			flags |= IR_DEBUG_SCHEDULE;
 		} else if (strcmp(argv[i], "--debug-ra") == 0) {
 			flags |= IR_DEBUG_RA;
-		} else if (strcmp(argv[i], "--debug-bb-schedule") == 0) {
+		} else if (strcmp(argv[i], "--debug-bb-scheduling") == 0) {
 			flags |= IR_DEBUG_BB_SCHEDULE;
 #endif
 		} else if (strcmp(argv[i], "--debug-regset") == 0) {
@@ -1257,7 +1263,7 @@ int main(int argc, char **argv)
 	if (dump && !(dump & (IR_DUMP_AFTER_LOAD|IR_DUMP_AFTER_USE_LISTS|
 		IR_DUMP_AFTER_MEM2SSA|IR_DUMP_AFTER_SCCP|
 		IR_DUMP_AFTER_CFG|IR_DUMP_AFTER_DOM|IR_DUMP_AFTER_LOOP|
-		IR_DUMP_AFTER_GCM|IR_DUMP_AFTER_SCHEDULE|
+		IR_DUMP_AFTER_GCM|IR_DUMP_AFTER_SCHEDULING|
 		IR_DUMP_AFTER_LIVE_RANGES|IR_DUMP_AFTER_COALESCING|IR_DUMP_AFTER_REGALLOC|
 		IR_DUMP_FINAL))) {
 		dump |= IR_DUMP_FINAL;

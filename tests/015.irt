@@ -1,7 +1,7 @@
 --TEST--
 015: Schedule for a larger loop (Figure 9 from "Global Code Motion Global Value Numbering" by Cliff Click)
 --ARGS--
---dump-cfg --save --dump-after-schedule
+--dump-cfg --save --dump-after-scheduling
 --CODE--
 {
 	uintptr_t c_1 = 0;
