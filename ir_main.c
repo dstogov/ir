@@ -136,6 +136,13 @@ static void help(const char *cmd)
 #define IR_DUMP_ASM                 (1<<5)
 #define IR_DUMP_SIZE                (1<<6)
 
+#define IR_RUN                      (1<<7)
+#define IR_PERF                     (1<<8)
+#define IR_GDB                      (1<<9)
+
+#define IR_GEN_NATIVE               (IR_RUN|IR_DUMP_ASM|IR_DUMP_SIZE)
+#define IR_GEN_CODE                 (IR_DUMP_LLVM|IR_DUMP_C)
+
 #define IR_DUMP_AFTER_LOAD          (1<<16)
 #define IR_DUMP_AFTER_USE_LISTS     (1<<17)
 #define IR_DUMP_AFTER_MEM2SSA       (1<<18)
@@ -282,7 +289,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 		return 0;
 	}
 
-	if (opt_level > 0 || (ctx->flags & (IR_GEN_NATIVE|IR_GEN_CODE))) {
+	if (opt_level > 0 || (dump & (IR_GEN_NATIVE|IR_GEN_CODE))) {
 		ir_build_def_use_lists(ctx);
 		if ((dump & IR_DUMP_AFTER_USE_LISTS)
 		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_USE_LISTS, dump_file, func_name)) {
@@ -334,7 +341,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 #endif
 	}
 
-	if ((opt_level > 0 || (ctx->flags & (IR_GEN_NATIVE|IR_GEN_CODE))) && !ctx->cfg_blocks) {
+	if ((opt_level > 0 || (dump & (IR_GEN_NATIVE|IR_GEN_CODE))) && !ctx->cfg_blocks) {
 		ir_build_cfg(ctx);
 		if ((dump & IR_DUMP_AFTER_CFG)
 		 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_CFG, dump_file, func_name)) {
@@ -380,7 +387,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 #endif
 	}
 
-	if (ctx->flags & IR_GEN_NATIVE) {
+	if (dump & IR_GEN_NATIVE) {
 		ir_match(ctx);
 
 		if ((dump & IR_DUMP_AFTER_CODE_MATCHING)
@@ -405,7 +412,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 			return 0;
 		}
 
-		if (ctx->flags & IR_GEN_NATIVE) {
+		if (dump & IR_GEN_NATIVE) {
 			ir_reg_alloc(ctx);
 			if ((dump & IR_DUMP_AFTER_REGALLOC)
 			 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_REGALLOC, dump_file, func_name)) {
@@ -414,7 +421,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 		}
 
 		ir_schedule_blocks(ctx);
-	} else if (ctx->flags & (IR_GEN_NATIVE|IR_GEN_CODE)) {
+	} else if (dump & (IR_GEN_NATIVE|IR_GEN_CODE)) {
 		ir_assign_virtual_registers(ctx);
 		ir_compute_dessa_moves(ctx);
 	}
@@ -448,9 +455,6 @@ typedef struct _ir_main_loader {
 	uint64_t   debug_regset;
 	uint32_t   save_flags;
 	uint32_t   dump;
-	bool       run;
-	bool       gdb;
-	bool       perf;
 	size_t     size;
 	void      *main;
 	FILE      *dump_file;
@@ -637,7 +641,7 @@ static bool ir_loader_external_sym_dcl(ir_loader *loader, const char *name, uint
 	if (l->dump & IR_DUMP_LLVM) {
 		ir_emit_llvm_sym_decl(name, flags | IR_EXTERN, l->out_file);
 	}
-	if ((l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || l->run) {
+	if (l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE|IR_RUN)) {
 		void *addr = ir_loader_resolve_sym_name(loader, name, IR_RESOLVE_SYM_SILENT);
 
 		if (!addr) {
@@ -682,7 +686,7 @@ static bool ir_loader_external_func_dcl(ir_loader *loader, const char *name, uin
 	if (l->dump & IR_DUMP_LLVM) {
 		ir_emit_llvm_func_decl(name, flags | IR_EXTERN, ret_type,  params_count, param_types, l->out_file);
 	}
-	if ((l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || l->run) {
+	if (l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE|IR_RUN)) {
 		void *addr = ir_loader_resolve_sym_name(loader, name, IR_RESOLVE_SYM_SILENT);
 
 		if (!addr) {
@@ -740,7 +744,7 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 	if (l->dump & IR_DUMP_LLVM) {
 		ir_emit_llvm_sym_decl(name, flags, l->out_file);
 	}
-	if ((l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || l->run) {
+	if (l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE|IR_RUN)) {
 		void *data;
 
 		if (flags & IR_CONST) {
@@ -776,7 +780,7 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 			ir_disasm_add_symbol(name, (uintptr_t)data, size);
 		}
 #ifndef _WIN32
-		if (l->gdb) {
+		if (l->dump & IR_GDB) {
 			ir_gdb_register(name, data, size, 0, 0);
 		}
 #endif
@@ -824,7 +828,7 @@ static bool ir_loader_sym_data(ir_loader *loader, ir_type type, uint32_t count, 
 	if (l->dump & IR_DUMP_LLVM) {
 		// TODO:
 	}
-	if ((l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || l->run) {
+	if (l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE|IR_RUN)) {
 		IR_ASSERT(l->data_start);
 		if (count == 1) {
 			memcpy((char*)l->data_start + l->data_pos, data, size);
@@ -858,7 +862,7 @@ static bool ir_loader_sym_data_str(ir_loader *loader, const char *str, size_t le
 	if (l->dump & IR_DUMP_LLVM) {
 		// TODO:
 	}
-	if ((l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || l->run) {
+	if (l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE|IR_RUN)) {
 		IR_ASSERT(l->data_start);
 		memcpy((char*)l->data_start + l->data_pos, str, len);
 	}
@@ -885,7 +889,7 @@ static bool ir_loader_sym_data_pad(ir_loader *loader, size_t offset)
 		if (l->dump & IR_DUMP_LLVM) {
 			// TODO:
 		}
-		if ((l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || l->run) {
+		if (l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE|IR_RUN)) {
 			IR_ASSERT(l->data_start);
 			memset((char*)l->data_start + l->data_pos, 0, offset);
 		}
@@ -912,7 +916,7 @@ static bool ir_loader_sym_data_ref(ir_loader *loader, ir_op op, const char *ref,
 	if (l->dump & IR_DUMP_LLVM) {
 		// TODO:
 	}
-	if ((l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || l->run) {
+	if (l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE|IR_RUN)) {
 		void *data = (char*)l->data_start + l->data_pos;
 		void *addr = ir_loader_resolve_sym_name(loader, ref, IR_RESOLVE_SYM_SILENT);
 
@@ -944,7 +948,7 @@ static bool ir_loader_sym_data_end(ir_loader *loader, uint32_t flags)
 	if (l->dump & IR_DUMP_LLVM) {
 		// TODO:
 	}
-	if ((l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || l->run) {
+	if (l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE|IR_RUN)) {
 		if ((char*)l->data_start >= (char*)l->code_buffer.start
 		 && (char*)l->data_start < (char*)l->code_buffer.end) {
 			ir_mem_protect(l->code_buffer.start, (char*)l->code_buffer.end - (char*)l->code_buffer.start);
@@ -986,7 +990,7 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 	}
 
 	if (name == NULL) {
-		name = (l->run) ? "main" : "test";
+		name = (l->dump & IR_RUN) ? "main" : "test";
 	} else if ((l->dump & (IR_DUMP_IR|IR_DUMP_CODEGEN|IR_DUMP_LIVE_RANGES)) && l->dump_file) {
 		ir_print_func_proto(ctx, name, l->dump_file);
 		fprintf(l->dump_file, "\n");
@@ -1010,7 +1014,7 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 		}
 	}
 
-	if ((l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || l->run) {
+	if (l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE|IR_RUN)) {
 		size_t size;
 		void *entry;
 
@@ -1020,7 +1024,7 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 		}
 		entry = ir_emit_code(ctx, &size);
 #ifndef _WIN32
-		if (l->gdb) {
+		if (l->dump & IR_GDB) {
 			if (!l->code_buffer.start) {
 				ir_mem_unprotect(entry, size);
 			}
@@ -1061,9 +1065,9 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 
 				ir_disasm(name, entry, size, 0, ctx, l->out_file);
 			}
-			if (l->run) {
+			if (l->dump & IR_RUN) {
 #ifndef _WIN32
-				if (l->perf) {
+				if (l->dump & IR_PERF) {
 					ir_perf_map_register(name, entry, size);
 					ir_perf_jitdump_register(name, entry, size);
 				}
@@ -1088,7 +1092,7 @@ int main(int argc, char **argv)
 	char *input = NULL;
 	char *dump_file = NULL, *out_file = 0;
 	FILE *f;
-	bool dump_time = 0, run = 0, gdb = 0, perf = 0;
+	bool dump_time = 0;
 	bool disable_inline = 0;
 	bool force_inline = 0;
 	bool disable_mem2ssa = 0;
@@ -1218,7 +1222,7 @@ int main(int argc, char **argv)
 		} else if (strcmp(argv[i], "-S") == 0) {
 			dump |= IR_DUMP_ASM;
 		} else if (strcmp(argv[i], "--run") == 0) {
-			run = 1;
+			dump |= IR_RUN;
 			if (i + 1 < argc) {
 				run_args = i + 1;
 			}
@@ -1281,9 +1285,9 @@ int main(int argc, char **argv)
 			input = argv[++i];
 #endif
 		} else if (strcmp(argv[i], "-g") == 0) {
-			gdb = 1;
+			dump |= IR_GDB;
 		} else if (strcmp(argv[i], "-p") == 0) {
-			perf = 1;
+			dump |= IR_PERF;
 		} else if (argv[i][0] == '-') {
 			fprintf(stderr, "ERROR: Unknown option '%s' (use --help)\n", argv[i]);
 			return 1;
@@ -1340,18 +1344,20 @@ int main(int argc, char **argv)
 	if (opt_level > 0 && !disable_mem2ssa) {
 		flags |= IR_OPT_MEM2SSA;
 	}
-	if (dump & (IR_DUMP_C|IR_DUMP_LLVM)) {
+	if (dump & IR_GEN_CODE) {
 		if ((dump & (IR_DUMP_C|IR_DUMP_LLVM)) == (IR_DUMP_C|IR_DUMP_LLVM)) {
 			fprintf(stderr, "ERROR: --emit-c and --emit-llvm are incompatible\n");
 		}
-		flags |= IR_GEN_CODE;
 	}
-	if ((dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || run) {
-		flags |= IR_GEN_NATIVE;
-		if (dump & (IR_DUMP_C|IR_DUMP_LLVM)) {
+	if (dump & IR_GEN_NATIVE) {
+		if (dump & IR_GEN_CODE) {
 			fprintf(stderr, "ERROR: --emit-c and --emit-llvm are incompatible with native code generator (-S, --dump-size, --run)\n");
 			return 1;
 		}
+	}
+
+	if (!(dump & IR_RUN)) {
+		dump &= ~(IR_GDB|IR_PERF);
 	}
 
 	memset(&loader, 0, sizeof(loader));
@@ -1378,9 +1384,6 @@ int main(int argc, char **argv)
 	loader.debug_regset = debug_regset;
 	loader.save_flags = save_flags;
 	loader.dump = dump;
-	loader.run = run;
-	loader.gdb = run && gdb;
-	loader.perf = run && perf;
 
 	ir_strtab_init(&loader.symtab, 16, 4096);
 	loader.sym = NULL;
@@ -1413,7 +1416,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if ((dump & (IR_DUMP_ASM|IR_DUMP_SIZE)) || run) {
+	if (dump & (IR_DUMP_ASM|IR_DUMP_SIZE|IR_RUN)) {
 		/* Preallocate 2MB JIT code buffer. It may be necessary to generate veneers and thunks. */
 		size_t size = 2 * 1024 * 1024;
 		void *entry;
@@ -1446,7 +1449,7 @@ int main(int argc, char **argv)
 	}
 
 #ifndef _WIN32
-	if (run && perf) {
+	if (dump & IR_PERF) {
 		ir_perf_jitdump_open();
 	}
 #endif
@@ -1505,7 +1508,7 @@ finish:
 	}
 
 	if (!ir_loader_fix_relocs(&loader)) {
-		if (run && loader.main) {
+		if ((dump & IR_RUN) && loader.main) {
 			fprintf(stderr, "ERROR: Cannot run program with undefined symbols\n");
 			ret = 1;
 			goto exit;
@@ -1525,7 +1528,7 @@ finish:
 		start = t;
 	}
 
-	if (run && loader.main) {
+	if ((dump & IR_RUN) && loader.main) {
 		int jit_argc = 1;
 		char **jit_argv;
 		int (*func)(int, char**) = loader.main;
@@ -1552,7 +1555,7 @@ finish:
 		}
 
 #ifndef _WIN32
-		if (perf) {
+		if (dump & IR_PERF) {
 			ir_perf_jitdump_close();
 		}
 #endif

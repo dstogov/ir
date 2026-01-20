@@ -569,8 +569,6 @@ void ir_strtab_free(ir_strtab *strtab);
 #define IR_OPT_CFG             (1<<21) /* merge BBs, by remove END->BEGIN nodes during CFG construction */
 #define IR_OPT_MEM2SSA         (1<<22)
 #define IR_OPT_CODEGEN         (1<<23)
-#define IR_GEN_NATIVE          (1<<24)
-#define IR_GEN_CODE            (1<<25)
 
 /* debug related */
 #ifdef IR_DEBUG
