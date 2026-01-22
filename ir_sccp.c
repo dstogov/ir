@@ -42,7 +42,7 @@ typedef struct {
 							);
 							uint16_t           opt;
 						},
-						uint16_t               _space_1;
+						uint16_t               _space_1
 					);
 					uint32_t                   optx;
 				},
@@ -51,7 +51,7 @@ typedef struct {
 					ir_ref                     unfeasible_inputs; /* number of unfeasible inputs for IR_MERGE */
 					ir_ref                     single_output;     /* reachable output for IR_IF */
 					ir_ref                     visited;           /* for IR_TOP */
-				};
+				}
 			);
 			union {
 				struct {
