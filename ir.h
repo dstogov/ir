@@ -769,7 +769,7 @@ ir_ref ir_emit3(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
 
 ir_ref ir_emit_N(ir_ctx *ctx, uint32_t opt, int32_t count);
 void   ir_set_op(ir_ctx *ctx, ir_ref ref, int32_t n, ir_ref val);
-ir_ref ir_get_op(ir_ctx *ctx, ir_ref ref, int32_t n);
+ir_ref ir_get_op(const ir_ctx *ctx, ir_ref ref, int32_t n);
 
 IR_ALWAYS_INLINE void ir_set_op1(ir_ctx *ctx, ir_ref ref, ir_ref val)
 {
@@ -863,13 +863,13 @@ int ir_reg_alloc(ir_ctx *ctx);
 int ir_regs_number(void);
 bool ir_reg_is_int(int32_t reg);
 const char *ir_reg_name(int8_t reg, ir_type type);
-int32_t ir_get_spill_slot_offset(ir_ctx *ctx, ir_ref ref);
+int32_t ir_get_spill_slot_offset(const ir_ctx *ctx, ir_ref ref);
 
 /* Target CPU instruction selection and code generation (see ir_x86.c) */
 int ir_match(ir_ctx *ctx);
 void *ir_emit_code(ir_ctx *ctx, size_t *size);
 
-bool ir_needs_thunk(ir_code_buffer *code_buffer, void *addr);
+bool ir_needs_thunk(const ir_code_buffer *code_buffer, void *addr);
 void *ir_emit_thunk(ir_code_buffer *code_buffer, void *addr, size_t *size_ptr);
 void ir_fix_thunk(void *thunk_entry, void *addr);
 

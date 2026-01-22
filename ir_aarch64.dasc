@@ -7181,7 +7181,7 @@ static int ir_add_veneer(dasm_State *Dst, void *buffer, uint32_t ins, int *b, ui
 	return n;
 }
 
-bool ir_needs_thunk(ir_code_buffer *code_buffer, void *addr)
+bool ir_needs_thunk(const ir_code_buffer *code_buffer, void *addr)
 {
 	return !aarch64_may_use_b(code_buffer, addr);
 }

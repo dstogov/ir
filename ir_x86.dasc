@@ -12379,7 +12379,7 @@ const void *ir_emit_exitgroup(uint32_t first_exit_point, uint32_t exit_points_pe
 	return entry;
 }
 
-bool ir_needs_thunk(ir_code_buffer *code_buffer, void *addr)
+bool ir_needs_thunk(const ir_code_buffer *code_buffer, void *addr)
 {
 	return sizeof(void*) == 8 && !IR_MAY_USE_32BIT_ADDR(code_buffer, addr);
 }

@@ -285,7 +285,7 @@ IR_ALWAYS_INLINE bool ir_sccp_meet(const ir_ctx *ctx, ir_sccp_val *_values, ir_b
 
 static ir_ref ir_sccp_fold(const ir_ctx *ctx, ir_sccp_val *_values, ir_bitqueue *worklist, ir_ref ref, const ir_insn *insn)
 {
-	ir_insn *op1_insn, *op2_insn, *op3_insn;
+	const ir_insn *op1_insn, *op2_insn, *op3_insn;
 	ir_ref op1, op2, op3, copy;
 	uint32_t opt = insn->opt;
 
@@ -847,7 +847,7 @@ static void ir_sccp_make_nop(ir_ctx *ctx, ir_ref ref)
 	}
 }
 
-static void ir_sccp_remove_insn(ir_ctx *ctx, ir_sccp_val *_values, ir_ref ref, ir_bitqueue *worklist)
+static void ir_sccp_remove_insn(ir_ctx *ctx, const ir_sccp_val *_values, ir_ref ref, ir_bitqueue *worklist)
 {
 	ir_ref j, n, *p;
 	ir_insn *insn;
@@ -870,7 +870,7 @@ static void ir_sccp_remove_insn(ir_ctx *ctx, ir_sccp_val *_values, ir_ref ref, i
 	}
 }
 
-static void ir_sccp_replace_insn(ir_ctx *ctx, ir_sccp_val *_values, ir_ref ref, ir_ref new_ref, ir_bitqueue *worklist)
+static void ir_sccp_replace_insn(ir_ctx *ctx, const ir_sccp_val *_values, ir_ref ref, ir_ref new_ref, ir_bitqueue *worklist)
 {
 	ir_ref j, n, *p, use, i;
 	ir_insn *insn;
@@ -948,7 +948,7 @@ static void ir_sccp_replace_insn(ir_ctx *ctx, ir_sccp_val *_values, ir_ref ref, 
 	CLEAR_USES(ref);
 }
 
-static void ir_sccp_remove_if(ir_ctx *ctx, ir_sccp_val *_values, ir_ref ref, ir_ref dst)
+static void ir_sccp_remove_if(ir_ctx *ctx, const ir_sccp_val *_values, ir_ref ref, ir_ref dst)
 {
 	ir_ref next;
 	ir_insn *insn, *next_insn;
@@ -1095,10 +1095,10 @@ static bool ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_ref ref, ir_i
 	return 1;
 }
 
-static IR_NEVER_INLINE void ir_sccp_transform(ir_ctx *ctx, ir_sccp_val *_values, ir_bitqueue *worklist, ir_bitqueue *iter_worklist)
+static IR_NEVER_INLINE void ir_sccp_transform(ir_ctx *ctx, const ir_sccp_val *_values, ir_bitqueue *worklist, ir_bitqueue *iter_worklist)
 {
 	ir_ref i, j;
-	ir_sccp_val *value;
+	const ir_sccp_val *value;
 
 	for (i = 1, value = _values + i; i < ctx->insns_count; value++, i++) {
 		if (value->op == IR_BOTTOM) {
@@ -1173,16 +1173,16 @@ static IR_NEVER_INLINE void ir_sccp_transform(ir_ctx *ctx, ir_sccp_val *_values,
  *
  * TODO: Think abput a more general solution ???
  */
-static void ir_iter_add_related_uses(ir_ctx *ctx, ir_ref ref, ir_bitqueue *worklist)
+static void ir_iter_add_related_uses(const ir_ctx *ctx, ir_ref ref, ir_bitqueue *worklist)
 {
-	ir_insn *insn = &ctx->ir_base[ref];
+	const ir_insn *insn = &ctx->ir_base[ref];
 
 	if (insn->op == IR_ADD || insn->op == IR_SUB) {
-		ir_use_list *use_list = &ctx->use_lists[ref];
+		const ir_use_list *use_list = &ctx->use_lists[ref];
 
 		if (use_list->count == 1) {
 			ir_ref use = ctx->use_edges[use_list->refs];
-			ir_insn *use_insn = &ctx->ir_base[ref];
+			const ir_insn *use_insn = &ctx->ir_base[ref];
 
 			if (use_insn->op == IR_ADD || use_insn->op == IR_SUB) {
 				ir_bitqueue_add(worklist, use);
@@ -1307,16 +1307,17 @@ void ir_iter_update_op(ir_ctx *ctx, ir_ref ref, uint32_t idx, ir_ref new_val, ir
 	}
 }
 
-static ir_ref ir_iter_find_cse1(ir_ctx *ctx, uint32_t optx, ir_ref op1)
+static ir_ref ir_iter_find_cse1(const ir_ctx *ctx, uint32_t optx, ir_ref op1)
 {
 	IR_ASSERT(!IR_IS_CONST_REF(op1));
 
-	ir_use_list *use_list = &ctx->use_lists[op1];
-	ir_ref *p, n = use_list->count;
+	const ir_use_list *use_list = &ctx->use_lists[op1];
+	const ir_ref *p;
+	ir_ref n = use_list->count;
 
 	for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
 		ir_ref use = *p;
-		ir_insn *use_insn = &ctx->ir_base[use];
+		const ir_insn *use_insn = &ctx->ir_base[use];
 
 		if (use_insn->optx == optx) {
 			IR_ASSERT(use_insn->op1 == op1);
@@ -1326,12 +1327,13 @@ static ir_ref ir_iter_find_cse1(ir_ctx *ctx, uint32_t optx, ir_ref op1)
 	return IR_UNUSED;
 }
 
-static ir_ref ir_iter_find_cse(ir_ctx *ctx, ir_ref ref, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3, ir_bitqueue *worklist)
+static ir_ref ir_iter_find_cse(const ir_ctx *ctx, ir_ref ref, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3, ir_bitqueue *worklist)
 {
 	uint32_t n = IR_INPUT_EDGES_COUNT(ir_op_flags[opt & IR_OPT_OP_MASK]);
-	ir_use_list *use_list = NULL;
-	ir_ref *p, use;
-	ir_insn *use_insn;
+	const ir_use_list *use_list = NULL;
+	const ir_ref *p;
+	ir_ref use;
+	const ir_insn *use_insn;
 
 	if (n == 2) {
 		if (!IR_IS_CONST_REF(op1)) {
@@ -1414,7 +1416,8 @@ static void ir_iter_fold(ir_ctx *ctx, ir_ref ref, ir_bitqueue *worklist)
 {
 	uint32_t opt;
 	ir_ref op1, op2, op3, copy;
-	ir_insn *op1_insn, *op2_insn, *op3_insn, *insn;
+	const ir_insn *op1_insn, *op2_insn, *op3_insn;
+	ir_insn *insn;
 
 	insn = &ctx->ir_base[ref];
 	opt = insn->opt;
@@ -1505,9 +1508,9 @@ restart:
 	}
 }
 
-static bool ir_may_promote_d2f(ir_ctx *ctx, ir_ref ref)
+static bool ir_may_promote_d2f(const ir_ctx *ctx, ir_ref ref)
 {
-	ir_insn *insn = &ctx->ir_base[ref];
+	const ir_insn *insn = &ctx->ir_base[ref];
 
 	IR_ASSERT(insn->type == IR_DOUBLE);
 	if (IR_IS_CONST_REF(ref)) {
@@ -1538,9 +1541,9 @@ static bool ir_may_promote_d2f(ir_ctx *ctx, ir_ref ref)
 	return 0;
 }
 
-static bool ir_may_promote_f2d(ir_ctx *ctx, ir_ref ref)
+static bool ir_may_promote_f2d(const ir_ctx *ctx, ir_ref ref)
 {
-	ir_insn *insn = &ctx->ir_base[ref];
+	const ir_insn *insn = &ctx->ir_base[ref];
 
 	IR_ASSERT(insn->type == IR_FLOAT);
 	if (IR_IS_CONST_REF(ref)) {
@@ -1709,10 +1712,11 @@ static ir_ref ir_promote_f2d(ir_ctx *ctx, ir_ref ref, ir_ref use, ir_bitqueue *w
 	return ref;
 }
 
-static bool ir_may_promote_trunc(ir_ctx *ctx, ir_type type, ir_ref ref)
+static bool ir_may_promote_trunc(const ir_ctx *ctx, ir_type type, ir_ref ref)
 {
-	ir_insn *insn = &ctx->ir_base[ref];
-	ir_ref *p, n, input;
+	const ir_insn *insn = &ctx->ir_base[ref];
+	const ir_ref *p;
+	ir_ref n, input;
 
 	if (IR_IS_CONST_REF(ref)) {
 		return !IR_IS_SYM_CONST(insn->op);
@@ -1898,7 +1902,7 @@ static ir_ref ir_promote_i2i(ir_ctx *ctx, ir_type type, ir_ref ref, ir_ref use, 
 	return ref;
 }
 
-static ir_ref ir_ext_const(ir_ctx *ctx, ir_insn *val_insn, ir_op op, ir_type type)
+static ir_ref ir_ext_const(ir_ctx *ctx, const ir_insn *val_insn, ir_op op, ir_type type)
 {
 	ir_val new_val;
 
@@ -1962,10 +1966,11 @@ static ir_ref ir_ext_ref(ir_ctx *ctx, ir_ref var_ref, ir_ref src_ref, ir_op op, 
 	return ref;
 }
 
-static uint32_t _ir_estimated_control(ir_ctx *ctx, ir_ref val, ir_ref loop)
+static uint32_t _ir_estimated_control(const ir_ctx *ctx, ir_ref val, ir_ref loop)
 {
-	ir_insn *insn;
-	ir_ref n, *p, input, result, ctrl;
+	const ir_insn *insn;
+	const ir_ref *p;
+	ir_ref n, input, result, ctrl;
 
 	if (IR_IS_CONST_REF(val)) {
 		return 1; /* IR_START */
@@ -1996,18 +2001,18 @@ static uint32_t _ir_estimated_control(ir_ctx *ctx, ir_ref val, ir_ref loop)
 	return result;
 }
 
-static bool ir_is_loop_invariant(ir_ctx *ctx, ir_ref ref, ir_ref loop)
+static bool ir_is_loop_invariant(const ir_ctx *ctx, ir_ref ref, ir_ref loop)
 {
 	ref = _ir_estimated_control(ctx, ref, loop);
 	return ref < loop; // TODO: check dominance instead of order
 }
 
-static bool ir_is_cheaper_ext(ir_ctx *ctx, ir_ref ref, ir_ref loop, ir_ref ext_ref, ir_op op)
+static bool ir_is_cheaper_ext(const ir_ctx *ctx, ir_ref ref, ir_ref loop, ir_ref ext_ref, ir_op op)
 {
 	if (IR_IS_CONST_REF(ref)) {
 		return 1;
 	} else {
-		ir_insn *insn = &ctx->ir_base[ref];
+		const ir_insn *insn = &ctx->ir_base[ref];
 
 		if (insn->op == IR_LOAD) {
 			if (ir_is_loop_invariant(ctx, ref, loop)) {
@@ -2023,7 +2028,7 @@ static bool ir_is_cheaper_ext(ir_ctx *ctx, ir_ref ref, ir_ref loop, ir_ref ext_r
 					for (p = &ctx->use_edges[use_list->refs], n = use_list->count; n > 0; p++, n--) {
 						use = *p;
 						if (use != ext_ref) {
-							ir_insn *use_insn = &ctx->ir_base[use];
+							const ir_insn *use_insn = &ctx->ir_base[use];
 
 							if (use_insn->op != op
 							 && (!(ir_op_flags[use_insn->op] & (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM))
@@ -2059,7 +2064,7 @@ static bool ir_try_promote_induction_var_ext(ir_ctx *ctx, ir_ref ext_ref, ir_ref
 			if (use == op_ref || use == ext_ref) {
 				continue;
 			} else {
-				ir_insn *use_insn = &ctx->ir_base[use];
+				const ir_insn *use_insn = &ctx->ir_base[use];
 
 				if (use_insn->op >= IR_EQ && use_insn->op <= IR_UGT) {
 					if (use_insn->op1 == phi_ref) {
@@ -2098,7 +2103,7 @@ static bool ir_try_promote_induction_var_ext(ir_ctx *ctx, ir_ref ext_ref, ir_ref
 			if (use == phi_ref || use == ext_ref) {
 				continue;
 			} else {
-				ir_insn *use_insn = &ctx->ir_base[use];
+				const ir_insn *use_insn = &ctx->ir_base[use];
 
 				if (use_insn->op >= IR_EQ && use_insn->op <= IR_UGT) {
 					if (use_insn->op1 == phi_ref) {
@@ -2486,7 +2491,7 @@ static bool ir_try_remove_empty_diamond(ir_ctx *ctx, ir_ref ref, ir_insn *insn, 
 	}
 }
 
-static bool ir_is_zero(ir_ctx *ctx, ir_ref ref)
+static bool ir_is_zero(const ir_ctx *ctx, ir_ref ref)
 {
 	return IR_IS_CONST_REF(ref)
 		&& !IR_IS_SYM_CONST(ctx->ir_base[ref].op)
@@ -2767,7 +2772,7 @@ static bool ir_optimize_phi(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_re
 	return 0;
 }
 
-static bool ir_cmp_is_true(ir_op op, ir_insn *op1, ir_insn *op2)
+static bool ir_cmp_is_true(ir_op op, const ir_insn *op1, const ir_insn *op2)
 {
 	IR_ASSERT(op1->type == op2->type);
 	if (IR_IS_TYPE_INT(op1->type)) {
@@ -3294,7 +3299,7 @@ static void ir_iter_optimize_merge(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge
 	}
 }
 
-static ir_ref ir_find_ext_use(ir_ctx *ctx, ir_ref ref)
+static ir_ref ir_find_ext_use(const ir_ctx *ctx, ir_ref ref)
 {
 	ir_use_list *use_list = &ctx->use_lists[ref];
 	ir_ref *p, n, use;

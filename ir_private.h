@@ -908,7 +908,7 @@ IR_ALWAYS_INLINE bool ir_const_is_true(const ir_insn *v)
 	return 0;
 }
 
-IR_ALWAYS_INLINE bool ir_ref_is_true(ir_ctx *ctx, ir_ref ref)
+IR_ALWAYS_INLINE bool ir_ref_is_true(const ir_ctx *ctx, ir_ref ref)
 {
 	if (ref == IR_TRUE) {
 		return 1;
@@ -1179,16 +1179,17 @@ typedef enum _ir_fold_action {
 	IR_FOLD_DO_CONST
 } ir_fold_action;
 
-ir_ref ir_folding(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3, ir_insn *op1_insn, ir_insn *op2_insn, ir_insn *op3_insn);
+ir_ref ir_folding(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3,
+                  const ir_insn *op1_insn, const ir_insn *op2_insn, const ir_insn *op3_insn);
 
 /*** Alias Analyzes (see ir.c) ***/
-ir_ref ir_find_aliasing_load(ir_ctx *ctx, ir_ref ref, ir_type type, ir_ref addr);
-ir_ref ir_find_aliasing_vload(ir_ctx *ctx, ir_ref ref, ir_type type, ir_ref var);
+ir_ref ir_find_aliasing_load(const ir_ctx *ctx, ir_ref ref, ir_type type, ir_ref addr);
+ir_ref ir_find_aliasing_vload(const ir_ctx *ctx, ir_ref ref, ir_type type, ir_ref var);
 ir_ref ir_find_aliasing_store(ir_ctx *ctx, ir_ref ref, ir_ref addr, ir_ref val);
 ir_ref ir_find_aliasing_vstore(ir_ctx *ctx, ir_ref ref, ir_ref addr, ir_ref val);
 
 /*** Predicates (see ir.c) ***/
-ir_ref ir_check_dominating_predicates(ir_ctx *ctx, ir_ref ref, ir_ref condition);
+ir_ref ir_check_dominating_predicates(const ir_ctx *ctx, ir_ref ref, ir_ref condition);
 
 /*** IR Live Info ***/
 typedef ir_ref                   ir_live_pos;
@@ -1468,7 +1469,6 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 void ir_fix_stack_frame(ir_ctx *ctx);
 
 /* Utility */
-ir_type ir_get_return_type(ir_ctx *ctx);
 const ir_proto_t *ir_call_proto(const ir_ctx *ctx, const ir_insn *insn);
 
 //#define IR_BITSET_LIVENESS
