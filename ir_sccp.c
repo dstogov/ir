@@ -19,7 +19,6 @@
 #define IR_TOP                  IR_UNUSED
 #define IR_BOTTOM               IR_LAST_OP
 
-#define IR_MAKE_TOP(ref)        do {IR_ASSERT(ref > 0); _values[ref].optx = IR_TOP;} while (0)
 #define IR_MAKE_BOTTOM(ref)     do {IR_ASSERT(ref > 0); _values[ref].optx = IR_BOTTOM;} while (0)
 
 #define IR_IS_TOP(ref)          (ref >= 0 && _values[ref].op == IR_TOP)
