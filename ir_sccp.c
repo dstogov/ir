@@ -2194,7 +2194,7 @@ static bool ir_try_promote_induction_var_ext(ir_ctx *ctx, ir_ref ext_ref, ir_ref
 }
 
 static bool ir_try_promote_ext(ir_ctx *ctx, ir_ref ext_ref, ir_insn *insn, ir_bitqueue *worklist)
- {
+{
 	ir_ref ref = insn->op1;
 
 	/* Check for simple induction variable in the form: x2 = PHI(loop, x1, x3); x3 = ADD(x2, _); */
