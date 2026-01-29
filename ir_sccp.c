@@ -246,42 +246,47 @@ IR_ALWAYS_INLINE bool ir_sccp_meet_const(const ir_ctx *ctx, ir_sccp_val *_values
 	return 1;
 }
 
+IR_ALWAYS_INLINE bool ir_sccp_meet_copy(const ir_ctx *ctx, ir_sccp_val *_values, ir_bitqueue *worklist, ir_ref ref, ir_ref val)
+{
+#if IR_COMBO_COPY_PROPAGATION
+	if (_values[ref].op == IR_COPY) {
+		/* COPY(OLD_VAL) meet COPY(NEW_VAL) =>
+		 *   (IDENTITY(OLD_VAL) == IDENTITY(NEW_VAL) ? COPY(OLD_VAL) ? BOTTOM */
+		if (ir_sccp_identity(ctx, _values, ref) == ir_sccp_identity(ctx, _values, val)) {
+			return 0; /* not changed */
+		}
+		ir_sccp_split_partition(ctx, _values, worklist, ref);
+		return 1;
+	} else {
+		IR_ASSERT(_values[ref].op != IR_BOTTOM);
+		/* TOP       meet COPY(NEW_VAL) -> COPY(NEW_VAL) */
+		/* OLD_CONST meet COPY(NEW_VAL) -> COPY(NEW_VAL) */
+		ir_sccp_add_identity(ctx, _values, val, ref);
+		return 1;
+	}
+#endif
+	IR_MAKE_BOTTOM(ref);
+	return 1;
+}
+
+#if 0
 IR_ALWAYS_INLINE bool ir_sccp_meet(const ir_ctx *ctx, ir_sccp_val *_values, ir_bitqueue *worklist, ir_ref ref, ir_ref val)
 {
-	ir_ref val_identity = ir_sccp_identity(ctx, _values, val);
 	const ir_insn *val_insn;
 
-	if (IR_IS_CONST_REF(val_identity)) {
-		val_insn = &ctx->ir_base[val_identity];
+	if (IR_IS_CONST_REF(val)) {
+		val_insn = &ctx->ir_base[val];
 	} else {
-		val_insn = &_values[val_identity].insn;
+		val_insn = &_values[val].insn;
 
 		if (!IR_IS_CONST_OP(val_insn->op) && !IR_IS_SYM_CONST(val_insn->op)) {
-#if IR_COMBO_COPY_PROPAGATION
-			if (_values[ref].op == IR_COPY) {
-				/* COPY(OLD_VAL) meet COPY(NEW_VAL) =>
-				 *   (IDENTITY(OLD_VAL) == IDENTITY(NEW_VAL) ? COPY(OLD_VAL) ? BOTTOM */
-				if (ir_sccp_identity(ctx, _values, ref) == val_identity) {
-					return 0; /* not changed */
-				}
-				ir_sccp_split_partition(ctx, _values, worklist, ref);
-				return 1;
-			} else {
-				IR_ASSERT(_values[ref].op != IR_BOTTOM);
-				/* TOP       meet COPY(NEW_VAL) -> COPY(NEW_VAL) */
-				/* OLD_CONST meet COPY(NEW_VAL) -> COPY(NEW_VAL) */
-				ir_sccp_add_identity(ctx, _values, val, ref);
-				return 1;
-			}
-#endif
-
-			IR_MAKE_BOTTOM(ref);
-			return 1;
+			return ir_sccp_meet_copy(ctx, _values, worklist, ref, val);
 		}
 	}
 
 	return ir_sccp_meet_const(ctx, _values, worklist, ref, val_insn);
 }
+#endif
 
 static ir_ref ir_sccp_fold(const ir_ctx *ctx, ir_sccp_val *_values, ir_bitqueue *worklist, ir_ref ref, const ir_insn *insn)
 {
@@ -311,9 +316,19 @@ restart:
 			return 1;
 		case IR_FOLD_DO_COPY:
 			copy = ctx->fold_insn.op1;
-			return ir_sccp_meet(ctx, _values, worklist, ref, copy);
+			if (IR_IS_CONST_REF(copy)) {
+				insn = &ctx->ir_base[copy];
+			} else {
+				insn = &_values[copy].insn;
+				if (!IR_IS_CONST_OP(insn->op) && !IR_IS_SYM_CONST(insn->op)) {
+					return ir_sccp_meet_copy(ctx, _values, worklist, ref, copy);
+				}
+		    }
+			goto meet_const;
 		case IR_FOLD_DO_CONST:
-			return ir_sccp_meet_const(ctx, _values, worklist, ref, &ctx->fold_insn);
+			insn = &ctx->fold_insn;
+meet_const:
+			return ir_sccp_meet_const(ctx, _values, worklist, ref, insn);
 		default:
 			IR_ASSERT(0);
 			return 0;
@@ -438,7 +453,9 @@ next:
 
 #if IR_COMBO_COPY_PROPAGATION
 	if (new_copy) {
-		return ir_sccp_meet(ctx, _values, worklist, i, new_copy);
+		IR_ASSERT(!IR_IS_CONST_REF(new_copy));
+		IR_ASSERT(!IR_IS_CONST_OP(_values[new_copy].op) && !IR_IS_SYM_CONST(_values[new_copy].op));
+		return ir_sccp_meet_copy(ctx, _values, worklist, i, new_copy);
 	}
 #endif
 
@@ -816,7 +833,9 @@ static IR_NEVER_INLINE void ir_sccp_analyze(const ir_ctx *ctx, ir_sccp_val *_val
 				fprintf(stderr, "%d. COPY(%d)\n", i, _values[i].copy);
 #endif
 			} else if (IR_IS_TOP(i)) {
-				fprintf(stderr, "%d. TOP\n", i);
+				if (ctx->ir_base[i].op != IR_TOP) {
+					fprintf(stderr, "%d. TOP\n", i);
+				}
 			} else if (_values[i].op == IR_IF) {
 				fprintf(stderr, "%d. IF(%d)\n", i, _values[i].single_output);
 			} else if (_values[i].op == IR_MERGE) {
