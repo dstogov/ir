@@ -734,7 +734,7 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 		if (flags & IR_STATIC) {
 			fprintf(l->dump_file, "static ");
 		}
-		fprintf(l->dump_file, "%s %s [%" PRIuPTR "]%s",
+		fprintf(l->dump_file, "%s %s[%" PRIuPTR "]%s",
 			(flags & IR_CONST) ? "const" : "var", name, size,
 			(flags & IR_INITIALIZED) ? ((flags & IR_CONST_STRING) ? " = " : " = {\n") : ";\n");
 	}
@@ -802,22 +802,38 @@ static bool ir_loader_sym_data(ir_loader *loader, ir_type type, uint32_t count, 
 		switch (size) {
 			case 1:
 				for (i = 0; i < count; i++) {
-					fprintf(l->dump_file, "\t%s 0x%02x,\n", ir_type_cname[type], (uint32_t)*(uint8_t*)p);
+					if (!*(uint8_t*)p) {
+						fprintf(l->dump_file, "\t%s 0,\n", ir_type_cname[type]);
+					} else {
+						fprintf(l->dump_file, "\t%s 0x%02x,\n", ir_type_cname[type], (uint32_t)*(uint8_t*)p);
+					}
 				}
 				break;
 			case 2:
 				for (i = 0; i < count; i++) {
-					fprintf(l->dump_file, "\t%s 0x%04x,\n", ir_type_cname[type], (uint32_t)*(uint16_t*)p);
+					if (!*(uint16_t*)p) {
+						fprintf(l->dump_file, "\t%s 0,\n", ir_type_cname[type]);
+					} else {
+						fprintf(l->dump_file, "\t%s 0x%04x,\n", ir_type_cname[type], (uint32_t)*(uint16_t*)p);
+					}
 				}
 				break;
 			case 4:
 				for (i = 0; i < count; i++) {
-					fprintf(l->dump_file, "\t%s 0x%08x,\n", ir_type_cname[type], *(uint32_t*)p);
+					if (!*(uint32_t*)p) {
+						fprintf(l->dump_file, "\t%s 0,\n", ir_type_cname[type]);
+					} else {
+						fprintf(l->dump_file, "\t%s 0x%08x,\n", ir_type_cname[type], *(uint32_t*)p);
+					}
 				}
 				break;
 			case 8:
 				for (i = 0; i < count; i++) {
-					fprintf(l->dump_file, "\t%s 0x%016" PRIx64 ",\n", ir_type_cname[type], *(uint64_t*)p);
+					if (!*(uint64_t*)p) {
+						fprintf(l->dump_file, "\t%s 0,\n", ir_type_cname[type]);
+					} else {
+						fprintf(l->dump_file, "\t%s 0x%016" PRIx64 ",\n", ir_type_cname[type], *(uint64_t*)p);
+					}
 				}
 				break;
 		}
