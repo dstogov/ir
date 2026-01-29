@@ -253,6 +253,8 @@ create_phi:
 				use_insn->inputs_count = 1;
 				use_insn->op1 = val;
 				use_insn->op2 = IR_UNUSED;
+				ir_bitqueue_add(iter_worklist, use);
+				ir_iter_add_uses(ctx, use, iter_worklist);
 				if (val > 0) {
 					ir_use_list_add(ctx, val, use);
 				}

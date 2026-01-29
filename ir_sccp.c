@@ -1162,6 +1162,16 @@ static IR_NEVER_INLINE void ir_sccp_transform(ir_ctx *ctx, const ir_sccp_val *_v
 /* Iterative Optimizations */
 /***************************/
 
+void ir_iter_add_uses(ir_ctx *ctx, ir_ref ref, ir_bitqueue *worklist)
+{
+	ir_use_list *use_list = &ctx->use_lists[ref];
+	ir_ref *p, n = use_list->count;
+
+	for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
+		ir_bitqueue_add(worklist, *p);
+	}
+}
+
 /* Modification of some instruction may open new optimization oprtunities for other
  * instructions that use this one.
  *
@@ -1452,9 +1462,6 @@ restart:
 			 || insn->op2 != ctx->fold_insn.op2
 			 || insn->op3 != ctx->fold_insn.op3) {
 
-				ir_use_list *use_list;
-				ir_ref n, j, *p, use;
-
 				insn->optx = ctx->fold_insn.opt;
 				IR_ASSERT(!IR_OP_HAS_VAR_INPUTS(ir_op_flags[opt & IR_OPT_OP_MASK]));
 				insn->inputs_count = IR_INPUT_EDGES_COUNT(ir_op_flags[opt & IR_OPT_OP_MASK]);
@@ -1486,12 +1493,7 @@ restart:
 				insn->op2 = ctx->fold_insn.op2;
 				insn->op3 = ctx->fold_insn.op3;
 
-				use_list = &ctx->use_lists[ref];
-				n = use_list->count;
-				for (j = 0, p = &ctx->use_edges[use_list->refs]; j < n; j++, p++) {
-					use = *p;
-					ir_bitqueue_add(worklist, use);
-				}
+				ir_iter_add_uses(ctx, ref, worklist);
 			}
 			break;
 		case IR_FOLD_DO_COPY:
@@ -1822,6 +1824,7 @@ static ir_ref ir_promote_i2i(ir_ctx *ctx, ir_type type, ir_ref ref, ir_ref use, 
 						}
 					}
 					insn->type = type;
+					ir_iter_add_uses(ctx, ref, worklist);
 					return ref;
 				}
 
@@ -3681,6 +3684,7 @@ remove_aliased_load:
 					insn->op1 = val;
 					insn->op2 = IR_UNUSED;
 					ir_bitqueue_add(worklist, i);
+					ir_iter_add_uses(ctx, i, worklist);
 				}
 			}
 		} else if (insn->op == IR_STORE) {

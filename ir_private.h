@@ -1096,6 +1096,7 @@ void ir_replace(ir_ctx *ctx, ir_ref ref, ir_ref new_ref);
 void ir_update_op(ir_ctx *ctx, ir_ref ref, uint32_t idx, ir_ref new_val);
 
 /*** Iterative Optimization ***/
+void ir_iter_add_uses(ir_ctx *ctx, ir_ref ref, ir_bitqueue *worklist);
 void ir_iter_replace(ir_ctx *ctx, ir_ref ref, ir_ref new_ref, ir_bitqueue *worklist);
 void ir_iter_update_op(ir_ctx *ctx, ir_ref ref, uint32_t idx, ir_ref new_val, ir_bitqueue *worklist);
 void ir_iter_opt(ir_ctx *ctx, ir_bitqueue *worklist);
