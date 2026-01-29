@@ -72,7 +72,7 @@ void ir_dump_dot(const ir_ctx *ctx, const char *name, const char *comments, FILE
 	fprintf(f, "digraph %s {\n", name);
 	fprintf(f, "\tlabelloc=t;\n");
 	fprintf(f, "\tlabel=\"");
-	ir_print_func_proto(ctx, name, f);
+	ir_print_func_proto(ctx, name, 0, f);
 	if (comments) {
 		fprintf(f, " # %s", comments);
 	}

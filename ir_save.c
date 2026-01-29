@@ -75,12 +75,14 @@ void ir_print_proto_ex(uint8_t flags, ir_type ret_type, uint32_t params_count, c
 	}
 }
 
-void ir_print_func_proto(const ir_ctx *ctx, const char *name, FILE *f)
+void ir_print_func_proto(const ir_ctx *ctx, const char *name, bool prefix, FILE *f)
 {
 	if (ctx->flags & IR_STATIC) {
 		fprintf(f, "static ");
 	}
-	fprintf(f, "func %s(", name);
+	fprintf(f, "func %s%s(",
+		prefix ? "@" : "",
+		name);
 	if (ctx->ir_base[2].op == IR_PARAM) {
 		ir_insn *insn = &ctx->ir_base[2];
 

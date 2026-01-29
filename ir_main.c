@@ -633,7 +633,10 @@ static bool ir_loader_external_sym_dcl(ir_loader *loader, const char *name, uint
 	}
 
 	if ((l->dump & IR_DUMP_IR) && (l->dump_file)) {
-		fprintf(l->dump_file, "extern %s %s;\n", (flags & IR_CONST) ? "const" : "var", name);
+		fprintf(l->dump_file, "extern %s %s%s;\n",
+			(flags & IR_CONST) ? "const" : "var",
+			(l->save_flags & IR_SAVE_SAFE_NAMES) ? "@" : "",
+			name);
 	}
 	if (l->dump & IR_DUMP_C) {
 		ir_emit_c_sym_decl(name, flags | IR_EXTERN, l->out_file);
@@ -656,14 +659,16 @@ static bool ir_loader_external_sym_dcl(ir_loader *loader, const char *name, uint
 	return 1;
 }
 
-static void ir_dump_func_dcl(const char *name, uint32_t flags, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, FILE *f)
+static void ir_dump_func_dcl(const char *name, uint32_t flags, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, FILE *f, uint32_t save_flags)
 {
 	if (flags & IR_EXTERN) {
 		fprintf(f, "extern ");
 	} else if (flags & IR_STATIC) {
 		fprintf(f, "static ");
 	}
-	fprintf(f, "func %s", name);
+	fprintf(f, "func %s%s",
+		(save_flags & IR_SAVE_SAFE_NAMES) ? "@" : "",
+		name);
 	ir_print_proto_ex(flags, ret_type, params_count, param_types, f);
 	fprintf(f, ";\n");
 }
@@ -678,7 +683,7 @@ static bool ir_loader_external_func_dcl(ir_loader *loader, const char *name, uin
 	}
 
 	if ((l->dump & IR_DUMP_IR) && (l->dump_file)) {
-		ir_dump_func_dcl(name, flags | IR_EXTERN, ret_type, params_count, param_types, l->dump_file);
+		ir_dump_func_dcl(name, flags | IR_EXTERN, ret_type, params_count, param_types, l->dump_file, l->save_flags);
 	}
 	if (l->dump & IR_DUMP_C) {
 		ir_emit_c_func_decl(name, flags | IR_EXTERN, ret_type,  params_count, param_types, l->out_file);
@@ -713,7 +718,7 @@ static bool ir_loader_forward_func_dcl(ir_loader *loader, const char *name, uint
 	}
 
 	if ((l->dump & IR_DUMP_IR) && (l->dump_file)) {
-		ir_dump_func_dcl(name, flags, ret_type, params_count, param_types, l->dump_file);
+		ir_dump_func_dcl(name, flags, ret_type, params_count, param_types, l->dump_file, l->save_flags);
 	}
 	if (l->dump & IR_DUMP_C) {
 		ir_emit_c_func_decl(name, flags, ret_type,  params_count, param_types, l->out_file);
@@ -734,8 +739,11 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 		if (flags & IR_STATIC) {
 			fprintf(l->dump_file, "static ");
 		}
-		fprintf(l->dump_file, "%s %s[%" PRIuPTR "]%s",
-			(flags & IR_CONST) ? "const" : "var", name, size,
+		fprintf(l->dump_file, "%s %s%s[%" PRIuPTR "]%s",
+			(flags & IR_CONST) ? "const" : "var",
+			(l->save_flags & IR_SAVE_SAFE_NAMES) ? "@" : "",
+			name,
+			size,
 			(flags & IR_INITIALIZED) ? ((flags & IR_CONST_STRING) ? " = " : " = {\n") : ";\n");
 	}
 	if (l->dump & IR_DUMP_C) {
@@ -921,9 +929,18 @@ static bool ir_loader_sym_data_ref(ir_loader *loader, ir_op op, const char *ref,
 	IR_ASSERT(op == IR_FUNC || op == IR_SYM);
 	if ((l->dump & IR_DUMP_IR) && (l->dump_file)) {
 		if (!offset) {
-			fprintf(l->dump_file, "\t%s %s(%s),\n", ir_type_cname[IR_ADDR], op == IR_FUNC ? "func" : "sym", ref);
+			fprintf(l->dump_file, "\t%s %s(%s%s),\n",
+				ir_type_cname[IR_ADDR],
+				op == IR_FUNC ? "func" : "sym",
+				(l->save_flags & IR_SAVE_SAFE_NAMES) ? "@" : "",
+				ref);
 		} else {
-			fprintf(l->dump_file, "\t%s %s(%s)+0x%" PRIxPTR ",\n", ir_type_cname[IR_ADDR], op == IR_FUNC ? "func" : "sym", ref, offset);
+			fprintf(l->dump_file, "\t%s %s(%s%s)+0x%" PRIxPTR ",\n",
+				ir_type_cname[IR_ADDR],
+				op == IR_FUNC ? "func" : "sym",
+				(l->save_flags & IR_SAVE_SAFE_NAMES) ? "@" : "",
+				ref,
+				offset);
 		}
 	}
 	if (l->dump & IR_DUMP_C) {
@@ -1008,7 +1025,7 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 	if (name == NULL) {
 		name = (l->dump & IR_RUN) ? "main" : "test";
 	} else if ((l->dump & (IR_DUMP_IR|IR_DUMP_CODEGEN|IR_DUMP_LIVE_RANGES)) && l->dump_file) {
-		ir_print_func_proto(ctx, name, l->dump_file);
+		ir_print_func_proto(ctx, name, (l->save_flags & IR_SAVE_SAFE_NAMES) != 0, l->dump_file);
 		fprintf(l->dump_file, "\n");
 	}
 
@@ -1171,9 +1188,17 @@ int main(int argc, char **argv)
 			dump |= IR_DUMP_C;
 		} else if (strcmp(argv[i], "--emit-llvm") == 0) {
 			dump |= IR_DUMP_LLVM;
-		} else if (strcmp(argv[i], "--save") == 0 || strcmp(argv[i], "--emit-ir") == 0) {
+		} else if (strcmp(argv[i], "--save") == 0) {
 			// TODO: check save/dot/dump/... conflicts
 			dump |= IR_DUMP_IR;
+			if (i + 1 < argc && argv[i + 1][0] != '-') {
+				dump_file = argv[i + 1];
+				i++;
+			}
+		} else if (strcmp(argv[i], "--emit-ir") == 0) {
+			// TODO: check save/dot/dump/... conflicts
+			dump |= IR_DUMP_IR;
+			save_flags |= IR_SAVE_CFG | IR_SAVE_SAFE_NAMES;
 			if (i + 1 < argc && argv[i + 1][0] != '-') {
 				dump_file = argv[i + 1];
 				i++;
