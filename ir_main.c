@@ -265,7 +265,7 @@ static int _save(ir_ctx *ctx, uint32_t save_flags, uint32_t dump, uint32_t pass,
 		}
 		if (pass == IR_DUMP_FINAL && (dump & IR_DUMP_CODEGEN)) {
 			ir_dump_codegen(ctx, f);
-		} else if (dump & IR_DUMP_IR) {
+		} else if (dump & (IR_DUMP_IR|IR_DUMP_AFTER_ALL)) {
 			ir_save(ctx, save_flags, f);
 		}
 		if (dump & IR_DUMP_LIVE_RANGES) {
@@ -1179,19 +1179,14 @@ int main(int argc, char **argv)
 				i++;
 			}
 		} else if (strcmp(argv[i], "--save-cfg") == 0) {
-			dump |= IR_DUMP_IR;
 			save_flags |= IR_SAVE_CFG;
 		} else if (strcmp(argv[i], "--save-cfg-map") == 0) {
-			dump |= IR_DUMP_IR;
 			save_flags |= IR_SAVE_CFG | IR_SAVE_CFG_MAP;
 		} else if (strcmp(argv[i], "--save-rules") == 0) {
-			dump |= IR_DUMP_IR;
 			save_flags |= IR_SAVE_RULES;
 		} else if (strcmp(argv[i], "--save-regs") == 0) {
-			dump |= IR_DUMP_IR;
 			save_flags |= IR_SAVE_REGS;
 		} else if (strcmp(argv[i], "--save-use-lists") == 0) {
-			dump |= IR_DUMP_IR;
 			save_flags |= IR_SAVE_USE_LISTS;
 		} else if (strcmp(argv[i], "--save-dot") == 0) {
 			dump |= IR_DUMP_DOT;
