@@ -144,7 +144,7 @@ static test *parse_file(const char *filename, int id)
 		}
 		if (section) {
 			if (!last_section || last_section != &t->code) {
-				while (start > 0 && (buf[start - 1] == '\r' || buf[start - 1] == '\n')) start--;
+				while (start > 0 && (buf[start - 1] == '\r' || buf[start - 1] == '\n') && buf + start > *last_section) start--;
 			}
 			buf[start] = 0;
 			if (*section) {
