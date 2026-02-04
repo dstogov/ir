@@ -81,8 +81,9 @@ static uint32_t IR_NEVER_INLINE ir_cfg_remove_dead_inputs(ir_ctx *ctx, uint32_t 
 {
 	uint32_t b, count = 0;
 	ir_block *bb = blocks + 1;
-	ir_insn *insn;
-	ir_ref i, j, n, *ops, input;
+	ir_insn *insn, *phi_insn;
+	ir_ref i, j, n, m, *p, *ops, *phi_ops, input;
+	ir_use_list *use_list;
 
 	for (b = 1; b <= bb_count; b++, bb++) {
 		bb->successors = count;
@@ -91,6 +92,46 @@ static uint32_t IR_NEVER_INLINE ir_cfg_remove_dead_inputs(ir_ctx *ctx, uint32_t 
 		bb->predecessors = count;
 		insn = &ctx->ir_base[bb->start];
 		if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) {
+
+			/* Remove dead phi inputs */
+			use_list = &ctx->use_lists[bb->start];
+			m = use_list->count;
+			for (p = &ctx->use_edges[use_list->refs]; m > 0; p++, m--) {
+				phi_insn = &ctx->ir_base[*p];
+				if (phi_insn->op != IR_PHI) {
+					continue;
+				}
+				IR_ASSERT(phi_insn->inputs_count == insn->inputs_count+1);
+				n = insn->inputs_count;
+				ops = insn->ops;
+				phi_ops = phi_insn->ops;
+				for (i = 1, j = 1; i <= n; i++) {
+					input = ops[i];
+					if (_blocks[input]) {
+						if (i != j) {
+							phi_ops[j+1] = phi_ops[i+1];
+						}
+						j++;
+					} else if (input > 0) {
+						ir_use_list_remove_one(ctx, phi_ops[i+1], *p);
+					}
+				}
+				j--;
+				if (j != n) {
+					if (j == 1) {
+						phi_insn->op = IR_COPY;
+						phi_ops[1] = phi_ops[2];
+						j--;
+						ir_use_list_remove_one(ctx, bb->start, *p);
+					}
+					phi_insn->inputs_count = j+1;
+					j++;
+					for (;j <= n; j++) {
+						phi_ops[j+1] = IR_UNUSED;
+					}
+				}
+			}
+
 			n = insn->inputs_count;
 			ops = insn->ops;
 			for (i = 1, j = 1; i <= n; i++) {
