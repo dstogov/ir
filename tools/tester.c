@@ -143,8 +143,10 @@ static test *parse_file(const char *filename, int id)
 			while (i < size && (buf[i] == '\r' || buf[i] == '\n')) i++;
 		}
 		if (section) {
-			if (!last_section || last_section != &t->code) {
-				while (start > 0 && (buf[start - 1] == '\r' || buf[start - 1] == '\n')) start--;
+			if (last_section && last_section != &t->code) {
+				/* Trim terminating EOL(s) */
+				size_t last_section_start = *last_section - buf;
+				while (start > last_section_start && (buf[start - 1] == '\r' || buf[start - 1] == '\n')) start--;
 			}
 			buf[start] = 0;
 			if (*section) {
