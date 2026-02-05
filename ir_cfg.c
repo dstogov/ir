@@ -77,7 +77,78 @@ void ir_reset_cfg(ir_ctx *ctx)
 	}
 }
 
-static void ir_remove_phis_inputs(ir_ctx *ctx, ir_use_list *use_list, int new_inputs_count, ir_bitset life_inputs);
+static void ir_remove_phis_inputs(ir_ctx *ctx, ir_use_list *use_list, int new_inputs_count, ir_bitset life_inputs)
+{
+	ir_ref i, j, n, k, *p, *q, use;
+	ir_insn *use_insn;
+
+	if (new_inputs_count == 1) {
+		for (k = use_list->count, p = q = &ctx->use_edges[use_list->refs]; k > 0; p++, k--) {
+			use = *p;
+			use_insn = &ctx->ir_base[use];
+			if (use_insn->op == IR_PHI) {
+				/* Convert PHI to COPY */
+				n = use_insn->inputs_count;
+				i = 2;
+				for (j = 2; j <= n; j++) {
+					ir_ref input = ir_insn_op(use_insn, j);
+
+					if (ir_bitset_in(life_inputs, j - 1)) {
+						use_insn->op1 = ir_insn_op(use_insn, j);
+					} else if (input > 0) {
+						ir_use_list_remove_one(ctx, input, use);
+					}
+				}
+				use_insn->op = IR_COPY;
+				use_insn->inputs_count = 1;
+				for (j = 2; j <= n; j++) {
+					ir_insn_set_op(use_insn, j, IR_UNUSED);
+				}
+				continue;
+			}
+
+			/*compact use list */
+			if (p != q){
+				*q = use;
+			}
+			q++;
+		}
+
+		if (p != q) {
+			use_list->count -= (p - q);
+			do {
+				*q = IR_UNUSED; /* clenu-op the removed tail */
+				q++;
+			} while (p != q);
+		}
+	} else {
+		for (k = use_list->count, p = &ctx->use_edges[use_list->refs]; k > 0; p++, k--) {
+			use = *p;
+			use_insn = &ctx->ir_base[use];
+			if (use_insn->op == IR_PHI) {
+				n = use_insn->inputs_count;
+				i = 2;
+				for (j = 2; j <= n; j++) {
+					ir_ref input = ir_insn_op(use_insn, j);
+
+					if (ir_bitset_in(life_inputs, j - 1)) {
+						IR_ASSERT(input);
+						if (i != j) {
+							ir_insn_set_op(use_insn, i, input);
+						}
+						i++;
+					} else if (input > 0) {
+						ir_use_list_remove_one(ctx, input, use);
+					}
+				}
+				use_insn->inputs_count = i - 1;
+				for (j = i; j <= n; j++) {
+					ir_insn_set_op(use_insn, j, IR_UNUSED);
+				}
+			}
+		}
+	}
+}
 
 static uint32_t IR_NEVER_INLINE ir_cfg_remove_dead_inputs(ir_ctx *ctx, uint32_t *_blocks, ir_block *blocks, uint32_t bb_count)
 {
@@ -433,79 +504,6 @@ static void ir_remove_merge_input(ir_ctx *ctx, ir_ref merge, ir_ref from)
 
 	ir_mem_free(life_inputs);
 	ir_use_list_remove_all(ctx, from, merge);
-}
-
-static void ir_remove_phis_inputs(ir_ctx *ctx, ir_use_list *use_list, int new_inputs_count, ir_bitset life_inputs)
-{
-	ir_ref i, j, n, k, *p, *q, use;
-	ir_insn *use_insn;
-
-	if (new_inputs_count == 1) {
-			for (k = use_list->count, p = q = &ctx->use_edges[use_list->refs]; k > 0; p++, k--) {
-				use = *p;
-				use_insn = &ctx->ir_base[use];
-				if (use_insn->op == IR_PHI) {
-					/* Convert PHI to COPY */
-					n = use_insn->inputs_count;
-					i = 2;
-					for (j = 2; j <= n; j++) {
-						ir_ref input = ir_insn_op(use_insn, j);
-
-						if (ir_bitset_in(life_inputs, j - 1)) {
-							use_insn->op1 = ir_insn_op(use_insn, j);
-						} else if (input > 0) {
-							ir_use_list_remove_one(ctx, input, use);
-						}
-					}
-					use_insn->op = IR_COPY;
-					use_insn->inputs_count = 1;
-					for (j = 2; j <= n; j++) {
-						ir_insn_set_op(use_insn, j, IR_UNUSED);
-					}
-					continue;
-				}
-
-				/*compact use list */
-				if (p != q){
-					*q = use;
-				}
-				q++;
-			}
-
-			if (p != q) {
-				use_list->count -= (p - q);
-				do {
-					*q = IR_UNUSED; /* clenu-op the removed tail */
-					q++;
-				} while (p != q);
-			}
-	} else {
-			for (k = use_list->count, p = &ctx->use_edges[use_list->refs]; k > 0; p++, k--) {
-				use = *p;
-				use_insn = &ctx->ir_base[use];
-				if (use_insn->op == IR_PHI) {
-					n = use_insn->inputs_count;
-					i = 2;
-					for (j = 2; j <= n; j++) {
-						ir_ref input = ir_insn_op(use_insn, j);
-
-						if (ir_bitset_in(life_inputs, j - 1)) {
-							IR_ASSERT(input);
-							if (i != j) {
-								ir_insn_set_op(use_insn, i, input);
-							}
-							i++;
-						} else if (input > 0) {
-							ir_use_list_remove_one(ctx, input, use);
-						}
-					}
-					use_insn->inputs_count = i - 1;
-					for (j = i; j <= n; j++) {
-						ir_insn_set_op(use_insn, j, IR_UNUSED);
-					}
-				}
-			}
-	}
 }
 
 /* CFG constructed after SCCP pass doesn't have unreachable BBs, otherwise they should be removed */
