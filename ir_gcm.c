@@ -924,6 +924,104 @@ next:
 	ctx->cfg_blocks = new_blocks;
 }
 
+#if IR_DEBUG
+static void ir_schedule_print_list(const ir_ctx *ctx, uint32_t b, const ir_ref *_next,
+                                   ir_ref start, ir_ref end, const char *label)
+{
+	ir_ref ref;
+
+	fprintf(stderr, "  %s [%d", label, start);
+	ref = _next[start];
+	while (ref != end) {
+		fprintf(stderr, ",%d", ref);
+		ref = _next[ref];
+	}
+	fprintf(stderr, ",%d]\n", ref);
+}
+#endif
+
+/* Simple Stable Topological Sort */
+static void ir_schedule_topsort(const ir_ctx *ctx, uint32_t b, const ir_block *bb,
+                                ir_ref *_xlat, ir_ref *_next, ir_ref *_prev,
+                                ir_ref ref, ir_ref end,
+                                ir_ref *insns_count, ir_ref *consts_count)
+{
+	ir_ref i = ref;
+	const ir_insn *insn;
+
+	if (bb->successors_count > 1) {
+		ir_ref input, j = bb->end;
+		ir_insn *end = &ctx->ir_base[j];
+
+		if (end->op == IR_IF) {
+			/* Move condition closer to IF */
+			input = end->op2;
+			if (input > 0
+			 && ctx->cfg_map[input] == b
+			 && !_xlat[input]
+			 && _prev[j] != input
+			 && (!(ir_op_flags[ctx->ir_base[input].op] & IR_OP_FLAG_CONTROL) || end->op1 == input)) {
+				if (input == i) {
+					i = _next[i];
+					insn = &ctx->ir_base[i];
+				}
+				/* remove "input" */
+				_prev[_next[input]] = _prev[input];
+				_next[_prev[input]] = _next[input];
+				/* insert before "j" */
+				_prev[input] = _prev[j];
+				_next[input] = j;
+				_next[_prev[j]] = input;
+				_prev[j] = input;
+			}
+		}
+	}
+
+	while (i != end) {
+		ir_ref n, j, input;
+		const ir_ref *p;
+
+restart:
+		IR_ASSERT(ctx->cfg_map[i] == b);
+		insn = &ctx->ir_base[i];
+		n = insn->inputs_count;
+		for (j = n, p = insn->ops + 1; j > 0; p++, j--) {
+			input = *p;
+			if (!_xlat[input]) {
+				/* input is not scheduled yet */
+				if (input > 0) {
+					if (ctx->cfg_map[input] == b) {
+						/* "input" should be before "i" to satisfy dependency */
+#ifdef IR_DEBUG
+						if (ctx->flags & IR_DEBUG_SCHEDULE) {
+							fprintf(stderr, "Wrong dependency %d:%d -> %d\n", b, input, i);
+						}
+#endif
+						/* remove "input" */
+						_prev[_next[input]] = _prev[input];
+						_next[_prev[input]] = _next[input];
+						/* insert before "i" */
+						_prev[input] = _prev[i];
+						_next[input] = i;
+						_next[_prev[i]] = input;
+						_prev[i] = input;
+						/* restart from "input" */
+						i = input;
+						insn = &ctx->ir_base[i];
+						goto restart;
+					}
+				} else if (input < IR_TRUE) {
+					*consts_count += ir_count_constant(_xlat, input);
+				}
+			}
+		}
+		_xlat[i] = *insns_count;
+		*insns_count += ir_insn_inputs_to_len(n);
+		IR_ASSERT(_next[i] != IR_UNUSED);
+		i = _next[i];
+	}
+}
+
 int ir_schedule(ir_ctx *ctx)
 {
 	ir_ref i, j, k, n, *p, *q, ref, new_ref, prev_ref, insns_count, consts_count, use_edges_count;
@@ -983,15 +1081,6 @@ int ir_schedule(ir_ctx *ctx)
 		ir_fix_bb_order(ctx, _prev, _next);
 	}
 
-#ifdef IR_DEBUG
-	if (ctx->flags & IR_DEBUG_SCHEDULE) {
-		fprintf(stderr, "Before Schedule\n");
-		for (i = 1; i != 0; i = _next[i]) {
-			fprintf(stderr, "%d -> %d\n", i, ctx->cfg_map[i]);
-		}
-	}
-#endif
-
 	_xlat = ir_mem_calloc((ctx->consts_count + ctx->insns_count), sizeof(ir_ref));
 	_xlat += ctx->consts_count;
 	_xlat[IR_TRUE] = IR_TRUE;
@@ -1004,6 +1093,13 @@ int ir_schedule(ir_ctx *ctx)
 	/* Schedule instructions inside each BB (now just topological sort according to dependencies) */
 	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; b++, bb++) {
 		ir_ref start;
+
+#ifdef IR_DEBUG
+		if (ctx->flags & IR_DEBUG_SCHEDULE) {
+			fprintf(stderr, "BB%d\n", b);
+			ir_schedule_print_list(ctx, b, _next, bb->start, bb->end, "INITIAL");
+		}
+#endif
 
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		/* Schedule BB start */
@@ -1102,76 +1198,20 @@ int ir_schedule(ir_ctx *ctx)
 				insn = &ctx->ir_base[i];
 			}
 		}
-		if (bb->successors_count > 1) {
-			ir_ref input, j = bb->end;
-			ir_insn *end = &ctx->ir_base[j];
 
-			if (end->op == IR_IF) {
-				/* Move condition closer to IF */
-				input = end->op2;
-				if (input > 0
-				 && ctx->cfg_map[input] == b
-				 && !_xlat[input]
-				 && _prev[j] != input
-				 && (!(ir_op_flags[ctx->ir_base[input].op] & IR_OP_FLAG_CONTROL) || end->op1 == input)) {
-					if (input == i) {
-						i = _next[i];
-						insn = &ctx->ir_base[i];
-					}
-					/* remove "input" */
-					_prev[_next[input]] = _prev[input];
-					_next[_prev[input]] = _next[input];
-					/* insert before "j" */
-					_prev[input] = _prev[j];
-					_next[input] = j;
-					_next[_prev[j]] = input;
-					_prev[j] = input;
-				}
-			}
+		if (i != bb->end) {
+			ir_schedule_topsort(ctx, b, bb, _xlat, _next, _prev, i, bb->end, &insns_count, &consts_count);
 		}
-		while (i != bb->end) {
-			ir_ref n, j, *p, input;
 
-restart:
-			IR_ASSERT(ctx->cfg_map[i] == b);
-			n = insn->inputs_count;
-			for (j = n, p = insn->ops + 1; j > 0; p++, j--) {
-				input = *p;
-				if (!_xlat[input]) {
-					/* input is not scheduled yet */
-					if (input > 0) {
-						if (ctx->cfg_map[input] == b) {
-							/* "input" should be before "i" to satisfy dependency */
 #ifdef IR_DEBUG
-							if (ctx->flags & IR_DEBUG_SCHEDULE) {
-								fprintf(stderr, "Wrong dependency %d:%d -> %d\n", b, input, i);
-							}
-#endif
-							/* remove "input" */
-							_prev[_next[input]] = _prev[input];
-							_next[_prev[input]] = _next[input];
-							/* insert before "i" */
-							_prev[input] = _prev[i];
-							_next[input] = i;
-							_next[_prev[i]] = input;
-							_prev[i] = input;
-							/* restart from "input" */
-							i = input;
-							insn = &ctx->ir_base[i];
-							goto restart;
-						}
-					} else if (input < IR_TRUE) {
-						consts_count += ir_count_constant(_xlat, input);
-					}
-				}
-			}
-			_xlat[i] = insns_count;
-			insns_count += ir_insn_inputs_to_len(n);
-			IR_ASSERT(_next[i] != IR_UNUSED);
-			i = _next[i];
-			insn = &ctx->ir_base[i];
+		if (ctx->flags & IR_DEBUG_SCHEDULE) {
+			ir_schedule_print_list(ctx, b, _next, start, bb->end, "  FINAL");
 		}
+#endif
+
 		/* Schedule BB end */
+		i = bb->end;
+		insn = &ctx->ir_base[i];
 		_xlat[i] = bb->end = insns_count;
 		insns_count++;
 		if (IR_INPUT_EDGES_COUNT(ir_op_flags[insn->op]) == 2) {
@@ -1180,15 +1220,6 @@ restart:
 			}
 		}
 	}
-
-#ifdef IR_DEBUG
-	if (ctx->flags & IR_DEBUG_SCHEDULE) {
-		fprintf(stderr, "After Schedule\n");
-		for (i = 1; i != 0; i = _next[i]) {
-			fprintf(stderr, "%d -> %d (%d)\n", i, ctx->cfg_map[i], _xlat[i]);
-		}
-	}
-#endif
 
 #if 1
 	/* Check if scheduling didn't make any modifications */
