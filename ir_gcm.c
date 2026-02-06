@@ -1007,7 +1007,6 @@ restart:
 						_prev[i] = input;
 						/* restart from "input" */
 						i = input;
-						insn = &ctx->ir_base[i];
 						goto restart;
 					}
 				} else if (input < IR_TRUE) {
@@ -1015,6 +1014,7 @@ restart:
 				}
 			}
 		}
+
 		_xlat[i] = *insns_count;
 		*insns_count += ir_insn_inputs_to_len(n);
 		IR_ASSERT(_next[i] != IR_UNUSED);
@@ -1035,7 +1035,6 @@ int ir_schedule(ir_ctx *ctx)
 	ir_insn *insn, *new_insn, *base;
 	ir_use_list *lists, *use_list, *new_list;
 	bool bad_bb_order = 0;
-
 
 	/* Create a double-linked list of nodes ordered by BB, respecting BB->start and BB->end */
 	IR_ASSERT(ctx->cfg_map[1] == 1);
