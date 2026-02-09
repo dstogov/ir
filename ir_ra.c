@@ -3941,11 +3941,12 @@ static void assign_regs(ir_ctx *ctx)
 
 								use_pos = use_pos->next;
 							}
-						} else if (!(top_ival->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL)) {
+						} else {
 							use_pos = ival->use_pos;
 							while (use_pos) {
 								ref = IR_LIVE_POS_TO_REF(use_pos->pos);
-								if (ctx->ir_base[ref].op == IR_SNAPSHOT) {
+								if (ctx->ir_base[ref].op == IR_SNAPSHOT
+								 && !(top_ival->flags & IR_LIVE_INTERVAL_SPILL_SPECIAL)) {
 									IR_ASSERT(use_pos->hint_ref >= 0);
 									/* A reference to a CPU spill slot */
 									reg = IR_REG_SPILL_STORE | IR_REG_STACK_POINTER;
