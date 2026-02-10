@@ -188,9 +188,9 @@ static uint32_t IR_NEVER_INLINE ir_cfg_remove_dead_inputs(ir_ctx *ctx, uint32_t 
 							}
 						}
 					}
-					if (input > 0) {
-						ir_use_list_remove_one(ctx, input, bb->start);
-					}
+					IR_ASSERT(input > 0);
+					IR_ASSERT(ctx->use_lists[input].count == 1 && ctx->use_edges[ctx->use_lists[input].refs] == bb->start);
+					CLEAR_USES(input);
 				}
 			}
 			j--;
@@ -503,7 +503,8 @@ static void ir_remove_merge_input(ir_ctx *ctx, ir_ref merge, ir_ref from)
 	}
 
 	ir_mem_free(life_inputs);
-	ir_use_list_remove_all(ctx, from, merge);
+	IR_ASSERT(ctx->use_lists[from].count == 1 && ctx->use_edges[ctx->use_lists[from].refs] == merge);
+	CLEAR_USES(from);
 }
 
 /* CFG constructed after SCCP pass doesn't have unreachable BBs, otherwise they should be removed */
