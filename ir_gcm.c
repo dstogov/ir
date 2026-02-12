@@ -1288,7 +1288,7 @@ static ir_ref ir_schedule_select(const ir_ctx *ctx, uint32_t b,
 		} else if (best != 0x7fffffff
 		 && ctx->ir_base[ref].op == IR_CALL
 		 && best_cost < 0) {
-		 	/* pass */
+			/* pass */
 #endif
 		} else if (cost < best_cost) {
 			best = ref;
