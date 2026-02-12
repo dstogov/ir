@@ -934,6 +934,169 @@ next:
 }
 
 #if IR_DEBUG
+static void ir_schedule_print_block(const ir_ctx *ctx, uint32_t b, const ir_ref *_next,
+                                    ir_ref start, ir_ref end)
+{
+	FILE *f = stderr;
+	const ir_block *bb = &ctx->cfg_blocks[b];
+	const ir_insn *insn;
+	uint32_t flags;
+	ir_ref i, j, n, ref;
+	const ir_ref *p;
+	bool first;
+
+	fprintf(f, "#BB%d:", b);
+	if (bb->dom_parent > 0) {
+		fprintf(f, " idom=BB%d(%d)", bb->dom_parent, bb->dom_depth);
+	}
+	if (bb->loop_depth != 0) {
+		if (bb->flags & IR_BB_LOOP_HEADER) {
+			if (bb->loop_header > 0) {
+				fprintf(f, ", loop=HDR,BB%d(%d)", bb->loop_header, bb->loop_depth);
+			} else {
+				IR_ASSERT(bb->loop_depth == 1);
+				fprintf(f, ", loop=HDR(%d)", bb->loop_depth);
+			}
+		} else {
+			IR_ASSERT(bb->loop_header > 0);
+			fprintf(f, ", loop=BB%d(%d)", bb->loop_header, bb->loop_depth);
+		}
+	}
+	if (bb->flags & IR_BB_IRREDUCIBLE_LOOP) {
+		fprintf(f, ", IRREDUCIBLE");
+	}
+	if (bb->predecessors_count) {
+		uint32_t i;
+
+		fprintf(f, ", pred(%d)=[BB%d", bb->predecessors_count, ctx->cfg_edges[bb->predecessors]);
+		for (i = 1; i < bb->predecessors_count; i++) {
+			fprintf(f, ", BB%d", ctx->cfg_edges[bb->predecessors + i]);
+		}
+		fprintf(f, "]");
+	}
+	if (bb->successors_count) {
+		uint32_t i;
+
+		fprintf(f, ", succ(%d)=[BB%d", bb->successors_count, ctx->cfg_edges[bb->successors]);
+		for (i = 1; i < bb->successors_count; i++) {
+			fprintf(f, ", BB%d", ctx->cfg_edges[bb->successors + i]);
+		}
+		fprintf(f, "]");
+	}
+	fprintf(f, "\n");
+
+	i = start;
+	do {
+		insn = &ctx->ir_base[i];
+		flags = ir_op_flags[insn->op];
+
+		if (flags & IR_OP_FLAG_CONTROL) {
+			if (!(flags & IR_OP_FLAG_MEM) || insn->type == IR_VOID) {
+				fprintf(f, "\tl_%d = ", i);
+			} else {
+				fprintf(f, "\t%s d_%d", ir_type_cname[insn->type], i);
+				fprintf(f, ", l_%d = ", i);
+			}
+		} else {
+			fprintf(f, "\t");
+			if (flags & IR_OP_FLAG_DATA) {
+				fprintf(f, "%s d_%d", ir_type_cname[insn->type], i);
+				fprintf(f, " = ");
+			}
+		}
+		fprintf(f, "%s", ir_op_name[insn->op]);
+		n = ir_operands_count(ctx, insn);
+		if ((insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) && n != 2) {
+			fprintf(f, "/%d", n);
+		} else if ((insn->op == IR_CALL || insn->op == IR_TAILCALL) && n != 2) {
+			fprintf(f, "/%d", n - 2);
+		} else if (insn->op == IR_PHI && n != 3) {
+			fprintf(f, "/%d", n - 1);
+		} else if (insn->op == IR_SNAPSHOT) {
+			fprintf(f, "/%d", n - 1);
+		}
+		first = 1;
+		for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
+			uint32_t opnd_kind = IR_OPND_KIND(flags, j);
+
+			ref = *p;
+			if (ref) {
+				switch (opnd_kind) {
+					case IR_OPND_DATA:
+						if (IR_IS_CONST_REF(ref)) {
+							fprintf(f, "%sc_%d", first ? "(" : ", ", -ref);
+						} else {
+							fprintf(f, "%sd_%d", first ? "(" : ", ", ref);
+						}
+						first = 0;
+						break;
+					case IR_OPND_CONTROL:
+					case IR_OPND_CONTROL_DEP:
+					case IR_OPND_CONTROL_REF:
+						fprintf(f, "%sl_%d", first ? "(" : ", ", ref);
+						first = 0;
+						break;
+					case IR_OPND_STR:
+						fprintf(f, "%s\"%s\"", first ? "(" : ", ", ir_get_str(ctx, ref));
+						first = 0;
+						break;
+					case IR_OPND_PROTO:
+						fprintf(f, "%sfunc ", first ? "(" : ", ");
+						ir_print_proto(ctx, ref, f);
+						break;
+					case IR_OPND_PROB:
+						if (ref == 0) {
+							break;
+						}
+						IR_FALLTHROUGH;
+					case IR_OPND_NUM:
+						fprintf(f, "%s%d", first ? "(" : ", ", ref);
+						first = 0;
+						break;
+					case IR_OPND_LABEL_REF:
+						if (ref) {
+							IR_ASSERT(IR_IS_CONST_REF(ref));
+							fprintf(f, "%sc_%d", first ? "(" : ", ", -ref);
+							first = 0;
+						}
+						break;
+				}
+			} else if (opnd_kind == IR_OPND_NUM) {
+				fprintf(f, "%s%d", first ? "(" : ", ", ref);
+				first = 0;
+			} else if (j != n &&
+					(IR_IS_REF_OPND_KIND(opnd_kind) || (opnd_kind == IR_OPND_UNUSED && p[n-j]))) {
+				fprintf(f, "%snull", first ? "(" : ", ");
+				first = 0;
+			}
+		}
+
+		if (first) {
+			fprintf(f, ";");
+		} else {
+			fprintf(f, ");");
+		}
+
+		ir_use_list *use_list = &ctx->use_lists[i];
+		ir_ref n = use_list->count;
+
+		if (n > 0) {
+			ir_ref *p = ctx->use_edges + use_list->refs;
+
+			fprintf(f, " #");
+			fprintf(f, " USE_LIST(%d)=[%05d", n, *p);
+			for (p++, n--; n; p++, n--) {
+				fprintf(f, ", %05d", *p);
+			}
+			fprintf(f, "];");
+		}
+
+		fprintf(f, "\n");
+
+		i = _next[i];
+	} while (i != end);
+}
+
 static void ir_schedule_print_list(const ir_ctx *ctx, uint32_t b, const ir_ref *_next,
                                    ir_ref start, ir_ref end, const char *label)
 {
@@ -948,6 +1111,749 @@ static void ir_schedule_print_list(const ir_ctx *ctx, uint32_t b, const ir_ref *
 	fprintf(stderr, ",%d]\n", ref);
 }
 #endif
+
+#ifndef IR_SCHEDULE_GOODWAY
+# define IR_SCHEDULE_GOODWAY 1
+#endif
+
+#if IR_SCHEDULE_GOODWAY
+/* Integrated Prepass Scheduling that integrates CSP (Code Scheduling to avoid Pipeline delays) and
+ * CSR (Code Scheduling to minimize Registers usage).
+ *
+ * See: Goodman J.R., Hsu W.C. (2014).
+ * "Code scheduling and register allocation in large basic blocks".
+ * 25th Anniversary International Conference on Supercomputing Anniversary Volume, 88-98.
+ * https://doi.org/10.1145/2591635.2667158
+ */
+
+#define UNKNOWN_PRESSURE_DELTA    0x7fffffff
+
+#define UNKNOWN_UNSCHEDULED_USES  0x7fffffff
+#define LIVE_OUT_UNSCHEDULED_USES 0x10000000
+
+static int ir_schedule_update_unscheduled_uses(const ir_ctx *ctx, uint32_t b,
+                                               const ir_ref *_xlat, int *_counters, ir_ref ref)
+{
+	int use_count = 0;
+	const ir_use_list *use_list = &ctx->use_lists[ref];
+	ir_ref n = use_list->count;
+	const ir_ref *p = ctx->use_edges + use_list->refs;
+
+	for (; n > 0; p++, n--) {
+		ir_ref use = *p;
+
+		if (!_xlat[use] && ctx->cfg_map[use] == b) {
+			/* "use" is not scheduled yet */
+			use_count++;
+		}
+	}
+
+	_counters[ref] = use_count;
+
+	return use_count;
+}
+
+static bool last_use_is_control(const ir_ctx *ctx, uint32_t b,
+                               const ir_ref *_xlat, int *_counters, ir_ref ref, ir_ref ignore)
+{
+	const ir_use_list *use_list = &ctx->use_lists[ref];
+	ir_ref n = use_list->count;
+	const ir_ref *p = ctx->use_edges + use_list->refs;
+
+	IR_ASSERT(_counters[ref] == 1);
+	for (; n > 0; p++, n--) {
+		ir_ref use = *p;
+
+		if (use != ignore && !_xlat[use] && ctx->cfg_map[use] == b) {
+			/* "use" is not scheduled yet */
+			const ir_insn *insn = &ctx->ir_base[use];
+			return (ir_op_flags[insn->op] & IR_OP_FLAG_CONTROL) && insn->op1 == ref;
+		}
+	}
+	return 0;
+}
+
+static int ir_schedule_update_pressure_delta(const ir_ctx *ctx, uint32_t b,
+                                             const ir_ref *_xlat, int *_counters,
+                                             const ir_bitset used_regs, ir_ref ref)
+{
+	int pressure = 0;
+	const ir_insn *insn = &ctx->ir_base[ref];
+	ir_ref n = insn->inputs_count;
+	const ir_ref *p = insn->ops + 1;
+
+	if (insn->type == IR_VOID) {
+		IR_ASSERT(ir_op_flags[insn->op] & IR_OP_FLAG_CONTROL);
+		/* Skip control edge */
+		p++;
+		n--;
+	} else {
+		/* Instruction defines a new register */
+		pressure++;
+		if (ir_op_flags[insn->op] & IR_OP_FLAG_CONTROL) {
+			/* Skip control edge */
+			p++;
+			n--;
+		}
+	}
+
+	for (; n > 0; p++, n--) {
+		ir_ref input = *p;
+		if (input > 0) {
+			IR_ASSERT(ir_bitset_in(used_regs, input));
+			int use_count = _counters[input];
+
+			if (use_count == UNKNOWN_UNSCHEDULED_USES) {
+				use_count = ir_schedule_update_unscheduled_uses(ctx, b, _xlat, _counters, input);
+			}
+			if (use_count == 1) {
+				/* Instruction KILLs the register (there are no other usages after this). */
+				pressure--;
+			} else if (n >= use_count) {
+				// TODO: check for multiple usages (quadratick complexity)
+				ir_ref m, uses = 1;
+				const ir_ref *q;
+
+				for(m = n - 1, q = p + 1; m > 0; q++, m--) {
+					if (*q == input) uses++;
+				}
+				IR_ASSERT(uses <= use_count);
+				if (uses == use_count) {
+					pressure--;
+				}
+			}
+		}
+	}
+
+	_counters[ref] = pressure;
+
+	return pressure;
+}
+
+static int ir_schedule_pressure_delta(const ir_ctx *ctx, uint32_t b,
+                                      const ir_ref *_xlat, int *_counters,
+                                      const ir_bitset used_regs, ir_ref ref)
+{
+	int pressure = _counters[ref];
+
+//	if (pressure == UNKNOWN_PRESSURE_DELTA) {
+		pressure = ir_schedule_update_pressure_delta(ctx, b, _xlat, _counters, used_regs, ref);
+//	}
+
+	return pressure;
+}
+
+static ir_ref ir_schedule_select(const ir_ctx *ctx, uint32_t b,
+                                 const ir_ref *_xlat, int *_counters,
+                                 const ir_ref *_next, ir_ref first, ir_ref last,
+                                 const ir_bitset used_regs)
+{
+	ir_ref ref = first;
+	ir_ref best = 0x7fffffff;;
+	int best_cost = 0x7fffffff;
+	int cost;
+
+	do {
+		if (ctx->ir_base[ref].op == IR_OVERFLOW) {
+			/* Schedule projections first. OVERFLOW should directly follow ADD/SUN/MUL_OV. */
+			return ref;
+		}
+		// TODO: Support for more SCP/SCR heuristics
+		cost = ir_schedule_pressure_delta(ctx, b, _xlat, _counters, used_regs, ref);
+		if (best != 0x7fffffff
+		 && (ctx->ir_base[best].op >= IR_EQ && ctx->ir_base[best].op <= IR_UNORDERED)
+		 && ctx->use_lists[best].count == 1
+		 && (ctx->ir_base[ctx->use_edges[ctx->use_lists[best].refs]].op == IR_IF
+		  || ctx->ir_base[ctx->use_edges[ctx->use_lists[best].refs]].op == IR_COND
+		  || ctx->ir_base[ctx->use_edges[ctx->use_lists[best].refs]].op == IR_GUARD
+		  || ctx->ir_base[ctx->use_edges[ctx->use_lists[best].refs]].op == IR_GUARD_NOT)) {
+			/* Schedule comparisons closer to IF */
+			best = ref;
+			best_cost = cost;
+		} else if (best != 0x7fffffff
+		 && (ctx->ir_base[ref].op >= IR_EQ && ctx->ir_base[ref].op <= IR_UNORDERED)
+		 && ctx->use_lists[ref].count == 1
+		 && (ctx->ir_base[ctx->use_edges[ctx->use_lists[ref].refs]].op == IR_IF
+		  || ctx->ir_base[ctx->use_edges[ctx->use_lists[ref].refs]].op == IR_COND
+		  || ctx->ir_base[ctx->use_edges[ctx->use_lists[ref].refs]].op == IR_GUARD
+		  || ctx->ir_base[ctx->use_edges[ctx->use_lists[ref].refs]].op == IR_GUARD_NOT)) {
+			/* Schedule comparisons closer to IF */
+#if 0
+		} else if (best != 0x7fffffff
+		 && ctx->ir_base[best].op == IR_CALL
+		 && cost < 0) {
+			/* Schedule comparisons closer to IF */
+			best = ref;
+			best_cost = cost;
+		} else if (best != 0x7fffffff
+		 && ctx->ir_base[ref].op == IR_CALL
+		 && best_cost < 0) {
+		 	/* pass */
+#endif
+		} else if (cost < best_cost) {
+			best = ref;
+			best_cost = cost;
+		} else if (cost == best_cost) {
+			if (ref < best) best = ref;
+		} else {
+		}
+		ref = _next[ref];
+	} while (ref != last);
+
+	return best;
+}
+
+#if IR_DEBUG
+static void ir_schedule_print_live_sets(const ir_ctx *ctx, uint32_t b,
+                                        const ir_ref *_xlat, int *_counters,
+                                        ir_bitset used_regs, ir_bitset live_out)
+{
+	ir_ref ref;
+	int n = 0;
+
+	IR_BITSET_FOREACH(used_regs, ir_bitset_len(ctx->insns_count), ref) {
+		if (ctx->cfg_map[ref] != b) {
+			if (n == 0) {
+				fprintf(stderr, "  LIVEIN  [");
+			} else {
+				fprintf(stderr, ",");
+			}
+			n++;
+			fprintf(stderr, "%d", ref);
+			int use_count = _counters[ref];
+			if (use_count == UNKNOWN_UNSCHEDULED_USES) {
+				use_count = ir_schedule_update_unscheduled_uses(ctx, b, _xlat, _counters, ref);
+			}
+			if (use_count == LIVE_OUT_UNSCHEDULED_USES) {
+				fprintf(stderr, "/+");
+			} else {
+				fprintf(stderr, "/%d", use_count);
+			}
+		}
+	} IR_BITSET_FOREACH_END();
+	if (n != 0) {
+		fprintf(stderr, "] (REGS=%d)\n", n);
+	}
+
+	n = 0;
+	IR_BITSET_FOREACH(live_out, ir_bitset_len(ctx->insns_count), ref) {
+		if (n == 0) {
+			fprintf(stderr, "  LIVEOUT [");
+		} else {
+			fprintf(stderr, ",");
+		}
+		n++;
+		fprintf(stderr, "%d", ref);
+	} IR_BITSET_FOREACH_END();
+	if (n != 0) {
+		fprintf(stderr, "] (REGS=%d)\n", n);
+	}
+}
+
+static void ir_schedule_print_lists(const ir_ctx *ctx, uint32_t b,
+                                    const ir_ref *_xlat, int *_counters,
+                                    const ir_ref *_next,
+                                    ir_ref start, ir_ref ready, ir_ref waiting, ir_ref end,
+                                    int regs, ir_bitset used_regs)
+{
+	ir_ref ref;
+	bool first;
+
+	fprintf(stderr, "    SCHEDULED [");
+	ref = start;
+	first = 1;
+	while (_xlat[ref]) {
+		if (!first) fprintf(stderr, ",");
+		if (first) first = 0;
+		fprintf(stderr, "%d", ref);
+		int use_count = _counters[ref];
+		if (use_count == UNKNOWN_UNSCHEDULED_USES) {
+			use_count = ir_schedule_update_unscheduled_uses(ctx, b, _xlat, _counters, ref);
+		}
+		if (use_count == LIVE_OUT_UNSCHEDULED_USES) {
+			fprintf(stderr, "/+");
+		} else if (use_count != 0) {
+			fprintf(stderr, "/%d", use_count);
+		}
+		ref = _next[ref];
+	}
+	fprintf(stderr, "] (REGS=%d)\n", regs);
+
+	ref = ready;
+	first = 1;
+	while (ref != waiting) {
+		if (first) {
+			fprintf(stderr, "      READY [");
+			first = 0;
+		} else {
+			fprintf(stderr, ",");
+		}
+		int pressure = ir_schedule_pressure_delta(ctx, b, _xlat, _counters, used_regs, ref);
+		fprintf(stderr, "%d/%d", ref, pressure);
+		ref = _next[ref];
+	}
+	if (!first) {
+		fprintf(stderr, "]\n");
+	}
+
+#if 0
+	ref = waiting;
+	first = 1;
+	while (ref != end) {
+		if (first) {
+			fprintf(stderr, "        WAITING [");
+			first = 0;
+		} else {
+			fprintf(stderr, ",");
+		}
+		fprintf(stderr, "%d/%d", ref, _counters[ref]);
+		ref = _next[ref];
+	}
+	if (!first) {
+		fprintf(stderr, "]\n");
+	}
+#endif
+}
+#endif
+
+static void ir_schedule_list(const ir_ctx *ctx, uint32_t b,
+                             ir_ref *_xlat, int *_counters,
+                             const uint32_t *live_outs, const ir_list *live_lists,
+                             ir_ref *_next, ir_ref *_prev, ir_ref start, ir_ref ref, ir_ref end,
+                             ir_ref *insns_count, ir_ref *consts_count,
+                             ir_bitset used_regs, ir_bitset live_out)
+{
+	const ir_insn *insn;
+	ir_ref ready = ref;
+	ir_ref waiting = ref;
+	ir_ref n;
+	const ir_ref *p;
+	int regs = 0;
+
+	ir_bitset_clear(live_out, ir_bitset_len(ctx->insns_count));
+	ir_bitset_clear(used_regs, ir_bitset_len(ctx->insns_count));
+	ir_ref i;
+
+	/* Collect nodes live at the end of the block */
+	n = live_outs[b];
+	while (n != 0) {
+		i = ir_list_at(live_lists, n);
+		ir_bitset_incl(live_out, i);
+		if (ctx->cfg_map[i] != b) {
+			/* The node also live at start of the block */
+			if (!ir_bitset_in(used_regs, i)) {
+				ir_bitset_incl(used_regs, i);
+				_counters[i] = LIVE_OUT_UNSCHEDULED_USES;
+				regs++;
+			}
+		}
+		n = ir_list_at(live_lists, n - 1);
+	}
+
+	for (i = start; i != ready; i = _next[i]) {
+		insn = &ctx->ir_base[i];
+		if (insn->type
+		 && ctx->use_lists[i].count > ((ir_op_flags[insn->op] & IR_OP_FLAG_CONTROL) ? 1 : 0)) {
+			IR_ASSERT(!ir_bitset_in(used_regs, i));
+			ir_bitset_incl(used_regs, i);
+			if (ir_bitset_in(live_out, i)) {
+				_counters[i] = LIVE_OUT_UNSCHEDULED_USES;
+			} else {
+				_counters[i] = UNKNOWN_UNSCHEDULED_USES;
+			}
+			regs++;
+		} else {
+			_counters[i] = UNKNOWN_UNSCHEDULED_USES;
+		}
+	}
+
+	do {
+		int unscheduled_predecessors_count = 0;
+
+		insn = &ctx->ir_base[ref];
+		n = insn->inputs_count;
+		p = insn->ops + 1;
+		if (ir_op_flags[insn->op] & IR_OP_FLAG_CONTROL) {
+			ir_ref input = *p;
+			IR_ASSERT(input > 0 && ctx->cfg_map[input] == b);
+			if (!_xlat[input]) {
+				/* input is not scheduled yet */
+				unscheduled_predecessors_count++;
+			}
+			p++;
+			n--;
+		}
+		for (; n > 0; p++, n--) {
+			ir_ref input = *p;
+			if (input > 0) {
+				if (ctx->cfg_map[input] == b) {
+					if (!_xlat[input]) {
+						/* input is not scheduled yet */
+						unscheduled_predecessors_count++;
+					} else {
+						IR_ASSERT(ir_bitset_in(used_regs, input));
+					}
+				} else {
+					/* input from the predecessor(s) block */
+					IR_ASSERT(ctx->ir_base[input].type);
+					if (!ir_bitset_in(used_regs, input)) {
+						ir_bitset_incl(used_regs, input);
+						if (ir_bitset_in(live_out, input)) {
+							_counters[input] = LIVE_OUT_UNSCHEDULED_USES;
+						} else {
+							_counters[input] = UNKNOWN_UNSCHEDULED_USES;
+						}
+						regs++;
+					}
+				}
+			} else if (input < IR_TRUE) {
+				*consts_count += ir_count_constant(_xlat, input);
+			}
+		}
+
+		if (unscheduled_predecessors_count) {
+			/* Instruction is not ready. Keep it in "waiting" list. */
+			_counters[ref] = unscheduled_predecessors_count;
+			ref = _next[ref];
+		} else {
+			/* Instruction is ready. Move it into the end of "ready" list. */
+			_counters[ref] = UNKNOWN_PRESSURE_DELTA;
+			if (ref == waiting) {
+				waiting = ref = _next[ref];
+			} else {
+				if (ready == waiting) {
+					ready = ref;
+				}
+				/* remove "ref" */
+				ir_ref prev = _prev[ref];
+				ir_ref next = _next[ref];
+				_prev[next] = prev;
+				_next[prev] = next;
+				/* re-insert it before "waiting" */
+				prev = _prev[waiting];
+				_prev[ref] = prev;
+				_next[ref] = waiting;
+				_next[prev] = ref;
+				_prev[waiting] = ref;
+				ref = next;
+			}
+		}
+	} while (ref != end);
+
+#if IR_DEBUG
+	if (ctx->flags & IR_DEBUG_SCHEDULE) {
+		ir_schedule_print_live_sets(ctx, b, _xlat, _counters, used_regs, live_out);
+	}
+#endif
+
+	while (1) {
+#if IR_DEBUG
+		if (ctx->flags & IR_DEBUG_SCHEDULE) {
+			ir_schedule_print_lists(ctx, b, _xlat, _counters, _next, start, ready, waiting, end, regs, used_regs);
+		}
+#endif
+		IR_ASSERT(ready != waiting);
+		if (_next[ready] == waiting) {
+			/* Only one instruction is "ready" */
+			ref = ready;
+			ready = waiting;
+		} else {
+			/* Select the best instruction from the "ready" list */
+			ref = ir_schedule_select(ctx, b, _xlat, _counters, _next, ready, waiting, used_regs);
+
+			/* Move it into the start of the "ready" list */
+			if (ref == ready) {
+				ready = _next[ready];
+			} else {
+				/* remove "ref" */
+				ir_ref prev = _prev[ref];
+				ir_ref next = _next[ref];
+				_prev[next] = prev;
+				_next[prev] = next;
+				/* re-insert it before "ready" */
+				prev = _prev[ready];
+				_prev[ref] = prev;
+				_next[ref] = ready;
+				_next[prev] = ref;
+				_prev[ready] = ref;
+			}
+		}
+
+		/* Decrise counters of "scheduled" insns that are used by this one */
+		insn = &ctx->ir_base[ref];
+		n = insn->inputs_count;
+		p = insn->ops + 1;
+		if (ir_op_flags[insn->op] & IR_OP_FLAG_CONTROL) {
+			ir_ref input = *p;
+			int use_count = _counters[input];
+			if (use_count == UNKNOWN_UNSCHEDULED_USES) {
+				ir_schedule_update_unscheduled_uses(ctx, b, _xlat, _counters, input);
+			}
+			if (use_count != LIVE_OUT_UNSCHEDULED_USES) {
+				IR_ASSERT(use_count > 0);
+				use_count--;
+				_counters[input] = use_count;
+			}
+			p++;
+			n--;
+		}
+		for (; n > 0; p++, n--) {
+			ir_ref input = *p;
+			if (input > 0) {
+				IR_ASSERT(ir_bitset_in(used_regs, input));
+				int use_count = _counters[input];
+				if (use_count == UNKNOWN_UNSCHEDULED_USES) {
+					ir_schedule_update_unscheduled_uses(ctx, b, _xlat, _counters, input);
+				}
+				if (use_count != LIVE_OUT_UNSCHEDULED_USES) {
+					IR_ASSERT(use_count > 0);
+					use_count--;
+					_counters[input] = use_count;
+					if (use_count == 0
+					 // TODO: find a better way to check for the remaining contol edge
+					 || (use_count == 1
+					  && (ir_op_flags[ctx->ir_base[input].op] & IR_OP_FLAG_CONTROL)
+					  && last_use_is_control(ctx, b, _xlat, _counters, input, ref))) {
+						/* Register is not used anymore. "Free" it. */
+						IR_ASSERT(ir_bitset_in(used_regs, input));
+						ir_bitset_excl(used_regs, input);
+						regs--;
+//					} else if (input is READY and input
+//						// TODO: Invalidate pressure for "ready" instructions that use the the same "input"
+//						_counters[use] = UNKNOWN_PRESSURE_DELTA;
+					}
+				}
+			}
+		}
+
+		/* Schedule instruction */
+		_xlat[ref] = *insns_count;
+		*insns_count += ir_insn_inputs_to_len(insn->inputs_count);
+
+//		if (ready == end) break;
+
+		/* "Allocate" output register */
+		if (insn->type
+		 && ctx->use_lists[ref].count > ((ir_op_flags[insn->op] & IR_OP_FLAG_CONTROL) ? 1 : 0)) {
+			IR_ASSERT(!ir_bitset_in(used_regs, ref));
+			ir_bitset_incl(used_regs, ref);
+			if (ir_bitset_in(live_out, ref)) {
+				_counters[ref] = LIVE_OUT_UNSCHEDULED_USES;
+			} else {
+				_counters[ref] = UNKNOWN_UNSCHEDULED_USES;
+			}
+			regs++;
+		} else {
+			_counters[ref] = UNKNOWN_UNSCHEDULED_USES;
+		}
+
+		if (ready == end) break;
+
+		if (waiting != end) {
+#if 0
+			n = insn->inputs_count;
+			p = insn->ops + 1;
+			if (ir_op_flags[insn->op] & IR_OP_FLAG_CONTROL) {
+				p++;
+				n--;
+			}
+			for (; n > 0; p++, n--) {
+				ir_ref input = *p;
+				if (input > 0) {
+					int use_count = _counters[input];
+					if (use_count != LIVE_OUT_UNSCHEDULED_USES && use_count != 0) {
+						ir_use_list *use_list = &ctx->use_lists[input];
+						ir_ref m = use_list->count;
+						const ir_ref *q;
+
+						for (q = &ctx->use_edges[use_list->refs]; m > 0; q++, m--) {
+							ir_ref use = *q;
+							if (!_xlat[use] && ctx->cfg_map[use] == b && use != end) {
+//								_counters[use] = UNKNOWN_PRESSURE_DELTA;
+							}
+						}
+					}
+				}
+			}
+#endif
+
+			/* Decrise counters of "waiting" insns that use ths one (were blocked by this one) */
+			ir_use_list *use_list = &ctx->use_lists[ref];
+			n = use_list->count;
+			for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
+				ir_ref use = *p;
+				if (!_xlat[use] && ctx->cfg_map[use] == b && use != end) {
+					IR_ASSERT(_counters[use] > 0);
+					int unscheduled_predecessors_count = --_counters[use];
+
+					if (unscheduled_predecessors_count == 0) {
+						/* Move "use" from "waiting" to "ready" */
+						if (use == waiting) {
+							waiting = _next[use];
+						} else {
+							if (ready == waiting) {
+								ready = use;
+							}
+							/* remove "use" */
+							ir_ref prev = _prev[use];
+							ir_ref next = _next[use];
+							_prev[next] = prev;
+							_next[prev] = next;
+							/* re-insert it before "waiting" */
+							prev = _prev[waiting];
+							_prev[use] = prev;
+							_next[use] = waiting;
+							_next[prev] = use;
+							_prev[waiting] = use;
+						}
+						_counters[use] = UNKNOWN_PRESSURE_DELTA;
+					}
+				}
+			}
+		}
+	}
+
+#if IR_DEBUG
+	if (ctx->flags & IR_DEBUG_SCHEDULE) {
+		ir_schedule_print_lists(ctx, b, _xlat, _counters, _next, start, ready, waiting, end, regs, used_regs);
+	}
+#endif
+}
+
+/* Path exploration by definition liveness for SSA using sets represented by linked lists */
+#define IS_LIVE_IN_BLOCK(v, b) \
+	(live_in_block[v] == b)
+#define SET_LIVE_IN_BLOCK(v, b) do { \
+		live_in_block[v] = b; \
+	} while (0)
+
+/* Returns the last virtual register alive at the end of the block (it is used as an already-visited marker) */
+IR_ALWAYS_INLINE uint32_t ir_live_out_top(ir_ctx *ctx, uint32_t *live_outs, ir_list *live_lists, uint32_t b)
+{
+#if 0
+	return live_outs[b];
+#else
+	if (!live_outs[b]) {
+		return -1;
+	}
+	return ir_list_at(live_lists, live_outs[b]);
+#endif
+}
+
+/* Remember a virtual register alive at the end of the block */
+IR_ALWAYS_INLINE void ir_live_out_push(ir_ctx *ctx, uint32_t *live_outs, ir_list *live_lists, uint32_t b, uint32_t v)
+{
+#if 0
+	ir_block *bb = &ctx->cfg_blocks[b];
+	live_outs[b] = v;
+	ir_add_prev_live_range(ctx, v,
+		IR_START_LIVE_POS_FROM_REF(bb->start),
+		IR_END_LIVE_POS_FROM_REF(bb->end));
+#else
+	if (live_lists->len >= live_lists->a.size) {
+		ir_array_grow(&live_lists->a, live_lists->a.size + 1024);
+	}
+	/* Form a linked list of virtual register live at the end of the block */
+	ir_list_push_unchecked(live_lists, live_outs[b]); /* push old root of the list (previous element of the list) */
+	live_outs[b] = ir_list_len(live_lists);           /* remember the new root */
+	ir_list_push_unchecked(live_lists, v);            /* push a virtual register */
+#endif
+}
+
+/*
+ * Computes live-out sets for each basic-block per variable using def-use chains.
+ *
+ * The implementation is based on algorithms 6 and 7 desriebed in
+ * "Computing Liveness Sets for SSA-Form Programs", Florian Brandner, Benoit Boissinot.
+ * Alain Darte, Benoit Dupont de Dinechin, Fabrice Rastello. TR Inria RR-7503, 2011
+ */
+static void ir_compute_live_sets(ir_ctx *ctx, uint32_t *live_outs, ir_list *live_lists)
+{
+	ir_list block_queue;
+	ir_ref i;
+
+	ir_list_init(&block_queue, 256);
+
+	/* For each virtual register explore paths from all uses to definition */
+	for (i = ctx->insns_count - 1; i > 0; i--) {
+		uint32_t def_block = ctx->cfg_map[i];
+		ir_use_list *use_list = &ctx->use_lists[i];
+		ir_ref *p, n = use_list->count;
+
+		if (!def_block || ctx->ir_base[i].type == IR_VOID) continue;
+
+		/* Collect all blocks where 'i' is used into a 'block_queue' */
+		for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
+			ir_ref use = *p;
+			ir_insn *insn = &ctx->ir_base[use];
+			uint32_t use_block = ctx->cfg_map[use];
+
+			if (!use_block) continue;
+			if (UNEXPECTED(insn->op == IR_PHI)) {
+				ir_ref n = insn->inputs_count - 1;
+				ir_ref *p = insn->ops + 2; /* PHI data inputs */
+				ir_ref *q = ctx->ir_base[insn->op1].ops + 1; /* MERGE inputs */
+
+				for (;n > 0; p++, q++, n--) {
+					if (*p == i) {
+						uint32_t pred_block = ctx->cfg_map[*q];
+
+						if (ir_live_out_top(ctx, live_outs, live_lists, pred_block) != (uint32_t)i) {
+							ir_live_out_push(ctx, live_outs, live_lists, pred_block, i);
+							if (pred_block != def_block) {
+								ir_list_push(&block_queue, pred_block);
+							}
+						}
+					}
+				}
+			} else {
+				/* Check if the virtual register is alive at the start of 'use_block' */
+				if (def_block != use_block && ir_live_out_top(ctx, live_outs, live_lists, use_block) != (uint32_t)i) {
+					ir_list_push(&block_queue, use_block);
+				}
+			}
+
+			/* UP_AND_MARK: Traverse through predecessor blocks until we reach the block where 'i' is defined*/
+			while (ir_list_len(&block_queue)) {
+				uint32_t b = ir_list_pop(&block_queue);
+				ir_block *bb = &ctx->cfg_blocks[b];
+				uint32_t *p, n = bb->predecessors_count;
+
+#if 0
+				if (bb->flags & IR_BB_ENTRY) {
+					/* live_in_push(ENTRY, i) */
+					ir_insn *insn = &ctx->ir_base[bb->start];
+
+					IR_ASSERT(insn->op == IR_ENTRY);
+					IR_ASSERT(insn->op3 >= 0 && insn->op3 < (ir_ref)ctx->entries_count);
+					if (live_lists->len >= live_lists->a.size) {
+						ir_array_grow(&live_lists->a, live_lists->a.size + 1024);
+					}
+					ir_list_push_unchecked(live_lists, live_outs[ctx->cfg_blocks_count + 1 + insn->op3]);
+					ir_list_push_unchecked(live_lists, i);
+					live_outs[ctx->cfg_blocks_count + 1 + insn->op3] = ir_list_len(live_lists) - 1;
+					continue;
+				}
+#endif
+				for (p = &ctx->cfg_edges[bb->predecessors]; n > 0; p++, n--) {
+					uint32_t pred_block = *p;
+
+					/* Check if 'pred_block' wasn't traversed before */
+					if (ir_live_out_top(ctx, live_outs, live_lists, pred_block) != (uint32_t)i) {
+						/* Mark a virtual register 'i' alive at the end of 'pred_block' */
+						ir_live_out_push(ctx, live_outs, live_lists, pred_block, i);
+						if (pred_block != def_block) {
+							ir_list_push(&block_queue, pred_block);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	ir_list_free(&block_queue);
+}
+#else
 
 /* Simple Stable Topological Sort */
 static void ir_schedule_topsort(const ir_ctx *ctx, uint32_t b, const ir_block *bb,
@@ -1030,6 +1936,7 @@ restart:
 		i = _next[i];
 	}
 }
+#endif
 
 int ir_schedule(ir_ctx *ctx)
 {
@@ -1098,13 +2005,33 @@ int ir_schedule(ir_ctx *ctx)
 	insns_count = 1;
 	consts_count = -(IR_TRUE - 1);
 
+#if IR_SCHEDULE_GOODWAY
+	/* _counters[] - keeps different information for each involved in the scheduled BB Node
+	 *  - for already scheduled nodes - Number_of_Unscheduled_Uses
+	 *  - for ready nodes - Register_Pressure_Delta = Numner_of_Defined - Number_of_Killed
+	 *  - for wating nodes - Number_of_Unscheduled_Inputs
+	 */
+	int *_counters = ir_mem_malloc(ctx->insns_count * sizeof(ir_ref));
+	ir_bitset used_regs = ir_bitset_malloc(ctx->insns_count);
+	ir_bitset live_out = ir_bitset_malloc(ctx->insns_count);
+
+	uint32_t *live_outs;
+	ir_list live_lists;
+	live_outs = ir_mem_calloc(ctx->cfg_blocks_count + 1, sizeof(uint32_t));
+	ir_list_init(&live_lists, 1024);
+	ir_compute_live_sets(ctx, live_outs, &live_lists);
+#endif
+
 	/* Schedule instructions inside each BB (now just topological sort according to dependencies) */
 	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; b++, bb++) {
 		ir_ref start;
 
 #ifdef IR_DEBUG
 		if (ctx->flags & IR_DEBUG_SCHEDULE) {
-			fprintf(stderr, "BB%d\n", b);
+			fprintf(stderr, "===\n");
+			ir_schedule_print_block(ctx, b, _next, bb->start, bb->end);
+//			fprintf(stderr, "BB%d\n", b);
+			fprintf(stderr, "---\n");
 			ir_schedule_print_list(ctx, b, _next, bb->start, bb->end, "INITIAL");
 		}
 #endif
@@ -1113,6 +2040,9 @@ int ir_schedule(ir_ctx *ctx)
 		/* Schedule BB start */
 		start = i = bb->start;
 		_xlat[i] = bb->start = insns_count;
+#if IR_SCHEDULE_GOODWAY
+//		_counters[i] = 0; /* no data outputs */
+#endif
 		insn = &ctx->ir_base[i];
 		if (insn->op == IR_BEGIN) {
 			if (insn->op2) {
@@ -1137,6 +2067,9 @@ int ir_schedule(ir_ctx *ctx)
 			/* Schedule PARAM, VAR, PI */
 			while (insn->op == IR_PARAM || insn->op == IR_VAR || insn->op == IR_PI) {
 				_xlat[i] = insns_count;
+#if IR_SCHEDULE_GOODWAY
+//				_counters[i] = UNKNOWN_UNSCHEDULED_USES;
+#endif
 				insns_count += 1;
 				i = _next[i];
 				insn = &ctx->ir_base[i];
@@ -1147,6 +2080,9 @@ int ir_schedule(ir_ctx *ctx)
 				ir_ref j, *p, input;
 
 				_xlat[i] = insns_count;
+#if IR_SCHEDULE_GOODWAY
+//				_counters[i] = UNKNOWN_UNSCHEDULED_USES;
+#endif
 				/* Reuse "n" from MERGE and skip first input */
 				insns_count += ir_insn_inputs_to_len(n + 1);
 				for (j = n, p = insn->ops + 2; j > 0; p++, j--) {
@@ -1186,6 +2122,9 @@ int ir_schedule(ir_ctx *ctx)
 							}
 							phis = use;
 							_xlat[use] = insns_count;
+#if IR_SCHEDULE_GOODWAY
+//							_counters[use] = UNKNOWN_UNSCHEDULED_USES;
+#endif
 							if (use_insn->op == IR_PHI) {
 								ir_ref *q;
 								/* Reuse "n" from MERGE and skip first input */
@@ -1208,12 +2147,21 @@ int ir_schedule(ir_ctx *ctx)
 		}
 
 		if (i != bb->end) {
-			ir_schedule_topsort(ctx, b, bb, _xlat, _next, _prev, i, bb->end, &insns_count, &consts_count);
+#if IR_SCHEDULE_GOODWAY
+			ir_schedule_list(ctx, b, _xlat, _counters, live_outs, &live_lists,
+				_next, _prev, start, i, bb->end,
+				&insns_count, &consts_count, used_regs, live_out);
+#else
+			ir_schedule_topsort(ctx, b, _xlat, _next, _prev, i, bb->end, &insns_count, &consts_count);
+#endif
 		}
 
 #ifdef IR_DEBUG
 		if (ctx->flags & IR_DEBUG_SCHEDULE) {
-			ir_schedule_print_list(ctx, b, _next, start, bb->end, "  FINAL");
+			ir_schedule_print_list(ctx, b, _next, start, bb->end, "FINAL  ");
+			fprintf(stderr, "---\n");
+			ir_schedule_print_block(ctx, b, _next, start, bb->end);
+			fprintf(stderr, "===\n");
 		}
 #endif
 
@@ -1228,6 +2176,14 @@ int ir_schedule(ir_ctx *ctx)
 			}
 		}
 	}
+
+#if IR_SCHEDULE_GOODWAY
+	ir_list_free(&live_lists);
+	ir_mem_free(live_outs);
+	ir_mem_free(live_out);
+	ir_mem_free(used_regs);
+	ir_mem_free(_counters);
+#endif
 
 #if 1
 	/* Check if scheduling didn't make any modifications */
