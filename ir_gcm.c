@@ -2152,7 +2152,7 @@ int ir_schedule(ir_ctx *ctx)
 				_next, _prev, start, i, bb->end,
 				&insns_count, &consts_count, used_regs, live_out);
 #else
-			ir_schedule_topsort(ctx, b, _xlat, _next, _prev, i, bb->end, &insns_count, &consts_count);
+			ir_schedule_topsort(ctx, b, bb, _xlat, _next, _prev, i, bb->end, &insns_count, &consts_count);
 #endif
 		}
 
