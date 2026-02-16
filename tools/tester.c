@@ -5,6 +5,10 @@
  * Authors: Dmitry Stogov <dmitry@php.net>, Anatol Belski <anbelski@linux.microsoft.com>
  */
 
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <limits.h>
