@@ -12,7 +12,7 @@
 #ifndef _WIN32
 IR_ALWAYS_INLINE void ir_cpuid_ex(uint32_t info[4], uint32_t function, uint32_t index)
 {
-	asm volatile("cpuid"
+	__asm__ volatile("cpuid"
 		: "=a" (info[0]),
 		"=b" (info[1]),
 		"=c" (info[2]),
