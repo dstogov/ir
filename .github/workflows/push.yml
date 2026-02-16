@@ -30,6 +30,27 @@ jobs:
         run: make TARGET=x86_64 BUILD=debug all
       - name: test
         run: make TARGET=x86_64 BUILD=debug test-ci
+  Linux_x86_64_c11:
+    name: 'Linux x86_64 -std=c11'
+    runs-on: ubuntu-22.04
+    container:
+      image: ubuntu:22.04
+    env:
+      CFLAGS: '-fsanitize=address,undefined'
+    steps:
+      - uses: actions/checkout@v3
+      - name: apt
+        run: |
+          apt update -y
+          DEBIAN_FRONTEND=noninteractive apt install -y \
+            gcc \
+            libcapstone-dev \
+            libcapstone4 \
+            make
+      - name: make
+        run: make TARGET=x86_64 BUILD=debug CFLAGS=-std=c11 all
+      - name: test
+        run: make TARGET=x86_64 BUILD=debug CFLAGS=-std=c11 test-ci
   Linux_i386:
     name: 'Linux i386'
     runs-on: ubuntu-22.04
