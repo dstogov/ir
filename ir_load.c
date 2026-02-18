@@ -10,6 +10,10 @@
  * php llk.php ir.g
  */
 
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+
 #include "ir.h"
 #include "ir_private.h"
 #include "ir_builder.h"

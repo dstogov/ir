@@ -5,6 +5,10 @@
  * Authors: Dmitry Stogov <dmitry@php.net>
  */
 
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE
+#endif
+
 #include "ir.h"
 #include "ir_private.h" // TODO: move this together with loader
 #include <stdlib.h>
