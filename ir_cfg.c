@@ -1062,11 +1062,10 @@ next:
 		IR_ASSERT(bb->dom_depth <= prev_dom_depth);
 		if (UNEXPECTED(irreducible_depth) && bb->dom_depth != irreducible_depth) {
 			/* process delyed irreducible loops */
-			uint32_t i;
 
 			IR_ASSERT(ir_list_len(&irreducible_list) != 0);
-			for (i = 0; i < ir_list_len(&irreducible_list); i++) {
-				b = ir_list_at(&irreducible_list, i);
+			while (ir_list_len(&irreducible_list)) {
+				b = ir_list_pop(&irreducible_list);
 				bb = &blocks[b];
 				IR_ASSERT(bb->flags & IR_BB_IRREDUCIBLE_LOOP);
 				if (!bb->loop_depth) {
@@ -1129,7 +1128,6 @@ next:
 					}
 				}
 			}
-			ir_list_clear(&irreducible_list);
 			irreducible_depth = 0;
 			b = sorted_blocks[n];
 			bb = &blocks[b];
