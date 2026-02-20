@@ -997,6 +997,7 @@ static IR_NEVER_INLINE void ir_collect_irreducible_loops(ir_ctx *ctx, uint32_t *
 		ir_block *bb = &blocks[hdr];
 
 		IR_ASSERT(bb->flags & IR_BB_IRREDUCIBLE_LOOP);
+		IR_ASSERT(!bb->loop_depth);
 		if (!bb->loop_depth) {
 			/* process irreducible loop */
 
@@ -1010,6 +1011,7 @@ static IR_NEVER_INLINE void ir_collect_irreducible_loops(ir_ctx *ctx, uint32_t *
 			IR_ASSERT(bb->predecessors_count > 1);
 			IR_ASSERT(ir_worklist_len(work) == 0);
 			ir_bitset_clear(work->visited, ir_bitset_len(ir_worklist_capasity(work)));
+			ir_bitset_incl(work->visited, hdr);
 
 			uint32_t *p = &edges[bb->predecessors];
 			uint32_t n = bb->predecessors_count;
@@ -1026,32 +1028,31 @@ static IR_NEVER_INLINE void ir_collect_irreducible_loops(ir_ctx *ctx, uint32_t *
 			while (ir_worklist_len(work)) {
 				uint32_t b = ir_worklist_pop(work);
 
-				if (b != hdr) {
-					bb = &blocks[b];
-					bb->loop_header = hdr;
-					if (bb->predecessors_count) {
-						uint32_t *p = &edges[bb->predecessors];
-						uint32_t n = bb->predecessors_count;
+				bb = &blocks[b];
+				bb->loop_header = hdr;
 
-						do {
-							uint32_t pred = *p;
-							while (blocks[pred].loop_header > 0) {
+				uint32_t *p = &edges[bb->predecessors];
+				uint32_t n = bb->predecessors_count;
+
+				for (; n > 0; p++, n--) {
+					uint32_t pred = *p;
+					if (!ir_bitset_in(work->visited, pred)) {
+						if (blocks[pred].loop_header) {
+							if (blocks[pred].loop_header == b) continue;
+							do {
 								pred = blocks[pred].loop_header;
+							} while (blocks[pred].loop_header > 0);
+						}
+						if (ENTRY_TIME(pred) > ENTRY_TIME(hdr) && EXIT_TIME(pred) < EXIT_TIME(hdr)) {
+							/* "pred" is a descendant of "hdr" */
+								ir_worklist_push(work, pred);
+						} else if (bb->predecessors_count > 1) {
+							/* another entry to the irreducible loop */
+							bb->flags |= IR_BB_IRREDUCIBLE_LOOP;
+							if (ctx->ir_base[bb->start].op == IR_MERGE) {
+								ctx->ir_base[bb->start].op = IR_LOOP_BEGIN;
 							}
-							if (pred != hdr) {
-								if (ENTRY_TIME(pred) > ENTRY_TIME(hdr) && EXIT_TIME(pred) < EXIT_TIME(hdr)) {
-									/* "pred" is a descendant of "hdr" */
-									ir_worklist_push(work, pred);
-								} else if (bb->predecessors_count > 1) {
-									/* another entry to the irreducible loop */
-									bb->flags |= IR_BB_IRREDUCIBLE_LOOP;
-									if (ctx->ir_base[bb->start].op == IR_MERGE) {
-										ctx->ir_base[bb->start].op = IR_LOOP_BEGIN;
-									}
-								}
-							}
-							p++;
-						} while (--n);
+						}
 					}
 				}
 			}
@@ -1157,7 +1158,8 @@ next:
 						if (!ir_worklist_len(&work)) {
 							ir_bitset_clear(work.visited, ir_bitset_len(ir_worklist_capasity(&work)));
 						}
-						blocks[pred].loop_header = 0; /* support for merged loops */
+						IR_ASSERT(!blocks[pred].loop_header);
+						// blocks[pred].loop_header = 0; /* support for merged loops */
 						ir_worklist_push(&work, pred);
 					} else {
 						/* Otherwise it's a back-edge of irreducible loop. */
@@ -1189,24 +1191,31 @@ next:
 				if (ctx->ir_base[bb->start].op == IR_MERGE) {
 					ctx->ir_base[bb->start].op = IR_LOOP_BEGIN;
 				}
+				ir_bitset_incl(work.visited, hdr);
 				while (ir_worklist_len(&work)) {
 					b = ir_worklist_pop(&work);
 					if (b != hdr) {
 						ir_block *bb = &blocks[b];
+
+						IR_ASSERT(!bb->loop_header);
 						bb->loop_header = hdr;
-						if (bb->predecessors_count) {
-							uint32_t *p = &edges[bb->predecessors];
-							uint32_t n = bb->predecessors_count;
-							do {
-								uint32_t pred = *p;
-								while (blocks[pred].loop_header > 0) {
-									pred = blocks[pred].loop_header;
-								}
-								if (pred != hdr) {
+
+						uint32_t *p = &edges[bb->predecessors];
+						uint32_t n = bb->predecessors_count;
+						for (; n > 0; p++, n--) {
+							uint32_t pred = *p;
+							if (!ir_bitset_in(work.visited, pred)) {
+								if (blocks[pred].loop_header) {
+									if (blocks[pred].loop_header == b) continue;
+									do {
+										pred = blocks[pred].loop_header;
+									} while (blocks[pred].loop_header > 0);
 									ir_worklist_push(&work, pred);
+								} else {
+									ir_bitset_incl(work.visited, pred);
+									ir_list_push_unchecked(&work.l, pred);
 								}
-								p++;
-							} while (--n);
+							}
 						}
 					}
 				}
