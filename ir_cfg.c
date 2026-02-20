@@ -992,6 +992,22 @@ static IR_NEVER_INLINE void ir_collect_irreducible_loops(ir_ctx *ctx, uint32_t *
 	uint32_t *edges = ctx->cfg_edges;
 
 	IR_ASSERT(ir_list_len(list) != 0);
+	if (ir_list_len(list) > 1) {
+		/* Sort list to process irreducible loops in DFS order (insertion sort) */
+		ir_ref *a = list->a.refs;
+		uint32_t n = ir_list_len(list);
+		uint32_t i = 1;
+		while (i < n) {
+			uint32_t j = i;
+			while (j > 0 && ENTRY_TIME(a[j-1]) > ENTRY_TIME(a[j])) {
+				ir_ref tmp = a[j];
+				a[j] = a[j-1];
+				a[j-1] = tmp;
+				j--;
+			}
+			i++;
+		}
+	}
 	while (ir_list_len(list)) {
 		uint32_t hdr = ir_list_pop(list);
 		ir_block *bb = &blocks[hdr];
@@ -1018,7 +1034,8 @@ static IR_NEVER_INLINE void ir_collect_irreducible_loops(ir_ctx *ctx, uint32_t *
 			do {
 				uint32_t pred = *p;
 				if (ENTRY_TIME(pred) > ENTRY_TIME(hdr) && EXIT_TIME(pred) < EXIT_TIME(hdr)) {
-					blocks[pred].loop_header = 0; /* support for merged loops */
+					IR_ASSERT(blocks[pred].loop_header == 0);
+					// blocks[pred].loop_header = 0; /* support for merged loops */
 					ir_worklist_push(work, pred);
 				}
 				p++;
