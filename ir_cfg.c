@@ -1042,7 +1042,7 @@ static IR_NEVER_INLINE void ir_collect_irreducible_loops(ir_ctx *ctx, uint32_t *
 								if (ENTRY_TIME(pred) > ENTRY_TIME(hdr) && EXIT_TIME(pred) < EXIT_TIME(hdr)) {
 									/* "pred" is a descendant of "hdr" */
 									ir_worklist_push(work, pred);
-								} else {
+								} else if (bb->predecessors_count > 1) {
 									/* another entry to the irreducible loop */
 									bb->flags |= IR_BB_IRREDUCIBLE_LOOP;
 									if (ctx->ir_base[bb->start].op == IR_MERGE) {
