@@ -1061,7 +1061,7 @@ static IR_NEVER_INLINE void ir_collect_irreducible_loops(ir_ctx *ctx, uint32_t *
 
 int ir_find_loops(ir_ctx *ctx)
 {
-	uint32_t b, j, n, count;
+	uint32_t b, j, n;
 	uint32_t *times, *sorted_blocks, time = 1;
 	ir_block *blocks = ctx->cfg_blocks;
 	uint32_t *edges = ctx->cfg_edges;
@@ -1121,7 +1121,7 @@ next:
 			}
 		}
 	}
-	count = n;
+	IR_ASSERT(n == ctx->cfg_blocks_count + 1);
 
 #if IR_DEBUG
 	uint32_t prev_dom_depth = blocks[sorted_blocks[n - 1]].dom_depth;
@@ -1220,8 +1220,9 @@ next:
 	}
 
 	if (ctx->flags2 & IR_CFG_HAS_LOOPS) {
-		for (n = 1; n < count; n++) {
-			b = sorted_blocks[n];
+		n = ctx->cfg_blocks_count + 1;
+		for (j = 1; j < n; j++) {
+			b = sorted_blocks[j];
 			ir_block *bb = &blocks[b];
 			if (bb->loop_header > 0) {
 				ir_block *loop = &blocks[bb->loop_header];
