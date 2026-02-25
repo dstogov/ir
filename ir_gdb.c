@@ -240,7 +240,6 @@ static void ir_gdbjit_secthdr(ir_gdbjit_ctx *ctx)
 	sect->size = ctx->szmcode;
 
 	SECTDEF(eh_frame, PROGBITS, sizeof(uintptr_t));
-	sect->flags = ELFSECT_FLAGS_ALLOC;
 
 	SECTDEF(shstrtab, STRTAB, 1);
 	SECTDEF(strtab, STRTAB, 1);
