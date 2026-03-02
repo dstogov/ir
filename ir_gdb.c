@@ -532,13 +532,13 @@ static bool ir_gdb_register_code(const void *object, size_t size)
 
 	elf_header = (ir_elf_header*)entry->symfile_addr;
 	elf_section = (ir_elf_sectheader*)(entry->symfile_addr + elf_header->shofs);
-	elf_section_end = elf_section + elf_header->shnum;
+	elf_section_end = (ir_elf_sectheader*)((char*)elf_section + (elf_header->shentsize * elf_header->shnum));
 
 	while (elf_section < elf_section_end) {
 		if ((elf_section->flags & ELFSECT_FLAGS_ALLOC) && elf_section->addr == 0) {
 			elf_section->addr = (uintptr_t)(entry->symfile_addr + elf_section->ofs);
 		}
-		elf_section++;
+		elf_section = (ir_elf_sectheader*)((char*)elf_section + elf_header->shentsize);
 	}
 
 	entry->prev_entry = NULL;
