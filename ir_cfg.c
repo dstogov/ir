@@ -211,6 +211,7 @@ static uint32_t IR_NEVER_INLINE ir_cfg_remove_dead_inputs(ir_ctx *ctx, uint32_t 
 				if (life_inputs) {
 					ir_remove_phis_inputs(ctx, &ctx->use_lists[bb->start], insn->inputs_count, life_inputs);
 					ir_mem_free(life_inputs);
+					life_inputs = NULL;
 				}
 			}
 		}
