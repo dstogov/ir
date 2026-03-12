@@ -618,9 +618,10 @@ static int ir_remove_unreachable_blocks(ir_ctx *ctx)
  * Cooper, Harvey and Kennedy. */
 static IR_NEVER_INLINE int ir_build_dominators_tree_slow(ir_ctx *ctx)
 {
-	uint32_t blocks_count, b, postnum;
+	uint32_t blocks_count, b, postnum, i;
 	ir_block *blocks, *bb;
 	uint32_t *edges;
+	uint32_t *rpo = ir_mem_malloc((ctx->cfg_blocks_count + 1) * sizeof(uint32_t));
 	bool changed;
 
 	blocks = ctx->cfg_blocks;
@@ -631,39 +632,46 @@ static IR_NEVER_INLINE int ir_build_dominators_tree_slow(ir_ctx *ctx)
 
 	postnum = 1;
 	ir_worklist work;
-	ir_bitset visited = ir_bitset_malloc(ctx->cfg_blocks_count + 1);
 	ir_worklist_init(&work, ctx->cfg_blocks_count + 1);
 	ir_worklist_push(&work, 1);
+	IR_ASSERT(blocks[1].next_succ == 0);
 	while (ir_worklist_len(&work)) {
+next:
 		b = ir_worklist_peek(&work);
 		bb = &blocks[b];
-		if (!ir_bitset_in(visited, b)) {
-
-			ir_bitset_incl(visited, b);
-			uint32_t n = bb->successors_count;
-			if (n) {
-				uint32_t *p = edges + bb->successors + n;
-				for (; n > 0; n--) {
-					uint32_t succ = *(--p);
-					ir_worklist_push(&work, succ);
+		uint32_t n = bb->successors_count - bb->next_succ;
+		if (n) {
+			uint32_t *p = edges + bb->successors + bb->next_succ;
+			for (; n > 0; p++, n--) {
+				uint32_t succ = *p;
+				if (ir_worklist_push(&work, succ)) {
+					bb->next_succ = bb->successors_count - n + 1;
+					IR_ASSERT(blocks[succ].next_succ == 0);
+					goto next;
 				}
 			}
-		} else {
-			/* Start from bb->idom calculated by the fast dominators algorithm */
-			// bb->idom = 0;
-			bb->postnum = postnum++;
-			ir_worklist_pop(&work);
 		}
+
+		/* Start from bb->idom calculated by the fast dominators algorithm */
+		// bb->idom = 0;
+		bb->next_succ = 0;
+		rpo[postnum] = b;
+		bb->postnum = postnum++;
+		ir_worklist_pop(&work);
 	}
 	ir_worklist_free(&work);
-	ir_mem_free(visited);
+
+	IR_ASSERT(rpo[blocks_count] == 1);
 
 	/* Find immediate dominators by iterative fixed-point algorithm */
 	blocks[1].idom = 1;
 	do {
 		changed = 0;
+
 		/* Iterating in Reverse Post Order */
-		for (b = 2, bb = &blocks[2]; b <= blocks_count; b++, bb++) {
+		for (i = blocks_count - 1; i > 0; i--) {
+			b = rpo[i];
+			bb = &blocks[b];
 			IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 			IR_ASSERT(bb->predecessors_count > 0);
 			if (bb->predecessors_count == 1) {
@@ -715,6 +723,8 @@ static IR_NEVER_INLINE int ir_build_dominators_tree_slow(ir_ctx *ctx)
 			}
 		}
 	} while (changed);
+
+	ir_mem_free(rpo);
 
 	/* Build dominators tree */
 	blocks[1].idom = 0;
@@ -769,7 +779,7 @@ int ir_build_dominators_tree(ir_ctx *ctx)
 	blocks[1].idom = 1;
 	blocks[1].dom_depth = 0;
 
-	/* Iterating in Reverse Post Order */
+	/* Iterating in Reverse Post Order (relay on existing BB order and fall-back to slow algorithm) */
 	for (b = 2, bb = &blocks[2]; b <= blocks_count; b++, bb++) {
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		IR_ASSERT(bb->predecessors_count > 0);
@@ -1095,25 +1105,31 @@ int ir_find_loops(ir_ctx *ctx)
 	ir_bitset visited = ir_bitset_malloc(ctx->cfg_blocks_count + 1);
 	ir_worklist_push(&work, 1);
 	while (ir_worklist_len(&work)) {
+next:
 		b = ir_worklist_peek(&work);
-		if (!ir_bitset_in(visited, b)) {
-			ir_block *bb = &blocks[b];
+		ir_block *bb = &blocks[b];
 
+		if (!ir_bitset_in(visited, b)) {
 			ir_bitset_incl(visited, b);
 			ENTRY_TIME(b) = time++;
+		}
 
-			n = bb->successors_count;
-			if (n) {
-				uint32_t *p = edges + bb->successors + n;
-				for (; n > 0; n--) {
-					uint32_t succ = *(--p);
-					ir_worklist_push(&work, succ);
+		uint32_t n = bb->successors_count - bb->next_succ;
+		if (n) {
+			uint32_t *p = edges + bb->successors + bb->next_succ;
+			for (; n > 0; p++, n--) {
+				uint32_t succ = *p;
+				if (ir_worklist_push(&work, succ)) {
+					bb->next_succ = bb->successors_count - n + 1;
+					IR_ASSERT(blocks[succ].next_succ == 0);
+					goto next;
 				}
 			}
-		} else {
-			EXIT_TIME(b) = time++;
-			ir_worklist_pop(&work);
 		}
+
+		bb->next_succ = 0;
+		EXIT_TIME(b) = time++;
+		ir_worklist_pop(&work);
 	}
 	ir_mem_free(visited);
 
