@@ -1243,59 +1243,49 @@ static int ir_schedule_pressure_delta(const ir_ctx *ctx, uint32_t b,
 	return pressure;
 }
 
+static int ir_schedule_score(const ir_ctx *ctx, uint32_t b,
+                             const ir_ref *_xlat, int *_counters,
+                             const ir_bitset used_regs, ir_bitset live_out, int *_h, ir_ref ref)
+{
+	int delta, score = 0;
+
+	if (ctx->use_lists[ref].count == 1
+	 && ctx->cfg_map[ctx->use_edges[ctx->use_lists[ref].refs]] == b
+	 && (ctx->ir_base[ctx->use_edges[ctx->use_lists[ref].refs]].op == IR_IF
+	  || ctx->ir_base[ctx->use_edges[ctx->use_lists[ref].refs]].op == IR_GUARD
+	  || ctx->ir_base[ctx->use_edges[ctx->use_lists[ref].refs]].op == IR_GUARD_NOT)
+	 && ctx->ir_base[ctx->use_edges[ctx->use_lists[ref].refs]].op2 == ref) {
+		/* Schedule condition closer to IF */
+		return 0;
+	}
+	delta = ir_schedule_pressure_delta(ctx, b, _xlat, _counters, used_regs, ref);
+	if (delta == 0 && ir_bitset_in(live_out, ref)) {
+		delta = 1;
+	}
+	score |= IR_MIN(0x3f - delta, 0x7f) << 24;
+	score |= IR_MIN(_h[ref], 0xffffff);
+	return score;
+}
+
 static ir_ref ir_schedule_select(const ir_ctx *ctx, uint32_t b,
                                  const ir_ref *_xlat, int *_counters,
                                  const ir_ref *_next, ir_ref first, ir_ref last,
-                                 const ir_bitset used_regs)
+                                 const ir_bitset used_regs, ir_bitset live_out, int *_h)
 {
 	ir_ref ref = first;
-	ir_ref best = 0x7fffffff;;
-	int best_cost = 0x7fffffff;
-	int cost;
+	ir_ref best = IR_UNUSED;
+	int best_score = 0;
+	int score;
 
 	do {
 		if (ctx->ir_base[ref].op == IR_OVERFLOW) {
-			/* Schedule projections first. OVERFLOW should directly follow ADD/SUN/MUL_OV. */
+			/* Schedule projections first. OVERFLOW should directly follow (ADD/SUB/MUL)_OV. */
 			return ref;
 		}
-		// TODO: Support for more SCP/SCR heuristics
-		cost = ir_schedule_pressure_delta(ctx, b, _xlat, _counters, used_regs, ref);
-		if (best != 0x7fffffff
-		 && (ctx->ir_base[best].op >= IR_EQ && ctx->ir_base[best].op <= IR_UNORDERED)
-		 && ctx->use_lists[best].count == 1
-		 && (ctx->ir_base[ctx->use_edges[ctx->use_lists[best].refs]].op == IR_IF
-		  || ctx->ir_base[ctx->use_edges[ctx->use_lists[best].refs]].op == IR_COND
-		  || ctx->ir_base[ctx->use_edges[ctx->use_lists[best].refs]].op == IR_GUARD
-		  || ctx->ir_base[ctx->use_edges[ctx->use_lists[best].refs]].op == IR_GUARD_NOT)) {
-			/* Schedule comparisons closer to IF */
+		score = ir_schedule_score(ctx, b, _xlat, _counters, used_regs, live_out, _h, ref);
+		if (!best || score > best_score || (score == best_score && ref < best)) {
 			best = ref;
-			best_cost = cost;
-		} else if (best != 0x7fffffff
-		 && (ctx->ir_base[ref].op >= IR_EQ && ctx->ir_base[ref].op <= IR_UNORDERED)
-		 && ctx->use_lists[ref].count == 1
-		 && (ctx->ir_base[ctx->use_edges[ctx->use_lists[ref].refs]].op == IR_IF
-		  || ctx->ir_base[ctx->use_edges[ctx->use_lists[ref].refs]].op == IR_COND
-		  || ctx->ir_base[ctx->use_edges[ctx->use_lists[ref].refs]].op == IR_GUARD
-		  || ctx->ir_base[ctx->use_edges[ctx->use_lists[ref].refs]].op == IR_GUARD_NOT)) {
-			/* Schedule comparisons closer to IF */
-#if 0
-		} else if (best != 0x7fffffff
-		 && ctx->ir_base[best].op == IR_CALL
-		 && cost < 0) {
-			/* Schedule comparisons closer to IF */
-			best = ref;
-			best_cost = cost;
-		} else if (best != 0x7fffffff
-		 && ctx->ir_base[ref].op == IR_CALL
-		 && best_cost < 0) {
-			/* pass */
-#endif
-		} else if (cost < best_cost) {
-			best = ref;
-			best_cost = cost;
-		} else if (cost == best_cost) {
-			if (ref < best) best = ref;
-		} else {
+			best_score = score;
 		}
 		ref = _next[ref];
 	} while (ref != last);
@@ -1354,7 +1344,7 @@ static void ir_schedule_print_lists(const ir_ctx *ctx, uint32_t b,
                                     const ir_ref *_xlat, int *_counters,
                                     const ir_ref *_next,
                                     ir_ref start, ir_ref ready, ir_ref waiting, ir_ref end,
-                                    int regs, ir_bitset used_regs)
+                                    int regs, ir_bitset used_regs, int *_h)
 {
 	ir_ref ref;
 	bool first;
@@ -1389,7 +1379,7 @@ static void ir_schedule_print_lists(const ir_ctx *ctx, uint32_t b,
 			fprintf(stderr, ",");
 		}
 		int pressure = ir_schedule_pressure_delta(ctx, b, _xlat, _counters, used_regs, ref);
-		fprintf(stderr, "%d/%d", ref, pressure);
+		fprintf(stderr, "%d/%d|%d", ref, pressure, _h[ref]);
 		ref = _next[ref];
 	}
 	if (!first) {
@@ -1414,14 +1404,197 @@ static void ir_schedule_print_lists(const ir_ctx *ctx, uint32_t b,
 	}
 #endif
 }
+
+static void ir_dump_scheduling_graph(const ir_ctx *ctx, uint32_t b, const ir_ref *_xlat,
+                                     ir_ref *_next, ir_ref *_prev, ir_ref start, ir_ref end,
+                                     int *_h, ir_bitset used_regs, ir_bitset live_out,
+                                     FILE *f)
+{
+	ir_ref ref, prev, n, *p, input;
+	ir_insn *insn;
+	uint32_t flags, opnd_kind;
+	uint32_t len = ir_bitset_len(ctx->insns_count);
+
+	fprintf(f, "digraph BB%d {\n", b);
+	fprintf(f, "\tlabelloc=t;\n");
+	fprintf(f, "\tlabel=\"BB%d\";\n", b);
+	fprintf(f, "\trankdir=TB;\n");
+
+	fprintf(f, "\t{rank=min d_%d [label=\"d_%d = %s (%d)\",style=filled,fillcolor=red];\n",
+		start, start, ir_op_name[ctx->ir_base[start].op], _h[start]);
+
+	IR_BITSET_FOREACH(used_regs, len, ref) {
+		if (ctx->cfg_map[ref] != b) {
+			fprintf(f, "\td_%d [style=filled,fillcolor=yellow];\n", ref);
+		}
+	} IR_BITSET_FOREACH_END();
+
+	fprintf(f, "\t}\n");
+
+	prev = start;
+	for (ref = _next[start]; ref != end; prev = ref, ref = _next[ref]) {
+		insn = &ctx->ir_base[ref];
+
+		if (ir_op_flags[insn->op] & IR_OP_FLAG_CONTROL) {
+			fprintf(f, "\td_%d [label=\"d_%d = %s (%d)\",style=filled,fillcolor=pink];\n",
+				ref, ref, ir_op_name[insn->op], _h[ref]);
+		} else {
+			fprintf(f, "\td_%d [label=\"d_%d = %s (%d)\"];\n",
+				ref, ref, ir_op_name[insn->op], _h[ref]);
+		}
+
+		if (_xlat[ref] && _xlat[prev]) {
+			fprintf(f, "\td_%d->d_%d [color=green,style=bold,weight=10];\n", prev, ref);
+		}
+
+		if (insn->op == IR_PHI || (insn->op == IR_PI && insn->op1 == start)) {
+			fprintf(f, "\td_%d->d_%d [color=pink];\n", insn->op1, ref);
+			/* don't care about PHI data inputs */
+		} else {
+			flags = ir_op_flags[insn->op];
+			for (n = 1, p = insn->ops + 1; n <= insn->inputs_count; p++, n++) {
+				input = *p;
+				if (input > 0) {
+					opnd_kind = IR_OPND_KIND(flags, n);
+					switch (opnd_kind) {
+						case IR_OPND_DATA:
+							fprintf(f, "\td_%d->d_%d;\n", input, ref);
+							break;
+						case IR_OPND_CONTROL:
+							fprintf(f, "\td_%d->d_%d [color=red];\n", input, ref);
+							break;
+						case IR_OPND_CONTROL_DEP:
+							fprintf(f, "\td_%d->d_%d [color=pink];\n", input, ref);
+							break;
+						default:
+							IR_ASSERT(0);
+							break;
+					}
+				}
+			}
+		}
+
+	}
+
+	fprintf(f, "\t{rank=max d_%d [label=\"d_%d = %s (%d)\",style=filled,fillcolor=red];\n",
+		end, end, ir_op_name[ctx->ir_base[end].op], _h[end]);
+
+	IR_BITSET_FOREACH(live_out, len, ref) {
+		fprintf(f, "\t_d_%d [label=\"d_%d\",style=filled,fillcolor=yellow];\n", ref, ref);
+	} IR_BITSET_FOREACH_END();
+
+	fprintf(f, "\t}\n");
+
+	ref = end;
+	if (/*_xlat[ref] && ???*/_xlat[prev]) {
+		fprintf(f, "\td_%d->d_%d [color=green,style=bold,weight=10];\n", prev, ref);
+	}
+
+	insn = &ctx->ir_base[ref];
+	flags = ir_op_flags[insn->op];
+	for (n = 1, p = insn->ops + 1; n <= insn->inputs_count; p++, n++) {
+		input = *p;
+		if (input > 0) {
+			opnd_kind = IR_OPND_KIND(flags, n);
+			switch (opnd_kind) {
+				case IR_OPND_DATA:
+					fprintf(f, "\td_%d->d_%d;\n", input, ref);
+					break;
+				case IR_OPND_CONTROL:
+					fprintf(f, "\td_%d->d_%d [color=red];\n", input, ref);
+					break;
+				case IR_OPND_CONTROL_DEP:
+					fprintf(f, "\td_%d->d_%d [color=pink];\n", input, ref);
+					break;
+				default:
+					IR_ASSERT(0);
+					break;
+			}
+		}
+	}
+
+	IR_BITSET_FOREACH(live_out, len, ref) {
+		fprintf(f, "\td_%d->_d_%d;\n", ref, ref);
+	} IR_BITSET_FOREACH_END();
+
+	fprintf(f, "}\n");
+}
 #endif
+
+static void ir_calculate_heights(const ir_ctx *ctx, uint32_t b,
+								 ir_ref *_next, ir_ref *_prev, ir_ref start, ir_ref end,
+                                 int *_h)
+{
+	ir_ref ref, n, *p, use;
+	ir_use_list *use_list;
+	int h;
+	ir_worklist work;
+
+	memset(_h, 0, ctx->insns_count * sizeof(int));
+
+	ir_worklist_init(&work, ctx->insns_count);
+	ir_bitset_incl(work.visited, end);
+//	if (ctx->ir_base[end].inputs_count > 1 && ctx->ir_base[end].op2 > 0) {
+//		_h[end] = 1;
+//	} else {
+		_h[end] = 0;
+//	}
+	for (ref = start; ref != end; ref = _next[ref]) {
+		if (!ir_bitset_in(work.visited, ref)) {
+			ir_worklist_push(&work, ref);
+			while (ir_worklist_len(&work)) {
+next:
+				ref = ir_worklist_peek(&work);
+				use_list = &ctx->use_lists[ref];
+				n = use_list->count;
+				if (n) {
+					for (p = ctx->use_edges + use_list->refs + n; n > 0; n--) {
+						use = *(--p);
+						if (ctx->cfg_map[use] == b
+						 && (ctx->ir_base[use].op != IR_PHI || !ctx->ir_base[ref].type)
+						 && ir_worklist_push(&work, use)) {
+							// TODO:
+							goto next;
+						}
+					}
+				}
+
+				ir_worklist_pop(&work);
+				use_list = &ctx->use_lists[ref];
+				n = use_list->count;
+				h = 0;
+				if (n) {
+					for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
+						use = *p;
+						if (ctx->cfg_map[use] == b
+						 && (ctx->ir_base[use].op != IR_PHI || !ctx->ir_base[ref].type)) {
+							IR_ASSERT(_h[use] > 0 || use == end);
+							h = IR_MAX(h, _h[use]);
+						}
+					}
+				}
+				if (ir_op_flags[ctx->ir_base[ref].op] & IR_OP_FLAG_CONTROL) {
+					if (ctx->ir_base[ref].op == IR_CALL) {
+						_h[ref] = h + 10;
+					} else {
+						_h[ref] = h + 2;
+					}
+				} else {
+					_h[ref] = h + 1;
+				}
+			}
+		}
+	}
+	ir_worklist_free(&work);
+}
 
 static void ir_schedule_list(const ir_ctx *ctx, uint32_t b,
                              ir_ref *_xlat, int *_counters,
                              const uint32_t *live_outs, const ir_list *live_lists,
                              ir_ref *_next, ir_ref *_prev, ir_ref start, ir_ref ref, ir_ref end,
                              ir_ref *insns_count, ir_ref *consts_count,
-                             ir_bitset used_regs, ir_bitset live_out)
+                             ir_bitset used_regs, ir_bitset live_out,
+                             int *_h)
 {
 	const ir_insn *insn;
 	ir_ref ready = ref;
@@ -1429,6 +1602,8 @@ static void ir_schedule_list(const ir_ctx *ctx, uint32_t b,
 	ir_ref n;
 	const ir_ref *p;
 	int regs = 0;
+
+	ir_calculate_heights(ctx, b, _next, _prev, start, end, _h);
 
 	ir_bitset_clear(live_out, ir_bitset_len(ctx->insns_count));
 	ir_bitset_clear(used_regs, ir_bitset_len(ctx->insns_count));
@@ -1544,12 +1719,15 @@ static void ir_schedule_list(const ir_ctx *ctx, uint32_t b,
 	if (ctx->flags & IR_DEBUG_SCHEDULE) {
 		ir_schedule_print_live_sets(ctx, b, _xlat, _counters, used_regs, live_out);
 	}
+	if (0) {
+		ir_dump_scheduling_graph(ctx, b, _xlat, _next, _prev, start, end, _h, used_regs, live_out, stderr);
+	}
 #endif
 
 	while (1) {
 #if IR_DEBUG
 		if (ctx->flags & IR_DEBUG_SCHEDULE) {
-			ir_schedule_print_lists(ctx, b, _xlat, _counters, _next, start, ready, waiting, end, regs, used_regs);
+			ir_schedule_print_lists(ctx, b, _xlat, _counters, _next, start, ready, waiting, end, regs, used_regs, _h);
 		}
 #endif
 		IR_ASSERT(ready != waiting);
@@ -1559,7 +1737,7 @@ static void ir_schedule_list(const ir_ctx *ctx, uint32_t b,
 			ready = waiting;
 		} else {
 			/* Select the best instruction from the "ready" list */
-			ref = ir_schedule_select(ctx, b, _xlat, _counters, _next, ready, waiting, used_regs);
+			ref = ir_schedule_select(ctx, b, _xlat, _counters, _next, ready, waiting, used_regs, live_out, _h);
 
 			/* Move it into the start of the "ready" list */
 			if (ref == ready) {
@@ -1715,7 +1893,10 @@ static void ir_schedule_list(const ir_ctx *ctx, uint32_t b,
 
 #if IR_DEBUG
 	if (ctx->flags & IR_DEBUG_SCHEDULE) {
-		ir_schedule_print_lists(ctx, b, _xlat, _counters, _next, start, ready, waiting, end, regs, used_regs);
+		ir_schedule_print_lists(ctx, b, _xlat, _counters, _next, start, ready, waiting, end, regs, used_regs, _h);
+	}
+	if (0) {
+		ir_dump_scheduling_graph(ctx, b, _xlat, _next, _prev, start, end, _h, used_regs, live_out, stderr);
 	}
 #endif
 }
@@ -2014,6 +2195,7 @@ int ir_schedule(ir_ctx *ctx)
 	int *_counters = ir_mem_malloc(ctx->insns_count * sizeof(ir_ref));
 	ir_bitset used_regs = ir_bitset_malloc(ctx->insns_count);
 	ir_bitset live_out = ir_bitset_malloc(ctx->insns_count);
+	int *_h = ir_mem_malloc(ctx->insns_count * sizeof(ir_ref));
 
 	uint32_t *live_outs;
 	ir_list live_lists;
@@ -2150,7 +2332,7 @@ int ir_schedule(ir_ctx *ctx)
 #if IR_SCHEDULE_GOODWAY
 			ir_schedule_list(ctx, b, _xlat, _counters, live_outs, &live_lists,
 				_next, _prev, start, i, bb->end,
-				&insns_count, &consts_count, used_regs, live_out);
+				&insns_count, &consts_count, used_regs, live_out, _h);
 #else
 			ir_schedule_topsort(ctx, b, bb, _xlat, _next, _prev, i, bb->end, &insns_count, &consts_count);
 #endif
@@ -2178,6 +2360,7 @@ int ir_schedule(ir_ctx *ctx)
 	}
 
 #if IR_SCHEDULE_GOODWAY
+	ir_mem_free(_h);
 	ir_list_free(&live_lists);
 	ir_mem_free(live_outs);
 	ir_mem_free(live_out);
