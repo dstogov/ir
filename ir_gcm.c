@@ -1175,7 +1175,7 @@ static bool last_use_is_control(const ir_ctx *ctx, uint32_t b,
 
 static int ir_schedule_update_pressure_delta(const ir_ctx *ctx, uint32_t b,
                                              const ir_ref *_xlat, int *_counters,
-                                             const ir_bitset used_regs, ir_ref ref)
+                                             const uint32_t *used_regs, ir_ref ref)
 {
 	int pressure = 0;
 	const ir_insn *insn = &ctx->ir_base[ref];
@@ -1200,7 +1200,7 @@ static int ir_schedule_update_pressure_delta(const ir_ctx *ctx, uint32_t b,
 	for (; n > 0; p++, n--) {
 		ir_ref input = *p;
 		if (input > 0) {
-			IR_ASSERT(ir_bitset_in(used_regs, input));
+			IR_ASSERT(used_regs[input] == b);
 			int use_count = _counters[input];
 
 			if (use_count == UNKNOWN_UNSCHEDULED_USES) {
@@ -1232,7 +1232,7 @@ static int ir_schedule_update_pressure_delta(const ir_ctx *ctx, uint32_t b,
 
 static int ir_schedule_pressure_delta(const ir_ctx *ctx, uint32_t b,
                                       const ir_ref *_xlat, int *_counters,
-                                      const ir_bitset used_regs, ir_ref ref)
+                                      const uint32_t *used_regs, ir_ref ref)
 {
 	int pressure = _counters[ref];
 
@@ -1243,11 +1243,13 @@ static int ir_schedule_pressure_delta(const ir_ctx *ctx, uint32_t b,
 	return pressure;
 }
 
-static int ir_schedule_score(const ir_ctx *ctx, uint32_t b,
-                             const ir_ref *_xlat, int *_counters,
-                             const ir_bitset used_regs, ir_bitset live_out, int *_h, ir_ref ref)
+static uint32_t ir_schedule_score(const ir_ctx *ctx, uint32_t b,
+                                  const ir_ref *_xlat, int *_counters,
+                                  const uint32_t *used_regs, const uint32_t *live_out, const uint32_t *_h,
+                                  ir_ref ref)
 {
-	int delta, score = 0;
+	int delta;
+	uint32_t score = 0;
 
 	if (ctx->use_lists[ref].count == 1
 	 && ctx->cfg_map[ctx->use_edges[ctx->use_lists[ref].refs]] == b
@@ -1259,7 +1261,7 @@ static int ir_schedule_score(const ir_ctx *ctx, uint32_t b,
 		return 0;
 	}
 	delta = ir_schedule_pressure_delta(ctx, b, _xlat, _counters, used_regs, ref);
-	if (delta == 0 && ir_bitset_in(live_out, ref)) {
+	if (delta == 0 && live_out[ref] == b) {
 		delta = 1;
 	}
 	score |= IR_MIN(0x3f - delta, 0x7f) << 24;
@@ -1270,12 +1272,11 @@ static int ir_schedule_score(const ir_ctx *ctx, uint32_t b,
 static ir_ref ir_schedule_select(const ir_ctx *ctx, uint32_t b,
                                  const ir_ref *_xlat, int *_counters,
                                  const ir_ref *_next, ir_ref first, ir_ref last,
-                                 const ir_bitset used_regs, ir_bitset live_out, int *_h)
+                                 const uint32_t *used_regs, const uint32_t *live_out, const uint32_t *_h)
 {
 	ir_ref ref = first;
 	ir_ref best = IR_UNUSED;
-	int best_score = 0;
-	int score;
+	uint32_t score, best_score = 0;
 
 	do {
 		if (ctx->ir_base[ref].op == IR_OVERFLOW) {
@@ -1296,13 +1297,13 @@ static ir_ref ir_schedule_select(const ir_ctx *ctx, uint32_t b,
 #if IR_DEBUG
 static void ir_schedule_print_live_sets(const ir_ctx *ctx, uint32_t b,
                                         const ir_ref *_xlat, int *_counters,
-                                        ir_bitset used_regs, ir_bitset live_out)
+                                        const uint32_t *used_regs, const uint32_t *live_out)
 {
 	ir_ref ref;
 	int n = 0;
 
-	IR_BITSET_FOREACH(used_regs, ir_bitset_len(ctx->insns_count), ref) {
-		if (ctx->cfg_map[ref] != b) {
+	for (ref = 1; ref < ctx->insns_count; ref++) {
+		if (used_regs[ref] == b && ctx->cfg_map[ref] != b) {
 			if (n == 0) {
 				fprintf(stderr, "  LIVEIN  [");
 			} else {
@@ -1320,21 +1321,23 @@ static void ir_schedule_print_live_sets(const ir_ctx *ctx, uint32_t b,
 				fprintf(stderr, "/%d", use_count);
 			}
 		}
-	} IR_BITSET_FOREACH_END();
+	}
 	if (n != 0) {
 		fprintf(stderr, "] (REGS=%d)\n", n);
 	}
 
 	n = 0;
-	IR_BITSET_FOREACH(live_out, ir_bitset_len(ctx->insns_count), ref) {
-		if (n == 0) {
-			fprintf(stderr, "  LIVEOUT [");
-		} else {
-			fprintf(stderr, ",");
+	for (ref = 1; ref < ctx->insns_count; ref++) {
+		if (live_out[ref] == b) {
+			if (n == 0) {
+				fprintf(stderr, "  LIVEOUT [");
+			} else {
+				fprintf(stderr, ",");
+			}
+			n++;
+			fprintf(stderr, "%d", ref);
 		}
-		n++;
-		fprintf(stderr, "%d", ref);
-	} IR_BITSET_FOREACH_END();
+	}
 	if (n != 0) {
 		fprintf(stderr, "] (REGS=%d)\n", n);
 	}
@@ -1344,7 +1347,7 @@ static void ir_schedule_print_lists(const ir_ctx *ctx, uint32_t b,
                                     const ir_ref *_xlat, int *_counters,
                                     const ir_ref *_next,
                                     ir_ref start, ir_ref ready, ir_ref waiting, ir_ref end,
-                                    int regs, ir_bitset used_regs, int *_h)
+                                    int regs, const uint32_t *used_regs, const uint32_t *_h)
 {
 	ir_ref ref;
 	bool first;
@@ -1379,7 +1382,7 @@ static void ir_schedule_print_lists(const ir_ctx *ctx, uint32_t b,
 			fprintf(stderr, ",");
 		}
 		int pressure = ir_schedule_pressure_delta(ctx, b, _xlat, _counters, used_regs, ref);
-		fprintf(stderr, "%d/%d|%d", ref, pressure, _h[ref]);
+		fprintf(stderr, "%d/%d|%u", ref, pressure, _h[ref]);
 		ref = _next[ref];
 	}
 	if (!first) {
@@ -1407,27 +1410,26 @@ static void ir_schedule_print_lists(const ir_ctx *ctx, uint32_t b,
 
 static void ir_dump_scheduling_graph(const ir_ctx *ctx, uint32_t b, const ir_ref *_xlat,
                                      ir_ref *_next, ir_ref *_prev, ir_ref start, ir_ref end,
-                                     int *_h, ir_bitset used_regs, ir_bitset live_out,
+                                     const uint32_t *_h, const uint32_t *used_regs, const uint32_t *live_out,
                                      FILE *f)
 {
 	ir_ref ref, prev, n, *p, input;
 	ir_insn *insn;
 	uint32_t flags, opnd_kind;
-	uint32_t len = ir_bitset_len(ctx->insns_count);
 
 	fprintf(f, "digraph BB%d {\n", b);
 	fprintf(f, "\tlabelloc=t;\n");
 	fprintf(f, "\tlabel=\"BB%d\";\n", b);
 	fprintf(f, "\trankdir=TB;\n");
 
-	fprintf(f, "\t{rank=min d_%d [label=\"d_%d = %s (%d)\",style=filled,fillcolor=red];\n",
+	fprintf(f, "\t{rank=min d_%d [label=\"d_%d = %s (%u)\",style=filled,fillcolor=red];\n",
 		start, start, ir_op_name[ctx->ir_base[start].op], _h[start]);
 
-	IR_BITSET_FOREACH(used_regs, len, ref) {
-		if (ctx->cfg_map[ref] != b) {
+	for (ref = 1; ref < ctx->insns_count; ref++) {
+		if (used_regs[ref] == b && ctx->cfg_map[ref] != b) {
 			fprintf(f, "\td_%d [style=filled,fillcolor=yellow];\n", ref);
 		}
-	} IR_BITSET_FOREACH_END();
+	}
 
 	fprintf(f, "\t}\n");
 
@@ -1436,10 +1438,10 @@ static void ir_dump_scheduling_graph(const ir_ctx *ctx, uint32_t b, const ir_ref
 		insn = &ctx->ir_base[ref];
 
 		if (ir_op_flags[insn->op] & IR_OP_FLAG_CONTROL) {
-			fprintf(f, "\td_%d [label=\"d_%d = %s (%d)\",style=filled,fillcolor=pink];\n",
+			fprintf(f, "\td_%d [label=\"d_%d = %s (%u)\",style=filled,fillcolor=pink];\n",
 				ref, ref, ir_op_name[insn->op], _h[ref]);
 		} else {
-			fprintf(f, "\td_%d [label=\"d_%d = %s (%d)\"];\n",
+			fprintf(f, "\td_%d [label=\"d_%d = %s (%u)\"];\n",
 				ref, ref, ir_op_name[insn->op], _h[ref]);
 		}
 
@@ -1476,12 +1478,14 @@ static void ir_dump_scheduling_graph(const ir_ctx *ctx, uint32_t b, const ir_ref
 
 	}
 
-	fprintf(f, "\t{rank=max d_%d [label=\"d_%d = %s (%d)\",style=filled,fillcolor=red];\n",
+	fprintf(f, "\t{rank=max d_%d [label=\"d_%d = %s (%u)\",style=filled,fillcolor=red];\n",
 		end, end, ir_op_name[ctx->ir_base[end].op], _h[end]);
 
-	IR_BITSET_FOREACH(live_out, len, ref) {
-		fprintf(f, "\t_d_%d [label=\"d_%d\",style=filled,fillcolor=yellow];\n", ref, ref);
-	} IR_BITSET_FOREACH_END();
+	for (ref = 1; ref < ctx->insns_count; ref++) {
+		if (live_out[ref] == b) {
+			fprintf(f, "\t_d_%d [label=\"d_%d\",style=filled,fillcolor=yellow];\n", ref, ref);
+		}
+	}
 
 	fprintf(f, "\t}\n");
 
@@ -1513,9 +1517,11 @@ static void ir_dump_scheduling_graph(const ir_ctx *ctx, uint32_t b, const ir_ref
 		}
 	}
 
-	IR_BITSET_FOREACH(live_out, len, ref) {
-		fprintf(f, "\td_%d->_d_%d;\n", ref, ref);
-	} IR_BITSET_FOREACH_END();
+	for (ref = 1; ref < ctx->insns_count; ref++) {
+		if (live_out[ref] == b) {
+			fprintf(f, "\td_%d->_d_%d;\n", ref, ref);
+		}
+	}
 
 	fprintf(f, "}\n");
 }
@@ -1523,28 +1529,24 @@ static void ir_dump_scheduling_graph(const ir_ctx *ctx, uint32_t b, const ir_ref
 
 static void ir_calculate_heights(const ir_ctx *ctx, uint32_t b,
 								 ir_ref *_next, ir_ref *_prev, ir_ref start, ir_ref end,
-                                 int *_h)
+                                 ir_worklist *work, uint32_t *_h)
 {
 	ir_ref ref, n, *p, use;
 	ir_use_list *use_list;
-	int h;
-	ir_worklist work;
+	uint32_t h;
 
-	memset(_h, 0, ctx->insns_count * sizeof(int));
-
-	ir_worklist_init(&work, ctx->insns_count);
-	ir_bitset_incl(work.visited, end);
+	ir_bitset_incl(work->visited, end);
 //	if (ctx->ir_base[end].inputs_count > 1 && ctx->ir_base[end].op2 > 0) {
 //		_h[end] = 1;
 //	} else {
 		_h[end] = 0;
 //	}
 	for (ref = start; ref != end; ref = _next[ref]) {
-		if (!ir_bitset_in(work.visited, ref)) {
-			ir_worklist_push(&work, ref);
-			while (ir_worklist_len(&work)) {
+		if (!ir_bitset_in(work->visited, ref)) {
+			ir_worklist_push(work, ref);
+			while (ir_worklist_len(work)) {
 next:
-				ref = ir_worklist_peek(&work);
+				ref = ir_worklist_peek(work);
 				use_list = &ctx->use_lists[ref];
 				n = use_list->count;
 				if (n) {
@@ -1552,14 +1554,14 @@ next:
 						use = *(--p);
 						if (ctx->cfg_map[use] == b
 						 && (ctx->ir_base[use].op != IR_PHI || !ctx->ir_base[ref].type)
-						 && ir_worklist_push(&work, use)) {
+						 && ir_worklist_push(work, use)) {
 							// TODO:
 							goto next;
 						}
 					}
 				}
 
-				ir_worklist_pop(&work);
+				ir_worklist_pop(work);
 				use_list = &ctx->use_lists[ref];
 				n = use_list->count;
 				h = 0;
@@ -1585,7 +1587,6 @@ next:
 			}
 		}
 	}
-	ir_worklist_free(&work);
 }
 
 static void ir_schedule_list(const ir_ctx *ctx, uint32_t b,
@@ -1593,8 +1594,7 @@ static void ir_schedule_list(const ir_ctx *ctx, uint32_t b,
                              const uint32_t *live_outs, const ir_list *live_lists,
                              ir_ref *_next, ir_ref *_prev, ir_ref start, ir_ref ref, ir_ref end,
                              ir_ref *insns_count, ir_ref *consts_count,
-                             ir_bitset used_regs, ir_bitset live_out,
-                             int *_h)
+                             uint32_t *used_regs, uint32_t *live_out, uint32_t *_h)
 {
 	const ir_insn *insn;
 	ir_ref ready = ref;
@@ -1602,22 +1602,17 @@ static void ir_schedule_list(const ir_ctx *ctx, uint32_t b,
 	ir_ref n;
 	const ir_ref *p;
 	int regs = 0;
-
-	ir_calculate_heights(ctx, b, _next, _prev, start, end, _h);
-
-	ir_bitset_clear(live_out, ir_bitset_len(ctx->insns_count));
-	ir_bitset_clear(used_regs, ir_bitset_len(ctx->insns_count));
 	ir_ref i;
 
 	/* Collect nodes live at the end of the block */
 	n = live_outs[b];
 	while (n != 0) {
 		i = ir_list_at(live_lists, n);
-		ir_bitset_incl(live_out, i);
+		live_out[i] = b;
 		if (ctx->cfg_map[i] != b) {
 			/* The node also live at start of the block */
-			if (!ir_bitset_in(used_regs, i)) {
-				ir_bitset_incl(used_regs, i);
+			if (used_regs[i] != b) {
+				used_regs[i] = b;
 				_counters[i] = LIVE_OUT_UNSCHEDULED_USES;
 				regs++;
 			}
@@ -1629,9 +1624,9 @@ static void ir_schedule_list(const ir_ctx *ctx, uint32_t b,
 		insn = &ctx->ir_base[i];
 		if (insn->type
 		 && ctx->use_lists[i].count > ((ir_op_flags[insn->op] & IR_OP_FLAG_CONTROL) ? 1 : 0)) {
-			IR_ASSERT(!ir_bitset_in(used_regs, i));
-			ir_bitset_incl(used_regs, i);
-			if (ir_bitset_in(live_out, i)) {
+			IR_ASSERT(used_regs[i] != b);
+			used_regs[i] = b;
+			if (live_out[i] == b) {
 				_counters[i] = LIVE_OUT_UNSCHEDULED_USES;
 			} else {
 				_counters[i] = UNKNOWN_UNSCHEDULED_USES;
@@ -1666,14 +1661,14 @@ static void ir_schedule_list(const ir_ctx *ctx, uint32_t b,
 						/* input is not scheduled yet */
 						unscheduled_predecessors_count++;
 					} else {
-						IR_ASSERT(ir_bitset_in(used_regs, input));
+						IR_ASSERT(used_regs[input] == b);
 					}
 				} else {
 					/* input from the predecessor(s) block */
 					IR_ASSERT(ctx->ir_base[input].type);
-					if (!ir_bitset_in(used_regs, input)) {
-						ir_bitset_incl(used_regs, input);
-						if (ir_bitset_in(live_out, input)) {
+					if (used_regs[input] != b) {
+						used_regs[input] = b;
+						if (live_out[input] == b) {
 							_counters[input] = LIVE_OUT_UNSCHEDULED_USES;
 						} else {
 							_counters[input] = UNKNOWN_UNSCHEDULED_USES;
@@ -1778,7 +1773,7 @@ static void ir_schedule_list(const ir_ctx *ctx, uint32_t b,
 		for (; n > 0; p++, n--) {
 			ir_ref input = *p;
 			if (input > 0) {
-				IR_ASSERT(ir_bitset_in(used_regs, input));
+				IR_ASSERT(used_regs[input] == b);
 				int use_count = _counters[input];
 				if (use_count == UNKNOWN_UNSCHEDULED_USES) {
 					ir_schedule_update_unscheduled_uses(ctx, b, _xlat, _counters, input);
@@ -1793,8 +1788,8 @@ static void ir_schedule_list(const ir_ctx *ctx, uint32_t b,
 					  && (ir_op_flags[ctx->ir_base[input].op] & IR_OP_FLAG_CONTROL)
 					  && last_use_is_control(ctx, b, _xlat, _counters, input, ref))) {
 						/* Register is not used anymore. "Free" it. */
-						IR_ASSERT(ir_bitset_in(used_regs, input));
-						ir_bitset_excl(used_regs, input);
+						IR_ASSERT(used_regs[input] == b);
+						used_regs[input] = 0;
 						regs--;
 //					} else if (input is READY and input
 //						// TODO: Invalidate pressure for "ready" instructions that use the the same "input"
@@ -1813,9 +1808,9 @@ static void ir_schedule_list(const ir_ctx *ctx, uint32_t b,
 		/* "Allocate" output register */
 		if (insn->type
 		 && ctx->use_lists[ref].count > ((ir_op_flags[insn->op] & IR_OP_FLAG_CONTROL) ? 1 : 0)) {
-			IR_ASSERT(!ir_bitset_in(used_regs, ref));
-			ir_bitset_incl(used_regs, ref);
-			if (ir_bitset_in(live_out, ref)) {
+			IR_ASSERT(used_regs[ref] != b);
+			used_regs[ref] = b;
+			if (live_out[ref] == b) {
 				_counters[ref] = LIVE_OUT_UNSCHEDULED_USES;
 			} else {
 				_counters[ref] = UNKNOWN_UNSCHEDULED_USES;
@@ -2193,15 +2188,17 @@ int ir_schedule(ir_ctx *ctx)
 	 *  - for wating nodes - Number_of_Unscheduled_Inputs
 	 */
 	int *_counters = ir_mem_malloc(ctx->insns_count * sizeof(ir_ref));
-	ir_bitset used_regs = ir_bitset_malloc(ctx->insns_count);
-	ir_bitset live_out = ir_bitset_malloc(ctx->insns_count);
-	int *_h = ir_mem_malloc(ctx->insns_count * sizeof(ir_ref));
+	uint32_t *_h = ir_mem_calloc(ctx->insns_count * 3, sizeof(uint32_t));
+	uint32_t *used_regs = _h + ctx->insns_count;
+	uint32_t *live_out = used_regs + ctx->insns_count;
+	ir_worklist work;
 
 	uint32_t *live_outs;
 	ir_list live_lists;
 	live_outs = ir_mem_calloc(ctx->cfg_blocks_count + 1, sizeof(uint32_t));
 	ir_list_init(&live_lists, 1024);
 	ir_compute_live_sets(ctx, live_outs, &live_lists);
+	ir_worklist_init(&work, ctx->insns_count);
 #endif
 
 	/* Schedule instructions inside each BB (now just topological sort according to dependencies) */
@@ -2330,6 +2327,7 @@ int ir_schedule(ir_ctx *ctx)
 
 		if (i != bb->end) {
 #if IR_SCHEDULE_GOODWAY
+			ir_calculate_heights(ctx, b, _next, _prev, start, bb->end, &work, _h);
 			ir_schedule_list(ctx, b, _xlat, _counters, live_outs, &live_lists,
 				_next, _prev, start, i, bb->end,
 				&insns_count, &consts_count, used_regs, live_out, _h);
@@ -2360,11 +2358,10 @@ int ir_schedule(ir_ctx *ctx)
 	}
 
 #if IR_SCHEDULE_GOODWAY
+	ir_worklist_free(&work);
 	ir_mem_free(_h);
 	ir_list_free(&live_lists);
 	ir_mem_free(live_outs);
-	ir_mem_free(live_out);
-	ir_mem_free(used_regs);
 	ir_mem_free(_counters);
 #endif
 
