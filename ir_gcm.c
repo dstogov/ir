@@ -1545,36 +1545,26 @@ static void ir_calculate_heights(const ir_ctx *ctx, uint32_t b,
 		if (!ir_bitset_in(work->visited, ref)) {
 			ir_worklist_push(work, ref);
 			while (ir_worklist_len(work)) {
-next:
 				ref = ir_worklist_peek(work);
-				use_list = &ctx->use_lists[ref];
-				n = use_list->count;
-				if (n) {
-					for (p = ctx->use_edges + use_list->refs + n; n > 0; n--) {
-						use = *(--p);
-						if (ctx->cfg_map[use] == b
-						 && (ctx->ir_base[use].op != IR_PHI || !ctx->ir_base[ref].type)
-						 && ir_worklist_push(work, use)) {
-							// TODO:
-							goto next;
-						}
-					}
-				}
-
-				ir_worklist_pop(work);
+next:
 				use_list = &ctx->use_lists[ref];
 				n = use_list->count;
 				h = 0;
 				if (n) {
 					for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
 						use = *p;
-						if (ctx->cfg_map[use] == b
-						 && (ctx->ir_base[use].op != IR_PHI || !ctx->ir_base[ref].type)) {
+						if (ctx->cfg_map[use] == b && (ctx->ir_base[use].op != IR_PHI || !ctx->ir_base[ref].type)) {
+							if (ir_worklist_push(work, use)) {
+								ref = use;
+								goto next;
+							}
 							IR_ASSERT(_h[use] > 0 || use == end);
 							h = IR_MAX(h, _h[use]);
 						}
 					}
 				}
+
+				ir_worklist_pop(work);
 				if (ir_op_flags[ctx->ir_base[ref].op] & IR_OP_FLAG_CONTROL) {
 					if (ctx->ir_base[ref].op == IR_CALL) {
 						_h[ref] = h + 10;
