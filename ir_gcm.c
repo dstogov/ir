@@ -1750,7 +1750,7 @@ static void ir_schedule_list(const ir_ctx *ctx, uint32_t b,
 			ir_ref input = *p;
 			int use_count = _counters[input];
 			if (use_count == UNKNOWN_UNSCHEDULED_USES) {
-				ir_schedule_update_unscheduled_uses(ctx, b, _xlat, _counters, input);
+				use_count = ir_schedule_update_unscheduled_uses(ctx, b, _xlat, _counters, input);
 			}
 			if (use_count != LIVE_OUT_UNSCHEDULED_USES) {
 				IR_ASSERT(use_count > 0);
@@ -1766,7 +1766,7 @@ static void ir_schedule_list(const ir_ctx *ctx, uint32_t b,
 				IR_ASSERT(used_regs[input] == b);
 				int use_count = _counters[input];
 				if (use_count == UNKNOWN_UNSCHEDULED_USES) {
-					ir_schedule_update_unscheduled_uses(ctx, b, _xlat, _counters, input);
+					use_count = ir_schedule_update_unscheduled_uses(ctx, b, _xlat, _counters, input);
 				}
 				if (use_count != LIVE_OUT_UNSCHEDULED_USES) {
 					IR_ASSERT(use_count > 0);
