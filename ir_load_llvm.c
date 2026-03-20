@@ -1421,8 +1421,8 @@ static void llvm2ir_call(ir_ctx *ctx, LLVMValueRef insn, LLVMModuleRef module, L
 			if (LLVMGetInstructionOpcode(next_insn) == LLVMRet
 			 && LLVMGetNumOperands(next_insn) == 1
 			 && LLVMGetOperand(next_insn, 1) == insn) {
-				ref = ir_TAILCALL_N(llvm2ir_type(LLVMGetReturnType(ftype)), llvm2ir_op(ctx, func, IR_ADDR), count, args);
-				break;
+				ir_TAILCALL_N(llvm2ir_type(LLVMGetReturnType(ftype)), llvm2ir_op(ctx, func, IR_ADDR), count, args);
+				return;
 			}
 		}
 		ref = ir_CALL_N(llvm2ir_type(LLVMGetReturnType(ftype)), llvm2ir_op(ctx, func, IR_ADDR), count, args);
