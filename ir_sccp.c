@@ -987,6 +987,7 @@ static void ir_sccp_remove_if(ir_ctx *ctx, const ir_sccp_val *_values, ir_ref re
 		insn->optx = IR_OPTX(IR_END, IR_VOID, 1);
 		next_insn = &ctx->ir_base[dst];
 		next_insn->op = IR_BEGIN;
+		next_insn->op2 = IR_UNUSED;
 	}
 }
 
@@ -2968,9 +2969,11 @@ static bool ir_try_split_if(ir_ctx *ctx, ir_ref ref, ir_insn *insn, ir_bitqueue 
 
 						if_false->optx = IR_OPTX(IR_BEGIN, IR_VOID, 1);
 						if_false->op1 = end1_ref;
+						if_false->op2 = IR_UNUSED;
 
 						if_true->optx = IR_OPTX(IR_BEGIN, IR_VOID, 1);
 						if_true->op1 = end2_ref;
+						if_true->op2 = IR_UNUSED;
 
 						ir_bitqueue_add(worklist, if_false_ref);
 						ir_bitqueue_add(worklist, if_true_ref);
@@ -3008,6 +3011,7 @@ static bool ir_try_split_if(ir_ctx *ctx, ir_ref ref, ir_insn *insn, ir_bitqueue 
 
 						if_true->optx = IR_BEGIN;
 						if_true->op1 = IR_UNUSED;
+						if_true->op2 = IR_UNUSED;
 
 						ctx->flags2 &= ~IR_CFG_REACHABLE;
 
@@ -3157,9 +3161,11 @@ static bool ir_try_split_if_cmp(ir_ctx *ctx, ir_ref ref, ir_insn *insn, ir_bitqu
 
 							if_false->optx = IR_OPTX(IR_BEGIN, IR_VOID, 1);
 							if_false->op1 = end1_ref;
+							if_false->op2 = IR_UNUSED;
 
 							if_true->optx = IR_OPTX(IR_BEGIN, IR_VOID, 1);
 							if_true->op1 = end2_ref;
+							if_true->op2 = IR_UNUSED;
 
 							ir_bitqueue_add(worklist, if_false_ref);
 							ir_bitqueue_add(worklist, if_true_ref);
@@ -3201,6 +3207,7 @@ static bool ir_try_split_if_cmp(ir_ctx *ctx, ir_ref ref, ir_insn *insn, ir_bitqu
 
 							if_true->optx = IR_BEGIN;
 							if_true->op1 = IR_UNUSED;
+							if_true->op2 = IR_UNUSED;
 
 							ctx->flags2 &= ~IR_CFG_REACHABLE;
 
@@ -3487,7 +3494,9 @@ static void ir_iter_optimize_if(ir_ctx *ctx, ir_ref ref, ir_insn *insn, ir_bitqu
 		if_true = &ctx->ir_base[if_true_ref];
 		if_false = &ctx->ir_base[if_false_ref];
 		if_true->op = IR_BEGIN;
+		if_true->op2 = IR_UNUSED;
 		if_false->op = IR_BEGIN;
+		if_false->op2 = IR_UNUSED;
 		if (ir_ref_is_true(ctx, condition)) {
 			if_false->op1 = IR_UNUSED;
 			ir_use_list_remove_one(ctx, ref, if_false_ref);
