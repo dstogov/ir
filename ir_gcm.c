@@ -428,6 +428,7 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 
 		uint32_t u = clones[i].use;
 		while (u != (uint32_t)-1) {
+			uint32_t src = uses[u].block;
 			use = uses[u].ref;
 			ctx->use_edges[n++] = use;
 			u = uses[u].next;
@@ -437,9 +438,11 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 				ir_ref k, l = insn->inputs_count;
 
 				if (insn->op == IR_PHI) {
-					for (k = 1; k <= l; k++) {
-						if (ir_insn_op(insn, k) == ref) {
-							j = ctx->cfg_map[ir_insn_op(&ctx->ir_base[insn->op1], k - 1)];
+					ir_insn *merge = &ctx->ir_base[insn->op1];
+					for (k = 2; k <= l; k++) {
+						j = ctx->cfg_map[ir_insn_op(merge, k - 1)];
+						if (j == src) {
+							IR_ASSERT(ir_insn_op(insn, k) == ref);
 							if (j != clones[i].block) {
 								uint32_t dom_depth = ctx->cfg_blocks[clones[i].block].dom_depth;
 								while (ctx->cfg_blocks[j].dom_depth > dom_depth) {
