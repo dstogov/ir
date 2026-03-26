@@ -1,0 +1,34 @@
+--TEST--
+GH-132: RLOAD/RSTORE: Spilled RLOAD
+--TARGET--
+x86_64
+--ARGS--
+-S --debug-regset 1
+--CODE--
+{
+    uintptr_t c_30 = 1;
+    uintptr_t c_31 = 2;
+    uintptr_t c_35 = 0xffff;
+
+    l_1 = START(l_99);
+
+	uintptr_t d_1, l_2 = RLOAD(l_1, 15);
+    l_3 = RSTORE(l_2, d_1, 15);
+    uintptr_t d_2, l_4 = RLOAD(l_3, 15);
+    l_5 = RSTORE(l_4, d_1, 15);
+	uintptr_t d_3 = ADD(d_2, c_35);
+    l_6 = STORE(l_5, d_3, c_31);
+
+    l_99 = RETURN(l_6);
+}
+--EXPECT--
+test:
+	subq $8, %rsp
+	movq %r15, %rax
+	movq %rax, (%rsp)
+	movq %rax, %r15
+	movq %r15, %rax
+	movq (%rsp), %r15
+	movq $2, 0xffff(%rax)
+	addq $8, %rsp
+	retq

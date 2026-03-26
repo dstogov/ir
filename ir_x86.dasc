@@ -1691,6 +1691,7 @@ get_arg_hints:
 			flags = IR_OP2_SHOULD_BE_IN_REG;
 			break;
 		case IR_RSTORE:
+			constraints->def_reg = ctx->ir_base[ref].op3;
 			flags = IR_OP3_SHOULD_BE_IN_REG;
 			break;
 		case IR_RETURN_INT:
@@ -2844,11 +2845,6 @@ store_int:
 				return IR_STORE_FP;
 			}
 			break;
-		case IR_RLOAD:
-			if (IR_REGSET_IN(IR_REGSET_UNION((ir_regset)ctx->fixed_regset, IR_REGSET_FIXED), insn->op2)) {
-				return IR_SKIPPED | IR_RLOAD;
-			}
-			return IR_RLOAD;
 		case IR_RSTORE:
 			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
 				if ((ctx->flags & IR_OPT_CODEGEN)
@@ -8702,36 +8698,27 @@ static void ir_emit_rload(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_reg src_reg = insn->op2;
 	ir_type type = insn->type;
+	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 
-	if (IR_REGSET_IN(IR_REGSET_UNION((ir_regset)ctx->fixed_regset, IR_REGSET_FIXED), src_reg)) {
-		if (ctx->vregs[def]
-		 && ctx->live_intervals[ctx->vregs[def]]
-		 && ctx->live_intervals[ctx->vregs[def]]->stack_spill_pos != -1) {
+	if (def_reg == IR_REG_NONE) {
+		/* op3 is used as a flag that the value is already stored in memory.
+		 * If op3 is set we don't have to store the value once again (in case of spilling)
+		 */
+		if (!insn->op3 || !ir_is_same_spill_slot(ctx, def, IR_MEM_BO(ctx->spill_base, insn->op3))) {
 			ir_emit_store(ctx, type, def, src_reg);
 		}
 	} else {
-		ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
-
-		if (def_reg == IR_REG_NONE) {
-			/* op3 is used as a flag that the value is already stored in memory.
-			 * If op3 is set we don't have to store the value once again (in case of spilling)
-			 */
-			if (!insn->op3 || !ir_is_same_spill_slot(ctx, def, IR_MEM_BO(ctx->spill_base, insn->op3))) {
-				ir_emit_store(ctx, type, def, src_reg);
+		if (src_reg != def_reg) {
+			if (IR_IS_TYPE_INT(type)) {
+				ir_emit_mov(ctx, type, def_reg, src_reg);
+			} else {
+				IR_ASSERT(IR_IS_TYPE_FP(type));
+				ir_emit_fp_mov(ctx, type, def_reg, src_reg);
 			}
-		} else {
-			if (src_reg != def_reg) {
-				if (IR_IS_TYPE_INT(type)) {
-					ir_emit_mov(ctx, type, def_reg, src_reg);
-				} else {
-					IR_ASSERT(IR_IS_TYPE_FP(type));
-					ir_emit_fp_mov(ctx, type, def_reg, src_reg);
-				}
-			}
-			if (IR_REG_SPILLED(ctx->regs[def][0])
-			 && (!insn->op3 || !ir_is_same_spill_slot(ctx, def,  IR_MEM_BO(ctx->spill_base, insn->op3)))) {
-				ir_emit_store(ctx, type, def, def_reg);
-			}
+		}
+		if (IR_REG_SPILLED(ctx->regs[def][0])
+		 && (!insn->op3 || !ir_is_same_spill_slot(ctx, def,  IR_MEM_BO(ctx->spill_base, insn->op3)))) {
+			ir_emit_store(ctx, type, def, def_reg);
 		}
 	}
 }
