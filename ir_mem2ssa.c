@@ -8,6 +8,125 @@
 #include "ir.h"
 #include "ir_private.h"
 
+/* We perform SSA renaming in a sparse way, iterating though VAR use lists,
+ * therefore use lists should be sorted acording to dominance order
+ * (dominance tree pre-order and control order inside the blocks).
+ *
+ * ir_mem2ssa_order() labels conrtol nodes in the desired order
+ *
+ * ir_mem2ssa_sort() - sorts use list of given VAR
+ */
+static uint32_t *ir_mem2ssa_order(ir_ctx *ctx)
+{
+	uint32_t num = 1;
+	uint32_t *order = ir_mem_malloc(sizeof(int) * ctx->insns_count);
+	uint32_t *block_order = ir_mem_malloc(sizeof(uint32_t) * (ctx->cfg_blocks_count + 1));
+	ir_list work;
+	uint32_t i, b;
+	ir_block *bb;
+
+	/* DFS over dominance tree compute pre-order */
+	ir_list_init(&work, ctx->cfg_blocks_count + 1);
+	ir_list_push(&work, 1);
+	IR_ASSERT(ctx->cfg_blocks[1].next_succ == 0);
+	while (ir_list_len(&work)) {
+		b = ir_list_pop(&work);
+		block_order[num++] = b;
+		bb = &ctx->cfg_blocks[b];
+		if (bb->dom_child) {
+			uint32_t child = bb->dom_child;
+			uint32_t i = ir_list_len(&work);
+			do {
+				ir_list_push(&work, child);
+				bb = &ctx->cfg_blocks[child];
+				child = bb->dom_next_child;
+			} while (child);
+			uint32_t j = ir_list_len(&work) - 1;
+			/* revert children */
+			while (i < j) {
+				SWAP_REFS(work.a.refs[i], work.a.refs[j]);
+				i++;
+				j--;
+			}
+		}
+	}
+	ir_list_free(&work);
+	IR_ASSERT(num == ctx->cfg_blocks_count + 1);
+
+	/* For each block in reverse pre-order */
+	num = 1;
+	for (i = ctx->cfg_blocks_count; i; i--) {
+		b = block_order[i];
+		bb = &ctx->cfg_blocks[b];
+
+		/* Number control nodes of the block in reverse order */
+		ir_ref ref = bb->end;
+		IR_ASSERT(ctx->cfg_map[ref] == b);
+//		order[ref] = num++;
+		ref = ctx->ir_base[ref].op1;
+		while (ref != bb->start) {
+			ctx->cfg_map[ref] = b;
+			order[ref] = num++;
+			ref = ctx->ir_base[ref].op1;
+		}
+		IR_ASSERT(ctx->cfg_map[ref] == b);
+//		order[ref] = num++;
+	}
+	ir_mem_free(block_order);
+	return order;
+}
+
+static void ir_mem2ssa_sort(ir_ref *a, int n, uint32_t *order)
+{
+	int i, j;
+
+	/* quick sort */
+	while (n > 15) {
+		int p;
+		uint32_t pivot;
+		int mid = (n - 1) / 2;
+
+		if (order[a[mid]] > order[a[0]]) SWAP_REFS(a[mid], a[0]);
+		if (order[a[n-1]] > order[a[0]]) SWAP_REFS(a[n-1], a[0]);
+		if (order[a[n-1]] > order[a[mid]]) SWAP_REFS(a[n-1], a[mid]);
+		pivot = order[a[mid]];
+		i = -1;
+		j = n;
+		while (1) {
+			while (order[a[++i]] > pivot);
+			while (order[a[--j]] < pivot);
+			if (i >= j) break;
+			SWAP_REFS(a[i], a[j]);
+		}
+		p = j + 1;
+		if (j < n - p) {
+			ir_mem2ssa_sort(a, p, order);
+			a += p;
+			n = n - p;
+		} else {
+			ir_mem2ssa_sort(a + p, n - p, order);
+			n = p;
+		}
+	}
+
+	if (n > 1) {
+		/* insert sort */
+		int i, j;
+
+		for (i = 1; i < n; i++) {
+			ir_ref tmp = a[i];
+			j = i;
+			do {
+				ir_ref prev = a[j - 1];
+				if (order[prev] > order[tmp]) break;
+				a[j] = prev;
+				j--;
+			} while (j > 0);
+			a[j] = tmp;
+		}
+	}
+}
+
 static ir_ref ir_uninitialized(ir_ctx *ctx, ir_type type)
 {
 	/* read of uninitialized variable (use 0) */
@@ -18,6 +137,7 @@ static ir_ref ir_uninitialized(ir_ctx *ctx, ir_type type)
 }
 
 static void ir_mem2ssa_convert(ir_ctx      *ctx,
+                               uint32_t    *order,
                                ir_ref      *ssa_vars,
                                ir_list     *queue,
                                ir_bitset    defs,
@@ -30,8 +150,10 @@ static void ir_mem2ssa_convert(ir_ctx      *ctx,
 	ir_ref *p, i, n, use, next_ctrl;
 	ir_insn *use_insn;
 	uint32_t b, *q;
+	uint32_t last_order;
 
-	/* For each usage of VAR (use list must be sorted) */
+	/* For each usage of VAR (use list should be sorted) */
+	last_order = 0xffffffff;
 	next_ctrl = next;
 	n = ctx->use_lists[var].count;
 	for (p = ctx->use_edges + ctx->use_lists[var].refs; n > 0; p++, n--) {
@@ -45,7 +167,11 @@ static void ir_mem2ssa_convert(ir_ctx      *ctx,
 		if (use_insn->op == IR_VSTORE || use_insn->op == IR_STORE) {
 			IR_ASSERT(use_insn->op2 == var && use_insn->op3 != var);
 			b = ctx->cfg_map[use];
-			if (EXPECTED(b)) {
+			if (b) {
+				if (UNEXPECTED(order[use] > last_order)) {
+					goto sort_use_list;
+				}
+				last_order = order[use];
 				/* Mark VAR as defined and alive at the end of BB */
 				ir_bitset_incl(defs, b);
 				ssa_vars[b] = var;
@@ -54,9 +180,70 @@ static void ir_mem2ssa_convert(ir_ctx      *ctx,
 			IR_ASSERT(use_insn->op == IR_VLOAD || use_insn->op == IR_LOAD);
 			IR_ASSERT(use_insn->op2 == var);
 			b = ctx->cfg_map[use];
-			if (EXPECTED(b) && ssa_vars[b] != var) {
-				ssa_vars[b] = var;  /* mark VAR as alive at start of BB */
-				ir_list_push(queue, b); /* schedule BB for backward path exploration on the next step */
+			if (b) {
+				if (UNEXPECTED(order[use] > last_order)) {
+					goto sort_use_list;
+				}
+				last_order = order[use];
+				if (ssa_vars[b] != var) {
+					ssa_vars[b] = var;  /* mark VAR as alive at start of BB */
+					ir_list_push(queue, b); /* schedule BB for backward path exploration on the next step */
+				}
+			}
+		}
+	}
+
+	if (0) {
+sort_use_list:
+		/* Revert all actions done on unsorted use_list */
+		queue->len = 0;
+		n = ctx->use_lists[var].count;
+		p = ctx->use_edges + ctx->use_lists[var].refs;
+		i = 0;
+		while (p[i] != use) {
+			b = ctx->cfg_map[p[i]];
+			if (b) {
+				ir_bitset_excl(defs, b);
+				ssa_vars[b] = 0;
+			}
+			i++;
+		}
+		/* Move dead LOAD/STOREs to the end of use_list to exclude them from sorting */
+		i = 0;
+		while (i < n) {
+			b = ctx->cfg_map[p[i]];
+			if (b) {
+				i++;
+			} else {
+				SWAP_REFS(p[i], p[n-1]);
+				n--;
+			}
+		}
+		ir_mem2ssa_sort(p, n, order);
+
+		next_ctrl = next;
+		for (; n > 0; p++, n--) {
+			use = *p;
+			IR_ASSERT(use);
+			if (use == next_ctrl) {
+				next_ctrl = IR_UNUSED;
+				continue;
+			}
+			b = ctx->cfg_map[use];
+			IR_ASSERT(b);
+			use_insn = &ctx->ir_base[use];
+			if (use_insn->op == IR_VSTORE || use_insn->op == IR_STORE) {
+				IR_ASSERT(use_insn->op2 == var && use_insn->op3 != var);
+				/* Mark VAR as defined and alive at the end of BB */
+				ir_bitset_incl(defs, b);
+				ssa_vars[b] = var;
+			} else {
+				IR_ASSERT(use_insn->op == IR_VLOAD || use_insn->op == IR_LOAD);
+				IR_ASSERT(use_insn->op2 == var);
+				if (ssa_vars[b] != var) {
+					ssa_vars[b] = var;  /* mark VAR as alive at start of BB */
+					ir_list_push(queue, b); /* schedule BB for backward path exploration on the next step */
+				}
 			}
 		}
 	}
@@ -300,8 +487,6 @@ static bool ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, 
 	ir_use_list *use_list;
 	ir_type type = IR_VOID;
 	size_t size;
-	ir_ref last_use = IR_UNUSED;
-	bool needs_sorting = 0;
 
 	if (!IR_IS_CONST_REF(insn->op2)) {
 		return 0;
@@ -323,10 +508,6 @@ static bool ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, 
 	do {
 		use = *p;
 		IR_ASSERT(use);
-		if (use < last_use) {
-			needs_sorting = 1;
-		}
-		last_use = use;
 		use_insn = &ctx->ir_base[use];
 		if (use == next) {
 			next = IR_UNUSED;
@@ -358,10 +539,6 @@ static bool ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, 
 
 	*type_ptr = type;
 
-	if (needs_sorting) {
-		ir_use_list_sort(ctx, var);
-	}
-
 	return 1;
 }
 
@@ -371,8 +548,6 @@ static bool ir_mem2ssa_may_convert_var(ir_ctx *ctx, ir_ref var, ir_insn *insn)
 	ir_insn *use_insn;
 	ir_use_list *use_list;
 	ir_type type;
-	ir_ref last_use = IR_UNUSED;
-	bool needs_sorting = 0;
 
 	use_list = &ctx->use_lists[var];
 	n = use_list->count;
@@ -385,10 +560,6 @@ static bool ir_mem2ssa_may_convert_var(ir_ctx *ctx, ir_ref var, ir_insn *insn)
 	do {
 		use = *p;
 		IR_ASSERT(use);
-		if (use < last_use) {
-			needs_sorting = 1;
-		}
-		last_use = use;
 		use_insn = &ctx->ir_base[use];
 		if (use_insn->op == IR_VLOAD) {
 			if (use_insn->op2 != var
@@ -409,10 +580,6 @@ static bool ir_mem2ssa_may_convert_var(ir_ctx *ctx, ir_ref var, ir_insn *insn)
 		p++;
 	} while (--n > 0);
 
-	if (needs_sorting) {
-		ir_use_list_sort(ctx, var);
-	}
-
 	return 1;
 }
 
@@ -424,20 +591,10 @@ int ir_mem2ssa(ir_ctx *ctx)
 	ir_list queue;
 	ir_bitset defs;
 	ir_bitqueue iter_worklist;
+	uint32_t *order;
 
 	ctx->flags2 &= ~IR_MEM2SSA_VARS;
 	IR_ASSERT(ctx->use_lists && ctx->cfg_blocks);
-	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; bb++, b++) {
-		ir_ref ref = bb->end;
-
-		IR_ASSERT(ctx->cfg_map[ref] == b);
-		ref = ctx->ir_base[ref].op1;
-		while (ref != bb->start) {
-			ctx->cfg_map[ref] = b;
-			ref = ctx->ir_base[ref].op1;
-		}
-		IR_ASSERT(ctx->cfg_map[ref] == b);
-	}
 
 	for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; bb++, b++) {
 		ir_ref ref, next, start = bb->start;
@@ -471,11 +628,12 @@ int ir_mem2ssa(ir_ctx *ctx)
 							ssa_vars = ir_mem_calloc(ctx->cfg_blocks_count + 1, sizeof(ir_ref));
 							ir_list_init(&queue, ctx->cfg_blocks_count);
 							defs = ir_mem_calloc(len * 2, IR_BITSET_BITS / 8);
+							order = ir_mem2ssa_order(ctx);
 						} else {
 							memset(defs, 0, len * 2 * IR_BITSET_BITS / 8);
 						}
 
-						ir_mem2ssa_convert(ctx, ssa_vars, &queue, defs, defs + len, &iter_worklist, use, IR_UNUSED, insn->type);
+						ir_mem2ssa_convert(ctx, order, ssa_vars, &queue, defs, defs + len, &iter_worklist, use, IR_UNUSED, insn->type);
 
 						insn = &ctx->ir_base[use];
 						MAKE_NOP(insn);
@@ -532,11 +690,12 @@ int ir_mem2ssa(ir_ctx *ctx)
 						ssa_vars = ir_mem_calloc(ctx->cfg_blocks_count + 1, sizeof(ir_ref));
 						ir_list_init(&queue, ctx->cfg_blocks_count);
 						defs = ir_mem_calloc(len * 2, IR_BITSET_BITS / 8);
+						order = ir_mem2ssa_order(ctx);
 					} else {
 						memset(defs, 0, len * 2 * IR_BITSET_BITS / 8);
 					}
 
-					ir_mem2ssa_convert(ctx, ssa_vars, &queue, defs, defs + len, &iter_worklist, ref, next, type);
+					ir_mem2ssa_convert(ctx, order, ssa_vars, &queue, defs, defs + len, &iter_worklist, ref, next, type);
 
 					insn = &ctx->ir_base[ref];
 					prev = insn->op1;
@@ -567,6 +726,7 @@ int ir_mem2ssa(ir_ctx *ctx)
 	}
 
 	if (ssa_vars) {
+		ir_mem_free(order);
 		ir_mem_free(defs);
 		ir_list_free(&queue);
 		ir_mem_free(ssa_vars);
