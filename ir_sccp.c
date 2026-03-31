@@ -603,7 +603,7 @@ static IR_NEVER_INLINE void ir_sccp_analyze(const ir_ctx *ctx, ir_sccp_val *_val
 				bool may_benefit = 0;
 				bool has_top = 0;
 
-				if (_values[i].op != IR_TOP) {
+				if (_values[i].op != IR_TOP || insn->op == IR_COPY) {
 					may_benefit = 1;
 				}
 
@@ -3757,6 +3757,47 @@ remove_bitcast:
 			ir_iter_optimize_guard(ctx, i, insn, worklist);
 		}
 	}
+}
+
+void ir_iter_cleanup(ir_ctx *ctx)
+{
+	ir_bitqueue iter_worklist;
+	ir_bitqueue cfg_worklist;
+	ir_ref i, n;
+	ir_insn *insn;
+
+	ir_bitqueue_init(&cfg_worklist, ctx->insns_count);
+	ir_bitqueue_init(&iter_worklist, ctx->insns_count);
+
+	/* Remove unused nodes */
+	for (i = IR_UNUSED + 1, insn = ctx->ir_base + i; i < ctx->insns_count;) {
+		if (IR_IS_FOLDABLE_OP(insn->op)) {
+			if (insn->op != IR_NOP && ctx->use_lists[i].count == 0) {
+				ir_iter_remove_insn(ctx, i, &iter_worklist);
+			}
+		} else if (insn->op == IR_IF || insn->op == IR_MERGE) {
+			ir_bitqueue_add(&cfg_worklist, i);
+		}
+		n = insn->inputs_count;
+		n = ir_insn_inputs_to_len(n);
+		i += n;
+		insn += n;
+	}
+
+	while ((i = ir_bitqueue_pop(&iter_worklist)) >= 0) {
+		insn = &ctx->ir_base[i];
+		if (IR_IS_FOLDABLE_OP(insn->op)) {
+			if (ctx->use_lists[i].count == 0) {
+				ir_iter_remove_insn(ctx, i, &iter_worklist);
+			}
+		}
+	}
+
+	/* Cleanup Control Flow */
+	ir_iter_opt(ctx, &cfg_worklist);
+
+	ir_bitqueue_free(&iter_worklist);
+	ir_bitqueue_free(&cfg_worklist);
 }
 
 int ir_sccp(ir_ctx *ctx)
