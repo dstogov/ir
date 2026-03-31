@@ -2727,13 +2727,16 @@ static bool ir_optimize_phi(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_re
 					}
 
 					return 1;
-				} else if (cond->op != IR_OVERFLOW
+				} else if (insn->op2 <= cond_ref && insn->op3 <= cond_ref
+					&& cond->op != IR_OVERFLOW
 					// TODO: temporary disable IF-conversion for RLOAD.
-					// We don't track antri-dependencies in GCM and Local Scheduling.
-					// As result COND may be scheduled below the folowing RSTORE.
+					// We don't track anti-dependencies in GCM and Local Scheduling.
+					// As result COND may be scheduled below the following RSTORE.
 					// See: https://github.com/dstogov/ir/issues/132
 					&& cond->op != IR_RLOAD
-					&& insn->op2 <= cond_ref && insn->op3 <= cond_ref) {
+					&& !((cond->op >= IR_EQ && cond->op <= IR_UNORDERED)
+					  && ((!IR_IS_CONST_REF(cond->op1) && ctx->ir_base[cond->op1].op == IR_RLOAD)
+					   || (!IR_IS_CONST_REF(cond->op2) && ctx->ir_base[cond->op2].op == IR_RLOAD)))) {
 					/* COND
 					 *
 					 *    prev                     prev
