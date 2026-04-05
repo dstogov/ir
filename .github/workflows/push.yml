@@ -132,6 +132,26 @@ jobs:
             gmake all
             gmake test-ci
 
+  MACOS_aarch64:
+    name: 'macOS arm64'
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v3
+      - name: brew
+        run: brew install capstone
+      - name: make
+        run: |
+          make TARGET=aarch64 BUILD=debug \
+            CFLAGS="-fsanitize=address,undefined -I$(brew --prefix)/include" \
+            LDFLAGS="-lm -ldl -L$(brew --prefix)/lib" \
+            all
+      - name: test
+        run: |
+          make TARGET=aarch64 BUILD=debug \
+            CFLAGS="-fsanitize=address,undefined -I$(brew --prefix)/include" \
+            LDFLAGS="-lm -ldl -L$(brew --prefix)/lib" \
+            test-ci
+
   MACOS_x86_64:
     runs-on: macos-15-intel
     env:
