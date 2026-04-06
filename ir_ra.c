@@ -3004,6 +3004,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 {
 	ir_live_pos nextUsePos[IR_REG_NUM];
 	ir_live_pos blockPos[IR_REG_NUM];
+	int score, best_score, scores[IR_REG_NUM];
 	int i, reg;
 	ir_live_pos pos, next_use_pos;
 	ir_live_interval *other, *prev;
@@ -3032,6 +3033,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 		for (i = IR_REG_FP_FIRST; i <= IR_REG_FP_LAST; i++) {
 			nextUsePos[i] = 0x7fffffff;
 			blockPos[i] = 0x7fffffff;
+			scores[i] = 0;
 		}
 	} else {
 		available = IR_REGSET_GP;
@@ -3050,6 +3052,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 		for (i = IR_REG_GP_FIRST; i <= IR_REG_GP_LAST; i++) {
 			nextUsePos[i] = 0x7fffffff;
 			blockPos[i] = 0x7fffffff;
+			scores[i] = 0;
 		}
 	}
 
@@ -3080,6 +3083,8 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 					IR_USE_MUST_BE_IN_REG | IR_USE_SHOULD_BE_IN_REG);
 				if (pos < nextUsePos[reg]) {
 					nextUsePos[reg] = pos;
+						/* Prefer splitting interval that was already splitted before */
+					scores[reg] = (other->flags & IR_LIVE_INTERVAL_SPLIT_CHILD) ? 1 : 0;
 				}
 			}
 		}
@@ -3100,6 +3105,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 				IR_REGSET_FOREACH(regset, reg) {
 					if (overlap < nextUsePos[reg]) {
 						nextUsePos[reg] = overlap;
+						scores[reg] = 0;
 					}
 					if (overlap < blockPos[reg]) {
 						blockPos[reg] = overlap;
@@ -3113,6 +3119,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 				if (other->flags & (IR_LIVE_INTERVAL_FIXED|IR_LIVE_INTERVAL_TEMP)) {
 					if (overlap < nextUsePos[reg]) {
 						nextUsePos[reg] = overlap;
+						scores[reg] = 0;
 					}
 					if (overlap < blockPos[reg]) {
 						blockPos[reg] = overlap;
@@ -3122,6 +3129,8 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 						IR_USE_MUST_BE_IN_REG | IR_USE_SHOULD_BE_IN_REG);
 					if (pos < nextUsePos[reg]) {
 						nextUsePos[reg] = pos;
+						/* Prefer splitting interval that was already splitted before */
+						scores[reg] = (other->flags & IR_LIVE_INTERVAL_SPLIT_CHILD) ? 1 : 0;
 					}
 				}
 			}
@@ -3141,12 +3150,17 @@ select_register:
 
 	/* reg = register with highest nextUsePos */
 	pos = nextUsePos[reg];
+	best_score = (scores[reg] << 28) + nextUsePos[reg];
 	tmp_regset = available;
 	IR_REGSET_EXCL(tmp_regset, reg);
 	IR_REGSET_FOREACH(tmp_regset, i) {
 		if (nextUsePos[i] > pos) {
 			pos = nextUsePos[i];
+		}
+		score = (scores[i] << 28) + nextUsePos[i];
+		if (score > best_score) {
 			reg = i;
+			best_score = score;
 		}
 	} IR_REGSET_FOREACH_END();
 
