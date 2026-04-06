@@ -5,17 +5,14 @@ Requires clang with libFuzzer support.
 ## Quick Start
 
 ```bash
-# 1. Build the main project first, generates required headers
-make BUILD=debug
-
-# 2. Extract seed corpus from existing tests
+# 1. Extract seed corpus from existing tests
 make -f fuzz/Makefile corpus
 
-# 3. Build and run parser fuzzer
+# 2. Build and run parser fuzzer
 make -f fuzz/Makefile CC=clang fuzz-load
 ./fuzz/build/fuzz-load fuzz/corpus/load/
 
-# 4. Build and run pipeline fuzzer
+# 3. Build and run pipeline fuzzer
 make -f fuzz/Makefile CC=clang fuzz-pipeline
 ./fuzz/build/fuzz-pipeline fuzz/corpus/pipeline/
 ```

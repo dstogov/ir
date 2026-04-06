@@ -24,24 +24,10 @@ FUZZ_BUILD  = $(FUZZ_DIR)/build
 CORPUS_DIR  = $(FUZZ_DIR)/corpus
 
 # Default to clang for fuzzing
-CC         ?= clang
+CC          = clang
 
 # Base flags
 CFLAGS_BASE = -Wall -Wextra -Wno-unused-parameter -g -O1 -DIR_DEBUG=1
-
-# Target flags
-ifeq (x86_64, $(TARGET))
-  CFLAGS_BASE += -m64 -DIR_TARGET_X64
-  DASM_ARCH = x86
-endif
-ifeq (x86, $(TARGET))
-  CFLAGS_BASE += -m32 -DIR_TARGET_X86
-  DASM_ARCH = x86
-endif
-ifeq (aarch64, $(TARGET))
-  CFLAGS_BASE += -DIR_TARGET_AARCH64
-  DASM_ARCH = aarch64
-endif
 
 # Sanitizer flags (always on for fuzzing)
 SANITIZE_FLAGS = -fsanitize=address,undefined -fno-sanitize-recover=all
@@ -49,72 +35,32 @@ SANITIZE_FLAGS = -fsanitize=address,undefined -fno-sanitize-recover=all
 # libFuzzer flags
 FUZZER_FLAGS = -fsanitize=fuzzer
 
-# System libraries
-LDFLAGS = -lm
-ifneq ($(OS),Windows_NT)
-  LDFLAGS += -ldl
-endif
-LDFLAGS += -lcapstone
-
-# Object list (same as main Makefile)
-OBJS_COMMON = $(FUZZ_BUILD)/ir.o $(FUZZ_BUILD)/ir_strtab.o $(FUZZ_BUILD)/ir_cfg.o \
-	$(FUZZ_BUILD)/ir_sccp.o $(FUZZ_BUILD)/ir_gcm.o $(FUZZ_BUILD)/ir_ra.o \
-	$(FUZZ_BUILD)/ir_emit.o $(FUZZ_BUILD)/ir_load.o $(FUZZ_BUILD)/ir_save.o \
-	$(FUZZ_BUILD)/ir_emit_c.o $(FUZZ_BUILD)/ir_dump.o $(FUZZ_BUILD)/ir_disasm.o \
-	$(FUZZ_BUILD)/ir_gdb.o $(FUZZ_BUILD)/ir_perf.o $(FUZZ_BUILD)/ir_check.o \
-	$(FUZZ_BUILD)/ir_cpuinfo.o $(FUZZ_BUILD)/ir_emit_llvm.o $(FUZZ_BUILD)/ir_mem2ssa.o
-
-# Use pre-built DynASM headers from the main build
-BUILD_DIR ?= .
-
 # Check that the compiler supports libFuzzer
-HAVE_FUZZER := $(shell echo 'int LLVMFuzzerTestOneInput(const unsigned char *d, long s) { return 0; }' | \
-	$(CC) -x c -fsanitize=fuzzer -fsanitize=address - -o /dev/null 2>/dev/null && echo 1 || echo 0)
+#HAVE_FUZZER := $(shell echo 'int LLVMFuzzerTestOneInput(const unsigned char *d, long s) { return 0; }' | \
+#       $(CC) -x c -fsanitize=fuzzer -fsanitize=address - -o /dev/null 2>/dev/null && echo 1 || echo 0)
 
 .PHONY: all fuzz-load fuzz-pipeline corpus clean
 
-ifneq ($(HAVE_FUZZER),1)
-  ifneq ($(MAKECMDGOALS),corpus)
-    ifneq ($(MAKECMDGOALS),clean)
-      $(error libFuzzer not available. Use clang with -fsanitize=fuzzer support)
-    endif
-  endif
-endif
-
 all: fuzz-load fuzz-pipeline
 
-$(FUZZ_BUILD):
+$(FUZZ_BUILD)/libir.a:
 	@mkdir -p $(FUZZ_BUILD)
-
-# Common objects, compiled with sanitizers but no fuzzer instrumentation
-
-$(FUZZ_BUILD)/%.o: $(SRC_DIR)/%.c | $(FUZZ_BUILD)
-	$(CC) $(CFLAGS_BASE) $(SANITIZE_FLAGS) -I$(BUILD_DIR) -o $@ -c $<
-
-# Specific dependencies
-$(FUZZ_BUILD)/ir.o: $(SRC_DIR)/ir_fold.h $(BUILD_DIR)/ir_fold_hash.h
-$(FUZZ_BUILD)/ir_ra.o: $(SRC_DIR)/ir_$(DASM_ARCH).h
-$(FUZZ_BUILD)/ir_emit.o: $(SRC_DIR)/ir_$(DASM_ARCH).h $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h
+	make $(FUZZ_BUILD)/libir.a \
+		TARGET=$(TARGET) BUILD_DIR=$(FUZZ_BUILD) BUILD=$(BUILD) \
+		CC=$(CC) CFLAGS="$(CFLAGS_BASE) $(SANITIZE_FLAGS) $(FUZZER_FLAGS)"
 
 # Fuzzer targets
-
-fuzz-load: $(OBJS_COMMON) $(FUZZ_BUILD)/fuzz_load.o | $(FUZZ_BUILD)
-	$(CC) $(CFLAGS_BASE) $(SANITIZE_FLAGS) $(FUZZER_FLAGS) -o $(FUZZ_BUILD)/$@ $^ $(LDFLAGS)
+fuzz-load: $(FUZZ_DIR)/fuzz_load.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h $(FUZZ_BUILD)/libir.a
+	$(CC) $(CFLAGS_BASE) $(SANITIZE_FLAGS) $(FUZZER_FLAGS) -DFUZZ_LIBFUZZER \
+		-I$(SRC_DIR) -I$(FUZZ_BUILD) -L$(FUZZ_BUILD) -o $(FUZZ_BUILD)/$@ $< -lir
 	@echo "Built: $(FUZZ_BUILD)/$@"
 	@echo "Run:   $(FUZZ_BUILD)/$@ $(CORPUS_DIR)/load/"
 
-$(FUZZ_BUILD)/fuzz_load.o: $(FUZZ_DIR)/fuzz_load.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h | $(FUZZ_BUILD)
-	$(CC) $(CFLAGS_BASE) $(SANITIZE_FLAGS) $(FUZZER_FLAGS) -DFUZZ_LIBFUZZER -I$(SRC_DIR) -I$(BUILD_DIR) -o $@ -c $<
-
-fuzz-pipeline: $(OBJS_COMMON) $(FUZZ_BUILD)/fuzz_pipeline.o | $(FUZZ_BUILD)
-	$(CC) $(CFLAGS_BASE) $(SANITIZE_FLAGS) $(FUZZER_FLAGS) -o $(FUZZ_BUILD)/$@ $^ $(LDFLAGS)
+fuzz-pipeline: $(FUZZ_DIR)/fuzz_pipeline.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h $(FUZZ_BUILD)/libir.a
+	$(CC) $(CFLAGS_BASE) $(SANITIZE_FLAGS) $(FUZZER_FLAGS) -DFUZZ_LIBFUZZER \
+		-I$(SRC_DIR) -I$(FUZZ_BUILD) -L$(FUZZ_BUILD) -o $(FUZZ_BUILD)/$@ $< -lir
 	@echo "Built: $(FUZZ_BUILD)/$@"
 	@echo "Run:   $(FUZZ_BUILD)/$@ $(CORPUS_DIR)/pipeline/"
-
-$(FUZZ_BUILD)/fuzz_pipeline.o: $(FUZZ_DIR)/fuzz_pipeline.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h | $(FUZZ_BUILD)
-	$(CC) $(CFLAGS_BASE) $(SANITIZE_FLAGS) $(FUZZER_FLAGS) -DFUZZ_LIBFUZZER -I$(SRC_DIR) -I$(BUILD_DIR) -o $@ -c $<
-
-# Corpus extraction
 
 corpus: | $(CORPUS_DIR)/load $(CORPUS_DIR)/pipeline
 	@echo "Extracting seed corpus from tests..."
