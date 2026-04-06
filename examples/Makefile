@@ -7,7 +7,7 @@ CC      = gcc
 CFLAGS  = -O0 -g -Wall -Wextra -Wno-unused-parameter -I$(INC_DIR)
 LDFLAGS = -L$(LIB_DIR) -lir -lcapstone
 
-EXAMPLE_EXES = mandelbrot 0001-basic 0002-while 0003-pointer 0004-func 0005-basic-runner-func
+EXAMPLE_EXES = mandelbrot 0001-basic 0002-while 0003-pointer 0004-func 0005-basic-runner-func 0006-ifelse
 
 all: $(EXAMPLE_EXES)
 
