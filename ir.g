@@ -52,6 +52,7 @@ uint32_t yy_line;
 typedef struct _ir_parser_ctx {
 	ir_ctx    *ctx;
 	uint32_t   undef_count;
+	uint32_t   undef_mem_op;
 	uint32_t   value_params_count;
 	ir_ref     curr_ref;
 	ir_strtab  var_tab;
@@ -453,6 +454,7 @@ ir_sym_data(ir_loader *loader):
 
 ir_func(ir_parser_ctx *p):
 	{p->undef_count = 0;}
+	{p->undef_mem_op = 0;}
 	{ir_strtab_init(&p->var_tab, 256, 4096);}
 	"{" ( ("NOP" | ir_insn(p) ir_modifier(p)? ) ";" )* "}"
 	{if (p->undef_count) ir_check_indefined_vars(p);}
@@ -666,7 +668,8 @@ ir_insn(ir_parser_ctx *p):
 					p->ctx->control = IR_UNUSED;
 				} else if (op == IR_VLOAD
 				 && !IR_IS_UNRESOLVED(op1)
-				 && !IR_IS_UNRESOLVED(op2)) {
+				 && !IR_IS_UNRESOLVED(op2)
+				 && !p->undef_mem_op) {
 					p->ctx->control = op1;
 					ref = _ir_VLOAD(p->ctx, t, op2);
 					ref2 = p->ctx->control;
@@ -674,14 +677,16 @@ ir_insn(ir_parser_ctx *p):
 				} else if (op == IR_VSTORE
 				 && !IR_IS_UNRESOLVED(op1)
 				 && !IR_IS_UNRESOLVED(op2)
-				 && !IR_IS_UNRESOLVED(op3)) {
+				 && !IR_IS_UNRESOLVED(op3)
+				 && !p->undef_mem_op) {
 					p->ctx->control = op1;
 					_ir_VSTORE(p->ctx, op2, op3);
 					ref = p->ctx->control;
 					p->ctx->control = IR_UNUSED;
 				} else if (op == IR_LOAD
 				 && !IR_IS_UNRESOLVED(op1)
-				 && !IR_IS_UNRESOLVED(op2)) {
+				 && !IR_IS_UNRESOLVED(op2)
+				 && !p->undef_mem_op) {
 					p->ctx->control = op1;
 					ref = _ir_LOAD(p->ctx, t, op2);
 					ref2 = p->ctx->control;
@@ -689,7 +694,8 @@ ir_insn(ir_parser_ctx *p):
 				} else if (op == IR_STORE
 				 && !IR_IS_UNRESOLVED(op1)
 				 && !IR_IS_UNRESOLVED(op2)
-				 && !IR_IS_UNRESOLVED(op3)) {
+				 && !IR_IS_UNRESOLVED(op3)
+				 && !p->undef_mem_op) {
 					p->ctx->control = op1;
 					_ir_STORE(p->ctx, op2, op3);
 					ref = p->ctx->control;
@@ -697,6 +703,10 @@ ir_insn(ir_parser_ctx *p):
 				} else {
 					uint32_t opt;
 
+					if ((op == IR_VSTORE || op == IR_STORE || op == IR_VLOAD || op == IR_LOAD)
+					 && (IR_IS_UNRESOLVED(op1) || IR_IS_UNRESOLVED(op2) || IR_IS_UNRESOLVED(op3))) {
+						p->undef_mem_op = 1;
+					}
 					if (!IR_OP_HAS_VAR_INPUTS(ir_op_flags[op])) {
 						opt = IR_OPT(op, t);
 					} else {
