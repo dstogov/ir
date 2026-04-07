@@ -52,13 +52,13 @@ $(FUZZ_BUILD)/libir.a:
 # Fuzzer targets
 fuzz-load: $(FUZZ_DIR)/fuzz_load.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h $(FUZZ_BUILD)/libir.a
 	$(CC) $(CFLAGS_BASE) $(SANITIZE_FLAGS) $(FUZZER_FLAGS) -DFUZZ_LIBFUZZER \
-		-I$(SRC_DIR) -I$(FUZZ_BUILD) -L$(FUZZ_BUILD) -o $(FUZZ_BUILD)/$@ $< -lir
+		-I$(SRC_DIR) -I$(FUZZ_BUILD) -L$(FUZZ_BUILD) -o $(FUZZ_BUILD)/$@ $< -lir -lcapstone -lm
 	@echo "Built: $(FUZZ_BUILD)/$@"
 	@echo "Run:   $(FUZZ_BUILD)/$@ $(CORPUS_DIR)/load/"
 
 fuzz-pipeline: $(FUZZ_DIR)/fuzz_pipeline.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h $(FUZZ_BUILD)/libir.a
 	$(CC) $(CFLAGS_BASE) $(SANITIZE_FLAGS) $(FUZZER_FLAGS) -DFUZZ_LIBFUZZER \
-		-I$(SRC_DIR) -I$(FUZZ_BUILD) -L$(FUZZ_BUILD) -o $(FUZZ_BUILD)/$@ $< -lir
+		-I$(SRC_DIR) -I$(FUZZ_BUILD) -L$(FUZZ_BUILD) -o $(FUZZ_BUILD)/$@ $< -lir -lcapstone -lm
 	@echo "Built: $(FUZZ_BUILD)/$@"
 	@echo "Run:   $(FUZZ_BUILD)/$@ $(CORPUS_DIR)/pipeline/"
 
