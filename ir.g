@@ -716,6 +716,11 @@ ir_insn(ir_parser_ctx *p):
 						goto fallback;
 					}
 					goto emit;
+				} else if (ir_op_flags[op] & IR_OP_FLAG_CONTROL) {
+					if (op != IR_LOOP_BEGIN && op != IR_MERGE && op != IR_START && IR_IS_UNRESOLVED(op1)) {
+						goto fallback;
+					}
+					goto emit;
 				} else {
 					uint32_t opt;
 
