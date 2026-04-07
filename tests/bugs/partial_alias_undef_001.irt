@@ -1,0 +1,15 @@
+--TEST--
+SEGV in ir_check_partial_aliasing on undefined variable during folding
+--CODE--
+{
+	int64_t c_1 = 1;
+	l_1 = START(l_4);
+	uintptr_t p_1 = PARAM(l_1, "p1", 1);
+	int32_t d_2, l_2 = LOAD(l_1, u_1);
+	l_3 = STORE(l_2, p_1, c_1);
+	l_4 = RETURN(l_3, d_2);
+}
+--EXPECT--
+ERROR: Undefined variable `u_1`
+
+exit code = 2

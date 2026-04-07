@@ -1,0 +1,14 @@
+--TEST--
+SEGV in ir_find_aliasing_vload_i on undefined variable during folding
+--CODE--
+{
+	l_1 = START(l_8);
+	int32_t d_2 = VAR(l_1, "x");
+	l_3 = VSTORE(l_1, d_2, c_5);
+	int32_t d_4, l_4 = VLOAD(l_3, d_2);
+	l_8 = RETURN(l_4, d_4);
+}
+--EXPECT--
+ERROR: Undefined variable `c_5`
+
+exit code = 2
