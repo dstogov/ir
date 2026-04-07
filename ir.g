@@ -915,7 +915,7 @@ CHARACTER(uint32_t t, ir_val *val):
 		} else if ((char)yy_text[2] == '0') {
 			val->i64 = '\0';
 		} else {
-			IR_ASSERT(0);
+			yy_error("unsupported escape sequence");
 		}
     }
 ;
