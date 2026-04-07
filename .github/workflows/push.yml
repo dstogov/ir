@@ -86,28 +86,24 @@ jobs:
         run: make TARGET=x86 BUILD=debug test-ci
   Linux_aarch64:
     name: 'Linux aarch64'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22.04-arm
+    container:
+      image: ubuntu:22.04
     steps:
       - uses: actions/checkout@v3
-      - uses: uraimo/run-on-arch-action@v2
-        name: QEMU
-        id: runcmd
-        with:
-          arch: aarch64
-          distro: ubuntu22.04
-          githubToken: ${{ github.token }}
-          install: |
-            apt update -y
-            DEBIAN_FRONTEND=noninteractive apt install -y \
-              gcc \
-              libc6 \
-              libcapstone-dev \
-              libcapstone4 \
-              make
-          run: |
-            make CC=gcc TARGET=aarch64 BUILD=debug all
-            # FIXME: For some reason some of the object files are rebuilt
-            make CC=gcc TARGET=aarch64 BUILD=debug test-ci
+      - name: apt
+        run: |
+          apt update -y
+          DEBIAN_FRONTEND=noninteractive apt install -y \
+            gcc \
+            libc6 \
+            libcapstone-dev \
+            libcapstone4 \
+            make
+      - name: make
+        run: make TARGET=aarch64 BUILD=debug all
+      - name: test
+        run: make TARGET=aarch64 BUILD=debug test-ci
 
   FreeBSD_amd_64:
     name: 'FreeBSD amd64'
