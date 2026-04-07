@@ -1827,9 +1827,12 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 					sym = get_sym();
 				}
 				if (IR_IS_FOLDABLE_OP(op)) {
-					if (op != IR_PHI
-					 && (IR_IS_UNRESOLVED(op1) || IR_IS_UNRESOLVED(op2) || IR_IS_UNRESOLVED(op3))) {
-						goto fallback;
+					if (IR_IS_UNRESOLVED(op1) || IR_IS_UNRESOLVED(op2) || IR_IS_UNRESOLVED(op3)) {
+						if (op == IR_PHI) {
+							goto emit;
+						} else {
+							goto fallback;
+						}
 					}
 					ref = ir_fold(p->ctx, IR_OPT(op, t), op1, op2, op3);
 				/* Folding for control and memory instructions */
@@ -1909,6 +1912,7 @@ fallback:
 							p->bad_insns = 1;
 						}
 					}
+emit:
 					if (!IR_OP_HAS_VAR_INPUTS(ir_op_flags[op])) {
 						opt = IR_OPT(op, t);
 					} else {
