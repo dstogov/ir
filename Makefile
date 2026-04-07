@@ -149,3 +149,59 @@ uninstall:
 	rm $(PREFIX)/include/ir_private.h
 	rm $(PREFIX)/include/ir_x86.h
 	rm $(PREFIX)/include/ir_aarch64.h
+
+FUZZ_DIR       = $(SRC_DIR)/fuzz
+FUZZ_BUILD     = $(FUZZ_DIR)/build
+FUZZ_CORPUS    = $(FUZZ_DIR)/corpus
+FUZZ_CFLAGS    = -Wall -Wextra -Wno-unused-parameter -g -O1 -DIR_DEBUG=1
+FUZZ_SANITIZE  = -fsanitize=address,undefined -fno-sanitize-recover=all
+FUZZ_FUZZER    = -fsanitize=fuzzer
+FUZZ_CC        = clang
+
+FUZZ_SRCS = $(FUZZ_DIR)/fuzz_ir.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h \
+	$(SRC_DIR)/ir_main.c $(FUZZ_BUILD)/libir.a
+FUZZ_COMPILE = $(FUZZ_CC) $(FUZZ_CFLAGS) $(FUZZ_SANITIZE) $(FUZZ_FUZZER) -DFUZZ_LIBFUZZER \
+	-I$(SRC_DIR) -I$(FUZZ_BUILD) -L$(FUZZ_BUILD)
+FUZZ_LIBS = -lir -lcapstone -lm
+FUZZ_OBJS = $(patsubst $(BUILD_DIR)/%,$(FUZZ_BUILD)/%,$(OBJS_COMMON))
+
+$(FUZZ_BUILD):
+	@mkdir -p $@
+
+$(FUZZ_BUILD)/%.o: $(SRC_DIR)/%.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h | $(FUZZ_BUILD)
+	$(FUZZ_CC) $(FUZZ_CFLAGS) $(FUZZ_SANITIZE) $(FUZZ_FUZZER) -I$(BUILD_DIR) -o $@ -c $<
+
+$(FUZZ_BUILD)/ir.o: $(SRC_DIR)/ir_fold.h $(BUILD_DIR)/ir_fold_hash.h
+$(FUZZ_BUILD)/ir_ra.o: $(SRC_DIR)/ir_$(DASM_ARCH).h
+$(FUZZ_BUILD)/ir_emit.o: $(SRC_DIR)/ir_$(DASM_ARCH).h $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h
+$(FUZZ_BUILD)/ir_gdb.o: $(SRC_DIR)/ir_elf.h
+$(FUZZ_BUILD)/ir_perf.o: $(SRC_DIR)/ir_elf.h
+$(FUZZ_BUILD)/ir_disasm.o: $(SRC_DIR)/ir_elf.h
+
+$(FUZZ_BUILD)/libir.a: $(FUZZ_OBJS)
+	ar r $@ $^
+
+fuzz-load: $(FUZZ_SRCS)
+	$(FUZZ_COMPILE) -DFUZZ_MODE_LOAD -o $(FUZZ_BUILD)/$@ $(FUZZ_DIR)/fuzz_ir.c $(FUZZ_LIBS)
+
+fuzz-O0: $(FUZZ_SRCS)
+	$(FUZZ_COMPILE) -DFUZZ_MODE_O0 -o $(FUZZ_BUILD)/$@ $(FUZZ_DIR)/fuzz_ir.c $(FUZZ_LIBS)
+
+fuzz-O1: $(FUZZ_SRCS)
+	$(FUZZ_COMPILE) -DFUZZ_MODE_O1 -o $(FUZZ_BUILD)/$@ $(FUZZ_DIR)/fuzz_ir.c $(FUZZ_LIBS)
+
+fuzz-O2: $(FUZZ_SRCS)
+	$(FUZZ_COMPILE) -DFUZZ_MODE_O2 -o $(FUZZ_BUILD)/$@ $(FUZZ_DIR)/fuzz_ir.c $(FUZZ_LIBS)
+
+fuzz: fuzz-load fuzz-O0 fuzz-O1 fuzz-O2
+
+fuzz-corpus:
+	$(FUZZ_DIR)/make_corpus.sh $(SRC_DIR)/tests $(FUZZ_CORPUS)
+
+fuzz-clean:
+	rm -rf $(FUZZ_BUILD)
+
+fuzz-corpus-clean:
+	rm -rf $(FUZZ_CORPUS)
+
+.PHONY: fuzz fuzz-load fuzz-O0 fuzz-O1 fuzz-O2 fuzz-corpus fuzz-clean fuzz-corpus-clean
