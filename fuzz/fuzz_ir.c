@@ -1,8 +1,17 @@
 /*
  * IR - Lightweight JIT Compilation Framework
- * (Fuzz harness for ir_load - text IR parser)
+ * (Fuzz harness)
  * Copyright (C) 2026 IR project.
  * Authors: Anatol Belski <anbelski@linux.microsoft.com>
+ *
+ * Single source for all fuzz targets. The mode is selected at compile
+ * time via -DFUZZ_MODE_xxx which determines the argv passed to the
+ * IR driver:
+ *
+ *   FUZZ_MODE_LOAD  -> -fsyntax-only  (parser only)
+ *   FUZZ_MODE_O0    -> -O0 --dump-size
+ *   FUZZ_MODE_O1    -> -O1 --dump-size
+ *   FUZZ_MODE_O2    -> -O2 --dump-size
  */
 
 #include "../ir_main.c"
@@ -15,6 +24,11 @@
 # include <unistd.h>
 #else
 # include <process.h>
+#endif
+
+#if !defined(FUZZ_MODE_LOAD) && !defined(FUZZ_MODE_O0) && \
+    !defined(FUZZ_MODE_O1) && !defined(FUZZ_MODE_O2)
+# define FUZZ_MODE_LOAD
 #endif
 
 #define TEST_FILENAME "fuzz-test.ir"
@@ -43,7 +57,6 @@ void __assert_fail(const char *expr, const char *file,
 const char *__lsan_default_suppressions(void) { return "leak:ir_"; }
 const char *__asan_default_options(void) { return "detect_leaks=0"; }
 
-/* Create a FILE* from a memory buffer. */
 static bool fuzz_buf_to_file(const uint8_t *data, size_t size, const char *filename)
 {
 	FILE *f = fopen(filename, "w+");
@@ -59,7 +72,21 @@ static bool fuzz_buf_to_file(const uint8_t *data, size_t size, const char *filen
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 {
+#if defined(FUZZ_MODE_LOAD)
 	char *argv[] = {"ir", "-fsyntax-only", TEST_FILENAME};
+	int argc = 3;
+#elif defined(FUZZ_MODE_O0)
+	char *argv[] = {"ir", "-O0", "--dump-size", TEST_FILENAME};
+	int argc = 4;
+#elif defined(FUZZ_MODE_O1)
+	char *argv[] = {"ir", "-O1", "--dump-size", TEST_FILENAME};
+	int argc = 4;
+#elif defined(FUZZ_MODE_O2)
+	char *argv[] = {"ir", "-O2", "--dump-size", TEST_FILENAME};
+	int argc = 4;
+#else
+# error "Unknown FUZZ_MODE"
+#endif
 
 	/* Limit input size to avoid timeouts on huge inputs */
 	if (size > 1024 * 1024) {
@@ -72,7 +99,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 
 	fuzz_in_load = 1;
 	if (setjmp(fuzz_exit_jmp) == 0) {
-		_fuzz_main(3, argv);
+		_fuzz_main(argc, argv);
 	}
 	fuzz_in_load = 0;
 

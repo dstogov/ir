@@ -49,16 +49,20 @@ $(FUZZ_BUILD)/libir.a:
 		TARGET=$(TARGET) BUILD_DIR=$(FUZZ_BUILD) BUILD=$(BUILD) \
 		CC=$(CC) CFLAGS="$(CFLAGS_BASE) $(SANITIZE_FLAGS) $(FUZZER_FLAGS)"
 
-# Fuzzer targets
-fuzz-load: $(FUZZ_DIR)/fuzz_load.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h $(FUZZ_BUILD)/libir.a
-	$(CC) $(CFLAGS_BASE) $(SANITIZE_FLAGS) $(FUZZER_FLAGS) -DFUZZ_LIBFUZZER \
-		-I$(SRC_DIR) -I$(FUZZ_BUILD) -L$(FUZZ_BUILD) -o $(FUZZ_BUILD)/$@ $< -lir -lcapstone -lm
+FUZZ_SRCS = $(FUZZ_DIR)/fuzz_ir.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h \
+	$(SRC_DIR)/ir_main.c $(FUZZ_BUILD)/libir.a
+FUZZ_COMPILE = $(CC) $(CFLAGS_BASE) $(SANITIZE_FLAGS) $(FUZZER_FLAGS) -DFUZZ_LIBFUZZER \
+	-I$(SRC_DIR) -I$(FUZZ_BUILD) -L$(FUZZ_BUILD)
+FUZZ_LIBS = -lir -lcapstone -lm
+
+# Fuzzer targets (all built from fuzz_ir.c with different FUZZ_MODE)
+fuzz-load: $(FUZZ_SRCS)
+	$(FUZZ_COMPILE) -DFUZZ_MODE=0 -o $(FUZZ_BUILD)/$@ $(FUZZ_DIR)/fuzz_ir.c $(FUZZ_LIBS)
 	@echo "Built: $(FUZZ_BUILD)/$@"
 	@echo "Run:   $(FUZZ_BUILD)/$@ $(CORPUS_DIR)/load/"
 
-fuzz-pipeline: $(FUZZ_DIR)/fuzz_pipeline.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h $(FUZZ_BUILD)/libir.a
-	$(CC) $(CFLAGS_BASE) $(SANITIZE_FLAGS) $(FUZZER_FLAGS) -DFUZZ_LIBFUZZER \
-		-I$(SRC_DIR) -I$(FUZZ_BUILD) -L$(FUZZ_BUILD) -o $(FUZZ_BUILD)/$@ $< -lir -lcapstone -lm
+fuzz-pipeline: $(FUZZ_SRCS)
+	$(FUZZ_COMPILE) -DFUZZ_MODE=3 -o $(FUZZ_BUILD)/$@ $(FUZZ_DIR)/fuzz_ir.c $(FUZZ_LIBS)
 	@echo "Built: $(FUZZ_BUILD)/$@"
 	@echo "Run:   $(FUZZ_BUILD)/$@ $(CORPUS_DIR)/pipeline/"
 
