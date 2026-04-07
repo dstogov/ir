@@ -1795,12 +1795,27 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 						sym = parse_val(sym, p, op, 1, &op1);
 						n = 1;
 						if (n > count.i32) yy_error("too many operands");
+						if (op == IR_CALL
+						 && IR_IS_UNRESOLVED(op1)
+						 && (p->ctx->flags & IR_OPT_FOLDING)) {
+							/* TODO: Disabling folding completely is too agressive. Try to find another solution. */
+							p->ctx->flags &= ~IR_OPT_FOLDING;
+							p->bad_insns = 1;
+						}
 						ir_set_op(p->ctx, ref, n, op1);
 						while (sym == YY__COMMA) {
 							sym = get_sym();
 							sym = parse_val(sym, p, op, n + 1, &op1);
 							n++;
 							if (n > count.i32) yy_error("too many operands");
+							if (op == IR_CALL
+							 && n == 2
+							 && IR_IS_UNRESOLVED(op1)
+							 && (p->ctx->flags & IR_OPT_FOLDING)) {
+								/* TODO: Disabling folding completely is too agressive. Try to find another solution. */
+								p->ctx->flags &= ~IR_OPT_FOLDING;
+								p->bad_insns = 1;
+							}
 							ir_set_op(p->ctx, ref, n, op1);
 						}
 					}
