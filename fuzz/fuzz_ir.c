@@ -31,8 +31,6 @@
 # define FUZZ_MODE_LOAD
 #endif
 
-#define TEST_FILENAME "fuzz-test.ir"
-
 static jmp_buf fuzz_exit_jmp;
 static int fuzz_in_load = 0;
 
@@ -72,17 +70,21 @@ static bool fuzz_buf_to_file(const uint8_t *data, size_t size, const char *filen
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 {
+	char filename[64];
+
+	snprintf(filename, sizeof(filename), "fuzz-test-%d.ir", getpid());
+
 #if defined(FUZZ_MODE_LOAD)
-	char *argv[] = {"ir", "-fsyntax-only", TEST_FILENAME};
+	char *argv[] = {"ir", "-fsyntax-only", filename};
 	int argc = 3;
 #elif defined(FUZZ_MODE_O0)
-	char *argv[] = {"ir", "-O0", "--dump-size", TEST_FILENAME};
+	char *argv[] = {"ir", "-O0", "--dump-size", filename};
 	int argc = 4;
 #elif defined(FUZZ_MODE_O1)
-	char *argv[] = {"ir", "-O1", "--dump-size", TEST_FILENAME};
+	char *argv[] = {"ir", "-O1", "--dump-size", filename};
 	int argc = 4;
 #elif defined(FUZZ_MODE_O2)
-	char *argv[] = {"ir", "-O2", "--dump-size", TEST_FILENAME};
+	char *argv[] = {"ir", "-O2", "--dump-size", filename};
 	int argc = 4;
 #else
 # error "Unknown FUZZ_MODE"
@@ -93,7 +95,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 		return 0;
 	}
 
-	if (!fuzz_buf_to_file(data, size, TEST_FILENAME)) {
+	if (!fuzz_buf_to_file(data, size, filename)) {
 		return 0;
 	}
 
@@ -103,7 +105,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 	}
 	fuzz_in_load = 0;
 
-	unlink(TEST_FILENAME);
+	unlink(filename);
 
 	return 0;
 }
