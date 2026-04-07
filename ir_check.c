@@ -148,6 +148,12 @@ bool ir_check(const ir_ctx *ctx)
 	bool ok = 1;
 	ir_check_ctx check_ctx;
 
+	if (ctx->insns_count < 1 || ctx->ir_base[1].op != IR_START) {
+		fprintf(stderr, "ir_base[1].op invalid opcode (%d)\n",
+			(ctx->insns_count < 1) ? IR_NOP : ctx->ir_base[0].op);
+		ok = 0;
+	}
+
 	check_ctx.arena = NULL;
 	check_ctx.use_set = NULL;
 	check_ctx.input_set = NULL;
