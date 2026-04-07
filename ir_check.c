@@ -470,6 +470,10 @@ bool ir_check(const ir_ctx *ctx)
 //	if (!ok) {
 //		ir_dump_codegen(ctx, stderr);
 //	}
+
+#ifndef IR_CHECK_NO_ABORT
 	IR_ASSERT(ok);
+#endif
+
 	return ok;
 }
