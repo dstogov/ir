@@ -370,8 +370,9 @@ ir(ir_loader *loader):
 					{ctx.flags |= flags;}
 					{ctx.ret_type = ret_type;}
 					ir_func(&p)
-					{if (!loader->func_process(loader, &ctx, name)) yy_error("process_func error");}
+					{bool ok = loader->func_process(loader, &ctx, name);}
 					{ir_free(&ctx);}
+					{if (!ok) yy_error("process_func error");}
 				)
 			)
 		)+
@@ -379,8 +380,9 @@ ir(ir_loader *loader):
 		{if (!loader->func_init(loader, &ctx, NULL)) yy_error("ini_func error");}
 		{ctx.ret_type = -1;}
 		ir_func(&p)
-		{if (!loader->func_process(loader, &ctx, NULL)) yy_error("process_func error");}
+		{bool ok = loader->func_process(loader, &ctx, NULL);}
 		{ir_free(&ctx);}
+		{if (!ok) yy_error("process_func error");}
 	)
 ;
 

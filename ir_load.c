@@ -1382,8 +1382,9 @@ _yy_state_13:
 						ctx.flags |= flags;
 						ctx.ret_type = ret_type;
 						sym = parse_ir_func(sym, &p);
-						if (!loader->func_process(loader, &ctx, name)) yy_error("process_func error");
+						bool ok = loader->func_process(loader, &ctx, name);
 						ir_free(&ctx);
+						if (!ok) yy_error("process_func error");
 					} else {
 						yy_error_sym("unexpected", sym);
 					}
@@ -1398,8 +1399,9 @@ _yy_state_13:
 		if (!loader->func_init(loader, &ctx, NULL)) yy_error("ini_func error");
 		ctx.ret_type = -1;
 		sym = parse_ir_func(sym, &p);
-		if (!loader->func_process(loader, &ctx, NULL)) yy_error("process_func error");
+		bool ok = loader->func_process(loader, &ctx, NULL);
 		ir_free(&ctx);
+		if (!ok) yy_error("process_func error");
 	} else {
 		yy_error_sym("unexpected", sym);
 	}
