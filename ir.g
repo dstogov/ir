@@ -61,6 +61,7 @@ typedef struct _ir_parser_ctx {
 	ir_strtab  var_tab;
 } ir_parser_ctx;
 
+static ir_parser_ctx *yy_ctx = NULL; /* we keep this global only to cleanum memory on syntax errors */
 static ir_strtab op_tab;
 
 #define IR_UNRESOLVED_MASK            0xc0000000
@@ -113,6 +114,9 @@ static void ir_define_var(ir_parser_ctx *p, const char *str, size_t len, ir_ref 
 			ir_strtab_update(&p->var_tab, str, len32, ref);
 		} else {
 			fprintf(stderr, "ERROR: Redefined variable `%.*s` on line %d\n", (int)len32, str, yy_line);
+			ir_strtab_free(&p->var_tab);
+			ir_free(p->ctx);
+			yy_ctx = NULL;
 			longjmp(yy_jmp_buf, 2);
 		}
 	}
@@ -130,6 +134,7 @@ static void ir_check_indefined_vars(ir_parser_ctx *p)
 	ir_strtab_apply(&p->var_tab, report_undefined_var);
 	ir_strtab_free(&p->var_tab);
 	ir_free(p->ctx);
+	yy_ctx = NULL;
 	longjmp(yy_jmp_buf, 2);
 }
 
@@ -461,9 +466,11 @@ ir_func(ir_parser_ctx *p):
 	{p->undef_count = 0;}
 	{p->bad_insns = 0;}
 	{ir_strtab_init(&p->var_tab, 256, 4096);}
+	{yy_ctx = p;}
 	"{" ( ("NOP" | ir_insn(p) ir_modifier(p)? ) ";" )* "}"
 	{if (p->undef_count) ir_check_indefined_vars(p);}
 	{if (p->bad_insns) p->ctx->flags |= IR_OPT_FOLDING;}
+	{yy_ctx = NULL;}
 	{ir_strtab_free(&p->var_tab);}
 	{
 		if (p->ctx->value_params) {
@@ -908,16 +915,31 @@ IGNORE: EOL | WS | ONE_LINE_COMMENT | COMMENT;
 
 static void yy_error(const char *msg) {
 	fprintf(stderr, "ERROR: %s at line %d\n", msg, yy_line);
+	if (yy_ctx) {
+		ir_strtab_free(&yy_ctx->var_tab);
+		ir_free(yy_ctx->ctx);
+		yy_ctx = NULL;
+	}
 	longjmp(yy_jmp_buf, 2);
 }
 
 static void yy_error_sym(const char *msg, int sym) {
 	fprintf(stderr, "ERROR: %s '%s' at line %d\n", msg, sym_name[sym], yy_line);
+	if (yy_ctx) {
+		ir_strtab_free(&yy_ctx->var_tab);
+		ir_free(yy_ctx->ctx);
+		yy_ctx = NULL;
+	}
 	longjmp(yy_jmp_buf, 2);
 }
 
 static void yy_error_str(const char *msg, const char *str) {
 	fprintf(stderr, "ERROR: %s '%s' at line %d\n", msg, str, yy_line);
+	if (yy_ctx) {
+		ir_strtab_free(&yy_ctx->var_tab);
+		ir_free(yy_ctx->ctx);
+		yy_ctx = NULL;
+	}
 	longjmp(yy_jmp_buf, 2);
 }
 
@@ -939,6 +961,7 @@ int ir_load(ir_loader *loader, FILE *f) {
 	*(unsigned char*)yy_end = 0;
 
 	if (setjmp(yy_jmp_buf) == 0) {
+		yy_ctx = NULL;
 		parse(loader);
 		ret = 1;
 	} else {
