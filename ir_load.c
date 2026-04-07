@@ -1901,6 +1901,11 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 					_ir_STORE(p->ctx, op2, op3);
 					ref = p->ctx->control;
 					p->ctx->control = IR_UNUSED;
+				} else if (op == IR_CALL) {
+					if (IR_IS_UNRESOLVED(op1) || IR_IS_UNRESOLVED(op2)) {
+						goto fallback;
+					}
+					goto emit;
 				} else {
 					uint32_t opt;
 

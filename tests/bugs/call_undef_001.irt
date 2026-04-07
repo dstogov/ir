@@ -1,0 +1,14 @@
+--TEST--
+SEGV in ir_find_aliasing_load_i after CALL with undefined function
+--CODE--
+{
+	l_1 = START(l_4);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	l_2 = CALL(l_1, u_1);
+	int32_t d_3, l_3 = LOAD(l_2);
+	l_4 = RETURN(l_3);
+}
+--EXPECT--
+ERROR: Undefined variable `u_1`
+
+exit code = 2
