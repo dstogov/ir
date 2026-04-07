@@ -1528,8 +1528,7 @@ int main(int argc, char **argv)
 	if (!ir_load(&loader.loader, f)) {
 		fclose(f);
 		ir_loader_free();
-		fprintf(stderr, "ERROR: Cannot load input file '%s'\n", input);
-		ret = 1;
+		ret = 2;
 		goto exit;
 	}
 

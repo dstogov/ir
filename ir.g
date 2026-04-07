@@ -39,6 +39,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <setjmp.h>
 #ifndef _WIN32
 # include <unistd.h>
 #endif
@@ -48,6 +49,8 @@ const unsigned char *yy_end;
 const unsigned char *yy_pos;
 const unsigned char *yy_text;
 uint32_t yy_line;
+
+static jmp_buf yy_jmp_buf;
 
 typedef struct _ir_parser_ctx {
 	ir_ctx    *ctx;
@@ -109,7 +112,7 @@ static void ir_define_var(ir_parser_ctx *p, const char *str, size_t len, ir_ref 
 			ir_strtab_update(&p->var_tab, str, len32, ref);
 		} else {
 			fprintf(stderr, "ERROR: Redefined variable `%.*s` on line %d\n", (int)len32, str, yy_line);
-			exit(2);
+			longjmp(yy_jmp_buf, 2);
 		}
 	}
 }
@@ -124,7 +127,7 @@ static void report_undefined_var(const char *str, uint32_t len, ir_ref val)
 static void ir_check_indefined_vars(ir_parser_ctx *p)
 {
 	ir_strtab_apply(&p->var_tab, report_undefined_var);
-	exit(2);
+	longjmp(yy_jmp_buf, 2);
 }
 
 /* forward declarations */
@@ -872,21 +875,22 @@ IGNORE: EOL | WS | ONE_LINE_COMMENT | COMMENT;
 
 static void yy_error(const char *msg) {
 	fprintf(stderr, "ERROR: %s at line %d\n", msg, yy_line);
-	exit(2);
+	longjmp(yy_jmp_buf, 2);
 }
 
 static void yy_error_sym(const char *msg, int sym) {
 	fprintf(stderr, "ERROR: %s '%s' at line %d\n", msg, sym_name[sym], yy_line);
-	exit(2);
+	longjmp(yy_jmp_buf, 2);
 }
 
 static void yy_error_str(const char *msg, const char *str) {
 	fprintf(stderr, "ERROR: %s '%s' at line %d\n", msg, str, yy_line);
-	exit(2);
+	longjmp(yy_jmp_buf, 2);
 }
 
 int ir_load(ir_loader *loader, FILE *f) {
 	long pos, end;
+	int ret;
 
 	pos = ftell(f);
 	fseek(f, 0, SEEK_END);
@@ -894,16 +898,23 @@ int ir_load(ir_loader *loader, FILE *f) {
 	fseek(f, pos, SEEK_SET);
 	yy_buf = ir_mem_malloc(end - pos + 1);
 	if (!yy_buf) {
+		fprintf(stderr, "ERROR: Cannot load IR file. Insufficient memory.\n");
 		return 0;
 	}
 	yy_end = yy_buf + (end - pos);
 	fread((void*)yy_buf, (end - pos), 1, f);
 	*(unsigned char*)yy_end = 0;
 
-	parse(loader);
+	if (setjmp(yy_jmp_buf) == 0) {
+		parse(loader);
+		ret = 1;
+	} else {
+		ret = 0;
+	}
+
 	ir_mem_free((void*)yy_buf);
 
-	return 1;
+	return ret;
 }
 
 void ir_loader_init(void)
