@@ -121,6 +121,7 @@ static void help(const char *cmd)
 		"  --debug-bb-scheduling      - debug BB PLCEMENT optimization pass\n"
 #endif
 		"Utility Options\n"
+		"  -fsyntax-only              - check the input files for syntax errors, but don't do anything beyond that\n"
 		"  --emit-c                   - convert final IR to C source (implementation is incomplete)\n"
 		"  --emit-llvm                - convert final IR to LLVM code (implementation is incomplete)\n"
 		"  --dump-size                - dump generated code size\n"
@@ -143,6 +144,8 @@ static void help(const char *cmd)
 #define IR_RUN                      (1<<7)
 #define IR_PERF                     (1<<8)
 #define IR_GDB                      (1<<9)
+
+#define IR_LOAD_ONLY                (1<<10)
 
 #define IR_GEN_NATIVE               (IR_RUN|IR_DUMP_ASM|IR_DUMP_SIZE)
 #define IR_GEN_CODE                 (IR_DUMP_LLVM|IR_DUMP_C)
@@ -304,6 +307,10 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 #ifdef IR_DEBUG
 	ir_check(ctx);
 #endif
+
+	if (dump & IR_LOAD_ONLY) {
+		return 1;
+	}
 
 	if (opt_level > 0 && (ctx->flags & IR_OPT_MEM2SSA)) {
 		ir_build_cfg(ctx);
@@ -1328,6 +1335,8 @@ int main(int argc, char **argv)
 			dump |= IR_GDB;
 		} else if (strcmp(argv[i], "-p") == 0) {
 			dump |= IR_PERF;
+		} else if (strcmp(argv[i], "-fsyntax-only") == 0) {
+			dump |= IR_LOAD_ONLY;
 		} else if (argv[i][0] == '-') {
 			fprintf(stderr, "ERROR: Unknown option '%s' (use --help)\n", argv[i]);
 			return 1;
@@ -1392,6 +1401,16 @@ int main(int argc, char **argv)
 	if (dump & IR_GEN_NATIVE) {
 		if (dump & IR_GEN_CODE) {
 			fprintf(stderr, "ERROR: --emit-c and --emit-llvm are incompatible with native code generator (-S, --dump-size, --run)\n");
+			return 1;
+		}
+	}
+	if (dump & IR_LOAD_ONLY) {
+		if (dump & IR_GEN_NATIVE) {
+			fprintf(stderr, "ERROR: -fsyntax-only is not compatible with native compilation flags (-S, --run, --dump-size)\n");
+			return 1;
+		}
+		if (dump & IR_GEN_CODE) {
+			fprintf(stderr, "ERROR: -fsyntax-only is not compatible with --emit-c and --emit-llvm\n");
 			return 1;
 		}
 	}
