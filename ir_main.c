@@ -1018,7 +1018,7 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 	ir_main_loader *l = (ir_main_loader*) loader;
 
 	// TODO: remove this
-	if (ctx->ret_type == (ir_type)-1) {
+	if (ctx->ret_type == (ir_type)-1 && ctx->insns_count > 1 && ctx->ir_base[1].op == IR_START) {
 		ir_ref ref = ctx->ir_base[1].op1;
 		while (ref) {
 			ir_insn *insn = &ctx->ir_base[ref];
