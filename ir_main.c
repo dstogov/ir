@@ -305,7 +305,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 	}
 
 #ifdef IR_DEBUG
-	ir_check(ctx);
+	if (!ir_check(ctx)) return 0;
 #endif
 
 	if (dump & IR_LOAD_ONLY) {
@@ -319,7 +319,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 			return 0;
 		}
 #ifdef IR_DEBUG
-		ir_check(ctx);
+		if (!ir_check(ctx)) return 0;
 #endif
 
 		ir_build_dominators_tree(ctx);
@@ -336,7 +336,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 			return 0;
 		}
 #ifdef IR_DEBUG
-		ir_check(ctx);
+		if (!ir_check(ctx)) return 0;
 #endif
 	}
 
@@ -348,7 +348,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 			return 0;
 		}
 #ifdef IR_DEBUG
-		ir_check(ctx);
+		if (!ir_check(ctx)) return 0;
 #endif
 	}
 
@@ -359,7 +359,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 			return 0;
 		}
 #ifdef IR_DEBUG
-		ir_check(ctx);
+		if (!ir_check(ctx)) return 0;
 #endif
 
 		if (opt_level > 0) {
@@ -385,7 +385,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 			return 0;
 		}
 #ifdef IR_DEBUG
-		ir_check(ctx);
+		if (!ir_check(ctx)) return 0;
 #endif
 
 		ir_schedule(ctx);
@@ -394,7 +394,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 			return 0;
 		}
 #ifdef IR_DEBUG
-		ir_check(ctx);
+		if (!ir_check(ctx)) return 0;
 #endif
 	}
 
@@ -443,7 +443,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 	}
 
 #ifdef IR_DEBUG
-	ir_check(ctx);
+	if (!ir_check(ctx)) return 0;
 #endif
 
 	return 1;
