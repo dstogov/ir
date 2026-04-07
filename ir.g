@@ -55,7 +55,7 @@ static jmp_buf yy_jmp_buf;
 typedef struct _ir_parser_ctx {
 	ir_ctx    *ctx;
 	uint32_t   undef_count;
-	uint32_t   undef_mem_op;
+	bool       bad_insns; /* some insns that might affect folding had undefined operands */
 	uint32_t   value_params_count;
 	ir_ref     curr_ref;
 	ir_strtab  var_tab;
@@ -457,10 +457,11 @@ ir_sym_data(ir_loader *loader):
 
 ir_func(ir_parser_ctx *p):
 	{p->undef_count = 0;}
-	{p->undef_mem_op = 0;}
+	{p->bad_insns = 0;}
 	{ir_strtab_init(&p->var_tab, 256, 4096);}
 	"{" ( ("NOP" | ir_insn(p) ir_modifier(p)? ) ";" )* "}"
 	{if (p->undef_count) ir_check_indefined_vars(p);}
+	{if (p->bad_insns) p->ctx->flags |= IR_OPT_FOLDING;}
 	{ir_strtab_free(&p->var_tab);}
 	{
 		if (p->ctx->value_params) {
@@ -633,72 +634,74 @@ ir_insn(ir_parser_ctx *p):
 				")"
 			)?
 			{
-				if (IR_IS_FOLDABLE_OP(op)
-				 && !IR_IS_UNRESOLVED(op1)
-				 && !IR_IS_UNRESOLVED(op2)
-				 && !IR_IS_UNRESOLVED(op3)) {
+				if (IR_IS_FOLDABLE_OP(op)) {
+					if (op != IR_PHI
+					 && (IR_IS_UNRESOLVED(op1) || IR_IS_UNRESOLVED(op2) || IR_IS_UNRESOLVED(op3))) {
+						goto fallback;
+					}
 					ref = ir_fold(p->ctx, IR_OPT(op, t), op1, op2, op3);
 				/* Folding for control and memory instructions */
 #if 0
-				} else if (op == IR_BEGIN
-				 && !IR_IS_UNRESOLVED(op1)) {
+				} else if (op == IR_BEGIN) {
+					if (IR_IS_UNRESOLVED(op1)) {
+						goto fallback;
+					}
 					p->ctx->control = IR_UNUSED;
 					_ir_BEGIN(p->ctx, op1);
 					ref = p->ctx->control;
 					p->ctx->control = IR_UNUSED;
 #endif
-				} else if (op == IR_IF
-				 && !IR_IS_UNRESOLVED(op1)
-				 && !IR_IS_UNRESOLVED(op2)) {
+				} else if (op == IR_IF) {
+					if (IR_IS_UNRESOLVED(op1) || IR_IS_UNRESOLVED(op2)) {
+						goto fallback;
+					}
 					p->ctx->control = op1;
 					ref = _ir_IF(p->ctx, op2);
 					p->ctx->control = IR_UNUSED;
-				} else if (op == IR_GUARD
-				 && !IR_IS_UNRESOLVED(op1)
-				 && !IR_IS_UNRESOLVED(op2)
-				 && !IR_IS_UNRESOLVED(op3)) {
+				} else if (op == IR_GUARD) {
+					if (IR_IS_UNRESOLVED(op1) || IR_IS_UNRESOLVED(op2) || IR_IS_UNRESOLVED(op3)) {
+						goto fallback;
+					}
 					p->ctx->control = op1;
 					_ir_GUARD(p->ctx, op2, op3);
 					ref = p->ctx->control;
 					p->ctx->control = IR_UNUSED;
-				} else if (op == IR_GUARD_NOT
-				 && !IR_IS_UNRESOLVED(op1)
-				 && !IR_IS_UNRESOLVED(op2)
-				 && !IR_IS_UNRESOLVED(op3)) {
+				} else if (op == IR_GUARD_NOT) {
+					if (IR_IS_UNRESOLVED(op1) || IR_IS_UNRESOLVED(op2) || IR_IS_UNRESOLVED(op3)) {
+						goto fallback;
+					}
 					p->ctx->control = op1;
 					_ir_GUARD_NOT(p->ctx, op2, op3);
 					ref = p->ctx->control;
 					p->ctx->control = IR_UNUSED;
-				} else if (op == IR_VLOAD
-				 && !IR_IS_UNRESOLVED(op1)
-				 && !IR_IS_UNRESOLVED(op2)
-				 && !p->undef_mem_op) {
+				} else if (op == IR_VLOAD) {
+					if (IR_IS_UNRESOLVED(op1) || IR_IS_UNRESOLVED(op2)) {
+						goto fallback;
+					}
 					p->ctx->control = op1;
 					ref = _ir_VLOAD(p->ctx, t, op2);
 					ref2 = p->ctx->control;
 					p->ctx->control = IR_UNUSED;
-				} else if (op == IR_VSTORE
-				 && !IR_IS_UNRESOLVED(op1)
-				 && !IR_IS_UNRESOLVED(op2)
-				 && !IR_IS_UNRESOLVED(op3)
-				 && !p->undef_mem_op) {
+				} else if (op == IR_VSTORE) {
+					if (IR_IS_UNRESOLVED(op1) || IR_IS_UNRESOLVED(op2) || IR_IS_UNRESOLVED(op3)) {
+						goto fallback;
+					}
 					p->ctx->control = op1;
 					_ir_VSTORE(p->ctx, op2, op3);
 					ref = p->ctx->control;
 					p->ctx->control = IR_UNUSED;
-				} else if (op == IR_LOAD
-				 && !IR_IS_UNRESOLVED(op1)
-				 && !IR_IS_UNRESOLVED(op2)
-				 && !p->undef_mem_op) {
+				} else if (op == IR_LOAD) {
+					if (IR_IS_UNRESOLVED(op1) || IR_IS_UNRESOLVED(op2)) {
+						goto fallback;
+					}
 					p->ctx->control = op1;
 					ref = _ir_LOAD(p->ctx, t, op2);
 					ref2 = p->ctx->control;
 					p->ctx->control = IR_UNUSED;
-				} else if (op == IR_STORE
-				 && !IR_IS_UNRESOLVED(op1)
-				 && !IR_IS_UNRESOLVED(op2)
-				 && !IR_IS_UNRESOLVED(op3)
-				 && !p->undef_mem_op) {
+				} else if (op == IR_STORE) {
+					if (IR_IS_UNRESOLVED(op1) || IR_IS_UNRESOLVED(op2) || IR_IS_UNRESOLVED(op3)) {
+						goto fallback;
+					}
 					p->ctx->control = op1;
 					_ir_STORE(p->ctx, op2, op3);
 					ref = p->ctx->control;
@@ -706,9 +709,13 @@ ir_insn(ir_parser_ctx *p):
 				} else {
 					uint32_t opt;
 
-					if ((op == IR_VSTORE || op == IR_STORE || op == IR_VLOAD || op == IR_LOAD)
-					 && (IR_IS_UNRESOLVED(op1) || IR_IS_UNRESOLVED(op2) || IR_IS_UNRESOLVED(op3))) {
-						p->undef_mem_op = 1;
+					if (0) {
+fallback:
+						if (p->ctx->flags & IR_OPT_FOLDING) {
+							/* TODO: Disabling folding completely is too agressive. Try to find another solution. */
+							p->ctx->flags &= ~IR_OPT_FOLDING;
+							p->bad_insns = 1;
+						}
 					}
 					if (!IR_OP_HAS_VAR_INPUTS(ir_op_flags[op])) {
 						opt = IR_OPT(op, t);
