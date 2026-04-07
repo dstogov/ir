@@ -110,6 +110,8 @@ static void report_undefined_var(const char *str, uint32_t len, ir_ref val)
 static void ir_check_indefined_vars(ir_parser_ctx *p)
 {
 	ir_strtab_apply(&p->var_tab, report_undefined_var);
+	ir_strtab_free(&p->var_tab);
+	ir_free(p->ctx);
 	longjmp(yy_jmp_buf, 2);
 }
 
