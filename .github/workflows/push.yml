@@ -27,9 +27,9 @@ jobs:
             libcapstone4 \
             make
       - name: make
-        run: make TARGET=x86_64 BUILD=debug all
+        run: make BUILD=debug all
       - name: test
-        run: make TARGET=x86_64 BUILD=debug test-ci
+        run: make BUILD=debug test-ci
   Linux_x86_64_c11:
     name: 'Linux x86_64 -std=c11'
     runs-on: ubuntu-22.04
@@ -48,9 +48,9 @@ jobs:
             libcapstone4 \
             make
       - name: make
-        run: make TARGET=x86_64 BUILD=debug CFLAGS=-std=c11 all
+        run: make BUILD=debug CFLAGS=-std=c11 all
       - name: test
-        run: make TARGET=x86_64 BUILD=debug CFLAGS=-std=c11 test-ci
+        run: make BUILD=debug CFLAGS=-std=c11 test-ci
   Linux_i386:
     name: 'Linux i386'
     runs-on: ubuntu-22.04
@@ -101,9 +101,9 @@ jobs:
             libcapstone4 \
             make
       - name: make
-        run: make TARGET=aarch64 BUILD=debug all
+        run: make BUILD=debug all
       - name: test
-        run: make TARGET=aarch64 BUILD=debug test-ci
+        run: make BUILD=debug test-ci
 
   FreeBSD_amd_64:
     name: 'FreeBSD amd64'
@@ -137,9 +137,9 @@ jobs:
       - name: brew
         run: brew install capstone
       - name: make
-        run: make TARGET=x86_64 BUILD=debug all
+        run: make BUILD=debug all
       - name: test
-        run: make TARGET=x86_64 BUILD=debug test-ci
+        run: make BUILD=debug test-ci
 
   Windows:
     strategy:
