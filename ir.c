@@ -1843,7 +1843,7 @@ int ir_mem_unprotect(void *ptr, size_t size)
 
 int ir_mem_flush(void *ptr, size_t size)
 {
-	return 1;
+	return FlushInstructionCache(GetCurrentProcesss(), ptr, size) == TRUE ? 1 : 0;
 }
 #else
 
