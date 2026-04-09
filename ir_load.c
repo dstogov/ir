@@ -1826,7 +1826,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 					}
 					sym = get_sym();
 				}
-			} else if (sym == YY__LPAREN || sym == YY_BYVAL || sym == YY__SEMICOLON) {
+			} else {
 				n = 0;
 				if (sym == YY__LPAREN) {
 					sym = get_sym();
@@ -1954,8 +1954,6 @@ emit:
 					}
 					ref = ref2 = ir_emit(p->ctx, opt, op1, op2, op3);
 				}
-			} else {
-				yy_error_sym("unexpected", sym);
 			}
 			break;
 		default:
