@@ -1130,7 +1130,11 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 	return 1;
 }
 
+#ifdef FUZZ_LIBFUZZER
+int _fuzz_main(int argc, char **argv)
+#else
 int main(int argc, char **argv)
+#endif
 {
 	int i, run_args = 0;
 	char *input = NULL;
