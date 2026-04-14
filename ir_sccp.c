@@ -1907,6 +1907,46 @@ static ir_ref ir_promote_i2i(ir_ctx *ctx, ir_type type, ir_ref ref, ir_ref use, 
 					insn->op3 = ir_promote_i2i(ctx, type, insn->op3, ref, worklist);
 				}
 				insn->type = type;
+				if (IR_IS_TYPE_SIGNED(type)) {
+					ir_insn *cond = &ctx->ir_base[insn->op1];
+					if (cond->op == IR_LT || cond->op == IR_LE || cond->op == IR_GT || cond->op == IR_GE) {
+						if (cond->op1 == insn->op2 && cond->op2 == insn->op3) {
+							insn->op = (cond->op == IR_LT || cond->op == IR_LE) ? IR_MIN : IR_MAX;
+							ir_use_list_remove_one(ctx, insn->op1, ref);
+							ir_bitqueue_add(worklist, insn->op1);
+							insn->op1 = insn->op2;
+							insn->op2 = insn->op3;
+							insn->op3 = IR_UNUSED;
+						} else if (cond->op1 == insn->op3 && cond->op2 == insn->op1) {
+							insn->op = (cond->op == IR_LT || cond->op == IR_LE) ? IR_MAX : IR_MIN;
+							ir_use_list_remove_one(ctx, insn->op1, ref);
+							ir_bitqueue_add(worklist, insn->op1);
+							insn->op1 = insn->op2;
+							insn->op2 = insn->op3;
+							insn->op3 = IR_UNUSED;
+						}
+					}
+				} else {
+					IR_ASSERT(IR_IS_TYPE_UNSIGNED(type));
+					ir_insn *cond = &ctx->ir_base[insn->op1];
+					if (cond->op == IR_ULT || cond->op == IR_ULE || cond->op == IR_UGT || cond->op == IR_UGE) {
+						if (cond->op1 == insn->op2 && cond->op2 == insn->op3) {
+							insn->op = (cond->op == IR_ULT || cond->op == IR_ULE) ? IR_MIN : IR_MAX;
+							ir_use_list_remove_one(ctx, insn->op1, ref);
+							ir_bitqueue_add(worklist, insn->op1);
+							insn->op1 = insn->op2;
+							insn->op2 = insn->op3;
+							insn->op3 = IR_UNUSED;
+						} else if (cond->op1 == insn->op3 && cond->op2 == insn->op1) {
+							insn->op = (cond->op == IR_ULT || cond->op == IR_ULE) ? IR_MAX : IR_MIN;
+							ir_use_list_remove_one(ctx, insn->op1, ref);
+							ir_bitqueue_add(worklist, insn->op1);
+							insn->op1 = insn->op2;
+							insn->op2 = insn->op3;
+							insn->op3 = IR_UNUSED;
+						}
+					}
+				}
 				return ref;
 			case IR_PHI:
 				for (p = insn->ops + 2, n = insn->inputs_count - 1; n > 0; p++, n--) {
