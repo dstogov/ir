@@ -1680,7 +1680,7 @@ IR_FOLD(EQ(SEXT, C_I32))
 IR_FOLD(EQ(SEXT, C_I64))
 IR_FOLD(EQ(SEXT, C_ADDR))
 {
-	if (ctx->use_lists && ctx->use_lists[op1_insn->op1].count != 1) {
+	if (ctx->use_lists && ctx->use_lists[op1].count != 1) {
 		/* pass */
 	} else if (op2_insn->val.u64 == 0 && ctx->ir_base[op1_insn->op1].type == IR_BOOL) {
 		opt = IR_OPT(IR_NOT, IR_BOOL);
@@ -1732,7 +1732,7 @@ IR_FOLD(NE(SEXT, C_I32))
 IR_FOLD(NE(SEXT, C_I64))
 IR_FOLD(NE(SEXT, C_ADDR))
 {
-	if (ctx->use_lists && ctx->use_lists[op1_insn->op1].count != 1) {
+	if (ctx->use_lists && ctx->use_lists[op1].count != 1) {
 		/* pass */
 	} else if (op2_insn->val.u64 == 0 && ctx->ir_base[op1_insn->op1].type == IR_BOOL) {
 		IR_FOLD_COPY(op1_insn->op1);
