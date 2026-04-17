@@ -562,11 +562,13 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 				constraints->tmp_regs[0] = IR_TMP_REG(1, IR_ADDR, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 				n = 1;
 			}
-			if (IR_IS_CONST_REF(insn->op2) && insn->op1 != insn->op2) {
-				insn = &ctx->ir_base[insn->op2];
-				if (IR_IS_SYM_CONST(insn->op) || !aarch64_may_encode_imm12(insn->val.u64)) {
-					constraints->tmp_regs[n] = IR_TMP_REG(2, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
-					n++;
+			if (IR_IS_CONST_REF(insn->op2)) {
+				if (insn->op1 != insn->op2) {
+					insn = &ctx->ir_base[insn->op2];
+					if (IR_IS_SYM_CONST(insn->op) || !aarch64_may_encode_imm12(insn->val.u64)) {
+						constraints->tmp_regs[n] = IR_TMP_REG(2, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+						n++;
+					}
 				}
 			} else if (ir_rule(ctx, insn->op2) == IR_STATIC_ALLOCA) {
 				constraints->tmp_regs[n] = IR_TMP_REG(2, IR_ADDR, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);

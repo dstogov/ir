@@ -1345,9 +1345,11 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
 op2_const:
 			insn = &ctx->ir_base[ref];
-			if (IR_IS_CONST_REF(insn->op2) && insn->op1 != insn->op2) {
-				constraints->tmp_regs[n] = IR_TMP_REG(2, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
-				n++;
+			if (IR_IS_CONST_REF(insn->op2)) {
+				if (insn->op1 != insn->op2) {
+					constraints->tmp_regs[n] = IR_TMP_REG(2, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+					n++;
+				}
 			} else if (ir_rule(ctx, insn->op2) == IR_STATIC_ALLOCA) {
 				constraints->tmp_regs[n] = IR_TMP_REG(2, IR_ADDR, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 				n = 1;
