@@ -3477,6 +3477,13 @@ static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref con
 		}
 	}
 
+	if (condition_insn->op == IR_SHL && IR_IS_CONST_REF(condition_insn->op1)) {
+		ir_insn *val_insn = &ctx->ir_base[condition_insn->op1];
+		if (!IR_IS_SYM_CONST(val_insn->op) && val_insn->val.u64 == 1) {
+			return IR_TRUE;
+		}
+	}
+
 	while ((condition_insn->op == IR_BITCAST
 	  || condition_insn->op == IR_ZEXT
 	  || condition_insn->op == IR_SEXT)
