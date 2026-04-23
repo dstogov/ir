@@ -419,6 +419,7 @@ bool ir_check(const ir_ctx *ctx)
 						}
 						break;
 					case IR_IGOTO:
+					case IR_ASM_GOTO:
 						break;
 					default:
 						/* skip data references */

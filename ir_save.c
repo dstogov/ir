@@ -283,7 +283,7 @@ void ir_save(const ir_ctx *ctx, uint32_t save_flags, FILE *f)
 		n = ir_operands_count(ctx, insn);
 		if ((insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN) && n != 2) {
 			fprintf(f, "/%d", n);
-		} else if ((insn->op == IR_CALL || insn->op == IR_TAILCALL) && n != 2) {
+		} else if ((insn->op == IR_CALL || insn->op == IR_TAILCALL || insn->op == IR_ASM) && n != 2) {
 			fprintf(f, "/%d", n - 2);
 		} else if (insn->op == IR_PHI && n != 3) {
 			fprintf(f, "/%d", n - 1);

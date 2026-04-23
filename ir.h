@@ -383,6 +383,14 @@ typedef enum _ir_type {
 	_(RETURN,       T2X1, src, def, ret) /* function return             */ \
 	_(UNREACHABLE,  T1X2, src, ___, ret) /* unreachable (tailcall, etc) */ \
 	\
+	/* inline assembler                                                 */ \
+	_(ASM,          xN,   src, def, def) /* GCC inline assembler        */ \
+	                                     /* op2 - asm template string   */ \
+	                                     /* op3 - asm constraint string */ \
+	                                     /* opN - asm input argument    */ \
+	_(ASM_OUT,      x1,   src, ___, ___) /* ASM data output projection  */ \
+	_(ASM_GOTO,     E1,   src, ___, ___) /* ASM goto (bb end after ASM) */ \
+	\
 	/* deoptimization helper                                            */ \
 	_(EXITCALL,     x2,   src, def, ___) /* save CPU regs and call op2  */ \
 

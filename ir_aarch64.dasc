@@ -1267,6 +1267,12 @@ binop_fp:
 			return IR_FUSED | IR_ARGVAL;
 		case IR_NOP:
 			return IR_SKIPPED | IR_NOP;
+		case IR_ASM:
+		case IR_ASM_OUT:
+		case IR_ASM_GOTO:
+			fprintf(stderr, "ERROR: IR_ASM is not implemented yet\n");
+			exit(1);
+			return IR_SKIPPED | IR_NOP;
 		default:
 			break;
 	}
