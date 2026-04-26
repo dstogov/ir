@@ -1,0 +1,27 @@
+--TEST--
+GH-132: RLOAD/RSTORE without conflict
+--TARGET--
+x86_64
+--ARGS--
+-S
+--CODE--
+{
+    uintptr_t c_30 = 1;
+    uintptr_t c_31 = 2;
+    uintptr_t c_35 = 0xffff;
+
+    l_1 = START(l_99);
+
+    uintptr_t d_2, l_2 = RLOAD(l_1, 15);
+    l_3 = RSTORE(l_2, c_30, 14);
+    l_4 = STORE(l_3, c_35, d_2);
+
+    l_99 = RETURN(l_4);
+}
+--EXPECT--
+test:
+	pushq %r15
+	movl $1, %r14d
+	movq %r15, 0xffff
+	popq %r15
+	retq
