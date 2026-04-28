@@ -1761,7 +1761,7 @@ IR_FOLD(GT(SEXT, C_ADDR))
 				op1 = op1_insn->op1;
 				op2 = IR_UNUSED;
 				IR_FOLD_RESTART;
-			} else if ((opt & IR_OPT_OP_MASK) == IR_EQ) {
+			} else if ((opt & IR_OPT_OP_MASK) == IR_NE) {
 				IR_FOLD_COPY(op1_insn->op1);
 			}
 		}
