@@ -1,0 +1,66 @@
+--TEST--
+DIV must not be hoisted above the guard
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 0;
+	int32_t c_5 = 10;
+	int32_t c_6 = 1;
+	l_1 = START(l_23);
+	int32_t d_2 = PARAM(l_1, "x", 1);
+	int32_t d_3 = PARAM(l_1, "y", 2);
+	l_4 = END(l_1);
+	l_5 = LOOP_BEGIN(l_4, l_21);
+	int32_t d_6 = PHI(l_5, c_4, d_19);
+	int32_t d_7 = PHI(l_5, c_4, d_20);
+	bool d_8 = LT(d_7, c_5);
+	l_9 = IF(l_5, d_8);
+	l_10 = IF_TRUE(l_9);
+	l_11 = IF(l_10, d_3);
+	l_12 = IF_TRUE(l_11);
+	int32_t d_13 = DIV(d_2, d_3, l_12); // without the guarding "l_12", GCM would move DIV out of the LOOP
+	int32_t d_14 = ADD(d_13, d_6);
+	l_15 = END(l_12);
+	l_16 = IF_FALSE(l_11);
+	l_17 = END(l_16);
+	l_18 = MERGE(l_15, l_17);
+	int32_t d_19 = PHI(l_18, d_14, d_6);
+	int32_t d_20 = ADD(d_7, c_6);
+	l_21 = LOOP_END(l_18);
+	l_22 = IF_FALSE(l_9);
+	l_23 = RETURN(l_22, d_6);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 0;
+	int32_t c_5 = 10;
+	int32_t c_6 = 1;
+	l_1 = START(l_23);
+	int32_t d_2 = PARAM(l_1, "x", 1);
+	int32_t d_3 = PARAM(l_1, "y", 2);
+	l_4 = END(l_1);
+	l_5 = LOOP_BEGIN(l_4, l_21);
+	int32_t d_6 = PHI(l_5, c_4, d_19);
+	int32_t d_7 = PHI(l_5, c_4, d_20);
+	bool d_8 = LT(d_7, c_5);
+	l_9 = IF(l_5, d_8);
+	l_10 = IF_TRUE(l_9);
+	l_11 = IF(l_10, d_3);
+	l_12 = IF_TRUE(l_11);
+	int32_t d_13 = DIV(d_2, d_3, l_12);
+	int32_t d_14 = ADD(d_13, d_6);
+	l_15 = END(l_12);
+	l_16 = IF_FALSE(l_11);
+	l_17 = END(l_16);
+	l_18 = MERGE(l_15, l_17);
+	int32_t d_19 = PHI(l_18, d_14, d_6);
+	int32_t d_20 = ADD(d_7, c_6);
+	l_21 = LOOP_END(l_18);
+	l_22 = IF_FALSE(l_9);
+	l_23 = RETURN(l_22, d_6);
+}

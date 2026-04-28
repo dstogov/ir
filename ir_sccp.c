@@ -609,6 +609,10 @@ static IR_NEVER_INLINE void ir_sccp_analyze(const ir_ctx *ctx, ir_sccp_val *_val
 
 				IR_ASSERT(!IR_OP_HAS_VAR_INPUTS(flags));
 				n = IR_INPUT_EDGES_COUNT(flags);
+				if (insn->op == IR_DIV || insn->op == IR_MOD) {
+					/* skip data-control guard edge */
+					n--;
+				}
 				for (p = insn->ops + 1; n > 0; p++, n--) {
 					ir_ref input = *p;
 					if (input > 0) {
@@ -1419,7 +1423,7 @@ static ir_ref ir_iter_find_cse(const ir_ctx *ctx, ir_ref ref, uint32_t opt, ir_r
 		if (!IR_IS_CONST_REF(op2) && (!use_list || use_list->count > ctx->use_lists[op2].count)) {
 			use_list = &ctx->use_lists[op2];
 		}
-		if (!IR_IS_CONST_REF(op3) && (!use_list || use_list->count > ctx->use_lists[op3].count)) {
+		if (op3 > 0 && (!use_list || use_list->count > ctx->use_lists[op3].count)) {
 			use_list = &ctx->use_lists[op3];
 		}
 		if (use_list) {
@@ -2035,7 +2039,7 @@ static uint32_t _ir_estimated_control(const ir_ctx *ctx, ir_ref val, ir_ref loop
 	const ir_ref *p;
 	ir_ref n, input, result, ctrl;
 
-	if (IR_IS_CONST_REF(val)) {
+	if (val <= 0) { /* constant or IR_UNUSED */
 		return 1; /* IR_START */
 	}
 

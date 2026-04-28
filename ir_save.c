@@ -321,6 +321,7 @@ void ir_save(const ir_ctx *ctx, uint32_t save_flags, FILE *f)
 					case IR_OPND_CONTROL:
 					case IR_OPND_CONTROL_DEP:
 					case IR_OPND_CONTROL_REF:
+					case IR_OPND_CONTROL_GUARD:
 						fprintf(f, "%sl_%d", first ? "(" : ", ", ref);
 						first = 0;
 						break;
@@ -352,6 +353,8 @@ void ir_save(const ir_ctx *ctx, uint32_t save_flags, FILE *f)
 			} else if (opnd_kind == IR_OPND_NUM) {
 				fprintf(f, "%s%d", first ? "(" : ", ", ref);
 				first = 0;
+			} else if (opnd_kind == IR_OPND_CONTROL_GUARD) {
+				/* skip */
 			} else if (j != n &&
 					(IR_IS_REF_OPND_KIND(opnd_kind) || (opnd_kind == IR_OPND_UNUSED && p[n-j]))) {
 				fprintf(f, "%snull", first ? "(" : ", ");

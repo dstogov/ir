@@ -1170,11 +1170,11 @@ int ir_schedule(ir_ctx *ctx)
 					ir_ref use = *p;
 					ir_insn *use_insn = &ctx->ir_base[use];
 					if (!_xlat[use] && ctx->cfg_map[use]) {
-						IR_ASSERT(ctx->cfg_map[use] == b);
 						if (use_insn->op == IR_PARAM
 						 || use_insn->op == IR_VAR
 						 || use_insn->op == IR_PI
 						 || use_insn->op == IR_PHI) {
+							IR_ASSERT(ctx->cfg_map[use] == b);
 							if (_prev[use] != phis) {
 								/* remove "use" */
 								_prev[_next[use]] = _prev[use];

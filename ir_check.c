@@ -303,6 +303,14 @@ bool ir_check(const ir_ctx *ctx)
 								ok = 0;
 							}
 							break;
+						case IR_OPND_CONTROL_GUARD:
+							if (!(ir_op_flags[use_insn->op] & IR_OP_FLAG_BB_START)
+							 && use_insn->op != IR_GUARD
+							 && use_insn->op != IR_GUARD_NOT) {
+								fprintf(stderr, "ir_base[%d].ops[%d] reference (%d) must be BB_START or GUARD\n", i, j, use);
+								ok = 0;
+							}
+							break;
 						default:
 							fprintf(stderr, "ir_base[%d].ops[%d] reference (%d) of unsupported kind\n", i, j, use);
 							ok = 0;
@@ -312,6 +320,8 @@ bool ir_check(const ir_ctx *ctx)
 				/* pass (function returns void) */
 			} else if (insn->op == IR_BEGIN && j == 1) {
 				/* pass (start of unreachable basic block) */
+			} else if (IR_OPND_KIND(flags, j) == IR_OPND_CONTROL_GUARD) {
+				/* reference to control guard is optional */
 			} else if (IR_OPND_KIND(flags, j) != IR_OPND_CONTROL_REF
 					&& (insn->op != IR_SNAPSHOT || j == 1)) {
 				fprintf(stderr, "ir_base[%d].ops[%d] missing reference (%d)\n", i, j, use);

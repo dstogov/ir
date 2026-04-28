@@ -210,6 +210,7 @@ typedef enum _ir_type {
  * arg - argument reference CALL/TAILCALL/CARG->CARG
  * src - reference to a previous control region (IF, IF_TRUE, IF_FALSE, MERGE, LOOP_BEGIN, LOOP_END, RETURN)
  * reg - data-control dependency on region (PHI, VAR, PARAM)
+ * grd - optional data-control dependency guard (DIV, MOD)
  * ret - reference to a previous RETURN instruction (RETURN)
  * str - string: variable/argument name (VAR, PARAM, CALL, TAILCALL)
  * num - number: argument number (PARAM)
@@ -265,8 +266,8 @@ typedef enum _ir_type {
 	_(ADD,          d2C,  def, def, ___) /* addition                    */ \
 	_(SUB,          d2,   def, def, ___) /* subtraction (must be ADD+1) */ \
 	_(MUL,          d2C,  def, def, ___) /* multiplication              */ \
-	_(DIV,          d2,   def, def, ___) /* division                    */ \
-	_(MOD,          d2,   def, def, ___) /* modulo                      */ \
+	_(DIV,          d3,   def, def, grd) /* division                    */ \
+	_(MOD,          d3,   def, def, grd) /* modulo                      */ \
 	_(NEG,          d1,   def, ___, ___) /* change sign                 */ \
 	_(ABS,          d1,   def, ___, ___) /* absolute value              */ \
 	/* (LDEXP, MIN, MAX, FPMATH)                                        */ \
