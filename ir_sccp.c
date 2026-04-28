@@ -2823,7 +2823,7 @@ static bool ir_optimize_phi(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_re
 					}
 
 					return 1;
-				} else if (insn->op2 <= cond_ref && insn->op3 <= cond_ref
+				} else if (insn->op2 <= root_ref && insn->op3 <= root_ref
 					&& cond->op != IR_OVERFLOW
 					// TODO: temporary disable IF-conversion for RLOAD.
 					// We don't track anti-dependencies in GCM and Local Scheduling.
