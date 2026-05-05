@@ -1,0 +1,51 @@
+--TEST--
+GH-132: RLOAD/RSTORE
+--TARGET--
+x86_64
+--ARGS--
+-S --debug-regset 0xffffffffffff3fff
+--CODE--
+{
+    uintptr_t c_30 = 1;
+    uintptr_t c_31 = 2;
+    uintptr_t c_35 = 0xffff;
+
+    l_1 = START(l_364);
+
+    bool d_80, l_80 = RLOAD(l_1, 15);
+    l_81 = IF(l_80, d_80);
+    l_82 = IF_TRUE(l_81);
+    l_83 = END(l_82);
+    l_84 = IF_FALSE(l_81);
+    l_85 = END(l_84);
+    l_86 = MERGE(l_83, l_85);
+    uintptr_t d_87 = PHI(l_86, c_30, c_31);
+
+    l_92 = RSTORE(l_86, c_35, 15);
+    uintptr_t d_93, l_93 = RLOAD(l_92, 15);
+    uintptr_t d_95, l_95 = LOAD(l_93, d_93);
+    l_98 = IF(l_95, d_95);
+    l_99 = IF_TRUE(l_98, 1);
+    l_104 = IJMP(l_99, c_35);
+    l_105 = IF_FALSE(l_98);
+    l_108 = STORE(l_105, c_35, d_87);
+
+    l_363 = TAILCALL(l_108, c_35);
+    l_364 = UNREACHABLE(l_363);
+}
+--EXPECT--
+test:
+	movb %r15b, %al
+	movl $0xffff, %r15d
+	cmpq $0, (%r15)
+	jne .L1
+	movl $2, %ecx
+	testb %al, %al
+	movl $1, %eax
+	cmoveq %rcx, %rax
+	movq %rax, 0xffff
+	movq $0xffff, %rax
+	jmpq *%rax
+.L1:
+	movq $0xffff, %rax
+	jmpq *%rax
