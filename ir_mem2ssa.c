@@ -195,25 +195,18 @@ static void ir_mem2ssa_convert(ir_ctx      *ctx,
 
 	if (0) {
 sort_use_list:
-		/* Revert all actions done on unsorted use_list */
+		/* Move dead LOAD/STOREs to the end of use_list to exclude them from sorting
+		 * and revert all actions done on unsorted use_list */
 		queue->len = 0;
 		n = ctx->use_lists[var].count;
 		p = ctx->use_edges + ctx->use_lists[var].refs;
-		i = 0;
-		while (p[i] != use) {
-			b = ctx->cfg_map[p[i]];
-			if (b) {
-				ir_bitset_excl(defs, b);
-				ssa_vars[b] = 0;
-			}
-			i++;
-		}
-		/* Move dead LOAD/STOREs to the end of use_list to exclude them from sorting */
 		i = 0;
 		while (i < n) {
 			b = ctx->cfg_map[p[i]];
 			if (b) {
 				i++;
+				ir_bitset_excl(defs, b);
+				ssa_vars[b] = 0;
 			} else {
 				SWAP_REFS(p[i], p[n-1]);
 				n--;
