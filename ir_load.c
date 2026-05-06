@@ -26,6 +26,8 @@
 # include <unistd.h>
 #endif
 
+#define IR_MAX_OPERANDS 512
+
 const unsigned char *yy_buf;
 const unsigned char *yy_end;
 const unsigned char *yy_pos;
@@ -125,58 +127,71 @@ static void yy_error(const char *msg);
 static void yy_error_sym(const char *msg, int sym);
 static void yy_error_str(const char *msg, const char *str);
 
-static size_t yy_unescape_str(char*buf, const char *str, size_t len)
+static char yy_unescape_char(const char *str, size_t *len)
+{
+	char ch;
+
+	switch (*str) {
+		case '\\': return '\\';
+		case '\'': return '\'';
+		case '"':  return '"';
+		case 'a':  return '\a';
+		case 'b':  return '\b';
+		case 'e':  return 27; /* '\e'; */
+		case 'f':  return '\f';
+		case 'n':  return '\n';
+		case 'r':  return '\r';
+		case 't':  return '\t';
+		case 'v':  return '\v';
+		case '?':  return 0x3f;
+		case '0':
+		case '1':
+		case '2':
+		case '3':
+		case '4':
+		case '5':
+		case '6':
+		case '7':
+			ch = *str - '0';
+			str++;
+			if (*str >= '0' && *str <= '7') {
+				ch = ch * 8 + (*str - '0');
+				str++;
+				(*len)++;
+				if (*str >= '0' && *str <= '7') {
+					ch = ch * 8 + (*str - '0');
+					str++;
+					(*len)++;
+				}
+			}
+			return ch;
+		default:
+			yy_error("unsupported escape sequence");
+			return 0;
+	}
+}
+
+static size_t yy_unescape_str(char *buf, const char *str, size_t len)
 {
 	char *p = buf;
-	char ch;
 
 	while (len > 0) {
 		if (*str != '\\') {
 			*p = *str;
 		} else {
+			size_t l;
+
 			str++;
 			len--;
-			IR_ASSERT(len != 0);
-			switch (*str) {
-				case '\\': *p = '\\'; break;
-				case '\'': *p = '\''; break;
-				case '"':  *p = '"';  break;
-				case 'a':  *p = '\a'; break;
-				case 'b':  *p = '\b'; break;
-				case 'e':  *p = 27;   break; /* '\e'; */
-				case 'f':  *p = '\f'; break;
-				case 'n':  *p = '\n'; break;
-				case 'r':  *p = '\r'; break;
-				case 't':  *p = '\t'; break;
-				case 'v':  *p = '\v'; break;
-				case '?':  *p = 0x3f; break;
-				case '0':
-				case '1':
-				case '2':
-				case '3':
-				case '4':
-				case '5':
-				case '6':
-				case '7':
-					ch = *str - '0';
-					str++;
-					len--;
-					if (*str >= '0' && *str <= '7') {
-						ch = ch * 8 + (*str - '0');
-						str++;
-						len--;
-						if (*str >= '0' && *str <= '7') {
-							ch = ch * 8 + (*str - '0');
-							str++;
-							len--;
-						}
-				   }
-				   *p = ch;
-				   p++;
-				   continue;
-				default:
-					yy_error("unsupported escape sequence");
+			if (len == 0) {
+				yy_error("bad escape sequence");
 			}
+			l = 1;
+			*p = yy_unescape_char(str, &l);
+			p++;
+			str += l;
+			len -= l;
+			continue;
 		}
 		str++;
 		p++;
@@ -1697,7 +1712,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 	uint8_t ret_type;
 	uint32_t flags;
 	uint32_t params_count;
-	uint8_t param_types[256];
+	uint8_t param_types[IR_MAX_OPERANDS + 1];
 	if (YY_IN_SET(sym, (YY_BOOL,YY_UINT8_T,YY_UINT16_T,YY_UINT32_T,YY_UINT64_T,YY_UINTPTR_T,YY_CHAR,YY_INT8_T,YY_INT16_T,YY_INT32_T,YY_INT64_T,YY_DOUBLE,YY_FLOAT), "\000\000\000\300\377\007\000\000")) {
 		sym = parse_type(sym, &t);
 		sym = parse_ID(sym, &str, &len);
@@ -1788,7 +1803,8 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 				sym = parse_DECNUMBER(sym, IR_I32, &count);
 				if (op == IR_PHI || op == IR_SNAPSHOT) count.i32++;
 				if (op == IR_CALL || op == IR_TAILCALL || op == IR_ASM) count.i32+=2;
-				if (count.i32 < 0 || count.i32 > 255) yy_error("bad number of operands");
+				if (count.i32 < 0) yy_error("negative number of operands");
+				if (count.i32 > IR_MAX_OPERANDS) yy_error("too many operands");
 				ref = ref2 = ir_emit_N(p->ctx, IR_OPT(op, t), count.i32);
 				if (sym == YY__LPAREN) {
 					sym = get_sym();
@@ -2208,18 +2224,9 @@ static int parse_CHARACTER(int sym, uint32_t t, ir_val *val) {
 	if (!IR_IS_TYPE_INT(t)) yy_error("Unexpected <CHARACTER>");
 	if ((char)yy_text[1] != '\\') {
 		val->i64 = (signed char)yy_text[1];
-	} else if ((char)yy_text[2] == '\\') {
-		val->i64 = '\\';
-	} else if ((char)yy_text[2] == 'r') {
-		val->i64 = '\r';
-	} else if ((char)yy_text[2] == 'n') {
-		val->i64 = '\n';
-	} else if ((char)yy_text[2] == 't') {
-		val->i64 = '\t';
-	} else if ((char)yy_text[2] == '0') {
-		val->i64 = '\0';
 	} else {
-		yy_error("unsupported escape sequence");
+		size_t l = 1;
+		val->i64 = (signed char)yy_unescape_char((const char*)yy_text + 2, &l);
 	}
 	sym = get_sym();
 	return sym;

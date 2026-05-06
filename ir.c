@@ -161,6 +161,8 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted
 		case IR_CHAR:
 			if (insn->val.c == '\\') {
 				fprintf(f, "'\\\\'");
+			} else if (insn->val.c >= '\'') {
+				fprintf(f, "'\\\''", insn->val.c);
 			} else if (insn->val.c >= ' ') {
 				fprintf(f, "'%c'", insn->val.c);
 			} else if (insn->val.c == '\t') {
