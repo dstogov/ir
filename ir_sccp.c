@@ -2712,14 +2712,14 @@ static bool ir_optimize_phi(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_re
 
 					next->op1 = root->op1;
 					ir_use_list_replace_one(ctx, root->op1, root_ref, next_ref);
-					if (!IR_IS_CONST_REF(insn->op1)) {
-						ir_use_list_remove_one(ctx, insn->op1, cond_ref);
-					}
-					if (!IR_IS_CONST_REF(insn->op2)) {
-						ir_use_list_remove_one(ctx, insn->op2, cond_ref);
-					}
 
 					if (ctx->use_lists[cond_ref].count == 1) {
+						if (!IR_IS_CONST_REF(insn->op1)) {
+							ir_use_list_remove_one(ctx, insn->op1, cond_ref);
+						}
+						if (!IR_IS_CONST_REF(insn->op2)) {
+							ir_use_list_remove_one(ctx, insn->op2, cond_ref);
+						}
 						MAKE_NOP(cond);   CLEAR_USES(cond_ref);
 					} else {
 						ir_use_list_remove_one(ctx, cond_ref, root_ref);
@@ -2805,11 +2805,11 @@ static bool ir_optimize_phi(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_re
 					next->op1 = root->op1;
 					ir_use_list_replace_one(ctx, root->op1, root_ref, next_ref);
 					ir_use_list_remove_one(ctx, insn->op1, neg_ref);
-					if (!IR_IS_CONST_REF(insn->op1)) {
-						ir_use_list_remove_one(ctx, insn->op1, cond_ref);
-					}
 
 					if (ctx->use_lists[cond_ref].count == 1) {
+						if (!IR_IS_CONST_REF(insn->op1)) {
+							ir_use_list_remove_one(ctx, insn->op1, cond_ref);
+						}
 						MAKE_NOP(cond);   CLEAR_USES(cond_ref);
 					} else {
 						ir_use_list_remove_one(ctx, cond_ref, root_ref);
