@@ -476,26 +476,173 @@ create_phi:
 	}
 }
 
-static bool ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, ir_insn *insn, ir_type *type_ptr)
+#define IR_CANNOT_CONVERT 0
+#define IR_MAY_PROMOTE    1
+#define IR_MAY_SPLIT      2
+
+#define IR_MAX_SPLIT_SIZE 256
+
+
+typedef struct {
+	uint32_t size;
+	uint32_t count;
+	uint8_t  sizes[IR_MAX_SPLIT_SIZE + 1];
+} ir_mem2ssa_split_layout;
+
+
+static int ir_mem2ssa_may_split_alloca(ir_ctx *ctx, ir_mem2ssa_split_layout *layout, ir_ref var, ir_ref next);
+
+static int ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, ir_insn *insn,
+                                         ir_type *type_ptr, ir_mem2ssa_split_layout *split_layout)
 {
-	ir_ref n, *p, use;
+	ir_ref n, *p, use, skip;
 	ir_insn *use_insn;
 	ir_use_list *use_list;
 	ir_type type = IR_VOID;
 	size_t size;
 
 	if (!IR_IS_CONST_REF(insn->op2)) {
-		return 0;
+		/* dynamic alloca() of variable size */
+		return IR_CANNOT_CONVERT;
 	}
-	if (!(ctx->ir_base[insn->op2].type >= IR_U8 && ctx->ir_base[insn->op2].type <= IR_U64)
-	 && !(ctx->ir_base[insn->op2].type >= IR_I8 && ctx->ir_base[insn->op2].type <= IR_I64)) {
-		return 0;
+	if (!(ctx->ir_base[insn->op2].type >= IR_U8
+	   && ctx->ir_base[insn->op2].type <= IR_U64
+	   && ctx->ir_base[insn->op2].val.u64 > 0)
+	 && !(ctx->ir_base[insn->op2].type >= IR_I8
+	   && ctx->ir_base[insn->op2].type <= IR_I64
+	   && ctx->ir_base[insn->op2].val.i64 > 0)) {
+		/* size passed to alloca() is not a positive integer number */
+		return IR_CANNOT_CONVERT;
 	}
 
 	size = ctx->ir_base[insn->op2].val.u64;
 	if (size != 1 && size != 2 && size != 4 && size != 8 && size != sizeof(double)) {
-		return 0;
+		goto try_split;
 	}
+
+	use_list = &ctx->use_lists[var];
+	n = use_list->count;
+	skip = next;
+
+	p = &ctx->use_edges[use_list->refs];
+	do {
+		use = *p;
+		IR_ASSERT(use);
+		use_insn = &ctx->ir_base[use];
+		if (use == skip) {
+			skip = IR_UNUSED;
+			p++;
+			continue; /* skip control link */
+		}
+		if (use_insn->op == IR_LOAD) {
+			if (use_insn->op2 != var) {
+				return IR_CANNOT_CONVERT;
+			} else if (ir_type_size[use_insn->type] != size) {
+				goto try_split;
+			}
+			if (!type) {
+				type = use_insn->type;
+			}
+		} else if (use_insn->op == IR_STORE) {
+			if (use_insn->op2 != var || use_insn->op3 == var) {
+				return IR_CANNOT_CONVERT;
+			} else if (ir_type_size[ctx->ir_base[use_insn->op3].type] != size) {
+				goto try_split;
+			}
+			if (!type) {
+				type = ctx->ir_base[use_insn->op3].type;
+			}
+		} else {
+try_split:
+			if (size > IR_MAX_SPLIT_SIZE) return IR_CANNOT_CONVERT;
+			split_layout->size = size;
+			split_layout->count = 0;
+			return ir_mem2ssa_may_split_alloca(ctx, split_layout, var, next);
+		}
+		p++;
+	} while (--n > 0);
+
+	*type_ptr = type;
+
+	return IR_MAY_PROMOTE;
+}
+
+static bool ir_mem2ssa_add_split_var(ir_ctx *ctx, ir_mem2ssa_split_layout *layout, size_t offset, size_t size)
+{
+	IR_ASSERT(size > 0 && size <= 8);
+
+	if (offset + size > layout->size) {
+		return 0;
+	} else if (!layout->count) {
+		memset(layout->sizes, 0, layout->size);
+	} else if (layout->sizes[offset]) {
+		/* check for the same size */
+		return (layout->sizes[offset] == size);
+	} else {
+		size_t i;
+
+		/* check for overlapping */
+		for (i = offset + 1; i < offset + size; i++) {
+			if (layout->sizes[i]) return 0;
+		}
+		if (offset > 0) {
+			size_t n = IR_MIN(offset, 7);
+
+			for (i = 1; i <= n; i++) {
+				if (layout->sizes[offset - i] > i) return 0;
+			}
+		}
+	}
+
+	layout->count++;
+	layout->sizes[offset] = size;
+
+	return 1;
+}
+
+static bool ir_mem2ssa_may_promote(ir_ctx *ctx, ir_mem2ssa_split_layout *layout, ir_ref var, size_t offset)
+{
+	ir_ref n, *p, use;
+	ir_insn *use_insn;
+	ir_use_list *use_list;
+
+	use_list = &ctx->use_lists[var];
+	n = use_list->count;
+
+	p = &ctx->use_edges[use_list->refs];
+	while (n > 0) {
+		use = *p;
+		IR_ASSERT(use);
+		use_insn = &ctx->ir_base[use];
+		if (use_insn->op == IR_LOAD) {
+			if (use_insn->op2 != var) {
+				return 0;
+			}
+			if (!ir_mem2ssa_add_split_var(ctx, layout, offset, ir_type_size[use_insn->type])) {
+				return 0;
+			}
+		} else if (use_insn->op == IR_STORE) {
+			if (use_insn->op2 != var || use_insn->op3 == var) {
+				return 0;
+			}
+			if (!ir_mem2ssa_add_split_var(ctx, layout, offset, ir_type_size[ctx->ir_base[use_insn->op3].type])) {
+				return 0;
+			}
+		} else {
+			return 0;
+		}
+		p++;
+		n--;
+	}
+
+	return 1;
+}
+
+static int ir_mem2ssa_may_split_alloca(ir_ctx *ctx, ir_mem2ssa_split_layout *layout, ir_ref var, ir_ref next)
+{
+	ir_ref n, *p, use;
+	ir_insn *use_insn;
+	ir_use_list *use_list;
 
 	use_list = &ctx->use_lists[var];
 	n = use_list->count;
@@ -511,31 +658,119 @@ static bool ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, 
 			continue; /* skip control link */
 		}
 		if (use_insn->op == IR_LOAD) {
-			if (use_insn->op2 != var
-			 || ir_type_size[use_insn->type] != size) {
-				return 0;
+			if (use_insn->op2 != var) {
+				return IR_CANNOT_CONVERT;
 			}
-			if (!type) {
-				type = use_insn->type;
+			if (!ir_mem2ssa_add_split_var(ctx, layout, 0, ir_type_size[use_insn->type])) {
+				return IR_CANNOT_CONVERT;
 			}
 		} else if (use_insn->op == IR_STORE) {
-			if (use_insn->op2 != var
-			 || use_insn->op3 == var
-			 || ir_type_size[ctx->ir_base[use_insn->op3].type] != size) {
-				return 0;
+			if (use_insn->op2 != var || use_insn->op3 == var) {
+				return IR_CANNOT_CONVERT;
 			}
-			if (!type) {
-				type = ctx->ir_base[use_insn->op3].type;
+			if (!ir_mem2ssa_add_split_var(ctx, layout, 0, ir_type_size[ctx->ir_base[use_insn->op3].type])) {
+				return IR_CANNOT_CONVERT;
 			}
+		} else if (use_insn->op == IR_ADD
+				&& use_insn->op1 == var
+				&& IR_IS_CONST_REF(use_insn->op2)
+				&& IR_IS_TYPE_INT(ctx->ir_base[use_insn->op2].type)
+				&& ctx->ir_base[use_insn->op2].val.u64 < layout->size
+				&& ir_mem2ssa_may_promote(ctx, layout, use, ctx->ir_base[use_insn->op2].val.u64)) {
+			/* pass */
 		} else {
-			return 0;
+			return IR_CANNOT_CONVERT;
 		}
 		p++;
 	} while (--n > 0);
 
-	*type_ptr = type;
+	return IR_MAY_SPLIT;
+}
 
-	return 1;
+/* SRA - Scalar Replacement Of Aggregates */
+static void ir_mem2ssa_split_alloca(ir_ctx *ctx, ir_mem2ssa_split_layout *layout, ir_ref var, ir_ref next)
+{
+	ir_ref ref;
+	ir_ref i, j, use;
+	ir_insn *use_insn;
+	ir_use_list *use_list;
+	ir_ref first_new_alloca = IR_UNUSED;
+
+	if (layout->count > 0) {
+		uint32_t b = ctx->cfg_map[var];
+
+		/* update size in the original ALLOCA node */
+		i = 0;
+		while (!layout->sizes[i]) i++;
+		ctx->ir_base[var].op2 = ir_const_size_t(ctx, layout->sizes[i]);
+		layout->sizes[i] = 0; /* reuse original ALLOCA node */
+
+		if (layout->count > 1) {
+			/* create new ALLOCA nodes and link them into the control chain */
+			ir_ref prev = ctx->ir_base[var].op1;
+			uint32_t n = layout->count;
+			uint32_t j = 1;
+
+			ir_use_list_remove_one(ctx, prev, var);
+			first_new_alloca = ctx->insns_count;
+			do {
+				i++;
+				while (!layout->sizes[i]) i++;
+				ref = ir_emit2(ctx, IR_OPTX(IR_ALLOCA, IR_ADDR, 2), prev, ir_const_size_t(ctx, layout->sizes[i]));
+				ir_use_list_add(ctx, prev, ref);
+				prev = ref;
+				ctx->cfg_map[ref] = b;
+				layout->sizes[i] = j; /* use new ALLOCA node */
+				j++;
+				n--;
+			} while (n > 1);
+			ir_use_list_add(ctx, prev, var);
+			ctx->ir_base[var].op1 = prev;
+		}
+	}
+
+	use_list = &ctx->use_lists[var];
+	for (i = 0, j = 0; i < use_list->count; i++) {
+		use = ctx->use_edges[use_list->refs + i];
+		IR_ASSERT(use);
+		if (use == next) {
+			next = IR_UNUSED;
+			/* compact use_list */
+			if (i != j) {
+				ctx->use_edges[use_list->refs + j] = use;
+			}
+			j++;
+			continue; /* skip control link */
+		}
+		use_insn = &ctx->ir_base[use];
+		if (use_insn->op == IR_LOAD || use_insn->op == IR_STORE) {
+			/* compact use_list */
+			if (i != j) {
+				ctx->use_edges[use_list->refs + j] = use;
+			}
+			j++;
+		} else {
+			IR_ASSERT(use_insn->op == IR_ADD
+				&& use_insn->op1 == var
+				&& IR_IS_CONST_REF(use_insn->op2)
+				&& IR_IS_TYPE_INT(ctx->ir_base[use_insn->op2].type)
+				&& ctx->ir_base[use_insn->op2].val.u64 < layout->size);
+
+			size_t offset = ctx->ir_base[use_insn->op2].val.u64;
+
+			ref = layout->sizes[offset] == 0 ? var : first_new_alloca + layout->sizes[offset] - 1;
+			ir_replace(ctx, use, ref);
+			MAKE_NOP(use_insn);
+			CLEAR_USES(use);
+		}
+	}
+
+	/* clean the tail of use list */
+	i = use_list->count;
+	use_list->count = j;
+	for (; j < i; j++) {
+		ctx->use_edges[use_list->refs + j] = IR_UNUSED;
+	}
 }
 
 static bool ir_mem2ssa_may_convert_var(ir_ctx *ctx, ir_ref var, ir_insn *insn)
@@ -588,6 +823,7 @@ int ir_mem2ssa(ir_ctx *ctx)
 	ir_bitset defs;
 	ir_bitqueue iter_worklist;
 	uint32_t *order;
+	ir_mem2ssa_split_layout split_layout;
 
 	ctx->flags2 &= ~IR_MEM2SSA_VARS;
 	IR_ASSERT(ctx->use_lists && ctx->cfg_blocks);
@@ -664,6 +900,7 @@ int ir_mem2ssa(ir_ctx *ctx)
 			insn = &ctx->ir_base[ref];
 			if (insn->op == IR_ALLOCA) {
 				ir_type type;
+				int convert;
 
 				if (ctx->use_lists[ref].count == 1) {
 					ir_ref prev = insn->op1;
@@ -677,7 +914,9 @@ int ir_mem2ssa(ir_ctx *ctx)
 					ctx->cfg_map[ref] = 0;
 					ref = prev;
 					continue;
-				} else if (ir_mem2ssa_may_convert_alloca(ctx, ref, next, insn, &type)) {
+				}
+				convert = ir_mem2ssa_may_convert_alloca(ctx, ref, next, insn, &type, &split_layout);
+				if (convert == IR_MAY_PROMOTE) {
 					uint32_t len = ir_bitset_len(ctx->cfg_blocks_count + 1);
 					ir_ref prev;
 
@@ -705,7 +944,11 @@ int ir_mem2ssa(ir_ctx *ctx)
 					CLEAR_USES(ref);
 					ctx->cfg_map[ref] = 0;
 					ref = prev;
+					next = ir_next_control(ctx, ref);
 					ctx->flags2 |= IR_MEM2SSA_VARS;
+					continue;
+				} else if (convert == IR_MAY_SPLIT) {
+					ir_mem2ssa_split_alloca(ctx, &split_layout, ref, next);
 					continue;
 				}
 			} else if (ssa_vars
