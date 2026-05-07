@@ -347,8 +347,11 @@ create_phi:
 			ctx->ir_base[next].op1 = prev;
 			ir_use_list_replace_one(ctx, prev, use, next);
 
-			if (ctx->ir_base[use_insn->op3].type == type) {
-//				ir_use_list_remove_one(ctx, use, next);
+			if (ctx->ir_base[use_insn->op3].type == type
+				/* We can't store a reference to ALLOCA in ssa_vars[], because this may break
+				 * the following call to ir_mem2saa_convert() for this ALLOCA.
+				 * TODO: find a better solution ??? */
+			 && ctx->ir_base[use_insn->op3].op != IR_ALLOCA) {
 				if (!IR_IS_CONST_REF(use_insn->op3)) {
 					ir_use_list_remove_one(ctx, use_insn->op3, use);
 					/* op3 may became dead */
