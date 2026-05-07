@@ -2171,7 +2171,10 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_load_i(const ir_ctx *ctx, ir_ref ref, i
 			if (!(proto->flags & (IR_CONST_FUNC|IR_PURE_FUNC))) {
 				break;
 			}
-		} else if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN || insn->op == IR_VSTORE) {
+		} else if (insn->op == IR_MERGE
+				|| insn->op == IR_LOOP_BEGIN
+				|| insn->op == IR_VSTORE
+				|| (insn->op == IR_BEGIN && insn->op2)) {
 			return IR_UNUSED;
 		}
 		ref = insn->op1;
@@ -2236,7 +2239,10 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_vload_i(const ir_ctx *ctx, ir_ref ref, 
 			if (!(proto->flags & (IR_CONST_FUNC|IR_PURE_FUNC))) {
 				break;
 			}
-		} else if (insn->op == IR_MERGE || insn->op == IR_LOOP_BEGIN || insn->op == IR_STORE) {
+		} else if (insn->op == IR_MERGE
+				|| insn->op == IR_LOOP_BEGIN
+				|| insn->op == IR_STORE
+				|| (insn->op == IR_BEGIN && insn->op2)) {
 			break;
 		}
 		ref = insn->op1;
@@ -2329,7 +2335,15 @@ check_aliasing:
 			}
 		} else if (insn->op == IR_GUARD || insn->op == IR_GUARD_NOT) {
 			guarded = 1;
-		} else if (insn->op >= IR_START || insn->op == IR_CALL) {
+		} else if (insn->op >= IR_START) {
+			if (insn->op == IR_BEGIN && insn->op1 && !insn->op2) {
+				/* skip END */
+				ref = insn->op1;
+				insn = &ctx->ir_base[ref];
+			} else {
+				break;
+			}
+		} else if (insn->op == IR_CALL) {
 			break;
 		}
 		next = ref;
@@ -2410,7 +2424,15 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_vstore_i(ir_ctx *ctx, ir_ref ref, ir_re
 			}
 		} else if (insn->op == IR_GUARD || insn->op == IR_GUARD_NOT) {
 			guarded = 1;
-		} else if (insn->op >= IR_START || insn->op == IR_CALL || insn->op == IR_LOAD || insn->op == IR_STORE) {
+		} else if (insn->op >= IR_START) {
+			if (insn->op == IR_BEGIN && insn->op1 && !insn->op2) {
+				/* skip END */
+				ref = insn->op1;
+				insn = &ctx->ir_base[ref];
+			} else {
+				break;
+			}
+		} else if (insn->op == IR_CALL || insn->op == IR_LOAD || insn->op == IR_STORE) {
 			break;
 		}
 		next = ref;
