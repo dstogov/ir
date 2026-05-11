@@ -761,8 +761,11 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 
 					if (reg != IR_REG_NONE) {
 						def_pos = IR_SAVE_LIVE_POS_FROM_REF(ref);
-						if (insn->op == IR_PARAM || insn->op == IR_RLOAD) {
-							/* parameter register must be kept before it's copied */
+						/* Parameter register must be kept before it's copied.
+						 * Ignore if register is fixed, as it is already
+						 * unavailable for allocation. */
+						if ((insn->op == IR_PARAM || insn->op == IR_RLOAD)
+						 && !IR_REGSET_IN(ctx->fixed_regset, reg)) {
 							ir_add_fixed_live_range(ctx, reg, IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
 						}
 					} else if (def_flags & IR_DEF_REUSES_OP1_REG) {
@@ -785,6 +788,9 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					ival = ir_fix_live_range(ctx, v,
 						IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
 					ival->type = insn->type;
+					if (insn->op == IR_RLOAD) {
+						ival->flags |= IR_LIVE_INTERVAL_ALLOW_FIXED;
+					}
 					ir_add_use(ctx, ival, 0, def_pos, reg, def_flags, hint_ref);
 				} else {
 					/* live.remove(opd) */
@@ -798,6 +804,14 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					ival->type = insn->type;
 					ir_add_use(ctx, ival, 0, IR_DEF_LIVE_POS_FROM_REF(ref), IR_REG_NONE, IR_USE_SHOULD_BE_IN_REG, 0);
 					continue;
+				}
+			} else if (insn->op == IR_RSTORE) {
+				ir_reg reg = constraints.def_reg;
+
+				if (reg != IR_REG_NONE) {
+					ir_add_fixed_live_range(ctx, reg,
+							IR_USE_LIVE_POS_FROM_REF(ref),
+							IR_DEF_LIVE_POS_FROM_REF(ref));
 				}
 			}
 
@@ -1380,8 +1394,11 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 
 					if (reg != IR_REG_NONE) {
 						def_pos = IR_SAVE_LIVE_POS_FROM_REF(ref);
-						if (insn->op == IR_PARAM || insn->op == IR_RLOAD) {
-							/* parameter register must be kept before it's copied */
+						/* Parameter register must be kept before it's copied.
+						 * Ignore if register is fixed, as it is already
+						 * unavailable for allocation. */
+						if ((insn->op == IR_PARAM || insn->op == IR_RLOAD)
+						 && !IR_REGSET_IN(IR_REGSET_UNION(ctx->fixed_regset, IR_REGSET_FIXED), reg)) {
 							ir_add_fixed_live_range(ctx, reg, IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
 						}
 					} else if (def_flags & IR_DEF_REUSES_OP1_REG) {
@@ -1406,6 +1423,9 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					ival = ir_fix_live_range(ctx, v,
 						IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
 					ival->type = insn->type;
+					if (insn->op == IR_RLOAD) {
+						ival->flags |= IR_LIVE_INTERVAL_ALLOW_FIXED;
+					}
 					ir_add_use(ctx, ival, 0, def_pos, reg, def_flags, hint_ref);
 				} else {
 					/* PHIs inputs must not be processed */
@@ -1417,6 +1437,14 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					ival->type = insn->type;
 					ir_add_use(ctx, ival, 0, IR_DEF_LIVE_POS_FROM_REF(ref), IR_REG_NONE, IR_USE_SHOULD_BE_IN_REG, 0);
 					continue;
+				}
+			} else if (insn->op == IR_RSTORE) {
+				ir_reg reg = constraints.def_reg;
+
+				if (reg != IR_REG_NONE) {
+					ir_add_fixed_live_range(ctx, reg,
+							IR_USE_LIVE_POS_FROM_REF(ref),
+							IR_DEF_LIVE_POS_FROM_REF(ref));
 				}
 			}
 
@@ -2803,6 +2831,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 	ir_live_pos pos, next;
 	ir_live_interval *other;
 	ir_regset available, overlapped, scratch;
+	ir_regset unavailable_fixed_regset;
 
 	if (IR_IS_TYPE_FP(ival->type)) {
 		available = IR_REGSET_FP;
@@ -2829,7 +2858,24 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 		}
 	}
 
-	available = IR_REGSET_DIFFERENCE(available, (ir_regset)ctx->fixed_regset);
+	available = IR_REGSET_UNION(available, IR_REGSET_FIXED);
+	unavailable_fixed_regset = IR_REGSET_UNION((ir_regset)ctx->fixed_regset, IR_REGSET_FIXED);
+
+	if ((ival->flags & IR_LIVE_INTERVAL_HAS_HINT_REGS)
+	  && (ival->flags & IR_LIVE_INTERVAL_ALLOW_FIXED)) {
+		ir_use_pos *use_pos = ival->use_pos;
+		ir_reg reg;
+
+		while (use_pos) {
+			reg = use_pos->hint;
+			if (reg >= 0) {
+				IR_REGSET_EXCL(unavailable_fixed_regset, reg);
+			}
+			use_pos = use_pos->next;
+		}
+	}
+
+	available = IR_REGSET_DIFFERENCE(available, unavailable_fixed_regset);
 
 	/* for each interval it in active */
 	other = *active;

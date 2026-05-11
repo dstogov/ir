@@ -1262,6 +1262,7 @@ struct _ir_live_range {
 #define IR_LIVE_INTERVAL_SPILL_SPECIAL   (1<<6) /* spill slot is pre-allocated in a special area (see ir_ctx.spill_reserved_base) */
 #define IR_LIVE_INTERVAL_SPILLED         (1<<7)
 #define IR_LIVE_INTERVAL_SPLIT_CHILD     (1<<8)
+#define IR_LIVE_INTERVAL_ALLOW_FIXED     (1<<9) /* allocate from fixed regs if hint is a fixed reg */
 
 struct _ir_live_interval {
 	uint8_t           type;
