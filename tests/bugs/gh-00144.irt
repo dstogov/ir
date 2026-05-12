@@ -1,0 +1,33 @@
+--TEST--
+GH-144: incorrect Switch =>default_label not emitted
+--ARGS--
+--run
+--CODE--
+func test(int32_t): void
+{
+	int32_t c_91 = 9;
+	uintptr_t c_92 = 0x3fe009b0;
+	int32_t c_93 = 10;
+	int32_t c_94 = 11;
+	uintptr_t c_95 = 0x40029d20;
+	l_1 = START(l_379);
+	int32_t d_350 = PARAM(l_1, "p", 1);
+	l_351 = SWITCH(l_1, d_350);
+	l_370 = CASE_VAL(l_351, c_91);
+	l_371 = IJMP(l_370, c_92);
+	l_372 = CASE_VAL(l_351, c_93);
+	l_373 = END(l_372);
+	l_374 = CASE_VAL(l_351, c_94);
+	l_375 = END(l_374);
+	l_376 = CASE_DEFAULT(l_351);
+	l_377 = END(l_376);
+	l_378 = MERGE/3(l_373, l_375, l_377);
+	l_379 = IJMP(l_378, c_95, l_371);
+}
+func main(): int32_t
+{
+	int32_t c_0 = 0;
+	l_1 = START(l_2);
+	l_2 = RETURN(l_1, c_0);	
+}
+--EXPECT--
