@@ -1224,6 +1224,7 @@ typedef struct _ir_use_pos       ir_use_pos;
 #define IR_USE_SHOULD_BE_IN_REG          (1<<1)
 #define IR_DEF_REUSES_OP1_REG            (1<<2)
 #define IR_DEF_CONFLICTS_WITH_INPUT_REGS (1<<3)
+#define IR_EXTEND_INPUTS_TO_NEXT         (1<<4) /* used for SNAPSHOT followed by GUARD */
 
 #define IR_FUSED_USE                     (1<<6)
 #define IR_PHI_USE                       (1<<7)

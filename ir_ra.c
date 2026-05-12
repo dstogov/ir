@@ -799,6 +799,34 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					ir_add_use(ctx, ival, 0, IR_DEF_LIVE_POS_FROM_REF(ref), IR_REG_NONE, IR_USE_SHOULD_BE_IN_REG, 0);
 					continue;
 				}
+			} else if (def_flags & IR_EXTEND_INPUTS_TO_NEXT) {
+				ir_ref next = ir_next_control(ctx, ref);
+				ir_live_pos use_pos;
+
+				IR_ASSERT(insn->op == IR_SNAPSHOT);
+				j = 2;
+				p = insn->ops + 2;
+				for (; j <= insn->inputs_count; j++, p++) {
+					ir_ref input = *p;
+					uint32_t v;
+
+					if (input > 0) {
+						v = ctx->vregs[input];
+						IR_ASSERT(v);
+						use_pos = IR_USE_LIVE_POS_FROM_REF(next);
+						if (!ir_bitset_in(live, v)) {
+							/* live.add(opd) */
+							ir_bitset_incl(live, v);
+							/* intervals[opd].addRange(b.from, op.id) */
+							ival = ir_add_live_range(ctx, v, IR_START_LIVE_POS_FROM_REF(bb->start), use_pos);
+						} else {
+							ival = ctx->live_intervals[v];
+						}
+						use_pos = IR_USE_LIVE_POS_FROM_REF(ref);
+						ir_add_use(ctx, ival, j, use_pos, IR_REG_NONE, 0, IR_UNUSED);
+					}
+				}
+				continue;
 			}
 
 			IR_ASSERT(insn->op != IR_PHI && (!ctx->rules || !(ctx->rules[ref] & (IR_FUSED|IR_SKIPPED))));
@@ -1418,6 +1446,34 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					ir_add_use(ctx, ival, 0, IR_DEF_LIVE_POS_FROM_REF(ref), IR_REG_NONE, IR_USE_SHOULD_BE_IN_REG, 0);
 					continue;
 				}
+			} else if (def_flags & IR_EXTEND_INPUTS_TO_NEXT) {
+				ir_ref next = ir_next_control(ctx, ref);
+				ir_live_pos use_pos;
+
+				IR_ASSERT(insn->op == IR_SNAPSHOT);
+				j = 2;
+				p = insn->ops + 2;
+				for (; j <= insn->inputs_count; j++, p++) {
+					ir_ref input = *p;
+					uint32_t v;
+
+					if (input > 0) {
+						v = ctx->vregs[input];
+						IR_ASSERT(v);
+						use_pos = IR_USE_LIVE_POS_FROM_REF(next);
+						if (!IS_LIVE_IN_BLOCK(v, b)) {
+							/* live.add(opd) */
+							SET_LIVE_IN_BLOCK(v, b);
+							/* intervals[opd].addRange(b.from, op.id) */
+							ival = ir_add_live_range(ctx, v, IR_START_LIVE_POS_FROM_REF(bb->start), use_pos);
+						} else {
+							ival = ctx->live_intervals[v];
+						}
+						use_pos = IR_USE_LIVE_POS_FROM_REF(ref);
+						ir_add_use(ctx, ival, j, use_pos, IR_REG_NONE, 0, IR_UNUSED);
+					}
+				}
+				continue;
 			}
 
 			IR_ASSERT(insn->op != IR_PHI && (!ctx->rules || !(ctx->rules[ref] & (IR_FUSED|IR_SKIPPED))));

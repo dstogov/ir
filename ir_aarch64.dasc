@@ -402,6 +402,7 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 	int flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG | IR_OP3_MUST_BE_IN_REG;
 	const ir_proto_t *proto;
 	const ir_call_conv_dsc *cc;
+	ir_ref next;
 
 	constraints->def_reg = IR_REG_NONE;
 	constraints->hints_count = 0;
@@ -753,6 +754,10 @@ get_arg_hints:
 			break;
 		case IR_SNAPSHOT:
 			flags = 0;
+			next = ir_next_control(ctx, ref);
+			if (ctx->ir_base[next].op == IR_GUARD || ctx->ir_base[next].op == IR_GUARD_NOT) {
+				flags = IR_EXTEND_INPUTS_TO_NEXT;
+			}
 			break;
 		case IR_VA_START:
 			flags = IR_OP2_MUST_BE_IN_REG;
@@ -1201,10 +1206,6 @@ binop_fp:
 			if (!IR_IS_CONST_REF(insn->op2) && (ctx->use_lists[insn->op2].count == 1 || all_usages_are_fusable(ctx, insn->op2))) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (op2_insn->op >= IR_EQ && op2_insn->op <= IR_UNORDERED) {
-					// TODO: register allocator may clobber operands of CMP before they are used in the GUARD_CMP
-//???				 && (insn->op2 == ref - 1 ||
-//???				     (insn->op2 == ctx->prev_ref[ref] - 1
-//???				   && ctx->ir_base[ctx->prev_ref[ref]].op == IR_SNAPSHOT))) {
 					if (IR_IS_TYPE_INT(ctx->ir_base[op2_insn->op1].type)) {
 						ctx->rules[insn->op2] = IR_FUSED | IR_CMP_INT;
 						return IR_GUARD_CMP_INT;
