@@ -681,19 +681,6 @@ get_arg_hints:
 			}
 			flags = IR_USE_SHOULD_BE_IN_REG | IR_OP2_MUST_BE_IN_REG | IR_OP3_SHOULD_BE_IN_REG;
 			break;
-		case IR_IGOTO:
-			insn = &ctx->ir_base[ref];
-			if (ctx->ir_base[insn->op1].op == IR_MERGE || ctx->ir_base[insn->op1].op == IR_LOOP_BEGIN) {
-				ir_insn *merge = &ctx->ir_base[insn->op1];
-				ir_ref *p, n = merge->inputs_count;
-
-				for (p = merge->ops + 1; n > 0; p++, n--) {
-					ir_ref input = *p;
-					IR_ASSERT(ctx->ir_base[input].op == IR_END || ctx->ir_base[input].op == IR_LOOP_END);
-					ctx->rules[input] = IR_IGOTO_DUP;
-				}
-			}
-			return insn->op;
 		case IR_COND:
 			insn = &ctx->ir_base[ref];
 			n = 0;
@@ -1094,6 +1081,19 @@ binop_fp:
 			}
 			ctx->flags2 |= IR_HAS_CALLS;
 			return IR_CALL;
+		case IR_IGOTO:
+			insn = &ctx->ir_base[ref];
+			if (ctx->ir_base[insn->op1].op == IR_MERGE || ctx->ir_base[insn->op1].op == IR_LOOP_BEGIN) {
+				ir_insn *merge = &ctx->ir_base[insn->op1];
+				ir_ref *p, n = merge->inputs_count;
+
+				for (p = merge->ops + 1; n > 0; p++, n--) {
+					ir_ref input = *p;
+					IR_ASSERT(ctx->ir_base[input].op == IR_END || ctx->ir_base[input].op == IR_LOOP_END);
+					ctx->rules[input] = IR_IGOTO_DUP;
+				}
+			}
+			return insn->op;
 		case IR_VAR:
 			return IR_STATIC_ALLOCA;
 		case IR_PARAM:
