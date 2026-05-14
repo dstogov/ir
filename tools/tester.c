@@ -48,6 +48,7 @@ typedef struct _test {
 	char *code;
 	char *expect;
 	char *xfail;
+	char *ext;
 } test;
 
 static int colorize = 1;
@@ -142,6 +143,8 @@ static test *parse_file(const char *filename, int id)
 			section = &t->xfail;
 		} else if (i - start == strlen("--TARGET--")  && memcmp(buf + start, "--TARGET--", strlen("--TARGET--")) == 0) {
 			section = &t->target;
+		} else if (i - start == strlen("--EXT--")  && memcmp(buf + start, "--EXT--", strlen("--EXT--")) == 0) {
+			section = &t->ext;
 		} else {
 			section = NULL;
 			while (i < size && (buf[i] == '\r' || buf[i] == '\n')) i++;
@@ -275,7 +278,11 @@ static int run_test(const char *filename, test *t, int show_diff)
 
 	len = strlen(filename);
 
-	code_filename = replace_extension(filename, len, code_extension, code_extension_len);
+	if (t->ext) {
+		code_filename = replace_extension(filename, len, t->ext, strlen(t->ext));
+	} else {
+		code_filename = replace_extension(filename, len, code_extension, code_extension_len);
+	}
 	out_filename = replace_extension(filename, len, ".out", strlen(".out"));
 	exp_filename = replace_extension(filename, len, ".exp", strlen(".exp"));
 	diff_filename = replace_extension(filename, len, ".diff", strlen(".diff"));
