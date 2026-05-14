@@ -12449,8 +12449,10 @@ void ir_fix_thunk(void *thunk_entry, void *addr)
 	unsigned char *code = thunk_entry;
 
 	if (sizeof(void*) == 8 && !IR_IS_SIGNED_32BIT(((unsigned char*)addr - (code + 5)))) {
-		int32_t *offset_ptr;
-		void **addr_ptr;
+		typedef IR_SET_ALIGNED(1, int32_t unaligned_int32_t);
+		typedef IR_SET_ALIGNED(1, void* unaligned_ptr_t);
+		unaligned_int32_t *offset_ptr;
+		unaligned_ptr_t *addr_ptr;
 
 		IR_ASSERT(code[0] == 0xff && code[1] == 0x25);
 		offset_ptr = (int32_t*)(code + 2);
