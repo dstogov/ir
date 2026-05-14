@@ -1492,6 +1492,7 @@ restart:
 				if (insn->op1 != ctx->fold_insn.op1) {
 					if (insn->op1 > 0) {
 						ir_use_list_remove_one(ctx, insn->op1, ref);
+						if (ctx->use_lists[insn->op1].count == 0) ir_bitqueue_add(worklist, insn->op1);
 					}
 					if (ctx->fold_insn.op1 > 0) {
 						ir_use_list_add(ctx, ctx->fold_insn.op1, ref);
@@ -1500,6 +1501,7 @@ restart:
 				if (insn->op2 != ctx->fold_insn.op2) {
 					if (insn->op2 > 0) {
 						ir_use_list_remove_one(ctx, insn->op2, ref);
+						if (ctx->use_lists[insn->op1].count == 0) ir_bitqueue_add(worklist, insn->op2);
 					}
 					if (ctx->fold_insn.op2 > 0) {
 						ir_use_list_add(ctx, ctx->fold_insn.op2, ref);
@@ -1508,6 +1510,7 @@ restart:
 				if (insn->op3 != ctx->fold_insn.op3) {
 					if (insn->op3 > 0) {
 						ir_use_list_remove_one(ctx, insn->op3, ref);
+						if (ctx->use_lists[insn->op1].count == 0) ir_bitqueue_add(worklist, insn->op3);
 					}
 					if (ctx->fold_insn.op3 > 0) {
 						ir_use_list_add(ctx, ctx->fold_insn.op3, ref);
@@ -3703,6 +3706,7 @@ void ir_iter_opt(ir_ctx *ctx, ir_bitqueue *worklist)
 	ir_ref i, val;
 	ir_insn *insn;
 
+	ctx->iter_worklist = worklist;
 	while ((i = ir_bitqueue_pop(worklist)) >= 0) {
 		insn = &ctx->ir_base[i];
 		if (IR_IS_FOLDABLE_OP(insn->op)) {
@@ -3873,6 +3877,7 @@ remove_bitcast:
 			ir_iter_optimize_guard(ctx, i, insn, worklist);
 		}
 	}
+	ctx->iter_worklist = NULL;
 }
 
 void ir_iter_cleanup(ir_ctx *ctx)

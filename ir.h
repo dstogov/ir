@@ -636,6 +636,8 @@ typedef struct {
 	int   offset;
 } ir_value_param;
 
+typedef struct _ir_bitqueue ir_bitqueue;
+
 #define IR_CONST_HASH_SIZE 64
 
 struct _ir_ctx {
@@ -653,6 +655,7 @@ struct _ir_ctx {
 	int32_t            status;                  /* non-zero error code (see IR_ERROR_... macros), app may use negative codes */
 	ir_ref             fold_cse_limit;          /* CSE finds identical insns backward from "insn_count" to "fold_cse_limit" */
 	ir_insn            fold_insn;               /* temporary storage for folding engine */
+	ir_bitqueue       *iter_worklist;
 	ir_value_param    *value_params;            /* information about "by-val" struct parameters */
 	ir_hashtab        *binding;
 	ir_use_list       *use_lists;               /* def->use lists for each instruction */
