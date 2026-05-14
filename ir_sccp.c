@@ -1501,7 +1501,7 @@ restart:
 				if (insn->op2 != ctx->fold_insn.op2) {
 					if (insn->op2 > 0) {
 						ir_use_list_remove_one(ctx, insn->op2, ref);
-						if (ctx->use_lists[insn->op1].count == 0) ir_bitqueue_add(worklist, insn->op2);
+						if (ctx->use_lists[insn->op2].count == 0) ir_bitqueue_add(worklist, insn->op2);
 					}
 					if (ctx->fold_insn.op2 > 0) {
 						ir_use_list_add(ctx, ctx->fold_insn.op2, ref);
@@ -1510,7 +1510,7 @@ restart:
 				if (insn->op3 != ctx->fold_insn.op3) {
 					if (insn->op3 > 0) {
 						ir_use_list_remove_one(ctx, insn->op3, ref);
-						if (ctx->use_lists[insn->op1].count == 0) ir_bitqueue_add(worklist, insn->op3);
+						if (ctx->use_lists[insn->op3].count == 0) ir_bitqueue_add(worklist, insn->op3);
 					}
 					if (ctx->fold_insn.op3 > 0) {
 						ir_use_list_add(ctx, ctx->fold_insn.op3, ref);
