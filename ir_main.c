@@ -1413,9 +1413,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "ERROR: -mavx is not compatible with CPU (AVX is not supported)\n");
 		return 1;
 	}
-	if ((cpuinfo & IR_X86_BMI1) && !(mflags_disabled & IR_X86_BMI1)) {
-		mflags |= IR_X86_BMI1;
-	}
+	mflags |= (cpuinfo & (IR_X86_SSE3|IR_X86_SSSE3|IR_X86_SSE41|IR_X86_SSE42|IR_X86_BMI1)) & ~mflags_disabled;
 #endif
 
 #ifdef _WIN32
