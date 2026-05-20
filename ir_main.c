@@ -72,7 +72,12 @@ static void help(const char *cmd)
 		"Code Generation Options:\n"
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 		"  -mavx                      - use AVX instruction set\n"
-		"  -mno-bmi1                  - disable BMI1 instruction set\n"
+		"  -m[no-]bmi1                - enable/disable BMI1 instruction set\n"
+		"  -m[no-]sse3                - enable/disable SSE3 instruction set\n"
+		"  -m[no-]ssse3               - enable/disable SSSE3 instruction set\n"
+		"  -m[no-]sse4                - enable/disable SSE4 instruction set\n"
+		"  -m[no-]sse4.1              - enable/disable SSE4.1 instruction set\n"
+		"  -m[no-]sse4.2              - enable/disable SSE4.2 instruction set\n"
 #endif
 		"  -muse-fp                   - use base frame pointer register\n"
 #ifndef _WIN32
@@ -1281,8 +1286,42 @@ int main(int argc, char **argv)
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 		} else if (strcmp(argv[i], "-mavx") == 0) {
 			mflags |= IR_X86_AVX;
+		} else if (strcmp(argv[i], "-mbmi1") == 0) {
+			mflags |= IR_X86_BMI1;
+			mflags_disabled &= ~IR_X86_BMI1;
 		} else if (strcmp(argv[i], "-mno-bmi1") == 0) {
+			mflags &= ~IR_X86_BMI1;
 			mflags_disabled |= IR_X86_BMI1;
+		} else if (strcmp(argv[i], "-msse3") == 0) {
+			mflags |= IR_X86_SSE3;
+			mflags_disabled &= ~IR_X86_SSE3;
+		} else if (strcmp(argv[i], "-mno-sse3") == 0) {
+			mflags &= ~IR_X86_SSE3;
+			mflags_disabled |= IR_X86_SSE3;
+		} else if (strcmp(argv[i], "-mssse3") == 0) {
+			mflags |= IR_X86_SSSE3;
+			mflags_disabled &= ~IR_X86_SSSE3;
+		} else if (strcmp(argv[i], "-mno-ssse3") == 0) {
+			mflags &= ~IR_X86_SSSE3;
+			mflags_disabled |= IR_X86_SSSE3;
+		} else if (strcmp(argv[i], "-msse4") == 0) {
+			mflags |= IR_X86_SSE41 | IR_X86_SSE42;
+			mflags_disabled &= ~(IR_X86_SSE41 | IR_X86_SSE42);
+		} else if (strcmp(argv[i], "-mno-sse4") == 0) {
+			mflags &= ~(IR_X86_SSE41 | IR_X86_SSE42);
+			mflags_disabled |= IR_X86_SSE41 | IR_X86_SSE42;
+		} else if (strcmp(argv[i], "-msse4.1") == 0) {
+			mflags |= IR_X86_SSE41;
+			mflags_disabled &= ~IR_X86_SSE41;
+		} else if (strcmp(argv[i], "-mno-sse4.1") == 0) {
+			mflags &= ~IR_X86_SSE41;
+			mflags_disabled |= IR_X86_SSE41;
+		} else if (strcmp(argv[i], "-msse4.2") == 0) {
+			mflags |= IR_X86_SSE42;
+			mflags_disabled &= ~IR_X86_SSE42;
+		} else if (strcmp(argv[i], "-mno-sse4.2") == 0) {
+			mflags &= ~IR_X86_SSE42;
+			mflags_disabled |= IR_X86_SSE42;
 #endif
 		} else if (strcmp(argv[i], "-muse-fp") == 0) {
 			flags |= IR_USE_FRAME_POINTER;
