@@ -180,8 +180,12 @@ static test *parse_file(const char *filename, int id)
 
 static int skip_test(test *t)
 {
-	if (target && (t->target && strcmp(t->target, target) != 0)) {
-		return 1;
+	if (target && t->target) {
+		if (t->target[0] == '!') {
+			return strcmp(t->target + 1, target) == 0;
+		} else {
+			return strcmp(t->target, target) != 0;
+		}
 	}
 	return 0;
 }
