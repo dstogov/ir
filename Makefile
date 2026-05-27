@@ -34,17 +34,20 @@ ifneq (, $(filter x86_64 amd64, $(TARGET)))
   override BUILD_CFLAGS += -m64 -DIR_TARGET_X64
   DASM_ARCH  = x86
   DASM_FLAGS = -M -D X64=1
+  TEST_TARGET=x86_64
 else ifneq (, $(filter x86 i386, $(TARGET)))
   override CFLAGS += -m32 -DIR_TARGET_X86
   override BUILD_CFLAGS += -m32 -DIR_TARGET_X86
   DASM_ARCH  = x86
   DASM_FLAGS = -M
+  TEST_TARGET=x86
 else ifneq (, $(filter aarch64 arm64, $(TARGET)))
 # CC= aarch64-linux-gnu-gcc --sysroot=$(HOME)/php/ARM64
   override CFLAGS += -DIR_TARGET_AARCH64
   override BUILD_CFLAGS += -DIR_TARGET_AARCH64
   DASM_ARCH  = aarch64
   DASM_FLAGS = -M
+  TEST_TARGET=aarch64
 else
  $(error Unsupported target. TRGET must be 'x86_64', 'x86' or 'aarch64')
 endif
@@ -121,11 +124,11 @@ $(BUILD_DIR)/tester: $(SRC_DIR)/tools/tester.c
 	$(CC) $(BUILD_CFLAGS) -o $@ $<
 
 test: $(BUILD_DIR)/ir $(BUILD_DIR)/tester
-	$(BUILD_DIR)/tester --test-cmd $(BUILD_DIR)/ir --target $(TARGET) --default-args "--save" \
+	$(BUILD_DIR)/tester --test-cmd $(BUILD_DIR)/ir --target $(TEST_TARGET) --default-args "--save" \
 		--test-extension ".irt" --code-extension ".ir" $(TESTS)
 
 test-ci: $(BUILD_DIR)/ir $(BUILD_DIR)/tester
-	$(BUILD_DIR)/tester --test-cmd $(BUILD_DIR)/ir --target $(TARGET) --default-args "--save" \
+	$(BUILD_DIR)/tester --test-cmd $(BUILD_DIR)/ir --target $(TEST_TARGET) --default-args "--save" \
 		--test-extension ".irt" --code-extension ".ir" --show-diff $(TESTS)
 
 clean:
