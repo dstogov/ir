@@ -2,8 +2,6 @@
 009: sub function
 --TARGET--
 x86
---XFAIL--
-64-bit integers are not implemented on 32-bit systems
 --ARGS--
 -S
 --CODE--
@@ -16,6 +14,8 @@ x86
 }
 --EXPECT--
 test:
-	movabsq $0x100000000, %rax
-	subq %rdi, %rax
-	retq
+	xorl %eax, %eax
+	movl $1, %edx
+	subl 4(%esp), %eax
+	sbbl 8(%esp), %edx
+	retl

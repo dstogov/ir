@@ -1086,6 +1086,12 @@ IR_ALWAYS_INLINE ir_ref ir_next_control(const ir_ctx *ctx, ir_ref ref)
 		_ref2 = _tmp; \
 	} while (0)
 
+#define SWAP_REGS(_reg1, _reg2) do { \
+		ir_reg _tmp = _reg1; \
+		_reg1 = _reg2; \
+		_reg2 = _tmp; \
+	} while (0)
+
 #define SWAP_INSNS(_insn1, _insn2) do { \
 		ir_insn *_tmp = _insn1; \
 		_insn1 = _insn2; \
@@ -1265,10 +1271,14 @@ struct _ir_live_range {
 #define IR_LIVE_INTERVAL_SPILL_SPECIAL   (1<<6) /* spill slot is pre-allocated in a special area (see ir_ctx.spill_reserved_base) */
 #define IR_LIVE_INTERVAL_SPILLED         (1<<7)
 #define IR_LIVE_INTERVAL_SPLIT_CHILD     (1<<8)
+#define IR_LIVE_INTERVAL_TWO_REGS        (1<<9)
 
 struct _ir_live_interval {
 	uint8_t           type;
 	int8_t            reg;
+#if IR_X86_I64
+	int8_t            reg_hi;
+#endif
 	uint16_t          flags;
 	union {
 		int32_t       vreg;
@@ -1442,6 +1452,7 @@ IR_ALWAYS_INLINE int8_t ir_get_alocated_reg(const ir_ctx *ctx, ir_ref ref, int o
 #define IR_FUSED_REG (1U<<28) /* Register assignemnt may be stored in ctx->fused_regs instead of ctx->regs */
 #define IR_MAY_SWAP  (1U<<27) /* Allow swapping operands for better register allocation */
 #define IR_MAY_REUSE (1U<<26) /* Result may reuse register of the source */
+#define IR_TWO_REGS  (1U<<25) /* Result needs two registers (used for 64-bit integers on x86) */
 
 #define IR_RULE_MASK 0xff
 

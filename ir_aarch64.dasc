@@ -266,6 +266,14 @@ const char *ir_reg_name(int8_t reg, ir_type type)
 	}
 }
 
+void ir_dump_reg(const ir_ctx *ctx, int8_t reg, ir_ref ref, bool store, FILE *f)
+{
+	if (reg != IR_REG_NONE) {
+		fprintf(f, " {%%%s%s}", ir_reg_name(IR_REG_NUM(reg), ctx->ir_base[ref].type),
+			(reg & (IR_REG_SPILL_STORE|IR_REG_SPILL_SPECIAL)) ? (store ? ":store" : ":load") : "");
+	}
+}
+
 /* Calling Conventions */
 #define IR_REG_SCRATCH_AARCH64         IR_REG_SET_1
 

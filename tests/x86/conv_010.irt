@@ -2,8 +2,6 @@
 010: type conversion BITCAST
 --TARGET--
 x86
---XFAIL--
-64-bit integers are not implemented on 32-bit systems
 --ARGS--
 -S
 --CODE--
@@ -15,5 +13,9 @@ x86
 }
 --EXPECT--
 test:
-	movq %rdi, %xmm0
-	retq
+	subl $8, %esp
+	movsd 0xc(%esp), %xmm0
+	movsd %xmm0, (%esp)
+	fldl (%esp)
+	addl $8, %esp
+	retl
