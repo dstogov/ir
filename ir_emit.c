@@ -809,6 +809,15 @@ static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_dessa_copy *copies, int count,
 		ir_bitset_excl(todo, to);
 		type = types[to];
 		from = pred[to];
+#ifdef IR_DEBUG
+		/* If destionation is set, it can't be used as temporary anymore */
+		if (to == tmp_reg) {
+			tmp_reg = IR_REG_NONE;
+		}
+		if (to == tmp_fp_reg) {
+			tmp_fp_reg = IR_REG_NONE;
+		}
+#endif
 		if (IR_IS_CONST_REF(from)) {
 			ir_emit_dessa_move(ctx, type, to, from, tmp_reg, tmp_fp_reg);
 		} else {
