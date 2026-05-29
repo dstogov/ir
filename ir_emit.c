@@ -613,11 +613,12 @@ static void ir_emit_dessa_move(ir_ctx *ctx, ir_type type, ir_ref to, ir_ref from
 	}
 }
 
-IR_ALWAYS_INLINE void ir_dessa_resolve_cycle(ir_ctx *ctx, int32_t *pred, int32_t *loc, int8_t *types, ir_bitset todo, int32_t to, ir_reg tmp_reg, ir_reg tmp_fp_reg)
+IR_ALWAYS_INLINE void ir_dessa_resolve_cycle(ir_ctx *ctx, int32_t *pred, int32_t *loc, int8_t *types, ir_bitset todo, int32_t root, ir_reg tmp_reg, ir_reg tmp_fp_reg)
 {
 	ir_ref from;
 	ir_mem tmp_spill_slot;
 	ir_type type;
+	int32_t to = root;
 
 	IR_MEM_VAL(tmp_spill_slot) = 0;
 	IR_ASSERT(!IR_IS_CONST_REF(to));
@@ -679,26 +680,24 @@ IR_ALWAYS_INLINE void ir_dessa_resolve_cycle(ir_ctx *ctx, int32_t *pred, int32_t
 		r = loc[from];
 		type = types[to];
 
-		if (from == r && ir_bitset_in(todo, from)) {
-			/* Memory to memory move inside an isolated or "blocked" cycle requres an additional temporary register */
-			if (to >= IR_REG_NUM && r >= IR_REG_NUM) {
-				ir_reg tmp = IR_IS_TYPE_INT(type) ?  tmp_reg : tmp_fp_reg;
+		if (from == root) break;
 
-				if (!IR_MEM_VAL(tmp_spill_slot)) {
-					/* Free a register, saving it in a temporary spill slot */
-					tmp_spill_slot = IR_MEM_BO(IR_REG_STACK_POINTER, -16);
-					ir_emit_store_mem(ctx, type, tmp_spill_slot, tmp);
-				}
-				ir_emit_dessa_move(ctx, type, to, r, tmp_reg, tmp_fp_reg);
-			} else {
-				ir_emit_dessa_move(ctx, type, to, r, IR_REG_NONE, IR_REG_NONE);
+		/* Memory to memory move inside an isolated or "blocked" cycle requres an additional temporary register */
+		if (to >= IR_REG_NUM && r >= IR_REG_NUM) {
+			ir_reg tmp = IR_IS_TYPE_INT(type) ?  tmp_reg : tmp_fp_reg;
+
+			if (!IR_MEM_VAL(tmp_spill_slot)) {
+				/* Free a register, saving it in a temporary spill slot */
+				tmp_spill_slot = IR_MEM_BO(IR_REG_STACK_POINTER, -16);
+				ir_emit_store_mem(ctx, type, tmp_spill_slot, tmp);
 			}
-			ir_bitset_excl(todo, to);
-			loc[from] = to;
-			to = from;
+			ir_emit_dessa_move(ctx, type, to, r, tmp_reg, tmp_fp_reg);
 		} else {
-			break;
+			ir_emit_dessa_move(ctx, type, to, r, IR_REG_NONE, IR_REG_NONE);
 		}
+		ir_bitset_excl(todo, to);
+		loc[from] = to;
+		to = from;
 	}
 
 	type = types[to];
