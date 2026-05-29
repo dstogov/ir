@@ -1896,6 +1896,11 @@ get_arg_hints:
 			constraints->tmp_regs[2] = IR_TMP_REG(3, IR_U32, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 			n = 3;
 			break;
+		case IR_BIT_COUNT_I64:
+			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
+			constraints->tmp_regs[0] = IR_TMP_REG(2, IR_U32, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+			n = 1;
+			break;
 		case IR_BINOP_HELPER_I64:
 			flags = IR_USE_SHOULD_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 			constraints->def_reg = IR_REG_RAX; // TODO: add hint for %rdx ???
@@ -3587,7 +3592,7 @@ store_int:
 		case IR_CTTZ:
 			ir_match_fuse_load(ctx, insn->op1, ref);
 #if IR_X86_I64
-			if (ctx->ir_base[insn->op2].type == IR_I64 || ctx->ir_base[insn->op2].type == IR_U64) {
+			if (ctx->ir_base[insn->op1].type == IR_I64 || ctx->ir_base[insn->op1].type == IR_U64) {
 				return IR_BIT_COUNT_I64;
 			}
 #endif
@@ -3595,8 +3600,8 @@ store_int:
 		case IR_CTPOP:
 			ir_match_fuse_load(ctx, insn->op1, ref);
 #if IR_X86_I64
-			if (ctx->ir_base[insn->op2].type == IR_I64 || ctx->ir_base[insn->op2].type == IR_U64) {
-				return IR_BIT_COUNT_I64;
+			if (ctx->ir_base[insn->op1].type == IR_I64 || ctx->ir_base[insn->op1].type == IR_U64) {
+ 				return (ctx->mflags & IR_X86_BMI1) ? IR_BIT_COUNT_I64 : IR_CTPOP; // TODO: call __popcountdi2() ???
 			}
 #endif
 			return (ctx->mflags & IR_X86_BMI1) ? IR_BIT_COUNT : IR_CTPOP;
@@ -12427,6 +12432,7 @@ extern int64_t __divdi3(int64_t, int64_t);
 extern int64_t __moddi3(int64_t, int64_t);
 extern uint64_t __udivdi3(uint64_t, uint64_t);
 extern uint64_t __umoddi3(uint64_t, uint64_t);
+extern int32_t __popcountdi2(uint64_t);
 
 static uint64_t __roldi3(uint64_t a, uint64_t b)
 {
@@ -13043,7 +13049,87 @@ static void ir_emit_fp2int_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 static void ir_emit_bit_count_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
-	IR_ASSERT(0 && "NIY: ir_emit_bit_count_i64()"); // TODO: ???
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_reg op1_reg = ctx->regs[def][1];
+	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
+	ir_reg tmp_reg = ctx->regs[def][2];
+	ir_reg op1_reg_hi;
+
+	IR_ASSERT(def_reg != IR_REG_NONE && tmp_reg != IR_REG_NONE);
+	if (op1_reg != IR_REG_NONE) {
+		if (IR_REG_SPILLED(op1_reg)) {
+			op1_reg = IR_REG_NUM(op1_reg);
+			op1_reg_hi = IR_REG_I64_HI(op1_reg);
+			op1_reg = IR_REG_I64_LO(op1_reg);
+			ir_emit_load_i64_lo(ctx, op1_reg, insn->op1);
+			ir_emit_load_i64_hi(ctx, op1_reg_hi, insn->op1);
+		} else {
+			op1_reg_hi = IR_REG_I64_HI(op1_reg);
+			op1_reg = IR_REG_I64_LO(op1_reg);
+		}
+
+		switch (insn->op) {
+			case IR_CTPOP:
+				|	popcnt Rd(def_reg), Rd(op1_reg)
+				|	popcnt Rd(tmp_reg), Rd(op1_reg_hi)
+				|	add Rd(def_reg), Rd(tmp_reg)
+				break;
+			case IR_CTLZ:
+				|   bsr Rd(tmp_reg), Rd(op1_reg)
+				|	or Rd(tmp_reg), 32
+				|	bsr Rd(def_reg), Rd(op1_reg_hi)
+				|	cmovz Rd(def_reg), Rd(tmp_reg)
+				|	xor Rd(def_reg), 31
+				break;
+			case IR_CTTZ:
+				|	bsf Rd(tmp_reg), Rd(op1_reg_hi)
+				|	add Rd(tmp_reg), 32
+				|   bsf Rd(def_reg), Rd(op1_reg_hi)
+				|	cmovnz Rd(def_reg), Rd(tmp_reg)
+				break;
+			default:
+				IR_ASSERT(0);
+		}
+	} else if (IR_IS_CONST_REF(insn->op1)) {
+		IR_ASSERT(0);
+	} else {
+		ir_mem mem, mem_hi;
+
+		if (ir_rule(ctx, insn->op1) & IR_FUSED) {
+			mem = ir_fuse_load(ctx, def, insn->op1);
+		} else {
+			mem = ir_ref_spill_slot(ctx, insn->op1);
+		}
+		mem_hi = IR_MEM_I64_HI(mem);
+
+		switch (insn->op) {
+			case IR_CTPOP:
+				|	ASM_TXT_TMEM_OP popcnt, Rd(def_reg), dword, mem
+				|	ASM_TXT_TMEM_OP popcnt, Rd(tmp_reg), dword, mem_hi
+				|	add Rd(def_reg), Rd(tmp_reg)
+				break;
+			case IR_CTLZ:
+				|   ASM_TXT_TMEM_OP bsr, Rd(tmp_reg), dword, mem
+				|	or Rd(tmp_reg), 32
+				|	ASM_TXT_TMEM_OP bsr, Rd(def_reg), dword, mem_hi
+				|	cmovz Rd(def_reg), Rd(tmp_reg)
+				|	xor Rd(def_reg), 31
+				break;
+			case IR_CTTZ:
+				|	ASM_TXT_TMEM_OP bsf, Rd(tmp_reg), dword, mem_hi
+				|	add Rd(tmp_reg), 32
+				|	ASM_TXT_TMEM_OP bsf, Rd(def_reg), dword, mem
+				|	cmovnz Rd(def_reg), Rd(tmp_reg)
+				break;
+			default:
+				IR_ASSERT(0);
+		}
+	}
+
+	if (IR_REG_SPILLED(ctx->regs[def][0])) {
+		ir_emit_store(ctx, insn->type, def, def_reg);
+	}
 }
 
 static void ir_emit_min_max_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
