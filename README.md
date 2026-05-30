@@ -131,8 +131,8 @@ git clone https://github.com/dstogov/ir.git
 cd ir
 make
 make test
-./ir bench/mandelbrit.ir --run
-./ir bench/mandelbrit.ir -S
+./ir bench/mandelbrot.ir --run
+./ir bench/mandelbrot.ir -S
 ./ir --help
 ```
 
