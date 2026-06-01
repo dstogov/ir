@@ -1650,6 +1650,11 @@ get_arg_hints:
 			break;
 		case IR_FP2INT:
 			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
+			insn = &ctx->ir_base[ref];
+			if (insn->type == IR_U64) {
+				constraints->tmp_regs[0] = IR_TMP_REG(2, ctx->ir_base[insn->op1].type, IR_USE_SUB_REF, IR_DEF_SUB_REF);
+				n = 1;
+			}
 			break;
 		case IR_INT2FP:
 			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
@@ -8123,6 +8128,7 @@ static void ir_emit_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 	ir_reg op1_reg = ctx->regs[def][1];
+	ir_reg tmp_reg = ctx->regs[def][2];
 	bool dst64 = 0;
 
 	IR_ASSERT(IR_IS_TYPE_FP(src_type));
@@ -8155,6 +8161,34 @@ static void ir_emit_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		} else {
 			IR_ASSERT(sizeof(void*) == 8);
 |.if X64
+			if (dst_type == IR_U64) {
+				if (src_type == IR_DOUBLE) {
+					uint32_t c = (sizeof(void*) == 4) ? 0x41e00000 : 0x43e00000;
+					if (!data->u2d_const) {
+						data->u2d_const = 1;
+						ir_rodata(ctx);
+						|.align 8
+						|->u2d_const:
+						|.dword 0, c
+						|.code
+					}
+					|	ASM_FP_REG_TXT_OP ucomis, src_type, op1_reg, [->u2d_const]
+					|	jnb >1
+				} else {
+					uint32_t c = (sizeof(void*) == 4) ? 0x4f000000 : 0x5f000000;
+					if (!data->u2f_const) {
+						data->u2f_const = 1;
+						ir_rodata(ctx);
+						|.align 4
+						|->u2f_const:
+						|.dword c
+						|.code
+					}
+					IR_ASSERT(src_type == IR_FLOAT);
+					|	ASM_FP_REG_TXT_OP ucomis, src_type, op1_reg, [->u2f_const]
+					|	jnb >1
+				}
+			}
 			if (src_type == IR_DOUBLE) {
 				if (ctx->mflags & IR_X86_AVX) {
 					|	vcvttsd2si Rq(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
@@ -8169,8 +8203,37 @@ static void ir_emit_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					|	cvttss2si Rq(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
 				}
 			}
+			if (dst_type == IR_U64) {
+				IR_ASSERT(tmp_reg != IR_REG_NONE);
+				|1:
+				if (src_type == IR_DOUBLE) {
+					if (ctx->mflags & IR_X86_AVX) {
+						|	ASM_AVX_REG_REG_TXT_OP vsubs, src_type, tmp_reg, op1_reg, [->u2d_const]
+						|	vcvttsd2si Rq(def_reg), xmm(tmp_reg-IR_REG_FP_FIRST)
+					} else {
+						if (tmp_reg != op1_reg) {
+							|	movsd xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						}
+						|	ASM_SSE2_REG_TXT_OP subs, src_type, tmp_reg, [->u2d_const]
+						|	cvttsd2si Rq(def_reg), xmm(tmp_reg-IR_REG_FP_FIRST)
+					}
+				} else {
+					if (ctx->mflags & IR_X86_AVX) {
+						|	ASM_AVX_REG_REG_TXT_OP vsubs, src_type, tmp_reg, op1_reg, [->u2f_const]
+						|	vcvttss2si Rq(def_reg), xmm(tmp_reg-IR_REG_FP_FIRST)
+					} else {
+						if (tmp_reg != op1_reg) {
+							|	movss xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						}
+						|	ASM_SSE2_REG_TXT_OP subs, src_type, tmp_reg, [->u2f_const]
+						|	cvttss2si Rq(def_reg), xmm(tmp_reg-IR_REG_FP_FIRST)
+					}
+				}
+				|	btc Rq(def_reg), 63
+			}
 |.endif
 		}
+
 	} else if (IR_IS_CONST_REF(insn->op1)) {
 		int label = ir_get_const_label(ctx, insn->op1);
 
