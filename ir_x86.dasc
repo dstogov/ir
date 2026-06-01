@@ -7902,8 +7902,11 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			if (tmp_reg != op1_reg) {
 				| mov Rq(tmp_reg), Rq(op1_reg)
 			}
+			// TODO: we might replace "jnc" by "and", but this would require an extra temporary register ???
 			|	shr	Rq(tmp_reg), 1
-			|	adc Rq(tmp_reg), 0
+			|	jnc >3
+			|	or Rq(tmp_reg), 1
+			|3:
 			if (dst_type == IR_DOUBLE) {
 				if (ctx->mflags & IR_X86_AVX) {
 					|	vxorps xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
