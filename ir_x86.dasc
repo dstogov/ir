@@ -8211,6 +8211,7 @@ static void ir_emit_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 			if (dst_type == IR_U64) {
 				IR_ASSERT(tmp_reg != IR_REG_NONE);
+				|	jmp >2
 				|1:
 				if (src_type == IR_DOUBLE) {
 					if (ctx->mflags & IR_X86_AVX) {
@@ -8236,6 +8237,7 @@ static void ir_emit_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					}
 				}
 				|	btc Rq(def_reg), 63
+				|2:
 			}
 |.endif
 		}
