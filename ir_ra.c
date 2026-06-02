@@ -2555,8 +2555,10 @@ static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, ir_live_interval *iva
 	child->reg = IR_REG_NONE;
 #if IR_X86_I64
 	child->reg_hi = IR_REG_NONE;
-#endif
+	child->flags = (ival->flags & IR_LIVE_INTERVAL_TWO_REGS) | IR_LIVE_INTERVAL_SPLIT_CHILD;
+#else
 	child->flags = IR_LIVE_INTERVAL_SPLIT_CHILD;
+#endif
 	child->vreg = ival->vreg;
 	child->stack_spill_pos = -1; // not allocated
 	child->range.start = pos;
@@ -3037,6 +3039,11 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 				if (ival->flags & IR_LIVE_INTERVAL_TWO_REGS) {
 					int8_t reg_hi = ctx->live_intervals[ival->vreg]->reg_hi;
 					if (reg_hi >= 0 && IR_REGSET_IN(available, reg_hi)) {
+						if (reg > reg_hi) {
+							int tmp = reg;
+							reg = reg_hi;
+							reg_hi = tmp;
+						}
 						ival->reg = reg;
 						ival->reg_hi = reg_hi;
 						IR_LOG_LSRA_ASSIGN("    ---- Assign", ival, " (available without spilling)");
@@ -3551,7 +3558,10 @@ try_next_available_register:
 					goto try_next_available_register;
 				}
 			}
-#if !IR_X86_I64
+#if IR_X86_I64
+			other = other->list_next;
+			continue;
+#else
 			break;
 #endif
 		}
