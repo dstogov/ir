@@ -115,6 +115,11 @@ static ir_reg ir_get_param_reg(const ir_ctx *ctx, ir_ref ref)
 						/* struct passed by value on stack */
 						return IR_REG_NONE;
 					} else if (int_param < cc->int_param_regs_count) {
+#if IR_X86_I64
+						if (insn->type == IR_I64 || insn->type == IR_U64) {
+							return IR_REG_NONE;
+						}
+#endif
 						return cc->int_param_regs[int_param];
 					} else {
 						return IR_REG_NONE;
@@ -127,6 +132,14 @@ static ir_reg ir_get_param_reg(const ir_ctx *ctx, ir_ref ref)
 				if (cc->shadow_param_regs) {
 					fp_param++;
 				}
+#if IR_X86_I64
+				if (insn->type == IR_I64 || insn->type == IR_U64) {
+					int_param++;
+					if (cc->shadow_param_regs) {
+						fp_param++;
+					}
+				}
+#endif
 			} else {
 				IR_ASSERT(IR_IS_TYPE_FP(insn->type));
 				if (use == ref) {
@@ -161,6 +174,17 @@ static int ir_get_args_regs(const ir_ctx *ctx, const ir_insn *insn, const ir_cal
 		type = arg->type;
 		if (IR_IS_TYPE_INT(type)) {
 			if (int_param < cc->int_param_regs_count && arg->op != IR_ARGVAL) {
+#if IR_X86_I64
+				if (type == IR_I64 || type == IR_U64) {
+					regs[j] = IR_REG_NONE;
+					count = j + 1;
+					int_param += 1;
+					if (cc->shadow_param_regs) {
+						fp_param += 2;
+					}
+					continue;
+				}
+#endif
 				regs[j] = cc->int_param_regs[int_param];
 				count = j + 1;
 				int_param++;

@@ -10348,6 +10348,15 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn, const ir_call_conv
 					continue;
 				}
 			}
+#if IR_X86_I64
+			if (type == IR_I64 || type == IR_U64) {
+				used_stack += IR_MAX(sizeof(void*), ir_type_size[type]);
+				int_param++;
+				if (cc->shadow_param_regs) {
+					fp_param++;
+				}
+			} else
+#endif
 			if (int_param >= cc->int_param_regs_count) {
 				used_stack += IR_MAX(sizeof(void*), ir_type_size[type]);
 			}
@@ -10530,6 +10539,17 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 			}
 			if (int_param < cc->int_param_regs_count) {
 				dst_reg = cc->int_param_regs[int_param];
+#if IR_X86_I64
+				if (dst_reg != IR_REG_NONE && (type == IR_I64 || type == IR_U64)) {
+					if (int_param + 1 < cc->int_param_regs_count) {
+						int_param++;
+						if (cc->shadow_param_regs) {
+							fp_param++;
+						}
+					}
+					dst_reg = IR_REG_NONE;
+				}
+#endif
 			} else {
 				dst_reg = IR_REG_NONE; /* pass argument through stack */
 			}
@@ -10644,6 +10664,17 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 				}
 				if (int_param < cc->int_param_regs_count) {
 					dst_reg = cc->int_param_regs[int_param];
+#if IR_X86_I64
+					if (dst_reg != IR_REG_NONE && (type == IR_I64 || type == IR_U64)) {
+						if (int_param + 1 < cc->int_param_regs_count) {
+							int_param++;
+							if (cc->shadow_param_regs) {
+								fp_param++;
+							}
+						}
+						dst_reg = IR_REG_NONE;
+					}
+#endif
 				} else {
 					dst_reg = IR_REG_NONE; /* argument already passed through stack */
 				}
@@ -10782,7 +10813,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 		}
 	}
 
-	if (insn->op == IR_CALL && (ctx->flags2 & IR_PREALLOCATED_STACK)) {
+	if (insn->op == IR_CALL && (ctx->flags2 & IR_PREALLOCATED_STACK) && !cc->cleanup_stack_by_callee) {
 		used_stack = 0;
 	}
 
@@ -14899,6 +14930,17 @@ static void ir_emit_load_params(ir_ctx *ctx)
 					continue;
 				} else if (int_param_num < cc->int_param_regs_count) {
 					src_reg = cc->int_param_regs[int_param_num];
+#if IR_X86_I64
+					if (src_reg != IR_REG_NONE && (insn->type == IR_I64 || insn->type == IR_U64)) {
+						if (int_param_num + 1 < cc->int_param_regs_count) {
+							int_param_num++;
+							if (cc->shadow_param_regs) {
+								fp_param_num++;
+							}
+						}
+						src_reg = IR_REG_NONE;
+					}
+#endif
 				} else {
 					src_reg = IR_REG_NONE;
 				}
@@ -15020,6 +15062,17 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 				}
 				if (int_param_num < cc->int_param_regs_count) {
 					src_reg = cc->int_param_regs[int_param_num];
+#if IR_X86_I64
+					if (src_reg != IR_REG_NONE && (insn->type == IR_I64 || insn->type == IR_U64)) {
+						if (int_param_num + 1 < cc->int_param_regs_count) {
+							int_param_num++;
+							if (cc->shadow_param_regs) {
+								fp_param_num++;
+							}
+						}
+						src_reg = IR_REG_NONE;
+					}
+#endif
 				} else {
 					src_reg = IR_REG_NONE;
 				}
