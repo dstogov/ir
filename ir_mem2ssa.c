@@ -684,7 +684,7 @@ static int ir_mem2ssa_may_split_alloca(ir_ctx *ctx, ir_mem2ssa_split_layout *lay
 		p++;
 	} while (--n > 0);
 
-	return IR_MAY_SPLIT;
+	return layout->count > 0 ? IR_MAY_SPLIT : IR_CANNOT_CONVERT;
 }
 
 /* SRA - Scalar Replacement Of Aggregates */
@@ -695,38 +695,37 @@ static void ir_mem2ssa_split_alloca(ir_ctx *ctx, ir_mem2ssa_split_layout *layout
 	ir_insn *use_insn;
 	ir_use_list *use_list;
 	ir_ref first_new_alloca = IR_UNUSED;
+	uint32_t b = ctx->cfg_map[var];
 
-	if (layout->count > 0) {
-		uint32_t b = ctx->cfg_map[var];
+	IR_ASSERT(layout->count > 0);
 
-		/* update size in the original ALLOCA node */
-		i = 0;
-		while (!layout->sizes[i]) i++;
-		ctx->ir_base[var].op2 = ir_const_size_t(ctx, layout->sizes[i]);
-		layout->sizes[i] = 0; /* reuse original ALLOCA node */
+	/* update size in the original ALLOCA node */
+	i = 0;
+	while (!layout->sizes[i]) i++;
+	ctx->ir_base[var].op2 = ir_const_size_t(ctx, layout->sizes[i]);
+	layout->sizes[i] = 0; /* reuse original ALLOCA node */
 
-		if (layout->count > 1) {
-			/* create new ALLOCA nodes and link them into the control chain */
-			ir_ref prev = ctx->ir_base[var].op1;
-			uint32_t n = layout->count;
-			uint32_t j = 1;
+	if (layout->count > 1) {
+		/* create new ALLOCA nodes and link them into the control chain */
+		ir_ref prev = ctx->ir_base[var].op1;
+		uint32_t n = layout->count;
+		uint32_t j = 1;
 
-			ir_use_list_remove_one(ctx, prev, var);
-			first_new_alloca = ctx->insns_count;
-			do {
-				i++;
-				while (!layout->sizes[i]) i++;
-				ref = ir_emit2(ctx, IR_OPTX(IR_ALLOCA, IR_ADDR, 2), prev, ir_const_size_t(ctx, layout->sizes[i]));
-				ir_use_list_add(ctx, prev, ref);
-				prev = ref;
-				ctx->cfg_map[ref] = b;
-				layout->sizes[i] = j; /* use new ALLOCA node */
-				j++;
-				n--;
-			} while (n > 1);
-			ir_use_list_add(ctx, prev, var);
-			ctx->ir_base[var].op1 = prev;
-		}
+		ir_use_list_remove_one(ctx, prev, var);
+		first_new_alloca = ctx->insns_count;
+		do {
+			i++;
+			while (!layout->sizes[i]) i++;
+			ref = ir_emit2(ctx, IR_OPTX(IR_ALLOCA, IR_ADDR, 2), prev, ir_const_size_t(ctx, layout->sizes[i]));
+			ir_use_list_add(ctx, prev, ref);
+			prev = ref;
+			ctx->cfg_map[ref] = b;
+			layout->sizes[i] = j; /* use new ALLOCA node */
+			j++;
+			n--;
+		} while (n > 1);
+		ir_use_list_add(ctx, prev, var);
+		ctx->ir_base[var].op1 = prev;
 	}
 
 	use_list = &ctx->use_lists[var];
