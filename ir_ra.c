@@ -298,21 +298,6 @@ static void ir_add_tmp(ir_ctx *ctx, ir_ref ref, ir_ref tmp_ref, int32_t tmp_op_n
 	return;
 }
 
-static bool ir_has_tmp(ir_ctx *ctx, ir_ref ref, int32_t op_num)
-{
-	ir_live_interval *ival = ctx->live_intervals[0];
-
-	if (ival) {
-		while (ival && IR_LIVE_POS_TO_REF(ival->range.start) <= ref) {
-			if (ival->tmp_ref == ref && ival->tmp_op_num == op_num) {
-				return 1;
-			}
-			ival = ival->next;
-		}
-	}
-	return 0;
-}
-
 static ir_live_interval *ir_fix_live_range(ir_ctx *ctx, int v, ir_live_pos old_start, ir_live_pos new_start)
 {
 	ir_live_interval *ival = ctx->live_intervals[v];
@@ -1737,11 +1722,16 @@ static void ir_vregs_coalesce(ir_ctx *ctx, uint32_t v1, uint32_t v2, ir_ref from
 	}
 }
 
-static void ir_add_phi_move(ir_ctx *ctx, uint32_t b, ir_ref from, ir_ref to)
+static void ir_add_phi_move(ir_ctx *ctx, uint32_t b, ir_type type, ir_ref from, ir_ref to)
 {
 	if (IR_IS_CONST_REF(from) || ctx->vregs[from] != ctx->vregs[to]) {
 		ctx->cfg_blocks[b].flags &= ~IR_BB_EMPTY;
 		ctx->cfg_blocks[b].flags |= IR_BB_DESSA_MOVES;
+		if (IR_IS_TYPE_INT(type)) {
+			ctx->cfg_blocks[b].flags |= IR_BB_DESSA_TMP_INT;
+		} else {
+			ctx->cfg_blocks[b].flags |= IR_BB_DESSA_TMP_FP;
+		}
 		ctx->flags2 |= IR_LR_HAVE_DESSA_MOVES;
 #if 0
 		fprintf(stderr, "BB%d: MOV %d -> %d\n", b, from, to);
@@ -2022,12 +2012,12 @@ int ir_coalesce(ir_ctx *ctx)
 								}
 							}
 #endif
-							ir_add_phi_move(ctx, b, input, use);
+							ir_add_phi_move(ctx, b, insn->type, input, use);
 						}
 					}
 				} else {
 					/* Move for constant input */
-					ir_add_phi_move(ctx, b, input, use);
+					ir_add_phi_move(ctx, b, insn->type, input, use);
 				}
 			}
 		}
@@ -2137,10 +2127,17 @@ int ir_compute_dessa_moves(ir_ctx *ctx)
 					insn = &ctx->ir_base[use];
 					if (insn->op == IR_PHI) {
 						for (j = 2; j <= k; j++) {
-							if (IR_IS_CONST_REF(ir_insn_op(insn, j)) || ctx->vregs[ir_insn_op(insn, j)] != ctx->vregs[use]) {
+							ir_ref input = ir_insn_op(insn, j);
+
+							if (IR_IS_CONST_REF(input) || ctx->vregs[input] != ctx->vregs[use]) {
 								int pred = ctx->cfg_edges[bb->predecessors + (j-2)];
 								ctx->cfg_blocks[pred].flags &= ~IR_BB_EMPTY;
 								ctx->cfg_blocks[pred].flags |= IR_BB_DESSA_MOVES;
+								if (IR_IS_TYPE_INT(insn->type)) {
+									ctx->cfg_blocks[pred].flags |= IR_BB_DESSA_TMP_INT;
+								} else {
+									ctx->cfg_blocks[pred].flags |= IR_BB_DESSA_TMP_FP;
+								}
 								ctx->flags2 |= IR_LR_HAVE_DESSA_MOVES;
 							}
 						}
@@ -3376,46 +3373,6 @@ try_next_available_register:
 	return reg;
 }
 
-static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to, void *data)
-{
-	ir_block *bb = data;
-	ir_tmp_reg tmp_reg;
-
-	if (to == 0) {
-		if (IR_IS_TYPE_INT(type)) {
-			tmp_reg.num = 0;
-			tmp_reg.type = type;
-			tmp_reg.start = IR_USE_SUB_REF;
-			tmp_reg.end = IR_SAVE_SUB_REF;
-		} else {
-			IR_ASSERT(IR_IS_TYPE_FP(type));
-			tmp_reg.num = 1;
-			tmp_reg.type = type;
-			tmp_reg.start = IR_USE_SUB_REF;
-			tmp_reg.end = IR_SAVE_SUB_REF;
-		}
-	} else if (from != 0) {
-		if (IR_IS_TYPE_INT(type)) {
-			tmp_reg.num = 0;
-			tmp_reg.type = type;
-			tmp_reg.start = IR_USE_SUB_REF;
-			tmp_reg.end = IR_SAVE_SUB_REF;
-		} else {
-			IR_ASSERT(IR_IS_TYPE_FP(type));
-			tmp_reg.num = 1;
-			tmp_reg.type = type;
-			tmp_reg.start = IR_USE_SUB_REF;
-			tmp_reg.end = IR_SAVE_SUB_REF;
-		}
-	} else {
-		return 1;
-	}
-	if (!ir_has_tmp(ctx, bb->end, tmp_reg.num)) {
-		ir_add_tmp(ctx, bb->end, bb->end, tmp_reg.num, tmp_reg);
-	}
-	return 1;
-}
-
 static bool ir_ival_spill_for_fuse_load(ir_ctx *ctx, ir_live_interval *ival)
 {
 	ir_use_pos *use_pos = ival->use_pos;
@@ -3489,7 +3446,22 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 		for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
 			IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 			if (bb->flags & IR_BB_DESSA_MOVES) {
-				ir_gen_dessa_moves(ctx, b, ir_fix_dessa_tmps, bb);
+				ir_tmp_reg tmp_reg;
+
+				if (bb->flags & IR_BB_DESSA_TMP_INT) {
+					tmp_reg.num = 0;
+					tmp_reg.type = IR_U32; // ???
+					tmp_reg.start = IR_USE_SUB_REF;
+					tmp_reg.end = IR_SAVE_SUB_REF;
+					ir_add_tmp(ctx, bb->end, bb->end, tmp_reg.num, tmp_reg);
+				}
+				if (bb->flags & IR_BB_DESSA_TMP_FP) {
+					tmp_reg.num = 1;
+					tmp_reg.type = IR_DOUBLE; // ???
+					tmp_reg.start = IR_USE_SUB_REF;
+					tmp_reg.end = IR_SAVE_SUB_REF;
+					ir_add_tmp(ctx, bb->end, bb->end, tmp_reg.num, tmp_reg);
+				}
 			}
 		}
 	}

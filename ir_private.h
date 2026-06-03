@@ -1131,6 +1131,9 @@ void ir_iter_cleanup(ir_ctx *ctx);
 /* The following flags are set by BB scheduler */
 #define IR_BB_ALIGN_LOOP       (1<<14)
 
+#define IR_BB_DESSA_TMP_INT    (1<<15) /* translation out of SSA may need temporary genral purpose register */
+#define IR_BB_DESSA_TMP_FP     (1<<16) /* translation out of SSA may need temporary floating point register */
+
 struct _ir_block {
 	uint32_t flags;
 	ir_ref   start;              /* index of first instruction                 */
