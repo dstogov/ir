@@ -8272,6 +8272,11 @@ static void ir_emit_trunc(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				ir_backend_data *data = ctx->data;
 				dasm_State **Dst = &data->dasm_state;
 
+#if IR_X86_I64
+				if (src_type == IR_I64 || src_type == IR_U64) {
+					src_type = IR_U32;
+				}
+#endif
 				ir_emit_mov(ctx, src_type, def_reg, op1_reg);
 				|	and	Rb(def_reg), 0xff
 			} else {
@@ -10901,14 +10906,14 @@ static void ir_emit_call_ex(ir_ctx *ctx, ir_ref def, ir_insn *insn, const ir_pro
 			def_reg = IR_REG_NUM(ctx->regs[def][0]);
 			if (def_reg != IR_REG_NONE) {
 #if IR_X86_I64
-				if (insn->type == IR_I64|| insn->type == IR_U64) {
+				if (insn->type == IR_I64 || insn->type == IR_U64) {
 					ir_reg def_reg_hi = IR_REG_I64_HI(def_reg);
 					def_reg = IR_REG_I64_LO(def_reg);
 					if (def_reg != cc->int_ret_reg) {
-						ir_emit_mov(ctx, insn->type, def_reg, cc->int_ret_reg);
+						ir_emit_mov(ctx, IR_U32, def_reg, cc->int_ret_reg);
 					}
 					if (def_reg_hi != IR_REG_RDX) { // TODO: avoid hardcoded register ???
-						ir_emit_mov(ctx, insn->type, def_reg_hi, IR_REG_RDX);
+						ir_emit_mov(ctx, IR_U32, def_reg_hi, IR_REG_RDX);
 					}
 					if (IR_REG_SPILLED(ctx->regs[def][0])) {
 						ir_emit_store_i64_lo(ctx, def, def_reg);
@@ -10926,7 +10931,7 @@ static void ir_emit_call_ex(ir_ctx *ctx, ir_ref def, ir_insn *insn, const ir_pro
 				}
 			} else if (ctx->use_lists[def].count > 1) {
 #if IR_X86_I64
-				if (insn->type == IR_I64|| insn->type == IR_U64) {
+				if (insn->type == IR_I64 || insn->type == IR_U64) {
 					ir_emit_store_i64_lo(ctx, def, cc->int_ret_reg);
 					ir_emit_store_i64_hi(ctx, def, IR_REG_RDX); // TODO: avoid hardcoded register ???
 				} else
