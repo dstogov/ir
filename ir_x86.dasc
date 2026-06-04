@@ -2318,6 +2318,8 @@ static uint32_t ir_match_builtin_call(ir_ctx *ctx, const ir_insn *func)
 			if (IR_IS_FP_FUNC_1(proto, IR_FLOAT)) {
 				return IR_SSE_SQRT;
 			}
+		} else if (!(ctx->mflags & (IR_X86_AVX|IR_X86_SSE41))) {
+			/* skip */
 		} else if (STR_EQUAL(name, name_len, "rint")) {
 			if (IR_IS_FP_FUNC_1(proto, IR_DOUBLE)) {
 				return IR_SSE_RINT;
@@ -11862,6 +11864,7 @@ static void ir_emit_sse_round(ir_ctx *ctx, ir_ref def, ir_insn *insn, int round_
 	if (ctx->mflags & IR_X86_AVX) {
 		|	ASM_SSE2_REG_REG_REG_TXT_OP vrounds, insn->type, def_reg, def_reg, op3_reg, round_op
 	} else {
+		IR_ASSERT(ctx->mflags & IR_X86_SSE41);
 		|	ASM_SSE2_REG_REG_TXT_OP rounds, insn->type, def_reg, op3_reg, round_op
 	}
 
