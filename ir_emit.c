@@ -61,6 +61,8 @@ typedef struct _ir_copy {
 	ir_reg  to;
 } ir_copy;
 
+#define IR_U32_HI IR_U64 /* type for dessa copy of the high 32-bit value of constant */
+
 typedef struct _ir_dessa_copy {
 	ir_type type;
 	int32_t from; /* negative - constant ref, [0..IR_REG_NUM) - CPU reg, [IR_REG_NUM...) - memory slot */
@@ -586,6 +588,11 @@ static void ir_emit_dessa_move(ir_ctx *ctx, ir_mem *mem_slots,
 	if (to < IR_REG_NUM) {
 		if (IR_IS_CONST_REF(from)) {
 			if (-from < ctx->consts_count) {
+#if IR_X86_I64
+				if (type == IR_U32_HI) {
+					ir_emit_load_i64_hi(ctx, to, from);
+				} else
+#endif
 				/* constant reference */
 				ir_emit_load(ctx, type, to, from);
 			} else {
@@ -607,6 +614,18 @@ static void ir_emit_dessa_move(ir_ctx *ctx, ir_mem *mem_slots,
 		if (IR_IS_CONST_REF(from)) {
 			if (-from < ctx->consts_count) {
 				/* constant reference */
+#if IR_X86_I64
+				if (type == IR_U32_HI) {
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
+					ir_emit_store_mem_imm(ctx, IR_U32, mem_to, ctx->ir_base[from].val.u32_hi);
+#else
+					IR_ASSERT(tmp_reg != IR_REG_NONE);
+					ir_emit_load_i64_hi(ctx, tmp_reg, from);
+					ir_emit_store_mem(ctx, IR_U32, mem_to, tmp_reg);
+#endif
+					return;
+				} else
+#endif
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 				if (IR_IS_TYPE_INT(type)
 				 && !IR_IS_SYM_CONST(ctx->ir_base[from].op)
@@ -615,7 +634,7 @@ static void ir_emit_dessa_move(ir_ctx *ctx, ir_mem *mem_slots,
 					return;
 				}
 #endif
-				ir_reg tmp = IR_IS_TYPE_INT(type) ?  tmp_reg : tmp_fp_reg;
+				ir_reg tmp = IR_IS_TYPE_INT(type) ? tmp_reg : tmp_fp_reg;
 				IR_ASSERT(tmp != IR_REG_NONE);
 				ir_emit_load(ctx, type, tmp, from);
 				ir_emit_store_mem(ctx, type, mem_to, tmp);
@@ -899,8 +918,13 @@ static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb)
 	use_list = &ctx->use_lists[succ_bb->start];
 	k = ir_phi_input_number(ctx, succ_bb, b);
 
+#if IR_X86_I64
+	copies = alloca((use_list->count - 1) * 2 * sizeof(ir_dessa_copy));
+	mem_slots = alloca((use_list->count - 1) * 2 * 2 * sizeof(ir_mem));
+#else
 	copies = alloca((use_list->count - 1) * sizeof(ir_dessa_copy));
 	mem_slots = alloca((use_list->count - 1) * 2 * sizeof(ir_mem));
+#endif
 
 	for (i = use_list->count, p = &ctx->use_edges[use_list->refs]; i > 0; p++, i--) {
 		ir_ref ref = *p;
@@ -911,6 +935,9 @@ static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb)
 			ir_reg src = ir_get_alocated_reg(ctx, ref, k);
 			ir_reg dst = ctx->regs[ref][0];
 			ir_ref from, to;
+#if IR_X86_I64
+			ir_reg src_hi = IR_REG_NONE, dst_hi = IR_REG_NONE;
+#endif
 
 			IR_ASSERT(dst == IR_REG_NONE || !IR_REG_SPILLED(dst));
 			if (IR_IS_CONST_REF(input)) {
@@ -919,6 +946,12 @@ static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb)
 				/* encode local variable address */
 				from = -(ctx->consts_count + input);
 			} else if (src != IR_REG_NONE && !IR_REG_SPILLED(src)) {
+#if IR_X86_I64
+				if (insn->type == IR_I64 || insn->type == IR_U64) {
+					src_hi = IR_REG_I64_HI(src);
+					src = IR_REG_I64_LO(src);
+				}
+#endif
 				from = src;
 			} else {
 				ir_mem mem = ir_vreg_spill_slot(ctx, ctx->vregs[input]);
@@ -926,12 +959,54 @@ static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb)
 				from = IR_REG_NUM + _find_mem_slot(mem_slots, &mem_slots_count, mem);
 			}
 			if (dst != IR_REG_NONE) {
+				IR_ASSERT(!IR_REG_SPILLED(dst));
+#if IR_X86_I64
+				if (insn->type == IR_I64 || insn->type == IR_U64) {
+					dst_hi = IR_REG_I64_HI(dst);
+					dst = IR_REG_I64_LO(dst);
+				}
+#endif
 				to = dst;
 			} else {
 				ir_mem mem = ir_vreg_spill_slot(ctx, ctx->vregs[ref]);
 
 				to = IR_REG_NUM + _find_mem_slot(mem_slots, &mem_slots_count, mem);
 			}
+#if IR_X86_I64
+			if (insn->type == IR_I64 || insn->type == IR_U64) {
+				if (from != to) {
+					copies[n].type = IR_U32;
+					copies[n].from = from;
+					copies[n].to = to;
+					n++;
+				} else if (from >= IR_REG_NUM) {
+					continue;
+				}
+				if (from < 0) {
+					/* pass */
+				} else if (from < IR_REG_NUM) {
+					from = src_hi;
+				} else {
+					ir_mem mem = IR_MEM_I64_HI(mem_slots[from - IR_REG_NUM]);
+
+					from = IR_REG_NUM + _find_mem_slot(mem_slots, &mem_slots_count, mem);
+				}
+				if (to < IR_REG_NUM) {
+					to = dst_hi;
+				} else {
+					ir_mem mem = IR_MEM_I64_HI(mem_slots[to - IR_REG_NUM]);
+
+					to = IR_REG_NUM + _find_mem_slot(mem_slots, &mem_slots_count, mem);
+				}
+				if (from != to) {
+					copies[n].type = (from < 0) ? IR_U32_HI : IR_U32;
+					copies[n].from = from;
+					copies[n].to = to;
+					n++;
+				}
+				continue;
+			}
+#endif
 			if (to != from) {
 				copies[n].type = insn->type;
 				copies[n].from = from;
