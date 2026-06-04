@@ -9888,6 +9888,7 @@ static void ir_emit_va_arg(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 			} else {
 				// TODO: ???
+				IR_ASSERT(0 && "NIY: VA_ARG/64");
 				|	add Ra(tmp_reg), sizeof(uint64_t)
 				|	mov aword [Ra(op2_reg)+offset], Ra(tmp_reg)
 			}
