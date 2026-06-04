@@ -10279,39 +10279,71 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 				label = ir_skip_empty_target_blocks(ctx, use_block);
 #if IR_X86_I64
 				if (type == IR_I64 || type == IR_U64) {
-					IR_ASSERT(0 && "NIY: ir_emit_switch(i64, range)");
+					|	cmp Rd(op2_reg), val->val.u32
+					|	mov Rd(tmp_reg), Rd(op2_reg_hi)
+					|	sbb Rd(tmp_reg), val->val.u32_hi
+					if (IR_IS_TYPE_SIGNED(type)) {
+						|	jl >1
+					} else {
+						|	jc >1
+					}
 				} else
 #endif
 				if (IR_IS_32BIT(type, val->val)) {
 					|	ASM_REG_IMM_OP cmp, type, op2_reg, val->val.i32
+					if (IR_IS_TYPE_SIGNED(type)) {
+						|	jl >1
+					} else {
+						|	jb >1
+					}
 				} else {
 					IR_ASSERT(sizeof(void*) == 8);
 |.if X64
 					|	mov64 Ra(tmp_reg), val->val.i64
 					|	ASM_REG_REG_OP cmp, type, op2_reg, tmp_reg
+					if (IR_IS_TYPE_SIGNED(type)) {
+						|	jl >1
+					} else {
+						|	jb >1
+					}
 |.endif
 				}
-				if (IR_IS_TYPE_SIGNED(type)) {
-					|	jl >1
-				} else {
-					|	jb >1
-				}
+
 				val = &ctx->ir_base[use_insn->op3];
 				IR_ASSERT(!IR_IS_SYM_CONST(val->op3));
 				label = ir_skip_empty_target_blocks(ctx, use_block);
+#if IR_X86_I64
+				if (type == IR_I64 || type == IR_U64) {
+					|	mov Rd(tmp_reg), val->val.u32
+					|	cmp Rd(tmp_reg), Rd(op2_reg)
+					|	mov Rd(tmp_reg), val->val.u32_hi
+					|	sbb Rd(tmp_reg), Rd(op2_reg_hi)
+					if (IR_IS_TYPE_SIGNED(type)) {
+						|	jl >1
+					} else {
+						|	jc >1
+					}
+					|	jmp =>label
+				} else
+#endif
 				if (IR_IS_32BIT(type, val->val)) {
 					|	ASM_REG_IMM_OP cmp, type, op2_reg, val->val.i32
+					if (IR_IS_TYPE_SIGNED(type)) {
+						|	jle =>label
+					} else {
+						|	jbe =>label
+					}
 				} else {
 					IR_ASSERT(sizeof(void*) == 8);
 |.if X64
 					|	mov64 Ra(tmp_reg), val->val.i64
 					|	ASM_REG_REG_OP cmp, type, op2_reg, tmp_reg
+					if (IR_IS_TYPE_SIGNED(type)) {
+						|	jle =>label
+					} else {
+						|	jbe =>label
+					}
 |.endif
-				}
-				if (IR_IS_TYPE_SIGNED(type)) {
-					|	jle =>label
-				} else {
-					|	jbe =>label
 				}
 				|1:
 			}
