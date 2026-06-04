@@ -8289,6 +8289,9 @@ static void ir_emit_trunc(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			ir_emit_mov(ctx, dst_type, def_reg, op1_reg);
 #endif
 		}
+	} else if (!IR_IS_CONST_REF(insn->op1) && ctx->vregs[insn->op1] == ctx->vregs[def]) {
+		/* If source and destination share the same vreg, we load the whole source */
+		ir_emit_load_ex(ctx, src_type, def_reg, insn->op1, def);
 	} else {
 		ir_emit_load_ex(ctx, dst_type, def_reg, insn->op1, def);
 	}
