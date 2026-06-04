@@ -75,20 +75,20 @@ test:
 	nop
 .L1:
 	xorb %bl, %bl
-	movsd (%rsp), %xmm0
-	movsd %xmm0, -0x10(%rsp)
 	movsd 8(%rsp), %xmm0
-	movsd %xmm0, (%rsp)
-	movsd -0x10(%rsp), %xmm0
-	movsd %xmm0, 8(%rsp)
-	movsd 0x10(%rsp), %xmm0
 	movsd %xmm0, -0x10(%rsp)
+	movsd (%rsp), %xmm0
+	movsd %xmm0, 8(%rsp)
+	movsd -0x10(%rsp), %xmm0
+	movsd %xmm0, (%rsp)
 	movsd 0x18(%rsp), %xmm0
-	movsd %xmm0, 0x10(%rsp)
+	movsd %xmm0, -0x10(%rsp)
 	movsd 0x20(%rsp), %xmm0
 	movsd %xmm0, 0x18(%rsp)
-	movsd -0x10(%rsp), %xmm0
+	movsd 0x10(%rsp), %xmm0
 	movsd %xmm0, 0x20(%rsp)
+	movsd -0x10(%rsp), %xmm0
+	movsd %xmm0, 0x10(%rsp)
 .L2:
 	leaq .L4(%rip), %rdi
 	xorl %eax, %eax
