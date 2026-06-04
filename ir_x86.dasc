@@ -12823,11 +12823,22 @@ static void ir_emit_mul_ov_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
+#ifdef _WIN32
+extern int64_t _alldiv(int64_t, int64_t);
+extern int64_t _allrem(int64_t, int64_t);
+extern uint64_t _aulldiv(uint64_t, uint64_t);
+extern uint64_t _aullrem(uint64_t, uint64_t);
+# define __divdi3   _alldiv
+# define __moddi3   _allrem
+# define __udivdi3  _aulldiv
+# define __umoddi3  _aullrem
+#else
 extern int64_t __divdi3(int64_t, int64_t);
 extern int64_t __moddi3(int64_t, int64_t);
 extern uint64_t __udivdi3(uint64_t, uint64_t);
 extern uint64_t __umoddi3(uint64_t, uint64_t);
 extern int32_t __popcountdi2(uint64_t);
+#endif
 
 static uint64_t __roldi3(uint64_t a, uint64_t b)
 {
