@@ -15501,6 +15501,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	data.u2f_const = 0;
 	data.ull2d_const = 0;
 	data.ull2f_const = 0;
+	data.ull2fp_const = 0;
 	data.resolved_label_syms = 0;
 	ctx->data = &data;
 
