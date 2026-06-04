@@ -12954,12 +12954,24 @@ static void ir_emit_binop_helper_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (def_reg != IR_REG_NONE) {
 		def_reg_hi = IR_REG_I64_HI(def_reg);
 		def_reg = IR_REG_I64_LO(def_reg);
-		if (def_reg != IR_REG_RAX) {
-			|	mov eax, Rd(def_reg);
+
+		if (def_reg != IR_REG_RDX) {
+			if (def_reg != IR_REG_RAX) {
+				|	mov Rd(def_reg), eax
+			}
+			if (def_reg_hi != IR_REG_RDX) {
+				|	mov Rd(def_reg_hi), edx
+			}
+		} else {
+			if (def_reg_hi != IR_REG_RDX) {
+				|	mov Rd(def_reg_hi), edx
+			}
+			if (def_reg != IR_REG_RAX) {
+				IR_ASSERT(def_reg_hi != IR_REG_RAX);
+				|	mov Rd(def_reg), eax
+			}
 		}
-		if (def_reg_hi != IR_REG_RDX) {
-			|	mov edx, Rd(def_reg_hi);
-		}
+
 		if (IR_REG_SPILLED(ctx->regs[def][0])) {
 			ir_emit_store_i64_lo(ctx, def, IR_REG_RAX);
 			ir_emit_store_i64_hi(ctx, def, IR_REG_RDX);
