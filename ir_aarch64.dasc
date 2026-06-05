@@ -295,8 +295,10 @@ const ir_call_conv_dsc ir_call_conv_aarch64_sysv = {
 	0,           /* shadow_store_size       */
 	8,           /* int_param_regs_count    */
 	8,           /* fp_param_regs_count     */
-	IR_REG_X0 ,  /* int_ret_reg             */
+	IR_REG_X0,   /* int_ret_reg             */
+	IR_REG_X1,   /* int_ret2_reg (up to X7) */
 	IR_REG_V0,   /* fp_ret_reg              */
+	IR_REG_V1,   /* fp_ret2_reg (up to V7)  */
 	IR_REG_NONE, /* fp_varargs_reg          */
 	IR_REG_SCRATCH_AARCH64,
 	(const int8_t[8]){IR_REG_X0, IR_REG_X1, IR_REG_X2, IR_REG_X3, IR_REG_X4, IR_REG_X5, IR_REG_X6, IR_REG_X7},
@@ -314,7 +316,9 @@ const ir_call_conv_dsc ir_call_conv_aarch64_darwin = {
 	8,           /* int_param_regs_count    */
 	8,           /* fp_param_regs_count     */
 	IR_REG_X0 ,  /* int_ret_reg             */
+	IR_REG_X1,   /* int_ret2_reg (up to X7) */
 	IR_REG_V0,   /* fp_ret_reg              */
+	IR_REG_V1,   /* fp_ret2_reg (up to V7)  */
 	IR_REG_NONE, /* fp_varargs_reg          */
 	IR_REG_SCRATCH_AARCH64,
 	(const int8_t[8]){IR_REG_X0, IR_REG_X1, IR_REG_X2, IR_REG_X3, IR_REG_X4, IR_REG_X5, IR_REG_X6, IR_REG_X7},
@@ -332,7 +336,9 @@ const ir_call_conv_dsc ir_call_conv_aarch64_preserve_none = {
 	23,          /* int_param_regs_count    */
 	8,           /* fp_param_regs_count     */
 	IR_REG_X0 ,  /* int_ret_reg             */
+	IR_REG_X1,   /* int_ret2_reg (up to X7) */
 	IR_REG_V0,   /* fp_ret_reg              */
+	IR_REG_V1,   /* fp_ret2_reg (up to V7)  */
 	IR_REG_NONE, /* fp_varargs_reg          */
 	IR_REG_ALL,
 	(const int8_t[23]){IR_REG_X20, IR_REG_X21, IR_REG_X22, IR_REG_X23, IR_REG_X24, IR_REG_X25, IR_REG_X26, IR_REG_X27,

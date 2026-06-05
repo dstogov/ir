@@ -1396,7 +1396,9 @@ struct _ir_call_conv_dsc {
 	uint8_t       int_param_regs_count;       /* number of registers for INT parameters */
 	uint8_t       fp_param_regs_count;        /* number of registers for FP parameters */
 	int8_t        int_ret_reg;                /* register to return INT value */
+	int8_t        int_ret2_reg;               /* register to return second INT value (used to return I64 on 32-bit) */
 	int8_t        fp_ret_reg;                 /* register to return FP value */
+	int8_t        fp_ret2_reg;                /* register to return second FP value */
 	int8_t        fp_varargs_reg;             /* register to pass number of fp register arguments into vararg func */
 	int8_t        scratch_reg;                /* pseudo register to reffer srcatch regset (clobbered by call) */
 	const int8_t *int_param_regs;             /* registers for INT parameters */

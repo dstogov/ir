@@ -1041,7 +1041,9 @@ const ir_call_conv_dsc ir_call_conv_x86_64_ms = {
 	4,           /* int_param_regs_count    */
 	4,           /* fp_param_regs_count     */
 	IR_REG_RAX,  /* int_ret_reg             */
+	IR_REG_NONE, /* int_ret2_reg            */
 	IR_REG_XMM0, /* fp_ret_reg              */
+	IR_REG_NONE, /* fp_ret2_reg             */
 	IR_REG_NONE, /* fp_varargs_reg          */
 	IR_REG_SCRATH_X86_64_MS,
 	(const int8_t[4]){IR_REG_RCX, IR_REG_RDX, IR_REG_R8, IR_REG_R9},
@@ -1059,7 +1061,9 @@ const ir_call_conv_dsc ir_call_conv_x86_64_sysv = {
 	6,           /* int_param_regs_count    */
 	8,           /* fp_param_regs_count     */
 	IR_REG_RAX,  /* int_ret_reg             */
+	IR_REG_RDX,  /* int_ret2_reg            */
 	IR_REG_XMM0, /* fp_ret_reg              */
+	IR_REG_XMM1, /* fp_ret2_reg             */
 	IR_REG_RAX,  /* fp_varargs_reg          */
 	IR_REG_SCRATH_X86_64_SYSV,
 	(const int8_t[6]){IR_REG_RDI, IR_REG_RSI, IR_REG_RDX, IR_REG_RCX, IR_REG_R8, IR_REG_R9},
@@ -1078,7 +1082,9 @@ const ir_call_conv_dsc ir_call_conv_x86_64_preserve_none = {
 	12,          /* int_param_regs_count    */
 	8,           /* fp_param_regs_count     */
 	IR_REG_RAX,  /* int_ret_reg             */
+	IR_REG_RDX,  /* int_ret2_reg            */
 	IR_REG_XMM0, /* fp_ret_reg              */
+	IR_REG_XMM1, /* fp_ret2_reg             */
 	IR_REG_RAX,  /* fp_varargs_reg          */
 	IR_REG_SCRATH_X86_64_PN,
 	(const int8_t[12]){IR_REG_R12, IR_REG_R13, IR_REG_R14, IR_REG_R15,
@@ -1117,7 +1123,9 @@ const ir_call_conv_dsc ir_call_conv_x86_cdecl = {
 	0,           /* int_param_regs_count    */
 	0,           /* fp_param_regs_count     */
 	IR_REG_RAX,  /* int_ret_reg             */
+	IR_REG_RDX,  /* int_ret2_reg            */
 	IR_REG_NONE, /* fp_ret_reg              */
+	IR_REG_NONE, /* fp_ret2_reg             */
 	IR_REG_NONE, /* fp_varargs_reg          */
 	IR_REG_SCRATCH_X86,
 	NULL,
@@ -1134,7 +1142,9 @@ const ir_call_conv_dsc ir_call_conv_x86_fastcall = {
 	2,           /* int_param_regs_count    */
 	0,           /* fp_param_regs_count     */
 	IR_REG_RAX,  /* int_ret_reg             */
+	IR_REG_RDX,  /* int_ret2_reg            */
 	IR_REG_NONE, /* fp_ret_reg              */
+	IR_REG_NONE, /* fp_ret2_reg             */
 	IR_REG_NONE, /* fp_varargs_reg          */
 	IR_REG_SCRATCH_X86,
 	(const int8_t[4]){IR_REG_RCX, IR_REG_RDX},
@@ -10949,12 +10959,14 @@ static void ir_emit_call_ex(ir_ctx *ctx, ir_ref def, ir_insn *insn, const ir_pro
 #if IR_X86_I64
 				if (insn->type == IR_I64 || insn->type == IR_U64) {
 					ir_reg def_reg_hi = IR_REG_I64_HI(def_reg);
+
 					def_reg = IR_REG_I64_LO(def_reg);
+					IR_ASSERT(cc->int_ret2_reg != IR_REG_NONE);
 					if (def_reg != cc->int_ret_reg) {
 						ir_emit_mov(ctx, IR_U32, def_reg, cc->int_ret_reg);
 					}
-					if (def_reg_hi != IR_REG_RDX) { // TODO: avoid hardcoded register ???
-						ir_emit_mov(ctx, IR_U32, def_reg_hi, IR_REG_RDX);
+					if (def_reg_hi != cc->int_ret2_reg) {
+						ir_emit_mov(ctx, IR_U32, def_reg_hi, cc->int_ret2_reg);
 					}
 					if (IR_REG_SPILLED(ctx->regs[def][0])) {
 						ir_emit_store_i64_lo(ctx, def, def_reg);
@@ -10973,8 +10985,9 @@ static void ir_emit_call_ex(ir_ctx *ctx, ir_ref def, ir_insn *insn, const ir_pro
 			} else if (ctx->use_lists[def].count > 1) {
 #if IR_X86_I64
 				if (insn->type == IR_I64 || insn->type == IR_U64) {
+					IR_ASSERT(cc->int_ret2_reg != IR_REG_NONE);
 					ir_emit_store_i64_lo(ctx, def, cc->int_ret_reg);
-					ir_emit_store_i64_hi(ctx, def, IR_REG_RDX); // TODO: avoid hardcoded register ???
+					ir_emit_store_i64_hi(ctx, def, cc->int_ret2_reg);
 				} else
 #endif
 				ir_emit_store(ctx, insn->type, def, cc->int_ret_reg);
@@ -14806,6 +14819,7 @@ static void ir_emit_return_i64(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg ret_reg = data->ra_data.cc->int_ret_reg;
+	ir_reg ret2_reg = data->ra_data.cc->int_ret2_reg;
 	ir_reg op2_reg = ctx->regs[ref][2];
 	ir_reg op2_reg_hi;
 
@@ -14815,12 +14829,12 @@ static void ir_emit_return_i64(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 		if (op2_reg != ret_reg) {
 			|	mov Rd(ret_reg), Rd(op2_reg)
 		}
-		if (op2_reg_hi != IR_REG_RDX) { // TODO: avoid hardcoded register ???
-			|	mov edx, Rd(op2_reg_hi)
+		if (op2_reg_hi != ret2_reg) {
+			|	mov Rd(ret2_reg), Rd(op2_reg_hi)
 		}
 	} else {
 		ir_emit_load_i64_lo(ctx, ret_reg, insn->op2);
-		ir_emit_load_i64_hi(ctx, IR_REG_RDX, insn->op2); // TODO: avoid hardcoded register ???
+		ir_emit_load_i64_hi(ctx, ret2_reg, insn->op2);
 	}
 	ir_emit_return_void(ctx);
 }
