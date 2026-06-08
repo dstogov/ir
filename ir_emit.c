@@ -180,7 +180,7 @@ static int ir_get_args_regs(const ir_ctx *ctx, const ir_insn *insn, const ir_cal
 				if (type == IR_I64 || type == IR_U64) {
 					regs[j] = IR_REG_NONE;
 					count = j + 1;
-					int_param += 1;
+					int_param += 2;
 					if (cc->shadow_param_regs) {
 						fp_param += 2;
 					}
