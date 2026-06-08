@@ -4393,7 +4393,6 @@ static void assign_regs(ir_ctx *ctx)
 									if ((!prev_use_ref || ctx->cfg_map[prev_use_ref] != ctx->cfg_map[ref])
 									 && needs_spill_reload(ctx, ival, ctx->cfg_map[ref], available)) {
 										if (!(use_pos->flags & IR_USE_MUST_BE_IN_REG)
-//???										 && use_pos->hint != reg
 //										 && ctx->ir_base[ref].op != IR_CALL
 //										 && ctx->ir_base[ref].op != IR_TAILCALL) {
 										 && ctx->ir_base[ref].op != IR_SNAPSHOT
