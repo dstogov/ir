@@ -13387,7 +13387,9 @@ static void ir_emit_bitcast_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				ir_emit_load_mem_fp(ctx, IR_DOUBLE, def_reg, IR_MEM_BO(fp, offset));
 			}
 		} else if (IR_IS_CONST_REF(insn->op1)) {
-			IR_ASSERT(0); // TODO: ???
+			int label = ir_get_const_label(ctx, insn->op1);
+
+			|	ASM_FP_REG_TXT_OP movs, IR_DOUBLE, def_reg, [=>label]
 		} else {
 			ir_mem mem;
 
@@ -16223,7 +16225,33 @@ next_block:;
 			|.byte 0
 
 		} else {
-			IR_ASSERT(0);
+			IR_ASSERT(IR_IS_TYPE_FP(insn->type));
+			int label = ctx->cfg_blocks_count + i;
+
+			if (!data.rodata_label) {
+				data.rodata_label = ctx->cfg_blocks_count + ctx->consts_count + 2;
+
+				|.rodata
+				|=>data.rodata_label:
+			}
+			if (ir_type_size[insn->type] == 8) {
+				|.align 8
+				|=>label:
+				|.dword insn->val.u32, insn->val.u32_hi
+			} else if (ir_type_size[insn->type] == 4) {
+				|.align 4
+				|=>label:
+				|.dword insn->val.u32
+			} else if (ir_type_size[insn->type] == 2) {
+				|.align 2
+				|=>label:
+				|.word insn->val.u16
+			} else if (ir_type_size[insn->type] == 1) {
+				|=>label:
+				|.byte insn->val.u8
+			} else {
+				IR_ASSERT(0);
+			}
 		}
 	} IR_BITSET_FOREACH_END();
 	if (data.rodata_label) {
