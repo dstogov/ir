@@ -981,7 +981,6 @@ void ir_dump_cfg(ir_ctx *ctx, FILE *f);
 void ir_dump_cfg_map(const ir_ctx *ctx, FILE *f);
 void ir_dump_live_ranges(const ir_ctx *ctx, FILE *f);
 void ir_dump_codegen(const ir_ctx *ctx, FILE *f);
-void ir_dump_reg(const ir_ctx *ctx, int8_t reg, ir_ref ref, bool store, FILE *f);
 
 /* IR to C conversion (implementation in ir_emit_c.c) */
 int ir_emit_c(ir_ctx *ctx, const char *name, FILE *f);
