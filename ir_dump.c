@@ -401,7 +401,7 @@ void ir_dump_live_ranges(const ir_ctx *ctx, FILE *f)
 				if (ival->reg != IR_REG_NONE) {
 #if IR_X86_I64
 					if (ival->type == IR_I64 || ival->type == IR_U64) {
-						fprintf(f, ", [%%%s,%%%s]", ir_reg_name(ival->reg, IR_U32), ir_reg_name(ival->reg_hi, IR_U32));
+						fprintf(f, "[%%%s,%%%s]", ir_reg_name(ival->reg, IR_U32), ir_reg_name(ival->reg_hi, IR_U32));
 					} else
 #endif
 					fprintf(f, "[%%%s]", ir_reg_name(ival->reg, ival->type));
