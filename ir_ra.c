@@ -428,9 +428,8 @@ static void ir_hint_propagation(ir_ctx *ctx)
 								ir_add_hint(ctx, hint_ival, hint_use_pos->pos, IR_REG_I64_LO(use_pos->hint), 0);
 							}
 						} else
-#else
-						ir_add_hint(ctx, hint_ival, hint_use_pos->pos, use_pos->hint, 0);
 #endif
+						ir_add_hint(ctx, hint_ival, hint_use_pos->pos, use_pos->hint, 0);
 						hint_use_pos = NULL;
 					}
 				}
