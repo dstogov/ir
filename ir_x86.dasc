@@ -12898,8 +12898,8 @@ extern uint64_t _aullrem(uint64_t, uint64_t);
 
 static int __popcountdi2(uint64_t arg)
 {
-	unsigned y = x >> 32;
-	unsigned x = arg;
+	unsigned y = (unsigned)(arg >> 32ULL);
+	unsigned x = (unsigned)arg;
 
     x = x - ((x >> 1) & 0x55555555);
     x = (x & 0x33333333) + ((x >> 2) & 0x33333333);
