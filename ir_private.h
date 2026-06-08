@@ -1230,21 +1230,25 @@ typedef struct _ir_use_pos       ir_use_pos;
 /* ir_use_pos.flags bits */
 #define IR_USE_MUST_BE_IN_REG            (1<<0)
 #define IR_USE_SHOULD_BE_IN_REG          (1<<1)
-#define IR_DEF_REUSES_OP1_REG            (1<<2)
-#define IR_DEF_CONFLICTS_WITH_INPUT_REGS (1<<3)
-#define IR_EXTEND_INPUTS_TO_NEXT         (1<<4) /* used for SNAPSHOT followed by GUARD */
+#define IR_HINT_TWO_REGS                 (1<<2)
+#define IR_DEF_REUSES_OP1_REG            (1<<3)
+#define IR_DEF_CONFLICTS_WITH_INPUT_REGS (1<<4)
+#define IR_EXTEND_INPUTS_TO_NEXT         (1<<5) /* used for SNAPSHOT followed by GUARD */
 
 #define IR_FUSED_USE                     (1<<6)
 #define IR_PHI_USE                       (1<<7)
 
 #define IR_OP1_MUST_BE_IN_REG            (1<<8)
 #define IR_OP1_SHOULD_BE_IN_REG          (1<<9)
-#define IR_OP2_MUST_BE_IN_REG            (1<<10)
-#define IR_OP2_SHOULD_BE_IN_REG          (1<<11)
-#define IR_OP3_MUST_BE_IN_REG            (1<<12)
-#define IR_OP3_SHOULD_BE_IN_REG          (1<<13)
+#define IR_OP1_HINT_TWO_REGS             (1<<10)
+#define IR_OP2_MUST_BE_IN_REG            (1<<11)
+#define IR_OP2_SHOULD_BE_IN_REG          (1<<12)
+#define IR_OP2_HINT_TWO_REGS             (1<<13)
+#define IR_OP3_MUST_BE_IN_REG            (1<<14)
+#define IR_OP3_SHOULD_BE_IN_REG          (1<<15)
+#define IR_OP3_HINT_TWO_REGS             (1<<16)
 
-#define IR_USE_FLAGS(def_flags, op_num)  (((def_flags) >> (6 + (IR_MIN((op_num), 3) * 2))) & 3)
+#define IR_USE_FLAGS(def_flags, op_num) (((def_flags) >> (5 + (IR_MIN((op_num), 3) * 3))) & 7)
 
 struct _ir_use_pos {
 	uint16_t       op_num; /* 0 - means result */

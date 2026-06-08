@@ -440,7 +440,13 @@ void ir_dump_live_ranges(const ir_ctx *ctx, FILE *f)
 						if (use_pos->hint >= 0) {
 #if IR_X86_I64
 							if (ival->type == IR_I64 || ival->type == IR_U64) {
-								fprintf(f, ", hint=%%%s", ir_reg_name(use_pos->hint, IR_U32)); // TODO: hi_reg ???
+								if (use_pos->flags & IR_HINT_TWO_REGS) {
+									fprintf(f, ", hint=%%%s,%%%s",
+										ir_reg_name(IR_REG_I64_LO(use_pos->hint), IR_U32),
+										ir_reg_name(IR_REG_I64_HI(use_pos->hint), IR_U32));
+								} else {
+									fprintf(f, ", hint=%%%s", ir_reg_name(use_pos->hint, IR_U32));
+								}
 							} else
 #endif
 							fprintf(f, ", hint=%%%s", ir_reg_name(use_pos->hint, ival->type));
@@ -461,7 +467,13 @@ void ir_dump_live_ranges(const ir_ctx *ctx, FILE *f)
 						if (use_pos->hint >= 0) {
 #if IR_X86_I64
 							if (ival->type == IR_I64 || ival->type == IR_U64) {
-								fprintf(f, ", hint=%%%s", ir_reg_name(use_pos->hint, IR_U32)); // TODO: hi_reg ???
+								if (use_pos->flags & IR_HINT_TWO_REGS) {
+									fprintf(f, ", hint=%%%s,%%%s",
+										ir_reg_name(IR_REG_I64_LO(use_pos->hint), IR_U32),
+										ir_reg_name(IR_REG_I64_HI(use_pos->hint), IR_U32));
+								} else {
+									fprintf(f, ", hint=%%%s", ir_reg_name(use_pos->hint, IR_U32));
+							    }
 							} else
 #endif
 							fprintf(f, ", hint=%%%s", ir_reg_name(use_pos->hint, ival->type));
