@@ -86,8 +86,11 @@ EXAMPLE_EXES = $(EXAMPLES_BUILD_DIR)/mandelbrot.exe \
 
 all: $(BUILD_DIR) $(BUILD_DIR)\ir.exe
 
-$(BUILD_DIR)\ir.exe: $(OBJS_IR) $(OBJS_COMMON)
-	"$(LD)" $(LDFLAGS) $(OBJS_COMMON) $(OBJS_IR) $(LIBS) /out:$@
+$(BUILD_DIR)\ir.exe: $(OBJS_IR) $(BUILD_DIR)\ir.lib
+	"$(LD)" $(LDFLAGS) $(OBJS_IR) $(BUILD_DIR)\ir.lib $(LIBS) /out:$@
+
+$(BUILD_DIR)\ir.lib: $(OBJS_COMMON)
+	lib $(OBJS_COMMON) /out:$@
 
 $(BUILD_DIR)\ir_fold_hash.h: $(BUILD_DIR)\gen_ir_fold_hash.exe $(SRC_DIR)\ir_fold.h $(SRC_DIR)\ir.h
 	$(BUILD_DIR)\gen_ir_fold_hash.exe < $(SRC_DIR)\ir_fold.h > $(BUILD_DIR)\ir_fold_hash.h
