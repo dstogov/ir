@@ -2,8 +2,6 @@
 001: type conversion SEXT
 --TARGET--
 x86
---XFAIL--
-64-bit integers are not implemented on 32-bit systems
 --ARGS--
 -S
 --CODE--
@@ -15,5 +13,6 @@ x86
 }
 --EXPECT--
 test:
-	movslq %edi, %rax
-	retq
+	movl 4(%esp), %eax
+	cltd
+	retl

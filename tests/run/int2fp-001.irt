@@ -1,0 +1,183 @@
+--TEST--
+INT2FP 001:
+--ARGS--
+--run
+--CODE--
+func @main(): int32_t;
+extern func @printf(uintptr_t, ...): int32_t;
+func @i2f(int32_t): float;
+func @i2d(int32_t): double;
+func @u2f(uint32_t): float;
+func @u2d(uint32_t): double;
+func @ll2f(int64_t): float;
+func @ll2d(int64_t): double;
+func @ull2f(uint64_t): float;
+func @ull2d(uint64_t): double;
+static const @str.1[7] = "%g %g\n\000";
+static const @str.2[10] = "%g %g %g\n\000";
+func @main(): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uintptr_t c_4 = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t c_5 = func @i2f(int32_t): float;
+	int32_t c_6 = -2147483648;
+	int32_t c_7 = 2147483647;
+	uintptr_t c_8 = sym(@str.1);
+	uintptr_t c_9 = func @i2d(int32_t): double;
+	uintptr_t c_10 = func @u2f(uint32_t): float;
+	uint32_t c_11 = 2147483648;
+	uint32_t c_12 = 2147483647;
+	uint32_t c_13 = 4294967295;
+	uintptr_t c_14 = sym(@str.2);
+	uintptr_t c_15 = func @u2d(uint32_t): double;
+	uintptr_t c_16 = func @ll2f(int64_t): float;
+	int64_t c_17 = -9223372036854775808;
+	int64_t c_18 = 9223372036854775807;
+	uintptr_t c_19 = func @ll2d(int64_t): double;
+	uintptr_t c_20 = func @ull2f(uint64_t): float;
+	uint64_t c_21 = 9223372036854775808;
+	uint64_t c_22 = 9223372036854775807;
+	uint64_t c_23 = 18446744073709551615;
+	uintptr_t c_24 = func @ull2d(uint64_t): double;
+	int32_t c_25 = 0;
+#BB1: end=l_48
+	l_1 = START(l_48);
+	float d_2, l_2 = CALL/1(l_1, c_5, c_6);
+	float d_3, l_3 = CALL/1(l_2, c_5, c_7);
+	double d_4 = FP2FP(d_2);
+	double d_5 = FP2FP(d_3);
+	int32_t d_6, l_6 = CALL/3(l_3, c_4, c_8, d_4, d_5);
+	double d_8, l_8 = CALL/1(l_6, c_9, c_6);
+	double d_9, l_9 = CALL/1(l_8, c_9, c_7);
+	int32_t d_10, l_10 = CALL/3(l_9, c_4, c_8, d_8, d_9);
+	float d_12, l_12 = CALL/1(l_10, c_10, c_11);
+	float d_13, l_13 = CALL/1(l_12, c_10, c_12);
+	float d_14, l_14 = CALL/1(l_13, c_10, c_13);
+	double d_15 = FP2FP(d_12);
+	double d_16 = FP2FP(d_13);
+	double d_17 = FP2FP(d_14);
+	int32_t d_18, l_18 = CALL/4(l_14, c_4, c_14, d_15, d_16, d_17);
+	double d_20, l_20 = CALL/1(l_18, c_15, c_11);
+	double d_21, l_21 = CALL/1(l_20, c_15, c_12);
+	double d_22, l_22 = CALL/1(l_21, c_15, c_13);
+	int32_t d_23, l_23 = CALL/4(l_22, c_4, c_14, d_20, d_21, d_22);
+	float d_25, l_25 = CALL/1(l_23, c_16, c_17);
+	float d_26, l_26 = CALL/1(l_25, c_16, c_18);
+	double d_27 = FP2FP(d_25);
+	double d_28 = FP2FP(d_26);
+	int32_t d_29, l_29 = CALL/3(l_26, c_4, c_8, d_27, d_28);
+	double d_31, l_31 = CALL/1(l_29, c_19, c_17);
+	double d_32, l_32 = CALL/1(l_31, c_19, c_18);
+	int32_t d_33, l_33 = CALL/3(l_32, c_4, c_8, d_31, d_32);
+	float d_35, l_35 = CALL/1(l_33, c_20, c_21);
+	float d_36, l_36 = CALL/1(l_35, c_20, c_22);
+	float d_37, l_37 = CALL/1(l_36, c_20, c_23);
+	double d_38 = FP2FP(d_35);
+	double d_39 = FP2FP(d_36);
+	double d_40 = FP2FP(d_37);
+	int32_t d_41, l_41 = CALL/4(l_37, c_4, c_14, d_38, d_39, d_40);
+	double d_43, l_43 = CALL/1(l_41, c_24, c_21);
+	double d_44, l_44 = CALL/1(l_43, c_24, c_22);
+	double d_45, l_45 = CALL/1(l_44, c_24, c_23);
+	int32_t d_46, l_46 = CALL/4(l_45, c_4, c_14, d_43, d_44, d_45);
+	l_48 = RETURN(l_46, c_25);
+}
+func @i2f(int32_t): float
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+#BB1: end=l_4
+	l_1 = START(l_4);
+	int32_t d_2 = PARAM(l_1, "i", 1);
+	float d_3 = INT2FP(d_2);
+	l_4 = RETURN(l_1, d_3);
+}
+func @i2d(int32_t): double
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+#BB1: end=l_4
+	l_1 = START(l_4);
+	int32_t d_2 = PARAM(l_1, "i", 1);
+	double d_3 = INT2FP(d_2);
+	l_4 = RETURN(l_1, d_3);
+}
+func @u2f(uint32_t): float
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+#BB1: end=l_4
+	l_1 = START(l_4);
+	uint32_t d_2 = PARAM(l_1, "u", 1);
+	float d_3 = INT2FP(d_2);
+	l_4 = RETURN(l_1, d_3);
+}
+func @u2d(uint32_t): double
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+#BB1: end=l_4
+	l_1 = START(l_4);
+	uint32_t d_2 = PARAM(l_1, "u", 1);
+	double d_3 = INT2FP(d_2);
+	l_4 = RETURN(l_1, d_3);
+}
+func @ll2f(int64_t): float
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+#BB1: end=l_4
+	l_1 = START(l_4);
+	int64_t d_2 = PARAM(l_1, "i", 1);
+	float d_3 = INT2FP(d_2);
+	l_4 = RETURN(l_1, d_3);
+}
+func @ll2d(int64_t): double
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+#BB1: end=l_4
+	l_1 = START(l_4);
+	int64_t d_2 = PARAM(l_1, "i", 1);
+	double d_3 = INT2FP(d_2);
+	l_4 = RETURN(l_1, d_3);
+}
+func @ull2f(uint64_t): float
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+#BB1: end=l_4
+	l_1 = START(l_4);
+	uint64_t d_2 = PARAM(l_1, "u", 1);
+	float d_3 = INT2FP(d_2);
+	l_4 = RETURN(l_1, d_3);
+}
+func @ull2d(uint64_t): double
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+#BB1: end=l_4
+	l_1 = START(l_4);
+	uint64_t d_2 = PARAM(l_1, "u", 1);
+	double d_3 = INT2FP(d_2);
+	l_4 = RETURN(l_1, d_3);
+}
+--EXPECT--
+-2.14748e+09 2.14748e+09
+-2.14748e+09 2.14748e+09
+2.14748e+09 2.14748e+09 4.29497e+09
+2.14748e+09 2.14748e+09 4.29497e+09
+-9.22337e+18 9.22337e+18
+-9.22337e+18 9.22337e+18
+9.22337e+18 9.22337e+18 1.84467e+19
+9.22337e+18 9.22337e+18 1.84467e+19

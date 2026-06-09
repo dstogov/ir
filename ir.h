@@ -115,6 +115,14 @@ extern "C" {
 # include "ir_php.h"
 #endif
 
+#ifdef IR_TARGET_X86
+# ifndef IR_X86_I64
+#  define IR_X86_I64 1
+# endif
+#else
+# define IR_X86_I64 0
+#endif
+
 /* IR Type flags (low 4 bits are used for type size) */
 #define IR_TYPE_SIGNED     (1<<4)
 #define IR_TYPE_UNSIGNED   (1<<5)
@@ -684,6 +692,9 @@ struct _ir_ctx {
 	ir_arena          *arena;
 	ir_live_range     *unused_ranges;
 	ir_regs           *regs;
+#if IR_X86_I64
+	int8_t            *tmp_regs;                /* used only for COND(I64, _, _) */
+#endif
 	ir_strtab         *fused_regs;
 	ir_ref            *prev_ref;
 	union {

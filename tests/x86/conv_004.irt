@@ -2,10 +2,8 @@
 004: type conversion BITCAST
 --TARGET--
 x86
---XFAIL--
-64-bit integers are not implemented on 32-bit systems
 --ARGS--
--S
+-S -msse4.1
 --CODE--
 {
 	l_1 = START(l_4);
@@ -15,5 +13,7 @@ x86
 }
 --EXPECT--
 test:
-	movq %xmm0, %rax
-	retq
+	movsd 4(%esp), %xmm0
+	movd %xmm0, %eax
+	pextrd $1, %xmm0, %edx
+	retl

@@ -116,4 +116,10 @@ enum _ir_reg {
 #define IR_REG_RSI IR_REG_R6
 #define IR_REG_RDI IR_REG_R7
 
+#if IR_X86_I64
+# define IR_REG_I64_PAIR(lo, hi) (((lo) & 7) | (((hi) & 7) << 3))
+# define IR_REG_I64_LO(reg)      ((reg) & 7)
+# define IR_REG_I64_HI(reg)      (((reg) >> 3) & 7)
+#endif
+
 #endif /* IR_X86_H */

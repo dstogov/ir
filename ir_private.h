@@ -1086,6 +1086,12 @@ IR_ALWAYS_INLINE ir_ref ir_next_control(const ir_ctx *ctx, ir_ref ref)
 		_ref2 = _tmp; \
 	} while (0)
 
+#define SWAP_REGS(_reg1, _reg2) do { \
+		ir_reg _tmp = _reg1; \
+		_reg1 = _reg2; \
+		_reg2 = _tmp; \
+	} while (0)
+
 #define SWAP_INSNS(_insn1, _insn2) do { \
 		ir_insn *_tmp = _insn1; \
 		_insn1 = _insn2; \
@@ -1224,21 +1230,25 @@ typedef struct _ir_use_pos       ir_use_pos;
 /* ir_use_pos.flags bits */
 #define IR_USE_MUST_BE_IN_REG            (1<<0)
 #define IR_USE_SHOULD_BE_IN_REG          (1<<1)
-#define IR_DEF_REUSES_OP1_REG            (1<<2)
-#define IR_DEF_CONFLICTS_WITH_INPUT_REGS (1<<3)
-#define IR_EXTEND_INPUTS_TO_NEXT         (1<<4) /* used for SNAPSHOT followed by GUARD */
+#define IR_HINT_TWO_REGS                 (1<<2)
+#define IR_DEF_REUSES_OP1_REG            (1<<3)
+#define IR_DEF_CONFLICTS_WITH_INPUT_REGS (1<<4)
+#define IR_EXTEND_INPUTS_TO_NEXT         (1<<5) /* used for SNAPSHOT followed by GUARD */
 
 #define IR_FUSED_USE                     (1<<6)
 #define IR_PHI_USE                       (1<<7)
 
 #define IR_OP1_MUST_BE_IN_REG            (1<<8)
 #define IR_OP1_SHOULD_BE_IN_REG          (1<<9)
-#define IR_OP2_MUST_BE_IN_REG            (1<<10)
-#define IR_OP2_SHOULD_BE_IN_REG          (1<<11)
-#define IR_OP3_MUST_BE_IN_REG            (1<<12)
-#define IR_OP3_SHOULD_BE_IN_REG          (1<<13)
+#define IR_OP1_HINT_TWO_REGS             (1<<10)
+#define IR_OP2_MUST_BE_IN_REG            (1<<11)
+#define IR_OP2_SHOULD_BE_IN_REG          (1<<12)
+#define IR_OP2_HINT_TWO_REGS             (1<<13)
+#define IR_OP3_MUST_BE_IN_REG            (1<<14)
+#define IR_OP3_SHOULD_BE_IN_REG          (1<<15)
+#define IR_OP3_HINT_TWO_REGS             (1<<16)
 
-#define IR_USE_FLAGS(def_flags, op_num)  (((def_flags) >> (6 + (IR_MIN((op_num), 3) * 2))) & 3)
+#define IR_USE_FLAGS(def_flags, op_num) (((def_flags) >> (5 + (IR_MIN((op_num), 3) * 3))) & 7)
 
 struct _ir_use_pos {
 	uint16_t       op_num; /* 0 - means result */
@@ -1265,10 +1275,14 @@ struct _ir_live_range {
 #define IR_LIVE_INTERVAL_SPILL_SPECIAL   (1<<6) /* spill slot is pre-allocated in a special area (see ir_ctx.spill_reserved_base) */
 #define IR_LIVE_INTERVAL_SPILLED         (1<<7)
 #define IR_LIVE_INTERVAL_SPLIT_CHILD     (1<<8)
+#define IR_LIVE_INTERVAL_TWO_REGS        (1<<9)
 
 struct _ir_live_interval {
 	uint8_t           type;
 	int8_t            reg;
+#if IR_X86_I64
+	int8_t            reg_hi;
+#endif
 	uint16_t          flags;
 	union {
 		int32_t       vreg;
@@ -1386,7 +1400,9 @@ struct _ir_call_conv_dsc {
 	uint8_t       int_param_regs_count;       /* number of registers for INT parameters */
 	uint8_t       fp_param_regs_count;        /* number of registers for FP parameters */
 	int8_t        int_ret_reg;                /* register to return INT value */
+	int8_t        int_ret2_reg;               /* register to return second INT value (used to return I64 on 32-bit) */
 	int8_t        fp_ret_reg;                 /* register to return FP value */
+	int8_t        fp_ret2_reg;                /* register to return second FP value */
 	int8_t        fp_varargs_reg;             /* register to pass number of fp register arguments into vararg func */
 	int8_t        scratch_reg;                /* pseudo register to reffer srcatch regset (clobbered by call) */
 	const int8_t *int_param_regs;             /* registers for INT parameters */
@@ -1412,14 +1428,28 @@ typedef struct _ir_reg_alloc_data {
 } ir_reg_alloc_data;
 
 int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type);
+void ir_dump_reg(const ir_ctx *ctx, int8_t reg, ir_ref ref, bool store, FILE *f);
 
 IR_ALWAYS_INLINE void ir_set_alocated_reg(ir_ctx *ctx, ir_ref ref, int op_num, int8_t reg)
 {
 	int8_t *regs = ctx->regs[ref];
 
 	if (op_num > 0) {
+#if IR_X86_I64
+		if (UNEXPECTED(op_num == 4 && op_num > ctx->ir_base[ref].inputs_count)) {
+			/* Used only for COND(I64, _, _) */
+			IR_ASSERT(ctx->ir_base[ref].op == IR_COND);
+			if (!ctx->tmp_regs) {
+				ctx->tmp_regs = ir_mem_malloc(ctx->insns_count);
+				memset(ctx->tmp_regs, -1, ctx->insns_count);
+			}
+			ctx->tmp_regs[ref] = reg;
+			return;
+		}
+#else
 		/* regs[] is not limited by the declared boundary 4, the real boundary checked below */
 		IR_ASSERT(op_num <= IR_MAX(3, ctx->ir_base[ref].inputs_count));
+#endif
 	}
 	regs[op_num] = reg;
 }
@@ -1442,6 +1472,7 @@ IR_ALWAYS_INLINE int8_t ir_get_alocated_reg(const ir_ctx *ctx, ir_ref ref, int o
 #define IR_FUSED_REG (1U<<28) /* Register assignemnt may be stored in ctx->fused_regs instead of ctx->regs */
 #define IR_MAY_SWAP  (1U<<27) /* Allow swapping operands for better register allocation */
 #define IR_MAY_REUSE (1U<<26) /* Result may reuse register of the source */
+#define IR_TWO_REGS  (1U<<25) /* Result needs two registers (used for 64-bit integers on x86) */
 
 #define IR_RULE_MASK 0xff
 

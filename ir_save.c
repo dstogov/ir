@@ -138,16 +138,14 @@ static void ir_save_dessa_moves(const ir_ctx *ctx, int b, ir_block *bb, FILE *f)
 				int8_t *regs = ctx->regs[use_ref];
 				int8_t reg = regs[k];
 				if (reg != IR_REG_NONE) {
-					fprintf(f, " {%%%s%s}", ir_reg_name(IR_REG_NUM(reg), ctx->ir_base[input].type),
-						(reg & (IR_REG_SPILL_LOAD|IR_REG_SPILL_SPECIAL)) ? ":load" : "");
+					ir_dump_reg(ctx, reg, input, 0, f);
 				}
 			}
 			fprintf(f, " -> d_%d {R%d}", use_ref, ctx->vregs[use_ref]);
 			if (ctx->regs) {
 				int8_t reg = ctx->regs[use_ref][0];
 				if (reg != IR_REG_NONE) {
-					fprintf(f, " {%%%s%s}", ir_reg_name(IR_REG_NUM(reg), ctx->ir_base[use_ref].type),
-						(reg & (IR_REG_SPILL_STORE|IR_REG_SPILL_SPECIAL)) ? ":store" : "");
+					ir_dump_reg(ctx, reg, use_ref, 1, f);
 				}
 			}
 			fprintf(f, "\n");
@@ -253,8 +251,7 @@ void ir_save(const ir_ctx *ctx, uint32_t save_flags, FILE *f)
 					if (ctx->regs) {
 						int8_t reg = ctx->regs[i][0];
 						if (reg != IR_REG_NONE) {
-							fprintf(f, " {%%%s%s}", ir_reg_name(IR_REG_NUM(reg), insn->type),
-								(reg & (IR_REG_SPILL_STORE|IR_REG_SPILL_SPECIAL)) ? ":store" : "");
+							ir_dump_reg(ctx, reg, i, 1, f);
 						}
 					}
 				}
@@ -271,8 +268,7 @@ void ir_save(const ir_ctx *ctx, uint32_t save_flags, FILE *f)
 					if (ctx->regs) {
 						int8_t reg = ctx->regs[i][0];
 						if (reg != IR_REG_NONE) {
-							fprintf(f, " {%%%s%s}", ir_reg_name(IR_REG_NUM(reg), insn->type),
-								(reg & (IR_REG_SPILL_STORE|IR_REG_SPILL_SPECIAL)) ? ":store" : "");
+							ir_dump_reg(ctx, reg, i, 1, f);
 						}
 					}
 				}
@@ -311,8 +307,7 @@ void ir_save(const ir_ctx *ctx, uint32_t save_flags, FILE *f)
 								int8_t *regs = ctx->regs[i];
 								int8_t reg = regs[j];
 								if (reg != IR_REG_NONE) {
-									fprintf(f, " {%%%s%s}", ir_reg_name(IR_REG_NUM(reg), ctx->ir_base[ref].type),
-										(reg & (IR_REG_SPILL_LOAD|IR_REG_SPILL_SPECIAL)) ? ":load" : "");
+									ir_dump_reg(ctx, reg, ref, 0, f);
 								}
 							}
 						}
@@ -416,6 +411,11 @@ void ir_save(const ir_ctx *ctx, uint32_t save_flags, FILE *f)
 			if (rule & IR_SIMPLE) {
 				fprintf(f, ":SIMPLE");
 			}
+#if IR_X86_I64
+			if (rule & IR_TWO_REGS) {
+				fprintf(f, ":TWO_REGS");
+			}
+#endif
 			fprintf(f, ");");
 		}
 

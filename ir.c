@@ -464,6 +464,11 @@ void ir_free(ir_ctx *ctx)
 	}
 	if (ctx->regs) {
 		ir_mem_free(ctx->regs);
+#if IR_X86_I64
+		if (ctx->tmp_regs) {
+			ir_mem_free(ctx->tmp_regs);
+		}
+#endif
 		if (ctx->fused_regs) {
 			ir_strtab_free(ctx->fused_regs);
 			ir_mem_free(ctx->fused_regs);

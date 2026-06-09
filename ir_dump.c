@@ -214,16 +214,14 @@ static void ir_dump_dessa_moves(const ir_ctx *ctx, int b, ir_block *bb, FILE *f)
 				int8_t *regs = ctx->regs[use_ref];
 				int8_t reg = regs[k];
 				if (reg != IR_REG_NONE) {
-					fprintf(f, " {%%%s%s}", ir_reg_name(IR_REG_NUM(reg), ctx->ir_base[input].type),
-						(reg & (IR_REG_SPILL_LOAD|IR_REG_SPILL_SPECIAL)) ? ":load" : "");
+					ir_dump_reg(ctx, reg, input, 0, f);
 				}
 			}
 			fprintf(f, " -> d_%d {R%d}", use_ref, ctx->vregs[use_ref]);
 			if (ctx->regs) {
 				int8_t reg = ctx->regs[use_ref][0];
 				if (reg != IR_REG_NONE) {
-					fprintf(f, " {%%%s%s}", ir_reg_name(IR_REG_NUM(reg), ctx->ir_base[use_ref].type),
-						(reg & (IR_REG_SPILL_STORE|IR_REG_SPILL_SPECIAL)) ? ":store" : "");
+					ir_dump_reg(ctx, reg, use_ref, 1, f);
 				}
 			}
 			fprintf(f, "\n");
@@ -401,6 +399,11 @@ void ir_dump_live_ranges(const ir_ctx *ctx, FILE *f)
 			}
 			do {
 				if (ival->reg != IR_REG_NONE) {
+#if IR_X86_I64
+					if (ival->type == IR_I64 || ival->type == IR_U64) {
+						fprintf(f, "[%%%s,%%%s]", ir_reg_name(ival->reg, IR_U32), ir_reg_name(ival->reg_hi, IR_U32));
+					} else
+#endif
 					fprintf(f, "[%%%s]", ir_reg_name(ival->reg, ival->type));
 				}
 				p = &ival->range;
@@ -435,6 +438,17 @@ void ir_dump_live_ranges(const ir_ctx *ctx, FILE *f)
 							IR_LIVE_POS_TO_REF(use_pos->pos), IR_LIVE_POS_TO_SUB_REF(use_pos->pos),
 							-use_pos->hint_ref, use_pos->op_num);
 						if (use_pos->hint >= 0) {
+#if IR_X86_I64
+							if (ival->type == IR_I64 || ival->type == IR_U64) {
+								if (use_pos->flags & IR_HINT_TWO_REGS) {
+									fprintf(f, ", hint=%%%s,%%%s",
+										ir_reg_name(IR_REG_I64_LO(use_pos->hint), IR_U32),
+										ir_reg_name(IR_REG_I64_HI(use_pos->hint), IR_U32));
+								} else {
+									fprintf(f, ", hint=%%%s", ir_reg_name(use_pos->hint, IR_U32));
+								}
+							} else
+#endif
 							fprintf(f, ", hint=%%%s", ir_reg_name(use_pos->hint, ival->type));
 						}
 						fprintf(f, ")");
@@ -451,6 +465,17 @@ void ir_dump_live_ranges(const ir_ctx *ctx, FILE *f)
 								use_pos->op_num);
 						}
 						if (use_pos->hint >= 0) {
+#if IR_X86_I64
+							if (ival->type == IR_I64 || ival->type == IR_U64) {
+								if (use_pos->flags & IR_HINT_TWO_REGS) {
+									fprintf(f, ", hint=%%%s,%%%s",
+										ir_reg_name(IR_REG_I64_LO(use_pos->hint), IR_U32),
+										ir_reg_name(IR_REG_I64_HI(use_pos->hint), IR_U32));
+								} else {
+									fprintf(f, ", hint=%%%s", ir_reg_name(use_pos->hint, IR_U32));
+							    }
+							} else
+#endif
 							fprintf(f, ", hint=%%%s", ir_reg_name(use_pos->hint, ival->type));
 						}
 						if (use_pos->hint_ref) {
@@ -588,8 +613,7 @@ void ir_dump_codegen(const ir_ctx *ctx, FILE *f)
 					if (ctx->regs) {
 						int8_t reg = ctx->regs[i][0];
 						if (reg != IR_REG_NONE) {
-							fprintf(f, " {%%%s%s}", ir_reg_name(IR_REG_NUM(reg), insn->type),
-								(reg & (IR_REG_SPILL_STORE|IR_REG_SPILL_SPECIAL)) ? ":store" : "");
+							ir_dump_reg(ctx, reg, i, 1, f);
 						}
 					}
 					fprintf(f, ", l_%d = ", i);
@@ -604,8 +628,7 @@ void ir_dump_codegen(const ir_ctx *ctx, FILE *f)
 					if (ctx->regs) {
 						int8_t reg = ctx->regs[i][0];
 						if (reg != IR_REG_NONE) {
-							fprintf(f, " {%%%s%s}", ir_reg_name(IR_REG_NUM(reg), insn->type),
-								(reg & (IR_REG_SPILL_STORE|IR_REG_SPILL_SPECIAL)) ? ":store" : "");
+							ir_dump_reg(ctx, reg, i, 1, f);
 						}
 					}
 					fprintf(f, " = ");
@@ -642,8 +665,7 @@ void ir_dump_codegen(const ir_ctx *ctx, FILE *f)
 								int8_t *regs = ctx->regs[i];
 								int8_t reg = regs[j];
 								if (reg != IR_REG_NONE) {
-									fprintf(f, " {%%%s%s}", ir_reg_name(IR_REG_NUM(reg), ctx->ir_base[ref].type),
-										(reg & (IR_REG_SPILL_LOAD|IR_REG_SPILL_SPECIAL)) ? ":load" : "");
+									ir_dump_reg(ctx, reg, ref, 0, f);
 								}
 							}
 							first = 0;
@@ -727,6 +749,11 @@ void ir_dump_codegen(const ir_ctx *ctx, FILE *f)
 				if (rule & IR_SIMPLE) {
 					fprintf(f, ":SIMPLE");
 				}
+#if IR_X86_I64
+				if (rule & IR_TWO_REGS) {
+					fprintf(f, ":TWO_REGS");
+				}
+#endif
 				fprintf(f, ")");
 			}
 			fprintf(f, "\n");
