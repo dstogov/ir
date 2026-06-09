@@ -515,7 +515,7 @@ static int ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, i
 		return IR_CANNOT_CONVERT;
 	}
 
-	size = ctx->ir_base[insn->op2].val.u64;
+	size = (size_t)ctx->ir_base[insn->op2].val.u64;
 	if (size != 1 && size != 2 && size != 4 && size != 8 && size != sizeof(double)) {
 		goto try_split;
 	}
@@ -555,7 +555,7 @@ static int ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, i
 		} else {
 try_split:
 			if (size > IR_MAX_SPLIT_SIZE) return IR_CANNOT_CONVERT;
-			split_layout->size = size;
+			split_layout->size = (uint32_t)size;
 			split_layout->count = 0;
 			return ir_mem2ssa_may_split_alloca(ctx, split_layout, var, next);
 		}
@@ -595,7 +595,7 @@ static bool ir_mem2ssa_add_split_var(ir_ctx *ctx, ir_mem2ssa_split_layout *layou
 	}
 
 	layout->count++;
-	layout->sizes[offset] = size;
+	layout->sizes[offset] = (uint8_t)size;
 
 	return 1;
 }
@@ -676,7 +676,7 @@ static int ir_mem2ssa_may_split_alloca(ir_ctx *ctx, ir_mem2ssa_split_layout *lay
 				&& IR_IS_CONST_REF(use_insn->op2)
 				&& IR_IS_TYPE_INT(ctx->ir_base[use_insn->op2].type)
 				&& ctx->ir_base[use_insn->op2].val.u64 < layout->size
-				&& ir_mem2ssa_may_promote(ctx, layout, use, ctx->ir_base[use_insn->op2].val.u64)) {
+				&& ir_mem2ssa_may_promote(ctx, layout, use, (size_t)ctx->ir_base[use_insn->op2].val.u64)) {
 			/* pass */
 		} else {
 			return IR_CANNOT_CONVERT;
@@ -755,7 +755,7 @@ static void ir_mem2ssa_split_alloca(ir_ctx *ctx, ir_mem2ssa_split_layout *layout
 				&& IR_IS_TYPE_INT(ctx->ir_base[use_insn->op2].type)
 				&& ctx->ir_base[use_insn->op2].val.u64 < layout->size);
 
-			size_t offset = ctx->ir_base[use_insn->op2].val.u64;
+			size_t offset = (size_t)ctx->ir_base[use_insn->op2].val.u64;
 
 			ref = layout->sizes[offset] == 0 ? var : first_new_alloca + layout->sizes[offset] - 1;
 			ir_replace(ctx, use, ref);

@@ -419,7 +419,7 @@ ir_sym(char *buf, uint32_t *flags):
 ir_sym_size(size_t *size):
 	{ir_val val;}
 	"[" DECNUMBER(IR_U64, &val) "]"
-	{*size = val.u64;}
+	{*size = (size_t)val.u64;}
 ;
 
 ir_sym_data(ir_loader *loader):

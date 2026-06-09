@@ -4183,7 +4183,7 @@ static void ir_emit_store_mem_int_const(ir_ctx *ctx, ir_type type, ir_mem mem, i
 			if (is_arg && ir_type_size[type] < 4) {
 				type = IR_U32;
 			}
-			ir_emit_store_mem_imm(ctx, type, mem, val);
+			ir_emit_store_mem_imm(ctx, type, mem, (int32_t)val);
 		} else if (sizeof(void*) == 4) {
 			ir_mem mem_hi = IR_MEM_I64_HI(mem);
 
@@ -4539,7 +4539,7 @@ static ir_mem ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 		if (IR_IS_SYM_CONST(addr_insn->op)) {
 			void *addr = ir_sym_val(ctx, addr_insn);
 			IR_ASSERT(sizeof(void*) != 8 || IR_IS_SIGNED_32BIT((intptr_t)addr));
-			offset += (int64_t)(intptr_t)(addr);
+			offset += (int32_t)(intptr_t)(addr);
 		} else {
 			if (offset_insn->op == IR_SUB) {
 				offset -= addr_insn->val.i32;
@@ -4752,7 +4752,7 @@ static void ir_emit_prologue(ir_ctx *ctx)
 			if (ctx->flags & IR_USE_FRAME_POINTER) {
 				fp = IR_REG_FRAME_POINTER;
 
-				offset = -(ctx->stack_frame_size - ctx->locals_area_size);
+				offset = -(int32_t)(ctx->stack_frame_size - ctx->locals_area_size);
 			} else {
 				fp = IR_REG_STACK_POINTER;
 				offset = ctx->locals_area_size + ctx->call_stack_size;
@@ -9757,7 +9757,7 @@ static void ir_emit_va_start(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
 			fp = IR_REG_FRAME_POINTER;
-			reg_save_area_offset = -(ctx->stack_frame_size - ctx->locals_area_size);
+			reg_save_area_offset = -(int32_t)(ctx->stack_frame_size - ctx->locals_area_size);
 			overflow_arg_area_offset = sizeof(void*) * 2 + ctx->param_stack_size;
 		} else {
 			fp = IR_REG_STACK_POINTER;
@@ -15131,7 +15131,7 @@ static void ir_emit_load_params(ir_ctx *ctx)
 			if (IR_IS_TYPE_INT(insn->type)) {
 				if (ctx->value_params && ctx->value_params[insn->op3 - 1].align) {
 					/* struct passed by value on stack */
-					size_t align = ctx->value_params[insn->op3 - 1].align;
+					uint32_t align = ctx->value_params[insn->op3 - 1].align;
 
 					align = IR_MAX(sizeof(void*), align);
 					stack_offset = IR_ALIGNED_SIZE(stack_offset, align);
@@ -15261,7 +15261,7 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 			if (IR_IS_TYPE_INT(insn->type)) {
 				if (ctx->value_params && ctx->value_params[insn->op3 - 1].align && cc->pass_struct_by_val) {
 					/* struct passed by value on stack */
-					size_t align = ctx->value_params[insn->op3 - 1].align;
+					uint32_t align = ctx->value_params[insn->op3 - 1].align;
 
 					align = IR_MAX(sizeof(void*), align);
 					stack_offset = IR_ALIGNED_SIZE(stack_offset, align);

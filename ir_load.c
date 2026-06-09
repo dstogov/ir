@@ -1452,7 +1452,7 @@ static int parse_ir_sym_size(int sym, size_t *size) {
 		yy_error_sym("']' expected, got", sym);
 	}
 	sym = get_sym();
-	*size = val.u64;
+	*size = (size_t)val.u64;
 	return sym;
 }
 

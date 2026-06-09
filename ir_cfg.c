@@ -119,7 +119,7 @@ static void ir_remove_phis_inputs(ir_ctx *ctx, ir_use_list *use_list, int new_in
 		}
 
 		if (p != q) {
-			use_list->count -= (p - q);
+			use_list->count -= (ir_ref)(p - q);
 			do {
 				*q = IR_UNUSED; /* clenu-op the removed tail */
 				q++;

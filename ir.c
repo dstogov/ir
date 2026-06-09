@@ -505,7 +505,7 @@ ir_ref ir_unique_const_addr(ir_ctx *ctx, uintptr_t addr)
 
 IR_ALWAYS_INLINE uintptr_t ir_const_hash(ir_val val, uint32_t optx)
 {
-	return (val.u64 ^ (val.u64 >> 32) ^ optx);
+	return (uintptr_t)(val.u64 ^ (val.u64 >> 32) ^ optx);
 }
 
 static IR_NEVER_INLINE void ir_const_hash_rehash(ir_ctx *ctx)
@@ -1292,7 +1292,7 @@ void ir_build_def_use_lists(ir_ctx *ctx)
 					/* form a linked list of "uses" (like in binsort) */
 					linked_lists[linked_lists_top] = i; /* store the "use" */
 					linked_lists[linked_lists_top + 1] = use_list->refs; /* store list next */
-					use_list->refs = -(linked_lists_top + 1); /* store a head of the list using a negative number */
+					use_list->refs = -(ir_ref)(linked_lists_top + 1); /* store a head of the list using a negative number */
 					linked_lists_top += 2;
 					use_list->count++;
 				}
@@ -1303,7 +1303,8 @@ void ir_build_def_use_lists(ir_ctx *ctx)
 		insn += n;
 	}
 
-	ctx->use_edges_count = edges_count;
+	IR_ASSERT(edges_count <= 0x7fffffff);
+	ctx->use_edges_count = (ir_ref)edges_count;
 	edges = ir_mem_malloc(IR_ALIGNED_SIZE(edges_count * sizeof(ir_ref), 4096));
 	for (use_list = lists + ctx->insns_count - 1; use_list != lists; use_list--) {
 		n = use_list->refs;
@@ -1316,7 +1317,7 @@ void ir_build_def_use_lists(ir_ctx *ctx)
 			}
 			IR_ASSERT(n > 0);
 			edges[--edges_count] = n;
-			use_list->refs = edges_count;
+			use_list->refs = (ir_ref)edges_count;
 		}
 	}
 
@@ -1344,7 +1345,7 @@ void ir_use_list_remove_all(ir_ctx *ctx, ir_ref from, ir_ref ref)
 		}
 	}
 	if (p != q) {
-		use_list->count -= (p - q);
+		use_list->count -= (ir_ref)(p - q);
 		do {
 			*q = IR_UNUSED;
 			q++;
