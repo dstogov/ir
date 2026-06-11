@@ -74,7 +74,7 @@ static const ir_type fuzz_fp_types[] = {
 
 static const ir_op fuzz_int_bin[] = {
 	IR_ADD, IR_SUB, IR_MUL, IR_OR, IR_AND, IR_XOR,
-	IR_SHL, IR_SHR, IR_SAR, IR_MIN, IR_MAX
+	IR_SHL, IR_SHR, IR_SAR, IR_MIN, IR_MAX, IR_DIV, IR_MOD
 };
 static const ir_op fuzz_int_un[] = {
 	IR_NEG, IR_NOT
@@ -157,10 +157,22 @@ static void fuzz_build(ir_ctx *ctx, fuzz_cursor *c)
 		for (int b = 0; b < 8; b++) {
 			val.u64 = (val.u64 << 8) | fuzz_u8(c);
 		}
-		if (wtype == IR_FLOAT) {
-			val.f = (float)(int64_t)val.u64;
-		} else if (wtype == IR_DOUBLE) {
-			val.d = (double)(int64_t)val.u64;
+		/*
+		 * Canonicalize the value to the working type, matching the
+		 * zero/sign extension the typed ir_const_* helpers produce.
+		 * A constant of a narrow type must carry no garbage in its
+		 * upper bits, or width-specific fold rules misbehave.
+		 */
+		switch (wtype) {
+			case IR_U8:  val.u64 = (uint8_t)val.u64; break;
+			case IR_U16: val.u64 = (uint16_t)val.u64; break;
+			case IR_U32: val.u64 = (uint32_t)val.u64; break;
+			case IR_I8:  val.i64 = (int8_t)val.u64; break;
+			case IR_I16: val.i64 = (int16_t)val.u64; break;
+			case IR_I32: val.i64 = (int32_t)val.u64; break;
+			case IR_FLOAT:  val.f = (float)(int64_t)val.u64; break;
+			case IR_DOUBLE: val.d = (double)(int64_t)val.u64; break;
+			default: break;
 		}
 		pool[count++] = ir_const(ctx, val, wtype);
 	}
