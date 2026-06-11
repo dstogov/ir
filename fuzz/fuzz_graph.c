@@ -115,6 +115,17 @@ static int fuzz_eof(const fuzz_cursor *c)
 	return c->pos >= c->len;
 }
 
+/* Size in bytes of a working integer type, for valid conversions. */
+static uint32_t fuzz_int_size(ir_type t)
+{
+	switch (t) {
+		case IR_U8:  case IR_I8:  return 1;
+		case IR_U16: case IR_I16: return 2;
+		case IR_U32: case IR_I32: return 4;
+		default:                  return 8;
+	}
+}
+
 /*
  * Decode the blob into a valid function:
  *   START
@@ -184,6 +195,7 @@ static void fuzz_build(ir_ctx *ctx, fuzz_cursor *c)
 		bool unary = (op_sel & 0x80) != 0;
 		bool branch = (op_sel & 0x40) != 0;
 		bool loop = (op_sel & 0x20) != 0;
+		bool conv = (op_sel & 0x10) != 0;
 		ir_ref a, r;
 
 		a = pool[s1 % count];
@@ -236,6 +248,54 @@ static void fuzz_build(ir_ctx *ctx, fuzz_cursor *c)
 			_ir_MERGE_SET_OP(ctx, loop_ref, 2, loop_end);
 			_ir_PHI_SET_OP(ctx, iv, 2, next);
 			r = next;
+		} else if (conv) {
+			/*
+			 * Emit a type conversion round trip that returns the
+			 * working type, so the pool stays homogeneous. The code is
+			 * never executed, so the converted value need not be
+			 * preserved, only that every step is a valid typed
+			 * conversion. FP2INT is left out on purpose because an out
+			 * of range float to integer cast is undefined and would be
+			 * folded at compile time.
+			 */
+			uint8_t kind = op_sel & 0x0f;
+
+			if (is_fp) {
+				if (kind & 1) {
+					/* fp -> other fp -> fp */
+					ir_type other = (wtype == IR_FLOAT) ? IR_DOUBLE : IR_FLOAT;
+					ir_ref t = ir_fold1(ctx, IR_OPT(IR_FP2FP, other), a);
+					r = ir_fold1(ctx, IR_OPT(IR_FP2FP, wtype), t);
+				} else {
+					/* fp -> same size int bits -> fp value */
+					ir_type it = (wtype == IR_FLOAT) ? IR_U32 : IR_U64;
+					ir_ref t = ir_fold1(ctx, IR_OPT(IR_BITCAST, it), a);
+					r = ir_fold1(ctx, IR_OPT(IR_INT2FP, wtype), t);
+				}
+			} else {
+				bool sgn = IR_IS_TYPE_SIGNED(wtype);
+				uint32_t sz = fuzz_int_size(wtype);
+
+				if ((kind & 1) && sz == 4) {
+					/* int <-> same size float by bitcast */
+					ir_ref t = ir_fold1(ctx, IR_OPT(IR_BITCAST, IR_FLOAT), a);
+					r = ir_fold1(ctx, IR_OPT(IR_BITCAST, wtype), t);
+				} else if ((kind & 1) && sz == 8) {
+					/* int <-> same size double by bitcast */
+					ir_ref t = ir_fold1(ctx, IR_OPT(IR_BITCAST, IR_DOUBLE), a);
+					r = ir_fold1(ctx, IR_OPT(IR_BITCAST, wtype), t);
+				} else if (sz < 8) {
+					/* widen to 64 bit then truncate back */
+					ir_op ext = sgn ? IR_SEXT : IR_ZEXT;
+					ir_type wide = sgn ? IR_I64 : IR_U64;
+					ir_ref t = ir_fold1(ctx, IR_OPT(ext, wide), a);
+					r = ir_fold1(ctx, IR_OPT(IR_TRUNC, wtype), t);
+				} else {
+					/* 64 bit int reinterpreted through a double */
+					ir_ref t = ir_fold1(ctx, IR_OPT(IR_BITCAST, IR_DOUBLE), a);
+					r = ir_fold1(ctx, IR_OPT(IR_BITCAST, wtype), t);
+				}
+			}
 		} else if (unary) {
 			ir_op op = is_fp
 				? fuzz_fp_un[(op_sel & 0x7f) % FUZZ_ARRAY_LEN(fuzz_fp_un)]
