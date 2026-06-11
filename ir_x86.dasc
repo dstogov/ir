@@ -15233,6 +15233,55 @@ static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to, 
 	return 1;
 }
 
+/* This remaps spill slot of the VAR, where PARAM is stored, to the PARAMs slot.
+ * This eliminates copying, but more important, this fixes va_start() compilation
+ * on systems, where it's defined through address calculation macro (e.g. MSVC x86).
+ */
+static void ir_remap_param_spill_slot(ir_ctx *ctx, ir_ref param, int32_t spill_slot)
+{
+	ir_use_list *param_use_list = &ctx->use_lists[param];
+
+	if (param_use_list->count >= 1) {
+		ir_ref param_store = ctx->use_edges[param_use_list->refs];
+		ir_insn *param_store_insn = &ctx->ir_base[param_store];
+
+		if (param_store_insn->op == IR_VSTORE) {
+			ir_ref var = param_store_insn->op2;
+			ir_insn *var_insn = &ctx->ir_base[var];
+
+			IR_ASSERT(param_store_insn->op3 == param);
+			IR_ASSERT(ctx->ir_base[var].op == IR_VAR);
+
+			/* Remap all related VADDR and VLOAD */
+			ir_use_list *var_use_list = &ctx->use_lists[var];
+			ir_ref n = var_use_list->count;
+			ir_ref *p = &ctx->use_edges[var_use_list->refs];
+			for (; n > 0; p++, n--) {
+				ir_ref use = *p;
+				ir_insn *insn = &ctx->ir_base[use];
+
+				if (insn->op == IR_VADDR) {
+					IR_ASSERT(insn->op3 == var_insn->op3);
+					insn->op3 = spill_slot;
+				} else if (insn->op == IR_VLOAD) {
+					if (ctx->vregs[use]) {
+						ir_live_interval *ival = ctx->live_intervals[ctx->vregs[use]];
+						if (ival->stack_spill_pos == var_insn->op3) {
+							ival->stack_spill_pos = spill_slot;
+						}
+					}
+				}
+			}
+
+			/* Remap VAR itself */
+			var_insn->op3 = spill_slot;
+
+			/* Avoid copying to itself */
+			ctx->rules[param_store] = IR_SKIPPED | IR_NOP;
+		}
+	}
+}
+
 static void ir_fix_param_spills(ir_ctx *ctx)
 {
 	ir_use_list *use_list = &ctx->use_lists[1];
@@ -15305,9 +15354,10 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 				if (ctx->vregs[use]) {
 					ir_live_interval *ival = ctx->live_intervals[ctx->vregs[use]];
 					if ((ival->flags & IR_LIVE_INTERVAL_MEM_PARAM)
-					 && ival->stack_spill_pos == -1
-					 && (ival->next || ival->reg == IR_REG_NONE)) {
+					 && ival->stack_spill_pos == -1) {
 						ival->stack_spill_pos = stack_start + stack_offset;
+						/* Remap VAR to PARAM stack slot */
+						ir_remap_param_spill_slot(ctx, use, stack_start + stack_offset);
 					}
 				}
 				if (sizeof(void*) == 8) {

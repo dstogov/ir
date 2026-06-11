@@ -79,8 +79,6 @@ test:
 	movsd 0x60(%esp), %xmm0
 	subsd .L3, %xmm0
 	movsd %xmm0, (%esp)
-	movsd 0x58(%esp), %xmm0
-	movsd %xmm0, 8(%esp)
 	xorpd %xmm0, %xmm0
 	movsd %xmm0, 0x10(%esp)
 	xorpd %xmm0, %xmm0
@@ -109,7 +107,7 @@ test:
 	addsd %xmm0, %xmm0
 	movsd %xmm0, 0x44(%esp)
 	movsd 0x44(%esp), %xmm0
-	addsd 8(%esp), %xmm0
+	addsd 0x58(%esp), %xmm0
 	movsd %xmm0, 0x10(%esp)
 	movsd 0x34(%esp), %xmm0
 	addsd 0x2c(%esp), %xmm0
@@ -127,7 +125,7 @@ test:
 	addl $0x54, %esp
 	retl
 .rodata
-	.db 0x90, 0x90
+	.db 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
 .L3:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f
 .L4:
