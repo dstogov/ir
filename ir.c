@@ -1074,12 +1074,27 @@ ir_fold_copy:
 		return IR_FOLD_DO_COPY;
 	}
 ir_fold_const:
-	if (!ctx->use_lists) {
-		return ir_const(ctx, val, IR_OPT_TYPE(opt));
-	} else {
-		ctx->fold_insn.opt = IR_OPT(IR_OPT_TYPE(opt), IR_OPT_TYPE(opt));
-		ctx->fold_insn.val.u64 = val.u64;
-		return IR_FOLD_DO_CONST;
+	{
+		ir_type type = IR_OPT_TYPE(opt);
+
+		/* Extend a narrow integer result to its type width so no
+		 * fold rule sees garbage in the upper bits. */
+		if (IR_IS_TYPE_INT(type) && ir_type_size[type] < 8) {
+			uint32_t shift = (8 - ir_type_size[type]) * 8;
+			if (IR_IS_TYPE_SIGNED(type)) {
+				val.i64 = (int64_t)(val.u64 << shift) >> shift;
+			} else {
+				val.u64 = (val.u64 << shift) >> shift;
+			}
+		}
+
+		if (!ctx->use_lists) {
+			return ir_const(ctx, val, type);
+		} else {
+			ctx->fold_insn.opt = IR_OPT(type, type);
+			ctx->fold_insn.val.u64 = val.u64;
+			return IR_FOLD_DO_CONST;
+		}
 	}
 }
 
