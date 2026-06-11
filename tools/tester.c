@@ -306,7 +306,8 @@ static int run_test(const char *filename, test *t, int show_diff)
 
 	if ((size_t)snprintf(cmd, sizeof(cmd), "%s %s %s %s > %s 2>&1",
 			test_cmd, code_filename,
-			t->args ? t->args : default_args, additional_args,
+			additional_args,
+			t->args ? t->args : default_args,
 			out_filename) > sizeof(cmd)) {
 		free(code_filename);
 		free(out_filename);
