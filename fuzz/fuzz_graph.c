@@ -195,7 +195,8 @@ static void fuzz_build(ir_ctx *ctx, fuzz_cursor *c)
 		bool unary = (op_sel & 0x80) != 0;
 		bool branch = (op_sel & 0x40) != 0;
 		bool loop = (op_sel & 0x20) != 0;
-		bool conv = (op_sel & 0x10) != 0;
+		bool mem = (op_sel & 0x10) != 0 && (op_sel & 0x08) != 0;
+		bool conv = (op_sel & 0x10) != 0 && (op_sel & 0x08) == 0;
 		ir_ref a, r;
 
 		a = pool[s1 % count];
@@ -248,6 +249,28 @@ static void fuzz_build(ir_ctx *ctx, fuzz_cursor *c)
 			_ir_MERGE_SET_OP(ctx, loop_ref, 2, loop_end);
 			_ir_PHI_SET_OP(ctx, iv, 2, next);
 			r = next;
+		} else if (mem) {
+			/*
+			 * Round trip the value through local memory so the
+			 * mem2ssa pass and the load store aliasing analysis are
+			 * exercised. Two shapes are produced. A named VAR written
+			 * by VSTORE and read back by VLOAD, and a stack slot from
+			 * ALLOCA written by STORE and read back by LOAD. Both keep
+			 * the working type so the pool stays homogeneous, and both
+			 * feed the loaded value back into later records.
+			 */
+			if (op_sel & 0x04) {
+				ir_ref sz = ir_const_addr(ctx, 16);
+				ir_ref addr = _ir_ALLOCA(ctx, sz);
+				_ir_STORE(ctx, addr, a);
+				r = _ir_LOAD(ctx, wtype, addr);
+			} else {
+				char vname[16];
+				snprintf(vname, sizeof(vname), "v%u", count);
+				ir_ref var = _ir_VAR(ctx, wtype, vname);
+				_ir_VSTORE(ctx, var, a);
+				r = _ir_VLOAD(ctx, wtype, var);
+			}
 		} else if (conv) {
 			/*
 			 * Emit a type conversion round trip that returns the
@@ -352,6 +375,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 
 #if FUZZ_OPT_LEVEL > 0
 	flags |= IR_OPT_FOLDING;
+	flags |= IR_OPT_MEM2SSA;
 #endif
 
 	ir_init(&ctx, flags, IR_CONSTS_LIMIT_MIN, IR_INSNS_LIMIT_MIN);
