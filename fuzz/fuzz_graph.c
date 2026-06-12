@@ -254,14 +254,26 @@ static void fuzz_build(ir_ctx *ctx, fuzz_cursor *c)
 			 * working type, so the pool stays homogeneous. The code is
 			 * never executed, so the converted value need not be
 			 * preserved, only that every step is a valid typed
-			 * conversion. FP2INT is left out on purpose because an out
-			 * of range float to integer cast is undefined and would be
-			 * folded at compile time.
+			 * conversion.
 			 */
 			uint8_t kind = op_sel & 0x0f;
 
 			if (is_fp) {
-				if (kind & 1) {
+				if (kind & 2) {
+					/*
+					 * fp -> int -> fp through a parameter. FP2INT is
+					 * emitted only on a non constant operand so the
+					 * folder cannot evaluate an out of range float to
+					 * integer cast at compile time, which is undefined.
+					 * A parameter is always non constant and SCCP cannot
+					 * prove it constant, and the code is never executed
+					 * so the runtime cast is never performed.
+					 */
+					ir_ref src = pool[s2 % nparams];
+					ir_type it = (wtype == IR_FLOAT) ? IR_I32 : IR_I64;
+					ir_ref t = ir_fold1(ctx, IR_OPT(IR_FP2INT, it), src);
+					r = ir_fold1(ctx, IR_OPT(IR_INT2FP, wtype), t);
+				} else if (kind & 1) {
 					/* fp -> other fp -> fp */
 					ir_type other = (wtype == IR_FLOAT) ? IR_DOUBLE : IR_FLOAT;
 					ir_ref t = ir_fold1(ctx, IR_OPT(IR_FP2FP, other), a);
