@@ -2216,7 +2216,7 @@ IR_FOLD(DIV(NEG, C_I32))
 IR_FOLD(DIV(NEG, C_I64))
 {
 	op1 = op1_insn->op1;
-	val.i64 = -op2_insn->val.i64;
+	val.i64 = -(uint64_t)op2_insn->val.i64;
 	op2 = ir_const(ctx, val, op2_insn->type);
 	IR_FOLD_RESTART;
 }
