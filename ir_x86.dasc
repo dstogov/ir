@@ -907,6 +907,9 @@ typedef struct _ir_backend_data {
 	bool               ull2f_const;    /*    0x5f000000 */
 	bool               ull2fp_const;   /*    0x5f800000 */
 	bool               resolved_label_syms;
+#ifdef _WIN64
+	bool               chkstk_addr;
+#endif
 } ir_backend_data;
 
 typedef struct _ir_x86_64_sysv_va_list {
@@ -4667,6 +4670,69 @@ static void ir_emit_load_ex(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref src, i
 	}
 }
 
+static void ir_rodata(ir_ctx *ctx)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+
+	|.rodata
+	if (!data->rodata_label) {
+		int label = data->rodata_label = ctx->cfg_blocks_count + ctx->consts_count + 2;
+		|=>label:
+	}
+}
+
+#ifdef _WIN32
+# ifdef _WIN64
+#  define WIN_CHKSTK_LIMIT (8 * 1024)
+extern size_t __chkstk(size_t);
+# else
+#  define WIN_CHKSTK_LIMIT (4 * 1024)
+#  define __chkstk _chkstk
+extern size_t _chkstk(size_t);
+# endif
+#endif
+
+static void ir_stack_alloca(ir_ctx *ctx, int32_t size)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+
+#ifdef _WIN32
+# ifdef _WIN64
+	if (size >= WIN_CHKSTK_LIMIT) {
+		void *addr = __chkstk;
+		if (IR_MAY_USE_32BIT_ADDR(ctx->code_buffer, addr)) {
+			|	mov Ra(IR_REG_RAX), size
+			|	call aword &addr
+			|	sub Ra(IR_REG_RSP), Ra(IR_REG_RAX)
+		} else {
+			if (!data->chkstk_addr) {
+				data->chkstk_addr = 1;
+				ir_rodata(ctx);
+				|.align 8
+				|->chkstk_addr:
+				|	.aword addr
+				|.code
+			}
+			|	mov Ra(IR_REG_RAX), size
+			|	call aword [->chkstk_addr]
+			|	sub Ra(IR_REG_RSP), Ra(IR_REG_RAX)
+		}
+	} else
+# else
+	if (size >= WIN_CHKSTK_LIMIT) {
+		void *addr = __chkstk;
+		|	mov Ra(IR_REG_RAX), size
+		|	call aword &addr
+	} else
+# endif
+#endif
+	{
+		|	sub Ra(IR_REG_RSP), size
+	}
+}
+
 static void ir_emit_prologue(ir_ctx *ctx)
 {
 	ir_backend_data *data = ctx->data;
@@ -4692,7 +4758,7 @@ static void ir_emit_prologue(ir_ctx *ctx)
 		if (ctx->fixed_stack_red_zone) {
 			IR_ASSERT(ctx->stack_frame_size + ctx->call_stack_size <= ctx->fixed_stack_red_zone);
 		} else if (offset) {
-			|	sub Ra(IR_REG_RSP), offset
+			ir_stack_alloca(ctx, offset);
 		}
 	}
 	if (IR_REGSET_INTERSECTION((ir_regset)ctx->used_preserved_regs, IR_REGSET_FP)) {
@@ -6335,18 +6401,6 @@ static void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				ir_emit_store(ctx, type, def, IR_REG_RDX);
 			}
 		}
-	}
-}
-
-static void ir_rodata(ir_ctx *ctx)
-{
-	ir_backend_data *data = ctx->data;
-	dasm_State **Dst = &data->dasm_state;
-
-	|.rodata
-	if (!data->rodata_label) {
-		int label = data->rodata_label = ctx->cfg_blocks_count + ctx->consts_count + 2;
-		|=>label:
 	}
 }
 
@@ -9572,7 +9626,7 @@ static void ir_emit_alloca(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 		/* Stack must be 16 byte aligned */
 		size = IR_ALIGNED_SIZE(size, 16);
-		|	ASM_REG_IMM_OP sub, IR_ADDR, IR_REG_RSP, size
+		ir_stack_alloca(ctx, size);
 		if (!(ctx->flags & IR_USE_FRAME_POINTER)) {
 			ctx->call_stack_size += size;
 		}
@@ -10509,7 +10563,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 			int32_t aligned_stack = IR_ALIGNED_SIZE(used_stack, 16);
 			ctx->call_stack_size += aligned_stack;
 			if (aligned_stack) {
-				|	sub Ra(IR_REG_RSP), aligned_stack
+				ir_stack_alloca(ctx, aligned_stack);
 			}
 		}
 	}
@@ -15735,6 +15789,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	data.ull2f_const = 0;
 	data.ull2fp_const = 0;
 	data.resolved_label_syms = 0;
+#ifdef _WIN64
+	data.chkstk_addr = 0;
+#endif
 	ctx->data = &data;
 
 	if (!ctx->live_intervals) {
