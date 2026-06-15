@@ -254,29 +254,38 @@ IR_ALWAYS_INLINE void ir_arena_free(ir_arena *arena)
 	} while (arena);
 }
 
-IR_ALWAYS_INLINE void* ir_arena_alloc(ir_arena **arena_ptr, size_t size)
+IR_ALWAYS_INLINE void* ir_arena_alloc_aligned(ir_arena **arena_ptr, size_t size, size_t align)
 {
 	ir_arena *arena = *arena_ptr;
-	char *ptr = (char*)IR_ALIGNED_SIZE((uintptr_t)arena->ptr, 8);
+	char *ptr;
 
+	if (align < 8) {
+		align = 8;
+	}
+	ptr = (char*)IR_ALIGNED_SIZE((uintptr_t)arena->ptr, align);
 	if (EXPECTED((ptrdiff_t)size <= (ptrdiff_t)(arena->end - ptr))) {
 		arena->ptr = ptr + size;
 	} else {
 		size_t arena_size =
-			UNEXPECTED((size + IR_ALIGNED_SIZE(sizeof(ir_arena), 8)) > (size_t)(arena->end - (char*) arena)) ?
-				(size + IR_ALIGNED_SIZE(sizeof(ir_arena), 8)) :
+			UNEXPECTED((size + IR_ALIGNED_SIZE(sizeof(ir_arena), align)) > (size_t)(arena->end - (char*) arena)) ?
+				(size + IR_ALIGNED_SIZE(sizeof(ir_arena), align)) :
 				(size_t)(arena->end - (char*) arena);
 		ir_arena *new_arena = (ir_arena*)ir_mem_malloc(arena_size);
 
 		if (UNEXPECTED(!new_arena)) return NULL;
-		ptr = (char*) new_arena + IR_ALIGNED_SIZE(sizeof(ir_arena), 8);
-		new_arena->ptr = (char*) new_arena + IR_ALIGNED_SIZE(sizeof(ir_arena), 8) + size;
+		ptr = (char*) new_arena + IR_ALIGNED_SIZE(sizeof(ir_arena), align);
+		new_arena->ptr = (char*) new_arena + IR_ALIGNED_SIZE(sizeof(ir_arena), align) + size;
 		new_arena->end = (char*) new_arena + arena_size;
 		new_arena->prev = arena;
 		*arena_ptr = new_arena;
 	}
 
 	return (void*) ptr;
+}
+
+IR_ALWAYS_INLINE void* ir_arena_alloc(ir_arena **arena_ptr, size_t size)
+{
+	return ir_arena_alloc_aligned(arena_ptr, size, 8);
 }
 
 IR_ALWAYS_INLINE void* ir_arena_checkpoint(ir_arena *arena)
