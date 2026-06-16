@@ -129,7 +129,7 @@ jobs:
             gmake test-ci
 
   MACOS_x86_64:
-    runs-on: macos-15-intel
+    runs-on: macos-26-intel
     env:
       CFLAGS: '-fsanitize=address,undefined'
     steps:
@@ -140,6 +140,21 @@ jobs:
         run: make BUILD=debug all
       - name: test
         run: make BUILD=debug test-ci
+
+  MACOS_M1:
+    runs-on: macos-26
+    env:
+      CFLAGS: '-fsanitize=address,undefined'
+      CPATH: /opt/homebrew/include
+      LIBRARY_PATH: /opt/homebrew/lib
+    steps:
+      - uses: actions/checkout@v3
+      - name: brew
+        run: brew install capstone
+      - name: make
+        run: make CC=cc all
+      - name: test
+        run: make CC=cc test-ci
 
   Windows:
     strategy:
