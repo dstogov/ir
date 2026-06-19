@@ -1987,11 +1987,11 @@ typedef enum _ir_alias {
 	IR_MUST_ALIAS =  1,
 } ir_alias;
 
-IR_ALWAYS_INLINE const ir_insn *ir_decompose_addr(const ir_ctx *ctx, ir_ref addr, ir_ref *base, ir_ref *index, ssize_t *offset)
+IR_ALWAYS_INLINE const ir_insn *ir_decompose_addr(const ir_ctx *ctx, ir_ref addr, ir_ref *base, ir_ref *index, intptr_t *offset)
 {
 	const ir_insn *insn = &ctx->ir_base[addr];
 	ir_ref idx = IR_UNUSED;
-	ssize_t off = 0;
+	intptr_t off = 0;
 
 	while (1) {
 		if (insn->op == IR_ADD) {
@@ -2091,7 +2091,7 @@ static ir_alias ir_check_aliasing(const ir_ctx *ctx, ir_ref addr1, ir_ref addr2,
 {
 	const ir_insn *insn1, *insn2;
 	ir_ref base1, base2, index1, index2;
-	ssize_t offset1, offset2;
+	intptr_t offset1, offset2;
 
 	/* this must be already check */
 	IR_ASSERT(addr1 != addr2);
