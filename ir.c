@@ -1987,133 +1987,146 @@ typedef enum _ir_alias {
 	IR_MUST_ALIAS =  1,
 } ir_alias;
 
-#if 0
-static ir_alias ir_check_aliasing(ir_ctx *ctx, ir_ref addr1, ir_ref addr2)
+IR_ALWAYS_INLINE const ir_insn *ir_decompose_addr(const ir_ctx *ctx, ir_ref addr, ir_ref *base, ir_ref *index, ssize_t *offset)
 {
-	ir_insn *insn1, *insn2;
+	const ir_insn *insn = &ctx->ir_base[addr];
+	ir_ref idx = IR_UNUSED;
+	ssize_t off = 0;
 
-	if (addr1 == addr2) {
-		return IR_MUST_ALIAS;
+	while (1) {
+		if (insn->op == IR_ADD) {
+			ir_ref op1 = insn->op1;
+			ir_ref op2 = insn->op2;
+			const ir_insn *op1_insn = &ctx->ir_base[op1];
+			const ir_insn *op2_insn = &ctx->ir_base[op2];
+
+			if ((op2_insn->type == IR_ADDR && op1_insn->type != IR_ADDR)
+			 || op2_insn->op == IR_SYM
+			 || op2_insn->op == IR_ALLOCA
+			 || op2_insn->op == IR_VADDR) {
+				const ir_insn *tmp = op1_insn;
+				op1_insn = op2_insn;
+				op2_insn = tmp;
+				SWAP_REFS(op1, op2);
+		    }
+			if (IR_IS_CONST_REF(op2) && !IR_IS_SYM_CONST(op2_insn->op)) {
+				off += op2_insn->val.addr;
+				addr = op1;
+				insn = op1_insn;
+			} else if (!idx) {
+				addr = op1;
+				insn = op1_insn;
+				idx = op2;
+			} else {
+				goto exit;
+			}
+		} else if (insn->op == IR_SUB
+		 && IR_IS_CONST_REF(insn->op2)
+		 && !IR_IS_SYM_CONST(ctx->ir_base[insn->op2].op)) {
+			off -= ctx->ir_base[insn->op2].val.addr;
+			addr = insn->op1;
+			insn = &ctx->ir_base[insn->op1];
+		} else {
+			break;
+		}
 	}
 
-	insn1 = &ctx->ir_base[addr1];
-	insn2 = &ctx->ir_base[addr2];
-	if (insn1->op == IR_ADD && IR_IS_CONST_REF(insn1->op2)) {
-		if (insn1->op1 == addr2) {
-			uintptr_t offset1 = ctx->ir_base[insn1->op2].val.u64;
-			return (offset1 != 0) ? IR_MUST_ALIAS : IR_NO_ALIAS;
-		} else if (insn2->op == IR_ADD && IR_IS_CONST_REF(insn1->op2) && insn1->op1 == insn2->op1) {
-			if (insn1->op2 == insn2->op2) {
-				return IR_MUST_ALIAS;
-			} else if (IR_IS_CONST_REF(insn1->op2) && IR_IS_CONST_REF(insn2->op2)) {
-				uintptr_t offset1 = ctx->ir_base[insn1->op2].val.u64;
-				uintptr_t offset2 = ctx->ir_base[insn2->op2].val.u64;
+	if (idx) {
+		while (1) {
+			const ir_insn *insn = &ctx->ir_base[idx];
 
-				return (offset1 == offset2) ? IR_MUST_ALIAS : IR_NO_ALIAS;
+			if (insn->op == IR_ADD) {
+				if (IR_IS_CONST_REF(insn->op2)
+				 && !IR_IS_SYM_CONST(ctx->ir_base[insn->op2].op)) {
+					off += ctx->ir_base[insn->op2].val.addr;
+					idx = insn->op1;
+				} else {
+					break;
+				}
+			} else if (insn->op == IR_SUB
+			 && IR_IS_CONST_REF(insn->op2)
+			 && !IR_IS_SYM_CONST(ctx->ir_base[insn->op2].op)) {
+				off -= ctx->ir_base[insn->op2].val.addr;
+				idx = insn->op1;
+			} else {
+				break;
 			}
 		}
-	} else if (insn2->op == IR_ADD && IR_IS_CONST_REF(insn2->op2)) {
-		if (insn2->op1 == addr1) {
-			uintptr_t offset2 = ctx->ir_base[insn2->op2].val.u64;
+	}
 
-			return (offset2 != 0) ? IR_MUST_ALIAS : IR_NO_ALIAS;
+exit:
+	*base = addr;
+	*index = idx;
+	*offset = off;
+
+	return insn;
+}
+
+IR_ALWAYS_INLINE const ir_insn *ir_get_base_addr(const ir_ctx *ctx, const ir_insn *insn)
+{
+	while (1) {
+		if (insn->op == IR_ADD) {
+			ir_ref op1 = insn->op1;
+			ir_ref op2 = insn->op2;
+			const ir_insn *op1_insn = &ctx->ir_base[op1];
+			const ir_insn *op2_insn = &ctx->ir_base[op2];
+
+			if (op2_insn->op == IR_SYM || op2_insn->op == IR_ALLOCA || op2_insn->op == IR_VADDR) {
+				return op2_insn;
+			} else if (op2_insn->type == IR_ADDR && op1_insn->type != IR_ADDR) {
+				insn = op2_insn;
+		    } else {
+				insn = op1_insn;
+			}
+		} else if (insn->op == IR_SUB) {
+			insn = &ctx->ir_base[insn->op1];
+		} else {
+			break;
 		}
 	}
-	return IR_MAY_ALIAS;
+	return insn;
 }
-#endif
 
-ir_alias ir_check_partial_aliasing(const ir_ctx *ctx, ir_ref addr1, ir_ref addr2, ir_type type1, ir_type type2)
+static ir_alias ir_check_aliasing(const ir_ctx *ctx, ir_ref addr1, ir_ref addr2, ir_type type1, ir_type type2)
 {
 	const ir_insn *insn1, *insn2;
-	ir_ref base1, base2, off1, off2;
+	ir_ref base1, base2, index1, index2;
+	ssize_t offset1, offset2;
 
 	/* this must be already check */
 	IR_ASSERT(addr1 != addr2);
 
-	insn1 = &ctx->ir_base[addr1];
-	insn2 = &ctx->ir_base[addr2];
-	if (insn1->op != IR_ADD) {
-		base1 = addr1;
-		off1 = IR_UNUSED;
-	} else if (ctx->ir_base[insn1->op2].op == IR_SYM
-			|| ctx->ir_base[insn1->op2].op == IR_ALLOCA
-			|| ctx->ir_base[insn1->op2].op == IR_VADDR) {
-		base1 = insn1->op2;
-		off1 = insn1->op1;
-	} else {
-		base1 = insn1->op1;
-		off1 = insn1->op2;
-	}
-	if (insn2->op != IR_ADD) {
-		base2 = addr2;
-		off2 = IR_UNUSED;
-	} else if (ctx->ir_base[insn2->op2].op == IR_SYM
-			|| ctx->ir_base[insn2->op2].op == IR_ALLOCA
-			|| ctx->ir_base[insn2->op2].op == IR_VADDR) {
-		base2 = insn2->op2;
-		off2 = insn2->op1;
-	} else {
-		base2 = insn2->op1;
-		off2 = insn2->op2;
-	}
-	if (base1 == base2) {
-		uintptr_t offset1, offset2;
+	/* check if addresses overlap */
+	insn1 = ir_decompose_addr(ctx, addr1, &base1, &index1, &offset1);
+	insn2 = ir_decompose_addr(ctx, addr2, &base2, &index2, &offset2);
 
-		if (!off1) {
-			offset1 = 0;
-		} else if (IR_IS_CONST_REF(off1) && !IR_IS_SYM_CONST(ctx->ir_base[off1].op)) {
-			offset1 = ctx->ir_base[off1].val.addr;
-		} else {
+	if (base1 == base2) {
+		if (index1 != index2) {
 			return IR_MAY_ALIAS;
-		}
-		if (!off2) {
-			offset2 = 0;
-		} else if (IR_IS_CONST_REF(off2) && !IR_IS_SYM_CONST(ctx->ir_base[off2].op)) {
-			offset2 = ctx->ir_base[off2].val.addr;
-		} else {
-			return IR_MAY_ALIAS;
-		}
-		if (offset1 == offset2) {
+		} else if (offset1 == offset2) {
 			return IR_MUST_ALIAS;
 		} else if (offset1 < offset2) {
 			return offset1 + ir_type_size[type1] <= offset2 ? IR_NO_ALIAS : IR_MUST_ALIAS;
 		} else {
 			return offset2 + ir_type_size[type2] <= offset1 ? IR_NO_ALIAS : IR_MUST_ALIAS;
 		}
-	} else {
-		insn1 = &ctx->ir_base[base1];
-		insn2 = &ctx->ir_base[base2];
-		while (insn1->op == IR_ADD) {
-			insn1 = &ctx->ir_base[insn1->op2];
-			if (insn1->op == IR_SYM
-			 || insn1->op == IR_ALLOCA
-			 || insn1->op == IR_VADDR) {
-				break;
-			} else {
-				insn1 = &ctx->ir_base[insn1->op1];
-			}
-		}
-		while (insn2->op == IR_ADD) {
-			insn2 = &ctx->ir_base[insn2->op2];
-			if (insn2->op == IR_SYM
-			 || insn2->op == IR_ALLOCA
-			 || insn2->op == IR_VADDR) {
-				break;
-			} else {
-				insn2 = &ctx->ir_base[insn2->op1];
-			}
-		}
-		if (insn1 == insn2) {
-			return IR_MAY_ALIAS;
-		}
-		if ((insn1->op == IR_ALLOCA && (insn2->op == IR_ALLOCA || insn2->op == IR_VADDR || insn2->op == IR_SYM || insn2->op == IR_PARAM))
-		 || (insn1->op == IR_VADDR && (insn2->op == IR_ALLOCA || insn2->op == IR_VADDR || insn2->op == IR_SYM || insn2->op == IR_PARAM))
-		 || (insn1->op == IR_SYM && (insn2->op == IR_ALLOCA || insn2->op == IR_VADDR || insn2->op == IR_SYM))
-		 || (insn1->op == IR_PARAM && (insn2->op == IR_ALLOCA || insn2->op == IR_VADDR))) {
-			return IR_NO_ALIAS;
-		}
 	}
+
+	/* check if addresses lay in different memory areas (e.g. local variables cannot alias with arguments) */
+	insn1 = ir_get_base_addr(ctx, insn1);
+	insn2 = ir_get_base_addr(ctx, insn2);
+
+	if (insn1 == insn2 || insn1->type != IR_ADDR || insn2->type != IR_ADDR) {
+		return IR_MAY_ALIAS;
+	}
+
+	if ((insn1->op == IR_ALLOCA && (insn2->op == IR_ALLOCA || insn2->op == IR_VADDR || insn2->op == IR_SYM || insn2->op == IR_PARAM))
+	 || (insn1->op == IR_VADDR && (insn2->op == IR_ALLOCA || insn2->op == IR_VADDR || insn2->op == IR_SYM || insn2->op == IR_PARAM))
+	 || (insn1->op == IR_SYM && (insn2->op == IR_ALLOCA || insn2->op == IR_VADDR || insn2->op == IR_SYM))
+	 || (insn1->op == IR_PARAM && (insn2->op == IR_ALLOCA || insn2->op == IR_VADDR))) {
+		return IR_NO_ALIAS;
+	}
+
 	return IR_MAY_ALIAS;
 }
 
@@ -2153,7 +2166,7 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_load_i(const ir_ctx *ctx, ir_ref ref, i
 				} else {
 					return IR_UNUSED;
 				}
-			} else if (ir_check_partial_aliasing(ctx, addr, insn->op2, type, type2) != IR_NO_ALIAS) {
+			} else if (ir_check_aliasing(ctx, addr, insn->op2, type, type2) != IR_NO_ALIAS) {
 				return IR_UNUSED;
 			}
 		} else if (insn->op == IR_RSTORE) {
@@ -2342,7 +2355,7 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_store_i(ir_ctx *ctx, ir_ref ref, ir_ref
 			}
 			type2 = insn->type;
 check_aliasing:
-			if (ir_check_partial_aliasing(ctx, addr, insn->op2, type, type2) != IR_NO_ALIAS) {
+			if (ir_check_aliasing(ctx, addr, insn->op2, type, type2) != IR_NO_ALIAS) {
 				break;
 			}
 		} else if (insn->op == IR_GUARD || insn->op == IR_GUARD_NOT) {
