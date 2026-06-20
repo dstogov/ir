@@ -8,6 +8,7 @@
 # Usage from this directory:
 #   make            build every fuzz target
 #   make fuzz-text-O2
+#   make fuzz-graph-O2
 #   make corpus     extract the seed corpus from ../tests
 #   make clean
 
@@ -57,10 +58,12 @@ OBJS = $(addprefix $(BUILD_DIR)/, ir.o ir_strtab.o ir_cfg.o ir_sccp.o ir_gcm.o \
 
 TEXT_SRCS = fuzz_text.c fuzz_corpus.h $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h \
 	$(SRC_DIR)/ir_main.c $(BUILD_DIR)/libir.a
+GRAPH_SRCS = fuzz_graph.c fuzz_corpus.h $(SRC_DIR)/ir.h $(SRC_DIR)/ir_builder.h \
+	$(BUILD_DIR)/libir.a
 
 all: fuzz
 
-fuzz: fuzz-text-load fuzz-text-O0 fuzz-text-O1 fuzz-text-O2
+fuzz: fuzz-text-load fuzz-text-O0 fuzz-text-O1 fuzz-text-O2 fuzz-graph-O0 fuzz-graph-O1 fuzz-graph-O2
 
 $(BUILD_DIR):
 	@mkdir -p $@
@@ -100,6 +103,15 @@ fuzz-text-O1: $(TEXT_SRCS)
 fuzz-text-O2: $(TEXT_SRCS)
 	$(COMPILE) -DFUZZ_MODE_O2 -o $(BUILD_DIR)/$@ fuzz_text.c $(LIBS)
 
+fuzz-graph-O0: $(GRAPH_SRCS)
+	$(COMPILE) -DFUZZ_GRAPH_O0 -o $(BUILD_DIR)/$@ fuzz_graph.c $(LIBS)
+
+fuzz-graph-O1: $(GRAPH_SRCS)
+	$(COMPILE) -DFUZZ_GRAPH_O1 -o $(BUILD_DIR)/$@ fuzz_graph.c $(LIBS)
+
+fuzz-graph-O2: $(GRAPH_SRCS)
+	$(COMPILE) -DFUZZ_GRAPH_O2 -o $(BUILD_DIR)/$@ fuzz_graph.c $(LIBS)
+
 corpus:
 	./make_corpus.sh $(SRC_DIR)/tests corpus
 
@@ -109,4 +121,5 @@ clean:
 corpus-clean:
 	rm -rf corpus/text
 
-.PHONY: all fuzz fuzz-text-load fuzz-text-O0 fuzz-text-O1 fuzz-text-O2 corpus clean corpus-clean
+.PHONY: all fuzz fuzz-text-load fuzz-text-O0 fuzz-text-O1 fuzz-text-O2 \
+	fuzz-graph-O0 fuzz-graph-O1 fuzz-graph-O2 corpus clean corpus-clean
