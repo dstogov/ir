@@ -7,7 +7,7 @@
 #
 # Usage from this directory:
 #   make            build every fuzz target
-#   make fuzz-O2
+#   make fuzz-text-O2
 #   make corpus     extract the seed corpus from ../tests
 #   make clean
 
@@ -55,12 +55,12 @@ OBJS = $(addprefix $(BUILD_DIR)/, ir.o ir_strtab.o ir_cfg.o ir_sccp.o ir_gcm.o \
 	ir_ra.o ir_emit.o ir_load.o ir_save.o ir_emit_c.o ir_dump.o ir_disasm.o \
 	ir_gdb.o ir_perf.o ir_check.o ir_cpuinfo.o ir_emit_llvm.o ir_mem2ssa.o)
 
-TEXT_SRCS = fuzz_ir.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h \
+TEXT_SRCS = fuzz_text.c fuzz_corpus.h $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h \
 	$(SRC_DIR)/ir_main.c $(BUILD_DIR)/libir.a
 
 all: fuzz
 
-fuzz: fuzz-load fuzz-O0 fuzz-O1 fuzz-O2
+fuzz: fuzz-text-load fuzz-text-O0 fuzz-text-O1 fuzz-text-O2
 
 $(BUILD_DIR):
 	@mkdir -p $@
@@ -88,17 +88,17 @@ $(BUILD_DIR)/minilua: $(SRC_DIR)/dynasm/minilua.c | $(BUILD_DIR)
 $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h: $(SRC_DIR)/ir_$(DASM_ARCH).dasc $(SRC_DIR)/dynasm/*.lua $(BUILD_DIR)/minilua
 	$(BUILD_DIR)/minilua $(SRC_DIR)/dynasm/dynasm.lua $(DASM_FLAGS) -o $@ $(SRC_DIR)/ir_$(DASM_ARCH).dasc
 
-fuzz-load: $(TEXT_SRCS)
-	$(COMPILE) -DFUZZ_MODE_LOAD -o $(BUILD_DIR)/$@ fuzz_ir.c $(LIBS)
+fuzz-text-load: $(TEXT_SRCS)
+	$(COMPILE) -DFUZZ_MODE_LOAD -o $(BUILD_DIR)/$@ fuzz_text.c $(LIBS)
 
-fuzz-O0: $(TEXT_SRCS)
-	$(COMPILE) -DFUZZ_MODE_O0 -o $(BUILD_DIR)/$@ fuzz_ir.c $(LIBS)
+fuzz-text-O0: $(TEXT_SRCS)
+	$(COMPILE) -DFUZZ_MODE_O0 -o $(BUILD_DIR)/$@ fuzz_text.c $(LIBS)
 
-fuzz-O1: $(TEXT_SRCS)
-	$(COMPILE) -DFUZZ_MODE_O1 -o $(BUILD_DIR)/$@ fuzz_ir.c $(LIBS)
+fuzz-text-O1: $(TEXT_SRCS)
+	$(COMPILE) -DFUZZ_MODE_O1 -o $(BUILD_DIR)/$@ fuzz_text.c $(LIBS)
 
-fuzz-O2: $(TEXT_SRCS)
-	$(COMPILE) -DFUZZ_MODE_O2 -o $(BUILD_DIR)/$@ fuzz_ir.c $(LIBS)
+fuzz-text-O2: $(TEXT_SRCS)
+	$(COMPILE) -DFUZZ_MODE_O2 -o $(BUILD_DIR)/$@ fuzz_text.c $(LIBS)
 
 corpus:
 	./make_corpus.sh $(SRC_DIR)/tests corpus
@@ -107,6 +107,6 @@ clean:
 	rm -rf $(BUILD_DIR)
 
 corpus-clean:
-	rm -rf corpus
+	rm -rf corpus/text
 
-.PHONY: all fuzz fuzz-load fuzz-O0 fuzz-O1 fuzz-O2 corpus clean corpus-clean
+.PHONY: all fuzz fuzz-text-load fuzz-text-O0 fuzz-text-O1 fuzz-text-O2 corpus clean corpus-clean
