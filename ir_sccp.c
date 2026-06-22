@@ -3545,6 +3545,25 @@ static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref con
 		if (!IR_IS_SYM_CONST(val_insn->op) && val_insn->val.u64 == 1) {
 			return IR_TRUE;
 		}
+	} else if (condition_insn->op == IR_AND && IR_IS_CONST_REF(condition_insn->op2)) {
+		ir_insn *val_insn = &ctx->ir_base[condition_insn->op2];
+		ir_insn *op1_insn = &ctx->ir_base[condition_insn->op1];
+
+		if (!IR_IS_SYM_CONST(val_insn->op)
+		 && ctx->use_lists[condition].count == 1
+		 && ctx->use_lists[condition_insn->op1].count == 1
+		 && (op1_insn->op == IR_ZEXT || op1_insn->op == IR_SEXT)
+		 && val_insn->val.u64 <= (((uint64_t)-1ULL) >> (64 - ir_type_size[ctx->ir_base[op1_insn->op1].type] * 8))) {
+			/* IF(AND(ZEXT(X), C)) => IF(AND(X, C)) */
+			ir_use_list_replace_one(ctx, op1_insn->op1, condition_insn->op1, condition);
+			CLEAR_USES(condition_insn->op1);
+			condition_insn->type = ctx->ir_base[op1_insn->op1].type;
+			condition_insn->op1 = op1_insn->op1;
+			condition_insn->op2 = ir_const(ctx, val_insn->val, condition_insn->type);
+			ir_bitqueue_add(ctx->iter_worklist, condition);
+			MAKE_NOP(op1_insn);
+			return condition;
+		}
 	}
 
 	while ((condition_insn->op == IR_BITCAST
