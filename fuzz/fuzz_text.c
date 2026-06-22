@@ -26,6 +26,9 @@
 # include <process.h>
 #endif
 
+#define FUZZ_CORPUS_DIR "corpus/text"
+#include "fuzz_corpus.h"
+
 #if !defined(FUZZ_MODE_LOAD) && !defined(FUZZ_MODE_O0) && \
     !defined(FUZZ_MODE_O1) && !defined(FUZZ_MODE_O2)
 # define FUZZ_MODE_LOAD

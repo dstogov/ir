@@ -524,7 +524,7 @@ IR_FOLD(MUL(C_U8, C_U8))
 IR_FOLD(MUL(C_U16, C_U16))
 {
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
-	IR_FOLD_CONST_U(op1_insn->val.u16 * op2_insn->val.u16);
+	IR_FOLD_CONST_U((uint32_t)op1_insn->val.u16 * (uint32_t)op2_insn->val.u16);
 }
 
 IR_FOLD(MUL(C_U32, C_U32))
@@ -2216,7 +2216,7 @@ IR_FOLD(DIV(NEG, C_I32))
 IR_FOLD(DIV(NEG, C_I64))
 {
 	op1 = op1_insn->op1;
-	val.i64 = -op2_insn->val.i64;
+	val.i64 = -(uint64_t)op2_insn->val.i64;
 	op2 = ir_const(ctx, val, op2_insn->type);
 	IR_FOLD_RESTART;
 }
