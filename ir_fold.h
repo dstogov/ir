@@ -2319,6 +2319,12 @@ IR_FOLD(DIV(_, C_U64))
 {
 	if (op2_insn->val.u64 == 1) {
 		IR_FOLD_COPY(op1);
+	} else if (IR_IS_POWER_OF_TWO(op2_insn->val.u64)) {
+		/* a / C => a >> log2(C) ; C is power of 2 */
+		val.u64 = IR_LOG2(op2_insn->val.u64);;
+		op2 = ir_const(ctx, val, IR_OPT_TYPE(opt));
+		opt = IR_SHR | (opt & IR_OPT_TYPE_MASK);
+		IR_FOLD_RESTART;
 	}
 	IR_FOLD_NEXT;
 }
@@ -2336,6 +2342,13 @@ IR_FOLD(DIV(_, C_I64))
 		opt = IR_NEG | (opt & IR_OPT_TYPE_MASK);
 		op2 = IR_UNUSED;
 		IR_FOLD_RESTART;
+		IR_FOLD_COPY(op1);
+	} else if (IR_IS_POWER_OF_TWO(op2_insn->val.u64) && op1_insn->op == IR_ZEXT) {
+		/* a / C => a >> log2(C) ; C is power of 2 */
+		val.u64 = IR_LOG2(op2_insn->val.u64);;
+		op2 = ir_const(ctx, val, IR_OPT_TYPE(opt));
+		opt = IR_SHR | (opt & IR_OPT_TYPE_MASK);
+		IR_FOLD_RESTART;
 	}
 	IR_FOLD_NEXT;
 }
@@ -2352,6 +2365,13 @@ IR_FOLD(MOD(_, C_I64))
 	if (op2_insn->val.i64 == 1) {
 		/* a % 1 => 0 */
 		IR_FOLD_CONST_U(0);
+	} else if (IR_IS_POWER_OF_TWO(op2_insn->val.u64)
+	 && (IR_IS_TYPE_UNSIGNED(IR_OPT_TYPE(opt)) || op1_insn->op == IR_ZEXT)) {
+		/* a % C => a & (C - 1) ; C is power of 2 */
+		val.u64 = op2_insn->val.u64 - 1;
+		op2 = ir_const(ctx, val, IR_OPT_TYPE(opt));
+		opt = IR_AND | (opt & IR_OPT_TYPE_MASK);
+		IR_FOLD_RESTART;
 	}
 	IR_FOLD_NEXT;
 }
