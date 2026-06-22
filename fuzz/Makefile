@@ -12,49 +12,22 @@
 #   make corpus     extract the seed corpus from ../tests
 #   make clean
 
-TARGET     = $(shell uname -m)
-OS         = $(shell uname -s)
-
 SRC_DIR    = ..
 BUILD_DIR  = build
 
 CC         = clang
-BUILD_CC   = gcc
 
 CFLAGS        = -Wall -Wextra -Wno-unused-parameter -g -O1 -DIR_DEBUG=1
-BUILD_CFLAGS  = -Wall -Wextra -Wno-unused-parameter -O2 -g
 
 UBSAN_IGNORE =
 IGNORELIST   = $(if $(wildcard $(UBSAN_IGNORE)),-fsanitize-ignorelist=$(UBSAN_IGNORE))
 SANITIZE     = -fsanitize=address,undefined -fno-sanitize-recover=all $(IGNORELIST)
 FUZZER       = -fsanitize=fuzzer
 
-ifneq (, $(filter x86_64 amd64, $(TARGET)))
-  CFLAGS       += -m64 -DIR_TARGET_X64
-  BUILD_CFLAGS += -m64 -DIR_TARGET_X64
-  DASM_ARCH  = x86
-  DASM_FLAGS = -M -D X64=1
-else ifneq (, $(filter x86 i386, $(TARGET)))
-  CFLAGS       += -m32 -DIR_TARGET_X86
-  BUILD_CFLAGS += -m32 -DIR_TARGET_X86
-  DASM_ARCH  = x86
-  DASM_FLAGS = -M
-else ifneq (, $(filter aarch64 arm64, $(TARGET)))
-  CFLAGS       += -DIR_TARGET_AARCH64
-  BUILD_CFLAGS += -DIR_TARGET_AARCH64
-  DASM_ARCH  = aarch64
-  DASM_FLAGS = -M
-else
-  $(error Unsupported target. TARGET must be 'x86_64', 'x86' or 'aarch64')
-endif
-
 COMPILE = $(CC) $(CFLAGS) $(SANITIZE) $(FUZZER) -DFUZZ_LIBFUZZER \
 	-I$(SRC_DIR) -I$(BUILD_DIR) -L$(BUILD_DIR)
-LIBS = -lir -lcapstone -lm
 
-OBJS = $(addprefix $(BUILD_DIR)/, ir.o ir_strtab.o ir_cfg.o ir_sccp.o ir_gcm.o \
-	ir_ra.o ir_emit.o ir_load.o ir_save.o ir_emit_c.o ir_dump.o ir_disasm.o \
-	ir_gdb.o ir_perf.o ir_check.o ir_cpuinfo.o ir_emit_llvm.o ir_mem2ssa.o)
+LIBS = -lir -lcapstone -lm
 
 TEXT_SRCS = fuzz_text.c fuzz_corpus.h $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h \
 	$(SRC_DIR)/ir_main.c $(BUILD_DIR)/libir.a
@@ -68,28 +41,17 @@ fuzz: fuzz-text-load fuzz-text-O0 fuzz-text-O1 fuzz-text-O2 fuzz-graph-O0 fuzz-g
 $(BUILD_DIR):
 	@mkdir -p $@
 
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(SANITIZE) $(FUZZER) -I$(BUILD_DIR) -o $@ -c $<
-
-$(BUILD_DIR)/ir.o: $(SRC_DIR)/ir_fold.h $(BUILD_DIR)/ir_fold_hash.h
-$(BUILD_DIR)/ir_ra.o: $(SRC_DIR)/ir_$(DASM_ARCH).h
-$(BUILD_DIR)/ir_emit.o: $(SRC_DIR)/ir_$(DASM_ARCH).h $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h
-$(BUILD_DIR)/ir_gdb.o: $(SRC_DIR)/ir_elf.h
-$(BUILD_DIR)/ir_perf.o: $(SRC_DIR)/ir_elf.h
-$(BUILD_DIR)/ir_disasm.o: $(SRC_DIR)/ir_elf.h
-
-$(BUILD_DIR)/libir.a: $(OBJS)
-	ar r $@ $^
-
-$(BUILD_DIR)/ir_fold_hash.h: $(BUILD_DIR)/gen_ir_fold_hash $(SRC_DIR)/ir_fold.h $(SRC_DIR)/ir.h
-	$(BUILD_DIR)/gen_ir_fold_hash < $(SRC_DIR)/ir_fold.h > $@
-$(BUILD_DIR)/gen_ir_fold_hash: $(SRC_DIR)/gen_ir_fold_hash.c $(SRC_DIR)/ir_strtab.c $(SRC_DIR)/ir.h | $(BUILD_DIR)
-	$(BUILD_CC) $(BUILD_CFLAGS) -o $@ $<
-
-$(BUILD_DIR)/minilua: $(SRC_DIR)/dynasm/minilua.c | $(BUILD_DIR)
-	$(BUILD_CC) -O2 -g $(SRC_DIR)/dynasm/minilua.c -lm -o $@
-$(BUILD_DIR)/ir_emit_$(DASM_ARCH).h: $(SRC_DIR)/ir_$(DASM_ARCH).dasc $(SRC_DIR)/dynasm/*.lua $(BUILD_DIR)/minilua
-	$(BUILD_DIR)/minilua $(SRC_DIR)/dynasm/dynasm.lua $(DASM_FLAGS) -o $@ $(SRC_DIR)/ir_$(DASM_ARCH).dasc
+$(BUILD_DIR)/libir.a: $(SRC_DIR)/ir.c $(SRC_DIR)/ir_strtab.c $(SRC_DIR)/ir_cfg.c \
+	$(SRC_DIR)/ir_sccp.c $(SRC_DIR)/ir_gcm.c $(SRC_DIR)/ir_ra.c $(SRC_DIR)/ir_emit.c \
+	$(SRC_DIR)/ir_load.c $(SRC_DIR)/ir_save.c $(SRC_DIR)/ir_emit_c.c $(SRC_DIR)/ir_dump.c \
+	$(SRC_DIR)/ir_disasm.c $(SRC_DIR)/ir_gdb.c $(SRC_DIR)/ir_perf.c $(SRC_DIR)/ir_check.c \
+	$(SRC_DIR)/ir_cpuinfo.c $(SRC_DIR)/ir_emit_llvm.c $(SRC_DIR)/ir_mem2ssa.c \
+	$(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h $(SRC_DIR)/ir_x86.h $(SRC_DIR)/ir_aarch64.h \
+	$(SRC_DIR)/ir_elf.h $(SRC_DIR)/ir_builder.h  \
+	$(SRC_DIR)/ir_fold.h $(SRC_DIR)/ir_x86.dasc $(SRC_DIR)/ir_aarch64.dasc | $(BUILD_DIR)
+	make -f $(SRC_DIR)/Makefile $(BUILD_DIR)/libir.a \
+		CC=$(CC) SRC_DIR=$(SRC_DIR) BUILD_DIR=$(BUILD_DIR) \
+		CFLAGS="$(CFLAGS) $(SANITIZE) $(FUZZER) -DFUZZ_LIBFUZZER"
 
 fuzz-text-load: $(TEXT_SRCS)
 	$(COMPILE) -DFUZZ_MODE_LOAD -o $(BUILD_DIR)/$@ fuzz_text.c $(LIBS)
