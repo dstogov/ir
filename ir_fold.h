@@ -1665,6 +1665,62 @@ IR_FOLD(NE(_, C_BOOL))
 	}
 }
 
+IR_FOLD(EQ(BITCAST, C_U8))
+IR_FOLD(EQ(BITCAST, C_U16))
+IR_FOLD(EQ(BITCAST, C_U32))
+IR_FOLD(EQ(BITCAST, C_U64))
+IR_FOLD(EQ(BITCAST, C_I8))
+IR_FOLD(EQ(BITCAST, C_I16))
+IR_FOLD(EQ(BITCAST, C_I32))
+IR_FOLD(EQ(BITCAST, C_I64))
+IR_FOLD(EQ(BITCAST, C_ADDR))
+IR_FOLD(EQ(BITCAST, C_CHAR))
+IR_FOLD(NE(BITCAST, C_U8))
+IR_FOLD(NE(BITCAST, C_U16))
+IR_FOLD(NE(BITCAST, C_U32))
+IR_FOLD(NE(BITCAST, C_U64))
+IR_FOLD(NE(BITCAST, C_I8))
+IR_FOLD(NE(BITCAST, C_I16))
+IR_FOLD(NE(BITCAST, C_I32))
+IR_FOLD(NE(BITCAST, C_I64))
+IR_FOLD(NE(BITCAST, C_ADDR))
+IR_FOLD(NE(BITCAST, C_CHAR))
+{
+	ir_type type = ctx->ir_base[op1_insn->op1].type;
+	if (type == IR_BOOL) {
+		if ((((opt & IR_OPT_OP_MASK) == IR_NE) && (op2_insn->val.u64 == 1))
+		 || (((opt & IR_OPT_OP_MASK) == IR_EQ) && (op2_insn->val.u64 == 0))) {
+			opt = IR_OPT(IR_NOT, IR_BOOL);
+			op1 = op1_insn->op1;
+			op2 = IR_UNUSED;
+			IR_FOLD_RESTART;
+		} else if ((((opt & IR_OPT_OP_MASK) == IR_NE) && (op2_insn->val.u64 == 0))
+				|| (((opt & IR_OPT_OP_MASK) == IR_EQ) && (op2_insn->val.u64 == 1))) {
+			IR_FOLD_COPY(op1_insn->op1);
+		}
+	} else if (IR_IS_TYPE_INT(type)) {
+		op1 = op1_insn->op1;
+		if (IR_IS_TYPE_SIGNED(type)) {
+			switch (ir_type_size[type]) {
+				case 1:  val.i64 = op2_insn->val.i8;  break;
+				case 2:  val.i64 = op2_insn->val.i16; break;
+				case 4:  val.i64 = op2_insn->val.i32; break;
+				default: val.u64 = op2_insn->val.u64; break;
+			 }
+		} else {
+			switch (ir_type_size[type]) {
+				case 1:  val.u64 = op2_insn->val.u8;  break;
+				case 2:  val.u64 = op2_insn->val.u16; break;
+				case 4:  val.u64 = op2_insn->val.u32; break;
+				default: val.u64 = op2_insn->val.u64; break;
+			 }
+		}
+		op2 = ir_const(ctx, val, type);
+		IR_FOLD_RESTART;
+	}
+	IR_FOLD_NEXT;
+}
+
 IR_FOLD(EQ(ZEXT, C_U16))
 IR_FOLD(EQ(ZEXT, C_U32))
 IR_FOLD(EQ(ZEXT, C_U64))
@@ -1755,13 +1811,15 @@ IR_FOLD(GT(SEXT, C_ADDR))
 	} else {
 		ir_type type = ctx->ir_base[op1_insn->op1].type;
 
-		if (type == IR_BOOL && op2_insn->val.u64 == 0) {
-			if ((opt & IR_OPT_OP_MASK) == IR_EQ) {
+		if (type == IR_BOOL) {
+			if ((((opt & IR_OPT_OP_MASK) == IR_NE) && (op2_insn->val.u64 == 1))
+			 || (((opt & IR_OPT_OP_MASK) == IR_EQ) && (op2_insn->val.u64 == 0))) {
 				opt = IR_OPT(IR_NOT, IR_BOOL);
 				op1 = op1_insn->op1;
 				op2 = IR_UNUSED;
 				IR_FOLD_RESTART;
-			} else if ((opt & IR_OPT_OP_MASK) == IR_NE) {
+			} else if ((((opt & IR_OPT_OP_MASK) == IR_NE) && (op2_insn->val.u64 == 0))
+					|| (((opt & IR_OPT_OP_MASK) == IR_EQ) && (op2_insn->val.u64 == 1))) {
 				IR_FOLD_COPY(op1_insn->op1);
 			}
 		}
