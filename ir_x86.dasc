@@ -3658,7 +3658,7 @@ store_int:
 					ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_OVERFLOW;
 					return IR_GUARD_OVERFLOW;
 #if IR_X86_I64
-				} else if (op2_insn->type != IR_I64 || op2_insn->type != IR_U64) {
+				} else if (op2_insn->type == IR_I64 || op2_insn->type == IR_U64) {
 					/* pass */
 #endif
 				} else if (op2_insn->op == IR_AND) { // TODO: OR, XOR. etc
@@ -3670,7 +3670,7 @@ store_int:
 			}
 			ir_match_fuse_load(ctx, insn->op2, ref);
 #if IR_X86_I64
-			if (op2_insn->type != IR_I64 || op2_insn->type != IR_U64) {
+			if (ctx->ir_base[insn->op2].type == IR_I64 || ctx->ir_base[insn->op2].type == IR_U64) {
 				return IR_GUARD_I64;
 			}
 #endif
