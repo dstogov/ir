@@ -3545,46 +3545,77 @@ static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref con
 		if (!IR_IS_SYM_CONST(val_insn->op) && val_insn->val.u64 == 1) {
 			return IR_TRUE;
 		}
-	} else if (condition_insn->op == IR_SHR && IR_IS_CONST_REF(condition_insn->op2)) {
-		ir_insn *val_insn = &ctx->ir_base[condition_insn->op2];
+	} else if (ctx->use_lists[condition].count == 1
+			&& condition_insn->op == IR_SHR
+			&& IR_IS_CONST_REF(condition_insn->op2)
+			&& !IR_IS_SYM_CONST(ctx->ir_base[condition_insn->op2].op)) {
+		uint64_t c1, c2 = ctx->ir_base[condition_insn->op2].val.u64;
 		ir_insn *op1_insn = &ctx->ir_base[condition_insn->op1];
+		ir_val val;
 
-		if (!IR_IS_SYM_CONST(val_insn->op)
-		 && ctx->use_lists[condition].count == 1
-		 && ctx->use_lists[condition_insn->op1].count == 1
+		if (ctx->use_lists[condition_insn->op1].count == 1
 		 && op1_insn->op == IR_SHL
 		 && IR_IS_CONST_REF(op1_insn->op2)
 		 && !IR_IS_SYM_CONST(ctx->ir_base[op1_insn->op2].op)) {
 			/* IF(SHR(SHL(X, C1), C2)) => IF(AND(X, ((-1) << C2) >> C1) */
-			ir_insn *val2_insn = &ctx->ir_base[op1_insn->op2];
-			ir_val val;
-
+			c1 = ctx->ir_base[op1_insn->op2].val.u64;
 			if (op1_insn->op1 > 0) {
 				ir_use_list_replace_one(ctx, op1_insn->op1, condition_insn->op1, condition);
 			}
 			CLEAR_USES(condition_insn->op1);
-			switch (ir_type_size[condition_insn->type]) {
-				case 1:
-					val.u64 = (uint8_t)((uint8_t)((uint8_t)(-1) << (val_insn->val.u8 & 7)) >> (val2_insn->val.u8 & 7));
-					break;
-				case 2:
-					val.u64 = (uint16_t)((uint16_t)((uint16_t)(-1) << (val_insn->val.u16 & 0xf)) >> (val2_insn->val.u16 & 0xf));
-					break;
-				case 4:
-					val.u64 = (uint32_t)((uint32_t)((uint32_t)(-1) << (val_insn->val.u32 & 0x1f)) >> (val2_insn->val.u32 & 0x1f));
-					break;
-				case 8:
-					val.u64 = (((uint64_t)(-1) << (val_insn->val.u64 & 0x3f)) >> (val2_insn->val.u64 & 0x3f));
-					break;
-				default:
-					IR_ASSERT(0);
-			}
-			condition_insn->op = IR_AND;
 			condition_insn->op1 = op1_insn->op1;
-			condition_insn->op2 = ir_const(ctx, val, condition_insn->type);
 			MAKE_NOP(op1_insn);
+		} else if (ctx->use_lists[condition_insn->op1].count == 1
+		 && op1_insn->op == IR_ADD
+		 && op1_insn->op1 == op1_insn->op2) {
+			/* IF(SHR(ADD(X, X), C2)) => IF(AND(X, ((-1) << C2) >> 1) */
+			c1 = 1;
+			if (op1_insn->op1 > 0) {
+				ir_use_list_replace_one(ctx, op1_insn->op1, condition_insn->op1, condition);
+				ir_use_list_remove_one(ctx, op1_insn->op1, condition_insn->op1);
+			}
+			CLEAR_USES(condition_insn->op1);
+			condition_insn->op1 = op1_insn->op1;
+			MAKE_NOP(op1_insn);
+		} else if (ctx->use_lists[condition_insn->op1].count == 1
+		 && op1_insn->op == IR_MUL
+		 && IR_IS_CONST_REF(op1_insn->op2)
+		 && !IR_IS_SYM_CONST(ctx->ir_base[op1_insn->op2].op)
+		 && IR_IS_POWER_OF_TWO(ctx->ir_base[op1_insn->op2].val.u64)) {
+			/* IF(SHR(MUL(X, C1), C2)) => IF(AND(X, ((-1) << C2) >> log2(C1)) */
+			c1 = IR_LOG2(ctx->ir_base[op1_insn->op2].val.u64);
+			if (op1_insn->op1 > 0) {
+				ir_use_list_replace_one(ctx, op1_insn->op1, condition_insn->op1, condition);
+			}
+			CLEAR_USES(condition_insn->op1);
+			condition_insn->op1 = op1_insn->op1;
+			MAKE_NOP(op1_insn);
+		} else {
+			/* IF(SHR(X, C2)) => IF(AND(X, (-1) << C2) */
+			c1 = 0;
 		}
+
+		switch (ir_type_size[condition_insn->type]) {
+			case 1:
+				val.u64 = (uint8_t)((uint8_t)((uint8_t)(-1) << ((uint8_t)c2 & 7)) >> ((uint8_t)c1 & 7));
+				break;
+			case 2:
+				val.u64 = (uint16_t)((uint16_t)((uint16_t)(-1) << ((uint16_t)c2 & 0xf)) >> ((uint16_t)c1 & 0xf));
+				break;
+			case 4:
+				val.u64 = (uint32_t)((uint32_t)((uint32_t)(-1) << ((uint32_t)c2 & 0x1f)) >> ((uint32_t)c1 & 0x1f));
+				break;
+			case 8:
+				val.u64 = (((uint64_t)(-1) << (c2 & 0x3f)) >> (c1 & 0x3f));
+				break;
+			default:
+				IR_ASSERT(0);
+		}
+
+		condition_insn->op = IR_AND;
+		condition_insn->op2 = ir_const(ctx, val, condition_insn->type);
 	}
+
 	if (condition_insn->op == IR_AND && IR_IS_CONST_REF(condition_insn->op2)) {
 		ir_insn *val_insn = &ctx->ir_base[condition_insn->op2];
 		ir_insn *op1_insn = &ctx->ir_base[condition_insn->op1];
