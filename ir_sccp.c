@@ -3545,16 +3545,16 @@ static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref con
 		if (!IR_IS_SYM_CONST(val_insn->op) && val_insn->val.u64 == 1) {
 			return IR_TRUE;
 		}
-	} else if (ctx->use_lists[condition].count == 1
-			&& condition_insn->op == IR_SHR
+	} else if (condition_insn->op == IR_SHR
+			&& ctx->use_lists[condition].count == 1
 			&& IR_IS_CONST_REF(condition_insn->op2)
 			&& !IR_IS_SYM_CONST(ctx->ir_base[condition_insn->op2].op)) {
 		uint64_t c1, c2 = ctx->ir_base[condition_insn->op2].val.u64;
 		ir_insn *op1_insn = &ctx->ir_base[condition_insn->op1];
 		ir_val val;
 
-		if (ctx->use_lists[condition_insn->op1].count == 1
-		 && op1_insn->op == IR_SHL
+		if (op1_insn->op == IR_SHL
+		 && ctx->use_lists[condition_insn->op1].count == 1
 		 && IR_IS_CONST_REF(op1_insn->op2)
 		 && !IR_IS_SYM_CONST(ctx->ir_base[op1_insn->op2].op)) {
 			/* IF(SHR(SHL(X, C1), C2)) => IF(AND(X, ((-1) << C2) >> C1) */
@@ -3565,8 +3565,8 @@ static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref con
 			CLEAR_USES(condition_insn->op1);
 			condition_insn->op1 = op1_insn->op1;
 			MAKE_NOP(op1_insn);
-		} else if (ctx->use_lists[condition_insn->op1].count == 1
-		 && op1_insn->op == IR_ADD
+		} else if (op1_insn->op == IR_ADD
+		 && ctx->use_lists[condition_insn->op1].count == 1
 		 && op1_insn->op1 == op1_insn->op2) {
 			/* IF(SHR(ADD(X, X), C2)) => IF(AND(X, ((-1) << C2) >> 1) */
 			c1 = 1;
@@ -3577,8 +3577,8 @@ static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref con
 			CLEAR_USES(condition_insn->op1);
 			condition_insn->op1 = op1_insn->op1;
 			MAKE_NOP(op1_insn);
-		} else if (ctx->use_lists[condition_insn->op1].count == 1
-		 && op1_insn->op == IR_MUL
+		} else if (op1_insn->op == IR_MUL
+		 && ctx->use_lists[condition_insn->op1].count == 1
 		 && IR_IS_CONST_REF(op1_insn->op2)
 		 && !IR_IS_SYM_CONST(ctx->ir_base[op1_insn->op2].op)
 		 && IR_IS_POWER_OF_TWO(ctx->ir_base[op1_insn->op2].val.u64)) {
