@@ -19,7 +19,6 @@
 	- PI should not be lifted to BB with PHIs
 
 ?  instruction selection
-	- btl=IN
     - BURS ???
 
 ?  register allocation
