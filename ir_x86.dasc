@@ -13349,7 +13349,8 @@ static void ir_emit_zext_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	def_reg_hi = IR_REG_I64_HI(def_reg);
 	def_reg = IR_REG_I64_LO(def_reg);
 	if (ir_type_size[ctx->ir_base[insn->op1].type] < 4) {
-		ir_emit_zext_common(ctx, def, insn, IR_I32, IR_I32, 4, def_reg);
+		ir_type src_type = ctx->ir_base[insn->op1].type;
+		ir_emit_zext_common(ctx, def, insn, IR_I32, src_type, ir_type_size[src_type], def_reg);
 	} else if (op1_reg != def_reg) {
 		if (op1_reg != IR_REG_NONE && !IR_REG_SPILLED(op1_reg)) {
 			|	mov Rd(def_reg), Rd(op1_reg)
