@@ -1248,6 +1248,7 @@ const ir_call_conv_dsc ir_call_conv_x86_fastcall = {
 	_(SSE_TRUNC)           \
 	_(SSE_NEARBYINT)       \
 	_(BIT_OP)              \
+	_(AND_ZEXT)            \
 	_(IGOTO_DUP)           \
 
 #if IR_X86_I64
@@ -1721,6 +1722,7 @@ get_arg_hints:
 		case IR_COPY_FP:
 		case IR_SEXT:
 		case IR_ZEXT:
+		case IR_AND_ZEXT:
 		case IR_TRUNC:
 		case IR_PROTO:
 		case IR_FP2FP:
@@ -2897,6 +2899,13 @@ binop_fp:
 				} else if (IR_IS_POWER_OF_TWO(~op2_insn->val.u64) && !IR_IS_SIGNED_32BIT(op2_insn->val.i64)) {
 					/* AND(X, ~PWR2) => BTR */
 					return IR_BIT_OP;
+#ifdef IR_TARGET_X64
+				} else if (op2_insn->val.u64 == 0xff || op2_insn->val.u64 == 0xffff || op2_insn->val.u64 == 0xffffffff) {
+#else
+				} else if (op2_insn->val.u64 == 0xffff) {
+#endif
+					/* AND(X, 0xff) => MOVZX */
+					return IR_AND_ZEXT;
 				}
 			}
 			goto binop_int;
@@ -8208,16 +8217,15 @@ static void ir_emit_sext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
-static void ir_emit_zext_common(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_type dst_type, ir_reg def_reg)
+static void ir_emit_zext_common(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_type dst_type, ir_type src_type, uint8_t src_size, ir_reg def_reg)
 {
-	ir_type src_type = ctx->ir_base[insn->op1].type;
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg op1_reg = ctx->regs[def][1];
 
 	IR_ASSERT(IR_IS_TYPE_INT(src_type));
 	IR_ASSERT(IR_IS_TYPE_INT(dst_type));
-	IR_ASSERT(ir_type_size[dst_type] > ir_type_size[src_type]);
+	IR_ASSERT(ir_type_size[dst_type] > src_size);
 	IR_ASSERT(def_reg != IR_REG_NONE);
 
 	if (op1_reg != IR_REG_NONE) {
@@ -8225,7 +8233,7 @@ static void ir_emit_zext_common(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_type 
 			op1_reg = IR_REG_NUM(op1_reg);
 			ir_emit_load(ctx, src_type, op1_reg, insn->op1);
 		}
-		if (ir_type_size[src_type] == 1) {
+		if (src_size == 1) {
 			if (ir_type_size[dst_type] == 2) {
 				|	movzx Rw(def_reg), Rb(op1_reg)
 			} else if (ir_type_size[dst_type] == 4) {
@@ -8237,7 +8245,7 @@ static void ir_emit_zext_common(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_type 
 				|	movzx Rq(def_reg), Rb(op1_reg)
 |.endif
 			}
-		} else if (ir_type_size[src_type] == 2) {
+		} else if (src_size == 2) {
 			if (ir_type_size[dst_type] == 4) {
 				|	movzx Rd(def_reg), Rw(op1_reg)
 			} else {
@@ -8248,7 +8256,7 @@ static void ir_emit_zext_common(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_type 
 |.endif
 			}
 		} else {
-			IR_ASSERT(ir_type_size[src_type] == 4);
+			IR_ASSERT(src_size == 4);
 			IR_ASSERT(ir_type_size[dst_type] == 8);
 			IR_ASSERT(sizeof(void*) == 8);
 |.if X64
@@ -8261,14 +8269,14 @@ static void ir_emit_zext_common(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_type 
 	} else if (IR_IS_CONST_REF(insn->op1)) {
 		uint64_t val;
 
-		if (ir_type_size[src_type] == 1)  {
+		if (src_size == 1)  {
 			val = ctx->ir_base[insn->op1].val.u8;
-		} else if (ir_type_size[src_type] == 2) {
+		} else if (src_size == 2) {
 			val = ctx->ir_base[insn->op1].val.u16;
-		} else if (ir_type_size[src_type] == 4) {
+		} else if (src_size == 4) {
 			val = ctx->ir_base[insn->op1].val.u32;
 		} else {
-			IR_ASSERT(ir_type_size[src_type] == 8);
+			IR_ASSERT(src_size == 8);
 			val = ctx->ir_base[insn->op1].val.u64;
 		}
 		ir_emit_mov_imm_int(ctx, dst_type, def_reg, val);
@@ -8281,7 +8289,7 @@ static void ir_emit_zext_common(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_type 
 			mem = ir_ref_spill_slot(ctx, insn->op1);
 		}
 
-		if (ir_type_size[src_type] == 1) {
+		if (src_size == 1) {
 			if (ir_type_size[dst_type] == 2) {
 				|	ASM_TXT_TMEM_OP movzx, Rw(def_reg), byte, mem
 			} else if (ir_type_size[dst_type] == 4) {
@@ -8293,7 +8301,7 @@ static void ir_emit_zext_common(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_type 
 				|	ASM_TXT_TMEM_OP movzx, Rq(def_reg), byte, mem
 |.endif
 			}
-		} else if (ir_type_size[src_type] == 2) {
+		} else if (src_size == 2) {
 			if (ir_type_size[dst_type] == 4) {
 				|	ASM_TXT_TMEM_OP movzx, Rd(def_reg), word, mem
 			} else {
@@ -8304,7 +8312,7 @@ static void ir_emit_zext_common(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_type 
 |.endif
 			}
 		} else {
-			IR_ASSERT(ir_type_size[src_type] == 4);
+			IR_ASSERT(src_size == 4);
 			IR_ASSERT(ir_type_size[dst_type] == 8);
 |.if X64
 			|	ASM_TXT_TMEM_OP mov, Rd(def_reg), dword, mem
@@ -8315,7 +8323,29 @@ static void ir_emit_zext_common(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_type 
 
 static void ir_emit_zext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
-	ir_emit_zext_common(ctx, def, insn, insn->type, IR_REG_NUM(ctx->regs[def][0]));
+	ir_type src_type = ctx->ir_base[insn->op1].type;
+
+	ir_emit_zext_common(ctx, def, insn, insn->type, src_type, ir_type_size[src_type], IR_REG_NUM(ctx->regs[def][0]));
+	if (IR_REG_SPILLED(ctx->regs[def][0])) {
+		ir_emit_store(ctx, insn->type, def, IR_REG_NUM(ctx->regs[def][0]));
+	}
+}
+
+static void ir_emit_and_zext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_type src_type = ctx->ir_base[insn->op1].type;
+	uint8_t src_size;
+
+	IR_ASSERT(IR_IS_CONST_REF(insn->op2));
+	if (ctx->ir_base[insn->op2].val.u64 == 0xff) {
+		src_size = 1;
+	} else if (ctx->ir_base[insn->op2].val.u64 == 0xffff) {
+		src_size = 2;
+	} else {
+		IR_ASSERT(ctx->ir_base[insn->op2].val.u64 == 0xffffffff);
+		src_size = 4;
+	}
+	ir_emit_zext_common(ctx, def, insn, insn->type, src_type, src_size, IR_REG_NUM(ctx->regs[def][0]));
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, insn->type, def, IR_REG_NUM(ctx->regs[def][0]));
 	}
@@ -13319,7 +13349,7 @@ static void ir_emit_zext_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	def_reg_hi = IR_REG_I64_HI(def_reg);
 	def_reg = IR_REG_I64_LO(def_reg);
 	if (ir_type_size[ctx->ir_base[insn->op1].type] < 4) {
-		ir_emit_zext_common(ctx, def, insn, IR_I32, def_reg);
+		ir_emit_zext_common(ctx, def, insn, IR_I32, IR_I32, 4, def_reg);
 	} else if (op1_reg != def_reg) {
 		if (op1_reg != IR_REG_NONE && !IR_REG_SPILLED(op1_reg)) {
 			|	mov Rd(def_reg), Rd(op1_reg)
@@ -15930,6 +15960,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					break;
 				case IR_BIT_OP:
 					ir_emit_bit_op(ctx, i, insn);
+					break;
+				case IR_AND_ZEXT:
+					ir_emit_and_zext(ctx, i, insn);
 					break;
 				case IR_SDIV_PWR2:
 					ir_emit_sdiv_pwr2(ctx, i, insn);

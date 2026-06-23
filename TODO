@@ -20,7 +20,6 @@
 
 ?  instruction selection
 	- btsl=INCL, btrl=EXCL, btl=IN, bsr
-    - MOVZX to avoid a SHIFT and AND instruction
     - BURS ???
 
 ?  register allocation
