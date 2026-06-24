@@ -64,7 +64,7 @@ static int ir_assign_virtual_registers_slow(ir_ctx *ctx)
 			flags = ir_op_flags[insn->op];
 			if (((flags & IR_OP_FLAG_DATA) && insn->op != IR_VAR && (insn->op != IR_PARAM || ctx->use_lists[i].count > 0))
 			 || ((flags & IR_OP_FLAG_MEM) && ctx->use_lists[i].count > 1)) {
-				if (!ctx->rules || !(ctx->rules[i] & (IR_FUSED|IR_SKIPPED))) {
+				if (!ctx->rules || !(ctx->rules[i] & (IR_FUSED|IR_SKIPPED|IR_NO_REG))) {
 					vregs[i] = ++vregs_count;
 				}
 			}
@@ -96,7 +96,7 @@ int ir_assign_virtual_registers(ir_ctx *ctx)
 	for (i = 1, insn = &ctx->ir_base[1]; i < ctx->insns_count; i++, insn++) {
 		uint32_t v = 0;
 
-		if (ctx->rules[i] && !(ctx->rules[i] & (IR_FUSED|IR_SKIPPED))) {
+		if (ctx->rules[i] && !(ctx->rules[i] & (IR_FUSED|IR_SKIPPED|IR_NO_REG))) {
 			uint32_t flags = ir_op_flags[insn->op];
 
 			if ((flags & IR_OP_FLAG_DATA)

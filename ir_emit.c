@@ -1021,6 +1021,240 @@ static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb)
 	}
 }
 
+/* TAILCALL optimization */
+static bool ir_may_be_local_addr(ir_ctx *ctx, ir_insn *insn)
+{
+	if (insn->op == IR_PARAM) return 0;
+
+	return 1;
+}
+
+static bool ir_try_tailcall(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
+{
+	ir_ref proto_ref = IR_UNUSED;
+	const ir_proto_t *proto = NULL;
+	const ir_call_conv_dsc *cc;
+	int32_t params_stack_size, copy_stack;
+
+	if (IR_IS_CONST_REF(insn->op2)) {
+		const ir_insn *func = &ctx->ir_base[insn->op2];
+
+		if (func->op == IR_FUNC && func->proto) {
+			uint32_t rule = ir_match_builtin_call(ctx, func);
+
+			if (rule) {
+				ctx->rules[ref] = rule;
+				return 0;
+			}
+			proto_ref = func->proto;
+		} else if (func->op == IR_FUNC_ADDR) {
+			proto_ref = func->proto;
+		}
+	} else if (ctx->ir_base[insn->op2].op == IR_PROTO) {
+		proto_ref = ctx->ir_base[insn->op2].op2;
+	}
+
+	if (!proto_ref) return 0;
+	proto = (const ir_proto_t *)ir_get_str(ctx, proto_ref);
+
+	if ((proto->flags & IR_CALL_CONV_MASK) != (ctx->flags & IR_CALL_CONV_MASK)) return 0;
+
+	cc = ir_get_call_conv_dsc(proto ? proto->flags : IR_CC_DEFAULT);
+	copy_stack = 0;
+	params_stack_size = ir_call_used_stack(ctx, insn, cc, &copy_stack);
+	if (cc->shadow_store_size && params_stack_size == cc->shadow_store_size) {
+		params_stack_size = 0;
+	}
+
+	// TODO: "params_stack_size" must match the "args_stack_size"
+	if (params_stack_size) return 0;
+
+	/* check for passing addresses of local variable */
+	uint32_t n = insn->inputs_count;
+	for (uint32_t i = 3; i <= n; i++) {
+		ir_ref input = ir_insn_op(insn, i);
+		if (!IR_IS_CONST_REF(input) && ctx->ir_base[input].type == IR_ADDR) {
+			/* Passing addrss of local varible to TAILCALL is disallowd */
+			if (ir_may_be_local_addr(ctx, &ctx->ir_base[input])) {
+				return 0;
+			}
+		}
+	}
+
+#if defined(IR_TARGET_X64) || defined(IR_TARGET_X86)
+	if (!IR_IS_CONST_REF(insn->op2)) {
+		if (ctx->ir_base[insn->op2].op == IR_PROTO) {
+			if (IR_IS_CONST_REF(ctx->ir_base[insn->op2].op1)) {
+				ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_PROTO;
+			} else {
+				ir_match_fuse_load(ctx, ctx->ir_base[insn->op2].op1, ref);
+				if (ctx->rules[ctx->ir_base[insn->op2].op1] & IR_FUSED) {
+					ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_PROTO;
+				}
+		   }
+		} else {
+			ir_match_fuse_load(ctx, insn->op2, ref);
+		}
+	}
+#endif
+
+	ctx->rules[ref] = IR_TAILCALL | IR_NO_REG;
+
+	return 1;
+}
+
+#if 0
+static bool ir_try_tailcalls(ir_ctx *ctx, ir_insn *merge_insn)
+{
+	ir_ref count = 0, n = merge_insn->inputs_count;
+	ir_ref end, ref, *p = merge_insn->ops + 1;
+	ir_insn *insn;
+
+	do {
+		end = *p;
+		insn = &ctx->ir_base[end];
+		IR_ASSERT(insn->op == IR_END);
+		ref = insn->op1;
+		insn = &ctx->ir_base[ref];
+		if (insn->op == IR_CALL) {
+			if (ir_try_tailcall(ctx, ref, insn)) {
+				ctx->rules[end] = IR_SKIPPED | IR_NOP;
+				count++;
+			}
+		} else if (insn->op == IR_MERGE) {
+			if (ir_try_tailcalls(ctx, insn)) {
+				ctx->rules[end] = IR_SKIPPED | IR_NOP;
+				ctx->rules[ref] = IR_SKIPPED | IR_NOP;
+				count++;
+			}
+		}
+		p++;
+	} while (--n != 0);
+
+	return count == merge_insn->inputs_count;
+}
+#endif
+
+static size_t ir_calc_args_stack(const ir_ctx *ctx)
+{
+	ir_use_list *use_list = &ctx->use_lists[1];
+	ir_insn *insn;
+	ir_ref i, n, *p, use;
+	int int_param_num = 0;
+	int fp_param_num = 0;
+	ir_reg src_reg;
+	const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(ctx->flags);
+	int32_t stack_offset = 0;
+
+	n = use_list->count;
+	for (i = 0, p = &ctx->use_edges[use_list->refs]; i < n; i++, p++) {
+		use = *p;
+		insn = &ctx->ir_base[use];
+		if (insn->op == IR_PARAM) {
+			if (IR_IS_TYPE_INT(insn->type)) {
+				if (ctx->value_params && ctx->value_params[insn->op3 - 1].align) {
+					/* struct passed by value on stack */
+					uint32_t align = ctx->value_params[insn->op3 - 1].align;
+
+					align = IR_MAX(sizeof(void*), align);
+					stack_offset = IR_ALIGNED_SIZE(stack_offset, align);
+					stack_offset += ctx->value_params[insn->op3 - 1].size;
+					stack_offset = IR_ALIGNED_SIZE(stack_offset, sizeof(void*));
+					continue;
+				} else if (int_param_num < cc->int_param_regs_count) {
+					src_reg = cc->int_param_regs[int_param_num];
+#if IR_X86_I64
+					if (src_reg != IR_REG_NONE && (insn->type == IR_I64 || insn->type == IR_U64)) {
+						if (int_param_num + 1 < cc->int_param_regs_count) {
+							int_param_num++;
+							if (cc->shadow_param_regs) {
+								fp_param_num++;
+							}
+						}
+						src_reg = IR_REG_NONE;
+					}
+#endif
+				} else {
+					src_reg = IR_REG_NONE;
+				}
+				int_param_num++;
+				if (cc->shadow_param_regs) {
+					fp_param_num++;
+				}
+			} else {
+				if (fp_param_num < cc->fp_param_regs_count) {
+					src_reg = cc->fp_param_regs[fp_param_num];
+				} else {
+					src_reg = IR_REG_NONE;
+				}
+				fp_param_num++;
+				if (cc->shadow_param_regs) {
+					int_param_num++;
+				}
+			}
+			if (src_reg == IR_REG_NONE) {
+				if (sizeof(void*) == 8) {
+					stack_offset += sizeof(void*);
+				} else {
+					stack_offset += IR_MAX(sizeof(void*), ir_type_size[insn->type]);
+				}
+			}
+		}
+	}
+
+	return stack_offset;
+}
+
+static void ir_match_tailcalls(ir_ctx *ctx)
+{
+	ir_ref ref;
+	ir_insn *insn;
+	size_t args_stack_size = (size_t)-1;
+
+	ref = ctx->ir_base[1].op1;
+	while (ref) {
+		insn = &ctx->ir_base[ref];
+		if (insn->op == IR_RETURN) {
+			if (insn->op1 == insn->op2) {
+				if (ctx->ir_base[insn->op1].op == IR_CALL) {
+					if (args_stack_size == (size_t)-1) {
+						args_stack_size = ir_calc_args_stack(ctx);
+						// TODO: "args_stack_size" must match the "params_stack_size"
+						if (args_stack_size) return;
+					}
+					if (ir_try_tailcall(ctx, insn->op1, &ctx->ir_base[insn->op1])) {
+						ctx->rules[ref] = IR_SKIPPED | IR_NOP;
+					}
+				}
+			} else if (insn->op2 == IR_UNUSED) {
+				if (ctx->ir_base[insn->op1].op == IR_CALL) {
+					if (args_stack_size == (size_t)-1) {
+						args_stack_size = ir_calc_args_stack(ctx);
+						// TODO: "args_stack_size" must match the "params_stack_size"
+						if (args_stack_size) return;
+					}
+					if (ir_try_tailcall(ctx, insn->op1, &ctx->ir_base[insn->op1])) {
+						ctx->rules[ref] = IR_SKIPPED | IR_NOP;
+					}
+#if 0
+				} else if (ctx->ir_base[insn->op1].op == IR_MERGE) {
+					if (args_stack_size == (size_t)-1) {
+						args_stack_size = ir_calc_args_stack(ctx);
+						// TODO: "args_stack_size" must match the "params_stack_size"
+						if (args_stack_size) return;
+					}
+					if (ir_try_tailcalls(ctx, &ctx->ir_base[insn->op1])) {
+						ctx->rules[insn->op1] = IR_SKIPPED | IR_NOP;
+						ctx->rules[ref] = IR_SKIPPED | IR_NOP;
+					}
+#endif
+				}
+			}
+		}
+		ref = insn->op3;
+	}
+}
+
 int ir_match(ir_ctx *ctx)
 {
 	uint32_t b;
@@ -1039,6 +1273,12 @@ int ir_match(ir_ctx *ctx)
 
 	if (ctx->entries_count) {
 		ctx->entries = ir_mem_malloc(ctx->entries_count * sizeof(ir_ref));
+	}
+
+	if ((ctx->flags & IR_OPT_TAILCALL)
+	 && (ctx->flags & IR_FUNCTION)
+	 && !(ctx->flags & IR_VARARG_FUNC)) {
+		ir_match_tailcalls(ctx);
 	}
 
 	for (b = ctx->cfg_blocks_count, bb = ctx->cfg_blocks + b; b > 0; b--, bb--) {

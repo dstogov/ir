@@ -68,6 +68,7 @@ static void help(const char *cmd)
 		"Optimization Options:\n"
 		"  -O[012]                    - optimization level (default: -O2)\n"
 		"  -f[no-]inline              - enable/disable function inlining (default: enabled at -O1)\n"
+		"  -f[no-]tail-calls          - enable/disable tail call optimization (default: enabled at -O1)\n"
 		"  -fno-mem2ssa               - disable MEM2SSA pass (default: enabled at -O1)\n"
 		"Code Generation Options:\n"
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
@@ -1148,6 +1149,8 @@ int main(int argc, char **argv)
 	bool dump_time = 0;
 	bool disable_inline = 0;
 	bool force_inline = 0;
+	bool disable_tail_calls = 0;
+	bool force_tail_calls = 0;
 	bool disable_mem2ssa = 0;
 	uint32_t save_flags = 0;
 	uint32_t dump = 0;
@@ -1331,6 +1334,10 @@ int main(int argc, char **argv)
 			disable_inline = 1;
 		} else if (strcmp(argv[i], "-finline") == 0) {
 			force_inline = 1;
+		} else if (strcmp(argv[i], "-fno-tail-calls") == 0) {
+			disable_tail_calls = 1;
+		} else if (strcmp(argv[i], "-ftail-calls") == 0) {
+			force_tail_calls = 1;
 		} else if (strcmp(argv[i], "-fno-mem2ssa") == 0) {
 			disable_mem2ssa = 1;
 #ifdef IR_DEBUG
@@ -1430,6 +1437,9 @@ int main(int argc, char **argv)
 	}
 	if ((opt_level > 1 && !disable_inline) || force_inline) {
 		flags |= IR_OPT_INLINE;
+	}
+	if ((opt_level > 1 && !disable_tail_calls) || force_tail_calls) {
+		flags |= IR_OPT_TAILCALL;
 	}
 	if (opt_level > 0 && !disable_mem2ssa) {
 		flags |= IR_OPT_MEM2SSA;

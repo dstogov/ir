@@ -3,7 +3,7 @@ Simple CALL
 --TARGET--
 aarch64
 --ARGS--
--S --run
+-fno-tail-calls -S --run
 --CODE--
 {
 	uintptr_t c_1 = 0;
