@@ -682,6 +682,11 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 			break;
 		case IR_TAILCALL:
 			insn = &ctx->ir_base[ref];
+			if (IR_IS_CONST_REF(insn->op2)
+			 && ctx->ir_base[insn->op2].op == IR_FUNC
+			 && ctx->func_name == ctx->ir_base[insn->op2].val.name) {
+				ctx->flags2 |= IR_RECURSIVE_TAILCALL;
+			}
 			if (insn->inputs_count > 2) {
 				proto = ir_call_proto(ctx, insn);
 				cc = ir_get_call_conv_dsc(proto ? proto->flags : IR_CC_DEFAULT);
@@ -5517,6 +5522,27 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 	}
 
+	if (IR_IS_CONST_REF(insn->op2)
+	 && (ctx->flags2 & IR_RECURSIVE_TAILCALL)
+	 && ctx->ir_base[insn->op2].op == IR_FUNC
+	 && ctx->func_name == ctx->ir_base[insn->op2].val.name) {
+		if (ctx->flags2 & IR_HAS_ALLOCA) {
+			IR_ASSERT(ctx->flags & IR_USE_FRAME_POINTER);
+			if (!ctx->call_stack_size) {
+				|	mov sp, x29
+			} else if (aarch64_may_encode_imm12(ctx->call_stack_size)) {
+				|	sub sp, x29, #(ctx->call_stack_size)
+			} else {
+				ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, ctx->call_stack_size);
+				|	sub sp, x29, Rx(IR_REG_INT_TMP)
+			}
+		}
+
+		|	b =>0
+
+		return;
+	}
+
 	ir_emit_epilogue(ctx);
 
 	if (IR_IS_CONST_REF(insn->op2)) {
@@ -6519,6 +6545,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 
 	if (!(ctx->flags & IR_SKIP_PROLOGUE)) {
 		ir_emit_prologue(ctx);
+		if (ctx->flags2 & IR_RECURSIVE_TAILCALL) {
+			|=>0:
+		}
 	}
 	if (ctx->flags & IR_FUNCTION) {
 		ir_emit_load_params(ctx);

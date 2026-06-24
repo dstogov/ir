@@ -405,6 +405,8 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 	}
 
 	if (dump & IR_GEN_NATIVE) {
+		ctx->func_name = ir_str(ctx, func_name);
+
 		ir_match(ctx);
 
 		if ((dump & IR_DUMP_AFTER_CODE_MATCHING)

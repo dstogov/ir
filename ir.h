@@ -679,6 +679,7 @@ struct _ir_ctx {
 	uint32_t          *rules;                   /* array of target specific code-generation rules (for each instruction) */
 	uint32_t          *vregs;
 	ir_ref             vregs_count;
+	ir_ref             func_name;               /* Function name (should be set through ir_str()/ir_strl()) */
 	int32_t            spill_base;              /* base register for special spill area (e.g. PHP VM frame pointer) */
 	uint64_t           fixed_regset;            /* fixed registers, excluded for regular register allocation */
 	int32_t            fixed_stack_red_zone;    /* reusable stack allocated by caller (default 0) */

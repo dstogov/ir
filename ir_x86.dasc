@@ -1651,6 +1651,11 @@ op2_const:
 				constraints->tmp_regs[n] = IR_SCRATCH_REG(cc->fp_varargs_reg, IR_LOAD_SUB_REF, IR_USE_SUB_REF);
 				n++;
 			}
+			if (IR_IS_CONST_REF(insn->op2)
+			 && ctx->ir_base[insn->op2].op == IR_FUNC
+			 && ctx->func_name == ctx->ir_base[insn->op2].val.name) {
+				ctx->flags2 |= IR_RECURSIVE_TAILCALL;
+			}
 			if (insn->inputs_count > 2) {
 get_arg_hints:
 				constraints->hints[2] = IR_REG_NONE;
@@ -11505,6 +11510,22 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 	}
 
+	if (IR_IS_CONST_REF(func)
+	 && (ctx->flags2 & IR_RECURSIVE_TAILCALL)
+	 && ctx->ir_base[func].op == IR_FUNC
+	 && ctx->func_name == ctx->ir_base[func].val.name) {
+		if (ctx->flags2 & IR_HAS_ALLOCA) {
+			int offset = ctx->stack_frame_size + ctx->call_stack_size;
+
+			IR_ASSERT(ctx->flags & IR_USE_FRAME_POINTER);
+			|	lea Ra(IR_REG_RSP), [Ra(IR_REG_RBP)+offset]
+		}
+
+		|	jmp =>0
+
+		return;
+	}
+
 	ir_emit_epilogue(ctx);
 
 	if (IR_IS_CONST_REF(func)) {
@@ -16177,6 +16198,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 
 	if (!(ctx->flags & IR_SKIP_PROLOGUE)) {
 		ir_emit_prologue(ctx);
+		if (ctx->flags2 & IR_RECURSIVE_TAILCALL) {
+			|=>0:
+		}
 	}
 	if (ctx->flags & IR_FUNCTION) {
 		ir_emit_load_params(ctx);
