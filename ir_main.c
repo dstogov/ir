@@ -144,6 +144,7 @@ static void help(const char *cmd)
 
 #define IR_DUMP_C                   (1<<3)
 #define IR_DUMP_LLVM                (1<<4)
+#define IR_DUMP_RISCV               (1<<11)
 #define IR_DUMP_ASM                 (1<<5)
 #define IR_DUMP_SIZE                (1<<6)
 
@@ -1057,6 +1058,13 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 		}
 	}
 
+
+	if (l->dump & IR_DUMP_RISCV) {
+		if (!ir_emit_riscv(ctx, name, l->out_file)) {
+			fprintf(stderr, "\nERROR: %d\n", ctx->status);
+			return 0;
+		}
+	}
 	if (l->dump & IR_DUMP_LLVM) {
 		if (!ir_emit_llvm(ctx, name, l->out_file)) {
 			fprintf(stderr, "\nERROR: %d\n", ctx->status);
@@ -1209,6 +1217,8 @@ int main(int argc, char **argv)
 			}
 		} else if (strcmp(argv[i], "--emit-c") == 0) {
 			dump |= IR_DUMP_C;
+		} else if (strcmp(argv[i], "--emit-riscv") == 0) {
+			dump |= IR_DUMP_RISCV;
 		} else if (strcmp(argv[i], "--emit-llvm") == 0) {
 			dump |= IR_DUMP_LLVM;
 		} else if (strcmp(argv[i], "--save") == 0) {
@@ -1511,7 +1521,7 @@ int main(int argc, char **argv)
 	} else {
 		loader.dump_file = stderr;
 	}
-	if (dump & (IR_DUMP_C|IR_DUMP_LLVM|IR_DUMP_ASM)) {
+	if (dump & (IR_DUMP_C|IR_DUMP_LLVM|IR_DUMP_ASM|IR_DUMP_RISCV)) {
 		if (!out_file) {
 			loader.out_file = stderr;
 		} else if (strcmp(out_file, "-") == 0) {
