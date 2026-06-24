@@ -1477,12 +1477,12 @@ IR_ALWAYS_INLINE int8_t ir_get_alocated_reg(const ir_ctx *ctx, ir_ref ref, int o
 /* ctx->rules[] flags */
 #define IR_FUSED     (1U<<31) /* Insn is fused into others (code is generated as part of the fusion root) */
 #define IR_SKIPPED   (1U<<30) /* Insn is skipped (code is not generated) */
-#define IR_SIMPLE    (1U<<29) /* Insn doesn't have any target constraints */
-#define IR_FUSED_REG (1U<<28) /* Register assignemnt may be stored in ctx->fused_regs instead of ctx->regs */
-#define IR_MAY_SWAP  (1U<<27) /* Allow swapping operands for better register allocation */
-#define IR_MAY_REUSE (1U<<26) /* Result may reuse register of the source */
-#define IR_TWO_REGS  (1U<<25) /* Result needs two registers (used for 64-bit integers on x86) */
-#define IR_NO_REG    (1U<<24) /* Result doesn't need register (used for TAILCALL) */
+#define IR_NO_REG    (1U<<29) /* Result doesn't need register (used for TAILCALL) */
+#define IR_SIMPLE    (1U<<28) /* Insn doesn't have any target constraints */
+#define IR_FUSED_REG (1U<<27) /* Register assignemnt may be stored in ctx->fused_regs instead of ctx->regs */
+#define IR_MAY_SWAP  (1U<<26) /* Allow swapping operands for better register allocation */
+#define IR_MAY_REUSE (1U<<25) /* Result may reuse register of the source */
+#define IR_TWO_REGS  (1U<<24) /* Result needs two registers (used for 64-bit integers on x86) */
 
 #define IR_RULE_MASK 0xff
 
