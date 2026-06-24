@@ -1482,6 +1482,7 @@ IR_ALWAYS_INLINE int8_t ir_get_alocated_reg(const ir_ctx *ctx, ir_ref ref, int o
 #define IR_MAY_SWAP  (1U<<27) /* Allow swapping operands for better register allocation */
 #define IR_MAY_REUSE (1U<<26) /* Result may reuse register of the source */
 #define IR_TWO_REGS  (1U<<25) /* Result needs two registers (used for 64-bit integers on x86) */
+#define IR_NO_REG    (1U<<24) /* Result doesn't need register (used for TAILCALL) */
 
 #define IR_RULE_MASK 0xff
 

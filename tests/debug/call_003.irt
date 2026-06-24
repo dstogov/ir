@@ -3,7 +3,7 @@ Simple CALL (dup reg params)
 --TARGET--
 x86_64
 --ARGS--
--S
+-fno-tail-calls -S
 --CODE--
 {
 	uintptr_t c_1 = 0;

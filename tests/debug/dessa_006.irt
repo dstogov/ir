@@ -3,7 +3,7 @@ DESSA 006 (swap & tmp register)
 --TARGET--
 x86_64
 --ARGS--
--S --run
+-fno-tail-calls -S --run
 --CODE--
 func test(double, double, double, double, double, bool): void
 {

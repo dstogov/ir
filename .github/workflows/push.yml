@@ -143,6 +143,7 @@ jobs:
 
   Windows:
     strategy:
+      fail-fast: false
       matrix:
         arch: [x86, amd64]
     runs-on: windows-2022

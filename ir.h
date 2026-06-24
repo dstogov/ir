@@ -586,6 +586,7 @@ void ir_strtab_free(ir_strtab *strtab);
 #define IR_OPT_CFG             (1<<21) /* merge BBs, by remove END->BEGIN nodes during CFG construction */
 #define IR_OPT_MEM2SSA         (1<<22)
 #define IR_OPT_CODEGEN         (1<<23)
+#define IR_OPT_TAILCALL        (1<<24)
 
 /* debug related */
 #ifdef IR_DEBUG
@@ -1025,7 +1026,7 @@ IR_ALWAYS_INLINE void *ir_jit_compile(ir_ctx *ctx, int opt_level, size_t *size)
 			// IR_ASSERT(0 && "IR_OPT_FOLDING is incompatible with -O0");
 			return NULL;
 		}
-		ctx->flags &= ~(IR_OPT_CFG | IR_OPT_CODEGEN);
+		ctx->flags &= ~(IR_OPT_CFG | IR_OPT_CODEGEN | IR_OPT_TAILCALL);
 
 		ir_build_def_use_lists(ctx);
 
@@ -1042,7 +1043,7 @@ IR_ALWAYS_INLINE void *ir_jit_compile(ir_ctx *ctx, int opt_level, size_t *size)
 			// IR_ASSERT(0 && "IR_OPT_FOLDING must be set in ir_init() for -O1 and -O2");
 			return NULL;
 		}
-		ctx->flags |= IR_OPT_CFG | IR_OPT_CODEGEN;
+		ctx->flags |= IR_OPT_CFG | IR_OPT_CODEGEN | IR_OPT_TAILCALL;
 
 		ir_build_def_use_lists(ctx);
 
