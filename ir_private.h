@@ -952,17 +952,17 @@ IR_ALWAYS_INLINE bool ir_ref_is_true(const ir_ctx *ctx, ir_ref ref)
 #define IR_OP_FLAG_MEM_ALLOC      ((1<<6)|(1<<7))
 #define IR_OP_FLAG_MEM_MASK       ((1<<6)|(1<<7))
 
-#define IR_OPND_UNUSED            0x0
-#define IR_OPND_DATA              0x1
-#define IR_OPND_CONTROL           0x2
-#define IR_OPND_LABEL_REF         0x3
-#define IR_OPND_CONTROL_DEP       0x4
-#define IR_OPND_CONTROL_REF       0x5
-#define IR_OPND_CONTROL_GUARD     0x6
-#define IR_OPND_STR               0x7
-#define IR_OPND_NUM               0x8
-#define IR_OPND_PROB              0x9
-#define IR_OPND_PROTO             0xa
+#define IR_OPND_UNUSED            0x0U
+#define IR_OPND_DATA              0x1U
+#define IR_OPND_CONTROL           0x2U
+#define IR_OPND_LABEL_REF         0x3U
+#define IR_OPND_CONTROL_DEP       0x4U
+#define IR_OPND_CONTROL_REF       0x5U
+#define IR_OPND_CONTROL_GUARD     0x6U
+#define IR_OPND_STR               0x7U
+#define IR_OPND_NUM               0x8U
+#define IR_OPND_PROB              0x9U
+#define IR_OPND_PROTO             0xaU
 
 #define IR_OP_FLAGS(op_flags, op1_flags, op2_flags, op3_flags) \
 	((op_flags) | ((op1_flags) << 20) | ((op2_flags) << 24) | ((op3_flags) << 28))
