@@ -6,38 +6,85 @@
 #include "ir.h"
 #include "ir_private.h"
 #include <string.h>
+#include <stdlib.h>
 
-/* Allocatable temp registers (caller-saved) */
-#define RISCV_NUM_REGS 7
-static const char *riscv_tmp_regs[] = {
-    "t0", "t1", "t2", "t3", "t4", "t5", "t6"
+#define MAX_REFS 4096
+#define NUM_TMP_REGS 6
+
+static const char *tmp_regs[NUM_TMP_REGS] = {
+    "t0", "t1", "t2", "t3", "t4", "t5"
+};
+static const char *param_regs[] = {
+    "a0","a1","a2","a3","a4","a5","a6","a7"
 };
 
-/* Map from IR ref -> register name (simple linear scan) */
-#define MAX_REFS 4096
 static const char *reg_map[MAX_REFS];
 static int reg_next;
 
 static const char *alloc_reg(ir_ref ref) {
-    if (ref < 0 || ref >= MAX_REFS) return "t0";
+    if (ref <= 0 || ref >= MAX_REFS) return "t0";
     if (reg_map[ref]) return reg_map[ref];
-    const char *r = riscv_tmp_regs[reg_next % RISCV_NUM_REGS];
+    const char *r = tmp_regs[reg_next % NUM_TMP_REGS];
     reg_next++;
     reg_map[ref] = r;
     return r;
 }
 
 static const char *get_reg(ir_ref ref) {
-    if (ref < 0 || ref >= MAX_REFS) return "t0";
-    return reg_map[ref] ? reg_map[ref] : "t0";
+    if (ref <= 0 || ref >= MAX_REFS) return "zero";
+    return reg_map[ref] ? reg_map[ref] : "zero";
 }
 
-static void emit_load_const(FILE *f, const char *dst, ir_insn *insn) {
-    int64_t v = insn->val.i64;
-    if (v >= -2048 && v <= 2047) {
-        fprintf(f, "\tli\t%s, %lld\n", dst, (long long)v);
+static void emit_ref(FILE *f, ir_ctx *ctx, const char *dst, ir_ref ref) {
+    if (IR_IS_CONST_REF(ref)) {
+        ir_insn *c = &ctx->ir_base[ref];
+        fprintf(f, "\tli\t%s, %lld\n", dst, (long long)c->val.i64);
     } else {
-        fprintf(f, "\tli\t%s, %lld\n", dst, (long long)v);
+        const char *src = get_reg(ref);
+        if (strcmp(dst, src) != 0)
+            fprintf(f, "\tmv\t%s, %s\n", dst, src);
+    }
+}
+
+/* emit PHI initial values before loop entry */
+static void emit_phi_init(ir_ctx *ctx, FILE *f, ir_ref loop_begin) {
+    ir_ref i;
+    for (i = 1; i < ctx->insns_count; i++) {
+        ir_insn *insn = &ctx->ir_base[i];
+        if (insn->op == IR_PHI && insn->op1 == loop_begin) {
+            const char *dst = alloc_reg(i);
+            emit_ref(f, ctx, dst, insn->op2);
+        }
+    }
+}
+
+/* emit PHI back-edge updates before loop end */
+static void emit_phi_update(ir_ctx *ctx, FILE *f, ir_ref loop_begin) {
+    ir_ref i;
+    /* use scratch space to avoid clobber */
+    /* simple: copy to scratch first, then to phi regs */
+    static const char *scratch[] = {"s1","s2","s3","s4","s5","s6"};
+    int sc = 0;
+    /* first pass: load back-edge values into scratch */
+    for (i = 1; i < ctx->insns_count; i++) {
+        ir_insn *insn = &ctx->ir_base[i];
+        if (insn->op == IR_PHI && insn->op1 == loop_begin) {
+            const char *s = scratch[sc % 6];
+            emit_ref(f, ctx, s, insn->op3);
+            sc++;
+        }
+    }
+    /* second pass: move scratch to phi regs */
+    sc = 0;
+    for (i = 1; i < ctx->insns_count; i++) {
+        ir_insn *insn = &ctx->ir_base[i];
+        if (insn->op == IR_PHI && insn->op1 == loop_begin) {
+            const char *dst = get_reg(i);
+            const char *s = scratch[sc % 6];
+            if (strcmp(dst, s) != 0)
+                fprintf(f, "\tmv\t%s, %s\n", dst, s);
+            sc++;
+        }
     }
 }
 
@@ -49,208 +96,195 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
     memset(reg_map, 0, sizeof(reg_map));
     reg_next = 0;
 
-    /* Function header */
     fprintf(f, "\t.text\n");
     fprintf(f, "\t.globl %s\n", name);
     fprintf(f, "\t.type %s, @function\n", name);
     fprintf(f, "%s:\n", name);
+    fprintf(f, "\taddi\tsp, sp, -48\n");
+    fprintf(f, "\tsd\tra, 40(sp)\n");
+    fprintf(f, "\tsd\ts0, 32(sp)\n");
+    fprintf(f, "\tsd\ts1, 24(sp)\n");
+    fprintf(f, "\tsd\ts2, 16(sp)\n");
+    fprintf(f, "\tsd\ts3, 8(sp)\n");
+    fprintf(f, "\tsd\ts4, 0(sp)\n");
+    fprintf(f, "\taddi\ts0, sp, 48\n");
 
-    /* Prologue: save ra and s0 */
-    fprintf(f, "\taddi\tsp, sp, -16\n");
-    fprintf(f, "\tsd\tra, 8(sp)\n");
-    fprintf(f, "\tsd\ts0, 0(sp)\n");
-    fprintf(f, "\taddi\ts0, sp, 16\n");
-
-    /* Map PARAM to a0, a1, ... */
+    /* assign params */
     int param_idx = 0;
-    static const char *param_regs[] = {"a0","a1","a2","a3","a4","a5","a6","a7"};
-
-    /* First pass: assign param registers */
-    for (i = 1 - ctx->consts_count; i < ctx->insns_count; i++) {
+    for (i = 1; i < ctx->insns_count; i++) {
         insn = &ctx->ir_base[i];
-        if (insn->op == IR_PARAM) {
-            if (param_idx < 8 && i >= 0 && i < MAX_REFS) {
-                reg_map[i] = param_regs[param_idx++];
-            }
+        if (insn->op == IR_PARAM && param_idx < 8) {
+            reg_map[i] = param_regs[param_idx++];
         }
     }
 
-    /* Second pass: emit instructions */
+    /* main emit loop */
     for (i = 1; i < ctx->insns_count; i++) {
         insn = &ctx->ir_base[i];
         ir_ref op1 = insn->op1;
         ir_ref op2 = insn->op2;
-        ir_ref op3 = insn->op3;
         const char *dst;
 
         switch (insn->op) {
         case IR_NOP:
         case IR_START:
+        case IR_PARAM:
+            break;
+
         case IR_END:
+            break;
+
+        case IR_LOOP_BEGIN:
+            emit_phi_init(ctx, f, i);
+            fprintf(f, ".Lloop_%d:\n", i);
+            break;
+
+        case IR_LOOP_END: {
+            /* find LOOP_BEGIN */
+            ir_ref lb = op1;
+            while (lb > 0 && ctx->ir_base[lb].op != IR_LOOP_BEGIN)
+                lb = ctx->ir_base[lb].op1;
+            emit_phi_update(ctx, f, lb);
+            fprintf(f, "\tj\t.Lloop_%d\n", lb);
+            break;
+        }
+
+        case IR_PHI:
+            /* handled by emit_phi_init/emit_phi_update */
+            alloc_reg(i); /* ensure reg is allocated */
+            break;
+
         case IR_BEGIN:
         case IR_MERGE:
-            break;
-
-        case IR_PARAM:
-            /* already handled */
-            break;
-
-        case IR_VAR:
+            fprintf(f, ".Lbb_%d:\n", i);
             break;
 
         case IR_COPY:
-            if (op1 > 0 && op1 < ctx->insns_count) {
-                dst = alloc_reg(i);
-                if (IR_IS_CONST_REF(op1)) {
-                    emit_load_const(f, dst, &ctx->ir_base[op1]);
-                } else {
-                    fprintf(f, "\tmv\t%s, %s\n", dst, get_reg(op1));
-                }
-            } else if (IR_IS_CONST_REF(op1)) {
-                dst = alloc_reg(i);
-                emit_load_const(f, dst, &ctx->ir_base[op1]);
-            }
+            dst = alloc_reg(i);
+            if (IR_IS_CONST_REF(op1))
+                fprintf(f, "\tli\t%s, %lld\n", dst, (long long)ctx->ir_base[op1].val.i64);
+            else if (op1 > 0)
+                fprintf(f, "\tmv\t%s, %s\n", dst, get_reg(op1));
             break;
 
         case IR_ADD:
             dst = alloc_reg(i);
-            if (IR_IS_CONST_REF(op1)) {
-                const char *r2 = (op2 > 0) ? get_reg(op2) : "zero";
-                int64_t v = ctx->ir_base[op1].val.i64;
-                if (v >= -2048 && v <= 2047)
-                    fprintf(f, "\taddi\t%s, %s, %lld\n", dst, r2, (long long)v);
-                else {
-                    fprintf(f, "\tli\tt6, %lld\n", (long long)v);
-                    fprintf(f, "\tadd\t%s, %s, t6\n", dst, r2);
-                }
-            } else if (IR_IS_CONST_REF(op2)) {
-                const char *r1 = (op1 > 0) ? get_reg(op1) : "zero";
+            if (IR_IS_CONST_REF(op2)) {
                 int64_t v = ctx->ir_base[op2].val.i64;
+                const char *r1 = op1 > 0 ? get_reg(op1) : "zero";
                 if (v >= -2048 && v <= 2047)
                     fprintf(f, "\taddi\t%s, %s, %lld\n", dst, r1, (long long)v);
                 else {
-                    fprintf(f, "\tli\tt6, %lld\n", (long long)v);
-                    fprintf(f, "\tadd\t%s, %s, t6\n", dst, r1);
+                    fprintf(f, "\tli\ts5, %lld\n", (long long)v);
+                    fprintf(f, "\tadd\t%s, %s, s5\n", dst, r1);
+                }
+            } else if (IR_IS_CONST_REF(op1)) {
+                int64_t v = ctx->ir_base[op1].val.i64;
+                const char *r2 = op2 > 0 ? get_reg(op2) : "zero";
+                if (v >= -2048 && v <= 2047)
+                    fprintf(f, "\taddi\t%s, %s, %lld\n", dst, r2, (long long)v);
+                else {
+                    fprintf(f, "\tli\ts5, %lld\n", (long long)v);
+                    fprintf(f, "\tadd\t%s, %s, s5\n", dst, r2);
                 }
             } else {
-                const char *r1 = (op1 > 0) ? get_reg(op1) : "zero";
-                const char *r2 = (op2 > 0) ? get_reg(op2) : "zero";
-                fprintf(f, "\tadd\t%s, %s, %s\n", dst, r1, r2);
+                fprintf(f, "\tadd\t%s, %s, %s\n", dst, get_reg(op1), get_reg(op2));
             }
             break;
 
         case IR_SUB:
             dst = alloc_reg(i);
             if (IR_IS_CONST_REF(op2)) {
-                const char *r1 = (op1 > 0) ? get_reg(op1) : "zero";
                 int64_t v = ctx->ir_base[op2].val.i64;
-                fprintf(f, "\taddi\t%s, %s, %lld\n", dst, r1, (long long)-v);
+                fprintf(f, "\taddi\t%s, %s, %lld\n", dst, get_reg(op1), (long long)-v);
+            } else if (IR_IS_CONST_REF(op1)) {
+                fprintf(f, "\tli\ts5, %lld\n", (long long)ctx->ir_base[op1].val.i64);
+                fprintf(f, "\tsub\t%s, s5, %s\n", dst, get_reg(op2));
             } else {
-                const char *r1 = (op1 > 0) ? get_reg(op1) : "zero";
-                const char *r2 = (op2 > 0) ? get_reg(op2) : "zero";
-                fprintf(f, "\tsub\t%s, %s, %s\n", dst, r1, r2);
+                fprintf(f, "\tsub\t%s, %s, %s\n", dst, get_reg(op1), get_reg(op2));
             }
             break;
 
         case IR_MUL:
             dst = alloc_reg(i);
             {
-                const char *r1 = (op1 > 0) ? get_reg(op1) : "zero";
-                const char *r2 = (op2 > 0) ? get_reg(op2) : "zero";
+                const char *r1, *r2;
                 if (IR_IS_CONST_REF(op1)) {
-                    fprintf(f, "\tli\t%s, %lld\n", dst, (long long)ctx->ir_base[op1].val.i64);
-                    r1 = dst;
-                }
+                    fprintf(f, "\tli\ts5, %lld\n", (long long)ctx->ir_base[op1].val.i64);
+                    r1 = "s5";
+                } else r1 = get_reg(op1);
                 if (IR_IS_CONST_REF(op2)) {
-                    /* use t6 as scratch if dst == r1 */
-                    fprintf(f, "\tli\tt6, %lld\n", (long long)ctx->ir_base[op2].val.i64);
-                    r2 = "t6";
-                }
+                    fprintf(f, "\tli\ts6, %lld\n", (long long)ctx->ir_base[op2].val.i64);
+                    r2 = "s6";
+                } else r2 = get_reg(op2);
                 fprintf(f, "\tmul\t%s, %s, %s\n", dst, r1, r2);
             }
             break;
 
-        case IR_EQ:
-        case IR_NE:
-        case IR_LT:
-        case IR_GE:
-        case IR_LE:
-        case IR_GT:
-            /* comparison: produce 0/1 in dst */
+        case IR_EQ: case IR_NE: case IR_LT:
+        case IR_GE: case IR_LE: case IR_GT:
+        case IR_ULT: case IR_UGE: case IR_ULE: case IR_UGT:
             dst = alloc_reg(i);
             {
-                const char *r1 = IR_IS_CONST_REF(op1) ? "t5" : ((op1>0)?get_reg(op1):"zero");
-                const char *r2 = IR_IS_CONST_REF(op2) ? "t6" : ((op2>0)?get_reg(op2):"zero");
-                if (IR_IS_CONST_REF(op1))
-                    fprintf(f, "\tli\tt5, %lld\n", (long long)ctx->ir_base[op1].val.i64);
-                if (IR_IS_CONST_REF(op2))
-                    fprintf(f, "\tli\tt6, %lld\n", (long long)ctx->ir_base[op2].val.i64);
+                const char *r1, *r2;
+                if (IR_IS_CONST_REF(op1)) {
+                    fprintf(f, "\tli\ts5, %lld\n", (long long)ctx->ir_base[op1].val.i64);
+                    r1 = "s5";
+                } else r1 = op1 > 0 ? get_reg(op1) : "zero";
+                if (IR_IS_CONST_REF(op2)) {
+                    fprintf(f, "\tli\ts6, %lld\n", (long long)ctx->ir_base[op2].val.i64);
+                    r2 = "s6";
+                } else r2 = op2 > 0 ? get_reg(op2) : "zero";
                 switch (insn->op) {
-                case IR_EQ: fprintf(f, "\tsub\t%s, %s, %s\n\tseqz\t%s, %s\n", dst,r1,r2,dst,dst); break;
-                case IR_NE: fprintf(f, "\tsub\t%s, %s, %s\n\tsnez\t%s, %s\n", dst,r1,r2,dst,dst); break;
-                case IR_LT: fprintf(f, "\tslt\t%s, %s, %s\n", dst,r1,r2); break;
-                case IR_GE: fprintf(f, "\tslt\t%s, %s, %s\n\txori\t%s, %s, 1\n", dst,r1,r2,dst,dst); break;
-                case IR_LE: fprintf(f, "\tslt\t%s, %s, %s\n\txori\t%s, %s, 1\n", dst,r2,r1,dst,dst); break;
-                case IR_GT: fprintf(f, "\tslt\t%s, %s, %s\n", dst,r2,r1); break;
+                case IR_EQ:  fprintf(f,"\tsub\t%s,%s,%s\n\tseqz\t%s,%s\n",dst,r1,r2,dst,dst); break;
+                case IR_NE:  fprintf(f,"\tsub\t%s,%s,%s\n\tsnez\t%s,%s\n",dst,r1,r2,dst,dst); break;
+                case IR_LT:  case IR_ULT: fprintf(f,"\tslt\t%s,%s,%s\n",dst,r1,r2); break;
+                case IR_GE:  case IR_UGE: fprintf(f,"\tslt\t%s,%s,%s\n\txori\t%s,%s,1\n",dst,r1,r2,dst,dst); break;
+                case IR_LE:  case IR_ULE: fprintf(f,"\tslt\t%s,%s,%s\n\txori\t%s,%s,1\n",dst,r2,r1,dst,dst); break;
+                case IR_GT:  case IR_UGT: fprintf(f,"\tslt\t%s,%s,%s\n",dst,r2,r1); break;
                 default: break;
                 }
             }
             break;
 
         case IR_IF: {
-            /* conditional branch: op1=control, op2=cond */
-            const char *cond = IR_IS_CONST_REF(op2) ? "t0" : ((op2>0)?get_reg(op2):"zero");
-            if (IR_IS_CONST_REF(op2))
-                fprintf(f, "\tli\tt0, %lld\n", (long long)ctx->ir_base[op2].val.i64);
+            const char *cond;
+            if (IR_IS_CONST_REF(op2)) {
+                fprintf(f, "\tli\ts5, %lld\n", (long long)ctx->ir_base[op2].val.i64);
+                cond = "s5";
+            } else cond = get_reg(op2);
             fprintf(f, "\tbeqz\t%s, .Lfalse_%d\n", cond, i);
-            fprintf(f, ".Ltrue_%d:\n", i);
             break;
         }
 
         case IR_IF_TRUE:
-            /* falls through from IF true branch */
+            /* fall-through */
             break;
 
         case IR_IF_FALSE:
             fprintf(f, ".Lfalse_%d:\n", op1);
             break;
 
-        case IR_LOOP_BEGIN:
-            fprintf(f, ".Lloop_%d:\n", i);
-            break;
-
-        case IR_LOOP_END: {
-            /* find the LOOP_BEGIN by walking up the control chain */
-            ir_ref ctrl = op1;
-            while (ctrl > 0 && ctx->ir_base[ctrl].op != IR_LOOP_BEGIN) {
-                ctrl = ctx->ir_base[ctrl].op1;
-            }
-            fprintf(f, "\tj\t.Lloop_%d\n", ctrl);
-            break;
-        }
-
-        case IR_PHI:
-            /* PHI handled by register allocation; skip */
-            dst = alloc_reg(i);
-            break;
-
         case IR_RETURN:
-            /* op2 = return value */
-            if (op2 > 0 && !IR_IS_CONST_REF(op2)) {
-                const char *rv = get_reg(op2);
-                if (strcmp(rv, "a0") != 0)
-                    fprintf(f, "\tmv\ta0, %s\n", rv);
-            } else if (IR_IS_CONST_REF(op2)) {
-                fprintf(f, "\tli\ta0, %lld\n", (long long)ctx->ir_base[op2].val.i64);
-            }
-            fprintf(f, "\tld\tra, 8(sp)\n");
-            fprintf(f, "\tld\ts0, 0(sp)\n");
-            fprintf(f, "\taddi\tsp, sp, 16\n");
+            emit_ref(f, ctx, "a0", op2);
+            fprintf(f, "\tld\ts4, 0(sp)\n");
+            fprintf(f, "\tld\ts3, 8(sp)\n");
+            fprintf(f, "\tld\ts2, 16(sp)\n");
+            fprintf(f, "\tld\ts1, 24(sp)\n");
+            fprintf(f, "\tld\ts0, 32(sp)\n");
+            fprintf(f, "\tld\tra, 40(sp)\n");
+            fprintf(f, "\taddi\tsp, sp, 48\n");
             fprintf(f, "\tret\n");
             break;
 
+        case IR_VAR:
+        case IR_VSTORE:
+        case IR_VLOAD:
+            /* skip virtual vars for now */
+            break;
+
         default:
-            fprintf(f, "\t# unhandled op %d (ref %d)\n", insn->op, i);
+            fprintf(f, "\t# skip op=%d ref=%d\n", insn->op, i);
             break;
         }
     }
