@@ -37,15 +37,15 @@
 
 #define BUILTIN_FUNC_1(name, ret_type, arg1_type) \
 	ir_const_func(ctx, \
-		ir_strl(ctx, name, strlen(name)), \
+		ir_stringl(ctx, name, strlen(name)), \
 		ir_proto_1(ctx, IR_CC_BUILTIN, ret_type, arg1_type))
 #define BUILTIN_FUNC_2(name, ret_type, arg1_type, arg2_type) \
 	ir_const_func(ctx, \
-		ir_strl(ctx, name, strlen(name)), \
+		ir_stringl(ctx, name, strlen(name)), \
 		ir_proto_2(ctx, IR_CC_BUILTIN, ret_type, arg1_type, arg2_type))
 #define BUILTIN_FUNC_3(name, ret_type, arg1_type, arg2_type, arg3_type) \
 	ir_const_func(ctx, \
-		ir_strl(ctx, name, strlen(name)), \
+		ir_stringl(ctx, name, strlen(name)), \
 		ir_proto_3(ctx, IR_CC_BUILTIN, ret_type, arg1_type, arg2_type, arg3_type))
 
 static ir_ref llvm2ir_const_expr(ir_ctx *ctx, LLVMValueRef expr);
@@ -258,7 +258,7 @@ static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 					return 0;
 				}
 			}
-			return ir_const_sym(ctx, ir_strl(ctx, name, name_len));
+			return ir_const_sym(ctx, ir_stringl(ctx, name, name_len));
 		case LLVMFunctionValueKind:
 			// TODO: resolve function address
 			proto = llvm2ir_proto(ctx, LLVMGetFunctionCallConv(op), LLVMGlobalGetValueType(op));
@@ -269,7 +269,7 @@ static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 					return 0;
 				}
 			}
-			return ir_const_func(ctx, ir_strl(ctx, name, name_len), proto);
+			return ir_const_func(ctx, ir_stringl(ctx, name, name_len), proto);
 		case LLVMUndefValueValueKind:
 		case LLVMPoisonValueValueKind:
 			// TODO: ???
@@ -278,7 +278,7 @@ static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 		case LLVMBlockAddressValueKind:
 			name = llvm2ir_label_name(buf, sizeof(buf), LLVMGetBlockAddressFunction(op), LLVMGetBlockAddressBasicBlock(op));
 			IR_ASSERT(name);
-			return ir_const_label(ctx, ir_str(ctx, name));
+			return ir_const_label(ctx, ir_string(ctx, name));
 		default:
 			fprintf(stderr, "Unsupported LLVM value kind: %d\n", kind);
 			IR_ASSERT(0);
@@ -1774,7 +1774,7 @@ static void llvm2ir_bb_start(ir_ctx *ctx, LLVMBasicBlockRef bb, LLVMBasicBlockRe
 		const char *name = llvm2ir_label_name(buf, sizeof(buf), func, bb);
 
 		IR_ASSERT(name);
-		ctx->control = ir_emit2(ctx, IR_BEGIN, ref, ir_const_label(ctx, ir_str(ctx, name)));
+		ctx->control = ir_emit2(ctx, IR_BEGIN, ref, ir_const_label(ctx, ir_string(ctx, name)));
 	} else {
 		IR_ASSERT(0);
 	}

@@ -405,7 +405,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 	}
 
 	if (dump & IR_GEN_NATIVE) {
-		ctx->func_name = ir_str(ctx, func_name);
+		ctx->func_name = ir_string(ctx, func_name);
 
 		ir_match(ctx);
 
@@ -464,7 +464,7 @@ typedef struct _ir_sym {
 
 typedef struct _ir_reloc {
 	void   *addr;
-	ir_ref  sym;
+	ir_str  sym;
 } ir_reloc;
 
 typedef struct _ir_main_loader {
@@ -481,8 +481,8 @@ typedef struct _ir_main_loader {
 	ir_strtab  symtab;
 	ir_sym    *sym;
 	ir_reloc  *reloc;
-	ir_ref     sym_count;
-	ir_ref     reloc_count;
+	ir_str     sym_count;
+	uint32_t   reloc_count;
 	void      *data_start;
 	size_t     data_pos;
 	ir_code_buffer code_buffer;
@@ -502,8 +502,8 @@ static void ir_loader_free_symbols(ir_main_loader *l)
 static void ir_loader_add_reloc(ir_main_loader *l, const char *name, void *addr)
 {
 	ir_reloc *r;
-	ir_ref val = ir_strtab_count(&l->symtab) + 1;
-	ir_ref sym = ir_strtab_lookup(&l->symtab, name, strlen(name), val);
+	ir_str val = ir_strtab_count(&l->symtab) + 1;
+	ir_str sym = ir_strtab_lookup(&l->symtab, name, strlen(name), val);
 
 	if (sym == val) {
 		if (val >= l->sym_count) {
@@ -524,7 +524,7 @@ static void ir_loader_add_reloc(ir_main_loader *l, const char *name, void *addr)
 static bool ir_loader_fix_relocs(ir_main_loader *l)
 {
 	bool ret = 1;
-	ir_ref n = l->reloc_count;
+	uint32_t n = l->reloc_count;
 
 	if (n > 0) {
 		ir_reloc *r = l->reloc;
@@ -557,7 +557,7 @@ static bool ir_loader_fix_relocs(ir_main_loader *l)
 		n = ir_strtab_count(&l->symtab);
 		if (n > 0) {
 			ir_sym *s = l->sym + 1;
-			ir_ref j;
+			uint32_t j;
 
 			for (j = 1; j < n; s++, j++) {
 				if (!s->addr && s->thunk_addr) {
@@ -575,8 +575,9 @@ static bool ir_loader_add_sym(ir_loader *loader, const char *name, void *addr)
 {
 	ir_main_loader *l = (ir_main_loader*)loader;
 	uint32_t len = (uint32_t)strlen(name);
-	ir_ref val = ir_strtab_count(&l->symtab) + 1;
-	ir_ref old_val = ir_strtab_lookup(&l->symtab, name, len, val);
+	ir_str val = ir_strtab_count(&l->symtab) + 1;
+	ir_str old_val = ir_strtab_lookup(&l->symtab, name, len, val);
+
 	if (old_val != val) {
 		if (addr && !l->sym[old_val].addr) {
 			/* Update forward declaration */
@@ -641,6 +642,11 @@ static void* ir_loader_resolve_sym_name(ir_loader *loader, const char *name, uin
 		fprintf(stderr, "Undefined symbol: %s\n", name);
 	}
 	return addr;
+}
+
+static void* _ir_loader_resolve_sym_name(ir_loader *loader, ir_ctx *ctx, ir_str name, uint32_t flags)
+{
+	return ir_loader_resolve_sym_name(loader, ir_get_str(ctx, name), flags);
 }
 
 static bool ir_loader_external_sym_dcl(ir_loader *loader, const char *name, uint32_t flags)
@@ -1486,7 +1492,7 @@ int main(int argc, char **argv)
 	loader.loader.sym_data_end       = ir_loader_sym_data_end;
 	loader.loader.func_init          = ir_loader_func_init;
 	loader.loader.func_process       = ir_loader_func_process;
-	loader.loader.resolve_sym_name   = ir_loader_resolve_sym_name;
+	loader.loader.resolve_sym_name   = _ir_loader_resolve_sym_name;
 	loader.loader.has_sym            = ir_loader_has_sym;
 	loader.loader.add_sym            = ir_loader_add_sym;
 	loader.loader.add_label          = ir_loader_add_sym;

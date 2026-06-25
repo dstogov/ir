@@ -70,7 +70,7 @@ static ir_strtab op_tab;
 #define IR_UNRESOLVED_LIST_END        ((ir_ref)IR_UNRESOLVED_MASK)
 
 #define IR_IS_UNRESOLVED(ref) \
-	((ref) <= (ir_ref)0xc0000000)
+	((ir_ref)(ref) <= (ir_ref)0xc0000000)
 #define IR_ENCODE_UNRESOLVED_REF(ref, op) \
 	((ir_ref)0xc0000000 - ((ref) * sizeof(ir_ref) + (op)))
 #define IR_DECODE_UNRESOLVED_REF(ref) \
@@ -124,7 +124,7 @@ static void ir_define_var(ir_parser_ctx *p, const char *str, size_t len, ir_ref 
 	}
 }
 
-static void report_undefined_var(const char *str, uint32_t len, ir_ref val)
+static void report_undefined_var(const char *str, uint32_t len, ir_str val)
 {
 	if (IR_IS_UNRESOLVED(val)) {
 		fprintf(stderr, "ERROR: Undefined variable `%.*s`\n", (int)len, str);
@@ -224,7 +224,7 @@ static ir_ref ir_make_const_str(ir_ctx *ctx, const char *str, size_t len)
 	char *buf = alloca(len + 1);
 
 	len = yy_unescape_str(buf, str, len);
-	return ir_const_str(ctx, ir_strl(ctx, buf, len));
+	return ir_const_str(ctx, ir_stringl(ctx, buf, len));
 }
 
 static bool ir_loader_sym_data_str(ir_loader *loader, const char *str, size_t len)
@@ -601,7 +601,7 @@ ir_insn(ir_parser_ctx *p):
 			{flags = 0;}
 			ir_func_proto(p, &flags, &ret_type, &params_count, param_types)
 			{ref = ir_proto(p->ctx, flags, ret_type, params_count, param_types);}
-			{ref = ir_const_func(p->ctx, ir_strl(p->ctx, func, func_len), ref);}
+			{ref = ir_const_func(p->ctx, ir_stringl(p->ctx, func, func_len), ref);}
 		|	"*"
 			(	DECNUMBER(IR_ADDR, &val)
 			|	HEXNUMBER(IR_ADDR, &val)
@@ -612,9 +612,9 @@ ir_insn(ir_parser_ctx *p):
 			{ref = ir_const_func_addr(p->ctx, val.addr, ref);}
 		)
 	|	"sym" "(" ID(&func, &func_len) ")"
-		{ref = ir_const_sym(p->ctx, ir_strl(p->ctx, func, func_len));}
+		{ref = ir_const_sym(p->ctx, ir_stringl(p->ctx, func, func_len));}
 	|	"label" "(" ID(&func, &func_len) ")"
-		{ref = ir_const_label(p->ctx, ir_strl(p->ctx, func, func_len));}
+		{ref = ir_const_label(p->ctx, ir_stringl(p->ctx, func, func_len));}
 	|   STRING(&func, &func_len)
 		{ref = ir_make_const_str(p->ctx, func, func_len);}
 	|	func(&op)
@@ -855,7 +855,7 @@ val(ir_parser_ctx *p, uint8_t op, uint32_t n, ir_ref *ref):
 		{*ref = ir_use_var(p, n, str, len);}
 	|   STRING(&str, &len)
 		{if (kind != IR_OPND_STR) yy_error("unexpected string");}
-		{*ref = ir_strl(p->ctx, str, len);}
+		{*ref = ir_stringl(p->ctx, str, len);}
 	|	DECNUMBER(IR_I32, &val)
 		{if (kind != IR_OPND_NUM && kind != IR_OPND_PROB) yy_error("unexpected number");}
 		{if (val.i64 < 0 || val.i64 > 0x7fffffff) yy_error("number out of range");}

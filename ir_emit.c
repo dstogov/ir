@@ -267,22 +267,28 @@ void *ir_resolve_sym_name(const char *name)
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 static void* ir_sym_addr(ir_ctx *ctx, const ir_insn *addr_insn)
 {
-	const char *name = ir_get_str(ctx, addr_insn->val.name);
-	void *addr = (ctx->loader && ctx->loader->resolve_sym_name) ?
-		ctx->loader->resolve_sym_name(ctx->loader, name, IR_RESOLVE_SYM_SILENT) :
-		ir_resolve_sym_name(name);
+	void *addr;
 
+	if (ctx->loader && ctx->loader->resolve_sym_name) {
+		addr = ctx->loader->resolve_sym_name(ctx->loader, ctx, addr_insn->val.name, IR_RESOLVE_SYM_SILENT);
+	} else {
+		const char *name = ir_get_str(ctx, addr_insn->val.name);
+		addr = ir_resolve_sym_name(name);
+	}
 	return addr;
 }
 #endif
 
 static void* ir_sym_val(ir_ctx *ctx, const ir_insn *addr_insn)
 {
-	const char *name = ir_get_str(ctx, addr_insn->val.name);
-	void *addr = (ctx->loader && ctx->loader->resolve_sym_name) ?
-		ctx->loader->resolve_sym_name(ctx->loader, name, addr_insn->op == IR_FUNC ? IR_RESOLVE_SYM_ADD_THUNK : 0) :
-		ir_resolve_sym_name(name);
+	void *addr;
 
+	if (ctx->loader && ctx->loader->resolve_sym_name) {
+		addr = ctx->loader->resolve_sym_name(ctx->loader, ctx, addr_insn->val.name, addr_insn->op == IR_FUNC ? IR_RESOLVE_SYM_ADD_THUNK : 0);
+	} else {
+		const char *name = ir_get_str(ctx, addr_insn->val.name);
+		addr = ir_resolve_sym_name(name);
+	}
 	IR_ASSERT(addr);
 	return addr;
 }

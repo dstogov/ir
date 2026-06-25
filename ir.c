@@ -665,7 +665,7 @@ ir_ref ir_const_addr(ir_ctx *ctx, uintptr_t c)
 	return ir_const(ctx, val, IR_ADDR);
 }
 
-ir_ref ir_const_func_addr(ir_ctx *ctx, uintptr_t c, ir_ref proto)
+ir_ref ir_const_func_addr(ir_ctx *ctx, uintptr_t c, ir_str proto)
 {
 	if (c == 0) {
 		return IR_NULL;
@@ -676,7 +676,7 @@ ir_ref ir_const_func_addr(ir_ctx *ctx, uintptr_t c, ir_ref proto)
 	return ir_const_ex(ctx, val, IR_ADDR, IR_OPTX(IR_FUNC_ADDR, IR_ADDR, proto));
 }
 
-ir_ref ir_const_func(ir_ctx *ctx, ir_ref str, ir_ref proto)
+ir_ref ir_const_func(ir_ctx *ctx, ir_str str, ir_str proto)
 {
 	ir_val val;
 	val.u64 = str;
@@ -684,28 +684,28 @@ ir_ref ir_const_func(ir_ctx *ctx, ir_ref str, ir_ref proto)
 	return ir_const_ex(ctx, val, IR_ADDR, IR_OPTX(IR_FUNC, IR_ADDR, proto));
 }
 
-ir_ref ir_const_sym(ir_ctx *ctx, ir_ref str)
+ir_ref ir_const_sym(ir_ctx *ctx, ir_str str)
 {
 	ir_val val;
 	val.u64 = str;
 	return ir_const_ex(ctx, val, IR_ADDR, IR_OPTX(IR_SYM, IR_ADDR, 0));
 }
 
-ir_ref ir_const_str(ir_ctx *ctx, ir_ref str)
+ir_ref ir_const_str(ir_ctx *ctx, ir_str str)
 {
 	ir_val val;
 	val.u64 = str;
 	return ir_const_ex(ctx, val, IR_ADDR, IR_OPTX(IR_STR, IR_ADDR, 0));
 }
 
-ir_ref ir_const_label(ir_ctx *ctx, ir_ref str)
+ir_ref ir_const_label(ir_ctx *ctx, ir_str str)
 {
 	ir_val val;
 	val.u64 = str;
 	return ir_const_ex(ctx, val, IR_ADDR, IR_OPTX(IR_LABEL, IR_ADDR, 0));
 }
 
-ir_ref ir_str(ir_ctx *ctx, const char *s)
+ir_str ir_string(ir_ctx *ctx, const char *s)
 {
 	size_t len;
 
@@ -717,7 +717,7 @@ ir_ref ir_str(ir_ctx *ctx, const char *s)
 	return ir_strtab_lookup(&ctx->strtab, s, (uint32_t)len, ir_strtab_count(&ctx->strtab) + 1);
 }
 
-ir_ref ir_strl(ir_ctx *ctx, const char *s, size_t len)
+ir_str ir_stringl(ir_ctx *ctx, const char *s, size_t len)
 {
 	if (!ctx->strtab.data) {
 		ir_strtab_init(&ctx->strtab, 64, 4096);
@@ -726,29 +726,35 @@ ir_ref ir_strl(ir_ctx *ctx, const char *s, size_t len)
 	return ir_strtab_lookup(&ctx->strtab, s, (uint32_t)len, ir_strtab_count(&ctx->strtab) + 1);
 }
 
-const char *ir_get_str(const ir_ctx *ctx, ir_ref idx)
+const char *ir_get_str(const ir_ctx *ctx, ir_str idx)
 {
+	if (IR_IS_EXT_STR(idx)) {
+		return ctx->loader->get_str(ctx->loader, idx);
+	}
 	IR_ASSERT(ctx->strtab.data);
 	return ir_strtab_str(&ctx->strtab, idx - 1);
 }
 
-const char *ir_get_strl(const ir_ctx *ctx, ir_ref idx, size_t *len)
+const char *ir_get_strl(const ir_ctx *ctx, ir_str idx, size_t *len)
 {
+	if (IR_IS_EXT_STR(idx)) {
+		return ctx->loader->get_strl(ctx->loader, idx, len);
+	}
 	IR_ASSERT(ctx->strtab.data);
 	return ir_strtab_strl(&ctx->strtab, idx - 1, len);
 }
 
-ir_ref ir_proto_0(ir_ctx *ctx, uint8_t flags, ir_type ret_type)
+ir_str ir_proto_0(ir_ctx *ctx, uint8_t flags, ir_type ret_type)
 {
 	ir_proto_t proto;
 
 	proto.flags = flags;
 	proto.ret_type = ret_type;
 	proto.params_count = 0;
-	return ir_strl(ctx, (const char *)&proto, offsetof(ir_proto_t, param_types) + 0);
+	return ir_stringl(ctx, (const char *)&proto, offsetof(ir_proto_t, param_types) + 0);
 }
 
-ir_ref ir_proto_1(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1)
+ir_str ir_proto_1(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1)
 {
 	ir_proto_t proto;
 
@@ -756,10 +762,10 @@ ir_ref ir_proto_1(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1)
 	proto.ret_type = ret_type;
 	proto.params_count = 1;
 	proto.param_types[0] = t1;
-	return ir_strl(ctx, (const char *)&proto, offsetof(ir_proto_t, param_types) + 1);
+	return ir_stringl(ctx, (const char *)&proto, offsetof(ir_proto_t, param_types) + 1);
 }
 
-ir_ref ir_proto_2(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2)
+ir_str ir_proto_2(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2)
 {
 	ir_proto_t proto;
 
@@ -768,10 +774,10 @@ ir_ref ir_proto_2(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_t
 	proto.params_count = 2;
 	proto.param_types[0] = t1;
 	proto.param_types[1] = t2;
-	return ir_strl(ctx, (const char *)&proto, offsetof(ir_proto_t, param_types) + 2);
+	return ir_stringl(ctx, (const char *)&proto, offsetof(ir_proto_t, param_types) + 2);
 }
 
-ir_ref ir_proto_3(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2, ir_type t3)
+ir_str ir_proto_3(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2, ir_type t3)
 {
 	ir_proto_t proto;
 
@@ -781,10 +787,10 @@ ir_ref ir_proto_3(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_t
 	proto.param_types[0] = t1;
 	proto.param_types[1] = t2;
 	proto.param_types[2] = t3;
-	return ir_strl(ctx, (const char *)&proto, offsetof(ir_proto_t, param_types) + 3);
+	return ir_stringl(ctx, (const char *)&proto, offsetof(ir_proto_t, param_types) + 3);
 }
 
-ir_ref ir_proto_4(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2, ir_type t3,
+ir_str ir_proto_4(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2, ir_type t3,
                                                                 ir_type t4)
 {
 	ir_proto_t proto;
@@ -796,10 +802,10 @@ ir_ref ir_proto_4(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_t
 	proto.param_types[1] = t2;
 	proto.param_types[2] = t3;
 	proto.param_types[3] = t4;
-	return ir_strl(ctx, (const char *)&proto, offsetof(ir_proto_t, param_types) + 4);
+	return ir_stringl(ctx, (const char *)&proto, offsetof(ir_proto_t, param_types) + 4);
 }
 
-ir_ref ir_proto_5(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2, ir_type t3,
+ir_str ir_proto_5(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2, ir_type t3,
                                                                 ir_type t4, ir_type t5)
 {
 	ir_proto_t proto;
@@ -812,10 +818,10 @@ ir_ref ir_proto_5(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_t
 	proto.param_types[2] = t3;
 	proto.param_types[3] = t4;
 	proto.param_types[4] = t5;
-	return ir_strl(ctx, (const char *)&proto, offsetof(ir_proto_t, param_types) + 5);
+	return ir_stringl(ctx, (const char *)&proto, offsetof(ir_proto_t, param_types) + 5);
 }
 
-ir_ref ir_proto(ir_ctx *ctx, uint8_t flags, ir_type ret_type, uint32_t params_count, uint8_t *param_types)
+ir_str ir_proto(ir_ctx *ctx, uint8_t flags, ir_type ret_type, uint32_t params_count, uint8_t *param_types)
 {
 	ir_proto_t *proto = alloca(offsetof(ir_proto_t, param_types) + params_count);
 
@@ -826,7 +832,7 @@ ir_ref ir_proto(ir_ctx *ctx, uint8_t flags, ir_type ret_type, uint32_t params_co
 	if (params_count) {
 		memcpy(proto->param_types, param_types, params_count);
 	}
-	return ir_strl(ctx, (const char *)proto, offsetof(ir_proto_t, param_types) + params_count);
+	return ir_stringl(ctx, (const char *)proto, offsetof(ir_proto_t, param_types) + params_count);
 }
 
 /* IR construction */
@@ -1164,13 +1170,25 @@ ir_ref ir_get_op(const ir_ctx *ctx, ir_ref ref, int32_t n)
 ir_ref ir_param(ir_ctx *ctx, ir_type type, ir_ref region, const char *name, int pos)
 {
 	IR_ASSERT(ctx->ir_base[region].op == IR_START);
-	return ir_emit(ctx, IR_OPT(IR_PARAM, type), region, ir_str(ctx, name), pos);
+	return ir_emit(ctx, IR_OPT(IR_PARAM, type), region, ir_string(ctx, name), pos);
+}
+
+ir_ref ir_param_ex(ir_ctx *ctx, ir_type type, ir_ref region, ir_str name, int pos)
+{
+	IR_ASSERT(ctx->ir_base[region].op == IR_START);
+	return ir_emit(ctx, IR_OPT(IR_PARAM, type), region, name, pos);
 }
 
 ir_ref ir_var(ir_ctx *ctx, ir_type type, ir_ref region, const char *name)
 {
 	IR_ASSERT(IR_IS_BB_START(ctx->ir_base[region].op));
-	return ir_emit(ctx, IR_OPT(IR_VAR, type), region, ir_str(ctx, name), IR_UNUSED);
+	return ir_emit(ctx, IR_OPT(IR_VAR, type), region, ir_string(ctx, name), IR_UNUSED);
+}
+
+ir_ref ir_var_ex(ir_ctx *ctx, ir_type type, ir_ref region, ir_str name)
+{
+	IR_ASSERT(IR_IS_BB_START(ctx->ir_base[region].op));
+	return ir_emit(ctx, IR_OPT(IR_VAR, type), region, name, IR_UNUSED);
 }
 
 ir_ref ir_bind(ir_ctx *ctx, ir_ref var, ir_ref def)

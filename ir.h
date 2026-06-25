@@ -431,10 +431,16 @@ typedef enum _ir_op {
 #define IR_VA_ARG_ALIGN(op3) (1U << ((uint32_t)(op3) & 0x7))
 #define IR_VA_ARG_OP3(s, a)  (((s) << 3) | ir_ntzl(a))
 
-/* IR References */
+/* IR Reference: index of ir_insn in ir_ctx.ir_base[], positive - instructions, negaive - constants */
 typedef int32_t ir_ref;
 
 #define IR_IS_CONST_REF(ref) ((ref) < 0)
+
+/* IR String: string index; positive - index in ir_strtab, negative - resolved through loader.get_str() */
+typedef int32_t ir_str;
+
+#define IR_IS_EXT_STR(str)   ((str) < 0)
+#define IR_EXT_STR(str)      (-(str))
 
 /* IR Constant Value */
 #define IR_UNUSED            0
@@ -467,8 +473,8 @@ typedef union _ir_val {
 			int32_t                    i32;
 			float                      f;
 			ADDR_MEMBER
-			ir_ref                     name;
-			ir_ref                     str;
+			ir_str                     name;
+			ir_str                     str;
 			IR_STRUCT_LOHI(
 				union {
 					uint16_t           u16;
@@ -544,14 +550,14 @@ typedef struct _ir_strtab {
 
 #define ir_strtab_count(strtab) (strtab)->count
 
-typedef void (*ir_strtab_apply_t)(const char *str, uint32_t len, ir_ref val);
+typedef void (*ir_strtab_apply_t)(const char *str, uint32_t len, ir_str val);
 
 void ir_strtab_init(ir_strtab *strtab, uint32_t count, uint32_t buf_size);
-ir_ref ir_strtab_lookup(ir_strtab *strtab, const char *str, uint32_t len, ir_ref val);
-ir_ref ir_strtab_find(const ir_strtab *strtab, const char *str, uint32_t len);
-ir_ref ir_strtab_update(ir_strtab *strtab, const char *str, uint32_t len, ir_ref val);
-const char *ir_strtab_str(const ir_strtab *strtab, ir_ref idx);
-const char *ir_strtab_strl(const ir_strtab *strtab, ir_ref idx, size_t *len);
+ir_str ir_strtab_lookup(ir_strtab *strtab, const char *str, uint32_t len, ir_str val);
+ir_str ir_strtab_find(const ir_strtab *strtab, const char *str, uint32_t len);
+ir_str ir_strtab_update(ir_strtab *strtab, const char *str, uint32_t len, ir_str val);
+const char *ir_strtab_str(const ir_strtab *strtab, ir_str idx);
+const char *ir_strtab_strl(const ir_strtab *strtab, ir_str idx, size_t *len);
 void ir_strtab_apply(const ir_strtab *strtab, ir_strtab_apply_t func);
 void ir_strtab_free(ir_strtab *strtab);
 
@@ -679,7 +685,7 @@ struct _ir_ctx {
 	uint32_t          *rules;                   /* array of target specific code-generation rules (for each instruction) */
 	uint32_t          *vregs;
 	ir_ref             vregs_count;
-	ir_ref             func_name;               /* Function name (should be set through ir_str()/ir_strl()) */
+	ir_str             func_name;               /* Function name (should be set through ir_string()/ir_stringl()) */
 	int32_t            spill_base;              /* base register for special spill area (e.g. PHP VM frame pointer) */
 	uint64_t           fixed_regset;            /* fixed registers, excluded for regular register allocation */
 	int32_t            fixed_stack_red_zone;    /* reusable stack allocated by caller (default 0) */
@@ -751,20 +757,20 @@ ir_ref ir_const_float(ir_ctx *ctx, float c);
 ir_ref ir_const_double(ir_ctx *ctx, double c);
 ir_ref ir_const_addr(ir_ctx *ctx, uintptr_t c);
 
-ir_ref ir_const_func_addr(ir_ctx *ctx, uintptr_t c, ir_ref proto);
-ir_ref ir_const_func(ir_ctx *ctx, ir_ref str, ir_ref proto);
-ir_ref ir_const_sym(ir_ctx *ctx, ir_ref str);
-ir_ref ir_const_str(ir_ctx *ctx, ir_ref str);
-ir_ref ir_const_label(ir_ctx *ctx, ir_ref str);
+ir_ref ir_const_func_addr(ir_ctx *ctx, uintptr_t c, ir_str proto);
+ir_ref ir_const_func(ir_ctx *ctx, ir_str str, ir_str proto);
+ir_ref ir_const_sym(ir_ctx *ctx, ir_str str);
+ir_ref ir_const_str(ir_ctx *ctx, ir_str str);
+ir_ref ir_const_label(ir_ctx *ctx, ir_str str);
 
 ir_ref ir_unique_const_addr(ir_ctx *ctx, uintptr_t c);
 
 void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted);
 
-ir_ref ir_str(ir_ctx *ctx, const char *s);
-ir_ref ir_strl(ir_ctx *ctx, const char *s, size_t len);
-const char *ir_get_str(const ir_ctx *ctx, ir_ref idx);
-const char *ir_get_strl(const ir_ctx *ctx, ir_ref idx, size_t *len);
+ir_str ir_string(ir_ctx *ctx, const char *s);
+ir_str ir_stringl(ir_ctx *ctx, const char *s, size_t len);
+const char *ir_get_str(const ir_ctx *ctx, ir_str idx);
+const char *ir_get_strl(const ir_ctx *ctx, ir_str idx, size_t *len);
 
 #define IR_MAX_PROTO_PARAMS 255
 
@@ -775,15 +781,15 @@ typedef struct _ir_proto_t {
 	uint8_t param_types[5];
 } ir_proto_t;
 
-ir_ref ir_proto_0(ir_ctx *ctx, uint8_t flags, ir_type ret_type);
-ir_ref ir_proto_1(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1);
-ir_ref ir_proto_2(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2);
-ir_ref ir_proto_3(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2, ir_type t3);
-ir_ref ir_proto_4(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2, ir_type t3,
+ir_str ir_proto_0(ir_ctx *ctx, uint8_t flags, ir_type ret_type);
+ir_str ir_proto_1(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1);
+ir_str ir_proto_2(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2);
+ir_str ir_proto_3(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2, ir_type t3);
+ir_str ir_proto_4(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2, ir_type t3,
                                                                 ir_type t4);
-ir_ref ir_proto_5(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2, ir_type t3,
+ir_str ir_proto_5(ir_ctx *ctx, uint8_t flags, ir_type ret_type, ir_type t1, ir_type t2, ir_type t3,
                                                                 ir_type t4, ir_type t5);
-ir_ref ir_proto(ir_ctx *ctx, uint8_t flags, ir_type ret_type, uint32_t params_counts, uint8_t *param_types);
+ir_str ir_proto(ir_ctx *ctx, uint8_t flags, ir_type ret_type, uint32_t params_counts, uint8_t *param_types);
 
 ir_ref ir_emit(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
 
@@ -843,7 +849,9 @@ ir_ref ir_fold2(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2);
 ir_ref ir_fold3(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir_ref op3);
 
 ir_ref ir_param(ir_ctx *ctx, ir_type type, ir_ref region, const char *name, int pos);
+ir_ref ir_param_ex(ir_ctx *ctx, ir_type type, ir_ref region, ir_str name, int pos);
 ir_ref ir_var(ir_ctx *ctx, ir_type type, ir_ref region, const char *name);
+ir_ref ir_var_ex(ir_ctx *ctx, ir_type type, ir_ref region, ir_str name);
 
 /* IR Binding */
 ir_ref ir_bind(ir_ctx *ctx, ir_ref var, ir_ref def);
@@ -948,10 +956,12 @@ struct _ir_loader {
 	bool (*sym_data_end)      (ir_loader *loader, uint32_t flags);
 	bool (*func_init)         (ir_loader *loader, ir_ctx *ctx, const char *name);
 	bool (*func_process)      (ir_loader *loader, ir_ctx *ctx, const char *name);
-	void*(*resolve_sym_name)  (ir_loader *loader, const char *name, uint32_t flags);
+	void*(*resolve_sym_name)  (ir_loader *loader, ir_ctx *ctx, ir_str name, uint32_t flags);
 	bool (*has_sym)           (ir_loader *loader, const char *name);
 	bool (*add_sym)           (ir_loader *loader, const char *name, void *addr);
 	bool (*add_label)         (ir_loader *loader, const char *name, void *addr);
+	const char * (*get_str)   (ir_loader *loader, ir_str idx);
+	const char * (*get_strl)  (ir_loader *loader, ir_str idx, size_t *len);
 };
 
 void ir_loader_init(void);
