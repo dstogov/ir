@@ -77,5 +77,16 @@ run_test $TESTS_DIR/add.ir 10 20
 run_test $TESTS_DIR/add.ir 100 200
 run_test $TESTS_DIR/add.ir -1 1
 
+run_test $TESTS_DIR/sub.ir 10 3
+run_test $TESTS_DIR/sub.ir 0 5
+run_test $TESTS_DIR/sub.ir 100 200
+
+run_test $TESTS_DIR/mul.ir 3 5
+run_test $TESTS_DIR/mul.ir 7 8
+run_test $TESTS_DIR/mul.ir 100 200
+
+run_test ~/wasm2sea/build/factorial.ir 5
+run_test ~/wasm2sea/build/factorial.ir 10
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
