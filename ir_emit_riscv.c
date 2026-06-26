@@ -10,16 +10,22 @@
 
 #define MAX_REFS 4096
 #define NUM_TMP_REGS 6
+#define NUM_FTMP_REGS 6
 
 static const char *tmp_regs[NUM_TMP_REGS] = {
     "t0", "t1", "t2", "t3", "t4", "t5"
+};
+static const char *ftmp_regs[NUM_FTMP_REGS] = {
+    "ft0", "ft1", "ft2", "ft3", "ft4", "ft5"
 };
 static const char *param_regs[] = {
     "a0","a1","a2","a3","a4","a5","a6","a7"
 };
 
 static const char *reg_map[MAX_REFS];
+static const char *freg_map[MAX_REFS];
 static int reg_next;
+static int freg_next;
 
 static const char *alloc_reg(ir_ref ref) {
     if (ref <= 0 || ref >= MAX_REFS) return "t0";
@@ -30,9 +36,23 @@ static const char *alloc_reg(ir_ref ref) {
     return r;
 }
 
+static const char *alloc_freg(ir_ref ref) {
+    if (ref <= 0 || ref >= MAX_REFS) return "ft0";
+    if (freg_map[ref]) return freg_map[ref];
+    const char *r = ftmp_regs[freg_next % NUM_FTMP_REGS];
+    freg_next++;
+    freg_map[ref] = r;
+    return r;
+}
+
 static const char *get_reg(ir_ref ref) {
     if (ref <= 0 || ref >= MAX_REFS) return "zero";
     return reg_map[ref] ? reg_map[ref] : "zero";
+}
+
+static const char *get_freg(ir_ref ref) {
+    if (ref <= 0 || ref >= MAX_REFS) return "ft0";
+    return freg_map[ref] ? freg_map[ref] : "ft0";
 }
 
 static void emit_ref(FILE *f, ir_ctx *ctx, const char *dst, ir_ref ref) {
@@ -43,6 +63,28 @@ static void emit_ref(FILE *f, ir_ctx *ctx, const char *dst, ir_ref ref) {
         const char *src = get_reg(ref);
         if (strcmp(dst, src) != 0)
             fprintf(f, "\tmv\t%s, %s\n", dst, src);
+    }
+}
+
+static void emit_fref(FILE *f, ir_ctx *ctx, const char *dst, ir_ref ref, int is_double) {
+    if (IR_IS_CONST_REF(ref)) {
+        ir_insn *c = &ctx->ir_base[ref];
+        // 把浮點常數存到 stack 再 load
+        if (is_double) {
+            uint64_t bits = c->val.u64;
+            fprintf(f, "\tli\ts5, %llu\n", (unsigned long long)bits);
+            fprintf(f, "\tsd\ts5, -8(sp)\n");
+            fprintf(f, "\tfld\t%s, -8(sp)\n", dst);
+        } else {
+            uint32_t bits = c->val.u32;
+            fprintf(f, "\tli\ts5, %u\n", bits);
+            fprintf(f, "\tsw\ts5, -4(sp)\n");
+            fprintf(f, "\tflw\t%s, -4(sp)\n", dst);
+        }
+    } else {
+        const char *src = get_freg(ref);
+        if (strcmp(dst, src) != 0)
+            fprintf(f, "\t%s\t%s, %s\n", is_double ? "fmv.d" : "fmv.s", dst, src);
     }
 }
 
@@ -94,7 +136,9 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
     ir_insn *insn;
 
     memset(reg_map, 0, sizeof(reg_map));
+    memset(freg_map, 0, sizeof(freg_map));
     reg_next = 0;
+    freg_next = 0;
 
     fprintf(f, "\t.text\n");
     fprintf(f, "\t.globl %s\n", name);
@@ -111,10 +155,18 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
 
     /* assign params */
     int param_idx = 0;
+    int fparam_idx = 0;
+    static const char *fparam_regs[] = {"fa0","fa1","fa2","fa3","fa4","fa5","fa6","fa7"};
     for (i = 1; i < ctx->insns_count; i++) {
         insn = &ctx->ir_base[i];
-        if (insn->op == IR_PARAM && param_idx < 8) {
-            reg_map[i] = param_regs[param_idx++];
+        if (insn->op == IR_PARAM) {
+            if (insn->type == IR_FLOAT || insn->type == IR_DOUBLE) {
+                if (fparam_idx < 8)
+                    freg_map[i] = fparam_regs[fparam_idx++];
+            } else {
+                if (param_idx < 8)
+                    reg_map[i] = param_regs[param_idx++];
+            }
         }
     }
 
@@ -168,6 +220,14 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
             break;
 
         case IR_ADD:
+            if (insn->type == IR_FLOAT || insn->type == IR_DOUBLE) {
+                int is_d = (insn->type == IR_DOUBLE);
+                dst = alloc_freg(i);
+                const char *r1 = alloc_freg(op1); emit_fref(f, ctx, r1, op1, is_d);
+                const char *r2 = alloc_freg(op2); emit_fref(f, ctx, r2, op2, is_d);
+                fprintf(f, "\t%s\t%s, %s, %s\n", is_d ? "fadd.d" : "fadd.s", dst, r1, r2);
+                break;
+            }
             dst = alloc_reg(i);
             if (IR_IS_CONST_REF(op2)) {
                 int64_t v = ctx->ir_base[op2].val.i64;
@@ -193,6 +253,14 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
             break;
 
         case IR_SUB:
+            if (insn->type == IR_FLOAT || insn->type == IR_DOUBLE) {
+                int is_d = (insn->type == IR_DOUBLE);
+                dst = alloc_freg(i);
+                const char *r1 = alloc_freg(op1); emit_fref(f, ctx, r1, op1, is_d);
+                const char *r2 = alloc_freg(op2); emit_fref(f, ctx, r2, op2, is_d);
+                fprintf(f, "\t%s\t%s, %s, %s\n", is_d ? "fsub.d" : "fsub.s", dst, r1, r2);
+                break;
+            }
             dst = alloc_reg(i);
             if (IR_IS_CONST_REF(op2)) {
                 int64_t v = ctx->ir_base[op2].val.i64;
@@ -206,6 +274,14 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
             break;
 
         case IR_MUL:
+            if (insn->type == IR_FLOAT || insn->type == IR_DOUBLE) {
+                int is_d = (insn->type == IR_DOUBLE);
+                dst = alloc_freg(i);
+                const char *r1 = alloc_freg(op1); emit_fref(f, ctx, r1, op1, is_d);
+                const char *r2 = alloc_freg(op2); emit_fref(f, ctx, r2, op2, is_d);
+                fprintf(f, "\t%s\t%s, %s, %s\n", is_d ? "fmul.d" : "fmul.s", dst, r1, r2);
+                break;
+            }
             dst = alloc_reg(i);
             {
                 const char *r1, *r2;
@@ -266,7 +342,14 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
             break;
 
         case IR_RETURN:
-            emit_ref(f, ctx, "a0", op2);
+            if (op2 > 0) {
+                ir_insn *ret_insn = &ctx->ir_base[op2];
+                if (ret_insn->type == IR_FLOAT || ret_insn->type == IR_DOUBLE) {
+                    emit_fref(f, ctx, "fa0", op2, ret_insn->type == IR_DOUBLE);
+                } else {
+                    emit_ref(f, ctx, "a0", op2);
+                }
+            }
             fprintf(f, "\tld\ts4, 0(sp)\n");
             fprintf(f, "\tld\ts3, 8(sp)\n");
             fprintf(f, "\tld\ts2, 16(sp)\n");
