@@ -15,6 +15,13 @@
 static const char *tmp_regs[NUM_TMP_REGS] = {
     "t0", "t1", "t2", "t3", "t4", "t5"
 };
+/* PHI regs: use callee-saved s1~s6 to avoid clobber by tmp_regs */
+#define NUM_PHI_REGS 6
+static const char *phi_regs[NUM_PHI_REGS] = {
+    "s1", "s2", "s3", "s4", "s6", "s7"
+};
+static int phi_next;
+static const char *phi_reg_map[MAX_REFS];
 static const char *ftmp_regs[NUM_FTMP_REGS] = {
     "ft0", "ft1", "ft2", "ft3", "ft4", "ft5"
 };
@@ -94,8 +101,13 @@ static void emit_phi_init(ir_ctx *ctx, FILE *f, ir_ref loop_begin) {
     for (i = 1; i < ctx->insns_count; i++) {
         ir_insn *insn = &ctx->ir_base[i];
         if (insn->op == IR_PHI && insn->op1 == loop_begin) {
-            const char *dst = alloc_reg(i);
-            emit_ref(f, ctx, dst, insn->op2);
+            /* allocate phi reg if not yet done */
+            if (!phi_reg_map[i]) {
+                phi_reg_map[i] = phi_regs[phi_next % NUM_PHI_REGS];
+                phi_next++;
+            }
+            reg_map[i] = phi_reg_map[i];
+            emit_ref(f, ctx, phi_reg_map[i], insn->op2);
         }
     }
 }
@@ -137,8 +149,10 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
 
     memset(reg_map, 0, sizeof(reg_map));
     memset(freg_map, 0, sizeof(freg_map));
+    memset(phi_reg_map, 0, sizeof(phi_reg_map));
     reg_next = 0;
     freg_next = 0;
+    phi_next = 0;
 
     fprintf(f, "\t.text\n");
     fprintf(f, "\t.globl %s\n", name);
@@ -203,7 +217,12 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
 
         case IR_PHI:
             /* handled by emit_phi_init/emit_phi_update */
-            alloc_reg(i); /* ensure reg is allocated */
+            /* use callee-saved regs to avoid clobber */
+            if (!phi_reg_map[i]) {
+                phi_reg_map[i] = phi_regs[phi_next % NUM_PHI_REGS];
+                phi_next++;
+            }
+            reg_map[i] = phi_reg_map[i];
             break;
 
         case IR_BEGIN:
