@@ -297,28 +297,92 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
             }
             break;
 
-        case IR_EQ: case IR_NE: case IR_LT:
-        case IR_GE: case IR_LE: case IR_GT:
-        case IR_ULT: case IR_UGE: case IR_ULE: case IR_UGT:
+        case IR_DIV:
+            if (insn->type == IR_FLOAT || insn->type == IR_DOUBLE) {
+                int is_d = (insn->type == IR_DOUBLE);
+                dst = alloc_freg(i);
+                const char *r1 = alloc_freg(op1); emit_fref(f, ctx, r1, op1, is_d);
+                const char *r2 = alloc_freg(op2); emit_fref(f, ctx, r2, op2, is_d);
+                fprintf(f, "\t%s\t%s, %s, %s\n", is_d ? "fdiv.d" : "fdiv.s", dst, r1, r2);
+                break;
+            }
             dst = alloc_reg(i);
             {
                 const char *r1, *r2;
                 if (IR_IS_CONST_REF(op1)) {
                     fprintf(f, "\tli\ts5, %lld\n", (long long)ctx->ir_base[op1].val.i64);
                     r1 = "s5";
-                } else r1 = op1 > 0 ? get_reg(op1) : "zero";
+                } else r1 = get_reg(op1);
                 if (IR_IS_CONST_REF(op2)) {
                     fprintf(f, "\tli\ts6, %lld\n", (long long)ctx->ir_base[op2].val.i64);
                     r2 = "s6";
-                } else r2 = op2 > 0 ? get_reg(op2) : "zero";
-                switch (insn->op) {
-                case IR_EQ:  fprintf(f,"\tsub\t%s,%s,%s\n\tseqz\t%s,%s\n",dst,r1,r2,dst,dst); break;
-                case IR_NE:  fprintf(f,"\tsub\t%s,%s,%s\n\tsnez\t%s,%s\n",dst,r1,r2,dst,dst); break;
-                case IR_LT:  case IR_ULT: fprintf(f,"\tslt\t%s,%s,%s\n",dst,r1,r2); break;
-                case IR_GE:  case IR_UGE: fprintf(f,"\tslt\t%s,%s,%s\n\txori\t%s,%s,1\n",dst,r1,r2,dst,dst); break;
-                case IR_LE:  case IR_ULE: fprintf(f,"\tslt\t%s,%s,%s\n\txori\t%s,%s,1\n",dst,r2,r1,dst,dst); break;
-                case IR_GT:  case IR_UGT: fprintf(f,"\tslt\t%s,%s,%s\n",dst,r2,r1); break;
-                default: break;
+                } else r2 = get_reg(op2);
+                fprintf(f, "\tdiv\t%s, %s, %s\n", dst, r1, r2);
+            }
+            break;
+
+        case IR_EQ: case IR_NE: case IR_LT:
+        case IR_GE: case IR_LE: case IR_GT:
+        case IR_ULT: case IR_UGE: case IR_ULE: case IR_UGT:
+            dst = alloc_reg(i);
+            {
+                /* 浮點比較：operand 的 type 看 op1 的 insn type */
+                ir_insn *op1_insn = (op1 > 0 && !IR_IS_CONST_REF(op1)) ? &ctx->ir_base[op1] : NULL;
+                int is_float = op1_insn && (op1_insn->type == IR_FLOAT || op1_insn->type == IR_DOUBLE);
+                int is_d     = op1_insn && (op1_insn->type == IR_DOUBLE);
+
+                if (is_float) {
+                    /* 把兩個 operand 載入 float 暫存器 */
+                    const char *fr1 = alloc_freg(op1); emit_fref(f, ctx, fr1, op1, is_d);
+                    const char *fr2 = alloc_freg(op2); emit_fref(f, ctx, fr2, op2, is_d);
+                    const char *suf = is_d ? "d" : "s";
+                    switch (insn->op) {
+                    /* feq/flt/fle 直接有對應指令 */
+                    case IR_EQ:
+                        fprintf(f, "\tfeq.%s\t%s, %s, %s\n", suf, dst, fr1, fr2);
+                        break;
+                    case IR_NE:
+                        fprintf(f, "\tfeq.%s\t%s, %s, %s\n", suf, dst, fr1, fr2);
+                        fprintf(f, "\txori\t%s, %s, 1\n", dst, dst);
+                        break;
+                    case IR_LT:
+                        fprintf(f, "\tflt.%s\t%s, %s, %s\n", suf, dst, fr1, fr2);
+                        break;
+                    case IR_LE:
+                        fprintf(f, "\tfle.%s\t%s, %s, %s\n", suf, dst, fr1, fr2);
+                        break;
+                    case IR_GT:
+                        /* a > b  ≡  b < a */
+                        fprintf(f, "\tflt.%s\t%s, %s, %s\n", suf, dst, fr2, fr1);
+                        break;
+                    case IR_GE:
+                        /* a >= b  ≡  b <= a */
+                        fprintf(f, "\tfle.%s\t%s, %s, %s\n", suf, dst, fr2, fr1);
+                        break;
+                    default:
+                        fprintf(f, "\t# unsupported float cmp op=%d\n", insn->op);
+                        break;
+                    }
+                } else {
+                    /* 原整數比較邏輯 */
+                    const char *r1, *r2;
+                    if (IR_IS_CONST_REF(op1)) {
+                        fprintf(f, "\tli\ts5, %lld\n", (long long)ctx->ir_base[op1].val.i64);
+                        r1 = "s5";
+                    } else r1 = op1 > 0 ? get_reg(op1) : "zero";
+                    if (IR_IS_CONST_REF(op2)) {
+                        fprintf(f, "\tli\ts6, %lld\n", (long long)ctx->ir_base[op2].val.i64);
+                        r2 = "s6";
+                    } else r2 = op2 > 0 ? get_reg(op2) : "zero";
+                    switch (insn->op) {
+                    case IR_EQ:  fprintf(f,"\tsub\t%s,%s,%s\n\tseqz\t%s,%s\n",dst,r1,r2,dst,dst); break;
+                    case IR_NE:  fprintf(f,"\tsub\t%s,%s,%s\n\tsnez\t%s,%s\n",dst,r1,r2,dst,dst); break;
+                    case IR_LT:  case IR_ULT: fprintf(f,"\tslt\t%s,%s,%s\n",dst,r1,r2); break;
+                    case IR_GE:  case IR_UGE: fprintf(f,"\tslt\t%s,%s,%s\n\txori\t%s,%s,1\n",dst,r1,r2,dst,dst); break;
+                    case IR_LE:  case IR_ULE: fprintf(f,"\tslt\t%s,%s,%s\n\txori\t%s,%s,1\n",dst,r2,r1,dst,dst); break;
+                    case IR_GT:  case IR_UGT: fprintf(f,"\tslt\t%s,%s,%s\n",dst,r2,r1); break;
+                    default: break;
+                    }
                 }
             }
             break;
@@ -359,6 +423,67 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
             fprintf(f, "\taddi\tsp, sp, 48\n");
             fprintf(f, "\tret\n");
             break;
+
+        case IR_INT2FP: {
+            /* int → float/double */
+            int is_d = (insn->type == IR_DOUBLE);
+            dst = alloc_freg(i);  /* dst 是 float reg */
+            const char *src;
+            if (IR_IS_CONST_REF(op1)) {
+                fprintf(f, "\tli\ts5, %lld\n", (long long)ctx->ir_base[op1].val.i64);
+                src = "s5";
+            } else src = get_reg(op1);
+            /* fcvt.d.l = int64→double, fcvt.s.l = int64→float */
+            fprintf(f, "\t%s\t%s, %s\n", is_d ? "fcvt.d.l" : "fcvt.s.l", dst, src);
+            break;
+        }
+
+        case IR_FP2INT: {
+            /* float/double → int */
+            ir_insn *src_insn = (op1 > 0 && !IR_IS_CONST_REF(op1)) ? &ctx->ir_base[op1] : NULL;
+            int src_is_d = src_insn && (src_insn->type == IR_DOUBLE);
+            dst = alloc_reg(i);  /* dst 是 int reg */
+            const char *fr1 = alloc_freg(op1); emit_fref(f, ctx, fr1, op1, src_is_d);
+            /* fcvt.l.d = double→int64 (round to zero), fcvt.l.s = float→int64 */
+            fprintf(f, "\t%s\t%s, %s, rtz\n", src_is_d ? "fcvt.l.d" : "fcvt.l.s", dst, fr1);
+            break;
+        }
+
+        case IR_FP2FP: {
+            /* f32 ↔ f64 */
+            int dst_is_d = (insn->type == IR_DOUBLE);
+            dst = alloc_freg(i);
+            ir_insn *src_insn = (op1 > 0 && !IR_IS_CONST_REF(op1)) ? &ctx->ir_base[op1] : NULL;
+            int src_is_d = src_insn && (src_insn->type == IR_DOUBLE);
+            const char *fr1 = alloc_freg(op1); emit_fref(f, ctx, fr1, op1, src_is_d);
+            if (dst_is_d && !src_is_d)
+                fprintf(f, "\tfcvt.d.s\t%s, %s\n", dst, fr1);  /* f32 → f64 */
+            else if (!dst_is_d && src_is_d)
+                fprintf(f, "\tfcvt.s.d\t%s, %s\n", dst, fr1);  /* f64 → f32 */
+            else
+                fprintf(f, "\t%s\t%s, %s\n", dst_is_d ? "fmv.d" : "fmv.s", dst, fr1);
+            break;
+        }
+
+        case IR_ZEXT:
+        case IR_SEXT: {
+            dst = alloc_reg(i);
+            /* bool/int → wider int，直接 mv 就夠（RISC-V register 本來就是 64-bit） */
+            if (IR_IS_CONST_REF(op1))
+                fprintf(f, "\tli\t%s, %lld\n", dst, (long long)ctx->ir_base[op1].val.i64);
+            else
+                fprintf(f, "\tmv\t%s, %s\n", dst, get_reg(op1));
+            break;
+        }
+
+        case IR_TRUNC: {
+            dst = alloc_reg(i);
+            if (IR_IS_CONST_REF(op1))
+                fprintf(f, "\tli\t%s, %lld\n", dst, (long long)ctx->ir_base[op1].val.i64);
+            else
+                fprintf(f, "\tmv\t%s, %s\n", dst, get_reg(op1));
+            break;
+        }
 
         case IR_VAR:
         case IR_VSTORE:
