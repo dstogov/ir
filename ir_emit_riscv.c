@@ -197,8 +197,41 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
         case IR_PARAM:
             break;
 
-        case IR_END:
+        case IR_END: {
+            ir_insn *parent = (op1 > 0) ? &ctx->ir_base[op1] : NULL;
+            int is_if_true  = parent && parent->op == IR_IF_TRUE;
+            int is_if_false = parent && parent->op == IR_IF_FALSE;
+            if (is_if_true || is_if_false) {
+                /* find MERGE after this END, emit PHI assignments */
+                for (ir_ref m = i + 1; m < ctx->insns_count; m++) {
+                    ir_insn *mi = &ctx->ir_base[m];
+                    if (mi->op == IR_MERGE) {
+                        /* emit PHI value for this branch */
+                        for (ir_ref p = m + 1; p < ctx->insns_count; p++) {
+                            ir_insn *pi = &ctx->ir_base[p];
+                            if (pi->op != IR_PHI || pi->op1 != m) break;
+                            /* op2 = true-branch value, op3 = false-branch value */
+                            ir_ref val = is_if_true ? pi->op2 : pi->op3;
+                            if (pi->type == IR_FLOAT || pi->type == IR_DOUBLE) {
+                                int is_d = (pi->type == IR_DOUBLE);
+                                const char *pdst = alloc_freg(p);
+                                emit_fref(f, ctx, pdst, val, is_d);
+                            } else {
+                                const char *pdst = alloc_reg(p);
+                                emit_ref(f, ctx, pdst, val);
+                            }
+                        }
+                        /* jump to merge (only for true branch) */
+                        if (is_if_true) {
+                            ir_ref if_ref = parent->op1;
+                            fprintf(f, "\tj\t.Lend_%d\n", if_ref);
+                        }
+                        break;
+                    }
+                }
+            }
             break;
+        }
 
         case IR_LOOP_BEGIN:
             emit_phi_init(ctx, f, i);
@@ -228,14 +261,42 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
         case IR_BEGIN:
         case IR_MERGE:
             fprintf(f, ".Lbb_%d:\n", i);
+            {
+                /* MERGE op1/op2 are ENDs; trace END->parent to find IF_FALSE->IF */
+                ir_ref ops[2] = {insn->op1, insn->op2};
+                for (int k = 0; k < 2; k++) {
+                    ir_ref e = ops[k];
+                    if (e <= 0) continue;
+                    ir_insn *ep = &ctx->ir_base[e];
+                    /* e might be END whose op1 is IF_FALSE */
+                    if (ep->op == IR_END && ep->op1 > 0) {
+                        ir_insn *pp = &ctx->ir_base[ep->op1];
+                        if (pp->op == IR_IF_FALSE) {
+                            fprintf(f, ".Lend_%d:\n", pp->op1);
+                            break;
+                        }
+                    }
+                    /* or e is directly IF_FALSE */
+                    if (ep->op == IR_IF_FALSE) {
+                        fprintf(f, ".Lend_%d:\n", ep->op1);
+                        break;
+                    }
+                }
+            }
             break;
 
         case IR_COPY:
-            dst = alloc_reg(i);
-            if (IR_IS_CONST_REF(op1))
-                fprintf(f, "\tli\t%s, %lld\n", dst, (long long)ctx->ir_base[op1].val.i64);
-            else if (op1 > 0)
-                fprintf(f, "\tmv\t%s, %s\n", dst, get_reg(op1));
+            if (insn->type == IR_FLOAT || insn->type == IR_DOUBLE) {
+                int is_d = (insn->type == IR_DOUBLE);
+                dst = alloc_freg(i);
+                emit_fref(f, ctx, dst, op1, is_d);
+            } else {
+                dst = alloc_reg(i);
+                if (IR_IS_CONST_REF(op1))
+                    fprintf(f, "\tli\t%s, %lld\n", dst, (long long)ctx->ir_base[op1].val.i64);
+                else if (op1 > 0)
+                    fprintf(f, "\tmv\t%s, %s\n", dst, get_reg(op1));
+            }
             break;
 
         case IR_ADD:
