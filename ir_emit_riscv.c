@@ -45,6 +45,7 @@ static ir_ref int_owner[NUM_INT_REGS];
 static ir_ref flt_owner[NUM_FLT_REGS];
 static int current_insn;
 
+#define MAX_LOOPS 16
 static void compute_last_use(ir_ctx *ctx) {
     memset(last_use, 0, sizeof(last_use));
     ir_ref i;
@@ -58,19 +59,32 @@ static void compute_last_use(ir_ctx *ctx) {
         if (insn->op3 > 0 && !IR_IS_CONST_REF(insn->op3) && insn->op3 < MAX_REFS)
             last_use[insn->op3] = i;
     }
-    /* second pass: extend last_use for values live across loops
-     * any value defined before LOOP_BEGIN and used inside the loop
-     * must stay alive until LOOP_END */
-    ir_ref loop_begin = 0, loop_end = 0;
+    /* second pass: collect all loop begin/end pairs */
+    ir_ref loop_begins[MAX_LOOPS], loop_ends[MAX_LOOPS];
+    int num_loops = 0;
+    int depth = 0;
+    ir_ref stack[MAX_LOOPS];
     for (i = 1; i < ctx->insns_count; i++) {
         ir_insn *insn = &ctx->ir_base[i];
-        if (insn->op == IR_LOOP_BEGIN) loop_begin = i;
-        if (insn->op == IR_LOOP_END)   loop_end = i;
+        if (insn->op == IR_LOOP_BEGIN) {
+            stack[depth++] = i;
+        } else if (insn->op == IR_LOOP_END && depth > 0) {
+            ir_ref lb = stack[--depth];
+            if (num_loops < MAX_LOOPS) {
+                loop_begins[num_loops] = lb;
+                loop_ends[num_loops] = i;
+                num_loops++;
+            }
+        }
     }
-    if (loop_begin > 0 && loop_end > 0) {
-        for (i = 1; i < (ir_ref)loop_begin; i++) {
-            if (last_use[i] > loop_begin && last_use[i] < loop_end)
-                last_use[i] = loop_end;
+    /* third pass: for each loop, extend last_use of values defined
+     * before the loop but used inside it */
+    for (int l = 0; l < num_loops; l++) {
+        ir_ref lb = loop_begins[l];
+        ir_ref le = loop_ends[l];
+        for (i = 1; i < lb; i++) {
+            if (last_use[i] > lb && last_use[i] < le)
+                last_use[i] = le;
         }
     }
 }
@@ -78,15 +92,25 @@ static void compute_last_use(ir_ctx *ctx) {
 static const char *alloc_reg(ir_ref ref) {
     if (ref <= 0 || ref >= MAX_REFS) return "t0";
     if (reg_map[ref]) return reg_map[ref];
+    /* first: try to find a truly free slot (owner==0) */
     for (int k = 0; k < NUM_INT_REGS; k++) {
-        ir_ref owner = int_owner[k];
-        if (owner == 0 || last_use[owner] < current_insn) {
+        if (int_owner[k] == 0) {
             int_owner[k] = ref;
             reg_map[ref] = int_regs[k];
             return int_regs[k];
         }
     }
-    /* evict earliest last_use */
+    /* second: find expired (last_use strictly < current_insn) */
+    for (int k = 0; k < NUM_INT_REGS; k++) {
+        ir_ref owner = int_owner[k];
+        if (last_use[owner] < current_insn) {
+            reg_map[owner] = NULL;
+            int_owner[k] = ref;
+            reg_map[ref] = int_regs[k];
+            return int_regs[k];
+        }
+    }
+    /* spill: evict the one with smallest last_use */
     int best = 0;
     for (int k = 1; k < NUM_INT_REGS; k++)
         if (last_use[int_owner[k]] < last_use[int_owner[best]]) best = k;
@@ -101,8 +125,16 @@ static const char *alloc_freg(ir_ref ref) {
     if (ref <= 0 || ref >= MAX_REFS) return "ft0";
     if (freg_map[ref]) return freg_map[ref];
     for (int k = 0; k < NUM_FLT_REGS; k++) {
+        if (flt_owner[k] == 0) {
+            flt_owner[k] = ref;
+            freg_map[ref] = flt_regs[k];
+            return flt_regs[k];
+        }
+    }
+    for (int k = 0; k < NUM_FLT_REGS; k++) {
         ir_ref owner = flt_owner[k];
-        if (owner == 0 || last_use[owner] < current_insn) {
+        if (last_use[owner] < current_insn) {
+            freg_map[owner] = NULL;
             flt_owner[k] = ref;
             freg_map[ref] = flt_regs[k];
             return flt_regs[k];
