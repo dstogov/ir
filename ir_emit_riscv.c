@@ -9,21 +9,27 @@
 #include <stdlib.h>
 
 #define MAX_REFS 4096
-#define NUM_TMP_REGS 6
-#define NUM_FTMP_REGS 6
 
-static const char *tmp_regs[NUM_TMP_REGS] = {
-    "t0", "t1", "t2", "t3", "t4", "t5"
+/* Integer regs: t0-t6 (caller-saved) */
+#define NUM_INT_REGS 7
+static const char *int_regs[NUM_INT_REGS] = {
+    "t0","t1","t2","t3","t4","t5","t6"
 };
-/* PHI regs: use callee-saved s1~s6 to avoid clobber by tmp_regs */
+/* Float regs: ft0-ft11 (caller-saved) */
+#define NUM_FLT_REGS 12
+static const char *flt_regs[NUM_FLT_REGS] = {
+    "ft0","ft1","ft2","ft3","ft4","ft5",
+    "ft6","ft7","ft8","ft9","ft10","ft11"
+};
+/* PHI regs: callee-saved int */
 #define NUM_PHI_REGS 6
 static const char *phi_regs[NUM_PHI_REGS] = {
-    "s1", "s2", "s3", "s4", "s6", "s7"
+    "s1","s2","s3","s4","s6","s7"
 };
-static int phi_next;
-static const char *phi_reg_map[MAX_REFS];
-static const char *ftmp_regs[NUM_FTMP_REGS] = {
-    "ft0", "ft1", "ft2", "ft3", "ft4", "ft5"
+/* Float PHI regs: callee-saved float */
+#define NUM_FPHI_REGS 8
+static const char *fphi_regs[NUM_FPHI_REGS] = {
+    "fs0","fs1","fs2","fs3","fs4","fs5","fs6","fs7"
 };
 static const char *param_regs[] = {
     "a0","a1","a2","a3","a4","a5","a6","a7"
@@ -31,25 +37,85 @@ static const char *param_regs[] = {
 
 static const char *reg_map[MAX_REFS];
 static const char *freg_map[MAX_REFS];
-static int reg_next;
-static int freg_next;
+static const char *phi_reg_map[MAX_REFS];
+static int phi_next;
+
+static int last_use[MAX_REFS];
+static ir_ref int_owner[NUM_INT_REGS];
+static ir_ref flt_owner[NUM_FLT_REGS];
+static int current_insn;
+
+static void compute_last_use(ir_ctx *ctx) {
+    memset(last_use, 0, sizeof(last_use));
+    ir_ref i;
+    /* first pass: basic last_use */
+    for (i = 1; i < ctx->insns_count; i++) {
+        ir_insn *insn = &ctx->ir_base[i];
+        if (insn->op1 > 0 && !IR_IS_CONST_REF(insn->op1) && insn->op1 < MAX_REFS)
+            last_use[insn->op1] = i;
+        if (insn->op2 > 0 && !IR_IS_CONST_REF(insn->op2) && insn->op2 < MAX_REFS)
+            last_use[insn->op2] = i;
+        if (insn->op3 > 0 && !IR_IS_CONST_REF(insn->op3) && insn->op3 < MAX_REFS)
+            last_use[insn->op3] = i;
+    }
+    /* second pass: extend last_use for values live across loops
+     * any value defined before LOOP_BEGIN and used inside the loop
+     * must stay alive until LOOP_END */
+    ir_ref loop_begin = 0, loop_end = 0;
+    for (i = 1; i < ctx->insns_count; i++) {
+        ir_insn *insn = &ctx->ir_base[i];
+        if (insn->op == IR_LOOP_BEGIN) loop_begin = i;
+        if (insn->op == IR_LOOP_END)   loop_end = i;
+    }
+    if (loop_begin > 0 && loop_end > 0) {
+        for (i = 1; i < (ir_ref)loop_begin; i++) {
+            if (last_use[i] > loop_begin && last_use[i] < loop_end)
+                last_use[i] = loop_end;
+        }
+    }
+}
 
 static const char *alloc_reg(ir_ref ref) {
     if (ref <= 0 || ref >= MAX_REFS) return "t0";
     if (reg_map[ref]) return reg_map[ref];
-    const char *r = tmp_regs[reg_next % NUM_TMP_REGS];
-    reg_next++;
-    reg_map[ref] = r;
-    return r;
+    for (int k = 0; k < NUM_INT_REGS; k++) {
+        ir_ref owner = int_owner[k];
+        if (owner == 0 || last_use[owner] < current_insn) {
+            int_owner[k] = ref;
+            reg_map[ref] = int_regs[k];
+            return int_regs[k];
+        }
+    }
+    /* evict earliest last_use */
+    int best = 0;
+    for (int k = 1; k < NUM_INT_REGS; k++)
+        if (last_use[int_owner[k]] < last_use[int_owner[best]]) best = k;
+    ir_ref evicted = int_owner[best];
+    reg_map[evicted] = NULL;
+    int_owner[best] = ref;
+    reg_map[ref] = int_regs[best];
+    return int_regs[best];
 }
 
 static const char *alloc_freg(ir_ref ref) {
     if (ref <= 0 || ref >= MAX_REFS) return "ft0";
     if (freg_map[ref]) return freg_map[ref];
-    const char *r = ftmp_regs[freg_next % NUM_FTMP_REGS];
-    freg_next++;
-    freg_map[ref] = r;
-    return r;
+    for (int k = 0; k < NUM_FLT_REGS; k++) {
+        ir_ref owner = flt_owner[k];
+        if (owner == 0 || last_use[owner] < current_insn) {
+            flt_owner[k] = ref;
+            freg_map[ref] = flt_regs[k];
+            return flt_regs[k];
+        }
+    }
+    int best = 0;
+    for (int k = 1; k < NUM_FLT_REGS; k++)
+        if (last_use[flt_owner[k]] < last_use[flt_owner[best]]) best = k;
+    ir_ref evicted = flt_owner[best];
+    freg_map[evicted] = NULL;
+    flt_owner[best] = ref;
+    freg_map[ref] = flt_regs[best];
+    return flt_regs[best];
 }
 
 static const char *get_reg(ir_ref ref) {
@@ -101,13 +167,19 @@ static void emit_phi_init(ir_ctx *ctx, FILE *f, ir_ref loop_begin) {
     for (i = 1; i < ctx->insns_count; i++) {
         ir_insn *insn = &ctx->ir_base[i];
         if (insn->op == IR_PHI && insn->op1 == loop_begin) {
-            /* allocate phi reg if not yet done */
-            if (!phi_reg_map[i]) {
-                phi_reg_map[i] = phi_regs[phi_next % NUM_PHI_REGS];
-                phi_next++;
+            int is_float = (insn->type == IR_FLOAT || insn->type == IR_DOUBLE);
+            int is_d = (insn->type == IR_DOUBLE);
+            if (is_float) {
+                const char *fr = alloc_freg(i);
+                emit_fref(f, ctx, fr, insn->op2, is_d);
+            } else {
+                if (!phi_reg_map[i]) {
+                    phi_reg_map[i] = phi_regs[phi_next % NUM_PHI_REGS];
+                    phi_next++;
+                }
+                reg_map[i] = phi_reg_map[i];
+                emit_ref(f, ctx, phi_reg_map[i], insn->op2);
             }
-            reg_map[i] = phi_reg_map[i];
-            emit_ref(f, ctx, phi_reg_map[i], insn->op2);
         }
     }
 }
@@ -115,29 +187,46 @@ static void emit_phi_init(ir_ctx *ctx, FILE *f, ir_ref loop_begin) {
 /* emit PHI back-edge updates before loop end */
 static void emit_phi_update(ir_ctx *ctx, FILE *f, ir_ref loop_begin) {
     ir_ref i;
-    /* use scratch space to avoid clobber */
-    /* simple: copy to scratch first, then to phi regs */
     static const char *scratch[] = {"s1","s2","s3","s4","s5","s6"};
-    int sc = 0;
+    static const char *fscratch[] = {"ft6","ft7","ft8","ft9","ft10","ft11"};
+    int sc = 0, fsc = 0;
     /* first pass: load back-edge values into scratch */
     for (i = 1; i < ctx->insns_count; i++) {
         ir_insn *insn = &ctx->ir_base[i];
         if (insn->op == IR_PHI && insn->op1 == loop_begin) {
-            const char *s = scratch[sc % 6];
-            emit_ref(f, ctx, s, insn->op3);
-            sc++;
+            int is_float = (insn->type == IR_FLOAT || insn->type == IR_DOUBLE);
+            int is_d = (insn->type == IR_DOUBLE);
+            if (is_float) {
+                const char *fs = fscratch[fsc % 6];
+                emit_fref(f, ctx, fs, insn->op3, is_d);
+                fsc++;
+            } else {
+                const char *s = scratch[sc % 6];
+                emit_ref(f, ctx, s, insn->op3);
+                sc++;
+            }
         }
     }
     /* second pass: move scratch to phi regs */
-    sc = 0;
+    sc = 0; fsc = 0;
     for (i = 1; i < ctx->insns_count; i++) {
         ir_insn *insn = &ctx->ir_base[i];
         if (insn->op == IR_PHI && insn->op1 == loop_begin) {
-            const char *dst = get_reg(i);
-            const char *s = scratch[sc % 6];
-            if (strcmp(dst, s) != 0)
-                fprintf(f, "\tmv\t%s, %s\n", dst, s);
-            sc++;
+            int is_float = (insn->type == IR_FLOAT || insn->type == IR_DOUBLE);
+            int is_d = (insn->type == IR_DOUBLE);
+            if (is_float) {
+                const char *pdst = get_freg(i);
+                const char *fs = fscratch[fsc % 6];
+                if (strcmp(pdst, fs) != 0)
+                    fprintf(f, "\t%s\t%s, %s\n", is_d ? "fmv.d" : "fmv.s", pdst, fs);
+                fsc++;
+            } else {
+                const char *dst = get_reg(i);
+                const char *s = scratch[sc % 6];
+                if (strcmp(dst, s) != 0)
+                    fprintf(f, "\tmv\t%s, %s\n", dst, s);
+                sc++;
+            }
         }
     }
 }
@@ -150,9 +239,12 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
     memset(reg_map, 0, sizeof(reg_map));
     memset(freg_map, 0, sizeof(freg_map));
     memset(phi_reg_map, 0, sizeof(phi_reg_map));
-    reg_next = 0;
-    freg_next = 0;
+    memset(last_use, 0, sizeof(last_use));
+    memset(int_owner, 0, sizeof(int_owner));
+    memset(flt_owner, 0, sizeof(flt_owner));
     phi_next = 0;
+    current_insn = 0;
+    compute_last_use(ctx);
 
     fprintf(f, "\t.text\n");
     fprintf(f, "\t.globl %s\n", name);
@@ -186,6 +278,7 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
 
     /* main emit loop */
     for (i = 1; i < ctx->insns_count; i++) {
+        current_insn = i;
         insn = &ctx->ir_base[i];
         ir_ref op1 = insn->op1;
         ir_ref op2 = insn->op2;
@@ -250,12 +343,15 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
 
         case IR_PHI:
             /* handled by emit_phi_init/emit_phi_update */
-            /* use callee-saved regs to avoid clobber */
-            if (!phi_reg_map[i]) {
-                phi_reg_map[i] = phi_regs[phi_next % NUM_PHI_REGS];
-                phi_next++;
+            if (insn->type == IR_FLOAT || insn->type == IR_DOUBLE) {
+                alloc_freg(i);  /* ensure freg allocated */
+            } else {
+                if (!phi_reg_map[i]) {
+                    phi_reg_map[i] = phi_regs[phi_next % NUM_PHI_REGS];
+                    phi_next++;
+                }
+                reg_map[i] = phi_reg_map[i];
             }
-            reg_map[i] = phi_reg_map[i];
             break;
 
         case IR_BEGIN:
@@ -562,6 +658,43 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
                 fprintf(f, "\tli\t%s, %lld\n", dst, (long long)ctx->ir_base[op1].val.i64);
             else
                 fprintf(f, "\tmv\t%s, %s\n", dst, get_reg(op1));
+            break;
+        }
+
+        case IR_LOAD: {
+            /* op1 = control, op2 = address */
+            ir_ref addr_ref = insn->op2;
+            const char *addr = IR_IS_CONST_REF(addr_ref) ? "zero" : get_reg(addr_ref);
+            if (insn->type == IR_FLOAT) {
+                dst = alloc_freg(i);
+                fprintf(f, "\tflw\t%s, 0(%s)\n", dst, addr);
+            } else if (insn->type == IR_DOUBLE) {
+                dst = alloc_freg(i);
+                fprintf(f, "\tfld\t%s, 0(%s)\n", dst, addr);
+            } else {
+                dst = alloc_reg(i);
+                fprintf(f, "\tld\t%s, 0(%s)\n", dst, addr);
+            }
+            break;
+        }
+
+        case IR_STORE: {
+            /* op1 = control, op2 = address, op3 = value */
+            ir_ref addr_ref = insn->op2;
+            ir_ref val_ref  = insn->op3;
+            const char *addr = IR_IS_CONST_REF(addr_ref) ? "zero" : get_reg(addr_ref);
+            ir_insn *val_insn = (val_ref > 0 && !IR_IS_CONST_REF(val_ref)) ? &ctx->ir_base[val_ref] : NULL;
+            int is_float = val_insn && (val_insn->type == IR_FLOAT || val_insn->type == IR_DOUBLE);
+            if (is_float) {
+                int is_d = val_insn->type == IR_DOUBLE;
+                const char *fr = get_freg(val_ref);
+                fprintf(f, "\t%s\t%s, 0(%s)\n", is_d ? "fsd" : "fsw", fr, addr);
+            } else {
+                const char *vr = IR_IS_CONST_REF(val_ref) ? "s5" : get_reg(val_ref);
+                if (IR_IS_CONST_REF(val_ref))
+                    fprintf(f, "\tli\ts5, %lld\n", (long long)ctx->ir_base[val_ref].val.i64);
+                fprintf(f, "\tsd\t%s, 0(%s)\n", vr, addr);
+            }
             break;
         }
 
