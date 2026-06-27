@@ -1,124 +1,131 @@
 /*
  * IR - Lightweight JIT Compilation Framework
  * (RISC-V assembly text code generator)
+ *
+ * Design: two-phase operand preparation + post-emit alloc
+ *   1. prep_int / prep_flt  : load operand into scratch (t6 / ft11)
+ *                             or return its current phys reg
+ *   2. emit the instruction
+ *   3. alloc_reg / alloc_freg : assign a phys reg to the result
+ *                              (may spill someone else, but operands
+ *                               are already safe in scratch / stable regs)
  */
 
 #include "ir.h"
 #include "ir_private.h"
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
-#define MAX_REFS 4096
+#define MAX_REFS  4096
+#define MAX_SPILL 64
+#define MAX_LOOPS 16
 
-/* Integer regs: t0-t6 (caller-saved) */
-#define NUM_INT_REGS 7
+/* ── Physical register pools ──────────────────────────────────────────────── */
+/* Scratch regs NOT in pool: t6 (int), ft11 (flt), s5/s6 (codegen scratch)  */
+/* NOTE: s1-s4, s7-s8 are used for PHI regs — keep them OUT of LSRA pool */
+#define NUM_INT_REGS 10
 static const char *int_regs[NUM_INT_REGS] = {
-    "t0","t1","t2","t3","t4","t5","t6"
+    "t0","t1","t2","t3","t4","t5",
+    "s9","s10","s11","a6"
 };
-/* Float regs: ft0-ft11 (caller-saved) */
-#define NUM_FLT_REGS 12
+#define NUM_FLT_REGS 18
 static const char *flt_regs[NUM_FLT_REGS] = {
-    "ft0","ft1","ft2","ft3","ft4","ft5",
-    "ft6","ft7","ft8","ft9","ft10","ft11"
+    "ft0","ft1","ft2","ft3","ft4","ft5","ft6","ft7","ft8","ft9","ft10",
+    "fs0","fs1","fs2","fs3","fs4","fs5","fs6"
 };
-/* PHI regs: callee-saved int */
 #define NUM_PHI_REGS 6
 static const char *phi_regs[NUM_PHI_REGS] = {
-    "s1","s2","s3","s4","s6","s7"
+    "s1","s2","s3","s4","s7","s8"
 };
-/* Float PHI regs: callee-saved float */
-#define NUM_FPHI_REGS 8
+#define NUM_FPHI_REGS 6
 static const char *fphi_regs[NUM_FPHI_REGS] = {
-    "fs0","fs1","fs2","fs3","fs4","fs5","fs6","fs7"
+    "fs0","fs1","fs2","fs3","fs4","fs5"
 };
-static const char *param_regs[] = {
-    "a0","a1","a2","a3","a4","a5","a6","a7"
-};
+static const char *param_regs[]  = {"a0","a1","a2","a3","a4","a5","a6","a7"};
+static const char *fparam_regs[] = {"fa0","fa1","fa2","fa3","fa4","fa5","fa6","fa7"};
 
-static const char *reg_map[MAX_REFS];
+/* ── LSRA state ───────────────────────────────────────────────────────────── */
+static const char *reg_map [MAX_REFS];
 static const char *freg_map[MAX_REFS];
 static const char *phi_reg_map[MAX_REFS];
 static int phi_next;
+static int fphi_next;
 
-static int last_use[MAX_REFS];
-static ir_ref int_owner[NUM_INT_REGS];
-static ir_ref flt_owner[NUM_FLT_REGS];
-static int current_insn;
+static int    last_use  [MAX_REFS];
+static ir_ref int_owner [NUM_INT_REGS];
+static ir_ref flt_owner [NUM_FLT_REGS];
+static int    current_insn;
 
-#define MAX_LOOPS 16
+static int   spill_map[MAX_REFS];
+static int   spill_count;
+static FILE *g_f;
+static int   frame_size;
+
+/* ── last_use computation ─────────────────────────────────────────────────── */
 static void compute_last_use(ir_ctx *ctx) {
     memset(last_use, 0, sizeof(last_use));
-    ir_ref i;
-    /* first pass: basic last_use */
-    for (i = 1; i < ctx->insns_count; i++) {
+    for (ir_ref i = 1; i < ctx->insns_count; i++) {
         ir_insn *insn = &ctx->ir_base[i];
-        if (insn->op1 > 0 && !IR_IS_CONST_REF(insn->op1) && insn->op1 < MAX_REFS)
-            last_use[insn->op1] = i;
-        if (insn->op2 > 0 && !IR_IS_CONST_REF(insn->op2) && insn->op2 < MAX_REFS)
-            last_use[insn->op2] = i;
-        if (insn->op3 > 0 && !IR_IS_CONST_REF(insn->op3) && insn->op3 < MAX_REFS)
-            last_use[insn->op3] = i;
+#define UPD(r) do { \
+    ir_ref _r = (r); \
+    if (_r > 0 && !IR_IS_CONST_REF(_r) && _r < MAX_REFS) last_use[_r] = i; \
+} while(0)
+        UPD(insn->op1); UPD(insn->op2); UPD(insn->op3);
+#undef UPD
     }
-    /* second pass: collect all loop begin/end pairs */
-    ir_ref loop_begins[MAX_LOOPS], loop_ends[MAX_LOOPS];
-    int num_loops = 0;
-    int depth = 0;
-    ir_ref stack[MAX_LOOPS];
-    for (i = 1; i < ctx->insns_count; i++) {
+    /* extend last_use across loops */
+    ir_ref stk[MAX_LOOPS];
+    ir_ref lbegins[MAX_LOOPS], lends[MAX_LOOPS];
+    int depth = 0, nloops = 0;
+    for (ir_ref i = 1; i < ctx->insns_count; i++) {
         ir_insn *insn = &ctx->ir_base[i];
-        if (insn->op == IR_LOOP_BEGIN) {
-            stack[depth++] = i;
-        } else if (insn->op == IR_LOOP_END && depth > 0) {
-            ir_ref lb = stack[--depth];
-            if (num_loops < MAX_LOOPS) {
-                loop_begins[num_loops] = lb;
-                loop_ends[num_loops] = i;
-                num_loops++;
-            }
+        if (insn->op == IR_LOOP_BEGIN && depth < MAX_LOOPS)
+            stk[depth++] = i;
+        else if (insn->op == IR_LOOP_END && depth > 0) {
+            ir_ref lb = stk[--depth];
+            if (nloops < MAX_LOOPS) { lbegins[nloops]=lb; lends[nloops]=i; nloops++; }
         }
     }
-    /* third pass: for each loop, extend last_use of values defined
-     * before the loop but used inside it */
-    for (int l = 0; l < num_loops; l++) {
-        ir_ref lb = loop_begins[l];
-        ir_ref le = loop_ends[l];
-        for (i = 1; i < lb; i++) {
+    for (int l = 0; l < nloops; l++) {
+        ir_ref lb = lbegins[l], le = lends[l];
+        for (ir_ref i = 1; i < lb; i++)
             if (last_use[i] > lb && last_use[i] < le)
                 last_use[i] = le;
-        }
     }
 }
 
+/* ── Spill helpers ────────────────────────────────────────────────────────── */
+static int spill_slot(ir_ref ref) {
+    if (spill_map[ref] < 0)
+        spill_map[ref] = (spill_count < MAX_SPILL) ? spill_count++ : MAX_SPILL-1;
+    return spill_map[ref];
+}
+static int spill_off(ir_ref ref) { return 56 + spill_slot(ref) * 8; }
+
+/* ── Allocators ───────────────────────────────────────────────────────────── */
 static const char *alloc_reg(ir_ref ref) {
     if (ref <= 0 || ref >= MAX_REFS) return "t0";
     if (reg_map[ref]) return reg_map[ref];
-    /* first: try to find a truly free slot (owner==0) */
     for (int k = 0; k < NUM_INT_REGS; k++) {
         if (int_owner[k] == 0) {
-            int_owner[k] = ref;
-            reg_map[ref] = int_regs[k];
-            return int_regs[k];
+            int_owner[k] = ref; reg_map[ref] = int_regs[k]; return int_regs[k];
         }
     }
-    /* second: find expired (last_use strictly < current_insn) */
     for (int k = 0; k < NUM_INT_REGS; k++) {
-        ir_ref owner = int_owner[k];
-        if (last_use[owner] < current_insn) {
-            reg_map[owner] = NULL;
-            int_owner[k] = ref;
-            reg_map[ref] = int_regs[k];
-            return int_regs[k];
+        if (last_use[int_owner[k]] < current_insn) {
+            reg_map[int_owner[k]] = NULL;
+            int_owner[k] = ref; reg_map[ref] = int_regs[k]; return int_regs[k];
         }
     }
-    /* spill: evict the one with smallest last_use */
+    /* spill: evict earliest */
     int best = 0;
     for (int k = 1; k < NUM_INT_REGS; k++)
         if (last_use[int_owner[k]] < last_use[int_owner[best]]) best = k;
-    ir_ref evicted = int_owner[best];
-    reg_map[evicted] = NULL;
-    int_owner[best] = ref;
-    reg_map[ref] = int_regs[best];
-    return int_regs[best];
+    ir_ref ev = int_owner[best];
+    fprintf(g_f, "\tsd\t%s, %d(sp)\n", int_regs[best], spill_off(ev));
+    reg_map[ev] = NULL;
+    int_owner[best] = ref; reg_map[ref] = int_regs[best]; return int_regs[best];
 }
 
 static const char *alloc_freg(ir_ref ref) {
@@ -126,257 +133,348 @@ static const char *alloc_freg(ir_ref ref) {
     if (freg_map[ref]) return freg_map[ref];
     for (int k = 0; k < NUM_FLT_REGS; k++) {
         if (flt_owner[k] == 0) {
-            flt_owner[k] = ref;
-            freg_map[ref] = flt_regs[k];
-            return flt_regs[k];
+            flt_owner[k] = ref; freg_map[ref] = flt_regs[k]; return flt_regs[k];
         }
     }
     for (int k = 0; k < NUM_FLT_REGS; k++) {
-        ir_ref owner = flt_owner[k];
-        if (last_use[owner] < current_insn) {
-            freg_map[owner] = NULL;
-            flt_owner[k] = ref;
-            freg_map[ref] = flt_regs[k];
-            return flt_regs[k];
+        if (last_use[flt_owner[k]] < current_insn) {
+            freg_map[flt_owner[k]] = NULL;
+            flt_owner[k] = ref; freg_map[ref] = flt_regs[k]; return flt_regs[k];
         }
     }
     int best = 0;
     for (int k = 1; k < NUM_FLT_REGS; k++)
         if (last_use[flt_owner[k]] < last_use[flt_owner[best]]) best = k;
-    ir_ref evicted = flt_owner[best];
-    freg_map[evicted] = NULL;
-    flt_owner[best] = ref;
-    freg_map[ref] = flt_regs[best];
-    return flt_regs[best];
+    ir_ref ev = flt_owner[best];
+    fprintf(g_f, "\tfsd\t%s, %d(sp)\n", flt_regs[best], spill_off(ev));
+    freg_map[ev] = NULL;
+    flt_owner[best] = ref; freg_map[ref] = flt_regs[best]; return flt_regs[best];
 }
 
-static const char *get_reg(ir_ref ref) {
-    if (ref <= 0 || ref >= MAX_REFS) return "zero";
+static const char *get_reg (ir_ref ref) {
+    if (ref<=0||ref>=MAX_REFS) return "zero";
     return reg_map[ref] ? reg_map[ref] : "zero";
 }
-
 static const char *get_freg(ir_ref ref) {
-    if (ref <= 0 || ref >= MAX_REFS) return "ft0";
+    if (ref<=0||ref>=MAX_REFS) return "ft0";
     return freg_map[ref] ? freg_map[ref] : "ft0";
 }
 
-static void emit_ref(FILE *f, ir_ctx *ctx, const char *dst, ir_ref ref) {
+/* ── Operand preparation ──────────────────────────────────────────────────── */
+/*
+ * prep_int(ref):
+ *   - const  → li t6, imm  ; return "t6"
+ *   - in reg → return reg_map[ref]
+ *   - spilled → ld t6, off(sp) ; return "t6"
+ *   - lost   → return "zero"  (should not happen with enough regs)
+ *
+ * After calling prep_int(op1), if result is "t6", caller MUST copy to "s5"
+ * before calling prep_int(op2), because op2 may also use "t6".
+ */
+static const char *prep_int(ir_ref ref) {
+    if (IR_IS_CONST_REF(ref)) {
+        ir_insn *c = &g_f[0] - &g_f[0] + (ir_insn*)NULL; /* unused */
+        (void)c;
+        return "t6"; /* caller fills in li below */
+    }
+    if (ref <= 0 || ref >= MAX_REFS) return "zero";
+    if (reg_map[ref]) return reg_map[ref];
+    if (spill_map[ref] >= 0) {
+        fprintf(g_f, "\tld\tt6, %d(sp)\n", spill_off(ref));
+        return "t6";
+    }
+    return "zero";
+}
+
+/* Simpler version that handles const inline */
+static const char *prep_int_full(ir_ctx *ctx, ir_ref ref) {
+    if (IR_IS_CONST_REF(ref)) {
+        fprintf(g_f, "\tli\tt6, %lld\n", (long long)ctx->ir_base[ref].val.i64);
+        return "t6";
+    }
+    if (ref <= 0 || ref >= MAX_REFS) return "zero";
+    if (reg_map[ref]) return reg_map[ref];
+    if (spill_map[ref] >= 0) {
+        fprintf(g_f, "\tld\tt6, %d(sp)\n", spill_off(ref));
+        return "t6";
+    }
+    return "zero";
+}
+
+static const char *prep_flt_full(ir_ctx *ctx, ir_ref ref, int is_d) {
     if (IR_IS_CONST_REF(ref)) {
         ir_insn *c = &ctx->ir_base[ref];
-        fprintf(f, "\tli\t%s, %lld\n", dst, (long long)c->val.i64);
+        if (is_d) {
+            fprintf(g_f, "\tli\ts6, %llu\n", (unsigned long long)c->val.u64);
+            fprintf(g_f, "\tsd\ts6, -8(sp)\n");
+            fprintf(g_f, "\tfld\tft11, -8(sp)\n");
+        } else {
+            fprintf(g_f, "\tli\ts6, %u\n", c->val.u32);
+            fprintf(g_f, "\tsw\ts6, -4(sp)\n");
+            fprintf(g_f, "\tflw\tft11, -4(sp)\n");
+        }
+        return "ft11";
+    }
+    if (ref <= 0 || ref >= MAX_REFS) return "ft0";
+    if (freg_map[ref]) return freg_map[ref];
+    if (spill_map[ref] >= 0) {
+        fprintf(g_f, "\t%s\tft11, %d(sp)\n", is_d ? "fld" : "flw", spill_off(ref));
+        return "ft11";
+    }
+    return "ft0";
+}
+
+/*
+ * prep2_int: prepare two integer operands safely.
+ * op1 → r1buf,  op2 → r2buf
+ * If r1 = "t6", copy to "s5" before computing r2.
+ */
+static void prep2_int(ir_ctx *ctx, ir_ref op1, ir_ref op2,
+                      char *r1buf, char *r2buf) {
+    const char *r1 = prep_int_full(ctx, op1);
+    if (strcmp(r1, "t6") == 0) {
+        fprintf(g_f, "\tmv\ts5, t6\n");
+        r1 = "s5";
+    }
+    strcpy(r1buf, r1);
+    const char *r2 = prep_int_full(ctx, op2);
+    strcpy(r2buf, r2);
+}
+
+static void prep2_flt(ir_ctx *ctx, ir_ref op1, ir_ref op2, int is_d,
+                      char *r1buf, char *r2buf) {
+    const char *r1 = prep_flt_full(ctx, op1, is_d);
+    if (strcmp(r1, "ft11") == 0) {
+        fprintf(g_f, "\t%s\tfs6, ft11\n", is_d ? "fmv.d" : "fmv.s");
+        r1 = "fs6";
+    }
+    strcpy(r1buf, r1);
+    const char *r2 = prep_flt_full(ctx, op2, is_d);
+    strcpy(r2buf, r2);
+}
+
+/* ── emit_ref / emit_fref (for PHI init/update) ─────────────────────────── */
+static void emit_ref(ir_ref ref, const char *dst, ir_ctx *ctx) {
+    if (IR_IS_CONST_REF(ref)) {
+        fprintf(g_f, "\tli\t%s, %lld\n", dst, (long long)ctx->ir_base[ref].val.i64);
     } else {
         const char *src = get_reg(ref);
         if (strcmp(dst, src) != 0)
-            fprintf(f, "\tmv\t%s, %s\n", dst, src);
+            fprintf(g_f, "\tmv\t%s, %s\n", dst, src);
     }
 }
-
-static void emit_fref(FILE *f, ir_ctx *ctx, const char *dst, ir_ref ref, int is_double) {
+static void emit_fref(ir_ref ref, const char *dst, int is_d, ir_ctx *ctx) {
     if (IR_IS_CONST_REF(ref)) {
         ir_insn *c = &ctx->ir_base[ref];
-        // 把浮點常數存到 stack 再 load
-        if (is_double) {
-            uint64_t bits = c->val.u64;
-            fprintf(f, "\tli\ts5, %llu\n", (unsigned long long)bits);
-            fprintf(f, "\tsd\ts5, -8(sp)\n");
-            fprintf(f, "\tfld\t%s, -8(sp)\n", dst);
+        if (is_d) {
+            fprintf(g_f, "\tli\ts6, %llu\n", (unsigned long long)c->val.u64);
+            fprintf(g_f, "\tsd\ts6, -8(sp)\n");
+            fprintf(g_f, "\tfld\t%s, -8(sp)\n", dst);
         } else {
-            uint32_t bits = c->val.u32;
-            fprintf(f, "\tli\ts5, %u\n", bits);
-            fprintf(f, "\tsw\ts5, -4(sp)\n");
-            fprintf(f, "\tflw\t%s, -4(sp)\n", dst);
+            fprintf(g_f, "\tli\ts6, %u\n", c->val.u32);
+            fprintf(g_f, "\tsw\ts6, -4(sp)\n");
+            fprintf(g_f, "\tflw\t%s, -4(sp)\n", dst);
         }
     } else {
         const char *src = get_freg(ref);
         if (strcmp(dst, src) != 0)
-            fprintf(f, "\t%s\t%s, %s\n", is_double ? "fmv.d" : "fmv.s", dst, src);
+            fprintf(g_f, "\t%s\t%s, %s\n", is_d ? "fmv.d" : "fmv.s", dst, src);
     }
 }
 
-/* emit PHI initial values before loop entry */
-static void emit_phi_init(ir_ctx *ctx, FILE *f, ir_ref loop_begin) {
-    ir_ref i;
-    for (i = 1; i < ctx->insns_count; i++) {
+/* ── PHI helpers ──────────────────────────────────────────────────────────── */
+static void emit_phi_init(ir_ctx *ctx, ir_ref loop_begin) {
+    for (ir_ref i = 1; i < ctx->insns_count; i++) {
         ir_insn *insn = &ctx->ir_base[i];
-        if (insn->op == IR_PHI && insn->op1 == loop_begin) {
-            int is_float = (insn->type == IR_FLOAT || insn->type == IR_DOUBLE);
-            int is_d = (insn->type == IR_DOUBLE);
-            if (is_float) {
-                const char *fr = alloc_freg(i);
-                emit_fref(f, ctx, fr, insn->op2, is_d);
-            } else {
-                if (!phi_reg_map[i]) {
-                    phi_reg_map[i] = phi_regs[phi_next % NUM_PHI_REGS];
-                    phi_next++;
-                }
-                reg_map[i] = phi_reg_map[i];
-                emit_ref(f, ctx, phi_reg_map[i], insn->op2);
+        if (insn->op != IR_PHI || insn->op1 != loop_begin) continue;
+        int is_float = (insn->type == IR_FLOAT || insn->type == IR_DOUBLE);
+        int is_d = (insn->type == IR_DOUBLE);
+        if (is_float) {
+            if (!phi_reg_map[i]) {
+                phi_reg_map[i] = fphi_regs[fphi_next % NUM_FPHI_REGS];
+                fphi_next++;
             }
+            freg_map[i] = phi_reg_map[i];
+            emit_fref(insn->op2, phi_reg_map[i], is_d, ctx);
+        } else {
+            if (!phi_reg_map[i]) {
+                phi_reg_map[i] = phi_regs[phi_next % NUM_PHI_REGS];
+                phi_next++;
+            }
+            reg_map[i] = phi_reg_map[i];
+            emit_ref(insn->op2, phi_reg_map[i], ctx);
         }
     }
 }
 
-/* emit PHI back-edge updates before loop end */
-static void emit_phi_update(ir_ctx *ctx, FILE *f, ir_ref loop_begin) {
-    ir_ref i;
-    static const char *scratch[] = {"s1","s2","s3","s4","s5","s6"};
-    static const char *fscratch[] = {"ft6","ft7","ft8","ft9","ft10","ft11"};
+static void emit_phi_update(ir_ctx *ctx, ir_ref loop_begin) {
+    static const char *scratch[]  = {"s5","s6","a5","a4","a3","a2"};
+    static const char *fscratch[] = {"ft8","ft9","ft10","fs6","fs5","fs4"};
     int sc = 0, fsc = 0;
     /* first pass: load back-edge values into scratch */
-    for (i = 1; i < ctx->insns_count; i++) {
+    for (ir_ref i = 1; i < ctx->insns_count; i++) {
         ir_insn *insn = &ctx->ir_base[i];
-        if (insn->op == IR_PHI && insn->op1 == loop_begin) {
-            int is_float = (insn->type == IR_FLOAT || insn->type == IR_DOUBLE);
-            int is_d = (insn->type == IR_DOUBLE);
-            if (is_float) {
-                const char *fs = fscratch[fsc % 6];
-                emit_fref(f, ctx, fs, insn->op3, is_d);
-                fsc++;
-            } else {
-                const char *s = scratch[sc % 6];
-                emit_ref(f, ctx, s, insn->op3);
-                sc++;
-            }
+        if (insn->op != IR_PHI || insn->op1 != loop_begin) continue;
+        int is_float = (insn->type == IR_FLOAT || insn->type == IR_DOUBLE);
+        int is_d = (insn->type == IR_DOUBLE);
+        if (is_float) {
+            emit_fref(insn->op3, fscratch[fsc % 6], is_d, ctx);
+            fsc++;
+        } else {
+            emit_ref(insn->op3, scratch[sc % 6], ctx);
+            sc++;
         }
     }
     /* second pass: move scratch to phi regs */
     sc = 0; fsc = 0;
-    for (i = 1; i < ctx->insns_count; i++) {
+    for (ir_ref i = 1; i < ctx->insns_count; i++) {
         ir_insn *insn = &ctx->ir_base[i];
-        if (insn->op == IR_PHI && insn->op1 == loop_begin) {
-            int is_float = (insn->type == IR_FLOAT || insn->type == IR_DOUBLE);
-            int is_d = (insn->type == IR_DOUBLE);
-            if (is_float) {
-                const char *pdst = get_freg(i);
-                const char *fs = fscratch[fsc % 6];
-                if (strcmp(pdst, fs) != 0)
-                    fprintf(f, "\t%s\t%s, %s\n", is_d ? "fmv.d" : "fmv.s", pdst, fs);
-                fsc++;
-            } else {
-                const char *dst = get_reg(i);
-                const char *s = scratch[sc % 6];
-                if (strcmp(dst, s) != 0)
-                    fprintf(f, "\tmv\t%s, %s\n", dst, s);
-                sc++;
-            }
+        if (insn->op != IR_PHI || insn->op1 != loop_begin) continue;
+        int is_float = (insn->type == IR_FLOAT || insn->type == IR_DOUBLE);
+        int is_d = (insn->type == IR_DOUBLE);
+        if (is_float) {
+            const char *dst = phi_reg_map[i] ? phi_reg_map[i] : get_freg(i);
+            const char *s   = fscratch[fsc % 6];
+            if (strcmp(dst, s) != 0)
+                fprintf(g_f, "\t%s\t%s, %s\n", is_d ? "fmv.d":"fmv.s", dst, s);
+            fsc++;
+        } else {
+            const char *dst = phi_reg_map[i] ? phi_reg_map[i] : get_reg(i);
+            const char *s   = scratch[sc % 6];
+            if (strcmp(dst, s) != 0)
+                fprintf(g_f, "\tmv\t%s, %s\n", dst, s);
+            sc++;
         }
     }
 }
 
+/* ── Main emit function ───────────────────────────────────────────────────── */
 int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
 {
-    ir_ref i;
-    ir_insn *insn;
-
-    memset(reg_map, 0, sizeof(reg_map));
-    memset(freg_map, 0, sizeof(freg_map));
-    memset(phi_reg_map, 0, sizeof(phi_reg_map));
-    memset(last_use, 0, sizeof(last_use));
-    memset(int_owner, 0, sizeof(int_owner));
-    memset(flt_owner, 0, sizeof(flt_owner));
-    phi_next = 0;
+    g_f = f;
+    memset(reg_map,      0, sizeof(reg_map));
+    memset(freg_map,     0, sizeof(freg_map));
+    memset(phi_reg_map,  0, sizeof(phi_reg_map));
+    memset(last_use,     0, sizeof(last_use));
+    memset(int_owner,    0, sizeof(int_owner));
+    memset(flt_owner,    0, sizeof(flt_owner));
+    memset(spill_map,   -1, sizeof(spill_map));
+    phi_next  = 0;
+    fphi_next = 0;
+    spill_count = 0;
     current_insn = 0;
     compute_last_use(ctx);
+
+    frame_size = 56 + MAX_SPILL * 8;   /* 56 = ra+s0..s4 area; rest = spill */
 
     fprintf(f, "\t.text\n");
     fprintf(f, "\t.globl %s\n", name);
     fprintf(f, "\t.type %s, @function\n", name);
     fprintf(f, "%s:\n", name);
-    fprintf(f, "\taddi\tsp, sp, -48\n");
-    fprintf(f, "\tsd\tra, 40(sp)\n");
-    fprintf(f, "\tsd\ts0, 32(sp)\n");
-    fprintf(f, "\tsd\ts1, 24(sp)\n");
-    fprintf(f, "\tsd\ts2, 16(sp)\n");
-    fprintf(f, "\tsd\ts3, 8(sp)\n");
-    fprintf(f, "\tsd\ts4, 0(sp)\n");
-    fprintf(f, "\taddi\ts0, sp, 48\n");
+    fprintf(f, "\taddi\tsp, sp, -%d\n", frame_size);
+    fprintf(f, "\tsd\tra, %d(sp)\n", frame_size - 8);
+    fprintf(f, "\tsd\ts0, %d(sp)\n", frame_size - 16);
+    fprintf(f, "\tsd\ts1, %d(sp)\n", frame_size - 24);
+    fprintf(f, "\tsd\ts2, %d(sp)\n", frame_size - 32);
+    fprintf(f, "\tsd\ts3, %d(sp)\n", frame_size - 40);
+    fprintf(f, "\tsd\ts4, %d(sp)\n", frame_size - 48);
+    fprintf(f, "\taddi\ts0, sp, %d\n", frame_size);
 
     /* assign params */
-    int param_idx = 0;
-    int fparam_idx = 0;
-    static const char *fparam_regs[] = {"fa0","fa1","fa2","fa3","fa4","fa5","fa6","fa7"};
-    for (i = 1; i < ctx->insns_count; i++) {
-        insn = &ctx->ir_base[i];
+    int param_idx = 0, fparam_idx = 0;
+    for (ir_ref i = 1; i < ctx->insns_count; i++) {
+        ir_insn *insn = &ctx->ir_base[i];
         if (insn->op == IR_PARAM) {
             if (insn->type == IR_FLOAT || insn->type == IR_DOUBLE) {
-                if (fparam_idx < 8)
-                    freg_map[i] = fparam_regs[fparam_idx++];
+                if (fparam_idx < 8) freg_map[i] = fparam_regs[fparam_idx++];
             } else {
-                if (param_idx < 8)
-                    reg_map[i] = param_regs[param_idx++];
+                if (param_idx < 8) reg_map[i] = param_regs[param_idx++];
             }
         }
     }
 
     /* main emit loop */
-    for (i = 1; i < ctx->insns_count; i++) {
+    for (ir_ref i = 1; i < ctx->insns_count; i++) {
         current_insn = i;
-        insn = &ctx->ir_base[i];
+        ir_insn *insn = &ctx->ir_base[i];
         ir_ref op1 = insn->op1;
         ir_ref op2 = insn->op2;
         const char *dst;
+        char r1buf[16], r2buf[16];
 
         switch (insn->op) {
+
         case IR_NOP:
         case IR_START:
         case IR_PARAM:
             break;
 
-        case IR_END: {
-            ir_insn *parent = (op1 > 0) ? &ctx->ir_base[op1] : NULL;
-            int is_if_true  = parent && parent->op == IR_IF_TRUE;
-            int is_if_false = parent && parent->op == IR_IF_FALSE;
-            if (is_if_true || is_if_false) {
-                /* find MERGE after this END, emit PHI assignments */
-                for (ir_ref m = i + 1; m < ctx->insns_count; m++) {
-                    ir_insn *mi = &ctx->ir_base[m];
-                    if (mi->op == IR_MERGE) {
-                        /* emit PHI value for this branch */
-                        for (ir_ref p = m + 1; p < ctx->insns_count; p++) {
-                            ir_insn *pi = &ctx->ir_base[p];
-                            if (pi->op != IR_PHI || pi->op1 != m) break;
-                            /* op2 = true-branch value, op3 = false-branch value */
-                            ir_ref val = is_if_true ? pi->op2 : pi->op3;
-                            if (pi->type == IR_FLOAT || pi->type == IR_DOUBLE) {
-                                int is_d = (pi->type == IR_DOUBLE);
-                                const char *pdst = alloc_freg(p);
-                                emit_fref(f, ctx, pdst, val, is_d);
-                            } else {
-                                const char *pdst = alloc_reg(p);
-                                emit_ref(f, ctx, pdst, val);
-                            }
-                        }
-                        /* jump to merge (only for true branch) */
-                        if (is_if_true) {
-                            ir_ref if_ref = parent->op1;
+        case IR_END:
+            /* if inside if-true branch → jump over false branch */
+            {
+                ir_insn *parent = (op1 > 0) ? &ctx->ir_base[op1] : NULL;
+                if (parent && parent->op == IR_IF_TRUE) {
+                    ir_ref if_ref = parent->op1;
+                    for (ir_ref m = i+1; m < ctx->insns_count; m++) {
+                        if (ctx->ir_base[m].op == IR_MERGE) {
                             fprintf(f, "\tj\t.Lend_%d\n", if_ref);
+                            break;
                         }
-                        break;
+                    }
+                }
+                /* if/else PHI update for this branch */
+                int is_if_true  = parent && parent->op == IR_IF_TRUE;
+                int is_if_false = parent && parent->op == IR_IF_FALSE;
+                if (is_if_true || is_if_false) {
+                    for (ir_ref m = i+1; m < ctx->insns_count; m++) {
+                        ir_insn *mi = &ctx->ir_base[m];
+                        if (mi->op == IR_MERGE) {
+                            for (ir_ref p = m+1; p < ctx->insns_count; p++) {
+                                ir_insn *pi = &ctx->ir_base[p];
+                                if (pi->op != IR_PHI || pi->op1 != m) break;
+                                ir_ref val = is_if_true ? pi->op2 : pi->op3;
+                                if (pi->type == IR_FLOAT || pi->type == IR_DOUBLE) {
+                                    int is_d = (pi->type == IR_DOUBLE);
+                                    const char *pdst = alloc_freg(p);
+                                    emit_fref(val, pdst, is_d, ctx);
+                                } else {
+                                    const char *pdst = alloc_reg(p);
+                                    emit_ref(val, pdst, ctx);
+                                }
+                            }
+                            break;
+                        }
                     }
                 }
             }
             break;
-        }
 
         case IR_LOOP_BEGIN:
-            emit_phi_init(ctx, f, i);
+            emit_phi_init(ctx, i);
             fprintf(f, ".Lloop_%d:\n", i);
             break;
 
         case IR_LOOP_END: {
-            /* find LOOP_BEGIN */
-            ir_ref lb = op1;
-            while (lb > 0 && ctx->ir_base[lb].op != IR_LOOP_BEGIN)
-                lb = ctx->ir_base[lb].op1;
-            emit_phi_update(ctx, f, lb);
+            /* find corresponding LOOP_BEGIN via its op2 back-edge */
+            ir_ref lb = 0;
+            for (ir_ref m = 1; m < ctx->insns_count; m++) {
+                if (ctx->ir_base[m].op == IR_LOOP_BEGIN && ctx->ir_base[m].op2 == i) {
+                    lb = m; break;
+                }
+            }
+            if (!lb) { lb = op1; while (lb>0 && ctx->ir_base[lb].op!=IR_LOOP_BEGIN) lb=ctx->ir_base[lb].op1; }
+            emit_phi_update(ctx, lb);
             fprintf(f, "\tj\t.Lloop_%d\n", lb);
             break;
         }
 
         case IR_PHI:
-            /* handled by emit_phi_init/emit_phi_update */
             if (insn->type == IR_FLOAT || insn->type == IR_DOUBLE) {
-                alloc_freg(i);  /* ensure freg allocated */
+                if (!phi_reg_map[i]) {
+                    phi_reg_map[i] = fphi_regs[fphi_next % NUM_FPHI_REGS];
+                    fphi_next++;
+                }
+                freg_map[i] = phi_reg_map[i];
             } else {
                 if (!phi_reg_map[i]) {
                     phi_reg_map[i] = phi_regs[phi_next % NUM_PHI_REGS];
@@ -390,223 +488,131 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
         case IR_MERGE:
             fprintf(f, ".Lbb_%d:\n", i);
             {
-                /* MERGE op1/op2 are ENDs; trace END->parent to find IF_FALSE->IF */
-                ir_ref ops[2] = {insn->op1, insn->op2};
-                for (int k = 0; k < 2; k++) {
-                    ir_ref e = ops[k];
-                    if (e <= 0) continue;
-                    ir_insn *ep = &ctx->ir_base[e];
-                    /* e might be END whose op1 is IF_FALSE */
-                    if (ep->op == IR_END && ep->op1 > 0) {
-                        ir_insn *pp = &ctx->ir_base[ep->op1];
-                        if (pp->op == IR_IF_FALSE) {
-                            fprintf(f, ".Lend_%d:\n", pp->op1);
-                            break;
-                        }
-                    }
-                    /* or e is directly IF_FALSE */
-                    if (ep->op == IR_IF_FALSE) {
-                        fprintf(f, ".Lend_%d:\n", ep->op1);
-                        break;
-                    }
+                ir_insn *p1 = (insn->op1>0) ? &ctx->ir_base[insn->op1] : NULL;
+                ir_insn *p2 = (insn->op2>0) ? &ctx->ir_base[insn->op2] : NULL;
+                ir_ref if_ref = 0;
+                if (p1 && p1->op == IR_IF_FALSE) if_ref = p1->op1;
+                else if (p2 && p2->op == IR_IF_FALSE) if_ref = p2->op1;
+                /* also check END→IF_FALSE */
+                if (!if_ref) {
+                    if (p1 && p1->op == IR_END && p1->op1>0 && ctx->ir_base[p1->op1].op == IR_IF_FALSE)
+                        if_ref = ctx->ir_base[p1->op1].op1;
+                    else if (p2 && p2->op == IR_END && p2->op1>0 && ctx->ir_base[p2->op1].op == IR_IF_FALSE)
+                        if_ref = ctx->ir_base[p2->op1].op1;
                 }
+                if (if_ref) fprintf(f, ".Lend_%d:\n", if_ref);
             }
             break;
 
         case IR_COPY:
             if (insn->type == IR_FLOAT || insn->type == IR_DOUBLE) {
                 int is_d = (insn->type == IR_DOUBLE);
+                const char *r1 = prep_flt_full(ctx, op1, is_d);
                 dst = alloc_freg(i);
-                emit_fref(f, ctx, dst, op1, is_d);
+                if (strcmp(r1, dst) != 0)
+                    fprintf(f, "\t%s\t%s, %s\n", is_d?"fmv.d":"fmv.s", dst, r1);
             } else {
+                const char *r1 = prep_int_full(ctx, op1);
                 dst = alloc_reg(i);
-                if (IR_IS_CONST_REF(op1))
-                    fprintf(f, "\tli\t%s, %lld\n", dst, (long long)ctx->ir_base[op1].val.i64);
-                else if (op1 > 0)
-                    fprintf(f, "\tmv\t%s, %s\n", dst, get_reg(op1));
+                if (strcmp(r1, dst) != 0)
+                    fprintf(f, "\tmv\t%s, %s\n", dst, r1);
             }
             break;
 
         case IR_ADD:
             if (insn->type == IR_FLOAT || insn->type == IR_DOUBLE) {
                 int is_d = (insn->type == IR_DOUBLE);
+                prep2_flt(ctx, op1, op2, is_d, r1buf, r2buf);
                 dst = alloc_freg(i);
-                const char *r1 = alloc_freg(op1); emit_fref(f, ctx, r1, op1, is_d);
-                const char *r2 = alloc_freg(op2); emit_fref(f, ctx, r2, op2, is_d);
-                fprintf(f, "\t%s\t%s, %s, %s\n", is_d ? "fadd.d" : "fadd.s", dst, r1, r2);
-                break;
-            }
-            dst = alloc_reg(i);
-            if (IR_IS_CONST_REF(op2)) {
-                int64_t v = ctx->ir_base[op2].val.i64;
-                const char *r1 = op1 > 0 ? get_reg(op1) : "zero";
-                if (v >= -2048 && v <= 2047)
-                    fprintf(f, "\taddi\t%s, %s, %lld\n", dst, r1, (long long)v);
-                else {
-                    fprintf(f, "\tli\ts5, %lld\n", (long long)v);
-                    fprintf(f, "\tadd\t%s, %s, s5\n", dst, r1);
-                }
-            } else if (IR_IS_CONST_REF(op1)) {
-                int64_t v = ctx->ir_base[op1].val.i64;
-                const char *r2 = op2 > 0 ? get_reg(op2) : "zero";
-                if (v >= -2048 && v <= 2047)
-                    fprintf(f, "\taddi\t%s, %s, %lld\n", dst, r2, (long long)v);
-                else {
-                    fprintf(f, "\tli\ts5, %lld\n", (long long)v);
-                    fprintf(f, "\tadd\t%s, %s, s5\n", dst, r2);
-                }
+                fprintf(f, "\t%s\t%s, %s, %s\n", is_d?"fadd.d":"fadd.s", dst, r1buf, r2buf);
             } else {
-                fprintf(f, "\tadd\t%s, %s, %s\n", dst, get_reg(op1), get_reg(op2));
+                prep2_int(ctx, op1, op2, r1buf, r2buf);
+                dst = alloc_reg(i);
+                fprintf(f, "\tadd\t%s, %s, %s\n", dst, r1buf, r2buf);
             }
             break;
 
         case IR_SUB:
             if (insn->type == IR_FLOAT || insn->type == IR_DOUBLE) {
                 int is_d = (insn->type == IR_DOUBLE);
+                prep2_flt(ctx, op1, op2, is_d, r1buf, r2buf);
                 dst = alloc_freg(i);
-                const char *r1 = alloc_freg(op1); emit_fref(f, ctx, r1, op1, is_d);
-                const char *r2 = alloc_freg(op2); emit_fref(f, ctx, r2, op2, is_d);
-                fprintf(f, "\t%s\t%s, %s, %s\n", is_d ? "fsub.d" : "fsub.s", dst, r1, r2);
-                break;
-            }
-            dst = alloc_reg(i);
-            if (IR_IS_CONST_REF(op2)) {
-                int64_t v = ctx->ir_base[op2].val.i64;
-                fprintf(f, "\taddi\t%s, %s, %lld\n", dst, get_reg(op1), (long long)-v);
-            } else if (IR_IS_CONST_REF(op1)) {
-                fprintf(f, "\tli\ts5, %lld\n", (long long)ctx->ir_base[op1].val.i64);
-                fprintf(f, "\tsub\t%s, s5, %s\n", dst, get_reg(op2));
+                fprintf(f, "\t%s\t%s, %s, %s\n", is_d?"fsub.d":"fsub.s", dst, r1buf, r2buf);
             } else {
-                fprintf(f, "\tsub\t%s, %s, %s\n", dst, get_reg(op1), get_reg(op2));
+                prep2_int(ctx, op1, op2, r1buf, r2buf);
+                dst = alloc_reg(i);
+                fprintf(f, "\tsub\t%s, %s, %s\n", dst, r1buf, r2buf);
             }
             break;
 
         case IR_MUL:
             if (insn->type == IR_FLOAT || insn->type == IR_DOUBLE) {
                 int is_d = (insn->type == IR_DOUBLE);
+                prep2_flt(ctx, op1, op2, is_d, r1buf, r2buf);
                 dst = alloc_freg(i);
-                const char *r1 = alloc_freg(op1); emit_fref(f, ctx, r1, op1, is_d);
-                const char *r2 = alloc_freg(op2); emit_fref(f, ctx, r2, op2, is_d);
-                fprintf(f, "\t%s\t%s, %s, %s\n", is_d ? "fmul.d" : "fmul.s", dst, r1, r2);
-                break;
-            }
-            dst = alloc_reg(i);
-            {
-                const char *r1, *r2;
-                if (IR_IS_CONST_REF(op1)) {
-                    fprintf(f, "\tli\ts5, %lld\n", (long long)ctx->ir_base[op1].val.i64);
-                    r1 = "s5";
-                } else r1 = get_reg(op1);
-                if (IR_IS_CONST_REF(op2)) {
-                    fprintf(f, "\tli\ts6, %lld\n", (long long)ctx->ir_base[op2].val.i64);
-                    r2 = "s6";
-                } else r2 = get_reg(op2);
-                fprintf(f, "\tmul\t%s, %s, %s\n", dst, r1, r2);
+                fprintf(f, "\t%s\t%s, %s, %s\n", is_d?"fmul.d":"fmul.s", dst, r1buf, r2buf);
+            } else {
+                prep2_int(ctx, op1, op2, r1buf, r2buf);
+                dst = alloc_reg(i);
+                fprintf(f, "\tmul\t%s, %s, %s\n", dst, r1buf, r2buf);
             }
             break;
 
         case IR_DIV:
             if (insn->type == IR_FLOAT || insn->type == IR_DOUBLE) {
                 int is_d = (insn->type == IR_DOUBLE);
+                prep2_flt(ctx, op1, op2, is_d, r1buf, r2buf);
                 dst = alloc_freg(i);
-                const char *r1 = alloc_freg(op1); emit_fref(f, ctx, r1, op1, is_d);
-                const char *r2 = alloc_freg(op2); emit_fref(f, ctx, r2, op2, is_d);
-                fprintf(f, "\t%s\t%s, %s, %s\n", is_d ? "fdiv.d" : "fdiv.s", dst, r1, r2);
-                break;
-            }
-            dst = alloc_reg(i);
-            {
-                const char *r1, *r2;
-                if (IR_IS_CONST_REF(op1)) {
-                    fprintf(f, "\tli\ts5, %lld\n", (long long)ctx->ir_base[op1].val.i64);
-                    r1 = "s5";
-                } else r1 = get_reg(op1);
-                if (IR_IS_CONST_REF(op2)) {
-                    fprintf(f, "\tli\ts6, %lld\n", (long long)ctx->ir_base[op2].val.i64);
-                    r2 = "s6";
-                } else r2 = get_reg(op2);
-                fprintf(f, "\tdiv\t%s, %s, %s\n", dst, r1, r2);
+                fprintf(f, "\t%s\t%s, %s, %s\n", is_d?"fdiv.d":"fdiv.s", dst, r1buf, r2buf);
+            } else {
+                prep2_int(ctx, op1, op2, r1buf, r2buf);
+                dst = alloc_reg(i);
+                fprintf(f, "\tdiv\t%s, %s, %s\n", dst, r1buf, r2buf);
             }
             break;
 
         case IR_EQ: case IR_NE: case IR_LT:
         case IR_GE: case IR_LE: case IR_GT:
-        case IR_ULT: case IR_UGE: case IR_ULE: case IR_UGT:
-            dst = alloc_reg(i);
-            {
-                /* 浮點比較：operand 的 type 看 op1 的 insn type */
-                ir_insn *op1_insn = (op1 > 0 && !IR_IS_CONST_REF(op1)) ? &ctx->ir_base[op1] : NULL;
-                int is_float = op1_insn && (op1_insn->type == IR_FLOAT || op1_insn->type == IR_DOUBLE);
-                int is_d     = op1_insn && (op1_insn->type == IR_DOUBLE);
-
-                if (is_float) {
-                    /* 把兩個 operand 載入 float 暫存器 */
-                    const char *fr1 = alloc_freg(op1); emit_fref(f, ctx, fr1, op1, is_d);
-                    const char *fr2 = alloc_freg(op2); emit_fref(f, ctx, fr2, op2, is_d);
-                    const char *suf = is_d ? "d" : "s";
-                    switch (insn->op) {
-                    /* feq/flt/fle 直接有對應指令 */
-                    case IR_EQ:
-                        fprintf(f, "\tfeq.%s\t%s, %s, %s\n", suf, dst, fr1, fr2);
-                        break;
-                    case IR_NE:
-                        fprintf(f, "\tfeq.%s\t%s, %s, %s\n", suf, dst, fr1, fr2);
-                        fprintf(f, "\txori\t%s, %s, 1\n", dst, dst);
-                        break;
-                    case IR_LT:
-                        fprintf(f, "\tflt.%s\t%s, %s, %s\n", suf, dst, fr1, fr2);
-                        break;
-                    case IR_LE:
-                        fprintf(f, "\tfle.%s\t%s, %s, %s\n", suf, dst, fr1, fr2);
-                        break;
-                    case IR_GT:
-                        /* a > b  ≡  b < a */
-                        fprintf(f, "\tflt.%s\t%s, %s, %s\n", suf, dst, fr2, fr1);
-                        break;
-                    case IR_GE:
-                        /* a >= b  ≡  b <= a */
-                        fprintf(f, "\tfle.%s\t%s, %s, %s\n", suf, dst, fr2, fr1);
-                        break;
-                    default:
-                        fprintf(f, "\t# unsupported float cmp op=%d\n", insn->op);
-                        break;
-                    }
-                } else {
-                    /* 原整數比較邏輯 */
-                    const char *r1, *r2;
-                    if (IR_IS_CONST_REF(op1)) {
-                        fprintf(f, "\tli\ts5, %lld\n", (long long)ctx->ir_base[op1].val.i64);
-                        r1 = "s5";
-                    } else r1 = op1 > 0 ? get_reg(op1) : "zero";
-                    if (IR_IS_CONST_REF(op2)) {
-                        fprintf(f, "\tli\ts6, %lld\n", (long long)ctx->ir_base[op2].val.i64);
-                        r2 = "s6";
-                    } else r2 = op2 > 0 ? get_reg(op2) : "zero";
-                    switch (insn->op) {
-                    case IR_EQ:  fprintf(f,"\tsub\t%s,%s,%s\n\tseqz\t%s,%s\n",dst,r1,r2,dst,dst); break;
-                    case IR_NE:  fprintf(f,"\tsub\t%s,%s,%s\n\tsnez\t%s,%s\n",dst,r1,r2,dst,dst); break;
-                    case IR_LT:  case IR_ULT: fprintf(f,"\tslt\t%s,%s,%s\n",dst,r1,r2); break;
-                    case IR_GE:  case IR_UGE: fprintf(f,"\tslt\t%s,%s,%s\n\txori\t%s,%s,1\n",dst,r1,r2,dst,dst); break;
-                    case IR_LE:  case IR_ULE: fprintf(f,"\tslt\t%s,%s,%s\n\txori\t%s,%s,1\n",dst,r2,r1,dst,dst); break;
-                    case IR_GT:  case IR_UGT: fprintf(f,"\tslt\t%s,%s,%s\n",dst,r2,r1); break;
-                    default: break;
-                    }
+        case IR_ULT: case IR_UGE: case IR_ULE: case IR_UGT: {
+            ir_insn *op1_insn = (op1>0 && !IR_IS_CONST_REF(op1)) ? &ctx->ir_base[op1] : NULL;
+            int is_float = op1_insn && (op1_insn->type==IR_FLOAT||op1_insn->type==IR_DOUBLE);
+            int is_d     = op1_insn && (op1_insn->type==IR_DOUBLE);
+            if (is_float) {
+                prep2_flt(ctx, op1, op2, is_d, r1buf, r2buf);
+                dst = alloc_reg(i);
+                const char *suf = is_d ? "d" : "s";
+                switch(insn->op) {
+                case IR_EQ: fprintf(f,"\tfeq.%s\t%s, %s, %s\n",suf,dst,r1buf,r2buf); break;
+                case IR_NE: fprintf(f,"\tfeq.%s\t%s, %s, %s\n\txori\t%s,%s,1\n",suf,dst,r1buf,r2buf,dst,dst); break;
+                case IR_LT: fprintf(f,"\tflt.%s\t%s, %s, %s\n",suf,dst,r1buf,r2buf); break;
+                case IR_LE: fprintf(f,"\tfle.%s\t%s, %s, %s\n",suf,dst,r1buf,r2buf); break;
+                case IR_GT: fprintf(f,"\tflt.%s\t%s, %s, %s\n",suf,dst,r2buf,r1buf); break;
+                case IR_GE: fprintf(f,"\tfle.%s\t%s, %s, %s\n",suf,dst,r2buf,r1buf); break;
+                default: break;
+                }
+            } else {
+                prep2_int(ctx, op1, op2, r1buf, r2buf);
+                dst = alloc_reg(i);
+                switch(insn->op) {
+                case IR_EQ:  fprintf(f,"\tsub\t%s,%s,%s\n\tseqz\t%s,%s\n",dst,r1buf,r2buf,dst,dst); break;
+                case IR_NE:  fprintf(f,"\tsub\t%s,%s,%s\n\tsnez\t%s,%s\n",dst,r1buf,r2buf,dst,dst); break;
+                case IR_LT: case IR_ULT: fprintf(f,"\tslt\t%s,%s,%s\n",dst,r1buf,r2buf); break;
+                case IR_GE: case IR_UGE: fprintf(f,"\tslt\t%s,%s,%s\n\txori\t%s,%s,1\n",dst,r1buf,r2buf,dst,dst); break;
+                case IR_LE: case IR_ULE: fprintf(f,"\tslt\t%s,%s,%s\n\txori\t%s,%s,1\n",dst,r2buf,r1buf,dst,dst); break;
+                case IR_GT: case IR_UGT: fprintf(f,"\tslt\t%s,%s,%s\n",dst,r2buf,r1buf); break;
+                default: break;
                 }
             }
             break;
+        }
 
         case IR_IF: {
-            const char *cond;
-            if (IR_IS_CONST_REF(op2)) {
-                fprintf(f, "\tli\ts5, %lld\n", (long long)ctx->ir_base[op2].val.i64);
-                cond = "s5";
-            } else cond = get_reg(op2);
+            const char *cond = prep_int_full(ctx, op2);
             fprintf(f, "\tbeqz\t%s, .Lfalse_%d\n", cond, i);
             break;
         }
 
         case IR_IF_TRUE:
-            /* fall-through */
             break;
 
         case IR_IF_FALSE:
@@ -615,88 +621,74 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
 
         case IR_RETURN:
             if (op2 > 0) {
-                ir_insn *ret_insn = &ctx->ir_base[op2];
-                if (ret_insn->type == IR_FLOAT || ret_insn->type == IR_DOUBLE) {
-                    emit_fref(f, ctx, "fa0", op2, ret_insn->type == IR_DOUBLE);
+                ir_insn *ret = &ctx->ir_base[op2];
+                if (ret->type == IR_FLOAT || ret->type == IR_DOUBLE) {
+                    int is_d = (ret->type == IR_DOUBLE);
+                    const char *r = prep_flt_full(ctx, op2, is_d);
+                    if (strcmp(r, "fa0") != 0)
+                        fprintf(f, "\t%s\tfa0, %s\n", is_d?"fmv.d":"fmv.s", r);
                 } else {
-                    emit_ref(f, ctx, "a0", op2);
+                    const char *r = prep_int_full(ctx, op2);
+                    if (strcmp(r, "a0") != 0)
+                        fprintf(f, "\tmv\ta0, %s\n", r);
                 }
             }
-            fprintf(f, "\tld\ts4, 0(sp)\n");
-            fprintf(f, "\tld\ts3, 8(sp)\n");
-            fprintf(f, "\tld\ts2, 16(sp)\n");
-            fprintf(f, "\tld\ts1, 24(sp)\n");
-            fprintf(f, "\tld\ts0, 32(sp)\n");
-            fprintf(f, "\tld\tra, 40(sp)\n");
-            fprintf(f, "\taddi\tsp, sp, 48\n");
+            fprintf(f, "\tld\ts4, %d(sp)\n", frame_size - 48);
+            fprintf(f, "\tld\ts3, %d(sp)\n", frame_size - 40);
+            fprintf(f, "\tld\ts2, %d(sp)\n", frame_size - 32);
+            fprintf(f, "\tld\ts1, %d(sp)\n", frame_size - 24);
+            fprintf(f, "\tld\ts0, %d(sp)\n", frame_size - 16);
+            fprintf(f, "\tld\tra, %d(sp)\n", frame_size - 8);
+            fprintf(f, "\taddi\tsp, sp, %d\n", frame_size);
             fprintf(f, "\tret\n");
             break;
 
+        /* Type conversion */
+        case IR_ZEXT:
+        case IR_SEXT:
+        case IR_TRUNC: {
+            const char *r1 = prep_int_full(ctx, op1);
+            dst = alloc_reg(i);
+            if (strcmp(r1, dst) != 0) fprintf(f, "\tmv\t%s, %s\n", dst, r1);
+            break;
+        }
+
         case IR_INT2FP: {
-            /* int → float/double */
             int is_d = (insn->type == IR_DOUBLE);
-            dst = alloc_freg(i);  /* dst 是 float reg */
-            const char *src;
-            if (IR_IS_CONST_REF(op1)) {
-                fprintf(f, "\tli\ts5, %lld\n", (long long)ctx->ir_base[op1].val.i64);
-                src = "s5";
-            } else src = get_reg(op1);
-            /* fcvt.d.l = int64→double, fcvt.s.l = int64→float */
-            fprintf(f, "\t%s\t%s, %s\n", is_d ? "fcvt.d.l" : "fcvt.s.l", dst, src);
+            const char *r1 = prep_int_full(ctx, op1);
+            dst = alloc_freg(i);
+            fprintf(f, "\t%s\t%s, %s\n", is_d?"fcvt.d.l":"fcvt.s.l", dst, r1);
             break;
         }
 
         case IR_FP2INT: {
-            /* float/double → int */
-            ir_insn *src_insn = (op1 > 0 && !IR_IS_CONST_REF(op1)) ? &ctx->ir_base[op1] : NULL;
-            int src_is_d = src_insn && (src_insn->type == IR_DOUBLE);
-            dst = alloc_reg(i);  /* dst 是 int reg */
-            const char *fr1 = alloc_freg(op1); emit_fref(f, ctx, fr1, op1, src_is_d);
-            /* fcvt.l.d = double→int64 (round to zero), fcvt.l.s = float→int64 */
-            fprintf(f, "\t%s\t%s, %s, rtz\n", src_is_d ? "fcvt.l.d" : "fcvt.l.s", dst, fr1);
+            ir_insn *si = (op1>0&&!IR_IS_CONST_REF(op1)) ? &ctx->ir_base[op1] : NULL;
+            int src_is_d = si && (si->type == IR_DOUBLE);
+            const char *r1 = prep_flt_full(ctx, op1, src_is_d);
+            dst = alloc_reg(i);
+            fprintf(f, "\t%s\t%s, %s, rtz\n", src_is_d?"fcvt.l.d":"fcvt.l.s", dst, r1);
             break;
         }
 
         case IR_FP2FP: {
-            /* f32 ↔ f64 */
             int dst_is_d = (insn->type == IR_DOUBLE);
+            ir_insn *si = (op1>0&&!IR_IS_CONST_REF(op1)) ? &ctx->ir_base[op1] : NULL;
+            int src_is_d = si && (si->type == IR_DOUBLE);
+            const char *r1 = prep_flt_full(ctx, op1, src_is_d);
             dst = alloc_freg(i);
-            ir_insn *src_insn = (op1 > 0 && !IR_IS_CONST_REF(op1)) ? &ctx->ir_base[op1] : NULL;
-            int src_is_d = src_insn && (src_insn->type == IR_DOUBLE);
-            const char *fr1 = alloc_freg(op1); emit_fref(f, ctx, fr1, op1, src_is_d);
             if (dst_is_d && !src_is_d)
-                fprintf(f, "\tfcvt.d.s\t%s, %s\n", dst, fr1);  /* f32 → f64 */
+                fprintf(f, "\tfcvt.d.s\t%s, %s\n", dst, r1);
             else if (!dst_is_d && src_is_d)
-                fprintf(f, "\tfcvt.s.d\t%s, %s\n", dst, fr1);  /* f64 → f32 */
-            else
-                fprintf(f, "\t%s\t%s, %s\n", dst_is_d ? "fmv.d" : "fmv.s", dst, fr1);
-            break;
-        }
-
-        case IR_ZEXT:
-        case IR_SEXT: {
-            dst = alloc_reg(i);
-            /* bool/int → wider int，直接 mv 就夠（RISC-V register 本來就是 64-bit） */
-            if (IR_IS_CONST_REF(op1))
-                fprintf(f, "\tli\t%s, %lld\n", dst, (long long)ctx->ir_base[op1].val.i64);
-            else
-                fprintf(f, "\tmv\t%s, %s\n", dst, get_reg(op1));
-            break;
-        }
-
-        case IR_TRUNC: {
-            dst = alloc_reg(i);
-            if (IR_IS_CONST_REF(op1))
-                fprintf(f, "\tli\t%s, %lld\n", dst, (long long)ctx->ir_base[op1].val.i64);
-            else
-                fprintf(f, "\tmv\t%s, %s\n", dst, get_reg(op1));
+                fprintf(f, "\tfcvt.s.d\t%s, %s\n", dst, r1);
+            else if (strcmp(r1, dst) != 0)
+                fprintf(f, "\t%s\t%s, %s\n", dst_is_d?"fmv.d":"fmv.s", dst, r1);
             break;
         }
 
         case IR_LOAD: {
-            /* op1 = control, op2 = address */
-            ir_ref addr_ref = insn->op2;
-            const char *addr = IR_IS_CONST_REF(addr_ref) ? "zero" : get_reg(addr_ref);
+            const char *addr = prep_int_full(ctx, insn->op2);
+            /* addr might be t6; if alloc_reg evicts something, addr is safe
+             * because it's in t6 (scratch, not in pool) */
             if (insn->type == IR_FLOAT) {
                 dst = alloc_freg(i);
                 fprintf(f, "\tflw\t%s, 0(%s)\n", dst, addr);
@@ -711,29 +703,45 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
         }
 
         case IR_STORE: {
-            /* op1 = control, op2 = address, op3 = value */
-            ir_ref addr_ref = insn->op2;
-            ir_ref val_ref  = insn->op3;
-            const char *addr = IR_IS_CONST_REF(addr_ref) ? "zero" : get_reg(addr_ref);
-            ir_insn *val_insn = (val_ref > 0 && !IR_IS_CONST_REF(val_ref)) ? &ctx->ir_base[val_ref] : NULL;
-            int is_float = val_insn && (val_insn->type == IR_FLOAT || val_insn->type == IR_DOUBLE);
+            /* prepare addr first, save to s5 since prep_flt may use t6 */
+            const char *addr = prep_int_full(ctx, insn->op2);
+            if (strcmp(addr, "t6") == 0) { fprintf(f, "\tmv\ts5, t6\n"); addr = "s5"; }
+            char addrbuf[16]; strcpy(addrbuf, addr);
+            ir_ref val_ref = insn->op3;
+            ir_insn *vi = (val_ref>0&&!IR_IS_CONST_REF(val_ref)) ? &ctx->ir_base[val_ref] : NULL;
+            int is_float = vi && (vi->type==IR_FLOAT||vi->type==IR_DOUBLE);
             if (is_float) {
-                int is_d = val_insn->type == IR_DOUBLE;
-                const char *fr = get_freg(val_ref);
-                fprintf(f, "\t%s\t%s, 0(%s)\n", is_d ? "fsd" : "fsw", fr, addr);
+                int is_d = vi->type == IR_DOUBLE;
+                const char *vr = prep_flt_full(ctx, val_ref, is_d);
+                fprintf(f, "\t%s\t%s, 0(%s)\n", is_d?"fsd":"fsw", vr, addrbuf);
             } else {
-                const char *vr = IR_IS_CONST_REF(val_ref) ? "s5" : get_reg(val_ref);
-                if (IR_IS_CONST_REF(val_ref))
-                    fprintf(f, "\tli\ts5, %lld\n", (long long)ctx->ir_base[val_ref].val.i64);
-                fprintf(f, "\tsd\t%s, 0(%s)\n", vr, addr);
+                const char *vr = prep_int_full(ctx, val_ref);
+                fprintf(f, "\tsd\t%s, 0(%s)\n", vr, addrbuf);
             }
             break;
         }
 
+        /* Comparison ops already handled above in IR_EQ..IR_UGT */
+
+        /* ABS */
+        case IR_ABS:
+            if (insn->type == IR_FLOAT || insn->type == IR_DOUBLE) {
+                int is_d = (insn->type == IR_DOUBLE);
+                const char *r1 = prep_flt_full(ctx, op1, is_d);
+                dst = alloc_freg(i);
+                fprintf(f, "\t%s\t%s, %s\n", is_d?"fabs.d":"fabs.s", dst, r1);
+            } else {
+                /* integer abs: neg + max */
+                const char *r1 = prep_int_full(ctx, op1);
+                dst = alloc_reg(i);
+                fprintf(f, "\tneg\tt6, %s\n", r1);
+                fprintf(f, "\tmax\t%s, %s, t6\n", dst, r1);
+            }
+            break;
+
         case IR_VAR:
         case IR_VSTORE:
         case IR_VLOAD:
-            /* skip virtual vars for now */
             break;
 
         default:
