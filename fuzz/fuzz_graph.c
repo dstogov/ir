@@ -86,6 +86,11 @@ static const ir_op fuzz_fp_un[] = {
 	IR_NEG, IR_ABS
 };
 
+/* Comparisons used to build branch conditions, valid for int and fp. */
+static const ir_op fuzz_cmp[] = {
+	IR_EQ, IR_NE, IR_LT, IR_GE, IR_LE, IR_GT
+};
+
 #define FUZZ_ARRAY_LEN(a) (sizeof(a) / sizeof((a)[0]))
 
 #define FUZZ_MAX_NODES   4096
@@ -114,7 +119,8 @@ static int fuzz_eof(const fuzz_cursor *c)
  * Decode the blob into a valid function:
  *   START
  *   parameters and two seed constants
- *   a linear sequence of type preserving data ops over earlier nodes
+ *   a sequence of type preserving data ops over earlier nodes with
+ *   occasional if/else diamonds that merge through a PHI
  *   RETURN of the last value
  */
 static void fuzz_build(ir_ctx *ctx, fuzz_cursor *c)
@@ -163,11 +169,31 @@ static void fuzz_build(ir_ctx *ctx, fuzz_cursor *c)
 		uint8_t s1 = fuzz_u8(c);
 		uint8_t s2 = fuzz_u8(c);
 		bool unary = (op_sel & 0x80) != 0;
+		bool branch = (op_sel & 0x40) != 0;
 		ir_ref a, r;
 
 		a = pool[s1 % count];
 
-		if (unary) {
+		if (branch) {
+			/*
+			 * Emit an if/else diamond and merge the two sides with a
+			 * PHI of the working type. The condition compares two pool
+			 * values, and each side feeds an existing value into the
+			 * PHI. Data ops float, so back-refs dominate both sides.
+			 */
+			ir_ref b = pool[s2 % count];
+			ir_op cmp = fuzz_cmp[(op_sel & 0x3f) % FUZZ_ARRAY_LEN(fuzz_cmp)];
+			ir_ref cond = ir_fold2(ctx, IR_OPT(cmp, IR_BOOL), a, b);
+			ir_ref if_ref = _ir_IF(ctx, cond);
+			ir_ref t_end, f_end;
+
+			_ir_IF_TRUE(ctx, if_ref);
+			t_end = _ir_END(ctx);
+			_ir_IF_FALSE(ctx, if_ref);
+			f_end = _ir_END(ctx);
+			_ir_MERGE_2(ctx, t_end, f_end);
+			r = _ir_PHI_2(ctx, wtype, a, b);
+		} else if (unary) {
 			ir_op op = is_fp
 				? fuzz_fp_un[(op_sel & 0x7f) % FUZZ_ARRAY_LEN(fuzz_fp_un)]
 				: fuzz_int_un[(op_sel & 0x7f) % FUZZ_ARRAY_LEN(fuzz_int_un)];
