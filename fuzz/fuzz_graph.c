@@ -120,7 +120,8 @@ static int fuzz_eof(const fuzz_cursor *c)
  *   START
  *   parameters and two seed constants
  *   a sequence of type preserving data ops over earlier nodes with
- *   occasional if/else diamonds that merge through a PHI
+ *   occasional if/else diamonds that merge through a PHI and simple
+ *   natural loops driven by an induction PHI
  *   RETURN of the last value
  */
 static void fuzz_build(ir_ctx *ctx, fuzz_cursor *c)
@@ -170,6 +171,7 @@ static void fuzz_build(ir_ctx *ctx, fuzz_cursor *c)
 		uint8_t s2 = fuzz_u8(c);
 		bool unary = (op_sel & 0x80) != 0;
 		bool branch = (op_sel & 0x40) != 0;
+		bool loop = (op_sel & 0x20) != 0;
 		ir_ref a, r;
 
 		a = pool[s1 % count];
@@ -193,6 +195,35 @@ static void fuzz_build(ir_ctx *ctx, fuzz_cursor *c)
 			f_end = _ir_END(ctx);
 			_ir_MERGE_2(ctx, t_end, f_end);
 			r = _ir_PHI_2(ctx, wtype, a, b);
+		} else if (loop) {
+			/*
+			 * Emit a simple natural loop. An induction PHI starts from
+			 * a pool value, the body advances it with a binary op, and
+			 * a comparison decides whether to take the back edge. The
+			 * code is never executed, so the trip count is irrelevant,
+			 * only that the loop is a valid reducible region. After the
+			 * exit the advanced value is available to later records.
+			 */
+			ir_ref step = pool[s2 % count];
+			ir_op body_op = is_fp
+				? fuzz_fp_bin[(op_sel & 0x1f) % FUZZ_ARRAY_LEN(fuzz_fp_bin)]
+				: fuzz_int_bin[(op_sel & 0x1f) % FUZZ_ARRAY_LEN(fuzz_int_bin)];
+			ir_op cmp = fuzz_cmp[(uint8_t)(s1 ^ s2) % FUZZ_ARRAY_LEN(fuzz_cmp)];
+			ir_ref loop_ref, iv, next, cond, if_ref, loop_end;
+
+			loop_ref = _ir_LOOP_BEGIN(ctx, _ir_END(ctx));
+			iv = _ir_PHI_2(ctx, wtype, a, IR_UNUSED);
+			next = ir_fold2(ctx, IR_OPT(body_op, wtype), iv, step);
+			cond = ir_fold2(ctx, IR_OPT(cmp, IR_BOOL), next, step);
+
+			if_ref = _ir_IF(ctx, cond);
+			_ir_IF_TRUE(ctx, if_ref);
+			loop_end = _ir_LOOP_END(ctx);
+			_ir_IF_FALSE(ctx, if_ref);
+
+			_ir_MERGE_SET_OP(ctx, loop_ref, 2, loop_end);
+			_ir_PHI_SET_OP(ctx, iv, 2, next);
+			r = next;
 		} else if (unary) {
 			ir_op op = is_fp
 				? fuzz_fp_un[(op_sel & 0x7f) % FUZZ_ARRAY_LEN(fuzz_fp_un)]
