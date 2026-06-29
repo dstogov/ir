@@ -173,7 +173,7 @@ bool ir_check(const ir_ctx *ctx)
 					if (IR_OPND_KIND(flags, j) != IR_OPND_DATA) {
 						fprintf(stderr, "ir_base[%d].ops[%d] reference (%d) must not be constant\n", i, j, use);
 						ok = 0;
-					} else if (use >= ctx->consts_count) {
+					} else if (-use >= ctx->consts_count) {
 						fprintf(stderr, "ir_base[%d].ops[%d] constant reference (%d) is out of range\n", i, j, use);
 						ok = 0;
 					}
@@ -181,6 +181,7 @@ bool ir_check(const ir_ctx *ctx)
 					if (use >= ctx->insns_count) {
 						fprintf(stderr, "ir_base[%d].ops[%d] insn reference (%d) is out of range\n", i, j, use);
 						ok = 0;
+						continue;
 					}
 					use_insn = &ctx->ir_base[use];
 					switch (IR_OPND_KIND(flags, j)) {
