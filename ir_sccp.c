@@ -3612,8 +3612,10 @@ static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref con
 				IR_ASSERT(0);
 		}
 
+		ir_ref c = ir_const(ctx, val, condition_insn->type);
+		condition_insn = &ctx->ir_base[condition];
 		condition_insn->op = IR_AND;
-		condition_insn->op2 = ir_const(ctx, val, condition_insn->type);
+		condition_insn->op2 = c;
 	}
 
 	if (condition_insn->op == IR_AND && IR_IS_CONST_REF(condition_insn->op2)) {
@@ -3629,12 +3631,15 @@ static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref con
 			if (op1_insn->op1 > 0) {
 				ir_use_list_replace_one(ctx, op1_insn->op1, condition_insn->op1, condition);
 			}
+			ir_ref op1_ref = condition_insn->op1;
 			CLEAR_USES(condition_insn->op1);
 			condition_insn->type = ctx->ir_base[op1_insn->op1].type;
 			condition_insn->op1 = op1_insn->op1;
-			condition_insn->op2 = ir_const(ctx, val_insn->val, condition_insn->type);
+			ir_ref c = ir_const(ctx, val_insn->val, condition_insn->type);
+			condition_insn = &ctx->ir_base[condition];
+			condition_insn->op2 = c;
 			ir_bitqueue_add(ctx->iter_worklist, condition);
-			MAKE_NOP(op1_insn);
+			MAKE_NOP(&ctx->ir_base[op1_ref]);
 			return condition;
 		}
 	}
@@ -3662,6 +3667,8 @@ static void ir_iter_optimize_if(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 {
 	bool swap = 0;
 	ir_ref condition = ir_iter_optimize_condition(ctx, insn->op1, insn->op2, &swap);
+
+	insn = &ctx->ir_base[ref];
 
 	if (swap) {
 		ir_use_list *use_list = &ctx->use_lists[ref];
@@ -3727,6 +3734,8 @@ static void ir_iter_optimize_guard(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 {
 	bool swap = 0;
 	ir_ref condition = ir_iter_optimize_condition(ctx, insn->op1, insn->op2, &swap);
+
+	insn = &ctx->ir_base[ref];
 
 	if (swap) {
 		if (insn->op == IR_GUARD) {

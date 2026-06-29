@@ -86,6 +86,11 @@ static const ir_op fuzz_fp_un[] = {
 	IR_NEG, IR_ABS
 };
 
+/* Comparisons used to build branch conditions, valid for int and fp. */
+static const ir_op fuzz_cmp[] = {
+	IR_EQ, IR_NE, IR_LT, IR_GE, IR_LE, IR_GT
+};
+
 #define FUZZ_ARRAY_LEN(a) (sizeof(a) / sizeof((a)[0]))
 
 #define FUZZ_MAX_NODES   4096
@@ -114,7 +119,9 @@ static int fuzz_eof(const fuzz_cursor *c)
  * Decode the blob into a valid function:
  *   START
  *   parameters and two seed constants
- *   a linear sequence of type preserving data ops over earlier nodes
+ *   a sequence of type preserving data ops over earlier nodes with
+ *   occasional if/else diamonds that merge through a PHI and simple
+ *   natural loops driven by an induction PHI
  *   RETURN of the last value
  */
 static void fuzz_build(ir_ctx *ctx, fuzz_cursor *c)
@@ -163,11 +170,61 @@ static void fuzz_build(ir_ctx *ctx, fuzz_cursor *c)
 		uint8_t s1 = fuzz_u8(c);
 		uint8_t s2 = fuzz_u8(c);
 		bool unary = (op_sel & 0x80) != 0;
+		bool branch = (op_sel & 0x40) != 0;
+		bool loop = (op_sel & 0x20) != 0;
 		ir_ref a, r;
 
 		a = pool[s1 % count];
 
-		if (unary) {
+		if (branch) {
+			/*
+			 * Emit an if/else diamond and merge the two sides with a
+			 * PHI of the working type. The condition compares two pool
+			 * values, and each side feeds an existing value into the
+			 * PHI. Data ops float, so back-refs dominate both sides.
+			 */
+			ir_ref b = pool[s2 % count];
+			ir_op cmp = fuzz_cmp[(op_sel & 0x3f) % FUZZ_ARRAY_LEN(fuzz_cmp)];
+			ir_ref cond = ir_fold2(ctx, IR_OPT(cmp, IR_BOOL), a, b);
+			ir_ref if_ref = _ir_IF(ctx, cond);
+			ir_ref t_end, f_end;
+
+			_ir_IF_TRUE(ctx, if_ref);
+			t_end = _ir_END(ctx);
+			_ir_IF_FALSE(ctx, if_ref);
+			f_end = _ir_END(ctx);
+			_ir_MERGE_2(ctx, t_end, f_end);
+			r = _ir_PHI_2(ctx, wtype, a, b);
+		} else if (loop) {
+			/*
+			 * Emit a simple natural loop. An induction PHI starts from
+			 * a pool value, the body advances it with a binary op, and
+			 * a comparison decides whether to take the back edge. The
+			 * code is never executed, so the trip count is irrelevant,
+			 * only that the loop is a valid reducible region. After the
+			 * exit the advanced value is available to later records.
+			 */
+			ir_ref step = pool[s2 % count];
+			ir_op body_op = is_fp
+				? fuzz_fp_bin[(op_sel & 0x1f) % FUZZ_ARRAY_LEN(fuzz_fp_bin)]
+				: fuzz_int_bin[(op_sel & 0x1f) % FUZZ_ARRAY_LEN(fuzz_int_bin)];
+			ir_op cmp = fuzz_cmp[(uint8_t)(s1 ^ s2) % FUZZ_ARRAY_LEN(fuzz_cmp)];
+			ir_ref loop_ref, iv, next, cond, if_ref, loop_end;
+
+			loop_ref = _ir_LOOP_BEGIN(ctx, _ir_END(ctx));
+			iv = _ir_PHI_2(ctx, wtype, a, IR_UNUSED);
+			next = ir_fold2(ctx, IR_OPT(body_op, wtype), iv, step);
+			cond = ir_fold2(ctx, IR_OPT(cmp, IR_BOOL), next, step);
+
+			if_ref = _ir_IF(ctx, cond);
+			_ir_IF_TRUE(ctx, if_ref);
+			loop_end = _ir_LOOP_END(ctx);
+			_ir_IF_FALSE(ctx, if_ref);
+
+			_ir_MERGE_SET_OP(ctx, loop_ref, 2, loop_end);
+			_ir_PHI_SET_OP(ctx, iv, 2, next);
+			r = next;
+		} else if (unary) {
 			ir_op op = is_fp
 				? fuzz_fp_un[(op_sel & 0x7f) % FUZZ_ARRAY_LEN(fuzz_fp_un)]
 				: fuzz_int_un[(op_sel & 0x7f) % FUZZ_ARRAY_LEN(fuzz_int_un)];
