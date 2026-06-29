@@ -1993,10 +1993,10 @@ static ir_ref ir_promote_i2i(ir_ctx *ctx, ir_type type, ir_ref ref, ir_ref use)
 				return ref;
 			case IR_PHI:
 				for (count = 2, n = insn->inputs_count - 1; n > 0; count++, n--) {
-					input = ctx->ir_base[ref].ops[count];
+					input = ir_get_op(ctx, ref, count);
 					if (input != ref) {
 						op = ir_promote_i2i(ctx, type, input, ref);
-						ctx->ir_base[ref].ops[count] = op;
+						ir_set_op(ctx, ref, count, op);
 					}
 				}
 				insn = &ctx->ir_base[ref];
