@@ -42,7 +42,7 @@
 # include <valgrind/valgrind.h>
 #endif
 
-#define IR_TYPE_FLAGS(name, type, field, flags) ((flags)|sizeof(type)),
+#define IR_TYPE_FLAGS(name, type, field, flags) (flags),
 #define IR_TYPE_NAME(name, type, field, flags)  #name,
 #define IR_TYPE_CNAME(name, type, field, flags) #type,
 #define IR_TYPE_SIZE(name, type, field, flags)  sizeof(type),
@@ -134,6 +134,13 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted
 		}
 		return;
 	}
+
+	if (IR_IS_TYPE_VECTOR(insn->type)) {
+		// TODO: vector constants are not implemented yet ???
+		fprintf(f, "VECTOR???");
+		return;
+	}
+
 	IR_ASSERT(IR_IS_CONST_OP(insn->op) || insn->op == IR_FUNC_ADDR);
 	switch (insn->type) {
 		case IR_BOOL:
@@ -2139,9 +2146,9 @@ static ir_alias ir_check_aliasing(const ir_ctx *ctx, ir_ref addr1, ir_ref addr2,
 		} else if (offset1 == offset2) {
 			return IR_MUST_ALIAS;
 		} else if (offset1 < offset2) {
-			return offset1 + ir_type_size[type1] <= offset2 ? IR_NO_ALIAS : IR_MUST_ALIAS;
+			return offset1 + ir_get_type_size(type1) <= offset2 ? IR_NO_ALIAS : IR_MUST_ALIAS;
 		} else {
-			return offset2 + ir_type_size[type2] <= offset1 ? IR_NO_ALIAS : IR_MUST_ALIAS;
+			return offset2 + ir_get_type_size(type2) <= offset1 ? IR_NO_ALIAS : IR_MUST_ALIAS;
 		}
 	}
 
@@ -2174,11 +2181,13 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_load_i(const ir_ctx *ctx, ir_ref ref, i
 			if (insn->op2 == addr) {
 				if (insn->type == type) {
 					return ref; /* load forwarding (L2L) */
-				} else if (ir_type_size[insn->type] == ir_type_size[type]) {
-					return ref; /* load forwarding with bitcast (L2L) */
-				} else if (ir_type_size[insn->type] > ir_type_size[type]
-						&& IR_IS_TYPE_INT(type) && IR_IS_TYPE_INT(insn->type)) {
-					return ref; /* partial load forwarding (L2L) */
+				} else if (IR_IS_TYPE_SCALAR(insn->type) && IR_IS_TYPE_SCALAR(type)) {
+					if (ir_type_size[insn->type] == ir_type_size[type]) {
+						return ref; /* load forwarding with bitcast (L2L) */
+					} else if (ir_type_size[insn->type] > ir_type_size[type]
+							&& IR_IS_TYPE_INT(type) && IR_IS_TYPE_INT(insn->type)) {
+						return ref; /* partial load forwarding (L2L) */
+					}
 				}
 			}
 		} else if (insn->op == IR_STORE) {
@@ -2191,11 +2200,15 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_load_i(const ir_ctx *ctx, ir_ref ref, i
 					return IR_UNUSED;
 				} else if (type2 == type) {
 					return insn->op3; /* store forwarding (S2L) */
-				} else if (ir_type_size[type2] == ir_type_size[type]) {
-					return insn->op3; /* store forwarding with bitcast (S2L) */
-				} else if (ir_type_size[type2] > ir_type_size[type]
-						&& IR_IS_TYPE_INT(type) && IR_IS_TYPE_INT(type2)) {
-					return insn->op3; /* partial store forwarding (S2L) */
+				} else if (IR_IS_TYPE_SCALAR(type2) && IR_IS_TYPE_SCALAR(type)) {
+					if (ir_type_size[type2] == ir_type_size[type]) {
+						return insn->op3; /* store forwarding with bitcast (S2L) */
+					} else if (ir_type_size[type2] > ir_type_size[type]
+							&& IR_IS_TYPE_INT(type) && IR_IS_TYPE_INT(type2)) {
+						return insn->op3; /* partial store forwarding (S2L) */
+					} else {
+						return IR_UNUSED;
+					}
 				} else {
 					return IR_UNUSED;
 				}
@@ -2250,11 +2263,13 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_vload_i(const ir_ctx *ctx, ir_ref ref, 
 			if (insn->op2 == var) {
 				if (insn->type == type) {
 					return ref; /* load forwarding (L2L) */
-				} else if (ir_type_size[insn->type] == ir_type_size[type]) {
-					return ref; /* load forwarding with bitcast (L2L) */
-				} else if (ir_type_size[insn->type] > ir_type_size[type]
-						&& IR_IS_TYPE_INT(type) && IR_IS_TYPE_INT(insn->type)) {
-					return ref; /* partial load forwarding (L2L) */
+				} else if (IR_IS_TYPE_SCALAR(insn->type) && IR_IS_TYPE_SCALAR(type)) {
+					if (ir_type_size[insn->type] == ir_type_size[type]) {
+						return ref; /* load forwarding with bitcast (L2L) */
+					} else if (ir_type_size[insn->type] > ir_type_size[type]
+							&& IR_IS_TYPE_INT(type) && IR_IS_TYPE_INT(insn->type)) {
+						return ref; /* partial load forwarding (L2L) */
+					}
 				}
 			}
 		} else if (insn->op == IR_VSTORE) {
@@ -2263,11 +2278,15 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_vload_i(const ir_ctx *ctx, ir_ref ref, 
 			if (insn->op2 == var) {
 				if (type2 == type) {
 					return insn->op3; /* store forwarding (S2L) */
-				} else if (ir_type_size[type2] == ir_type_size[type]) {
-					return insn->op3; /* store forwarding with bitcast (S2L) */
-				} else if (ir_type_size[type2] > ir_type_size[type]
-						&& IR_IS_TYPE_INT(type) && IR_IS_TYPE_INT(type2)) {
-					return insn->op3; /* partial store forwarding (S2L) */
+				} else if (IR_IS_TYPE_SCALAR(type2) && IR_IS_TYPE_SCALAR(type)) {
+					if (ir_type_size[type2] == ir_type_size[type]) {
+						return insn->op3; /* store forwarding with bitcast (S2L) */
+					} else if (ir_type_size[type2] > ir_type_size[type]
+							&& IR_IS_TYPE_INT(type) && IR_IS_TYPE_INT(type2)) {
+						return insn->op3; /* partial store forwarding (S2L) */
+					} else {
+						break;
+					}
 				} else {
 					break;
 				}

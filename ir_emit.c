@@ -143,7 +143,7 @@ static ir_reg ir_get_param_reg(const ir_ctx *ctx, ir_ref ref)
 				}
 #endif
 			} else {
-				IR_ASSERT(IR_IS_TYPE_FP(insn->type));
+				IR_ASSERT(IR_IS_TYPE_FP(insn->type) || IR_IS_TYPE_VECTOR(insn->type));
 				if (use == ref) {
 					if (fp_param < cc->fp_param_regs_count) {
 						return cc->fp_param_regs[fp_param];
@@ -197,7 +197,7 @@ static int ir_get_args_regs(const ir_ctx *ctx, const ir_insn *insn, const ir_cal
 				regs[j] = IR_REG_NONE;
 			}
 		} else {
-			IR_ASSERT(IR_IS_TYPE_FP(type));
+			IR_ASSERT(IR_IS_TYPE_FP(type) || IR_IS_TYPE_VECTOR(type));
 			if (fp_param < cc->fp_param_regs_count) {
 				regs[j] = cc->fp_param_regs[fp_param];
 				count = j + 1;

@@ -228,6 +228,12 @@ IR_ALWAYS_INLINE void ir_sccp_make_bottom_ex(const ir_ctx *ctx, ir_sccp_val *_va
 
 IR_ALWAYS_INLINE bool ir_sccp_meet_const(const ir_ctx *ctx, ir_sccp_val *_values, ir_bitqueue *worklist, ir_ref ref, const ir_insn *val_insn)
 {
+	if (IR_IS_TYPE_VECTOR(val_insn->type)) {
+		// TODO: vector constants are not implemented yet ???
+		IR_MAKE_BOTTOM_EX(ref);
+		return 1;
+	}
+
 	IR_ASSERT(IR_IS_CONST_OP(val_insn->op) || IR_IS_SYM_CONST(val_insn->op));
 
 	if (_values[ref].op == IR_TOP) {
@@ -3472,7 +3478,9 @@ static void ir_iter_optimize_merge(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge
 						}
 					}
 				}
-				ir_optimize_phi(ctx, merge_ref, merge, phi_ref, phi);
+				if (IR_IS_TYPE_SCALAR(phi->type)) {
+					ir_optimize_phi(ctx, merge_ref, merge, phi_ref, phi);
+				}
 			}
 		}
 	}
@@ -3991,7 +3999,7 @@ remove_bitcast:
 				val = insn->op3;
 				val_insn = &ctx->ir_base[val];
 				if (val_insn->op == IR_BITCAST
-				 && ir_type_size[val_insn->type] == ir_type_size[ctx->ir_base[val_insn->op1].type]) {
+				 && ir_get_type_size(val_insn->type) == ir_get_type_size(ctx->ir_base[val_insn->op1].type)) {
 					insn->op3 = val_insn->op1;
 					ir_use_list_remove_one(ctx, val, i);
 					if (ctx->use_lists[val].count == 0) {

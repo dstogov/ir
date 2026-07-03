@@ -2762,11 +2762,6 @@ static int32_t ir_allocate_small_spill_slot(ir_ctx *ctx, size_t size)
 	return ret;
 }
 
-int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type)
-{
-	return ir_allocate_small_spill_slot(ctx, ir_type_size[type]);
-}
-
 static int32_t ir_allocate_big_spill_slot(ir_ctx *ctx, int32_t size)
 {
 	int32_t ret;
@@ -2788,6 +2783,17 @@ static int32_t ir_allocate_big_spill_slot(ir_ctx *ctx, int32_t size)
 
 	return ret;
 }
+
+int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type)
+{
+	if (IR_IS_TYPE_SCALAR(type)) {
+		return ir_allocate_small_spill_slot(ctx, ir_type_size[type]);
+	} else {
+		IR_ASSERT(IR_IS_TYPE_VECTOR(type));
+		return ir_allocate_big_spill_slot(ctx, IR_VECTOR_SIZE(type));
+	}
+}
+
 
 static ir_reg ir_get_first_reg_hint(ir_ctx *ctx, ir_live_interval *ival, ir_regset available)
 {
@@ -3066,7 +3072,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 	ir_live_interval *other;
 	ir_regset available, overlapped, scratch;
 
-	if (IR_IS_TYPE_FP(ival->type)) {
+	if (IR_IS_TYPE_FP(ival->type) || IR_IS_TYPE_VECTOR(ival->type)) {
 		available = IR_REGSET_FP;
 		/* set freeUntilPos of all physical registers to maxInt */
 		for (i = IR_REG_FP_FIRST; i <= IR_REG_FP_LAST; i++) {
@@ -3404,7 +3410,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 		next_use_pos = ival->range.end;
 	}
 
-	if (IR_IS_TYPE_FP(ival->type)) {
+	if (IR_IS_TYPE_FP(ival->type) || IR_IS_TYPE_VECTOR(ival->type)) {
 		available = IR_REGSET_FP;
 		/* set nextUsePos of all physical registers to maxInt */
 		for (i = IR_REG_FP_FIRST; i <= IR_REG_FP_LAST; i++) {
@@ -4141,18 +4147,21 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 						} else {
 							active = other->list_next;
 						}
-						size = ir_type_size[other->type];
-						IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8);
-						old = handled[size];
-						while (old) {
-							if (old->stack_spill_pos == other->stack_spill_pos) {
-								break;
+						// TODO: reuse spill slots for vectors as well ???
+						if (IR_IS_TYPE_SCALAR(other->type)) {
+							size = ir_type_size[other->type];
+							IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8);
+							old = handled[size];
+							while (old) {
+								if (old->stack_spill_pos == other->stack_spill_pos) {
+									break;
+								}
+								old = old->list_next;
 							}
-							old = old->list_next;
-						}
-						if (!old) {
-							other->list_next = handled[size];
-							handled[size] = other;
+							if (!old) {
+								other->list_next = handled[size];
+								handled[size] = other;
+							}
 						}
 					} else {
 						prev = other;
@@ -4164,7 +4173,8 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 				if (unhandled && ival->end > unhandled->range.start) {
 					ival->list_next = active;
 					active = ival;
-				} else {
+				// TODO: reuse spill slots for vectors as well ???
+				} else if (IR_IS_TYPE_SCALAR(ival->type)) {
 					size = ir_type_size[ival->type];
 					IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8);
 					old = handled[size];
