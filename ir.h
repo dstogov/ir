@@ -123,11 +123,15 @@ extern "C" {
 # define IR_X86_I64 0
 #endif
 
-/* IR Type flags (low 4 bits are used for type size) */
-#define IR_TYPE_SIGNED     (1<<4)
-#define IR_TYPE_UNSIGNED   (1<<5)
-#define IR_TYPE_FP         (1<<6)
-#define IR_TYPE_SPECIAL    (1<<7)
+#ifndef IR_SIMD
+# define IR_SIMD 1
+#endif
+
+/* IR Type flags */
+#define IR_TYPE_SIGNED     (1<<0)
+#define IR_TYPE_UNSIGNED   (1<<1)
+#define IR_TYPE_FP         (1<<2)
+#define IR_TYPE_SPECIAL    (1<<3)
 #define IR_TYPE_BOOL       (IR_TYPE_SPECIAL|IR_TYPE_UNSIGNED)
 #define IR_TYPE_ADDR       (IR_TYPE_SPECIAL|IR_TYPE_UNSIGNED)
 #define IR_TYPE_CHAR       (IR_TYPE_SPECIAL|IR_TYPE_SIGNED)
@@ -151,15 +155,32 @@ extern "C" {
 #define IR_IS_TYPE_UNSIGNED(t) ((t) < IR_CHAR)
 #define IR_IS_TYPE_SIGNED(t)   ((t) >= IR_CHAR && (t) < IR_DOUBLE)
 #define IR_IS_TYPE_INT(t)      ((t) < IR_DOUBLE)
-#define IR_IS_TYPE_FP(t)       ((t) >= IR_DOUBLE)
+#define IR_IS_TYPE_FP(t)       ((t) >= IR_DOUBLE && (t) <= IR_FLOAT)
 
 #define IR_TYPE_ENUM(name, type, field, flags) IR_ ## name,
 
 typedef enum _ir_type {
 	IR_VOID,
 	IR_TYPES(IR_TYPE_ENUM)
-	IR_LAST_TYPE
+	IR_LAST_TYPE,
+
+	IR_BASE_TYPE_MASK = 0x0f,
+	IR_VECTOR_MASK    = 0x70,
+
+	IR_VECTOR_1       = 0x10,
+	IR_VECTOR_2       = 0x20,
+	IR_VECTOR_4       = 0x30,
+	IR_VECTOR_8       = 0x40,
+	IR_VECTOR_16      = 0x50,
+	IR_VECTOR_32      = 0x60,
+	IR_VECTOR_64      = 0x70,
 } ir_type;
+
+#define IR_IS_TYPE_SCALAR(t)   (((t) & IR_VECTOR_MASK) == 0)
+#define IR_IS_TYPE_VECTOR(t)   (((t) & IR_VECTOR_MASK) != 0)
+
+#define IR_VECTOR_BASE_TYPE(t) ((t) & IR_BASE_TYPE_MASK)
+#define IR_VECTOR_LENGTH(t)    (1 << ((((t) & IR_VECTOR_MASK) >> 4) - 1))
 
 #ifdef IR_64
 # define IR_SIZE_T          IR_U64
@@ -315,6 +336,11 @@ typedef enum _ir_type {
 	_(MIN,	        d2C,  def, def, ___) /* min(op1, op2)               */ \
 	_(MAX,	        d2C,  def, def, ___) /* max(op1, op2)               */ \
 	_(COND,	        d3,   def, def, def) /* op1 ? op2 : op3             */ \
+	\
+	/* SIMD vector ops                                                  */ \
+	_(EXTRACT,      d2,   def, def, ___) /* get element of vector       */ \
+	_(REPLACE,      d3,   def, def, def) /* set element of vector       */ \
+	_(SPLAT,        d1,   def, ___, ___) /* set all elements of vector  */ \
 	\
 	/* data-flow and miscellaneous ops                                  */ \
 	_(VADDR,        d1,   var, ___, ___) /* load address of local var   */ \

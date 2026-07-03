@@ -1471,6 +1471,10 @@ IR_FOLD(BITCAST(C_BOOL))
 IR_FOLD(BITCAST(C_CHAR))
 IR_FOLD(BITCAST(C_ADDR))
 {
+	if (IR_IS_TYPE_VECTOR(IR_OPT_TYPE(opt))) {
+		// TODO: constant folding for vectors ???
+		IR_FOLD_NEXT;
+	}
 	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] == ir_type_size[op1_insn->type]);
 	switch (IR_OPT_TYPE(opt)) {
 		default:

@@ -884,11 +884,31 @@ void ir_addrtab_free(ir_hashtab *tab);
 ir_ref ir_addrtab_find(const ir_hashtab *tab, uint64_t key);
 void ir_addrtab_set(ir_hashtab *tab, uint64_t key, ir_ref val);
 
-/*** IR OP info ***/
+/*** IR Type info ***/
 extern const uint8_t ir_type_flags[IR_LAST_TYPE];
 extern const char *ir_type_name[IR_LAST_TYPE];
 extern const char *ir_type_cname[IR_LAST_TYPE];
 extern const uint8_t ir_type_size[IR_LAST_TYPE];
+
+#define IR_VECTOR_SIZE(t)                 (ir_type_size[IR_VECTOR_BASE_TYPE(t)] * IR_VECTOR_LENGTH(t))
+#define IR_MAKE_VECTOR_TYPE(base, length) ir_make_vector_type(base, length)
+
+IR_ALWAYS_INLINE ir_type ir_make_vector_type(ir_type base, uint8_t length)
+{
+	IR_ASSERT(IR_IS_TYPE_SCALAR(base) && length > 0 && length <= 64 && (length & (length - 1)) == 0);
+
+	return base | ((ir_ntz(length) + 1) << 4);
+}
+
+IR_ALWAYS_INLINE uint32_t ir_get_type_size(ir_type type)
+{
+#if IR_SIMD
+	if (IR_IS_TYPE_VECTOR(type)) return IR_VECTOR_SIZE(type);
+#endif
+	return ir_type_size[type];
+}
+
+/*** IR OP info ***/
 extern const uint32_t ir_op_flags[IR_LAST_OP];
 extern const char *ir_op_name[IR_LAST_OP];
 
