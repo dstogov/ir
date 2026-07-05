@@ -706,13 +706,44 @@ IR_FOLD(MOD(C_ADDR, C_ADDR))
 }
 
 IR_FOLD(MOD(C_I8, C_I8))
+{
+	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
+	if (op2_insn->val.i64 == 0
+	 || (op2_insn->val.i64 == -1 && op1_insn->val.i8 == INT8_MIN)) {
+		/* division by zero or signed overflow */
+		IR_FOLD_EMIT;
+	}
+	IR_FOLD_CONST_I(op1_insn->val.i8 % op2_insn->val.i8);
+}
+
 IR_FOLD(MOD(C_I16, C_I16))
+{
+	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
+	if (op2_insn->val.i64 == 0
+	 || (op2_insn->val.i64 == -1 && op1_insn->val.i16 == INT16_MIN)) {
+		/* division by zero or signed overflow */
+		IR_FOLD_EMIT;
+	}
+	IR_FOLD_CONST_I(op1_insn->val.i16 % op2_insn->val.i16);
+}
+
 IR_FOLD(MOD(C_I32, C_I32))
+{
+	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
+	if (op2_insn->val.i64 == 0
+	 || (op2_insn->val.i64 == -1 && op1_insn->val.i32 == INT32_MIN)) {
+		/* division by zero or signed overflow */
+		IR_FOLD_EMIT;
+	}
+	IR_FOLD_CONST_I(op1_insn->val.i32 % op2_insn->val.i32);
+}
+
 IR_FOLD(MOD(C_I64, C_I64))
 {
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
-	if (op2_insn->val.i64 == 0) {
-		/* division by zero */
+	if (op2_insn->val.i64 == 0
+	 || (op2_insn->val.i64 == -1 && op1_insn->val.i64 == INT64_MIN)) {
+		/* division by zero or signed overflow */
 		IR_FOLD_EMIT;
 	}
 	IR_FOLD_CONST_I(op1_insn->val.i64 % op2_insn->val.i64);

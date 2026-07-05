@@ -1,0 +1,23 @@
+--TEST--
+019: FOLD: signed MOD INT16_MIN by minus one not folded
+--ARGS--
+-O2 --save
+--CODE--
+{
+	int16_t c_1 = -32768;
+	int16_t c_2 = -1;
+	l_1 = START(l_3);
+	int16_t d_2 = MOD(c_1, c_2);
+	l_3 = RETURN(l_1, d_2);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int16_t c_4 = -32768;
+	int16_t c_5 = -1;
+	l_1 = START(l_3);
+	int16_t d_2 = MOD(c_4, c_5);
+	l_3 = RETURN(l_1, d_2);
+}

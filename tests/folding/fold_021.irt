@@ -1,0 +1,23 @@
+--TEST--
+021: FOLD: signed MOD INT64_MIN by minus one not folded
+--ARGS--
+-O2 --save
+--CODE--
+{
+	int64_t c_1 = -9223372036854775808;
+	int64_t c_2 = -1;
+	l_1 = START(l_3);
+	int64_t d_2 = MOD(c_1, c_2);
+	l_3 = RETURN(l_1, d_2);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int64_t c_4 = -9223372036854775808;
+	int64_t c_5 = -1;
+	l_1 = START(l_3);
+	int64_t d_2 = MOD(c_4, c_5);
+	l_3 = RETURN(l_1, d_2);
+}
