@@ -688,6 +688,7 @@ static void ir_emit_splat(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 	fprintf(f, "};\n");
 }
 
+<<<<<<< HEAD
 static void ir_emit_shuffle(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 {
 	ir_type t;
@@ -747,6 +748,8 @@ static void ir_emit_convert_vector(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 	fprintf(f, ");\n");
 }
 
+=======
+>>>>>>> 51ff23a (ir_emit_c() support for vector types)
 static void ir_emit_switch(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn *insn)
 {
 	ir_block *bb;
@@ -1357,6 +1360,7 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_SPLAT:
 					ir_emit_splat(ctx, f, i, insn);
 					break;
+<<<<<<< HEAD
 				case IR_SHUFFLE:
 					ir_emit_shuffle(ctx, f, i, insn);
 					break;
@@ -1368,6 +1372,8 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 					fprintf(stderr, "ERROR: IR_%s is not implemented yet\n", ir_op_name[insn->op]);
 					exit(1);
 					return 0;
+=======
+>>>>>>> 51ff23a (ir_emit_c() support for vector types)
 				default:
 					IR_ASSERT(0 && "NIY instruction");
 					ctx->status = IR_ERROR_UNSUPPORTED_CODE_RULE;
