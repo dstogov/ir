@@ -1604,6 +1604,218 @@ IR_FOLD(FP2FP(C_DOUBLE))
 	}
 }
 
+IR_FOLD(SPLAT(C_I8))
+IR_FOLD(SPLAT(C_U8))
+IR_FOLD(SPLAT(C_CHAR))
+{
+	uint8_t v = op1_insn->val.u8;
+	ir_type type = IR_OPT_TYPE(opt);
+	int n = IR_VECTOR_LENGTH(type);
+	ir_ref vec = ir_const_vector(ctx, type);
+	uint8_t *ptr = (uint8_t*)ir_long_const_ptr(ctx, vec);
+
+	for (;n > 0; ptr++, n--) {
+		*ptr = v;
+	}
+	IR_FOLD_COPY(vec);
+}
+
+IR_FOLD(SPLAT(C_I16))
+IR_FOLD(SPLAT(C_U16))
+{
+	uint16_t v = op1_insn->val.u16;
+	ir_type type = IR_OPT_TYPE(opt);
+	int n = IR_VECTOR_LENGTH(type);
+	ir_ref vec = ir_const_vector(ctx, type);
+	uint16_t *ptr = (uint16_t*)ir_long_const_ptr(ctx, vec);
+
+	for (;n > 0; ptr++, n--) {
+		*ptr = v;
+	}
+	IR_FOLD_COPY(vec);
+}
+
+IR_FOLD(SPLAT(C_I32))
+IR_FOLD(SPLAT(C_U32))
+{
+	uint32_t v = op1_insn->val.u32;
+	ir_type type = IR_OPT_TYPE(opt);
+	int n = IR_VECTOR_LENGTH(type);
+	ir_ref vec = ir_const_vector(ctx, type);
+	uint32_t *ptr = (uint32_t*)ir_long_const_ptr(ctx, vec);
+
+	for (;n > 0; ptr++, n--) {
+		*ptr = v;
+	}
+	IR_FOLD_COPY(vec);
+}
+
+IR_FOLD(SPLAT(C_I64))
+IR_FOLD(SPLAT(C_U64))
+{
+	uint64_t v = op1_insn->val.u64;
+	ir_type type = IR_OPT_TYPE(opt);
+	int n = IR_VECTOR_LENGTH(type);
+	ir_ref vec = ir_const_vector(ctx, type);
+	uint64_t *ptr = (uint64_t*)ir_long_const_ptr(ctx, vec);
+
+	for (;n > 0; ptr++, n--) {
+		*ptr = v;
+	}
+	IR_FOLD_COPY(vec);
+}
+
+IR_FOLD(SPLAT(C_FLOAT))
+{
+	float v = op1_insn->val.f;
+	ir_type type = IR_OPT_TYPE(opt);
+	int n = IR_VECTOR_LENGTH(type);
+	ir_ref vec = ir_const_vector(ctx, type);
+	float *ptr = (float*)ir_long_const_ptr(ctx, vec);
+
+	for (;n > 0; ptr++, n--) {
+		*ptr = v;
+	}
+	IR_FOLD_COPY(vec);
+}
+
+IR_FOLD(SPLAT(C_DOUBLE))
+{
+	double v = op1_insn->val.d;
+	ir_type type = IR_OPT_TYPE(opt);
+	int n = IR_VECTOR_LENGTH(type);
+	ir_ref vec = ir_const_vector(ctx, type);
+	double *ptr = (double*)ir_long_const_ptr(ctx, vec);
+
+	for (;n > 0; ptr++, n--) {
+		*ptr = v;
+	}
+	IR_FOLD_COPY(vec);
+}
+
+IR_FOLD(REPLACE(LONG_CONST, _))
+{
+	if (IR_IS_CONST_REF(op3)
+	 && IR_IS_CONST_REF(op2)
+	 && IR_IS_TYPE_INT(op2_insn->type)
+	 && op2_insn->val.i64 >= 0
+	 && op2_insn->val.i64 < IR_VECTOR_LENGTH(op1_insn->type)) {
+		IR_ASSERT(IR_IS_TYPE_VECTOR(op1_insn->type) && IR_VECTOR_BASE_TYPE(op1_insn->type) == op3_insn->type);
+		uint32_t idx = op2_insn->val.u32;
+
+		if (op3_insn->type == IR_U8 || op3_insn->type == IR_I8 || op3_insn->type == IR_CHAR) {
+			uint8_t v = op3_insn->val.u8;
+			uint8_t *src = (uint8_t*)ir_long_const_ptr(ctx, op1);
+			if (src[idx] == v) {
+				IR_FOLD_COPY(op1);
+			} else {
+				ir_ref vec = ir_const_vector(ctx, IR_OPT_TYPE(opt));
+				uint8_t *src = (uint8_t*)ir_long_const_ptr(ctx, op1);
+				uint8_t *dst = (uint8_t*)ir_long_const_ptr(ctx, vec);
+				memcpy(dst, src, IR_VECTOR_SIZE(IR_OPT_TYPE(opt)));
+				dst[idx] = v;
+				IR_FOLD_COPY(vec);
+			}
+		} else if (op3_insn->type == IR_U16 || op3_insn->type == IR_I16) {
+			uint16_t v = op3_insn->val.u16;
+			uint16_t *src = (uint16_t*)ir_long_const_ptr(ctx, op1);
+			if (src[idx] == v) {
+				IR_FOLD_COPY(op1);
+			} else {
+				ir_ref vec = ir_const_vector(ctx, IR_OPT_TYPE(opt));
+				uint16_t *src = (uint16_t*)ir_long_const_ptr(ctx, op1);
+				uint16_t *dst = (uint16_t*)ir_long_const_ptr(ctx, vec);
+				memcpy(dst, src, IR_VECTOR_SIZE(IR_OPT_TYPE(opt)));
+				dst[idx] = v;
+				IR_FOLD_COPY(vec);
+			}
+		} else if (op3_insn->type == IR_U32 || op3_insn->type == IR_I32) {
+			uint32_t v = op3_insn->val.u32;
+			uint32_t *src = (uint32_t*)ir_long_const_ptr(ctx, op1);
+			if (src[idx] == v) {
+				IR_FOLD_COPY(op1);
+			} else {
+				ir_ref vec = ir_const_vector(ctx, IR_OPT_TYPE(opt));
+				uint32_t *src = (uint32_t*)ir_long_const_ptr(ctx, op1);
+				uint32_t *dst = (uint32_t*)ir_long_const_ptr(ctx, vec);
+				memcpy(dst, src, IR_VECTOR_SIZE(IR_OPT_TYPE(opt)));
+				dst[idx] = v;
+				IR_FOLD_COPY(vec);
+			}
+		} else if (op3_insn->type == IR_U64 || op3_insn->type == IR_I64) {
+			uint64_t v = op3_insn->val.u64;
+			uint64_t *src = (uint64_t*)ir_long_const_ptr(ctx, op1);
+			if (src[idx] == v) {
+				IR_FOLD_COPY(op1);
+			} else {
+				ir_ref vec = ir_const_vector(ctx, IR_OPT_TYPE(opt));
+				uint64_t *src = (uint64_t*)ir_long_const_ptr(ctx, op1);
+				uint64_t *dst = (uint64_t*)ir_long_const_ptr(ctx, vec);
+				memcpy(dst, src, IR_VECTOR_SIZE(IR_OPT_TYPE(opt)));
+				dst[idx] = v;
+				IR_FOLD_COPY(vec);
+			}
+		} else if (op3_insn->type == IR_DOUBLE) {
+			double v = op3_insn->val.d;
+			double *src = (double*)ir_long_const_ptr(ctx, op1);
+			if (src[idx] == v) {
+				IR_FOLD_COPY(op1);
+			} else {
+				ir_ref vec = ir_const_vector(ctx, IR_OPT_TYPE(opt));
+				double *src = (double*)ir_long_const_ptr(ctx, op1);
+				double *dst = (double*)ir_long_const_ptr(ctx, vec);
+				memcpy(dst, src, IR_VECTOR_SIZE(IR_OPT_TYPE(opt)));
+				dst[idx] = v;
+				IR_FOLD_COPY(vec);
+			}
+		} else if (op3_insn->type == IR_FLOAT) {
+			float v = op3_insn->val.d;
+			float *src = (float*)ir_long_const_ptr(ctx, op1);
+			if (src[idx] == v) {
+				IR_FOLD_COPY(op1);
+			} else {
+				ir_ref vec = ir_const_vector(ctx, IR_OPT_TYPE(opt));
+				float *src = (float*)ir_long_const_ptr(ctx, op1);
+				float *dst = (float*)ir_long_const_ptr(ctx, vec);
+				memcpy(dst, src, IR_VECTOR_SIZE(IR_OPT_TYPE(opt)));
+				dst[idx] = v;
+				IR_FOLD_COPY(vec);
+			}
+		}
+	}
+	IR_FOLD_EMIT;
+}
+
+IR_FOLD(EXTRACT(LONG_CONST, _))
+{
+	if (IR_IS_CONST_REF(op2)
+	 && IR_IS_TYPE_INT(op2_insn->type)
+	 && op2_insn->val.i64 >= 0
+	 && op2_insn->val.i64 < IR_VECTOR_LENGTH(op1_insn->type)) {
+		uint32_t idx = op2_insn->val.u32;
+		void *ptr;
+
+		IR_ASSERT(IR_IS_TYPE_VECTOR(op1_insn->type) && IR_VECTOR_BASE_TYPE(op1_insn->type) == IR_OPT_TYPE(opt));
+		ptr = (uint8_t*)ir_long_const_ptr(ctx, op1);
+		switch (IR_OPT_TYPE(opt)) {
+			case IR_CHAR:
+			case IR_I8:     IR_FOLD_CONST_I(((int8_t*)ptr)[idx]);
+			case IR_I16:    IR_FOLD_CONST_I(((int16_t*)ptr)[idx]);
+			case IR_I32:    IR_FOLD_CONST_I(((int32_t*)ptr)[idx]);
+			case IR_I64:    IR_FOLD_CONST_I(((int64_t*)ptr)[idx]);
+			case IR_U8:     IR_FOLD_CONST_U(((uint8_t*)ptr)[idx]);
+			case IR_U16:    IR_FOLD_CONST_U(((uint16_t*)ptr)[idx]);
+			case IR_U32:    IR_FOLD_CONST_U(((uint32_t*)ptr)[idx]);
+			case IR_U64:    IR_FOLD_CONST_U(((uint64_t*)ptr)[idx]);
+			case IR_DOUBLE: IR_FOLD_CONST_D(((double*)ptr)[idx]);
+			case IR_FLOAT:  IR_FOLD_CONST_F(((float*)ptr)[idx]);
+			default:
+				IR_ASSERT(0);
+		}
+	}
+	IR_FOLD_EMIT;
+}
+
 // TODO: constant functions (e.g.  sin, cos)
 
 /* Copy Propagation */

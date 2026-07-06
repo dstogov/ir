@@ -1048,7 +1048,7 @@ IR_ALWAYS_INLINE uint32_t ir_insn_len(const ir_insn *insn)
 #define IR_PREALLOCATED_STACK  (1<<13)
 #define IR_RECURSIVE_TAILCALL  (1<<14)
 #define IR_HAS_MEMCPY          (1<<15)
-
+#define IR_HAS_LONG_CONSTANTS  (1<<16)
 
 /* Temporary: MEM2SSA -> SCCP */
 #define IR_MEM2SSA_VARS        (1<<25)
