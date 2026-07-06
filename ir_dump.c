@@ -555,53 +555,23 @@ void ir_dump_codegen(const ir_ctx *ctx, FILE *f)
 	bool first;
 
 	fprintf(f, "{\n");
-	/* Separate behavior to keep tests compatibility. TODO: remove the old behavior */
-	if (ctx->flags2 & IR_HAS_LONG_CONSTANTS) {
-		for (i = 1 - ctx->consts_count, insn = ctx->ir_base + i; i < IR_UNUSED; i++, insn++) {
-			fprintf(f, "\t");
-			ir_print_type_cname(insn->type, f);
-			fprintf(f, " c_%d = ", -i);
-			if (insn->op == IR_FUNC) {
-				fprintf(f, "func %s", ir_get_str(ctx, insn->val.name));
-				ir_print_proto(ctx, insn->proto, f);
-			} else if (insn->op == IR_SYM) {
-				fprintf(f, "sym(%s)", ir_get_str(ctx, insn->val.name));
-			} else if (insn->op == IR_LABEL) {
-				fprintf(f, "label(%s)", ir_get_str(ctx, insn->val.name));
-			} else if (insn->op == IR_FUNC_ADDR) {
-				fprintf(f, "func *");
-				ir_print_const(ctx, insn, f, true);
-				ir_print_proto(ctx, insn->proto, f);
-			} else {
-				ir_print_const(ctx, insn, f, true);
-			}
-			fprintf(f, ";\n");
-			if (insn->op == IR_LONG_CONST) {
-				i += IR_ALIGNED_SIZE(insn->long_const_size, sizeof(ir_insn)) / sizeof(ir_insn);
-				insn += IR_ALIGNED_SIZE(insn->long_const_size, sizeof(ir_insn)) / sizeof(ir_insn);
-			}
+	for (i = IR_UNUSED + 1, insn = ctx->ir_base - i; i < ctx->consts_count; i++, insn--) {
+		fprintf(f, "\t%s c_%d = ", ir_type_cname[insn->type], i);
+		if (insn->op == IR_FUNC) {
+			fprintf(f, "func %s", ir_get_str(ctx, insn->val.name));
+			ir_print_proto(ctx, insn->proto, f);
+		} else if (insn->op == IR_SYM) {
+			fprintf(f, "sym(%s)", ir_get_str(ctx, insn->val.name));
+		} else if (insn->op == IR_LABEL) {
+			fprintf(f, "label(%s)", ir_get_str(ctx, insn->val.name));
+		} else if (insn->op == IR_FUNC_ADDR) {
+			fprintf(f, "func *");
+			ir_print_const(ctx, insn, f, true);
+			ir_print_proto(ctx, insn->proto, f);
+		} else {
+			ir_print_const(ctx, insn, f, true);
 		}
-	} else {
-		for (i = IR_UNUSED + 1, insn = ctx->ir_base - i; i < ctx->consts_count; i++, insn--) {
-			fprintf(f, "\t");
-			ir_print_type_cname(insn->type, f);
-			fprintf(f, " c_%d = ", i);
-			if (insn->op == IR_FUNC) {
-				fprintf(f, "func %s", ir_get_str(ctx, insn->val.name));
-				ir_print_proto(ctx, insn->proto, f);
-			} else if (insn->op == IR_SYM) {
-				fprintf(f, "sym(%s)", ir_get_str(ctx, insn->val.name));
-			} else if (insn->op == IR_LABEL) {
-				fprintf(f, "label(%s)", ir_get_str(ctx, insn->val.name));
-			} else if (insn->op == IR_FUNC_ADDR) {
-				fprintf(f, "func *");
-				ir_print_const(ctx, insn, f, true);
-				ir_print_proto(ctx, insn->proto, f);
-			} else {
-				ir_print_const(ctx, insn, f, true);
-			}
-			fprintf(f, ";\n");
-		}
+		fprintf(f, ";\n");
 	}
 
 	for (_b = 1; _b <= ctx->cfg_blocks_count; _b++) {

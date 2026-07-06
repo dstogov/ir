@@ -970,10 +970,7 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 			} else {
 				fprintf(f, ", ");
 			}
-			ir_emit_c_type_name(insn->type, f);
-			if (insn->op2) {
-				fprintf(f, " %s", ir_get_str(ctx, insn->op2));
-			}
+			fprintf(f, "%s %s", ir_type_cname[insn->type], ir_get_str(ctx, insn->op2));
 		}
 	}
 	if (ctx->flags & IR_VARARG_FUNC) {
