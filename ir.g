@@ -813,7 +813,7 @@ ir_modifier(ir_parser_ctx *p):
 	}
 ;
 
-type(uint8_t *t):
+simple_type(uint8_t *t):
 	(	"bool"      {*t = IR_BOOL;}
 	|	"uint8_t"   {*t = IR_U8;}
 	|	"uint16_t"  {*t = IR_U16;}
@@ -828,6 +828,14 @@ type(uint8_t *t):
 	|	"double"    {*t = IR_DOUBLE;}
 	|	"float"     {*t = IR_FLOAT;}
 	)
+;
+
+type(uint8_t *t):
+		simple_type(t)
+	|	{ir_val val;}
+		"<" simple_type(t) "*" DECNUMBER(IR_I32, &val) ">"
+		{if (val.u64 == 0 || val.u64 > 64 || (val.u64 & (val.u64 - 1)) != 0) yy_error("unsupported vector length");}
+		{*t = ir_make_vector_type(*t, val.u32);}
 ;
 
 func(uint8_t *op):
