@@ -56,6 +56,8 @@ static ir_type llvm2ir_type(LLVMTypeRef type)
 {
 	char *str;
 	uint32_t width;
+	ir_type element_type;
+	uint32_t count;
 
 	switch (LLVMGetTypeKind(type)) {
 		case LLVMVoidTypeKind:
@@ -88,7 +90,18 @@ static ir_type llvm2ir_type(LLVMTypeRef type)
 		case LLVMLabelTypeKind:
 			return IR_ADDR;
 		case LLVMVectorTypeKind:
-			IR_ASSERT(0 && "NIY LLVMVectorTypeKind use -fno-vectorize -fno-slp-vectorize");
+			element_type = llvm2ir_type(LLVMGetElementType(type));
+			count = LLVMGetVectorSize(type);
+			if (!IR_IS_TYPE_SCALAR(element_type)) {
+				fprintf(stderr, "Unsupported LLVM vector base type\n");
+				IR_ASSERT(0);
+			}
+			if (count == 0 || count > 64 || (count & (count - 1)) != 0) {
+				fprintf(stderr, "Unsupported LLVM vector length: %u\n", count);
+				IR_ASSERT(0);
+			}
+			return ir_make_vector_type(element_type, count);
+			//??? IR_ASSERT(0 && "NIY LLVMVectorTypeKind use -fno-vectorize -fno-slp-vectorize");
 		default:
 			break;
 	}
