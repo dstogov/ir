@@ -637,6 +637,46 @@ static void ir_emit_guard(ir_ctx *ctx, FILE *f, ir_insn *insn)
 	fprintf(f, "))();\n");
 }
 
+static void ir_emit_extract(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
+{
+	ir_emit_def_ref(ctx, f, def);
+	ir_emit_ref(ctx, f, insn->op1);
+	fprintf(f, "[");
+	ir_emit_ref(ctx, f, insn->op2);
+	fprintf(f, "];\n");
+}
+
+static void ir_emit_replace(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
+{
+	ir_emit_def_ref(ctx, f, def);
+	ir_emit_ref(ctx, f, insn->op1);
+	fprintf(f, ";\n");
+	fprintf(f, "\td_%d[", ctx->vregs[def]);
+	ir_emit_ref(ctx, f, insn->op2);
+	fprintf(f, "] = ");
+	ir_emit_ref(ctx, f, insn->op3);
+	fprintf(f, ";\n");
+}
+
+static void ir_emit_splat(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
+{
+	uint32_t n;
+
+	IR_ASSERT(IR_IS_TYPE_VECTOR(insn->type));
+	n = IR_VECTOR_LENGTH(insn->type);
+	IR_ASSERT(n > 0);
+	ir_emit_def_ref(ctx, f, def);
+	fprintf(f, "(");
+	ir_emit_c_type_name(insn->type, f);
+	fprintf(f, "){");
+	ir_emit_ref(ctx, f, insn->op1);
+	while (--n) {
+		fprintf(f, ", ");
+		ir_emit_ref(ctx, f, insn->op1);
+	}
+	fprintf(f, "};\n");
+}
+
 static void ir_emit_switch(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn *insn)
 {
 	ir_block *bb;
@@ -1224,6 +1264,15 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_GUARD:
 				case IR_GUARD_NOT:
 					ir_emit_guard(ctx, f, insn);
+					break;
+				case IR_EXTRACT:
+					ir_emit_extract(ctx, f, i, insn);
+					break;
+				case IR_REPLACE:
+					ir_emit_replace(ctx, f, i, insn);
+					break;
+				case IR_SPLAT:
+					ir_emit_splat(ctx, f, i, insn);
 					break;
 				case IR_RLOAD:
 				case IR_RSTORE:
