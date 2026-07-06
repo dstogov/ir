@@ -827,8 +827,10 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 static bool ir_loader_sym_data(ir_loader *loader, ir_type type, uint32_t count, const void *data)
 {
 	ir_main_loader *l = (ir_main_loader*) loader;
-	size_t size = ir_type_size[type];
+	size_t size;
 
+	IR_ASSERT(IR_IS_TYPE_SCALAR(type));
+	size = ir_type_size[type];
 	if ((l->dump & IR_DUMP_IR) && (l->dump_file)) {
 		const void *p = data;
 		uint32_t i;

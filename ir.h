@@ -1014,6 +1014,7 @@ int ir_load_llvm_asm(ir_loader *loader, const char *filename);
 void ir_print_func_proto(const ir_ctx *ctx, const char *name, bool prefix, FILE *f);
 void ir_print_proto(const ir_ctx *ctx, ir_ref proto, FILE *f);
 void ir_print_proto_ex(uint8_t flags, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, FILE *f);
+void ir_print_type_cname(ir_type type, FILE *f);
 void ir_save(const ir_ctx *ctx, uint32_t save_flags, FILE *f);
 
 /* IR debug dump API (implementation in ir_dump.c) */

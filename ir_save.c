@@ -50,7 +50,7 @@ static void ir_print_call_conv(uint32_t flags, FILE *f)
 	}
 }
 
-static void ir_print_type_cname(ir_type type, FILE *f)
+void ir_print_type_cname(ir_type type, FILE *f)
 {
 	if (IR_IS_TYPE_VECTOR(type)) {
 		fprintf(f, "<%s*%d>", ir_type_cname[IR_VECTOR_BASE_TYPE(type)], IR_VECTOR_LENGTH(type));
