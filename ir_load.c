@@ -1726,6 +1726,8 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 	uint32_t flags;
 	uint32_t params_count;
 	uint8_t param_types[IR_MAX_OPERANDS + 1];
+	void *ptr;
+	ir_type t2;
 	if (YY_IN_SET(sym, (YY_BOOL,YY_UINT8_T,YY_UINT16_T,YY_UINT32_T,YY_UINT64_T,YY_UINTPTR_T,YY_CHAR,YY_INT8_T,YY_INT16_T,YY_INT32_T,YY_INT64_T,YY_DOUBLE,YY_FLOAT,YY__LESS), "\000\000\000\300\377\017\000\000")) {
 		sym = parse_type(sym, &t);
 		sym = parse_ID(sym, &str, &len);
@@ -1753,6 +1755,42 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 			val.u64 = 0;
 			sym = parse_const(sym, t, &val);
 			ref = ir_const(p->ctx, val, t);
+			break;
+		case YY__LBRACE:
+			sym = get_sym();
+			ref = ir_const_vector(p->ctx, t);
+			ptr = ir_long_const_ptr(p->ctx, ref);
+			memset(ptr, 0, IR_VECTOR_SIZE(t));
+			t2 = IR_VECTOR_BASE_TYPE(t);
+			if (YY_IN_SET(sym, (YY_DECNUMBER,YY_HEXNUMBER,YY_FLOATNUMBER,YY_CHARACTER,YY_INF,YY_NAN,YY__MINUS), "\000\000\000\000\000\300\075\000")) {
+				sym = parse_const(sym, t2, &val);
+				switch (ir_type_size[2]) {
+					case 1: *(uint8_t*)ptr  = val.u8;  ptr = (char*)ptr + 1; break;
+					case 2: *(uint16_t*)ptr = val.u16; ptr = (char*)ptr + 2; break;
+					case 4: *(uint32_t*)ptr = val.u32; ptr = (char*)ptr + 4; break;
+					case 8: *(uint64_t*)ptr = val.u64; ptr = (char*)ptr + 8; break;
+					default:
+						IR_ASSERT(0);
+						break;
+				}
+				while (sym == YY__COMMA) {
+					sym = get_sym();
+					sym = parse_const(sym, t2, &val);
+					switch (ir_type_size[2]) {
+						case 1: *(uint8_t*)ptr  = val.u8;  ptr = (char*)ptr + 1; break;
+						case 2: *(uint16_t*)ptr = val.u16; ptr = (char*)ptr + 2; break;
+						case 4: *(uint32_t*)ptr = val.u32; ptr = (char*)ptr + 4; break;
+						case 8: *(uint64_t*)ptr = val.u64; ptr = (char*)ptr + 8; break;
+						default:
+							IR_ASSERT(0);
+							break;
+					}
+				}
+			}
+			if (sym != YY__RBRACE) {
+				yy_error_sym("'}' expected, got", sym);
+			}
+			sym = get_sym();
 			break;
 		case YY_FUNC:
 			sym = get_sym();

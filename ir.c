@@ -114,10 +114,44 @@ void ir_print_escaped_str(const char *s, size_t len, FILE *f)
 	}
 }
 
-void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted)
+static void ir_print_double(double v, FILE *f)
 {
 	char buf[128];
 
+	if (isnan(v)) {
+		fprintf(f, "nan");
+	} else {
+		snprintf(buf, sizeof(buf), "%g", v);
+		if (strtod(buf, NULL) != v) {
+			snprintf(buf, sizeof(buf), "%.53e", v);
+			if (strtod(buf, NULL) != v) {
+				IR_ASSERT(0 && "can't format double");
+			}
+		}
+		fprintf(f, "%s", buf);
+	}
+}
+
+static void ir_print_float(float v, FILE *f)
+{
+	char buf[128];
+
+	if (isnan(v)) {
+		fprintf(f, "nan");
+	} else {
+		snprintf(buf, sizeof(buf), "%g", v);
+		if (strtod(buf, NULL) != v) {
+			snprintf(buf, sizeof(buf), "%.24e", v);
+			if (strtod(buf, NULL) != v) {
+				IR_ASSERT(0 && "can't format float");
+			}
+		}
+		fprintf(f, "%s", buf);
+	}
+}
+
+void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted)
+{
 	if (insn->op == IR_FUNC || insn->op == IR_SYM || insn->op == IR_LABEL) {
 		fprintf(f, "%s", ir_get_str(ctx, insn->val.name));
 		return;
@@ -136,8 +170,91 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted
 	}
 
 	if (IR_IS_TYPE_VECTOR(insn->type)) {
+		ir_type t = IR_VECTOR_BASE_TYPE(insn->type);
+		uint32_t n = IR_VECTOR_LENGTH(insn->type);
+		const void *p = insn + 1;
+
 		// TODO: vector constants are not implemented yet ???
-		fprintf(f, "VECTOR???");
+		fprintf(f, "{");
+		switch (t) {
+			case IR_I8:
+			case IR_CHAR:
+				fprintf(f, "%d", *(int8_t*)p);
+				while (--n) {
+					p = (char*)p + sizeof(int8_t);;
+					fprintf(f, ", %d", *(int8_t*)p);
+				}
+				break;
+			case IR_I16:
+				fprintf(f, "%d", *(int16_t*)p);
+				while (--n) {
+					p = (char*)p + sizeof(int16_t);
+					fprintf(f, ", %d", *(int16_t*)p);
+				}
+				break;
+			case IR_I32:
+				fprintf(f, "%d", *(int32_t*)p);
+				while (--n) {
+					p = (char*)p + sizeof(int32_t);
+					fprintf(f, ", %d", *(int32_t*)p);
+				}
+				break;
+			case IR_I64:
+				fprintf(f, "%" PRIi64, *(int64_t*)p);
+				while (--n) {
+					p = (char*)p + sizeof(int64_t);
+					fprintf(f, ", %" PRIi64, *(int64_t*)p);
+				}
+				break;
+			case IR_U8:
+				fprintf(f, "%u", *(uint8_t*)p);
+				while (--n) {
+					p = (char*)p + sizeof(uint8_t);
+					fprintf(f, ", %u", *(uint8_t*)p);
+				}
+				break;
+			case IR_U16:
+				fprintf(f, "%u", *(uint16_t*)p);
+				while (--n) {
+					p = (char*)p + sizeof(uint16_t);
+					fprintf(f, ", %u", *(uint16_t*)p);
+				}
+				break;
+			case IR_U32:
+				fprintf(f, "%u", *(uint32_t*)p);
+				while (--n) {
+					p = (char*)p + sizeof(uint32_t);
+					fprintf(f, ", %u", *(uint32_t*)p);
+				}
+				break;
+			case IR_U64:
+				fprintf(f, "%" PRIu64, *(uint64_t*)p);
+				while (--n) {
+					p = (char*)p + sizeof(uint64_t);
+					fprintf(f, ", %" PRIu64, *(uint64_t*)p);
+				}
+				break;
+			case IR_DOUBLE:
+				ir_print_double(*(double*)p, f);
+				while (--n) {
+					p = (char*)p + sizeof(double);
+					fprintf(f, ", ");
+					ir_print_double(*(double*)p, f);
+				}
+				break;
+			case IR_FLOAT:
+				ir_print_double(*(float*)p, f);
+				while (--n) {
+					p = (char*)p + sizeof(float);
+					fprintf(f, ", ");
+					ir_print_double(*(float*)p, f);
+				}
+				break;
+			default:
+				IR_ASSERT(0);
+				break;
+		}
+		fprintf(f, "}");
 		return;
 	}
 
@@ -197,32 +314,10 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted
 			fprintf(f, "%" PRIi64, insn->val.i64);
 			break;
 		case IR_DOUBLE:
-			if (isnan(insn->val.d)) {
-				fprintf(f, "nan");
-			} else {
-				snprintf(buf, sizeof(buf), "%g", insn->val.d);
-				if (strtod(buf, NULL) != insn->val.d) {
-					snprintf(buf, sizeof(buf), "%.53e", insn->val.d);
-					if (strtod(buf, NULL) != insn->val.d) {
-						IR_ASSERT(0 && "can't format double");
-					}
-				}
-				fprintf(f, "%s", buf);
-			}
+			ir_print_double(insn->val.d, f);
 			break;
 		case IR_FLOAT:
-			if (isnan(insn->val.f)) {
-				fprintf(f, "nan");
-			} else {
-				snprintf(buf, sizeof(buf), "%g", insn->val.f);
-				if (strtod(buf, NULL) != insn->val.f) {
-					snprintf(buf, sizeof(buf), "%.24e", insn->val.f);
-					if (strtod(buf, NULL) != insn->val.f) {
-						IR_ASSERT(0 && "can't format float");
-					}
-				}
-				fprintf(f, "%s", buf);
-			}
+			ir_print_float(insn->val.f, f);
 			break;
 		default:
 			IR_ASSERT(0);
@@ -710,6 +805,42 @@ ir_ref ir_const_label(ir_ctx *ctx, ir_str str)
 	ir_val val;
 	val.u64 = str;
 	return ir_const_ex(ctx, val, IR_ADDR, IR_OPTX(IR_LABEL, IR_ADDR, 0));
+}
+
+ir_ref ir_long_const(ir_ctx *ctx, ir_type type, size_t size)
+{
+	ir_ref ref = ctx->consts_count;
+	ir_insn *insn;
+
+	IR_ASSERT(size <= 0xfff0);
+
+	ref = ctx->consts_count + IR_ALIGNED_SIZE(size, sizeof(ir_insn)) / sizeof(ir_insn);
+	while (UNEXPECTED(ref >= ctx->consts_limit)) {
+		ir_grow_bottom(ctx);
+	}
+	ctx->consts_count = ref + 1;
+	ref = -ref;
+
+	insn = &ctx->ir_base[ref];
+	insn->optx = IR_OPTX(IR_LONG_CONST, type, size);
+	insn->op1 = IR_UNUSED;
+	insn->val.u64 = 0;
+
+	ctx->flags2 |= IR_HAS_LONG_CONSTANTS;
+
+	return ref;
+}
+
+void *ir_long_const_ptr(ir_ctx *ctx, ir_ref ref)
+{
+	IR_ASSERT(IR_IS_CONST_REF(ref));
+	return (void*)&ctx->ir_base[ref + 1];
+}
+
+ir_ref ir_const_vector(ir_ctx *ctx, ir_type type)
+{
+	IR_ASSERT(IR_IS_TYPE_VECTOR(type));
+	return ir_long_const(ctx, type, IR_VECTOR_SIZE(type));
 }
 
 ir_str ir_string(ir_ctx *ctx, const char *s)

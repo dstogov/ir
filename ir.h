@@ -360,6 +360,7 @@ typedef enum _ir_type {
 	_(SYM,          r0,   ___, ___, ___) /* constant symbol ref         */ \
 	_(LABEL,        r0,   ___, ___, ___) /* label address ref           */ \
 	_(STR,          r0,   ___, ___, ___) /* constant str ref            */ \
+	_(LONG_CONST,   r0,   ___, ___, ___) /* long constant (vector)      */ \
 	\
 	/* call ops                                                         */ \
 	_(CALL,         xN,   src, def, def) /* CALL(src, func, args...)    */ \
@@ -539,6 +540,7 @@ typedef struct _ir_insn {
 					uint16_t           inputs_count;       /* number of input control edges for MERGE, PHI, CALL, TAILCALL */
 					uint16_t           prev_insn_offset;   /* 16-bit backward offset from current instruction for CSE */
 					uint16_t           proto;
+					uint16_t           long_const_size;
 				}
 			);
 			uint32_t                   optx;
@@ -790,6 +792,10 @@ ir_ref ir_const_str(ir_ctx *ctx, ir_str str);
 ir_ref ir_const_label(ir_ctx *ctx, ir_str str);
 
 ir_ref ir_unique_const_addr(ir_ctx *ctx, uintptr_t c);
+
+ir_ref ir_long_const(ir_ctx *ctx, ir_type type, size_t size);
+void *ir_long_const_ptr(ir_ctx *ctx, ir_ref ref);
+ir_ref ir_const_vector(ir_ctx *ctx, ir_type type);
 
 void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted);
 

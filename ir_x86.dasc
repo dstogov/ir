@@ -4389,6 +4389,46 @@ static void ir_emit_load_imm_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref sr
 		}
 	} else {
 		label = ir_get_const_label(ctx, src);
+#if IR_SIMD
+		if (IR_IS_TYPE_VECTOR(type)) {
+			ir_type element_type = IR_VECTOR_BASE_TYPE(type);
+			uint32_t width = IR_VECTOR_SIZE(type);
+
+			if (ctx->mflags & IR_X86_AVX) {
+				if (width == 16) {
+					if (IR_IS_TYPE_INT(element_type)) {
+						|	vmovdqa xmm(reg-IR_REG_FP_FIRST), [=>label]
+					} else if (element_type == IR_DOUBLE) {
+						|	vmovapd xmm(reg-IR_REG_FP_FIRST), [=>label]
+					} else {
+						IR_ASSERT(element_type == IR_FLOAT);
+						|	vmovaps xmm(reg-IR_REG_FP_FIRST), [=>label]
+					}
+				} else {
+					IR_ASSERT(width == 32);
+					if (IR_IS_TYPE_INT(element_type)) {
+						|	vmovdqa ymm(reg-IR_REG_FP_FIRST), [=>label]
+					} else if (element_type == IR_DOUBLE) {
+						|	vmovapd ymm(reg-IR_REG_FP_FIRST), [=>label]
+					} else {
+						IR_ASSERT(element_type == IR_FLOAT);
+						|	vmovaps ymm(reg-IR_REG_FP_FIRST), [=>label]
+					}
+				}
+			} else {
+				IR_ASSERT(width == 16);
+				if (IR_IS_TYPE_INT(element_type)) {
+					|	movdqa xmm(reg-IR_REG_FP_FIRST), [=>label]
+				} else if (element_type == IR_DOUBLE) {
+					|	movapd xmm(reg-IR_REG_FP_FIRST), [=>label]
+				} else {
+					IR_ASSERT(element_type == IR_FLOAT);
+					|	movaps xmm(reg-IR_REG_FP_FIRST), [=>label]
+				}
+			}
+			return;
+		}
+#endif
 		|	ASM_FP_REG_TXT_OP movs, type, reg, [=>label]
 	}
 }
@@ -20065,8 +20105,56 @@ next_block:;
 			}
 			|.byte 0
 
+		} else if (IR_IS_TYPE_VECTOR(insn->type)) {
+			int label = ctx->cfg_blocks_count + i;
+			uint32_t size = IR_VECTOR_SIZE(insn->type);
+			uint32_t n = IR_VECTOR_LENGTH(insn->type);
+			ir_type type = IR_VECTOR_BASE_TYPE(insn->type);
+			void *p = ir_long_const_ptr(ctx, -i);
+
+			if (!data.rodata_label) {
+				data.rodata_label = ctx->cfg_blocks_count + ctx->consts_count + 2;
+
+				|.rodata
+				|=>data.rodata_label:
+			}
+			if (size >= 16) {
+				|.align 16
+			} else if (size == 8) {
+				|.align 8
+			} else if (size == 4) {
+				|.align 4
+			} else if (size == 2) {
+				|.align 2
+			}
+			|=>label:
+			if (ir_type_size[type] == 8) {
+				while (n--) {
+					ir_val val;
+					val.u64 = *(uint64_t*)p;
+					|.dword val.u32, val.u32_hi
+					p = (char*)p + 8;
+				}
+			} else if (ir_type_size[type] == 4) {
+				while (n--) {
+					|.dword *(uint32_t*)p
+					p = (char*)p + 4;
+				}
+			} else if (ir_type_size[type] == 2) {
+				while (n--) {
+					|.word *(uint16_t*)p
+					p = (char*)p + 2;
+				}
+			} else if (ir_type_size[type] == 1) {
+				while (n--) {
+					|.byte *(uint8_t*)p
+					p = (char*)p + 1;
+				}
+			} else {
+				IR_ASSERT(0);
+			}
 		} else {
-			IR_ASSERT(IR_IS_TYPE_FP(insn->type));
+			IR_ASSERT(IR_IS_TYPE_INT(insn->type));
 			int label = ctx->cfg_blocks_count + i;
 
 			if (!data.rodata_label) {

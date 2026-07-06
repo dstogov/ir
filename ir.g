@@ -582,6 +582,8 @@ ir_insn(ir_parser_ctx *p):
 	{uint32_t flags;}
 	{uint32_t params_count;}
 	{uint8_t param_types[IR_MAX_OPERANDS + 1];}
+	{void *ptr;}
+	{ir_type t2;}
 	(
 		type(&t)
 		ID(&str, &len)
@@ -596,6 +598,41 @@ ir_insn(ir_parser_ctx *p):
 	(	{val.u64 = 0;}
 		const(t, &val)
 		{ref = ir_const(p->ctx, val, t);}
+	|	"{"
+		{ref = ir_const_vector(p->ctx, t);}
+		{ptr = ir_long_const_ptr(p->ctx, ref);}
+		{memset(ptr, 0, IR_VECTOR_SIZE(t));}
+		{t2 = IR_VECTOR_BASE_TYPE(t);}
+		(
+			const(t2, &val)
+			{
+				switch (ir_type_size[2]) {
+					case 1: *(uint8_t*)ptr  = val.u8;  ptr = (char*)ptr + 1; break;
+					case 2: *(uint16_t*)ptr = val.u16; ptr = (char*)ptr + 2; break;
+					case 4: *(uint32_t*)ptr = val.u32; ptr = (char*)ptr + 4; break;
+					case 8: *(uint64_t*)ptr = val.u64; ptr = (char*)ptr + 8; break;
+					default:
+						IR_ASSERT(0);
+						break;
+				}
+			}
+			(
+				","
+				const(t2, &val)
+				{
+					switch (ir_type_size[2]) {
+						case 1: *(uint8_t*)ptr  = val.u8;  ptr = (char*)ptr + 1; break;
+						case 2: *(uint16_t*)ptr = val.u16; ptr = (char*)ptr + 2; break;
+						case 4: *(uint32_t*)ptr = val.u32; ptr = (char*)ptr + 4; break;
+						case 8: *(uint64_t*)ptr = val.u64; ptr = (char*)ptr + 8; break;
+						default:
+							IR_ASSERT(0);
+							break;
+					}
+				}
+			)*
+		)?
+		"}"
 	|	"func"
 		(	ID(&func, &func_len)
 			{flags = 0;}
