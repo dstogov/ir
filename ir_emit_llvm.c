@@ -1303,7 +1303,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					ir_emit_def_ref(ctx, f, i);
 					fprintf(f, "va_arg ptr ");
 					ir_emit_ref(ctx, f, insn->op2);
-					fprintf(f, ", %s\n", ir_type_cname[insn->type]);
+					fprintf(f, ", %s\n", ir_type_llvm_name[insn->type]);
 					break;
 				case IR_TRAP:
 					ir_bitset_incl(used_intrinsics, IR_LLVM_INTR_DEBUGTRAP);

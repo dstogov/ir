@@ -238,6 +238,8 @@ bool ir_check(const ir_ctx *ctx)
 											  || insn->op == IR_SAR
 											  || insn->op == IR_ROL
 											  || insn->op == IR_ROR)
+											 && IR_IS_TYPE_INT(use_insn->type)
+											 && IR_IS_TYPE_INT(insn->type)
 											 && ir_type_size[use_insn->type] < ir_type_size[insn->type]) {
 												/* second argument of SHIFT may be incompatible with result */
 												break;
@@ -352,7 +354,7 @@ bool ir_check(const ir_ctx *ctx)
 				if (type != IR_ADDR
 				 && (!IR_IS_TYPE_INT(type) || ir_type_size[type] != ir_type_size[IR_ADDR])) {
 					fprintf(stderr, "ir_base[%d].op2 must have ADDR type (%s)\n",
-						i, ir_type_name[type]);
+						i, IR_IS_TYPE_VECTOR(type) ? "VECTOR" : ir_type_name[type]);
 					ok = 0;
 				}
 				break;
