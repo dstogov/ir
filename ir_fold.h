@@ -1535,15 +1535,8 @@ IR_FOLD(BITCAST(LONG_CONST))
 		if (size == IR_VECTOR_SIZE(dst_type)) {
 			ir_ref vec = ir_const_vector(ctx, dst_type);
 			void *dst = ir_long_const_ptr(ctx, vec);
-			op1_insn = &ctx->ir_base[op1];
-			switch (ir_type_size[op1_insn->type]) {
-				case 8: memcpy(dst, &op1_insn->val.u64, 8); break;
-				case 4: memcpy(dst, &op1_insn->val.u32, 4); break;
-				case 2: memcpy(dst, &op1_insn->val.u16, 2); break;
-				case 1: memcpy(dst, &op1_insn->val.u8, 1);  break;
-				default:
-					IR_ASSERT(0);
-			}
+			void *src = ir_long_const_ptr(ctx, op1);
+			memcpy(dst, src, size);
 			IR_FOLD_COPY(vec);
 		}
 	} else {
