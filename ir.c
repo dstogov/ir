@@ -174,7 +174,6 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted
 		uint32_t n = IR_VECTOR_LENGTH(insn->type);
 		const void *p = insn + 1;
 
-		// TODO: vector constants are not implemented yet ???
 		fprintf(f, "{");
 		switch (t) {
 			case IR_I8:
