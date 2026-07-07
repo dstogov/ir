@@ -826,7 +826,7 @@ IR_ALWAYS_INLINE ir_ref ir_count_constant(const ir_ctx *ctx, ir_ref *_xlat, ir_r
 	if (!_xlat[ref]) {
 		_xlat[ref] = ref; /* this is only a "used constant" marker */
 		if (ctx->ir_base[ref].op == IR_LONG_CONST) {
-			ir_ref i, n = IR_ALIGNED_SIZE(ctx->ir_base[ref].long_const_size, sizeof(ir_insn)) / sizeof(ir_insn);
+				ir_ref i, n = IR_ALIGNED_SIZE(ctx->ir_base[ref].long_const_size, sizeof(ir_insn)) / sizeof(ir_insn);
 
 			for (i = 1; i <= n; i++) {
 				_xlat[ref + i] = ref + i; /* this is only a "used constant" marker */
@@ -1330,10 +1330,23 @@ int ir_schedule(ir_ctx *ctx)
 		while (i < IR_TRUE) {
 			if (_xlat[i]) {
 				*dst = *src;
-				dst->prev_const = 0;
 				_xlat[i] = j;
-				dst++;
-				j++;
+				if (dst->op == IR_LONG_CONST) {
+					uintptr_t n;
+
+					memset(dst + 1, 0, dst->long_const_size);
+					memcpy(dst + 1, src + 1, dst->long_const_size);
+					n = IR_ALIGNED_SIZE(dst->long_const_size, sizeof(ir_insn)) / sizeof(ir_insn);
+					dst += n + 1;
+					src += n + 1;
+					i += n + 1;
+					j += n + 1;
+					continue;
+				} else {
+					dst->prev_const = 0;
+					dst++;
+					j++;
+				}
 			}
 			src++;
 			i++;
