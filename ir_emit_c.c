@@ -142,7 +142,7 @@ static void ir_emit_binary_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, cons
 
 static void ir_emit_signed_cast(FILE *f, ir_type type)
 {
-	if (!IR_IS_TYPE_SIGNED(type)) {
+	if (!IR_IS_TYPE_SIGNED(type) && !IR_IS_TYPE_VECTOR(type)) {
 		switch (ir_type_size[type]) {
 			default:
 				IR_ASSERT(0);
@@ -164,7 +164,7 @@ static void ir_emit_signed_cast(FILE *f, ir_type type)
 
 static void ir_emit_unsigned_cast(FILE *f, ir_type type)
 {
-	if (!IR_IS_TYPE_UNSIGNED(type)) {
+	if (!IR_IS_TYPE_UNSIGNED(type) && !IR_IS_TYPE_VECTOR(type)) {
 		switch (ir_type_size[type]) {
 			default:
 				IR_ASSERT(0);
@@ -252,6 +252,7 @@ static void ir_emit_rol_ror(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const 
 {
 	uint8_t t1 = ctx->ir_base[insn->op1].type;
 
+	IR_ASSERT(!IR_IS_TYPE_VECTOR(insn->type) && !IR_IS_TYPE_VECTOR(t1));
 	ir_emit_def_ref(ctx, f, def);
 	fprintf(f, "(");
 	ir_emit_unsigned_cast(f, t1);
@@ -273,6 +274,7 @@ static void ir_emit_bswap(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 {
 	ir_emit_def_ref(ctx, f, def);
 
+	IR_ASSERT(!IR_IS_TYPE_VECTOR(insn->type));
 	switch (ir_type_size[insn->type]) {
 		default:
 			IR_ASSERT(0);
@@ -290,6 +292,7 @@ static void ir_emit_bswap(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 
 static void ir_emit_count(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *name)
 {
+	IR_ASSERT(!IR_IS_TYPE_VECTOR(insn->type));
 	ir_emit_def_ref(ctx, f, def);
 	fprintf(f, "__builtin_%s%s(", name, ir_type_size[insn->type] == 8 ? "ll" : "");
 	ir_emit_ref(ctx, f, insn->op1);
@@ -424,8 +427,15 @@ static void ir_emit_trunc(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 
 static void ir_emit_bitcast(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 {
-	IR_ASSERT(ir_type_size[insn->type] == ir_type_size[ctx->ir_base[insn->op1].type]);
-	if (IR_IS_TYPE_INT(insn->type)) {
+	IR_ASSERT(ir_get_type_size(insn->type) == ir_get_type_size(ctx->ir_base[insn->op1].type));
+	if (IR_IS_TYPE_VECTOR(insn->type) || IR_IS_TYPE_VECTOR(ctx->ir_base[insn->op1].type)) {
+		ir_emit_def_ref(ctx, f, def);
+		fprintf(f, "(");
+		ir_emit_c_type_name(insn->type, f);
+		fprintf(f, ")");
+		ir_emit_ref(ctx, f, insn->op1);
+		fprintf(f, ";\n");
+	} else if (IR_IS_TYPE_INT(insn->type)) {
 		if (IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)) {
 			ir_emit_def_ref(ctx, f, def);
 			ir_emit_ref(ctx, f, insn->op1);
@@ -544,6 +554,7 @@ static void ir_emit_overflow_math(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, 
 	}
 	IR_ASSERT(overflow != IR_UNUSED);
 
+	IR_ASSERT(IR_IS_TYPE_INT(type));
 	if (ir_type_size[type] == 4 || ir_type_size[type] == 8) {
 		fprintf(f, "\tint overflow_%d;\n", overflow);
 		ir_emit_def_ref(ctx, f, def);
@@ -710,6 +721,16 @@ static void ir_emit_shuffle(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 	}
 
 
+	fprintf(f, ");\n");
+}
+
+static void ir_emit_convert_vector(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
+{
+	ir_emit_def_ref(ctx, f, def);
+	fprintf(f, "__builtin_convertvector(");
+	ir_emit_ref(ctx, f, insn->op1);
+	fprintf(f, ", ");
+	ir_emit_c_type_name(insn->type, f);
 	fprintf(f, ");\n");
 }
 
@@ -1164,13 +1185,25 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 					ir_emit_count(ctx, f, i, insn, "ctz");
 					break;
 				case IR_SEXT:
-					ir_emit_sext(ctx, f, i, insn);
+					if (IR_IS_TYPE_VECTOR(insn->type)) {
+						ir_emit_convert_vector(ctx, f, i, insn);
+					} else {
+						ir_emit_sext(ctx, f, i, insn);
+					}
 					break;
 				case IR_ZEXT:
-					ir_emit_zext(ctx, f, i, insn);
+					if (IR_IS_TYPE_VECTOR(insn->type)) {
+						ir_emit_convert_vector(ctx, f, i, insn);
+					} else {
+						ir_emit_zext(ctx, f, i, insn);
+					}
 					break;
 				case IR_TRUNC:
-					ir_emit_trunc(ctx, f, i, insn);
+					if (IR_IS_TYPE_VECTOR(insn->type)) {
+						ir_emit_convert_vector(ctx, f, i, insn);
+					} else {
+						ir_emit_trunc(ctx, f, i, insn);
+					}
 					break;
 				case IR_BITCAST:
 				case IR_PROTO:
@@ -1179,7 +1212,11 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_INT2FP:
 				case IR_FP2INT:
 				case IR_FP2FP:
-					ir_emit_conv(ctx, f, i, insn);
+					if (IR_IS_TYPE_VECTOR(insn->type)) {
+						ir_emit_convert_vector(ctx, f, i, insn);
+					} else {
+						ir_emit_conv(ctx, f, i, insn);
+					}
 					break;
 				case IR_ADD_OV:
 					ir_emit_overflow_math(ctx, f, i, insn, "add", "+");
