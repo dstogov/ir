@@ -229,7 +229,7 @@ IR_ALWAYS_INLINE void ir_sccp_make_bottom_ex(const ir_ctx *ctx, ir_sccp_val *_va
 IR_ALWAYS_INLINE bool ir_sccp_meet_const(const ir_ctx *ctx, ir_sccp_val *_values, ir_bitqueue *worklist, ir_ref ref, const ir_insn *val_insn)
 {
 	if (IR_IS_TYPE_VECTOR(val_insn->type)) {
-		// TODO: vector constants are not implemented yet ???
+		// TODO: vector constants propagation is not implemented yet ???
 		IR_MAKE_BOTTOM_EX(ref);
 		return 1;
 	}

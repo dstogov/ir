@@ -180,7 +180,7 @@ typedef enum _ir_type {
 #define IR_IS_TYPE_VECTOR(t)   (((t) & IR_VECTOR_MASK) != 0)
 
 #define IR_VECTOR_BASE_TYPE(t) ((t) & IR_BASE_TYPE_MASK)
-#define IR_VECTOR_LENGTH(t)    (1 << ((((t) & IR_VECTOR_MASK) >> 4) - 1))
+#define IR_VECTOR_LENGTH(t)    (1U << ((((t) & IR_VECTOR_MASK) >> 4) - 1))
 
 #ifdef IR_64
 # define IR_SIZE_T          IR_U64
