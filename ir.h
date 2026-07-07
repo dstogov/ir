@@ -341,6 +341,7 @@ typedef enum _ir_type {
 	_(EXTRACT,      d2,   def, def, ___) /* get element of vector       */ \
 	_(REPLACE,      d3,   def, def, def) /* set element of vector       */ \
 	_(SPLAT,        d1,   def, ___, ___) /* set all elements of vector  */ \
+	_(SHUFFLE,      d3,   def, def, def) /* shuffle elements of vectors */ \
 	\
 	/* data-flow and miscellaneous ops                                  */ \
 	_(VADDR,        d1,   var, ___, ___) /* load address of local var   */ \
