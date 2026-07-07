@@ -1471,12 +1471,29 @@ IR_FOLD(BITCAST(C_BOOL))
 IR_FOLD(BITCAST(C_CHAR))
 IR_FOLD(BITCAST(C_ADDR))
 {
-	if (IR_IS_TYPE_VECTOR(IR_OPT_TYPE(opt))) {
-		// TODO: constant folding for vectors ???
+	ir_type dst_type = IR_OPT_TYPE(opt);
+
+	if (IR_IS_TYPE_VECTOR(dst_type)) {
+		uint32_t size = IR_VECTOR_SIZE(dst_type);
+
+		if (size == ir_get_type_size(op1_insn->type)) {
+			ir_ref vec = ir_const_vector(ctx, dst_type);
+			void *dst = ir_long_const_ptr(ctx, vec);
+			op1_insn = &ctx->ir_base[op1];
+			switch (ir_type_size[op1_insn->type]) {
+				case 8: memcpy(dst, &op1_insn->val.u64, 8); break;
+				case 4: memcpy(dst, &op1_insn->val.u32, 4); break;
+				case 2: memcpy(dst, &op1_insn->val.u16, 2); break;
+				case 1: memcpy(dst, &op1_insn->val.u8, 1);  break;
+				default:
+					IR_ASSERT(0);
+			}
+			IR_FOLD_COPY(vec);
+		}
 		IR_FOLD_NEXT;
 	}
-	IR_ASSERT(ir_type_size[IR_OPT_TYPE(opt)] == ir_type_size[op1_insn->type]);
-	switch (IR_OPT_TYPE(opt)) {
+	IR_ASSERT(ir_type_size[dst_type] == ir_type_size[op1_insn->type]);
+	switch (dst_type) {
 		default:
 			IR_ASSERT(0);
 		case IR_BOOL:
@@ -1506,6 +1523,51 @@ IR_FOLD(BITCAST(C_ADDR))
 		case IR_ADDR:
 			IR_FOLD_CONST_U(op1_insn->val.addr);
 	}
+}
+
+IR_FOLD(BITCAST(LONG_CONST))
+{
+	ir_type dst_type = IR_OPT_TYPE(opt);
+	ir_type src_type = op1_insn->type;
+	uint32_t size = IR_VECTOR_SIZE(src_type);
+
+	if (IR_IS_TYPE_VECTOR(dst_type)) {
+		if (size == IR_VECTOR_SIZE(dst_type)) {
+			ir_ref vec = ir_const_vector(ctx, dst_type);
+			void *dst = ir_long_const_ptr(ctx, vec);
+			op1_insn = &ctx->ir_base[op1];
+			switch (ir_type_size[op1_insn->type]) {
+				case 8: memcpy(dst, &op1_insn->val.u64, 8); break;
+				case 4: memcpy(dst, &op1_insn->val.u32, 4); break;
+				case 2: memcpy(dst, &op1_insn->val.u16, 2); break;
+				case 1: memcpy(dst, &op1_insn->val.u8, 1);  break;
+				default:
+					IR_ASSERT(0);
+			}
+			IR_FOLD_COPY(vec);
+		}
+	} else {
+		if (size == ir_type_size[dst_type]) {
+			void *ptr = ir_long_const_ptr(ctx, op1);
+
+			switch (dst_type) {
+				case IR_CHAR:
+				case IR_I8:     IR_FOLD_CONST_I(*(int8_t*)ptr);
+				case IR_I16:    IR_FOLD_CONST_I(*(int16_t*)ptr);
+				case IR_I32:    IR_FOLD_CONST_I(*(int32_t*)ptr);
+				case IR_I64:    IR_FOLD_CONST_I(*(int64_t*)ptr);
+				case IR_U8:     IR_FOLD_CONST_U(*(uint8_t*)ptr);
+				case IR_U16:    IR_FOLD_CONST_U(*(uint16_t*)ptr);
+				case IR_U32:    IR_FOLD_CONST_U(*(uint32_t*)ptr);
+				case IR_U64:    IR_FOLD_CONST_U(*(uint64_t*)ptr);
+				case IR_DOUBLE: IR_FOLD_CONST_D(*(double*)ptr);
+				case IR_FLOAT:  IR_FOLD_CONST_F(*(float*)ptr);
+				default:
+					IR_ASSERT(0);
+			}
+		}
+	}
+	IR_FOLD_NEXT;
 }
 
 IR_FOLD(INT2FP(C_I8))
