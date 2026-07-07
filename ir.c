@@ -620,11 +620,15 @@ static IR_NEVER_INLINE void ir_const_hash_rehash(ir_ctx *ctx)
 	}
 	ctx->const_hash_mask = (ctx->const_hash_mask + 1) * 2 - 1;
 	ctx->const_hash = ir_mem_calloc(ctx->const_hash_mask + 1, sizeof(ir_ref));
-	for (ref = IR_TRUE - 1; ref > -ctx->consts_count; ref--) {
-		insn = &ctx->ir_base[ref];
-		hash = ir_const_hash(insn->val, insn->optx) & ctx->const_hash_mask;
-		insn->prev_const = ctx->const_hash[hash];
-		ctx->const_hash[hash] = ref;
+	for (ref = 1 - ctx->consts_count, insn = ctx->ir_base + ref; ref < IR_TRUE; ref++, insn++) {
+		if (insn->op == IR_LONG_CONST) {
+			ref += IR_ALIGNED_SIZE(insn->long_const_size, sizeof(ir_insn)) / sizeof(ir_insn);
+			insn += IR_ALIGNED_SIZE(insn->long_const_size, sizeof(ir_insn)) / sizeof(ir_insn);
+		} else {
+			hash = ir_const_hash(insn->val, insn->optx) & ctx->const_hash_mask;
+			insn->prev_const = ctx->const_hash[hash];
+			ctx->const_hash[hash] = ref;
+		}
 	}
 }
 
