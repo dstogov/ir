@@ -669,6 +669,65 @@ static void ir_emit_replace(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 	fprintf(f, ";\n");
 }
 
+static void ir_emit_reduce(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
+{
+	ir_type src_type = ctx->ir_base[insn->op1].type;
+	uint32_t n = IR_VECTOR_LENGTH(src_type);
+	uint32_t j;
+	ir_op op = (ir_op) insn->op2;
+
+	IR_ASSERT(n > 0);
+
+	if (op == IR_ADD || op == IR_MUL) {
+		const char *sym = (op == IR_ADD) ? "+" : "*";
+
+		ir_emit_def_ref(ctx, f, def);
+		ir_emit_ref(ctx, f, insn->op1);
+		fprintf(f, "[0]");
+		for (j = 1; j < n; j++) {
+			fprintf(f, " %s ", sym);
+			ir_emit_ref(ctx, f, insn->op1);
+			fprintf(f, "[%u]", j);
+		}
+		fprintf(f, ";\n");
+	} else {
+		int is_max;
+
+		IR_ASSERT(op == IR_MIN || op == IR_MAX);
+		is_max = (op == IR_MAX);
+
+		ir_emit_def_ref(ctx, f, def);
+		ir_emit_ref(ctx, f, insn->op1);
+		fprintf(f, "[0];\n");
+		for (j = 1; j < n; j++) {
+			fprintf(f, "\td_%d = (", ctx->vregs[def]);
+			ir_emit_ref(ctx, f, insn->op1);
+			fprintf(f, "[%u] %s d_%d) ? ", j, is_max ? ">" : "<", ctx->vregs[def]);
+			ir_emit_ref(ctx, f, insn->op1);
+			fprintf(f, "[%u] : d_%d;\n", j, ctx->vregs[def]);
+		}
+	}
+}
+
+static void ir_emit_reduce_minmax(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn, int is_max)
+{
+	ir_type src_type = ctx->ir_base[insn->op1].type;
+	uint32_t n = IR_VECTOR_LENGTH(src_type);
+	uint32_t j;
+
+	IR_ASSERT(n > 0);
+	ir_emit_def_ref(ctx, f, def);
+	ir_emit_ref(ctx, f, insn->op1);
+	fprintf(f, "[0];\n");
+	for (j = 1; j < n; j++) {
+		fprintf(f, "\td_%d = (", ctx->vregs[def]);
+		ir_emit_ref(ctx, f, insn->op1);
+		fprintf(f, "[%u] %s d_%d) ? ", j, is_max ? ">" : "<", ctx->vregs[def]);
+		ir_emit_ref(ctx, f, insn->op1);
+		fprintf(f, "[%u] : d_%d;\n", j, ctx->vregs[def]);
+	}
+}
+
 static void ir_emit_splat(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 {
 	uint32_t n;
@@ -688,7 +747,6 @@ static void ir_emit_splat(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 	fprintf(f, "};\n");
 }
 
-<<<<<<< HEAD
 static void ir_emit_shuffle(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 {
 	ir_type t;
@@ -748,8 +806,6 @@ static void ir_emit_convert_vector(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 	fprintf(f, ");\n");
 }
 
-=======
->>>>>>> 51ff23a (ir_emit_c() support for vector types)
 static void ir_emit_switch(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn *insn)
 {
 	ir_block *bb;
@@ -973,7 +1029,10 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 			} else {
 				fprintf(f, ", ");
 			}
-			fprintf(f, "%s %s", ir_type_cname[insn->type], ir_get_str(ctx, insn->op2));
+			ir_emit_c_type_name(insn->type, f);
+			if (insn->op2) {
+				fprintf(f, " %s", ir_get_str(ctx, insn->op2));
+			}
 		}
 	}
 	if (ctx->flags & IR_VARARG_FUNC) {
@@ -1360,7 +1419,9 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_SPLAT:
 					ir_emit_splat(ctx, f, i, insn);
 					break;
-<<<<<<< HEAD
+				case IR_REDUCE:
+					ir_emit_reduce(ctx, f, i, insn);
+					break;
 				case IR_SHUFFLE:
 					ir_emit_shuffle(ctx, f, i, insn);
 					break;
@@ -1372,8 +1433,6 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 					fprintf(stderr, "ERROR: IR_%s is not implemented yet\n", ir_op_name[insn->op]);
 					exit(1);
 					return 0;
-=======
->>>>>>> 51ff23a (ir_emit_c() support for vector types)
 				default:
 					IR_ASSERT(0 && "NIY instruction");
 					ctx->status = IR_ERROR_UNSUPPORTED_CODE_RULE;

@@ -343,6 +343,7 @@ typedef enum _ir_type {
 	_(SPLAT,        d1,   def, ___, ___) /* set all elements of vector  */ \
 	_(SHUFFLE,      d3,   def, def, def) /* shuffle elements of vectors */ \
 	\
+	_(REDUCE,       d1X1, def, num, ___) /* horizontal reduce; op2 = ir_op (IR_ADD/IR_MUL/IR_MIN/IR_MAX) */ \
 	/* data-flow and miscellaneous ops                                  */ \
 	_(VADDR,        d1,   var, ___, ___) /* load address of local var   */ \
 	_(FRAME_ADDR,   d0,   ___, ___, ___) /* function frame address      */ \
