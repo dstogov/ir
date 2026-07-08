@@ -1348,6 +1348,7 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 					break;
 				case IR_RLOAD:
 				case IR_RSTORE:
+				case IR_TLS:
 				case IR_ASM:
 				case IR_ASM_OUT:
 				case IR_ASM_GOTO:
