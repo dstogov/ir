@@ -242,11 +242,11 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted
 				}
 				break;
 			case IR_FLOAT:
-				ir_print_double(*(float*)p, f);
+				ir_print_float(*(float*)p, f);
 				while (--n) {
 					p = (char*)p + sizeof(float);
 					fprintf(f, ", ");
-					ir_print_double(*(float*)p, f);
+					ir_print_float(*(float*)p, f);
 				}
 				break;
 			default:
