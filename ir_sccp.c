@@ -3874,7 +3874,7 @@ void ir_iter_opt(ir_ctx *ctx, ir_bitqueue *worklist)
 								ir_iter_replace_insn(ctx, i, ref);
 								break;
 							}
-						} else {
+						} else if (insn->type == IR_DOUBLE) {
 							if (ir_may_promote_f2d(ctx, insn->op1)) {
 								ir_ref ref = ir_promote_f2d(ctx, insn->op1, i);
 								insn = &ctx->ir_base[i];
@@ -3891,7 +3891,7 @@ void ir_iter_opt(ir_ctx *ctx, ir_bitqueue *worklist)
 								insn = &ctx->ir_base[i];
 								insn->op1 = ref;
 							}
-						} else {
+						} else if (ctx->ir_base[insn->op1].type == IR_FLOAT) {
 							if (ir_may_promote_f2d(ctx, insn->op1)) {
 								ir_ref ref = ir_promote_f2d(ctx, insn->op1, i);
 								insn = &ctx->ir_base[i];
