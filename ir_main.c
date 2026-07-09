@@ -79,7 +79,7 @@ static void help(const char *cmd)
 		"  -m[no-]sse4                - enable/disable SSE4 instruction set\n"
 		"  -m[no-]sse4.1              - enable/disable SSE4.1 instruction set\n"
 		"  -m[no-]sse4.2              - enable/disable SSE4.2 instruction set\n"
-		"  -m[no-]avx2                - use AVX2 instruction set\n"
+		"  -m[no-]avx2                - enable/disable AVX2 instruction set\n"
 #endif
 		"  -muse-fp                   - use base frame pointer register\n"
 #ifndef _WIN32
