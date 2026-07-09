@@ -1755,7 +1755,11 @@ IR_FOLD(REPLACE(LONG_CONST, _))
 	 && IR_IS_TYPE_INT(op2_insn->type)
 	 && op2_insn->val.i64 >= 0
 	 && op2_insn->val.i64 < IR_VECTOR_LENGTH(op1_insn->type)) {
-		IR_ASSERT(IR_IS_TYPE_VECTOR(op1_insn->type) && IR_VECTOR_BASE_TYPE(op1_insn->type) == op3_insn->type);
+		IR_ASSERT(IR_IS_TYPE_VECTOR(op1_insn->type)
+		  && (IR_VECTOR_BASE_TYPE(op1_insn->type) == op3_insn->type
+		   || (IR_IS_TYPE_INT(IR_VECTOR_BASE_TYPE(op1_insn->type))
+		    && IR_IS_TYPE_INT(op3_insn->type)
+		    && ir_type_size[IR_VECTOR_BASE_TYPE(op1_insn->type)] == ir_type_size[op3_insn->type])));
 		uint32_t idx = op2_insn->val.u32;
 
 		if (op3_insn->type == IR_U8 || op3_insn->type == IR_I8 || op3_insn->type == IR_CHAR) {
@@ -1824,7 +1828,7 @@ IR_FOLD(REPLACE(LONG_CONST, _))
 				IR_FOLD_COPY(vec);
 			}
 		} else if (op3_insn->type == IR_FLOAT) {
-			float v = op3_insn->val.d;
+			float v = op3_insn->val.f;
 			float *src = (float*)ir_long_const_ptr(ctx, op1);
 			if (src[idx] == v) {
 				IR_FOLD_COPY(op1);
