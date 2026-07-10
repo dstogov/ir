@@ -4530,7 +4530,11 @@ static void ir_emit_load_imm_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref sr
 					if (width == 16) {
 						|	movdqa xmm(reg-IR_REG_FP_FIRST), [=>label]
 					} else if (width == 8) {
+|.if X64
 						|	movd xmm(reg-IR_REG_FP_FIRST), qword [=>label]
+|.else
+						|	movlpd xmm(reg-IR_REG_FP_FIRST), qword [=>label]
+|.endif
 					} else if (width == 4) {
 						|	movd xmm(reg-IR_REG_FP_FIRST), dword [=>label]
 					} else {
@@ -4619,7 +4623,11 @@ static void ir_emit_load_mem_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_mem me
 				if (width == 16) {
 					|	ASM_TXT_TMEM_OP movdqa, xmm(reg-IR_REG_FP_FIRST), oword, mem
 				} else if (width == 8) {
+|.if X64
 					|	ASM_TXT_TMEM_OP movd, xmm(reg-IR_REG_FP_FIRST), qword, mem
+|.else
+					|	ASM_TXT_TMEM_OP movlpd, xmm(reg-IR_REG_FP_FIRST), qword, mem
+|.endif
 				} else if (width == 4) {
 					|	ASM_TXT_TMEM_OP movd, xmm(reg-IR_REG_FP_FIRST), dword, mem
 				} else {
@@ -4818,7 +4826,11 @@ static void ir_emit_store_mem_fp(ir_ctx *ctx, ir_type type, ir_mem mem, ir_reg r
 				if (width == 16) {
 					|	ASM_TMEM_TXT_OP movdqa, oword, mem, xmm(reg-IR_REG_FP_FIRST)
 				} else if (width == 8) {
+|.if X64
 					|	ASM_TMEM_TXT_OP movd, qword, mem, xmm(reg-IR_REG_FP_FIRST)
+|.else
+					|	ASM_TMEM_TXT_OP movlpd, qword, mem, xmm(reg-IR_REG_FP_FIRST)
+|.endif
 				} else if (width == 4) {
 					|	ASM_TMEM_TXT_OP movd, dword, mem, xmm(reg-IR_REG_FP_FIRST)
 				} else {
