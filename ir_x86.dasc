@@ -2360,7 +2360,7 @@ get_arg_hints:
 					ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] >= 4 &&
 					!(ctx->mflags & (IR_X86_SSE41|IR_X86_AVX)))) {
 				// TODO: tmp reg 2 may be used for op2. Find a better place. ???
-				constraints->tmp_regs[n] = IR_TMP_REG(2, IR_DOUBLE, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
+				constraints->tmp_regs[n] = IR_TMP_REG(2, IR_DOUBLE, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 				n++;
 			}
 			break;
