@@ -19822,6 +19822,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 	size_t size;
 	ir_ref igoto_dup_ref = IR_UNUSED;
 	uint32_t igoto_dup_block = 0;
+	size_t required_alignment = 16;
 
 	data.ra_data.cc = ir_get_call_conv_dsc(ctx->flags);
 	data.ra_data.unused_slot_4 = 0;
@@ -20545,7 +20546,10 @@ next_block:;
 				|.rodata
 				|=>data.rodata_label:
 			}
-			if (size >= 16) {
+			if (size >= 32) {
+				|.align 32
+				required_alignment = 32;
+			} else if (size >= 16) {
 				|.align 16
 			} else if (size == 8) {
 				|.align 8
@@ -20641,7 +20645,7 @@ next_block:;
 
 	if (ctx->code_buffer) {
 		entry = ctx->code_buffer->pos;
-		entry = (void*)IR_ALIGNED_SIZE(((size_t)(entry)), 16);
+		entry = (void*)IR_ALIGNED_SIZE(((size_t)(entry)), required_alignment);
 		if (size > (size_t)((char*)ctx->code_buffer->end - (char*)entry)) {
 			ctx->data = NULL;
 			ctx->status = IR_ERROR_CODE_MEM_OVERFLOW;
