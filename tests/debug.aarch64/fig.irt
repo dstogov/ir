@@ -77,11 +77,9 @@ test:
 	add w7, w6, #1
 	mov w3, w2
 .L2:
-	cmp w8, #0
-	b.eq .L4
+	cbz w8, .L4
 .L3:
-	cmp w4, #0
-	b.eq .L1
+	cbz w4, .L1
 	mov w5, w10
 	mov w0, w2
 	b .L2

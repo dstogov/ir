@@ -24,8 +24,7 @@ test:
 	mov x19, x0
 	str x19, [sp]
 	add x19, x19, x19
-	cmp x19, #0
-	b.eq .L1
+	cbz x19, .L1
 	ldr x17, [sp]
 	ldr x19, [sp, #8]
 	add sp, sp, #0x10

@@ -70,8 +70,7 @@ test:
 	ret
 	nop
 .L5:
-	cmp w1, #0
-	b.ne .L5
+	cbnz w1, .L5
 	movz w0, #0x1
 	ret
 .rodata

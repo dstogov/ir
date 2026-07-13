@@ -21,8 +21,7 @@ aarch64
 }
 --EXPECT--
 test:
-	cmp w0, #0
-	b.eq .L1
+	cbz w0, .L1
 	mov w0, wzr
 	b .L2
 .L1:

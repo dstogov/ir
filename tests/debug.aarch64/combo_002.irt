@@ -49,7 +49,6 @@ aarch64
 --EXPECT--
 test:
 .L1:
-	cmp w0, #0
-	b.ne .L1
+	cbnz w0, .L1
 	movz w0, #0x1
 	ret
