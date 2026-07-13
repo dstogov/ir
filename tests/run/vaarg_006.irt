@@ -4,7 +4,7 @@ VA_ARG 006: va_arg(int)
 --run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
-func sum(int32_t, ...): int32_t
+func sum(int32_t, int32_t, int32_t, ...): int32_t
 {
 	int32_t c_4 = 32;
 	int32_t c_5 = 1;
@@ -46,7 +46,7 @@ func main(void): int32_t
 	int32_t c_8 = 4;
 	int32_t c_9 = 5;
 	int32_t c_10 = 6;
-	uintptr_t c_11 = func sum(int32_t, ...): int32_t;
+	uintptr_t c_11 = func sum(int32_t, int32_t, int32_t, ...): int32_t;
 	uintptr_t c_12 = "sum %d\n";
 	uintptr_t c_13 = func printf(uintptr_t, ...): int32_t;
 	int32_t c_14 = 0;
