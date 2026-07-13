@@ -41,6 +41,5 @@ test:
 	mov w0, w1
 	mov w1, w3
 .L2:
-	cmp w2, #0
-	b.ne .L1
+	cbnz w2, .L1
 	ret
