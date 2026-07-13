@@ -385,6 +385,19 @@ ir(ir_loader *loader):
 					{ctx.flags |= flags;}
 					{ctx.ret_type = ret_type;}
 					ir_func(&p)
+					{
+						uint32_t real_params_count = 0;
+						ir_ref r = 2;
+
+						while (ctx.ir_base[r].op == IR_PARAM) {
+							real_params_count++;
+							r++;
+						}
+						if (real_params_count != params_count) {
+							ir_free(&ctx);
+							yy_error_str("parameter count doesn't match function signature", name);
+						}
+					}
 					{bool ok = loader->func_process(loader, &ctx, name);}
 					{ir_free(&ctx);}
 					{if (!ok) yy_error("process_func error");}
