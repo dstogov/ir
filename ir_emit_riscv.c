@@ -16,17 +16,6 @@
  * (IR -> external-toolchain text), not the same role as ir_emit_aarch64.h /
  * ir_x86.h (IR -> in-memory JIT machine code). Positioned for AOT/standalone
  * `ir` tool use, not for the PHP-JIT in-memory codegen path.
- *
- * Fixes applied in this revision:
- *  - removed dead/unused prep_int() (had a nonsensical pointer expression
- *    and was never called; prep_int_full() is the real implementation).
- *  - comparison ops (EQ/NE/LT/.../UGT) now correctly detect a float
- *    operand even when op1 is a constant reference (previously only
- *    checked type when op1 was a non-const instruction ref, so
- *    "float_const < x" was mis-emitted as an integer compare).
- *  - INT2FP / FP2INT now select the correct fcvt width (w vs l) and
- *    signedness (u suffix) based on the actual source/destination
- *    integer type, instead of always assuming 64-bit signed (.l).
  */
 
 #include "ir.h"
@@ -47,10 +36,13 @@ static const char *int_regs[NUM_INT_REGS] = {
     "t0","t1","t2","t3","t4","t5",
     "s9","s10","s11","a6"
 };
-#define NUM_FLT_REGS 18
+/* NOTE: fs0-fs5 are reserved for fphi_regs below — must stay OUT of this
+ * pool, mirroring how s1-s4/s7-s8 are kept out of int_regs above. General
+ * pool uses ft0-ft10 plus the remaining callee-saved fs6-fs11. */
+#define NUM_FLT_REGS 17
 static const char *flt_regs[NUM_FLT_REGS] = {
     "ft0","ft1","ft2","ft3","ft4","ft5","ft6","ft7","ft8","ft9","ft10",
-    "fs0","fs1","fs2","fs3","fs4","fs5","fs6"
+    "fs6","fs7","fs8","fs9","fs10","fs11"
 };
 #define NUM_PHI_REGS 6
 static const char *phi_regs[NUM_PHI_REGS] = {
@@ -119,7 +111,12 @@ static int spill_slot(ir_ref ref) {
         spill_map[ref] = (spill_count < MAX_SPILL) ? spill_count++ : MAX_SPILL-1;
     return spill_map[ref];
 }
-static int spill_off(ir_ref ref) { return 56 + spill_slot(ref) * 8; }
+/* Spill slots occupy [0, MAX_SPILL*8) at the bottom of the frame; the
+ * callee-saved register save area occupies the top 48 bytes
+ * (frame_size-48 .. frame_size, see ir_emit_riscv() below). Do NOT add an
+ * offset here — doing so previously made the last 6 spill slots alias the
+ * ra/s0-s4 save slots and corrupt them under heavy register pressure. */
+static int spill_off(ir_ref ref) { return spill_slot(ref) * 8; }
 
 /* ── Allocators ───────────────────────────────────────────────────────────── */
 static const char *alloc_reg(ir_ref ref) {
@@ -367,7 +364,10 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
     current_insn = 0;
     compute_last_use(ctx);
 
-    frame_size = 56 + MAX_SPILL * 8;   /* 56 = ra+s0..s4 area; rest = spill */
+    /* layout: [0, MAX_SPILL*8) = spill slots, [frame_size-48, frame_size)
+     * = ra/s0-s4 save area (6 regs * 8 bytes); the extra 8 bytes of
+     * padding between them is intentional, not a bug. */
+    frame_size = 56 + MAX_SPILL * 8;
 
     fprintf(f, "\t.text\n");
     fprintf(f, "\t.globl %s\n", name);
