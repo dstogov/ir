@@ -2481,7 +2481,7 @@ get_arg_hints:
 				n = 1;
 			}
 			if (IR_IS_TYPE_INT(insn->type)) {
-				if ((IR_IS_CONST_REF(insn->op2) && ctx->ir_base[insn->op2].val.u64 > 16 / ir_type_size[insn->type]) ||
+				if ((IR_IS_CONST_REF(insn->op2) && ctx->ir_base[insn->op2].val.u64 >= 16 / ir_type_size[insn->type]) ||
 					(ir_type_size[insn->type] >= 4 && !(ctx->mflags & (IR_X86_SSE41|IR_X86_AVX)))) {
 					constraints->tmp_regs[n] = IR_TMP_REG(3, IR_DOUBLE, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
