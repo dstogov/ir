@@ -516,10 +516,6 @@ static int ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, i
 	}
 
 	size = (size_t)ctx->ir_base[insn->op2].val.u64;
-	if (size != 1 && size != 2 && size != 4 && size != 8 && size != sizeof(double)) {
-		goto try_split;
-	}
-
 	use_list = &ctx->use_lists[var];
 	n = use_list->count;
 	skip = next;
