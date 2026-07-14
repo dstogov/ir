@@ -9,6 +9,24 @@
  *   3. alloc_reg / alloc_freg : assign a phys reg to the result
  *                              (may spill someone else, but operands
  *                               are already safe in scratch / stable regs)
+ *
+ * NOTE ON SCOPE: this emits RISC-V *assembly text*, not machine code into
+ * an in-memory code buffer. It does not go through ir_match()/ir_ra.c's
+ * register allocator. It plays the same role as ir_emit_c.c / ir_emit_llvm.c
+ * (IR -> external-toolchain text), not the same role as ir_emit_aarch64.h /
+ * ir_x86.h (IR -> in-memory JIT machine code). Positioned for AOT/standalone
+ * `ir` tool use, not for the PHP-JIT in-memory codegen path.
+ *
+ * Fixes applied in this revision:
+ *  - removed dead/unused prep_int() (had a nonsensical pointer expression
+ *    and was never called; prep_int_full() is the real implementation).
+ *  - comparison ops (EQ/NE/LT/.../UGT) now correctly detect a float
+ *    operand even when op1 is a constant reference (previously only
+ *    checked type when op1 was a non-const instruction ref, so
+ *    "float_const < x" was mis-emitted as an integer compare).
+ *  - INT2FP / FP2INT now select the correct fcvt width (w vs l) and
+ *    signedness (u suffix) based on the actual source/destination
+ *    integer type, instead of always assuming 64-bit signed (.l).
  */
 
 #include "ir.h"
@@ -162,31 +180,15 @@ static const char *get_freg(ir_ref ref) {
 
 /* ── Operand preparation ──────────────────────────────────────────────────── */
 /*
- * prep_int(ref):
+ * prep_int_full(ref):
  *   - const  → li t6, imm  ; return "t6"
  *   - in reg → return reg_map[ref]
  *   - spilled → ld t6, off(sp) ; return "t6"
  *   - lost   → return "zero"  (should not happen with enough regs)
  *
- * After calling prep_int(op1), if result is "t6", caller MUST copy to "s5"
- * before calling prep_int(op2), because op2 may also use "t6".
+ * After calling prep_int_full(op1), if result is "t6", caller MUST copy to
+ * "s5" before calling prep_int_full(op2), because op2 may also use "t6".
  */
-static const char *prep_int(ir_ref ref) {
-    if (IR_IS_CONST_REF(ref)) {
-        ir_insn *c = &g_f[0] - &g_f[0] + (ir_insn*)NULL; /* unused */
-        (void)c;
-        return "t6"; /* caller fills in li below */
-    }
-    if (ref <= 0 || ref >= MAX_REFS) return "zero";
-    if (reg_map[ref]) return reg_map[ref];
-    if (spill_map[ref] >= 0) {
-        fprintf(g_f, "\tld\tt6, %d(sp)\n", spill_off(ref));
-        return "t6";
-    }
-    return "zero";
-}
-
-/* Simpler version that handles const inline */
 static const char *prep_int_full(ir_ctx *ctx, ir_ref ref) {
     if (IR_IS_CONST_REF(ref)) {
         fprintf(g_f, "\tli\tt6, %lld\n", (long long)ctx->ir_base[ref].val.i64);
@@ -574,7 +576,14 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
         case IR_EQ: case IR_NE: case IR_LT:
         case IR_GE: case IR_LE: case IR_GT:
         case IR_ULT: case IR_UGE: case IR_ULE: case IR_UGT: {
-            ir_insn *op1_insn = (op1>0 && !IR_IS_CONST_REF(op1)) ? &ctx->ir_base[op1] : NULL;
+            /* FIX: previously only inspected op1's type when op1 was a
+             * non-const ref, so a float *constant* on the left-hand side
+             * (op1) was silently treated as an integer compare. ir_base[]
+             * is valid for negative (constant) refs too — the context
+             * comment in ir.h describes it as a two-directional array —
+             * so we can safely dereference op1 whenever it isn't
+             * IR_UNUSED, const or not. */
+            ir_insn *op1_insn = (op1 != IR_UNUSED) ? &ctx->ir_base[op1] : NULL;
             int is_float = op1_insn && (op1_insn->type==IR_FLOAT||op1_insn->type==IR_DOUBLE);
             int is_d     = op1_insn && (op1_insn->type==IR_DOUBLE);
             if (is_float) {
@@ -654,19 +663,34 @@ int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f)
         }
 
         case IR_INT2FP: {
+            /* FIX: pick fcvt width (w/l) and signedness (u suffix) from
+             * the *source* integer type instead of always assuming a
+             * 64-bit signed source (previously hardcoded fcvt.?.l). */
             int is_d = (insn->type == IR_DOUBLE);
+            ir_insn *si = &ctx->ir_base[op1];
+            int src_is_64 = (ir_type_size[si->type] == 8);
+            int src_unsigned = IR_IS_TYPE_UNSIGNED(si->type);
+            const char *width = src_is_64 ? "l" : "w";
+            const char *usuf  = src_unsigned ? "u" : "";
             const char *r1 = prep_int_full(ctx, op1);
             dst = alloc_freg(i);
-            fprintf(f, "\t%s\t%s, %s\n", is_d?"fcvt.d.l":"fcvt.s.l", dst, r1);
+            fprintf(f, "\tfcvt.%s.%s%s\t%s, %s\n", is_d?"d":"s", width, usuf, dst, r1);
             break;
         }
 
         case IR_FP2INT: {
+            /* FIX: pick fcvt width (w/l) and signedness (u suffix) from
+             * the *destination* integer type instead of always assuming
+             * a 64-bit signed destination (previously hardcoded fcvt.l.?). */
             ir_insn *si = (op1>0&&!IR_IS_CONST_REF(op1)) ? &ctx->ir_base[op1] : NULL;
             int src_is_d = si && (si->type == IR_DOUBLE);
+            int dst_is_64 = (ir_type_size[insn->type] == 8);
+            int dst_unsigned = IR_IS_TYPE_UNSIGNED(insn->type);
+            const char *width = dst_is_64 ? "l" : "w";
+            const char *usuf  = dst_unsigned ? "u" : "";
             const char *r1 = prep_flt_full(ctx, op1, src_is_d);
             dst = alloc_reg(i);
-            fprintf(f, "\t%s\t%s, %s, rtz\n", src_is_d?"fcvt.l.d":"fcvt.l.s", dst, r1);
+            fprintf(f, "\tfcvt.%s%s.%s\t%s, %s, rtz\n", width, usuf, src_is_d?"d":"s", dst, r1);
             break;
         }
 
