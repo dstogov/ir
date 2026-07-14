@@ -17627,7 +17627,7 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					|	psllw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 				} else if (element_type == IR_I32 || element_type == IR_U32) {
 					|	pslld xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-				} else if (element_type == IR_I32 || element_type == IR_U32) {
+				} else if (element_type == IR_I64 || element_type == IR_U64) {
 					|	psllq xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 				} else {
 					IR_ASSERT(0 && "unsupported vector type");
@@ -17635,16 +17635,22 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 			case IR_SHR:
 				IR_ASSERT(IR_IS_TYPE_INT(element_type));
-				if (element_type == IR_I16) {
-					|	psraw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-				} else if (element_type == IR_U16) {
+				if (element_type == IR_I16 || element_type == IR_U16) {
 					|	psrlw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-				} else if (element_type == IR_I32) {
-					|	psrad xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-				} else if (element_type == IR_U32) {
+				} else if (element_type == IR_I32 || element_type == IR_U32) {
 					|	psrld xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-				} else if (element_type == IR_U64) {
+				} else if (element_type == IR_I64 || element_type == IR_U64) {
 					|	psrlq xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+				} else {
+					IR_ASSERT(0 && "unsupported vector type");
+				}
+				break;
+			case IR_SAR:
+				IR_ASSERT(IR_IS_TYPE_INT(element_type));
+				if (element_type == IR_I16 || element_type == IR_U16) {
+					|	psraw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+				} else if (element_type == IR_I32 || element_type == IR_U32) {
+					|	psrad xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 				} else {
 					IR_ASSERT(0 && "unsupported vector type");
 				}
@@ -17808,7 +17814,7 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					|	psllw xmm(def_reg-IR_REG_FP_FIRST), [=>label]
 				} else if (element_type == IR_I32 || element_type == IR_U32) {
 					|	pslld xmm(def_reg-IR_REG_FP_FIRST), [=>label]
-				} else if (element_type == IR_I32 || element_type == IR_U32) {
+				} else if (element_type == IR_I64 || element_type == IR_U64) {
 					|	psllq xmm(def_reg-IR_REG_FP_FIRST), [=>label]
 				} else {
 					IR_ASSERT(0 && "unsupported vector type");
@@ -17816,16 +17822,22 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 			case IR_SHR:
 				IR_ASSERT(IR_IS_TYPE_INT(element_type));
-				if (element_type == IR_I16) {
-					|	psraw xmm(def_reg-IR_REG_FP_FIRST), [=>label]
-				} else if (element_type == IR_U16) {
+				if (element_type == IR_I16 || element_type == IR_U16) {
 					|	psrlw xmm(def_reg-IR_REG_FP_FIRST), [=>label]
-				} else if (element_type == IR_I32) {
-					|	psrad xmm(def_reg-IR_REG_FP_FIRST), [=>label]
-				} else if (element_type == IR_U32) {
+				} else if (element_type == IR_I32 || element_type == IR_U32) {
 					|	psrld xmm(def_reg-IR_REG_FP_FIRST), [=>label]
-				} else if (element_type == IR_U64) {
+				} else if (element_type == IR_I64 || element_type == IR_U64) {
 					|	psrlq xmm(def_reg-IR_REG_FP_FIRST), [=>label]
+				} else {
+					IR_ASSERT(0 && "unsupported vector type");
+				}
+				break;
+			case IR_SAR:
+				IR_ASSERT(IR_IS_TYPE_INT(element_type));
+				if (element_type == IR_I16 || element_type == IR_U16) {
+					|	psraw xmm(def_reg-IR_REG_FP_FIRST), [=>label]
+				} else if (element_type == IR_I32 || element_type == IR_U32) {
+					|	psrad xmm(def_reg-IR_REG_FP_FIRST), [=>label]
 				} else {
 					IR_ASSERT(0 && "unsupported vector type");
 				}
@@ -17992,7 +18004,7 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					|	ASM_TXT_TMEM_OP psllw, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
 				} else if (element_type == IR_I32 || element_type == IR_U32) {
 					|	ASM_TXT_TMEM_OP pslld, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
-				} else if (element_type == IR_I32 || element_type == IR_U32) {
+				} else if (element_type == IR_I64 || element_type == IR_U64) {
 					|	ASM_TXT_TMEM_OP psllq, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
 				} else {
 					IR_ASSERT(0 && "unsupported vector type");
@@ -18000,16 +18012,22 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 			case IR_SHR:
 				IR_ASSERT(IR_IS_TYPE_INT(element_type));
-				if (element_type == IR_I16) {
-					|	ASM_TXT_TMEM_OP psraw, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
-				} else if (element_type == IR_U16) {
+				if (element_type == IR_I16 || element_type == IR_U16) {
 					|	ASM_TXT_TMEM_OP psrlw, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
-				} else if (element_type == IR_I32) {
-					|	ASM_TXT_TMEM_OP psrad, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
-				} else if (element_type == IR_U32) {
+				} else if (element_type == IR_I32 || element_type == IR_U32) {
 					|	ASM_TXT_TMEM_OP psrld, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
-				} else if (element_type == IR_U64) {
+				} else if (element_type == IR_I64 || element_type == IR_U64) {
 					|	ASM_TXT_TMEM_OP psrlq, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
+				} else {
+					IR_ASSERT(0 && "unsupported vector type");
+				}
+				break;
+			case IR_SAR:
+				IR_ASSERT(IR_IS_TYPE_INT(element_type));
+				if (element_type == IR_I16 || element_type == IR_U16) {
+					|	ASM_TXT_TMEM_OP psraw, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
+				} else if (element_type == IR_I32 || element_type == IR_U32) {
+					|	ASM_TXT_TMEM_OP psrad, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
 				} else {
 					IR_ASSERT(0 && "unsupported vector type");
 				}
@@ -18533,7 +18551,7 @@ static void ir_emit_vector_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	vpsllw xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 					} else if (element_type == IR_I32 || element_type == IR_U32) {
 						|	vpslld xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-					} else if (element_type == IR_I32 || element_type == IR_U32) {
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
 						|	vpsllq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 					} else {
 						IR_ASSERT(0 && "unsupported vector type");
@@ -18543,7 +18561,7 @@ static void ir_emit_vector_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	vpsllw ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
 					} else if (element_type == IR_I32 || element_type == IR_U32) {
 						|	vpslld ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
-					} else if (element_type == IR_I32 || element_type == IR_U32) {
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
 						|	vpsllq ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
 					} else {
 						IR_ASSERT(0 && "unsupported vector type");
@@ -18555,30 +18573,44 @@ static void ir_emit_vector_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			case IR_SHR:
 				IR_ASSERT(IR_IS_TYPE_INT(element_type));
 				if (width == 16) {
-					if (element_type == IR_I16) {
-						|	vpsraw xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-					} else if (element_type == IR_U16) {
+					if (element_type == IR_I16 || element_type == IR_U16) {
 						|	vpsrlw xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-					} else if (element_type == IR_I32) {
-						|	vpsrad xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-					} else if (element_type == IR_U32) {
+					} else if (element_type == IR_I32 || element_type == IR_U32) {
 						|	vpsrld xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-					} else if (element_type == IR_U64) {
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
 						|	vpsrlq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 					} else {
 						IR_ASSERT(0 && "unsupported vector type");
 					}
 				} else if (width == 32) {
-					if (element_type == IR_I16) {
-						|	vpsraw ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
-					} else if (element_type == IR_U16) {
+					if (element_type == IR_I16 || element_type == IR_U16) {
 						|	vpsrlw ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
-					} else if (element_type == IR_I32) {
-						|	vpsrad ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
-					} else if (element_type == IR_U32) {
+					} else if (element_type == IR_I32 || element_type == IR_U32) {
 						|	vpsrld ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
-					} else if (element_type == IR_U64) {
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
 						|	vpsrlq ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+					} else {
+						IR_ASSERT(0 && "unsupported vector type");
+					}
+				} else {
+					IR_ASSERT(0 && "unsupported vector width");
+				}
+				break;
+			case IR_SAR:
+				IR_ASSERT(IR_IS_TYPE_INT(element_type));
+				if (width == 16) {
+					if (element_type == IR_I16 || element_type == IR_U16) {
+						|	vpsraw xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+					} else if (element_type == IR_I32 || element_type == IR_U32) {
+						|	vpsrad xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+					} else {
+						IR_ASSERT(0 && "unsupported vector type");
+					}
+				} else if (width == 32) {
+					if (element_type == IR_I16 || element_type == IR_U16) {
+						|	vpsraw ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+					} else if (element_type == IR_I32 || element_type == IR_U32) {
+						|	vpsrad ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
 					} else {
 						IR_ASSERT(0 && "unsupported vector type");
 					}
@@ -18787,7 +18819,7 @@ static void ir_emit_vector_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	vpsllw xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), [=>label]
 					} else if (element_type == IR_I32 || element_type == IR_U32) {
 						|	vpslld xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), [=>label]
-					} else if (element_type == IR_I32 || element_type == IR_U32) {
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
 						|	vpsllq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), [=>label]
 					} else {
 						IR_ASSERT(0 && "unsupported vector type");
@@ -18797,7 +18829,7 @@ static void ir_emit_vector_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	vpsllw ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), [=>label]
 					} else if (element_type == IR_I32 || element_type == IR_U32) {
 						|	vpslld ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), [=>label]
-					} else if (element_type == IR_I32 || element_type == IR_U32) {
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
 						|	vpsllq ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), [=>label]
 					} else {
 						IR_ASSERT(0 && "unsupported vector type");
@@ -18809,30 +18841,44 @@ static void ir_emit_vector_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			case IR_SHR:
 				IR_ASSERT(IR_IS_TYPE_INT(element_type));
 				if (width == 16) {
-					if (element_type == IR_I16) {
-						|	vpsraw xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), [=>label]
-					} else if (element_type == IR_U16) {
+					if (element_type == IR_I16 || element_type == IR_U16) {
 						|	vpsrlw xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), [=>label]
-					} else if (element_type == IR_I32) {
-						|	vpsrad xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), [=>label]
-					} else if (element_type == IR_U32) {
+					} else if (element_type == IR_I32 || element_type == IR_U32) {
 						|	vpsrld xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), [=>label]
-					} else if (element_type == IR_U64) {
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
 						|	vpsrlq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), [=>label]
 					} else {
 						IR_ASSERT(0 && "unsupported vector type");
 					}
 				} else if (width == 32) {
-					if (element_type == IR_I16) {
-						|	vpsraw ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), [=>label]
-					} else if (element_type == IR_U16) {
+					if (element_type == IR_I16 || element_type == IR_U16) {
 						|	vpsrlw ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), [=>label]
-					} else if (element_type == IR_I32) {
-						|	vpsrad ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), [=>label]
-					} else if (element_type == IR_U32) {
+					} else if (element_type == IR_I32 || element_type == IR_U32) {
 						|	vpsrld ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), [=>label]
-					} else if (element_type == IR_U64) {
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
 						|	vpsrlq ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), [=>label]
+					} else {
+						IR_ASSERT(0 && "unsupported vector type");
+					}
+				} else {
+					IR_ASSERT(0 && "unsupported vector width");
+				}
+				break;
+			case IR_SAR:
+				IR_ASSERT(IR_IS_TYPE_INT(element_type));
+				if (width == 16) {
+					if (element_type == IR_I16 || element_type == IR_U16) {
+						|	vpsraw xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), [=>label]
+					} else if (element_type == IR_I32 || element_type == IR_U32) {
+						|	vpsrad xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), [=>label]
+					} else {
+						IR_ASSERT(0 && "unsupported vector type");
+					}
+				} else if (width == 32) {
+					if (element_type == IR_I16 || element_type == IR_U16) {
+						|	vpsraw ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), [=>label]
+					} else if (element_type == IR_I32 || element_type == IR_U32) {
+						|	vpsrad ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), [=>label]
 					} else {
 						IR_ASSERT(0 && "unsupported vector type");
 					}
@@ -19056,7 +19102,7 @@ static void ir_emit_vector_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	ASM_TXT_TXT_TMEM_OP vpsllw, xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), oword, mem
 					} else if (element_type == IR_I32 || element_type == IR_U32) {
 						|	ASM_TXT_TXT_TMEM_OP vpslld, xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), oword, mem
-					} else if (element_type == IR_I32 || element_type == IR_U32) {
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
 						|	ASM_TXT_TXT_TMEM_OP vpsllq, xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), oword, mem
 					} else {
 						IR_ASSERT(0 && "unsupported vector type");
@@ -19066,7 +19112,7 @@ static void ir_emit_vector_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	ASM_TXT_TXT_TMEM_OP vpsllw, ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), yword, mem
 					} else if (element_type == IR_I32 || element_type == IR_U32) {
 						|	ASM_TXT_TXT_TMEM_OP vpslld, ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), yword, mem
-					} else if (element_type == IR_I32 || element_type == IR_U32) {
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
 						|	ASM_TXT_TXT_TMEM_OP vpsllq, ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), yword, mem
 					} else {
 						IR_ASSERT(0 && "unsupported vector type");
@@ -19078,30 +19124,44 @@ static void ir_emit_vector_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			case IR_SHR:
 				IR_ASSERT(IR_IS_TYPE_INT(element_type));
 				if (width == 16) {
-					if (element_type == IR_I16) {
-						|	ASM_TXT_TXT_TMEM_OP vpsraw, xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), oword, mem
-					} else if (element_type == IR_U16) {
+					if (element_type == IR_I16 || element_type == IR_U16) {
 						|	ASM_TXT_TXT_TMEM_OP vpsrlw, xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), oword, mem
-					} else if (element_type == IR_I32) {
-						|	ASM_TXT_TXT_TMEM_OP vpsrad, xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), oword, mem
-					} else if (element_type == IR_U32) {
+					} else if (element_type == IR_I32 || element_type == IR_U32) {
 						|	ASM_TXT_TXT_TMEM_OP vpsrld, xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), oword, mem
-					} else if (element_type == IR_U64) {
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
 						|	ASM_TXT_TXT_TMEM_OP vpsrlq, xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), oword, mem
 					} else {
 						IR_ASSERT(0 && "unsupported vector type");
 					}
 				} else if (width == 32) {
-					if (element_type == IR_I16) {
-						|	ASM_TXT_TXT_TMEM_OP vpsraw, ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), yword, mem
-					} else if (element_type == IR_U16) {
+					if (element_type == IR_I16 || element_type == IR_U16) {
 						|	ASM_TXT_TXT_TMEM_OP vpsrlw, ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), yword, mem
-					} else if (element_type == IR_I32) {
-						|	ASM_TXT_TXT_TMEM_OP vpsrad, ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), yword, mem
-					} else if (element_type == IR_U32) {
+					} else if (element_type == IR_I32 || element_type == IR_U32) {
 						|	ASM_TXT_TXT_TMEM_OP vpsrld, ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), yword, mem
-					} else if (element_type == IR_U64) {
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
 						|	ASM_TXT_TXT_TMEM_OP vpsrlq, ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), yword, mem
+					} else {
+						IR_ASSERT(0 && "unsupported vector type");
+					}
+				} else {
+					IR_ASSERT(0 && "unsupported vector width");
+				}
+				break;
+			case IR_SAR:
+				IR_ASSERT(IR_IS_TYPE_INT(element_type));
+				if (width == 16) {
+					if (element_type == IR_I16 || element_type == IR_U16) {
+						|	ASM_TXT_TXT_TMEM_OP vpsraw, xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), oword, mem
+					} else if (element_type == IR_I32 || element_type == IR_U32) {
+						|	ASM_TXT_TXT_TMEM_OP vpsrad, xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), oword, mem
+					} else {
+						IR_ASSERT(0 && "unsupported vector type");
+					}
+				} else if (width == 32) {
+					if (element_type == IR_I16 || element_type == IR_U16) {
+						|	ASM_TXT_TXT_TMEM_OP vpsraw, ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), yword, mem
+					} else if (element_type == IR_I32 || element_type == IR_U32) {
+						|	ASM_TXT_TXT_TMEM_OP vpsrad, ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), yword, mem
 					} else {
 						IR_ASSERT(0 && "unsupported vector type");
 					}
