@@ -545,6 +545,88 @@ IR_ALWAYS_INLINE ir_mem IR_MEM(ir_reg base, int32_t offset, ir_reg index, int32_
 ||	} while (0);
 |.endmacro
 
+|.macro ASM_TXT_TXT_TMEM_TXT_OP, op, op1, op2, type, op3, op4
+||	do {
+||		int32_t offset = IR_MEM_OFFSET(op3);
+||		int32_t base = IR_MEM_BASE(op3);
+||		int32_t index = IR_MEM_INDEX(op3);
+||		int32_t scale = IR_MEM_SCALE(op3);
+||  	if (index == IR_REG_NONE) {
+||			if (base == IR_REG_NONE) {
+|				op op1, op2, type [offset], op4
+||			} else {
+|				op op1, op2, type [Ra(base)+offset], op4
+||			}
+||		} else if (scale == 8) {
+||			if (base == IR_REG_NONE) {
+|				op op1, op2, type [Ra(index)*8+offset], op4
+||			} else {
+|				op op1, op2, type [Ra(base)+Ra(index)*8+offset], op4
+||			}
+||		} else if (scale == 4) {
+||			if (base == IR_REG_NONE) {
+|				op op1, op2, type [Ra(index)*4+offset], op4
+||			} else {
+|				op op1, op2, type [Ra(base)+Ra(index)*4+offset], op4
+||			}
+||		} else if (scale == 2) {
+||			if (base == IR_REG_NONE) {
+|				op op1, op2, type [Ra(index)*2+offset], op4
+||			} else {
+|				op op1, op2, type [Ra(base)+Ra(index)*2+offset], op4
+||			}
+||		} else {
+||			IR_ASSERT(scale == 1);
+||			if (base == IR_REG_NONE) {
+|				op op1, op2, type [Ra(index)+offset], op4
+||			} else {
+|				op op1, op2, type [Ra(base)+Ra(index)+offset], op4
+||			}
+||		}
+||	} while (0);
+|.endmacro
+
+|.macro ASM_TXT_TMEM_TXT_OP, op, op1, type, op2, op3
+||	do {
+||		int32_t offset = IR_MEM_OFFSET(op2);
+||		int32_t base = IR_MEM_BASE(op2);
+||		int32_t index = IR_MEM_INDEX(op2);
+||		int32_t scale = IR_MEM_SCALE(op2);
+||  	if (index == IR_REG_NONE) {
+||			if (base == IR_REG_NONE) {
+|				op op1, type [offset], op3
+||			} else {
+|				op op1, type [Ra(base)+offset], op3
+||			}
+||		} else if (scale == 8) {
+||			if (base == IR_REG_NONE) {
+|				op op1, type [Ra(index)*8+offset], op3
+||			} else {
+|				op op1, type [Ra(base)+Ra(index)*8+offset], op3
+||			}
+||		} else if (scale == 4) {
+||			if (base == IR_REG_NONE) {
+|				op op1, type [Ra(index)*4+offset], op3
+||			} else {
+|				op op1, type [Ra(base)+Ra(index)*4+offset], op3
+||			}
+||		} else if (scale == 2) {
+||			if (base == IR_REG_NONE) {
+|				op op1, type [Ra(index)*2+offset], op3
+||			} else {
+|				op op1, type [Ra(base)+Ra(index)*2+offset], op3
+||			}
+||		} else {
+||			IR_ASSERT(scale == 1);
+||			if (base == IR_REG_NONE) {
+|				op op1, type [Ra(index)+offset], op3
+||			} else {
+|				op op1, type [Ra(base)+Ra(index)+offset], op3
+||			}
+||		}
+||	} while (0);
+|.endmacro
+
 |.macro ASM_REG_OP, op, type, op1
 ||	switch (ir_type_size[type]) {
 || 		default:
@@ -875,12 +957,30 @@ IR_ALWAYS_INLINE ir_mem IR_MEM(ir_reg base, int32_t offset, ir_reg index, int32_
 ||	}
 |.endmacro
 
+|.macro ASM_SSE_FP_VEC_REG_TXT_TXT_OP, op, type, op1, op2, op3
+||	if (type == IR_DOUBLE) {
+|		op..d xmm(op1-IR_REG_FP_FIRST), op2, op3
+||	} else {
+||		IR_ASSERT(type == IR_FLOAT);
+|		op..s xmm(op1-IR_REG_FP_FIRST), op2, op3
+||	}
+|.endmacro
+
 |.macro ASM_SSE_FP_VEC_REG_MEM_OP, op, type, op1, op2
 ||	if (type == IR_DOUBLE) {
 |		ASM_TXT_TMEM_OP op..d, xmm(op1-IR_REG_FP_FIRST), oword, op2
 ||	} else {
 ||		IR_ASSERT(type == IR_FLOAT);
 |		ASM_TXT_TMEM_OP op..s, xmm(op1-IR_REG_FP_FIRST), oword, op2
+||	}
+|.endmacro
+
+|.macro ASM_SSE_FP_VEC_REG_MEM_TXT_OP, op, type, op1, op2, op3
+||	if (type == IR_DOUBLE) {
+|		ASM_TXT_TMEM_TXT_OP op..d, xmm(op1-IR_REG_FP_FIRST), oword, op2, op3
+||	} else {
+||		IR_ASSERT(type == IR_FLOAT);
+|		ASM_TXT_TMEM_TXT_OP op..s, xmm(op1-IR_REG_FP_FIRST), oword, op2, op3
 ||	}
 |.endmacro
 
@@ -1009,6 +1109,26 @@ IR_ALWAYS_INLINE ir_mem IR_MEM(ir_reg base, int32_t offset, ir_reg index, int32_
 ||	}
 |.endmacro
 
+|.macro ASM_AVX_FP_VEC_REG_REG_TXT_TXT_OP, op, type, width, op1, op2, op3, op4
+||	if (width <= 16) {
+||		if (type == IR_DOUBLE) {
+|			op..d xmm(op1-IR_REG_FP_FIRST), xmm(op2-IR_REG_FP_FIRST), op3, op4
+||		} else {
+||			IR_ASSERT(type == IR_FLOAT);
+|			op..s xmm(op1-IR_REG_FP_FIRST), xmm(op2-IR_REG_FP_FIRST), op3, op4
+||		}
+||	} else if (width == 32) {
+||		if (type == IR_DOUBLE) {
+|			op..d ymm(op1-IR_REG_FP_FIRST), ymm(op2-IR_REG_FP_FIRST), op3, op4
+||		} else {
+||			IR_ASSERT(type == IR_FLOAT);
+|			op..s ymm(op1-IR_REG_FP_FIRST), ymm(op2-IR_REG_FP_FIRST), op3, op4
+||		}
+||	} else {
+||		IR_ASSERT(0 && "unsupported vector width");
+||	}
+|.endmacro
+
 |.macro ASM_AVX_FP_VEC_REG_REG_MEM_OP, op, type, width, op1, op2, op3
 ||	if (width <= 16) {
 ||		if (type == IR_DOUBLE) {
@@ -1023,6 +1143,26 @@ IR_ALWAYS_INLINE ir_mem IR_MEM(ir_reg base, int32_t offset, ir_reg index, int32_
 ||		} else {
 ||			IR_ASSERT(type == IR_FLOAT);
 |			ASM_TXT_TXT_TMEM_OP op..s, ymm(op1-IR_REG_FP_FIRST), ymm(op2-IR_REG_FP_FIRST), yword, op3
+||		}
+||	} else {
+||		IR_ASSERT(0 && "unsupported vector width");
+||	}
+|.endmacro
+
+|.macro ASM_AVX_FP_VEC_REG_REG_MEM_TXT_OP, op, type, width, op1, op2, op3, op4
+||	if (width <= 16) {
+||		if (type == IR_DOUBLE) {
+|			ASM_TXT_TXT_TMEM_TXT_OP op..d, xmm(op1-IR_REG_FP_FIRST), xmm(op2-IR_REG_FP_FIRST), oword, op3, op4
+||		} else {
+||			IR_ASSERT(type == IR_FLOAT);
+|			ASM_TXT_TXT_TMEM_TXT_OP op..s, xmm(op1-IR_REG_FP_FIRST), xmm(op2-IR_REG_FP_FIRST), oword, op3, op4
+||		}
+||	} else if (width == 32) {
+||		if (type == IR_DOUBLE) {
+|			ASM_TXT_TXT_TMEM_TXT_OP op..d, ymm(op1-IR_REG_FP_FIRST), ymm(op2-IR_REG_FP_FIRST), yword, op3, op4
+||		} else {
+||			IR_ASSERT(type == IR_FLOAT);
+|			ASM_TXT_TXT_TMEM_TXT_OP op..s, ymm(op1-IR_REG_FP_FIRST), ymm(op2-IR_REG_FP_FIRST), yword, op3, op4
 ||		}
 ||	} else {
 ||		IR_ASSERT(0 && "unsupported vector width");
@@ -2314,7 +2454,7 @@ get_arg_hints:
 #endif
 #if IR_SIMD
 		case IR_SPLAT:
-			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;
+			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;
 			insn = &ctx->ir_base[ref];
 			if (IR_IS_CONST_REF(insn->op1)) {
 				constraints->tmp_regs[0] = IR_TMP_REG(1, ctx->ir_base[insn->op1].type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
@@ -2381,17 +2521,108 @@ get_arg_hints:
 				n = 1;
 			}
 			if (IR_VECTOR_SIZE(insn->type) == 16) {
-				flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
+				flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
+				if (IR_IS_CONST_REF(insn->op2) &&
+						IR_IS_TYPE_FP(IR_VECTOR_BASE_TYPE(insn->type)) &&
+						insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
+					// TODO: workaroud against DynASM limitation: "rip-relative displacement followed by immediate" ???
+					constraints->tmp_regs[n] = IR_TMP_REG(2, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+					n++;
+				}
 			} else {
-				flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+				flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
 				if (IR_IS_CONST_REF(insn->op2)) {
 					constraints->tmp_regs[n] = IR_TMP_REG(2, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
 				}
 			}
 			if (IR_IS_TYPE_INT(IR_VECTOR_BASE_TYPE(insn->type))) {
-				if (insn->op == IR_NE) {
-					constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_USE_SUB_REF, IR_DEF_SUB_REF);
+				if (insn->op == IR_NE ||
+						(insn->op == IR_EQ &&
+						 ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] == 8 &&
+						 !(ctx->mflags & IR_X86_SSE41))) {
+					constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
+					n++;
+				} else if ((insn->op == IR_LE || insn->op == IR_GE) &&
+						 ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] == 8) {
+					constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
+					n++;
+				} else if ((insn->op == IR_ULE || insn->op == IR_UGE) &&
+						 ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] == 8) {
+					constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
+					n++;
+				} else if (insn->op == IR_ULT || insn->op == IR_UGT) {
+					constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
+					n++;
+				}
+				if (insn->op == IR_LT ||
+						(insn->op == IR_GE && ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] == 8) ||
+						insn->op == IR_ULT) {
+					flags &= ~IR_DEF_REUSES_OP1_REG;
+					// TODO: DEF_MAY_REUSE_OP2 ???
+					flags |= IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+				} else if (insn->op == IR_UGT && ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] == 4) {
+					flags &= ~IR_DEF_REUSES_OP1_REG;
+					// TODO: DEF_MAY_REUSE_OP2 ???
+					flags |= IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+				} else if ((insn->op == IR_LE || insn->op == IR_ULT || insn->op == IR_ULE) &&
+						ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] != 8) {
+					flags &= ~IR_DEF_REUSES_OP1_REG;
+					// TODO: DEF_MAY_REUSE_OP2 ???
+					flags |= IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+				}
+			} else {
+				if (insn->op == IR_GT || insn->op == IR_GE || insn->op == IR_ULT || insn->op == IR_ULE) {
+					flags &= ~IR_DEF_REUSES_OP1_REG;
+					// TODO: DEF_MAY_REUSE_OP2 ???
+					flags |= IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+				}
+			}
+			break;
+		case IR_VECTOR_BINOP_AVX:
+			insn = &ctx->ir_base[ref];
+			if (IR_IS_CONST_REF(insn->op1)) {
+				constraints->tmp_regs[0] = IR_TMP_REG(1, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n = 1;
+			}
+			if (IR_VECTOR_SIZE(insn->type) == 16 || IR_VECTOR_SIZE(insn->type) == 32) {
+				flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
+				if (IR_IS_CONST_REF(insn->op2) &&
+						IR_IS_TYPE_FP(IR_VECTOR_BASE_TYPE(insn->type)) &&
+						insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
+					// TODO: workaroud against DynASM limitation: "rip-relative displacement followed by immediate" ???
+					constraints->tmp_regs[n] = IR_TMP_REG(2, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+					n++;
+				}
+			} else {
+				flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+				if (IR_IS_CONST_REF(insn->op2)) {
+					constraints->tmp_regs[n] = IR_TMP_REG(2, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+					n++;
+				}
+			}
+			if (IR_IS_TYPE_INT(IR_VECTOR_BASE_TYPE(insn->type))) {
+				if ((insn->op == IR_UGT || insn->op == IR_ULT || insn->op == IR_UGE || insn->op == IR_ULE) &&
+						ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] == 8) {
+					flags |= IR_DEF_CONFLICTS_WITH_INPUT_REGS;
+					constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
+					n++;
+				} else if ((insn->op == IR_UGT || insn->op == IR_ULT) &&
+						ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] == 4) {
+					constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
+					n++;
+				} else if (insn->op == IR_UGE || insn->op == IR_ULE) {
+					constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+					n++;
+				} else if (insn->op == IR_NE ||
+						insn->op == IR_GE ||
+						insn->op == IR_LE ||
+						insn->op == IR_UGT ||
+						insn->op == IR_ULT ||
+						(insn->op == IR_EQ &&
+						 ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] == 8 &&
+						 !(ctx->mflags & IR_X86_SSE41))) {
+					constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
 					n++;
 				}
 			}
@@ -4608,13 +4839,14 @@ static void ir_emit_load_mem_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_mem me
 				}
 			} else {
 				IR_ASSERT(width == 32);
+				// TODO: USe 32-byte stack alinment and "aligned" moves ???
 				if (IR_IS_TYPE_INT(element_type)) {
-					|	ASM_TXT_TMEM_OP vmovdqa, ymm(reg-IR_REG_FP_FIRST), yword, mem
+					|	ASM_TXT_TMEM_OP vmovdqu, ymm(reg-IR_REG_FP_FIRST), yword, mem
 				} else if (element_type == IR_DOUBLE) {
-					|	ASM_TXT_TMEM_OP vmovapd, ymm(reg-IR_REG_FP_FIRST), yword, mem
+					|	ASM_TXT_TMEM_OP vmovupd, ymm(reg-IR_REG_FP_FIRST), yword, mem
 				} else {
 					IR_ASSERT(element_type == IR_FLOAT);
-					|	ASM_TXT_TMEM_OP vmovaps, ymm(reg-IR_REG_FP_FIRST), yword, mem
+					|	ASM_TXT_TMEM_OP vmovups, ymm(reg-IR_REG_FP_FIRST), yword, mem
 				}
 			}
 		} else {
@@ -4811,13 +5043,14 @@ static void ir_emit_store_mem_fp(ir_ctx *ctx, ir_type type, ir_mem mem, ir_reg r
 				}
 			} else {
 				IR_ASSERT(width == 32);
+				// TODO: USe 32-byte stack alinment and "aligned" moves ???
 				if (IR_IS_TYPE_INT(element_type)) {
-					|	ASM_TMEM_TXT_OP vmovdqa, yword, mem, ymm(reg-IR_REG_FP_FIRST)
+					|	ASM_TMEM_TXT_OP vmovdqu, yword, mem, ymm(reg-IR_REG_FP_FIRST)
 				} else if (element_type == IR_DOUBLE) {
-					|	ASM_TMEM_TXT_OP vmovapd, yword, mem, ymm(reg-IR_REG_FP_FIRST)
+					|	ASM_TMEM_TXT_OP vmovupd, yword, mem, ymm(reg-IR_REG_FP_FIRST)
 				} else {
 					IR_ASSERT(element_type == IR_FLOAT);
-					|	ASM_TMEM_TXT_OP vmovaps, yword, mem, ymm(reg-IR_REG_FP_FIRST)
+					|	ASM_TMEM_TXT_OP vmovups, yword, mem, ymm(reg-IR_REG_FP_FIRST)
 				}
 			}
 		} else {
@@ -16761,13 +16994,16 @@ static void ir_emit_vector_splat(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					}
 				} else if (ctx->mflags & IR_X86_AVX) {
 					IR_ASSERT(width <= 32);
-					|	vshufps xmm(op1_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), 0
+					|	vshufps xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), 0
 					if (width == 32) {
 						|	vinsertf128 ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), 1
 					}
 				} else {
 					IR_ASSERT(width <= 16);
-					|	shufps xmm(op1_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), 0
+					if (op1_reg != def_reg) {
+						|	movaps xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+					}
+					|	shufps xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), 0
 				}
 			}
 		}
@@ -16972,17 +17208,24 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (op1_reg != IR_REG_NONE && IR_REG_SPILLED(op1_reg)) {
 		op1_reg = IR_REG_NUM(op1_reg);
 		ir_emit_load(ctx, type, op1_reg, op1);
-	}
-	if (def_reg != op1_reg) {
-		if (op1_reg != IR_REG_NONE) {
-			ir_emit_fp_mov(ctx, type, def_reg, op1_reg);
-		} else {
-			ir_emit_load(ctx, type, def_reg, op1);
-		}
 		if (op1 == op2) {
 			op2_reg = def_reg;
 		}
 	}
+
+	if ((IR_IS_TYPE_INT(element_type) &&
+				(insn->op != IR_LT && !(insn->op == IR_LE && ir_type_size[element_type] == 8))) ||
+			(IR_IS_TYPE_FP(element_type) &&
+				(insn->op != IR_GT && insn->op != IR_GE && insn->op != IR_ULT && insn->op != IR_ULE))) {
+		if (def_reg != op1_reg) {
+			if (op1_reg != IR_REG_NONE) {
+				ir_emit_fp_mov(ctx, type, def_reg, op1_reg);
+			} else {
+				ir_emit_load(ctx, type, def_reg, op1);
+			}
+		}
+	}
+
 	if (op2_reg != IR_REG_NONE) {
 		if (IR_REG_SPILLED(op2_reg)) {
 			op2_reg = IR_REG_NUM(op2_reg);
@@ -17084,19 +17327,51 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 				break;
 			case IR_EQ:
-				|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 				if (IR_IS_TYPE_INT(element_type)) {
-					|	ASM_SSE_INT_VEC_REG_REG_OP pcmpeq, element_type, def_reg, op2_reg
+					if (element_type == IR_I8 || element_type == IR_U8) {
+						|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+					} else if (element_type == IR_I16 || element_type == IR_U16) {
+						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+					} else if (element_type == IR_I32 || element_type == IR_U32) {
+						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
+						if (ctx->mflags & IR_X86_SSE41) {
+							|	pcmpeqq xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						} else {
+							IR_ASSERT(tmp_reg != IR_REG_NONE);
+							|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	pshufd	xmm(tmp_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), 177
+							|	pand xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						}
+					} else {
+						IR_ASSERT(0);
+					}
 				} else {
 					IR_ASSERT(IR_IS_TYPE_FP(element_type));
 					|	ASM_SSE_FP_VEC_REG_REG_TXT_OP cmpp, element_type, def_reg, op2_reg, 0
 				}
 				break;
 			case IR_NE:
-				|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 				if (IR_IS_TYPE_INT(element_type)) {
 					IR_ASSERT(tmp_reg != IR_REG_NONE);
-					|	ASM_SSE_INT_VEC_REG_REG_OP pcmpeq, element_type, def_reg, op2_reg
+					if (element_type == IR_I8 || element_type == IR_U8) {
+						|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+					} else if (element_type == IR_I16 || element_type == IR_U16) {
+						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+					} else if (element_type == IR_I32 || element_type == IR_U32) {
+						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
+						if (ctx->mflags & IR_X86_SSE41) {
+							|	pcmpeqq xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						} else {
+							IR_ASSERT(tmp_reg != IR_REG_NONE);
+							|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	pshufd	xmm(tmp_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), 177
+							|	pand xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						}
+					} else {
+						IR_ASSERT(0);
+					}
 					|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
 					|	ASM_SSE_INT_VEC_REG_REG_OP pcmpeq, element_type, def_reg, tmp_reg
 				} else {
@@ -17106,69 +17381,228 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 			case IR_LT:
 				if (IR_IS_TYPE_INT(element_type)) {
-					|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+					if (def_reg != op2_reg) {
+						IR_ASSERT(def_reg != op1_reg || op1_reg == op2_reg);
+						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+					}
+//??? pcmpgtq requires SSE4.2
 					|	ASM_SSE_INT_VEC_REG_REG_OP pcmpgt, element_type, def_reg, op1_reg
 				} else {
 					IR_ASSERT(IR_IS_TYPE_FP(element_type));
-					|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 					|	ASM_SSE_FP_VEC_REG_REG_TXT_OP cmpp, element_type, def_reg, op2_reg, 1
 				}
 				break;
 			case IR_GT:
 				if (IR_IS_TYPE_INT(element_type)) {
-					|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+//??? pcmpgtq requires SSE4.2
 					|	ASM_SSE_INT_VEC_REG_REG_OP pcmpgt, element_type, def_reg, op2_reg
 				} else {
 					IR_ASSERT(IR_IS_TYPE_FP(element_type));
-					|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+					if (def_reg != op2_reg) {
+						IR_ASSERT(def_reg != op1_reg || op1_reg == op2_reg);
+						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+					}
 					|	ASM_SSE_FP_VEC_REG_REG_TXT_OP cmpp, element_type, def_reg, op1_reg, 1
 				}
 				break;
 			case IR_LE:
 				if (IR_IS_TYPE_INT(element_type)) {
 					if (element_type == IR_I8 || element_type == IR_U8) {
-						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+//??? pminsb requires SSE4.1
 						|	pminsb xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 						|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 					} else if (element_type == IR_I16 || element_type == IR_U16) {
-						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 						|	pminsw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 					} else if (element_type == IR_I32|| element_type == IR_U32) {
-						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+//??? pminsd requires SSE4.1
 						|	pminsd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 					} else if (element_type == IR_I64 || element_type == IR_U64) {
-						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-						|	pcmpgtq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-						|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
+						IR_ASSERT(tmp_reg != IR_REG_NONE);
+//??? pcmpgtq requires SSE4.2
+						|	pcmpgtq xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
 						|	pcmpeqq xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
 					} else {
 						IR_ASSERT(0 && "unsupported vector type");
 					}
 				} else {
 					IR_ASSERT(IR_IS_TYPE_FP(element_type));
-					|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 					|	ASM_SSE_FP_VEC_REG_REG_TXT_OP cmpp, element_type, def_reg, op2_reg, 2
 				}
 				break;
 			case IR_GE:
 				if (IR_IS_TYPE_INT(element_type)) {
 					if (element_type == IR_I8 || element_type == IR_U8) {
-						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+//??? pminsb requires SSE4.1
 						|	pminsb xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 						|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 					} else if (element_type == IR_I16 || element_type == IR_U16) {
-						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 						|	pminsw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 					} else if (element_type == IR_I32|| element_type == IR_U32) {
-						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+//??? pminsd requires SSE4.1
 						|	pminsd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 					} else if (element_type == IR_I64 || element_type == IR_U64) {
-						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-						|	pcmpgtq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						IR_ASSERT(tmp_reg != IR_REG_NONE);
+						if (def_reg != op2_reg) {
+							IR_ASSERT(def_reg != op1_reg || op1_reg == op2_reg);
+							|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						}
+//??? pcmpgtq requires SSE4.2
+						|	pcmpgtq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						|	pcmpeqq xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+					} else {
+						IR_ASSERT(0 && "unsupported vector type");
+					}
+				} else {
+					IR_ASSERT(IR_IS_TYPE_FP(element_type));
+					if (def_reg != op2_reg) {
+						IR_ASSERT(def_reg != op1_reg || op1_reg == op2_reg);
+						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+					}
+					|	ASM_SSE_FP_VEC_REG_REG_TXT_OP cmpp, element_type, def_reg, op1_reg, 2
+				}
+				break;
+			case IR_ULT:
+				if (IR_IS_TYPE_INT(element_type)) {
+					IR_ASSERT(tmp_reg != IR_REG_NONE);
+					if (def_reg != op2_reg) {
+						IR_ASSERT(def_reg != op1_reg || op1_reg == op2_reg);
+						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+					}
+					if (element_type == IR_I8 || element_type == IR_U8) {
+						|	psubusb xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+					} else if (element_type == IR_I16 || element_type == IR_U16) {
+						|	psubusw xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+					} else if (element_type == IR_I32|| element_type == IR_U32) {
+//??? pminud requires SSE4.1
+						|	pminud xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
+//??? pcmpeqq requires SSE4.1
+						|	pcmpeqq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						|	psllq xmm(tmp_reg-IR_REG_FP_FIRST), 63
+						|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+//??? pcmpgtq requires SSE4.2
+						|	pcmpgtq xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+					} else {
+						IR_ASSERT(0 && "unsupported vector type");
+					}
+				} else {
+					IR_ASSERT(IR_IS_TYPE_FP(element_type));
+					if (def_reg != op2_reg) {
+						IR_ASSERT(def_reg != op1_reg || op1_reg == op2_reg);
+						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+					}
+					|	ASM_SSE_FP_VEC_REG_REG_TXT_OP cmpp, element_type, def_reg, op1_reg, 6
+				}
+				break;
+			case IR_UGT:
+				if (IR_IS_TYPE_INT(element_type)) {
+					IR_ASSERT(tmp_reg != IR_REG_NONE);
+					if (element_type == IR_I8 || element_type == IR_U8) {
+						|	psubusb xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+					} else if (element_type == IR_I16 || element_type == IR_U16) {
+						|	psubusw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+					} else if (element_type == IR_I32|| element_type == IR_U32) {
+//??? pminud requires SSE4.1
+						|	pminud xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
+//??? pcmpeqq requires SSE4.1
+						|	pcmpeqq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						|	psllq xmm(tmp_reg-IR_REG_FP_FIRST), 63
+						|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+//??? pcmpgtq requires SSE4.2
+						|	pcmpgtq xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+					} else {
+						IR_ASSERT(0 && "unsupported vector type");
+					}
+				} else {
+					IR_ASSERT(IR_IS_TYPE_FP(element_type));
+					|	ASM_SSE_FP_VEC_REG_REG_TXT_OP cmpp, element_type, def_reg, op2_reg, 6
+				}
+				break;
+			case IR_ULE:
+				if (IR_IS_TYPE_INT(element_type)) {
+					if (element_type == IR_I8 || element_type == IR_U8) {
+						|	pminub xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+					} else if (element_type == IR_I16 || element_type == IR_U16) {
+//??? pminuw requires SSE4.1
+						|	pminuw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+					} else if (element_type == IR_I32|| element_type == IR_U32) {
+//??? pminud requires SSE4.1
+						|	pminud xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
+						IR_ASSERT(tmp_reg != IR_REG_NONE);
+//??? pcmpeqq requires SSE4.1
+						|	pcmpeqq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						|	psllq xmm(tmp_reg-IR_REG_FP_FIRST), 63
+						|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+//??? pcmpgtq requires SSE4.2
+						|	pcmpgtq xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						|	pcmpeqq xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+					} else {
+						IR_ASSERT(0 && "unsupported vector type");
+					}
+				} else {
+					IR_ASSERT(IR_IS_TYPE_FP(element_type));
+					if (def_reg != op2_reg) {
+						IR_ASSERT(def_reg != op1_reg || op1_reg == op2_reg);
+						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+					}
+					|	ASM_SSE_FP_VEC_REG_REG_TXT_OP cmpp, element_type, def_reg, op1_reg, 5
+				}
+				break;
+			case IR_UGE:
+				if (IR_IS_TYPE_INT(element_type)) {
+					if (element_type == IR_I8 || element_type == IR_U8) {
+						|	pminub xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+					} else if (element_type == IR_I16 || element_type == IR_U16) {
+//??? pminuw requires SSE4.1
+						|	pminuw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+					} else if (element_type == IR_I32|| element_type == IR_U32) {
+//??? pminud requires SSE4.1
+						|	pminud xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
+						IR_ASSERT(tmp_reg != IR_REG_NONE);
+//??? pcmpeqq requires SSE4.1
+						|	pcmpeqq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						|	psllq xmm(tmp_reg-IR_REG_FP_FIRST), 63
+						|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+//??? pcmpgtq requires SSE4.2
+						|	pcmpgtq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 						|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 						|	pcmpeqq xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
 					} else {
@@ -17176,92 +17610,15 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					}
 				} else {
 					IR_ASSERT(IR_IS_TYPE_FP(element_type));
-						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-					|	ASM_SSE_FP_VEC_REG_REG_TXT_OP cmpp, element_type, def_reg, op1_reg, 2
-				}
-				break;
-			case IR_ULT:
-				if (IR_IS_TYPE_INT(element_type)) {
-//???					|	ASM_SSE_INT_VEC_REG_REG_OP pcmpgt, element_type, def_reg, op2_reg, op1_reg
-					IR_ASSERT(0 && "unsupported vector type");
-				} else {
-					IR_ASSERT(IR_IS_TYPE_FP(element_type));
-					|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-					|	ASM_SSE_FP_VEC_REG_REG_TXT_OP cmpp, element_type, def_reg, op1_reg, 6
-				}
-				break;
-			case IR_UGT:
-				if (IR_IS_TYPE_INT(element_type)) {
-//???					|	ASM_SSE_INT_VEC_REG_REG_REG_OP vpcmpgt, element_type, def_reg, op1_reg, op2_reg
-					IR_ASSERT(0 && "unsupported vector type");
-				} else {
-					IR_ASSERT(IR_IS_TYPE_FP(element_type));
-					|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-					|	ASM_SSE_FP_VEC_REG_REG_TXT_OP cmpp, element_type, def_reg, op2_reg, 6
-				}
-				break;
-			case IR_ULE:
-				if (IR_IS_TYPE_INT(element_type)) {
-					if (element_type == IR_I8 || element_type == IR_U8) {
-						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-						|	pminub xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-						|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-					} else if (element_type == IR_I16 || element_type == IR_U16) {
-						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-						|	pminuw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-					} else if (element_type == IR_I32|| element_type == IR_U32) {
-						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-						|	pminsd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-//???				} else if (element_type == IR_I64 || element_type == IR_U64) {
-//						|	vpcmpgtq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-//						|	vpxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
-//						|	vpcmpeqq xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
-					} else {
-						IR_ASSERT(0 && "unsupported vector type");
-					}
-				} else {
-					IR_ASSERT(IR_IS_TYPE_FP(element_type));
-					|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-					|	ASM_SSE_FP_VEC_REG_REG_TXT_OP cmpp, element_type, def_reg, op1_reg, 5
-				}
-				break;
-			case IR_UGE:
-				if (IR_IS_TYPE_INT(element_type)) {
-					if (element_type == IR_I8 || element_type == IR_U8) {
-						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-						|	pminub xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-						|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-					} else if (element_type == IR_I16 || element_type == IR_U16) {
-						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-						|	pminuw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-					} else if (element_type == IR_I32|| element_type == IR_U32) {
-						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-						|	pminud xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-//???				} else if (element_type == IR_I64 || element_type == IR_U64) {
-//						|	vpcmpgtq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-//						|	vpxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
-//						|	vpcmpeqq xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
-					} else {
-						IR_ASSERT(0 && "unsupported vector type");
-					}
-				} else {
-					IR_ASSERT(IR_IS_TYPE_FP(element_type));
-					|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 					|	ASM_SSE_FP_VEC_REG_REG_TXT_OP cmpp, element_type, def_reg, op2_reg, 5
 				}
 				break;
 			case IR_ORDERED:
 				IR_ASSERT(IR_IS_TYPE_FP(element_type));
-				|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 				|	ASM_SSE_FP_VEC_REG_REG_TXT_OP cmpp, element_type, def_reg, op2_reg, 7
 				break;
 			case IR_UNORDERED:
 				IR_ASSERT(IR_IS_TYPE_FP(element_type));
-				|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 				|	ASM_SSE_FP_VEC_REG_REG_TXT_OP cmpp, element_type, def_reg, op2_reg, 3
 				break;
 			case IR_SHL:
@@ -17389,6 +17746,61 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			case IR_XOR:
 				IR_ASSERT(IR_IS_TYPE_INT(element_type));
 				|	pxor xmm(def_reg-IR_REG_FP_FIRST), [=>label]
+				break;
+			case IR_EQ:
+				if (IR_IS_TYPE_INT(element_type)) {
+					if (element_type == IR_I8 || element_type == IR_U8) {
+						|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), [=>label]
+					} else if (element_type == IR_I16 || element_type == IR_U16) {
+						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), [=>label]
+					} else if (element_type == IR_I32 || element_type == IR_U32) {
+						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), [=>label]
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
+						if (ctx->mflags & IR_X86_SSE41) {
+							|	pcmpeqq xmm(def_reg-IR_REG_FP_FIRST), [=>label]
+						} else {
+							IR_ASSERT(tmp_reg != IR_REG_NONE);
+							|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), [=>label]
+							|	pshufd	xmm(tmp_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), 177
+							|	pand xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						}
+					} else {
+						IR_ASSERT(0);
+					}
+				} else {
+					IR_ASSERT(IR_IS_TYPE_FP(element_type));
+//???					|	ASM_SSE_FP_VEC_REG_TXT_TXT_OP cmpp, element_type, def_reg, [=>label], 0
+					IR_ASSERT(0);
+				}
+				break;
+			case IR_NE:
+				if (IR_IS_TYPE_INT(element_type)) {
+					IR_ASSERT(tmp_reg != IR_REG_NONE);
+					if (element_type == IR_I8 || element_type == IR_U8) {
+						|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), [=>label]
+					} else if (element_type == IR_I16 || element_type == IR_U16) {
+						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), [=>label]
+					} else if (element_type == IR_I32 || element_type == IR_U32) {
+						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), [=>label]
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
+						if (ctx->mflags & IR_X86_SSE41) {
+							|	pcmpeqq xmm(def_reg-IR_REG_FP_FIRST), [=>label]
+						} else {
+							IR_ASSERT(tmp_reg != IR_REG_NONE);
+							|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), [=>label]
+							|	pshufd	xmm(tmp_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), 177
+							|	pand xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						}
+					} else {
+						IR_ASSERT(0);
+					}
+					|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+					|	ASM_SSE_INT_VEC_REG_REG_OP pcmpeq, element_type, def_reg, tmp_reg
+				} else {
+					IR_ASSERT(IR_IS_TYPE_FP(element_type));
+//???					|	ASM_SSE_FP_VEC_REG_TXT_TXT_OP cmpp, element_type, def_reg, [=>label], 4
+					IR_ASSERT(0);
+				}
 				break;
 			case IR_SHL:
 				IR_ASSERT(IR_IS_TYPE_INT(element_type));
@@ -17520,6 +17932,59 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			case IR_XOR:
 				IR_ASSERT(IR_IS_TYPE_INT(element_type));
 				|	ASM_TXT_TMEM_OP pxor, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
+				break;
+			case IR_EQ:
+				if (IR_IS_TYPE_INT(element_type)) {
+					if (element_type == IR_I8 || element_type == IR_U8) {
+						|	ASM_TXT_TMEM_OP pcmpeqb, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
+					} else if (element_type == IR_I16 || element_type == IR_U16) {
+						|	ASM_TXT_TMEM_OP pcmpeqw, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
+					} else if (element_type == IR_I32 || element_type == IR_U32) {
+						|	ASM_TXT_TMEM_OP pcmpeqd, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
+						if (ctx->mflags & IR_X86_SSE41) {
+							|	ASM_TXT_TMEM_OP pcmpeqq, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
+						} else {
+							IR_ASSERT(tmp_reg != IR_REG_NONE);
+							|	ASM_TXT_TMEM_OP pcmpeqd, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
+							|	pshufd	xmm(tmp_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), 177
+							|	pand xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						}
+					} else {
+						IR_ASSERT(0);
+					}
+				} else {
+					IR_ASSERT(IR_IS_TYPE_FP(element_type));
+					|	ASM_SSE_FP_VEC_REG_MEM_TXT_OP cmpp, element_type, def_reg, mem, 0
+				}
+				break;
+			case IR_NE:
+				if (IR_IS_TYPE_INT(element_type)) {
+					IR_ASSERT(tmp_reg != IR_REG_NONE);
+					if (element_type == IR_I8 || element_type == IR_U8) {
+						|	ASM_TXT_TMEM_OP pcmpeqb, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
+					} else if (element_type == IR_I16 || element_type == IR_U16) {
+						|	ASM_TXT_TMEM_OP pcmpeqw, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
+					} else if (element_type == IR_I32 || element_type == IR_U32) {
+						|	ASM_TXT_TMEM_OP pcmpeqd, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
+					} else if (element_type == IR_I64 || element_type == IR_U64) {
+						if (ctx->mflags & IR_X86_SSE41) {
+							|	ASM_TXT_TMEM_OP pcmpeqq, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
+						} else {
+							IR_ASSERT(tmp_reg != IR_REG_NONE);
+							|	ASM_TXT_TMEM_OP pcmpeqd, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
+							|	pshufd	xmm(tmp_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), 177
+							|	pand xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						}
+					} else {
+						IR_ASSERT(0);
+					}
+					|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+					|	ASM_SSE_INT_VEC_REG_REG_OP pcmpeq, element_type, def_reg, tmp_reg
+				} else {
+					IR_ASSERT(IR_IS_TYPE_FP(element_type));
+					|	ASM_SSE_FP_VEC_REG_MEM_TXT_OP cmpp, element_type, def_reg, mem, 4
+				}
 				break;
 			case IR_SHL:
 				IR_ASSERT(IR_IS_TYPE_INT(element_type));
@@ -17788,48 +18253,21 @@ static void ir_emit_vector_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					|	ASM_AVX_INT_VEC_REG_REG_REG_OP vpcmpgt, element_type, width, def_reg, op1_reg, op2_reg
 				} else {
 					IR_ASSERT(IR_IS_TYPE_FP(element_type));
-					|	ASM_AVX_FP_VEC_REG_REG_REG_TXT_OP vcmpp, element_type, width, def_reg, op2_reg, op1_reg, 1
+					|	ASM_AVX_FP_VEC_REG_REG_REG_TXT_OP vcmpp, element_type, width, def_reg, op1_reg, op2_reg, 14
 				}
 				break;
 			case IR_LE:
 				if (IR_IS_TYPE_INT(element_type)) {
-					if (width == 16) {
-						if (element_type == IR_I8 || element_type == IR_U8) {
-							|	vpminsb xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-						} else if (element_type == IR_I16 || element_type == IR_U16) {
-							|	vpminsw xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-						} else if (element_type == IR_I32|| element_type == IR_U32) {
-							|	vpminsd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-						} else if (element_type == IR_I64 || element_type == IR_U64) {
-							|	vpcmpgtq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-							|	vpxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqq xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
-						} else {
-							IR_ASSERT(0 && "unsupported vector type");
-						}
+					IR_ASSERT(tmp_reg != IR_REG_NONE);
+					|	ASM_AVX_INT_VEC_REG_REG_REG_OP vpcmpgt, element_type, width, def_reg, op1_reg, op2_reg
+					if (width <= 16) {
+						|	vpxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
 					} else if (width == 32) {
-						if (element_type == IR_I8 || element_type == IR_U8) {
-							|	vpminsb ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqb ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
-						} else if (element_type == IR_I16 || element_type == IR_U16) {
-							|	vpminsw ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqw ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
-						} else if (element_type == IR_I32 || element_type == IR_U32) {
-							|	vpminsd ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqd ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
-						} else if (element_type == IR_I64 || element_type == IR_U64) {
-							|	vpcmpgtq ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
-							|	vpxor ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqq ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST)
-						} else {
-							IR_ASSERT(0 && "unsupported vector type");
-						}
+						|	vpxor ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
 					} else {
 						IR_ASSERT(0 && "unsupported vector width");
 					}
+					|	ASM_AVX_INT_VEC_REG_REG_REG_OP vpcmpeq, element_type, width, def_reg, def_reg, tmp_reg
 				} else {
 					IR_ASSERT(IR_IS_TYPE_FP(element_type));
 					|	ASM_AVX_FP_VEC_REG_REG_REG_TXT_OP vcmpp, element_type, width, def_reg, op1_reg, op2_reg, 2
@@ -17837,37 +18275,71 @@ static void ir_emit_vector_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 			case IR_GE:
 				if (IR_IS_TYPE_INT(element_type)) {
-					if (width == 16) {
+					IR_ASSERT(tmp_reg != IR_REG_NONE);
+					|	ASM_AVX_INT_VEC_REG_REG_REG_OP vpcmpgt, element_type, width, def_reg, op2_reg, op1_reg
+					if (width <= 16) {
+						|	vpxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+					} else if (width == 32) {
+						|	vpxor ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+					} else {
+						IR_ASSERT(0 && "unsupported vector width");
+					}
+					|	ASM_AVX_INT_VEC_REG_REG_REG_OP vpcmpeq, element_type, width, def_reg, def_reg, tmp_reg
+				} else {
+					IR_ASSERT(IR_IS_TYPE_FP(element_type));
+					|	ASM_AVX_FP_VEC_REG_REG_REG_TXT_OP vcmpp, element_type, width, def_reg, op1_reg, op2_reg, 13
+				}
+				break;
+			case IR_ULT:
+				if (IR_IS_TYPE_INT(element_type)) {
+					IR_ASSERT(tmp_reg != IR_REG_NONE);
+					if (width <= 16) {
 						if (element_type == IR_I8 || element_type == IR_U8) {
-							|	vpminsb xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	vpsubusb xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+							|	vpxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
 						} else if (element_type == IR_I16 || element_type == IR_U16) {
-							|	vpminsw xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	vpsubusw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+							|	vpxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
 						} else if (element_type == IR_I32|| element_type == IR_U32) {
-							|	vpminsd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	vpminud xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	vpxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
 						} else if (element_type == IR_I64 || element_type == IR_U64) {
-							|	vpcmpgtq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-							|	vpxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
-							|	vpcmpgtq xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpsllq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), 63
+							|	vpxor xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	vpxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+							|	vpcmpgtq xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
 						} else {
 							IR_ASSERT(0 && "unsupported vector type");
 						}
 					} else if (width == 32) {
 						if (element_type == IR_I8 || element_type == IR_U8) {
-							|	vpminsb ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqb ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+							|	vpsubusb ymm(def_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
+							|	vpxor ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqb ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqb ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
 						} else if (element_type == IR_I16 || element_type == IR_U16) {
-							|	vpminsw ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqw ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
-						} else if (element_type == IR_I32 || element_type == IR_U32) {
-							|	vpminsd ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqd ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+							|	vpsubusw ymm(def_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
+							|	vpxor ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqw ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqw ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+						} else if (element_type == IR_I32|| element_type == IR_U32) {
+							|	vpminud ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqd ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+							|	vpxor ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqd ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
 						} else if (element_type == IR_I64 || element_type == IR_U64) {
-							|	vpcmpgtq ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
-							|	vpxor ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST)
-							|	vpcmpgtq ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqq ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpsllq ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), 63
+							|	vpxor ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+							|	vpxor ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
+							|	vpcmpgtq ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
 						} else {
 							IR_ASSERT(0 && "unsupported vector type");
 						}
@@ -17876,22 +18348,65 @@ static void ir_emit_vector_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					}
 				} else {
 					IR_ASSERT(IR_IS_TYPE_FP(element_type));
-					|	ASM_AVX_FP_VEC_REG_REG_REG_TXT_OP vcmpp, element_type, width, def_reg, op2_reg, op1_reg, 2
-				}
-				break;
-			case IR_ULT:
-				if (IR_IS_TYPE_INT(element_type)) {
-//???					|	ASM_AVX_INT_VEC_REG_REG_REG_OP vpcmpgt, element_type, width, def_reg, op2_reg, op1_reg
-					IR_ASSERT(0 && "unsupported vector type");
-				} else {
-					IR_ASSERT(IR_IS_TYPE_FP(element_type));
 					|	ASM_AVX_FP_VEC_REG_REG_REG_TXT_OP vcmpp, element_type, width, def_reg, op2_reg, op1_reg, 6
 				}
 				break;
 			case IR_UGT:
 				if (IR_IS_TYPE_INT(element_type)) {
-//???					|	ASM_AVX_INT_VEC_REG_REG_REG_OP vpcmpgt, element_type, width, def_reg, op1_reg, op2_reg
-					IR_ASSERT(0 && "unsupported vector type");
+					IR_ASSERT(tmp_reg != IR_REG_NONE);
+					if (width <= 16) {
+						if (element_type == IR_I8 || element_type == IR_U8) {
+							|	vpsubusb xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	vpxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						} else if (element_type == IR_I16 || element_type == IR_U16) {
+							|	vpsubusw xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	vpxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						} else if (element_type == IR_I32|| element_type == IR_U32) {
+							|	vpminud xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+							|	vpxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						} else if (element_type == IR_I64 || element_type == IR_U64) {
+							|	vpcmpeqq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpsllq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), 63
+							|	vpxor xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+							|	vpxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	vpcmpgtq xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						} else {
+							IR_ASSERT(0 && "unsupported vector type");
+						}
+					} else if (width == 32) {
+						if (element_type == IR_I8 || element_type == IR_U8) {
+							|	vpsubusb ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+							|	vpxor ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqb ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqb ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+						} else if (element_type == IR_I16 || element_type == IR_U16) {
+							|	vpsubusw ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+							|	vpxor ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqw ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqw ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+						} else if (element_type == IR_I32|| element_type == IR_U32) {
+							|	vpminud ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqd ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
+							|	vpxor ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqd ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+						} else if (element_type == IR_I64 || element_type == IR_U64) {
+							|	vpcmpeqq ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpsllq ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), 63
+							|	vpxor ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
+							|	vpxor ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+							|	vpcmpgtq ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+						} else {
+							IR_ASSERT(0 && "unsupported vector type");
+						}
+					} else {
+						IR_ASSERT(0 && "unsupported vector width");
+					}
 				} else {
 					IR_ASSERT(IR_IS_TYPE_FP(element_type));
 					|	ASM_AVX_FP_VEC_REG_REG_REG_TXT_OP vcmpp, element_type, width, def_reg, op1_reg, op2_reg, 6
@@ -17899,37 +18414,46 @@ static void ir_emit_vector_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 			case IR_ULE:
 				if (IR_IS_TYPE_INT(element_type)) {
-					if (width == 16) {
+					IR_ASSERT(tmp_reg != IR_REG_NONE);
+					if (width <= 16) {
 						if (element_type == IR_I8 || element_type == IR_U8) {
-							|	vpminub xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+							|	vpminub xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 						} else if (element_type == IR_I16 || element_type == IR_U16) {
-							|	vpminuw xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+							|	vpminuw xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 						} else if (element_type == IR_I32|| element_type == IR_U32) {
-							|	vpminsd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-//???					} else if (element_type == IR_I64 || element_type == IR_U64) {
-//							|	vpcmpgtq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-//							|	vpxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
-//							|	vpcmpgtq xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
+							|	vpminud xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						} else if (element_type == IR_I64 || element_type == IR_U64) {
+							|	vpcmpeqq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpsllq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), 63
+							|	vpxor xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+							|	vpxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	vpcmpgtq xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqq xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
 						} else {
 							IR_ASSERT(0 && "unsupported vector type");
 						}
 					} else if (width == 32) {
 						if (element_type == IR_I8 || element_type == IR_U8) {
-							|	vpminub ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqb ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
+							|	vpminub ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqb ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
 						} else if (element_type == IR_I16 || element_type == IR_U16) {
-							|	vpminuw ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqw ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
+							|	vpminuw ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqw ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
 						} else if (element_type == IR_I32 || element_type == IR_U32) {
-							|	vpminud ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqd ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
-//???					} else if (element_type == IR_I64 || element_type == IR_U64) {
-//							|	vpcmpgtq ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
-//							|	vpxor ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST)
-//							|	vpcmpgtq ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST)
+							|	vpminud ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqd ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
+						} else if (element_type == IR_I64 || element_type == IR_U64) {
+							|	vpcmpeqq ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpsllq ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), 63
+							|	vpxor ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
+							|	vpxor ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+							|	vpcmpgtq ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpxor ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqq ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
 						} else {
 							IR_ASSERT(0 && "unsupported vector type");
 						}
@@ -17943,37 +18467,46 @@ static void ir_emit_vector_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 			case IR_UGE:
 				if (IR_IS_TYPE_INT(element_type)) {
-					if (width == 16) {
+					IR_ASSERT(tmp_reg != IR_REG_NONE);
+					if (width <= 16) {
 						if (element_type == IR_I8 || element_type == IR_U8) {
-							|	vpminub xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	vpminub xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 						} else if (element_type == IR_I16 || element_type == IR_U16) {
-							|	vpminuw xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	vpminuw xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 						} else if (element_type == IR_I32|| element_type == IR_U32) {
-							|	vpminud xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-//???					} else if (element_type == IR_I64 || element_type == IR_U64) {
-//							|	vpcmpgtq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-//							|	vpxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
-//							|	vpxor xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
+							|	vpminud xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						} else if (element_type == IR_I64 || element_type == IR_U64) {
+							|	vpcmpeqq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpsllq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), 63
+							|	vpxor xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	vpxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+							|	vpcmpgtq xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqq xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
 						} else {
 							IR_ASSERT(0 && "unsupported vector type");
 						}
 					} else if (width == 32) {
 						if (element_type == IR_I8 || element_type == IR_U8) {
-							|	vpminub ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqb ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+							|	vpminub ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqb ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
 						} else if (element_type == IR_I16 || element_type == IR_U16) {
-							|	vpminuw ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqw ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+							|	vpminuw ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqw ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
 						} else if (element_type == IR_I32 || element_type == IR_U32) {
-							|	vpminud ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
-							|	vpcmpeqd ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
-//???					} else if (element_type == IR_I64 || element_type == IR_U64) {
-//							|	vpcmpgtq ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
-//							|	vpxor ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST)
-//							|	vpxor ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST)
+							|	vpminud ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqd ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+						} else if (element_type == IR_I64 || element_type == IR_U64) {
+							|	vpcmpeqq ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpsllq ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), 63
+							|	vpxor ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op2_reg-IR_REG_FP_FIRST)
+							|	vpxor ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
+							|	vpcmpgtq ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpxor ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+							|	vpcmpeqq ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
 						} else {
 							IR_ASSERT(0 && "unsupported vector type");
 						}
@@ -18220,6 +18753,33 @@ static void ir_emit_vector_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					IR_ASSERT(0 && "unsupported vector width");
 				}
 				break;
+			case IR_EQ:
+				if (IR_IS_TYPE_INT(element_type)) {
+					|	ASM_AVX_INT_VEC_REG_REG_TXT_OP vpcmpeq, element_type, width, def_reg, op1_reg, [=>label]
+				} else {
+					IR_ASSERT(IR_IS_TYPE_FP(element_type));
+//???					|	ASM_AVX_FP_VEC_REG_REG_TXT_TXT_OP vcmpp, element_type, width, def_reg, op1_reg, [=>label], 0
+					IR_ASSERT(0);
+				}
+				break;
+			case IR_NE:
+				if (IR_IS_TYPE_INT(element_type)) {
+					IR_ASSERT(tmp_reg != IR_REG_NONE);
+					|	ASM_AVX_INT_VEC_REG_REG_TXT_OP vpcmpeq, element_type, width, def_reg, op1_reg, [=>label]
+					if (width == 16) {
+						|	vpxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+					} else if (width == 32) {
+						|	vpxor ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+					} else {
+						IR_ASSERT(0 && "unsupported vector width");
+					}
+					|	ASM_AVX_INT_VEC_REG_REG_REG_OP vpcmpeq, element_type, width, def_reg, def_reg, tmp_reg
+				} else {
+					IR_ASSERT(IR_IS_TYPE_FP(element_type));
+//???					|	ASM_AVX_FP_VEC_REG_REG_TXT_TXT_OP vcmpp, element_type, width, def_reg, op1_reg, [=>label], 4
+					IR_ASSERT(0);
+				}
+				break;
 			case IR_SHL:
 				IR_ASSERT(IR_IS_TYPE_INT(element_type));
 				if (width == 16) {
@@ -18462,6 +19022,31 @@ static void ir_emit_vector_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				} else {
 					IR_ASSERT(IR_IS_TYPE_FP(element_type));
 					|	ASM_AVX_FP_VEC_REG_REG_MEM_OP vxorp, element_type, width, def_reg, op1_reg, mem
+				}
+				break;
+			case IR_EQ:
+				if (IR_IS_TYPE_INT(element_type)) {
+					|	ASM_AVX_INT_VEC_REG_REG_MEM_OP vpcmpeq, element_type, width, def_reg, op1_reg, mem
+				} else {
+					IR_ASSERT(IR_IS_TYPE_FP(element_type));
+					|	ASM_AVX_FP_VEC_REG_REG_MEM_TXT_OP vcmpp, element_type, width, def_reg, op1_reg, mem, 0
+				}
+				break;
+			case IR_NE:
+				if (IR_IS_TYPE_INT(element_type)) {
+					IR_ASSERT(tmp_reg != IR_REG_NONE);
+					|	ASM_AVX_INT_VEC_REG_REG_MEM_OP vpcmpeq, element_type, width, def_reg, op1_reg, mem
+					if (width == 16) {
+						|	vpxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+					} else if (width == 32) {
+						|	vpxor ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST), ymm(tmp_reg-IR_REG_FP_FIRST)
+					} else {
+						IR_ASSERT(0 && "unsupported vector width");
+					}
+					|	ASM_AVX_INT_VEC_REG_REG_REG_OP vpcmpeq, element_type, width, def_reg, def_reg, tmp_reg
+				} else {
+					IR_ASSERT(IR_IS_TYPE_FP(element_type));
+					|	ASM_AVX_FP_VEC_REG_REG_MEM_TXT_OP vcmpp, element_type, width, def_reg, op1_reg, mem, 4
 				}
 				break;
 			case IR_SHL:
