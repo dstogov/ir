@@ -1755,6 +1755,9 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 	const ir_proto_t *proto;
 	const ir_call_conv_dsc *cc;
 	ir_ref next;
+#if IR_SIMD
+	ir_type type;
+#endif
 
 	constraints->def_reg = IR_REG_NONE;
 	constraints->hints_count = 0;
@@ -2516,62 +2519,68 @@ get_arg_hints:
 			break;
 		case IR_VECTOR_BINOP_SSE2:
 			insn = &ctx->ir_base[ref];
+			if (insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
+				type = ctx->ir_base[insn->op1].type;
+			} else {
+				type = insn->type;
+			}
+
 			if (IR_IS_CONST_REF(insn->op1)) {
-				constraints->tmp_regs[0] = IR_TMP_REG(1, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				constraints->tmp_regs[0] = IR_TMP_REG(1, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 				n = 1;
 			}
-			if (IR_VECTOR_SIZE(insn->type) == 16) {
+			if (IR_VECTOR_SIZE(type) == 16) {
 				flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 				if (IR_IS_CONST_REF(insn->op2) &&
 						insn->op >= IR_LE && insn->op <= IR_UGT) {
 					// TODO: vector comparison may require the second oprand in the register ???
-					constraints->tmp_regs[n] = IR_TMP_REG(2, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+					constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
 				} else if (IR_IS_CONST_REF(insn->op2) &&
-						IR_IS_TYPE_FP(IR_VECTOR_BASE_TYPE(insn->type)) &&
+						IR_IS_TYPE_FP(IR_VECTOR_BASE_TYPE(type)) &&
 						insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
 					// TODO: workaroud against DynASM limitation: "rip-relative displacement followed by immediate" ???
-					constraints->tmp_regs[n] = IR_TMP_REG(2, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+					constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
 				}
 			} else {
 				flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
 				if (IR_IS_CONST_REF(insn->op2)) {
-					constraints->tmp_regs[n] = IR_TMP_REG(2, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+					constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
 				}
 			}
-			if (IR_IS_TYPE_INT(IR_VECTOR_BASE_TYPE(insn->type))) {
+			if (IR_IS_TYPE_INT(IR_VECTOR_BASE_TYPE(type))) {
 				if (insn->op == IR_NE ||
 						(insn->op == IR_EQ &&
-						 ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] == 8 &&
+						 ir_type_size[IR_VECTOR_BASE_TYPE(type)] == 8 &&
 						 !(ctx->mflags & IR_X86_SSE41))) {
-					constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
+					constraints->tmp_regs[n] = IR_TMP_REG(3, type, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
 					n++;
 				} else if ((insn->op == IR_LE || insn->op == IR_GE) &&
-						 ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] == 8) {
-					constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
+						 ir_type_size[IR_VECTOR_BASE_TYPE(type)] == 8) {
+					constraints->tmp_regs[n] = IR_TMP_REG(3, type, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
 					n++;
 				} else if ((insn->op == IR_ULE || insn->op == IR_UGE) &&
-						 ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] == 8) {
-					constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
+						 ir_type_size[IR_VECTOR_BASE_TYPE(type)] == 8) {
+					constraints->tmp_regs[n] = IR_TMP_REG(3, type, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 					n++;
 				} else if (insn->op == IR_ULT || insn->op == IR_UGT) {
-					constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
+					constraints->tmp_regs[n] = IR_TMP_REG(3, type, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 					n++;
 				}
 				if (insn->op == IR_LT ||
-						(insn->op == IR_GE && ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] == 8) ||
+						(insn->op == IR_GE && ir_type_size[IR_VECTOR_BASE_TYPE(type)] == 8) ||
 						insn->op == IR_ULT) {
 					flags &= ~IR_DEF_REUSES_OP1_REG;
 					// TODO: DEF_MAY_REUSE_OP2 ???
 					flags |= IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
-				} else if (insn->op == IR_UGT && ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] == 4) {
+				} else if (insn->op == IR_UGT && ir_type_size[IR_VECTOR_BASE_TYPE(type)] == 4) {
 					flags &= ~IR_DEF_REUSES_OP1_REG;
 					// TODO: DEF_MAY_REUSE_OP2 ???
 					flags |= IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
 				} else if ((insn->op == IR_LE || insn->op == IR_ULT || insn->op == IR_ULE) &&
-						ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] != 8) {
+						ir_type_size[IR_VECTOR_BASE_TYPE(type)] != 8) {
 					flags &= ~IR_DEF_REUSES_OP1_REG;
 					// TODO: DEF_MAY_REUSE_OP2 ???
 					flags |= IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
@@ -2586,43 +2595,49 @@ get_arg_hints:
 			break;
 		case IR_VECTOR_BINOP_AVX:
 			insn = &ctx->ir_base[ref];
+			if (insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
+				type = ctx->ir_base[insn->op1].type;
+			} else {
+				type = insn->type;
+			}
+
 			if (IR_IS_CONST_REF(insn->op1)) {
-				constraints->tmp_regs[0] = IR_TMP_REG(1, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				constraints->tmp_regs[0] = IR_TMP_REG(1, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 				n = 1;
 			}
-			if (IR_VECTOR_SIZE(insn->type) == 16 || IR_VECTOR_SIZE(insn->type) == 32) {
+			if (IR_VECTOR_SIZE(type) == 16 || IR_VECTOR_SIZE(type) == 32) {
 				flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 				if (IR_IS_CONST_REF(insn->op2) &&
 						insn->op >= IR_LE && insn->op <= IR_UGT) {
 					// TODO: vector comparison may require the second oprand in the register ???
-					constraints->tmp_regs[n] = IR_TMP_REG(2, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+					constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
 				} else if (IR_IS_CONST_REF(insn->op2) &&
-						IR_IS_TYPE_FP(IR_VECTOR_BASE_TYPE(insn->type)) &&
+						IR_IS_TYPE_FP(IR_VECTOR_BASE_TYPE(type)) &&
 						insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
 					// TODO: workaroud against DynASM limitation: "rip-relative displacement followed by immediate" ???
-					constraints->tmp_regs[n] = IR_TMP_REG(2, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+					constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
 				}
 			} else {
 				flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
 				if (IR_IS_CONST_REF(insn->op2)) {
-					constraints->tmp_regs[n] = IR_TMP_REG(2, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+					constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
 				}
 			}
-			if (IR_IS_TYPE_INT(IR_VECTOR_BASE_TYPE(insn->type))) {
+			if (IR_IS_TYPE_INT(IR_VECTOR_BASE_TYPE(type))) {
 				if ((insn->op == IR_UGT || insn->op == IR_ULT || insn->op == IR_UGE || insn->op == IR_ULE) &&
-						ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] == 8) {
+						ir_type_size[IR_VECTOR_BASE_TYPE(type)] == 8) {
 					flags |= IR_DEF_CONFLICTS_WITH_INPUT_REGS;
-					constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
+					constraints->tmp_regs[n] = IR_TMP_REG(3, type, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 					n++;
 				} else if ((insn->op == IR_UGT || insn->op == IR_ULT) &&
-						ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] == 4) {
-					constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
+						ir_type_size[IR_VECTOR_BASE_TYPE(type)] == 4) {
+					constraints->tmp_regs[n] = IR_TMP_REG(3, type, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 					n++;
 				} else if (insn->op == IR_UGE || insn->op == IR_ULE) {
-					constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+					constraints->tmp_regs[n] = IR_TMP_REG(3, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
 				} else if (insn->op == IR_NE ||
 						insn->op == IR_GE ||
@@ -2630,9 +2645,9 @@ get_arg_hints:
 						insn->op == IR_UGT ||
 						insn->op == IR_ULT ||
 						(insn->op == IR_EQ &&
-						 ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] == 8 &&
+						 ir_type_size[IR_VECTOR_BASE_TYPE(type)] == 8 &&
 						 !(ctx->mflags & IR_X86_SSE41))) {
-					constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
+					constraints->tmp_regs[n] = IR_TMP_REG(3, type, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
 					n++;
 				}
 			}
@@ -17235,11 +17250,17 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg tmp_reg = ctx->regs[def][3];
 
 	IR_ASSERT(IR_IS_TYPE_VECTOR(type));
+	if (insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
+		type = ctx->ir_base[op1].type;
+		IR_ASSERT(type == ctx->ir_base[op2].type);
+	} else {
+		IR_ASSERT(type == ctx->ir_base[op1].type && type == ctx->ir_base[op2].type);
+	}
+
 	element_type = IR_VECTOR_BASE_TYPE(type);
 	width = IR_VECTOR_SIZE(type);
 
 	IR_ASSERT(width <= 16);
-	IR_ASSERT(type == ctx->ir_base[op1].type && type == ctx->ir_base[op2].type);
 	IR_ASSERT(def_reg != IR_REG_NONE);
 
 	if (op1_reg != IR_REG_NONE && IR_REG_SPILLED(op1_reg)) {
@@ -17251,7 +17272,7 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 
 	if ((IR_IS_TYPE_INT(element_type) &&
-				(insn->op != IR_LT && !(insn->op == IR_LE && ir_type_size[element_type] == 8))) ||
+				insn->op != IR_LT) ||
 			(IR_IS_TYPE_FP(element_type) &&
 				(insn->op != IR_GT && insn->op != IR_GE && insn->op != IR_ULT && insn->op != IR_ULE))) {
 		if (def_reg != op1_reg) {
@@ -18094,7 +18115,16 @@ static void ir_emit_vector_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	element_type = IR_VECTOR_BASE_TYPE(type);
 	width = IR_VECTOR_SIZE(type);
 
-	IR_ASSERT(type == ctx->ir_base[op1].type && type == ctx->ir_base[op2].type);
+	if (insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
+		type = ctx->ir_base[op1].type;
+		IR_ASSERT(type == ctx->ir_base[op2].type);
+	} else {
+		IR_ASSERT(type == ctx->ir_base[op1].type && type == ctx->ir_base[op2].type);
+	}
+
+	element_type = IR_VECTOR_BASE_TYPE(type);
+	width = IR_VECTOR_SIZE(type);
+
 	IR_ASSERT(def_reg != IR_REG_NONE && op1_reg != IR_REG_NONE);
 	if (IR_REG_SPILLED(op1_reg)) {
 		op1_reg = IR_REG_NUM(op1_reg);
