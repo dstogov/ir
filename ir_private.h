@@ -1526,7 +1526,7 @@ typedef struct {
 	int8_t      def_reg;
 	uint8_t     tmps_count;
 	uint8_t     hints_count;
-	ir_tmp_reg  tmp_regs[3];
+	ir_tmp_reg  tmp_regs[4];
 	int8_t      hints[IR_MAX_REG_ARGS + 3];
 } ir_target_constraints;
 

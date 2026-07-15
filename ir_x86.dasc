@@ -2490,6 +2490,10 @@ get_arg_hints:
 					n++;
 				}
 			}
+			if (!IR_IS_CONST_REF(insn->op2)) {
+				/* extract though stack */
+				ctx->flags2 |= IR_16B_FRAME_ALIGNMENT;
+			}
 			break;
 		case IR_REPLACE:
 			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_MUST_BE_IN_REG | IR_OP3_MUST_BE_IN_REG;
@@ -2506,6 +2510,36 @@ get_arg_hints:
 				constraints->tmp_regs[n] = IR_TMP_REG(2, IR_DOUBLE, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 				n++;
 			}
+			if (!IR_IS_CONST_REF(insn->op2) ||
+					(ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] == 1 &&
+						!(ctx->mflags & (IR_X86_SSE42|IR_X86_AVX)))) {
+				/* replace though stack */
+				ctx->flags2 |= IR_16B_FRAME_ALIGNMENT;
+			}
+			break;
+		case IR_SHUFFLE:
+			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG | IR_OP3_MUST_BE_IN_REG;
+			insn = &ctx->ir_base[ref];
+			if (IR_IS_CONST_REF(insn->op1)) {
+				constraints->tmp_regs[n] = IR_TMP_REG(1, ctx->ir_base[insn->op1].type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n++;
+			}
+			if (IR_IS_CONST_REF(insn->op2)) {
+				constraints->tmp_regs[n] = IR_TMP_REG(2, ctx->ir_base[insn->op2].type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n++;
+			}
+			if (IR_IS_TYPE_INT(IR_VECTOR_BASE_TYPE(insn->type)) || !IR_IS_CONST_REF(insn->op3)) {
+				// TODO: hardcoded register ???
+				constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_RAX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
+				n++;
+			}
+			if (IR_IS_TYPE_FP(IR_VECTOR_BASE_TYPE(insn->type))) {
+				// TODO: hardcoded register ???
+				constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_XMM0, IR_USE_SUB_REF, IR_DEF_SUB_REF);
+				n++;
+			}
+			/* shuffle though stack */
+			ctx->flags2 |= IR_16B_FRAME_ALIGNMENT;
 			break;
 		case IR_VECTOR_OP:
 			insn = &ctx->ir_base[ref];
@@ -16559,7 +16593,10 @@ static void ir_emit_vector_extract(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					if (lane == 1) {
 						|	pshufd xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), 85
 					} else if (lane == 2) {
-						|	punpckhdq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						if (op1_reg != tmp_reg) {
+							|	movapd xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						}
+						|	punpckhdq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
 					} else if (lane == 3) {
 						|	pshufd xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), 255
 					} else {
@@ -16626,7 +16663,10 @@ static void ir_emit_vector_extract(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					if (ctx->mflags & IR_X86_AVX) {
 						|	vunpckhpd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 					} else {
-						|	unpckhpd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						if (def_reg != op1_reg) {
+							|	movapd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						}
+						|	unpckhpd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					}
 				} else {
 					IR_ASSERT(0);
@@ -16668,7 +16708,26 @@ static void ir_emit_vector_extract(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 		}
 	} else {
-		IR_ASSERT(0 && "EXTRACT with non-constant index NIY");
+		ir_reg op2_reg = ctx->regs[def][2];
+
+		IR_ASSERT(op2_reg != IR_REG_NONE);
+
+		if (IR_REG_SPILLED(op2_reg)) {
+			op2_reg = IR_REG_NUM(op2_reg);
+			ir_emit_load(ctx, element_type, op2_reg, insn->op2);
+		}
+
+		if (0) {
+			// TODO: add optimized SSE4/AVX code ???
+		} else {
+			/* extract through stack memory */
+			int offset = -width;
+			ir_mem mem = IR_MEM(IR_REG_RSP, offset, IR_REG_NONE, 1);
+			ir_mem mem2 = IR_MEM(IR_REG_RSP, offset, op2_reg, 1);
+
+			ir_emit_store_mem_fp(ctx, insn->type, mem, op1_reg);
+			ir_emit_load_mem(ctx, element_type, def_reg, mem2);
+		}
 	}
 
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
@@ -16755,7 +16814,7 @@ static void ir_emit_vector_replace(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					|	pinsrb xmm(tmp_reg-IR_REG_FP_FIRST), Rd(op3_reg), (lane%16)
 				} else {
 					/* modify through stack memory */
-					int offset = 16 + sizeof(void*);
+					int offset = sizeof(void*);
 
 					|	movdqu [Ra(IR_REG_RSP)-offset], xmm(tmp_reg-IR_REG_FP_FIRST)
 					|	mov [Ra(IR_REG_RSP)-(offset-(lane%16))], Rb(op3_reg)
@@ -16870,7 +16929,31 @@ static void ir_emit_vector_replace(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 		}
 	} else {
-		IR_ASSERT(0 && "REPLACE with non-constant index NIY");
+		ir_reg op2_reg = ctx->regs[def][2];
+
+		IR_ASSERT(op2_reg != IR_REG_NONE);
+
+		if (IR_REG_SPILLED(op2_reg)) {
+			op3_reg = IR_REG_NUM(op2_reg);
+			ir_emit_load(ctx, element_type, op2_reg, insn->op2);
+		}
+
+		if (0) {
+			// TODO: add optimized SSE4/AVX code ???
+		} else {
+			/* modify through stack memory */
+			int offset = -width;
+			ir_mem mem = IR_MEM(IR_REG_RSP, offset, IR_REG_NONE, 1);
+			ir_mem mem2 = IR_MEM(IR_REG_RSP, offset, op2_reg, 1);
+
+			ir_emit_store_mem_fp(ctx, insn->type, mem, op1_reg);
+			if (IR_IS_TYPE_INT(element_type)) {
+				ir_emit_store_mem_int(ctx, element_type, mem2, op3_reg);
+			} else {
+				ir_emit_store_mem_fp(ctx, element_type, mem2, op3_reg);
+			}
+			ir_emit_load_mem_fp(ctx, insn->type, def_reg, mem);
+		}
 	}
 
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
@@ -17061,6 +17144,151 @@ static void ir_emit_vector_splat(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 	} else {
 		IR_ASSERT(0);
+	}
+
+	if (IR_REG_SPILLED(ctx->regs[def][0])) {
+		ir_emit_store(ctx, insn->type, def, def_reg);
+	}
+}
+
+static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+//	ir_backend_data *data = ctx->data;
+//	dasm_State **Dst = &data->dasm_state;
+	ir_type type = insn->type;
+	ir_type element_type;
+	uint32_t element_size;
+	uint32_t width;
+	ir_reg op1_reg = ctx->regs[def][1];
+	ir_reg op2_reg = ctx->regs[def][2];
+	ir_reg op3_reg = ctx->regs[def][3];
+	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
+
+	IR_ASSERT(IR_IS_TYPE_VECTOR(type) && IR_IS_TYPE_VECTOR(ctx->ir_base[insn->op3].type));
+
+	element_type = IR_VECTOR_BASE_TYPE(type);
+	element_size = ir_type_size[element_type];
+	width = IR_VECTOR_SIZE(type);
+
+	IR_ASSERT(IR_IS_TYPE_VECTOR(ctx->ir_base[insn->op1].type)
+		&& element_type == IR_VECTOR_BASE_TYPE(ctx->ir_base[insn->op1].type));
+	IR_ASSERT(IR_IS_TYPE_VECTOR(ctx->ir_base[insn->op3].type)
+		&& element_type == IR_VECTOR_BASE_TYPE(ctx->ir_base[insn->op2].type));
+
+	IR_ASSERT(def_reg != IR_REG_NONE && op1_reg != IR_REG_NONE);
+
+//	len = IR_VECTOR_LENGTH(ctx->ir_base[insn->op3].type);
+//	mask_type = IR_VECTOR_BASE_TYPE(ctx->ir_base[insn->op3].type);
+//	mask_ptr = ir_long_const_ptr(ctx, insn->op3);
+//
+//	IR_ASSERT(len * ir_type_size[element_type] == width);
+
+	if (IR_REG_SPILLED(op1_reg)) {
+		op1_reg = IR_REG_NUM(op1_reg);
+		ir_emit_load(ctx, type, op1_reg, insn->op1);
+	}
+
+	if (insn->op1 == insn->op2) {
+		op2_reg = op1_reg;
+	} else {
+		IR_ASSERT(op2_reg != IR_REG_NONE);
+		if (IR_REG_SPILLED(op2_reg)) {
+			op2_reg = IR_REG_NUM(op2_reg);
+			ir_emit_load(ctx, type, op2_reg, insn->op2);
+		}
+	}
+
+	if (0) {
+		// TODO: add optimized SSE4/AVX code ???
+	} else {
+		/* shuffle through stack memory */
+		ir_type mask_type = ctx->ir_base[insn->op3].type;
+		ir_type mask_element_type = IR_VECTOR_BASE_TYPE(mask_type);
+		uint32_t mask_element_size = ir_type_size[mask_element_type];
+		uint32_t mask_len = IR_VECTOR_LENGTH(mask_type);
+		int dst_offset = -width;
+		int src_offset = dst_offset;
+		uint32_t mod = 0;
+		ir_reg tmp_reg = IR_IS_TYPE_INT(element_type) ? IR_REG_RAX : IR_REG_XMM0; // TODO: hardcoded registetrs ???
+
+		if (insn->op1 != insn->op2) {
+			if (IR_REG_SPILLED(op2_reg)) {
+				op2_reg = IR_REG_NUM(op2_reg);
+				ir_emit_load(ctx, type, op2_reg, insn->op2);
+			}
+			src_offset -= IR_VECTOR_SIZE(ctx->ir_base[insn->op2].type);
+			mod += IR_VECTOR_LENGTH(ctx->ir_base[insn->op2].type);
+			ir_emit_store_mem_fp(ctx, ctx->ir_base[insn->op2].type,
+				IR_MEM(IR_REG_RSP, src_offset, IR_REG_NONE, 1), op2_reg);
+		}
+		src_offset -= IR_VECTOR_SIZE(ctx->ir_base[insn->op1].type);
+		mod += IR_VECTOR_LENGTH(ctx->ir_base[insn->op1].type);
+		ir_emit_store_mem_fp(ctx, ctx->ir_base[insn->op1].type,
+			IR_MEM(IR_REG_RSP, src_offset, IR_REG_NONE, 1), op1_reg);
+
+		if (IR_IS_CONST_REF(insn->op3)) {
+			void *ptr = ir_long_const_ptr(ctx, insn->op3);
+			uint32_t i, j;
+
+			for (i = 0; i < mask_len; i++) {
+				ir_mem src, dst;
+
+				if (mask_element_size == 1) {
+					j = *(uint8_t*)ptr;
+					ptr = ((uint8_t*)ptr) + 1;
+				} else if (mask_element_size == 2) {
+					j = *(uint16_t*)ptr;
+					ptr = ((uint16_t*)ptr) + 1;
+				} else if (mask_element_size == 4) {
+					j = *(uint32_t*)ptr;
+					ptr = ((uint32_t*)ptr) + 1;
+				} else if (mask_element_size == 8) {
+					j = *(uint64_t*)ptr;
+					ptr = ((uint64_t*)ptr) + 1;
+				} else {
+					IR_ASSERT(0);
+				}
+				src = IR_MEM(IR_REG_RSP, src_offset + (j % mod) * element_size, IR_REG_NONE, 1);
+				dst = IR_MEM(IR_REG_RSP, dst_offset + i * element_size, IR_REG_NONE, 1);
+				if (IR_IS_TYPE_INT(element_type)) {
+					ir_emit_load_mem_int(ctx, element_type, tmp_reg, src);
+					ir_emit_store_mem_int(ctx, element_type, dst, tmp_reg);
+				} else {
+					ir_emit_load_mem_fp(ctx, element_type, tmp_reg, src);
+					ir_emit_store_mem_fp(ctx, element_type, dst, tmp_reg);
+				}
+			}
+		} else if (op3_reg != IR_REG_NONE) {
+			int mask_offset = src_offset - IR_VECTOR_SIZE(mask_type);
+			uint32_t i;
+			ir_reg idx_reg = IR_REG_RAX; // TODO: hardcoded registetrs ???
+
+			if (IR_REG_SPILLED(op3_reg)) {
+				op2_reg = IR_REG_NUM(op3_reg);
+				ir_emit_load(ctx, type, op3_reg, insn->op3);
+			}
+			ir_emit_store_mem_fp(ctx, mask_type, IR_MEM(IR_REG_RSP, mask_offset, IR_REG_NONE, 1), op3_reg);
+
+			for (i = 0; i < mask_len; i++) {
+				ir_mem src, dst;
+
+				src = IR_MEM(IR_REG_RSP, mask_offset + i * mask_element_size, IR_REG_NONE, 1);
+				ir_emit_load_mem_int(ctx, element_type, idx_reg, src);
+				src = IR_MEM(IR_REG_RSP, src_offset, idx_reg, element_size);
+				dst = IR_MEM(IR_REG_RSP, dst_offset + i * element_size, IR_REG_NONE, 1);
+				if (IR_IS_TYPE_INT(element_type)) {
+					ir_emit_load_mem_int(ctx, element_type, tmp_reg, src);
+					ir_emit_store_mem_int(ctx, element_type, dst, tmp_reg);
+				} else {
+					ir_emit_load_mem_fp(ctx, element_type, tmp_reg, src);
+					ir_emit_store_mem_fp(ctx, element_type, dst, tmp_reg);
+				}
+			}
+		} else {
+			IR_ASSERT(0 && "NIY: SHUFFLE/MEM");
+		}
+
+		ir_emit_load_mem_fp(ctx, insn->type, def_reg, IR_MEM(IR_REG_RSP, dst_offset, IR_REG_NONE, 1));
 	}
 
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
@@ -21081,6 +21309,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					break;
 				case IR_SPLAT:
 					ir_emit_vector_splat(ctx, i, insn);
+					break;
+				case IR_SHUFFLE:
+					ir_emit_vector_shuffle(ctx, i, insn);
 					break;
 				case IR_VECTOR_OP:
 					ir_emit_vector_op(ctx, i, insn);
