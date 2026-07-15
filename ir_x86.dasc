@@ -11933,7 +11933,7 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn, const ir_call_conv
 		} else {
 			IR_ASSERT(IR_IS_TYPE_FP(type) || IR_IS_TYPE_VECTOR(type));
 			if (fp_param >= cc->fp_param_regs_count) {
-				used_stack += IR_MAX(sizeof(void*), ir_type_size[type]);
+				used_stack += IR_MAX(sizeof(void*), ir_get_type_size(type));
 			}
 			fp_param++;
 			if (cc->shadow_param_regs) {
