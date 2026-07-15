@@ -2523,6 +2523,11 @@ get_arg_hints:
 			if (IR_VECTOR_SIZE(insn->type) == 16) {
 				flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 				if (IR_IS_CONST_REF(insn->op2) &&
+						insn->op >= IR_LE && insn->op <= IR_UGT) {
+					// TODO: vector comparison may require the second oprand in the register ???
+					constraints->tmp_regs[n] = IR_TMP_REG(2, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+					n++;
+				} else if (IR_IS_CONST_REF(insn->op2) &&
 						IR_IS_TYPE_FP(IR_VECTOR_BASE_TYPE(insn->type)) &&
 						insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
 					// TODO: workaroud against DynASM limitation: "rip-relative displacement followed by immediate" ???
@@ -2588,6 +2593,11 @@ get_arg_hints:
 			if (IR_VECTOR_SIZE(insn->type) == 16 || IR_VECTOR_SIZE(insn->type) == 32) {
 				flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 				if (IR_IS_CONST_REF(insn->op2) &&
+						insn->op >= IR_LE && insn->op <= IR_UGT) {
+					// TODO: vector comparison may require the second oprand in the register ???
+					constraints->tmp_regs[n] = IR_TMP_REG(2, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+					n++;
+				} else if (IR_IS_CONST_REF(insn->op2) &&
 						IR_IS_TYPE_FP(IR_VECTOR_BASE_TYPE(insn->type)) &&
 						insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
 					// TODO: workaroud against DynASM limitation: "rip-relative displacement followed by immediate" ???
