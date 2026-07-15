@@ -1854,7 +1854,11 @@ IR_FOLD(EXTRACT(LONG_CONST, _))
 		uint32_t idx = op2_insn->val.u32;
 		void *ptr;
 
-		IR_ASSERT(IR_IS_TYPE_VECTOR(op1_insn->type) && IR_VECTOR_BASE_TYPE(op1_insn->type) == IR_OPT_TYPE(opt));
+		IR_ASSERT(IR_IS_TYPE_VECTOR(op1_insn->type)
+			&& (IR_VECTOR_BASE_TYPE(op1_insn->type) == IR_OPT_TYPE(opt)
+				|| (IR_IS_TYPE_INT(IR_VECTOR_BASE_TYPE(op1_insn->type))
+					&& IR_IS_TYPE_INT(IR_OPT_TYPE(opt))
+					&& ir_type_size[IR_VECTOR_BASE_TYPE(op1_insn->type)] == ir_type_size[IR_OPT_TYPE(opt)])));
 		ptr = (uint8_t*)ir_long_const_ptr(ctx, op1);
 		switch (IR_OPT_TYPE(opt)) {
 			case IR_CHAR:
