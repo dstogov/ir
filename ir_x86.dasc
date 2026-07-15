@@ -4688,6 +4688,18 @@ static void ir_emit_load_mem_int(ir_ctx *ctx, ir_type type, ir_reg reg, ir_mem m
 	|	ASM_REG_MEM_OP mov, type, reg, mem
 }
 
+#if IR_SIMD
+static bool ir_is_zero_vector(const void * p, uint32_t size, uint32_t width)
+{
+	while (width > 0) {
+		if (*(uint8_t*)p != 0) return 0;
+		p = (uint8_t*)p + 1;
+		width--;
+	}
+	return 1;
+}
+#endif
+
 static void ir_emit_load_imm_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref src)
 {
 	ir_backend_data *data = ctx->data;
@@ -4707,12 +4719,26 @@ static void ir_emit_load_imm_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref sr
 		} else {
 			|	xorpd xmm(reg-IR_REG_FP_FIRST), xmm(reg-IR_REG_FP_FIRST)
 		}
-	} else {
-		label = ir_get_const_label(ctx, src);
 #if IR_SIMD
-		if (IR_IS_TYPE_VECTOR(type)) {
-			ir_type element_type = IR_VECTOR_BASE_TYPE(type);
-			uint32_t width = IR_VECTOR_SIZE(type);
+	} else if (IR_IS_TYPE_VECTOR(type)) {
+		ir_type element_type = IR_VECTOR_BASE_TYPE(type);
+		uint32_t width = IR_VECTOR_SIZE(type);
+		void *p = ir_long_const_ptr(ctx, src);
+
+		if (ir_is_zero_vector(p, ir_type_size[element_type], width)) {
+			if (ctx->mflags & IR_X86_AVX) {
+				if (width <= 16) {
+					|	vpxor xmm(reg-IR_REG_FP_FIRST), xmm(reg-IR_REG_FP_FIRST), xmm(reg-IR_REG_FP_FIRST)
+				} else {
+					IR_ASSERT(width == 32);
+					|	vpxor ymm(reg-IR_REG_FP_FIRST), ymm(reg-IR_REG_FP_FIRST), ymm(reg-IR_REG_FP_FIRST)
+				}
+			} else {
+				IR_ASSERT(width <= 16);
+				|	pxor xmm(reg-IR_REG_FP_FIRST), xmm(reg-IR_REG_FP_FIRST)
+			}
+		} else {
+			label = ir_get_const_label(ctx, src);
 
 			if (ctx->mflags & IR_X86_AVX) {
 				if (width <= 16) {
@@ -4741,7 +4767,7 @@ static void ir_emit_load_imm_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref sr
 							|	vmovlps xmm(reg-IR_REG_FP_FIRST), xmm(reg-IR_REG_FP_FIRST), qword [=>label]
 						} else {
 							IR_ASSERT(width == 4);
-							|	vmovss xmm(reg-IR_REG_FP_FIRST), dword [=>label]
+						|	vmovss xmm(reg-IR_REG_FP_FIRST), dword [=>label]
 						}
 					}
 				} else {
@@ -4790,9 +4816,10 @@ static void ir_emit_load_imm_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref sr
 					}
 				}
 			}
-			return;
 		}
 #endif
+	} else {
+		label = ir_get_const_label(ctx, src);
 		|	ASM_FP_REG_TXT_OP movs, type, reg, [=>label]
 	}
 }
