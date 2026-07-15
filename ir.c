@@ -2280,9 +2280,9 @@ static ir_alias ir_check_aliasing(const ir_ctx *ctx, ir_ref addr1, ir_ref addr2,
 		} else if (offset1 == offset2) {
 			return IR_MUST_ALIAS;
 		} else if (offset1 < offset2) {
-			return offset1 + ir_get_type_size(type1) <= offset2 ? IR_NO_ALIAS : IR_MUST_ALIAS;
+			return offset1 + (intptr_t)ir_get_type_size(type1) <= offset2 ? IR_NO_ALIAS : IR_MUST_ALIAS;
 		} else {
-			return offset2 + ir_get_type_size(type2) <= offset1 ? IR_NO_ALIAS : IR_MUST_ALIAS;
+			return offset2 + (intptr_t)ir_get_type_size(type2) <= offset1 ? IR_NO_ALIAS : IR_MUST_ALIAS;
 		}
 	}
 
