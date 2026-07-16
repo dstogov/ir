@@ -2708,8 +2708,15 @@ get_arg_hints:
 				n++;
 				if (insn->op == IR_MUL && insn->op == IR_DIV && insn->op == IR_MOD) {
 					constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_RDX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
+					if (IR_IS_CONST_REF(insn->op2)) {
+						constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_RCX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
+						n++;
+					}
 					n++;
 				} else if (insn->op == IR_SHL && insn->op == IR_SHR && insn->op == IR_SAR) {
+					constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_RCX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
+					n++;
+				} else if (IR_IS_CONST_REF(insn->op2) && ir_type_size[IR_VECTOR_BASE_TYPE(type)] == 8) {
 					constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_RCX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
 					n++;
 				}
@@ -19523,13 +19530,16 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	void *ptr2 = NULL;
 
 	IR_ASSERT(IR_IS_TYPE_VECTOR(type));
+	if (insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
+		type = ctx->ir_base[op1].type;
+	} else {
+		IR_ASSERT(type == ctx->ir_base[op1].type);
+	}
 
 	element_type = IR_VECTOR_BASE_TYPE(type);
 	element_size = ir_type_size[element_type];
 	width = IR_VECTOR_SIZE(type);
 	count = IR_VECTOR_LENGTH(type);
-
-	IR_ASSERT(type == ctx->ir_base[insn->op1].type);
 
 	IR_ASSERT(def_reg != IR_REG_NONE);
 
@@ -19537,7 +19547,7 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (op1_reg != IR_REG_NONE) {
 		if (IR_REG_SPILLED(op1_reg)) {
 			op1_reg = IR_REG_NUM(op1_reg);
-			ir_emit_load(ctx, type, op1_reg, insn->op1);
+			ir_emit_load(ctx, type, op1_reg, op1);
 		}
 
 		src1_mem = dst_mem;
@@ -19552,16 +19562,16 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 	}
 
-	if (IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
+	if (IR_IS_TYPE_INT(ctx->ir_base[op2].type)) {
 		ir_type shift_type;
 
 		IR_ASSERT(insn->op == IR_SHL || insn->op == IR_SHR || insn->op == IR_SAR);
 		scalar_shift = 1;
-		shift_type = ctx->ir_base[insn->op2].type;
+		shift_type = ctx->ir_base[op2].type;
 		if (op2_reg != IR_REG_NONE) {
 			if (IR_REG_SPILLED(op2_reg)) {
 				op2_reg = IR_REG_NUM(op2_reg);
-				ir_emit_load(ctx, shift_type, op2_reg, insn->op2);
+				ir_emit_load(ctx, shift_type, op2_reg, op2);
 			}
 			if (op2_reg != IR_REG_RCX) {
 				ir_emit_mov(ctx, shift_type, IR_REG_RCX, op2_reg);
@@ -19571,14 +19581,14 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			shift_count = ctx->ir_base[op2].val.i32;
 		}
 	} else {
-		IR_ASSERT(type == ctx->ir_base[insn->op2].type);
-		if (insn->op1 == insn->op2) {
+		IR_ASSERT(type == ctx->ir_base[op2].type);
+		if (op1 == op2) {
 			op2_reg = op1_reg;
 			src2_mem = src1_mem;
 		} else if (op2_reg != IR_REG_NONE) {
 			if (IR_REG_SPILLED(op2_reg)) {
 				op2_reg = IR_REG_NUM(op2_reg);
-				ir_emit_load(ctx, type, op2_reg, insn->op2);
+				ir_emit_load(ctx, type, op2_reg, op2);
 			}
 			src2_mem = IR_MEM_ADD(dst_mem, -width);
 			ir_emit_store_mem_fp(ctx, type, src2_mem, op2_reg);
@@ -19746,6 +19756,78 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						}
 						|	ASM_REG_OP neg, element_type, tmp1_reg
 						break;
+					case IR_NE:
+						|	ASM_REG_IMM_OP cmp, element_type, tmp1_reg, val
+						|	setne Rb(tmp1_reg)
+						if (element_size != 1) {
+							|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+						}
+						|	ASM_REG_OP neg, element_type, tmp1_reg
+						break;
+					case IR_LT:
+						|	ASM_REG_IMM_OP cmp, element_type, tmp1_reg, val
+						|	setl Rb(tmp1_reg)
+						if (element_size != 1) {
+							|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+						}
+						|	ASM_REG_OP neg, element_type, tmp1_reg
+						break;
+					case IR_LE:
+						|	ASM_REG_IMM_OP cmp, element_type, tmp1_reg, val
+						|	setle Rb(tmp1_reg)
+						if (element_size != 1) {
+							|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+						}
+						|	ASM_REG_OP neg, element_type, tmp1_reg
+						break;
+					case IR_GE:
+						|	ASM_REG_IMM_OP cmp, element_type, tmp1_reg, val
+						|	setge Rb(tmp1_reg)
+						if (element_size != 1) {
+							|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+						}
+						|	ASM_REG_OP neg, element_type, tmp1_reg
+						break;
+					case IR_GT:
+						|	ASM_REG_IMM_OP cmp, element_type, tmp1_reg, val
+						|	setg Rb(tmp1_reg)
+						if (element_size != 1) {
+							|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+						}
+						|	ASM_REG_OP neg, element_type, tmp1_reg
+						break;
+					case IR_ULT:
+						|	ASM_REG_IMM_OP cmp, element_type, tmp1_reg, val
+						|	setb Rb(tmp1_reg)
+						if (element_size != 1) {
+							|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+						}
+						|	ASM_REG_OP neg, element_type, tmp1_reg
+						break;
+					case IR_ULE:
+						|	ASM_REG_IMM_OP cmp, element_type, tmp1_reg, val
+						|	setbe Rb(tmp1_reg)
+						if (element_size != 1) {
+							|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+						}
+						|	ASM_REG_OP neg, element_type, tmp1_reg
+						break;
+					case IR_UGE:
+						|	ASM_REG_IMM_OP cmp, element_type, tmp1_reg, val
+						|	setae Rb(tmp1_reg)
+						if (element_size != 1) {
+							|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+						}
+						|	ASM_REG_OP neg, element_type, tmp1_reg
+						break;
+					case IR_UGT:
+						|	ASM_REG_IMM_OP cmp, element_type, tmp1_reg, val
+						|	seta Rb(tmp1_reg)
+						if (element_size != 1) {
+							|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+						}
+						|	ASM_REG_OP neg, element_type, tmp1_reg
+						break;
 				}
 			} else {
 				switch (insn->op) {
@@ -19782,6 +19864,78 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					case IR_EQ:
 						|	ASM_REG_IMM_OP cmp, element_type, tmp1_reg, val
 						|	sete Rb(tmp1_reg)
+						if (element_size != 1) {
+							|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+						}
+						|	ASM_REG_OP neg, element_type, tmp1_reg
+						break;
+					case IR_NE:
+						|	ASM_REG_IMM_OP cmp, element_type, tmp1_reg, val
+						|	setne Rb(tmp1_reg)
+						if (element_size != 1) {
+							|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+						}
+						|	ASM_REG_OP neg, element_type, tmp1_reg
+						break;
+					case IR_LT:
+						|	ASM_REG_IMM_OP cmp, element_type, tmp1_reg, val
+						|	setl Rb(tmp1_reg)
+						if (element_size != 1) {
+							|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+						}
+						|	ASM_REG_OP neg, element_type, tmp1_reg
+						break;
+					case IR_LE:
+						|	ASM_REG_IMM_OP cmp, element_type, tmp1_reg, val
+						|	setle Rb(tmp1_reg)
+						if (element_size != 1) {
+							|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+						}
+						|	ASM_REG_OP neg, element_type, tmp1_reg
+						break;
+					case IR_GE:
+						|	ASM_REG_IMM_OP cmp, element_type, tmp1_reg, val
+						|	setge Rb(tmp1_reg)
+						if (element_size != 1) {
+							|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+						}
+						|	ASM_REG_OP neg, element_type, tmp1_reg
+						break;
+					case IR_GT:
+						|	ASM_REG_IMM_OP cmp, element_type, tmp1_reg, val
+						|	setg Rb(tmp1_reg)
+						if (element_size != 1) {
+							|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+						}
+						|	ASM_REG_OP neg, element_type, tmp1_reg
+						break;
+					case IR_ULT:
+						|	ASM_REG_IMM_OP cmp, element_type, tmp1_reg, val
+						|	setb Rb(tmp1_reg)
+						if (element_size != 1) {
+							|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+						}
+						|	ASM_REG_OP neg, element_type, tmp1_reg
+						break;
+					case IR_ULE:
+						|	ASM_REG_IMM_OP cmp, element_type, tmp1_reg, val
+						|	setbe Rb(tmp1_reg)
+						if (element_size != 1) {
+							|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+						}
+						|	ASM_REG_OP neg, element_type, tmp1_reg
+						break;
+					case IR_UGE:
+						|	ASM_REG_IMM_OP cmp, element_type, tmp1_reg, val
+						|	setae Rb(tmp1_reg)
+						if (element_size != 1) {
+							|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+						}
+						|	ASM_REG_OP neg, element_type, tmp1_reg
+						break;
+					case IR_UGT:
+						|	ASM_REG_IMM_OP cmp, element_type, tmp1_reg, val
+						|	seta Rb(tmp1_reg)
 						if (element_size != 1) {
 							|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
 						}
@@ -19881,13 +20035,85 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					}
 					|	ASM_REG_OP neg, element_type, tmp1_reg
 					break;
+				case IR_NE:
+					|	ASM_REG_MEM_OP cmp, element_type, tmp1_reg, mem
+					|	setne Rb(tmp1_reg)
+					if (element_size != 1) {
+						|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+					}
+					|	ASM_REG_OP neg, element_type, tmp1_reg
+					break;
+				case IR_LT:
+					|	ASM_REG_MEM_OP cmp, element_type, tmp1_reg, mem
+					|	setl Rb(tmp1_reg)
+					if (element_size != 1) {
+						|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+					}
+					|	ASM_REG_OP neg, element_type, tmp1_reg
+					break;
+				case IR_LE:
+					|	ASM_REG_MEM_OP cmp, element_type, tmp1_reg, mem
+					|	setle Rb(tmp1_reg)
+					if (element_size != 1) {
+						|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+					}
+					|	ASM_REG_OP neg, element_type, tmp1_reg
+					break;
+				case IR_GE:
+					|	ASM_REG_MEM_OP cmp, element_type, tmp1_reg, mem
+					|	setge Rb(tmp1_reg)
+					if (element_size != 1) {
+						|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+					}
+					|	ASM_REG_OP neg, element_type, tmp1_reg
+					break;
+				case IR_GT:
+					|	ASM_REG_MEM_OP cmp, element_type, tmp1_reg, mem
+					|	setg Rb(tmp1_reg)
+					if (element_size != 1) {
+						|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+					}
+					|	ASM_REG_OP neg, element_type, tmp1_reg
+					break;
+				case IR_ULT:
+					|	ASM_REG_MEM_OP cmp, element_type, tmp1_reg, mem
+					|	setb Rb(tmp1_reg)
+					if (element_size != 1) {
+						|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+					}
+					|	ASM_REG_OP neg, element_type, tmp1_reg
+					break;
+				case IR_ULE:
+					|	ASM_REG_MEM_OP cmp, element_type, tmp1_reg, mem
+					|	setbe Rb(tmp1_reg)
+					if (element_size != 1) {
+						|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+					}
+					|	ASM_REG_OP neg, element_type, tmp1_reg
+					break;
+				case IR_UGE:
+					|	ASM_REG_MEM_OP cmp, element_type, tmp1_reg, mem
+					|	setae Rb(tmp1_reg)
+					if (element_size != 1) {
+						|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+					}
+					|	ASM_REG_OP neg, element_type, tmp1_reg
+					break;
+				case IR_UGT:
+					|	ASM_REG_MEM_OP cmp, element_type, tmp1_reg, mem
+					|	seta Rb(tmp1_reg)
+					if (element_size != 1) {
+						|	ASM_REG_TXT_MUL movzx, element_type, tmp1_reg, Rb(tmp1_reg)
+					}
+					|	ASM_REG_OP neg, element_type, tmp1_reg
+					break;
 			}
 		}
 
 		ir_emit_store_mem(ctx, element_type, IR_MEM_ADD(dst_mem, element_size * i), tmp1_reg);
 	}
 
-	ir_emit_load_mem_fp(ctx, type, def_reg, dst_mem);
+	ir_emit_load_mem_fp(ctx, insn->type, def_reg, dst_mem);
 
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, insn->type, def, def_reg);
