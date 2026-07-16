@@ -3887,7 +3887,7 @@ IR_FOLD(OR(SHR, SHL))
 IR_FOLD(ADD(SHL, SHR))
 IR_FOLD(ADD(SHR, SHL))
 {
-	if (op1_insn->op1 == op2_insn->op1) {
+	if (IR_IS_TYPE_INT(IR_OPT_TYPE(opt)) && op1_insn->op1 == op2_insn->op1) {
 		if (IR_IS_CONST_REF(op1_insn->op2) && IR_IS_CONST_REF(op2_insn->op2)) {
 			if (ctx->ir_base[op1_insn->op2].val.u64 + ctx->ir_base[op2_insn->op2].val.u64 ==
 					ir_type_size[IR_OPT_TYPE(opt)] * 8) {
