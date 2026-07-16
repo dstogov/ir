@@ -19708,9 +19708,9 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 							|	ASM_REG_REG_OP xor, element_type, IR_REG_RDX, IR_REG_RDX
 						}
 						if (IR_IS_TYPE_SIGNED(element_type)) {
-							|	idiv Rb(tmp2_reg)
+							|	ASM_REG_OP idiv, element_type, tmp2_reg
 						} else {
-							|	div Rb(tmp2_reg)
+							|	ASM_REG_OP div, element_type, tmp2_reg
 						}
 						if (insn->op == IR_MOD) {
 							if (element_size == 1) {
