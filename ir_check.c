@@ -239,8 +239,7 @@ bool ir_check(const ir_ctx *ctx)
 											  || insn->op == IR_ROL
 											  || insn->op == IR_ROR)
 											 && IR_IS_TYPE_INT(use_insn->type)
-											 && IR_IS_TYPE_INT(insn->type)
-											 && ir_type_size[use_insn->type] < ir_type_size[insn->type]) {
+											 && (IR_IS_TYPE_INT(insn->type) || IR_IS_TYPE_VECTOR(insn->type))) {
 												/* second argument of SHIFT may be incompatible with result */
 												break;
 											}

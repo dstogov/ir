@@ -3023,6 +3023,15 @@ IR_FOLD(ROR(_, C_I64))
 	IR_FOLD_NEXT;
 }
 
+IR_FOLD(SHL(_, SPLAT))
+IR_FOLD(SHR(_, SPLAT))
+IR_FOLD(SAR(_, SPLAT))
+{
+	/* a << SPLAT(b) => a << b */
+	op1 = op1_insn->op1;
+	IR_FOLD_RESTART;
+}
+
 IR_FOLD(SHL(C_U8, _))
 IR_FOLD(SHL(C_U16, _))
 IR_FOLD(SHL(C_U32, _))
