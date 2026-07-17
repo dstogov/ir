@@ -105,6 +105,9 @@ static ir_reg ir_get_param_reg(const ir_ctx *ctx, ir_ref ref)
 	ir_insn *insn;
 	int int_param = 0;
 	int fp_param = 0;
+#if IR_SIMD && defined(IR_TARGET_X86)
+	int vector_param = 0;
+#endif
 	const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(ctx->flags);
 
 	for (i = use_list->count, p = &ctx->use_edges[use_list->refs]; i > 0; p++, i--) {
@@ -142,6 +145,17 @@ static ir_reg ir_get_param_reg(const ir_ctx *ctx, ir_ref ref)
 					}
 				}
 #endif
+#if IR_SIMD && defined(IR_TARGET_X86)
+			} else if (IR_IS_TYPE_VECTOR(insn->type)) {
+				if (use == ref) {
+					if (vector_param < cc->vector_param_regs_count) {
+						return cc->vector_param_regs[vector_param];
+					} else {
+						return IR_REG_NONE;
+					}
+				}
+				vector_param++;
+#endif
 			} else {
 				IR_ASSERT(IR_IS_TYPE_FP(insn->type) || IR_IS_TYPE_VECTOR(insn->type));
 				if (use == ref) {
@@ -167,6 +181,9 @@ static int ir_get_args_regs(const ir_ctx *ctx, const ir_insn *insn, const ir_cal
 	ir_type type;
 	int int_param = 0;
 	int fp_param = 0;
+#if IR_SIMD && defined(IR_TARGET_X86)
+	int vector_param = 0;
+#endif
 	int count = 0;
 
 	n = insn->inputs_count;
@@ -196,6 +213,16 @@ static int ir_get_args_regs(const ir_ctx *ctx, const ir_insn *insn, const ir_cal
 			} else {
 				regs[j] = IR_REG_NONE;
 			}
+#if IR_SIMD && defined(IR_TARGET_X86)
+		} else if (IR_IS_TYPE_VECTOR(type)) {
+			if (vector_param < cc->vector_param_regs_count) {
+				regs[j] = cc->vector_param_regs[vector_param];
+				count = j + 1;
+				vector_param++;
+			} else {
+				regs[j] = IR_REG_NONE;
+			}
+#endif
 		} else {
 			IR_ASSERT(IR_IS_TYPE_FP(type) || IR_IS_TYPE_VECTOR(type));
 			if (fp_param < cc->fp_param_regs_count) {
@@ -1188,6 +1215,7 @@ static size_t ir_calc_args_stack(const ir_ctx *ctx)
 					fp_param_num++;
 				}
 			} else {
+				IR_ASSERT(IR_IS_TYPE_FP(insn->type));
 				if (fp_param_num < cc->fp_param_regs_count) {
 					src_reg = cc->fp_param_regs[fp_param_num];
 				} else {

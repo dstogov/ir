@@ -20,11 +20,13 @@
 #ifdef IR_DEBUG
 typedef struct _ir_mem {uint64_t v;} ir_mem;
 
+# define IR_MEM_NONE                (ir_mem){0}
 # define IR_MEM_VAL(loc)            ((loc).v)
 # define IR_MEM_ADD(mem, offset)    IR_MEM(IR_MEM_BASE(mem), IR_MEM_OFFSET(mem) + (offset), IR_MEM_INDEX(mem), IR_MEM_SCALE(mem))
 #else
 typedef uint64_t ir_mem;
 
+# define IR_MEM_NONE                0
 # define IR_MEM_VAL(loc)            (loc)
 # define IR_MEM_ADD(mem, offset)    ((mem) + (offset))
 #endif
@@ -1423,13 +1425,17 @@ const ir_call_conv_dsc ir_call_conv_x86_64_ms = {
 	32,          /* shadow_store_size       */
 	4,           /* int_param_regs_count    */
 	4,           /* fp_param_regs_count     */
+	4,           /* vector_param_regs_count */
 	IR_REG_RAX,  /* int_ret_reg             */
 	IR_REG_NONE, /* int_ret2_reg            */
 	IR_REG_XMM0, /* fp_ret_reg              */
 	IR_REG_NONE, /* fp_ret2_reg             */
+	IR_REG_XMM0, /* vector_ret_reg          */
+	IR_REG_NONE, /* vector_ret2_reg         */
 	IR_REG_NONE, /* fp_varargs_reg          */
 	IR_REG_SCRATH_X86_64_MS,
 	(const int8_t[4]){IR_REG_RCX, IR_REG_RDX, IR_REG_R8, IR_REG_R9},
+	(const int8_t[4]){IR_REG_XMM0, IR_REG_XMM1, IR_REG_XMM2, IR_REG_XMM3},
 	(const int8_t[4]){IR_REG_XMM0, IR_REG_XMM1, IR_REG_XMM2, IR_REG_XMM3},
 	IR_REGSET(IR_REG_RBX) | IR_REGSET(IR_REG_RBP) | IR_REGSET(IR_REG_RSI) | IR_REGSET(IR_REG_RDI) |
 		IR_REGSET_INTERVAL(IR_REG_R12, IR_REG_R15) | IR_REGSET_INTERVAL(IR_REG_XMM6, IR_REG_XMM15),
@@ -1443,13 +1449,18 @@ const ir_call_conv_dsc ir_call_conv_x86_64_sysv = {
 	0,           /* shadow_store_size       */
 	6,           /* int_param_regs_count    */
 	8,           /* fp_param_regs_count     */
+	8,           /* vector_param_regs_count */
 	IR_REG_RAX,  /* int_ret_reg             */
 	IR_REG_RDX,  /* int_ret2_reg            */
 	IR_REG_XMM0, /* fp_ret_reg              */
 	IR_REG_XMM1, /* fp_ret2_reg             */
+	IR_REG_XMM0, /* vector_ret_reg          */
+	IR_REG_XMM1, /* vector_ret2_reg         */
 	IR_REG_RAX,  /* fp_varargs_reg          */
 	IR_REG_SCRATH_X86_64_SYSV,
 	(const int8_t[6]){IR_REG_RDI, IR_REG_RSI, IR_REG_RDX, IR_REG_RCX, IR_REG_R8, IR_REG_R9},
+	(const int8_t[8]){IR_REG_XMM0, IR_REG_XMM1, IR_REG_XMM2, IR_REG_XMM3,
+	                  IR_REG_XMM4, IR_REG_XMM5, IR_REG_XMM6, IR_REG_XMM7},
 	(const int8_t[8]){IR_REG_XMM0, IR_REG_XMM1, IR_REG_XMM2, IR_REG_XMM3,
 	                  IR_REG_XMM4, IR_REG_XMM5, IR_REG_XMM6, IR_REG_XMM7},
 	IR_REGSET(IR_REG_RBX) | IR_REGSET(IR_REG_RBP) | IR_REGSET_INTERVAL(IR_REG_R12, IR_REG_R15),
@@ -1464,15 +1475,20 @@ const ir_call_conv_dsc ir_call_conv_x86_64_preserve_none = {
 	0,           /* shadow_store_size       */
 	12,          /* int_param_regs_count    */
 	8,           /* fp_param_regs_count     */
+	8,           /* vector_param_regs_count */
 	IR_REG_RAX,  /* int_ret_reg             */
 	IR_REG_RDX,  /* int_ret2_reg            */
 	IR_REG_XMM0, /* fp_ret_reg              */
 	IR_REG_XMM1, /* fp_ret2_reg             */
+	IR_REG_XMM0, /* vector_ret_reg          */
+	IR_REG_XMM1, /* vector_ret2_reg         */
 	IR_REG_RAX,  /* fp_varargs_reg          */
 	IR_REG_SCRATH_X86_64_PN,
 	(const int8_t[12]){IR_REG_R12, IR_REG_R13, IR_REG_R14, IR_REG_R15,
 	                   IR_REG_RDI, IR_REG_RSI, IR_REG_RDX, IR_REG_RCX, IR_REG_R8, IR_REG_R9,
 	                   IR_REG_R11, IR_REG_RAX},
+	(const int8_t[8]){IR_REG_XMM0, IR_REG_XMM1, IR_REG_XMM2, IR_REG_XMM3,
+	                  IR_REG_XMM4, IR_REG_XMM5, IR_REG_XMM6, IR_REG_XMM7},
 	(const int8_t[8]){IR_REG_XMM0, IR_REG_XMM1, IR_REG_XMM2, IR_REG_XMM3,
 	                  IR_REG_XMM4, IR_REG_XMM5, IR_REG_XMM6, IR_REG_XMM7},
 	IR_REGSET(IR_REG_RBP),
@@ -1505,14 +1521,18 @@ const ir_call_conv_dsc ir_call_conv_x86_cdecl = {
 	0,           /* shadow_store_size       */
 	0,           /* int_param_regs_count    */
 	0,           /* fp_param_regs_count     */
+	3,           /* vector_param_regs_count */
 	IR_REG_RAX,  /* int_ret_reg             */
 	IR_REG_RDX,  /* int_ret2_reg            */
 	IR_REG_NONE, /* fp_ret_reg              */
 	IR_REG_NONE, /* fp_ret2_reg             */
+	IR_REG_XMM0, /* vector_ret_reg          */
+	IR_REG_NONE, /* vector_ret2_reg         */
 	IR_REG_NONE, /* fp_varargs_reg          */
 	IR_REG_SCRATCH_X86,
 	NULL,
 	NULL,
+	(const int8_t[3]){IR_REG_XMM0, IR_REG_XMM1, IR_REG_XMM2},
 	IR_REGSET(IR_REG_RBX) | IR_REGSET(IR_REG_RBP) | IR_REGSET(IR_REG_RSI) | IR_REGSET(IR_REG_RDI),
 };
 
@@ -1524,14 +1544,18 @@ const ir_call_conv_dsc ir_call_conv_x86_fastcall = {
 	0,           /* shadow_store_size       */
 	2,           /* int_param_regs_count    */
 	0,           /* fp_param_regs_count     */
+	3,           /* vector_param_regs_count */
 	IR_REG_RAX,  /* int_ret_reg             */
 	IR_REG_RDX,  /* int_ret2_reg            */
 	IR_REG_NONE, /* fp_ret_reg              */
 	IR_REG_NONE, /* fp_ret2_reg             */
+	IR_REG_XMM0, /* vector_ret_reg          */
+	IR_REG_NONE, /* vector_ret2_reg         */
 	IR_REG_NONE, /* fp_varargs_reg          */
 	IR_REG_SCRATCH_X86,
 	(const int8_t[4]){IR_REG_RCX, IR_REG_RDX},
 	NULL,
+	(const int8_t[3]){IR_REG_XMM0, IR_REG_XMM1, IR_REG_XMM2},
 	IR_REGSET(IR_REG_RBX) | IR_REGSET(IR_REG_RBP) | IR_REGSET(IR_REG_RSI) | IR_REGSET(IR_REG_RDI),
 };
 
@@ -1643,7 +1667,10 @@ const ir_call_conv_dsc ir_call_conv_x86_fastcall = {
 	_(VECTOR_BINOP_AVX)    \
 	_(VECTOR_BINOP_EXPAND) \
 	_(VECTOR_EXT)          \
+	_(VECTOR_TRUNC)        \
 	_(VECTOR_FP2FP)        \
+	_(VECTOR_INT2FP)       \
+	_(VECTOR_FP2INT)       \
 
 #endif
 
@@ -2023,6 +2050,11 @@ op2_const:
 					IR_ASSERT(IR_IS_TYPE_FP(insn->type) || IR_IS_TYPE_VECTOR(insn->type));
 #ifdef IR_TARGET_X86
 					if (cc->fp_ret_reg == IR_REG_NONE) {
+# if IR_SIMD
+						if (IR_IS_TYPE_VECTOR(insn->type)) {
+							constraints->def_reg = cc->vector_ret_reg;
+						} else
+# endif
 						ctx->flags2 |= IR_HAS_FP_RET_SLOT;
 					} else
 #endif
@@ -2237,6 +2269,13 @@ get_arg_hints:
 		case IR_RETURN_FP:
 			cc = ir_get_call_conv_dsc(ctx->flags);
 #ifdef IR_TARGET_X86
+# if IR_SIMD
+			if (IR_IS_TYPE_VECTOR(ctx->ir_base[ctx->ir_base[ref].op2].type)) {
+				flags = IR_OP2_SHOULD_BE_IN_REG;
+				constraints->hints[2] = cc->vector_ret_reg;
+				constraints->hints_count = 3;
+			} else
+# endif
 			if (cc->fp_ret_reg != IR_REG_NONE)
 #endif
 			{
@@ -4560,6 +4599,11 @@ store_int:
 				return IR_INT2FP_I64;
 			}
 #endif
+#if IR_SIMD
+			if (IR_IS_TYPE_VECTOR(ctx->ir_base[insn->op1].type)) {
+				return IR_VECTOR_INT2FP;
+			}
+#endif
 			if (ir_type_size[ctx->ir_base[insn->op1].type] > (IR_IS_TYPE_SIGNED(ctx->ir_base[insn->op1].type) ? 2 : 4)) {
 				ir_match_fuse_load(ctx, insn->op1, ref);
 			}
@@ -4568,6 +4612,11 @@ store_int:
 #if IR_X86_I64
 			if (insn->type == IR_I64 || insn->type == IR_U64) {
 				return IR_TWO_REGS | IR_FP2INT_I64;
+			}
+#endif
+#if IR_SIMD
+			if (IR_IS_TYPE_VECTOR(insn->type)) {
+				return IR_VECTOR_FP2INT;
 			}
 #endif
 			ir_match_fuse_load(ctx, insn->op1, ref);
@@ -4598,6 +4647,11 @@ store_int:
 			ir_match_fuse_load(ctx, insn->op1, ref);
 			return insn->op;
 		case IR_TRUNC:
+#if IR_SIMD
+			if (IR_IS_TYPE_VECTOR(insn->type)) {
+				return IR_VECTOR_TRUNC;
+			}
+#endif
 			ir_match_fuse_load(ctx, insn->op1, ref);
 #if IR_X86_I64
 			if (ctx->ir_base[insn->op1].type == IR_I64 || ctx->ir_base[insn->op1].type == IR_U64) {
@@ -9472,6 +9526,12 @@ static void ir_emit_return_fp(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 	ir_type type = ctx->ir_base[insn->op2].type;
 	ir_reg ret_reg = data->ra_data.cc->fp_ret_reg;
 
+#if IR_SIMD && defined(IR_TARGET_X86)
+	if (IR_IS_TYPE_VECTOR(type)) {
+		ret_reg = data->ra_data.cc->vector_ret_reg;
+	}
+#endif
+
 	if (op2_reg != ret_reg && ret_reg != IR_REG_NONE) {
 		if (op2_reg != IR_REG_NONE && !IR_REG_SPILLED(op2_reg)) {
 			ir_emit_fp_mov(ctx, type, ret_reg, op2_reg);
@@ -11647,7 +11707,7 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 	ir_reg tmp_reg = ctx->regs[def][3];
 	bool has_case_range = 0;
 #if IR_X86_I64
-	ir_reg op2_reg_hi;
+	ir_reg op2_reg_hi = IR_REG_NONE;
 #endif
 
 	type = ctx->ir_base[insn->op2].type;
@@ -11987,6 +12047,9 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn, const ir_call_conv
 	ir_type type;
 	int int_param = 0;
 	int fp_param = 0;
+#if IR_SIMD && defined(IR_TARGET_X86)
+	int vector_param = 0;
+#endif
 	int32_t used_stack = 0;
 	int32_t copy_stack = 0;
 
@@ -12028,6 +12091,13 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn, const ir_call_conv
 			if (cc->shadow_param_regs) {
 				fp_param++;
 			}
+#if IR_SIMD && defined(IR_TARGET_X86)
+		} else if (IR_IS_TYPE_VECTOR(type)) {
+			if (vector_param >= cc->vector_param_regs_count) {
+				used_stack += IR_MAX(sizeof(void*), ir_get_type_size(type));
+			}
+			vector_param++;
+#endif
 		} else {
 			IR_ASSERT(IR_IS_TYPE_FP(type) || IR_IS_TYPE_VECTOR(type));
 			if (fp_param >= cc->fp_param_regs_count) {
@@ -12061,6 +12131,9 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 	ir_reg src_reg, dst_reg;
 	int int_param = 0;
 	int fp_param = 0;
+#if IR_SIMD && defined(IR_TARGET_X86)
+	int vector_param = 0;
+#endif
 	int count = 0;
 	int32_t used_stack, copy_stack = 0, stack_offset = cc->shadow_store_size;
 	ir_copy *copies;
@@ -12225,6 +12298,15 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 				do_pass3 = 3;
 				continue;
 			}
+#if IR_SIMD && defined(IR_TARGET_X86)
+		} else if (IR_IS_TYPE_VECTOR(type)) {
+			if (vector_param < cc->vector_param_regs_count) {
+				dst_reg = cc->vector_param_regs[fp_param];
+			} else {
+				dst_reg = IR_REG_NONE; /* pass argument through stack */
+			}
+			vector_param++;
+#endif
 		} else {
 			IR_ASSERT(IR_IS_TYPE_FP(type) || IR_IS_TYPE_VECTOR(type));
 			if (fp_param < cc->fp_param_regs_count) {
@@ -12290,6 +12372,9 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 		stack_offset = cc->shadow_store_size;
 		int_param = 0;
 		fp_param = 0;
+#if IR_SIMD && defined(IR_TARGET_X86)
+		vector_param = 0;
+#endif
 		for (j = 3; j <= n; j++) {
 			arg = ir_insn_op(insn, j);
 			src_reg = ir_get_alocated_reg(ctx, def, j);
@@ -12346,6 +12431,15 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 				if (cc->shadow_param_regs) {
 					fp_param++;
 				}
+#if IR_SIMD && defined(IR_TARGET_X86)
+			} else if (IR_IS_TYPE_VECTOR(type)) {
+				if (vector_param < cc->vector_param_regs_count) {
+					dst_reg = cc->vector_param_regs[fp_param];
+				} else {
+					dst_reg = IR_REG_NONE; /* pass argument through stack */
+				}
+				vector_param++;
+#endif
 			} else {
 				IR_ASSERT(IR_IS_TYPE_FP(type) || IR_IS_TYPE_VECTOR(type));
 				if (fp_param < cc->fp_param_regs_count) {
@@ -12601,22 +12695,29 @@ static void ir_emit_call_ex(ir_ctx *ctx, ir_ref def, ir_insn *insn, const ir_pro
 				ir_emit_store(ctx, insn->type, def, cc->int_ret_reg);
 			}
 		} else {
+			ir_reg ret_reg = cc->fp_ret_reg;
+
 			IR_ASSERT(IR_IS_TYPE_FP(insn->type) || IR_IS_TYPE_VECTOR(insn->type));
+#if IR_SIMD && defined(IR_TARGET_X86)
+			if (IR_IS_TYPE_VECTOR(insn->type)) {
+				ret_reg = cc->vector_ret_reg;
+			}
+#endif
 			def_reg = IR_REG_NUM(ctx->regs[def][0]);
-			if (cc->fp_ret_reg != IR_REG_NONE) {
+			if (ret_reg != IR_REG_NONE) {
 				if (def_reg != IR_REG_NONE) {
-					if (def_reg != cc->fp_ret_reg) {
-						ir_emit_fp_mov(ctx, insn->type, def_reg, cc->fp_ret_reg);
+					if (def_reg != ret_reg) {
+						ir_emit_fp_mov(ctx, insn->type, def_reg, ret_reg);
 					}
 					if (IR_REG_SPILLED(ctx->regs[def][0])) {
 						ir_emit_store(ctx, insn->type, def, def_reg);
 					}
 				} else if (ctx->use_lists[def].count > 1) {
-					ir_emit_store(ctx, insn->type, def, cc->fp_ret_reg);
+					ir_emit_store(ctx, insn->type, def, ret_reg);
 				}
 			}
 #ifdef IR_TARGET_X86
-			if (ctx->use_lists[def].count > 1 && cc->fp_ret_reg == IR_REG_NONE) {
+			if (ctx->use_lists[def].count > 1 && ret_reg == IR_REG_NONE) {
 				int32_t offset;
 				ir_reg fp;
 
@@ -17354,6 +17455,7 @@ static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					ptr = ((uint64_t*)ptr) + 1;
 				} else {
 					IR_ASSERT(0);
+					j = 0;
 				}
 				src = IR_MEM(IR_REG_RSP, src_offset + (j % mod) * element_size, IR_REG_NONE, 1);
 				dst = IR_MEM(IR_REG_RSP, dst_offset + i * element_size, IR_REG_NONE, 1);
@@ -17584,6 +17686,8 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg op2_reg = ctx->regs[def][2];
 	ir_reg tmp_reg = ctx->regs[def][3];
 	int shift_count = 0;
+
+	(void)width;
 
 	IR_ASSERT(IR_IS_TYPE_VECTOR(type));
 	if (insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
@@ -19553,6 +19657,7 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		src1_mem = dst_mem;
 		ir_emit_store_mem_fp(ctx, type, src1_mem, op1_reg);
 	} else if (IR_IS_CONST_REF(op1)) {
+		src1_mem = IR_MEM_NONE;
 		ptr1 = ir_long_const_ptr(ctx, op1);
 	} else {
 		if (ir_rule(ctx, op1) & IR_FUSED) {
@@ -19566,6 +19671,7 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_type shift_type;
 
 		IR_ASSERT(insn->op == IR_SHL || insn->op == IR_SHR || insn->op == IR_SAR);
+		src2_mem = IR_MEM_NONE;
 		scalar_shift = 1;
 		shift_type = ctx->ir_base[op2].type;
 		if (op2_reg != IR_REG_NONE) {
@@ -19593,6 +19699,7 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			src2_mem = IR_MEM_ADD(dst_mem, -width);
 			ir_emit_store_mem_fp(ctx, type, src2_mem, op2_reg);
 		} else if (IR_IS_CONST_REF(op2)) {
+			src2_mem = IR_MEM_NONE;
 			ptr2 = ir_long_const_ptr(ctx, op2);
 		} else {
 			if (ir_rule(ctx, op2) & IR_FUSED) {
@@ -19642,7 +19749,7 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 
 		if (IR_IS_CONST_REF(op2)) {
-			int val;
+			int val = 0;
 			ir_reg tmp2_reg = IR_REG_NONE;
 
 			if (!scalar_shift) {
@@ -19944,7 +20051,7 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 			}
 		} else {
-			ir_mem mem;
+			ir_mem mem = IR_MEM_NONE;
 
 			if (!scalar_shift) {
 				mem = IR_MEM_ADD(src2_mem, element_size * i);
@@ -20130,6 +20237,8 @@ static void ir_emit_vector_ext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	uint32_t src_width, dst_width, src_size, dst_size;
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 	ir_reg op1_reg = ctx->regs[def][1];
+
+	(void)src_width;
 
 	IR_ASSERT(IR_IS_TYPE_VECTOR(src_type) && IR_IS_TYPE_VECTOR(dst_type));
 	src_element_type = IR_VECTOR_BASE_TYPE(src_type);
@@ -20802,6 +20911,9 @@ static void ir_emit_load_params(ir_ctx *ctx)
 	ir_ref i, n, *p, use;
 	int int_param_num = 0;
 	int fp_param_num = 0;
+#if IR_SIMD && defined(IR_TARGET_X86)
+	int vector_param_num = 0;
+#endif
 	ir_reg src_reg;
 	ir_reg dst_reg;
 	ir_backend_data *data = ctx->data;
@@ -20851,6 +20963,15 @@ static void ir_emit_load_params(ir_ctx *ctx)
 				if (cc->shadow_param_regs) {
 					fp_param_num++;
 				}
+#if IR_SIMD && defined(IR_TARGET_X86)
+			} else if (IR_IS_TYPE_VECTOR(insn->type)) {
+				if (vector_param_num < cc->vector_param_regs_count) {
+					src_reg = cc->vector_param_regs[vector_param_num];
+				} else {
+					src_reg = IR_REG_NONE;
+				}
+				vector_param_num++;
+#endif
 			} else {
 				if (fp_param_num < cc->fp_param_regs_count) {
 					src_reg = cc->fp_param_regs[fp_param_num];
@@ -20877,7 +20998,7 @@ static void ir_emit_load_params(ir_ctx *ctx)
 				if (sizeof(void*) == 8) {
 					stack_offset += sizeof(void*);
 				} else {
-					stack_offset += IR_MAX(sizeof(void*), ir_type_size[insn->type]);
+					stack_offset += IR_MAX(sizeof(void*), ir_get_type_size(insn->type));
 				}
 			}
 		}
@@ -20982,6 +21103,9 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 	ir_ref i, n, *p, use;
 	int int_param_num = 0;
 	int fp_param_num = 0;
+#if IR_SIMD && defined(IR_TARGET_X86)
+	int vector_param_num = 0;
+#endif
 	ir_reg src_reg;
 	ir_backend_data *data = ctx->data;
 	const ir_call_conv_dsc *cc = data->ra_data.cc;
@@ -21032,6 +21156,15 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 				if (cc->shadow_param_regs) {
 					fp_param_num++;
 				}
+#if IR_SIMD && defined(IR_TARGET_X86)
+			} else if (IR_IS_TYPE_VECTOR(insn->type)) {
+				if (vector_param_num < cc->vector_param_regs_count) {
+					src_reg = cc->vector_param_regs[vector_param_num];
+				} else {
+					src_reg = IR_REG_NONE;
+				}
+				vector_param_num++;
+#endif
 			} else {
 				if (fp_param_num < cc->fp_param_regs_count) {
 					src_reg = cc->fp_param_regs[fp_param_num];
@@ -21056,7 +21189,7 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 				if (sizeof(void*) == 8) {
 					stack_offset += sizeof(void*);
 				} else {
-					stack_offset += IR_MAX(sizeof(void*), ir_type_size[insn->type]);
+					stack_offset += IR_MAX(sizeof(void*), ir_get_type_size(insn->type));
 				}
 			}
 		}

@@ -1430,14 +1430,18 @@ struct _ir_call_conv_dsc {
 	uint8_t       shadow_store_size;          /* reserved stack space to keep arguemnts passed in registers (WIN64) */
 	uint8_t       int_param_regs_count;       /* number of registers for INT parameters */
 	uint8_t       fp_param_regs_count;        /* number of registers for FP parameters */
+	uint8_t       vector_param_regs_count;    /* number of registers for SIMD vector parameters */
 	int8_t        int_ret_reg;                /* register to return INT value */
 	int8_t        int_ret2_reg;               /* register to return second INT value (used to return I64 on 32-bit) */
 	int8_t        fp_ret_reg;                 /* register to return FP value */
 	int8_t        fp_ret2_reg;                /* register to return second FP value */
+	int8_t        vector_ret_reg;             /* register to return SIMD vector value */
+	int8_t        vector_ret2_reg;            /* register to return second SIMD vector value */
 	int8_t        fp_varargs_reg;             /* register to pass number of fp register arguments into vararg func */
 	int8_t        scratch_reg;                /* pseudo register to reffer srcatch regset (clobbered by call) */
 	const int8_t *int_param_regs;             /* registers for INT parameters */
 	const int8_t *fp_param_regs;              /* registers for FP parameters */
+	const int8_t *vector_param_regs;          /* registers for SIMD vector parameters */
 	ir_regset     preserved_regs;             /* preserved or callee-saved registers */
 };
 
@@ -1506,7 +1510,7 @@ IR_ALWAYS_INLINE int8_t ir_get_alocated_reg(const ir_ctx *ctx, ir_ref ref, int o
 #define IR_MAY_REUSE (1U<<25) /* Result may reuse register of the source */
 #define IR_TWO_REGS  (1U<<24) /* Result needs two registers (used for 64-bit integers on x86) */
 
-#define IR_RULE_MASK 0xff
+#define IR_RULE_MASK 0xffff
 
 #define IR_MAX_REG_ARGS 64
 
