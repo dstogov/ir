@@ -20248,6 +20248,7 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 			}
 #if IR_X86_I64
+|.if not X64
 		} else if (element_type == IR_I64 || element_type == IR_U64) {
 			ir_mem mem = IR_MEM_NONE;
 			void *addr = NULL;
@@ -20312,6 +20313,7 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					|1:
 					break;
 			}
+|.endif
 #endif
 		} else {
 			ir_mem mem = IR_MEM_NONE;
