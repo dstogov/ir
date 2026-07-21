@@ -14802,7 +14802,11 @@ static void ir_emit_binop_helper_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		addr = NULL;
 	}
 	|	call aword &addr
+#ifdef _WIN32
+	|	add esp, 12
+#else
 	|	add esp, 28
+#endif
 	ctx->call_stack_size -= 28;
 
 	if (def_reg != IR_REG_NONE) {
@@ -20298,7 +20302,11 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						}
 					}
 					|	call aword &addr
+#ifdef _WIN32
+					|	add esp, (width*3)+12
+#else
 					|	add esp, (width*3)+28
+#endif
 					break;
 				case IR_SAR:
 					if (!scalar_shift) {
