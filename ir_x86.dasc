@@ -2529,7 +2529,8 @@ get_arg_hints:
 				ctx->flags2 |= IR_16B_FRAME_ALIGNMENT;
 			} else if (IR_IS_TYPE_INT(insn->type)) {
 				if ((IR_IS_CONST_REF(insn->op2) && ctx->ir_base[insn->op2].val.u64 >= 16 / ir_type_size[insn->type]) ||
-					(ir_type_size[insn->type] >= 4 && !(ctx->mflags & (IR_X86_SSE41|IR_X86_AVX)))) {
+					(ir_type_size[insn->type] >= 4 && !(ctx->mflags & (IR_X86_SSE41|IR_X86_AVX))) ||
+					(sizeof(void*) == 4 && ir_type_size[insn->type] == 8)) {
 					constraints->tmp_regs[n] = IR_TMP_REG(3, IR_DOUBLE, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
 				}
@@ -2576,6 +2577,12 @@ get_arg_hints:
 				// TODO: hardcoded register ???
 				constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_XMM0, IR_USE_SUB_REF, IR_DEF_SUB_REF);
 				n++;
+#if IR_X86_I64
+			} else if ((IR_VECTOR_BASE_TYPE(insn->type) == IR_I64 || IR_VECTOR_BASE_TYPE(insn->type) == IR_U64)
+				&& !IR_IS_CONST_REF(insn->op2)) {
+				constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_RDX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
+				n++;
+#endif
 			}
 			/* shuffle through stack */
 			ctx->flags2 |= IR_16B_FRAME_ALIGNMENT;
@@ -2583,7 +2590,11 @@ get_arg_hints:
 		case IR_VECTOR_OP:
 			insn = &ctx->ir_base[ref];
 			if (insn->op == IR_NOT || insn->op == IR_NEG) {
-				flags = IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
+				if (IR_VECTOR_SIZE(insn->type) == 16 || (IR_VECTOR_SIZE(insn->type) == 32 && (ctx->mflags & IR_X86_AVX))) {
+					flags = IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
+				} else {
+					flags = IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;
+				}
 			}
 			if (IR_IS_CONST_REF(insn->op1)) {
 				constraints->tmp_regs[0] = IR_TMP_REG(1, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
@@ -2603,7 +2614,11 @@ get_arg_hints:
 				n = 1;
 			}
 			if (IR_VECTOR_SIZE(type) == 16) {
-				flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
+				if (!IR_IS_CONST_REF(insn->op2) && IR_IS_TYPE_SCALAR(ctx->ir_base[insn->op2].type)) {
+					flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+				} else {
+					flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
+				}
 				if (IR_IS_CONST_REF(insn->op2) &&
 						insn->op >= IR_LE && insn->op <= IR_UGT) {
 					// TODO: vector comparison may require the second oprand in the register ???
@@ -2643,7 +2658,7 @@ get_arg_hints:
 					n++;
 				} else if ((insn->op == IR_SHL || insn->op == IR_SHR || insn->op == IR_SAR)
 				 && !IR_IS_CONST_REF(insn->op2)) {
-					constraints->tmp_regs[n] = IR_TMP_REG(3, type, IR_USE_SUB_REF, IR_DEF_SUB_REF);
+					constraints->tmp_regs[n] = IR_TMP_REG(3, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
 				}
 				if (insn->op == IR_LT ||
@@ -2683,7 +2698,11 @@ get_arg_hints:
 				n = 1;
 			}
 			if (IR_VECTOR_SIZE(type) == 16 || IR_VECTOR_SIZE(type) == 32) {
-				flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
+				if (!IR_IS_CONST_REF(insn->op2) && IR_IS_TYPE_SCALAR(ctx->ir_base[insn->op2].type)) {
+					flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+				} else {
+					flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
+				}
 				if (IR_IS_CONST_REF(insn->op2) &&
 						insn->op >= IR_LE && insn->op <= IR_UGT) {
 					// TODO: vector comparison may require the second oprand in the register ???
@@ -2728,14 +2747,18 @@ get_arg_hints:
 					n++;
 				} else if ((insn->op == IR_SHL || insn->op == IR_SHR || insn->op == IR_SAR)
 				 && !IR_IS_CONST_REF(insn->op2)) {
-					constraints->tmp_regs[n] = IR_TMP_REG(3, type, IR_USE_SUB_REF, IR_DEF_SUB_REF);
+					constraints->tmp_regs[n] = IR_TMP_REG(3, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
 				}
 			}
 			break;
 		case IR_VECTOR_BINOP_EXPAND:
-			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 			insn = &ctx->ir_base[ref];
+			if (!IR_IS_CONST_REF(insn->op2) && IR_IS_TYPE_SCALAR(ctx->ir_base[insn->op2].type)) {
+				flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+			} else {
+				flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
+			}
 			if (insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
 				type = ctx->ir_base[insn->op1].type;
 			} else {
@@ -3645,7 +3668,9 @@ binop_fp:
 				}
 #if IR_SIMD
 			} else if (IR_IS_TYPE_VECTOR(insn->type)) {
-				ir_match_fuse_load(ctx, insn->op1, ref);
+				if (IR_VECTOR_SIZE(insn->type) == 16 || (IR_VECTOR_SIZE(insn->type) == 32 && (ctx->mflags & IR_X86_AVX))) {
+					ir_match_fuse_load(ctx, insn->op1, ref);
+				}
 				return IR_VECTOR_OP;
 #endif
 			} else {
@@ -3668,7 +3693,9 @@ binop_fp:
 				return IR_OP_INT;
 #if IR_SIMD
 			} else if (IR_IS_TYPE_VECTOR(insn->type)) {
-				ir_match_fuse_load(ctx, insn->op1, ref);
+				if (IR_VECTOR_SIZE(insn->type) == 16 || (IR_VECTOR_SIZE(insn->type) == 32 && (ctx->mflags & IR_X86_AVX))) {
+					ir_match_fuse_load(ctx, insn->op1, ref);
+				}
 				return IR_VECTOR_OP;
 #endif
 			} else {
@@ -4759,6 +4786,7 @@ store_int:
 		case IR_VLOAD:
 		case IR_VLOAD_v:
 		case IR_VA_ARG:
+		case IR_EXTRACT:
 			if (insn->type == IR_I64 || insn->type == IR_U64) {
 				return IR_TWO_REGS | insn->op;
 			}
@@ -12301,7 +12329,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 #if IR_SIMD && defined(IR_TARGET_X86)
 		} else if (IR_IS_TYPE_VECTOR(type)) {
 			if (vector_param < cc->vector_param_regs_count) {
-				dst_reg = cc->vector_param_regs[fp_param];
+				dst_reg = cc->vector_param_regs[vector_param];
 			} else {
 				dst_reg = IR_REG_NONE; /* pass argument through stack */
 			}
@@ -12434,7 +12462,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 #if IR_SIMD && defined(IR_TARGET_X86)
 			} else if (IR_IS_TYPE_VECTOR(type)) {
 				if (vector_param < cc->vector_param_regs_count) {
-					dst_reg = cc->vector_param_regs[fp_param];
+					dst_reg = cc->vector_param_regs[vector_param];
 				} else {
 					dst_reg = IR_REG_NONE; /* pass argument through stack */
 				}
@@ -16803,8 +16831,6 @@ static void ir_emit_vector_extract(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					}
 					|	movd Rd(def_reg), xmm(tmp_reg-IR_REG_FP_FIRST)
 				}
-#if defined(IR_TARGET_X64)
-|.if X64
 			} else if (element_type == IR_I64 || element_type == IR_U64) {
 				if (width <= 16) {
 					tmp_reg = op1_reg;
@@ -16825,6 +16851,8 @@ static void ir_emit_vector_extract(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				} else {
 					IR_ASSERT(0 && "unsupprted vector wdith");
 				}
+#if defined(IR_TARGET_X64)
+|.if X64
 				if (lane == 0) {
 					|	movd Rq(def_reg), xmm(tmp_reg-IR_REG_FP_FIRST)
 				} else if (ctx->mflags & IR_X86_AVX) {
@@ -16841,6 +16869,46 @@ static void ir_emit_vector_extract(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					|	movd Rq(def_reg), xmm(tmp_reg-IR_REG_FP_FIRST)
 				}
 |.endif
+#elif IR_X86_I64
+|.if not X64
+				ir_mem mem = IR_MEM(IR_REG_RSP, -8, IR_REG_NONE, 1);
+				ir_mem mem_hi = IR_MEM_I64_HI(mem);
+				ir_reg def_reg_hi = IR_REG_I64_HI(def_reg);
+
+				def_reg = IR_REG_I64_LO(def_reg);
+
+				if (lane == 0) {
+					if (ctx->mflags & IR_X86_AVX) {
+						|	vmovq qword [Ra(IR_REG_RSP)-8], xmm(tmp_reg-IR_REG_FP_FIRST)
+					} else {
+						|	movq qword [Ra(IR_REG_RSP)-8], xmm(tmp_reg-IR_REG_FP_FIRST)
+					}
+				} else {
+					op1_reg = tmp_reg;
+					tmp_reg = ctx->regs[def][3];
+					IR_ASSERT(tmp_reg != IR_REG_NONE);
+
+					IR_ASSERT(lane == 1);
+					if (ctx->mflags & IR_X86_AVX) {
+						|	vmovhlps xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						|	vmovq qword [Ra(IR_REG_RSP)-8], xmm(tmp_reg-IR_REG_FP_FIRST)
+					} else {
+						|	movhlps xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						|	movq qword [Ra(IR_REG_RSP)-8], xmm(tmp_reg-IR_REG_FP_FIRST)
+					}
+				}
+
+				ir_emit_load_mem_int(ctx, IR_U32, def_reg, mem);
+				ir_emit_load_mem_int(ctx, IR_U32, def_reg_hi, mem_hi);
+
+				if (IR_REG_SPILLED(ctx->regs[def][0])) {
+					ir_emit_store_i64_lo(ctx, def, def_reg);
+					ir_emit_store_i64_hi(ctx, def, def_reg_hi);
+				}
+				return;
+|.endif
+#else
+				IR_ASSERT(0 && "unsupprted vector type");
 #endif
 			} else {
 				IR_ASSERT(0 && "unsupprted vector type");
@@ -17079,6 +17147,31 @@ static void ir_emit_vector_replace(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					}
 				}
 |.endif
+#elif IR_X86_I64
+|.if not X64
+			} else if (element_type == IR_I64 || element_type == IR_U64) {
+				ir_mem mem = IR_MEM(IR_REG_RSP, -8, IR_REG_NONE, 1);
+				ir_mem mem_hi = IR_MEM_I64_HI(mem);
+				ir_reg op3_reg_hi = IR_REG_I64_HI(op3_reg);
+
+				op3_reg = IR_REG_I64_LO(op3_reg);
+				ir_emit_store_mem_int(ctx, IR_U32, mem, op3_reg);
+				ir_emit_store_mem_int(ctx, IR_U32, mem_hi, op3_reg_hi);
+
+				if (ctx->mflags & IR_X86_AVX) {
+					if (lane % 2 == 0) {
+						|	ASM_TXT_TMEM_OP vmovsd, xmm(tmp_reg-IR_REG_FP_FIRST), qword, mem
+					} else {
+						|	ASM_TXT_TXT_TMEM_OP vmovhpd, xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST), qword, mem
+					}
+				} else {
+					if (lane % 2 == 0) {
+						|	ASM_TXT_TMEM_OP movsd, xmm(tmp_reg-IR_REG_FP_FIRST), qword, mem
+					} else {
+						|	ASM_TXT_TMEM_OP movhpd, xmm(tmp_reg-IR_REG_FP_FIRST), qword, mem
+					}
+				}
+|.endif
 #endif
 			} else {
 				IR_ASSERT(0);
@@ -17296,6 +17389,39 @@ static void ir_emit_vector_splat(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					|	punpcklqdq xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 				}
 |.endif
+#elif IR_X86_I64
+|.if not X64
+			} else if (element_type == IR_I64 || element_type == IR_U64) {
+				ir_mem mem = IR_MEM(IR_REG_RSP, -8, IR_REG_NONE, 1);
+				ir_mem mem_hi = IR_MEM_I64_HI(mem);
+				ir_reg op1_reg_hi = IR_REG_I64_HI(op1_reg);
+
+				op1_reg = IR_REG_I64_LO(op1_reg);
+				ir_emit_store_mem_int(ctx, IR_U32, mem, op1_reg);
+				ir_emit_store_mem_int(ctx, IR_U32, mem_hi, op1_reg_hi);
+
+				if (ctx->mflags & IR_X86_AVX2) {
+					|	ASM_TXT_TMEM_OP vmovq, xmm(def_reg-IR_REG_FP_FIRST), qword, mem
+					if (width <= 16) {
+						|	vpbroadcastq xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
+					} else if (width == 32) {
+						|	vpbroadcastq ymm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
+					} else {
+						IR_ASSERT(0 && "unsupprted vector wdith");
+					}
+				} else if (ctx->mflags & IR_X86_AVX) {
+					IR_ASSERT(width <= 32);
+					|	ASM_TXT_TMEM_OP vmovq, xmm(def_reg-IR_REG_FP_FIRST), qword, mem
+					|	vpunpcklqdq xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
+					if (width == 32) {
+						|	vinsertf128 ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), 1
+					}
+				} else {
+					IR_ASSERT(width <= 16);
+					|	ASM_TXT_TMEM_OP movq, xmm(def_reg-IR_REG_FP_FIRST), qword, mem
+					|	punpcklqdq xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
+				}
+|.endif
 #endif
 			} else {
 				IR_ASSERT(0);
@@ -17459,6 +17585,16 @@ static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 				src = IR_MEM(IR_REG_RSP, src_offset + (j % mod) * element_size, IR_REG_NONE, 1);
 				dst = IR_MEM(IR_REG_RSP, dst_offset + i * element_size, IR_REG_NONE, 1);
+#if IR_X86_I64
+				if (element_type == IR_I64 || element_type == IR_U64) {
+					ir_emit_load_mem_int(ctx, IR_U32, tmp_reg, src);
+					ir_emit_store_mem_int(ctx, IR_U32, dst, tmp_reg);
+					src = IR_MEM_I64_HI(src);
+					dst = IR_MEM_I64_HI(dst);
+					ir_emit_load_mem_int(ctx, IR_U32, tmp_reg, src);
+					ir_emit_store_mem_int(ctx, IR_U32, dst, tmp_reg);
+				} else
+#endif
 				if (IR_IS_TYPE_INT(element_type)) {
 					ir_emit_load_mem_int(ctx, element_type, tmp_reg, src);
 					ir_emit_store_mem_int(ctx, element_type, dst, tmp_reg);
@@ -17482,9 +17618,26 @@ static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				ir_mem src, dst;
 
 				src = IR_MEM(IR_REG_RSP, mask_offset + i * mask_element_size, IR_REG_NONE, 1);
-				ir_emit_load_mem_int(ctx, element_type, idx_reg, src);
+#if IR_X86_I64
+				if (mask_element_type == IR_I64 || mask_element_type == IR_U64) {
+					/* ignore the high part of 64-bit index */
+					ir_emit_load_mem_int(ctx, IR_U32, idx_reg, src);
+				} else
+#endif
+				ir_emit_load_mem_int(ctx, mask_element_type, idx_reg, src);
 				src = IR_MEM(IR_REG_RSP, src_offset, idx_reg, element_size);
 				dst = IR_MEM(IR_REG_RSP, dst_offset + i * element_size, IR_REG_NONE, 1);
+#if IR_X86_I64
+				if (element_type == IR_I64 || element_type == IR_U64) {
+					ir_reg tmp_reg = IR_REG_RDX; // TODO: hardcoded registetrs ???
+					ir_emit_load_mem_int(ctx, IR_U32, tmp_reg, src);
+					ir_emit_store_mem_int(ctx, IR_U32, dst, tmp_reg);
+					src = IR_MEM_I64_HI(src);
+					dst = IR_MEM_I64_HI(dst);
+					ir_emit_load_mem_int(ctx, IR_U32, tmp_reg, src);
+					ir_emit_store_mem_int(ctx, IR_U32, dst, tmp_reg);
+				} else
+#endif
 				if (IR_IS_TYPE_INT(element_type)) {
 					ir_emit_load_mem_int(ctx, element_type, tmp_reg, src);
 					ir_emit_store_mem_int(ctx, element_type, dst, tmp_reg);
@@ -17702,6 +17855,12 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				ir_emit_load(ctx, type, op2_reg, op2);
 			}
 			IR_ASSERT(tmp_reg != IR_REG_NONE);
+#if IR_X86_I64
+			if (ctx->ir_base[op2].type == IR_I64 || ctx->ir_base[op2].type == IR_U64) {
+				/* ignore the high part of the register */
+				op2_reg = IR_REG_I64_LO(op2_reg);
+			}
+#endif
 			if (ctx->mflags & IR_X86_AVX) {
 				|	vmovd xmm(tmp_reg-IR_REG_FP_FIRST), Rd(op2_reg)
 			} else {
@@ -18547,11 +18706,17 @@ static void ir_emit_vector_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	} else if (IR_IS_TYPE_INT(ctx->ir_base[op2].type)) {
 		IR_ASSERT(type == ctx->ir_base[op1].type);
 		IR_ASSERT(insn->op == IR_SHL || insn->op == IR_SHR || insn->op == IR_SAR);
-		if (insn->op2 != IR_REG_NONE) {
+		if (op2_reg != IR_REG_NONE) {
 			if (IR_REG_SPILLED(op2_reg)) {
 				op2_reg = IR_REG_NUM(op2_reg);
 				ir_emit_load(ctx, type, op2_reg, op2);
 			}
+#if IR_X86_I64
+			if (ctx->ir_base[op2].type == IR_I64 || ctx->ir_base[op2].type == IR_U64) {
+				/* ignore the high part of the register */
+				op2_reg = IR_REG_I64_LO(op2_reg);
+			}
+#endif
 			IR_ASSERT(tmp_reg != IR_REG_NONE);
 			if (ctx->mflags & IR_X86_AVX) {
 				|	vmovd xmm(tmp_reg-IR_REG_FP_FIRST), Rd(op2_reg)
