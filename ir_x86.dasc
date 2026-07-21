@@ -2764,6 +2764,16 @@ get_arg_hints:
 			} else {
 				type = insn->type;
 			}
+#if IR_X86_I64
+			if (IR_VECTOR_BASE_TYPE(type) == IR_I64 || IR_VECTOR_BASE_TYPE(type) == IR_U64) {
+				constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_RAX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
+				n++;
+				constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_RDX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
+				n++;
+				constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_RCX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
+				n++;
+			} else
+#endif
 			if (IR_IS_TYPE_INT(IR_VECTOR_BASE_TYPE(type))) {
 				// TODO: hardcoded register ???
 				constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_RAX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
@@ -15967,7 +15977,7 @@ static void ir_emit_cond_cmp_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 		IR_ASSERT(tmp_reg != IR_REG_NONE);
 
-		if (UNEXPECTED(ctx->rules[insn->op2] & IR_FUSED_REG)) {
+		if (!IR_IS_CONST_REF(insn->op2) && UNEXPECTED(ctx->rules[insn->op2] & IR_FUSED_REG)) {
 			op1_reg = ir_get_fused_reg(ctx, def, insn->op1 * sizeof(ir_ref) + 1);
 			op2_reg = ir_get_fused_reg(ctx, def, insn->op1 * sizeof(ir_ref) + 2);
 		} else {
@@ -19791,6 +19801,9 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg op1_reg = ctx->regs[def][1];
 	ir_reg op2_reg = ctx->regs[def][2];
 	ir_reg tmp1_reg = ctx->regs[def][3];
+#if IR_X86_I64
+	ir_reg tmp1_reg_hi = IR_REG_NONE;
+#endif
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 	ir_mem src1_mem, src2_mem, dst_mem;
 	bool scalar_shift = 0;
@@ -19844,6 +19857,15 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				op2_reg = IR_REG_NUM(op2_reg);
 				ir_emit_load(ctx, shift_type, op2_reg, op2);
 			}
+#if IR_X86_I64
+			if (ctx->ir_base[op2].type == IR_I64 || ctx->ir_base[op2].type == IR_U64) {
+				/* ignore the high part of the register */
+				op2_reg = IR_REG_I64_LO(op2_reg);
+				if (op2_reg != IR_REG_RCX) {
+					ir_emit_mov(ctx, IR_U32, IR_REG_RCX, op2_reg);
+				}
+			} else
+#endif
 			if (op2_reg != IR_REG_RCX) {
 				ir_emit_mov(ctx, shift_type, IR_REG_RCX, op2_reg);
 			}
@@ -19878,6 +19900,11 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (tmp1_reg == IR_REG_NONE) {
 		/* hardcoded temporary for integer vectors */
 		tmp1_reg = IR_REG_RAX;
+#if IR_X86_I64
+		if (element_type == IR_I64 || element_type == IR_U64) {
+			tmp1_reg_hi = IR_REG_RDX;
+		}
+#endif
 	}
 
 	IR_ASSERT(IR_IS_TYPE_INT(element_type));
@@ -19909,6 +19936,11 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 			}
 			ir_emit_load_imm_int(ctx, element_type, tmp1_reg, val);
+#if IR_X86_I64
+		} else if (element_type == IR_I64 || element_type == IR_U64) {
+			ir_emit_load_mem(ctx, IR_U32, tmp1_reg, IR_MEM_ADD(src1_mem, element_size * i));
+			ir_emit_load_mem(ctx, IR_U32, tmp1_reg_hi, IR_MEM_ADD(src1_mem, element_size * i + 4));
+#endif
 		} else {
 			ir_emit_load_mem(ctx, element_type, tmp1_reg, IR_MEM_ADD(src1_mem, element_size * i));
 		}
@@ -20215,6 +20247,72 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						break;
 				}
 			}
+#if IR_X86_I64
+		} else if (element_type == IR_I64 || element_type == IR_U64) {
+			ir_mem mem = IR_MEM_NONE;
+			void *addr = NULL;
+
+			if (!scalar_shift) {
+				mem = IR_MEM_ADD(src2_mem, element_size * i);
+		    }
+
+			switch (insn->op) {
+				default:
+					IR_ASSERT(0 && "NIY binary op");
+				case IR_MUL:
+					|	ASM_TXT_TMEM_OP mov, ecx, dword, IR_MEM_I64_HI(mem)
+					|	ASM_TXT_TMEM_OP imul, edx, dword, mem
+					|	imul ecx, eax
+					|	add ecx, edx
+					|	ASM_TMEM_OP mul, dword, mem
+					|	add edx, ecx
+					break;
+				case IR_DIV:
+				case IR_MOD:
+					|	sub esp, (width*3)+12
+					if (IR_MEM_BASE(mem) == IR_REG_RSP) {
+						mem = IR_MEM_ADD(mem, ((width*3)+16));
+						|	ASM_MEM_PUSH_OP push, IR_U32, mem
+						|	ASM_MEM_PUSH_OP push, IR_U32, mem
+					} else {
+						|	ASM_MEM_PUSH_OP push, IR_U32, IR_MEM_ADD(mem, 4)
+						|	ASM_MEM_PUSH_OP push, IR_U32, mem
+					}
+					|	push Rd(tmp1_reg_hi)
+					|	push Rd(tmp1_reg)
+					if (insn->op == IR_DIV) {
+						if (element_type == IR_I64) {
+							addr = __divdi3;
+						} else {
+							IR_ASSERT(element_type == IR_U64);
+							addr = __udivdi3;
+						}
+					} else {
+						IR_ASSERT(insn->op == IR_MOD);
+						if (element_type == IR_I64) {
+							addr = __moddi3;
+						} else {
+							IR_ASSERT(element_type == IR_U64);
+							addr = __umoddi3;
+						}
+					}
+					|	call aword &addr
+					|	add esp, (width*3)+28
+					break;
+				case IR_SAR:
+					if (!scalar_shift) {
+						ir_emit_load_mem_int(ctx, IR_U32, IR_REG_RCX, mem);
+					}
+					|	shrd Rd(tmp1_reg), Rd(tmp1_reg_hi), cl
+					|	sar	Rd(tmp1_reg_hi), cl
+					|	test cl, 32
+					|	je	>1
+					|	mov Rd(tmp1_reg), Rd(tmp1_reg_hi)
+					|	sar	Rd(tmp1_reg_hi), 31
+					|1:
+					break;
+			}
+#endif
 		} else {
 			ir_mem mem = IR_MEM_NONE;
 
@@ -20382,6 +20480,12 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 		}
 
+#if IR_X86_I64
+		if (element_type == IR_I64 || element_type == IR_U64) {
+			ir_emit_store_mem(ctx, IR_U32, IR_MEM_ADD(dst_mem, element_size * i), tmp1_reg);
+			ir_emit_store_mem(ctx, IR_U32, IR_MEM_ADD(dst_mem, element_size * i + 4), tmp1_reg_hi);
+		} else
+#endif
 		ir_emit_store_mem(ctx, element_type, IR_MEM_ADD(dst_mem, element_size * i), tmp1_reg);
 	}
 
