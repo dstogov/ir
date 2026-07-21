@@ -19,6 +19,10 @@
 # endif
 #endif
 
+#if defined(IR_TARGET_RISCV64)
+#include <unistd.h>
+#include <stdlib.h>
+#endif
 #include "ir.h"
 #include "ir_private.h"
 
@@ -354,7 +358,58 @@ int ir_disasm(const char    *name,
 	int32_t entry;
 	cs_err ret;
 
-# if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
+# if defined(IR_TARGET_RISCV64)
+	/* This system's libcapstone build has no CS_ARCH_RISCV (confirmed
+	 * via capstone.h's CS_ARCH_* enum — no RISC-V entry present).
+	 * Rather than falling through to cs_open()/cs handle usage below
+	 * with an unsupported/uninitialized architecture (which segfaults),
+	 * shell out to riscv64-linux-gnu-objdump on a temp file and bypass
+	 * everything else in this function.
+	 * TODO: replace with real capstone RISC-V support once available,
+	 * or a hand-written disassembler, for symbol/label annotation
+	 * parity with the x86/aarch64 paths. */
+	{
+		char tmp_path[] = "/tmp/ir_riscv_disasm_XXXXXX";
+		int fd = mkstemp(tmp_path);
+		if (fd < 0) {
+			fprintf(stderr, "ir_disasm: mkstemp failed\n");
+			return 0;
+		}
+		if (write(fd, start, size) != (ssize_t)size) {
+			fprintf(stderr, "ir_disasm: write failed\n");
+			close(fd);
+			unlink(tmp_path);
+			return 0;
+		}
+		close(fd);
+
+		if (name) {
+			fprintf(f, "%s:\n", name);
+		}
+
+		{
+			char cmd[512];
+			FILE *pipe_f;
+			char line[512];
+
+			snprintf(cmd, sizeof(cmd),
+				"riscv64-linux-gnu-objdump -D -b binary -m riscv:rv64 --adjust-vma=0 '%s' 2>/dev/null | grep -E '^[[:space:]]*[0-9a-f]+:'",
+				tmp_path);
+			pipe_f = popen(cmd, "r");
+			if (pipe_f) {
+				while (fgets(line, sizeof(line), pipe_f)) {
+					fputs(line, f);
+				}
+				pclose(pipe_f);
+			} else {
+				fprintf(stderr, "ir_disasm: popen failed for objdump fallback\n");
+			}
+		}
+
+		unlink(tmp_path);
+	}
+	return 1;
+# elif defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 #  ifdef IR_TARGET_X64
 	ret = cs_open(CS_ARCH_X86, CS_MODE_64, &cs);
 	if (ret != CS_ERR_OK) {
