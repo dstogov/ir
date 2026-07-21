@@ -35,10 +35,10 @@ main:
 	pushl %esi
 	pushl %edi
 	subl $0x24, %esp
-	movl $1, 0xc(%esp)
-	movl $2, 0x10(%esp)
-	movl $3, 0x14(%esp)
-	leal 0xc(%esp), %esi
+	movl $1, 0x10(%esp)
+	movl $2, 0x14(%esp)
+	movl $3, 0x18(%esp)
+	leal 0x10(%esp), %esi
 	movl %esp, %edi
 	movl $0xc, %ecx
 	rep movsb (%esi), %es:(%edi)

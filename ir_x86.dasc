@@ -3071,7 +3071,7 @@ binop_fp:
 					}
 				}
 			}
-			ctx->flags2 |= IR_HAS_CALLS | IR_16B_FRAME_ALIGNMENT;
+			ctx->flags2 |= IR_HAS_CALLS;
 			IR_FALLTHROUGH;
 		case IR_TAILCALL:
 		case IR_IJMP:
@@ -16091,13 +16091,26 @@ void ir_fix_stack_frame(ir_ctx *ctx)
 				ctx->stack_frame_size += sizeof(void*);
 			}
 		} else {
-			if (!(ctx->flags & IR_NO_STACK_COMBINE)) {
-				ir_preallocate_call_stack(ctx);
-			}
-			while (IR_ALIGNED_SIZE(ctx->stack_frame_size + ctx->call_stack_size + sizeof(void*), 16) !=
-					ctx->stack_frame_size + ctx->call_stack_size + sizeof(void*)) {
+			while (IR_ALIGNED_SIZE(ctx->stack_frame_size + sizeof(void*), 16) != ctx->stack_frame_size + sizeof(void*)) {
 				ctx->stack_frame_size += sizeof(void*);
 			}
+			if (ctx->flags2 & IR_HAS_CALLS) {
+				if (!(ctx->flags & IR_NO_STACK_COMBINE)) {
+					ir_preallocate_call_stack(ctx);
+				}
+				while (IR_ALIGNED_SIZE(ctx->stack_frame_size + ctx->call_stack_size + sizeof(void*), 16) !=
+					ctx->stack_frame_size + ctx->call_stack_size + sizeof(void*)) {
+					ctx->call_stack_size += sizeof(void*);
+				}
+			}
+		}
+	} else if ((ctx->flags2 & IR_HAS_CALLS) && (ctx->flags & IR_FUNCTION) && !(ctx->flags & IR_USE_FRAME_POINTER)) {
+		if (!(ctx->flags & IR_NO_STACK_COMBINE)) {
+			ir_preallocate_call_stack(ctx);
+		}
+		while (IR_ALIGNED_SIZE(ctx->stack_frame_size + ctx->call_stack_size + sizeof(void*), 16) !=
+			ctx->stack_frame_size + ctx->call_stack_size + sizeof(void*)) {
+			ctx->stack_frame_size += sizeof(void*);
 		}
 	}
 

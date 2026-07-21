@@ -34,10 +34,10 @@ func @main(): int32_t
 --EXPECT--
 main:
 	subq $0x38, %rsp
-	movq $1, 0x18(%rsp)
-	movq $2, 0x20(%rsp)
-	movq $3, 0x28(%rsp)
-	leaq 0x18(%rsp), %rsi
+	movq $1, 0x20(%rsp)
+	movq $2, 0x28(%rsp)
+	movq $3, 0x30(%rsp)
+	leaq 0x20(%rsp), %rsi
 	movq %rsp, %rdi
 	movq $0x18, %rcx
 	rep movsb (%rsi), (%rdi)
