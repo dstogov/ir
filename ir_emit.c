@@ -1227,7 +1227,7 @@ static size_t ir_calc_args_stack(const ir_ctx *ctx)
 				vector_param_num++;
 #endif
 			} else {
-				IR_ASSERT(IR_IS_TYPE_FP(insn->type));
+				IR_ASSERT(IR_IS_TYPE_FP(insn->type) || IR_IS_TYPE_VECTOR(insn->type));
 				if (fp_param_num < cc->fp_param_regs_count) {
 					src_reg = cc->fp_param_regs[fp_param_num];
 				} else {
