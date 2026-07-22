@@ -1867,6 +1867,8 @@ static ir_ref ir_promote_i2i(ir_ctx *ctx, ir_type type, ir_ref ref, ir_ref use)
 			case IR_TRUNC:
 				if (ctx->ir_base[insn->op1].type != type) {
 					ir_type src_type = ctx->ir_base[insn->op1].type;
+
+					IR_ASSERT(IR_IS_TYPE_INT(src_type) && IR_IS_TYPE_INT(type));
 					if (ir_type_size[src_type] == ir_type_size[type]) {
 						insn->op = IR_BITCAST;
 					} else if (ir_type_size[src_type] > ir_type_size[type]) {
@@ -3552,13 +3554,15 @@ static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref con
 {
 	ir_insn *condition_insn = &ctx->ir_base[condition];
 
-	while ((condition_insn->op == IR_BITCAST
+	while (((condition_insn->op == IR_BITCAST && IR_IS_TYPE_SCALAR(ctx->ir_base[condition].type))
 	  || condition_insn->op == IR_ZEXT
 	  || condition_insn->op == IR_SEXT)
 	 && ctx->use_lists[condition].count == 1) {
 		condition = condition_insn->op1;
 		condition_insn = &ctx->ir_base[condition];
 	}
+
+	IR_ASSERT(IR_IS_TYPE_SCALAR(condition_insn->type));
 
 	if (condition_insn->opt == IR_OPT(IR_NOT, IR_BOOL)) {
 		*swap = 1;
@@ -3690,7 +3694,7 @@ static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref con
 		}
 	}
 
-	while ((condition_insn->op == IR_BITCAST
+	while (((condition_insn->op == IR_BITCAST && IR_IS_TYPE_SCALAR(ctx->ir_base[condition].type))
 	  || condition_insn->op == IR_ZEXT
 	  || condition_insn->op == IR_SEXT)
 	 && ctx->use_lists[condition].count == 1) {
@@ -3976,7 +3980,7 @@ remove_aliased_load:
 					if (!IR_IS_CONST_REF(val)) {
 						ir_use_list_add(ctx, val, i);
 					}
-					if (ir_type_size[val_insn->type] == ir_type_size[insn->type]) {
+					if (ir_get_type_size(val_insn->type) == ir_get_type_size(insn->type)) {
 						/* load forwarding with bitcast (L2L) */
 						insn->optx = IR_OPTX(IR_BITCAST, insn->type, 1);
 					} else {

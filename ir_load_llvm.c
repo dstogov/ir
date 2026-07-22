@@ -1865,12 +1865,14 @@ static ir_ref llvm2ir_auto_cast(ir_ctx *ctx, ir_ref ref, ir_type src_type, ir_ty
 				return ir_TRUNC(type, ref);
 			}
 		} else {
-			// TODO: FP to INT conversion
+			IR_ASSERT(IR_IS_TYPE_FP(src_type));
+			return ir_FP2INT(type, ref);
 		}
 	} else if (IR_IS_TYPE_FP(type)) {
 		if (IR_IS_TYPE_FP(src_type)) {
 			return ir_FP2FP(type, ref);
 		} else {
+			IR_ASSERT(IR_IS_TYPE_INT(src_type));
 			return ir_INT2FP(type, ref);
 		}
 	}

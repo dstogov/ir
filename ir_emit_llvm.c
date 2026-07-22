@@ -748,6 +748,7 @@ static void ir_emit_minmax_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn,
 	if (IR_IS_TYPE_FP(type)) {
 		id += (type == IR_DOUBLE) ? 8 : 9;
 	} else {
+		IR_ASSERT(IR_IS_TYPE_INT(type));
 		if (IR_IS_TYPE_UNSIGNED(type)) {
 			id += 4;
 		}

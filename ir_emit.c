@@ -1175,6 +1175,9 @@ static size_t ir_calc_args_stack(const ir_ctx *ctx)
 	ir_ref i, n, *p, use;
 	int int_param_num = 0;
 	int fp_param_num = 0;
+#if IR_SIMD && defined(IR_TARGET_X86)
+	int vector_param_num = 0;
+#endif
 	ir_reg src_reg;
 	const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(ctx->flags);
 	int32_t stack_offset = 0;
@@ -1214,6 +1217,15 @@ static size_t ir_calc_args_stack(const ir_ctx *ctx)
 				if (cc->shadow_param_regs) {
 					fp_param_num++;
 				}
+#if IR_SIMD && defined(IR_TARGET_X86)
+			} else if (IR_IS_TYPE_VECTOR(insn->type)) {
+				if (vector_param_num < cc->vector_param_regs_count) {
+					src_reg = cc->vector_param_regs[vector_param_num];
+				} else {
+					src_reg = IR_REG_NONE;
+				}
+				vector_param_num++;
+#endif
 			} else {
 				IR_ASSERT(IR_IS_TYPE_FP(insn->type));
 				if (fp_param_num < cc->fp_param_regs_count) {
@@ -1230,7 +1242,7 @@ static size_t ir_calc_args_stack(const ir_ctx *ctx)
 				if (sizeof(void*) == 8) {
 					stack_offset += sizeof(void*);
 				} else {
-					stack_offset += IR_MAX(sizeof(void*), ir_type_size[insn->type]);
+					stack_offset += IR_MAX(sizeof(void*), ir_get_type_size(insn->type));
 				}
 			}
 		}
