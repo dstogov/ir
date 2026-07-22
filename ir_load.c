@@ -1764,7 +1764,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 			t2 = IR_VECTOR_BASE_TYPE(t);
 			if (YY_IN_SET(sym, (YY_DECNUMBER,YY_HEXNUMBER,YY_FLOATNUMBER,YY_CHARACTER,YY_INF,YY_NAN,YY__MINUS), "\000\000\000\000\000\300\075\000")) {
 				sym = parse_const(sym, t2, &val);
-				switch (ir_type_size[2]) {
+				switch (ir_type_size[t2]) {
 					case 1: *(uint8_t*)ptr  = val.u8;  ptr = (char*)ptr + 1; break;
 					case 2: *(uint16_t*)ptr = val.u16; ptr = (char*)ptr + 2; break;
 					case 4: *(uint32_t*)ptr = val.u32; ptr = (char*)ptr + 4; break;
@@ -1776,7 +1776,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 				while (sym == YY__COMMA) {
 					sym = get_sym();
 					sym = parse_const(sym, t2, &val);
-					switch (ir_type_size[2]) {
+					switch (ir_type_size[t2]) {
 						case 1: *(uint8_t*)ptr  = val.u8;  ptr = (char*)ptr + 1; break;
 						case 2: *(uint16_t*)ptr = val.u16; ptr = (char*)ptr + 2; break;
 						case 4: *(uint32_t*)ptr = val.u32; ptr = (char*)ptr + 4; break;

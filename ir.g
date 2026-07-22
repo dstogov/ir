@@ -606,7 +606,7 @@ ir_insn(ir_parser_ctx *p):
 		(
 			const(t2, &val)
 			{
-				switch (ir_type_size[2]) {
+				switch (ir_type_size[t2]) {
 					case 1: *(uint8_t*)ptr  = val.u8;  ptr = (char*)ptr + 1; break;
 					case 2: *(uint16_t*)ptr = val.u16; ptr = (char*)ptr + 2; break;
 					case 4: *(uint32_t*)ptr = val.u32; ptr = (char*)ptr + 4; break;
@@ -620,7 +620,7 @@ ir_insn(ir_parser_ctx *p):
 				","
 				const(t2, &val)
 				{
-					switch (ir_type_size[2]) {
+					switch (ir_type_size[t2]) {
 						case 1: *(uint8_t*)ptr  = val.u8;  ptr = (char*)ptr + 1; break;
 						case 2: *(uint16_t*)ptr = val.u16; ptr = (char*)ptr + 2; break;
 						case 4: *(uint32_t*)ptr = val.u32; ptr = (char*)ptr + 4; break;
