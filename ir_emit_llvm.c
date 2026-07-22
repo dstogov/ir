@@ -285,12 +285,21 @@ static void ir_print_double(double v, FILE *f)
 
 	if (isnan(v)) {
 		fprintf(f, "nan");
+	} else if (v == 0.0) {
+		fprintf(f, "0.0");
 	} else {
-		snprintf(buf, sizeof(buf), "%g", v);
+		double e = log10(v);
+		if (e < -4 || e >= 6) {
+			snprintf(buf, sizeof(buf), "%e", v);
+		} else if (round(v) == v) {
+			snprintf(buf, sizeof(buf), "%.0f.0", v);
+		} else {
+			snprintf(buf, sizeof(buf), "%g", v);
+		}
 		if (strtod(buf, NULL) != v) {
 			snprintf(buf, sizeof(buf), "%.53e", v);
 			if (strtod(buf, NULL) != v) {
-				IR_ASSERT(0 && "can't format double");
+				IR_ASSERT(0 && "can't format float");
 			}
 		}
 		fprintf(f, "%s", buf);
@@ -303,8 +312,17 @@ static void ir_print_float(float v, FILE *f)
 
 	if (isnan(v)) {
 		fprintf(f, "nan");
+	} else if (v == 0.0) {
+		fprintf(f, "0.0");
 	} else {
-		snprintf(buf, sizeof(buf), "%g", v);
+		double e = log10(v);
+		if (e < -4 || e >= 6) {
+			snprintf(buf, sizeof(buf), "%e", v);
+		} else if (round(v) == v) {
+			snprintf(buf, sizeof(buf), "%.0f.0", v);
+		} else {
+			snprintf(buf, sizeof(buf), "%g", v);
+		}
 		if (strtod(buf, NULL) != v) {
 			snprintf(buf, sizeof(buf), "%.24e", v);
 			if (strtod(buf, NULL) != v) {
@@ -421,38 +439,10 @@ static void ir_emit_ref(ir_ctx *ctx, FILE *f, ir_ref ref)
 			}
 		} else if (IR_IS_TYPE_FP(insn->type)) {
 			if (insn->type == IR_DOUBLE) {
-				double d = insn->val.d;
-				if (isnan(d)) {
-					fprintf(f, "nan");
-				} else if (d == 0.0) {
-					fprintf(f, "0.0");
-				} else {
-					double e = log10(d);
-					if (e < -4 || e >= 6) {
-						fprintf(f, "%e", d);
-					} else if (round(d) == d) {
-						fprintf(f, "%.0f.0", d);
-					} else {
-						fprintf(f, "%g", d);
-					}
-				}
+				ir_print_double(insn->val.d, f);
 			} else {
 				IR_ASSERT(insn->type == IR_FLOAT);
-				double d = insn->val.f;
-				if (isnan(d)) {
-					fprintf(f, "nan");
-				} else if (d == 0.0) {
-					fprintf(f, "0.0");
-				} else {
-					double e = log10(d);
-					if (e < -4 || e >= 6) {
-						fprintf(f, "%e", d);
-					} else if (round(d) == d) {
-						fprintf(f, "%.0f.0", d);
-					} else {
-						fprintf(f, "%g", d);
-					}
-				}
+				ir_print_float(insn->val.f, f);
 			}
 		} else if (insn->op == IR_LABEL) {
 			ir_llvm_backend_data *data = ctx->data;
@@ -890,13 +880,13 @@ static void ir_emit_replace(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 	fprintf(f, " ");
 	ir_emit_ref(ctx, f, insn->op1);
 	fprintf(f, ", ");
-	ir_emit_llvm_type_name(ctx->ir_base[insn->op2].type, f);
-	fprintf(f, " ");
-	ir_emit_ref(ctx, f, insn->op2);
-	fprintf(f, ", ");
 	ir_emit_llvm_type_name(ctx->ir_base[insn->op3].type, f);
 	fprintf(f, " ");
 	ir_emit_ref(ctx, f, insn->op3);
+	fprintf(f, ", ");
+	ir_emit_llvm_type_name(ctx->ir_base[insn->op2].type, f);
+	fprintf(f, " ");
+	ir_emit_ref(ctx, f, insn->op2);
 	fprintf(f, "\n");
 }
 
