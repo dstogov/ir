@@ -1397,7 +1397,7 @@ static bool llvm2ir_inline(ir_ctx *ctx, LLVMValueRef insn, LLVMValueRef func, LL
 		ir_ref begin = llvm2ir_insert_block_begin(ctx, start);
 		ir_BLOCK_END(begin);
 	}
-	ctx->flags2 = orig_flags2;
+	ctx->flags2 = orig_flags2 | (ctx->flags2 & IR_HAS_LONG_CONSTANTS);
 	if (!ref) {
 		return 0;
 	} else if (ref != 1) {
