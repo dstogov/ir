@@ -3153,7 +3153,9 @@ IR_FOLD(FP2INT(INT2FP))
 	ir_type dst_type = IR_OPT_TYPE(opt);
 	ir_type src_type = ctx->ir_base[op1_insn->op1].type;
 
-	if (ir_type_size[src_type] >= ir_type_size[op1_insn->type]) {
+	if (!IR_IS_TYPE_INT(IR_OPT_TYPE(opt))) {
+		IR_FOLD_NEXT;
+	} else if (ir_type_size[src_type] >= ir_type_size[op1_insn->type]) {
 		/* source integer type can not fit into intermediate floating point */
 		IR_FOLD_NEXT;
 	}
@@ -3173,11 +3175,11 @@ IR_FOLD(TRUNC(SEXT))
 	/* (int32_t)(int64_t)i => i */
 	if (src_type == dst_type) {
 		IR_FOLD_COPY(op1_insn->op1);
-	} else if (ir_type_size[src_type] == ir_type_size[dst_type]) {
+	} else if (ir_get_type_size(src_type) == ir_get_type_size(dst_type)) {
 		opt = IR_OPT(IR_BITCAST, dst_type);
 		op1 = op1_insn->op1;
 		IR_FOLD_RESTART;
-	} else if (ir_type_size[src_type] > ir_type_size[dst_type]) {
+	} else if (ir_get_type_size(src_type) > ir_get_type_size(dst_type)) {
 		opt = IR_OPT(IR_TRUNC, dst_type);
 		op1 = op1_insn->op1;
 		IR_FOLD_RESTART;
@@ -3208,11 +3210,10 @@ IR_FOLD(BITCAST(BITCAST))
 
 	if (src_type == dst_type) {
 		IR_FOLD_COPY(op1_insn->op1);
-	} else if (IR_IS_TYPE_INT(src_type) == IR_IS_TYPE_INT(dst_type)) {
+	} else {
 		op1 = op1_insn->op1;
 		IR_FOLD_RESTART;
 	}
-	IR_FOLD_NEXT;
 }
 
 IR_FOLD(TRUNC(TRUNC))
@@ -3232,7 +3233,8 @@ IR_FOLD(SEXT(ZEXT))
 
 IR_FOLD(SEXT(AND))
 {
-	if (IR_IS_CONST_REF(op1_insn->op2)
+	if (IR_IS_TYPE_INT(IR_OPT_TYPE(opt))
+	 && IR_IS_CONST_REF(op1_insn->op2)
 	 && !IR_IS_SYM_CONST(ctx->ir_base[op1_insn->op2].op)
 	 && !(ctx->ir_base[op1_insn->op2].val.u64
 			& (1ULL << ((ir_type_size[op1_insn->type] * 8) - 1)))) {
@@ -3245,7 +3247,8 @@ IR_FOLD(SEXT(AND))
 
 IR_FOLD(SEXT(SHR))
 {
-	if (IR_IS_CONST_REF(op1_insn->op2)
+	if (IR_IS_TYPE_INT(IR_OPT_TYPE(opt))
+	 && IR_IS_CONST_REF(op1_insn->op2)
 	 && !IR_IS_SYM_CONST(ctx->ir_base[op1_insn->op2].op)
 	 && ctx->ir_base[op1_insn->op2].val.u64 != 0) {
 		opt = IR_OPT(IR_ZEXT, IR_OPT_TYPE(opt));
@@ -3256,7 +3259,8 @@ IR_FOLD(SEXT(SHR))
 
 IR_FOLD(TRUNC(AND))
 {
-	if (IR_IS_CONST_REF(op1_insn->op2)) {
+	if (IR_IS_TYPE_INT(IR_OPT_TYPE(opt))
+	 && IR_IS_CONST_REF(op1_insn->op2)) {
 		size_t size = ir_type_size[IR_OPT_TYPE(opt)];
 		uint64_t mask = ctx->ir_base[op1_insn->op2].val.u64;
 
