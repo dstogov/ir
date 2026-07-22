@@ -3193,7 +3193,8 @@ IR_FOLD(TRUNC(BITCAST))
 IR_FOLD(ZEXT(BITCAST))
 IR_FOLD(SEXT(BITCAST))
 {
-	if (IR_IS_TYPE_INT(ctx->ir_base[op1_insn->op1].type)) {
+	if (IR_IS_TYPE_INT(IR_OPT_TYPE(opt))
+	 && IR_IS_TYPE_INT(ctx->ir_base[op1_insn->op1].type)) {
 		op1 = op1_insn->op1;
 		IR_FOLD_RESTART;
 	}

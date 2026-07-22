@@ -115,7 +115,12 @@ static ir_type llvm2ir_type(LLVMTypeRef type)
 
 static ir_type llvm2ir_unsigned_type(ir_type type)
 {
-	if (IR_IS_TYPE_SIGNED(type)) {
+	if (IR_IS_TYPE_VECTOR(type)) {
+		if (IR_IS_TYPE_SIGNED(IR_VECTOR_BASE_TYPE(type))) {
+			IR_ASSERT(IR_VECTOR_BASE_TYPE(type) >= IR_I8 && IR_VECTOR_BASE_TYPE(type) <= IR_I64);
+			type = type - (IR_I8 - IR_U8);
+		}
+	} else if (IR_IS_TYPE_SIGNED(type)) {
 		IR_ASSERT(type >= IR_I8 && type <= IR_I64);
 		type = type - (IR_I8 - IR_U8);
 	}
@@ -124,7 +129,12 @@ static ir_type llvm2ir_unsigned_type(ir_type type)
 
 static ir_type llvm2ir_signed_type(ir_type type)
 {
-	if (!IR_IS_TYPE_SIGNED(type)) {
+	if (IR_IS_TYPE_VECTOR(type)) {
+		if (!IR_IS_TYPE_SIGNED(IR_VECTOR_BASE_TYPE(type))) {
+			IR_ASSERT(IR_VECTOR_BASE_TYPE(type) >= IR_U8 && IR_VECTOR_BASE_TYPE(type) <= IR_U64);
+			type = type + (IR_I8 - IR_U8);
+		}
+	} else if (!IR_IS_TYPE_SIGNED(type)) {
 		IR_ASSERT(type >= IR_U8 && type <= IR_U64);
 		type = type + (IR_I8 - IR_U8);
 	}
@@ -216,6 +226,58 @@ static bool llvm2ir_is_static(LLVMValueRef op)
 	}
 }
 
+static ir_ref llvm2ir_const_vector(ir_ctx *ctx, LLVMValueRef op, ir_type type)
+{
+	ir_ref ref = ir_const_vector(ctx, type);
+	void *ptr = ir_long_const_ptr(ctx, ref);
+	ir_type element_type = IR_VECTOR_BASE_TYPE(type);
+	uint32_t element_size = ir_type_size[element_type];
+	uint32_t i, n = IR_VECTOR_LENGTH(type);
+	ir_val val;
+	LLVMBool lose;
+
+	memset(ptr, 0, IR_VECTOR_SIZE(type));
+	for (i = 0; i < n; i++) {
+		LLVMValueRef el = LLVMGetAggregateElement(op, i);
+		LLVMValueKind kind = LLVMGetValueKind(el);
+
+		switch (kind) {
+			case LLVMConstantIntValueKind:
+				IR_ASSERT(IR_IS_TYPE_INT(element_type));
+				if (IR_IS_TYPE_SIGNED(element_type)) {
+					val.i64 = LLVMConstIntGetSExtValue(el);
+				} else {
+					val.i64 = LLVMConstIntGetZExtValue(el);
+				}
+				if (element_size == 1) {
+					((uint8_t*)ptr)[i] = val.u8;
+				} else if (element_size == 2) {
+					((uint16_t*)ptr)[i] = val.u16;
+				} else if (element_size == 4) {
+					((uint32_t*)ptr)[i] = val.u32;
+				} else if (element_size == 8) {
+					((uint64_t*)ptr)[i] = val.u64;
+				} else {
+					IR_ASSERT(0);
+				}
+				break;
+			case LLVMConstantFPValueKind:
+				if (element_type == IR_DOUBLE) {
+					((double*)ptr)[i] = LLVMConstRealGetDouble(el, &lose);
+				} else {
+					((float*)ptr)[i] = (float)LLVMConstRealGetDouble(el, &lose);
+				}
+				break;
+			default:
+				fprintf(stderr, "Unsupported LLVM value kind: %d\n", kind);
+				IR_ASSERT(0);
+				return 0;
+		}
+	}
+
+	return ref;
+}
+
 static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 {
 	ir_ref ref;
@@ -225,6 +287,7 @@ static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 	ir_ref proto;
 	ir_val val;
 	char buf[256];
+	void *ptr;
 	LLVMValueKind kind = LLVMGetValueKind(op);
 
 	switch (kind) {
@@ -283,15 +346,27 @@ static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 				}
 			}
 			return ir_const_func(ctx, ir_stringl(ctx, name, name_len), proto);
-		case LLVMUndefValueValueKind:
-		case LLVMPoisonValueValueKind:
-			// TODO: ???
-			val.u64 = 0;
-			return ir_const(ctx, val, type);
 		case LLVMBlockAddressValueKind:
 			name = llvm2ir_label_name(buf, sizeof(buf), LLVMGetBlockAddressFunction(op), LLVMGetBlockAddressBasicBlock(op));
 			IR_ASSERT(name);
 			return ir_const_label(ctx, ir_string(ctx, name));
+		case LLVMUndefValueValueKind:
+		case LLVMPoisonValueValueKind:
+			if (!IR_IS_TYPE_VECTOR(type)) {
+				// TODO: ???
+				val.u64 = 0;
+				return ir_const(ctx, val, type);
+			}
+			IR_FALLTHROUGH;
+		case LLVMConstantAggregateZeroValueKind:
+			IR_ASSERT(IR_IS_TYPE_VECTOR(type));
+			ref = ir_const_vector(ctx, type);
+			ptr = ir_long_const_ptr(ctx, ref);
+			memset(ptr, 0, IR_VECTOR_SIZE(type));
+			return ref;
+		case LLVMConstantDataVectorValueKind:
+			IR_ASSERT(IR_IS_TYPE_VECTOR(type));
+			return llvm2ir_const_vector(ctx, op, type);
 		default:
 			fprintf(stderr, "Unsupported LLVM value kind: %d\n", kind);
 			IR_ASSERT(0);
@@ -390,7 +465,9 @@ static ir_ref llvm2ir_cast_op(ir_ctx *ctx, LLVMValueRef expr, ir_op op, LLVMOpco
 
 	src_type = llvm2ir_type(LLVMTypeOf(op0));
 	dst_type = llvm2ir_type(LLVMTypeOf(expr));
-	if (op == IR_ZEXT) {
+	if (IR_IS_TYPE_VECTOR(src_type) || IR_IS_TYPE_VECTOR(dst_type)) {
+		/* pass */
+	} else if (op == IR_ZEXT) {
 		if (src_type == IR_BOOL && (dst_type == IR_I8 || dst_type == IR_U8)) {
 			op = IR_BITCAST;
 		} else if (ir_type_size[src_type] == ir_type_size[dst_type]) {
@@ -1483,6 +1560,71 @@ static void llvm2ir_freeze(ir_ctx *ctx, LLVMValueRef expr)
 	ir_addrtab_set(ctx->binding, (uintptr_t)expr, ref);
 }
 
+static void llvm2ir_vector_extract(ir_ctx *ctx, LLVMValueRef expr)
+{
+	LLVMValueRef op0 = LLVMGetOperand(expr, 0);
+	LLVMValueRef op1 = LLVMGetOperand(expr, 1);
+	ir_type type = llvm2ir_type(LLVMTypeOf(expr));
+	ir_type type0 = llvm2ir_type(LLVMTypeOf(op0));
+	ir_type type1 = llvm2ir_type(LLVMTypeOf(op1));
+	ir_ref ref;
+
+	IR_ASSERT(LLVMGetNumOperands(expr) == 2);
+
+	ref = ir_fold2(ctx, IR_OPT(IR_EXTRACT, type), llvm2ir_op(ctx, op0, type0), llvm2ir_op(ctx, op1, type1));
+	ir_addrtab_set(ctx->binding, (uintptr_t)expr, ref);
+}
+
+static void llvm2ir_vector_insert(ir_ctx *ctx, LLVMValueRef expr)
+{
+	LLVMValueRef op0 = LLVMGetOperand(expr, 0);
+	LLVMValueRef op1 = LLVMGetOperand(expr, 1);
+	LLVMValueRef op2 = LLVMGetOperand(expr, 2);
+	ir_type type = llvm2ir_type(LLVMTypeOf(op0));
+	ir_type type1 = llvm2ir_type(LLVMTypeOf(op1));
+	ir_type type2 = llvm2ir_type(LLVMTypeOf(op2));
+	ir_ref ref;
+
+	IR_ASSERT(LLVMGetNumOperands(expr) == 3);
+
+	ref = ir_fold3(ctx, IR_OPT(IR_REPLACE, type), llvm2ir_op(ctx, op0, type),
+		llvm2ir_op(ctx, op2, type2), llvm2ir_op(ctx, op1, type1));
+	ir_addrtab_set(ctx->binding, (uintptr_t)expr, ref);
+}
+
+static void llvm2ir_vector_shuffle(ir_ctx *ctx, LLVMValueRef expr)
+{
+	ir_type type = llvm2ir_type(LLVMTypeOf(expr));
+	LLVMValueRef op0, op1;
+	ir_type type0, type1;
+	uint32_t i, n;
+	ir_ref ref, ref0, ref1, ref2;
+	int8_t *ptr;
+
+	IR_ASSERT(LLVMGetNumOperands(expr) == 2);
+	op0 = LLVMGetOperand(expr, 0);
+	type0 = llvm2ir_type(LLVMTypeOf(op0));
+	ref0 = llvm2ir_op(ctx, op0, type0);
+	op1 = LLVMGetOperand(expr, 1);
+	if (op0 == op1 || LLVMGetValueKind(op1) == LLVMPoisonValueValueKind) {
+		type1 = type0;
+		ref1 = ref0;
+	} else {
+		type1 = llvm2ir_type(LLVMTypeOf(op1));
+		ref1 = llvm2ir_op(ctx, op1, type1);
+	}
+
+	n = LLVMGetNumMaskElements(expr);
+	ref2 = ir_const_vector(ctx, IR_MAKE_VECTOR_TYPE(IR_I8, n));
+	ptr = ir_long_const_ptr(ctx, ref2);
+	for (i = 0; i < n; i++) {
+		ptr[i] = LLVMGetMaskValue(expr, i);
+	}
+
+	ref = ir_fold3(ctx, IR_OPT(IR_SHUFFLE, type), ref0, ref1, ref2);
+	ir_addrtab_set(ctx->binding, (uintptr_t)expr, ref);
+}
+
 static uintptr_t llvm2ir_const_element_ptr_offset(LLVMTargetDataRef target_data, LLVMValueRef expr)
 {
 	LLVMValueRef op;
@@ -2240,6 +2382,15 @@ next:
 					break;
 				case LLVMVAArg:
 					llvm2ir_va_arg(ctx, insn);
+					break;
+				case LLVMExtractElement:
+					llvm2ir_vector_extract(ctx, insn);
+					break;
+				case LLVMInsertElement:
+					llvm2ir_vector_insert(ctx, insn);
+					break;
+				case LLVMShuffleVector:
+					llvm2ir_vector_shuffle(ctx, insn);
 					break;
 				case LLVMExtractValue:
 					if (llvm2ir_extract(ctx, insn)) {

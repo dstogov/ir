@@ -370,31 +370,31 @@ static void ir_emit_vector_const(ir_type type, const void *p, FILE *f)
 			}
 			break;
 		case IR_U8:
-			fprintf(f, "u8 %u", *(uint8_t*)p);
+			fprintf(f, "i8 %u", *(uint8_t*)p);
 			while (--n) {
 				p = (char*)p + sizeof(uint8_t);
-				fprintf(f, ", u8 %u", *(uint8_t*)p);
+				fprintf(f, ", i8 %u", *(uint8_t*)p);
 			}
 			break;
 		case IR_U16:
-			fprintf(f, "u16 %u", *(uint16_t*)p);
+			fprintf(f, "i16 %u", *(uint16_t*)p);
 			while (--n) {
 				p = (char*)p + sizeof(uint16_t);
-				fprintf(f, ", u16 %u", *(uint16_t*)p);
+				fprintf(f, ", i16 %u", *(uint16_t*)p);
 			}
 			break;
 		case IR_U32:
-			fprintf(f, "u32 %u", *(uint32_t*)p);
+			fprintf(f, "i32 %u", *(uint32_t*)p);
 			while (--n) {
 				p = (char*)p + sizeof(uint32_t);
-				fprintf(f, ", u32 %u", *(uint32_t*)p);
+				fprintf(f, ", i32 %u", *(uint32_t*)p);
 			}
 			break;
 		case IR_U64:
-			fprintf(f, "u64 %" PRIu64, *(uint64_t*)p);
+			fprintf(f, "i64 %" PRIu64, *(uint64_t*)p);
 			while (--n) {
 				p = (char*)p + sizeof(uint64_t);
-				fprintf(f, ", u64 %" PRIu64, *(uint64_t*)p);
+				fprintf(f, ", i64 %" PRIu64, *(uint64_t*)p);
 			}
 			break;
 		case IR_DOUBLE:
@@ -588,6 +588,25 @@ static void ir_emit_binary_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, cons
 		return;
 	}
 
+	if (IR_IS_TYPE_VECTOR(insn->type) && insn->op >= IR_SHL && insn->op <= IR_SAR
+	 && IR_IS_TYPE_SCALAR(ctx->ir_base[insn->op2].type)) {
+		fprintf(f, "\t%%t%d_1 = ", def);
+		fprintf(f, "insertelement ");
+		ir_emit_llvm_type_name(insn->type, f);
+		fprintf(f, " poison, ");
+		ir_emit_llvm_type_name(ctx->ir_base[insn->op2].type, f);
+		fprintf(f, " ");
+		ir_emit_ref(ctx, f, insn->op2);
+		fprintf(f, ", i32 0\n");
+
+		fprintf(f, "\t%%t%d_2 = ", def);
+		fprintf(f, "shufflevector ");
+		ir_emit_llvm_type_name(insn->type, f);
+		fprintf(f, " %%t%d_1, ", def);
+		ir_emit_llvm_type_name(insn->type, f);
+		fprintf(f, " poison, <%d x i32> zeroinitializer\n", IR_VECTOR_LENGTH(insn->type));
+	}
+
 	if (IR_IS_TYPE_VECTOR(insn->type) && insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
 		fprintf(f, "\t%%t%d_1 = ", def);
 	} else {
@@ -608,7 +627,12 @@ static void ir_emit_binary_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, cons
 	fprintf(f, " ");
 	ir_emit_ref(ctx, f, insn->op1);
 	fprintf(f, ", ");
-	ir_emit_ref(ctx, f, insn->op2);
+	if (IR_IS_TYPE_VECTOR(insn->type) && insn->op >= IR_SHL && insn->op <= IR_SAR
+	 && IR_IS_TYPE_SCALAR(ctx->ir_base[insn->op2].type)) {
+		fprintf(f, "%%t%d_2", def);
+	} else {
+		ir_emit_ref(ctx, f, insn->op2);
+	}
 	fprintf(f, "\n");
 
 	if (IR_IS_TYPE_VECTOR(insn->type) && insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
@@ -893,13 +917,13 @@ static void ir_emit_replace(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 static void ir_emit_splat(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 {
 	fprintf(f, "\t%%t%d_1 = ", def);
-	fprintf(f, "insrtelement ");
+	fprintf(f, "insertelement ");
 	ir_emit_llvm_type_name(insn->type, f);
 	fprintf(f, " poison, ");
 	ir_emit_llvm_type_name(ctx->ir_base[insn->op1].type, f);
 	fprintf(f, " ");
 	ir_emit_ref(ctx, f, insn->op1);
-	fprintf(f, "\n");
+	fprintf(f, ", i32 0\n");
 
 	ir_emit_def_ref(ctx, f, def);
 	fprintf(f, "shufflevector ");
@@ -921,9 +945,47 @@ static void ir_emit_shuffle(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 	fprintf(f, " ");
 	ir_emit_ref(ctx, f, insn->op2);
 	fprintf(f, ", ");
-	ir_emit_llvm_type_name(ctx->ir_base[insn->op3].type, f);
-	fprintf(f, " ");
-	ir_emit_ref(ctx, f, insn->op3);
+	if (IR_IS_CONST_REF(insn->op3)) {
+		uint32_t i, n, element_size;
+		void *ptr;
+
+		IR_ASSERT(IR_IS_TYPE_VECTOR(ctx->ir_base[insn->op3].type));
+		element_size = ir_type_size[IR_VECTOR_BASE_TYPE(ctx->ir_base[insn->op3].type)];
+		n = IR_VECTOR_LENGTH(ctx->ir_base[insn->op3].type);
+		fprintf(f, "<%d x i32>", n);
+		ptr = ir_long_const_ptr(ctx, insn->op3);
+		if (element_size == 1) {
+			fprintf(f, " <i32 %d", ((int8_t*)ptr)[0]);
+			for (i = 1; i < n; i++) {
+				fprintf(f, ", i32 %d", ((int8_t*)ptr)[i]);
+			}
+			fprintf(f, ">");
+		} else if (element_size == 2) {
+			fprintf(f, " <i32 %d", ((int16_t*)ptr)[0]);
+			for (i = 1; i < n; i++) {
+				fprintf(f, ", i32 %d", ((int16_t*)ptr)[i]);
+			}
+			fprintf(f, ">");
+		} else if (element_size == 4) {
+			fprintf(f, " <i32 %d", ((int32_t*)ptr)[0]);
+			for (i = 1; i < n; i++) {
+				fprintf(f, ", i32 %d", ((int32_t*)ptr)[i]);
+			}
+			fprintf(f, ">");
+		} else if (element_size == 8) {
+			fprintf(f, " <i32 %d", (int)((int64_t*)ptr)[0]);
+			for (i = 1; i < n; i++) {
+				fprintf(f, ", i32 %d", (int)((int64_t*)ptr)[i]);
+			}
+			fprintf(f, ">");
+		} else {
+			IR_ASSERT(0);
+		}
+	} else {
+		ir_emit_llvm_type_name(ctx->ir_base[insn->op3].type, f);
+		fprintf(f, " ");
+		ir_emit_ref(ctx, f, insn->op3);
+	}
 	fprintf(f, "\n");
 }
 

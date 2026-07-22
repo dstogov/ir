@@ -681,49 +681,57 @@ static void ir_emit_splat(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 
 static void ir_emit_shuffle(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 {
-	ir_type t;
-	uint32_t n;
-
-	t = ctx->ir_base[insn->op3].type;
-	IR_ASSERT(IR_IS_TYPE_VECTOR(t));
-	n = IR_VECTOR_LENGTH(t);
-	t = IR_VECTOR_BASE_TYPE(t);
-	IR_ASSERT(IR_IS_TYPE_INT(t));
-
 	ir_emit_def_ref(ctx, f, def);
-	fprintf(f, "__builtin_shufflevector(");
-	ir_emit_ref(ctx, f, insn->op1);
-	fprintf(f, ", ");
-	ir_emit_ref(ctx, f, insn->op2);
+	if (IR_IS_CONST_REF(insn->op3)) {
+		ir_type t;
+		uint32_t n;
 
-	if (ir_type_size[t] == 1) {
-		int8_t *p = ir_long_const_ptr(ctx, insn->op3);
+		t = ctx->ir_base[insn->op3].type;
+		IR_ASSERT(IR_IS_TYPE_VECTOR(t));
+		n = IR_VECTOR_LENGTH(t);
+		t = IR_VECTOR_BASE_TYPE(t);
+		IR_ASSERT(IR_IS_TYPE_INT(t));
 
-		for (; n > 0; p++, n--) {
-			printf(", %d", (int)*p);
-		}
-	} else if (ir_type_size[t] == 2) {
-		int16_t *p = ir_long_const_ptr(ctx, insn->op3);
+		fprintf(f, "__builtin_shufflevector(");
+		ir_emit_ref(ctx, f, insn->op1);
+		fprintf(f, ", ");
+		ir_emit_ref(ctx, f, insn->op2);
 
-		for (; n > 0; p++, n--) {
-			printf(", %d", (int)*p);
-		}
-	} else if (ir_type_size[t] == 4) {
-		int32_t *p = ir_long_const_ptr(ctx, insn->op3);
+		if (ir_type_size[t] == 1) {
+			int8_t *p = ir_long_const_ptr(ctx, insn->op3);
 
-		for (; n > 0; p++, n--) {
-			printf(", %d", (int)*p);
-		}
-	} else if (ir_type_size[t] == 8) {
-		int64_t *p = ir_long_const_ptr(ctx, insn->op3);
+			for (; n > 0; p++, n--) {
+				fprintf(f, ", %d", (int)*p);
+			}
+		} else if (ir_type_size[t] == 2) {
+			int16_t *p = ir_long_const_ptr(ctx, insn->op3);
 
-		for (; n > 0; p++, n--) {
-			printf(", %d", (int)*p);
+			for (; n > 0; p++, n--) {
+				fprintf(f, ", %d", (int)*p);
+			}
+		} else if (ir_type_size[t] == 4) {
+			int32_t *p = ir_long_const_ptr(ctx, insn->op3);
+
+			for (; n > 0; p++, n--) {
+				fprintf(f, ", %d", (int)*p);
+			}
+		} else if (ir_type_size[t] == 8) {
+			int64_t *p = ir_long_const_ptr(ctx, insn->op3);
+
+			for (; n > 0; p++, n--) {
+				fprintf(f, ", %d", (int)*p);
+			}
+		} else {
+			IR_ASSERT(0);
 		}
 	} else {
-		IR_ASSERT(0);
+		fprintf(f, "__builtin_shuffle(");
+		ir_emit_ref(ctx, f, insn->op1);
+		fprintf(f, ", ");
+		ir_emit_ref(ctx, f, insn->op2);
+		fprintf(f, ", ");
+		ir_emit_ref(ctx, f, insn->op3);
 	}
-
 
 	fprintf(f, ");\n");
 }
