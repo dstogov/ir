@@ -45,6 +45,16 @@ static void ir_resolve_label_syms(ir_ctx *ctx)
 	}
 }
 
+static void ir_emit_c_type_name(ir_type type, FILE *f)
+{
+	if (IR_IS_TYPE_VECTOR(type)) {
+		fprintf(f, "%s __attribute__((__vector_size__(%d)))",
+			ir_type_cname[IR_VECTOR_BASE_TYPE(type)], IR_VECTOR_SIZE(type));
+	} else {
+		fprintf(f, "%s", ir_type_cname[type]);
+	}
+}
+
 static void ir_emit_c_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 {
 	if (insn->op == IR_LABEL) {
@@ -58,18 +68,12 @@ static void ir_emit_c_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 	} else {
 		if (insn->op == IR_SYM) {
 			fprintf(f, "&");
+		} else if (IR_IS_TYPE_VECTOR(insn->type)) {
+			fprintf(f, "(");
+			ir_emit_c_type_name(insn->type, f);
+			fprintf(f, ")");
 		}
 		ir_print_const(ctx, insn, f, true);
-	}
-}
-
-static void ir_emit_c_type_name(ir_type type, FILE *f)
-{
-	if (IR_IS_TYPE_VECTOR(type)) {
-		fprintf(f, "%s __attribute__((__vector_size__(%d)))",
-			ir_type_cname[IR_VECTOR_BASE_TYPE(type)], IR_VECTOR_SIZE(type));
-	} else {
-		fprintf(f, "%s", ir_type_cname[type]);
 	}
 }
 
@@ -1006,7 +1010,9 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 				/* IR_VAR never gets a vreg (see ir_assign_virtual_registers_slow()),
 				 * so it must be declared here, independently of ctx->vregs[i]. */
 				if (ctx->use_lists[i].count > 0) {
-					fprintf(f, "\t%s %s;\n", ir_type_cname[insn->type], ir_get_str(ctx, insn->op2));
+					fprintf(f, "\t");
+					ir_emit_c_type_name(insn->type, f);
+					fprintf(f, " %s;\n", ir_get_str(ctx, insn->op2));
 				}
 			} else if (ctx->vregs[i]) {
 				if (!ir_bitset_in(vars, ctx->vregs[i])) {
