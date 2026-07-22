@@ -17104,7 +17104,7 @@ static void ir_emit_vector_replace(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					|	pinsrb xmm(tmp_reg-IR_REG_FP_FIRST), Rd(op3_reg), (lane%16)
 				} else {
 					/* modify through stack memory */
-					int offset = sizeof(void*);
+					int offset = width;
 
 					|	movdqu [Ra(IR_REG_RSP)-offset], xmm(tmp_reg-IR_REG_FP_FIRST)
 					|	mov [Ra(IR_REG_RSP)-(offset-(lane%16))], Rb(op3_reg)
