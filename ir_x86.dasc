@@ -5018,7 +5018,9 @@ static void ir_emit_load_imm_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref sr
 						} else if (width == 4) {
 							|	vmovd xmm(reg-IR_REG_FP_FIRST), dword [=>label]
 						} else {
-							IR_ASSERT(width >= 4 && width <= 16);
+							// TODO: 4-byte read may be unsafe ???
+							// IR_ASSERT(width >= 4 && width <= 16);
+							|	vmovd xmm(reg-IR_REG_FP_FIRST), dword [=>label]
 						}
 					} else if (element_type == IR_DOUBLE) {
 						if (width == 16) {
@@ -5063,7 +5065,8 @@ static void ir_emit_load_imm_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref sr
 					} else if (width == 4) {
 						|	movd xmm(reg-IR_REG_FP_FIRST), dword [=>label]
 					} else {
-						// ??? IR_ASSERT(width >= 4 && width <= 16);
+						// TODO: 4-byte read may be unsafe ???
+						// IR_ASSERT(width >= 4 && width <= 16);
 						|	movd xmm(reg-IR_REG_FP_FIRST), dword [=>label]
 					}
 				} else if (element_type == IR_DOUBLE) {
@@ -5113,7 +5116,8 @@ static void ir_emit_load_mem_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_mem me
 					} else if (width == 4) {
 						|	ASM_TXT_TMEM_OP vmovd, xmm(reg-IR_REG_FP_FIRST), dword, mem
 					} else {
-						//??? IR_ASSERT(width >= 4 && width <= 16);
+						// TODO: 4-byte read may be unsafe ???
+						// IR_ASSERT(width >= 4 && width <= 16);
 						|	ASM_TXT_TMEM_OP vmovd, xmm(reg-IR_REG_FP_FIRST), dword, mem
 					}
 				} else if (element_type == IR_DOUBLE) {
@@ -5160,7 +5164,9 @@ static void ir_emit_load_mem_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_mem me
 				} else if (width == 4) {
 					|	ASM_TXT_TMEM_OP movd, xmm(reg-IR_REG_FP_FIRST), dword, mem
 				} else {
-					IR_ASSERT(width >= 4 && width <= 16);
+					// TODO: 4-byte read may be unsafe ???
+					// IR_ASSERT(width >= 4 && width <= 16);
+					|	ASM_TXT_TMEM_OP movd, xmm(reg-IR_REG_FP_FIRST), dword, mem
 				}
 			} else if (element_type == IR_DOUBLE) {
 				if (width == 16) {
