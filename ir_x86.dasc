@@ -1762,6 +1762,13 @@ static bool ir_may_fuse_imm(ir_ctx *ctx, const ir_insn *val_insn)
 	}
 }
 
+#if IR_SIMD
+static bool ir_may_fuse_load_vector(ir_ctx *ctx, ir_type type)
+{
+	return IR_VECTOR_SIZE(type) == 16 || (IR_VECTOR_SIZE(type) == 32 && (ctx->mflags & IR_X86_AVX));
+}
+#endif
+
 /* register allocation */
 static int ir_add_const_tmp_reg(ir_ctx *ctx, ir_ref ref, uint32_t num, int n, ir_target_constraints *constraints)
 {
@@ -2589,12 +2596,10 @@ get_arg_hints:
 			break;
 		case IR_VECTOR_OP:
 			insn = &ctx->ir_base[ref];
-			if (insn->op == IR_NOT || insn->op == IR_NEG) {
-				if (IR_VECTOR_SIZE(insn->type) == 16 || (IR_VECTOR_SIZE(insn->type) == 32 && (ctx->mflags & IR_X86_AVX))) {
-					flags = IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
-				} else {
-					flags = IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;
-				}
+			if (ir_may_fuse_load_vector(ctx, insn->type)) {
+				flags = IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
+			} else {
+				flags = IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;
 			}
 			if (IR_IS_CONST_REF(insn->op1)) {
 				constraints->tmp_regs[0] = IR_TMP_REG(1, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
@@ -2799,28 +2804,17 @@ get_arg_hints:
 			/* load/store through stack */
 			ctx->flags2 |= IR_16B_FRAME_ALIGNMENT;
 			break;
+		case IR_VECTOR_EXT:
 		case IR_VECTOR_FP2FP:
-			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
 			insn = &ctx->ir_base[ref];
+			if (ir_may_fuse_load_vector(ctx, ctx->ir_base[insn->op1].type)) {
+				flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
+			} else {
+				flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;
+			}
 			if (IR_IS_CONST_REF(insn->op1)) {
-				if (insn->op == IR_FP2FP) {
-					ir_type src_type = ctx->ir_base[insn->op1].type;
-					uint32_t src_width = IR_VECTOR_SIZE(src_type);
-					ir_type src_element_type = IR_VECTOR_BASE_TYPE(src_type);
-
-					if (src_element_type == IR_DOUBLE) {
-						if (src_width != 16 && (src_width != 32 || !(ctx->mflags & IR_X86_AVX))) {
-							constraints->tmp_regs[0] = IR_TMP_REG(1, src_type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
-							n = 1;
-						}
-					} else {
-						IR_ASSERT(src_element_type == IR_FLOAT);
-						if (src_width != 8 && (src_width != 16 || !(ctx->mflags & IR_X86_AVX))) {
-							constraints->tmp_regs[0] = IR_TMP_REG(1, src_type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
-							n = 1;
-						}
-					}
-				}
+				constraints->tmp_regs[0] = IR_TMP_REG(1, insn->type, IR_USE_SUB_REF, IR_DEF_SUB_REF);
+				n = 1;
 			}
 			break;
 #endif
@@ -3219,13 +3213,6 @@ static bool all_usages_are_fusable(ir_ctx *ctx, ir_ref ref)
 	}
 	return 0;
 }
-
-#if IR_SIMD
-static bool ir_may_fuse_load_vector(ir_ctx *ctx, ir_type type)
-{
-	return IR_VECTOR_SIZE(type) == 16 || (IR_VECTOR_SIZE(type) == 32 && (ctx->mflags & IR_X86_AVX));
-}
-#endif
 
 static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref)
 {
@@ -17526,8 +17513,6 @@ static void ir_emit_vector_splat(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
-//	ir_backend_data *data = ctx->data;
-//	dasm_State **Dst = &data->dasm_state;
 	ir_type type = insn->type;
 	ir_type element_type;
 	uint32_t element_size;
@@ -17549,12 +17534,6 @@ static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		&& element_type == IR_VECTOR_BASE_TYPE(ctx->ir_base[insn->op2].type));
 
 	IR_ASSERT(def_reg != IR_REG_NONE && op1_reg != IR_REG_NONE);
-
-//	len = IR_VECTOR_LENGTH(ctx->ir_base[insn->op3].type);
-//	mask_type = IR_VECTOR_BASE_TYPE(ctx->ir_base[insn->op3].type);
-//	mask_ptr = ir_long_const_ptr(ctx, insn->op3);
-//
-//	IR_ASSERT(len * ir_type_size[element_type] == width);
 
 	if (IR_REG_SPILLED(op1_reg)) {
 		op1_reg = IR_REG_NUM(op1_reg);
@@ -17723,9 +17702,6 @@ static void ir_emit_vector_op(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		switch (insn->op) {
 			default:
 			case IR_ABS:
-				if (IR_IS_TYPE_INT(element_type)) {
-				} else {
-				}
 				IR_ASSERT(0 && "NIY unary op");
 				break;
 			case IR_NEG:
@@ -17734,10 +17710,9 @@ static void ir_emit_vector_op(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					if (ctx->mflags & IR_X86_AVX) {
 						if (width <= 16) {
 							|	vpxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
-						} else if (width == 32) {
-							|	vpxor ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST)
 						} else {
-							IR_ASSERT(0 && "unsupported vector width");
+							IR_ASSERT(width == 32);
+							|	vpxor ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST)
 						}
 						|	ASM_AVX_INT_VEC_REG_REG_REG_OP vpsub, element_type, width, def_reg, def_reg, op1_reg
 					} else {
@@ -17749,10 +17724,9 @@ static void ir_emit_vector_op(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					if (ctx->mflags & IR_X86_AVX) {
 						if (width <= 16) {
 							|	vpxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
-						} else if (width == 32) {
-							|	vpxor ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST)
 						} else {
-							IR_ASSERT(0 && "unsupported vector width");
+							IR_ASSERT(width == 32);
+							|	vpxor ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST)
 						}
 						|	ASM_AVX_FP_VEC_REG_REG_REG_OP vsubp, element_type, width, def_reg, def_reg, op1_reg
 					} else {
@@ -17769,11 +17743,10 @@ static void ir_emit_vector_op(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					if (width <= 16) {
 						|	vpcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 						|	vpxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-					} else if (width == 32) {
+					} else {
+						IR_ASSERT(width == 32);
 						|	vpcmpeqd ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST)
 						|	vpxor ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
-					} else {
-						IR_ASSERT(0 && "unsupported vector width");
 					}
 				} else {
 					IR_ASSERT(width <= 16);
@@ -17798,40 +17771,35 @@ static void ir_emit_vector_op(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		switch (insn->op) {
 			default:
 			case IR_ABS:
-				if (IR_IS_TYPE_INT(element_type)) {
-				} else {
-				}
 				IR_ASSERT(0 && "NIY unary op");
 				break;
 			case IR_NEG:
 				IR_ASSERT(def_reg != op1_reg);
 				if (IR_IS_TYPE_INT(element_type)) {
 					if (ctx->mflags & IR_X86_AVX) {
-						if (width <= 16) {
+						if (width == 16) {
 							|	vpxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
-						} else if (width == 32) {
-							|	vpxor ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST)
 						} else {
-							IR_ASSERT(0 && "unsupported vector width");
+							IR_ASSERT(width == 32);
+							|	vpxor ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST)
 						}
 						|	ASM_AVX_INT_VEC_REG_REG_MEM_OP vpsub, element_type, width, def_reg, def_reg, mem
 					} else {
-						IR_ASSERT(width <= 16);
+						IR_ASSERT(width == 16);
 						|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 						|	ASM_SSE_INT_VEC_REG_MEM_OP psub, element_type, def_reg, mem
 					}
 				} else {
 					if (ctx->mflags & IR_X86_AVX) {
-						if (width <= 16) {
+						if (width == 16) {
 							|	vpxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
-						} else if (width == 32) {
-							|	vpxor ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST)
 						} else {
-							IR_ASSERT(0 && "unsupported vector width");
+							IR_ASSERT(width == 32);
+							|	vpxor ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST)
 						}
 						|	ASM_AVX_FP_VEC_REG_REG_MEM_OP vsubp, element_type, width, def_reg, def_reg, mem
 					} else {
-						IR_ASSERT(width <= 16);
+						IR_ASSERT(width == 16);
 						|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 						|	ASM_SSE_FP_VEC_REG_MEM_OP subp, element_type, def_reg, mem
 					}
@@ -17841,17 +17809,16 @@ static void ir_emit_vector_op(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				IR_ASSERT(IR_IS_TYPE_INT(element_type));
 				IR_ASSERT(def_reg != op1_reg);
 				if (ctx->mflags & IR_X86_AVX) {
-					if (width <= 16) {
+					if (width == 16) {
 						|	vpcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 						|	ASM_TXT_TXT_TMEM_OP vpxor, xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), oword, mem
-					} else if (width == 32) {
+					} else {
+						IR_ASSERT(width == 32);
 						|	vpcmpeqd ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST)
 						|	ASM_TXT_TXT_TMEM_OP vpxor, ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), yword, mem
-					} else {
-						IR_ASSERT(0 && "unsupported vector width");
 					}
 				} else {
-					IR_ASSERT(width <= 16);
+					IR_ASSERT(width == 16);
 					|	pcmpeqd	xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	ASM_TXT_TMEM_OP pxor, xmm(def_reg-IR_REG_FP_FIRST), oword, mem
 				}
@@ -21137,36 +21104,7 @@ static void ir_emit_vector_fp2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 		}
 	} else if (IR_IS_CONST_REF(insn->op1)) {
-		int label = ir_get_const_label(ctx, insn->op1);
-
-		if (src_type == IR_DOUBLE) {
-			IR_ASSERT(dst_type == IR_FLOAT);
-			if (ctx->mflags & IR_X86_AVX) {
-				if (src_width == 32) {
-					|	vcvtpd2ps ymm(def_reg-IR_REG_FP_FIRST), yword [=>label]
-				} else {
-					IR_ASSERT(src_width == 16);
-					|	vcvtpd2ps xmm(def_reg-IR_REG_FP_FIRST), oword [=>label]
-				}
-			} else {
-				IR_ASSERT(src_width == 16);
-				|	cvtpd2ps xmm(def_reg-IR_REG_FP_FIRST), oword [=>label]
-			}
-		} else {
-			IR_ASSERT(src_type == IR_FLOAT);
-			IR_ASSERT(dst_type == IR_DOUBLE);
-			if (ctx->mflags & IR_X86_AVX) {
-				if (src_width == 16) {
-					|	vcvtps2pd ymm(def_reg-IR_REG_FP_FIRST), oword [=>label]
-				} else {
-					IR_ASSERT(src_width == 8);
-					|	vcvtps2pd xmm(def_reg-IR_REG_FP_FIRST), qword [=>label]
-				}
-			} else {
-				IR_ASSERT(src_width == 8);
-				|	cvtps2pd xmm(def_reg-IR_REG_FP_FIRST), qword [=>label]
-			}
-		}
+		IR_ASSERT(0);
 	} else {
 		ir_mem mem;
 
