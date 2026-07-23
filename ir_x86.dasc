@@ -3297,14 +3297,20 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref)
 			} else if (IR_IS_TYPE_VECTOR(insn->type)) {
 binop_vector:
 				if (ir_op_flags[insn->op] & IR_OP_FLAG_COMMUTATIVE) {
-//					ir_match_fuse_load_commutative_fp(ctx, insn, ref);
+					if (ir_may_fuse_load_vector(ctx, insn->type)) {
+						ir_match_fuse_load_commutative_fp(ctx, insn, ref);
+					}
 					if (ctx->mflags & IR_X86_AVX) {
 						return IR_VECTOR_BINOP_AVX;
 					} else {
 						return IR_VECTOR_BINOP_SSE2 | IR_MAY_SWAP;
 					}
 				} else {
-//					ir_match_fuse_load(ctx, insn->op2, ref);
+					if (ir_may_fuse_load_vector(ctx, insn->type)
+					 && !(insn->op >= IR_LT && insn->op <= IR_UGT)) {
+						// TODO: load may be fuxed inly into some comparison instructions ???
+						ir_match_fuse_load(ctx, insn->op2, ref);
+					}
 					if (ctx->mflags & IR_X86_AVX) {
 						return IR_VECTOR_BINOP_AVX;
 					} else {
@@ -19901,6 +19907,7 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 #endif
 			if (op2_reg != IR_REG_RCX) {
 				ir_emit_mov(ctx, shift_type, IR_REG_RCX, op2_reg);
+				op2_reg = IR_REG_RCX;
 			}
 		} else if (IR_IS_CONST_REF(op2)) {
 			shift_count = ctx->ir_base[op2].val.i32;
@@ -19919,6 +19926,7 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			} else
 #endif
 			ir_emit_load_mem(ctx, shift_type, IR_REG_RCX, mem);
+			op2_reg = IR_REG_RCX;
 		}
 	} else {
 		IR_ASSERT(type == ctx->ir_base[op2].type);
@@ -20353,6 +20361,30 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 #else
 					|	add esp, (width*3)+28
 #endif
+					break;
+				case IR_SHL:
+					if (!scalar_shift) {
+						ir_emit_load_mem_int(ctx, IR_U32, IR_REG_RCX, mem);
+					}
+					|	shld Rd(tmp1_reg_hi), Rd(tmp1_reg), cl
+					|	shl	Rd(tmp1_reg), cl
+					|	test cl, 32
+					|	je	>1
+					|	mov Rd(tmp1_reg_hi), Rd(tmp1_reg)
+					|	xor	Rd(tmp1_reg), Rd(tmp1_reg)
+					|1:
+					break;
+				case IR_SHR:
+					if (!scalar_shift) {
+						ir_emit_load_mem_int(ctx, IR_U32, IR_REG_RCX, mem);
+					}
+					|	shrd Rd(tmp1_reg), Rd(tmp1_reg_hi), cl
+					|	shr	Rd(tmp1_reg_hi), cl
+					|	test cl, 32
+					|	je	>1
+					|	mov Rd(tmp1_reg), Rd(tmp1_reg_hi)
+					|	xor	Rd(tmp1_reg_hi), Rd(tmp1_reg_hi)
+					|1:
 					break;
 				case IR_SAR:
 					if (!scalar_shift) {
