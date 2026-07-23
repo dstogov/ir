@@ -2755,9 +2755,12 @@ get_arg_hints:
 		case IR_VECTOR_BINOP_EXPAND:
 			insn = &ctx->ir_base[ref];
 			if (!IR_IS_CONST_REF(insn->op2) && IR_IS_TYPE_SCALAR(ctx->ir_base[insn->op2].type)) {
-				flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+				flags = IR_OP2_SHOULD_BE_IN_REG; /* result and first operand may be in memory */
+				constraints->hints[1] = IR_REG_NONE;
+				constraints->hints[2] = IR_REG_RCX;
+				constraints->hints_count = 3;
 			} else {
-				flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
+				flags = 0; /* result and operands may be in memory */
 			}
 			if (insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
 				type = ctx->ir_base[insn->op1].type;
@@ -2775,7 +2778,6 @@ get_arg_hints:
 			} else
 #endif
 			if (IR_IS_TYPE_INT(IR_VECTOR_BASE_TYPE(type))) {
-				// TODO: hardcoded register ???
 				constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_RAX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
 				n++;
 				if (insn->op == IR_MUL && insn->op == IR_DIV && insn->op == IR_MOD) {
@@ -19821,7 +19823,8 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 #if IR_X86_I64
 	ir_reg tmp1_reg_hi = IR_REG_NONE;
 #endif
-	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
+	ir_reg def_reg = ctx->regs[def][0];
+	int offset = 0;
 	ir_mem src1_mem, src2_mem, dst_mem;
 	bool scalar_shift = 0;
 	int shift_count = 0;
@@ -19840,17 +19843,30 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	width = IR_VECTOR_SIZE(type);
 	count = IR_VECTOR_LENGTH(type);
 
-	IR_ASSERT(def_reg != IR_REG_NONE);
+	if (def_reg == IR_REG_NONE) {
+		dst_mem = ir_ref_spill_slot(ctx, def);
+	} else if (IR_REG_SPILLED(def_reg)) {
+		dst_mem = ir_ref_spill_slot(ctx, def);
+		def_reg = IR_REG_NUM(def_reg);
+	} else {
+		offset = -width;
+		dst_mem = IR_MEM(IR_REG_RSP, offset, IR_REG_NONE, 1);
+	}
 
-	dst_mem = IR_MEM(IR_REG_RSP, -width, IR_REG_NONE, 1);
 	if (op1_reg != IR_REG_NONE) {
 		if (IR_REG_SPILLED(op1_reg)) {
 			op1_reg = IR_REG_NUM(op1_reg);
+			src1_mem = ir_ref_spill_slot(ctx, op1);
 			ir_emit_load(ctx, type, op1_reg, op1);
+		} else {
+			if (offset != 0) {
+				src1_mem = dst_mem;
+			} else {
+				offset = -width;
+				src1_mem = IR_MEM(IR_REG_RSP, offset, IR_REG_NONE, 1);
+			}
+			ir_emit_store_mem_fp(ctx, type, src1_mem, op1_reg);
 		}
-
-		src1_mem = dst_mem;
-		ir_emit_store_mem_fp(ctx, type, src1_mem, op1_reg);
 	} else if (IR_IS_CONST_REF(op1)) {
 		src1_mem = IR_MEM_NONE;
 		ptr1 = ir_long_const_ptr(ctx, op1);
@@ -19886,9 +19902,23 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			if (op2_reg != IR_REG_RCX) {
 				ir_emit_mov(ctx, shift_type, IR_REG_RCX, op2_reg);
 			}
-		} else {
-			IR_ASSERT(IR_IS_CONST_REF(op2));
+		} else if (IR_IS_CONST_REF(op2)) {
 			shift_count = ctx->ir_base[op2].val.i32;
+		} else {
+			ir_mem mem;
+
+			if (ir_rule(ctx, op2) & IR_FUSED) {
+				mem = ir_fuse_load(ctx, def, op2);
+			} else {
+				mem = ir_ref_spill_slot(ctx, op2);
+			}
+#if IR_X86_I64
+			if (ctx->ir_base[op2].type == IR_I64 || ctx->ir_base[op2].type == IR_U64) {
+				/* ignore the high part of the register */
+				ir_emit_load_mem(ctx, IR_U32, IR_REG_RCX, mem);
+			} else
+#endif
+			ir_emit_load_mem(ctx, shift_type, IR_REG_RCX, mem);
 		}
 	} else {
 		IR_ASSERT(type == ctx->ir_base[op2].type);
@@ -19898,10 +19928,13 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		} else if (op2_reg != IR_REG_NONE) {
 			if (IR_REG_SPILLED(op2_reg)) {
 				op2_reg = IR_REG_NUM(op2_reg);
+				src2_mem = ir_ref_spill_slot(ctx, op2);
 				ir_emit_load(ctx, type, op2_reg, op2);
+			} else {
+				offset -= width;
+				src2_mem = IR_MEM(IR_REG_RSP, offset, IR_REG_NONE, 1);
+				ir_emit_store_mem_fp(ctx, type, src2_mem, op2_reg);
 			}
-			src2_mem = IR_MEM_ADD(dst_mem, -width);
-			ir_emit_store_mem_fp(ctx, type, src2_mem, op2_reg);
 		} else if (IR_IS_CONST_REF(op2)) {
 			src2_mem = IR_MEM_NONE;
 			ptr2 = ir_long_const_ptr(ctx, op2);
@@ -20512,10 +20545,8 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_emit_store_mem(ctx, element_type, IR_MEM_ADD(dst_mem, element_size * i), tmp1_reg);
 	}
 
-	ir_emit_load_mem_fp(ctx, insn->type, def_reg, dst_mem);
-
-	if (IR_REG_SPILLED(ctx->regs[def][0])) {
-		ir_emit_store(ctx, insn->type, def, def_reg);
+	if (def_reg != IR_REG_NONE) {
+		ir_emit_load_mem_fp(ctx, insn->type, def_reg, dst_mem);
 	}
 }
 
