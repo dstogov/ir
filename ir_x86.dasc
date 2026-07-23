@@ -17621,11 +17621,12 @@ static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					ir_emit_store_mem_fp(ctx, element_type, dst, tmp_reg);
 				}
 			}
-		} else if (op3_reg != IR_REG_NONE) {
+		} else {
 			int mask_offset = src_offset - IR_VECTOR_SIZE(mask_type);
 			uint32_t i;
 			ir_reg idx_reg = IR_REG_RAX; // TODO: hardcoded registetrs ???
 
+			IR_ASSERT(op3_reg != IR_REG_NONE);
 			if (IR_REG_SPILLED(op3_reg)) {
 				op2_reg = IR_REG_NUM(op3_reg);
 				ir_emit_load(ctx, type, op3_reg, insn->op3);
@@ -17664,8 +17665,6 @@ static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					ir_emit_store_mem_fp(ctx, element_type, dst, tmp_reg);
 				}
 			}
-		} else {
-			IR_ASSERT(0 && "NIY: SHUFFLE/MEM");
 		}
 
 		ir_emit_load_mem_fp(ctx, insn->type, def_reg, IR_MEM(IR_REG_RSP, dst_offset, IR_REG_NONE, 1));
@@ -17756,7 +17755,6 @@ static void ir_emit_vector_op(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 		}
 	} else if (IR_IS_CONST_REF(insn->op1)) {
-		IR_ASSERT(width == 16);
 		IR_ASSERT(0);
 	} else {
 		ir_mem mem;
@@ -18458,7 +18456,7 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				} else {
 					IR_ASSERT(IR_IS_TYPE_FP(element_type));
 //???					|	ASM_SSE_FP_VEC_REG_TXT_TXT_OP cmpp, element_type, def_reg, [=>label], 0
-					IR_ASSERT(0);
+					IR_ASSERT(0 && "DynAsm limitation");
 				}
 				break;
 			case IR_NE:
@@ -18487,7 +18485,7 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				} else {
 					IR_ASSERT(IR_IS_TYPE_FP(element_type));
 //???					|	ASM_SSE_FP_VEC_REG_TXT_TXT_OP cmpp, element_type, def_reg, [=>label], 4
-					IR_ASSERT(0);
+					IR_ASSERT(0 && "DynAsm limitation");
 				}
 				break;
 			case IR_SHL:
@@ -19474,7 +19472,7 @@ static void ir_emit_vector_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				} else {
 					IR_ASSERT(IR_IS_TYPE_FP(element_type));
 //???					|	ASM_AVX_FP_VEC_REG_REG_TXT_TXT_OP vcmpp, element_type, width, def_reg, op1_reg, [=>label], 0
-					IR_ASSERT(0);
+					IR_ASSERT(0 && "DynAsm limitation");
 				}
 				break;
 			case IR_NE:
@@ -19492,7 +19490,7 @@ static void ir_emit_vector_binop_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				} else {
 					IR_ASSERT(IR_IS_TYPE_FP(element_type));
 //???					|	ASM_AVX_FP_VEC_REG_REG_TXT_TXT_OP vcmpp, element_type, width, def_reg, op1_reg, [=>label], 4
-					IR_ASSERT(0);
+					IR_ASSERT(0 && "DynAsm limitation");
 				}
 				break;
 			case IR_SHL:
