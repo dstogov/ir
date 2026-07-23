@@ -2620,7 +2620,7 @@ get_arg_hints:
 					flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 				}
 				if (IR_IS_CONST_REF(insn->op2) &&
-						insn->op >= IR_LE && insn->op <= IR_UGT) {
+						insn->op >= IR_LT && insn->op <= IR_UGT) {
 					// TODO: vector comparison may require the second oprand in the register ???
 					constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
@@ -2704,7 +2704,7 @@ get_arg_hints:
 					flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 				}
 				if (IR_IS_CONST_REF(insn->op2) &&
-						insn->op >= IR_LE && insn->op <= IR_UGT) {
+						insn->op >= IR_LT && insn->op <= IR_UGT) {
 					// TODO: vector comparison may require the second oprand in the register ???
 					constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
