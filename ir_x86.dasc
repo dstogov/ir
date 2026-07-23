@@ -2656,8 +2656,7 @@ get_arg_hints:
 				} else if (insn->op == IR_ULT || insn->op == IR_UGT) {
 					constraints->tmp_regs[n] = IR_TMP_REG(3, type, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 					n++;
-				} else if ((insn->op == IR_SHL || insn->op == IR_SHR || insn->op == IR_SAR)
-				 && !IR_IS_CONST_REF(insn->op2)) {
+				} else if (insn->op == IR_SHL || insn->op == IR_SHR || insn->op == IR_SAR) {
 					constraints->tmp_regs[n] = IR_TMP_REG(3, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
 				}
@@ -2745,8 +2744,7 @@ get_arg_hints:
 						 !(ctx->mflags & IR_X86_SSE41))) {
 					constraints->tmp_regs[n] = IR_TMP_REG(3, type, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
 					n++;
-				} else if ((insn->op == IR_SHL || insn->op == IR_SHR || insn->op == IR_SAR)
-				 && !IR_IS_CONST_REF(insn->op2)) {
+				} else if (insn->op == IR_SHL || insn->op == IR_SHR || insn->op == IR_SAR) {
 					constraints->tmp_regs[n] = IR_TMP_REG(3, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
 				}
@@ -17890,7 +17888,7 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	} else if (IR_IS_TYPE_INT(ctx->ir_base[op2].type)) {
 		IR_ASSERT(type == ctx->ir_base[op1].type);
 		IR_ASSERT(insn->op == IR_SHL || insn->op == IR_SHR || insn->op == IR_SAR);
-		if (insn->op2 != IR_REG_NONE) {
+		if (op2_reg != IR_REG_NONE) {
 			if (IR_REG_SPILLED(op2_reg)) {
 				op2_reg = IR_REG_NUM(op2_reg);
 				ir_emit_load(ctx, type, op2_reg, op2);
@@ -20011,6 +20009,10 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 		if (IR_IS_CONST_REF(op2)) {
 			int val = 0;
+#if IR_X86_I64
+			uint32_t val_hi = 0;
+			void *addr = NULL;
+#endif
 			ir_reg tmp2_reg = IR_REG_NONE;
 
 			if (!scalar_shift) {
@@ -20018,8 +20020,12 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					if (IR_IS_SIGNED_32BIT(((int64_t*)ptr2)[i])) {
 						val = ((int64_t*)ptr2)[i];
 					} else {
+#if IR_X86_I64
+						val_hi = ((uint64_t*)ptr2)[i] >> 32;
+#else
 						tmp2_reg = IR_REG_RCX;
 						ir_emit_load_imm_int(ctx, element_type, tmp2_reg, ((int64_t*)ptr2)[i]);
+#endif
 					}
 				} else if (element_size == 4) {
 					val = ((int32_t*)ptr2)[i];
@@ -20037,6 +20043,11 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						val = ((uint8_t*)ptr2)[i];
 					}
 				}
+#if IR_X86_I64
+				if (element_type == IR_I64 || element_type == IR_U64) {
+					/* pass */
+			    } else
+#endif
 				if (tmp2_reg == IR_REG_NONE
 				 && (insn->op == IR_DIV || insn->op == IR_MOD || (insn->op == IR_MUL && element_size == 1))) {
 					tmp2_reg = IR_REG_RCX;
@@ -20197,6 +20208,87 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	ASM_REG_OP neg, element_type, tmp1_reg
 						break;
 				}
+#if IR_X86_I64
+|.if not X64
+			} else if (element_type == IR_I64 || element_type == IR_U64) {
+				switch (insn->op) {
+					default:
+						IR_ASSERT(0 && "NIY binary op");
+					case IR_MUL:
+						if (val_hi && val) {
+							|	imul edx, val
+							|	imul ecx, eax, val_hi
+							|	add ecx, edx
+							|	mov edx, val
+							|	mul edx
+							|	add edx, ecx
+						} else if (val_hi && !val) {
+							|	imul edx, eax, val_hi
+							|	xor eax, eax
+						} else {
+							|	imul ecx, edx, val
+							|	mov edx, val
+							|	mul edx
+							|	add edx, ecx
+						}
+						break;
+					case IR_DIV:
+					case IR_MOD:
+						|	sub esp, (width*3)+12
+						|	push val_hi
+						|	push val
+						|	push Rd(tmp1_reg_hi)
+						|	push Rd(tmp1_reg)
+						if (insn->op == IR_DIV) {
+							if (element_type == IR_I64) {
+								addr = __divdi3;
+							} else {
+								IR_ASSERT(element_type == IR_U64);
+								addr = __udivdi3;
+							}
+						} else {
+							IR_ASSERT(insn->op == IR_MOD);
+							if (element_type == IR_I64) {
+								addr = __moddi3;
+							} else {
+								IR_ASSERT(element_type == IR_U64);
+								addr = __umoddi3;
+							}
+						}
+						|	call aword &addr
+#ifdef _WIN32
+						|	add esp, (width*3)+12
+#else
+						|	add esp, (width*3)+28
+#endif
+						break;
+					case IR_SHL:
+						|	shld Rd(tmp1_reg_hi), Rd(tmp1_reg), val
+						|	shl	Rd(tmp1_reg), val
+						if (val & 32) {
+							|	mov Rd(tmp1_reg_hi), Rd(tmp1_reg)
+							|	xor	Rd(tmp1_reg), Rd(tmp1_reg)
+						}
+						break;
+					case IR_SHR:
+						|	shrd Rd(tmp1_reg), Rd(tmp1_reg_hi), val
+						|	shr	Rd(tmp1_reg_hi), val
+						if (val & 32) {
+							|	mov Rd(tmp1_reg), Rd(tmp1_reg_hi)
+							|	xor	Rd(tmp1_reg_hi), Rd(tmp1_reg_hi)
+						}
+						break;
+					case IR_SAR:
+						|	shrd Rd(tmp1_reg), Rd(tmp1_reg_hi), val
+						|	sar	Rd(tmp1_reg_hi), val
+						if (val & 32) {
+							|	mov Rd(tmp1_reg), Rd(tmp1_reg_hi)
+							|	sar	Rd(tmp1_reg_hi), 31
+						}
+						break;
+				}
+|.endif
+#endif
 			} else {
 				switch (insn->op) {
 					default:
