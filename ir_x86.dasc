@@ -21320,12 +21320,12 @@ static void ir_emit_vector_fp2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 static void ir_emit_vector_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
-	assert(0 && "NIY: ir_emit_vector_fp2int()");
+	IR_ASSERT(0 && "NIY: ir_emit_vector_fp2int()");
 }
 
 static void ir_emit_vector_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
-	assert(0 && "NIY: ir_emit_vector_int2fp()");
+	IR_ASSERT(0 && "NIY: ir_emit_vector_int2fp()");
 }
 #endif
 
