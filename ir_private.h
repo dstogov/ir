@@ -1083,6 +1083,18 @@ void ir_use_list_replace_all(ir_ctx *ctx, ir_ref def, ir_ref use, ir_ref new_use
 void ir_use_list_replace_one(ir_ctx *ctx, ir_ref def, ir_ref use, ir_ref new_use);
 bool ir_use_list_add(ir_ctx *ctx, ir_ref def, ir_ref use);
 
+IR_ALWAYS_INLINE uint32_t ir_count_params(const ir_ctx *ctx)
+{
+	uint32_t count = 0;
+	ir_ref r = 2;
+
+	while (r < ctx->insns_count && ctx->ir_base[r].op == IR_PARAM) {
+		count++;
+		r++;
+	}
+	return count;
+}
+
 IR_ALWAYS_INLINE ir_ref ir_next_control(const ir_ctx *ctx, ir_ref ref)
 {
 	ir_use_list *use_list = &ctx->use_lists[ref];

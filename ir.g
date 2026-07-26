@@ -384,16 +384,10 @@ ir(ir_loader *loader):
 					{if (!loader->func_init(loader, &ctx, name)) yy_error("init_func error");}
 					{ctx.flags |= flags;}
 					{ctx.ret_type = ret_type;}
+					{ctx.params_count = params_count;}
 					ir_func(&p)
 					{
-						uint32_t real_params_count = 0;
-						ir_ref r = 2;
-
-						while (ctx.ir_base[r].op == IR_PARAM) {
-							real_params_count++;
-							r++;
-						}
-						if (real_params_count != params_count) {
+						if (ir_count_params(&ctx) != params_count) {
 							ir_free(&ctx);
 							yy_error_str("parameter count doesn't match function signature", name);
 						}

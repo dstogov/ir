@@ -2009,6 +2009,7 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMValueRef func, LLVMModuleRef module)
 
 	ir_START();
 	params_count = LLVMCountParams(func);
+	ctx->params_count = params_count;
 	for (i = 0; i < params_count; i++) {
 		size_t name_len;
 		const char *name;

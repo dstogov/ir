@@ -695,6 +695,7 @@ struct _ir_ctx {
 	uint32_t           flags;                   /* IR context flags (see IR_* defines above) */
 	uint32_t           flags2;                  /* IR context private flags (see IR_* defines in ir_private.h) */
 	ir_type            ret_type;                /* Function return type */
+	uint32_t           params_count;            /* Number of function parameters declared in its prototype ((uint32_t)-1 if unknown) */
 	uint32_t           mflags;                  /* CPU specific flags (see IR_X86_... macros below) */
 	int32_t            status;                  /* non-zero error code (see IR_ERROR_... macros), app may use negative codes */
 	ir_ref             fold_cse_limit;          /* CSE finds identical insns backward from "insn_count" to "fold_cse_limit" */

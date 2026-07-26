@@ -154,6 +154,16 @@ bool ir_check(const ir_ctx *ctx)
 		ok = 0;
 	}
 
+	if (ctx->params_count != (uint32_t)-1) {
+		uint32_t real_params_count = ir_count_params(ctx);
+
+		if (real_params_count != ctx->params_count) {
+			fprintf(stderr, "PARAM count (%u) doesn't match function prototype (%u)\n",
+				real_params_count, ctx->params_count);
+			ok = 0;
+		}
+	}
+
 	check_ctx.arena = NULL;
 	check_ctx.use_set = NULL;
 	check_ctx.input_set = NULL;

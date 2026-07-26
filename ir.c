@@ -506,6 +506,7 @@ void ir_init(ir_ctx *ctx, uint32_t flags, ir_ref consts_limit, ir_ref insns_limi
 
 	ctx->spill_base = -1;
 	ctx->fixed_stack_frame_size = -1;
+	ctx->params_count = (uint32_t)-1;
 
 	buf = ir_mem_malloc((consts_limit + insns_limit) * sizeof(ir_insn));
 	ctx->ir_base = buf + consts_limit;
