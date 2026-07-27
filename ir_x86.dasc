@@ -10019,9 +10019,9 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				IR_ASSERT(sizeof(void*) == 8);
 |.if X64
 				if (ctx->mflags & IR_X86_AVX) {
-					|	vmovd Rq(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
+					|	vmovq Rq(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
 				} else {
-					|	movd Rq(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
+					|	movq Rq(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
 				}
 |.endif
 			} else if (src_type == IR_FLOAT) {
@@ -10035,9 +10035,9 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				if (ir_type_size[dst_type] == 8) {
 |.if X64
 					if (ctx->mflags & IR_X86_AVX) {
-						|	vmovd Rq(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
+						|	vmovq Rq(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
 					} else {
-						|	movd Rq(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
+						|	movq Rq(def_reg), xmm(op1_reg-IR_REG_FP_FIRST)
 					}
 |.endif
 				} else {
@@ -10126,9 +10126,9 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				IR_ASSERT(sizeof(void*) == 8);
 |.if X64
 				if (ctx->mflags & IR_X86_AVX) {
-					|	vmovd xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
+					|	vmovq xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
 				} else {
-					|	movd xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
+					|	movq xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
 				}
 |.endif
 			} else if (dst_type == IR_FLOAT) {
@@ -10142,9 +10142,9 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				if (ir_type_size[src_type] == 8) {
 |.if X64
 					if (ctx->mflags & IR_X86_AVX) {
-						|	vmovd xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
+						|	vmovq xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
 					} else {
-						|	movd xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
+						|	movq xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
 					}
 |.endif
 				} else {
@@ -12622,9 +12622,9 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 				dst_reg = cc->int_param_regs[j-3];
 |.if X64
 				if (ctx->mflags & IR_X86_AVX) {
-					|	vmovd Rq(dst_reg), xmm(src_reg-IR_REG_FP_FIRST)
+					|	vmovq Rq(dst_reg), xmm(src_reg-IR_REG_FP_FIRST)
 				} else {
-					|	movd Rq(dst_reg), xmm(src_reg-IR_REG_FP_FIRST)
+					|	movq Rq(dst_reg), xmm(src_reg-IR_REG_FP_FIRST)
 				}
 |.endif
 			}
@@ -16890,7 +16890,7 @@ static void ir_emit_vector_extract(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 #if defined(IR_TARGET_X64)
 |.if X64
 				if (lane == 0) {
-					|	movd Rq(def_reg), xmm(tmp_reg-IR_REG_FP_FIRST)
+					|	movq Rq(def_reg), xmm(tmp_reg-IR_REG_FP_FIRST)
 				} else if (ctx->mflags & IR_X86_AVX) {
 					|	vpextrq Rq(def_reg), xmm(tmp_reg-IR_REG_FP_FIRST), lane
 				} else if (ctx->mflags & IR_X86_SSE41) {
@@ -16902,7 +16902,7 @@ static void ir_emit_vector_extract(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 					IR_ASSERT(lane == 1);
 					|	movhlps xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-					|	movd Rq(def_reg), xmm(tmp_reg-IR_REG_FP_FIRST)
+					|	movq Rq(def_reg), xmm(tmp_reg-IR_REG_FP_FIRST)
 				}
 |.endif
 #elif IR_X86_I64
@@ -17175,7 +17175,7 @@ static void ir_emit_vector_replace(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					tmp_reg = IR_REG_NUM(ctx->regs[def][2]);
 					IR_ASSERT(tmp_reg != IR_REG_NONE);
 
-					|	movd xmm(tmp_reg-IR_REG_FP_FIRST), Rq(op3_reg)
+					|	movq xmm(tmp_reg-IR_REG_FP_FIRST), Rq(op3_reg)
 					if (lane % 2 == 0) {
 						|	movsd xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
 					} else {
@@ -17404,7 +17404,7 @@ static void ir_emit_vector_splat(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |.if X64
 			} else if (element_type == IR_I64 || element_type == IR_U64) {
 				if (ctx->mflags & IR_X86_AVX2) {
-					|	vmovd xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
+					|	vmovq xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
 					if (width <= 16) {
 						|	vpbroadcastq xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					} else if (width == 32) {
@@ -17414,14 +17414,14 @@ static void ir_emit_vector_splat(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					}
 				} else if (ctx->mflags & IR_X86_AVX) {
 					IR_ASSERT(width <= 32);
-					|	vmovd xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
+					|	vmovq xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
 					|	vpunpcklqdq xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					if (width == 32) {
 						|	vinsertf128 ymm(def_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), 1
 					}
 				} else {
 					IR_ASSERT(width <= 16);
-					|	movd xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
+					|	movq xmm(def_reg-IR_REG_FP_FIRST), Rq(op1_reg)
 					|	punpcklqdq xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 				}
 |.endif
