@@ -2576,7 +2576,7 @@ get_arg_hints:
 				constraints->tmp_regs[n] = IR_TMP_REG(1, ctx->ir_base[insn->op1].type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 				n++;
 			}
-			if (IR_IS_CONST_REF(insn->op2)) {
+			if (IR_IS_CONST_REF(insn->op2) && insn->op1 != insn->op1) {
 				constraints->tmp_regs[n] = IR_TMP_REG(2, ctx->ir_base[insn->op2].type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 				n++;
 			}
@@ -2629,21 +2629,20 @@ get_arg_hints:
 				} else {
 					flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 				}
-				if (IR_IS_CONST_REF(insn->op2) &&
-						insn->op >= IR_LT && insn->op <= IR_UGT) {
-					// TODO: vector comparison may require the second oprand in the register ???
-					constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
-					n++;
-				} else if (IR_IS_CONST_REF(insn->op2) &&
-						IR_IS_TYPE_FP(IR_VECTOR_BASE_TYPE(type)) &&
-						insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
-					// TODO: workaroud against DynASM limitation: "rip-relative displacement followed by immediate" ???
-					constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
-					n++;
+				if (IR_IS_CONST_REF(insn->op2) && insn->op2 != insn->op1) {
+					if (insn->op >= IR_LT && insn->op <= IR_UGT) {
+						// TODO: vector comparison may require the second oprand in the register ???
+						constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+						n++;
+					} else if (IR_IS_TYPE_FP(IR_VECTOR_BASE_TYPE(type)) && insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
+						// TODO: workaroud against DynASM limitation: "rip-relative displacement followed by immediate" ???
+						constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+						n++;
+					}
 				}
 			} else {
 				flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
-				if (IR_IS_CONST_REF(insn->op2)) {
+				if (IR_IS_CONST_REF(insn->op2) && insn->op2 != insn->op1) {
 					constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
 				}
@@ -2656,11 +2655,13 @@ get_arg_hints:
 					constraints->tmp_regs[n] = IR_TMP_REG(3, type, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
 					n++;
 				} else if ((insn->op == IR_LE || insn->op == IR_GE) &&
-						 ir_type_size[IR_VECTOR_BASE_TYPE(type)] == 8) {
+						 (ir_type_size[IR_VECTOR_BASE_TYPE(type)] == 8 ||
+						  (!(ctx->mflags & IR_X86_SSE41) && ir_type_size[IR_VECTOR_BASE_TYPE(type)] != 2))) {
 					constraints->tmp_regs[n] = IR_TMP_REG(3, type, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
 					n++;
 				} else if ((insn->op == IR_ULE || insn->op == IR_UGE) &&
-						 ir_type_size[IR_VECTOR_BASE_TYPE(type)] == 8) {
+						 (ir_type_size[IR_VECTOR_BASE_TYPE(type)] == 8 ||
+						  (!(ctx->mflags & IR_X86_SSE41) && ir_type_size[IR_VECTOR_BASE_TYPE(type)] != 1))) {
 					constraints->tmp_regs[n] = IR_TMP_REG(3, type, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 					n++;
 				} else if (insn->op == IR_ULT || insn->op == IR_UGT) {
@@ -2673,9 +2674,7 @@ get_arg_hints:
 					constraints->tmp_regs[n] = IR_TMP_REG(3, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
 				}
-				if (insn->op == IR_LT ||
-						(insn->op == IR_GE && ir_type_size[IR_VECTOR_BASE_TYPE(type)] == 8) ||
-						insn->op == IR_ULT) {
+				if (insn->op == IR_LT || insn->op == IR_GE || insn->op == IR_ULT) {
 					flags &= ~IR_DEF_REUSES_OP1_REG;
 					// TODO: DEF_MAY_REUSE_OP2 ???
 					flags |= IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
@@ -2715,21 +2714,20 @@ get_arg_hints:
 				} else {
 					flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
 				}
-				if (IR_IS_CONST_REF(insn->op2) &&
-						insn->op >= IR_LT && insn->op <= IR_UGT) {
-					// TODO: vector comparison may require the second oprand in the register ???
-					constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
-					n++;
-				} else if (IR_IS_CONST_REF(insn->op2) &&
-						IR_IS_TYPE_FP(IR_VECTOR_BASE_TYPE(type)) &&
-						insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
-					// TODO: workaroud against DynASM limitation: "rip-relative displacement followed by immediate" ???
-					constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
-					n++;
+				if (IR_IS_CONST_REF(insn->op2) && insn->op2 != insn->op1) {
+					if (insn->op >= IR_LT && insn->op <= IR_UGT) {
+						// TODO: vector comparison may require the second oprand in the register ???
+						constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+						n++;
+					} else if (IR_IS_TYPE_FP(IR_VECTOR_BASE_TYPE(type)) && insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
+						// TODO: workaroud against DynASM limitation: "rip-relative displacement followed by immediate" ???
+						constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+						n++;
+					}
 				}
 			} else {
 				flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
-				if (IR_IS_CONST_REF(insn->op2)) {
+				if (IR_IS_CONST_REF(insn->op2) && insn->op2 != insn->op1) {
 					constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 					n++;
 				}
@@ -18018,14 +18016,11 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		op1_reg = IR_REG_NUM(op1_reg);
 		ir_emit_load(ctx, type, op1_reg, op1);
 		if (op1 == op2) {
-			op2_reg = def_reg;
+			op2_reg = op1_reg;
 		}
 	}
 
-	if ((IR_IS_TYPE_INT(element_type) &&
-				insn->op != IR_LT) ||
-			(IR_IS_TYPE_FP(element_type) &&
-				(insn->op != IR_GT && insn->op != IR_GE && insn->op != IR_ULT && insn->op != IR_ULE))) {
+	if (insn->op < IR_LT || insn->op > IR_UGT) {
 		if (def_reg != op1_reg) {
 			if (op1_reg != IR_REG_NONE) {
 				ir_emit_fp_mov(ctx, type, def_reg, op1_reg);
@@ -18207,11 +18202,19 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					|	ASM_SSE_INT_VEC_REG_REG_OP pcmpgt, element_type, def_reg, op1_reg
 				} else {
 					IR_ASSERT(IR_IS_TYPE_FP(element_type));
+					if (def_reg != op1_reg) {
+						IR_ASSERT(def_reg != op2_reg || op1_reg == op2_reg);
+						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+					}
 					|	ASM_SSE_FP_VEC_REG_REG_TXT_OP cmpp, element_type, def_reg, op2_reg, 1
 				}
 				break;
 			case IR_GT:
 				if (IR_IS_TYPE_INT(element_type)) {
+					if (def_reg != op1_reg) {
+						IR_ASSERT(def_reg != op2_reg || op1_reg == op2_reg);
+						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+					}
 //??? pcmpgtq requires SSE4.2
 					|	ASM_SSE_INT_VEC_REG_REG_OP pcmpgt, element_type, def_reg, op2_reg
 				} else {
@@ -18224,18 +18227,32 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 				break;
 			case IR_LE:
+				if (def_reg != op1_reg) {
+					IR_ASSERT(def_reg != op2_reg || op1_reg == op2_reg);
+					|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+				}
 				if (IR_IS_TYPE_INT(element_type)) {
 					if (element_type == IR_I8 || element_type == IR_U8) {
-//??? pminsb requires SSE4.1
-						|	pminsb xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-						|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						if (ctx->mflags & IR_X86_SSE41) {
+							|	pminsb xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						} else {
+							|	pcmpgtb xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						}
 					} else if (element_type == IR_I16 || element_type == IR_U16) {
 						|	pminsw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 					} else if (element_type == IR_I32|| element_type == IR_U32) {
-//??? pminsd requires SSE4.1
-						|	pminsd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						if (ctx->mflags & IR_X86_SSE41) {
+							|	pminsd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						} else {
+							|	pcmpgtd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						}
 					} else if (element_type == IR_I64 || element_type == IR_U64) {
 						IR_ASSERT(tmp_reg != IR_REG_NONE);
 //??? pcmpgtq requires SSE4.2
@@ -18251,24 +18268,34 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 				break;
 			case IR_GE:
+				if (def_reg != op2_reg) {
+					IR_ASSERT(def_reg != op1_reg || op1_reg == op2_reg);
+					|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+				}
 				if (IR_IS_TYPE_INT(element_type)) {
 					if (element_type == IR_I8 || element_type == IR_U8) {
-//??? pminsb requires SSE4.1
-						|	pminsb xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-						|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						if (ctx->mflags & IR_X86_SSE41) {
+							|	pminsb xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+							|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						} else {
+							|	pcmpgtb xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+							|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						}
 					} else if (element_type == IR_I16 || element_type == IR_U16) {
-						|	pminsw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						|	pminsw xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 					} else if (element_type == IR_I32|| element_type == IR_U32) {
-//??? pminsd requires SSE4.1
-						|	pminsd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						if (ctx->mflags & IR_X86_SSE41) {
+							|	pminsd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+							|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						} else {
+							|	pcmpgtd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+							|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						}
 					} else if (element_type == IR_I64 || element_type == IR_U64) {
 						IR_ASSERT(tmp_reg != IR_REG_NONE);
-						if (def_reg != op2_reg) {
-							IR_ASSERT(def_reg != op1_reg || op1_reg == op2_reg);
-							|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-						}
 //??? pcmpgtq requires SSE4.2
 						|	pcmpgtq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 						|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
@@ -18278,20 +18305,16 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					}
 				} else {
 					IR_ASSERT(IR_IS_TYPE_FP(element_type));
-					if (def_reg != op2_reg) {
-						IR_ASSERT(def_reg != op1_reg || op1_reg == op2_reg);
-						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-					}
 					|	ASM_SSE_FP_VEC_REG_REG_TXT_OP cmpp, element_type, def_reg, op1_reg, 2
 				}
 				break;
 			case IR_ULT:
+				if (def_reg != op2_reg) {
+					IR_ASSERT(def_reg != op1_reg || op1_reg == op2_reg);
+					|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+				}
 				if (IR_IS_TYPE_INT(element_type)) {
 					IR_ASSERT(tmp_reg != IR_REG_NONE);
-					if (def_reg != op2_reg) {
-						IR_ASSERT(def_reg != op1_reg || op1_reg == op2_reg);
-						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-					}
 					if (element_type == IR_I8 || element_type == IR_U8) {
 						|	psubusb xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 						|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
@@ -18303,11 +18326,18 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
 						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
 					} else if (element_type == IR_I32|| element_type == IR_U32) {
-//??? pminud requires SSE4.1
-						|	pminud xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-						|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
-						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						if (ctx->mflags & IR_X86_SSE41) {
+							|	pminud xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+							|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						 } else {
+							|	pcmpeqd xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	pslld xmm(tmp_reg-IR_REG_FP_FIRST), 31
+							|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+							|	pcmpgtd xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						 }
 					} else if (element_type == IR_I64 || element_type == IR_U64) {
 //??? pcmpeqq requires SSE4.1
 						|	pcmpeqq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
@@ -18321,14 +18351,14 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					}
 				} else {
 					IR_ASSERT(IR_IS_TYPE_FP(element_type));
-					if (def_reg != op2_reg) {
-						IR_ASSERT(def_reg != op1_reg || op1_reg == op2_reg);
-						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-					}
 					|	ASM_SSE_FP_VEC_REG_REG_TXT_OP cmpp, element_type, def_reg, op1_reg, 6
 				}
 				break;
 			case IR_UGT:
+				if (def_reg != op1_reg) {
+					IR_ASSERT(def_reg != op2_reg || op1_reg == op2_reg);
+					|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+				}
 				if (IR_IS_TYPE_INT(element_type)) {
 					IR_ASSERT(tmp_reg != IR_REG_NONE);
 					if (element_type == IR_I8 || element_type == IR_U8) {
@@ -18342,11 +18372,18 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
 						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
 					} else if (element_type == IR_I32|| element_type == IR_U32) {
-//??? pminud requires SSE4.1
-						|	pminud xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
-						|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
-						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						if (ctx->mflags & IR_X86_SSE41) {
+							|	pminud xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+							|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						} else {
+							|	pcmpeqd xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	pslld xmm(tmp_reg-IR_REG_FP_FIRST), 31
+							|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	pcmpgtd xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						}
 					} else if (element_type == IR_I64 || element_type == IR_U64) {
 //??? pcmpeqq requires SSE4.1
 						|	pcmpeqq xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
@@ -18365,17 +18402,39 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 			case IR_ULE:
 				if (IR_IS_TYPE_INT(element_type)) {
+					if (def_reg != op1_reg) {
+						IR_ASSERT(def_reg != op2_reg || op1_reg == op2_reg);
+						|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+					}
 					if (element_type == IR_I8 || element_type == IR_U8) {
 						|	pminub xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 						|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 					} else if (element_type == IR_I16 || element_type == IR_U16) {
-//??? pminuw requires SSE4.1
-						|	pminuw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						if (ctx->mflags & IR_X86_SSE41) {
+							|	pminuw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						} else {
+							|	pcmpeqw xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	psllw xmm(tmp_reg-IR_REG_FP_FIRST), 15
+							|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	pcmpgtw xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						}
 					} else if (element_type == IR_I32|| element_type == IR_U32) {
-//??? pminud requires SSE4.1
-						|	pminud xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						if (ctx->mflags & IR_X86_SSE41) {
+							|	pminud xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						} else {
+							|	pcmpeqd xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	pslld xmm(tmp_reg-IR_REG_FP_FIRST), 31
+							|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	pcmpgtd xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						}
 					} else if (element_type == IR_I64 || element_type == IR_U64) {
 						IR_ASSERT(tmp_reg != IR_REG_NONE);
 //??? pcmpeqq requires SSE4.1
@@ -18400,18 +18459,40 @@ static void ir_emit_vector_binop_sse2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 				break;
 			case IR_UGE:
+				if (def_reg != op1_reg) {
+					IR_ASSERT(def_reg != op2_reg || op1_reg == op2_reg);
+					|	movdqa xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+				}
 				if (IR_IS_TYPE_INT(element_type)) {
 					if (element_type == IR_I8 || element_type == IR_U8) {
 						|	pminub xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 						|	pcmpeqb xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
 					} else if (element_type == IR_I16 || element_type == IR_U16) {
-//??? pminuw requires SSE4.1
-						|	pminuw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-						|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						if (ctx->mflags & IR_X86_SSE41) {
+							|	pminuw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						} else {
+							|	pcmpeqw xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	psllw xmm(tmp_reg-IR_REG_FP_FIRST), 15
+							|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	pcmpgtw xmm(tmp_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
+							|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
+							|	pcmpeqw xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						}
 					} else if (element_type == IR_I32|| element_type == IR_U32) {
-//??? pminud requires SSE4.1
-						|	pminud xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
-						|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						if (ctx->mflags & IR_X86_SSE41) {
+							|	pminud xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+						} else {
+							|	pcmpeqd xmm(tmp_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	psllw xmm(tmp_reg-IR_REG_FP_FIRST), 31
+							|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+							|	pxor xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+							|	pcmpgtd xmm(tmp_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
+							|	pxor xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
+							|	pcmpeqd xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp_reg-IR_REG_FP_FIRST)
+						}
 					} else if (element_type == IR_I64 || element_type == IR_U64) {
 						IR_ASSERT(tmp_reg != IR_REG_NONE);
 //??? pcmpeqq requires SSE4.1
