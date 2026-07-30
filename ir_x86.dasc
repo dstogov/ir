@@ -5224,7 +5224,7 @@ static void ir_emit_load_mem_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_mem me
 				}
 			} else {
 				IR_ASSERT(width == 32);
-				// TODO: USe 32-byte stack alinment and "aligned" moves ???
+				// TODO: Use 32-byte stack alihnment and "aligned" moves ???
 				if (IR_IS_TYPE_INT(element_type)) {
 					|	ASM_TXT_TMEM_OP vmovdqu, ymm(reg-IR_REG_FP_FIRST), yword, mem
 				} else if (element_type == IR_DOUBLE) {
@@ -5430,7 +5430,7 @@ static void ir_emit_store_mem_fp(ir_ctx *ctx, ir_type type, ir_mem mem, ir_reg r
 				}
 			} else {
 				IR_ASSERT(width == 32);
-				// TODO: USe 32-byte stack alinment and "aligned" moves ???
+				// TODO: Use 32-byte stack alignment and "aligned" moves ???
 				if (IR_IS_TYPE_INT(element_type)) {
 					|	ASM_TMEM_TXT_OP vmovdqu, yword, mem, ymm(reg-IR_REG_FP_FIRST)
 				} else if (element_type == IR_DOUBLE) {
