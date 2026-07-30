@@ -3385,7 +3385,7 @@ binop_vector:
 				} else {
 					if (ir_may_fuse_load_vector(ctx, insn->type)
 					 && !(insn->op >= IR_LT && insn->op <= IR_UGT)) {
-						// TODO: load may be fuxed inly into some comparison instructions ???
+						// TODO: load may be fused only into some comparison instructions ???
 						ir_match_fuse_load(ctx, insn->op2, ref);
 					}
 					if (ctx->mflags & IR_X86_AVX) {
