@@ -2564,8 +2564,7 @@ get_arg_hints:
 				(IR_IS_TYPE_INT(IR_VECTOR_BASE_TYPE(insn->type)) &&
 					ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] >= 4 &&
 					!(ctx->mflags & (IR_X86_SSE41|IR_X86_AVX)))) {
-				// TODO: tmp reg 2 may be used for op2. Find a better place. ???
-				constraints->tmp_regs[n] = IR_TMP_REG(2, IR_DOUBLE, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
+				constraints->tmp_regs[n] = IR_TMP_REG(4, IR_DOUBLE, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 				n++;
 			}
 			break;
@@ -2910,6 +2909,8 @@ get_arg_hints:
 			break;
 #endif
 	}
+
+	IR_ASSERT(n < 4);
 	constraints->tmps_count = n;
 
 	return flags;
@@ -17201,7 +17202,7 @@ static void ir_emit_vector_replace(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		if (width <= 16) {
 			tmp_reg = op1_reg = def_reg;
 		} else if (width == 32) {
-			tmp_reg = IR_REG_NUM(ctx->regs[def][2]);
+			tmp_reg = ctx->tmp_regs[def];
 			if (lane * ir_type_size[element_type] < 16) {
 				op1_reg = def_reg;
 			} else {
@@ -17244,7 +17245,7 @@ static void ir_emit_vector_replace(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				} else if (ctx->mflags & IR_X86_SSE41) {
 					|	pinsrd xmm(tmp_reg-IR_REG_FP_FIRST), Rd(op3_reg), (lane%4)
 				} else {
-					tmp_reg = IR_REG_NUM(ctx->regs[def][2]);
+					tmp_reg = ctx->tmp_regs[def];
 					IR_ASSERT(tmp_reg != IR_REG_NONE);
 
 					|	movd xmm(tmp_reg-IR_REG_FP_FIRST), Rd(op3_reg)
@@ -17272,7 +17273,7 @@ static void ir_emit_vector_replace(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				} else if (ctx->mflags & IR_X86_SSE42) {
 					|	pinsrq xmm(tmp_reg-IR_REG_FP_FIRST), Rq(op3_reg), (lane%2)
 				} else {
-					tmp_reg = IR_REG_NUM(ctx->regs[def][2]);
+					tmp_reg = ctx->tmp_regs[def];
 					IR_ASSERT(tmp_reg != IR_REG_NONE);
 
 					|	movq xmm(tmp_reg-IR_REG_FP_FIRST), Rq(op3_reg)
