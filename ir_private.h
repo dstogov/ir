@@ -1469,23 +1469,25 @@ IR_ALWAYS_INLINE void ir_set_alocated_reg(ir_ctx *ctx, ir_ref ref, int op_num, i
 {
 	int8_t *regs = ctx->regs[ref];
 
-	if (op_num > 0) {
-#if IR_X86_I64
-		if (UNEXPECTED(op_num == 4 && op_num > ctx->ir_base[ref].inputs_count)) {
-			/* Used only for COND(I64, _, _) */
-			IR_ASSERT(ctx->ir_base[ref].op == IR_COND);
-			if (!ctx->tmp_regs) {
-				ctx->tmp_regs = ir_mem_malloc(ctx->insns_count);
-				memset(ctx->tmp_regs, -1, ctx->insns_count);
-			}
-			ctx->tmp_regs[ref] = reg;
-			return;
+	/* regs[] is not limited by the declared boundary 4, the real boundary checked below */
+	IR_ASSERT(op_num >=0 && op_num <= IR_MAX(3, ctx->ir_base[ref].inputs_count));
+	regs[op_num] = reg;
+}
+
+IR_ALWAYS_INLINE void ir_set_alocated_tmp_reg(ir_ctx *ctx, ir_ref ref, int op_num, int8_t reg)
+{
+	int8_t *regs = ctx->regs[ref];
+
+	if (UNEXPECTED(op_num == 4)) {
+		/* Used for COND(I64, _, _) and SIMD instructions */
+		if (!ctx->tmp_regs) {
+			ctx->tmp_regs = ir_mem_malloc(ctx->insns_count);
+			memset(ctx->tmp_regs, -1, ctx->insns_count);
 		}
-#else
-		/* regs[] is not limited by the declared boundary 4, the real boundary checked below */
-		IR_ASSERT(op_num <= IR_MAX(3, ctx->ir_base[ref].inputs_count));
-#endif
+		ctx->tmp_regs[ref] = reg;
+		return;
 	}
+	IR_ASSERT(op_num >= 0 && op_num <= 3);
 	regs[op_num] = reg;
 }
 
@@ -1494,7 +1496,7 @@ IR_ALWAYS_INLINE int8_t ir_get_alocated_reg(const ir_ctx *ctx, ir_ref ref, int o
 	int8_t *regs = ctx->regs[ref];
 
 	/* regs[] is not limited by the declared boundary 4, the real boundary checked below */
-	IR_ASSERT(op_num <= IR_MAX(3, ctx->ir_base[ref].inputs_count));
+	IR_ASSERT(op_num >= 0 && op_num <= IR_MAX(3, ctx->ir_base[ref].inputs_count));
 	return regs[op_num];
 }
 

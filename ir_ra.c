@@ -4514,7 +4514,7 @@ static void assign_regs(ir_ctx *ctx)
 					}
 				}
 			}
-			ir_set_alocated_reg(ctx, ival->tmp_ref, ival->tmp_op_num, reg);
+			ir_set_alocated_tmp_reg(ctx, ival->tmp_ref, ival->tmp_op_num, reg);
 			ival = ival->next;
 		} while (ival);
 	}

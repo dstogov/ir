@@ -729,9 +729,7 @@ struct _ir_ctx {
 	ir_arena          *arena;
 	ir_live_range     *unused_ranges;
 	ir_regs           *regs;
-#if IR_X86_I64
-	int8_t            *tmp_regs;                /* used only for COND(I64, _, _) */
-#endif
+	int8_t            *tmp_regs;                /* additional tmp registers, used for COND(I64, _, _) and SIMD */
 	ir_strtab         *fused_regs;
 	ir_ref            *prev_ref;
 	union {
