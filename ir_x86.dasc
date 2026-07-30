@@ -2856,7 +2856,7 @@ get_arg_hints:
 				constraints->tmp_regs[n] = IR_TMP_REG(3, IR_I64, IR_USE_SUB_REF, IR_DEF_SUB_REF);
 				n++;
 				if (IR_VECTOR_SIZE(insn->type) == 32) {
-					constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_XMM15, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
+					constraints->tmp_regs[n] = IR_TMP_REG(4, IR_DOUBLE, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 					n++;
 				}
 #elif defined(IR_TARGET_X86)
@@ -2887,8 +2887,8 @@ get_arg_hints:
 #if defined(IR_TARGET_X64)
 				constraints->tmp_regs[n] = IR_TMP_REG(3, IR_I64, IR_USE_SUB_REF, IR_DEF_SUB_REF);
 				n++;
-				if (IR_VECTOR_SIZE(insn->type) == 32) {
-					constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_XMM15, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
+				if (IR_VECTOR_SIZE(ctx->ir_base[insn->op1].type) == 32) {
+					constraints->tmp_regs[n] = IR_TMP_REG(4, IR_DOUBLE, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 					n++;
 				}
 #elif defined(IR_TARGET_X86)
@@ -22004,7 +22004,7 @@ static void ir_emit_vector_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |.if X64
 				if (ctx->mflags & IR_X86_AVX) {
 					if (dst_width == 32) {
-						ir_reg tmp3_reg = IR_REG_XMM15;
+						ir_reg tmp3_reg = ctx->tmp_regs[def];
 
 						|	vshufps xmm(tmp1_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), 255
 						|	vcvttss2si Rq(tmp2_reg), xmm(tmp1_reg-IR_REG_FP_FIRST)
@@ -22191,7 +22191,7 @@ static void ir_emit_vector_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 				if (ctx->mflags & IR_X86_AVX) {
 					if (dst_width == 32) {
-						ir_reg tmp3_reg = IR_REG_XMM15;
+						ir_reg tmp3_reg = ctx->tmp_regs[def];
 
 						|	vshufps xmm(tmp1_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), 255
 						|	vucomiss xmm(tmp1_reg-IR_REG_FP_FIRST), dword [->ull2f_const]
@@ -22396,7 +22396,7 @@ static void ir_emit_vector_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |.if X64
 				if (ctx->mflags & IR_X86_AVX) {
 					if (src_width == 32) {
-						ir_reg tmp3_reg = IR_REG_XMM15;
+						ir_reg tmp3_reg = ctx->tmp_regs[def];
 
 						|	vextractf128 xmm(tmp1_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), 1
 						|	vcvttsd2si Rq(tmp2_reg), xmm(tmp1_reg-IR_REG_FP_FIRST)
@@ -22571,7 +22571,7 @@ static void ir_emit_vector_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 				if (ctx->mflags & IR_X86_AVX) {
 					if (src_width == 32) {
-						ir_reg tmp3_reg = IR_REG_XMM15;
+						ir_reg tmp3_reg = ctx->tmp_regs[def];
 
 						|	vextractf128 xmm(tmp1_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), 1
 						|	vucomisd xmm(tmp1_reg-IR_REG_FP_FIRST), qword [->ull2d_const]
@@ -22797,7 +22797,7 @@ static void ir_emit_vector_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |.if X64
 				if (ctx->mflags & IR_X86_AVX) {
 					if (src_width == 32) {
-						ir_reg tmp3_reg = IR_REG_XMM15;
+						ir_reg tmp3_reg = ctx->tmp_regs[def];
 
 						if (ctx->mflags & IR_X86_AVX2) {
 							|	vextracti128 xmm(tmp3_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), 1
@@ -23161,7 +23161,7 @@ static void ir_emit_vector_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |.if X64
 				if (ctx->mflags & IR_X86_AVX) {
 					if (dst_width == 32) {
-						ir_reg tmp3_reg = IR_REG_XMM15;
+						ir_reg tmp3_reg = ctx->tmp_regs[def];
 
 						if (ctx->mflags & IR_X86_AVX2) {
 							|	vextracti128 xmm(tmp1_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST), 1
