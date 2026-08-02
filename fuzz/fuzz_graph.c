@@ -197,6 +197,7 @@ static void fuzz_build(ir_ctx *ctx, fuzz_cursor *c)
 		bool loop = (op_sel & 0x20) != 0;
 		bool mem = (op_sel & 0x10) != 0 && (op_sel & 0x08) != 0;
 		bool conv = (op_sel & 0x10) != 0 && (op_sel & 0x08) == 0;
+		bool call = mem && (op_sel & 0x02) != 0;
 		ir_ref a, r;
 
 		a = pool[s1 % count];
@@ -249,6 +250,21 @@ static void fuzz_build(ir_ctx *ctx, fuzz_cursor *c)
 			_ir_MERGE_SET_OP(ctx, loop_ref, 2, loop_end);
 			_ir_PHI_SET_OP(ctx, iv, 2, next);
 			r = next;
+		} else if (call) {
+			/* Indirect call returning the working type; the address is a
+			 * fixed non null placeholder as the code is never executed. */
+			uint8_t nargs = (uint8_t)(s2 % 5);
+			ir_ref args[4];
+			uint8_t param_types[4];
+			ir_ref proto, func;
+
+			for (uint8_t i = 0; i < nargs; i++) {
+				args[i] = pool[(uint8_t)(s1 + i) % count];
+				param_types[i] = (uint8_t)wtype;
+			}
+			proto = ir_proto(ctx, 0, wtype, nargs, param_types);
+			func = ir_const_func_addr(ctx, (uintptr_t)0x1000, proto);
+			r = _ir_CALL_N(ctx, wtype, func, nargs, args);
 		} else if (mem) {
 			/*
 			 * Round trip the value through local memory so the
