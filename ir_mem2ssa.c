@@ -565,7 +565,8 @@ try_split:
 
 static bool ir_mem2ssa_add_split_var(ir_ctx *ctx, ir_mem2ssa_split_layout *layout, size_t offset, size_t size)
 {
-	IR_ASSERT(size > 0 && size <= 8);
+	IR_ASSERT(size > 0);
+	if (size > 128) return 0; // TODO: support for bigger vectors ???
 
 	if (offset + size > layout->size) {
 		return 0;
