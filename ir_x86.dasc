@@ -1682,6 +1682,21 @@ const ir_call_conv_dsc ir_call_conv_x86_fastcall = {
 	_(VECTOR_FP2FP)        \
 	_(VECTOR_INT2FP)       \
 	_(VECTOR_FP2INT)       \
+	_(SHUFPD_11)           \
+	_(SHUFPD_22)           \
+	_(SHUFPD_12)           \
+	_(SHUFPD_21)           \
+	_(MOVSD_12)            \
+	_(SHUFPS_11)           \
+	_(SHUFPS_22)           \
+	_(SHUFPS_12)           \
+	_(SHUFPS_21)           \
+	_(SHUFPS_12_0)         \
+	_(SHUFPS_12_1)         \
+	_(SHUFPS_12_2)         \
+	_(SHUFPS_1_21)         \
+	_(SHUFPS_2_12)         \
+	_(BLENDPS_12)          \
 
 #endif
 
@@ -2568,6 +2583,83 @@ get_arg_hints:
 				n++;
 			}
 			break;
+		case IR_SHUFPD_11:
+		case IR_SHUFPS_11:
+			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;
+			insn = &ctx->ir_base[ref];
+			if (IR_IS_CONST_REF(insn->op1)) {
+				constraints->tmp_regs[0] = IR_TMP_REG(1, IR_DOUBLE, IR_LOAD_SUB_REF, IR_USE_SUB_REF);
+				n = 1;
+			}
+			break;
+		case IR_SHUFPD_12:
+		case IR_MOVSD_12:
+		case IR_SHUFPS_12:
+		case IR_SHUFPS_12_0:
+		case IR_SHUFPS_12_2:
+		case IR_BLENDPS_12:
+			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+			insn = &ctx->ir_base[ref];
+			if (IR_IS_CONST_REF(insn->op1)) {
+				constraints->tmp_regs[0] = IR_TMP_REG(1, IR_DOUBLE, IR_LOAD_SUB_REF, IR_USE_SUB_REF);
+				n = 1;
+			}
+			if (IR_IS_CONST_REF(insn->op2) && insn->op1 != insn->op2) {
+				constraints->tmp_regs[n] = IR_TMP_REG(2, IR_DOUBLE, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
+				n++;
+			}
+			break;
+		case IR_SHUFPD_22:
+		case IR_SHUFPS_22:
+			flags = IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_USE_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+			insn = &ctx->ir_base[ref];
+			if (IR_IS_CONST_REF(insn->op2)) {
+				constraints->tmp_regs[0] = IR_TMP_REG(2, IR_DOUBLE, IR_LOAD_SUB_REF, IR_USE_SUB_REF);
+				n = 1;
+			}
+			break;
+		case IR_SHUFPD_21:
+		case IR_SHUFPS_21:
+		case IR_SHUFPS_12_1:
+			flags = IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+			insn = &ctx->ir_base[ref];
+			if (IR_IS_CONST_REF(insn->op1)) {
+				constraints->tmp_regs[0] = IR_TMP_REG(1, IR_DOUBLE, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
+				n = 1;
+			}
+			if (IR_IS_CONST_REF(insn->op2) && insn->op1 != insn->op2) {
+				constraints->tmp_regs[n] = IR_TMP_REG(2, IR_DOUBLE, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
+				n++;
+			}
+			break;
+		case IR_SHUFPS_1_21:
+			flags = IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+			insn = &ctx->ir_base[ref];
+			if (IR_IS_CONST_REF(insn->op1)) {
+				constraints->tmp_regs[0] = IR_TMP_REG(1, IR_DOUBLE, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
+				n = 1;
+			}
+			if (IR_IS_CONST_REF(insn->op2) && insn->op1 != insn->op2) {
+				constraints->tmp_regs[n] = IR_TMP_REG(2, IR_DOUBLE, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
+				n++;
+			}
+			constraints->tmp_regs[n] = IR_TMP_REG(4, IR_DOUBLE, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
+			n++;
+			break;
+		case IR_SHUFPS_2_12:
+			flags = IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+			insn = &ctx->ir_base[ref];
+			if (IR_IS_CONST_REF(insn->op1)) {
+				constraints->tmp_regs[0] = IR_TMP_REG(1, IR_DOUBLE, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
+				n = 1;
+			}
+			if (IR_IS_CONST_REF(insn->op2) && insn->op1 != insn->op2) {
+				constraints->tmp_regs[n] = IR_TMP_REG(2, IR_DOUBLE, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
+				n++;
+			}
+			constraints->tmp_regs[n] = IR_TMP_REG(4, IR_DOUBLE, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
+			n++;
+			break;
 		case IR_SHUFFLE:
 			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG | IR_OP3_MUST_BE_IN_REG;
 			insn = &ctx->ir_base[ref];
@@ -2740,6 +2832,12 @@ get_arg_hints:
 						n++;
 					} else if (IR_IS_TYPE_FP(IR_VECTOR_BASE_TYPE(type)) && insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
 						// TODO: workaroud against DynASM limitation: "rip-relative displacement followed by immediate" ???
+						constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+						n++;
+					} else if (!(ctx->mflags & IR_X86_AVX2)
+							&& IR_VECTOR_SIZE(type) == 32
+							&& IR_IS_TYPE_VECTOR(ctx->ir_base[insn->op2].type)) {
+						// TODO: workaroud against DynASM limitation: [=>label+16] doen't work ???
 						constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 						n++;
 					}
@@ -3351,6 +3449,169 @@ static bool all_usages_are_fusable(ir_ctx *ctx, ir_ref ref)
 	}
 	return 0;
 }
+
+#if IR_SIMD
+# define IR_SHUFFLE_MASK(i) (p[(i)*s])
+
+static uint32_t ir_match_shuffle(ir_ctx *ctx, const ir_insn *insn)
+{
+	if (IR_IS_CONST_REF(insn->op3)) {
+		ir_insn *op3_insn = &ctx->ir_base[insn->op3];
+		int8_t *p;
+		uint32_t s, n, n1, n2;
+		ir_type element_type;
+
+		IR_ASSERT(IR_IS_TYPE_VECTOR(insn->type) && IR_IS_TYPE_VECTOR(op3_insn->type));
+		p = ir_long_const_ptr(ctx, insn->op3);
+		s = ir_type_size[IR_VECTOR_BASE_TYPE(op3_insn->type)];
+		n = IR_VECTOR_LENGTH(op3_insn->type);
+		n1 = IR_VECTOR_LENGTH(ctx->ir_base[insn->op1].type);
+		n2 = IR_VECTOR_LENGTH(ctx->ir_base[insn->op2].type);
+		element_type = IR_VECTOR_BASE_TYPE(insn->type);
+
+		if (element_type == IR_I64 || element_type == IR_U64) {
+			if (n == 2 && n1 == 2 && n2 == 2) {
+				// TODO:  try PUNPCKHQDQ, PUNPCKLQDQ
+			}
+			element_type = IR_DOUBLE;
+		} else if (element_type == IR_I32 || element_type == IR_U32) {
+			if (n == 4 && n1 == 4 && n2 == 4) {
+				// TODO: try PUNPCKHDQ, PUNPCKLDQ, PSHUFD ???
+			}
+			element_type = IR_FLOAT;
+		}
+
+		if (element_type == IR_DOUBLE) {
+			if (n == 2 && n1 == 2 && n2 == 2) {
+				uint32_t mask = 0;
+
+				mask |= (IR_SHUFFLE_MASK(0) & 3);
+				mask |= (IR_SHUFFLE_MASK(1) & 3) << 2;
+				switch (mask) {
+					case 0x0: /* 0000 00 <src1[0], src1[0]> SHUFPD xmm0, xmm0, 0 (UNPCKLPD) */
+						return IR_SHUFPD_11;
+					case 0x1: /* 0001 10 <src1[1], src1[0]> SHUFPD xmm0, xmm0, 1 */
+						return IR_SHUFPD_11;
+					case 0x2: /* 0010 20 <src2[0], src1[0]> SHUFPD xmm1, xmm0, 0 (UNPCKLPD) */
+						return IR_SHUFPD_21;
+					case 0x3: /* 0011 30 <src2[1], src1[0]> SHUFPD xmm0, xmm0, 1 */
+						return IR_SHUFPD_21;
+					case 0x4: /* 0100 01 <src1[0], src1[1]> SHUFPD xmm0, xmm0, 2 (MOV) */
+						return IR_SHUFPD_11;
+					case 0x5: /* 0101 11 <src1[1], src1[1]> SHUFPD xmm0, xmm0, 3 (UNPCKHPD) */
+						return IR_SHUFPD_11;
+					case 0x6: /* 0110 21 <src2[0], src1[1]> MOVSD xmm0, xmm1 */
+						return IR_MOVSD_12;
+					case 0x7: /* 0111 31 <src2[1], src1[1]> SHUFPD xmm1, xmm0, 3 (UNPCKHPD) */
+						return IR_SHUFPD_21;
+					case 0x8: /* 1000 02 <src1[0], src2[0]> SHUFPD xmm0, xmm1, 0 (UNPCKLPD) */
+						return IR_SHUFPD_12;
+					case 0x9: /* 1001 12 <src1[1], src2[0]> SHUFPD xmm0, xmm1, 1 */
+						return IR_SHUFPD_12;
+					case 0xa: /* 1010 22 <src2[0], src2[0]> SHUFPD xmm1, xmm1, 0 (UNPCKLPD)*/
+						return IR_SHUFPD_22;
+					case 0xb: /* 1011 32 <src2[1], src2[0]> SHUFPD xmm1, xmm1, 1 */
+						return IR_SHUFPD_22;
+					case 0xc: /* 1100 30 <src1[0], src2[1]> SHUFPD xmm0, xmm1, 2 */
+						return IR_SHUFPD_12;
+					case 0xd: /* 1101 13 <src1[1], src2[1]> SHUFPD xmm0, xmm1, 3 (UNPCKHPD) */
+						return IR_SHUFPD_12;
+					case 0xe: /* 1110 23 <src2[0], src2[1]> SHUFPD xmm1, xmm1, 2 (MOV)*/
+						return IR_SHUFPD_22;
+					case 0xf: /* 1111 33 <src2[1], src2[1]> SHUFPD xmm1, xmm1, 3 (UNPCKHPD) */
+						return IR_SHUFPD_22;
+					default:
+						break;
+				}
+			}
+		} else if (element_type == IR_FLOAT) {
+			if (n == 4 && n1 == 4 && n2 == 4) {
+				if (insn->op1 == insn->op2) {
+					return IR_SHUFPS_11;
+				} else {
+					uint32_t i, v2_mask = 0;
+
+					if ((ctx->mflags & IR_X86_SSE41)
+					 && (IR_SHUFFLE_MASK(0) & 3) == 0
+					 && (IR_SHUFFLE_MASK(1) & 3) == 1
+					 && (IR_SHUFFLE_MASK(2) & 3) == 2
+					 && (IR_SHUFFLE_MASK(3) & 3) == 3) {
+						i = IR_SHUFFLE_MASK(0) & 4;
+						if ((IR_SHUFFLE_MASK(1) & 4) != i || (IR_SHUFFLE_MASK(3) & 4) != i || (IR_SHUFFLE_MASK(3) & 4) != i) {
+							return IR_BLENDPS_12;
+						}
+					}
+
+					for (i = 0; i < 4; i++) {
+						if (IR_SHUFFLE_MASK(i) >= 4) {
+							v2_mask |= (1 << i);
+						}
+					}
+					switch (v2_mask) {
+						case 0x0: /* 0000 */
+							return IR_SHUFPS_11;
+						case 0x1: /* 0001 */
+						case 0x2: /* 0010 */
+							return IR_SHUFPS_12_1;
+						case 0x3: /* 0011 */
+							return IR_SHUFPS_21;
+						case 0x4: /* 0100 */
+							if (IR_SHUFFLE_MASK(0) == IR_SHUFFLE_MASK(1) ||
+								IR_SHUFFLE_MASK(0) == IR_SHUFFLE_MASK(3) ||
+								IR_SHUFFLE_MASK(1) == IR_SHUFFLE_MASK(3)) {
+								return IR_SHUFPS_12_0;
+							} else {
+								return IR_SHUFPS_1_21;
+							}
+						case 0x5: /* 0101 */
+						case 0x6: /* 0110 */
+							return IR_SHUFPS_12_0;
+						case 0x7: /* 0111 */
+							if (IR_SHUFFLE_MASK(0) == IR_SHUFFLE_MASK(1) ||
+								IR_SHUFFLE_MASK(0) == IR_SHUFFLE_MASK(2) ||
+								IR_SHUFFLE_MASK(1) == IR_SHUFFLE_MASK(2)) {
+								return IR_SHUFPS_12_0;
+							} else {
+								return IR_SHUFPS_2_12;
+							}
+						case 0x8: /* 1000 */
+							if (IR_SHUFFLE_MASK(0) == IR_SHUFFLE_MASK(1) ||
+								IR_SHUFFLE_MASK(0) == IR_SHUFFLE_MASK(2) ||
+								IR_SHUFFLE_MASK(1) == IR_SHUFFLE_MASK(2)) {
+								return IR_SHUFPS_12_0;
+							} else {
+								return IR_SHUFPS_1_21;
+							}
+						case 0x9: /* 1001 */
+						case 0xa: /* 1010 */
+							return IR_SHUFPS_12_0;
+						case 0xb: /* 1011 */
+							if (IR_SHUFFLE_MASK(0) == IR_SHUFFLE_MASK(1) ||
+								IR_SHUFFLE_MASK(0) == IR_SHUFFLE_MASK(3) ||
+								IR_SHUFFLE_MASK(1) == IR_SHUFFLE_MASK(3)) {
+								return IR_SHUFPS_12_0;
+							} else {
+								return IR_SHUFPS_2_12;
+							}
+							break;
+						case 0xc: /* 1100 */
+							return IR_SHUFPS_12;
+						case 0xd: /* 1101 */
+						case 0xe: /* 1110 */
+							return IR_SHUFPS_12_2;
+						case 0xf: /* 1111 */
+							return IR_SHUFPS_22;
+						default:
+							break;
+					}
+				}
+			}
+		}
+	}
+
+	return IR_SHUFFLE;
+}
+#endif
 
 static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref)
 {
@@ -4935,6 +5196,10 @@ store_int:
 			fprintf(stderr, "ERROR: IR_ASM is not implemented yet\n");
 			exit(1);
 			return IR_SKIPPED | IR_NOP;
+	#if IR_SIMD
+			case IR_SHUFFLE:
+				return ir_match_shuffle(ctx, insn);
+	#endif
 #if IR_X86_I64
 		case IR_PHI:
 		case IR_VLOAD:
@@ -17690,6 +17955,540 @@ static void ir_emit_vector_splat(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
+
+static ir_reg ir_emit_load_reg(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref ref)
+{
+	if (reg != IR_REG_NONE) {
+		if (IR_REG_SPILLED(reg)) {
+			reg = IR_REG_NUM(reg);
+			ir_emit_load(ctx, type, reg, ref);
+		}
+	}
+	return reg;
+}
+
+static void ir_emit_load_def_reg(ir_ctx *ctx, ir_type type, ir_reg def_reg, ir_reg use_reg, ir_ref use)
+{
+	if (def_reg != use_reg) {
+		if (use_reg != IR_REG_NONE) {
+			if (IR_REG_SPILLED(use_reg)) {
+				use_reg = IR_REG_NUM(use_reg);
+				ir_emit_load(ctx, type, use_reg, use);
+			}
+			if (IR_IS_TYPE_INT(type)) {
+				ir_emit_mov(ctx, type, def_reg, use_reg);
+			} else {
+				ir_emit_fp_mov(ctx, type, def_reg, use_reg);
+			}
+		} else {
+			ir_emit_load(ctx, type, def_reg, use);
+		}
+	}
+}
+
+static uint32_t ir_shufps_mask(ir_ctx *ctx, ir_ref ref)
+{
+	int8_t *p;
+	uint32_t i, s, mask = 0;
+
+
+	IR_ASSERT(IR_IS_CONST_REF(ref) && IR_IS_TYPE_VECTOR(ctx->ir_base[ref].type));
+	p = ir_long_const_ptr(ctx, ref);
+	s = ir_type_size[IR_VECTOR_BASE_TYPE(ctx->ir_base[ref].type)];
+	for (i = 0; i < 4; i++) {
+		mask |= (IR_SHUFFLE_MASK(i) & 3) << (i * 2);
+	}
+	return mask;
+}
+
+static uint32_t ir_shufps_mask_12_0(ir_ctx *ctx, ir_ref ref)
+{
+	int8_t *p;
+	uint32_t i, i1, i2, s, mask1 = 0, mask2 = 0;
+
+	IR_ASSERT(IR_IS_CONST_REF(ref) && IR_IS_TYPE_VECTOR(ctx->ir_base[ref].type));
+	p = ir_long_const_ptr(ctx, ref);
+	s = ir_type_size[IR_VECTOR_BASE_TYPE(ctx->ir_base[ref].type)];
+	for (i = i1 = i2 = 0; i < 4; i++) {
+		if (!(IR_SHUFFLE_MASK(i) & 4)) {
+			if (i1 && (mask1 & 3) == (IR_SHUFFLE_MASK(i) & 3)) {
+				/* pass */
+			} else if (i1 == 2 && ((mask1 >> 2) & 3) == (IR_SHUFFLE_MASK(i) & 3)) {
+				mask2 |= 1 << (i * 2);
+			} else {
+				IR_ASSERT(i1 < 2);
+				mask1 |= (IR_SHUFFLE_MASK(i) & 3) << (i1 * 2);
+				mask2 |= i1 << (i * 2);
+				i1++;
+			}
+		} else {
+			if (i2 && ((mask1 >> 4) & 3) == (IR_SHUFFLE_MASK(i) & 3)) {
+				mask2 |= 2 << (i * 2);
+			} else if (i2 == 2 && ((mask1 >> 6) & 3) == (IR_SHUFFLE_MASK(i) & 3)) {
+				mask2 |= 3 << (i * 2);
+			} else {
+				IR_ASSERT(i2 < 2);
+				mask1 |= (IR_SHUFFLE_MASK(i) & 3) << ((i2 + 2) * 2);
+				mask2 |= (i2 + 2) << (i * 2);
+				i2++;
+			}
+		}
+	}
+	return mask1 | (mask2 << 8);
+}
+
+static uint32_t ir_shufps_mask_12_n(ir_ctx *ctx, ir_ref ref)
+{
+	int8_t *p;
+	uint32_t s, mask1 = 0, mask2 = 0;
+
+	IR_ASSERT(IR_IS_CONST_REF(ref) && IR_IS_TYPE_VECTOR(ctx->ir_base[ref].type));
+	p = ir_long_const_ptr(ctx, ref);
+	s = ir_type_size[IR_VECTOR_BASE_TYPE(ctx->ir_base[ref].type)];
+	IR_ASSERT((IR_SHUFFLE_MASK(0) & 4) != (IR_SHUFFLE_MASK(1) & 4));
+	if (!(IR_SHUFFLE_MASK(0) & 4)) {
+		mask1 |= (IR_SHUFFLE_MASK(0) & 3);
+		mask1 |= (IR_SHUFFLE_MASK(0) & 3) << 2;
+		mask1 |= (IR_SHUFFLE_MASK(1) & 3) << 4;
+		mask1 |= (IR_SHUFFLE_MASK(1) & 3) << 6;
+		mask2 |= 0x8;
+	} else {
+		mask1 |= (IR_SHUFFLE_MASK(1) & 3);
+		mask1 |= (IR_SHUFFLE_MASK(1) & 3) << 2;
+		mask1 |= (IR_SHUFFLE_MASK(0) & 3) << 4;
+		mask1 |= (IR_SHUFFLE_MASK(0) & 3) << 6;
+		mask2 |= 0x2;
+	}
+	mask2 |= (IR_SHUFFLE_MASK(2) & 3) << 4;
+	mask2 |= (IR_SHUFFLE_MASK(3) & 3) << 6;
+	return mask1 | (mask2 << 8);
+}
+
+static uint32_t ir_shufps_mask_n_12(ir_ctx *ctx, ir_ref ref)
+{
+	int8_t *p;
+	uint32_t s, mask1 = 0, mask2 = 0;
+
+	IR_ASSERT(IR_IS_CONST_REF(ref) && IR_IS_TYPE_VECTOR(ctx->ir_base[ref].type));
+	p = ir_long_const_ptr(ctx, ref);
+	s = ir_type_size[IR_VECTOR_BASE_TYPE(ctx->ir_base[ref].type)];
+	IR_ASSERT((IR_SHUFFLE_MASK(2) & 4) != (IR_SHUFFLE_MASK(3) & 4));
+	mask2 |= (IR_SHUFFLE_MASK(0) & 3);
+	mask2 |= (IR_SHUFFLE_MASK(1) & 3) << 2;
+	if (!(IR_SHUFFLE_MASK(2) & 4)) {
+		mask1 |= (IR_SHUFFLE_MASK(2) & 3);
+		mask1 |= (IR_SHUFFLE_MASK(2) & 3) << 2;
+		mask1 |= (IR_SHUFFLE_MASK(3) & 3) << 4;
+		mask1 |= (IR_SHUFFLE_MASK(3) & 3) << 6;
+		mask2 |= 0x80;
+	} else {
+		mask1 |= (IR_SHUFFLE_MASK(3) & 3);
+		mask1 |= (IR_SHUFFLE_MASK(3) & 3) << 2;
+		mask1 |= (IR_SHUFFLE_MASK(2) & 3) << 4;
+		mask1 |= (IR_SHUFFLE_MASK(2) & 3) << 6;
+		mask2 |= 0x20;
+	}
+	return mask1 | (mask2 << 8);
+}
+
+static uint32_t ir_shufps_mask_n_21(ir_ctx *ctx, ir_ref ref)
+{
+	int8_t *p;
+	uint32_t s, mask1 = 0, mask2 = 0;
+
+	IR_ASSERT(IR_IS_CONST_REF(ref) && IR_IS_TYPE_VECTOR(ctx->ir_base[ref].type));
+	p = ir_long_const_ptr(ctx, ref);
+	s = ir_type_size[IR_VECTOR_BASE_TYPE(ctx->ir_base[ref].type)];
+	IR_ASSERT((IR_SHUFFLE_MASK(2) & 4) != (IR_SHUFFLE_MASK(3) & 4));
+	mask2 |= (IR_SHUFFLE_MASK(0) & 3);
+	mask2 |= (IR_SHUFFLE_MASK(1) & 3) << 2;
+	if (!(IR_SHUFFLE_MASK(2) & 4)) {
+		mask1 |= (IR_SHUFFLE_MASK(3) & 3);
+		mask1 |= (IR_SHUFFLE_MASK(3) & 3) << 2;
+		mask1 |= (IR_SHUFFLE_MASK(2) & 3) << 4;
+		mask1 |= (IR_SHUFFLE_MASK(2) & 3) << 6;
+		mask2 |= 0x20;
+	} else {
+		mask1 |= (IR_SHUFFLE_MASK(2) & 3);
+		mask1 |= (IR_SHUFFLE_MASK(2) & 3) << 2;
+		mask1 |= (IR_SHUFFLE_MASK(3) & 3) << 4;
+		mask1 |= (IR_SHUFFLE_MASK(3) & 3) << 6;
+		mask2 |= 0x80;
+	}
+	return mask1 | (mask2 << 8);
+}
+
+static void ir_emit_shufpd(ir_ctx *ctx, ir_ref def_reg, ir_reg op2_reg, ir_ref ref)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	int8_t *p;
+	uint32_t s, mask = 0;
+
+	IR_ASSERT(IR_IS_CONST_REF(ref) && IR_IS_TYPE_VECTOR(ctx->ir_base[ref].type));
+	p = ir_long_const_ptr(ctx, ref);
+	s = ir_type_size[IR_VECTOR_BASE_TYPE(ctx->ir_base[ref].type)];
+	mask |= (IR_SHUFFLE_MASK(0) & 1);
+	mask |= (IR_SHUFFLE_MASK(1) & 1) << 1;
+
+	if (def_reg == op2_reg && mask == 2) {
+		/* pass */
+	} else if (mask == 0) {
+		|	unpcklpd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+	} else if (mask == 3) {
+		|	unpckhpd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+	} else {
+		|	shufpd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST), mask
+	}
+}
+
+static void ir_emit_shufps(ir_ctx *ctx, ir_ref def_reg, ir_reg op2_reg, uint32_t mask)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+
+	if (def_reg == op2_reg && mask == 0xe4) {
+		/* pass */
+	} else if (def_reg == op2_reg && mask == 0x50) {
+		|	unpcklps xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+	} else if (def_reg == op2_reg && mask == 0xfa) {
+		|	unpckhps xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+	} else if (def_reg == op2_reg && mask == 0xee) {
+		|	movhlps xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+	} else if (mask == 0x44) {
+		|	movlhps xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+	} else {
+		|	shufps xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST), mask
+	}
+}
+
+static void ir_emit_blendps(ir_ctx *ctx, ir_ref def_reg, ir_reg op2_reg, ir_ref ref)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	int8_t *p;
+	uint32_t s, mask = 0;
+
+	IR_ASSERT(IR_IS_CONST_REF(ref) && IR_IS_TYPE_VECTOR(ctx->ir_base[ref].type));
+	p = ir_long_const_ptr(ctx, ref);
+	s = ir_type_size[IR_VECTOR_BASE_TYPE(ctx->ir_base[ref].type)];
+	mask |= (IR_SHUFFLE_MASK(0) & 4) >> 2;
+	mask |= (IR_SHUFFLE_MASK(1) & 4) >> 1;
+	mask |= (IR_SHUFFLE_MASK(2) & 4);
+	mask |= (IR_SHUFFLE_MASK(3) & 4) << 1;
+
+	|	blendps xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST), mask
+}
+
+static void ir_emit_vector_shuffle_sse(ir_ctx *ctx, ir_ref def, ir_insn *insn, uint32_t rule)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_type type = insn->type;
+	ir_reg op1_reg = ctx->regs[def][1];
+	ir_reg op2_reg = ctx->regs[def][2];
+	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
+	ir_reg tmp_reg = IR_REG_NONE;
+	uint32_t mask;
+
+	if (op2_reg == IR_REG_NONE && insn->op1 == insn->op2) {
+		op2_reg = op1_reg;
+	}
+	IR_ASSERT(def_reg != IR_REG_NONE && op1_reg != IR_REG_NONE && op2_reg != IR_REG_NONE);
+
+	switch (rule) {
+		default:
+			IR_ASSERT(0 && "NIY shuffle rule");
+		case IR_SHUFPD_11:
+			ir_emit_load_def_reg(ctx, type, def_reg, op1_reg, insn->op1);
+			ir_emit_shufpd(ctx, def_reg, def_reg, insn->op3);
+			break;
+		case IR_SHUFPD_22:
+			ir_emit_load_def_reg(ctx, type, def_reg, op2_reg, insn->op2);
+			ir_emit_shufpd(ctx, def_reg, def_reg, insn->op3);
+			break;
+		case IR_SHUFPD_12:
+			ir_emit_load_def_reg(ctx, type, def_reg, op1_reg, insn->op1);
+			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
+			ir_emit_shufpd(ctx, def_reg, op2_reg, insn->op3);
+			break;
+		case IR_SHUFPD_21:
+			ir_emit_load_def_reg(ctx, type, def_reg, op2_reg, insn->op2);
+			op1_reg = ir_emit_load_reg(ctx, type, op1_reg, insn->op1);
+			ir_emit_shufpd(ctx, def_reg, op1_reg, insn->op3);
+			break;
+		case IR_MOVSD_12:
+			ir_emit_load_def_reg(ctx, type, def_reg, op1_reg, insn->op1);
+			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
+			|	movsd xmm(def_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+			break;
+		case IR_SHUFPS_11:
+			ir_emit_load_def_reg(ctx, type, def_reg, op1_reg, insn->op1);
+			mask = ir_shufps_mask(ctx, insn->op3);
+			ir_emit_shufps(ctx, def_reg, def_reg, mask);
+			break;
+		case IR_SHUFPS_22:
+			ir_emit_load_def_reg(ctx, type, def_reg, op2_reg, insn->op2);
+			mask = ir_shufps_mask(ctx, insn->op3);
+			ir_emit_shufps(ctx, def_reg, def_reg, mask);
+			break;
+		case IR_SHUFPS_12:
+			ir_emit_load_def_reg(ctx, type, def_reg, op1_reg, insn->op1);
+			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
+			mask = ir_shufps_mask(ctx, insn->op3);
+			ir_emit_shufps(ctx, def_reg, op2_reg, mask);
+			break;
+		case IR_SHUFPS_21:
+			ir_emit_load_def_reg(ctx, type, def_reg, op2_reg, insn->op2);
+			op1_reg = ir_emit_load_reg(ctx, type, op1_reg, insn->op1);
+			mask = ir_shufps_mask(ctx, insn->op3);
+			ir_emit_shufps(ctx, def_reg, op1_reg, mask);
+			break;
+		case IR_SHUFPS_12_0:
+			ir_emit_load_def_reg(ctx, type, def_reg, op1_reg, insn->op1);
+			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
+			mask = ir_shufps_mask_12_0(ctx, insn->op3);
+			ir_emit_shufps(ctx, def_reg, op2_reg, mask & 0xff);
+			ir_emit_shufps(ctx, def_reg, def_reg, mask >> 8);
+			break;
+		case IR_SHUFPS_12_1:
+			ir_emit_load_def_reg(ctx, type, def_reg, op1_reg, insn->op1);
+			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
+			mask = ir_shufps_mask_12_n(ctx, insn->op3);
+			ir_emit_shufps(ctx, def_reg, op2_reg, mask & 0xff);
+			ir_emit_shufps(ctx, def_reg, op1_reg, mask >> 8);
+			break;
+		case IR_SHUFPS_12_2:
+			ir_emit_load_def_reg(ctx, type, def_reg, op1_reg, insn->op1);
+			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
+			mask = ir_shufps_mask_12_n(ctx, insn->op3);
+			ir_emit_shufps(ctx, def_reg, op2_reg, mask & 0xff);
+			ir_emit_shufps(ctx, def_reg, op2_reg, mask >> 8);
+			break;
+		case IR_SHUFPS_1_21:
+			tmp_reg = ctx->tmp_regs[def];
+			IR_ASSERT(tmp_reg != IR_REG_NONE);
+			ir_emit_load_def_reg(ctx, type, def_reg, op1_reg, insn->op1);
+			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
+			if (tmp_reg == op1_reg) {
+				mask = ir_shufps_mask_n_12(ctx, insn->op3);
+				ir_emit_shufps(ctx, tmp_reg, op2_reg, mask & 0xff);
+			} else {
+				ir_emit_load_def_reg(ctx, type, tmp_reg, op2_reg, insn->op2);
+				mask = ir_shufps_mask_n_21(ctx, insn->op3);
+				ir_emit_shufps(ctx, tmp_reg, def_reg, mask & 0xff);
+			}
+			ir_emit_shufps(ctx, def_reg, tmp_reg, mask >> 8);
+			break;
+		case IR_SHUFPS_2_12:
+			tmp_reg = ctx->tmp_regs[def];
+			IR_ASSERT(tmp_reg != IR_REG_NONE);
+			ir_emit_load_def_reg(ctx, type, def_reg, op2_reg, insn->op2);
+			op1_reg = ir_emit_load_reg(ctx, type, op1_reg, insn->op1);
+			if (tmp_reg == op2_reg) {
+				mask = ir_shufps_mask_n_21(ctx, insn->op3);
+				ir_emit_shufps(ctx, tmp_reg, op1_reg, mask & 0xff);
+			} else {
+				ir_emit_load_def_reg(ctx, type, tmp_reg, op1_reg, insn->op1);
+				mask = ir_shufps_mask_n_12(ctx, insn->op3);
+				ir_emit_shufps(ctx, tmp_reg, def_reg, mask & 0xff);
+			}
+			ir_emit_shufps(ctx, def_reg, tmp_reg, mask >> 8);
+			break;
+		case IR_BLENDPS_12:
+			ir_emit_load_def_reg(ctx, type, def_reg, op1_reg, insn->op1);
+			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
+			ir_emit_blendps(ctx, def_reg, op2_reg, insn->op3);
+			break;
+	}
+
+	if (IR_REG_SPILLED(ctx->regs[def][0])) {
+		ir_emit_store(ctx, insn->type, def, def_reg);
+	}
+}
+
+static void ir_emit_vshufpd(ir_ctx *ctx, ir_ref def_reg, ir_reg op1_reg, ir_reg op2_reg, ir_ref ref)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	int8_t *p;
+	uint32_t s, mask = 0;
+
+	IR_ASSERT(IR_IS_CONST_REF(ref) && IR_IS_TYPE_VECTOR(ctx->ir_base[ref].type));
+	p = ir_long_const_ptr(ctx, ref);
+	s = ir_type_size[IR_VECTOR_BASE_TYPE(ctx->ir_base[ref].type)];
+	mask |= (IR_SHUFFLE_MASK(0) & 1);
+	mask |= (IR_SHUFFLE_MASK(1) & 1) << 1;
+
+	if (op1_reg == op2_reg && mask == 2) {
+		if (def_reg != op1_reg) {
+			|	vmovapd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+		}
+		/* pass */
+	} else if (mask == 0) {
+		|	vunpcklpd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+	} else if (mask == 3) {
+		|	vunpckhpd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+	} else {
+		|	vshufpd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST), mask
+	}
+}
+
+static void ir_emit_vshufps(ir_ctx *ctx, ir_ref def_reg, ir_reg op1_reg, ir_reg op2_reg, uint32_t mask)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+
+	if (op1_reg == op2_reg && mask == 0xe4) {
+		if (def_reg != op1_reg) {
+			|	vmovaps xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+		}
+	} else if (op1_reg == op2_reg && mask == 0x50) {
+		|	vunpcklps xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+	} else if (op1_reg == op2_reg && mask == 0xfa) {
+		|	vunpckhps xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+	} else if (op1_reg == op2_reg && mask == 0xee) {
+		|	vmovhlps xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+	} else if (mask == 0x44) {
+		|	vmovlhps xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+	} else {
+		|	vshufps xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST), mask
+	}
+}
+
+static void ir_emit_vblendps(ir_ctx *ctx, ir_ref def_reg, ir_reg op1_reg, ir_reg op2_reg, ir_ref ref)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	int8_t *p;
+	uint32_t s, mask = 0;
+
+	IR_ASSERT(IR_IS_CONST_REF(ref) && IR_IS_TYPE_VECTOR(ctx->ir_base[ref].type));
+	p = ir_long_const_ptr(ctx, ref);
+	s = ir_type_size[IR_VECTOR_BASE_TYPE(ctx->ir_base[ref].type)];
+	mask |= (IR_SHUFFLE_MASK(0) & 4) >> 2;
+	mask |= (IR_SHUFFLE_MASK(1) & 4) >> 1;
+	mask |= (IR_SHUFFLE_MASK(2) & 4);
+	mask |= (IR_SHUFFLE_MASK(3) & 4) << 1;
+
+	|	vblendps xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST), mask
+}
+
+static void ir_emit_vector_shuffle_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn, uint32_t rule)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_type type = insn->type;
+	ir_reg op1_reg = ctx->regs[def][1];
+	ir_reg op2_reg = ctx->regs[def][2];
+	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
+	ir_reg tmp_reg = IR_REG_NONE;
+	uint32_t mask;
+
+	if (op2_reg == IR_REG_NONE && insn->op1 == insn->op2) {
+		op2_reg = op1_reg;
+	}
+	IR_ASSERT(def_reg != IR_REG_NONE && op1_reg != IR_REG_NONE && op2_reg != IR_REG_NONE);
+
+	switch (rule) {
+		default:
+			IR_ASSERT(0 && "NIY shuffle rule");
+		case IR_SHUFPD_11:
+			op1_reg = ir_emit_load_reg(ctx, type, op1_reg, insn->op1);
+			ir_emit_vshufpd(ctx, def_reg, op1_reg, op1_reg, insn->op3);
+			break;
+		case IR_SHUFPD_22:
+			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
+			ir_emit_vshufpd(ctx, def_reg, op2_reg, op2_reg, insn->op3);
+			break;
+		case IR_SHUFPD_12:
+			op1_reg = ir_emit_load_reg(ctx, type, op1_reg, insn->op1);
+			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
+			ir_emit_vshufpd(ctx, def_reg, op1_reg, op2_reg, insn->op3);
+			break;
+		case IR_SHUFPD_21:
+			op1_reg = ir_emit_load_reg(ctx, type, op1_reg, insn->op1);
+			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
+			ir_emit_vshufpd(ctx, def_reg, op2_reg, op1_reg, insn->op3);
+			break;
+		case IR_MOVSD_12:
+			op1_reg = ir_emit_load_reg(ctx, type, op1_reg, insn->op1);
+			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
+			|	vmovsd xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op2_reg-IR_REG_FP_FIRST)
+			break;
+		case IR_SHUFPS_11:
+			op1_reg = ir_emit_load_reg(ctx, type, op1_reg, insn->op1);
+			mask = ir_shufps_mask(ctx, insn->op3);
+			ir_emit_vshufps(ctx, def_reg, op1_reg, op1_reg, mask);
+			break;
+		case IR_SHUFPS_22:
+			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
+			mask = ir_shufps_mask(ctx, insn->op3);
+			ir_emit_vshufps(ctx, def_reg, op2_reg, op2_reg, mask);
+			break;
+		case IR_SHUFPS_12:
+			op1_reg = ir_emit_load_reg(ctx, type, op1_reg, insn->op1);
+			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
+			mask = ir_shufps_mask(ctx, insn->op3);
+			ir_emit_vshufps(ctx, def_reg, op1_reg, op2_reg, mask);
+			break;
+		case IR_SHUFPS_21:
+			op1_reg = ir_emit_load_reg(ctx, type, op1_reg, insn->op1);
+			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
+			mask = ir_shufps_mask(ctx, insn->op3);
+			ir_emit_vshufps(ctx, def_reg, op2_reg, op1_reg, mask);
+			break;
+		case IR_SHUFPS_12_0:
+			op1_reg = ir_emit_load_reg(ctx, type, op1_reg, insn->op1);
+			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
+			mask = ir_shufps_mask_12_0(ctx, insn->op3);
+			ir_emit_vshufps(ctx, def_reg, op1_reg, op2_reg, mask & 0xff);
+			ir_emit_vshufps(ctx, def_reg, def_reg, def_reg, mask >> 8);
+			break;
+		case IR_SHUFPS_12_1:
+			op1_reg = ir_emit_load_reg(ctx, type, op1_reg, insn->op1);
+			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
+			mask = ir_shufps_mask_12_n(ctx, insn->op3);
+			ir_emit_vshufps(ctx, def_reg, op1_reg, op2_reg, mask & 0xff);
+			ir_emit_vshufps(ctx, def_reg, def_reg, op1_reg, mask >> 8);
+			break;
+		case IR_SHUFPS_12_2:
+			op1_reg = ir_emit_load_reg(ctx, type, op1_reg, insn->op1);
+			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
+			mask = ir_shufps_mask_12_n(ctx, insn->op3);
+			ir_emit_vshufps(ctx, def_reg, op1_reg, op2_reg, mask & 0xff);
+			ir_emit_vshufps(ctx, def_reg, def_reg, op2_reg, mask >> 8);
+			break;
+		case IR_SHUFPS_1_21:
+			tmp_reg = ctx->tmp_regs[def];
+			IR_ASSERT(tmp_reg != IR_REG_NONE);
+			op1_reg = ir_emit_load_reg(ctx, type, op1_reg, insn->op1);
+			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
+			mask = ir_shufps_mask_n_12(ctx, insn->op3);
+			ir_emit_vshufps(ctx, tmp_reg, op1_reg, op2_reg, mask & 0xff);
+			ir_emit_vshufps(ctx, def_reg, op1_reg, tmp_reg, mask >> 8);
+			break;
+		case IR_SHUFPS_2_12:
+			tmp_reg = ctx->tmp_regs[def];
+			IR_ASSERT(tmp_reg != IR_REG_NONE);
+			op1_reg = ir_emit_load_reg(ctx, type, op1_reg, insn->op1);
+			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
+			mask = ir_shufps_mask_n_12(ctx, insn->op3);
+			ir_emit_vshufps(ctx, tmp_reg, op1_reg, op2_reg, mask & 0xff);
+			ir_emit_vshufps(ctx, def_reg, op2_reg, tmp_reg, mask >> 8);
+			break;
+		case IR_BLENDPS_12:
+			op1_reg = ir_emit_load_reg(ctx, type, op1_reg, insn->op1);
+			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
+			ir_emit_vblendps(ctx, def_reg, op1_reg, op2_reg, insn->op3);
+			break;
+	}
+
+	if (IR_REG_SPILLED(ctx->regs[def][0])) {
+		ir_emit_store(ctx, insn->type, def, def_reg);
+	}
+}
+
 static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_type type = insn->type;
@@ -17729,9 +18528,7 @@ static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 	}
 
-	if (0) {
-		// TODO: add optimized SSE4/AVX code ???
-	} else {
+	if (1) {
 		/* shuffle through stack memory */
 		ir_type mask_type = ctx->ir_base[insn->op3].type;
 		ir_type mask_element_type = IR_VECTOR_BASE_TYPE(mask_type);
@@ -25781,6 +26578,27 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					break;
 				case IR_SPLAT:
 					ir_emit_vector_splat(ctx, i, insn);
+					break;
+				case IR_SHUFPD_11:
+				case IR_SHUFPD_22:
+				case IR_SHUFPD_12:
+				case IR_SHUFPD_21:
+				case IR_MOVSD_12:
+				case IR_SHUFPS_11:
+				case IR_SHUFPS_22:
+				case IR_SHUFPS_12:
+				case IR_SHUFPS_21:
+				case IR_SHUFPS_12_0:
+				case IR_SHUFPS_12_1:
+				case IR_SHUFPS_12_2:
+				case IR_SHUFPS_1_21:
+				case IR_SHUFPS_2_12:
+				case IR_BLENDPS_12:
+					if (ctx->mflags & IR_X86_AVX) {
+						ir_emit_vector_shuffle_avx(ctx, i, insn, (*rule) & IR_RULE_MASK);
+					} else {
+						ir_emit_vector_shuffle_sse(ctx, i, insn, (*rule) & IR_RULE_MASK);
+					}
 					break;
 				case IR_SHUFFLE:
 					ir_emit_vector_shuffle(ctx, i, insn);
