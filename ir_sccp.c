@@ -3604,7 +3604,7 @@ static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref con
 {
 	ir_insn *condition_insn = &ctx->ir_base[condition];
 
-	while (((condition_insn->op == IR_BITCAST && IR_IS_TYPE_SCALAR(ctx->ir_base[condition].type))
+	while (((condition_insn->op == IR_BITCAST && IR_IS_TYPE_SCALAR(ctx->ir_base[condition_insn->op1].type))
 	  || condition_insn->op == IR_ZEXT
 	  || condition_insn->op == IR_SEXT)
 	 && ctx->use_lists[condition].count == 1) {
@@ -3744,7 +3744,7 @@ static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref con
 		}
 	}
 
-	while (((condition_insn->op == IR_BITCAST && IR_IS_TYPE_SCALAR(ctx->ir_base[condition].type))
+	while (((condition_insn->op == IR_BITCAST && IR_IS_TYPE_SCALAR(ctx->ir_base[condition_insn->op1].type))
 	  || condition_insn->op == IR_ZEXT
 	  || condition_insn->op == IR_SEXT)
 	 && ctx->use_lists[condition].count == 1) {
