@@ -12808,7 +12808,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 			} else {
 				do_pass3 = 1;
 			}
-			stack_offset += IR_MAX(sizeof(void*), ir_type_size[type]);
+			stack_offset += IR_MAX(sizeof(void*), ir_get_type_size(type));
 		}
 	}
 
@@ -12919,17 +12919,18 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 							ir_emit_load(ctx, type, dst_reg, arg);
 						} else if (ctx->vregs[arg]) {
 							ir_mem mem = ir_ref_spill_slot(ctx, arg);
+							uint32_t size = ir_type_size[type];
 
-							if (ir_type_size[type] > 2) {
+							if (size > 2) {
 								ir_emit_load_mem_int(ctx, type, dst_reg, mem);
-							} else if (ir_type_size[type] == 2) {
+							} else if (size == 2) {
 								if (type == IR_I16) {
 									|	ASM_TXT_TMEM_OP movsx, Rd(dst_reg), word, mem
 								} else {
 									|	ASM_TXT_TMEM_OP movzx, Rd(dst_reg), word, mem
 								}
 							} else {
-								IR_ASSERT(ir_type_size[type] == 1);
+								IR_ASSERT(size == 1);
 								if (type == IR_I8) {
 									|	ASM_TXT_TMEM_OP movsx, Rd(dst_reg), byte, mem
 								} else {
@@ -12998,7 +12999,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 						ir_emit_store_mem_fp(ctx, type, mem, src_reg);
 					}
 				}
-				stack_offset += IR_MAX(sizeof(void*), ir_type_size[type]);
+				stack_offset += IR_MAX(sizeof(void*), ir_get_type_size(type));
 			}
 		}
 	}
