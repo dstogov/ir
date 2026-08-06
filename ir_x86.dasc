@@ -2672,7 +2672,7 @@ get_arg_hints:
 				n++;
 			}
 			if (IR_IS_TYPE_INT(IR_VECTOR_BASE_TYPE(insn->type)) || !IR_IS_CONST_REF(insn->op3)) {
-				// TODO: hardcoded register ???
+				// TODO: hardcoded registe???
 				constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_RAX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
 				n++;
 			}
@@ -2735,7 +2735,7 @@ get_arg_hints:
 				}
 				if (IR_IS_CONST_REF(insn->op2) && insn->op2 != insn->op1) {
 					if (insn->op >= IR_LT && insn->op <= IR_UGT) {
-						// TODO: vector comparison may require the second oprand in the register ???
+						/* vector comparison may require the second oprand in the register */
 						constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 						n++;
 					} else if (IR_IS_TYPE_FP(IR_VECTOR_BASE_TYPE(type)) && insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
@@ -2787,22 +2787,18 @@ get_arg_hints:
 				}
 				if (insn->op == IR_LT || insn->op == IR_GE || insn->op == IR_ULT ||  insn->op == IR_UGE) {
 					flags &= ~IR_DEF_REUSES_OP1_REG;
-					// TODO: DEF_MAY_REUSE_OP2 ???
 					flags |= IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
 				} else if (insn->op == IR_UGT && ir_type_size[IR_VECTOR_BASE_TYPE(type)] == 4) {
 					flags &= ~IR_DEF_REUSES_OP1_REG;
-					// TODO: DEF_MAY_REUSE_OP2 ???
 					flags |= IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
 				} else if ((insn->op == IR_LE || insn->op == IR_ULT || insn->op == IR_ULE) &&
 						ir_type_size[IR_VECTOR_BASE_TYPE(type)] != 8) {
 					flags &= ~IR_DEF_REUSES_OP1_REG;
-					// TODO: DEF_MAY_REUSE_OP2 ???
 					flags |= IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
 				}
 			} else {
 				if (insn->op == IR_GT || insn->op == IR_GE || insn->op == IR_ULT || insn->op == IR_ULE) {
 					flags &= ~IR_DEF_REUSES_OP1_REG;
-					// TODO: DEF_MAY_REUSE_OP2 ???
 					flags |= IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
 				}
 			}
@@ -2827,7 +2823,7 @@ get_arg_hints:
 				}
 				if (IR_IS_CONST_REF(insn->op2) && insn->op2 != insn->op1) {
 					if (insn->op >= IR_LT && insn->op <= IR_UGT) {
-						// TODO: vector comparison may require the second oprand in the register ???
+						/* vector comparison may require the second oprand in the register */
 						constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 						n++;
 					} else if (IR_IS_TYPE_FP(IR_VECTOR_BASE_TYPE(type)) && insn->op >= IR_EQ && insn->op <= IR_UNORDERED) {
@@ -2837,7 +2833,7 @@ get_arg_hints:
 					} else if (!(ctx->mflags & IR_X86_AVX2)
 							&& IR_VECTOR_SIZE(type) == 32
 							&& IR_IS_TYPE_VECTOR(ctx->ir_base[insn->op2].type)) {
-						// TODO: workaroud against DynASM limitation: [=>label+16] doen't work ???
+						// TODO: workaroud against DynASM limitation: [=>label+16] doesn't work ???
 						constraints->tmp_regs[n] = IR_TMP_REG(2, type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 						n++;
 					}
@@ -3692,7 +3688,7 @@ binop_vector:
 				} else {
 					if (ir_may_fuse_load_vector(ctx, insn->type)
 					 && !(insn->op >= IR_LT && insn->op <= IR_UGT)) {
-						// TODO: load may be fused only into some comparison instructions ???
+						/* load may be fused only into some vector comparison instructions */
 						ir_match_fuse_load(ctx, insn->op2, ref);
 					}
 					if (ctx->mflags & IR_X86_AVX) {
