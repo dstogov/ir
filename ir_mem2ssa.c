@@ -130,10 +130,19 @@ static void ir_mem2ssa_sort(ir_ref *a, int n, uint32_t *order)
 static ir_ref ir_uninitialized(ir_ctx *ctx, ir_type type)
 {
 	/* read of uninitialized variable (use 0) */
-	ir_val c;
+	if (IR_IS_TYPE_SCALAR(type)) {
+		ir_val c;
 
-	c.i64 = 0;
-	return ir_const(ctx, c, type);
+		c.i64 = 0;
+		return ir_const(ctx, c, type);
+	} else {
+		ir_ref ref;
+
+		IR_ASSERT(IR_IS_TYPE_VECTOR(type));
+		ref = ir_const_vector(ctx, type);
+		memset(ir_long_const_ptr(ctx, ref), 0, IR_VECTOR_SIZE(type));
+		return ir_long_const_commit(ctx, ref);
+	}
 }
 
 static void ir_mem2ssa_convert(ir_ctx      *ctx,
@@ -516,10 +525,6 @@ static int ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, i
 	}
 
 	size = (size_t)ctx->ir_base[insn->op2].val.u64;
-	if (size != 1 && size != 2 && size != 4 && size != 8 && size != sizeof(double)) {
-		goto try_split;
-	}
-
 	use_list = &ctx->use_lists[var];
 	n = use_list->count;
 	skip = next;
@@ -537,7 +542,7 @@ static int ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, i
 		if (use_insn->op == IR_LOAD) {
 			if (use_insn->op2 != var) {
 				return IR_CANNOT_CONVERT;
-			} else if (ir_type_size[use_insn->type] != size) {
+			} else if (ir_get_type_size(use_insn->type) != size) {
 				goto try_split;
 			}
 			if (!type) {
@@ -546,7 +551,7 @@ static int ir_mem2ssa_may_convert_alloca(ir_ctx *ctx, ir_ref var, ir_ref next, i
 		} else if (use_insn->op == IR_STORE) {
 			if (use_insn->op2 != var || use_insn->op3 == var) {
 				return IR_CANNOT_CONVERT;
-			} else if (ir_type_size[ctx->ir_base[use_insn->op3].type] != size) {
+			} else if (ir_get_type_size(ctx->ir_base[use_insn->op3].type) != size) {
 				goto try_split;
 			}
 			if (!type) {
@@ -569,7 +574,8 @@ try_split:
 
 static bool ir_mem2ssa_add_split_var(ir_ctx *ctx, ir_mem2ssa_split_layout *layout, size_t offset, size_t size)
 {
-	IR_ASSERT(size > 0 && size <= 8);
+	IR_ASSERT(size > 0);
+	if (size > 128) return 0; // TODO: support for bigger vectors ???
 
 	if (offset + size > layout->size) {
 		return 0;
@@ -605,6 +611,7 @@ static bool ir_mem2ssa_may_promote(ir_ctx *ctx, ir_mem2ssa_split_layout *layout,
 	ir_ref n, *p, use;
 	ir_insn *use_insn;
 	ir_use_list *use_list;
+	uint32_t use_size;
 
 	use_list = &ctx->use_lists[var];
 	n = use_list->count;
@@ -618,16 +625,18 @@ static bool ir_mem2ssa_may_promote(ir_ctx *ctx, ir_mem2ssa_split_layout *layout,
 			if (use_insn->op2 != var) {
 				return 0;
 			}
-			if (ir_type_size[use_insn->type] == layout->size
-			 || !ir_mem2ssa_add_split_var(ctx, layout, offset, ir_type_size[use_insn->type])) {
+			use_size = ir_get_type_size(use_insn->type);
+			if (use_size == layout->size
+			 || !ir_mem2ssa_add_split_var(ctx, layout, offset, use_size)) {
 				return 0;
 			}
 		} else if (use_insn->op == IR_STORE) {
 			if (use_insn->op2 != var || use_insn->op3 == var) {
 				return 0;
 			}
-			if (ir_type_size[ctx->ir_base[use_insn->op3].type] == layout->size
-			 || !ir_mem2ssa_add_split_var(ctx, layout, offset, ir_type_size[ctx->ir_base[use_insn->op3].type])) {
+			use_size = ir_get_type_size(ctx->ir_base[use_insn->op3].type);
+			if (use_size == layout->size
+			 || !ir_mem2ssa_add_split_var(ctx, layout, offset, use_size)) {
 				return 0;
 			}
 		} else {
@@ -645,6 +654,7 @@ static int ir_mem2ssa_may_split_alloca(ir_ctx *ctx, ir_mem2ssa_split_layout *lay
 	ir_ref n, *p, use;
 	ir_insn *use_insn;
 	ir_use_list *use_list;
+	uint32_t use_size;
 
 	use_list = &ctx->use_lists[var];
 	n = use_list->count;
@@ -663,16 +673,18 @@ static int ir_mem2ssa_may_split_alloca(ir_ctx *ctx, ir_mem2ssa_split_layout *lay
 			if (use_insn->op2 != var) {
 				return IR_CANNOT_CONVERT;
 			}
-			if (ir_type_size[use_insn->type] == layout->size
-			 || !ir_mem2ssa_add_split_var(ctx, layout, 0, ir_type_size[use_insn->type])) {
+			use_size = ir_get_type_size(use_insn->type);
+			if (use_size == layout->size
+			 || !ir_mem2ssa_add_split_var(ctx, layout, 0, use_size)) {
 				return IR_CANNOT_CONVERT;
 			}
 		} else if (use_insn->op == IR_STORE) {
 			if (use_insn->op2 != var || use_insn->op3 == var) {
 				return IR_CANNOT_CONVERT;
 			}
-			if (ir_type_size[ctx->ir_base[use_insn->op3].type] == layout->size
-			 || !ir_mem2ssa_add_split_var(ctx, layout, 0, ir_type_size[ctx->ir_base[use_insn->op3].type])) {
+			use_size = ir_get_type_size(ctx->ir_base[use_insn->op3].type);
+			if (use_size == layout->size
+			 || !ir_mem2ssa_add_split_var(ctx, layout, 0, use_size)) {
 				return IR_CANNOT_CONVERT;
 			}
 		} else if (use_insn->op == IR_ADD
@@ -782,6 +794,7 @@ static bool ir_mem2ssa_may_convert_var(ir_ctx *ctx, ir_ref var, ir_insn *insn)
 	ir_insn *use_insn;
 	ir_use_list *use_list;
 	ir_type type;
+	uint32_t size;
 
 	use_list = &ctx->use_lists[var];
 	n = use_list->count;
@@ -791,6 +804,7 @@ static bool ir_mem2ssa_may_convert_var(ir_ctx *ctx, ir_ref var, ir_insn *insn)
 
 	p = &ctx->use_edges[use_list->refs];
 	type = insn->type;
+	size = ir_get_type_size(type);
 	do {
 		use = *p;
 		IR_ASSERT(use);
@@ -798,14 +812,14 @@ static bool ir_mem2ssa_may_convert_var(ir_ctx *ctx, ir_ref var, ir_insn *insn)
 		if (use_insn->op == IR_VLOAD) {
 			if (use_insn->op2 != var
 			 || (use_insn->type != type
-			  && ir_type_size[use_insn->type] != ir_type_size[type])) {
+			  && ir_get_type_size(use_insn->type) != size)) {
 				return 0;
 			}
 		} else if (use_insn->op == IR_VSTORE) {
 			if (use_insn->op2 != var
 			 || use_insn->op3 == var
 			 || (ctx->ir_base[use_insn->op3].type != type
-			  && ir_type_size[ctx->ir_base[use_insn->op3].type] != ir_type_size[type])) {
+			  && ir_get_type_size(ctx->ir_base[use_insn->op3].type) != size)) {
 				return 0;
 			}
 		} else {

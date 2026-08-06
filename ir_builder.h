@@ -489,6 +489,11 @@ extern "C" {
 /* Helper to add address with a constant offset */
 #define ir_ADD_OFFSET(_addr, _offset)     _ir_ADD_OFFSET(_ir_CTX, (_addr), (_offset))
 
+#define ir_EXTRACT(_type, _op1, _op2)     ir_fold2(_ir_CTX, IR_OPT(IR_EXTRACT, (_type)), (_op1), (_op2))
+#define ir_REPLACE(_type, _op1, _op2, _v) ir_fold3(_ir_CTX, IR_OPT(IR_REPLACE, (_type)), (_op1), (_op2), (_v))
+#define ir_SPLAT(_type, _op1)             ir_UNARY_OP(IR_SPLAT, (_type), (_op1))
+#define ir_SHUFFLE(_type, _op1, _op2, _m) ir_fold3(_ir_CTX, IR_OPT(IR_SHUFFLE, (_type)), (_op1), (_op2), (_m))
+
 /* Unfoldable variant of COPY */
 #define ir_HARD_COPY(_type, _op1)         ir_emit2(_ir_CTX, IR_OPT(IR_COPY, (_type)), (_op1), IR_COPY_HARD)
 #define ir_HARD_COPY_B(_op1)              ir_HARD_COPY(IR_BOOL, _op1)

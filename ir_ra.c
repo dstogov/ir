@@ -2664,12 +2664,17 @@ static ir_live_interval *ir_split_interval_at(ir_ctx *ctx, ir_live_interval *iva
 static int32_t ir_allocate_small_spill_slot(ir_ctx *ctx, size_t size)
 {
 	ir_reg_alloc_data *data = ctx->data;
-	int32_t ret;
+	int32_t ret, n;
 
-	IR_ASSERT(size == 0 || size == 1 || size == 2 || size == 4 || size == 8);
-	if (data->handled && data->handled[size]) {
-		ret = data->handled[size]->stack_spill_pos;
-		data->handled[size] = data->handled[size]->list_next;
+	if (size == 0) {
+		return IR_NULL;
+	}
+
+	IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8);
+	n = ir_ntz(size);
+	if (data->handled && data->handled[n]) {
+		ret = data->handled[n]->stack_spill_pos;
+		data->handled[n] = data->handled[n]->list_next;
 	} else if (size == 8) {
 		ret = ctx->stack_frame_size;
 		ctx->stack_frame_size += 8;
@@ -2677,9 +2682,9 @@ static int32_t ir_allocate_small_spill_slot(ir_ctx *ctx, size_t size)
 		if (data->unused_slot_4) {
 			ret = data->unused_slot_4;
 			data->unused_slot_4 = 0;
-	    } else if (data->handled && data->handled[8]) {
-			ret = data->handled[8]->stack_spill_pos;
-			data->handled[8] = data->handled[8]->list_next;
+	    } else if (data->handled && data->handled[3]) {
+			ret = data->handled[3]->stack_spill_pos;
+			data->handled[3] = data->handled[3]->list_next;
 			data->unused_slot_4 = ret + 4;
 		} else {
 			ret = ctx->stack_frame_size;
@@ -2698,13 +2703,13 @@ static int32_t ir_allocate_small_spill_slot(ir_ctx *ctx, size_t size)
 			ret = data->unused_slot_4;
 			data->unused_slot_2 = data->unused_slot_4 + 2;
 			data->unused_slot_4 = 0;
-	    } else if (data->handled && data->handled[4]) {
-			ret = data->handled[4]->stack_spill_pos;
-			data->handled[4] = data->handled[4]->list_next;
+	    } else if (data->handled && data->handled[2]) {
+			ret = data->handled[2]->stack_spill_pos;
+			data->handled[2] = data->handled[2]->list_next;
 			data->unused_slot_2 = ret + 2;
-	    } else if (data->handled && data->handled[8]) {
-			ret = data->handled[8]->stack_spill_pos;
-			data->handled[8] = data->handled[8]->list_next;
+	    } else if (data->handled && data->handled[3]) {
+			ret = data->handled[3]->stack_spill_pos;
+			data->handled[3] = data->handled[3]->list_next;
 			data->unused_slot_2 = ret + 2;
 			data->unused_slot_4 = ret + 4;
 		} else {
@@ -2730,18 +2735,18 @@ static int32_t ir_allocate_small_spill_slot(ir_ctx *ctx, size_t size)
 			data->unused_slot_1 = data->unused_slot_4 + 1;
 			data->unused_slot_2 = data->unused_slot_4 + 2;
 			data->unused_slot_4 = 0;
+	    } else if (data->handled && data->handled[1]) {
+			ret = data->handled[1]->stack_spill_pos;
+			data->handled[1] = data->handled[1]->list_next;
+			data->unused_slot_1 = ret + 1;
 	    } else if (data->handled && data->handled[2]) {
 			ret = data->handled[2]->stack_spill_pos;
 			data->handled[2] = data->handled[2]->list_next;
 			data->unused_slot_1 = ret + 1;
-	    } else if (data->handled && data->handled[4]) {
-			ret = data->handled[4]->stack_spill_pos;
-			data->handled[4] = data->handled[4]->list_next;
-			data->unused_slot_1 = ret + 1;
 			data->unused_slot_2 = ret + 2;
-	    } else if (data->handled && data->handled[8]) {
-			ret = data->handled[8]->stack_spill_pos;
-			data->handled[8] = data->handled[8]->list_next;
+	    } else if (data->handled && data->handled[3]) {
+			ret = data->handled[3]->stack_spill_pos;
+			data->handled[3] = data->handled[3]->list_next;
 			data->unused_slot_1 = ret + 1;
 			data->unused_slot_2 = ret + 2;
 			data->unused_slot_4 = ret + 4;
@@ -2762,11 +2767,6 @@ static int32_t ir_allocate_small_spill_slot(ir_ctx *ctx, size_t size)
 	return ret;
 }
 
-int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type)
-{
-	return ir_allocate_small_spill_slot(ctx, ir_type_size[type]);
-}
-
 static int32_t ir_allocate_big_spill_slot(ir_ctx *ctx, int32_t size)
 {
 	int32_t ret;
@@ -2780,6 +2780,17 @@ static int32_t ir_allocate_big_spill_slot(ir_ctx *ctx, int32_t size)
 		return ir_allocate_small_spill_slot(ctx, size);
 	}
 
+	if (size <= 64 && (size & (size - 1)) == 0) {
+		uint32_t n = ir_ntz(size);
+		ir_reg_alloc_data *data = ctx->data;
+
+		if (data->handled && data->handled[n]) {
+			ret = data->handled[n]->stack_spill_pos;
+			data->handled[n] = data->handled[n]->list_next;
+			return ret;
+		}
+	}
+
 	/* Align stack allocated data to 16 byte */
 	ctx->flags2 |= IR_16B_FRAME_ALIGNMENT;
 	ret = IR_ALIGNED_SIZE(ctx->stack_frame_size, 16);
@@ -2788,6 +2799,17 @@ static int32_t ir_allocate_big_spill_slot(ir_ctx *ctx, int32_t size)
 
 	return ret;
 }
+
+int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type)
+{
+	if (IR_IS_TYPE_SCALAR(type)) {
+		return ir_allocate_small_spill_slot(ctx, ir_type_size[type]);
+	} else {
+		IR_ASSERT(IR_IS_TYPE_VECTOR(type));
+		return ir_allocate_big_spill_slot(ctx, IR_VECTOR_SIZE(type));
+	}
+}
+
 
 static ir_reg ir_get_first_reg_hint(ir_ctx *ctx, ir_live_interval *ival, ir_regset available)
 {
@@ -3066,7 +3088,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 	ir_live_interval *other;
 	ir_regset available, overlapped, scratch;
 
-	if (IR_IS_TYPE_FP(ival->type)) {
+	if (IR_IS_TYPE_FP(ival->type) || IR_IS_TYPE_VECTOR(ival->type)) {
 		available = IR_REGSET_FP;
 		/* set freeUntilPos of all physical registers to maxInt */
 		for (i = IR_REG_FP_FIRST; i <= IR_REG_FP_LAST; i++) {
@@ -3404,7 +3426,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 		next_use_pos = ival->range.end;
 	}
 
-	if (IR_IS_TYPE_FP(ival->type)) {
+	if (IR_IS_TYPE_FP(ival->type) || IR_IS_TYPE_VECTOR(ival->type)) {
 		available = IR_REGSET_FP;
 		/* set nextUsePos of all physical registers to maxInt */
 		for (i = IR_REG_FP_FIRST; i <= IR_REG_FP_LAST; i++) {
@@ -4116,10 +4138,8 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 				}
 			}
 		}
-
 		if (unhandled) {
-			uint8_t size;
-			ir_live_interval *handled[9] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+			ir_live_interval *handled[7] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL};
 			ir_live_interval *old;
 
 			((ir_reg_alloc_data*)(ctx->data))->handled = handled;
@@ -4141,9 +4161,12 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 						} else {
 							active = other->list_next;
 						}
-						size = ir_type_size[other->type];
-						IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8);
-						old = handled[size];
+
+						uint8_t n, size = ir_get_type_size(other->type);
+
+						IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8 || size == 16 || size == 32 || size == 64);
+						n = ir_ntz(size);
+						old = handled[n];
 						while (old) {
 							if (old->stack_spill_pos == other->stack_spill_pos) {
 								break;
@@ -4151,8 +4174,8 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 							old = old->list_next;
 						}
 						if (!old) {
-							other->list_next = handled[size];
-							handled[size] = other;
+							other->list_next = handled[n];
+							handled[n] = other;
 						}
 					} else {
 						prev = other;
@@ -4165,9 +4188,11 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 					ival->list_next = active;
 					active = ival;
 				} else {
-					size = ir_type_size[ival->type];
-					IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8);
-					old = handled[size];
+					uint32_t n, size = ir_get_type_size(ival->type);
+
+					IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8 || size == 16 || size == 32 || size == 64);
+					n = ir_ntz(size);
+					old = handled[n];
 					while (old) {
 						if (old->stack_spill_pos == ival->stack_spill_pos) {
 							break;
@@ -4175,8 +4200,8 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 						old = old->list_next;
 					}
 					if (!old) {
-						ival->list_next = handled[size];
-						handled[size] = ival;
+						ival->list_next = handled[n];
+						handled[n] = ival;
 					}
 				}
 			}
@@ -4504,7 +4529,7 @@ static void assign_regs(ir_ctx *ctx)
 					}
 				}
 			}
-			ir_set_alocated_reg(ctx, ival->tmp_ref, ival->tmp_op_num, reg);
+			ir_set_alocated_tmp_reg(ctx, ival->tmp_ref, ival->tmp_op_num, reg);
 			ival = ival->next;
 		} while (ival);
 	}

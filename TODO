@@ -4,7 +4,6 @@
 	- full ABI conformance
 -  MEMCPY, MEMSET
 -  Consider IR cleanup (VAR -> ALLOCA, VLOAD -> LOAD, VSTORE -> STORE, LOOP_END -> END, LOOP_BEGIN -> MERGE, PI)
--  long constants
 -  long double
 
 -  revisit ir_bind()

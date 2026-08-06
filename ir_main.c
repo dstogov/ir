@@ -79,7 +79,7 @@ static void help(const char *cmd)
 		"  -m[no-]sse4                - enable/disable SSE4 instruction set\n"
 		"  -m[no-]sse4.1              - enable/disable SSE4.1 instruction set\n"
 		"  -m[no-]sse4.2              - enable/disable SSE4.2 instruction set\n"
-		"  -m[no-]avx2                - use AVX2 instruction set\n"
+		"  -m[no-]avx2                - enable/disable AVX2 instruction set\n"
 #endif
 		"  -muse-fp                   - use base frame pointer register\n"
 #ifndef _WIN32
@@ -827,8 +827,10 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 static bool ir_loader_sym_data(ir_loader *loader, ir_type type, uint32_t count, const void *data)
 {
 	ir_main_loader *l = (ir_main_loader*) loader;
-	size_t size = ir_type_size[type];
+	size_t size;
 
+	IR_ASSERT(IR_IS_TYPE_SCALAR(type));
+	size = ir_type_size[type];
 	if ((l->dump & IR_DUMP_IR) && (l->dump_file)) {
 		const void *p = data;
 		uint32_t i;

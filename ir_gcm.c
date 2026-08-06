@@ -821,10 +821,18 @@ static void ir_xlat_binding(ir_ctx *ctx, ir_ref *_xlat)
 	binding->count = n2;
 }
 
-IR_ALWAYS_INLINE ir_ref ir_count_constant(ir_ref *_xlat, ir_ref ref)
+IR_ALWAYS_INLINE ir_ref ir_count_constant(const ir_ctx *ctx, ir_ref *_xlat, ir_ref ref)
 {
 	if (!_xlat[ref]) {
 		_xlat[ref] = ref; /* this is only a "used constant" marker */
+		if (ctx->ir_base[ref].op == IR_LONG_CONST) {
+				ir_ref i, n = IR_ALIGNED_SIZE(ctx->ir_base[ref].long_const_size, sizeof(ir_insn)) / sizeof(ir_insn);
+
+			for (i = 1; i <= n; i++) {
+				_xlat[ref + i] = ref + i; /* this is only a "used constant" marker */
+			}
+			return n + 1;
+		}
 		return 1;
 	}
 	return 0;
@@ -1063,7 +1071,7 @@ restart:
 						goto restart;
 					}
 				} else if (input < IR_TRUE) {
-					*consts_count += ir_count_constant(_xlat, input);
+					*consts_count += ir_count_constant(ctx, _xlat, input);
 				}
 			}
 		}
@@ -1160,16 +1168,16 @@ int ir_schedule(ir_ctx *ctx)
 		insn = &ctx->ir_base[i];
 		if (insn->op == IR_BEGIN) {
 			if (insn->op2) {
-				consts_count += ir_count_constant(_xlat, insn->op2);
+				consts_count += ir_count_constant(ctx, _xlat, insn->op2);
 			}
 		} else if (insn->op == IR_CASE_VAL) {
 			IR_ASSERT(insn->op2 < IR_TRUE);
-			consts_count += ir_count_constant(_xlat, insn->op2);
+			consts_count += ir_count_constant(ctx, _xlat, insn->op2);
 		} else if (insn->op == IR_CASE_RANGE) {
 			IR_ASSERT(insn->op2 < IR_TRUE);
-			consts_count += ir_count_constant(_xlat, insn->op2);
+			consts_count += ir_count_constant(ctx, _xlat, insn->op2);
 			IR_ASSERT(insn->op3 < IR_TRUE);
-			consts_count += ir_count_constant(_xlat, insn->op3);
+			consts_count += ir_count_constant(ctx, _xlat, insn->op3);
 		}
 		n = insn->inputs_count;
 		insns_count += ir_insn_inputs_to_len(n);
@@ -1196,7 +1204,7 @@ int ir_schedule(ir_ctx *ctx)
 				for (j = n, p = insn->ops + 2; j > 0; p++, j--) {
 					input = *p;
 					if (input < IR_TRUE) {
-						consts_count += ir_count_constant(_xlat, input);
+						consts_count += ir_count_constant(ctx, _xlat, input);
 					}
 				}
 				i = _next[i];
@@ -1237,7 +1245,7 @@ int ir_schedule(ir_ctx *ctx)
 								for (j = n, q = use_insn->ops + 2; j > 0; q++, j--) {
 									ir_ref input = *q;
 									if (input < IR_TRUE) {
-										consts_count += ir_count_constant(_xlat, input);
+										consts_count += ir_count_constant(ctx, _xlat, input);
 									}
 								}
 							} else {
@@ -1268,7 +1276,7 @@ int ir_schedule(ir_ctx *ctx)
 		insns_count++;
 		if (IR_INPUT_EDGES_COUNT(ir_op_flags[insn->op]) == 2) {
 			if (insn->op2 < IR_TRUE) {
-				consts_count += ir_count_constant(_xlat, insn->op2);
+				consts_count += ir_count_constant(ctx, _xlat, insn->op2);
 			}
 		}
 	}
@@ -1322,10 +1330,23 @@ int ir_schedule(ir_ctx *ctx)
 		while (i < IR_TRUE) {
 			if (_xlat[i]) {
 				*dst = *src;
-				dst->prev_const = 0;
 				_xlat[i] = j;
-				dst++;
-				j++;
+				if (dst->op == IR_LONG_CONST) {
+					uintptr_t n;
+
+					memset(dst + 1, 0, dst->long_const_size);
+					memcpy(dst + 1, src + 1, dst->long_const_size);
+					n = IR_ALIGNED_SIZE(dst->long_const_size, sizeof(ir_insn)) / sizeof(ir_insn);
+					dst += n + 1;
+					src += n + 1;
+					i += n + 1;
+					j += n + 1;
+					continue;
+				} else {
+					dst->prev_const = 0;
+					dst++;
+					j++;
+				}
 			}
 			src++;
 			i++;

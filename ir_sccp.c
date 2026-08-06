@@ -109,6 +109,8 @@ IR_ALWAYS_INLINE ir_ref ir_sccp_identity(const ir_ctx *ctx, const ir_sccp_val *_
 			IR_ASSERT(a > 0);
 		} while (_values[a].op == IR_COPY);
 		IR_ASSERT(_values[a].op == IR_BOTTOM);
+	} else if (a > 0 && _values[a].op == IR_LONG_CONST) {
+		a = _values[a].val.i32;
 	}
 	return a;
 }
@@ -226,8 +228,34 @@ IR_ALWAYS_INLINE void ir_sccp_make_bottom_ex(const ir_ctx *ctx, ir_sccp_val *_va
 # define IR_MAKE_BOTTOM_EX(ref) IR_MAKE_BOTTOM(ref)
 #endif
 
+IR_ALWAYS_INLINE bool ir_sccp_meet_long_const(const ir_ctx *ctx, ir_sccp_val *_values, ir_bitqueue *worklist, ir_ref ref, ir_ref const_ref, const ir_insn *const_insn)
+{
+	if (_values[ref].op == IR_TOP) {
+		/* TOP meet NEW_CONST => NEW_CONST */
+		_values[ref].optx = const_insn->opt;
+		_values[ref].val.i64 = const_ref;
+		return 1;
+	} else if (_values[ref].opt == const_insn->opt) {
+		/* OLD_CONST meet NEW_CONST => (OLD_CONST == NEW_CONST) ? OLD_CONST : BOTTOM */
+		if (_values[ref].val.i32 == const_ref) {
+			return 0;
+		}
+	}
+
+	IR_MAKE_BOTTOM_EX(ref);
+	return 1;
+}
+
 IR_ALWAYS_INLINE bool ir_sccp_meet_const(const ir_ctx *ctx, ir_sccp_val *_values, ir_bitqueue *worklist, ir_ref ref, const ir_insn *val_insn)
 {
+#if IR_COMBO_COPY_PROPAGATION
+	IR_ASSERT(IR_IS_TYPE_SCALAR(val_insn->type));
+#else
+	if (!IR_IS_TYPE_SCALAR(val_insn->type)) {
+		IR_MAKE_BOTTOM_EX(ref);
+		return 1;
+	}
+#endif
 	IR_ASSERT(IR_IS_CONST_OP(val_insn->op) || IR_IS_SYM_CONST(val_insn->op));
 
 	if (_values[ref].op == IR_TOP) {
@@ -318,6 +346,9 @@ restart:
 			copy = ctx->fold_insn.op1;
 			if (IR_IS_CONST_REF(copy)) {
 				insn = &ctx->ir_base[copy];
+				if (insn->op == IR_LONG_CONST) {
+					return ir_sccp_meet_long_const(ctx, _values, worklist, ref, copy, insn);
+				}
 			} else {
 				insn = &_values[copy].insn;
 				if (!IR_IS_CONST_OP(insn->op) && !IR_IS_SYM_CONST(insn->op)) {
@@ -367,6 +398,12 @@ static bool ir_sccp_analyze_phi(const ir_ctx *ctx, ir_sccp_val *_values, ir_bitq
 		input = *p;
 		if (IR_IS_CONST_REF(input)) {
 			v = &ctx->ir_base[input];
+#if IR_COMBO_COPY_PROPAGATION
+			if (v->op == IR_LONG_CONST) {
+				new_copy = input;
+				goto next;
+			}
+#endif
 		} else if (input == i) {
 			continue;
 		} else {
@@ -383,6 +420,9 @@ static bool ir_sccp_analyze_phi(const ir_ctx *ctx, ir_sccp_val *_values, ir_bitq
 					continue;
 				}
 				new_copy = input;
+				goto next;
+			} else if (v->op == IR_LONG_CONST) {
+				new_copy = v->val.i32;
 				goto next;
 #endif
 			} else if (v->op == IR_BOTTOM) {
@@ -417,6 +457,9 @@ next:
 		if (IR_IS_CONST_REF(input)) {
 #if IR_COMBO_COPY_PROPAGATION
 			if (new_copy) {
+				if (new_copy == input) {
+					continue;
+				}
 				goto make_bottom;
 			}
 #endif
@@ -433,6 +476,11 @@ next:
 				ir_ref identity = ir_sccp_identity(ctx, _values, v->op1);
 
 				if (identity == phi_identity || identity == new_copy_identity) {
+					continue;
+				}
+				goto make_bottom;
+			} else if (v->op == IR_LONG_CONST) {
+				if (v->val.i32 == new_copy) {
 					continue;
 				}
 				goto make_bottom;
@@ -453,6 +501,10 @@ next:
 
 #if IR_COMBO_COPY_PROPAGATION
 	if (new_copy) {
+		if (IR_IS_CONST_REF(new_copy)) {
+			IR_ASSERT(ctx->ir_base[new_copy].op == IR_LONG_CONST);
+			return ir_sccp_meet_long_const(ctx, _values, worklist, i, new_copy, &ctx->ir_base[new_copy]);
+		}
 		IR_ASSERT(!IR_IS_CONST_REF(new_copy));
 		IR_ASSERT(!IR_IS_CONST_OP(_values[new_copy].op) && !IR_IS_SYM_CONST(_values[new_copy].op));
 		return ir_sccp_meet_copy(ctx, _values, worklist, i, new_copy);
@@ -835,6 +887,8 @@ static IR_NEVER_INLINE void ir_sccp_analyze(const ir_ctx *ctx, ir_sccp_val *_val
 #if IR_COMBO_COPY_PROPAGATION
 			} else if (_values[i].op == IR_COPY) {
 				fprintf(stderr, "%d. COPY(%d)\n", i, _values[i].copy);
+			} else if (_values[i].op == IR_LONG_CONST) {
+				fprintf(stderr, "%d. LONG_CONST(%d)\n", i, _values[i].val.i32);
 #endif
 			} else if (IR_IS_TOP(i)) {
 				if (ctx->ir_base[i].op != IR_TOP) {
@@ -1138,6 +1192,8 @@ static IR_NEVER_INLINE void ir_sccp_transform(ir_ctx *ctx, const ir_sccp_val *_v
 #if IR_COMBO_COPY_PROPAGATION
 		} else if (value->op == IR_COPY) {
 			ir_sccp_replace_insn(ctx, _values, i, ir_sccp_identity(ctx, _values, value->copy), iter_worklist);
+		} else if (value->op == IR_LONG_CONST) {
+			ir_sccp_replace_insn(ctx, _values, i, value->val.i32, iter_worklist);
 #endif
 		} else if (value->op == IR_TOP) {
 			/* remove unreachable instruction */
@@ -1861,6 +1917,8 @@ static ir_ref ir_promote_i2i(ir_ctx *ctx, ir_type type, ir_ref ref, ir_ref use)
 			case IR_TRUNC:
 				if (ctx->ir_base[insn->op1].type != type) {
 					ir_type src_type = ctx->ir_base[insn->op1].type;
+
+					IR_ASSERT(IR_IS_TYPE_INT(src_type) && IR_IS_TYPE_INT(type));
 					if (ir_type_size[src_type] == ir_type_size[type]) {
 						insn->op = IR_BITCAST;
 					} else if (ir_type_size[src_type] > ir_type_size[type]) {
@@ -3472,7 +3530,9 @@ static void ir_iter_optimize_merge(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge
 						}
 					}
 				}
-				ir_optimize_phi(ctx, merge_ref, merge, phi_ref, phi);
+				if (IR_IS_TYPE_SCALAR(phi->type)) {
+					ir_optimize_phi(ctx, merge_ref, merge, phi_ref, phi);
+				}
 			}
 		}
 	}
@@ -3544,13 +3604,15 @@ static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref con
 {
 	ir_insn *condition_insn = &ctx->ir_base[condition];
 
-	while ((condition_insn->op == IR_BITCAST
+	while (((condition_insn->op == IR_BITCAST && IR_IS_TYPE_SCALAR(ctx->ir_base[condition_insn->op1].type))
 	  || condition_insn->op == IR_ZEXT
 	  || condition_insn->op == IR_SEXT)
 	 && ctx->use_lists[condition].count == 1) {
 		condition = condition_insn->op1;
 		condition_insn = &ctx->ir_base[condition];
 	}
+
+	IR_ASSERT(IR_IS_TYPE_SCALAR(condition_insn->type));
 
 	if (condition_insn->opt == IR_OPT(IR_NOT, IR_BOOL)) {
 		*swap = 1;
@@ -3682,7 +3744,7 @@ static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref con
 		}
 	}
 
-	while ((condition_insn->op == IR_BITCAST
+	while (((condition_insn->op == IR_BITCAST && IR_IS_TYPE_SCALAR(ctx->ir_base[condition_insn->op1].type))
 	  || condition_insn->op == IR_ZEXT
 	  || condition_insn->op == IR_SEXT)
 	 && ctx->use_lists[condition].count == 1) {
@@ -3866,7 +3928,7 @@ void ir_iter_opt(ir_ctx *ctx, ir_bitqueue *worklist)
 								ir_iter_replace_insn(ctx, i, ref);
 								break;
 							}
-						} else {
+						} else if (insn->type == IR_DOUBLE) {
 							if (ir_may_promote_f2d(ctx, insn->op1)) {
 								ir_ref ref = ir_promote_f2d(ctx, insn->op1, i);
 								insn = &ctx->ir_base[i];
@@ -3883,7 +3945,7 @@ void ir_iter_opt(ir_ctx *ctx, ir_bitqueue *worklist)
 								insn = &ctx->ir_base[i];
 								insn->op1 = ref;
 							}
-						} else {
+						} else if (ctx->ir_base[insn->op1].type == IR_FLOAT) {
 							if (ir_may_promote_f2d(ctx, insn->op1)) {
 								ir_ref ref = ir_promote_f2d(ctx, insn->op1, i);
 								insn = &ctx->ir_base[i];
@@ -3968,7 +4030,7 @@ remove_aliased_load:
 					if (!IR_IS_CONST_REF(val)) {
 						ir_use_list_add(ctx, val, i);
 					}
-					if (ir_type_size[val_insn->type] == ir_type_size[insn->type]) {
+					if (ir_get_type_size(val_insn->type) == ir_get_type_size(insn->type)) {
 						/* load forwarding with bitcast (L2L) */
 						insn->optx = IR_OPTX(IR_BITCAST, insn->type, 1);
 					} else {
@@ -3991,7 +4053,7 @@ remove_bitcast:
 				val = insn->op3;
 				val_insn = &ctx->ir_base[val];
 				if (val_insn->op == IR_BITCAST
-				 && ir_type_size[val_insn->type] == ir_type_size[ctx->ir_base[val_insn->op1].type]) {
+				 && ir_get_type_size(val_insn->type) == ir_get_type_size(ctx->ir_base[val_insn->op1].type)) {
 					insn->op3 = val_insn->op1;
 					ir_use_list_remove_one(ctx, val, i);
 					if (ctx->use_lists[val].count == 0) {

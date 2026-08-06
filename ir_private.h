@@ -884,11 +884,31 @@ void ir_addrtab_free(ir_hashtab *tab);
 ir_ref ir_addrtab_find(const ir_hashtab *tab, uint64_t key);
 void ir_addrtab_set(ir_hashtab *tab, uint64_t key, ir_ref val);
 
-/*** IR OP info ***/
+/*** IR Type info ***/
 extern const uint8_t ir_type_flags[IR_LAST_TYPE];
 extern const char *ir_type_name[IR_LAST_TYPE];
 extern const char *ir_type_cname[IR_LAST_TYPE];
 extern const uint8_t ir_type_size[IR_LAST_TYPE];
+
+#define IR_VECTOR_SIZE(t)                 (ir_type_size[IR_VECTOR_BASE_TYPE(t)] * IR_VECTOR_LENGTH(t))
+#define IR_MAKE_VECTOR_TYPE(base, length) ir_make_vector_type(base, length)
+
+IR_ALWAYS_INLINE ir_type ir_make_vector_type(ir_type base, uint8_t length)
+{
+	IR_ASSERT(IR_IS_TYPE_SCALAR(base) && length > 0 && length <= 64 && (length & (length - 1)) == 0);
+
+	return base | ((ir_ntz(length) + 1) << 4);
+}
+
+IR_ALWAYS_INLINE uint32_t ir_get_type_size(ir_type type)
+{
+#if IR_SIMD
+	if (IR_IS_TYPE_VECTOR(type)) return IR_VECTOR_SIZE(type);
+#endif
+	return ir_type_size[type];
+}
+
+/*** IR OP info ***/
 extern const uint32_t ir_op_flags[IR_LAST_OP];
 extern const char *ir_op_name[IR_LAST_OP];
 
@@ -1028,7 +1048,7 @@ IR_ALWAYS_INLINE uint32_t ir_insn_len(const ir_insn *insn)
 #define IR_PREALLOCATED_STACK  (1<<13)
 #define IR_RECURSIVE_TAILCALL  (1<<14)
 #define IR_HAS_MEMCPY          (1<<15)
-
+#define IR_HAS_LONG_CONSTANTS  (1<<16)
 
 /* Temporary: MEM2SSA -> SCCP */
 #define IR_MEM2SSA_VARS        (1<<25)
@@ -1410,14 +1430,18 @@ struct _ir_call_conv_dsc {
 	uint8_t       shadow_store_size;          /* reserved stack space to keep arguemnts passed in registers (WIN64) */
 	uint8_t       int_param_regs_count;       /* number of registers for INT parameters */
 	uint8_t       fp_param_regs_count;        /* number of registers for FP parameters */
+	uint8_t       vector_param_regs_count;    /* number of registers for SIMD vector parameters */
 	int8_t        int_ret_reg;                /* register to return INT value */
 	int8_t        int_ret2_reg;               /* register to return second INT value (used to return I64 on 32-bit) */
 	int8_t        fp_ret_reg;                 /* register to return FP value */
 	int8_t        fp_ret2_reg;                /* register to return second FP value */
+	int8_t        vector_ret_reg;             /* register to return SIMD vector value */
+	int8_t        vector_ret2_reg;            /* register to return second SIMD vector value */
 	int8_t        fp_varargs_reg;             /* register to pass number of fp register arguments into vararg func */
 	int8_t        scratch_reg;                /* pseudo register to reffer srcatch regset (clobbered by call) */
 	const int8_t *int_param_regs;             /* registers for INT parameters */
 	const int8_t *fp_param_regs;              /* registers for FP parameters */
+	const int8_t *vector_param_regs;          /* registers for SIMD vector parameters */
 	ir_regset     preserved_regs;             /* preserved or callee-saved registers */
 };
 
@@ -1445,23 +1469,25 @@ IR_ALWAYS_INLINE void ir_set_alocated_reg(ir_ctx *ctx, ir_ref ref, int op_num, i
 {
 	int8_t *regs = ctx->regs[ref];
 
-	if (op_num > 0) {
-#if IR_X86_I64
-		if (UNEXPECTED(op_num == 4 && op_num > ctx->ir_base[ref].inputs_count)) {
-			/* Used only for COND(I64, _, _) */
-			IR_ASSERT(ctx->ir_base[ref].op == IR_COND);
-			if (!ctx->tmp_regs) {
-				ctx->tmp_regs = ir_mem_malloc(ctx->insns_count);
-				memset(ctx->tmp_regs, -1, ctx->insns_count);
-			}
-			ctx->tmp_regs[ref] = reg;
-			return;
+	/* regs[] is not limited by the declared boundary 4, the real boundary checked below */
+	IR_ASSERT(op_num >=0 && op_num <= IR_MAX(3, ctx->ir_base[ref].inputs_count));
+	regs[op_num] = reg;
+}
+
+IR_ALWAYS_INLINE void ir_set_alocated_tmp_reg(ir_ctx *ctx, ir_ref ref, int op_num, int8_t reg)
+{
+	int8_t *regs = ctx->regs[ref];
+
+	if (UNEXPECTED(op_num == 4)) {
+		/* Used for COND(I64, _, _) and SIMD instructions */
+		if (!ctx->tmp_regs) {
+			ctx->tmp_regs = ir_mem_malloc(ctx->insns_count);
+			memset(ctx->tmp_regs, -1, ctx->insns_count);
 		}
-#else
-		/* regs[] is not limited by the declared boundary 4, the real boundary checked below */
-		IR_ASSERT(op_num <= IR_MAX(3, ctx->ir_base[ref].inputs_count));
-#endif
+		ctx->tmp_regs[ref] = reg;
+		return;
 	}
+	IR_ASSERT(op_num >= 0 && op_num <= 3);
 	regs[op_num] = reg;
 }
 
@@ -1470,7 +1496,7 @@ IR_ALWAYS_INLINE int8_t ir_get_alocated_reg(const ir_ctx *ctx, ir_ref ref, int o
 	int8_t *regs = ctx->regs[ref];
 
 	/* regs[] is not limited by the declared boundary 4, the real boundary checked below */
-	IR_ASSERT(op_num <= IR_MAX(3, ctx->ir_base[ref].inputs_count));
+	IR_ASSERT(op_num >= 0 && op_num <= IR_MAX(3, ctx->ir_base[ref].inputs_count));
 	return regs[op_num];
 }
 
@@ -1486,7 +1512,7 @@ IR_ALWAYS_INLINE int8_t ir_get_alocated_reg(const ir_ctx *ctx, ir_ref ref, int o
 #define IR_MAY_REUSE (1U<<25) /* Result may reuse register of the source */
 #define IR_TWO_REGS  (1U<<24) /* Result needs two registers (used for 64-bit integers on x86) */
 
-#define IR_RULE_MASK 0xff
+#define IR_RULE_MASK 0xffff
 
 #define IR_MAX_REG_ARGS 64
 
@@ -1506,7 +1532,7 @@ typedef struct {
 	int8_t      def_reg;
 	uint8_t     tmps_count;
 	uint8_t     hints_count;
-	ir_tmp_reg  tmp_regs[3];
+	ir_tmp_reg  tmp_regs[4];
 	int8_t      hints[IR_MAX_REG_ARGS + 3];
 } ir_target_constraints;
 

@@ -123,11 +123,15 @@ extern "C" {
 # define IR_X86_I64 0
 #endif
 
-/* IR Type flags (low 4 bits are used for type size) */
-#define IR_TYPE_SIGNED     (1<<4)
-#define IR_TYPE_UNSIGNED   (1<<5)
-#define IR_TYPE_FP         (1<<6)
-#define IR_TYPE_SPECIAL    (1<<7)
+#ifndef IR_SIMD
+# define IR_SIMD 1
+#endif
+
+/* IR Type flags */
+#define IR_TYPE_SIGNED     (1<<0)
+#define IR_TYPE_UNSIGNED   (1<<1)
+#define IR_TYPE_FP         (1<<2)
+#define IR_TYPE_SPECIAL    (1<<3)
 #define IR_TYPE_BOOL       (IR_TYPE_SPECIAL|IR_TYPE_UNSIGNED)
 #define IR_TYPE_ADDR       (IR_TYPE_SPECIAL|IR_TYPE_UNSIGNED)
 #define IR_TYPE_CHAR       (IR_TYPE_SPECIAL|IR_TYPE_SIGNED)
@@ -151,15 +155,32 @@ extern "C" {
 #define IR_IS_TYPE_UNSIGNED(t) ((t) < IR_CHAR)
 #define IR_IS_TYPE_SIGNED(t)   ((t) >= IR_CHAR && (t) < IR_DOUBLE)
 #define IR_IS_TYPE_INT(t)      ((t) < IR_DOUBLE)
-#define IR_IS_TYPE_FP(t)       ((t) >= IR_DOUBLE)
+#define IR_IS_TYPE_FP(t)       ((t) >= IR_DOUBLE && (t) <= IR_FLOAT)
 
 #define IR_TYPE_ENUM(name, type, field, flags) IR_ ## name,
 
 typedef enum _ir_type {
 	IR_VOID,
 	IR_TYPES(IR_TYPE_ENUM)
-	IR_LAST_TYPE
+	IR_LAST_TYPE,
+
+	IR_BASE_TYPE_MASK = 0x0f,
+	IR_VECTOR_MASK    = 0x70,
+
+	IR_VECTOR_1       = 0x10,
+	IR_VECTOR_2       = 0x20,
+	IR_VECTOR_4       = 0x30,
+	IR_VECTOR_8       = 0x40,
+	IR_VECTOR_16      = 0x50,
+	IR_VECTOR_32      = 0x60,
+	IR_VECTOR_64      = 0x70,
 } ir_type;
+
+#define IR_IS_TYPE_SCALAR(t)   (((t) & IR_VECTOR_MASK) == 0)
+#define IR_IS_TYPE_VECTOR(t)   (((t) & IR_VECTOR_MASK) != 0)
+
+#define IR_VECTOR_BASE_TYPE(t) ((t) & IR_BASE_TYPE_MASK)
+#define IR_VECTOR_LENGTH(t)    (1U << ((((t) & IR_VECTOR_MASK) >> 4) - 1))
 
 #ifdef IR_64
 # define IR_SIZE_T          IR_U64
@@ -316,6 +337,12 @@ typedef enum _ir_type {
 	_(MAX,	        d2C,  def, def, ___) /* max(op1, op2)               */ \
 	_(COND,	        d3,   def, def, def) /* op1 ? op2 : op3             */ \
 	\
+	/* SIMD vector ops                                                  */ \
+	_(EXTRACT,      d2,   def, def, ___) /* get element of vector       */ \
+	_(REPLACE,      d3,   def, def, def) /* set element of vector       */ \
+	_(SPLAT,        d1,   def, ___, ___) /* set all elements of vector  */ \
+	_(SHUFFLE,      d3,   def, def, def) /* shuffle elements of vectors */ \
+	\
 	/* data-flow and miscellaneous ops                                  */ \
 	_(VADDR,        d1,   var, ___, ___) /* load address of local var   */ \
 	_(FRAME_ADDR,   d0,   ___, ___, ___) /* function frame address      */ \
@@ -334,6 +361,7 @@ typedef enum _ir_type {
 	_(SYM,          r0,   ___, ___, ___) /* constant symbol ref         */ \
 	_(LABEL,        r0,   ___, ___, ___) /* label address ref           */ \
 	_(STR,          r0,   ___, ___, ___) /* constant str ref            */ \
+	_(LONG_CONST,   r0,   ___, ___, ___) /* long constant (vector)      */ \
 	\
 	/* call ops                                                         */ \
 	_(CALL,         xN,   src, def, def) /* CALL(src, func, args...)    */ \
@@ -513,6 +541,7 @@ typedef struct _ir_insn {
 					uint16_t           inputs_count;       /* number of input control edges for MERGE, PHI, CALL, TAILCALL */
 					uint16_t           prev_insn_offset;   /* 16-bit backward offset from current instruction for CSE */
 					uint16_t           proto;
+					uint16_t           long_const_size;
 				}
 			);
 			uint32_t                   optx;
@@ -700,9 +729,7 @@ struct _ir_ctx {
 	ir_arena          *arena;
 	ir_live_range     *unused_ranges;
 	ir_regs           *regs;
-#if IR_X86_I64
-	int8_t            *tmp_regs;                /* used only for COND(I64, _, _) */
-#endif
+	int8_t            *tmp_regs;                /* additional tmp registers, used for COND(I64, _, _) and SIMD */
 	ir_strtab         *fused_regs;
 	ir_ref            *prev_ref;
 	union {
@@ -764,6 +791,12 @@ ir_ref ir_const_str(ir_ctx *ctx, ir_str str);
 ir_ref ir_const_label(ir_ctx *ctx, ir_str str);
 
 ir_ref ir_unique_const_addr(ir_ctx *ctx, uintptr_t c);
+
+ir_ref ir_long_const(ir_ctx *ctx, ir_type type, size_t size);
+void *ir_long_const_ptr(ir_ctx *ctx, ir_ref ref);
+ir_ref ir_long_const_commit(ir_ctx *ctx, ir_ref ref);
+
+ir_ref ir_const_vector(ir_ctx *ctx, ir_type type);
 
 void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted);
 
@@ -988,6 +1021,7 @@ int ir_load_llvm_asm(ir_loader *loader, const char *filename);
 void ir_print_func_proto(const ir_ctx *ctx, const char *name, bool prefix, FILE *f);
 void ir_print_proto(const ir_ctx *ctx, ir_ref proto, FILE *f);
 void ir_print_proto_ex(uint8_t flags, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, FILE *f);
+void ir_print_type_cname(ir_type type, FILE *f);
 void ir_save(const ir_ctx *ctx, uint32_t save_flags, FILE *f);
 
 /* IR debug dump API (implementation in ir_dump.c) */
