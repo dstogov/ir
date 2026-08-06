@@ -794,6 +794,8 @@ ir_ref ir_unique_const_addr(ir_ctx *ctx, uintptr_t c);
 
 ir_ref ir_long_const(ir_ctx *ctx, ir_type type, size_t size);
 void *ir_long_const_ptr(ir_ctx *ctx, ir_ref ref);
+ir_ref ir_long_const_commit(ir_ctx *ctx, ir_ref ref);
+
 ir_ref ir_const_vector(ir_ctx *ctx, ir_type type);
 
 void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted);

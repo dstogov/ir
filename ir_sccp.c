@@ -109,6 +109,8 @@ IR_ALWAYS_INLINE ir_ref ir_sccp_identity(const ir_ctx *ctx, const ir_sccp_val *_
 			IR_ASSERT(a > 0);
 		} while (_values[a].op == IR_COPY);
 		IR_ASSERT(_values[a].op == IR_BOTTOM);
+	} else if (a > 0 && _values[a].op == IR_LONG_CONST) {
+		a = _values[a].val.i32;
 	}
 	return a;
 }
@@ -226,14 +228,34 @@ IR_ALWAYS_INLINE void ir_sccp_make_bottom_ex(const ir_ctx *ctx, ir_sccp_val *_va
 # define IR_MAKE_BOTTOM_EX(ref) IR_MAKE_BOTTOM(ref)
 #endif
 
+IR_ALWAYS_INLINE bool ir_sccp_meet_long_const(const ir_ctx *ctx, ir_sccp_val *_values, ir_bitqueue *worklist, ir_ref ref, ir_ref const_ref, const ir_insn *const_insn)
+{
+	if (_values[ref].op == IR_TOP) {
+		/* TOP meet NEW_CONST => NEW_CONST */
+		_values[ref].optx = const_insn->opt;
+		_values[ref].val.i64 = const_ref;
+		return 1;
+	} else if (_values[ref].opt == const_insn->opt) {
+		/* OLD_CONST meet NEW_CONST => (OLD_CONST == NEW_CONST) ? OLD_CONST : BOTTOM */
+		if (_values[ref].val.i32 == const_ref) {
+			return 0;
+		}
+	}
+
+	IR_MAKE_BOTTOM_EX(ref);
+	return 1;
+}
+
 IR_ALWAYS_INLINE bool ir_sccp_meet_const(const ir_ctx *ctx, ir_sccp_val *_values, ir_bitqueue *worklist, ir_ref ref, const ir_insn *val_insn)
 {
-	if (IR_IS_TYPE_VECTOR(val_insn->type)) {
-		// TODO: vector constants propagation is not implemented yet ???
+#if IR_COMBO_COPY_PROPAGATION
+	IR_ASSERT(IR_IS_TYPE_SCALAR(val_insn->type));
+#else
+	if (!IR_IS_TYPE_SCALAR(val_insn->type)) {
 		IR_MAKE_BOTTOM_EX(ref);
 		return 1;
 	}
-
+#endif
 	IR_ASSERT(IR_IS_CONST_OP(val_insn->op) || IR_IS_SYM_CONST(val_insn->op));
 
 	if (_values[ref].op == IR_TOP) {
@@ -324,6 +346,9 @@ restart:
 			copy = ctx->fold_insn.op1;
 			if (IR_IS_CONST_REF(copy)) {
 				insn = &ctx->ir_base[copy];
+				if (insn->op == IR_LONG_CONST) {
+					return ir_sccp_meet_long_const(ctx, _values, worklist, ref, copy, insn);
+				}
 			} else {
 				insn = &_values[copy].insn;
 				if (!IR_IS_CONST_OP(insn->op) && !IR_IS_SYM_CONST(insn->op)) {
@@ -373,6 +398,12 @@ static bool ir_sccp_analyze_phi(const ir_ctx *ctx, ir_sccp_val *_values, ir_bitq
 		input = *p;
 		if (IR_IS_CONST_REF(input)) {
 			v = &ctx->ir_base[input];
+#if IR_COMBO_COPY_PROPAGATION
+			if (v->op == IR_LONG_CONST) {
+				new_copy = input;
+				goto next;
+			}
+#endif
 		} else if (input == i) {
 			continue;
 		} else {
@@ -389,6 +420,9 @@ static bool ir_sccp_analyze_phi(const ir_ctx *ctx, ir_sccp_val *_values, ir_bitq
 					continue;
 				}
 				new_copy = input;
+				goto next;
+			} else if (v->op == IR_LONG_CONST) {
+				new_copy = v->val.i32;
 				goto next;
 #endif
 			} else if (v->op == IR_BOTTOM) {
@@ -423,6 +457,9 @@ next:
 		if (IR_IS_CONST_REF(input)) {
 #if IR_COMBO_COPY_PROPAGATION
 			if (new_copy) {
+				if (new_copy == input) {
+					continue;
+				}
 				goto make_bottom;
 			}
 #endif
@@ -439,6 +476,11 @@ next:
 				ir_ref identity = ir_sccp_identity(ctx, _values, v->op1);
 
 				if (identity == phi_identity || identity == new_copy_identity) {
+					continue;
+				}
+				goto make_bottom;
+			} else if (v->op == IR_LONG_CONST) {
+				if (v->val.i32 == new_copy) {
 					continue;
 				}
 				goto make_bottom;
@@ -459,6 +501,10 @@ next:
 
 #if IR_COMBO_COPY_PROPAGATION
 	if (new_copy) {
+		if (IR_IS_CONST_REF(new_copy)) {
+			IR_ASSERT(ctx->ir_base[new_copy].op == IR_LONG_CONST);
+			return ir_sccp_meet_long_const(ctx, _values, worklist, i, new_copy, &ctx->ir_base[new_copy]);
+		}
 		IR_ASSERT(!IR_IS_CONST_REF(new_copy));
 		IR_ASSERT(!IR_IS_CONST_OP(_values[new_copy].op) && !IR_IS_SYM_CONST(_values[new_copy].op));
 		return ir_sccp_meet_copy(ctx, _values, worklist, i, new_copy);
@@ -841,6 +887,8 @@ static IR_NEVER_INLINE void ir_sccp_analyze(const ir_ctx *ctx, ir_sccp_val *_val
 #if IR_COMBO_COPY_PROPAGATION
 			} else if (_values[i].op == IR_COPY) {
 				fprintf(stderr, "%d. COPY(%d)\n", i, _values[i].copy);
+			} else if (_values[i].op == IR_LONG_CONST) {
+				fprintf(stderr, "%d. LONG_CONST(%d)\n", i, _values[i].val.i32);
 #endif
 			} else if (IR_IS_TOP(i)) {
 				if (ctx->ir_base[i].op != IR_TOP) {
@@ -1144,6 +1192,8 @@ static IR_NEVER_INLINE void ir_sccp_transform(ir_ctx *ctx, const ir_sccp_val *_v
 #if IR_COMBO_COPY_PROPAGATION
 		} else if (value->op == IR_COPY) {
 			ir_sccp_replace_insn(ctx, _values, i, ir_sccp_identity(ctx, _values, value->copy), iter_worklist);
+		} else if (value->op == IR_LONG_CONST) {
+			ir_sccp_replace_insn(ctx, _values, i, value->val.i32, iter_worklist);
 #endif
 		} else if (value->op == IR_TOP) {
 			/* remove unreachable instruction */

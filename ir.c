@@ -620,6 +620,9 @@ static IR_NEVER_INLINE void ir_const_hash_rehash(ir_ctx *ctx)
 	ctx->const_hash = ir_mem_calloc(ctx->const_hash_mask + 1, sizeof(ir_ref));
 	for (ref = 1 - ctx->consts_count, insn = ctx->ir_base + ref; ref < IR_TRUE; ref++, insn++) {
 		if (insn->op == IR_LONG_CONST) {
+			hash = insn->val.u64;
+			insn->prev_const = ctx->const_hash[hash & ctx->const_hash_mask];
+			ctx->const_hash[hash & ctx->const_hash_mask] = ref;
 			ref += IR_ALIGNED_SIZE(insn->long_const_size, sizeof(ir_insn)) / sizeof(ir_insn);
 			insn += IR_ALIGNED_SIZE(insn->long_const_size, sizeof(ir_insn)) / sizeof(ir_insn);
 		} else {
@@ -836,6 +839,56 @@ void *ir_long_const_ptr(ir_ctx *ctx, ir_ref ref)
 {
 	IR_ASSERT(IR_IS_CONST_REF(ref));
 	return (void*)&ctx->ir_base[ref + 1];
+}
+
+IR_ALWAYS_INLINE uintptr_t ir_long_const_hash(uint32_t optx, const void *ptr, size_t len)
+{
+	size_t i;
+	const uint8_t *str = ptr;
+	uint32_t h = 5381;
+
+    for (i = 0; i < len; i++) {
+        h = ((h << 5) + h) + *str;
+        str++;
+    }
+	return (uintptr_t)(h ^ optx);
+}
+
+ir_ref ir_long_const_commit(ir_ctx *ctx, ir_ref const_ref)
+{
+	ir_ref ref;
+	uintptr_t hash, n;
+	ir_insn *insn = &ctx->ir_base[const_ref];
+	uint32_t optx = insn->optx;
+	size_t size = insn->long_const_size;
+	const void *ptr = insn + 1;
+
+	IR_ASSERT(ctx->consts_count == 1 - const_ref && "ir_long_const_commit() argument must be result of the last ir_long_const()");
+
+	/* check if we already have the same constant */
+	hash = ir_long_const_hash(optx, ptr, size);
+	ref = ctx->const_hash[hash & ctx->const_hash_mask];
+	while (ref) {
+		insn = &ctx->ir_base[ref];
+		if (insn->val.u64 == hash && insn->optx == optx && memcmp(ptr, insn + 1, size) == 0) {
+			/* rollback */
+			ctx->consts_count -= (IR_ALIGNED_SIZE(size, sizeof(ir_insn)) / sizeof(ir_insn)) + 1;
+			return ref;
+		}
+		ref = insn->prev_const;
+	}
+
+	if ((uintptr_t)ctx->consts_count > ctx->const_hash_mask) {
+		ir_const_hash_rehash(ctx);
+	}
+
+	n = hash & ctx->const_hash_mask;
+	insn = &ctx->ir_base[const_ref];
+	insn->prev_const = ctx->const_hash[n];
+	insn->val.u64 = hash;
+	ctx->const_hash[n] = const_ref;
+
+	return const_ref;
 }
 
 ir_ref ir_const_vector(ir_ctx *ctx, ir_type type)

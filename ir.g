@@ -633,6 +633,7 @@ ir_insn(ir_parser_ctx *p):
 			)*
 		)?
 		"}"
+		{ref = ir_long_const_commit(p->ctx, ref);}
 	|	"func"
 		(	ID(&func, &func_len)
 			{flags = 0;}

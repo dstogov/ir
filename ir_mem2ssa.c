@@ -130,10 +130,19 @@ static void ir_mem2ssa_sort(ir_ref *a, int n, uint32_t *order)
 static ir_ref ir_uninitialized(ir_ctx *ctx, ir_type type)
 {
 	/* read of uninitialized variable (use 0) */
-	ir_val c;
+	if (IR_IS_TYPE_SCALAR(type)) {
+		ir_val c;
 
-	c.i64 = 0;
-	return ir_const(ctx, c, type);
+		c.i64 = 0;
+		return ir_const(ctx, c, type);
+	} else {
+		ir_ref ref;
+
+		IR_ASSERT(IR_IS_TYPE_VECTOR(type));
+		ref = ir_const_vector(ctx, type);
+		memset(ir_long_const_ptr(ctx, ref), 0, IR_VECTOR_SIZE(type));
+		return ir_long_const_commit(ctx, ref);
+	}
 }
 
 static void ir_mem2ssa_convert(ir_ctx      *ctx,

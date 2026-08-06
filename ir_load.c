@@ -1791,6 +1791,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 				yy_error_sym("'}' expected, got", sym);
 			}
 			sym = get_sym();
+			ref = ir_long_const_commit(p->ctx, ref);
 			break;
 		case YY_FUNC:
 			sym = get_sym();

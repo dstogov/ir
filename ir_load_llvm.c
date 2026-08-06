@@ -287,7 +287,7 @@ static ir_ref llvm2ir_const_vector(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 		}
 	}
 
-	return ref;
+	return ir_long_const_commit(ctx, ref);
 }
 
 static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
@@ -375,7 +375,7 @@ static ir_ref llvm2ir_op(ir_ctx *ctx, LLVMValueRef op, ir_type type)
 			ref = ir_const_vector(ctx, type);
 			ptr = ir_long_const_ptr(ctx, ref);
 			memset(ptr, 0, IR_VECTOR_SIZE(type));
-			return ref;
+			return ir_long_const_commit(ctx, ref);
 		case LLVMConstantDataVectorValueKind:
 		case LLVMConstantVectorValueKind:
 			IR_ASSERT(IR_IS_TYPE_VECTOR(type));
@@ -1634,6 +1634,7 @@ static void llvm2ir_vector_shuffle(ir_ctx *ctx, LLVMValueRef expr)
 		ptr[i] = LLVMGetMaskValue(expr, i);
 	}
 
+	ref2 = ir_long_const_commit(ctx, ref2);
 	ref = ir_fold3(ctx, IR_OPT(IR_SHUFFLE, type), ref0, ref1, ref2);
 	ir_addrtab_set(ctx->binding, (uintptr_t)expr, ref);
 }
