@@ -1856,6 +1856,8 @@ static bool ir_may_promote_trunc(const ir_ctx *ctx, ir_type type, ir_ref ref)
 //				TODO: ???
 			case IR_COND:
 				return ctx->use_lists[ref].count == 1 &&
+					insn->op1 != insn->op2 &&
+					insn->op1 != insn->op3 &&
 					ir_may_promote_trunc(ctx, type, insn->op2) &&
 					ir_may_promote_trunc(ctx, type, insn->op3);
 			case IR_PHI:
