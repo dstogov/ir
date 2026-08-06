@@ -53,6 +53,7 @@
 
 #ifdef IR_DEBUG
 # define DASM_CHECKS
+# define DASM_ABORT IR_ASSERT(0)
 #endif
 
 typedef struct _ir_copy {
