@@ -2671,21 +2671,19 @@ get_arg_hints:
 				constraints->tmp_regs[n] = IR_TMP_REG(2, ctx->ir_base[insn->op2].type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 				n++;
 			}
-			if (IR_IS_TYPE_INT(IR_VECTOR_BASE_TYPE(insn->type)) || !IR_IS_CONST_REF(insn->op3)) {
-				// TODO: hardcoded registe???
-				constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_RAX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
-				n++;
-			}
-			if (IR_IS_TYPE_FP(IR_VECTOR_BASE_TYPE(insn->type))) {
-				// TODO: hardcoded register ???
-				constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_XMM0, IR_USE_SUB_REF, IR_DEF_SUB_REF);
-				n++;
+			constraints->tmp_regs[n] = IR_TMP_REG(4, IR_VECTOR_BASE_TYPE(insn->type), IR_USE_SUB_REF, IR_DEF_SUB_REF);
+			n++;
+			if (!IR_IS_CONST_REF(insn->op3)) {
+				if (IR_IS_TYPE_FP(IR_VECTOR_BASE_TYPE(insn->type))) {
+					// TODO: hardcoded index register ???
+					constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_RCX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
+					n++;
 #if IR_X86_I64
-			} else if ((IR_VECTOR_BASE_TYPE(insn->type) == IR_I64 || IR_VECTOR_BASE_TYPE(insn->type) == IR_U64)
-				&& !IR_IS_CONST_REF(insn->op2)) {
-				constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_RDX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
-				n++;
+				} else if (IR_VECTOR_BASE_TYPE(insn->type) == IR_I64 || IR_VECTOR_BASE_TYPE(insn->type) == IR_U64) {
+					constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_RCX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
+					n++;
 #endif
+				}
 			}
 			/* shuffle through stack */
 			ctx->flags2 |= IR_16B_FRAME_ALIGNMENT;
@@ -18534,7 +18532,7 @@ static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		int dst_offset = -width;
 		int src_offset = dst_offset;
 		uint32_t mod = 0;
-		ir_reg tmp_reg = IR_IS_TYPE_INT(element_type) ? IR_REG_RAX : IR_REG_XMM0; // TODO: hardcoded registetrs ???
+		ir_reg tmp_reg = ctx->tmp_regs[def];
 
 		if (insn->op1 != insn->op2) {
 			if (IR_REG_SPILLED(op2_reg)) {
@@ -18597,7 +18595,17 @@ static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		} else {
 			int mask_offset = src_offset - IR_VECTOR_SIZE(mask_type);
 			uint32_t i;
-			ir_reg idx_reg = IR_REG_RAX; // TODO: hardcoded registetrs ???
+			ir_reg idx_reg;
+
+			if (IR_IS_TYPE_FP(element_type)) {
+				idx_reg = IR_REG_RCX; // TODO: hardcoded registetrs ???
+#if IR_X86_I64
+			} else if (element_type == IR_I64 || element_type == IR_U64) {
+				idx_reg = IR_REG_RCX; // TODO: hardcoded registetrs ???
+#endif
+			} else {
+				idx_reg = tmp_reg;
+			}
 
 			IR_ASSERT(op3_reg != IR_REG_NONE);
 			if (IR_REG_SPILLED(op3_reg)) {
@@ -18621,7 +18629,6 @@ static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				dst = IR_MEM(IR_REG_RSP, dst_offset + i * element_size, IR_REG_NONE, 1);
 #if IR_X86_I64
 				if (element_type == IR_I64 || element_type == IR_U64) {
-					ir_reg tmp_reg = IR_REG_RDX; // TODO: hardcoded registetrs ???
 					ir_emit_load_mem_int(ctx, IR_U32, tmp_reg, src);
 					ir_emit_store_mem_int(ctx, IR_U32, dst, tmp_reg);
 					src = IR_MEM_I64_HI(src);
