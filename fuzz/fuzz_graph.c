@@ -406,3 +406,96 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 
 	return 0;
 }
+
+#ifdef FUZZ_LIBFUZZER
+size_t LLVMFuzzerMutate(uint8_t *data, size_t size, size_t max_size);
+
+/* Preserved prefix is the 2 byte header plus two 8 byte seed constants;
+ * the rest is a stream of 3 byte records that fuzz_build decodes. */
+#define FUZZ_PREFIX_LEN 18
+#define FUZZ_RECORD_LEN 3
+
+static uint64_t fuzz_rng_state;
+
+static uint32_t fuzz_rng(void)
+{
+	uint64_t z = (fuzz_rng_state += 0x9e3779b97f4a7c15ULL);
+	z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+	z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+	return (uint32_t)(z ^ (z >> 31));
+}
+
+size_t LLVMFuzzerCustomMutator(uint8_t *data, size_t size, size_t max_size,
+	unsigned int seed)
+{
+	size_t body, off, soff;
+	uint32_t nrec, at, src;
+
+	fuzz_rng_state = seed;
+
+	if (size < FUZZ_PREFIX_LEN + FUZZ_RECORD_LEN) {
+		return LLVMFuzzerMutate(data, size, max_size);
+	}
+
+	body = size - FUZZ_PREFIX_LEN;
+	nrec = (uint32_t)(body / FUZZ_RECORD_LEN);
+
+	switch (fuzz_rng() % 6) {
+		case 0:
+			if (nrec == 0 || size + FUZZ_RECORD_LEN > max_size) {
+				break;
+			}
+			at = fuzz_rng() % (nrec + 1);
+			off = FUZZ_PREFIX_LEN + (size_t)at * FUZZ_RECORD_LEN;
+			memmove(data + off + FUZZ_RECORD_LEN, data + off, size - off);
+			data[off + 0] = (uint8_t)fuzz_rng();
+			data[off + 1] = (uint8_t)fuzz_rng();
+			data[off + 2] = (uint8_t)fuzz_rng();
+			return size + FUZZ_RECORD_LEN;
+		case 1:
+			if (nrec == 0 || size + FUZZ_RECORD_LEN > max_size) {
+				break;
+			}
+			src = fuzz_rng() % nrec;
+			soff = FUZZ_PREFIX_LEN + (size_t)src * FUZZ_RECORD_LEN;
+			at = fuzz_rng() % (nrec + 1);
+			off = FUZZ_PREFIX_LEN + (size_t)at * FUZZ_RECORD_LEN;
+			{
+				uint8_t rec[FUZZ_RECORD_LEN];
+				memcpy(rec, data + soff, FUZZ_RECORD_LEN);
+				memmove(data + off + FUZZ_RECORD_LEN, data + off, size - off);
+				memcpy(data + off, rec, FUZZ_RECORD_LEN);
+			}
+			return size + FUZZ_RECORD_LEN;
+		case 2:
+			if (nrec <= 1) {
+				break;
+			}
+			at = fuzz_rng() % nrec;
+			off = FUZZ_PREFIX_LEN + (size_t)at * FUZZ_RECORD_LEN;
+			memmove(data + off, data + off + FUZZ_RECORD_LEN,
+				size - off - FUZZ_RECORD_LEN);
+			return size - FUZZ_RECORD_LEN;
+		case 3:
+			at = fuzz_rng() % nrec;
+			off = FUZZ_PREFIX_LEN + (size_t)at * FUZZ_RECORD_LEN;
+			data[off + 1 + (fuzz_rng() & 1)] = (uint8_t)fuzz_rng();
+			return size;
+		case 4:
+			{
+				static const uint8_t feature_bits[] = {
+					0x80, 0x40, 0x20, 0x10, 0x08, 0x02
+				};
+				at = fuzz_rng() % nrec;
+				off = FUZZ_PREFIX_LEN + (size_t)at * FUZZ_RECORD_LEN;
+				data[off] ^= feature_bits[fuzz_rng() % FUZZ_ARRAY_LEN(feature_bits)];
+			}
+			return size;
+		default:
+			break;
+	}
+
+	return LLVMFuzzerMutate(data, size, max_size);
+}
+#endif
+
