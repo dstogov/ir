@@ -1099,8 +1099,12 @@ IR_ALWAYS_INLINE ir_ref _ir_fold_cast(ir_ctx *ctx, ir_ref ref, ir_type type)
 		return ref;
 	} else if (IR_IS_CONST_REF(ref) && !IR_IS_SYM_CONST(ctx->ir_base[ref].op)) {
 		return ir_const(ctx, ctx->ir_base[ref].val, type);
-	} else {
+	} else if (EXPECTED(!ctx->use_lists)) {
 		return ir_emit1(ctx, IR_OPT(IR_BITCAST, type), ref);
+	} else {
+		ir_ref ret = ir_emit1(ctx, IR_OPTX(IR_BITCAST, type, 1), ref);
+		ir_use_list_add(ctx, ref, ret);
+		return ret;
 	}
 }
 
