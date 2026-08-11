@@ -39,13 +39,15 @@ extern "C" {
 #endif
 
 /* target auto detection */
-#if !defined(IR_TARGET_X86) && !defined(IR_TARGET_X64) && !defined(IR_TARGET_AARCH64)
+#if !defined(IR_TARGET_X86) && !defined(IR_TARGET_X64) && !defined(IR_TARGET_AARCH64) && !defined(IR_TARGET_RISCV64)
 # if defined(__x86_64__) || defined(__x86_64) || defined(_M_X64) || defined(_M_AMD64)
 #  define IR_TARGET_X64
 # elif defined(i386) || defined(__i386) || defined(__i386__) || defined(_M_IX86)
 #  define IR_TARGET_X86
 # elif defined(__aarch64__) || defined(_M_ARM64)
 #  define IR_TARGET_AARCH64
+# elif defined(__riscv) && defined(__riscv_xlen) && __riscv_xlen == 64
+#  define IR_TARGET_RISCV64
 # elif defined (_WIN64)
 #  define IR_TARGET_X64
 # elif defined (_WIN32)
@@ -63,6 +65,8 @@ extern "C" {
 # endif
 #elif defined(IR_TARGET_AARCH64)
 # define IR_TARGET "aarch64"
+#elif defined(IR_TARGET_RISCV64)
+# define IR_TARGET "riscv64"
 #else
 # error "Unknown IR target"
 #endif
@@ -1042,6 +1046,9 @@ void ir_emit_c_sym_decl(const char *name, uint32_t flags, FILE *f);
 int ir_emit_llvm(ir_ctx *ctx, const char *name, FILE *f);
 void ir_emit_llvm_func_decl(const char *name, uint32_t flags, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, FILE *f);
 void ir_emit_llvm_sym_decl(const char *name, uint32_t flags, FILE *f);
+
+/* IR to RISCV conversion (implementation in ir_emit_riscv.c) */
+int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f);
 
 /* IR verification API (implementation in ir_check.c) */
 bool ir_check(const ir_ctx *ctx);

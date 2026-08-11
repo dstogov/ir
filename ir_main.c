@@ -298,6 +298,14 @@ static int _save(ir_ctx *ctx, uint32_t save_flags, uint32_t dump, uint32_t pass,
 
 int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t dump, FILE *dump_file, const char *func_name)
 {
+#if defined(IR_TARGET_RISCV64)
+	/* -O0 skips register allocation (ctx->regs stays NULL), but the riscv64
+	 * emitter reads ctx->regs directly. Run the full O1 pipeline instead ---
+	 * the result is still correct, just optimized. */
+	if (opt_level == 0 && (dump & IR_GEN_NATIVE)) {
+		opt_level = 1;
+	}
+#endif
 	if ((dump & IR_DUMP_AFTER_LOAD)
 	 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_LOAD, dump_file, func_name)) {
 		return 0;
