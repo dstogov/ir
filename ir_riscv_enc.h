@@ -31,6 +31,8 @@
 #define RV_F3_SLTU  0x3
 #define RV_F3_XOR   0x4
 #define RV_F3_SR    0x5
+#define RV_F3_SRL   0x5
+#define RV_F3_SRA   0x5
 #define RV_F7_SRL   0x00
 #define RV_F7_SRA   0x20
 #define RV_F3_OR    0x6
@@ -182,5 +184,34 @@ static inline uint32_t rv_store(uint32_t f3, uint32_t rs2, uint32_t rs1, int32_t
 {
 	return rv_enc_s(off, rs2, rs1, f3, RV_OP_STORE);
 }
+
+/* M extension: div/divu/rem/remu */
+static inline uint32_t rv_div(uint32_t rd, uint32_t rs1, uint32_t rs2)
+{ return rv_alu(0, 0x01, 0x04, rd, rs1, rs2); }
+static inline uint32_t rv_divu(uint32_t rd, uint32_t rs1, uint32_t rs2)
+{ return rv_alu(0, 0x01, 0x05, rd, rs1, rs2); }
+static inline uint32_t rv_rem(uint32_t rd, uint32_t rs1, uint32_t rs2)
+{ return rv_alu(0, 0x01, 0x06, rd, rs1, rs2); }
+static inline uint32_t rv_remu(uint32_t rd, uint32_t rs1, uint32_t rs2)
+{ return rv_alu(0, 0x01, 0x07, rd, rs1, rs2); }
+static inline uint32_t rv_divw(uint32_t rd, uint32_t rs1, uint32_t rs2)
+{ return rv_alu(1, 0x01, 0x04, rd, rs1, rs2); }  /* divw */
+static inline uint32_t rv_divuw(uint32_t rd, uint32_t rs1, uint32_t rs2)
+{ return rv_alu(1, 0x01, 0x05, rd, rs1, rs2); }  /* divuw */
+static inline uint32_t rv_remw(uint32_t rd, uint32_t rs1, uint32_t rs2)
+{ return rv_alu(1, 0x01, 0x06, rd, rs1, rs2); }  /* remw */
+static inline uint32_t rv_remuw(uint32_t rd, uint32_t rs1, uint32_t rs2)
+{ return rv_alu(1, 0x01, 0x07, rd, rs1, rs2); }  /* remuw */
+
+/* Zbb: clz/ctz/cpop (I-type, funct3=1, imm[11:5] selects the op) */
+#define RV_ZBB_IMM_CLZ  0x600
+#define RV_ZBB_IMM_CTZ  0x601
+#define RV_ZBB_IMM_CPOP 0x602
+static inline uint32_t rv_clz(uint32_t rd, uint32_t rs)
+{ return rv_enc_i(RV_ZBB_IMM_CLZ, rs, 1, rd, RV_OP_IMM); }
+static inline uint32_t rv_ctz(uint32_t rd, uint32_t rs)
+{ return rv_enc_i(RV_ZBB_IMM_CTZ, rs, 1, rd, RV_OP_IMM); }
+static inline uint32_t rv_cpop(uint32_t rd, uint32_t rs)
+{ return rv_enc_i(RV_ZBB_IMM_CPOP, rs, 1, rd, RV_OP_IMM); }
 
 #endif /* IR_RISCV_ENC_H */

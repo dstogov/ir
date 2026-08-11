@@ -73,6 +73,15 @@ enum {
 	IR_RISCV_RULE_ZEXT,
 	IR_RISCV_RULE_SEXT,
 	IR_RISCV_RULE_TRUNC,
+	IR_RISCV_RULE_DIV,
+	IR_RISCV_RULE_MOD,
+	IR_RISCV_RULE_MIN,
+	IR_RISCV_RULE_MAX,
+	IR_RISCV_RULE_ROL,
+	IR_RISCV_RULE_ROR,
+	IR_RISCV_RULE_CTLZ,
+	IR_RISCV_RULE_CTTZ,
+	IR_RISCV_RULE_CTPOP,
 	IR_RISCV_RULE_SKIP,    /* IR_START and other pure control markers -> no code emitted */
 	IR_RISCV_RULE_PARAM,   /* IR_PARAM  -> no code emitted; def_reg pinned to a0-a7 per ABI */
 };
@@ -264,6 +273,33 @@ int ir_match(ir_ctx *ctx)
 				case IR_TRUNC:
 					ctx->rules[ref] = IR_RISCV_RULE_TRUNC;
 					break;
+				case IR_DIV:
+					ctx->rules[ref] = IR_RISCV_RULE_DIV;
+					break;
+				case IR_MOD:
+					ctx->rules[ref] = IR_RISCV_RULE_MOD;
+					break;
+				case IR_MIN:
+					ctx->rules[ref] = IR_RISCV_RULE_MIN;
+					break;
+				case IR_MAX:
+					ctx->rules[ref] = IR_RISCV_RULE_MAX;
+					break;
+				case IR_ROL:
+					ctx->rules[ref] = IR_RISCV_RULE_ROL;
+					break;
+				case IR_ROR:
+					ctx->rules[ref] = IR_RISCV_RULE_ROR;
+					break;
+				case IR_CTLZ:
+					ctx->rules[ref] = IR_RISCV_RULE_CTLZ;
+					break;
+				case IR_CTTZ:
+					ctx->rules[ref] = IR_RISCV_RULE_CTTZ;
+					break;
+				case IR_CTPOP:
+					ctx->rules[ref] = IR_RISCV_RULE_CTPOP;
+					break;
 				default:
 					/* Not yet supported --- leave rule as
 					 * IR_RISCV_RULE_NONE. Anything reaching
@@ -376,6 +412,42 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 		case IR_RISCV_RULE_ZEXT:
 		case IR_RISCV_RULE_SEXT:
 		case IR_RISCV_RULE_TRUNC:
+			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;
+			break;
+
+		case IR_RISCV_RULE_DIV:
+		case IR_RISCV_RULE_MOD:
+			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;
+			constraints->tmp_regs[0] = IR_TMP_REG(3, ctx->ir_base[ref].type,
+			                                      IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+			n = 1;
+			break;
+
+		case IR_RISCV_RULE_MIN:
+		case IR_RISCV_RULE_MAX:
+			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG
+			      | IR_OP2_MUST_BE_IN_REG;
+			constraints->tmp_regs[0] = IR_TMP_REG(3, ctx->ir_base[ref].type,
+			                                      IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+			n = 1;
+			if (IR_IS_CONST_REF(ctx->ir_base[ref].op2)) {
+				constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_T5,
+				                                          IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n++;
+			}
+			break;
+		case IR_RISCV_RULE_ROL:
+		case IR_RISCV_RULE_ROR:
+			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG
+			      | IR_OP2_MUST_BE_IN_REG;
+			constraints->tmp_regs[0] = IR_TMP_REG(3, ctx->ir_base[ref].type,
+			                                      IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+			n = 1;
+			break;
+
+		case IR_RISCV_RULE_CTLZ:
+		case IR_RISCV_RULE_CTTZ:
+		case IR_RISCV_RULE_CTPOP:
 			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;
 			break;
 
@@ -560,6 +632,36 @@ static void rv_emit_store_def(ir_ctx *ctx, ir_ref ref, ir_type type, int32_t reg
 	emit32(ctx, rv_store(rv_store_f3(type), (uint32_t)reg, IR_REG_SP, off));
 }
 
+/* RVA20U64 popcount: no Zbb, so use the classic divide-and-conquer
+ * sequence (rd may alias rs; T5/T6 are scratch). */
+static void rv_emit_soft_cpop(ir_ctx *ctx, int32_t rd, int32_t rs)
+{
+	/* consume rs up front: T5/T6 are reused as mask/intermediate below */
+	if (rs != rd) {
+		emit32(ctx, rv_mv((uint32_t)rd, (uint32_t)rs));
+	}
+	rv_emit_li64(ctx, IR_REG_T5, 0x5555555555555555LL);
+	emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)IR_REG_T6, (uint32_t)rd, 1));
+	emit32(ctx, rv_alu(0, 0, RV_F3_AND, (uint32_t)IR_REG_T6, (uint32_t)IR_REG_T6, (uint32_t)IR_REG_T5));
+	emit32(ctx, rv_alu(0, RV_F7_SUB, RV_F3_SUB, (uint32_t)rd, (uint32_t)rd, (uint32_t)IR_REG_T6));
+	rv_emit_li64(ctx, IR_REG_T5, 0x3333333333333333LL);
+	emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)IR_REG_T6, (uint32_t)rd, 2));
+	emit32(ctx, rv_alu(0, 0, RV_F3_AND, (uint32_t)IR_REG_T6, (uint32_t)IR_REG_T6, (uint32_t)IR_REG_T5));
+	emit32(ctx, rv_alu(0, 0, RV_F3_AND, (uint32_t)rd, (uint32_t)rd, (uint32_t)IR_REG_T5));
+	emit32(ctx, rv_alu(0, 0, RV_F3_ADD, (uint32_t)rd, (uint32_t)rd, (uint32_t)IR_REG_T6));
+	rv_emit_li64(ctx, IR_REG_T5, 0x0f0f0f0f0f0f0f0fLL);
+	emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)IR_REG_T6, (uint32_t)rd, 4));
+	emit32(ctx, rv_alu(0, 0, RV_F3_ADD, (uint32_t)IR_REG_T6, (uint32_t)rd, (uint32_t)IR_REG_T6));
+	emit32(ctx, rv_alu(0, 0, RV_F3_AND, (uint32_t)rd, (uint32_t)IR_REG_T6, (uint32_t)IR_REG_T5));
+	emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)IR_REG_T6, (uint32_t)rd, 8));
+	emit32(ctx, rv_alu(0, 0, RV_F3_ADD, (uint32_t)rd, (uint32_t)rd, (uint32_t)IR_REG_T6));
+	emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)IR_REG_T6, (uint32_t)rd, 16));
+	emit32(ctx, rv_alu(0, 0, RV_F3_ADD, (uint32_t)rd, (uint32_t)rd, (uint32_t)IR_REG_T6));
+	emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)IR_REG_T6, (uint32_t)rd, 32));
+	emit32(ctx, rv_alu(0, 0, RV_F3_ADD, (uint32_t)rd, (uint32_t)rd, (uint32_t)IR_REG_T6));
+	emit32(ctx, rv_alui(0, RV_F3_ANDI, (uint32_t)rd, (uint32_t)rd, 0x7f));
+}
+
 static bool rv_emit_get(ir_ctx *ctx, int32_t reg, ir_ref val_ref)
 {
 	int32_t home;
@@ -627,9 +729,33 @@ static bool rv_emit_binop(ir_ctx *ctx, ir_ref ref, ir_insn *insn, const rv_alu_d
 	bool rd_spilled = IR_REG_SPILLED(rd);
 	int32_t rdtmp = rd_spilled ? IR_REG_NUM(rd) : rd;
 	int w = ir_type_size[insn->type] == 4;
+	bool is_shr = (dsc == &rv_alu_shr);
+	int sz = ir_type_size[insn->type];
 
 	if (rd == IR_REG_NONE) {
 		return false;
+	}
+	if (IR_IS_CONST_REF(op1) && IR_IS_CONST_REF(op2)) {
+		/* constant-fold a binary op that survived optimization (e.g. -O0) */
+		int64_t a = ctx->ir_base[op1].val.i64;
+		int64_t b = ctx->ir_base[op2].val.i64;
+		int64_t r;
+
+		if (dsc == &rv_alu_add) r = a + b;
+		else if (dsc == &rv_alu_sub) r = a - b;
+		else if (dsc == &rv_alu_mul) r = a * b;
+		else if (dsc == &rv_alu_and) r = a & b;
+		else if (dsc == &rv_alu_or) r = a | b;
+		else if (dsc == &rv_alu_xor) r = a ^ b;
+		else if (dsc == &rv_alu_shl) r = a << b;
+		else if (dsc == &rv_alu_shr) r = (int64_t)((uint64_t)a >> b);
+		else if (dsc == &rv_alu_sar) r = a >> b;
+		else return false;
+		rv_emit_li64(ctx, (uint32_t)rdtmp, r);
+		if (rd_spilled) {
+			rv_emit_store_def(ctx, ref, insn->type, rdtmp);
+		}
+		return true;
 	}
 	if (IR_IS_CONST_REF(op1)) {
 		if (!dsc->commutative || IR_IS_CONST_REF(op2)) {
@@ -672,6 +798,17 @@ static bool rv_emit_binop(ir_ctx *ctx, ir_ref ref, ir_insn *insn, const rv_alu_d
 		if (!rv_emit_get(ctx, rs1, op1)) {
 			return false;
 		}
+		if (is_shr && sz < 4) {
+			/* logical shift of a narrow value: zero-extend first so that a
+			 * sign-extended i8/i16 operand (e.g. -1) shifts like 0xFF/0xFFFF */
+			if (sz == 1) {
+				emit32(ctx, rv_alui(0, RV_F3_ANDI, (uint32_t)rdtmp, (uint32_t)rs1, 0xFF));
+			} else {
+				emit32(ctx, rv_shifti(0, RV_F3_SLLI, 0, (uint32_t)rdtmp, (uint32_t)rs1, 48));
+				emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)rdtmp, (uint32_t)rdtmp, 48));
+			}
+			rs1 = rdtmp;
+		}
 		if (dsc->i_shift) {
 			if (v < 0 || v > (w ? 31 : 63)) {
 				return false;
@@ -706,6 +843,15 @@ static bool rv_emit_binop(ir_ctx *ctx, ir_ref ref, ir_insn *insn, const rv_alu_d
 			if (!rv_emit_get(ctx, rs1, op1) || !rv_emit_get(ctx, rs2, op2)) {
 				return false;
 			}
+		}
+		if (is_shr && sz < 4) {
+			if (sz == 1) {
+				emit32(ctx, rv_alui(0, RV_F3_ANDI, (uint32_t)rdtmp, (uint32_t)rs1, 0xFF));
+			} else {
+				emit32(ctx, rv_shifti(0, RV_F3_SLLI, 0, (uint32_t)rdtmp, (uint32_t)rs1, 48));
+				emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)rdtmp, (uint32_t)rdtmp, 48));
+			}
+			rs1 = rdtmp;
 		}
 		emit32(ctx, rv_alu(w, dsc->r_f7, dsc->r_f3,
 		                   (uint32_t)rdtmp, (uint32_t)rs1, (uint32_t)rs2));
@@ -981,6 +1127,297 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 				break;
 			}
 
+			case IR_RISCV_RULE_DIV:
+			case IR_RISCV_RULE_MOD: {
+				int32_t rd   = riscv_reg_of(ctx, ref, 0);
+				int32_t rs1  = riscv_reg_of(ctx, ref, 1);
+				int32_t rs2  = riscv_reg_of(ctx, ref, 2);
+				bool rd_spilled = IR_REG_SPILLED(rd);
+				int32_t rdtmp = rd_spilled ? IR_REG_NUM(rd) : rd;
+				bool uns = !IR_IS_TYPE_SIGNED(insn->type);
+				bool w = ir_type_size[insn->type] == 4;
+
+				int32_t tmp = riscv_reg_of(ctx, ref, 3);
+
+				if (rd == IR_REG_NONE || rs1 == IR_REG_NONE) goto fail;
+				if (!rv_emit_get(ctx, rs1, insn->op1)) goto fail;
+				if (IR_IS_CONST_REF(insn->op2)) {
+					if (tmp == IR_REG_NONE || !rv_emit_get(ctx, tmp, insn->op2)) goto fail;
+					rs2 = tmp;
+				} else {
+					if (rs2 == IR_REG_NONE || !rv_emit_get(ctx, rs2, insn->op2)) goto fail;
+				}
+				/* funct3: div=4, divu=5, rem=6, remu=7 */
+				emit32(ctx, rv_alu(w, 0x01,
+				                   ctx->rules[ref] == IR_RISCV_RULE_DIV
+					                   ? (uns ? 0x05 : 0x04)
+					                   : (uns ? 0x07 : 0x06),
+				                   (uint32_t)rdtmp, (uint32_t)rs1, (uint32_t)rs2));
+				if (rd_spilled) {
+					rv_emit_store_def(ctx, ref, insn->type, rdtmp);
+				}
+				break;
+			}
+
+			case IR_RISCV_RULE_MIN:
+			case IR_RISCV_RULE_MAX: {
+				int32_t rd   = riscv_reg_of(ctx, ref, 0);
+				int32_t rs1  = riscv_reg_of(ctx, ref, 1);
+				int32_t rs2  = riscv_reg_of(ctx, ref, 2);
+				int32_t tmp  = riscv_reg_of(ctx, ref, 3);
+				bool rd_spilled = IR_REG_SPILLED(rd);
+				int32_t rdtmp = rd_spilled ? IR_REG_NUM(rd) : rd;
+
+				if (rd == IR_REG_NONE || rs1 == IR_REG_NONE || tmp == IR_REG_NONE) goto fail;
+				if (!rv_emit_get(ctx, rs1, insn->op1)) goto fail;
+				if (IR_IS_CONST_REF(insn->op2)) {
+					if (rs2 == IR_REG_NONE) {
+						if (!rv_emit_get(ctx, IR_REG_T5, insn->op2)) goto fail;
+						rs2 = IR_REG_T5;
+					} else {
+						if (!rv_emit_get(ctx, rs2, insn->op2)) goto fail;
+					}
+				} else {
+					if (rs2 == IR_REG_NONE || !rv_emit_get(ctx, rs2, insn->op2)) goto fail;
+				}
+				/* min(a,b) = a - ((a-b) & ((a-b)>>63)) */
+				emit32(ctx, rv_alu(0, RV_F7_SUB, RV_F3_SUB, (uint32_t)tmp, (uint32_t)rs1, (uint32_t)rs2)); /* tmp = a-b */
+				emit32(ctx, rv_shifti(0, RV_F3_SRI, 1, (uint32_t)rdtmp, (uint32_t)tmp, 63));      /* rdtmp = (a-b)>>63 */
+				emit32(ctx, rv_alu(0, 0, RV_F3_AND, (uint32_t)rdtmp, (uint32_t)rdtmp, (uint32_t)tmp));
+				if (rdtmp != rs2) {
+					/* min = b + (d & (d>>63)) / max = a - (d & (d>>63)) */
+					if (ctx->rules[ref] == IR_RISCV_RULE_MIN) {
+						emit32(ctx, rv_alu(0, 0, RV_F3_ADD, (uint32_t)rdtmp, (uint32_t)rs2, (uint32_t)rdtmp));
+					} else {
+						emit32(ctx, rv_alu(0, RV_F7_SUB, RV_F3_SUB, (uint32_t)rdtmp, (uint32_t)rs1, (uint32_t)rdtmp));
+					}
+				} else {
+					/* rdtmp aliases rs2 (b), which is clobbered by the
+					 * masked computation: use the forms reading only rs1 (a)
+					 *   min = a - (d & ~(d>>63)), max = a - (d & (d>>63)) */
+					if (ctx->rules[ref] == IR_RISCV_RULE_MAX) {
+						emit32(ctx, rv_alu(0, 0, RV_F3_AND, (uint32_t)rdtmp, (uint32_t)rdtmp, (uint32_t)tmp));
+						emit32(ctx, rv_alu(0, RV_F7_SUB, RV_F3_SUB, (uint32_t)rdtmp, (uint32_t)rs1, (uint32_t)rdtmp));
+					} else {
+						emit32(ctx, rv_alui(0, RV_F3_XORI, (uint32_t)rdtmp, (uint32_t)rdtmp, -1));
+						emit32(ctx, rv_alu(0, 0, RV_F3_AND, (uint32_t)rdtmp, (uint32_t)rdtmp, (uint32_t)tmp));
+						emit32(ctx, rv_alu(0, RV_F7_SUB, RV_F3_SUB, (uint32_t)rdtmp, (uint32_t)rs1, (uint32_t)rdtmp));
+					}
+				}
+				if (rd_spilled) {
+					rv_emit_store_def(ctx, ref, insn->type, rdtmp);
+				}
+				break;
+			}
+
+			case IR_RISCV_RULE_ROL:
+			case IR_RISCV_RULE_ROR: {
+				int32_t rd   = riscv_reg_of(ctx, ref, 0);
+				int32_t rs1  = riscv_reg_of(ctx, ref, 1);
+				int32_t rs2  = riscv_reg_of(ctx, ref, 2);
+				int32_t tmp  = riscv_reg_of(ctx, ref, 3);
+				bool rd_spilled = IR_REG_SPILLED(rd);
+				int32_t rdtmp = rd_spilled ? IR_REG_NUM(rd) : rd;
+				int sz = ir_type_size[insn->type];
+				int bits = sz * 8;
+				int w = sz == 4;
+				bool ror = ctx->rules[ref] == IR_RISCV_RULE_ROR;
+				int64_t sh;
+				int32_t s2;   /* second scratch: rs1 unless it aliases rdtmp */
+
+				if (rd == IR_REG_NONE || rs1 == IR_REG_NONE) goto fail;
+				if (!rv_emit_get(ctx, rs1, insn->op1)) goto fail;
+				if (!IR_IS_CONST_REF(insn->op2)) {
+					/* variable shift: need a distinct scratch for -s */
+					int32_t s2v;
+
+					if (tmp == IR_REG_NONE || tmp == rs1) goto fail;
+					if (!rv_emit_get(ctx, rs2, insn->op2)) goto fail;
+					if (sz == 1) {
+						emit32(ctx, rv_alui(0, RV_F3_ANDI, (uint32_t)rs1, (uint32_t)rs1, 0xFF));
+					} else if (sz == 2) {
+						emit32(ctx, rv_shifti(0, RV_F3_SLLI, 0, (uint32_t)rs1, (uint32_t)rs1, 48));
+						emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)rs1, (uint32_t)rs1, 48));
+					} else if (w) {
+						/* 64-bit shifts: shamt 32 does not fit the 5-bit W-form field */
+						emit32(ctx, rv_shifti(0, RV_F3_SLLI, 0, (uint32_t)rs1, (uint32_t)rs1, 32));
+						emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)rs1, (uint32_t)rs1, 32));
+					}
+					if (sz < 4) {
+						/* narrow rotate: normalize the shift amount and later
+						 * mask the result; the complement shift must be
+						 * (bits - s), not the 64-bit (-s). */
+						emit32(ctx, rv_alui(0, RV_F3_ANDI, (uint32_t)rs2, (uint32_t)rs2, bits - 1));
+					}
+					s2v = (rdtmp == rs1) ? tmp : rs1;
+					if (s2v == IR_REG_NONE || s2v == rdtmp) goto fail;
+					if (rdtmp == rs1) {
+						/* def aliases the source: part2 into tmp first (reads x),
+						 * then part1 into rdtmp (reads x before writing it). */
+						emit32(ctx, rv_alu(w, RV_F7_SUB, RV_F3_SUB, (uint32_t)tmp, 0, (uint32_t)rs2));
+						if (sz < 4) {
+							emit32(ctx, rv_alui(0, RV_F3_ADDI, (uint32_t)tmp, (uint32_t)tmp, bits));
+						}
+						emit32(ctx, rv_alu(w, 0, ror ? RV_F3_SLL : RV_F3_SRL,
+						                    (uint32_t)tmp, (uint32_t)rs1, (uint32_t)tmp));
+						emit32(ctx, rv_alu(w, 0, ror ? RV_F3_SRL : RV_F3_SLL,
+						                    (uint32_t)rdtmp, (uint32_t)rs1, (uint32_t)rs2));
+						emit32(ctx, rv_alu(0, 0, RV_F3_OR, (uint32_t)rdtmp, (uint32_t)rdtmp, (uint32_t)tmp));
+						if (sz == 1) {
+							emit32(ctx, rv_alui(0, RV_F3_ANDI, (uint32_t)rdtmp, (uint32_t)rdtmp, 0xFF));
+						} else if (sz == 2) {
+							emit32(ctx, rv_shifti(0, RV_F3_SLLI, 0, (uint32_t)rdtmp, (uint32_t)rdtmp, 48));
+							emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)rdtmp, (uint32_t)rdtmp, 48));
+						}
+					} else if (tmp == rdtmp) {
+						/* tmp aliases the def: put -s in rdtmp, shift part2
+						 * back into rdtmp (read-before-write), then part1 into
+						 * rs1 which still holds x. */
+						emit32(ctx, rv_alu(w, RV_F7_SUB, RV_F3_SUB, (uint32_t)rdtmp, 0, (uint32_t)rs2));
+						if (sz < 4) {
+							emit32(ctx, rv_alui(0, RV_F3_ADDI, (uint32_t)rdtmp, (uint32_t)rdtmp, bits));
+						}
+						emit32(ctx, rv_alu(w, 0, ror ? RV_F3_SLL : RV_F3_SRL,
+						                    (uint32_t)rdtmp, (uint32_t)rs1, (uint32_t)rdtmp));
+						emit32(ctx, rv_alu(w, 0, ror ? RV_F3_SRL : RV_F3_SLL,
+						                    (uint32_t)rs1, (uint32_t)rs1, (uint32_t)rs2));
+						emit32(ctx, rv_alu(0, 0, RV_F3_OR, (uint32_t)rdtmp, (uint32_t)rs1, (uint32_t)rdtmp));
+						if (sz == 1) {
+							emit32(ctx, rv_alui(0, RV_F3_ANDI, (uint32_t)rdtmp, (uint32_t)rdtmp, 0xFF));
+						} else if (sz == 2) {
+							emit32(ctx, rv_shifti(0, RV_F3_SLLI, 0, (uint32_t)rdtmp, (uint32_t)rdtmp, 48));
+							emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)rdtmp, (uint32_t)rdtmp, 48));
+						}
+					} else {
+						emit32(ctx, rv_alu(w, RV_F7_SUB, RV_F3_SUB, (uint32_t)tmp, 0, (uint32_t)rs2)); /* tmp = -s */
+						if (sz < 4) {
+							emit32(ctx, rv_alui(0, RV_F3_ADDI, (uint32_t)tmp, (uint32_t)tmp, bits));
+						}
+						if (ror) {
+							emit32(ctx, rv_alu(w, 0, RV_F3_SRL, (uint32_t)rdtmp, (uint32_t)rs1, (uint32_t)rs2));
+							emit32(ctx, rv_alu(w, 0, RV_F3_SLL, (uint32_t)s2v, (uint32_t)rs1, (uint32_t)tmp));
+						} else {
+							emit32(ctx, rv_alu(w, 0, RV_F3_SLL, (uint32_t)rdtmp, (uint32_t)rs1, (uint32_t)rs2));
+							emit32(ctx, rv_alu(w, 0, RV_F3_SRL, (uint32_t)s2v, (uint32_t)rs1, (uint32_t)tmp));
+						}
+						emit32(ctx, rv_alu(0, 0, RV_F3_OR, (uint32_t)rdtmp, (uint32_t)rdtmp, (uint32_t)s2v));
+						if (sz == 1) {
+							emit32(ctx, rv_alui(0, RV_F3_ANDI, (uint32_t)rdtmp, (uint32_t)rdtmp, 0xFF));
+						} else if (sz == 2) {
+							emit32(ctx, rv_shifti(0, RV_F3_SLLI, 0, (uint32_t)rdtmp, (uint32_t)rdtmp, 48));
+							emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)rdtmp, (uint32_t)rdtmp, 48));
+						}
+					}
+					if (w) {
+						emit32(ctx, rv_alui(1, RV_F3_ADDI, (uint32_t)rdtmp, (uint32_t)rdtmp, 0));
+					}
+					if (rd_spilled) {
+						rv_emit_store_def(ctx, ref, insn->type, rdtmp);
+					}
+					break;
+				}
+				sh = ctx->ir_base[insn->op2].val.i64;
+				if (sh < 0 || sh >= bits) goto fail;
+				s2 = (rdtmp == rs1) ? tmp : rs1;
+				if (s2 == IR_REG_NONE || s2 == rdtmp) goto fail;
+				if (sz == 1) {
+					emit32(ctx, rv_alui(0, RV_F3_ANDI, (uint32_t)rs1, (uint32_t)rs1, 0xFF));
+				} else if (sz == 2) {
+					emit32(ctx, rv_shifti(0, RV_F3_SLLI, 0, (uint32_t)rs1, (uint32_t)rs1, 48));
+					emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)rs1, (uint32_t)rs1, 48));
+				} else if (w) {
+					/* 64-bit shifts: shamt 32 does not fit the 5-bit W-form field */
+					emit32(ctx, rv_shifti(0, RV_F3_SLLI, 0, (uint32_t)rs1, (uint32_t)rs1, 32));
+					emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)rs1, (uint32_t)rs1, 32));
+				}
+				/* part1 into rdtmp (reads x), then part2 into s2, then or.
+				 * If rdtmp aliases rs1, part1 would clobber x, so compute
+				 * part2 into s2 first in that case. */
+				if (rdtmp == rs1) {
+					emit32(ctx, rv_shifti(w, ror ? RV_F3_SLLI : RV_F3_SRI, 0,
+					                    (uint32_t)s2, (uint32_t)rs1, (uint32_t)(bits - sh)));
+					emit32(ctx, rv_shifti(w, ror ? RV_F3_SRI : RV_F3_SLLI, 0,
+					                    (uint32_t)rdtmp, (uint32_t)rs1, (uint32_t)sh));
+				} else {
+					emit32(ctx, rv_shifti(w, ror ? RV_F3_SRI : RV_F3_SLLI, 0,
+					                    (uint32_t)rdtmp, (uint32_t)rs1, (uint32_t)sh));
+					emit32(ctx, rv_shifti(w, ror ? RV_F3_SLLI : RV_F3_SRI, 0,
+					                    (uint32_t)s2, (uint32_t)rs1, (uint32_t)(bits - sh)));
+				}
+				/* OR has no 32-bit W-form (only ADD/SUB/SHIFTS/MUL/DIV/REM do);
+				 * combine with the 64-bit OR and canonicalize for 32-bit. */
+				emit32(ctx, rv_alu(0, 0, RV_F3_OR, (uint32_t)rdtmp, (uint32_t)rdtmp, (uint32_t)s2));
+				if (w) {
+					emit32(ctx, rv_alui(1, RV_F3_ADDI, (uint32_t)rdtmp, (uint32_t)rdtmp, 0));
+				}
+				if (rd_spilled) {
+					rv_emit_store_def(ctx, ref, insn->type, rdtmp);
+				}
+				break;
+			}
+
+			case IR_RISCV_RULE_CTLZ:
+			case IR_RISCV_RULE_CTTZ:
+			case IR_RISCV_RULE_CTPOP: {
+				int32_t rd   = riscv_reg_of(ctx, ref, 0);
+				int32_t rs1  = riscv_reg_of(ctx, ref, 1);
+				bool rd_spilled = IR_REG_SPILLED(rd);
+				int32_t rdtmp = rd_spilled ? IR_REG_NUM(rd) : rd;
+				int sz = ir_type_size[insn->type];
+				int rule = ctx->rules[ref] & IR_RULE_MASK;
+
+				if (rd == IR_REG_NONE || rs1 == IR_REG_NONE) goto fail;
+				if (!rv_emit_get(ctx, rs1, insn->op1)) goto fail;
+				/* sub-64-bit types are held sign-extended; zero the bits above
+				 * the type width so clz/cpop do not count them (ctz is
+				 * unaffected --- trailing zeros live in the low bits) */
+				if (sz == 4) {
+					emit32(ctx, rv_shifti(0, RV_F3_SLLI, 0, (uint32_t)rs1, (uint32_t)rs1, 32));
+					emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)rs1, (uint32_t)rs1, 32));
+				} else if (sz == 2) {
+					emit32(ctx, rv_shifti(0, RV_F3_SLLI, 0, (uint32_t)rs1, (uint32_t)rs1, 48));
+					emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)rs1, (uint32_t)rs1, 48));
+				} else if (sz == 1) {
+					emit32(ctx, rv_alui(0, RV_F3_ANDI, (uint32_t)rs1, (uint32_t)rs1, 0xFF));
+				}
+				if (rule == IR_RISCV_RULE_CTLZ) {
+					/* y = x | x>>1 | x>>2 | x>>4 | x>>8 | x>>16 | x>>32 */
+					emit32(ctx, rv_mv((uint32_t)rdtmp, (uint32_t)rs1));
+					emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)IR_REG_T6, (uint32_t)rdtmp, 1));
+					emit32(ctx, rv_alu(0, 0, RV_F3_OR, (uint32_t)rdtmp, (uint32_t)rdtmp, (uint32_t)IR_REG_T6));
+					emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)IR_REG_T6, (uint32_t)rdtmp, 2));
+					emit32(ctx, rv_alu(0, 0, RV_F3_OR, (uint32_t)rdtmp, (uint32_t)rdtmp, (uint32_t)IR_REG_T6));
+					emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)IR_REG_T6, (uint32_t)rdtmp, 4));
+					emit32(ctx, rv_alu(0, 0, RV_F3_OR, (uint32_t)rdtmp, (uint32_t)rdtmp, (uint32_t)IR_REG_T6));
+					emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)IR_REG_T6, (uint32_t)rdtmp, 8));
+					emit32(ctx, rv_alu(0, 0, RV_F3_OR, (uint32_t)rdtmp, (uint32_t)rdtmp, (uint32_t)IR_REG_T6));
+					emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)IR_REG_T6, (uint32_t)rdtmp, 16));
+					emit32(ctx, rv_alu(0, 0, RV_F3_OR, (uint32_t)rdtmp, (uint32_t)rdtmp, (uint32_t)IR_REG_T6));
+					emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)IR_REG_T6, (uint32_t)rdtmp, 32));
+					emit32(ctx, rv_alu(0, 0, RV_F3_OR, (uint32_t)rdtmp, (uint32_t)rdtmp, (uint32_t)IR_REG_T6));
+					rv_emit_soft_cpop(ctx, rdtmp, rdtmp);
+					/* clz = 64 - popcount */
+					emit32(ctx, rv_alu(0, RV_F7_SUB, RV_F3_SUB, (uint32_t)rdtmp, 0, (uint32_t)rdtmp));
+					emit32(ctx, rv_alui(0, RV_F3_ADDI, (uint32_t)rdtmp, (uint32_t)rdtmp, 64));
+					if (sz < 8) {
+						emit32(ctx, rv_alui(0, RV_F3_ADDI, (uint32_t)rdtmp, (uint32_t)rdtmp,
+						                    (sz == 4) ? -32 : ((sz == 2) ? -48 : -56)));
+					}
+				} else if (rule == IR_RISCV_RULE_CTTZ) {
+					/* ctz(x) = cpop((x & -x) - 1); x == 0 -> cpop(-1) = 64 */
+					emit32(ctx, rv_alu(0, RV_F7_SUB, RV_F3_SUB, (uint32_t)IR_REG_T6, 0, (uint32_t)rs1));
+					emit32(ctx, rv_alu(0, 0, RV_F3_AND, (uint32_t)IR_REG_T6, (uint32_t)rs1, (uint32_t)IR_REG_T6));
+					emit32(ctx, rv_alui(0, RV_F3_ADDI, (uint32_t)IR_REG_T6, (uint32_t)IR_REG_T6, -1));
+					rv_emit_soft_cpop(ctx, rdtmp, IR_REG_T6);
+				} else {
+					rv_emit_soft_cpop(ctx, rdtmp, rs1);
+				}
+				if (rd_spilled) {
+					rv_emit_store_def(ctx, ref, insn->type, rdtmp);
+				}
+				break;
+			}
+
 			case IR_RISCV_RULE_RETURN: {
 				if (!rv_emit_get(ctx, IR_REG_A0, insn->op2)) goto fail;
 				rv_emit_epilogue(ctx);
@@ -1187,6 +1624,15 @@ const char *ir_rule_name[] = {
 	"ZEXT",
 	"SEXT",
 	"TRUNC",
+	"DIV",
+	"MOD",
+	"MIN",
+	"MAX",
+	"ROL",
+	"ROR",
+	"CTLZ",
+	"CTTZ",
+	"CTPOP",
 	"SKIP",
 	"PARAM",
 };
