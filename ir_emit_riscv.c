@@ -27,6 +27,10 @@
 #include "ir_private.h"
 #include "ir_riscv_enc.h"
 
+#ifndef _WIN32
+# include <dlfcn.h>
+#endif
+
 /* ---- code-generation rules (parallel to ctx->rules[]) ---- */
 enum {
 	IR_RISCV_RULE_NONE = 0,
@@ -42,6 +46,7 @@ enum {
 	IR_RISCV_RULE_NEG,
 	IR_RISCV_RULE_NOT,
 	IR_RISCV_RULE_RETURN,
+	IR_RISCV_RULE_CALL,
 	IR_RISCV_RULE_SKIP,    /* IR_START and other pure control markers -> no code emitted */
 	IR_RISCV_RULE_PARAM,   /* IR_PARAM  -> no code emitted; def_reg pinned to a0-a7 per ABI */
 };
@@ -65,6 +70,75 @@ static ir_reg ir_get_param_reg(const ir_ctx *ctx, ir_ref ref)
 	return IR_REG_NONE; /* stack-passed, beyond 8 args --- not handled yet */
 }
 
+const ir_proto_t *ir_call_proto(const ir_ctx *ctx, const ir_insn *insn)
+{
+	if (IR_IS_CONST_REF(insn->op2)) {
+		const ir_insn *func = &ctx->ir_base[insn->op2];
+
+		if (func->op == IR_FUNC || func->op == IR_FUNC_ADDR) {
+			if (func->proto) {
+				return (const ir_proto_t *)ir_get_str(ctx, func->proto);
+			}
+		}
+	} else if (ctx->ir_base[insn->op2].op == IR_PROTO) {
+		return (const ir_proto_t *)ir_get_str(ctx, ctx->ir_base[insn->op2].op2);
+	}
+	return NULL;
+}
+
+static int ir_get_args_regs(const ir_ctx *ctx, const ir_insn *insn, const ir_call_conv_dsc *cc, int8_t *regs)
+{
+	int j, n;
+	ir_type type;
+	int int_param = 0;
+	int fp_param = 0;
+	int count = 0;
+
+	n = insn->inputs_count;
+	n = IR_MIN(n, IR_MAX_REG_ARGS + 2);
+	for (j = 3; j <= n; j++) {
+		ir_insn *arg = &ctx->ir_base[ir_insn_op(insn, j)];
+
+		type = arg->type;
+		if (IR_IS_TYPE_INT(type)) {
+			if (int_param < cc->int_param_regs_count && arg->op != IR_ARGVAL) {
+				regs[j] = cc->int_param_regs[int_param];
+				count = j + 1;
+				int_param++;
+			} else {
+				regs[j] = IR_REG_NONE;
+			}
+		} else {
+			if (!IR_IS_TYPE_FP(type)) return 0;
+			if (fp_param < cc->fp_param_regs_count) {
+				regs[j] = cc->fp_param_regs[fp_param];
+				count = j + 1;
+				fp_param++;
+			} else {
+				regs[j] = IR_REG_NONE;
+			}
+		}
+	}
+	return count;
+}
+
+static void *ir_call_addr(ir_ctx *ctx, ir_insn *insn, ir_insn *addr_insn)
+{
+	void *addr;
+
+	IR_ASSERT(addr_insn->type == IR_ADDR);
+	if (addr_insn->op == IR_FUNC) {
+		addr = (ctx->loader && ctx->loader->resolve_sym_name) ?
+			ctx->loader->resolve_sym_name(ctx->loader, ctx, addr_insn->val.name, 0) :
+			ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.name));
+		IR_ASSERT(addr);
+	} else {
+		IR_ASSERT(addr_insn->op == IR_ADDR || addr_insn->op == IR_FUNC_ADDR);
+		addr = (void*)addr_insn->val.addr;
+	}
+	return addr;
+}
+
 /* -------------------------------------------------------------------- */
 /* ir_match()                                                            */
 /* -------------------------------------------------------------------- */
@@ -84,6 +158,7 @@ int ir_match(ir_ctx *ctx)
 	for (b = 1; b <= ctx->cfg_blocks_count; b++) {
 		ir_block *bb = &ctx->cfg_blocks[b];
 		ir_ref ref;
+		ir_insn *insn;
 
 		/* VERIFY: bb->start / bb->end are the field names used in
 		 * ir_cfg.c for the first/last instruction ref of a block ---
@@ -91,8 +166,8 @@ int ir_match(ir_ctx *ctx)
 		 * ir_cfg.c snippet). Confirm bb->end exists under that name;
 		 * it may instead be derived some other way (e.g. via the
 		 * next block's start, or a separate "last insn" field). */
-		for (ref = bb->start; ref <= bb->end; ref++) {
-			ir_insn *insn = &ctx->ir_base[ref];
+		for (ref = bb->start; ref <= bb->end; ref += ir_insn_len(insn)) {
+			insn = &ctx->ir_base[ref];
 
 			switch (insn->op) {
 				case IR_START:
@@ -137,6 +212,10 @@ int ir_match(ir_ctx *ctx)
 				case IR_RETURN:
 					ctx->rules[ref] = IR_RISCV_RULE_RETURN;
 					break;
+				case IR_CALL:
+					ctx->flags2 |= IR_HAS_CALLS | IR_16B_FRAME_ALIGNMENT;
+					ctx->rules[ref] = IR_RISCV_RULE_CALL;
+					break;
 				default:
 					/* Not yet supported --- leave rule as
 					 * IR_RISCV_RULE_NONE. Anything reaching
@@ -171,6 +250,7 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 	 * function's one and only `return flags;`. */
 	int flags = 0;
 	int n = 0;
+	ir_insn *insn;
 
 	constraints->def_reg = IR_REG_NONE;
 	constraints->hints_count = 0;
@@ -208,21 +288,35 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 			flags = IR_OP1_MUST_BE_IN_REG | IR_USE_MUST_BE_IN_REG;
 			break;
 
+		case IR_RISCV_RULE_CALL: {
+			const ir_proto_t *proto;
+			const ir_call_conv_dsc *cc;
+
+			insn = &ctx->ir_base[ref];
+			proto = ir_call_proto(ctx, insn);
+			cc = ir_get_call_conv_dsc(proto ? proto->flags : IR_CC_DEFAULT);
+			if (insn->type != IR_VOID) {
+				constraints->def_reg = IR_IS_TYPE_INT(insn->type)
+					? cc->int_ret_reg : cc->fp_ret_reg;
+			}
+			constraints->tmp_regs[0] = IR_SCRATCH_REG(cc->scratch_reg, IR_USE_SUB_REF, IR_DEF_SUB_REF);
+			n = 1;
+			if (insn->inputs_count > 2) {
+				constraints->hints[2] = IR_REG_NONE;
+				constraints->hints_count = ir_get_args_regs(ctx, insn, cc, constraints->hints);
+			}
+			flags = IR_USE_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG | IR_OP3_SHOULD_BE_IN_REG;
+			break;
+		}
+
 		case IR_RISCV_RULE_RETURN:
-			/* op2 (the return value) should end up in a0 (x10)
-			 * per the RISC-V calling convention.
-			 *
-			 * VERIFY: how a fixed-register hint is actually
-			 * communicated back to ir_ra.c is unconfirmed here ---
-			 * on x86 this is likely done via constraints->hints[]
-			 * indexed by operand position, but I have not seen
-			 * that array's layout. Check ir_x86.dasc's RETURN/CALL
-			 * handling in ir_get_target_constraints() for the
-			 * exact mechanism before trusting this branch --- the
-			 * current add.ir test passes without it because
-			 * ir_ra.c apparently coalesces well enough here, but
-			 * this may not hold for more complex cases. */
 			flags = IR_OP2_MUST_BE_IN_REG;
+			if (!IR_IS_CONST_REF(ctx->ir_base[ref].op2)) {
+				constraints->hints[2] =
+					IR_IS_TYPE_INT(ctx->ir_base[ctx->ir_base[ref].op2].type)
+						? IR_REG_A0 : IR_REG_FA0;
+				constraints->hints_count = 3;
+			}
 			break;
 
 		default:
@@ -253,6 +347,76 @@ static void emit32(ir_ctx *ctx, uint32_t word)
 	ctx->code_buffer->pos = (char *)ctx->code_buffer->pos + 4;
 }
 
+static void rv_emit_li64(ir_ctx *ctx, uint32_t rd, int64_t v)
+{
+	int32_t lo;
+	int64_t hi;
+
+	if (v >= -2048 && v <= 2047) {
+		emit32(ctx, rv_addi(rd, 0, (int32_t)v));
+		return;
+	}
+	lo = (int32_t)((v << 52) >> 52);
+	hi = (v - lo) >> 12;
+	if (v == (int32_t)v) {
+		emit32(ctx, rv_enc_u((int32_t)(hi << 12), rd, RV_OP_LUI));
+		if (lo) {
+			emit32(ctx, rv_alui(1, RV_F3_ADDI, rd, rd, lo));
+		}
+		return;
+	}
+	rv_emit_li64(ctx, rd, hi);
+	emit32(ctx, rv_shifti(0, RV_F3_SLLI, 0, rd, rd, 12));
+	if (lo) {
+		emit32(ctx, rv_addi(rd, rd, lo));
+	}
+}
+
+static void rv_emit_prologue(ir_ctx *ctx)
+{
+	int32_t frame = ctx->stack_frame_size;
+	ir_regset used;
+	ir_reg reg;
+	int32_t off;
+
+	if (!frame) {
+		return;
+	}
+	IR_ASSERT(frame <= 2047);
+	emit32(ctx, rv_addi(IR_REG_SP, IR_REG_SP, -frame));
+	off = ctx->locals_area_size;
+	used = IR_REGSET_INTERSECTION((ir_regset)ctx->used_preserved_regs, IR_REGSET_GP);
+	IR_REGSET_FOREACH(used, reg) {
+		emit32(ctx, rv_enc_s(off, reg, IR_REG_SP, 3 /* SD */, RV_OP_STORE));
+		off += sizeof(void*);
+	} IR_REGSET_FOREACH_END();
+	if (ctx->flags2 & IR_HAS_CALLS) {
+		emit32(ctx, rv_enc_s(off, IR_REG_RA, IR_REG_SP, 3 /* SD */, RV_OP_STORE));
+	}
+}
+
+static void rv_emit_epilogue(ir_ctx *ctx)
+{
+	int32_t frame = ctx->stack_frame_size;
+	ir_regset used;
+	ir_reg reg;
+	int32_t off;
+
+	if (frame) {
+		off = ctx->locals_area_size;
+		used = IR_REGSET_INTERSECTION((ir_regset)ctx->used_preserved_regs, IR_REGSET_GP);
+		IR_REGSET_FOREACH(used, reg) {
+			emit32(ctx, rv_enc_i(off, IR_REG_SP, 3 /* LD */, reg, RV_OP_LOAD));
+			off += sizeof(void*);
+		} IR_REGSET_FOREACH_END();
+		if (ctx->flags2 & IR_HAS_CALLS) {
+			emit32(ctx, rv_enc_i(off, IR_REG_SP, 3 /* LD */, IR_REG_RA, RV_OP_LOAD));
+		}
+		emit32(ctx, rv_addi(IR_REG_SP, IR_REG_SP, frame));
+	}
+	emit32(ctx, rv_ret(IR_REG_RA));
+}
+
 typedef struct _rv_alu_dsc {
 	uint32_t r_f3;
 	uint32_t r_f7;
@@ -272,6 +436,38 @@ static const rv_alu_dsc rv_alu_shl = { RV_F3_SLL, RV_F7_BASE, RV_F3_SLLI, 0, 1, 
 static const rv_alu_dsc rv_alu_shr = { RV_F3_SR,  RV_F7_SRL,  RV_F3_SRI,  0, 1, 0 };
 static const rv_alu_dsc rv_alu_sar = { RV_F3_SR,  RV_F7_SRA,  RV_F3_SRI,  0, 2, 0 };
 
+static bool rv_emit_get(ir_ctx *ctx, int32_t reg, ir_ref val_ref)
+{
+	int32_t home;
+
+	if (IR_IS_CONST_REF(val_ref)) {
+		const ir_insn *ai = &ctx->ir_base[val_ref];
+		int64_t v;
+
+		if (!IR_IS_TYPE_INT(ai->type)) {
+			return false;
+		}
+		if (ai->op == IR_SYM) {
+			v = (int64_t)(uintptr_t)((ctx->loader && ctx->loader->resolve_sym_name)
+				? ctx->loader->resolve_sym_name(ctx->loader, ctx, ai->val.name, IR_RESOLVE_SYM_SILENT)
+				: ir_resolve_sym_name(ir_get_str(ctx, ai->val.name)));
+			if (!v) return false;
+		} else {
+			v = ai->val.i64;
+		}
+		rv_emit_li64(ctx, (uint32_t)reg, v);
+		return true;
+	}
+	home = ctx->regs[val_ref][0];
+	if (home == IR_REG_NONE || IR_REG_SPILLED(home)) {
+		return false;
+	}
+	if (home != reg) {
+		emit32(ctx, rv_mv((uint32_t)reg, (uint32_t)home));
+	}
+	return true;
+}
+
 static bool rv_emit_binop(ir_ctx *ctx, ir_ref ref, ir_insn *insn, const rv_alu_dsc *dsc)
 {
 	int32_t rd  = riscv_reg_of(ctx, ref, 0);
@@ -287,13 +483,14 @@ static bool rv_emit_binop(ir_ctx *ctx, ir_ref ref, ir_insn *insn, const rv_alu_d
 		}
 		op1 = insn->op2;
 		op2 = insn->op1;
-		rs1 = rs2;
-		rs2 = IR_REG_NONE;
 	}
 	if (IR_IS_CONST_REF(op2)) {
 		int64_t v = ctx->ir_base[op2].val.i64;
 
 		if (dsc->i_f3 == 0xFF || rs1 == IR_REG_NONE) {
+			return false;
+		}
+		if (!rv_emit_get(ctx, rs1, op1)) {
 			return false;
 		}
 		if (dsc->i_shift) {
@@ -313,8 +510,23 @@ static bool rv_emit_binop(ir_ctx *ctx, ir_ref ref, ir_insn *insn, const rv_alu_d
 			                    (uint32_t)rd, (uint32_t)rs1, (int32_t)v));
 		}
 	} else {
+		int32_t h1 = ctx->regs[op1][0];
+		int32_t h2 = ctx->regs[op2][0];
+
 		if (rs1 == IR_REG_NONE || rs2 == IR_REG_NONE) {
 			return false;
+		}
+		if (rs1 == h2 && rs2 == h1) {
+			return false; /* register swap needs a scratch --- later slice */
+		}
+		if (rs1 == h2) {
+			if (!rv_emit_get(ctx, rs2, op2) || !rv_emit_get(ctx, rs1, op1)) {
+				return false;
+			}
+		} else {
+			if (!rv_emit_get(ctx, rs1, op1) || !rv_emit_get(ctx, rs2, op2)) {
+				return false;
+			}
 		}
 		emit32(ctx, rv_alu(w, dsc->r_f7, dsc->r_f3,
 		                   (uint32_t)rd, (uint32_t)rs1, (uint32_t)rs2));
@@ -324,18 +536,40 @@ static bool rv_emit_binop(ir_ctx *ctx, ir_ref ref, ir_insn *insn, const rv_alu_d
 
 void *ir_emit_code(ir_ctx *ctx, size_t *size)
 {
-	void *start = ctx->code_buffer->pos;
+	void *start;
 	uint32_t b;
+	ir_insn *insn = NULL;
+	ir_ref ref = 0;
+	uint32_t rule = 0;
+
+	if (!ctx->code_buffer) {
+		ctx->status = IR_ERROR_CODE_MEM_OVERFLOW;
+		return NULL;
+	}
+	/* Instruction fetch needs 4-byte alignment on RV64 (no RVC); use 16
+	 * to match the x86 backend's entry alignment contract. */
+	start = (void*)IR_ALIGNED_SIZE((size_t)ctx->code_buffer->pos, 16);
+	if ((size_t)((char*)ctx->code_buffer->end - (char*)start)
+	    < 64 + (size_t)ctx->insns_count * 64) {
+		ctx->status = IR_ERROR_CODE_MEM_OVERFLOW;
+		return NULL;
+	}
+	ctx->code_buffer->pos = start;
+
+	if (!(ctx->flags & IR_SKIP_PROLOGUE)) {
+		rv_emit_prologue(ctx);
+	}
 
 	for (b = 1; b <= ctx->cfg_blocks_count; b++) {
 		ir_block *bb = &ctx->cfg_blocks[b];
 		ir_ref ref;
 
-		for (ref = bb->start; ref <= bb->end; ref++) {
-			ir_insn *insn = &ctx->ir_base[ref];
-			uint32_t rule = ctx->rules[ref];
+		for (ref = bb->start; ref <= bb->end; ) {
+			insn = &ctx->ir_base[ref];
+			rule = ctx->rules[ref];
 
 			if (rule & IR_SKIPPED) {
+				ref += ir_insn_len(insn);
 				continue;
 			}
 
@@ -348,39 +582,39 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 					break;
 
 			case IR_RISCV_RULE_ADD:
-				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_add)) return NULL;
+				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_add)) goto fail;
 				break;
 
 			case IR_RISCV_RULE_SUB:
-				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_sub)) return NULL;
+				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_sub)) goto fail;
 				break;
 
 			case IR_RISCV_RULE_MUL:
-				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_mul)) return NULL;
+				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_mul)) goto fail;
 				break;
 
 			case IR_RISCV_RULE_AND:
-				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_and)) return NULL;
+				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_and)) goto fail;
 				break;
 
 			case IR_RISCV_RULE_OR:
-				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_or)) return NULL;
+				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_or)) goto fail;
 				break;
 
 			case IR_RISCV_RULE_XOR:
-				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_xor)) return NULL;
+				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_xor)) goto fail;
 				break;
 
 			case IR_RISCV_RULE_SHL:
-				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_shl)) return NULL;
+				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_shl)) goto fail;
 				break;
 
 			case IR_RISCV_RULE_SHR:
-				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_shr)) return NULL;
+				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_shr)) goto fail;
 				break;
 
 			case IR_RISCV_RULE_SAR:
-				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_sar)) return NULL;
+				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_sar)) goto fail;
 				break;
 
 			case IR_RISCV_RULE_NEG: {
@@ -388,7 +622,8 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 				int32_t rs1 = riscv_reg_of(ctx, ref, 1);
 				int w = ir_type_size[insn->type] == 4;
 
-				if (rs1 == IR_REG_NONE) return NULL;
+				if (rs1 == IR_REG_NONE) goto fail;
+				if (!rv_emit_get(ctx, rs1, insn->op1)) goto fail;
 				emit32(ctx, rv_alu(w, RV_F7_SUB, RV_F3_SUB,
 				                   (uint32_t)rd, 0 /* x0 */, (uint32_t)rs1));
 				break;
@@ -398,67 +633,132 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 				int32_t rd  = riscv_reg_of(ctx, ref, 0);
 				int32_t rs1 = riscv_reg_of(ctx, ref, 1);
 
-				if (rs1 == IR_REG_NONE) return NULL;
+				if (rs1 == IR_REG_NONE) goto fail;
+				if (!rv_emit_get(ctx, rs1, insn->op1)) goto fail;
 				emit32(ctx, rv_alui(0, RV_F3_XORI, (uint32_t)rd, (uint32_t)rs1, -1));
 				break;
 			}
 
-			case IR_RISCV_RULE_RETURN: {
-				if (IR_IS_CONST_REF(insn->op2)) {
-					int64_t v = ctx->ir_base[insn->op2].val.i64;
+			case IR_RISCV_RULE_CALL: {
+				const ir_proto_t *proto = ir_call_proto(ctx, insn);
+				const ir_call_conv_dsc *cc =
+					ir_get_call_conv_dsc(proto ? proto->flags : IR_CC_DEFAULT);
+				int8_t want[IR_MAX_REG_ARGS + 3];
+				int n_args = insn->inputs_count;
+				int j, k;
 
-					if (v < -2048 || v > 2047) return NULL;
-					emit32(ctx, rv_li12(IR_REG_A0, (int32_t)v));
-				} else {
-					int32_t src = riscv_reg_of(ctx, ref, 2);
+				if (!IR_IS_CONST_REF(insn->op2)) goto fail;
+				memset(want, IR_REG_NONE, sizeof(want));
+				ir_get_args_regs(ctx, insn, cc, want);
 
-					if (src == IR_REG_NONE) return NULL;
-					if (src != IR_REG_A0) {
-						emit32(ctx, rv_mv(IR_REG_A0, (uint32_t)src));
+				for (j = 3; j <= n_args; j++) {
+					ir_ref arg = ir_insn_op(insn, j);
+					int32_t dst = want[j];
+					int32_t src;
+
+					if (dst == IR_REG_NONE) goto fail; /* stack args: later slice */
+					if (IR_IS_CONST_REF(arg)) {
+						if (!rv_emit_get(ctx, dst, arg)) goto fail;
+						continue;
+					}
+					src = ctx->regs[arg][0];
+					if (src == IR_REG_NONE || IR_REG_SPILLED(src)) goto fail;
+					if (src != dst) {
+						for (k = 3; k <= n_args; k++) {
+							ir_ref other = ir_insn_op(insn, k);
+
+							if (k != j && !IR_IS_CONST_REF(other)
+							 && ctx->regs[other][0] == dst) {
+								goto fail; /* move cycle: later slice */
+							}
+						}
+						emit32(ctx, rv_mv((uint32_t)dst, (uint32_t)src));
 					}
 				}
-				emit32(ctx, rv_ret(IR_REG_RA));
+
+				rv_emit_li64(ctx, IR_REG_T6,
+					(int64_t)(uintptr_t)ir_call_addr(ctx, insn, &ctx->ir_base[insn->op2]));
+				emit32(ctx, rv_jalr(IR_REG_RA, IR_REG_T6, 0));
+
+				if (insn->type != IR_VOID) {
+					int32_t def_reg;
+
+					if (!IR_IS_TYPE_INT(insn->type)) goto fail;
+					def_reg = ctx->regs[ref][0];
+					if (IR_REG_SPILLED(def_reg)) goto fail;
+					if (def_reg != IR_REG_NONE && def_reg != cc->int_ret_reg) {
+						emit32(ctx, rv_mv((uint32_t)def_reg, (uint32_t)cc->int_ret_reg));
+					}
+				}
+				break;
+			}
+
+			case IR_RISCV_RULE_RETURN: {
+				if (!rv_emit_get(ctx, IR_REG_A0, insn->op2)) goto fail;
+				rv_emit_epilogue(ctx);
 				break;
 			}
 
 				case IR_RISCV_RULE_NONE:
 				default:
 					if (insn->op != IR_NOP) {
-						/* An instruction reached emit with no
-						 * selected rule --- this is a bug, not a
-						 * silently-skippable case. Fail loudly
-						 * during bring-up rather than emit
-						 * incorrect code. */
-						return NULL;
+						goto fail;
 					}
 					break;
 			}
+			ref += ir_insn_len(insn);
 		}
 	}
 
 	*size = (size_t)((char *)ctx->code_buffer->pos - (char *)start);
 	return start;
+
+fail:
+	ctx->code_buffer->pos = start;
+	ctx->status = IR_ERROR_UNSUPPORTED_CODE_RULE;
+	return NULL;
 }
 
 void ir_fix_stack_frame(ir_ctx *ctx)
 {
+	uint32_t additional_size = 0;
+
 	ctx->locals_area_size = ctx->stack_frame_size;
 
-	/* VERIFY: add.ir has no varargs and no preserved-register spills,
-	 * so this simplified version is untested against those paths.
-	 * When adding CALL/varargs/PHI support later, come back and port
-	 * the full x86 logic (additional_size accumulation for varargs
-	 * register-save area + preserved-register spill slots, then
-	 * ctx->stack_frame_size += additional_size at the end). */
+	if (ctx->used_preserved_regs) {
+		ir_regset used_preserved_regs = (ir_regset)ctx->used_preserved_regs;
+		ir_reg reg;
+
+		IR_REGSET_FOREACH(used_preserved_regs, reg) {
+			additional_size += sizeof(void*);
+		} IR_REGSET_FOREACH_END();
+	}
+	if (ctx->flags2 & IR_HAS_CALLS) {
+		additional_size += sizeof(void*); /* ra save slot */
+	}
+
+	ctx->stack_frame_size = IR_ALIGNED_SIZE(ctx->stack_frame_size, sizeof(void*));
+	ctx->stack_frame_size += additional_size;
+	if (ctx->flags2 & IR_HAS_CALLS) {
+		ctx->stack_frame_size = IR_ALIGNED_SIZE(ctx->stack_frame_size, 16);
+	}
+	ctx->call_stack_size = 0;
 }
 
 /* ---- calling convention / scratch register set ---- */
 
 #define IR_REG_SCRATCH_RISCV64  IR_REG_SET_1
 
+/* s0/s1 and s2-s11 are not contiguous in riscv register numbering
+ * (a0-a7 sit between s1 and s2), so the preserved set is two pieces. */
+#define IR_REGSET_PRESERVED_GP_RISCV64 \
+	(IR_REGSET(IR_REG_S0) | IR_REGSET(IR_REG_S1) | IR_REGSET_INTERVAL(IR_REG_S2, IR_REG_S11))
+#define IR_REGSET_PRESERVED_FP_RISCV64 \
+	(IR_REGSET(IR_REG_FS0) | IR_REGSET(IR_REG_FS1) | IR_REGSET_INTERVAL(IR_REG_FS2, IR_REG_FS11))
+
 #define IR_REGSET_SCRATCH_RISCV64 \
-	(IR_REGSET_DIFFERENCE(IR_REGSET_GP, IR_REGSET_INTERVAL(IR_REG_S0, IR_REG_S11)) \
-	| IR_REGSET_DIFFERENCE(IR_REGSET_FP, IR_REGSET_INTERVAL(IR_REG_FS0, IR_REG_FS11)))
+	(IR_REGSET_DIFFERENCE(IR_REGSET_GP, IR_REGSET_PRESERVED_GP_RISCV64) \
+	| IR_REGSET_DIFFERENCE(IR_REGSET_FP, IR_REGSET_PRESERVED_FP_RISCV64))
 
 const ir_regset ir_scratch_regset[] = {
 	IR_REGSET_INTERVAL(IR_REG_GP_FIRST, IR_REG_FP_LAST), /* index 0: IR_REG_ALL fallback */
@@ -494,7 +794,7 @@ const ir_call_conv_dsc ir_call_conv_riscv64_lp64d = {
 	riscv_int_param_regs,
 	riscv_fp_param_regs,
 	NULL,        /* vector_param_regs       */
-	IR_REGSET_INTERVAL(IR_REG_S0, IR_REG_S11),
+	IR_REGSET_PRESERVED_GP_RISCV64 | IR_REGSET_PRESERVED_FP_RISCV64,
 };
 
 const ir_call_conv_dsc *ir_get_call_conv_dsc(uint32_t flags)
@@ -502,6 +802,8 @@ const ir_call_conv_dsc *ir_get_call_conv_dsc(uint32_t flags)
 	(void)flags;
 	return &ir_call_conv_riscv64_lp64d;
 }
+
+const ir_proto_t *ir_call_proto(const ir_ctx *ctx, const ir_insn *insn);
 
 /* ---- debug / dump string helpers ---- */
 
@@ -550,16 +852,23 @@ const char *ir_rule_name[] = {
 	"NEG",
 	"NOT",
 	"RETURN",
+	"CALL",
 	"SKIP",
 	"PARAM",
 };
 
-/* ---- stubs: not exercised by add.ir yet, needed only to link ---- */
-
 void *ir_resolve_sym_name(const char *name)
 {
+#ifndef _WIN32
+# ifdef RTLD_DEFAULT
+	return dlsym(RTLD_DEFAULT, name);
+# else
+	return dlsym(NULL, name);
+# endif
+#else
 	(void)name;
-	return NULL; /* TODO: implement when supporting external calls */
+	return NULL;
+#endif
 }
 
 bool ir_needs_thunk(const ir_code_buffer *code_buffer, void *addr)
@@ -579,10 +888,4 @@ void ir_fix_thunk(void *thunk_entry, void *addr)
 {
 	(void)thunk_entry; (void)addr;
 	/* TODO: implement when needed */
-}
-
-const ir_proto_t *ir_call_proto(const ir_ctx *ctx, const ir_insn *insn)
-{
-	(void)ctx; (void)insn;
-	return NULL; /* TODO: only needed for --emit-llvm path, not exercised yet */
 }

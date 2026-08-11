@@ -155,4 +155,9 @@ static inline uint32_t rv_ret(uint32_t ra_reg)
 	return rv_enc_i(0, ra_reg, RV_F3_JALR, 0 /* x0 */, RV_OP_JALR);
 }
 
+static inline uint32_t rv_jalr(uint32_t rd, uint32_t rs1, int32_t imm)
+{
+	return rv_enc_i(imm, rs1, RV_F3_JALR, rd, RV_OP_JALR);
+}
+
 #endif /* IR_RISCV_ENC_H */
