@@ -160,4 +160,27 @@ static inline uint32_t rv_jalr(uint32_t rd, uint32_t rs1, int32_t imm)
 	return rv_enc_i(imm, rs1, RV_F3_JALR, rd, RV_OP_JALR);
 }
 
+/* ---- memory: funct3 for LOAD (0x03) / STORE (0x23) ---- */
+#define RV_F3_LB  0
+#define RV_F3_LH  1
+#define RV_F3_LW  2
+#define RV_F3_LD  3
+#define RV_F3_LBU 4
+#define RV_F3_LHU 5
+#define RV_F3_LWU 6
+#define RV_F3_SB  0
+#define RV_F3_SH  1
+#define RV_F3_SW  2
+#define RV_F3_SD  3
+
+static inline uint32_t rv_load(uint32_t f3, uint32_t rd, uint32_t rs1, int32_t off)
+{
+	return rv_enc_i(off, rs1, f3, rd, RV_OP_LOAD);
+}
+
+static inline uint32_t rv_store(uint32_t f3, uint32_t rs2, uint32_t rs1, int32_t off)
+{
+	return rv_enc_s(off, rs2, rs1, f3, RV_OP_STORE);
+}
+
 #endif /* IR_RISCV_ENC_H */
