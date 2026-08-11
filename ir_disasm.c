@@ -37,8 +37,15 @@ const char* ir_disasm_find_symbol(uint64_t addr, int64_t *offset)
 
 int ir_disasm(const char *name, const void *start, size_t size, bool asm_addr, ir_ctx *ctx, FILE *f)
 {
-	(void)name; (void)start; (void)size; (void)asm_addr; (void)ctx; (void)f;
-	return 0;
+	const uint32_t *p = (const uint32_t *)start;
+	const uint32_t *end = (const uint32_t *)((const char *)start + size);
+
+	(void)asm_addr; (void)ctx;
+	fprintf(f, "%s:\n", name);
+	for (; p < end; p++) {
+		fprintf(f, "  %08x\n", *p);
+	}
+	return 1;
 }
 
 int ir_disasm_init(void)

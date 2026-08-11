@@ -19,16 +19,34 @@
 #define RV_OP_JAL      0x6F
 #define RV_OP_FP       0x53
 
-/* ---- R-type: funct3/funct7 for OP (0x33) ---- */
+/* ---- R-type: funct3/funct7 for OP (0x33) / OP-32 (0x3B) ---- */
 #define RV_F3_ADD   0x0
 #define RV_F7_ADD   0x00
 #define RV_F3_SUB   0x0
 #define RV_F7_SUB   0x20
 #define RV_F3_MUL   0x0
 #define RV_F7_MUL   0x01
+#define RV_F3_SLL   0x1
+#define RV_F3_SLT   0x2
+#define RV_F3_SLTU  0x3
+#define RV_F3_XOR   0x4
+#define RV_F3_SR    0x5
+#define RV_F7_SRL   0x00
+#define RV_F7_SRA   0x20
+#define RV_F3_OR    0x6
+#define RV_F3_AND   0x7
+#define RV_F7_BASE  0x00
 
-/* ---- I-type: funct3 for OP-IMM (0x13) ---- */
+/* ---- I-type: funct3 for OP-IMM (0x13) / OP-IMM-32 (0x1B) ---- */
 #define RV_F3_ADDI  0x0
+#define RV_F3_SLLI  0x1
+#define RV_F3_XORI  0x4
+#define RV_F3_SRI   0x5
+#define RV_F3_ORI   0x6
+#define RV_F3_ANDI  0x7
+
+#define RV_OP_IMM32  0x1B
+#define RV_OP_R32    0x3B
 
 /* ---- I-type: JALR (0x67) ---- */
 #define RV_F3_JALR  0x0
@@ -94,6 +112,35 @@ static inline uint32_t rv_add(uint32_t rd, uint32_t rs1, uint32_t rs2)
 static inline uint32_t rv_addi(uint32_t rd, uint32_t rs1, int32_t imm)
 {
 	return rv_enc_i(imm, rs1, RV_F3_ADDI, rd, RV_OP_IMM);
+}
+
+/* Generic ALU forms: w selects the 32-bit (sign-extending) variant. */
+
+static inline uint32_t rv_alu(int w, uint32_t f7, uint32_t f3,
+                              uint32_t rd, uint32_t rs1, uint32_t rs2)
+{
+	return rv_enc_r(f7, rs2, rs1, f3, rd, w ? RV_OP_R32 : RV_OP_R);
+}
+
+static inline uint32_t rv_alui(int w, uint32_t f3,
+                               uint32_t rd, uint32_t rs1, int32_t imm)
+{
+	return rv_enc_i(imm, rs1, f3, rd, w ? RV_OP_IMM32 : RV_OP_IMM);
+}
+
+/* Shift-immediate: shamt is 6 bits (RV64) / 5 bits (W form); SRAI sets imm bit 10. */
+static inline uint32_t rv_shifti(int w, uint32_t f3, int arithmetic,
+                                 uint32_t rd, uint32_t rs1, uint32_t shamt)
+{
+	uint32_t imm = (arithmetic ? 0x400 : 0) | (shamt & (w ? 0x1F : 0x3F));
+
+	return rv_enc_i((int32_t)imm, rs1, f3, rd, w ? RV_OP_IMM32 : RV_OP_IMM);
+}
+
+/* li for constants that fit in int12; larger values need lui chains (not yet) */
+static inline uint32_t rv_li12(uint32_t rd, int32_t imm)
+{
+	return rv_addi(rd, 0 /* x0 */, imm);
 }
 
 /* mv rd, rs  ==  addi rd, rs, 0 */

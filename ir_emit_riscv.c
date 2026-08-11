@@ -30,8 +30,18 @@
 /* ---- code-generation rules (parallel to ctx->rules[]) ---- */
 enum {
 	IR_RISCV_RULE_NONE = 0,
-	IR_RISCV_RULE_ADD,     /* IR_ADD    -> R-type ADD rd, rs1, rs2 */
-	IR_RISCV_RULE_RETURN,  /* IR_RETURN -> [mv a0, src] + jalr x0, ra, 0 */
+	IR_RISCV_RULE_ADD,
+	IR_RISCV_RULE_SUB,
+	IR_RISCV_RULE_MUL,
+	IR_RISCV_RULE_AND,
+	IR_RISCV_RULE_OR,
+	IR_RISCV_RULE_XOR,
+	IR_RISCV_RULE_SHL,
+	IR_RISCV_RULE_SHR,
+	IR_RISCV_RULE_SAR,
+	IR_RISCV_RULE_NEG,
+	IR_RISCV_RULE_NOT,
+	IR_RISCV_RULE_RETURN,
 	IR_RISCV_RULE_SKIP,    /* IR_START and other pure control markers -> no code emitted */
 	IR_RISCV_RULE_PARAM,   /* IR_PARAM  -> no code emitted; def_reg pinned to a0-a7 per ABI */
 };
@@ -94,6 +104,36 @@ int ir_match(ir_ctx *ctx)
 				case IR_ADD:
 					ctx->rules[ref] = IR_RISCV_RULE_ADD;
 					break;
+				case IR_SUB:
+					ctx->rules[ref] = IR_RISCV_RULE_SUB;
+					break;
+				case IR_MUL:
+					ctx->rules[ref] = IR_RISCV_RULE_MUL;
+					break;
+				case IR_AND:
+					ctx->rules[ref] = IR_RISCV_RULE_AND;
+					break;
+				case IR_OR:
+					ctx->rules[ref] = IR_RISCV_RULE_OR;
+					break;
+				case IR_XOR:
+					ctx->rules[ref] = IR_RISCV_RULE_XOR;
+					break;
+				case IR_SHL:
+					ctx->rules[ref] = IR_RISCV_RULE_SHL;
+					break;
+				case IR_SHR:
+					ctx->rules[ref] = IR_RISCV_RULE_SHR;
+					break;
+				case IR_SAR:
+					ctx->rules[ref] = IR_RISCV_RULE_SAR;
+					break;
+				case IR_NEG:
+					ctx->rules[ref] = IR_RISCV_RULE_NEG;
+					break;
+				case IR_NOT:
+					ctx->rules[ref] = IR_RISCV_RULE_NOT;
+					break;
 				case IR_RETURN:
 					ctx->rules[ref] = IR_RISCV_RULE_RETURN;
 					break;
@@ -104,6 +144,12 @@ int ir_match(ir_ctx *ctx)
 					 * be treated as an unimplemented-op error,
 					 * not silently skipped. */
 					break;
+			}
+
+			if (ctx->rules[ref] != IR_RISCV_RULE_NONE
+			 && (ir_op_flags[insn->op] & IR_OP_FLAG_DATA)
+			 && ctx->use_lists[ref].count == 0) {
+				ctx->rules[ref] |= IR_SKIPPED;
 			}
 		}
 	}
@@ -136,10 +182,18 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 
 		case IR_RISCV_RULE_PARAM:
 			constraints->def_reg = ir_get_param_reg(ctx, ref);
-			flags = 0;
+			flags = (constraints->def_reg != IR_REG_NONE) ? IR_USE_SHOULD_BE_IN_REG : 0;
 			break;
 
 		case IR_RISCV_RULE_ADD:
+		case IR_RISCV_RULE_SUB:
+		case IR_RISCV_RULE_MUL:
+		case IR_RISCV_RULE_AND:
+		case IR_RISCV_RULE_OR:
+		case IR_RISCV_RULE_XOR:
+		case IR_RISCV_RULE_SHL:
+		case IR_RISCV_RULE_SHR:
+		case IR_RISCV_RULE_SAR:
 			flags = IR_USE_MUST_BE_IN_REG;
 			if (!IR_IS_CONST_REF(ctx->ir_base[ref].op1)) {
 				flags |= IR_OP1_MUST_BE_IN_REG;
@@ -147,6 +201,11 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 			if (!IR_IS_CONST_REF(ctx->ir_base[ref].op2)) {
 				flags |= IR_OP2_MUST_BE_IN_REG;
 			}
+			break;
+
+		case IR_RISCV_RULE_NEG:
+		case IR_RISCV_RULE_NOT:
+			flags = IR_OP1_MUST_BE_IN_REG | IR_USE_MUST_BE_IN_REG;
 			break;
 
 		case IR_RISCV_RULE_RETURN:
@@ -194,6 +253,75 @@ static void emit32(ir_ctx *ctx, uint32_t word)
 	ctx->code_buffer->pos = (char *)ctx->code_buffer->pos + 4;
 }
 
+typedef struct _rv_alu_dsc {
+	uint32_t r_f3;
+	uint32_t r_f7;
+	uint32_t i_f3;    /* OP-IMM funct3; 0xFF = no immediate form */
+	int      i_neg;   /* immediate form uses the negated value (SUB -> addi -v) */
+	int      i_shift; /* 0 = not a shift, 1 = logical, 2 = arithmetic */
+	int      commutative;
+} rv_alu_dsc;
+
+static const rv_alu_dsc rv_alu_add = { RV_F3_ADD, RV_F7_ADD,  RV_F3_ADDI, 0, 0, 1 };
+static const rv_alu_dsc rv_alu_sub = { RV_F3_SUB, RV_F7_SUB,  RV_F3_ADDI, 1, 0, 0 };
+static const rv_alu_dsc rv_alu_mul = { RV_F3_MUL, RV_F7_MUL,  0xFF,       0, 0, 1 };
+static const rv_alu_dsc rv_alu_and = { RV_F3_AND, RV_F7_BASE, RV_F3_ANDI, 0, 0, 1 };
+static const rv_alu_dsc rv_alu_or  = { RV_F3_OR,  RV_F7_BASE, RV_F3_ORI,  0, 0, 1 };
+static const rv_alu_dsc rv_alu_xor = { RV_F3_XOR, RV_F7_BASE, RV_F3_XORI, 0, 0, 1 };
+static const rv_alu_dsc rv_alu_shl = { RV_F3_SLL, RV_F7_BASE, RV_F3_SLLI, 0, 1, 0 };
+static const rv_alu_dsc rv_alu_shr = { RV_F3_SR,  RV_F7_SRL,  RV_F3_SRI,  0, 1, 0 };
+static const rv_alu_dsc rv_alu_sar = { RV_F3_SR,  RV_F7_SRA,  RV_F3_SRI,  0, 2, 0 };
+
+static bool rv_emit_binop(ir_ctx *ctx, ir_ref ref, ir_insn *insn, const rv_alu_dsc *dsc)
+{
+	int32_t rd  = riscv_reg_of(ctx, ref, 0);
+	int32_t rs1 = riscv_reg_of(ctx, ref, 1);
+	int32_t rs2 = riscv_reg_of(ctx, ref, 2);
+	ir_ref  op1 = insn->op1;
+	ir_ref  op2 = insn->op2;
+	int w = ir_type_size[insn->type] == 4;
+
+	if (IR_IS_CONST_REF(op1)) {
+		if (!dsc->commutative || IR_IS_CONST_REF(op2)) {
+			return false;
+		}
+		op1 = insn->op2;
+		op2 = insn->op1;
+		rs1 = rs2;
+		rs2 = IR_REG_NONE;
+	}
+	if (IR_IS_CONST_REF(op2)) {
+		int64_t v = ctx->ir_base[op2].val.i64;
+
+		if (dsc->i_f3 == 0xFF || rs1 == IR_REG_NONE) {
+			return false;
+		}
+		if (dsc->i_shift) {
+			if (v < 0 || v > (w ? 31 : 63)) {
+				return false;
+			}
+			emit32(ctx, rv_shifti(w, dsc->i_f3, dsc->i_shift == 2,
+			                      (uint32_t)rd, (uint32_t)rs1, (uint32_t)v));
+		} else {
+			if (dsc->i_neg) {
+				v = -v;
+			}
+			if (v < -2048 || v > 2047) {
+				return false; /* needs lui+addiw materialization --- later slice */
+			}
+			emit32(ctx, rv_alui(dsc->i_f3 == RV_F3_ADDI ? w : 0, dsc->i_f3,
+			                    (uint32_t)rd, (uint32_t)rs1, (int32_t)v));
+		}
+	} else {
+		if (rs1 == IR_REG_NONE || rs2 == IR_REG_NONE) {
+			return false;
+		}
+		emit32(ctx, rv_alu(w, dsc->r_f7, dsc->r_f3,
+		                   (uint32_t)rd, (uint32_t)rs1, (uint32_t)rs2));
+	}
+	return true;
+}
+
 void *ir_emit_code(ir_ctx *ctx, size_t *size)
 {
 	void *start = ctx->code_buffer->pos;
@@ -205,8 +333,13 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 
 		for (ref = bb->start; ref <= bb->end; ref++) {
 			ir_insn *insn = &ctx->ir_base[ref];
+			uint32_t rule = ctx->rules[ref];
 
-			switch (ctx->rules[ref]) {
+			if (rule & IR_SKIPPED) {
+				continue;
+			}
+
+			switch (rule & IR_RULE_MASK) {
 				case IR_RISCV_RULE_SKIP:
 				case IR_RISCV_RULE_PARAM:
 					/* No machine code for these --- START is a
@@ -214,38 +347,79 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 					 * lives in the ABI-mandated register. */
 					break;
 
-			case IR_RISCV_RULE_ADD: {
+			case IR_RISCV_RULE_ADD:
+				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_add)) return NULL;
+				break;
+
+			case IR_RISCV_RULE_SUB:
+				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_sub)) return NULL;
+				break;
+
+			case IR_RISCV_RULE_MUL:
+				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_mul)) return NULL;
+				break;
+
+			case IR_RISCV_RULE_AND:
+				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_and)) return NULL;
+				break;
+
+			case IR_RISCV_RULE_OR:
+				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_or)) return NULL;
+				break;
+
+			case IR_RISCV_RULE_XOR:
+				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_xor)) return NULL;
+				break;
+
+			case IR_RISCV_RULE_SHL:
+				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_shl)) return NULL;
+				break;
+
+			case IR_RISCV_RULE_SHR:
+				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_shr)) return NULL;
+				break;
+
+			case IR_RISCV_RULE_SAR:
+				if (!rv_emit_binop(ctx, ref, insn, &rv_alu_sar)) return NULL;
+				break;
+
+			case IR_RISCV_RULE_NEG: {
 				int32_t rd  = riscv_reg_of(ctx, ref, 0);
 				int32_t rs1 = riscv_reg_of(ctx, ref, 1);
-				int32_t rs2 = riscv_reg_of(ctx, ref, 2);
+				int w = ir_type_size[insn->type] == 4;
 
-				if (IR_IS_CONST_REF(insn->op2)) {
-					int64_t v = ctx->ir_base[insn->op2].val.i64;
-
-					IR_ASSERT(rs1 != IR_REG_NONE && v >= -2048 && v <= 2047);
-					emit32(ctx, rv_addi((uint32_t)rd, (uint32_t)rs1, (int32_t)v));
-				} else if (IR_IS_CONST_REF(insn->op1)) {
-					int64_t v = ctx->ir_base[insn->op1].val.i64;
-
-					IR_ASSERT(rs2 != IR_REG_NONE && v >= -2048 && v <= 2047);
-					emit32(ctx, rv_addi((uint32_t)rd, (uint32_t)rs2, (int32_t)v));
-				} else {
-					IR_ASSERT(rs1 != IR_REG_NONE && rs2 != IR_REG_NONE);
-					emit32(ctx, rv_add((uint32_t)rd, (uint32_t)rs1, (uint32_t)rs2));
-				}
+				if (rs1 == IR_REG_NONE) return NULL;
+				emit32(ctx, rv_alu(w, RV_F7_SUB, RV_F3_SUB,
+				                   (uint32_t)rd, 0 /* x0 */, (uint32_t)rs1));
 				break;
 			}
 
-				case IR_RISCV_RULE_RETURN: {
-					/* RETURN's return value is insn->op2 ---
-					 * i.e. operand position 2 --- so read slot 2. */
+			case IR_RISCV_RULE_NOT: {
+				int32_t rd  = riscv_reg_of(ctx, ref, 0);
+				int32_t rs1 = riscv_reg_of(ctx, ref, 1);
+
+				if (rs1 == IR_REG_NONE) return NULL;
+				emit32(ctx, rv_alui(0, RV_F3_XORI, (uint32_t)rd, (uint32_t)rs1, -1));
+				break;
+			}
+
+			case IR_RISCV_RULE_RETURN: {
+				if (IR_IS_CONST_REF(insn->op2)) {
+					int64_t v = ctx->ir_base[insn->op2].val.i64;
+
+					if (v < -2048 || v > 2047) return NULL;
+					emit32(ctx, rv_li12(IR_REG_A0, (int32_t)v));
+				} else {
 					int32_t src = riscv_reg_of(ctx, ref, 2);
+
+					if (src == IR_REG_NONE) return NULL;
 					if (src != IR_REG_A0) {
 						emit32(ctx, rv_mv(IR_REG_A0, (uint32_t)src));
 					}
-					emit32(ctx, rv_ret(IR_REG_RA));
-					break;
 				}
+				emit32(ctx, rv_ret(IR_REG_RA));
+				break;
+			}
 
 				case IR_RISCV_RULE_NONE:
 				default:
@@ -365,6 +539,16 @@ void ir_dump_reg(const ir_ctx *ctx, int8_t reg, ir_ref ref, bool store, FILE *f)
 const char *ir_rule_name[] = {
 	"NONE",
 	"ADD",
+	"SUB",
+	"MUL",
+	"AND",
+	"OR",
+	"XOR",
+	"SHL",
+	"SHR",
+	"SAR",
+	"NEG",
+	"NOT",
 	"RETURN",
 	"SKIP",
 	"PARAM",
