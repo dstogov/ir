@@ -1,6 +1,7 @@
 /*
  * IR - Lightweight JIT Compilation Framework
  * (RISC-V 64 hand-written binary instruction encoder --- no DynAsm)
+ * Encodings verified against riscv-unified-db (spec/std/isa/inst).
  */
 
 #ifndef IR_RISCV_ENC_H
@@ -46,12 +47,15 @@
 #define RV_F3_SRI   0x5
 #define RV_F3_ORI   0x6
 #define RV_F3_ANDI  0x7
+#define RV_F3_SLTIU 0x3
 
 #define RV_OP_IMM32  0x1B
 #define RV_OP_R32    0x3B
 
 /* ---- I-type: JALR (0x67) ---- */
 #define RV_F3_JALR  0x0
+#define RV_F3_BEQ   0x0
+#define RV_F3_BNE   0x1
 
 /*
  * Instruction format encoders.
@@ -63,23 +67,23 @@
 static inline uint32_t rv_enc_r(uint32_t funct7, uint32_t rs2, uint32_t rs1,
                                  uint32_t funct3, uint32_t rd, uint32_t opcode)
 {
-	return (funct7 << 25) | (rs2 << 20) | (rs1 << 15)
-	     | (funct3 << 12) | (rd << 7) | opcode;
+	return (funct7 << 25) | ((rs2 & 0x1f) << 20) | ((rs1 & 0x1f) << 15)
+	     | ((funct3 & 0x7) << 12) | ((rd & 0x1f) << 7) | opcode;
 }
 
 static inline uint32_t rv_enc_i(int32_t imm, uint32_t rs1, uint32_t funct3,
                                  uint32_t rd, uint32_t opcode)
 {
-	return (((uint32_t)imm & 0xFFF) << 20) | (rs1 << 15)
-	     | (funct3 << 12) | (rd << 7) | opcode;
+	return (((uint32_t)imm & 0xFFF) << 20) | ((rs1 & 0x1f) << 15)
+	     | ((funct3 & 0x7) << 12) | ((rd & 0x1f) << 7) | opcode;
 }
 
 static inline uint32_t rv_enc_s(int32_t imm, uint32_t rs2, uint32_t rs1,
                                  uint32_t funct3, uint32_t opcode)
 {
 	uint32_t u = (uint32_t)imm;
-	return ((u & 0xFE0) << 20) | (rs2 << 20) | (rs1 << 15)
-	     | (funct3 << 12) | ((u & 0x1F) << 7) | opcode;
+	return ((u & 0xFE0) << 20) | ((rs2 & 0x1f) << 20) | ((rs1 & 0x1f) << 15)
+	     | ((funct3 & 0x7) << 12) | ((u & 0x1F) << 7) | opcode;
 }
 
 static inline uint32_t rv_enc_b(int32_t imm, uint32_t rs2, uint32_t rs1,
@@ -116,6 +120,23 @@ static inline uint32_t rv_addi(uint32_t rd, uint32_t rs1, int32_t imm)
 	return rv_enc_i(imm, rs1, RV_F3_ADDI, rd, RV_OP_IMM);
 }
 
+/* mv rd, rs  ==  addi rd, rs, 0 */
+static inline uint32_t rv_mv(uint32_t rd, uint32_t rs)
+{
+	return rv_addi(rd, rs, 0);
+}
+
+/* ret  ==  jalr x0, ra, 0 */
+static inline uint32_t rv_ret(uint32_t ra_reg)
+{
+	return rv_enc_i(0, ra_reg, RV_F3_JALR, 0 /* x0 */, RV_OP_JALR);
+}
+
+static inline uint32_t rv_jalr(uint32_t rd, uint32_t rs1, int32_t imm)
+{
+	return rv_enc_i(imm, rs1, RV_F3_JALR, rd, RV_OP_JALR);
+}
+
 /* Generic ALU forms: w selects the 32-bit (sign-extending) variant. */
 
 static inline uint32_t rv_alu(int w, uint32_t f7, uint32_t f3,
@@ -139,27 +160,10 @@ static inline uint32_t rv_shifti(int w, uint32_t f3, int arithmetic,
 	return rv_enc_i((int32_t)imm, rs1, f3, rd, w ? RV_OP_IMM32 : RV_OP_IMM);
 }
 
-/* li for constants that fit in int12; larger values need lui chains (not yet) */
+/* li for constants that fit in int12; larger values need lui chains */
 static inline uint32_t rv_li12(uint32_t rd, int32_t imm)
 {
 	return rv_addi(rd, 0 /* x0 */, imm);
-}
-
-/* mv rd, rs  ==  addi rd, rs, 0 */
-static inline uint32_t rv_mv(uint32_t rd, uint32_t rs)
-{
-	return rv_addi(rd, rs, 0);
-}
-
-/* ret  ==  jalr x0, ra, 0 */
-static inline uint32_t rv_ret(uint32_t ra_reg)
-{
-	return rv_enc_i(0, ra_reg, RV_F3_JALR, 0 /* x0 */, RV_OP_JALR);
-}
-
-static inline uint32_t rv_jalr(uint32_t rd, uint32_t rs1, int32_t imm)
-{
-	return rv_enc_i(imm, rs1, RV_F3_JALR, rd, RV_OP_JALR);
 }
 
 /* ---- memory: funct3 for LOAD (0x03) / STORE (0x23) ---- */
@@ -194,14 +198,6 @@ static inline uint32_t rv_rem(uint32_t rd, uint32_t rs1, uint32_t rs2)
 { return rv_alu(0, 0x01, 0x06, rd, rs1, rs2); }
 static inline uint32_t rv_remu(uint32_t rd, uint32_t rs1, uint32_t rs2)
 { return rv_alu(0, 0x01, 0x07, rd, rs1, rs2); }
-static inline uint32_t rv_divw(uint32_t rd, uint32_t rs1, uint32_t rs2)
-{ return rv_alu(1, 0x01, 0x04, rd, rs1, rs2); }  /* divw */
-static inline uint32_t rv_divuw(uint32_t rd, uint32_t rs1, uint32_t rs2)
-{ return rv_alu(1, 0x01, 0x05, rd, rs1, rs2); }  /* divuw */
-static inline uint32_t rv_remw(uint32_t rd, uint32_t rs1, uint32_t rs2)
-{ return rv_alu(1, 0x01, 0x06, rd, rs1, rs2); }  /* remw */
-static inline uint32_t rv_remuw(uint32_t rd, uint32_t rs1, uint32_t rs2)
-{ return rv_alu(1, 0x01, 0x07, rd, rs1, rs2); }  /* remuw */
 
 /* Zbb: clz/ctz/cpop (I-type, funct3=1, imm[11:5] selects the op) */
 #define RV_ZBB_IMM_CLZ  0x600
@@ -213,5 +209,65 @@ static inline uint32_t rv_ctz(uint32_t rd, uint32_t rs)
 { return rv_enc_i(RV_ZBB_IMM_CTZ, rs, 1, rd, RV_OP_IMM); }
 static inline uint32_t rv_cpop(uint32_t rd, uint32_t rs)
 { return rv_enc_i(RV_ZBB_IMM_CPOP, rs, 1, rd, RV_OP_IMM); }
+
+/* ---- FP (F/D extension, opcode 0x53) ----
+ * d selects the double form (funct7 + 1) for arithmetic/compare/sgnj/class.
+ * fcvt does NOT follow that rule (see below); comparisons write a GPR. */
+static inline uint32_t rv_fop(int d, uint32_t f7, uint32_t f3,
+                              uint32_t rd, uint32_t rs1, uint32_t rs2)
+{
+	return rv_enc_r(f7 | (d ? 0x01 : 0x00), rs2, rs1, f3, rd, RV_OP_FP);
+}
+
+#define RV_F7_FADD  0x00
+#define RV_F7_FSUB  0x04
+#define RV_F7_FMUL  0x08
+#define RV_F7_FDIV  0x0c
+#define RV_F7_FMIN  0x14
+#define RV_F7_FSQRT 0x2c
+#define RV_F7_FEQ   0x50
+#define RV_F7_FLT   0x50
+#define RV_F7_FLE   0x50
+#define RV_F3_FEQ   0x02
+#define RV_F3_FLT   0x01
+#define RV_F3_FLE   0x00
+#define RV_F7_FCLASS 0x70
+#define RV_F3_FCLASS 0x01
+#define RV_F7_FSGNJ  0x10
+
+/* fcvt: f7 depends on the conversion direction (unified-db):
+ *   to double: 0x21 (from s) / 0x69 (from GPR)
+ *   to single: 0x20 (from d);  to GPR: 0x61 (from d)
+ * rs2 selects the width (0=w 1=wu 2=l 3=lu, or 0x00/0x01 for s<->d). */
+static inline uint32_t rv_fcvt(int to_double, uint32_t rs2_sel,
+                               uint32_t rd, uint32_t rs1)
+{
+	return rv_fop(0, to_double ? 0x21 : 0x20, 0, rd, rs1, rs2_sel);
+}
+
+static inline uint32_t rv_fcvt_x(int w, int uns, uint32_t rd, uint32_t rs1)
+{
+	uint32_t rs2 = (w ? 0x02 : 0x00) | (uns ? 0x01 : 0x00);
+
+	return rv_fop(0, 0x61, 0, rd, rs1, rs2);
+}
+
+static inline uint32_t rv_fcvt_from_x(int w, int uns, uint32_t rd, uint32_t rs1)
+{
+	uint32_t rs2 = (w ? 0x02 : 0x00) | (uns ? 0x01 : 0x00);
+
+	return rv_fop(0, 0x69, 0, rd, rs1, rs2);
+}
+
+static inline uint32_t rv_fmv_x_d(uint32_t rd, uint32_t rs1)
+{ return rv_fop(1, RV_F7_FCLASS, 0, rd, rs1, 0); }
+
+static inline uint32_t rv_fmv_d_x(uint32_t rd, uint32_t rs1)
+{ return rv_fop(0, 0x79, 0, rd, rs1, 0); }
+
+static inline uint32_t rv_fsgnj(int d, int fn, uint32_t rd, uint32_t rs1, uint32_t rs2)
+{
+	return rv_fop(d, RV_F7_FSGNJ, (uint32_t)fn, rd, rs1, rs2);
+}
 
 #endif /* IR_RISCV_ENC_H */
