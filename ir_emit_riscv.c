@@ -1,6 +1,9 @@
 /*
  * IR - Lightweight JIT Compilation Framework
  * (RISC-V 64 code generator --- hand-written binary encoding, no DynAsm)
+ * Copyright (C) 2022 Zend by Perforce.
+ * Authors: Dmitry Stogov <dmitry@php.net>
+ *          Meng Zhuo <mengzhuo@iscas.ac.cn>
  *
  * Scope so far: IR_ADD and IR_RETURN, integer registers only, plus the
  * IR_START/IR_PARAM control/data markers needed to get a leaf function
@@ -649,11 +652,15 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 			break;
 
 		case IR_RISCV_RULE_STORE:
-			flags = IR_USE_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG
-			      | IR_OP3_MUST_BE_IN_REG;
+			flags = IR_USE_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
 			insn = &ctx->ir_base[ref];
 			if (ctx->ir_base[insn->op2].op == IR_ALLOCA) {
 				constraints->tmp_regs[n] = IR_TMP_REG(2, IR_ADDR,
+				                                      IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n++;
+			}
+			if (IR_IS_CONST_REF(insn->op3)) {
+				constraints->tmp_regs[n] = IR_TMP_REG(3, ctx->ir_base[insn->op3].type,
 				                                      IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 				n++;
 			}
@@ -877,6 +884,7 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
  * op3's register. */
 static int32_t riscv_reg_of(ir_ctx *ctx, ir_ref ref, int slot)
 {
+	IR_ASSERT(slot >= 0 && slot <= 3);
 	return ctx->regs[ref][slot];
 }
 
@@ -1056,6 +1064,7 @@ static uint32_t rv_store_f3(ir_type type)
  * gpr: a scratch GPR for address/constant handling. */
 static bool rv_emit_get_fp(ir_ctx *ctx, int32_t dst, ir_ref val_ref, int32_t gpr)
 {
+	IR_ASSERT(dst >= 0 && dst < 32);
 	int32_t home;
 	int d = 1; /* doubles (the IR keeps floats as doubles in regs) */
 
@@ -1427,6 +1436,7 @@ static int rv_emit_dessa_copy(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to,
 
 void *ir_emit_code(ir_ctx *ctx, size_t *size)
 {
+	IR_ASSERT(ctx && size);
 	void *start;
 	uint32_t _b, b;
 	ir_insn *insn = NULL;
@@ -1623,7 +1633,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 				int j, k;
 				int stack_size = 0;
 
-				if (!IR_IS_CONST_REF(insn->op2)) { fprintf(stderr, "DBG CALL fail: func not const\n"); goto fail; }
+				if (!IR_IS_CONST_REF(insn->op2)) goto fail;
 				memset(want, IR_REG_NONE, sizeof(want));
 				ir_get_args_regs(ctx, insn, cc, want);
 
@@ -1747,8 +1757,8 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 								if (dst >= IR_REG_FP_FIRST && dst <= IR_REG_FP_LAST) {
 									int32_t fa = dst - IR_REG_FP_FIRST;
 
-									if (fa < 0) { fprintf(stderr, "DBG CALL fail: fp const fa<0\n"); goto fail; }
-									if (!rv_emit_get_fp(ctx, fa, arg, IR_REG_T5)) { fprintf(stderr, "DBG CALL fail: get_fp\n"); goto fail; }
+									if (fa < 0) goto fail;
+									if (!rv_emit_get_fp(ctx, fa, arg, IR_REG_T5)) goto fail;
 								} else {
 									/* variadic arg: double bits go to a GPR */
 									rv_str_fixup *fx = ir_mem_malloc(sizeof(rv_str_fixup));
@@ -1879,9 +1889,75 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 				base = IR_REG_NUM(base);
 				val = IR_REG_NUM(val);
 				if (!rv_emit_get(ctx, base, insn->op2)) goto fail;
-				if (!rv_emit_get(ctx, val, insn->op3)) goto fail;
-				emit32(ctx, rv_store(rv_store_f3(insn->type),
-				                      (uint32_t)val, (uint32_t)base, 0));
+				if (IR_IS_TYPE_FP(insn->type)) {
+					if (val < IR_REG_FP_FIRST) goto fail;
+					if (!rv_emit_get_fp(ctx, val - IR_REG_FP_FIRST, insn->op3, IR_REG_T5)) goto fail;
+					emit32(ctx, rv_store(rv_store_f3(insn->type),
+					                      (uint32_t)(val - IR_REG_FP_FIRST),
+					                      (uint32_t)base, 0));
+				} else {
+					if (!rv_emit_get(ctx, val, insn->op3)) goto fail;
+					emit32(ctx, rv_store(rv_store_f3(insn->type),
+					                      (uint32_t)val, (uint32_t)base, 0));
+				}
+				break;
+			}
+
+			case IR_RISCV_RULE_VLOAD: {
+				int32_t rd   = riscv_reg_of(ctx, ref, 0);
+				bool rd_spilled = IR_REG_SPILLED(rd);
+				int32_t rdtmp = rd_spilled ? IR_REG_NUM(rd) : rd;
+				ir_insn *var_insn = &ctx->ir_base[insn->op2];
+				int32_t off;
+
+				if (rd == IR_REG_NONE) goto fail;
+				off = IR_SPILL_POS_TO_OFFSET(var_insn->op3);
+				if (off < -2048 || off > 2047) goto fail;
+				emit32(ctx, rv_load(rv_load_f3(insn->type),
+				                     (uint32_t)rdtmp, IR_REG_SP, off));
+				if (rd_spilled) {
+					rv_emit_store_def(ctx, ref, insn->type, rdtmp);
+				}
+				break;
+			}
+
+			case IR_RISCV_RULE_VSTORE: {
+				int32_t val  = riscv_reg_of(ctx, ref, 3);
+				ir_insn *var_insn = &ctx->ir_base[insn->op2];
+				int32_t off;
+
+				if (val == IR_REG_NONE) goto fail;
+				off = IR_SPILL_POS_TO_OFFSET(var_insn->op3);
+				if (off < -2048 || off > 2047) goto fail;
+				if (IR_IS_TYPE_FP(insn->type)) {
+					val = IR_REG_NUM(val);
+					if (val < IR_REG_FP_FIRST) goto fail;
+					if (!rv_emit_get_fp(ctx, val - IR_REG_FP_FIRST, insn->op3, IR_REG_T5)) goto fail;
+					emit32(ctx, rv_store(rv_store_f3(insn->type),
+					                      (uint32_t)(val - IR_REG_FP_FIRST),
+					                      IR_REG_SP, off));
+				} else {
+					if (!rv_emit_get(ctx, val, insn->op3)) goto fail;
+					emit32(ctx, rv_store(rv_store_f3(insn->type),
+					                      (uint32_t)val, IR_REG_SP, off));
+				}
+				break;
+			}
+
+			case IR_RISCV_RULE_VADDR: {
+				int32_t rd   = riscv_reg_of(ctx, ref, 0);
+				bool rd_spilled = IR_REG_SPILLED(rd);
+				int32_t rdtmp = rd_spilled ? IR_REG_NUM(rd) : rd;
+				ir_insn *var_insn = &ctx->ir_base[insn->op1];
+				int32_t off;
+
+				if (rd == IR_REG_NONE) goto fail;
+				off = IR_SPILL_POS_TO_OFFSET(var_insn->op3);
+				if (off < -2048 || off > 2047) goto fail;
+				emit32(ctx, rv_addi((uint32_t)rdtmp, IR_REG_SP, off));
+				if (rd_spilled) {
+					rv_emit_store_def(ctx, ref, insn->type, rdtmp);
+				}
 				break;
 			}
 
@@ -2345,35 +2421,16 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 				}
 				cond = riscv_reg_of(ctx, ref, 2);
 				if (cond == IR_REG_NONE || !rv_emit_get(ctx, cond, insn->op2)) goto fail;
-				if (true_block == nb) {
-					/* fall-through to true: branch to false when cond == 0 */
-					rv_br_fixup *fx = ir_mem_malloc(sizeof(rv_br_fixup));
-
-					fx->f3 = RV_F3_BEQ;
-					fx->is_jal = 0;
-					fx->cond_reg = cond;
-					fx->target_block = false_block;
-					fx->patch_off = (int32_t)((char*)ctx->code_buffer->pos - (char*)start);
-					fx->next = rv_br_fixups;
-					rv_br_fixups = fx;
-					emit32(ctx, 0); /* beqz placeholder */
-					break;
-				}
-				/* branch to true when cond != 0 */
+				/* Fixed 3-instruction sequence so branch targets never exceed
+				 * the 12-bit beq/bne range, however far the scheduler places
+				 * the true/false blocks (mirrors how large functions reorder
+				 * cold blocks to the end, e.g. fcmp_003 main).
+				 *   bnez cond, +8      ; cond != 0 -> skip jal-false
+				 *   jal  false_block   ; cond == 0
+				 *   jal  true_block    ; cond != 0
+				 */
+				emit32(ctx, rv_enc_b(8, 0, (uint32_t)cond, RV_F3_BNE, RV_OP_BRANCH));
 				{
-					rv_br_fixup *fx = ir_mem_malloc(sizeof(rv_br_fixup));
-
-					fx->f3 = RV_F3_BNE;
-					fx->is_jal = 0;
-					fx->cond_reg = cond;
-					fx->target_block = true_block;
-					fx->patch_off = (int32_t)((char*)ctx->code_buffer->pos - (char*)start);
-					fx->next = rv_br_fixups;
-					rv_br_fixups = fx;
-					emit32(ctx, 0); /* bnez placeholder */
-				}
-				if (false_block != nb) {
-					/* neither successor is the fall-through: need a jal too */
 					rv_br_fixup *fx = ir_mem_malloc(sizeof(rv_br_fixup));
 
 					fx->is_jal = 1;
@@ -2383,7 +2440,19 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 					fx->patch_off = (int32_t)((char*)ctx->code_buffer->pos - (char*)start);
 					fx->next = rv_br_fixups;
 					rv_br_fixups = fx;
-					emit32(ctx, 0); /* jal placeholder */
+					emit32(ctx, 0); /* jal false_block */
+				}
+				{
+					rv_br_fixup *fx = ir_mem_malloc(sizeof(rv_br_fixup));
+
+					fx->is_jal = 1;
+					fx->f3 = 0;
+					fx->cond_reg = 0;
+					fx->target_block = true_block;
+					fx->patch_off = (int32_t)((char*)ctx->code_buffer->pos - (char*)start);
+					fx->next = rv_br_fixups;
+					rv_br_fixups = fx;
+					emit32(ctx, 0); /* jal true_block */
 				}
 				break;
 			}
@@ -2541,13 +2610,11 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 			case IR_RISCV_RULE_GUARD_NOT: {
 				int32_t cond;
 				uint32_t words[8];
+				uint32_t *cond_pos;
 				int n, i;
+				int32_t skip;
 				void *addr;
 
-				/* speculative guard: when the condition fails, call the
-				 * deopt fallback (op3), which returns to the next code.
-				 * The fallback is a fixed 8-word li64 + jalr (36 bytes),
-				 * so the branch offset is a compile-time constant. */
 				cond = riscv_reg_of(ctx, ref, 2);
 				if (cond == IR_REG_NONE) goto fail;
 				if (!rv_emit_get(ctx, cond, insn->op2)) goto fail;
@@ -2565,15 +2632,44 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 					}
 				}
 				if (!addr) goto fail;
-				emit32(ctx, rv_enc_b(40, 0 /* x0 */, (uint32_t)cond,
-				                     (ctx->rules[ref] & IR_RULE_MASK) == IR_RISCV_RULE_GUARD
-					                     ? RV_F3_BNE : RV_F3_BEQ,
-				                     RV_OP_BRANCH));
+				/* Guard: when the condition fails, restore the callee-saved
+				 * state and tail-jump to the deopt fallback (op3). Its return
+				 * goes straight back to our caller (like x86's `jmp addr`),
+				 * carrying the guard result. The skipped region length is
+				 * known right after emission, so the branch is patched in
+				 * place without a fixup. */
+				cond_pos = (uint32_t*)ctx->code_buffer->pos;
+				emit32(ctx, 0);
+				rv_emit_restore_regs(ctx);
 				n = rv_li64_fixed_words(IR_REG_T6, (int64_t)(uintptr_t)addr, words);
 				for (i = 0; i < n; i++) {
 					emit32(ctx, words[i]);
 				}
-				emit32(ctx, rv_jalr(IR_REG_RA, IR_REG_T6, 0));
+				emit32(ctx, rv_jalr(0 /* x0 */, IR_REG_T6, 0));
+				skip = (int32_t)((char*)ctx->code_buffer->pos - (char*)cond_pos);
+				*cond_pos = rv_enc_b(skip, 0 /* x0 */, (uint32_t)cond,
+				                     (ctx->rules[ref] & IR_RULE_MASK) == IR_RISCV_RULE_GUARD
+					                     ? RV_F3_BNE : RV_F3_BEQ,
+				                     RV_OP_BRANCH);
+				break;
+			}
+
+			case IR_RISCV_RULE_FP2FP: {
+				int32_t rd   = riscv_reg_of(ctx, ref, 0);
+				int32_t rs1  = riscv_reg_of(ctx, ref, 1);
+				bool rd_spilled = IR_REG_SPILLED(rd);
+				int32_t rdtmp = rd_spilled ? IR_REG_NUM(rd) : rd;
+				bool to_double = (insn->type == IR_DOUBLE);
+
+				if (rd == IR_REG_NONE || rs1 == IR_REG_NONE) goto fail;
+				if (rs1 < IR_REG_FP_FIRST || rdtmp < IR_REG_FP_FIRST) goto fail;
+				if (!rv_emit_get_fp(ctx, rs1 - IR_REG_FP_FIRST, insn->op1, IR_REG_T5)) goto fail;
+				emit32(ctx, rv_fcvt(to_double, to_double ? 0 : 1,
+				                    (uint32_t)(rdtmp - IR_REG_FP_FIRST),
+				                    (uint32_t)(rs1 - IR_REG_FP_FIRST)));
+				if (rd_spilled) {
+					rv_emit_store_def(ctx, ref, insn->type, rdtmp);
+				}
 				break;
 			}
 
@@ -2609,6 +2705,199 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 				                      (uint32_t)(rs1 - IR_REG_FP_FIRST)));
 				if (rd_spilled) {
 					rv_emit_store_def(ctx, ref, insn->type, rdtmp);
+				}
+				break;
+			}
+
+			case IR_RISCV_RULE_SWITCH: {
+				int32_t cond = riscv_reg_of(ctx, ref, 2);
+				int32_t tmp  = riscv_reg_of(ctx, ref, 3);
+				ir_block *bb = &ctx->cfg_blocks[b];
+				uint32_t *p = &ctx->cfg_edges[bb->successors];
+				uint32_t n;
+
+				if (cond == IR_REG_NONE || !rv_emit_get(ctx, cond, insn->op2)) goto fail;
+				for (n = bb->successors_count; n != 0; p++, n--) {
+					uint32_t succ = *p;
+					ir_insn *sinsn = &ctx->ir_base[ctx->cfg_blocks[succ].start];
+
+					if (sinsn->op == IR_CASE_VAL) {
+						int64_t case_val = ctx->ir_base[sinsn->op2].val.i64;
+
+						if (tmp == IR_REG_NONE) goto fail;
+						rv_emit_li64(ctx, (uint32_t)tmp, case_val);
+						/* bne cond, tmp, +8; jal succ */
+						emit32(ctx, rv_enc_b(8, 0, (uint32_t)cond, RV_F3_BNE, RV_OP_BRANCH));
+						{
+							rv_br_fixup *fx = ir_mem_malloc(sizeof(rv_br_fixup));
+
+							fx->is_jal = 1;
+							fx->f3 = 0;
+							fx->cond_reg = 0;
+							fx->target_block = succ;
+							fx->patch_off = (int32_t)((char*)ctx->code_buffer->pos - (char*)start);
+							fx->next = rv_br_fixups;
+							rv_br_fixups = fx;
+							emit32(ctx, 0); /* jal case block */
+						}
+					} else if (sinsn->op == IR_CASE_DEFAULT || sinsn->op == IR_CASE_RANGE) {
+						rv_br_fixup *fx = ir_mem_malloc(sizeof(rv_br_fixup));
+
+						fx->is_jal = 1;
+						fx->f3 = 0;
+						fx->cond_reg = 0;
+						fx->target_block = succ;
+						fx->patch_off = (int32_t)((char*)ctx->code_buffer->pos - (char*)start);
+						fx->next = rv_br_fixups;
+						rv_br_fixups = fx;
+						emit32(ctx, 0); /* jal default/range block */
+					}
+				}
+				break;
+			}
+
+			case IR_RISCV_RULE_IJMP: {
+				uint32_t words[8];
+				void *addr;
+				int n, i;
+
+				if (!IR_IS_CONST_REF(insn->op2)) goto fail;
+				{
+					const ir_insn *ai = &ctx->ir_base[insn->op2];
+
+					if (ai->op == IR_FUNC) {
+						const char *name = ir_get_str(ctx, ai->val.name);
+
+						addr = (ctx->loader && ctx->loader->resolve_sym_name)
+							? ctx->loader->resolve_sym_name(ctx->loader, name, 0)
+							: ir_resolve_sym_name(name);
+					} else if (ai->op == IR_ADDR || ai->op == IR_FUNC_ADDR) {
+						addr = (void*)(uintptr_t)ai->val.addr;
+					} else {
+						goto fail;
+					}
+				}
+				if (!addr) goto fail;
+				n = rv_li64_fixed_words(IR_REG_T6, (int64_t)(uintptr_t)addr, words);
+				for (i = 0; i < n; i++) {
+					emit32(ctx, words[i]);
+				}
+				emit32(ctx, rv_jalr(0 /* x0 */, IR_REG_T6, 0));
+				break;
+			}
+
+			case IR_RISCV_RULE_ARGVAL:
+				/* emitted as part of the containing CALL */
+				break;
+
+			case IR_RISCV_RULE_VA_COPY: {
+				int32_t dst = riscv_reg_of(ctx, ref, 2);
+				int32_t src = riscv_reg_of(ctx, ref, 3);
+				int32_t i;
+
+				if (dst == IR_REG_NONE || src == IR_REG_NONE) goto fail;
+				if (!rv_emit_get(ctx, src, insn->op3)) goto fail;
+				if (!rv_emit_get(ctx, dst, insn->op2)) goto fail;
+				for (i = 0; i < 24; i += 8) {
+					emit32(ctx, rv_load(3, IR_REG_T4, (uint32_t)src, i));
+					emit32(ctx, rv_store(3, IR_REG_T4, (uint32_t)dst, i));
+				}
+				break;
+			}
+
+			case IR_RISCV_RULE_VA_START: {
+				int32_t ap = riscv_reg_of(ctx, ref, 2);
+				int32_t frame = ctx->stack_frame_size;
+				int32_t save_off = ctx->locals_area_size;
+				int named_gprs = 0;
+				ir_ref i;
+				ir_regset used;
+				ir_reg reg;
+
+				if (ap == IR_REG_NONE || !rv_emit_get(ctx, ap, insn->op2)) goto fail;
+				for (i = 1; i < ctx->insns_count; i++) {
+					if (ctx->ir_base[i].op == IR_PARAM
+					 && IR_IS_TYPE_INT(ctx->ir_base[i].type)) {
+						named_gprs++;
+					}
+				}
+				/* the GPR snapshot starts after the saved preserved regs,
+				 * ra and FP preserved regs (see rv_emit_prologue) */
+				used = IR_REGSET_INTERSECTION((ir_regset)ctx->used_preserved_regs, IR_REGSET_GP);
+				IR_REGSET_FOREACH(used, reg) {
+					save_off += sizeof(void*);
+				} IR_REGSET_FOREACH_END();
+				if (ctx->flags2 & IR_HAS_CALLS) {
+					save_off += sizeof(void*);
+				}
+				used = IR_REGSET_INTERSECTION((ir_regset)ctx->used_preserved_regs, IR_REGSET_FP);
+				IR_REGSET_FOREACH(used, reg) {
+					save_off += sizeof(void*);
+				} IR_REGSET_FOREACH_END();
+				/* riscv64 psABI va_list: gp_offset@0, fp_offset@4,
+				 * overflow_arg_area@8, reg_save_area@16 */
+				if (save_off < -2048 || save_off > 2047) goto fail;
+				emit32(ctx, rv_addi(IR_REG_T6, IR_REG_SP, save_off));
+				emit32(ctx, rv_store(3, IR_REG_T6, (uint32_t)ap, 16));       /* reg_save_area */
+				emit32(ctx, rv_addi(IR_REG_T6, 0, named_gprs * 8));
+				emit32(ctx, rv_store(2, IR_REG_T6, (uint32_t)ap, 0));        /* gp_offset (sw) */
+				emit32(ctx, rv_store(2, 0, (uint32_t)ap, 4));                /* fp_offset = 0 */
+				/* psABI: va_list points after the last named argument on the
+				 * stack; named GPR args beyond the 8 a0-a7 slots land on the
+				 * stack before any variadic args, so skip them. */
+				if (named_gprs > 8) frame += (named_gprs - 8) * 8;
+				if (frame < -2048 || frame > 2047) goto fail;
+				emit32(ctx, rv_addi(IR_REG_T6, IR_REG_SP, frame));
+				emit32(ctx, rv_store(3, IR_REG_T6, (uint32_t)ap, 8));        /* overflow_arg_area */
+				break;
+			}
+
+			case IR_RISCV_RULE_VA_ARG: {
+				int32_t rd   = riscv_reg_of(ctx, ref, 0);
+				bool rd_spilled = IR_REG_SPILLED(rd);
+				int32_t rdtmp = rd_spilled ? IR_REG_NUM(rd) : rd;
+				int32_t ap = riscv_reg_of(ctx, ref, 2);
+				bool fp = IR_IS_TYPE_FP(insn->type);
+
+				if (ap != IR_REG_NONE) ap = IR_REG_NUM(ap);
+				if (rd == IR_REG_NONE || ap == IR_REG_NONE) goto fail;
+				if (!rv_emit_get(ctx, ap, insn->op2)) goto fail;
+				/* t6 = gp_offset; t6 >= 64 means the GPR window is exhausted */
+				emit32(ctx, rv_load(2, IR_REG_T6, (uint32_t)ap, 0));         /* lw t6, gp_offset */
+				emit32(ctx, rv_addi(IR_REG_T5, 0, 64));
+				emit32(ctx, rv_enc_b(28, (uint32_t)IR_REG_T5, (uint32_t)IR_REG_T6, RV_F3_BGEU, RV_OP_BRANCH));
+				/* GPR path: value at reg_save_area + gp_offset */
+				emit32(ctx, rv_load(3, IR_REG_T5, (uint32_t)ap, 16));        /* ld t5, reg_save_area */
+				emit32(ctx, rv_alu(0, 0, RV_F3_ADD, IR_REG_T5, IR_REG_T5, IR_REG_T6));
+				emit32(ctx, rv_alui(0, RV_F3_ADDI, IR_REG_T6, IR_REG_T6, 8));
+				emit32(ctx, rv_store(2, IR_REG_T6, (uint32_t)ap, 0));        /* sw t6, gp_offset */
+				emit32(ctx, rv_load(3, IR_REG_T5, IR_REG_T5, 0));            /* ld t5, value */
+				emit32(ctx, rv_enc_j(24, 0, RV_OP_JAL));
+				/* overflow path: value at overflow_arg_area, then advance it */
+				emit32(ctx, rv_load(3, IR_REG_T5, (uint32_t)ap, 8));         /* ld t5, overflow_arg_area */
+				emit32(ctx, rv_load(3, IR_REG_T6, IR_REG_T5, 0));            /* ld t6, value */
+				emit32(ctx, rv_alui(0, RV_F3_ADDI, IR_REG_T5, IR_REG_T5, 8));
+				emit32(ctx, rv_store(3, IR_REG_T5, (uint32_t)ap, 8));        /* sd t5, overflow_arg_area */
+				emit32(ctx, rv_mv(IR_REG_T5, IR_REG_T6));
+				if (fp) {
+					/* variadic FP args arrive in GPRs */
+					if (rdtmp < IR_REG_FP_FIRST) goto fail;
+					if (insn->type == IR_FLOAT) {
+						emit32(ctx, rv_fmv_w_x((uint32_t)(rdtmp - IR_REG_FP_FIRST), (uint32_t)IR_REG_T5));
+					} else {
+						emit32(ctx, rv_fmv_d_x((uint32_t)(rdtmp - IR_REG_FP_FIRST), (uint32_t)IR_REG_T5));
+					}
+				} else {
+					emit32(ctx, rv_mv((uint32_t)rdtmp, (uint32_t)IR_REG_T5));
+				}
+				if (rd_spilled) {
+					if (fp) {
+						emit32(ctx, rv_store(rv_store_f3(insn->type),
+						                     (uint32_t)(rdtmp - IR_REG_FP_FIRST),
+						                     IR_REG_SP, ir_get_spill_slot_offset(ctx, ref)));
+					} else {
+						rv_emit_store_def(ctx, ref, insn->type, rdtmp);
+					}
 				}
 				break;
 			}
@@ -2758,7 +3047,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 fail:
 	ctx->code_buffer->pos = start;
 	ctx->status = IR_ERROR_UNSUPPORTED_CODE_RULE;
+#ifdef IR_DEBUG_MESSAGES
 	fprintf(stderr, "RVFAIL ref=%d op=%s rule=0x%x\n", ref, insn ? ir_op_name[insn->op] : "?", rule);
+#endif
 	return NULL;
 }
 

@@ -1,6 +1,9 @@
 /*
  * IR - Lightweight JIT Compilation Framework
  * (RISC-V 64 hand-written binary instruction encoder --- no DynAsm)
+ * Copyright (C) 2022 Zend by Perforce.
+ * Authors: Dmitry Stogov <dmitry@php.net>
+ *          Meng Zhuo <mengzhuo@iscas.ac.cn>
  * Encodings verified against riscv-unified-db (spec/std/isa/inst).
  */
 
