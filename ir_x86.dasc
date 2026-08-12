@@ -10685,8 +10685,7 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					| movzx Rq(op1_reg), Rb(op1_reg)
 ||				} else if (ir_type_size[src_type] == 2) {
 					| movzx Rq(op1_reg), Rw(op1_reg)
-||				} else if (ctx->ir_base[insn->op1].op == IR_TRUNC
-						&& IR_REG_NUM(ctx->regs[insn->op1][1]) == op1_reg) {
+||				} else if (ctx->ir_base[insn->op1].op == IR_TRUNC && IR_REG_NUM(ctx->regs[insn->op1][1]) == op1_reg) {
 					/* clear high bits (see: gcc/testsuite/gcc.dg/pr37544.c) */
 					| mov Rd(op1_reg), Rd(op1_reg)
 ||				}
