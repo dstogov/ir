@@ -266,12 +266,15 @@ IR_ALWAYS_INLINE void* ir_arena_alloc_aligned(ir_arena **arena_ptr, size_t size,
 	if (EXPECTED((ptrdiff_t)size <= (ptrdiff_t)(arena->end - ptr))) {
 		arena->ptr = ptr + size;
 	} else {
+		size_t hdr_size = IR_ALIGNED_SIZE(sizeof(ir_arena), align);
 		size_t arena_size =
-			UNEXPECTED((size + IR_ALIGNED_SIZE(sizeof(ir_arena), align)) > (size_t)(arena->end - (char*) arena)) ?
-				(size + IR_ALIGNED_SIZE(sizeof(ir_arena), align)) :
-				(size_t)(arena->end - (char*) arena);
-		ir_arena *new_arena = (ir_arena*)ir_mem_malloc(arena_size);
+			UNEXPECTED((size + hdr_size) > (size_t)(arena->end - (char*) arena)) ?
+				(size + hdr_size) :
+				(size_t)(arena->end - (char*)arena);
+		ir_arena *new_arena;
 
+		if (align > 16) arena_size += IR_ALIGNED_SIZE(align, 16);
+		new_arena = (ir_arena*)ir_mem_malloc(arena_size);
 		if (UNEXPECTED(!new_arena)) return NULL;
 		ptr = (char*)IR_ALIGNED_SIZE((uintptr_t)new_arena + sizeof(ir_arena), align);
 		new_arena->ptr = (char*) ptr + size;
