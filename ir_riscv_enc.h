@@ -56,6 +56,8 @@
 #define RV_F3_JALR  0x0
 #define RV_F3_BEQ   0x0
 #define RV_F3_BNE   0x1
+#define RV_F3_BLTU  0x6
+#define RV_F3_BGEU  0x7
 
 /*
  * Instruction format encoders.
@@ -261,6 +263,9 @@ static inline uint32_t rv_fcvt_from_x(int w, int uns, uint32_t rd, uint32_t rs1)
 
 static inline uint32_t rv_fmv_x_d(uint32_t rd, uint32_t rs1)
 { return rv_fop(1, RV_F7_FCLASS, 0, rd, rs1, 0); }
+
+static inline uint32_t rv_fmv_w_x(uint32_t rd, uint32_t rs1)
+{ return rv_fop(0, 0x78, 0, rd, rs1, 0); }
 
 static inline uint32_t rv_fmv_d_x(uint32_t rd, uint32_t rs1)
 { return rv_fop(0, 0x79, 0, rd, rs1, 0); }

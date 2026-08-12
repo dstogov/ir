@@ -115,6 +115,16 @@ enum {
 	IR_RISCV_RULE_GUARD_NOT,
 	IR_RISCV_RULE_SKIP,    /* IR_START and other pure control markers -> no code emitted */
 	IR_RISCV_RULE_PARAM,   /* IR_PARAM  -> no code emitted; def_reg pinned to a0-a7 per ABI */
+	IR_RISCV_RULE_VLOAD,   /* IR_VLOAD  -> load from a VAR stack slot */
+	IR_RISCV_RULE_VSTORE,  /* IR_VSTORE -> store to a VAR stack slot */
+	IR_RISCV_RULE_VADDR,   /* IR_VADDR  -> address of a VAR stack slot */
+	IR_RISCV_RULE_SWITCH,  /* IR_SWITCH -> compare chain over CASE_VALs */
+	IR_RISCV_RULE_IJMP,    /* IR_IJMP   -> unconditional jump to an address */
+	IR_RISCV_RULE_VA_START,/* IR_VA_START -> initialize a riscv64 va_list */
+	IR_RISCV_RULE_VA_ARG,  /* IR_VA_ARG -> fetch the next variadic argument */
+	IR_RISCV_RULE_FP2FP,   /* IR_FP2FP -> fcvt between float and double */
+	IR_RISCV_RULE_ARGVAL,  /* IR_ARGVAL -> fused into CALL: struct-by-value */
+	IR_RISCV_RULE_VA_COPY, /* IR_VA_COPY -> copy a riscv64 va_list */
 };
 
 static ir_reg ir_get_param_reg(const ir_ctx *ctx, ir_ref ref)
@@ -194,7 +204,16 @@ static int ir_get_args_regs(const ir_ctx *ctx, const ir_insn *insn, const ir_cal
 		}
 		type = arg->type;
 		if (IR_IS_TYPE_INT(type) || (j > last_named && IR_IS_TYPE_FP(type))) {
-			if (int_param < cc->int_param_regs_count && arg->op != IR_ARGVAL) {
+			if (arg->op == IR_ARGVAL) {
+				/* struct-by-value: the callee gets the address of a stack copy */
+				if (int_param < cc->int_param_regs_count) {
+					regs[j] = cc->int_param_regs[int_param];
+					count = j + 1;
+				} else {
+					regs[j] = IR_REG_NONE;
+				}
+				int_param++;
+			} else if (int_param < cc->int_param_regs_count) {
 				regs[j] = cc->int_param_regs[int_param];
 				count = j + 1;
 				int_param++;
@@ -222,7 +241,7 @@ static void *ir_call_addr(ir_ctx *ctx, ir_insn *insn, ir_insn *addr_insn)
 	IR_ASSERT(addr_insn->type == IR_ADDR);
 	if (addr_insn->op == IR_FUNC) {
 		addr = (ctx->loader && ctx->loader->resolve_sym_name) ?
-			ctx->loader->resolve_sym_name(ctx->loader, ctx, addr_insn->val.name, 0) :
+			ctx->loader->resolve_sym_name(ctx->loader, ctx, addr_insn->val.name, IR_RESOLVE_SYM_ADD_THUNK) :
 			ir_resolve_sym_name(ir_get_str(ctx, addr_insn->val.name));
 		IR_ASSERT(addr);
 	} else {
@@ -279,8 +298,54 @@ int ir_match(ir_ctx *ctx)
 						return 0;
 					}
 					break;
+				case IR_VAR:
+					/* static stack slot, same mechanism as static ALLOCA */
+					ctx->rules[ref] = IR_RISCV_RULE_ALLOCA | IR_SKIPPED;
+					break;
+				case IR_VLOAD:
+				case IR_VLOAD_v:
+					ctx->rules[ref] = IR_RISCV_RULE_VLOAD;
+					break;
+				case IR_VSTORE:
+				case IR_VSTORE_v:
+					ctx->rules[ref] = IR_RISCV_RULE_VSTORE;
+					break;
+				case IR_VADDR:
+					ctx->rules[ref] = IR_RISCV_RULE_VADDR;
+					break;
+				case IR_SWITCH:
+					ctx->rules[ref] = IR_RISCV_RULE_SWITCH;
+					break;
+				case IR_ARGVAL:
+					ctx->rules[ref] = IR_FUSED | IR_RISCV_RULE_ARGVAL;
+					break;
+				case IR_CASE_VAL:
+				case IR_CASE_RANGE:
+				case IR_CASE_DEFAULT:
+					ctx->rules[ref] = IR_RISCV_RULE_SKIP;
+					break;
+				case IR_IJMP:
+					ctx->rules[ref] = IR_RISCV_RULE_IJMP;
+					break;
+				case IR_VA_START:
+					ctx->flags2 |= IR_HAS_VA_START;
+					ctx->rules[ref] = IR_RISCV_RULE_VA_START;
+					break;
+				case IR_VA_ARG:
+					ctx->flags2 |= IR_HAS_VA_ARG_GP;
+					ctx->rules[ref] = IR_RISCV_RULE_VA_ARG;
+					break;
+				case IR_VA_END:
+					ctx->rules[ref] = IR_RISCV_RULE_SKIP;
+					break;
+				case IR_VA_COPY:
+					ctx->rules[ref] = IR_RISCV_RULE_VA_COPY;
+					break;
 				case IR_INT2FP:
 					ctx->rules[ref] = IR_RISCV_RULE_INT2FP;
+					break;
+				case IR_FP2FP:
+					ctx->rules[ref] = IR_RISCV_RULE_FP2FP;
 					break;
 				case IR_FP2INT:
 					ctx->rules[ref] = IR_RISCV_RULE_FP2INT;
@@ -634,10 +699,82 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 		case IR_RISCV_RULE_CTTZ:
 		case IR_RISCV_RULE_CTPOP:
 			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;
+			/* software implementations (RVA20U64 has no Zbb) need two
+			 * scratch registers for masks and intermediates */
+			constraints->tmp_regs[0] = IR_SCRATCH_REG(IR_REG_T5,
+			                                          IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+			constraints->tmp_regs[1] = IR_SCRATCH_REG(IR_REG_T6,
+			                                          IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+			n = 2;
 			break;
 
 		case IR_RISCV_RULE_IF:
 			flags = IR_OP2_MUST_BE_IN_REG;
+			break;
+
+		case IR_RISCV_RULE_VLOAD:
+			flags = IR_USE_MUST_BE_IN_REG;
+			break;
+
+		case IR_RISCV_RULE_VSTORE:
+			flags = IR_OP3_MUST_BE_IN_REG;
+			insn = &ctx->ir_base[ref];
+			if (IR_IS_CONST_REF(insn->op3)) {
+				constraints->tmp_regs[0] = IR_TMP_REG(3, ctx->ir_base[insn->op3].type,
+				                                      IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n = 1;
+			}
+			break;
+
+		case IR_RISCV_RULE_VADDR:
+			flags = IR_USE_MUST_BE_IN_REG;
+			break;
+
+		case IR_RISCV_RULE_SWITCH:
+			flags = IR_OP2_MUST_BE_IN_REG;
+			constraints->tmp_regs[0] = IR_TMP_REG(3, IR_ADDR,
+			                                      IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+			n = 1;
+			break;
+
+		case IR_RISCV_RULE_IJMP:
+			flags = 0;
+			break;
+
+		case IR_RISCV_RULE_ARGVAL:
+			flags = 0;
+			break;
+
+		case IR_RISCV_RULE_VA_COPY:
+			flags = IR_OP2_MUST_BE_IN_REG | IR_OP3_MUST_BE_IN_REG;
+			insn = &ctx->ir_base[ref];
+			if (ctx->ir_base[insn->op2].op == IR_ALLOCA) {
+				constraints->tmp_regs[n] = IR_TMP_REG(2, IR_ADDR,
+				                                      IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n++;
+			}
+			if (ctx->ir_base[insn->op3].op == IR_ALLOCA) {
+				constraints->tmp_regs[n] = IR_TMP_REG(3, IR_ADDR,
+				                                      IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n++;
+			}
+			break;
+
+		case IR_RISCV_RULE_VA_START:
+		case IR_RISCV_RULE_VA_ARG:
+			flags = IR_USE_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+			insn = &ctx->ir_base[ref];
+			if (ctx->ir_base[insn->op2].op == IR_ALLOCA) {
+				constraints->tmp_regs[0] = IR_TMP_REG(2, IR_ADDR,
+				                                      IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n = 1;
+			} else {
+				constraints->tmp_regs[0] = IR_SCRATCH_REG(IR_REG_T5,
+				                                          IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				constraints->tmp_regs[1] = IR_SCRATCH_REG(IR_REG_T6,
+				                                          IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n = 2;
+			}
 			break;
 
 		case IR_RISCV_RULE_ALLOCA:
@@ -645,6 +782,7 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 			break;
 
 		case IR_RISCV_RULE_INT2FP:
+		case IR_RISCV_RULE_FP2FP:
 		case IR_RISCV_RULE_FP2INT:
 			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;
 			break;
@@ -829,9 +967,19 @@ static void rv_emit_prologue(ir_ctx *ctx)
 		                     IR_REG_SP, 3 /* SD */, RV_OP_STORE));
 		off += sizeof(void*);
 	} IR_REGSET_FOREACH_END();
+	if (ctx->flags2 & IR_HAS_VA_START) {
+		/* snapshot incoming GPR arguments; VA_START points reg_save_area here */
+		int i;
+
+		for (i = 0; i < 8; i++) {
+			emit32(ctx, rv_enc_s(off, (uint32_t)(IR_REG_A0 + i),
+			                     IR_REG_SP, 3 /* SD */, RV_OP_STORE));
+			off += sizeof(void*);
+		}
+	}
 }
 
-static void rv_emit_epilogue(ir_ctx *ctx)
+static void rv_emit_restore_regs(ir_ctx *ctx)
 {
 	int32_t frame = ctx->stack_frame_size;
 	ir_regset used;
@@ -857,6 +1005,11 @@ static void rv_emit_epilogue(ir_ctx *ctx)
 		} IR_REGSET_FOREACH_END();
 		emit32(ctx, rv_addi(IR_REG_SP, IR_REG_SP, frame));
 	}
+}
+
+static void rv_emit_epilogue(ir_ctx *ctx)
+{
+	rv_emit_restore_regs(ctx);
 	emit32(ctx, rv_ret(IR_REG_RA));
 }
 
@@ -911,6 +1064,7 @@ static bool rv_emit_get_fp(ir_ctx *ctx, int32_t dst, ir_ref val_ref, int32_t gpr
 		uint32_t words[8];
 		int n = rv_li64_fixed_words((uint32_t)gpr, 0, words);
 		int i;
+		ir_type t = ctx->ir_base[val_ref].type;
 
 		if (gpr == IR_REG_NONE) return false;
 		fx->patch_offset = (int32_t)((char*)ctx->code_buffer->pos - (char*)ctx->code_buffer->start);
@@ -921,7 +1075,12 @@ static bool rv_emit_get_fp(ir_ctx *ctx, int32_t dst, ir_ref val_ref, int32_t gpr
 		for (i = 0; i < n; i++) {
 			emit32(ctx, words[i]);
 		}
-		emit32(ctx, rv_enc_i(0, (uint32_t)gpr, 3 /* LD double */, (uint32_t)dst, 0x07 /* LOAD-FP */));
+		/* float constants must be loaded with FLW (32-bit): an 8-byte
+		 * load zero-fills the upper half, which on some targets makes a
+		 * subsequent fadd.s misbehave. */
+		emit32(ctx, rv_enc_i(0, (uint32_t)gpr,
+		                     ir_type_size[t] <= 4 ? 2 /* FLW */ : 3 /* LD */,
+		                     (uint32_t)dst, 0x07 /* LOAD-FP */));
 		return true;
 	}
 	home = ctx->regs[val_ref][0];
@@ -1280,6 +1439,20 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 		ctx->status = IR_ERROR_CODE_MEM_OVERFLOW;
 		return NULL;
 	}
+	/* Pre-resolve forward function references so their thunks land before
+	 * the function entry instead of mid-code at the call site. */
+	{
+		ir_ref i;
+
+		for (i = IR_UNUSED + 1; i < ctx->consts_count; i++) {
+			const ir_insn *ci = &ctx->ir_base[-i];
+
+			if (ci->op == IR_FUNC && ctx->loader && ctx->loader->resolve_sym_name) {
+				ctx->loader->resolve_sym_name(ctx->loader, ctx, ci->val.name,
+					IR_RESOLVE_SYM_ADD_THUNK);
+			}
+		}
+	}
 	/* Instruction fetch needs 4-byte alignment on RV64 (no RVC); use 16
 	 * to match the x86 backend's entry alignment contract. */
 	start = (void*)IR_ALIGNED_SIZE((size_t)ctx->code_buffer->pos, 16);
@@ -1448,10 +1621,112 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 				int8_t want[IR_MAX_REG_ARGS + 3];
 				int n_args = insn->inputs_count;
 				int j, k;
+				int stack_size = 0;
 
 				if (!IR_IS_CONST_REF(insn->op2)) { fprintf(stderr, "DBG CALL fail: func not const\n"); goto fail; }
 				memset(want, IR_REG_NONE, sizeof(want));
 				ir_get_args_regs(ctx, insn, cc, want);
+
+				/* Stack args: riscv64 psABI passes arguments beyond the
+				 * register window on the caller's stack, in argument order.
+				 * ARGVAL (struct-by-value) is a stack copy of the struct,
+				 * and the address of that copy is passed as a normal arg. */
+				{
+					int32_t copy_offs[IR_MAX_REG_ARGS + 3];
+					int32_t param_size = 0, copy_off;
+
+					for (j = 3; j <= n_args; j++) {
+						ir_ref arg = ir_insn_op(insn, j);
+
+						if (arg != IR_UNUSED && want[j] == IR_REG_NONE) {
+							param_size += 8;
+						}
+					}
+					param_size = IR_ALIGNED_SIZE(param_size, 16);
+					copy_off = param_size;
+					for (j = 3; j <= n_args; j++) {
+						ir_ref arg = ir_insn_op(insn, j);
+
+						if (arg != IR_UNUSED && ctx->ir_base[arg].op == IR_ARGVAL) {
+							copy_off = IR_ALIGNED_SIZE(copy_off, 8);
+							copy_offs[j] = copy_off;
+							copy_off += ctx->ir_base[arg].op2;
+						}
+					}
+					stack_size = IR_ALIGNED_SIZE(copy_off, 16);
+					if (stack_size) {
+						int32_t off;
+
+						for (j = 3; j <= n_args; j++) {
+							ir_ref arg = ir_insn_op(insn, j);
+
+							if (arg == IR_UNUSED) continue;
+							if (ctx->ir_base[arg].op == IR_ARGVAL) {
+								ir_insn *av = &ctx->ir_base[arg];
+								int32_t i;
+
+								emit32(ctx, rv_addi(IR_REG_T6, IR_REG_SP, copy_offs[j] - stack_size));
+								if (!rv_emit_get(ctx, IR_REG_T5, av->op1)) goto fail;
+								for (i = 0; i + 8 <= (int32_t)av->op2; i += 8) {
+									emit32(ctx, rv_load(3, IR_REG_T4, IR_REG_T5, i));
+									emit32(ctx, rv_store(3, IR_REG_T4, IR_REG_T6, i));
+								}
+								for (; i < (int32_t)av->op2; i++) {
+									emit32(ctx, rv_load(1, IR_REG_T4, IR_REG_T5, i));
+									emit32(ctx, rv_store(1, IR_REG_T4, IR_REG_T6, i));
+								}
+							}
+						}
+						emit32(ctx, rv_addi(IR_REG_SP, IR_REG_SP, -stack_size));
+						off = 0;
+						for (j = 3; j <= n_args; j++) {
+							ir_ref arg = ir_insn_op(insn, j);
+
+							if (want[j] == IR_REG_NONE && arg != IR_UNUSED) {
+								if (ctx->ir_base[arg].op == IR_ARGVAL) {
+									emit32(ctx, rv_addi(IR_REG_T5, IR_REG_SP, copy_offs[j]));
+								} else if (IR_IS_TYPE_FP(ctx->ir_base[arg].type)) {
+									if (IR_IS_CONST_REF(arg)) {
+										rv_str_fixup *fx = ir_mem_malloc(sizeof(rv_str_fixup));
+										uint32_t words[8];
+										int n = rv_li64_fixed_words(IR_REG_T5, 0, words);
+										int i;
+
+										fx->patch_offset = (int32_t)((char*)ctx->code_buffer->pos - (char*)ctx->code_buffer->start);
+										fx->str_ref = arg;
+										fx->raw = true;
+										fx->next = rv_str_fixups;
+										rv_str_fixups = fx;
+										for (i = 0; i < n; i++) {
+											emit32(ctx, words[i]);
+										}
+										emit32(ctx, rv_load(3 /* LD */, IR_REG_T5, IR_REG_T5, 0));
+									} else {
+										int32_t fr = ctx->regs[arg][0];
+
+										if (fr == IR_REG_NONE || IR_REG_SPILLED(fr)
+										 || fr < IR_REG_FP_FIRST) goto fail;
+										emit32(ctx, rv_fmv_x_d((uint32_t)IR_REG_T5,
+										                       (uint32_t)(fr - IR_REG_FP_FIRST)));
+									}
+								} else {
+									if (!rv_emit_get(ctx, IR_REG_T5, arg)) goto fail;
+								}
+								emit32(ctx, rv_store(3, IR_REG_T5, IR_REG_SP, off));
+								off += 8;
+							}
+						}
+					}
+					/* register-passed ARGVAL: address of the stack copy */
+					for (j = 3; j <= n_args; j++) {
+						ir_ref arg = ir_insn_op(insn, j);
+
+						if (arg != IR_UNUSED && want[j] != IR_REG_NONE
+						 && ctx->ir_base[arg].op == IR_ARGVAL) {
+							emit32(ctx, rv_addi((uint32_t)want[j], IR_REG_SP, copy_offs[j]));
+						}
+					}
+				}
 
 				/* Pass 1: register args. Pass 2: constant args --- a constant
 				 * materialization into aX must not clobber a live value
@@ -1464,7 +1739,8 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 						bool is_const = IR_IS_CONST_REF(arg);
 
 						if (arg == IR_UNUSED) continue;
-						if (dst == IR_REG_NONE) goto fail; /* stack args: later slice */
+						if (ctx->ir_base[arg].op == IR_ARGVAL) continue; /* lea'd above */
+						if (dst == IR_REG_NONE) continue; /* handled as stack arg */
 						if (is_const != (k == 1)) continue;
 						if (is_const) {
 							if (IR_IS_TYPE_FP(ctx->ir_base[arg].type)) {
@@ -1488,8 +1764,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 									for (i = 0; i < n; i++) {
 										emit32(ctx, words[i]);
 									}
-									emit32(ctx, rv_enc_i(0, IR_REG_T5, 3 /* LD double */,
-									                    (uint32_t)dst, 0x07 /* LOAD-FP */));
+									emit32(ctx, rv_load(3 /* LD */, (uint32_t)dst, IR_REG_T5, 0));
 								}
 							} else {
 								if (!rv_emit_get(ctx, dst, arg)) goto fail;
@@ -1544,21 +1819,33 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 				rv_emit_li64(ctx, IR_REG_T6,
 					(int64_t)(uintptr_t)ir_call_addr(ctx, insn, &ctx->ir_base[insn->op2]));
 				emit32(ctx, rv_jalr(IR_REG_RA, IR_REG_T6, 0));
+				if (stack_size) {
+					emit32(ctx, rv_addi(IR_REG_SP, IR_REG_SP, stack_size));
+				}
 
 				if (insn->type != IR_VOID) {
 					int32_t def_reg;
 					bool def_spilled;
 					int32_t deftmp;
 
-					if (!IR_IS_TYPE_INT(insn->type)) goto fail;
 					def_reg = ctx->regs[ref][0];
 					if (def_reg == IR_REG_NONE) {
-						break; /* unused result --- value stays in a0, nobody reads it */
+						break; /* unused result --- value stays in a0/fa0, nobody reads it */
 					}
 					def_spilled = IR_REG_SPILLED(def_reg);
 					deftmp = def_spilled ? IR_REG_NUM(def_reg) : def_reg;
-					if (deftmp != cc->int_ret_reg) {
-						emit32(ctx, rv_mv((uint32_t)deftmp, (uint32_t)cc->int_ret_reg));
+					if (IR_IS_TYPE_FP(insn->type)) {
+						if (deftmp < IR_REG_FP_FIRST) goto fail;
+						if (deftmp != cc->fp_ret_reg) {
+							emit32(ctx, rv_fop(1, RV_F7_FSGNJ, 0,
+							                   (uint32_t)(deftmp - IR_REG_FP_FIRST),
+							                   (uint32_t)(cc->fp_ret_reg - IR_REG_FP_FIRST),
+							                   (uint32_t)(cc->fp_ret_reg - IR_REG_FP_FIRST)));
+						}
+					} else {
+						if (deftmp != cc->int_ret_reg) {
+							emit32(ctx, rv_mv((uint32_t)deftmp, (uint32_t)cc->int_ret_reg));
+						}
 					}
 					if (def_spilled) {
 						rv_emit_store_def(ctx, ref, insn->type, deftmp);
@@ -2270,11 +2557,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 
 					if (ai->op != IR_FUNC && ai->op != IR_FUNC_ADDR && ai->op != IR_ADDR) goto fail;
 					if (ai->op == IR_FUNC) {
-						const char *name = ir_get_str(ctx, ai->val.name);
-
 						addr = (ctx->loader && ctx->loader->resolve_sym_name)
-							? ctx->loader->resolve_sym_name(ctx->loader, name, 0)
-							: ir_resolve_sym_name(name);
+							? ctx->loader->resolve_sym_name(ctx->loader, ctx, ai->val.name, 0)
+							: ir_resolve_sym_name(ir_get_str(ctx, ai->val.name));
 					} else {
 						addr = (void*)(uintptr_t)ai->val.addr;
 					}
@@ -2355,6 +2640,30 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 		}
 		if (bb->flags & IR_BB_DESSA_MOVES) {
 			ir_gen_dessa_moves(ctx, b, rv_emit_dessa_copy, NULL);
+		}
+		if (bb->successors_count == 1) {
+			/* END/LOOP_END-terminated blocks fall through to their single
+			 * successor only when the scheduler placed that successor next;
+			 * otherwise emit a jump to it (mirrors ir_x86.dasc IR_END). */
+			ir_insn *e = &ctx->ir_base[bb->end];
+
+			if (e->op == IR_END || e->op == IR_LOOP_END) {
+				ir_ref succ = ctx->cfg_edges[bb->successors];
+				ir_ref target = ir_skip_empty_target_blocks(ctx, succ);
+
+				if (target != ir_next_block(ctx, _b)) {
+					rv_br_fixup *fx = ir_mem_malloc(sizeof(rv_br_fixup));
+
+					fx->is_jal = 1;
+					fx->f3 = 0;
+					fx->cond_reg = 0;
+					fx->target_block = target;
+					fx->patch_off = (int32_t)((char*)ctx->code_buffer->pos - (char*)start);
+					fx->next = rv_br_fixups;
+					rv_br_fixups = fx;
+					emit32(ctx, 0);
+				}
+			}
 		}
 	}
 
@@ -2470,6 +2779,10 @@ void ir_fix_stack_frame(ir_ctx *ctx)
 	}
 	if (ctx->flags2 & IR_HAS_CALLS) {
 		additional_size += sizeof(void*); /* ra save slot */
+	}
+	if (ctx->flags2 & IR_HAS_VA_START) {
+		/* 8 GPR slots to snapshot the incoming register arguments for va_list */
+		additional_size += 8 * sizeof(void*);
 	}
 
 	ctx->stack_frame_size = IR_ALIGNED_SIZE(ctx->stack_frame_size, sizeof(void*));
@@ -2642,13 +2955,19 @@ bool ir_needs_thunk(const ir_code_buffer *code_buffer, void *addr)
 
 void *ir_emit_thunk(ir_code_buffer *code_buffer, void *addr, size_t *size_ptr)
 {
-	(void)code_buffer; (void)addr;
-	*size_ptr = 0;
-	return NULL; /* TODO: implement when needed */
+	uint32_t *p = (uint32_t*)IR_ALIGNED_SIZE((size_t)code_buffer->pos, 4);
+
+	/* auipc t6,0; ld t6,12(t6); jalr x0,t6,0; .quad addr */
+	p[0] = (IR_REG_T6 << 7) | 0x17;
+	p[1] = rv_load(3, (uint32_t)IR_REG_T6, (uint32_t)IR_REG_T6, 12);
+	p[2] = rv_jalr(0, (uint32_t)IR_REG_T6, 0);
+	*(uint64_t*)(p + 3) = (uint64_t)(uintptr_t)addr;
+	code_buffer->pos = (char*)p + 16;
+	*size_ptr = 16;
+	return (void*)p;
 }
 
 void ir_fix_thunk(void *thunk_entry, void *addr)
 {
-	(void)thunk_entry; (void)addr;
-	/* TODO: implement when needed */
+	*(uint64_t*)((char*)thunk_entry + 12) = (uint64_t)(uintptr_t)addr;
 }
