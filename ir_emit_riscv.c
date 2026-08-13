@@ -1,9 +1,8 @@
 /*
  * IR - Lightweight JIT Compilation Framework
  * (RISC-V 64 code generator --- hand-written binary encoding, no DynAsm)
- * Copyright (C) 2022 Zend by Perforce.
- * Authors: Dmitry Stogov <dmitry@php.net>
- *          Meng Zhuo <mengzhuo@iscas.ac.cn>
+ * This file is part of the IR Project distributed under the MIT-style LICENSE.
+ * Authors: Meng Zhuo <mengzhuo@iscas.ac.cn>
  *
  * Scope so far: IR_ADD and IR_RETURN, integer registers only, plus the
  * IR_START/IR_PARAM control/data markers needed to get a leaf function
@@ -2683,7 +2682,8 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 
 				if (rd == IR_REG_NONE || rs1 == IR_REG_NONE) goto fail;
 				if (!rv_emit_get(ctx, rs1, insn->op1)) goto fail;
-				emit32(ctx, rv_fcvt_from_x(w, uns, (uint32_t)(rdtmp - IR_REG_FP_FIRST),
+				emit32(ctx, rv_fcvt_from_x(insn->type == IR_DOUBLE, w, uns,
+				                           (uint32_t)(rdtmp - IR_REG_FP_FIRST),
 				                           (uint32_t)rs1));
 				if (rd_spilled) {
 					rv_emit_store_def(ctx, ref, insn->type, rdtmp);
@@ -2701,7 +2701,8 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 
 				if (rd == IR_REG_NONE || rs1 == IR_REG_NONE) goto fail;
 				if (!rv_emit_get_fp(ctx, rs1 - IR_REG_FP_FIRST, insn->op1, IR_REG_T5)) goto fail;
-				emit32(ctx, rv_fcvt_x(w, uns, (uint32_t)rdtmp,
+				emit32(ctx, rv_fcvt_x(ctx->ir_base[insn->op1].type == IR_DOUBLE, w, uns,
+				                      (uint32_t)rdtmp,
 				                      (uint32_t)(rs1 - IR_REG_FP_FIRST)));
 				if (rd_spilled) {
 					rv_emit_store_def(ctx, ref, insn->type, rdtmp);
@@ -2766,11 +2767,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 					const ir_insn *ai = &ctx->ir_base[insn->op2];
 
 					if (ai->op == IR_FUNC) {
-						const char *name = ir_get_str(ctx, ai->val.name);
-
 						addr = (ctx->loader && ctx->loader->resolve_sym_name)
-							? ctx->loader->resolve_sym_name(ctx->loader, name, 0)
-							: ir_resolve_sym_name(name);
+							? ctx->loader->resolve_sym_name(ctx->loader, ctx, ai->val.name, 0)
+							: ir_resolve_sym_name(ir_get_str(ctx, ai->val.name));
 					} else if (ai->op == IR_ADDR || ai->op == IR_FUNC_ADDR) {
 						addr = (void*)(uintptr_t)ai->val.addr;
 					} else {
@@ -3253,8 +3252,8 @@ void *ir_emit_thunk(ir_code_buffer *code_buffer, void *addr, size_t *size_ptr)
 	p[1] = rv_load(3, (uint32_t)IR_REG_T6, (uint32_t)IR_REG_T6, 12);
 	p[2] = rv_jalr(0, (uint32_t)IR_REG_T6, 0);
 	*(uint64_t*)(p + 3) = (uint64_t)(uintptr_t)addr;
-	code_buffer->pos = (char*)p + 16;
-	*size_ptr = 16;
+	code_buffer->pos = (char*)p + 20;
+	*size_ptr = 20;
 	return (void*)p;
 }
 

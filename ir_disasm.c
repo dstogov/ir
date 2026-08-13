@@ -22,42 +22,6 @@
 #include "ir.h"
 #include "ir_private.h"
 
-#if defined(IR_TARGET_RISCV64)
-
-void ir_disasm_add_symbol(const char *name, uint64_t addr, uint64_t size)
-{
-	(void)name; (void)addr; (void)size;
-}
-
-const char* ir_disasm_find_symbol(uint64_t addr, int64_t *offset)
-{
-	(void)addr; (void)offset;
-	return NULL;
-}
-
-int ir_disasm(const char *name, const void *start, size_t size, bool asm_addr, ir_ctx *ctx, FILE *f)
-{
-	const uint32_t *p = (const uint32_t *)start;
-	const uint32_t *end = (const uint32_t *)((const char *)start + size);
-
-	(void)asm_addr; (void)ctx;
-	fprintf(f, "%s:\n", name);
-	for (; p < end; p++) {
-		fprintf(f, "  %08x\n", *p);
-	}
-	return 1;
-}
-
-int ir_disasm_init(void)
-{
-	return 1;
-}
-
-void ir_disasm_free(void)
-{
-}
-
-#else
 
 #ifndef _WIN32
 # include "ir_elf.h"
@@ -260,6 +224,13 @@ static uint64_t ir_disasm_branch_target(csh cs, const cs_insn *insn)
 				return insn->detail->arm64.operands[i].imm;
 		}
 	}
+#elif defined(IR_TARGET_RISCV64)
+	if (cs_insn_group(cs, insn, RISCV_GRP_JUMP)) {
+		for (i = 0; i < insn->detail->riscv.op_count; i++) {
+			if (insn->detail->riscv.operands[i].type == RISCV_OP_IMM)
+				return insn->detail->riscv.operands[i].imm;
+		}
+	}
 #endif
 
 	return 0;
@@ -415,6 +386,14 @@ int ir_disasm(const char    *name,
 	ret = cs_open(CS_ARCH_ARM64, CS_MODE_ARM, &cs);
 	if (ret != CS_ERR_OK) {
 		fprintf(stderr, "cs_open(CS_ARCH_ARM64, CS_MODE_ARM, ...) failed; [%d] %s\n", ret, cs_strerror(ret));
+		return 0;
+	}
+	cs_option(cs, CS_OPT_DETAIL, CS_OPT_ON);
+	cs_option(cs, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+# elif defined(IR_TARGET_RISCV64)
+	ret = cs_open(CS_ARCH_RISCV, CS_MODE_RISCV64, &cs);
+	if (ret != CS_ERR_OK) {
+		fprintf(stderr, "cs_open(CS_ARCH_RISCV, CS_MODE_RISCV64, ...) failed; [%d] %s\n", ret, cs_strerror(ret));
 		return 0;
 	}
 	cs_option(cs, CS_OPT_DETAIL, CS_OPT_ON);
@@ -899,4 +878,3 @@ void ir_disasm_free(void)
 		_symbols = NULL;
 	}
 }
-#endif /* IR_TARGET_RISCV64 */

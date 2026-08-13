@@ -1,9 +1,8 @@
 /*
  * IR - Lightweight JIT Compilation Framework
  * (RISC-V 64 CPU specific definitions)
- * Copyright (C) 2022 Zend by Perforce.
- * Authors: Dmitry Stogov <dmitry@php.net>
- *          Meng Zhuo <mengzhuo@iscas.ac.cn>
+ * This file is part of the IR Project distributed under the MIT-style LICENSE.
+ * Authors: Meng Zhuo <mengzhuo@iscas.ac.cn>
  */
 
 #ifndef IR_RISCV_H

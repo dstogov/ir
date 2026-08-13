@@ -1,9 +1,8 @@
 /*
  * IR - Lightweight JIT Compilation Framework
  * (RISC-V 64 hand-written binary instruction encoder --- no DynAsm)
- * Copyright (C) 2022 Zend by Perforce.
- * Authors: Dmitry Stogov <dmitry@php.net>
- *          Meng Zhuo <mengzhuo@iscas.ac.cn>
+ * This file is part of the IR Project distributed under the MIT-style LICENSE.
+ * Authors: Meng Zhuo <mengzhuo@iscas.ac.cn>
  * Encodings verified against riscv-unified-db (spec/std/isa/inst).
  */
 
@@ -250,18 +249,18 @@ static inline uint32_t rv_fcvt(int to_double, uint32_t rs2_sel,
 	return rv_fop(0, to_double ? 0x21 : 0x20, 0, rd, rs1, rs2_sel);
 }
 
-static inline uint32_t rv_fcvt_x(int w, int uns, uint32_t rd, uint32_t rs1)
+static inline uint32_t rv_fcvt_x(int to_double, int w, int uns, uint32_t rd, uint32_t rs1)
 {
 	uint32_t rs2 = (w ? 0x02 : 0x00) | (uns ? 0x01 : 0x00);
 
-	return rv_fop(0, 0x61, 0, rd, rs1, rs2);
+	return rv_fop(0, to_double ? 0x61 : 0x60, 0, rd, rs1, rs2);
 }
 
-static inline uint32_t rv_fcvt_from_x(int w, int uns, uint32_t rd, uint32_t rs1)
+static inline uint32_t rv_fcvt_from_x(int to_double, int w, int uns, uint32_t rd, uint32_t rs1)
 {
 	uint32_t rs2 = (w ? 0x02 : 0x00) | (uns ? 0x01 : 0x00);
 
-	return rv_fop(0, 0x69, 0, rd, rs1, rs2);
+	return rv_fop(0, to_double ? 0x69 : 0x68, 0, rd, rs1, rs2);
 }
 
 static inline uint32_t rv_fmv_x_d(uint32_t rd, uint32_t rs1)

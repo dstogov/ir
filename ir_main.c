@@ -302,6 +302,7 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 	/* -O0 skips register allocation (ctx->regs stays NULL), but the riscv64
 	 * emitter reads ctx->regs directly. Run the full O1 pipeline instead ---
 	 * the result is still correct, just optimized. */
+	// TODO: this workaround should be removed
 	if (opt_level == 0 && (dump & IR_GEN_NATIVE)) {
 		opt_level = 1;
 	}

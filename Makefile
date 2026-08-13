@@ -56,7 +56,6 @@ else ifneq (, $(filter riscv64, $(TARGET)))
   override BUILD_CFLAGS += -DIR_TARGET_RISCV64
   DASM_ARCH  = riscv
   TEST_TARGET=riscv64
-  CAPSTONE_LIB =
   EMIT_OBJ   = $(BUILD_DIR)/ir_emit_riscv.o
 else
  $(error Unsupported target. TARGET must be 'x86_64', 'x86', 'aarch64' or 'riscv64')
