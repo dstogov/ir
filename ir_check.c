@@ -490,3 +490,42 @@ bool ir_check(const ir_ctx *ctx)
 
 	return ok;
 }
+
+bool ir_check_prototype(const ir_ctx *ctx, uint32_t flags, uint8_t ret_type, uint32_t params_count, uint8_t *param_types)
+{
+	bool ok = 1;
+	ir_ref ref = 2;
+	uint32_t n = 0;
+
+	while (ref < ctx->insns_count && ctx->ir_base[ref].op == IR_PARAM) {
+		if (n >= params_count) {
+			fprintf(stderr, "parameter count doesn't match function signature\n");
+			ok = 0;
+			break;
+		} else if (ctx->ir_base[ref].type != param_types[n]) {
+			fprintf(stderr, "parameter %d type doesn't match function signature\n", n);
+			ok = 0;
+		}
+		ref++;
+		n++;
+	}
+
+	if (n < params_count) {
+		fprintf(stderr, "parameter count doesn't match function signature\n");
+		ok = 0;
+	}
+	if ((flags & IR_VARARG_FUNC) != (ctx->flags & IR_VARARG_FUNC)) {
+		fprintf(stderr, "IR_VARARG_FUNC flag doesn't match function signature\n");
+		ok = 0;
+	}
+	if (ret_type != ctx->ret_type) {
+		fprintf(stderr, "return type doesn't match function signature\n");
+		ok = 0;
+	}
+	if ((flags & IR_CALL_CONV_MASK) != (ctx->flags & IR_CALL_CONV_MASK)) {
+		fprintf(stderr, "calling convention doesn't match function signature\n");
+		ok = 0;
+	}
+
+	return ok;
+}
