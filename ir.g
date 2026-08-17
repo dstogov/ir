@@ -385,7 +385,10 @@ ir(ir_loader *loader):
 					{ctx.flags |= flags;}
 					{ctx.ret_type = ret_type;}
 					ir_func(&p)
-					{if (!ir_check_prototype(&ctx, flags, ret_type, params_count, param_types)) yy_error_str("function signature mismatch for", name);}
+					{if (!ir_check_prototype(&ctx, flags, ret_type, params_count, param_types)) {
+						ir_free(&ctx);
+						yy_error_str("function signature mismatch for", name);
+					}
 					{bool ok = loader->func_process(loader, &ctx, name);}
 					{ir_free(&ctx);}
 					{if (!ok) yy_error("process_func error");}
