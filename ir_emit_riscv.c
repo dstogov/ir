@@ -1290,11 +1290,43 @@ static bool rv_emit_binop(ir_ctx *ctx, ir_ref ref, ir_insn *insn, const rv_alu_d
 		return true;
 	}
 	if (IR_IS_CONST_REF(op1)) {
-		if (!dsc->commutative || IR_IS_CONST_REF(op2)) {
+		if (IR_IS_CONST_REF(op2)) {
 			return false;
 		}
-		op1 = insn->op2;
-		op2 = insn->op1;
+		if (dsc->commutative) {
+			op1 = insn->op2;
+			op2 = insn->op1;
+		} else {
+			/* Non-commutative op with a constant left operand (e.g. "c - x"):
+			 * materialize the constant in the T5 scratch.  Load the right
+			 * operand first --- rv_emit_get() may clobber T5. */
+			int32_t rs2_r = riscv_reg_of(ctx, ref, 2);
+
+			if (rs2_r == IR_REG_NONE || rs2_r == IR_REG_T5) {
+				return false;
+			}
+			if (!rv_emit_get(ctx, rs2_r, op2)) {
+				return false;
+			}
+			if (!rv_emit_get(ctx, IR_REG_T5, op1)) {
+				return false;
+			}
+			emit32(ctx, rv_alu(w, dsc->r_f7, dsc->r_f3,
+			                   (uint32_t)rdtmp, (uint32_t)IR_REG_T5, (uint32_t)rs2_r));
+			if (is_shr && sz < 4) {
+				/* narrow logical shift: mask the result */
+				if (sz == 1) {
+					emit32(ctx, rv_alui(0, RV_F3_ANDI, (uint32_t)rdtmp, (uint32_t)rdtmp, 0xFF));
+				} else {
+					emit32(ctx, rv_shifti(0, RV_F3_SLLI, 0, (uint32_t)rdtmp, (uint32_t)rdtmp, 48));
+					emit32(ctx, rv_shifti(0, RV_F3_SRI, 0, (uint32_t)rdtmp, (uint32_t)rdtmp, 48));
+				}
+			}
+			if (rd_spilled) {
+				rv_emit_store_def(ctx, ref, insn->type, rdtmp);
+			}
+			return true;
+		}
 	}
 	if (IR_IS_CONST_REF(op2)) {
 		const ir_insn *ai = &ctx->ir_base[op2];
@@ -1324,8 +1356,28 @@ static bool rv_emit_binop(ir_ctx *ctx, ir_ref ref, ir_insn *insn, const rv_alu_d
 		}
 		int64_t v = ai->val.i64;
 
-		if (dsc->i_f3 == 0xFF || rs1 == IR_REG_NONE) {
+		if (rs1 == IR_REG_NONE) {
 			return false;
+		}
+		if (dsc->i_f3 == 0xFF) {
+			/* No immediate form (e.g. MUL): materialize the constant in the
+			 * T5 scratch.  Load the left operand first --- rv_emit_get()
+			 * may clobber T5. */
+			if (rs1 == IR_REG_T5) {
+				return false;
+			}
+			if (!rv_emit_get(ctx, rs1, op1)) {
+				return false;
+			}
+			if (!rv_emit_get(ctx, IR_REG_T5, op2)) {
+				return false;
+			}
+			emit32(ctx, rv_alu(w, dsc->r_f7, dsc->r_f3,
+			                   (uint32_t)rdtmp, (uint32_t)rs1, (uint32_t)IR_REG_T5));
+			if (rd_spilled) {
+				rv_emit_store_def(ctx, ref, insn->type, rdtmp);
+			}
+			return true;
 		}
 		if (!rv_emit_get(ctx, rs1, op1)) {
 			return false;
@@ -1869,9 +1921,15 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 				bool rd_spilled = IR_REG_SPILLED(rd);
 				int32_t rdtmp = rd_spilled ? IR_REG_NUM(rd) : rd;
 
-				if (rd == IR_REG_NONE || base == IR_REG_NONE) goto fail;
-				base = IR_REG_NUM(base);
-				if (!rv_emit_get(ctx, base, insn->op2)) goto fail;
+				if (rd == IR_REG_NONE) goto fail;
+				if (base == IR_REG_NONE) {
+					/* absolute address (IR_SYM / const): materialize in T5 */
+					if (!rv_emit_get(ctx, IR_REG_T5, insn->op2)) goto fail;
+					base = IR_REG_T5;
+				} else {
+					base = IR_REG_NUM(base);
+					if (!rv_emit_get(ctx, base, insn->op2)) goto fail;
+				}
 				emit32(ctx, rv_load(rv_load_f3(insn->type),
 				                     (uint32_t)rdtmp, (uint32_t)base, 0));
 				if (rd_spilled) {
@@ -1883,19 +1941,30 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size)
 			case IR_RISCV_RULE_STORE: {
 				int32_t base = riscv_reg_of(ctx, ref, 2);
 				int32_t val  = riscv_reg_of(ctx, ref, 3);
+				bool base_const = (base == IR_REG_NONE);
 
-				if (base == IR_REG_NONE || val == IR_REG_NONE) goto fail;
-				base = IR_REG_NUM(base);
+				if (val == IR_REG_NONE) goto fail;
 				val = IR_REG_NUM(val);
-				if (!rv_emit_get(ctx, base, insn->op2)) goto fail;
 				if (IR_IS_TYPE_FP(insn->type)) {
 					if (val < IR_REG_FP_FIRST) goto fail;
 					if (!rv_emit_get_fp(ctx, val - IR_REG_FP_FIRST, insn->op3, IR_REG_T5)) goto fail;
+				} else {
+					if (!rv_emit_get(ctx, val, insn->op3)) goto fail;
+				}
+				if (base_const) {
+					/* absolute address (IR_SYM / const): materialize in T5
+					 * after the value is loaded (value loads may clobber T5) */
+					if (!rv_emit_get(ctx, IR_REG_T5, insn->op2)) goto fail;
+					base = IR_REG_T5;
+				} else {
+					base = IR_REG_NUM(base);
+					if (!rv_emit_get(ctx, base, insn->op2)) goto fail;
+				}
+				if (IR_IS_TYPE_FP(insn->type)) {
 					emit32(ctx, rv_store(rv_store_f3(insn->type),
 					                      (uint32_t)(val - IR_REG_FP_FIRST),
 					                      (uint32_t)base, 0));
 				} else {
-					if (!rv_emit_get(ctx, val, insn->op3)) goto fail;
 					emit32(ctx, rv_store(rv_store_f3(insn->type),
 					                      (uint32_t)val, (uint32_t)base, 0));
 				}
@@ -3049,6 +3118,7 @@ fail:
 #ifdef IR_DEBUG_MESSAGES
 	fprintf(stderr, "RVFAIL ref=%d op=%s rule=0x%x\n", ref, insn ? ir_op_name[insn->op] : "?", rule);
 #endif
+	IR_ASSERT(0 && "riscv64: unsupported code rule (see RVFAIL above)");
 	return NULL;
 }
 

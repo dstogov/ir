@@ -225,10 +225,12 @@ static uint64_t ir_disasm_branch_target(csh cs, const cs_insn *insn)
 		}
 	}
 #elif defined(IR_TARGET_RISCV64)
-	if (cs_insn_group(cs, insn, RISCV_GRP_JUMP)) {
+	if (cs_insn_group(cs, insn, RISCV_GRP_JUMP)
+	 || cs_insn_group(cs, insn, RISCV_GRP_BRANCH_RELATIVE)
+	 || insn->id == RISCV_INS_JAL) {
 		for (i = 0; i < insn->detail->riscv.op_count; i++) {
 			if (insn->detail->riscv.operands[i].type == RISCV_OP_IMM)
-				return insn->detail->riscv.operands[i].imm;
+				return insn->detail->riscv.operands[i].imm + insn->address;
 		}
 	}
 #endif
@@ -590,6 +592,52 @@ int ir_disasm(const char    *name,
 					fprintf(f, "%s\n", q);
 					continue;
 				}
+			}
+		}
+#endif
+#if defined(IR_TARGET_RISCV64)
+		/* riscv64 branches/jumps show relative offsets (not absolute
+		 * addresses), so replace the target with a symbol/label here. */
+		if ((addr = ir_disasm_branch_target(cs, insn))) {
+			entry = ir_hashtab_find(&labels, (uint32_t)((uintptr_t)addr - (uintptr_t)start));
+			if (entry != (ir_ref)IR_INVALID_VAL) {
+				q = strrchr(p, ',');
+				if (q) {
+					q++;
+					while (*q == ' ') q++;
+				} else {
+					q = p;
+				}
+				if (q > p) {
+					fwrite(p, 1, q - p, f);
+				}
+				if (entry >= 0) {
+					fprintf(f, ".ENTRY_%d\n", entry);
+				} else {
+					fprintf(f, ".L%d\n", -entry);
+				}
+				continue;
+			} else if ((sym = ir_disasm_resolver(addr, &offset))) {
+				q = strrchr(p, ',');
+				if (q) {
+					q++;
+					while (*q == ' ') q++;
+				} else {
+					q = p;
+				}
+				if (q > p) {
+					fwrite(p, 1, q - p, f);
+				}
+				fputs(sym, f);
+				if (offset != 0) {
+					if (offset > 0) {
+						fprintf(f, "+0x%" PRIx64, offset);
+					} else {
+						fprintf(f, "-0x%" PRIx64, -offset);
+					}
+				}
+				fprintf(f, "\n");
+				continue;
 			}
 		}
 #endif
