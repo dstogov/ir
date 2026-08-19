@@ -1810,7 +1810,12 @@ static void ir_emit_load_mem_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_mem me
 				uint32_t width = IR_VECTOR_SIZE(type);
 
 				if (width == 16) {
-					|	ldr Rq(reg-IR_REG_FP_FIRST), [Rx(base_reg), #offset]
+					//??? |	ldr Rq(reg-IR_REG_FP_FIRST), [Rx(base_reg), #offset]
+					IR_ASSERT(reg >= IR_REG_FP_FIRST && reg <= IR_REG_FP_LAST);
+					IR_ASSERT(base_reg >= IR_REG_GP_FIRST && base_reg <= IR_REG_GP_LAST);
+					IR_ASSERT(offset >= 0 && offset <= 0xfff0 && (offset & 0xf) == 0);
+					uint32_t code = 0x3dc00000 | (reg-IR_REG_FP_FIRST) | (base_reg << 5) | ((offset >> 4) << 10);
+					|	.long code
 				} else if (width == 8) {
 					|	ldr Rd(reg-IR_REG_FP_FIRST), [Rx(base_reg), #offset]
 				} else if (width == 4) {
@@ -2070,7 +2075,12 @@ static void ir_emit_store_mem_fp(ir_ctx *ctx, ir_type type, ir_mem mem, ir_reg r
 				uint32_t width = IR_VECTOR_SIZE(type);
 
 				if (width == 16) {
-					|	str Rq(reg-IR_REG_FP_FIRST), [Rx(base_reg), #offset]
+					//??? |	str Rq(reg-IR_REG_FP_FIRST), [Rx(base_reg), #offset]
+					IR_ASSERT(reg >= IR_REG_FP_FIRST && reg <= IR_REG_FP_LAST);
+					IR_ASSERT(base_reg >= IR_REG_GP_FIRST && base_reg <= IR_REG_GP_LAST);
+					IR_ASSERT(offset >= 0 && offset <= 0xfff0 && (offset & 0xf) == 0);
+					uint32_t code = 0x3d800000 | (reg-IR_REG_FP_FIRST) | (base_reg << 5) | ((offset >> 4) << 10);
+					|	.long code
 				} else if (width == 8) {
 					|	str Rd(reg-IR_REG_FP_FIRST), [Rx(base_reg), #offset]
 				} else if (width == 4) {
