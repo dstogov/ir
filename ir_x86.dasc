@@ -5190,10 +5190,10 @@ store_int:
 			fprintf(stderr, "ERROR: IR_ASM is not implemented yet\n");
 			exit(1);
 			return IR_SKIPPED | IR_NOP;
-	#if IR_SIMD
-			case IR_SHUFFLE:
-				return ir_match_shuffle(ctx, insn);
-	#endif
+#if IR_SIMD
+		case IR_SHUFFLE:
+			return ir_match_shuffle(ctx, insn);
+#endif
 #if IR_X86_I64
 		case IR_PHI:
 		case IR_VLOAD:
