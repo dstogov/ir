@@ -1849,7 +1849,7 @@ static void ir_emit_load_mem_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_mem me
 		if (shift == 0) {
 			|	ldr Rs(reg-IR_REG_FP_FIRST), [Rx(base_reg), Rx(index_reg)]
 		} else {
-			IR_ASSERT(shift == 3);
+			IR_ASSERT(shift == 2);
 			|	ldr Rs(reg-IR_REG_FP_FIRST), [Rx(base_reg), Rx(index_reg), lsl #2]
 		}
 #if IR_SIMD
