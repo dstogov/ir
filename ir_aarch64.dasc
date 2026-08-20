@@ -423,6 +423,7 @@ const ir_call_conv_dsc ir_call_conv_aarch64_preserve_none = {
 	_(VECTOR_FP2INT)       \
 	_(VECTOR_INT2FP)       \
 	_(SHUFFLE_DUP)         \
+	_(SHUFFLE_REV2)        \
 	_(SHUFFLE_EXT)         \
 	_(SHUFFLE_TRN)         \
 	_(SHUFFLE_ZIP)         \
@@ -884,6 +885,7 @@ get_arg_hints:
 			}
 			break;
 		case IR_SHUFFLE_DUP:
+		case IR_SHUFFLE_REV2:
 		case IR_SHUFFLE_EXT:
 		case IR_SHUFFLE_TRN:
 		case IR_SHUFFLE_ZIP:
@@ -1051,16 +1053,17 @@ static bool all_usages_are_fusable(ir_ctx *ctx, ir_ref ref)
 # define IR_SHUFFLE_MASK(i) (p[(i)*s])
 
 #define MAY_BE_DUP    (1<<0)   // 0000 1111 2222 3333 4444 5555 6666 7777
+#define MAY_BE_REV2   (1<<1)   // 1032
 
-#define MAY_BE_EXT    (1<<1)   // 1234 2345 3456 5670 6701 7012
-#define MAY_BE_TRN    (1<<2)   // 0426 1537 4062 5173
-#define MAY_BE_ZIP    (1<<3)   // 0415 2367 4051 6273
-#define MAY_BE_UZP    (1<<4)   // 0246 1357 4602 5713
+#define MAY_BE_EXT    (1<<2)   // 1234 2345 3456 5670 6701 7012
+#define MAY_BE_TRN    (1<<3)   // 0426 1537 4062 5173
+#define MAY_BE_ZIP    (1<<4)   // 0415 2367 4051 6273
+#define MAY_BE_UZP    (1<<5)   // 0246 1357 4602 5713
 
-#define MAY_BE_1EXT   (1<<5)   // 1230 2301 3012 5674 6745 7456
-#define MAY_BE_1TRN   (1<<6)   // 0022 1133 4466 5577
-#define MAY_BE_1ZIP   (1<<7)   // 0011 2233 4455 6677
-#define MAY_BE_1UZP   (1<<8)   // 0202 1313 4646 5757
+#define MAY_BE_1EXT   (1<<6)   // 1230 2301 3012 5674 6745 7456
+#define MAY_BE_1TRN   (1<<7)   // 0022 1133 4466 5577
+#define MAY_BE_1ZIP   (1<<8)   // 0011 2233 4455 6677
+#define MAY_BE_1UZP   (1<<9)   // 0202 1313 4646 5757
 
 static uint32_t ir_match_shuffle(ir_ctx *ctx, const ir_insn *insn)
 {
@@ -1086,6 +1089,9 @@ static uint32_t ir_match_shuffle(ir_ctx *ctx, const ir_insn *insn)
 					mask = MAY_BE_DUP | MAY_BE_EXT | MAY_BE_TRN | MAY_BE_ZIP | MAY_BE_UZP;
 				} else if (prev == 1 || prev == n + 1) {
 					mask = MAY_BE_DUP | MAY_BE_EXT | MAY_BE_TRN | MAY_BE_UZP;
+					if (element_size != 8) {
+						mask |= MAY_BE_REV2;
+					}
 				} else if (prev == n / 2 || prev == n + n / 2) {
 					mask = MAY_BE_DUP | MAY_BE_EXT | MAY_BE_ZIP;
 				} else {
@@ -1100,6 +1106,19 @@ static uint32_t ir_match_shuffle(ir_ctx *ctx, const ir_insn *insn)
 						if (next != prev) {
 							mask &= ~MAY_BE_DUP;
 							if (!mask) break;
+						}
+					}
+					if (mask & MAY_BE_REV2) {
+						if (i % 2 == 1) {
+							if (next != i - 1 + ((prev < n) ? 0 : n)) {
+								mask &= ~MAY_BE_REV2;
+								if (!mask) break;
+							}
+						} else {
+							if (next != i + 1 + ((prev < n) ? 0 : n)) {
+								mask &= ~MAY_BE_REV2;
+								if (!mask) break;
+							}
 						}
 					}
 					if (mask & MAY_BE_EXT) {
@@ -6633,6 +6652,28 @@ static uint32_t neon_DUP_lane(uint32_t element_size, ir_reg dst_reg, ir_reg src_
 	}
 }
 
+static uint32_t neon_REV(uint32_t element_size, ir_reg dst_reg, ir_reg src_reg, uint32_t n)
+{
+	IR_ASSERT(src_reg >= IR_REG_FP_FIRST && src_reg <= IR_REG_FP_LAST);
+	IR_ASSERT(dst_reg >= IR_REG_FP_FIRST && dst_reg <= IR_REG_FP_LAST);
+	if (n == 8) {
+		IR_ASSERT(element_size == 4);
+		/* rev64 Rv(dst_reg-IR_REG_FP_FIRST).4s, Rv(src_reg-IR_REG_FP_FIRST).4s */
+		return 0x0e200800 | (dst_reg-IR_REG_FP_FIRST) | ((src_reg-IR_REG_FP_FIRST) << 5) |
+			(1<<30) | (0x2 << 22);
+	} else if (n == 4) {
+		IR_ASSERT(element_size == 2);
+		/* rev32 Rv(dst_reg-IR_REG_FP_FIRST).8h, Rv(src_reg-IR_REG_FP_FIRST).8h */
+		return 0x2e200800 | (dst_reg-IR_REG_FP_FIRST) | ((src_reg-IR_REG_FP_FIRST) << 5) |
+			(1<<30) | (0x1 << 22);
+	} else {
+		IR_ASSERT(n == 2 && element_size == 1);
+		/* rev16 Rv(dst_reg-IR_REG_FP_FIRST).16b, Rv(src_reg-IR_REG_FP_FIRST).16b */
+		return 0x0e001800 | (dst_reg-IR_REG_FP_FIRST) | ((src_reg-IR_REG_FP_FIRST) << 5) |
+			(1<<30) | (0x0 << 22);
+	}
+}
+
 static uint32_t neon_EXT(uint32_t element_size, ir_reg dst_reg, ir_reg src1_reg, ir_reg src2_reg, uint32_t first)
 {
 	IR_ASSERT(first < 16);
@@ -6975,6 +7016,13 @@ static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn, uint3
 						code = neon_DUP_lane(element_size, def_reg, op1_reg, first);
 					} else {
 						code = neon_DUP_lane(element_size, def_reg, op2_reg, first % n);
+					}
+					break;
+				case IR_SHUFFLE_REV2:
+					if (first < n) {
+						code = neon_REV(element_size, def_reg, op1_reg, element_size * 2);
+					} else {
+						code = neon_REV(element_size, def_reg, op2_reg, element_size * 2);
 					}
 					break;
 				case IR_SHUFFLE_EXT:
@@ -9399,6 +9447,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					break;
 				case IR_SHUFFLE:
 				case IR_SHUFFLE_DUP:
+				case IR_SHUFFLE_REV2:
 				case IR_SHUFFLE_EXT:
 				case IR_SHUFFLE_TRN:
 				case IR_SHUFFLE_ZIP:
