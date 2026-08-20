@@ -1997,7 +1997,7 @@ static void ir_emit_load_imm_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref sr
 					|	ldr Rs(reg-IR_REG_FP_FIRST), =>label
 					break;
 				default:
-					IR_ASSERT(0);
+					IR_ASSERT(0 && "unsupported vector width");
 			}
 #endif
 		} else {
@@ -2043,7 +2043,7 @@ static void ir_emit_load_mem_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_mem me
 					|	ldrb Rw(IR_REG_INT_TMP), [Rx(base_reg), #offset]
 					|	fmov Rs(reg-IR_REG_FP_FIRST), Rw(IR_REG_INT_TMP)
 				} else {
-					IR_ASSERT(0);
+					IR_ASSERT(0 && "unsupported vector width");
 				}
 #endif
 			} else {
@@ -2091,7 +2091,7 @@ static void ir_emit_load_mem_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_mem me
 			|	ldrb Rw(IR_REG_INT_TMP), [Rx(base_reg), Rx(index_reg)]
 			|	fmov Rs(reg-IR_REG_FP_FIRST), Rw(IR_REG_INT_TMP)
 		} else {
-			IR_ASSERT(0);
+			IR_ASSERT(0 && "unsupported vector width");
 		}
 #endif
 	} else {
@@ -2308,7 +2308,7 @@ static void ir_emit_store_mem_fp(ir_ctx *ctx, ir_type type, ir_mem mem, ir_reg r
 					|	fmov Rw(IR_REG_INT_TMP), Rs(reg-IR_REG_FP_FIRST)
 					|	strb Rw(IR_REG_INT_TMP), [Rx(base_reg), #offset]
 				} else {
-					IR_ASSERT(0);
+					IR_ASSERT(0 && "unsupported vector width");
 				}
 #endif
 			} else {
@@ -2358,7 +2358,7 @@ static void ir_emit_store_mem_fp(ir_ctx *ctx, ir_type type, ir_mem mem, ir_reg r
 			|	fmov Rw(IR_REG_INT_TMP), Rs(reg-IR_REG_FP_FIRST)
 			|	strb Rw(IR_REG_INT_TMP), [Rx(base_reg), Rx(index_reg)]
 		} else {
-			IR_ASSERT(0);
+			IR_ASSERT(0 && "unsupported vector width");
 		}
 #endif
 	} else {
@@ -2440,7 +2440,7 @@ static void ir_emit_fp_mov(ir_ctx *ctx, ir_type type, ir_reg dst, ir_reg src)
 		} else if (width == 4) {
 			|	fmov Rs(dst-IR_REG_FP_FIRST), Rs(src-IR_REG_FP_FIRST)
 		} else {
-			IR_ASSERT(0);
+			IR_ASSERT(0 && "unsupported vector width");
 		}
 #endif
 	} else {
