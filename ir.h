@@ -1045,6 +1045,7 @@ void ir_emit_llvm_sym_decl(const char *name, uint32_t flags, FILE *f);
 
 /* IR verification API (implementation in ir_check.c) */
 bool ir_check(const ir_ctx *ctx);
+bool ir_check_prototype(const ir_ctx *ctx, uint32_t flags, uint8_t ret_type, uint32_t params_count, uint8_t *param_types);
 void ir_consistency_check(void);
 
 /* Code patching (implementation in ir_patch.c) */

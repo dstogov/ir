@@ -1993,6 +1993,7 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMValueRef func, LLVMModuleRef module)
 	ir_type type;
 	ir_ref ref;
 	int ret;
+	uint8_t *param_types;
 
 	// TODO: function prototype
 	ftype = LLVMGlobalGetValueType(func);
@@ -2009,6 +2010,7 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMValueRef func, LLVMModuleRef module)
 
 	ir_START();
 	params_count = LLVMCountParams(func);
+	param_types = alloca(sizeof(uint8_t) * params_count);
 	for (i = 0; i < params_count; i++) {
 		size_t name_len;
 		const char *name;
@@ -2019,6 +2021,7 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMValueRef func, LLVMModuleRef module)
 		if (type == IR_BAD_TYPE) {
 			return 0;
 		}
+		param_types[i] = type;
 		if (type == IR_ADDR) {
 			LLVMAttributeRef attr;
 			LLVMTypeRef val_type;
@@ -2053,6 +2056,13 @@ static int llvm2ir_func(ir_ctx *ctx, LLVMValueRef func, LLVMModuleRef module)
 	ir_addrtab_free(ctx->binding);
 	ir_mem_free(ctx->binding);
 	ctx->binding = NULL;
+
+	if (ret
+	 && !ir_check_prototype(ctx, ctx->flags, ctx->ret_type, params_count, param_types)) {
+		fprintf(stderr, "function signature mismatch for");
+		return 0;
+	}
+
 	return ret;
 }
 
