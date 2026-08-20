@@ -422,6 +422,15 @@ const ir_call_conv_dsc ir_call_conv_aarch64_preserve_none = {
 	_(VECTOR_FP2FP)        \
 	_(VECTOR_FP2INT)       \
 	_(VECTOR_INT2FP)       \
+	_(SHUFFLE_DUP)         \
+	_(SHUFFLE_EXT)         \
+	_(SHUFFLE_TRN)         \
+	_(SHUFFLE_ZIP)         \
+	_(SHUFFLE_UZP)         \
+	_(SHUFFLE_1EXT)        \
+	_(SHUFFLE_1TRN)        \
+	_(SHUFFLE_1ZIP)        \
+	_(SHUFFLE_1UZP)        \
 
 #endif
 
@@ -874,6 +883,26 @@ get_arg_hints:
 				ctx->flags2 |= IR_16B_FRAME_ALIGNMENT;
 			}
 			break;
+		case IR_SHUFFLE_DUP:
+		case IR_SHUFFLE_EXT:
+		case IR_SHUFFLE_TRN:
+		case IR_SHUFFLE_ZIP:
+		case IR_SHUFFLE_UZP:
+		case IR_SHUFFLE_1EXT:
+		case IR_SHUFFLE_1TRN:
+		case IR_SHUFFLE_1ZIP:
+		case IR_SHUFFLE_1UZP:
+			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+			insn = &ctx->ir_base[ref];
+			if (IR_IS_CONST_REF(insn->op1)) {
+				constraints->tmp_regs[n] = IR_TMP_REG(1, ctx->ir_base[insn->op1].type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n++;
+			}
+			if (IR_IS_CONST_REF(insn->op2) && insn->op1 != insn->op2) {
+				constraints->tmp_regs[n] = IR_TMP_REG(2, ctx->ir_base[insn->op2].type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n++;
+			}
+			break;
 		case IR_SHUFFLE:
 			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG | IR_OP3_MUST_BE_IN_REG;
 			insn = &ctx->ir_base[ref];
@@ -888,6 +917,10 @@ get_arg_hints:
 			if (IR_IS_CONST_REF(insn->op3)) {
 				/* shuffle through sequence of moves */
 				flags |= IR_DEF_CONFLICTS_WITH_INPUT_REGS;
+			} else if (insn->op1 == insn->op2
+					&& ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)] == 1
+					&& ir_type_size[IR_VECTOR_BASE_TYPE(ctx->ir_base[insn->op3].type)] == 1) {
+				/* shuffle through TBL */
 			} else {
 				/* shuffle through stack memory */
 				constraints->tmp_regs[n] = IR_TMP_REG(4, IR_U64, IR_USE_SUB_REF, IR_DEF_SUB_REF);
@@ -1017,10 +1050,141 @@ static bool all_usages_are_fusable(ir_ctx *ctx, ir_ref ref)
 #if IR_SIMD
 # define IR_SHUFFLE_MASK(i) (p[(i)*s])
 
+#define MAY_BE_DUP    (1<<0)   // 0000 1111 2222 3333 4444 5555 6666 7777
+
+#define MAY_BE_EXT    (1<<1)   // 1234 2345 3456 5670 6701 7012
+#define MAY_BE_TRN    (1<<2)   // 0426 1537 4062 5173
+#define MAY_BE_ZIP    (1<<3)   // 0415 2367 4051 6273
+#define MAY_BE_UZP    (1<<4)   // 0246 1357 4602 5713
+
+#define MAY_BE_1EXT   (1<<5)   // 1230 2301 3012 5674 6745 7456
+#define MAY_BE_1TRN   (1<<6)   // 0022 1133 4466 5577
+#define MAY_BE_1ZIP   (1<<7)   // 0011 2233 4455 6677
+#define MAY_BE_1UZP   (1<<8)   // 0202 1313 4646 5757
+
 static uint32_t ir_match_shuffle(ir_ctx *ctx, const ir_insn *insn)
 {
 	if (IR_IS_CONST_REF(insn->op3)) {
-		// TODO: support for MOV, DUP, EXT, REV*, TBL, TBX, TRN*, UZP*, ZIP* ???
+		ir_insn *op3_insn = &ctx->ir_base[insn->op3];
+		IR_ASSERT(IR_IS_TYPE_VECTOR(insn->type) && IR_IS_TYPE_VECTOR(op3_insn->type));
+		IR_ASSERT(insn->type == ctx->ir_base[insn->op1].type && insn->type == ctx->ir_base[insn->op2].type);
+		if (IR_VECTOR_SIZE(insn->type) == 16) {
+			uint32_t n = IR_VECTOR_LENGTH(op3_insn->type);
+			uint32_t element_size = ir_type_size[IR_VECTOR_BASE_TYPE(insn->type)];
+
+			if (n * element_size == 16) {
+				int8_t *p = ir_long_const_ptr(ctx, insn->op3);
+				uint32_t s = ir_type_size[IR_VECTOR_BASE_TYPE(op3_insn->type)];
+				uint32_t mod = IR_VECTOR_LENGTH(insn->type);
+				uint32_t mask, prev, next, i;
+
+				if (insn->op1 != insn->op2) {
+					mod += IR_VECTOR_LENGTH(insn->type);
+				}
+				prev = IR_SHUFFLE_MASK(0) % mod;
+				if (prev == 0 || prev == n) {
+					mask = MAY_BE_DUP | MAY_BE_EXT | MAY_BE_TRN | MAY_BE_ZIP | MAY_BE_UZP;
+				} else if (prev == 1 || prev == n + 1) {
+					mask = MAY_BE_DUP | MAY_BE_EXT | MAY_BE_TRN | MAY_BE_UZP;
+				} else if (prev == n / 2 || prev == n + n / 2) {
+					mask = MAY_BE_DUP | MAY_BE_EXT | MAY_BE_ZIP;
+				} else {
+					mask = MAY_BE_DUP | MAY_BE_EXT;
+				}
+				if (insn->op1 != insn->op2) {
+					mask = mask | ((mask & (MAY_BE_EXT|MAY_BE_TRN|MAY_BE_ZIP|MAY_BE_UZP)) << 4);
+				}
+				for (i = 1; i < n; i++) {
+					next = IR_SHUFFLE_MASK(i) % mod;
+					if (mask & MAY_BE_DUP) {
+						if (next != prev) {
+							mask &= ~MAY_BE_DUP;
+							if (!mask) break;
+						}
+					}
+					if (mask & MAY_BE_EXT) {
+						if (next != (prev + 1) % mod) {
+							mask &= ~MAY_BE_EXT;
+							if (!mask) break;
+						}
+					}
+					if (mask & MAY_BE_1EXT) {
+						if (next != ((prev + 1) % n) + ((prev < n) ? 0 : n)) {
+							mask &= ~MAY_BE_1EXT;
+							if (!mask) break;
+						}
+					}
+					if (mask & MAY_BE_TRN) {
+						if (i % 2 == 1) {
+							if (next != (prev + n) % mod) {
+								mask &= ~MAY_BE_TRN;
+								if (!mask) break;
+							}
+						} else {
+							if (next != (prev + n + 2) % mod) {
+								mask &= ~MAY_BE_TRN;
+								if (!mask) break;
+							}
+						}
+					}
+					if (mask & MAY_BE_1TRN) {
+						if (i % 2 == 1) {
+							if (next != (prev + n) % n + ((prev < n) ? 0 : n)) {
+								mask &= ~MAY_BE_1TRN;
+								if (!mask) break;
+							}
+						} else {
+							if (next != (prev + n + 2) % n + ((prev < n) ? 0 : n)) {
+								mask &= ~MAY_BE_1TRN;
+								if (!mask) break;
+							}
+						}
+					}
+					if (mask & MAY_BE_ZIP) {
+						if (i % 2 == 1) {
+							if (next != (prev + n) % mod) {
+								mask &= ~MAY_BE_ZIP;
+								if (!mask) break;
+							}
+						} else {
+							if (next != (prev + n) % mod + 1) {
+								mask &= ~MAY_BE_ZIP;
+								if (!mask) break;
+							}
+						}
+					}
+					if (mask & MAY_BE_1ZIP) {
+						if (i % 2 == 1) {
+							if (next != (prev + n) % n + ((prev < n) ? 0 : n)) {
+								mask &= ~MAY_BE_1ZIP;
+								if (!mask) break;
+							}
+						} else {
+							if (next != (prev + n) % n + 1 + ((prev < n) ? 0 : n)) {
+								mask &= ~MAY_BE_1ZIP;
+								if (!mask) break;
+							}
+						}
+					}
+					if (mask & MAY_BE_UZP) {
+						if (next != (prev + 2) % mod) {
+							mask &= ~MAY_BE_UZP;
+							if (!mask) break;
+						}
+					}
+					if (mask & MAY_BE_1UZP) {
+						if (next != (prev + 2) % n + ((prev < n) ? 0 : n)) {
+							mask &= ~MAY_BE_1UZP;
+							if (!mask) break;
+						}
+					}
+					prev = next;
+				}
+				if (mask) {
+					return IR_SHUFFLE_DUP + ir_ntz(mask);
+				}
+			}
+		}
 	}
 	return IR_SHUFFLE;
 }
@@ -2227,6 +2391,16 @@ static void ir_emit_mov_ext(ir_ctx *ctx, ir_type type, ir_reg dst, ir_reg src)
 		|	mov Rw(dst), Rw(src)
 	}
 }
+
+#if IR_SIMD
+static uint32_t neon_MOV(ir_reg dst, ir_reg src)
+{
+	/* mov Rv(dst-IR_REG_FP_FIRST).16b, Rv(src-IR_REG_FP_FIRST).16b */
+	return 0x0ea01c00 | (dst-IR_REG_FP_FIRST) | ((src-IR_REG_FP_FIRST) << 5) |
+		((src-IR_REG_FP_FIRST) << 16) | (1<<30);
+}
+#endif
+
 static void ir_emit_fp_mov(ir_ctx *ctx, ir_type type, ir_reg dst, ir_reg src)
 {
 	ir_backend_data *data = ctx->data;
@@ -2240,9 +2414,7 @@ static void ir_emit_fp_mov(ir_ctx *ctx, ir_type type, ir_reg dst, ir_reg src)
 	} else if (IR_IS_TYPE_VECTOR(type)) {
 		uint32_t width = IR_VECTOR_SIZE(type);
 		if (width == 16) {
-			/* mov Rv(dst-IR_REG_FP_FIRST).16b, Rv(src-IR_REG_FP_FIRST).16b */
-			uint32_t code = 0x0ea01c00 | (dst-IR_REG_FP_FIRST) | ((src-IR_REG_FP_FIRST) << 5) |
-				((src-IR_REG_FP_FIRST) << 16) | (1<<30);
+			uint32_t code = neon_MOV(dst, src);
 			|	.long code
 		} else if (width == 8) {
 			|	fmov Rd(dst-IR_REG_FP_FIRST), Rd(src-IR_REG_FP_FIRST)
@@ -6365,7 +6537,147 @@ static void ir_emit_tls(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 }
 
 #if IR_SIMD
-static uint32_t ir_vector_extract_int(ir_type element_type, ir_reg dst_reg, ir_reg src_reg, int lane)
+static uint32_t neon_INS_int(uint32_t element_size, ir_reg dst_reg, ir_reg src_reg, uint32_t lane)
+{
+	IR_ASSERT(src_reg >= IR_REG_GP_FIRST && src_reg <= IR_REG_GP_LAST);
+	IR_ASSERT(dst_reg >= IR_REG_FP_FIRST && dst_reg <= IR_REG_FP_LAST);
+	if (element_size == 8) {
+		/* ins Rv(dst_reg-IR_REG_FP_FIRST).d[lane], Rx(src_reg) */
+		return 0x4e001c00 | (dst_reg-IR_REG_FP_FIRST) | (src_reg << 5) |
+			(((lane << 4) | 0x8) << 16);
+	} else if (element_size == 4) {
+		/* ins Rv(dst_reg-IR_REG_FP_FIRST).s[lane], Rw(src_reg) */
+		return 0x4e001c00 | (dst_reg-IR_REG_FP_FIRST) | (src_reg << 5) |
+			(((lane << 3) | 0x4) << 16);
+	} else if (element_size == 2) {
+		/* ins Rv(dst_reg-IR_REG_FP_FIRST).h[lane], Rw(src_reg) */
+		return 0x4e001c00 | (dst_reg-IR_REG_FP_FIRST) | (src_reg << 5) |
+			(((lane << 2) | 0x2) << 16);
+	} else {
+		IR_ASSERT(element_size == 1);
+		/* ins Rv(dst_reg-IR_REG_FP_FIRST).b[lane], Rw(src_reg) */
+		return 0x4e001c00 | (dst_reg-IR_REG_FP_FIRST) | (src_reg << 5) |
+			(((lane << 1) | 0x1) << 16);
+	}
+}
+
+static uint32_t neon_INS_lane(uint32_t element_size, ir_reg dst_reg, ir_reg src_reg, uint32_t dst_lane, uint32_t src_lane)
+{
+	IR_ASSERT(src_reg >= IR_REG_FP_FIRST && src_reg <= IR_REG_FP_LAST);
+	IR_ASSERT(dst_reg >= IR_REG_FP_FIRST && dst_reg <= IR_REG_FP_LAST);
+	if (element_size == 8) {
+		/* ins Rv(dst_reg-IR_REG_FP_FIRST).d[dst_lane], Rv(src_reg-IR_REG_FP_FIRST).d[src_lane] */
+		return 0x6e000400 | (dst_reg-IR_REG_FP_FIRST) | ((src_reg-IR_REG_FP_FIRST) << 5) |
+			(((dst_lane << 4) | 0x8) << 16) | ((src_lane << 3) << 11);
+	} else if (element_size == 4) {
+		/* ins Rv(dst_reg-IR_REG_FP_FIRST).s[dst_lane], Rv(src_reg-IR_REG_FP_FIRST).s[src_lane] */
+		return 0x6e000400 | (dst_reg-IR_REG_FP_FIRST) | ((src_reg-IR_REG_FP_FIRST) << 5) |
+			(((dst_lane << 3) | 0x4) << 16) | ((src_lane << 2) << 11);
+	} else if (element_size == 2) {
+		/* ins Rv(dst_reg-IR_REG_FP_FIRST).h[dst_lane], Rv(src_reg-IR_REG_FP_FIRST).h[src_lane] */
+		return 0x6e000400 | (dst_reg-IR_REG_FP_FIRST) | ((src_reg-IR_REG_FP_FIRST) << 5) |
+			(((dst_lane << 2) | 0x2) << 16) | ((src_lane << 1) << 11);
+	} else {
+		IR_ASSERT(element_size == 1);
+		/* ins Rv(dst_reg-IR_REG_FP_FIRST).b[dst_lane], Rv(src_reg-IR_REG_FP_FIRST).b[src_lane] */
+		return 0x6e000400 | (dst_reg-IR_REG_FP_FIRST) | ((src_reg-IR_REG_FP_FIRST) << 5) |
+			(((dst_lane << 1) | 0x1) << 16) | (src_lane << 11);
+	}
+}
+
+static uint32_t neon_DUP_int(uint32_t element_size, ir_reg dst_reg, ir_reg src_reg)
+{
+	IR_ASSERT(src_reg >= IR_REG_GP_FIRST && src_reg <= IR_REG_GP_LAST);
+	IR_ASSERT(dst_reg >= IR_REG_FP_FIRST && dst_reg <= IR_REG_FP_LAST);
+	if (element_size == 8) {
+		/* dup Rv(dst_reg-IR_REG_FP_FIRST).2d, Rx(src_reg) */
+		return 0x0e000c00 | (dst_reg-IR_REG_FP_FIRST) | (src_reg << 5) |
+			(1<<30) | (0x8 << 16);
+	} else if (element_size == 4) {
+		/* dup Rv(dst_reg-IR_REG_FP_FIRST).4s, Rw(src_reg) */
+		return 0x0e000c00 | (dst_reg-IR_REG_FP_FIRST) | (src_reg << 5) |
+			(1<<30) | (0x4 << 16);
+	} else if (element_size == 2) {
+		/* dup Rv(dst_reg-IR_REG_FP_FIRST).8h, Rw(src_reg) */
+		return 0x0e000c00 | (dst_reg-IR_REG_FP_FIRST) | (src_reg << 5) |
+			(1<<30) | (0x2 << 16);
+	} else {
+		IR_ASSERT(element_size == 1);
+		/* dup Rv(dst_reg-IR_REG_FP_FIRST).16b, Rw(src_reg) */
+		return 0x0e000c00 | (dst_reg-IR_REG_FP_FIRST) | (src_reg << 5) |
+			(1<<30) | (0x1 << 16);
+	}
+}
+
+static uint32_t neon_DUP_lane(uint32_t element_size, ir_reg dst_reg, ir_reg src_reg, uint32_t lane)
+{
+	IR_ASSERT(src_reg >= IR_REG_FP_FIRST && src_reg <= IR_REG_FP_LAST);
+	IR_ASSERT(dst_reg >= IR_REG_FP_FIRST && dst_reg <= IR_REG_FP_LAST);
+	if (element_size == 8) {
+		/* dup Rv(dst_reg-IR_REG_FP_FIRST).2d, Rv(src_reg-IR_REG_FP_FIRST).d[lane] */
+		return 0x0e000400 | (dst_reg-IR_REG_FP_FIRST) | ((src_reg-IR_REG_FP_FIRST) << 5) |
+			(1<<30) | (((lane << 4) | 0x8) << 16);
+	} else if (element_size == 4) {
+		/* dup Rv(dst_reg-IR_REG_FP_FIRST).4s, Rv(src_reg-IR_REG_FP_FIRST).s[lane] */
+		return 0x0e000400 | (dst_reg-IR_REG_FP_FIRST) | ((src_reg-IR_REG_FP_FIRST) << 5) |
+			(1<<30) | (((lane << 3) | 0x4) << 16);
+	} else if (element_size == 2) {
+		/* dup Rv(dst_reg-IR_REG_FP_FIRST).8h, Rv(src_reg-IR_REG_FP_FIRST).h[lane] */
+		return 0x0e000400 | (dst_reg-IR_REG_FP_FIRST) | ((src_reg-IR_REG_FP_FIRST) << 5) |
+			(1<<30) | (((lane << 2) | 0x2) << 16);
+	} else {
+		IR_ASSERT(element_size == 1);
+		/* dup Rv(dst_reg-IR_REG_FP_FIRST).8h, Rv(src_reg-IR_REG_FP_FIRST).h[lane] */
+		return 0x0e000400 | (dst_reg-IR_REG_FP_FIRST) | ((src_reg-IR_REG_FP_FIRST) << 5) |
+			(1<<30) | (((lane << 1) | 0x1) << 16);
+	}
+}
+
+static uint32_t neon_EXT(uint32_t element_size, ir_reg dst_reg, ir_reg src1_reg, ir_reg src2_reg, uint32_t first)
+{
+	IR_ASSERT(first < 16);
+	IR_ASSERT(src1_reg >= IR_REG_FP_FIRST && src2_reg <= IR_REG_FP_LAST);
+	IR_ASSERT(src2_reg >= IR_REG_FP_FIRST && src2_reg <= IR_REG_FP_LAST);
+	IR_ASSERT(dst_reg >= IR_REG_FP_FIRST && dst_reg <= IR_REG_FP_LAST);
+	/* ext Rv(dst_reg-IR_REG_FP_FIRST).16b, Rv(src1_reg-IR_REG_FP_FIRST).16b, Rv(src1_reg-IR_REG_FP_FIRST).16b, first */
+	return 0x2e000000 | (dst_reg-IR_REG_FP_FIRST) | ((src1_reg-IR_REG_FP_FIRST) << 5) |
+		((src2_reg-IR_REG_FP_FIRST) << 16) | (1<<30) | (first << 11);
+}
+
+static uint32_t neon_TRN(uint32_t element_size, ir_reg dst_reg, ir_reg src1_reg, ir_reg src2_reg, uint32_t n)
+{
+	IR_ASSERT(src1_reg >= IR_REG_FP_FIRST && src1_reg <= IR_REG_FP_LAST);
+	IR_ASSERT(src2_reg >= IR_REG_FP_FIRST && src2_reg <= IR_REG_FP_LAST);
+	IR_ASSERT(dst_reg >= IR_REG_FP_FIRST && dst_reg <= IR_REG_FP_LAST);
+	IR_ASSERT(n == 0 || n == 1);
+	/* trn? Rv(dst_reg-IR_REG_FP_FIRST).?, Rv(src1_reg-IR_REG_FP_FIRST).?, Rv(src2_reg-IR_REG_FP_FIRST).? */
+	return 0x0e002800 | (dst_reg-IR_REG_FP_FIRST) | ((src1_reg-IR_REG_FP_FIRST) << 5) |
+		((src2_reg-IR_REG_FP_FIRST) << 16) | (1<<30) | (ir_ntz(element_size) << 22) | (n << 14);
+}
+
+static uint32_t neon_ZIP(uint32_t element_size, ir_reg dst_reg, ir_reg src1_reg, ir_reg src2_reg, uint32_t n)
+{
+	IR_ASSERT(src1_reg >= IR_REG_FP_FIRST && src1_reg <= IR_REG_FP_LAST);
+	IR_ASSERT(src2_reg >= IR_REG_FP_FIRST && src2_reg <= IR_REG_FP_LAST);
+	IR_ASSERT(dst_reg >= IR_REG_FP_FIRST && dst_reg <= IR_REG_FP_LAST);
+	IR_ASSERT(n == 0 || n == 1);
+	/* trn? Rv(dst_reg-IR_REG_FP_FIRST).?, Rv(src1_reg-IR_REG_FP_FIRST).?, Rv(src2_reg-IR_REG_FP_FIRST).? */
+	return 0x0e003800 | (dst_reg-IR_REG_FP_FIRST) | ((src1_reg-IR_REG_FP_FIRST) << 5) |
+		((src2_reg-IR_REG_FP_FIRST) << 16) | (1<<30) | (ir_ntz(element_size) << 22) | (n << 14);
+}
+
+static uint32_t neon_UZP(uint32_t element_size, ir_reg dst_reg, ir_reg src1_reg, ir_reg src2_reg, uint32_t n)
+{
+	IR_ASSERT(src1_reg >= IR_REG_FP_FIRST && src1_reg <= IR_REG_FP_LAST);
+	IR_ASSERT(src2_reg >= IR_REG_FP_FIRST && src2_reg <= IR_REG_FP_LAST);
+	IR_ASSERT(dst_reg >= IR_REG_FP_FIRST && dst_reg <= IR_REG_FP_LAST);
+	IR_ASSERT(n == 0 || n == 1);
+	/* trn? Rv(dst_reg-IR_REG_FP_FIRST).?, Rv(src1_reg-IR_REG_FP_FIRST).?, Rv(src2_reg-IR_REG_FP_FIRST).? */
+	return 0x0e001800 | (dst_reg-IR_REG_FP_FIRST) | ((src1_reg-IR_REG_FP_FIRST) << 5) |
+		((src2_reg-IR_REG_FP_FIRST) << 16) | (1<<30) | (ir_ntz(element_size) << 22) | (n << 14);
+}
+
+static uint32_t ir_vector_extract_int(ir_type element_type, ir_reg dst_reg, ir_reg src_reg, uint32_t lane)
 {
 	IR_ASSERT(src_reg >= IR_REG_FP_FIRST && src_reg <= IR_REG_FP_LAST);
 	IR_ASSERT(dst_reg >= IR_REG_GP_FIRST && dst_reg <= IR_REG_GP_LAST);
@@ -6398,22 +6710,6 @@ static uint32_t ir_vector_extract_int(ir_type element_type, ir_reg dst_reg, ir_r
 		return 0;
 	}
 
-}
-
-static uint32_t ir_vector_extract_fp(ir_type element_type, ir_reg dst_reg, ir_reg src_reg, int lane)
-{
-	IR_ASSERT(src_reg >= IR_REG_FP_FIRST && src_reg <= IR_REG_FP_LAST);
-	IR_ASSERT(dst_reg >= IR_REG_FP_FIRST && dst_reg <= IR_REG_FP_LAST);
-	if (element_type == IR_DOUBLE) {
-		/* dup Rd(dst_reg-IR_REG_FP_FIRST), Rv(src_reg-IR_REG_FP_FIRST).d[lane] */
-		return 0x5e000400 | (dst_reg-IR_REG_FP_FIRST) | ((src_reg-IR_REG_FP_FIRST) << 5) |
-			(1<<30) | (((lane << 4) | 0x8) << 16);
-	} else {
-		IR_ASSERT(element_type == IR_FLOAT);
-		/* dup Rs(dst_reg-IR_REG_FP_FIRST), Rv(src_reg-IR_REG_FP_FIRST).s[lane] */
-		return 0x5e000400 | (dst_reg-IR_REG_FP_FIRST) | ((src_reg-IR_REG_FP_FIRST) << 5) |
-			(1<<30) | (((lane << 3) | 0x4) << 16);
-	}
 }
 
 static void ir_emit_vector_extract(ir_ctx *ctx, ir_ref def, ir_insn *insn)
@@ -6451,7 +6747,7 @@ static void ir_emit_vector_extract(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			|	.long code
 		} else {
 			if (lane != 0 || def_reg != op1_reg) {
-				code = ir_vector_extract_fp(element_type, def_reg, op1_reg, lane);
+				code = neon_DUP_lane(ir_type_size[element_type], def_reg, op1_reg, lane);
 				|	.long code
 			}
 		}
@@ -6479,48 +6775,6 @@ static void ir_emit_vector_extract(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, insn->type, def, def_reg);
-	}
-}
-
-static uint32_t ir_vector_replace_int(ir_type element_type, ir_reg dst_reg, ir_reg src_reg, int lane)
-{
-	IR_ASSERT(src_reg >= IR_REG_GP_FIRST && src_reg <= IR_REG_GP_LAST);
-	IR_ASSERT(dst_reg >= IR_REG_FP_FIRST && dst_reg <= IR_REG_FP_LAST);
-	if (element_type == IR_I8 || element_type == IR_U8) {
-		/* ins Rv(dst_reg-IR_REG_FP_FIRST).b[lane], Rw(src_reg) */
-		return 0x4e001c00 | (dst_reg-IR_REG_FP_FIRST) | (src_reg << 5) |
-			(((lane << 1) | 0x1) << 16);
-	} else if (element_type == IR_I16 || element_type == IR_U16) {
-		/* ins Rv(dst_reg-IR_REG_FP_FIRST).h[lane], Rw(src_reg) */
-		return 0x4e001c00 | (dst_reg-IR_REG_FP_FIRST) | (src_reg << 5) |
-			(((lane << 2) | 0x2) << 16);
-	} else if (element_type == IR_I32 || element_type == IR_U32) {
-		/* ins Rv(dst_reg-IR_REG_FP_FIRST).s[lane], Rw(src_reg) */
-		return 0x4e001c00 | (dst_reg-IR_REG_FP_FIRST) | (src_reg << 5) |
-			(((lane << 3) | 0x4) << 16);
-	} else if (element_type == IR_I64 || element_type == IR_U64) {
-		/* ins Rv(dst_reg-IR_REG_FP_FIRST).d[lane], Rx(src_reg) */
-		return 0x4e001c00 | (dst_reg-IR_REG_FP_FIRST) | (src_reg << 5) |
-			(((lane << 4) | 0x8) << 16);
-	} else {
-		IR_ASSERT(0);
-		return 0;
-	}
-}
-
-static uint32_t ir_vector_replace_fp(ir_type element_type, ir_reg dst_reg, ir_reg src_reg, int lane)
-{
-	IR_ASSERT(src_reg >= IR_REG_FP_FIRST && src_reg <= IR_REG_FP_LAST);
-	IR_ASSERT(dst_reg >= IR_REG_FP_FIRST && dst_reg <= IR_REG_FP_LAST);
-	if (element_type == IR_DOUBLE) {
-		/* ins Rv(dst_reg-IR_REG_FP_FIRST).s[lane], Rv(src_reg-IR_REG_FP_FIRST).s[0] */
-		return 0x6e000400 | (dst_reg-IR_REG_FP_FIRST) | ((src_reg-IR_REG_FP_FIRST) << 5) |
-			(((lane << 4) | 0x8) << 16);
-	} else {
-		IR_ASSERT(element_type == IR_FLOAT);
-		/* ins Rv(dst_reg-IR_REG_FP_FIRST).s[lane], Rv(src_reg-IR_REG_FP_FIRST).s[0] */
-		return 0x6e000400 | (dst_reg-IR_REG_FP_FIRST) | ((src_reg-IR_REG_FP_FIRST) << 5) |
-			(((lane << 3) | 0x4) << 16);
 	}
 }
 
@@ -6571,11 +6825,11 @@ static void ir_emit_vector_replace(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 		IR_ASSERT(width <= 16 && lane < IR_VECTOR_LENGTH(type));
 		if (IR_IS_TYPE_INT(element_type)) {
-			code = ir_vector_replace_int(element_type, def_reg, op3_reg, lane);
+			code = neon_INS_int(ir_type_size[element_type], def_reg, op3_reg, lane);
 			|	.long code
 		} else {
 			if (lane != 0 || def_reg != op3_reg) {
-				code = ir_vector_replace_fp(element_type, def_reg, op3_reg, lane);
+				code = neon_INS_lane(ir_type_size[element_type], def_reg, op3_reg, lane, 0);
 				|	.long code
 			}
 		}
@@ -6611,47 +6865,6 @@ static void ir_emit_vector_replace(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
-static uint32_t ir_vector_splat_int(ir_type element_type, ir_reg dst_reg, ir_reg src_reg)
-{
-	IR_ASSERT(src_reg >= IR_REG_GP_FIRST && src_reg <= IR_REG_GP_LAST);
-	IR_ASSERT(dst_reg >= IR_REG_FP_FIRST && dst_reg <= IR_REG_FP_LAST);
-	if (element_type == IR_I8 || element_type == IR_U8) {
-		/* dup Rv(dst_reg-IR_REG_FP_FIRST).16b, Rw(src_reg) */
-		return 0x0e000c00 | (dst_reg-IR_REG_FP_FIRST) | (src_reg << 5) |
-			(1<<30) | (0x1 << 16);
-	} else if (element_type == IR_I16 || element_type == IR_U16) {
-		/* dup Rv(dst_reg-IR_REG_FP_FIRST).8h, Rw(src_reg) */
-		return 0x0e000c00 | (dst_reg-IR_REG_FP_FIRST) | (src_reg << 5) |
-			(1<<30) | (0x2 << 16);
-	} else if (element_type == IR_I32 || element_type == IR_U32) {
-		/* dup Rv(dst_reg-IR_REG_FP_FIRST).4s, Rw(src_reg) */
-		return 0x0e000c00 | (dst_reg-IR_REG_FP_FIRST) | (src_reg << 5) |
-			(1<<30) | (0x4 << 16);
-	} else if (element_type == IR_I64 || element_type == IR_U64) {
-		/* dup Rv(dst_reg-IR_REG_FP_FIRST).2d, Rx(src_reg) */
-		return 0x0e000c00 | (dst_reg-IR_REG_FP_FIRST) | (src_reg << 5) |
-			(1<<30) | (0x8 << 16);
-	} else {
-		IR_ASSERT(0);
-	}
-}
-
-static uint32_t ir_vector_splat_fp(ir_type element_type, ir_reg dst_reg, ir_reg src_reg, int lane)
-{
-	IR_ASSERT(src_reg >= IR_REG_FP_FIRST && src_reg <= IR_REG_FP_LAST);
-	IR_ASSERT(dst_reg >= IR_REG_FP_FIRST && dst_reg <= IR_REG_FP_LAST);
-	if (element_type == IR_DOUBLE) {
-		/* dup Rv(dst_reg-IR_REG_FP_FIRST).2d, Rv(src_reg-IR_REG_FP_FIRST).d[lane] */
-		return 0x0e000400 | (dst_reg-IR_REG_FP_FIRST) | ((src_reg-IR_REG_FP_FIRST) << 5) |
-			(1<<30) | (((lane << 4) | 0x8) << 16);
-	} else {
-		IR_ASSERT(element_type == IR_FLOAT);
-		/* dup Rv(dst_reg-IR_REG_FP_FIRST).4s, Rv(src_reg-IR_REG_FP_FIRST).s[lane] */
-		return 0x4e000400 | (dst_reg-IR_REG_FP_FIRST) | ((src_reg-IR_REG_FP_FIRST) << 5) |
-			(1<<30) | (((lane << 3) | 0x4) << 16);
-	}
-}
-
 static void ir_emit_vector_splat(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
@@ -6683,9 +6896,9 @@ static void ir_emit_vector_splat(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 
 	if (IR_IS_TYPE_INT(element_type)) {
-		code = ir_vector_splat_int(element_type, def_reg, op1_reg);
+		code = neon_DUP_int(ir_type_size[element_type], def_reg, op1_reg);
 	} else {
-		code = ir_vector_splat_fp(element_type, def_reg, op1_reg, 0);
+		code = neon_DUP_lane(ir_type_size[element_type], def_reg, op1_reg, 0);
 	}
 
 	|	.long code
@@ -6695,33 +6908,7 @@ static void ir_emit_vector_splat(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
-static uint32_t ir_vector_move_lane(ir_type element_type, ir_reg dst_reg, ir_reg src_reg, int dst_lane, int src_lane)
-{
-	uint32_t element_type_size = ir_type_size[element_type];
-
-	IR_ASSERT(src_reg >= IR_REG_FP_FIRST && src_reg <= IR_REG_FP_LAST);
-	IR_ASSERT(dst_reg >= IR_REG_FP_FIRST && dst_reg <= IR_REG_FP_LAST);
-	if (element_type_size == 8) {
-		/* ins Rv(dst_reg-IR_REG_FP_FIRST).d[dst_lane], Rv(src_reg-IR_REG_FP_FIRST).d[src_lane] */
-		return 0x6e000400 | (dst_reg-IR_REG_FP_FIRST) | ((src_reg-IR_REG_FP_FIRST) << 5) |
-			(((dst_lane << 4) | 0x8) << 16) | ((src_lane << 3) << 11);;
-	} else if (element_type_size == 4) {
-		/* ins Rv(dst_reg-IR_REG_FP_FIRST).s[dst_lane], Rv(src_reg-IR_REG_FP_FIRST).s[src_lane] */
-		return 0x6e000400 | (dst_reg-IR_REG_FP_FIRST) | ((src_reg-IR_REG_FP_FIRST) << 5) |
-			(((dst_lane << 3) | 0x4) << 16) | ((src_lane << 2) << 11);
-	} else if (element_type_size == 2) {
-		/* ins Rv(dst_reg-IR_REG_FP_FIRST).h[dst_lane], Rv(src_reg-IR_REG_FP_FIRST).h[src_lane] */
-		return 0x6e000400 | (dst_reg-IR_REG_FP_FIRST) | ((src_reg-IR_REG_FP_FIRST) << 5) |
-			(((dst_lane << 2) | 0x2) << 16) | ((src_lane << 1) << 11);
-	} else {
-		IR_ASSERT(element_type_size == 1);
-		/* ins Rv(dst_reg-IR_REG_FP_FIRST).b[dst_lane], Rv(src_reg-IR_REG_FP_FIRST).b[src_lane] */
-		return 0x6e000400 | (dst_reg-IR_REG_FP_FIRST) | ((src_reg-IR_REG_FP_FIRST) << 5) |
-			(((dst_lane << 1) | 0x1) << 16) | (src_lane << 11);
-	}
-}
-
-static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn, uint32_t rule)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
@@ -6739,7 +6926,7 @@ static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_type src1_type = ctx->ir_base[insn->op1].type;
 	ir_type src2_type = ctx->ir_base[insn->op2].type;
 	uint32_t code;
-	uint32_t mod,  src1_len;
+	uint32_t mod, src1_len;
 
 	(void)width;
 
@@ -6777,18 +6964,117 @@ static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		/* shuffle through sequence of moves */
 		int8_t *p = ir_long_const_ptr(ctx, insn->op3);
 		uint32_t s = mask_element_size;
-		uint32_t i, j;
 
-		IR_ASSERT(op1_reg != def_reg);
-		for (i = 0; i < mask_len; i++) {
-			j = IR_SHUFFLE_MASK(i) % mod;
-			if (j < src1_len) {
-				code = ir_vector_move_lane(element_type, def_reg, op1_reg, i, j);
-			} else {
-				code = ir_vector_move_lane(element_type, def_reg, op2_reg, i, j - src1_len);
+		if (rule != IR_SHUFFLE) {
+			uint32_t n = IR_VECTOR_LENGTH(insn->type);
+			uint32_t first = IR_SHUFFLE_MASK(0);
+
+			switch (rule) {
+				case IR_SHUFFLE_DUP:
+					if (first < n) {
+						code = neon_DUP_lane(element_size, def_reg, op1_reg, first);
+					} else {
+						code = neon_DUP_lane(element_size, def_reg, op2_reg, first % n);
+					}
+					break;
+				case IR_SHUFFLE_EXT:
+					if (first < n) {
+						if (first == 0) {
+							code = neon_MOV(def_reg, op1_reg);
+						} else {
+							code = neon_EXT(element_size, def_reg, op1_reg, op2_reg, first * element_size);
+						}
+					} else {
+						if (first == n) {
+							code = neon_MOV(def_reg, op2_reg);
+						} else {
+							code = neon_EXT(element_size, def_reg, op2_reg, op1_reg, (first % n) * element_size);
+						}
+					}
+					break;
+				case IR_SHUFFLE_TRN:
+					if (first < n) {
+						code = neon_TRN(element_size, def_reg, op1_reg, op2_reg, first != 0);
+					} else {
+						code = neon_TRN(element_size, def_reg, op2_reg, op1_reg, (first % n) != 0);
+					}
+					break;
+				case IR_SHUFFLE_ZIP:
+					if (first < n) {
+						code = neon_ZIP(element_size, def_reg, op1_reg, op2_reg, first != 0);
+					} else {
+						code = neon_ZIP(element_size, def_reg, op2_reg, op1_reg, (first % n) != 0);
+					}
+					break;
+				case IR_SHUFFLE_UZP:
+					if (first < n) {
+						code = neon_UZP(element_size, def_reg, op1_reg, op2_reg, first != 0);
+					} else {
+						code = neon_UZP(element_size, def_reg, op2_reg, op1_reg, (first % n) != 0);
+					}
+					break;
+				case IR_SHUFFLE_1EXT:
+					if (first < n) {
+						if (first == 0) {
+							code = neon_MOV(def_reg, op1_reg);
+						} else {
+							code = neon_EXT(element_size, def_reg, op1_reg, op1_reg, first * element_size);
+						}
+					} else {
+						if (first == n) {
+							code = neon_MOV(def_reg, op2_reg);
+						} else {
+							code = neon_EXT(element_size, def_reg, op2_reg, op2_reg, (first % n) * element_size);
+						}
+					}
+					break;
+				case IR_SHUFFLE_1TRN:
+					if (first < n) {
+						code = neon_TRN(element_size, def_reg, op1_reg, op1_reg, first != 0);
+					} else {
+						code = neon_TRN(element_size, def_reg, op2_reg, op2_reg, (first % n) != 0);
+					}
+					break;
+				case IR_SHUFFLE_1ZIP:
+					if (first < n) {
+						code = neon_ZIP(element_size, def_reg, op1_reg, op1_reg, first != 0);
+					} else {
+						code = neon_ZIP(element_size, def_reg, op2_reg, op2_reg, (first % n) != 0);
+					}
+					break;
+				case IR_SHUFFLE_1UZP:
+					if (first < n) {
+						code = neon_UZP(element_size, def_reg, op1_reg, op1_reg, first != 0);
+					} else {
+						code = neon_UZP(element_size, def_reg, op2_reg, op2_reg, (first % n) != 0);
+					}
+					break;
+				default:
+					IR_ASSERT(0);
 			}
 			|	.long code
+		} else {
+			uint32_t i, j;
+
+			IR_ASSERT(op1_reg != def_reg);
+			for (i = 0; i < mask_len; i++) {
+				j = IR_SHUFFLE_MASK(i) % mod;
+				if (j < src1_len) {
+					code = neon_INS_lane(element_size, def_reg, op1_reg, i, j);
+				} else {
+					code = neon_INS_lane(element_size, def_reg, op2_reg, i, j - src1_len);
+				}
+				|	.long code
+			}
 		}
+	} else if (element_size == 1 && mask_element_size == 1 && insn->op1 == insn->op2) {
+		code = 0x4e000000 | (def_reg-IR_REG_FP_FIRST) | ((op1_reg-IR_REG_FP_FIRST) << 5) |
+			((op3_reg-IR_REG_FP_FIRST) << 16);
+		|	.long code
+	} else if (element_size == 1 && mask_element_size == 1 && op2_reg == op1_reg + 1 && IR_VECTOR_SIZE(src1_type) == 16) {
+		code = 0x4e001000 | (def_reg-IR_REG_FP_FIRST) | ((op1_reg-IR_REG_FP_FIRST) << 5) |
+			((op3_reg-IR_REG_FP_FIRST) << 16);
+		|	.long code
 	} else {
 		/* shuffle through stack memory */
 		uint32_t stack_space;
@@ -6826,7 +7112,7 @@ static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 			src = IR_MEM(IR_REG_STACK_POINTER, 0, tmp_reg, ir_ntz(element_size));
 			ir_emit_load_mem_int(ctx, element_type, tmp_reg, src);
-			code = ir_vector_replace_int(element_type, def_reg, tmp_reg, i);
+			code = neon_INS_int(element_size, def_reg, tmp_reg, i);
 			|	.long code
 		}
 
@@ -9112,7 +9398,16 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					ir_emit_vector_splat(ctx, i, insn);
 					break;
 				case IR_SHUFFLE:
-					ir_emit_vector_shuffle(ctx, i, insn);
+				case IR_SHUFFLE_DUP:
+				case IR_SHUFFLE_EXT:
+				case IR_SHUFFLE_TRN:
+				case IR_SHUFFLE_ZIP:
+				case IR_SHUFFLE_UZP:
+				case IR_SHUFFLE_1EXT:
+				case IR_SHUFFLE_1TRN:
+				case IR_SHUFFLE_1ZIP:
+				case IR_SHUFFLE_1UZP:
+					ir_emit_vector_shuffle(ctx, i, insn, (*rule) & IR_RULE_MASK);
 					break;
 				case IR_VECTOR_OP:
 					ir_emit_vector_op(ctx, i, insn);
