@@ -178,13 +178,31 @@ static test *parse_file(const char *filename, int id)
 	return t;
 }
 
+static int match_target_name(const char *selector, const char *actual)
+{
+	size_t selector_len;
+
+	if (!selector || !actual) {
+		return 0;
+	}
+	if (strcmp(selector, actual) == 0) {
+		return 1;
+	}
+	selector_len = strlen(selector);
+	return strncmp(selector, actual, selector_len) == 0 && actual[selector_len] == '-';
+}
+
 static int skip_test(test *t)
 {
 	if (target && t->target) {
 		if (t->target[0] == '!') {
-			return strcmp(t->target + 1, target) == 0;
+			if (match_target_name(t->target + 1, target)) {
+				return 1;
+			}
 		} else {
-			return strcmp(t->target, target) != 0;
+			if (!match_target_name(t->target, target)) {
+				return 1;
+			}
 		}
 	}
 	return 0;
@@ -523,6 +541,7 @@ static void print_help(const char *exe_name)
 	    "  Run the \"--CODE--\" section of specified test files using <cmd>\n"
 	    "Options:\n"
 	    "  --target <target>        - skip tests that specifies different --TARGET--\n"
+	    "                            (e.g. aarch64 matches aarch64-sysv and aarch64-darwin)\n"
 	    "  --default-args <args>    - default <cmd> arguments (if --ARGS-- is missed)\n"
 	    "  --additional-args <args> - additional <cmd> arguments (always added at the end)\n"
 	    "  --diff-cmd <cmd>         - diff command\n"

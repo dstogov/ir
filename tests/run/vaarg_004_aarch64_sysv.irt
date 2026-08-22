@@ -1,7 +1,7 @@
 --TEST--
-VA_ARG 004: va_arg() expanded on AArch64
+VA_ARG 004: va_arg() expanded on AArch64 SysV
 --TARGET--
-aarch64
+aarch64-sysv
 --ARGS--
 --run
 --CODE--

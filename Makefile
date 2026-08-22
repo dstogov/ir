@@ -47,7 +47,11 @@ else ifneq (, $(filter aarch64 arm64, $(TARGET)))
   override BUILD_CFLAGS += -DIR_TARGET_AARCH64
   DASM_ARCH  = aarch64
   DASM_FLAGS = -M
-  TEST_TARGET=aarch64
+  ifeq (Darwin, $(OS))
+    TEST_TARGET=aarch64-darwin
+  else
+    TEST_TARGET=aarch64-sysv
+  endif
 else
  $(error Unsupported target. TRGET must be 'x86_64', 'x86' or 'aarch64')
 endif
