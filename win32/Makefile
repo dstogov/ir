@@ -51,16 +51,16 @@ PHP=php.exe
 TARGET = $(VSCMD_ARG_TGT_ARCH)
 !endif
 !if "$(TARGET)" == "x64"
-CFLAGS=$(CFLAGS) /DIR_TARGET_X64
+TARGET_TRIPLET=x86_64-windows-msvc
+CFLAGS=$(CFLAGS) /DIR_TARGET_X64 /DIR_TARGET_TRIPLET=\"$(TARGET_TRIPLET)\"
 DASM_ARCH=x86
 DASM_FLAGS=-D X64=1
-TEST_TARGET=Windows-x86_64
 !endif
 !if "$(TARGET)" == "x86"
-CFLAGS=$(CFLAGS) /DIR_TARGET_X86
+TARGET_TRIPLET=x86-windows-msvc
+CFLAGS=$(CFLAGS) /DIR_TARGET_X86 /DIR_TARGET_TRIPLET=\"$(TARGET_TRIPLET)\"
 DASM_ARCH=x86
 DASM_FLAGS=
-TEST_TARGET=x86
 !endif
 
 !if "$(VSCMD_ARG_TGT_ARCH)" == "x64"
@@ -154,12 +154,12 @@ $(BUILD_DIR)\tester.exe: $(SRC_DIR)/tools/tester.c
 	"$(CC)" $(CFLAGS) $(SRC_DIR)\tools\tester.c /Fe:$@
 
 test: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\tester.exe
-	$(BUILD_DIR)\tester.exe --test-cmd $(BUILD_DIR)\ir.exe --target $(TEST_TARGET) --default-args "--save" \
+	$(BUILD_DIR)\tester.exe --test-cmd $(BUILD_DIR)\ir.exe --target $(TARGET_TRIPLET) --default-args "--save" \
 	    --additional-args "--no-abort-fault" \
 		--test-extension ".irt" --code-extension ".ir" $(TESTS)
 
 test-ci: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\tester.exe
-	$(BUILD_DIR)\tester.exe --test-cmd $(BUILD_DIR)\ir.exe --target $(TEST_TARGET) --default-args "--save" \
+	$(BUILD_DIR)\tester.exe --test-cmd $(BUILD_DIR)\ir.exe --target $(TARGET_TRIPLET) --default-args "--save" \
 	    --additional-args "--no-abort-fault" --diff-cmd "diff --strip-trailing-cr -u" \
 		--test-extension ".irt" --code-extension ".ir" --show-diff $(TESTS)
 

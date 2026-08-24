@@ -1,7 +1,7 @@
 --TEST--
 004: type conversion BITCAST
 --TARGET--
-Windows-x86_64
+x86_64-windows
 --ARGS--
 -S
 --CODE--

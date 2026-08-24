@@ -1,7 +1,7 @@
 --TEST--
-VA_ARG 004: va_arg() expanded on x86_64
+VA_ARG 004: va_arg() expanded on x86_64 SysV
 --TARGET--
-x86_64
+x86_64-*-sysv
 --ARGS--
 --run
 --CODE--

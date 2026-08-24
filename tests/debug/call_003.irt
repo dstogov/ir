@@ -1,7 +1,7 @@
 --TEST--
 Simple CALL (dup reg params)
 --TARGET--
-x86_64
+x86_64-*-sysv
 --ARGS--
 -fno-tail-calls -S
 --CODE--

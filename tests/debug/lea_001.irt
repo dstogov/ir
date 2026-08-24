@@ -1,7 +1,7 @@
 --TEST--
 LEA 001
 --TARGET--
-x86_64
+x86_64-*-sysv
 --ARGS--
 -S
 --CODE--

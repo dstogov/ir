@@ -1,7 +1,8 @@
 --TEST--
 003: ule function
 --TARGET--
-x86_64
+x86_64-*-sysv
+
 --ARGS--
 -S
 --CODE--

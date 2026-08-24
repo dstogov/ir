@@ -178,13 +178,48 @@ static test *parse_file(const char *filename, int id)
 	return t;
 }
 
+static int match(const char *pattern, const char *str, int single)
+{
+	const char *start = str;
+	char ch;
+
+	while (1) {
+		ch = *pattern++;
+		if (ch == 0) {
+			return *str == 0 || *str == '-';
+		} else if (ch != *str) {
+			if (ch == ' ') {
+				if (*str == 0 || *str == '-') return 1;
+				if (single) return 0;
+				str = start;
+				continue;
+			} else if (ch == '*') {
+				do {
+					ch = *pattern++;
+				} while (ch == '*');
+				if (ch == 0 || *str == 0) return 1;
+				do {
+					if (match(pattern, str, single)) return 1;
+					str++;
+				} while (*str != 0);
+				return 0;
+			} else if (ch == '?') {
+				if (*str == 0 || *str == '-') return 0;
+			} else {
+				return 0;
+			}
+		}
+		str++;
+	}
+}
+
 static int skip_test(test *t)
 {
 	if (target && t->target) {
 		if (t->target[0] == '!') {
-			return strcmp(t->target + 1, target) == 0;
+			return match(t->target, target + 1, 1);
 		} else {
-			return strcmp(t->target, target) != 0;
+			return !match(t->target, target, 0);
 		}
 	}
 	return 0;
