@@ -53,7 +53,7 @@ else
 endif
 
 ifeq (Darwin, $(OS))
-  TARGET_TRIPLET = \"$(TARGET_CPU)-darwin\"
+  TARGET_TRIPLET = $(TARGET_CPU)-darwin
 else
   TARGET_OS = $(shell echo $(OS) | tr '[:upper:]' '[:lower:]')
   TARGET_TRIPLET = $(TARGET_CPU)-$(TARGET_OS)-sysv
