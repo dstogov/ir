@@ -16045,8 +16045,8 @@ static void ir_emit_bit_count_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			case IR_CTTZ:
 				|	bsf Rd(tmp_reg), Rd(op1_reg_hi)
 				|	add Rd(tmp_reg), 32
-				|   bsf Rd(def_reg), Rd(op1_reg_hi)
-				|	cmovnz Rd(def_reg), Rd(tmp_reg)
+				|	bsf Rd(def_reg), Rd(op1_reg)
+				|	cmovz Rd(def_reg), Rd(tmp_reg)
 				break;
 			default:
 				IR_ASSERT(0);
@@ -16080,7 +16080,7 @@ static void ir_emit_bit_count_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|	ASM_TXT_TMEM_OP bsf, Rd(tmp_reg), dword, mem_hi
 				|	add Rd(tmp_reg), 32
 				|	ASM_TXT_TMEM_OP bsf, Rd(def_reg), dword, mem
-				|	cmovnz Rd(def_reg), Rd(tmp_reg)
+				|	cmovz Rd(def_reg), Rd(tmp_reg)
 				break;
 			default:
 				IR_ASSERT(0);

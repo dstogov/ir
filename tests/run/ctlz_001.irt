@@ -27,14 +27,14 @@ func ctlz32(int32_t): int32_t
 	int32_t d_3 = CTLZ(d_2);
 	l_4 = RETURN(l_1, d_3);
 }
-#func ctlz64(int64_t): int32_t
-#{
-#	l_1 = START(l_5);
-#	int64_t d_2 = PARAM(l_1, "arg_1", 1);
-#	int64_t d_3 = CTLZ(d_2);
-#	int32_t d_4 = TRUNC(d_3);
-#	l_5 = RETURN(l_1, d_4);
-#}
+func ctlz64(int64_t): int32_t
+{
+	l_1 = START(l_5);
+	int64_t d_2 = PARAM(l_1, "arg_1", 1);
+	int64_t d_3 = CTLZ(d_2);
+	int32_t d_4 = TRUNC(d_3);
+	l_5 = RETURN(l_1, d_4);
+}
 func main(void): int32_t
 {
 	uintptr_t c_1 = 0;
@@ -75,14 +75,14 @@ func main(void): int32_t
 	int32_t d_13, l_13 = CALL/1(l_12, c_16, c_17);
 	int32_t d_14, l_14 = CALL/1(l_13, c_16, c_18);
 	int32_t d_15, l_15 = CALL/4(l_14, c_9, c_19, d_12, d_13, d_14);
-#	int32_t d_17, l_17 = CALL/1(l_15, c_21, c_20);
-#	int32_t d_18, l_18 = CALL/1(l_17, c_21, c_22);
-#	int32_t d_19, l_19 = CALL/1(l_18, c_21, c_23);
-#	int32_t d_20, l_20 = CALL/4(l_19, c_9, c_24, d_17, d_18, d_19);
-#	l_22 = RETURN(l_20, c_25);
-	l_22 = RETURN(l_15, c_25);
+	int32_t d_17, l_17 = CALL/1(l_15, c_21, c_20);
+	int32_t d_18, l_18 = CALL/1(l_17, c_21, c_22);
+	int32_t d_19, l_19 = CALL/1(l_18, c_21, c_23);
+	int32_t d_20, l_20 = CALL/4(l_19, c_9, c_24, d_17, d_18, d_19);
+	l_22 = RETURN(l_20, c_25);
 }
 --EXPECT--
 u8 :  7  1  0
 u16: 15  5  0
 u32: 31 13  0
+u64: 63 29  0

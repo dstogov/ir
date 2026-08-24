@@ -1,7 +1,7 @@
 --TEST--
 CTTZ 002: -mno-bmi1
 --TARGET--
-x86_64
+x86*
 --ARGS--
 -mno-bmi1 --run
 --CODE--
