@@ -217,7 +217,7 @@ static int skip_test(test *t)
 {
 	if (target && t->target) {
 		if (t->target[0] == '!') {
-			return match(t->target, target + 1, 1);
+			return match(t->target + 1, target, 1);
 		} else {
 			return !match(t->target, target, 0);
 		}
