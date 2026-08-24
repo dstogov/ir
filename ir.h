@@ -54,7 +54,51 @@ extern "C" {
 #endif
 
 #ifndef IR_TARGET_TRIPLET
-# error "Undefined IR_TARGRT_TRIPLET"
+# if defined(IR_TARGET_X64)
+#  if defined(_WIN32)
+#   define IR_TARGET_TRIPLET "x86-windows-msvc"
+#  elif defined(__APPLE__)
+#   define IR_TARGET_TRIPLET "x86-darwin"
+#  elif defined(__linux__)
+#   define IR_TARGET_TRIPLET "x86-linux-sysv"
+#  elif defined(__FreeBSD__)
+#   define IR_TARGET_TRIPLET "x86-freebsd-sysv"
+#  elif defined(__NetBSD__)
+#   define IR_TARGET_TRIPLET "x86-netbsd-sysv"
+#  else
+#   define IR_TARGET_TRIPLET "x86-unknown-sysv"
+#  endif
+# elif defined(IR_TARGET_X86)
+#  if defined(_WIN32)
+#   define IR_TARGET_TRIPLET "x86_64-windows-msvc"
+#  elif defined(__APPLE__)
+#   define IR_TARGET_TRIPLET "x86_64-darwin"
+#  elif defined(__linux__)
+#   define IR_TARGET_TRIPLET "x86_64-linux-sysv"
+#  elif defined(__FreeBSD__)
+#   define IR_TARGET_TRIPLET "x86_64-freebsd-sysv"
+#  elif defined(__NetBSD__)
+#   define IR_TARGET_TRIPLET "x86_64-netbsd-sysv"
+#  else
+#   define IR_TARGET_TRIPLET "x86_64-unknown-sysv"
+#  endif
+# elif defined(IR_TARGET_AARCH64)
+#  if defined(_WIN32)
+#   define IR_TARGET_TRIPLET "aarch64-windows"
+#  elif defined(__APPLE__)
+#   define IR_TARGET_TRIPLET "aarch64-darwin"
+#  elif defined(__linux__)
+#   define IR_TARGET_TRIPLET "aarch64-linux-sysv"
+#  elif defined(__FreeBSD__)
+#   define IR_TARGET_TRIPLET "aarch64-freebsd-sysv"
+#  elif defined(__NetBSD__)
+#   define IR_TARGET_TRIPLET "aarch64-netbsd-sysv"
+#  else
+#   define IR_TARGET_TRIPLET "aarch64-unknown-sysv"
+#  endif
+# else
+#  error "Unknown IR_TARGET"
+# endif
 #endif
 
 #if defined(__SIZEOF_SIZE_T__)
