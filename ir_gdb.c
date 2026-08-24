@@ -95,6 +95,9 @@ enum {
 	DW_REG_SP = 31,
 	DW_REG_RA = 30,
 	DW_REG_X29 = 29,
+#elif defined(IR_TARGET_RISCV64)
+	DW_REG_RA = 1,
+	DW_REG_SP = 2,
 #else
 #error "Unsupported target architecture"
 #endif
@@ -164,6 +167,8 @@ static const ir_elf_header ir_elfhdr_template = {
 	.machine     = 62,
 #elif defined(IR_TARGET_AARCH64)
 	.machine     = 183,
+#elif defined(IR_TARGET_RISCV64)
+	.machine     = 243,
 #else
 # error "Unsupported target architecture"
 #endif
@@ -329,6 +334,9 @@ static void ir_gdbjit_ehframe(ir_gdbjit_ctx *ctx, uint32_t sp_offset, uint32_t s
 		DB(DW_CFA_offset|DW_REG_RA); DUV(1);
 #elif defined(IR_TARGET_AARCH64)
 		DB(DW_CFA_def_cfa); DUV(DW_REG_SP); DUV(0);
+#elif defined(IR_TARGET_RISCV64)
+		DB(DW_CFA_def_cfa); DUV(DW_REG_SP); DUV(sizeof(uintptr_t));
+		DB(DW_CFA_offset|DW_REG_RA); DUV(1);
 #endif
 		DALIGNNOP(sizeof(uintptr_t));
 	)

@@ -1068,6 +1068,7 @@ static bool ir_loader_func_process(ir_loader *loader, ir_ctx *ctx, const char *n
 		}
 	}
 
+
 	if (l->dump & IR_DUMP_LLVM) {
 		if (!ir_emit_llvm(ctx, name, l->out_file)) {
 			fprintf(stderr, "\nERROR: %d\n", ctx->status);
