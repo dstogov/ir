@@ -1194,7 +1194,7 @@ int main(int argc, char **argv)
 			printf("IR %s\n", IR_VERSION);
 			return 0;
 		} else if (strcmp(argv[i], "--target") == 0) {
-			printf("%s\n", IR_TARGET);
+			printf("%s\n", IR_TARGET_TRIPLET);
 			return 0;
 		} else if (argv[i][0] == '-' && argv[i][1] == 'O' && strlen(argv[i]) == 3) {
 			if (argv[i][2] == '0') {

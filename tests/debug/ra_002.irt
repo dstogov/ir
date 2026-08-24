@@ -1,7 +1,7 @@
 --TEST--
 002: Register Allocation (spill load into result - movsd (%rsp), %xmm1)
 --TARGET--
-x86_64
+x86_64-*-sysv
 --ARGS--
 -S
 --CODE--

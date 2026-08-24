@@ -1,7 +1,7 @@
 --TEST--
 Simple CALL -O0
 --TARGET--
-x86_64
+x86_64-*-sysv
 --ARGS--
 -S -O0 --run
 --CODE--

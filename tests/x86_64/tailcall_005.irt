@@ -1,7 +1,7 @@
 --TEST--
 005: tailcall: epilogue does not override op2: spilled preserved reg
 --TARGET--
-x86_64
+x86_64-*-sysv
 --ARGS--
 -S --debug-regset 0x00000008
 --CODE--

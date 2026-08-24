@@ -1,7 +1,7 @@
 --TEST--
 001: IF(_, ADD(_,_)) -> JCC
 --TARGET--
-x86_64
+x86_64-*-sysv
 --ARGS--
 -O1 -S
 --CODE--

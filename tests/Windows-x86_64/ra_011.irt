@@ -1,7 +1,7 @@
 --TEST--
 011: Register Allocation (ADD + DIV)
 --TARGET--
-Windows-x86_64
+x86_64-windows
 --ARGS--
 -S
 --CODE--

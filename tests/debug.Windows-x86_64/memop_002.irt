@@ -1,7 +1,7 @@
 --TEST--
 002: Memory update (binary op with reg)
 --TARGET--
-Windows-x86_64
+x86_64-windows
 --ARGS--
 -S
 --CODE--

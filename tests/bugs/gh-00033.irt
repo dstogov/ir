@@ -1,7 +1,7 @@
 --TEST--
 GH-33: IR program failed to compile with "-O0" "-S" options
 --TARGET--
-x86_64
+x86_64-*-sysv
 --ARGS--
 -O0 -S
 --CODE--

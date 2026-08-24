@@ -1,7 +1,7 @@
 --TEST--
 002: tailcall: epilogue does not override op2: spill slot
 --TARGET--
-x86_64
+x86_64-*-sysv
 --ARGS--
 -S --debug-regset 0x00000088
 --CODE--
