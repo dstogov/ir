@@ -15,6 +15,8 @@ BUILD_CC   = gcc
 override CFLAGS += -Wall -Wextra -Wno-unused-parameter
 override BUILD_CFLAGS += -Wall -Wextra -Wno-unused-parameter
 LDFLAGS    = -lm -ldl
+CAPSTONE_LIB = -lcapstone
+EMIT_OBJ    = $(BUILD_DIR)/ir_emit.o
 LLK        = llk
 
 ifeq (debug, $(BUILD))
@@ -48,8 +50,15 @@ else ifneq (, $(filter aarch64 arm64, $(TARGET)))
   DASM_ARCH  = aarch64
   DASM_FLAGS = -M
   TEST_TARGET=aarch64
+else ifneq (, $(filter riscv64, $(TARGET)))
+# CC= riscv64-linux-gnu-gcc
+  override CFLAGS += -DIR_TARGET_RISCV64
+  override BUILD_CFLAGS += -DIR_TARGET_RISCV64
+  DASM_ARCH  = riscv
+  TEST_TARGET=riscv64
+  EMIT_OBJ   = $(BUILD_DIR)/ir_emit_riscv.o
 else
- $(error Unsupported target. TRGET must be 'x86_64', 'x86' or 'aarch64')
+ $(error Unsupported target. TARGET must be 'x86_64', 'x86', 'aarch64' or 'riscv64')
 endif
 
 ifeq (FreeBSD, $(OS))
@@ -76,7 +85,7 @@ else
 endif
 
 OBJS_COMMON = $(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_strtab.o $(BUILD_DIR)/ir_cfg.o \
-	$(BUILD_DIR)/ir_sccp.o $(BUILD_DIR)/ir_gcm.o $(BUILD_DIR)/ir_ra.o $(BUILD_DIR)/ir_emit.o \
+	$(BUILD_DIR)/ir_sccp.o $(BUILD_DIR)/ir_gcm.o $(BUILD_DIR)/ir_ra.o $(EMIT_OBJ) \
 	$(BUILD_DIR)/ir_load.o $(BUILD_DIR)/ir_save.o $(BUILD_DIR)/ir_emit_c.o $(BUILD_DIR)/ir_dump.o \
 	$(BUILD_DIR)/ir_disasm.o $(BUILD_DIR)/ir_gdb.o $(BUILD_DIR)/ir_perf.o $(BUILD_DIR)/ir_check.o \
 	$(BUILD_DIR)/ir_cpuinfo.o $(BUILD_DIR)/ir_emit_llvm.o $(BUILD_DIR)/ir_mem2ssa.o
@@ -91,7 +100,7 @@ $(BUILD_DIR)/libir.a: $(OBJS_COMMON)
 	ar r $@ $^
 
 $(BUILD_DIR)/ir: $(OBJS_IR) $(BUILD_DIR)/libir.a
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LLVM_LIBS) -lcapstone
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LLVM_LIBS) $(CAPSTONE_LIB)
 
 $(OBJS_COMMON): $(SRC_DIR)/ir.h $(SRC_DIR)/ir_private.h
 
@@ -99,6 +108,7 @@ $(BUILD_DIR)/ir_main.o: $(SRC_DIR)/ir.h
 $(BUILD_DIR)/ir.o: $(SRC_DIR)/ir_fold.h $(BUILD_DIR)/ir_fold_hash.h
 $(BUILD_DIR)/ir_ra.o: $(SRC_DIR)/ir_$(DASM_ARCH).h
 $(BUILD_DIR)/ir_emit.o: $(SRC_DIR)/ir_$(DASM_ARCH).h $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h
+$(BUILD_DIR)/ir_emit_riscv.o: $(SRC_DIR)/ir_riscv.h $(SRC_DIR)/ir_riscv_enc.h
 $(BUILD_DIR)/ir_gdb.o: $(SRC_DIR)/ir_elf.h
 $(BUILD_DIR)/ir_perf.o: $(SRC_DIR)/ir_elf.h
 $(BUILD_DIR)/ir_disasm.o: $(SRC_DIR)/ir_elf.h
@@ -145,7 +155,7 @@ install: $(BUILD_DIR)/ir $(BUILD_DIR)/libir.a
 	install -m a+rx $(BUILD_DIR)/ir $(PREFIX)/bin
 	install -m a+r $(BUILD_DIR)/libir.a $(PREFIX)/lib
 	install -m a+r $(SRC_DIR)/ir.h $(SRC_DIR)/ir_builder.h $(SRC_DIR)/ir_private.h \
-		$(SRC_DIR)/ir_x86.h $(SRC_DIR)/ir_aarch64.h $(PREFIX)/include
+		$(SRC_DIR)/ir_x86.h $(SRC_DIR)/ir_aarch64.h $(SRC_DIR)/ir_riscv.h $(PREFIX)/include
 
 uninstall:
 	rm $(PREFIX)/bin/ir
@@ -155,3 +165,4 @@ uninstall:
 	rm $(PREFIX)/include/ir_private.h
 	rm $(PREFIX)/include/ir_x86.h
 	rm $(PREFIX)/include/ir_aarch64.h
+	rm $(PREFIX)/include/ir_riscv.h

@@ -22,6 +22,7 @@
 #include "ir.h"
 #include "ir_private.h"
 
+
 #ifndef _WIN32
 # include "ir_elf.h"
 #endif
@@ -223,6 +224,15 @@ static uint64_t ir_disasm_branch_target(csh cs, const cs_insn *insn)
 				return insn->detail->arm64.operands[i].imm;
 		}
 	}
+#elif defined(IR_TARGET_RISCV64)
+	if (cs_insn_group(cs, insn, RISCV_GRP_JUMP)
+	 || cs_insn_group(cs, insn, RISCV_GRP_BRANCH_RELATIVE)
+	 || insn->id == RISCV_INS_JAL) {
+		for (i = 0; i < insn->detail->riscv.op_count; i++) {
+			if (insn->detail->riscv.operands[i].type == RISCV_OP_IMM)
+				return insn->detail->riscv.operands[i].imm + insn->address;
+		}
+	}
 #endif
 
 	return 0;
@@ -378,6 +388,14 @@ int ir_disasm(const char    *name,
 	ret = cs_open(CS_ARCH_ARM64, CS_MODE_ARM, &cs);
 	if (ret != CS_ERR_OK) {
 		fprintf(stderr, "cs_open(CS_ARCH_ARM64, CS_MODE_ARM, ...) failed; [%d] %s\n", ret, cs_strerror(ret));
+		return 0;
+	}
+	cs_option(cs, CS_OPT_DETAIL, CS_OPT_ON);
+	cs_option(cs, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+# elif defined(IR_TARGET_RISCV64)
+	ret = cs_open(CS_ARCH_RISCV, CS_MODE_RISCV64, &cs);
+	if (ret != CS_ERR_OK) {
+		fprintf(stderr, "cs_open(CS_ARCH_RISCV, CS_MODE_RISCV64, ...) failed; [%d] %s\n", ret, cs_strerror(ret));
 		return 0;
 	}
 	cs_option(cs, CS_OPT_DETAIL, CS_OPT_ON);
@@ -574,6 +592,52 @@ int ir_disasm(const char    *name,
 					fprintf(f, "%s\n", q);
 					continue;
 				}
+			}
+		}
+#endif
+#if defined(IR_TARGET_RISCV64)
+		/* riscv64 branches/jumps show relative offsets (not absolute
+		 * addresses), so replace the target with a symbol/label here. */
+		if ((addr = ir_disasm_branch_target(cs, insn))) {
+			entry = ir_hashtab_find(&labels, (uint32_t)((uintptr_t)addr - (uintptr_t)start));
+			if (entry != (ir_ref)IR_INVALID_VAL) {
+				q = strrchr(p, ',');
+				if (q) {
+					q++;
+					while (*q == ' ') q++;
+				} else {
+					q = p;
+				}
+				if (q > p) {
+					fwrite(p, 1, q - p, f);
+				}
+				if (entry >= 0) {
+					fprintf(f, ".ENTRY_%d\n", entry);
+				} else {
+					fprintf(f, ".L%d\n", -entry);
+				}
+				continue;
+			} else if ((sym = ir_disasm_resolver(addr, &offset))) {
+				q = strrchr(p, ',');
+				if (q) {
+					q++;
+					while (*q == ' ') q++;
+				} else {
+					q = p;
+				}
+				if (q > p) {
+					fwrite(p, 1, q - p, f);
+				}
+				fputs(sym, f);
+				if (offset != 0) {
+					if (offset > 0) {
+						fprintf(f, "+0x%" PRIx64, offset);
+					} else {
+						fprintf(f, "-0x%" PRIx64, -offset);
+					}
+				}
+				fprintf(f, "\n");
+				continue;
 			}
 		}
 #endif
