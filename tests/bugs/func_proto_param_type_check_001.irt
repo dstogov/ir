@@ -1,0 +1,15 @@
+--TEST--
+Function body PARAM types must match the declared prototype
+--CODE--
+func foo(int32_t, double): int32_t
+{
+	l_1 = START(l_4);
+	int32_t d_2 = PARAM(l_1, "a", 1);
+	int32_t d_3 = PARAM(l_1, "b", 2);
+	l_4 = RETURN(l_1, d_2);
+}
+--EXPECT--
+parameter 1 type doesn't match function signature
+ERROR: function signature mismatch for 'foo' at line 8
+
+exit code = 2

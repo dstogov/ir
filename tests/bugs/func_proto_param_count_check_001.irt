@@ -1,0 +1,14 @@
+--TEST--
+Function body must not omit PARAM instructions declared in the prototype
+--CODE--
+func foo(int32_t, int32_t): int32_t
+{
+	l_1 = START(l_4);
+	int32_t d_2 = PARAM(l_1, "a", 1);
+	l_4 = RETURN(l_1, d_2);
+}
+--EXPECT--
+parameter count doesn't match function signature
+ERROR: function signature mismatch for 'foo' at line 7
+
+exit code = 2
