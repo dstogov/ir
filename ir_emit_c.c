@@ -779,9 +779,34 @@ static void ir_emit_switch(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn
 	fprintf(f, "\t}\n");
 }
 
+static void ir_emit_func_ptr_cast(FILE *f, const ir_proto_t *proto, ir_type ret_type)
+{
+	uint32_t i;
+
+	ir_emit_c_type_name(proto ? proto->ret_type : ret_type, f);
+	fprintf(f, " (*)(");
+	if (proto && proto->params_count) {
+		for (i = 0; i < proto->params_count; i++) {
+			if (i) {
+				fprintf(f, ", ");
+			}
+			ir_emit_c_type_name(proto->param_types[i], f);
+		}
+		if (proto->flags & IR_VARARG_FUNC) {
+			fprintf(f, ", ...");
+		}
+	} else if (proto && (proto->flags & IR_VARARG_FUNC)) {
+		fprintf(f, "...");
+	} else {
+		fprintf(f, "void");
+	}
+	fprintf(f, "))");
+}
+
 static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 {
 	int j, n;
+	const ir_proto_t *proto = ir_call_proto(ctx, insn);
 
 	if (insn->type != IR_VOID && ctx->vregs[def] != IR_UNUSED) {
 		ir_emit_def_ref(ctx, f, def);
@@ -789,8 +814,15 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 		fprintf(f, "\t");
 	}
 	if (IR_IS_CONST_REF(insn->op2)) {
-		IR_ASSERT(ctx->ir_base[insn->op2].op == IR_FUNC);
-		fprintf(f, "%s", ir_get_str(ctx, ctx->ir_base[insn->op2].val.name));
+		if (ctx->ir_base[insn->op2].op == IR_FUNC) {
+			fprintf(f, "%s", ir_get_str(ctx, ctx->ir_base[insn->op2].val.name));
+		} else {
+		    IR_ASSERT(ctx->ir_base[insn->op2].op == IR_FUNC_ADDR);
+			fprintf(f, "((");
+			ir_emit_func_ptr_cast(f, proto, insn->type);
+			ir_emit_ref(ctx, f, insn->op2);
+			fprintf(f, ")");
+		}
 	} else {
 		ir_emit_ref(ctx, f, insn->op2);
 	}
@@ -812,6 +844,7 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 static void ir_emit_tailcall(ir_ctx *ctx, FILE *f, ir_insn *insn)
 {
 	int j, n;
+	const ir_proto_t *proto = ir_call_proto(ctx, insn);
 
 	if (insn->type != IR_VOID) {
 		fprintf(f, "\treturn ");
@@ -819,8 +852,15 @@ static void ir_emit_tailcall(ir_ctx *ctx, FILE *f, ir_insn *insn)
 		fprintf(f, "\t");
 	}
 	if (IR_IS_CONST_REF(insn->op2)) {
-		IR_ASSERT(ctx->ir_base[insn->op2].op == IR_FUNC);
-		fprintf(f, "%s", ir_get_str(ctx, ctx->ir_base[insn->op2].val.name));
+		if (ctx->ir_base[insn->op2].op == IR_FUNC) {
+			fprintf(f, "%s", ir_get_str(ctx, ctx->ir_base[insn->op2].val.name));
+		} else {
+            IR_ASSERT(ctx->ir_base[insn->op2].op == IR_FUNC_ADDR);
+			fprintf(f, "((");
+			ir_emit_func_ptr_cast(f, proto, insn->type);
+			ir_emit_ref(ctx, f, insn->op2);
+			fprintf(f, ")");
+		}
 	} else {
 		ir_emit_ref(ctx, f, insn->op2);
 	}
