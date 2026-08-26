@@ -3653,7 +3653,7 @@ static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref con
 			&& !IR_IS_SYM_CONST(ctx->ir_base[condition_insn->op2].op)) {
 		uint64_t c1, c2 = ctx->ir_base[condition_insn->op2].val.u64;
 		ir_insn *op1_insn = &ctx->ir_base[condition_insn->op1];
-		ir_val val;
+		ir_val val = {0};
 
 		if (op1_insn->op == IR_SHL
 		 && ctx->use_lists[condition_insn->op1].count == 1
