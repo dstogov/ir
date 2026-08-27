@@ -900,6 +900,9 @@ IR_ALWAYS_INLINE ir_type ir_make_vector_type(ir_type base, uint8_t length)
 {
 	IR_ASSERT(IR_IS_TYPE_SCALAR(base) && length > 0 && length <= 64 && (length & (length - 1)) == 0);
 
+	if (base == IR_CHAR) {
+		base = IR_I8;
+	}
 	return base | ((ir_ntz(length) + 1) << 4);
 }
 
