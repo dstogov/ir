@@ -1199,6 +1199,7 @@ struct _ir_block {
 	union {
 		uint32_t loop_depth;
 		uint32_t next_succ;      /* used temporary for iterative Post Ordering */
+		uint32_t next_loop;      /* used temporary for loop nesting tree       */
 	};
 };
 

@@ -77,15 +77,15 @@
 #BB7: end=l_17, idom=BB6(3), pred(1)=[BB6], succ(1)=[BB8]
 	l_16 = IF_FALSE(l_15);
 	l_17 = END(l_16);
-#BB8: end=l_20, idom=BB2(2), loop=HDR,BB12(2), IRREDUCIBLE, pred(3)=[BB7, BB10, BB14], succ(2)=[BB9, BB16]
+#BB8: end=l_20, idom=BB2(2), loop=HDR,BB12(3), IRREDUCIBLE, pred(3)=[BB7, BB10, BB14], succ(2)=[BB9, BB16]
 	l_18 = LOOP_BEGIN/3(l_17, l_25, l_34);
 	uint32_t d_19, l_19 = RLOAD(l_18, 15);
 	l_20 = IF(l_19, d_19);
-#BB9: end=l_23, idom=BB8(3), loop=BB8(2), pred(1)=[BB8], succ(2)=[BB10, BB11]
+#BB9: end=l_23, idom=BB8(3), loop=BB8(3), pred(1)=[BB8], succ(2)=[BB10, BB11]
 	l_21 = IF_FALSE(l_20);
 	uintptr_t d_22, l_22 = RLOAD(l_21, 14);
 	l_23 = IF(l_22, d_22);
-#BB10: end=l_25, idom=BB9(4), loop=BB8(2), pred(1)=[BB9], succ(1)=[BB8]
+#BB10: end=l_25, idom=BB9(4), loop=BB8(3), pred(1)=[BB9], succ(1)=[BB8]
 	l_24 = IF_TRUE(l_23, 1);
 	l_25 = LOOP_END(l_24);
 #BB11: end=l_27, idom=BB9(4), loop=BB12(2), pred(1)=[BB9], succ(1)=[BB12]

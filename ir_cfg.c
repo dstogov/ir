@@ -994,7 +994,7 @@ static bool ir_dominates(const ir_block *blocks, uint32_t b1, uint32_t b2)
 #define ENTRY_TIME(b) times[(b) * 2]
 #define EXIT_TIME(b)  times[(b) * 2 + 1]
 
-static IR_NEVER_INLINE void ir_collect_irreducible_loops(ir_ctx *ctx, uint32_t *times, ir_worklist *work, ir_list *list)
+static IR_NEVER_INLINE uint32_t ir_collect_irreducible_loops(ir_ctx *ctx, uint32_t loops, uint32_t *times, ir_worklist *work, ir_list *list)
 {
 	ir_block *blocks = ctx->cfg_blocks;
 	uint32_t *edges = ctx->cfg_edges;
@@ -1021,12 +1021,13 @@ static IR_NEVER_INLINE void ir_collect_irreducible_loops(ir_ctx *ctx, uint32_t *
 		ir_block *bb = &blocks[hdr];
 
 		IR_ASSERT(bb->flags & IR_BB_IRREDUCIBLE_LOOP);
-		IR_ASSERT(!bb->loop_depth);
-		if (!bb->loop_depth) {
+		IR_ASSERT(!(bb->flags & IR_BB_LOOP_HEADER));
+		if (!(bb->flags & IR_BB_LOOP_HEADER)) {
 			/* process irreducible loop */
 
 			bb->flags |= IR_BB_LOOP_HEADER;
-			bb->loop_depth = 1;
+			bb->next_loop = loops;
+			loops = hdr;
 			if (ctx->ir_base[bb->start].op == IR_MERGE) {
 				ctx->ir_base[bb->start].op = IR_LOOP_BEGIN;
 			}
@@ -1083,6 +1084,8 @@ static IR_NEVER_INLINE void ir_collect_irreducible_loops(ir_ctx *ctx, uint32_t *
 			}
 		}
 	}
+
+	return loops;
 }
 
 int ir_find_loops(ir_ctx *ctx)
@@ -1092,6 +1095,7 @@ int ir_find_loops(ir_ctx *ctx)
 	ir_block *blocks = ctx->cfg_blocks;
 	uint32_t *edges = ctx->cfg_edges;
 	ir_worklist work;
+	uint32_t loops = 0; /* linked list of identified loops ordered by dom_depth */
 
 	if (ctx->flags2 & IR_NO_LOOPS) {
 		return 1;
@@ -1163,7 +1167,7 @@ next:
 		IR_ASSERT(bb->dom_depth <= prev_dom_depth);
 
 		if (UNEXPECTED(bb->dom_depth < irreducible_depth)) {
-			ir_collect_irreducible_loops(ctx, times, &work, &irreducible_list);
+			loops = ir_collect_irreducible_loops(ctx, loops, times, &work, &irreducible_list);
 			irreducible_depth = 0;
 		}
 
@@ -1210,8 +1214,9 @@ next:
 				uint32_t hdr = b;
 
 				bb->flags |= IR_BB_LOOP_HEADER;
+				bb->next_loop = loops;
+				loops = b;
 				ctx->flags2 |= IR_CFG_HAS_LOOPS;
-				bb->loop_depth = 1;
 				if (ctx->ir_base[bb->start].op == IR_MERGE) {
 					ctx->ir_base[bb->start].op = IR_LOOP_BEGIN;
 				}
@@ -1253,36 +1258,43 @@ next:
 		ir_list_free(&irreducible_list);
 	}
 
-	if (ctx->flags2 & IR_CFG_HAS_LOOPS) {
-		n = ctx->cfg_blocks_count + 1;
-		for (j = 1; j < n; j++) {
-			b = sorted_blocks[j];
-			ir_block *bb = &blocks[b];
-			if (bb->loop_header > 0) {
-				ir_block *loop = &blocks[bb->loop_header];
-				uint32_t loop_depth = loop->loop_depth;
+	if (loops) {
+		ir_block *bb;
 
-				if (bb->flags & IR_BB_LOOP_HEADER) {
-					loop_depth++;
+		/* Set loop_depth for loop headers */
+		b = loops;
+		do {
+			bb = &blocks[b];
+			b = bb->next_loop;
+			IR_ASSERT(bb->flags & IR_BB_LOOP_HEADER);
+			bb->loop_depth = (bb->loop_header) ? blocks[bb->loop_header].loop_depth + 1 : 1;
+		} while (b);
+
+		/* Set loop_depth for loop members */
+		n = ctx->cfg_blocks_count + 1;
+		for (j = 1, bb = blocks + 1; j < n; bb++, j++) {
+			if (bb->loop_header) {
+				if (!(bb->flags & IR_BB_LOOP_HEADER)) {
+					bb->loop_depth = blocks[bb->loop_header].loop_depth;
 				}
-				bb->loop_depth = loop_depth;
-				if (bb->flags & (IR_BB_ENTRY|IR_BB_LOOP_WITH_ENTRY)) {
-					loop->flags |= IR_BB_LOOP_WITH_ENTRY;
-					if (loop_depth > 1) {
-						/* Set IR_BB_LOOP_WITH_ENTRY flag for all the enclosing loops */
-						bb = &blocks[loop->loop_header];
-						while (1) {
-							if (bb->flags & IR_BB_LOOP_WITH_ENTRY) {
-								break;
-							}
-							bb->flags |= IR_BB_LOOP_WITH_ENTRY;
-							if (bb->loop_depth == 1) {
-								break;
-							}
-							bb = &blocks[loop->loop_header];
-						}
+				if (bb->flags & IR_BB_ENTRY) {
+					if (bb->flags & IR_BB_LOOP_HEADER) {
+						bb->flags |= IR_BB_LOOP_WITH_ENTRY;
 					}
+					/* Set IR_BB_LOOP_WITH_ENTRY flag for all the enclosing loops */
+					b = bb->loop_header;
+					do {
+						ir_block *loop = &blocks[b];
+						if (loop->flags & IR_BB_LOOP_WITH_ENTRY) {
+							break;
+						}
+						loop->flags |= IR_BB_LOOP_WITH_ENTRY;
+						b = loop->loop_header;
+					} while (b);
 				}
+			} else if ((bb->flags & (IR_BB_LOOP_HEADER|IR_BB_ENTRY|IR_BB_LOOP_WITH_ENTRY)) ==
+					(IR_BB_LOOP_HEADER|IR_BB_ENTRY)) {
+				bb->flags |= IR_BB_LOOP_WITH_ENTRY;
 			}
 		}
 	}
