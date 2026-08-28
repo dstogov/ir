@@ -859,7 +859,7 @@ IR_ALWAYS_INLINE bool ir_is_good_bb_order(ir_ctx *ctx, uint32_t b, ir_block *bb,
 				} else if ((bb->flags & IR_BB_LOOP_HEADER)
 				  && (input_b == b || ctx->cfg_blocks[input_b].loop_header == b)) {
 					/* back-edge of reducible loop */
-				} else if ((bb->flags & IR_BB_IRREDUCIBLE_LOOP)
+				} else if (UNEXPECTED(bb->flags & IR_BB_IRREDUCIBLE_LOOP)
 				  && (ctx->cfg_blocks[input_b].loop_header == bb->loop_header)) {
 					/* closing edge of irreducible loop */
 				} else {
@@ -868,6 +868,37 @@ IR_ALWAYS_INLINE bool ir_is_good_bb_order(ir_ctx *ctx, uint32_t b, ir_block *bb,
 			}
 		}
 		return 1;
+	}
+}
+
+static bool ir_belongs_to_loop(ir_ctx *ctx, uint32_t loop_header, uint32_t b)
+{
+	uint32_t loop_depth = ctx->cfg_blocks[loop_header].loop_depth;
+	ir_block *bb = &ctx->cfg_blocks[b];
+
+	if (bb->loop_depth < loop_depth) {
+		return 0;
+	} else if (bb->loop_depth == loop_depth) {
+		if (bb->flags & IR_BB_LOOP_HEADER) {
+			return b == loop_header;
+		} else {
+			return bb->loop_header == loop_header;
+		}
+	} else {
+		while (bb->loop_depth > loop_depth) {
+			b = bb->loop_header;
+			bb = &ctx->cfg_blocks[b];
+		}
+		return bb->loop_header == loop_header;
+	}
+}
+
+static bool ir_is_irreducable_loop_side_entry(ir_ctx *ctx, ir_block *entry, uint32_t from)
+{
+	if (entry->flags & IR_BB_LOOP_HEADER) {
+		return 0;
+	} else {
+		return !ir_belongs_to_loop(ctx, entry->loop_header, from);
 	}
 }
 
@@ -904,10 +935,8 @@ next:
 			succ = ctx->cfg_edges[bb->successors];
 			if (ir_bitset_in(worklist.visited, succ)) {
 				/* already processed */
-			} else if ((ctx->cfg_blocks[succ].flags & IR_BB_IRREDUCIBLE_LOOP)
-					&& ((ctx->cfg_blocks[b].flags & IR_BB_LOOP_HEADER) ?
-						(ctx->cfg_blocks[succ].loop_header != b) :
-						(ctx->cfg_blocks[succ].loop_header != ctx->cfg_blocks[b].loop_header))) {
+			} else if (UNEXPECTED(ctx->cfg_blocks[succ].flags & IR_BB_IRREDUCIBLE_LOOP)
+					&& ir_is_irreducable_loop_side_entry(ctx, &ctx->cfg_blocks[succ], b)) {
 				/* "side" entry of irreducible loop (ignore) */
 			} else if (ir_worklist_push(&worklist, succ)) {
 				goto next;
@@ -922,10 +951,8 @@ next:
 				succ = *q;
 				if (ir_bitset_in(worklist.visited, succ)) {
 					/* already processed */
-				} else if ((ctx->cfg_blocks[succ].flags & IR_BB_IRREDUCIBLE_LOOP)
-						&& ((ctx->cfg_blocks[b].flags & IR_BB_LOOP_HEADER) ?
-							(ctx->cfg_blocks[succ].loop_header != b) :
-							(ctx->cfg_blocks[succ].loop_header != ctx->cfg_blocks[b].loop_header))) {
+				} else if (UNEXPECTED(ctx->cfg_blocks[succ].flags & IR_BB_IRREDUCIBLE_LOOP)
+						&& ir_is_irreducable_loop_side_entry(ctx, &ctx->cfg_blocks[succ], b)) {
 					/* "side" entry of irreducible loop (ignore) */
 				} else if (!best) {
 					best = succ;
