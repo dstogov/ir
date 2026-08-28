@@ -77,6 +77,9 @@ fuzz-graph-O2: $(GRAPH_SRCS)
 corpus:
 	./make_corpus.sh $(SRC_DIR)/tests corpus
 
+corpus-graph:
+	./make_graph_corpus.sh corpus/graph
+
 clean:
 	rm -rf $(BUILD_DIR)
 
@@ -84,4 +87,4 @@ corpus-clean:
 	rm -rf corpus/text
 
 .PHONY: all fuzz fuzz-text-load fuzz-text-O0 fuzz-text-O1 fuzz-text-O2 \
-	fuzz-graph-O0 fuzz-graph-O1 fuzz-graph-O2 corpus clean corpus-clean
+	fuzz-graph-O0 fuzz-graph-O1 fuzz-graph-O2 corpus corpus-graph clean corpus-clean
