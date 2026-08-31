@@ -307,6 +307,9 @@ static void ir_dump_cfg_block(ir_ctx *ctx, FILE *f, uint32_t b, ir_block *bb)
 	if (bb->flags & IR_BB_IRREDUCIBLE_LOOP) {
 		fprintf(stderr, "\tIRREDUCIBLE_LOOP\n");
 	}
+	if (bb->flags & IR_BB_IRREDUCIBLE_ENTRY) {
+		fprintf(stderr, "\tIRREDUCIBLE_ENTRY\n");
+	}
 	if (bb->loop_header > 0) {
 		fprintf(f, "\tloop_header=BB%d\n", bb->loop_header);
 	}

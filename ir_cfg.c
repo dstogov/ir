@@ -1074,7 +1074,8 @@ static IR_NEVER_INLINE uint32_t ir_collect_irreducible_loops(ir_ctx *ctx, uint32
 								ir_worklist_push(work, pred);
 						} else if (bb->predecessors_count > 1) {
 							/* another entry to the irreducible loop */
-							bb->flags |= IR_BB_IRREDUCIBLE_LOOP;
+							IR_ASSERT(!(bb->flags & IR_BB_IRREDUCIBLE_LOOP));
+							bb->flags |= IR_BB_IRREDUCIBLE_ENTRY;
 							if (ctx->ir_base[bb->start].op == IR_MERGE) {
 								ctx->ir_base[bb->start].op = IR_LOOP_BEGIN;
 							}

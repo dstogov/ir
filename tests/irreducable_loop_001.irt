@@ -77,7 +77,7 @@
 #BB7: end=l_17, idom=BB6(3), pred(1)=[BB6], succ(1)=[BB8]
 	l_16 = IF_FALSE(l_15);
 	l_17 = END(l_16);
-#BB8: end=l_20, idom=BB2(2), loop=HDR,BB12(3), IRREDUCIBLE, pred(3)=[BB7, BB10, BB14], succ(2)=[BB9, BB16]
+#BB8: end=l_20, idom=BB2(2), loop=HDR,BB12(3), IRREDUCIBLE_ENTRY, pred(3)=[BB7, BB10, BB14], succ(2)=[BB9, BB16]
 	l_18 = LOOP_BEGIN/3(l_17, l_25, l_34);
 	uint32_t d_19, l_19 = RLOAD(l_18, 15);
 	l_20 = IF(l_19, d_19);

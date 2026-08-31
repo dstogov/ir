@@ -1157,28 +1157,29 @@ void ir_iter_cleanup(ir_ctx *ctx);
 #define IR_IS_BB_END(op) \
 	((ir_op_flags[op] & IR_OP_FLAG_BB_END) != 0)
 
-#define IR_BB_UNREACHABLE      (1<<0)
-#define IR_BB_START            (1<<1)
-#define IR_BB_ENTRY            (1<<2)
-#define IR_BB_LOOP_HEADER      (1<<3)
-#define IR_BB_IRREDUCIBLE_LOOP (1<<4)
-#define IR_BB_DESSA_MOVES      (1<<5) /* translation out of SSA requires MOVEs */
-#define IR_BB_EMPTY            (1<<6)
-#define IR_BB_PREV_EMPTY_ENTRY (1<<7)
-#define IR_BB_OSR_ENTRY_LOADS  (1<<8) /* OSR Entry-point with register LOADs   */
-#define IR_BB_LOOP_WITH_ENTRY  (1<<9) /* set together with LOOP_HEADER if there is an ENTRY in the loop */
+#define IR_BB_UNREACHABLE       (1<<0)
+#define IR_BB_START             (1<<1)
+#define IR_BB_ENTRY             (1<<2)
+#define IR_BB_LOOP_HEADER       (1<<3)
+#define IR_BB_IRREDUCIBLE_LOOP  (1<<4)
+#define IR_BB_IRREDUCIBLE_ENTRY (1<<5)
+#define IR_BB_DESSA_MOVES       (1<<6) /* translation out of SSA requires MOVEs */
+#define IR_BB_EMPTY             (1<<7)
+#define IR_BB_PREV_EMPTY_ENTRY  (1<<8)
+#define IR_BB_OSR_ENTRY_LOADS   (1<<9) /* OSR Entry-point with register LOADs   */
+#define IR_BB_LOOP_WITH_ENTRY   (1<<10) /* set together with LOOP_HEADER if there is an ENTRY in the loop */
 
 /* The following flags are set by GCM */
-#define IR_BB_HAS_PHI          (1<<10)
-#define IR_BB_HAS_PI           (1<<11)
-#define IR_BB_HAS_PARAM        (1<<12)
-#define IR_BB_HAS_VAR          (1<<13)
+#define IR_BB_HAS_PHI           (1<<11)
+#define IR_BB_HAS_PI            (1<<12)
+#define IR_BB_HAS_PARAM         (1<<13)
+#define IR_BB_HAS_VAR           (1<<14)
 
 /* The following flags are set by BB scheduler */
-#define IR_BB_ALIGN_LOOP       (1<<14)
+#define IR_BB_ALIGN_LOOP        (1<<15)
 
-#define IR_BB_DESSA_TMP_INT    (1<<15) /* translation out of SSA may need temporary genral purpose register */
-#define IR_BB_DESSA_TMP_FP     (1<<16) /* translation out of SSA may need temporary floating point register */
+#define IR_BB_DESSA_TMP_INT     (1<<16) /* translation out of SSA may need temporary genral purpose register */
+#define IR_BB_DESSA_TMP_FP      (1<<17) /* translation out of SSA may need temporary floating point register */
 
 struct _ir_block {
 	uint32_t flags;

@@ -267,6 +267,9 @@ void ir_save(const ir_ctx *ctx, uint32_t save_flags, FILE *f)
 			if (bb->flags & IR_BB_IRREDUCIBLE_LOOP) {
 				fprintf(f, ", IRREDUCIBLE");
 			}
+			if (bb->flags & IR_BB_IRREDUCIBLE_ENTRY) {
+				fprintf(f, ", IRREDUCIBLE_ENTRY");
+			}
 			if (bb->predecessors_count) {
 				uint32_t i;
 

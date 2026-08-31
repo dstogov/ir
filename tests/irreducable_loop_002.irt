@@ -77,7 +77,7 @@ ir_find_loops() may miss loop paths targeted into nested irreducible loops
 #BB4: end=l_14, idom=BB2(2), loop=BB2(1), pred(1)=[BB2], succ(1)=[BB5]
 	l_13 = IF_FALSE(l_10);
 	l_14 = END(l_13);
-#BB5: end=l_16, idom=BB2(2), loop=BB6(3), IRREDUCIBLE, pred(2)=[BB4, BB13], succ(1)=[BB6]
+#BB5: end=l_16, idom=BB2(2), loop=BB6(3), IRREDUCIBLE_ENTRY, pred(2)=[BB4, BB13], succ(1)=[BB6]
 	l_15 = LOOP_BEGIN(l_14, l_32);
 	l_16 = END(l_15);
 #BB6: end=l_18, idom=BB2(2), loop=HDR,BB9(3), IRREDUCIBLE, pred(2)=[BB5, BB10], succ(2)=[BB7, BB8]
