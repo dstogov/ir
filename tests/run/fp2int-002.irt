@@ -1,0 +1,231 @@
+--TEST--
+FP2INT 002:
+--ARGS--
+--run
+--CODE--
+func @main(): int32_t;
+extern func @printf(uintptr_t, ...): int32_t;
+func @f2i(uintptr_t): int32_t;
+func @d2i(uintptr_t): int32_t;
+func @f2u(uintptr_t): uint32_t;
+func @d2u(uintptr_t): uint32_t;
+func @f2ll(uintptr_t): int64_t;
+func @d2ll(uintptr_t): int64_t;
+func @f2ull(uintptr_t): uint64_t;
+func @d2ull(uintptr_t): uint64_t;
+static const @str.1[7] = "%d %d\n\000";
+static const @str.2[7] = "%u %u\n\000";
+static const @str.3[11] = "%lld %lld\n\000";
+static const @str.4[11] = "%llu %llu\n\000";
+func @main(): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	float c_4 = -2.147480064000000000000000e+09;
+	float c_5 = 2.147480064000000000000000e+09;
+	uintptr_t c_6 = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t c_7 = func @f2i(uintptr_t): int32_t;
+	uintptr_t c_8 = sym(@str.1);
+	double c_9 = -2.14748e+09;
+	double c_10 = 2.14748e+09;
+	uintptr_t c_11 = func @d2i(uintptr_t): int32_t;
+	float c_12 = 4.294960128000000000000000e+09;
+	uintptr_t c_13 = func @f2u(uintptr_t): uint32_t;
+	uintptr_t c_14 = sym(@str.2);
+	double c_15 = 4.29496e+09;
+	uintptr_t c_16 = func @d2u(uintptr_t): uint32_t;
+	float c_17 = -9.223369837831520256000000e+18;
+	float c_18 = 9.223369837831520256000000e+18;
+	uintptr_t c_19 = func @f2ll(uintptr_t): int64_t;
+	uintptr_t c_20 = sym(@str.3);
+	double c_21 = -9.22337e+18;
+	double c_22 = 9.22337e+18;
+	uintptr_t c_23 = func @d2ll(uintptr_t): int64_t;
+	float c_24 = 1.844670009324444057600000e+19;
+	uintptr_t c_25 = func @f2ull(uintptr_t): uint64_t;
+	uintptr_t c_26 = sym(@str.4);
+	double c_27 = 1.84467e+19;
+	uintptr_t c_28 = func @d2ull(uintptr_t): uint64_t;
+	int32_t c_29 = 0;
+#BB1: end=l_82
+	l_1 = START(l_82);
+	float d_2 = VAR(l_1, "f1");
+	float d_3 = VAR(l_1, "f2");
+	double d_4 = VAR(l_1, "d1");
+	double d_5 = VAR(l_1, "d2");
+	float d_6 = VAR(l_1, "f3");
+	float d_7 = VAR(l_1, "f4");
+	double d_8 = VAR(l_1, "d3");
+	double d_9 = VAR(l_1, "d4");
+	float d_10 = VAR(l_1, "f5");
+	float d_11 = VAR(l_1, "f6");
+	double d_12 = VAR(l_1, "d5");
+	double d_13 = VAR(l_1, "d6");
+	float d_14 = VAR(l_1, "f7");
+	float d_15 = VAR(l_1, "f8");
+	double d_16 = VAR(l_1, "d7");
+	double d_17 = VAR(l_1, "d8");
+	l_18 = VSTORE(l_1, d_2, c_4);
+	l_19 = VSTORE(l_18, d_3, c_5);
+	uintptr_t d_20 = VADDR(d_2);
+	int32_t d_21, l_21 = CALL/1(l_19, c_7, d_20);
+	uintptr_t d_22 = VADDR(d_3);
+	int32_t d_23, l_23 = CALL/1(l_21, c_7, d_22);
+	int32_t d_24, l_24 = CALL/3(l_23, c_6, c_8, d_21, d_23);
+	l_26 = VSTORE(l_24, d_4, c_9);
+	l_27 = VSTORE(l_26, d_5, c_10);
+	uintptr_t d_28 = VADDR(d_4);
+	int32_t d_29, l_29 = CALL/1(l_27, c_11, d_28);
+	uintptr_t d_30 = VADDR(d_5);
+	int32_t d_31, l_31 = CALL/1(l_29, c_11, d_30);
+	int32_t d_32, l_32 = CALL/3(l_31, c_6, c_8, d_29, d_31);
+	l_34 = VSTORE(l_32, d_6, c_5);
+	l_35 = VSTORE(l_34, d_7, c_12);
+	uintptr_t d_36 = VADDR(d_6);
+	uint32_t d_37, l_37 = CALL/1(l_35, c_13, d_36);
+	uintptr_t d_38 = VADDR(d_7);
+	uint32_t d_39, l_39 = CALL/1(l_37, c_13, d_38);
+	int32_t d_40, l_40 = CALL/3(l_39, c_6, c_14, d_37, d_39);
+	l_42 = VSTORE(l_40, d_8, c_10);
+	l_43 = VSTORE(l_42, d_9, c_15);
+	uintptr_t d_44 = VADDR(d_8);
+	uint32_t d_45, l_45 = CALL/1(l_43, c_16, d_44);
+	uintptr_t d_46 = VADDR(d_9);
+	uint32_t d_47, l_47 = CALL/1(l_45, c_16, d_46);
+	int32_t d_48, l_48 = CALL/3(l_47, c_6, c_14, d_45, d_47);
+	l_50 = VSTORE(l_48, d_10, c_17);
+	l_51 = VSTORE(l_50, d_11, c_18);
+	uintptr_t d_52 = VADDR(d_10);
+	int64_t d_53, l_53 = CALL/1(l_51, c_19, d_52);
+	uintptr_t d_54 = VADDR(d_11);
+	int64_t d_55, l_55 = CALL/1(l_53, c_19, d_54);
+	int32_t d_56, l_56 = CALL/3(l_55, c_6, c_20, d_53, d_55);
+	l_58 = VSTORE(l_56, d_12, c_21);
+	l_59 = VSTORE(l_58, d_13, c_22);
+	uintptr_t d_60 = VADDR(d_12);
+	int64_t d_61, l_61 = CALL/1(l_59, c_23, d_60);
+	uintptr_t d_62 = VADDR(d_13);
+	int64_t d_63, l_63 = CALL/1(l_61, c_23, d_62);
+	int32_t d_64, l_64 = CALL/3(l_63, c_6, c_20, d_61, d_63);
+	l_66 = VSTORE(l_64, d_14, c_18);
+	l_67 = VSTORE(l_66, d_15, c_24);
+	uintptr_t d_68 = VADDR(d_14);
+	uint64_t d_69, l_69 = CALL/1(l_67, c_25, d_68);
+	uintptr_t d_70 = VADDR(d_15);
+	uint64_t d_71, l_71 = CALL/1(l_69, c_25, d_70);
+	int32_t d_72, l_72 = CALL/3(l_71, c_6, c_26, d_69, d_71);
+	l_74 = VSTORE(l_72, d_16, c_22);
+	l_75 = VSTORE(l_74, d_17, c_27);
+	uintptr_t d_76 = VADDR(d_16);
+	uint64_t d_77, l_77 = CALL/1(l_75, c_28, d_76);
+	uintptr_t d_78 = VADDR(d_17);
+	uint64_t d_79, l_79 = CALL/1(l_77, c_28, d_78);
+	int32_t d_80, l_80 = CALL/3(l_79, c_6, c_26, d_77, d_79);
+	l_82 = RETURN(l_80, c_29);
+}
+func @f2i(uintptr_t): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+#BB1: end=l_5
+	l_1 = START(l_5);
+	uintptr_t d_2 = PARAM(l_1, "f", 1);
+	float d_3, l_3 = LOAD(l_1, d_2);
+	int32_t d_4 = FP2INT(d_3);
+	l_5 = RETURN(l_3, d_4);
+}
+func @d2i(uintptr_t): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+#BB1: end=l_5
+	l_1 = START(l_5);
+	uintptr_t d_2 = PARAM(l_1, "d", 1);
+	double d_3, l_3 = LOAD(l_1, d_2);
+	int32_t d_4 = FP2INT(d_3);
+	l_5 = RETURN(l_3, d_4);
+}
+func @f2u(uintptr_t): uint32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+#BB1: end=l_5
+	l_1 = START(l_5);
+	uintptr_t d_2 = PARAM(l_1, "f", 1);
+	float d_3, l_3 = LOAD(l_1, d_2);
+	uint32_t d_4 = FP2INT(d_3);
+	l_5 = RETURN(l_3, d_4);
+}
+func @d2u(uintptr_t): uint32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+#BB1: end=l_5
+	l_1 = START(l_5);
+	uintptr_t d_2 = PARAM(l_1, "d", 1);
+	double d_3, l_3 = LOAD(l_1, d_2);
+	uint32_t d_4 = FP2INT(d_3);
+	l_5 = RETURN(l_3, d_4);
+}
+func @f2ll(uintptr_t): int64_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+#BB1: end=l_5
+	l_1 = START(l_5);
+	uintptr_t d_2 = PARAM(l_1, "f", 1);
+	float d_3, l_3 = LOAD(l_1, d_2);
+	int64_t d_4 = FP2INT(d_3);
+	l_5 = RETURN(l_3, d_4);
+}
+func @d2ll(uintptr_t): int64_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+#BB1: end=l_5
+	l_1 = START(l_5);
+	uintptr_t d_2 = PARAM(l_1, "d", 1);
+	double d_3, l_3 = LOAD(l_1, d_2);
+	int64_t d_4 = FP2INT(d_3);
+	l_5 = RETURN(l_3, d_4);
+}
+func @f2ull(uintptr_t): uint64_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+#BB1: end=l_5
+	l_1 = START(l_5);
+	uintptr_t d_2 = PARAM(l_1, "f", 1);
+	float d_3, l_3 = LOAD(l_1, d_2);
+	uint64_t d_4 = FP2INT(d_3);
+	l_5 = RETURN(l_3, d_4);
+}
+func @d2ull(uintptr_t): uint64_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+#BB1: end=l_5
+	l_1 = START(l_5);
+	uintptr_t d_2 = PARAM(l_1, "d", 1);
+	double d_3, l_3 = LOAD(l_1, d_2);
+	uint64_t d_4 = FP2INT(d_3);
+	l_5 = RETURN(l_3, d_4);
+}
+--EXPECT--
+-2147480064 2147480064
+-2147480000 2147480000
+2147480064 4294960128
+2147480000 4294960000
+-9223369837831520256 9223369837831520256
+-9223370000000000000 9223370000000000000
+9223369837831520256 18446700093244440576
+9223370000000000000 18446700000000000000
