@@ -1593,8 +1593,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 									if (IR_IS_CONST_REF(ops[constraints.tmp_regs[n].num])) {
 										/* rematerialization */
 										reg |= IR_REG_SPILL_LOAD;
-									} else if (ctx->ir_base[ops[constraints.tmp_regs[n].num]].op == IR_ALLOCA ||
-											ctx->ir_base[ops[constraints.tmp_regs[n].num]].op == IR_VADDR) {
+									} else if (ctx->rules[ops[constraints.tmp_regs[n].num]] == IR_STATIC_ALLOCA) {
 										/* local address rematerialization */
 										reg |= IR_REG_SPILL_LOAD;
 									}

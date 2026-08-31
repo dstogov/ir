@@ -4522,8 +4522,7 @@ static void assign_regs(ir_ctx *ctx)
 					if (IR_IS_CONST_REF(ops[ival->tmp_op_num])) {
 						/* constant rematerialization */
 						reg |= IR_REG_SPILL_LOAD;
-					} else if (ctx->ir_base[ops[ival->tmp_op_num]].op == IR_ALLOCA
-							|| ctx->ir_base[ops[ival->tmp_op_num]].op == IR_VADDR) {
+					} else if (ctx->rules[ops[ival->tmp_op_num]] == (IR_SKIPPED|IR_FUSED|IR_SIMPLE|IR_ALLOCA)) {
 						/* local address rematerialization */
 						reg |= IR_REG_SPILL_LOAD;
 					}
