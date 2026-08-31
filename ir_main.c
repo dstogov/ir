@@ -444,6 +444,13 @@ int ir_compile_func(ir_ctx *ctx, int opt_level, uint32_t save_flags, uint32_t du
 	} else if (dump & (IR_GEN_NATIVE|IR_GEN_CODE)) {
 		ir_assign_virtual_registers(ctx);
 		ir_compute_dessa_moves(ctx);
+		if (dump & IR_GEN_NATIVE) {
+			ir_reg_alloc_simple(ctx);
+			if ((dump & IR_DUMP_AFTER_REGALLOC)
+			 && !_save(ctx, save_flags, dump, IR_DUMP_AFTER_REGALLOC, dump_file, func_name)) {
+				return 0;
+			}
+		}
 	}
 
 	if ((dump & (IR_DUMP_FINAL|IR_DUMP_CODEGEN))
