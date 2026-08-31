@@ -1,7 +1,5 @@
 --TEST--
 002: irreducabe loop
---XFAIL--
-ir_find_loops() may miss loop paths targeted into nested irreducible loops
 --ARGS--
 --save --save-cfg --save-ir-after-loop
 --CODE--

@@ -994,7 +994,19 @@ static bool ir_dominates(const ir_block *blocks, uint32_t b1, uint32_t b2)
 #define ENTRY_TIME(b) times[(b) * 2]
 #define EXIT_TIME(b)  times[(b) * 2 + 1]
 
-static IR_NEVER_INLINE uint32_t ir_collect_irreducible_loops(ir_ctx *ctx, uint32_t loops, uint32_t *times, ir_worklist *work, ir_list *list)
+#define IRR_FIRST_ENTRY(b) irreducible_loops[(b) * 2]
+#define IRR_NEXT_ENTRY(b)  irreducible_loops[(b) * 2 + 1]
+
+static IR_NEVER_INLINE void ir_push_irreducible_loop_entries(ir_worklist *work, uint32_t *irreducible_loops, uint32_t b)
+{
+	b = IRR_FIRST_ENTRY(b);
+	while (b) {
+		ir_worklist_push(work, b);
+		b = IRR_NEXT_ENTRY(b);
+	}
+}
+
+static IR_NEVER_INLINE uint32_t ir_collect_irreducible_loops(ir_ctx *ctx, uint32_t loops, uint32_t *times, ir_worklist *work, ir_list *list, uint32_t *irreducible_loops)
 {
 	ir_block *blocks = ctx->cfg_blocks;
 	uint32_t *edges = ctx->cfg_edges;
@@ -1028,6 +1040,8 @@ static IR_NEVER_INLINE uint32_t ir_collect_irreducible_loops(ir_ctx *ctx, uint32
 			bb->flags |= IR_BB_LOOP_HEADER;
 			bb->next_loop = loops;
 			loops = hdr;
+			IRR_FIRST_ENTRY(hdr) = 0;
+
 			if (ctx->ir_base[bb->start].op == IR_MERGE) {
 				ctx->ir_base[bb->start].op = IR_LOOP_BEGIN;
 			}
@@ -1063,19 +1077,22 @@ static IR_NEVER_INLINE uint32_t ir_collect_irreducible_loops(ir_ctx *ctx, uint32
 				for (; n > 0; p++, n--) {
 					uint32_t pred = *p;
 					if (!ir_bitset_in(work->visited, pred)) {
-						if (blocks[pred].loop_header) {
-							if (blocks[pred].loop_header == b) continue;
-							do {
-								pred = blocks[pred].loop_header;
-							} while (blocks[pred].loop_header > 0);
+						if (blocks[pred].loop_header == b) continue;
+						while (1) {
+							if (UNEXPECTED(blocks[pred].flags & IR_BB_IRREDUCIBLE_LOOP)) {
+								ir_push_irreducible_loop_entries(work, irreducible_loops, pred);
+							}
+							if (!blocks[pred].loop_header) break;
+							pred = blocks[pred].loop_header;
 						}
 						if (ENTRY_TIME(pred) > ENTRY_TIME(hdr) && EXIT_TIME(pred) < EXIT_TIME(hdr)) {
 							/* "pred" is a descendant of "hdr" */
-								ir_worklist_push(work, pred);
-						} else if (bb->predecessors_count > 1) {
+							ir_worklist_push(work, pred);
+						} else if (bb->predecessors_count > 1 && !(bb->flags & IR_BB_IRREDUCIBLE_ENTRY)) {
 							/* another entry to the irreducible loop */
-							IR_ASSERT(!(bb->flags & IR_BB_IRREDUCIBLE_LOOP));
 							bb->flags |= IR_BB_IRREDUCIBLE_ENTRY;
+							IRR_NEXT_ENTRY(b) = IRR_FIRST_ENTRY(hdr);
+							IRR_FIRST_ENTRY(hdr) = b;
 							if (ctx->ir_base[bb->start].op == IR_MERGE) {
 								ctx->ir_base[bb->start].op = IR_LOOP_BEGIN;
 							}
@@ -1097,6 +1114,7 @@ int ir_find_loops(ir_ctx *ctx)
 	uint32_t *edges = ctx->cfg_edges;
 	ir_worklist work;
 	uint32_t loops = 0; /* linked list of identified loops ordered by dom_depth */
+	uint32_t *irreducible_loops = NULL;
 
 	if (ctx->flags2 & IR_NO_LOOPS) {
 		return 1;
@@ -1168,7 +1186,10 @@ next:
 		IR_ASSERT(bb->dom_depth <= prev_dom_depth);
 
 		if (UNEXPECTED(bb->dom_depth < irreducible_depth)) {
-			loops = ir_collect_irreducible_loops(ctx, loops, times, &work, &irreducible_list);
+			if (!irreducible_loops) {
+				irreducible_loops = ir_mem_malloc(sizeof(uint32_t) * 2 * (ctx->cfg_blocks_count + 1));
+			}
+			loops = ir_collect_irreducible_loops(ctx, loops, times, &work, &irreducible_list, irreducible_loops);
 			irreducible_depth = 0;
 		}
 
@@ -1236,10 +1257,16 @@ next:
 						for (; n > 0; p++, n--) {
 							uint32_t pred = *p;
 							if (!ir_bitset_in(work.visited, pred)) {
+								if (UNEXPECTED(blocks[pred].flags & IR_BB_IRREDUCIBLE_LOOP)) {
+									ir_push_irreducible_loop_entries(&work, irreducible_loops, pred);
+								}
 								if (blocks[pred].loop_header) {
 									if (blocks[pred].loop_header == b) continue;
 									do {
 										pred = blocks[pred].loop_header;
+										if (UNEXPECTED(blocks[pred].flags & IR_BB_IRREDUCIBLE_LOOP)) {
+											ir_push_irreducible_loop_entries(&work, irreducible_loops, pred);
+										}
 									} while (blocks[pred].loop_header > 0);
 									ir_worklist_push(&work, pred);
 								} else {
@@ -1256,6 +1283,8 @@ next:
 
 	IR_ASSERT(!irreducible_depth);
 	if (ir_list_capasity(&irreducible_list)) {
+		IR_ASSERT(irreducible_loops);
+		ir_mem_free(irreducible_loops);
 		ir_list_free(&irreducible_list);
 	}
 
