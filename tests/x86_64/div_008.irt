@@ -1,0 +1,45 @@
+--TEST--
+008: vector DIV expand keeps scalar args live
+--TARGET--
+x86_64-*-sysv
+--ARGS--
+--run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func test(<uint32_t*4>, <uint32_t*4>, uint32_t, uint32_t, uint32_t, uint32_t): uint32_t;
+func test(<uint32_t*4>, <uint32_t*4>, uint32_t, uint32_t, uint32_t, uint32_t): uint32_t
+{
+	uint32_t c_0 = 0;
+	l_1 = START(l_8);
+	<uint32_t*4> x = PARAM(l_1, "x", 1);
+	<uint32_t*4> y = PARAM(l_1, "y", 2);
+	uint32_t a = PARAM(l_1, "a", 3);
+	uint32_t b = PARAM(l_1, "b", 4);
+	uint32_t c = PARAM(l_1, "c", 5);
+	uint32_t d = PARAM(l_1, "d", 6);
+	<uint32_t*4> v = DIV(x, y);
+	uint32_t e = EXTRACT(v, c_0);
+	uint32_t ret = ADD(e, c);
+	l_8 = RETURN(l_1, ret);
+}
+func main(void): int32_t
+{
+	uint32_t c_1 = 1;
+	uint32_t c_2 = 2;
+	uint32_t c_3 = 3;
+	uint32_t c_4 = 4;
+	uint32_t c_7 = 7;
+	uint32_t c_100 = 100;
+	<uint32_t*4> vx = SPLAT(c_100);
+	<uint32_t*4> vy = SPLAT(c_7);
+	uintptr_t c_test = func test(<uint32_t*4>, <uint32_t*4>, uint32_t, uint32_t, uint32_t, uint32_t): uint32_t;
+	uintptr_t c_fmt = "%u\n";
+	uintptr_t c_printf = func printf(uintptr_t, ...): int32_t;
+	int32_t c_ret0 = 0;
+	l_1 = START(l_4);
+	int32_t r_1, l_2 = CALL/6(l_1, c_test, vx, vy, c_1, c_2, c_3, c_4);
+	int32_t r_2, l_3 = CALL/2(l_2, c_printf, c_fmt, r_1);
+	l_4 = RETURN(l_3, c_ret0);
+}
+--EXPECT--
+17

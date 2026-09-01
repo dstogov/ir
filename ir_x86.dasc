@@ -2916,14 +2916,14 @@ get_arg_hints:
 			if (IR_IS_TYPE_INT(IR_VECTOR_BASE_TYPE(type))) {
 				constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_RAX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
 				n++;
-				if (insn->op == IR_MUL && insn->op == IR_DIV && insn->op == IR_MOD) {
+				if (insn->op == IR_MUL || insn->op == IR_DIV || insn->op == IR_MOD) {
 					constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_RDX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
 					if (IR_IS_CONST_REF(insn->op2)) {
 						constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_RCX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
 						n++;
 					}
 					n++;
-				} else if (insn->op == IR_SHL && insn->op == IR_SHR && insn->op == IR_SAR) {
+				} else if (insn->op == IR_SHL || insn->op == IR_SHR || insn->op == IR_SAR) {
 					constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_RCX, IR_USE_SUB_REF, IR_DEF_SUB_REF);
 					n++;
 				} else if (IR_IS_CONST_REF(insn->op2) && ir_type_size[IR_VECTOR_BASE_TYPE(type)] == 8) {
