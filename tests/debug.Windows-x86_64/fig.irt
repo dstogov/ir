@@ -70,11 +70,11 @@ test:
 	pushq %rbp
 	pushq %rsi
 	pushq %rdi
-	movl 0x30(%rsp), %eax
-	movl 0x38(%rsp), %r10d
-	movl 0x40(%rsp), %r11d
-	movl 0x48(%rsp), %ebx
-	movl 0x50(%rsp), %ebp
+	movl 0x50(%rsp), %eax
+	movl 0x58(%rsp), %r10d
+	movl 0x60(%rsp), %r11d
+	movl 0x68(%rsp), %ebx
+	movl 0x70(%rsp), %ebp
 	movl %r8d, %esi
 	imull %edx, %esi
 	leal 4(%rsi), %edi

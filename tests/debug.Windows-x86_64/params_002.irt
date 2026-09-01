@@ -33,10 +33,10 @@ test:
 	addsd %xmm1, %xmm0
 	addsd %xmm2, %xmm0
 	addsd %xmm3, %xmm0
-	addsd 8(%rsp), %xmm0
-	addsd 0x10(%rsp), %xmm0
-	addsd 0x18(%rsp), %xmm0
-	addsd 0x20(%rsp), %xmm0
 	addsd 0x28(%rsp), %xmm0
-	subsd 0x30(%rsp), %xmm0
+	addsd 0x30(%rsp), %xmm0
+	addsd 0x38(%rsp), %xmm0
+	addsd 0x40(%rsp), %xmm0
+	addsd 0x48(%rsp), %xmm0
+	subsd 0x50(%rsp), %xmm0
 	retq

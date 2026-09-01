@@ -23,7 +23,7 @@ test:
 	pushq %rbx
 	subq $0x20, %rsp
 	movl %ecx, %ebx
-	movq 0x30(%rsp), %rax
+	movq 0x50(%rsp), %rax
 	movl %edx, %r10d
 	movl %r8d, %edx
 	movl %r9d, %r8d

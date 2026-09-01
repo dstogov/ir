@@ -75,14 +75,14 @@ test:
 	movl %eax, 0x10(%rsp)
 	movl 0xc(%rsp), %eax
 	movl %eax, 0x14(%rsp)
-	movl 0x90(%rsp), %eax
+	movl 0xb0(%rsp), %eax
 	movl %eax, 0x18(%rsp)
-	movl 0x98(%rsp), %eax
+	movl 0xb8(%rsp), %eax
 	movl %eax, 0x1c(%rsp)
-	movl 0xa0(%rsp), %eax
+	movl 0xc0(%rsp), %eax
 	movl %eax, 0x20(%rsp)
 .L1:
-	cmpl $0, 0xa8(%rsp)
+	cmpl $0, 0xc8(%rsp)
 	je .L2
 	movl 8(%rsp), %eax
 	imull 4(%rsp), %eax
@@ -136,7 +136,7 @@ test:
 	movl 0x58(%rsp), %eax
 	addl $1, %eax
 	movl %eax, 0x5c(%rsp)
-	cmpl $0, 0xb0(%rsp)
+	cmpl $0, 0xd0(%rsp)
 	je .L4
 	movl 0x40(%rsp), %eax
 	movl %eax, 0x10(%rsp)

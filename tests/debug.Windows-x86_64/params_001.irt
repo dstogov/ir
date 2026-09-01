@@ -33,10 +33,10 @@ test:
 	leal (%rdx, %rcx), %eax
 	addl %r8d, %eax
 	addl %r9d, %eax
-	addl 8(%rsp), %eax
-	addl 0x10(%rsp), %eax
-	addl 0x18(%rsp), %eax
-	addl 0x20(%rsp), %eax
 	addl 0x28(%rsp), %eax
-	subl 0x30(%rsp), %eax
+	addl 0x30(%rsp), %eax
+	addl 0x38(%rsp), %eax
+	addl 0x40(%rsp), %eax
+	addl 0x48(%rsp), %eax
+	subl 0x50(%rsp), %eax
 	retq
