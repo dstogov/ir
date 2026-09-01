@@ -55,6 +55,87 @@ static void ir_emit_c_type_name(ir_type type, FILE *f)
 	}
 }
 
+static bool ir_emit_c_call_conv(FILE *f, uint32_t flags)
+{
+	switch (flags & IR_CALL_CONV_MASK) {
+		case IR_CC_FASTCALL:
+			fprintf(f, "__fastcall");
+			return 1;
+		case IR_CC_PRESERVE_NONE:
+			fprintf(f, "__attribute__((preserve_none))");
+			return 1;
+#if defined(IR_TARGET_X64)
+		case IR_CC_X86_64_SYSV:
+			fprintf(f, "__attribute__((sysv_abi))");
+			return 1;
+		case IR_CC_X86_64_MS:
+			fprintf(f, "__attribute__((ms_abi))");
+			return 1;
+#elif defined(IR_TARGET_AARCH64)
+		case IR_CC_AARCH64_SYSV:
+			return 0;
+		case IR_CC_AARCH64_DARWIN:
+			return 0;
+#endif
+		default:
+			IR_ASSERT((flags & IR_CALL_CONV_MASK) == IR_CC_DEFAULT || (flags & IR_CALL_CONV_MASK) == IR_CC_BUILTIN);
+			return 0;
+	}
+}
+
+static void ir_emit_c_func_params(FILE *f, uint32_t flags, uint32_t params_count, const uint8_t *param_types)
+{
+	uint32_t i;
+
+	if (params_count) {
+		for (i = 0; i < params_count; i++) {
+			if (i) {
+				fprintf(f, ", ");
+			}
+			ir_emit_c_type_name(param_types[i], f);
+		}
+		if (flags & IR_VARARG_FUNC) {
+			fprintf(f, ", ...");
+		}
+	} else if (flags & IR_VARARG_FUNC) {
+		fprintf(f, "...");
+	} else {
+		fprintf(f, "void");
+	}
+}
+
+static void ir_emit_c_func_decl_ex(const char *name, uint32_t flags, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, bool is_ptr, FILE *f)
+{
+	bool has_call_conv;
+
+	ir_emit_c_type_name(ret_type, f);
+	has_call_conv = 0;
+	if (is_ptr) {
+		fprintf(f, " (");
+		has_call_conv = ir_emit_c_call_conv(f, flags);
+		if (has_call_conv) {
+			fprintf(f, " ");
+		}
+		fprintf(f, "*");
+		if (name) {
+			fprintf(f, "%s", name);
+		}
+		fprintf(f, ")");
+	} else {
+		fprintf(f, " ");
+		has_call_conv = ir_emit_c_call_conv(f, flags);
+		if (has_call_conv) {
+			fprintf(f, " ");
+		}
+		if (name) {
+			fprintf(f, "%s", name);
+		}
+	}
+	fprintf(f, "(");
+	ir_emit_c_func_params(f, flags, params_count, param_types);
+	fprintf(f, ")");
+}
+
 static void ir_emit_c_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 {
 	if (insn->op == IR_LABEL) {
@@ -779,9 +860,29 @@ static void ir_emit_switch(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn
 	fprintf(f, "\t}\n");
 }
 
+static void ir_emit_func_ptr_cast(FILE *f, const ir_proto_t *proto, ir_type ret_type)
+{
+	ir_emit_c_func_decl_ex(NULL,
+		proto ? proto->flags : IR_CC_DEFAULT,
+		proto ? proto->ret_type : ret_type,
+		proto ? proto->params_count : 0,
+		proto ? proto->param_types : NULL,
+		1, f);
+}
+
+static void ir_emit_typed_func_ref(ir_ctx *ctx, FILE *f, ir_ref ref, const ir_proto_t *proto, ir_type ret_type)
+{
+	fprintf(f, "((");
+	ir_emit_func_ptr_cast(f, proto, ret_type);
+	fprintf(f, ")");
+	ir_emit_ref(ctx, f, ref);
+	fprintf(f, ")");
+}
+
 static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 {
 	int j, n;
+	const ir_proto_t *proto = ir_call_proto(ctx, insn);
 
 	if (insn->type != IR_VOID && ctx->vregs[def] != IR_UNUSED) {
 		ir_emit_def_ref(ctx, f, def);
@@ -789,8 +890,14 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 		fprintf(f, "\t");
 	}
 	if (IR_IS_CONST_REF(insn->op2)) {
-		IR_ASSERT(ctx->ir_base[insn->op2].op == IR_FUNC);
-		fprintf(f, "%s", ir_get_str(ctx, ctx->ir_base[insn->op2].val.name));
+		if (ctx->ir_base[insn->op2].op == IR_FUNC) {
+			fprintf(f, "%s", ir_get_str(ctx, ctx->ir_base[insn->op2].val.name));
+		} else {
+			IR_ASSERT(ctx->ir_base[insn->op2].op == IR_FUNC_ADDR);
+			ir_emit_typed_func_ref(ctx, f, insn->op2, proto, insn->type);
+		}
+	} else if (ctx->ir_base[insn->op2].op == IR_PROTO) {
+		ir_emit_typed_func_ref(ctx, f, insn->op2, proto, insn->type);
 	} else {
 		ir_emit_ref(ctx, f, insn->op2);
 	}
@@ -812,6 +919,7 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 static void ir_emit_tailcall(ir_ctx *ctx, FILE *f, ir_insn *insn)
 {
 	int j, n;
+	const ir_proto_t *proto = ir_call_proto(ctx, insn);
 
 	if (insn->type != IR_VOID) {
 		fprintf(f, "\treturn ");
@@ -819,8 +927,14 @@ static void ir_emit_tailcall(ir_ctx *ctx, FILE *f, ir_insn *insn)
 		fprintf(f, "\t");
 	}
 	if (IR_IS_CONST_REF(insn->op2)) {
-		IR_ASSERT(ctx->ir_base[insn->op2].op == IR_FUNC);
-		fprintf(f, "%s", ir_get_str(ctx, ctx->ir_base[insn->op2].val.name));
+		if (ctx->ir_base[insn->op2].op == IR_FUNC) {
+			fprintf(f, "%s", ir_get_str(ctx, ctx->ir_base[insn->op2].val.name));
+		} else {
+			IR_ASSERT(ctx->ir_base[insn->op2].op == IR_FUNC_ADDR);
+			ir_emit_typed_func_ref(ctx, f, insn->op2, proto, insn->type);
+		}
+	} else if (ctx->ir_base[insn->op2].op == IR_PROTO) {
+		ir_emit_typed_func_ref(ctx, f, insn->op2, proto, insn->type);
 	} else {
 		ir_emit_ref(ctx, f, insn->op2);
 	}
@@ -915,33 +1029,6 @@ static void ir_emit_store(ir_ctx *ctx, FILE *f, ir_insn *insn)
 	fprintf(f, ";\n");
 }
 
-static void ir_emit_c_call_conv(FILE *f, uint32_t flags)
-{
-	switch (flags & IR_CALL_CONV_MASK) {
-		case IR_CC_FASTCALL:
-			fprintf(f, " __fastcall");
-			break;
-		case IR_CC_PRESERVE_NONE:
-			fprintf(f, " __attriute__((preserve_none))");
-			break;
-#if defined(IR_TARGET_X64)
-		case IR_CC_X86_64_SYSV:
-			fprintf(f, " __attriute__((sysv_abi))");
-			break;
-		case IR_CC_X86_64_MS:
-			fprintf(f, " __attriute__((ms_abi))");
-			break;
-#elif defined(IR_TARGET_AARCH64)
-		case IR_CC_AARCH64_SYSV:
-			break;
-		case IR_CC_AARCH64_DARWIN:
-			break;
-#endif
-		default:
-			IR_ASSERT((flags & IR_CALL_CONV_MASK) == IR_CC_DEFAULT || (flags & IR_CALL_CONV_MASK) == IR_CC_BUILTIN);
-	}
-}
-
 static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 {
 	ir_ref i, n, *p;
@@ -961,9 +1048,12 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 	if (ctx->flags & IR_STATIC) {
 		fprintf(f, "static ");
 	}
-	ir_emit_c_call_conv(f, ctx->flags);
 	ir_emit_c_type_name(ctx->ret_type != (ir_type)-1 ? ctx->ret_type : IR_VOID, f);
-	fprintf(f, " %s(", name);
+	fprintf(f, " ");
+	if (ir_emit_c_call_conv(f, ctx->flags)) {
+		fprintf(f, " ");
+	}
+	fprintf(f, "%s(", name);
 	use_list = &ctx->use_lists[1];
 	n = use_list->count;
 	first = 1;
@@ -1220,8 +1310,15 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 					}
 					break;
 				case IR_BITCAST:
-				case IR_PROTO:
 					ir_emit_bitcast(ctx, f, i, insn);
+					break;
+				case IR_PROTO:
+					ir_emit_def_ref(ctx, f, i);
+					fprintf(f, "(");
+					ir_emit_c_type_name(insn->type, f);
+					fprintf(f, ")");
+					ir_emit_typed_func_ref(ctx, f, insn->op1, (const ir_proto_t *)ir_get_str(ctx, insn->op2), insn->type);
+					fprintf(f, ";\n");
 					break;
 				case IR_INT2FP:
 				case IR_FP2INT:
@@ -1409,28 +1506,7 @@ void ir_emit_c_func_decl(const char *name, uint32_t flags, ir_type ret_type, uin
 	} else if (flags & IR_STATIC) {
 		fprintf(f, "static ");
 	}
-	ir_emit_c_type_name(ret_type, f);
-	fprintf(f, " ");
-	ir_emit_c_call_conv(f, flags);
-	fprintf(f, "%s(", name);
-	if (params_count) {
-		const uint8_t *p = param_types;
-
-		ir_emit_c_type_name(*p, f);
-		p++;
-		while (--params_count) {
-			fprintf(f, ", ");
-			ir_emit_c_type_name(*p, f);
-			p++;
-		}
-		if (flags & IR_VARARG_FUNC) {
-			fprintf(f, ", ...");
-		}
-	} else if (flags & IR_VARARG_FUNC) {
-		fprintf(f, "...");
-	} else {
-		fprintf(f, "void");
-	}
+	ir_emit_c_func_decl_ex(name, flags, ret_type, params_count, param_types, 0, f);
 	fprintf(f, ");\n");
 }
 

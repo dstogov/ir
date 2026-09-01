@@ -1,0 +1,16 @@
+--TEST--
+001: constant function address tailcall emits a typed function pointer
+--ARGS--
+--emit-c
+--CODE--
+{
+	uintptr_t c_1 = func *0x1234(void): int32_t;
+	l_1 = START(l_3);
+	int32_t d_2, l_2 = TAILCALL(l_1, c_1);
+	l_3 = UNREACHABLE(l_2);
+}
+--EXPECT--
+int32_t test(void)
+{
+	return ((int32_t (*)(void))0x1234)();
+}

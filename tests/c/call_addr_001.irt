@@ -1,0 +1,19 @@
+--TEST--
+001: constant function address call emits a casted function pointer
+--ARGS--
+--emit-c
+--CODE--
+{
+	int32_t c_1 = 7;
+	uintptr_t c_2 = func *0x1234(int32_t): int32_t;
+	l_1 = START(l_4);
+	int32_t d_3, l_3 = CALL/1(l_1, c_2, c_1);
+	l_4 = RETURN(l_3, d_3);
+}
+--EXPECT--
+int32_t test(void)
+{
+	int32_t d_1;
+	d_1 = ((int32_t (*)(int32_t))0x1234)(7);
+	return d_1;
+}

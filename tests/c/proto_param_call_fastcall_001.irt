@@ -1,0 +1,29 @@
+--TEST--
+001: parameter-backed proto call emits typed fastcall function-pointer casts
+--TARGET--
+x86
+--ARGS--
+--emit-c
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	l_1 = START(l_6);
+	uintptr_t d_2 = PARAM(l_1, "p", 1);
+	int32_t d_3 = PARAM(l_1, "a", 2);
+	uintptr_t d_4 = PROTO(d_2, func(int32_t): int32_t __fastcall);
+	int32_t d_5, l_5 = CALL/1(l_1, d_4, d_3);
+	l_6 = RETURN(l_5, d_5);
+}
+--EXPECT--
+int32_t test(uintptr_t p, int32_t a)
+{
+	uintptr_t d_1 = p;
+	int32_t d_2 = a;
+	uintptr_t d_3;
+	int32_t d_4;
+	d_3 = (uintptr_t)((int32_t (__fastcall *)(int32_t))d_1);
+	d_4 = ((int32_t (__fastcall *)(int32_t))d_3)(d_2);
+	return d_4;
+}

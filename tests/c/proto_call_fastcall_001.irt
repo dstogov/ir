@@ -1,0 +1,24 @@
+--TEST--
+001: proto values keep typed function-pointer casts in C emission
+--TARGET--
+x86
+--ARGS--
+--emit-c
+--CODE--
+{
+	uintptr_t c_1 = 0x1234;
+	int32_t c_2 = 7;
+	l_1 = START(l_5);
+	uintptr_t d_3 = PROTO/2(c_1, func(int32_t): int32_t __fastcall);
+	int32_t d_4, l_4 = CALL/1(l_1, d_3, c_2);
+	l_5 = RETURN(l_4, d_4);
+}
+--EXPECT--
+int32_t test(void)
+{
+	uintptr_t d_1;
+	int32_t d_2;
+	d_1 = (uintptr_t)((int32_t (__fastcall *)(int32_t))0x1234);
+	d_2 = ((int32_t (__fastcall *)(int32_t))d_1)(7);
+	return d_2;
+}
