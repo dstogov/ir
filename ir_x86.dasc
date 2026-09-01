@@ -2533,7 +2533,7 @@ get_arg_hints:
 #endif
 #if IR_SIMD
 		case IR_SPLAT:
-			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;
+			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;
 			insn = &ctx->ir_base[ref];
 			if (IR_IS_CONST_REF(insn->op1)) {
 				constraints->tmp_regs[0] = IR_TMP_REG(1, ctx->ir_base[insn->op1].type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
