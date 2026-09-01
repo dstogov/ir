@@ -733,11 +733,10 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 #endif
 
 				if (ctx->rules[ref] & (IR_FUSED|IR_SKIPPED)) {
-					if (((ctx->rules[ref] & IR_RULE_MASK) == IR_VAR
-					  || (ctx->rules[ref] & IR_RULE_MASK) == IR_ALLOCA)
+					if (((ctx->rules[ref] & IR_RULE_MASK) == IR_ALLOCA)
 					 && ctx->use_lists[ref].count > 0) {
 						insn = &ctx->ir_base[ref];
-						if (insn->op != IR_VADDR) {
+						if (insn->op == IR_VAR || insn->op == IR_ALLOCA) {
 							insn->op3 = ctx->vars;
 							ctx->vars = ref;
 						}
@@ -1417,11 +1416,10 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 #endif
 
 				if (ctx->rules[ref] & (IR_FUSED|IR_SKIPPED)) {
-					if (((ctx->rules[ref] & IR_RULE_MASK) == IR_VAR
-					  || (ctx->rules[ref] & IR_RULE_MASK) == IR_ALLOCA)
+					if (((ctx->rules[ref] & IR_RULE_MASK) == IR_ALLOCA)
 					 && ctx->use_lists[ref].count > 0) {
 						insn = &ctx->ir_base[ref];
-						if (insn->op != IR_VADDR && insn->op != IR_PARAM) {
+						if (insn->op == IR_VAR || insn->op == IR_ALLOCA) {
 							insn->op3 = ctx->vars;
 							ctx->vars = ref;
 						}
