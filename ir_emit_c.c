@@ -83,11 +83,34 @@ static bool ir_emit_c_call_conv(FILE *f, uint32_t flags)
 	}
 }
 
-static void ir_emit_c_func_params(FILE *f, uint32_t flags, uint32_t params_count, const uint8_t *param_types)
+static void ir_emit_c_func_proto(const char *name, uint32_t flags, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, bool is_ptr, FILE *f)
 {
-	uint32_t i;
+	ir_emit_c_type_name(ret_type, f);
 
+	if (is_ptr) {
+		fprintf(f, " (");
+		if (ir_emit_c_call_conv(f, flags)) {
+			fprintf(f, " ");
+		}
+		fprintf(f, "*");
+		if (name) {
+			fprintf(f, "%s", name);
+		}
+		fprintf(f, ")");
+	} else {
+		fprintf(f, " ");
+		if (ir_emit_c_call_conv(f, flags)) {
+			fprintf(f, " ");
+		}
+		if (name) {
+			fprintf(f, "%s", name);
+		}
+	}
+
+	fprintf(f, "(");
 	if (params_count) {
+		uint32_t i;
+
 		for (i = 0; i < params_count; i++) {
 			if (i) {
 				fprintf(f, ", ");
@@ -102,37 +125,6 @@ static void ir_emit_c_func_params(FILE *f, uint32_t flags, uint32_t params_count
 	} else {
 		fprintf(f, "void");
 	}
-}
-
-static void ir_emit_c_func_decl_ex(const char *name, uint32_t flags, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, bool is_ptr, FILE *f)
-{
-	bool has_call_conv;
-
-	ir_emit_c_type_name(ret_type, f);
-	has_call_conv = 0;
-	if (is_ptr) {
-		fprintf(f, " (");
-		has_call_conv = ir_emit_c_call_conv(f, flags);
-		if (has_call_conv) {
-			fprintf(f, " ");
-		}
-		fprintf(f, "*");
-		if (name) {
-			fprintf(f, "%s", name);
-		}
-		fprintf(f, ")");
-	} else {
-		fprintf(f, " ");
-		has_call_conv = ir_emit_c_call_conv(f, flags);
-		if (has_call_conv) {
-			fprintf(f, " ");
-		}
-		if (name) {
-			fprintf(f, "%s", name);
-		}
-	}
-	fprintf(f, "(");
-	ir_emit_c_func_params(f, flags, params_count, param_types);
 	fprintf(f, ")");
 }
 
@@ -860,20 +852,15 @@ static void ir_emit_switch(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn
 	fprintf(f, "\t}\n");
 }
 
-static void ir_emit_func_ptr_cast(FILE *f, const ir_proto_t *proto, ir_type ret_type)
+static void ir_emit_func_cast(ir_ctx *ctx, FILE *f, ir_ref ref, const ir_proto_t *proto, ir_type ret_type)
 {
-	ir_emit_c_func_decl_ex(NULL,
+	fprintf(f, "((");
+	ir_emit_c_func_proto(NULL,
 		proto ? proto->flags : IR_CC_DEFAULT,
 		proto ? proto->ret_type : ret_type,
 		proto ? proto->params_count : 0,
 		proto ? proto->param_types : NULL,
 		1, f);
-}
-
-static void ir_emit_typed_func_ref(ir_ctx *ctx, FILE *f, ir_ref ref, const ir_proto_t *proto, ir_type ret_type)
-{
-	fprintf(f, "((");
-	ir_emit_func_ptr_cast(f, proto, ret_type);
 	fprintf(f, ")");
 	ir_emit_ref(ctx, f, ref);
 	fprintf(f, ")");
@@ -894,10 +881,10 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 			fprintf(f, "%s", ir_get_str(ctx, ctx->ir_base[insn->op2].val.name));
 		} else {
 			IR_ASSERT(ctx->ir_base[insn->op2].op == IR_FUNC_ADDR);
-			ir_emit_typed_func_ref(ctx, f, insn->op2, proto, insn->type);
+			ir_emit_func_cast(ctx, f, insn->op2, proto, insn->type);
 		}
 	} else if (ctx->ir_base[insn->op2].op == IR_PROTO) {
-		ir_emit_typed_func_ref(ctx, f, insn->op2, proto, insn->type);
+		ir_emit_func_cast(ctx, f, insn->op2, proto, insn->type);
 	} else {
 		ir_emit_ref(ctx, f, insn->op2);
 	}
@@ -931,10 +918,10 @@ static void ir_emit_tailcall(ir_ctx *ctx, FILE *f, ir_insn *insn)
 			fprintf(f, "%s", ir_get_str(ctx, ctx->ir_base[insn->op2].val.name));
 		} else {
 			IR_ASSERT(ctx->ir_base[insn->op2].op == IR_FUNC_ADDR);
-			ir_emit_typed_func_ref(ctx, f, insn->op2, proto, insn->type);
+			ir_emit_func_cast(ctx, f, insn->op2, proto, insn->type);
 		}
 	} else if (ctx->ir_base[insn->op2].op == IR_PROTO) {
-		ir_emit_typed_func_ref(ctx, f, insn->op2, proto, insn->type);
+		ir_emit_func_cast(ctx, f, insn->op2, proto, insn->type);
 	} else {
 		ir_emit_ref(ctx, f, insn->op2);
 	}
@@ -1317,7 +1304,7 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 					fprintf(f, "(");
 					ir_emit_c_type_name(insn->type, f);
 					fprintf(f, ")");
-					ir_emit_typed_func_ref(ctx, f, insn->op1, (const ir_proto_t *)ir_get_str(ctx, insn->op2), insn->type);
+					ir_emit_func_cast(ctx, f, insn->op1, (const ir_proto_t *)ir_get_str(ctx, insn->op2), insn->type);
 					fprintf(f, ";\n");
 					break;
 				case IR_INT2FP:
@@ -1506,8 +1493,8 @@ void ir_emit_c_func_decl(const char *name, uint32_t flags, ir_type ret_type, uin
 	} else if (flags & IR_STATIC) {
 		fprintf(f, "static ");
 	}
-	ir_emit_c_func_decl_ex(name, flags, ret_type, params_count, param_types, 0, f);
-	fprintf(f, ");\n");
+	ir_emit_c_func_proto(name, flags, ret_type, params_count, param_types, 0, f);
+	fprintf(f, ";\n");
 }
 
 void ir_emit_c_sym_decl(const char *name, uint32_t flags, FILE *f)
