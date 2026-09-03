@@ -2795,11 +2795,15 @@ get_arg_hints:
 						ir_type_size[IR_VECTOR_BASE_TYPE(type)] != 8) {
 					flags &= ~IR_DEF_REUSES_OP1_REG;
 					flags |= IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+				} else if (insn->op >= IR_LT || insn->op <= IR_UGT) {
+					flags |= IR_OP1_MUST_BE_IN_REG;
 				}
 			} else {
 				if (insn->op == IR_GT || insn->op == IR_GE || insn->op == IR_ULT || insn->op == IR_ULE) {
 					flags &= ~IR_DEF_REUSES_OP1_REG;
 					flags |= IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+				} else if (insn->op >= IR_LT || insn->op <= IR_UGT) {
+					flags |= IR_OP1_MUST_BE_IN_REG;
 				}
 			}
 			break;
