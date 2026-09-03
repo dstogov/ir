@@ -1078,6 +1078,9 @@ int ir_emit_llvm(ir_ctx *ctx, const char *name, FILE *f);
 void ir_emit_llvm_func_decl(const char *name, uint32_t flags, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, FILE *f);
 void ir_emit_llvm_sym_decl(const char *name, uint32_t flags, FILE *f);
 
+/* IR to RISCV conversion (implementation in ir_emit_riscv.c) */
+int ir_emit_riscv(ir_ctx *ctx, const char *name, FILE *f);
+
 /* IR verification API (implementation in ir_check.c) */
 bool ir_check(const ir_ctx *ctx);
 bool ir_check_prototype(const ir_ctx *ctx, uint32_t flags, uint8_t ret_type, uint32_t params_count, uint8_t *param_types);
