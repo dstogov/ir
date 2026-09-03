@@ -2066,7 +2066,7 @@ op2_const:
 			n++;
 			break;
 		case IR_ARGVAL:
-			flags = 0;
+			flags = IR_OP1_SHOULD_BE_IN_REG;
 			constraints->tmp_regs[0] = IR_SCRATCH_REG(IR_REG_RSI, IR_DEF_SUB_REF - IR_SUB_REFS_COUNT, IR_USE_SUB_REF);
 			constraints->tmp_regs[1] = IR_SCRATCH_REG(IR_REG_RDI, IR_DEF_SUB_REF - IR_SUB_REFS_COUNT, IR_USE_SUB_REF);
 			constraints->tmp_regs[2] = IR_SCRATCH_REG(IR_REG_RCX, IR_DEF_SUB_REF - IR_SUB_REFS_COUNT, IR_USE_SUB_REF);

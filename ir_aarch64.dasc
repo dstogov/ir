@@ -713,7 +713,7 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 			n++;
 			break;
 		case IR_ARGVAL:
-			flags = 0;
+			flags = IR_OP1_SHOULD_BE_IN_REG;
 			/* memcpy() clobbers all scratch registers */
 			constraints->tmp_regs[0] = IR_SCRATCH_REG(IR_REG_SCRATCH_AARCH64, IR_DEF_SUB_REF - IR_SUB_REFS_COUNT, IR_USE_SUB_REF);
 			n = 1;
