@@ -2260,7 +2260,7 @@ get_arg_hints:
 			 && ir_type_size[ctx->ir_base[insn->op1].type] >= sizeof(void*)) {
 				constraints->tmp_regs[n] = IR_TMP_REG(2, ctx->ir_base[insn->op1].type, IR_USE_SUB_REF, IR_DEF_SUB_REF);
 				n++;
-			} else if (ctx->ir_base[insn->op1].type == IR_U32) {
+			} else if (ctx->ir_base[insn->op1].type == IR_U32 || ir_type_size[ctx->ir_base[insn->op1].type] < 4) {
 				flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;
 			}
 			break;
