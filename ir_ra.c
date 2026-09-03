@@ -540,7 +540,7 @@ static void ir_add_fusion_ranges(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_block
 		n = IR_INPUT_EDGES_COUNT(flags);
 		j = 1;
 		p = insn->ops + j;
-		if (flags & IR_OP_FLAG_CONTROL) {
+		if (flags & (IR_OP_FLAG_CONTROL|IR_OP_FLAG_PINNED)) {
 			j++;
 			p++;
 		}
