@@ -1698,7 +1698,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 				}
 			} else {
 #ifdef IR_TARGET_X86
-				if ((*rule & IR_RULE_MASK) == IR_CALL)
+				if ((*rule & IR_RULE_MASK) == IR_CALL) {
 					if (ctx->ret_slot == -1
 					 && (insn->type == IR_FLOAT || insn->type == IR_DOUBLE)) {
 						const ir_proto_t *proto = ir_call_proto(ctx, insn);
