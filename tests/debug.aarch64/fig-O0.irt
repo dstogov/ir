@@ -87,12 +87,12 @@ test:
 .L1:
 	ldr w0, [sp, #0x90]
 	cbz w0, .L2
-	ldr w1, [sp, #8]
-	ldr w2, [sp, #4]
-	mul w0, w1, w2
+	ldr w0, [sp, #8]
+	ldr w1, [sp, #4]
+	mul w0, w0, w1
 	str w0, [sp, #0x30]
-	ldr w1, [sp, #0x30]
-	add w0, w1, #4
+	ldr w0, [sp, #0x30]
+	add w0, w0, #4
 	str w0, [sp, #0x34]
 	ldr w0, [sp, #8]
 	str w0, [sp, #0x38]
@@ -112,16 +112,16 @@ test:
 .L2:
 	ldr w0, [sp, #8]
 	str w0, [sp, #0x3c]
-	ldr w1, [sp, #0x3c]
-	ldr w2, [sp, #4]
-	mul w0, w1, w2
+	ldr w0, [sp, #0x3c]
+	ldr w1, [sp, #4]
+	mul w0, w0, w1
 	str w0, [sp, #0x40]
-	ldr w1, [sp, #0x1c]
-	ldr w2, [sp, #4]
-	mul w0, w1, w2
+	ldr w0, [sp, #0x1c]
+	ldr w1, [sp, #4]
+	mul w0, w0, w1
 	str w0, [sp, #0x44]
-	ldr w1, [sp, #0x44]
-	add w0, w1, #1
+	ldr w0, [sp, #0x44]
+	add w0, w0, #1
 	str w0, [sp, #0x48]
 	ldr w0, [sp, #0x1c]
 	str w0, [sp, #0x4c]
@@ -136,12 +136,12 @@ test:
 	ldr w0, [sp, #0x48]
 	str w0, [sp, #0x60]
 .L3:
-	ldr w1, [sp, #0x4c]
-	ldr w2, [sp, #4]
-	mul w0, w1, w2
+	ldr w0, [sp, #0x4c]
+	ldr w1, [sp, #4]
+	mul w0, w0, w1
 	str w0, [sp, #0x64]
-	ldr w1, [sp, #0x64]
-	add w0, w1, #1
+	ldr w0, [sp, #0x64]
+	add w0, w0, #1
 	str w0, [sp, #0x68]
 	ldr w0, [sp, #0x98]
 	cbz w0, .L4
@@ -157,37 +157,37 @@ test:
 	str w0, [sp, #0x2c]
 	b .L1
 .L4:
-	ldr w1, [sp, #0x4c]
-	ldr w2, [sp, #4]
-	add w0, w1, w2
+	ldr w0, [sp, #0x4c]
+	ldr w1, [sp, #4]
+	add w0, w0, w1
 	str w0, [sp, #0x6c]
-	ldr w1, [sp, #0x6c]
-	ldr w2, [sp, #8]
-	add w0, w1, w2
+	ldr w0, [sp, #0x6c]
+	ldr w1, [sp, #8]
+	add w0, w0, w1
 	str w0, [sp, #0x70]
-	ldr w1, [sp, #0x70]
-	ldr w2, [sp, #0x50]
-	add w0, w1, w2
+	ldr w0, [sp, #0x70]
+	ldr w1, [sp, #0x50]
+	add w0, w0, w1
 	str w0, [sp, #0x74]
-	ldr w1, [sp, #0x74]
-	ldr w2, [sp, #0x54]
-	add w0, w1, w2
+	ldr w0, [sp, #0x74]
+	ldr w1, [sp, #0x54]
+	add w0, w0, w1
 	str w0, [sp, #0x78]
-	ldr w1, [sp, #0x78]
-	ldr w2, [sp, #0x58]
-	add w0, w1, w2
+	ldr w0, [sp, #0x78]
+	ldr w1, [sp, #0x58]
+	add w0, w0, w1
 	str w0, [sp, #0x7c]
-	ldr w1, [sp, #0x7c]
-	ldr w2, [sp, #0x5c]
-	add w0, w1, w2
+	ldr w0, [sp, #0x7c]
+	ldr w1, [sp, #0x5c]
+	add w0, w0, w1
 	str w0, [sp, #0x80]
-	ldr w1, [sp, #0x80]
-	ldr w2, [sp, #0x60]
-	add w0, w1, w2
+	ldr w0, [sp, #0x80]
+	ldr w1, [sp, #0x60]
+	add w0, w0, w1
 	str w0, [sp, #0x84]
-	ldr w1, [sp, #0x84]
-	ldr w2, [sp, #0x68]
-	add w0, w1, w2
+	ldr w0, [sp, #0x84]
+	ldr w1, [sp, #0x68]
+	add w0, w0, w1
 	str w0, [sp, #0x88]
 	ldr w0, [sp, #0x88]
 	add sp, sp, #0x90
