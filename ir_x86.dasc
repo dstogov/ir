@@ -7966,13 +7966,17 @@ static void ir_emit_bool_not(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	IR_ASSERT(def_reg != IR_REG_NONE);
 
-	if (op1_reg != IR_REG_NONE && IR_REG_SPILLED(op1_reg)) {
-		op1_reg = IR_REG_NUM(op1_reg);
-		ir_emit_load(ctx, type, op1_reg, op1);
-	}
+	if (op1_reg != IR_REG_NONE) {
+		if (IR_REG_SPILLED(op1_reg)) {
+			op1_reg = IR_REG_NUM(op1_reg);
+			ir_emit_load(ctx, type, op1_reg, op1);
+		}
 
-	if (def_reg != op1_reg) {
-		|	mov Rb(def_reg), Rb(op1_reg)
+		if (def_reg != op1_reg) {
+			|	mov Rb(def_reg), Rb(op1_reg)
+		}
+	} else {
+		ir_emit_load(ctx, type, def_reg, op1);
 	}
 
 	|	xor Rb(def_reg), 1
