@@ -7155,6 +7155,9 @@ static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn, uint3
 			code = ir_vector_extract_int(mask_element_type, tmp_reg, op3_reg, i);
 			|	.long code
 
+			IR_ASSERT(mod != 0 && ((mod - 1) & mod) == 0);
+			|	and Rx(tmp_reg), Rx(tmp_reg), #(mod-1)
+
 			src = IR_MEM(IR_REG_STACK_POINTER, 0, tmp_reg, ir_ntz(element_size));
 			ir_emit_load_mem_int(ctx, element_type, tmp_reg, src);
 			code = neon_INS_int(element_size, def_reg, tmp_reg, i);

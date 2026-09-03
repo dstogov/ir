@@ -18499,6 +18499,8 @@ static void ir_emit_vector_shuffle_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn, u
 
 static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
 	ir_type type = insn->type;
 	ir_type element_type;
 	uint32_t element_size;
@@ -18638,6 +18640,8 @@ static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				} else
 #endif
 				ir_emit_load_mem_int(ctx, mask_element_type, idx_reg, src);
+				IR_ASSERT(mod != 0 && ((mod - 1) & mod) == 0);
+				|	and Ra(idx_reg), (mod-1)
 				src = IR_MEM(IR_REG_RSP, src_offset, idx_reg, element_size);
 				dst = IR_MEM(IR_REG_RSP, dst_offset + i * element_size, IR_REG_NONE, 1);
 #if IR_X86_I64
