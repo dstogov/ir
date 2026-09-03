@@ -8675,18 +8675,6 @@ static void ir_emit_load_params(ir_ctx *ctx)
 	}
 }
 
-static ir_reg ir_get_free_reg(ir_type type, ir_regset available)
-{
-	if (IR_IS_TYPE_INT(type)) {
-		available = IR_REGSET_INTERSECTION(available, IR_REGSET_GP);
-	} else {
-		IR_ASSERT(IR_IS_TYPE_FP(type));
-		available = IR_REGSET_INTERSECTION(available, IR_REGSET_FP);
-	}
-	IR_ASSERT(!IR_REGSET_IS_EMPTY(available));
-	return IR_REGSET_FIRST(available);
-}
-
 static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to, void *dessa_from_block)
 {
 	ir_ref ref = ctx->cfg_blocks[(intptr_t)dessa_from_block].end;

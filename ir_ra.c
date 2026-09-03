@@ -2765,7 +2765,7 @@ static int32_t ir_allocate_small_spill_slot(ir_ctx *ctx, size_t size)
 	return ret;
 }
 
-static int32_t ir_allocate_big_spill_slot(ir_ctx *ctx, int32_t size)
+int32_t ir_allocate_big_spill_slot(ir_ctx *ctx, int32_t size)
 {
 	int32_t ret;
 
