@@ -18622,7 +18622,7 @@ static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 			IR_ASSERT(op3_reg != IR_REG_NONE);
 			if (IR_REG_SPILLED(op3_reg)) {
-				op2_reg = IR_REG_NUM(op3_reg);
+				op3_reg = IR_REG_NUM(op3_reg);
 				ir_emit_load(ctx, type, op3_reg, insn->op3);
 			}
 			ir_emit_store_mem_fp(ctx, mask_type, IR_MEM(IR_REG_RSP, mask_offset, IR_REG_NONE, 1), op3_reg);
