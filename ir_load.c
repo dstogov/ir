@@ -1476,7 +1476,7 @@ static int parse_ir_sym_size(int sym, size_t *size) {
 static int parse_ir_sym_data(int sym, ir_loader *loader) {
 	uint8_t t = 0;
 	ir_val val;
-	void *p;
+	void *p = NULL;
 	const char *name;
 	size_t name_len;
 	char buf[256];

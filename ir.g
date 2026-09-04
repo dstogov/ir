@@ -431,7 +431,7 @@ ir_sym_size(size_t *size):
 ir_sym_data(ir_loader *loader):
 	{uint8_t t = 0;}
 	{ir_val val;}
-	{void *p;}
+	{void *p = NULL;}
 	{const char *name;}
 	{size_t name_len;}
 	{char buf[256];}
