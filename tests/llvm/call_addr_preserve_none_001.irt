@@ -1,0 +1,18 @@
+--TEST--
+001: constant function address call emits a preserve-none function pointer
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	int32_t c_1 = 7;
+	uintptr_t c_2 = func *0x1234(int32_t): int32_t __preserve_none;
+	l_1 = START(l_4);
+	int32_t d_3, l_3 = CALL/1(l_1, c_2, c_1);
+	l_4 = RETURN(l_3, d_3);
+}
+--EXPECT--
+define i32 @test()
+{
+	%d2 = call preserve_nonecc i32 inttoptr (i64 u0x1234 to ptr)(i32 7)
+	ret i32 %d2
+}

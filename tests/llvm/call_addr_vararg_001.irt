@@ -1,0 +1,20 @@
+--TEST--
+001: constant function address vararg call emits a typed function pointer
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	uintptr_t c_1 = "x=%d\n";
+	int32_t c_2 = 7;
+	uintptr_t c_3 = func *0x1234(uintptr_t, ...): int32_t;
+	l_1 = START(l_5);
+	int32_t d_4, l_4 = CALL/2(l_1, c_3, c_1, c_2);
+	l_5 = RETURN(l_4, d_4);
+}
+--EXPECT--
+define i32 @test()
+{
+	%d2 = call i32 (...) inttoptr (i64 u0x1234 to ptr)(ptr @.str4, i32 7)
+	ret i32 %d2
+}
+@.str4 = private unnamed_addr constant [6 x i8] c"x=%d\0A\00"

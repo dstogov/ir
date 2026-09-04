@@ -1,0 +1,20 @@
+--TEST--
+001: proto values keep preserve-none function-pointer casts on aarch64
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	uintptr_t c_1 = 0x1234;
+	int32_t c_2 = 7;
+	l_1 = START(l_5);
+	uintptr_t d_3 = PROTO/2(c_1, func(int32_t): int32_t __preserve_none);
+	int32_t d_4, l_4 = CALL/1(l_1, d_3, c_2);
+	l_5 = RETURN(l_4, d_4);
+}
+--EXPECT--
+define i32 @test()
+{
+	%d2 = inttoptr i64 u0x1234 to ptr
+	%d3 = call preserve_nonecc i32 %d2(i32 7)
+	ret i32 %d3
+}

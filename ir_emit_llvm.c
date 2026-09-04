@@ -732,9 +732,13 @@ static void ir_emit_conv(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const cha
 {
 	ir_emit_def_ref(ctx, f, def);
 	fprintf(f, "%s ", op);
-	ir_emit_llvm_type_name(ctx->ir_base[insn->op1].type, f);
-	fprintf(f, " ");
-	ir_emit_ref(ctx, f, insn->op1);
+	if (IR_IS_CONST_REF(insn->op1) && ctx->ir_base[insn->op1].op == IR_ADDR) {
+		fprintf(f, "i64 u0x%" PRIxPTR, ctx->ir_base[insn->op1].val.addr);
+	} else {
+		ir_emit_llvm_type_name(ctx->ir_base[insn->op1].type, f);
+		fprintf(f, " ");
+		ir_emit_ref(ctx, f, insn->op1);
+	}
 	fprintf(f, " to ");
 	ir_emit_llvm_type_name(insn->type, f);
 	fprintf(f, "\n");
@@ -1090,31 +1094,32 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn, ir_bit
 	if (IR_IS_CONST_REF(insn->op2)) {
 		const ir_insn *func = &ctx->ir_base[insn->op2];
 
-		IR_ASSERT(func->op == IR_FUNC);
-		name = ir_get_str(ctx, func->val.name);
-		if (func->proto) {
-			const ir_proto_t *proto = (const ir_proto_t *)ir_get_str(ctx, func->proto);
+		if (func->op == IR_FUNC) {
+			name = ir_get_str(ctx, func->val.name);
+			if (func->proto) {
+				const ir_proto_t *proto = (const ir_proto_t *)ir_get_str(ctx, func->proto);
 
-			if ((proto->flags & IR_CALL_CONV_MASK) == IR_CC_BUILTIN) {
-				int n = ir_builtin_func(name);
-				if (n >= 0) {
-					ir_llvm_intrinsic_id id = ir_llvm_builtin_map[n].id;
+				if ((proto->flags & IR_CALL_CONV_MASK) == IR_CC_BUILTIN) {
+					int n = ir_builtin_func(name);
+					if (n >= 0) {
+						ir_llvm_intrinsic_id id = ir_llvm_builtin_map[n].id;
 
-					if (id == IR_LLVM_INTR_MEMSET
-					 || id == IR_LLVM_INTR_MEMCPY
-					 || id == IR_LLVM_INTR_MEMMOVE) {
-						last_arg = IR_FALSE;
-				    } else if (id == IR_LLVM_INTR_ISNAN_F64
-				     || id == IR_LLVM_INTR_ISNAN_F32) {
-						ir_emit_def_ref(ctx, f, def);
-						fprintf(f, "%s ", ir_llvm_intrinsic_desc[id].name);
-						ir_emit_ref(ctx, f, insn->op3);
-						fprintf(f, ", 0.0\n");
-						return;
+						if (id == IR_LLVM_INTR_MEMSET
+						 || id == IR_LLVM_INTR_MEMCPY
+						 || id == IR_LLVM_INTR_MEMMOVE) {
+							last_arg = IR_FALSE;
+					    } else if (id == IR_LLVM_INTR_ISNAN_F64
+					     || id == IR_LLVM_INTR_ISNAN_F32) {
+							ir_emit_def_ref(ctx, f, def);
+							fprintf(f, "%s ", ir_llvm_intrinsic_desc[id].name);
+							ir_emit_ref(ctx, f, insn->op3);
+							fprintf(f, ", 0.0\n");
+							return;
+					    }
+						ir_bitset_incl(used_intrinsics, id);
+						name = ir_llvm_intrinsic_desc[id].name;
 				    }
-					ir_bitset_incl(used_intrinsics, id);
-					name = ir_llvm_intrinsic_desc[id].name;
-			    }
+				}
 			}
 		}
 	}
@@ -1142,7 +1147,14 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn, ir_bit
 	// TODO: function prototype ???
 
 	if (IR_IS_CONST_REF(insn->op2)) {
-		fprintf(f, "@%s", name);
+		const ir_insn *func = &ctx->ir_base[insn->op2];
+		if (func->op == IR_FUNC) {
+			name = ir_get_str(ctx, func->val.name);
+			fprintf(f, "@%s", name);
+		} else {
+			IR_ASSERT(func->op == IR_FUNC_ADDR);
+			fprintf(f, "inttoptr (i64 u0x%" PRIxPTR " to ptr)", func->val.addr);
+		}
 	} else {
 		ir_emit_ref(ctx, f, insn->op2);
 	}
@@ -1496,7 +1508,14 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 					}
 					break;
 				case IR_PROTO:
-					ir_emit_conv(ctx, f, i, insn, "bitcast");
+					if (IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)
+					 && (ctx->ir_base[insn->op1].type != IR_ADDR
+					  || ctx->ir_base[insn->op1].op == IR_FUNC_ADDR
+					  || ctx->ir_base[insn->op1].op == IR_C_ADDR)) {
+						ir_emit_conv(ctx, f, i, insn, "inttoptr");
+					} else {
+						ir_emit_conv(ctx, f, i, insn, "bitcast");
+					}
 					break;
 				case IR_INT2FP:
 					if (IR_IS_TYPE_VECTOR(insn->type)) {

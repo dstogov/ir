@@ -1,0 +1,17 @@
+--TEST--
+001: constant function address void tailcall emits a typed function pointer
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	uintptr_t c_1 = func *0x1234(void): void;
+	l_1 = START(l_3);
+	l_2 = TAILCALL(l_1, c_1);
+	l_3 = UNREACHABLE(l_2);
+}
+--EXPECT--
+define void @test()
+{
+	tail call void inttoptr (i64 u0x1234 to ptr)()
+	unreachable
+}
