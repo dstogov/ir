@@ -7097,6 +7097,7 @@ static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn, uint3
 					break;
 				default:
 					IR_ASSERT(0);
+					return;
 			}
 			|	.long code
 		} else {
