@@ -216,6 +216,10 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	n = use_list->count;
 	for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
 		use = *p;
+		i = ctx->cfg_map[use];
+		if (!i) {
+			continue;
+		}
 		insn = &ctx->ir_base[use];
 		if (insn->op == IR_PHI) {
 			ir_ref *p = insn->ops + 2; /* PHI data inputs */
@@ -233,10 +237,6 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 				}
 			}
 		} else {
-			i = ctx->cfg_map[use];
-			if (!i) {
-				continue;
-			}
 			IR_ASSERT(i > 0 && i <= ctx->cfg_blocks_count);
 			if (!ir_sparse_set_in(&data->totally_useful, i)) {
 				if (i == b) return 0; /* node is totally-useful in the scheduled block */
