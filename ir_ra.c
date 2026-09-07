@@ -2270,6 +2270,20 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy, void *dat
 
 	k = ir_phi_input_number(ctx, succ_bb, b);
 
+	if (use_list->count == 2) {
+		/* Simple version for BB with single PHI */
+		ref = ctx->use_edges[use_list->refs];
+		insn = &ctx->ir_base[ref];
+		if (insn->op != IR_PHI) {
+			ref = ctx->use_edges[use_list->refs + 1];
+			insn = &ctx->ir_base[ref];
+		}
+		IR_ASSERT(insn->op == IR_PHI);
+		input = ir_insn_op(insn, k);
+		emit_copy(ctx, insn->type, input, ref, data);
+		return 1;
+	}
+
 	loc = ir_mem_malloc((ctx->vregs_count + 1) * 4 * sizeof(ir_ref));
 	pred = loc + ctx->vregs_count + 1;
 	src = pred + ctx->vregs_count + 1;
