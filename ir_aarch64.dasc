@@ -9761,6 +9761,7 @@ void *ir_emit_thunk(ir_code_buffer *code_buffer, void *addr, size_t *size_ptr)
 	entry = code_buffer->pos;
 	entry = (void*)IR_ALIGNED_SIZE(((size_t)(entry)), 4);
 	if (size > (size_t)((char*)code_buffer->end - (char*)entry)) {
+		*size_ptr = size;
 		dasm_free(&dasm_state);
 		return NULL;
 	}

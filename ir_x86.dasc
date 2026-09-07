@@ -26873,6 +26873,7 @@ void *ir_emit_thunk(ir_code_buffer *code_buffer, void *addr, size_t *size_ptr)
 	}
 
 	if (size > (size_t)((char*)code_buffer->end - (char*)code_buffer->pos)) {
+		*size_ptr = size;
 		dasm_free(&dasm_state);
 		return NULL;
 	}
