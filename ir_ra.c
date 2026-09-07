@@ -3923,7 +3923,7 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 
 	if (ctx->flags2 & IR_LR_HAVE_DESSA_MOVES) {
 		/* Add fixed intervals for temporary registers used for DESSA moves */
-		for (b = 1, bb = &ctx->cfg_blocks[1]; b <= ctx->cfg_blocks_count; b++, bb++) {
+		for (b = ctx->cfg_blocks_count, bb = &ctx->cfg_blocks[b]; b > 0; b--, bb--) {
 			IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 			if (bb->flags & IR_BB_DESSA_MOVES) {
 				ir_tmp_reg tmp_reg;
