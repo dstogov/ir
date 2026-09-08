@@ -1155,6 +1155,7 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 		prev = b;
 		for (i = bb->start, insn = ctx->ir_base + i; i <= bb->end;) {
 			switch (insn->op) {
+				case IR_NOP:
 				case IR_START:
 				case IR_BEGIN:
 				case IR_IF_TRUE:
