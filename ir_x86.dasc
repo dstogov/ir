@@ -13992,14 +13992,34 @@ static void ir_emit_lea(ir_ctx *ctx, ir_ref def, ir_type type)
 	}
 }
 
+|.macro TLS_LOAD_OR_ADDR, reg, offset, addr
+||	if (addr) {
+||		if (offset) {
+|			lea reg, aword [reg+offset]
+||		}
+||	} else {
+|		mov reg, aword [reg+offset]
+||	}
+|.endmacro
+
+|.macro STATIC_TLS_LOAD_OR_ADDR, reg, offset, addr
+||	if (addr) {
+|		mov reg, aword [0]
+|		TLS_LOAD_OR_ADDR reg, offset, addr
+||	} else {
+|		mov reg, aword [offset]
+||	}
+|.endmacro
+
 static void ir_emit_tls(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg reg = IR_REG_NUM(ctx->regs[def][0]);
+	bool addr = insn->op == IR_TLS_ADDR;
 
 	if (ctx->use_lists[def].count == 1) {
-		/* dead load */
+		/* dead result */
 		return;
 	}
 
@@ -14007,37 +14027,37 @@ static void ir_emit_tls(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |	gs
 |	mov Ra(reg), aword [0x58]
 |	mov Ra(reg), aword [Ra(reg)+insn->op2]
-|	mov Ra(reg), aword [Ra(reg)+insn->op3]
+|	TLS_LOAD_OR_ADDR Ra(reg), insn->op3, addr
 |.elif WIN
 |	fs
 |	mov Ra(reg), aword [0x2c]
 |	mov Ra(reg), aword [Ra(reg)+insn->op2]
-|	mov Ra(reg), aword [Ra(reg)+insn->op3]
+|	TLS_LOAD_OR_ADDR Ra(reg), insn->op3, addr
 |.elif X64APPLE
 |	gs
 ||	if (insn->op3 == IR_NULL) {
-|		mov Ra(reg), aword [insn->op2]
+|		STATIC_TLS_LOAD_OR_ADDR Ra(reg), insn->op2, addr
 ||	} else {
 |		mov Ra(reg), aword [insn->op2]
-|		mov Ra(reg), aword [Ra(reg)+insn->op3]
+|		TLS_LOAD_OR_ADDR Ra(reg), insn->op3, addr
 ||	}
 |.elif X64
 |	fs
 ||	if (insn->op3 == IR_NULL) {
-|		mov Ra(reg), aword [insn->op2]
+|		STATIC_TLS_LOAD_OR_ADDR Ra(reg), insn->op2, addr
 ||	} else {
 |		mov Ra(reg), [0x8]
 |		mov Ra(reg), aword [Ra(reg)+insn->op2]
-|		mov Ra(reg), aword [Ra(reg)+insn->op3]
+|		TLS_LOAD_OR_ADDR Ra(reg), insn->op3, addr
 ||	}
 |.else
 |	gs
 ||	if (insn->op3 == IR_NULL) {
-|		mov Ra(reg), aword [insn->op2]
+|		STATIC_TLS_LOAD_OR_ADDR Ra(reg), insn->op2, addr
 ||	} else {
 |		mov Ra(reg), [0x4]
 |		mov Ra(reg), aword [Ra(reg)+insn->op2]
-|		mov Ra(reg), aword [Ra(reg)+insn->op3]
+|		TLS_LOAD_OR_ADDR Ra(reg), insn->op3, addr
 ||	}
 |	.endif
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
@@ -26351,6 +26371,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					ir_emit_sse_round(ctx, i, insn, 12);
 					break;
 				case IR_TLS:
+				case IR_TLS_ADDR:
 					ir_emit_tls(ctx, i, insn);
 					break;
 				case IR_TRAP:
