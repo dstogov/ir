@@ -1,7 +1,7 @@
 --TEST--
 003: Parameter Loading and argument passing
 --TARGET--
-aarch64-*-sysv
+aarch64-darwin
 --ARGS--
 -S
 --CODE--
@@ -27,22 +27,22 @@ test:
 	stp x29, x30, [sp, #-0x10]!
 	mov x29, sp
 	mov w8, w7
-	sub sp, sp, #0x20
-	str w8, [sp]
-	mov w7, w6
-	mov w6, w5
-	mov w5, w4
-	mov w4, w3
-	mov w3, w2
-	mov w2, w1
-	mov w1, w0
+	sub sp, sp, #0x50
+	str w0, [sp]
+	str w1, [sp, #8]
+	str w2, [sp, #0x10]
+	str w3, [sp, #0x18]
+	str w4, [sp, #0x20]
+	str w5, [sp, #0x28]
+	str w6, [sp, #0x30]
+	str w8, [sp, #0x38]
 	adr x0, .L1
 	ldr w16, [x29, #0x10]
-	str w16, [sp, #8]
+	str w16, [sp, #0x40]
 	ldr w16, [x29, #0x18]
-	str w16, [sp, #0x10]
+	str w16, [sp, #0x48]
 	bl printf
-	add sp, sp, #0x20
+	add sp, sp, #0x50
 	ldp x29, x30, [sp], #0x10
 	ret
 .rodata

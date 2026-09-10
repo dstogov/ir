@@ -1,7 +1,7 @@
 --TEST--
-Simple CALL with VADDR
+Simple CALL with ALLOCA
 --TARGET--
-aarch64-*-sysv
+aarch64-darwin
 --ARGS--
 -S --run
 --CODE--
@@ -17,12 +17,12 @@ aarch64-*-sysv
 	char d = 'd';
 	char nl = '\n';
 	char zero = 0;
+	uint32_t len = 7;
 	uintptr_t one = 1;
 	uintptr_t c_5 = func printf(uintptr_t, ...): int32_t;
 	l_1 = START(l_4);
-	uint64_t var_1 = VAR(l_1, "str");
-	uintptr_t a_0 = VADDR(var_1);
-	s_1 = STORE(l_1, a_0, h);
+	uintptr_t a_0, s_0 = ALLOCA(l_1, len);
+	s_1 = STORE(s_0, a_0, h);
 	uintptr_t a_1 = ADD(a_0, one);
 	s_2 = STORE(s_1, a_1, i);
 	uintptr_t a_2 = ADD(a_1, one);
@@ -55,9 +55,12 @@ main:
 	movz w0, #0xa
 	strb w0, [x29, #0x15]
 	strb wzr, [x29, #0x16]
+	sub sp, sp, #0x10
 	add x0, x29, #0x10
-	movz w1, #0x2a
+	movz w16, #0x2a
+	str x16, [sp]
 	bl printf
+	add sp, sp, #0x10
 	ldp x29, x30, [sp], #0x20
 	ret
 

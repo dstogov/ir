@@ -1,7 +1,7 @@
 --TEST--
 Fib2
 --TARGET--
-aarch64
+aarch64-*-sysv
 --ARGS--
 --debug-regset 0x3ffffffff --save --save-live-ranges -S --run
 --CODE--

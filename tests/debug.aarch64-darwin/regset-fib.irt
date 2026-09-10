@@ -1,7 +1,7 @@
 --TEST--
 Fib
 --TARGET--
-aarch64-*-sysv
+aarch64-darwin
 --ARGS--
 --debug-regset 0x3ffffffff --save --save-live-ranges -S --run
 --CODE--
@@ -88,8 +88,11 @@ main:
 	str d1, [x29, #0x18]
 	fsub d0, d1, d0
 	str d0, [x29, #0x10]
+	sub sp, sp, #0x10
+	str d0, [sp]
 	adr x0, .L5
 	bl printf
+	add sp, sp, #0x10
 .L2:
 	ldr d1, [x29, #0x18]
 	ldr d0, .L4
@@ -99,6 +102,7 @@ main:
 	ldp x29, x30, [sp], #0x20
 	ret
 .rodata
+	.db 0x1f, 0x20, 0x03, 0xd5
 .L3:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f
 .L4:

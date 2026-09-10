@@ -1,7 +1,7 @@
 --TEST--
 CALL with parallel argument passing
 --TARGET--
-aarch64-*-sysv
+aarch64-darwin
 --ARGS--
 -S
 --CODE--
@@ -27,16 +27,18 @@ test:
 	mov x29, sp
 	str x19, [x29, #0x18]
 	mov w19, w0
-	mov w16, w1
-	mov w1, w2
-	mov w2, w3
-	mov w3, w16
+	sub sp, sp, #0x20
+	str w2, [sp]
+	str w3, [sp, #8]
+	str w1, [sp, #0x10]
 	adr x0, .L1
 	bl printf
+	add sp, sp, #0x20
 	add w0, w0, w19
 	ldr x19, [x29, #0x18]
 	ldp x29, x30, [sp], #0x20
 	ret
 .rodata
+	.db 0x1f, 0x20, 0x03, 0xd5
 .L1:
 	.db 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x25, 0x64, 0x21, 0x0a, 0x00, 0x00
