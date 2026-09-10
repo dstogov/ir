@@ -131,21 +131,35 @@ jobs:
   MACOS_aarch64:
     name: 'macOS arm64'
     runs-on: macos-26
+    env:
+      CAPSTONE_PREFIX: ${{ github.workspace }}/capstone-install
+      CAPSTONE_VERSION: 4.0.2
     steps:
-      - uses: actions/checkout@v3
-      - name: brew
-        run: brew install capstone
+      - uses: actions/checkout@v7
+      - name: Build capstone
+        run: |
+          curl --fail --location --retry 3 \
+            "https://github.com/capstone-engine/capstone/archive/${CAPSTONE_VERSION}.tar.gz" \
+            --output capstone.tar.gz
+          tar xzf capstone.tar.gz
+          make -C "capstone-${CAPSTONE_VERSION}" \
+            CAPSTONE_ARCHS=aarch64 \
+            CAPSTONE_BUILD_CORE_ONLY=yes \
+            CAPSTONE_SHARED=no \
+            CAPSTONE_STATIC=yes \
+            PREFIX="${CAPSTONE_PREFIX}" \
+            install
       - name: make
         run: |
           make TARGET=aarch64 BUILD=debug \
-            CFLAGS="-fsanitize=address,undefined -I$(brew --prefix)/include" \
-            LDFLAGS="-lm -ldl -L$(brew --prefix)/lib" \
+            CFLAGS="-fsanitize=address,undefined -I${CAPSTONE_PREFIX}/include" \
+            LDFLAGS="-lm -ldl -L${CAPSTONE_PREFIX}/lib" \
             all
       - name: test
         run: |
           make TARGET=aarch64 BUILD=debug \
-            CFLAGS="-fsanitize=address,undefined -I$(brew --prefix)/include" \
-            LDFLAGS="-lm -ldl -L$(brew --prefix)/lib" \
+            CFLAGS="-fsanitize=address,undefined -I${CAPSTONE_PREFIX}/include" \
+            LDFLAGS="-lm -ldl -L${CAPSTONE_PREFIX}/lib" \
             test-ci
 
   MACOS_x86_64:
