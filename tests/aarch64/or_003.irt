@@ -14,7 +14,7 @@ aarch64
 }
 --EXPECT--
 test:
-	mov x1, #1
+	movz x1, #0x1
 	movk x1, #0x400, lsl #32
 	orr x0, x0, x1
 	ret

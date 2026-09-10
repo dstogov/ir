@@ -25,5 +25,5 @@ test:
 	mov w0, wzr
 	ret
 .L1:
-	mov w0, #3
+	movz w0, #0x3
 	ret
