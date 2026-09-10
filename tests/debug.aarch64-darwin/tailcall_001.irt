@@ -1,7 +1,7 @@
 --TEST--
 Simple CALL
 --TARGET--
-aarch64-*-sysv
+aarch64-darwin
 --ARGS--
 -S --run
 --CODE--
@@ -18,11 +18,17 @@ aarch64-*-sysv
 }
 --EXPECT--
 main:
+	stp x29, x30, [sp, #-0x10]!
+	mov x29, sp
+	sub sp, sp, #0x10
 	adr x0, .L1
-	movz w1, #0x2a
-	b printf
+	movz w16, #0x2a
+	str x16, [sp]
+	bl printf
+	add sp, sp, #0x10
+	ldp x29, x30, [sp], #0x10
+	ret
 .rodata
-	.db 0x1f, 0x20, 0x03, 0xd5
 .L1:
 	.db 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x25, 0x64, 0x21, 0x0a, 0x00, 0x00
 

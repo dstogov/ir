@@ -1,7 +1,7 @@
 --TEST--
 FibI
 --TARGET--
-aarch64-*-sysv
+aarch64-darwin
 --ARGS--
 --save --save-live-ranges -S --run
 --CODE--
@@ -73,9 +73,11 @@ main:
 	b .L2
 .L1:
 	add w20, w19, w0
-	mov w1, w19
+	sub sp, sp, #0x10
+	str w19, [sp]
 	adr x0, .L3
 	bl printf
+	add sp, sp, #0x10
 	mov w0, w19
 	mov w19, w20
 .L2:

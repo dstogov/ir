@@ -1,7 +1,7 @@
 --TEST--
 Simple CALL -O0
 --TARGET--
-aarch64
+aarch64-*-sysv
 --ARGS--
 -S -O0 --run
 --CODE--

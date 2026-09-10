@@ -1,7 +1,7 @@
 --TEST--
 002: Argument Passing
 --TARGET--
-aarch64-*-sysv
+aarch64-darwin
 --ARGS--
 -S --run
 --CODE--
@@ -26,22 +26,30 @@ aarch64-*-sysv
 main:
 	stp x29, x30, [sp, #-0x10]!
 	mov x29, sp
-	sub sp, sp, #0x10
+	sub sp, sp, #0x50
 	adr x0, .L10
-	ldr d0, .L1
-	ldr d1, .L2
-	ldr d2, .L3
-	ldr d3, .L4
-	ldr d4, .L5
-	ldr d5, .L6
-	ldr d6, .L7
-	ldr d7, .L8
-	ldr d31, .L9
+	ldr d31, .L1
 	str d31, [sp]
-	fmov d31, xzr
+	ldr d31, .L2
 	str d31, [sp, #8]
+	ldr d31, .L3
+	str d31, [sp, #0x10]
+	ldr d31, .L4
+	str d31, [sp, #0x18]
+	ldr d31, .L5
+	str d31, [sp, #0x20]
+	ldr d31, .L6
+	str d31, [sp, #0x28]
+	ldr d31, .L7
+	str d31, [sp, #0x30]
+	ldr d31, .L8
+	str d31, [sp, #0x38]
+	ldr d31, .L9
+	str d31, [sp, #0x40]
+	fmov d31, xzr
+	str d31, [sp, #0x48]
 	bl printf
-	add sp, sp, #0x10
+	add sp, sp, #0x50
 	ldp x29, x30, [sp], #0x10
 	ret
 .rodata

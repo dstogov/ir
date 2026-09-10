@@ -1,7 +1,7 @@
 --TEST--
-Fib
+Fib2
 --TARGET--
-aarch64-*-sysv
+aarch64-darwin
 --ARGS--
 --debug-regset 0x3ffffffff --save --save-live-ranges -S --run
 --CODE--
@@ -24,9 +24,8 @@ aarch64-*-sysv
 	l_7 = IF_TRUE(l_4);
 	double hi_3 = ADD(hi_2, lo_2);
 	double lo_3 = SUB(hi_3, lo_2);
-	l_8 = CALL/2(l_7, f, format, lo_3);
-#	ll = CALL/2(l_7, f, format, lo_3);
-#	l_8 = CALL/2(ll, f, format, lo_3);
+	ll = CALL/2(l_7, f, format, lo_3);
+	l_8 = CALL/2(ll, f, format, lo_3);
 	l_9 = LOOP_END(l_8);
 	l_5 = IF_FALSE(l_4);
 	l_6 = RETURN(l_5, zero);
@@ -42,9 +41,9 @@ aarch64-*-sysv
 	double c_7 = 10000;
 	uintptr_t c_8 = func printf(uintptr_t, ...): int32_t;
 	uintptr_t c_9 = "%g\n";
-	l_1 = START(l_15);
+	l_1 = START(l_17);
 	l_2 = END(l_1);
-	l_3 = LOOP_BEGIN(l_2, l_13);
+	l_3 = LOOP_BEGIN(l_2, l_15);
 	double d_4 = PHI(l_3, c_5, d_10);
 	double d_5 = PHI(l_3, c_6, d_9);
 	bool d_6 = LT(d_5, c_7);
@@ -53,9 +52,10 @@ aarch64-*-sysv
 	double d_9 = ADD(d_5, d_4);
 	double d_10 = SUB(d_9, d_4);
 	l_11 = CALL/2(l_8, c_8, c_9, d_10);
-	l_13 = LOOP_END(l_11);
-	l_14 = IF_FALSE(l_7);
-	l_15 = RETURN(l_14, c_4);
+	l_13 = CALL/2(l_11, c_8, c_9, d_10);
+	l_15 = LOOP_END(l_13);
+	l_16 = IF_FALSE(l_7);
+	l_17 = RETURN(l_16, c_4);
 }
 { # LIVE-RANGES (vregs_count=2)
 TMP
@@ -65,13 +65,13 @@ R1 (d_4, d_10) [SPILL=0x0]
 	[%d0]: [3.0-7.0), DEF(4.2)
 	: [7.0-8.0)
 	[%d0]: [8.0-10.1), [10.2-11.0), USE(9.1/2)!, USE(10.1/2)!, DEF(10.2)!, USE(11.0/4, hint=%d0)
-	: [11.0-14.0), PHI_USE(13.2, phi=d_4/3)
+	: [11.0-16.0), USE(13.0/4, hint=%d0), PHI_USE(15.2, phi=d_4/3)
 R2 (d_5, d_9) [SPILL=0x8]
 	[%d1]: [3.0-9.1), [9.2-10.1), DEF(5.2), USE(7.1/6.1)!, USE(9.1/1)!, DEF(9.2)!, USE(10.1/1)!
-	: [10.1-14.0), PHI_USE(13.2, phi=d_5/3)
-[%x0] : [11.0-11.1), [15.0-15.1)
-[%d0] : [11.0-11.1)
-[%SCRATCH] : [11.1-11.2)
+	: [10.1-16.0), PHI_USE(15.2, phi=d_5/3)
+[%x0] : [11.0-11.1), [13.0-13.1), [17.0-17.1)
+[%d0] : [11.0-11.1), [13.0-13.1)
+[%SCRATCH] : [11.1-11.2), [13.1-13.2)
 }
 main:
 	stp x29, x30, [sp, #-0x20]!
@@ -88,8 +88,17 @@ main:
 	str d1, [x29, #0x18]
 	fsub d0, d1, d0
 	str d0, [x29, #0x10]
+	sub sp, sp, #0x10
+	str d0, [sp]
 	adr x0, .L5
 	bl printf
+	add sp, sp, #0x10
+	sub sp, sp, #0x10
+	adr x0, .L5
+	ldr d31, [x29, #0x10]
+	str d31, [sp]
+	bl printf
+	add sp, sp, #0x10
 .L2:
 	ldr d1, [x29, #0x18]
 	ldr d0, .L4
@@ -99,6 +108,7 @@ main:
 	ldp x29, x30, [sp], #0x20
 	ret
 .rodata
+	.db 0x1f, 0x20, 0x03, 0xd5
 .L3:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f
 .L4:
@@ -108,21 +118,41 @@ main:
 
 1
 1
+1
+1
+2
 2
 3
+3
+5
 5
 8
+8
+13
 13
 21
+21
+34
 34
 55
+55
+89
 89
 144
+144
+233
 233
 377
+377
+610
 610
 987
+987
+1597
 1597
 2584
+2584
 4181
+4181
+6765
 6765
