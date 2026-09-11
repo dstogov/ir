@@ -6509,15 +6509,38 @@ static void ir_emit_guard_overflow(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
+static void ir_emit_tls_load_or_addr(ir_ctx *ctx, ir_reg reg, int32_t offset, bool addr)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+
+	if (!addr) {
+		| ldr Rx(reg), [Rx(reg), #offset]
+		return;
+	}
+	if (offset == 0) {
+		return;
+	}
+	if (aarch64_may_encode_imm12(offset)) {
+		| add Rx(reg), Rx(reg), #offset
+	} else if (offset < 0 && aarch64_may_encode_imm12(-(int64_t)offset)) {
+		| sub Rx(reg), Rx(reg), #(-(int64_t)offset)
+	} else {
+		ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset);
+		| add Rx(reg), Rx(reg), Rx(IR_REG_INT_TMP)
+	}
+}
+
 static void ir_emit_tls(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 	uint32_t code;
 	ir_reg reg = IR_REG_NUM(ctx->regs[def][0]);
+	bool addr = insn->op == IR_TLS_ADDR;
 
 	if (ctx->use_lists[def].count == 1) {
-		/* dead load */
+		/* dead result */
 		return;
 	}
 
@@ -6525,6 +6548,7 @@ static void ir_emit_tls(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 ||	code = 0xd53bd060 | reg; // TODO: hard-coded: mrs reg, tpidrro_el0
 |	.long code
 |	and Rx(reg), Rx(reg), #0xfffffffffffffff8
+||	(void)addr;
 |//???	MEM_ACCESS_64_WITH_UOFFSET_64 ldr, Rx(reg), Rx(reg), #insn->op2, TMP1
 |//???	MEM_ACCESS_64_WITH_UOFFSET_64 ldr, Rx(reg), Rx(reg), #insn->op3, TMP1
 ||#else
@@ -6532,19 +6556,19 @@ static void ir_emit_tls(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |	.long code
 ||# ifndef __MUSL__
 ||	if (insn->op3 == IR_NULL) {
-|		ldr Rx(reg), [Rx(reg), #insn->op2]
+||		ir_emit_tls_load_or_addr(ctx, reg, insn->op2, addr);
 ||	} else {
 |		ldr Rx(reg), [Rx(reg), #0]
 |		ldr Rx(reg), [Rx(reg), #insn->op2]
-|		ldr Rx(reg), [Rx(reg), #insn->op3]
+||		ir_emit_tls_load_or_addr(ctx, reg, insn->op3, addr);
 ||	}
 ||# else
 ||	if (insn->op3 == IR_NULL) {
-|		ldr Rx(reg), [Rx(reg), #insn->op2]
+||		ir_emit_tls_load_or_addr(ctx, reg, insn->op2, addr);
 ||	} else {
 |		ldr Rx(reg), [Rx(reg), #-8]
 |		ldr Rx(reg), [Rx(reg), #insn->op2]
-|		ldr Rx(reg), [Rx(reg), #insn->op3]
+||		ir_emit_tls_load_or_addr(ctx, reg, insn->op3, addr);
 ||	}
 ||# endif
 ||#endif
@@ -9213,6 +9237,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					ir_emit_guard_overflow(ctx, i, insn);
 					break;
 				case IR_TLS:
+				case IR_TLS_ADDR:
 					ir_emit_tls(ctx, i, insn);
 					break;
 				case IR_TRAP:
