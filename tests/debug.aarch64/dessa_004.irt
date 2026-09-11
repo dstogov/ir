@@ -1,0 +1,37 @@
+--TEST--
+DESSA 004 (swap of coalesced virtual registers)
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+func foo(int32_t, uintptr_t, uintptr_t): int32_t
+{
+	l_1 = START(l_26);
+	int32_t d_4 = PARAM(l_1, "cond", 3);
+	uintptr_t d_5 = PARAM(l_1, "x", 4);
+	uintptr_t d_6 = PARAM(l_1, "y", 5);
+	int32_t d_7, l_7 = LOAD(l_1, d_5);
+	int32_t d_9, l_9 = LOAD(l_7, d_6);
+	l_15 = IF(l_9, d_4);
+	l_16 = IF_FALSE(l_15);
+	l_17 = END(l_16);
+	l_18 = IF_TRUE(l_15);
+	l_19 = END(l_18);
+	l_20 = MERGE(l_17, l_19);
+	int32_t d_22 = PHI(l_20, d_7, d_9);
+	int32_t d_23 = PHI(l_20, d_9, d_7);
+	int32_t d_24 = SUB(d_22, d_23);
+	l_26 = RETURN(l_20, d_24);
+}
+--EXPECT--
+foo:
+	ldr w1, [x1]
+	ldr w2, [x2]
+	cbnz w0, .L1
+	mov w0, w1
+	mov w1, w2
+	mov w2, w0
+.L1:
+	sub w0, w2, w1
+	ret
