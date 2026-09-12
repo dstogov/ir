@@ -1,0 +1,38 @@
+--TEST--
+013: type conversion BITCAST integer and floating-point constants
+--TARGET--
+aarch64
+--ARGS--
+-S -O0
+--CODE--
+{
+	float float_bits = 1.0;
+	double double_bits = 1.0;
+	uint32_t int_bits = 0x3f800000;
+	uint64_t long_bits = 0x3ff0000000000000;
+	l_1 = START(l_8);
+	uint32_t from_float = BITCAST(float_bits);
+	uint64_t from_double = BITCAST(double_bits);
+	float to_float = BITCAST(int_bits);
+	double to_double = BITCAST(long_bits);
+	l_8 = RETURN(l_1, from_float);
+}
+--EXPECT--
+test:
+	sub sp, sp, #0x20
+	movz w0, #0x3f80, lsl #16
+	str w0, [sp]
+	movz x0, #0x3ff0, lsl #48
+	str x0, [sp, #8]
+	ldr s0, .L1
+	str s0, [sp, #4]
+	ldr d0, .L2
+	str d0, [sp, #0x10]
+	ldr w0, [sp]
+	add sp, sp, #0x20
+	ret
+.rodata
+.L1:
+	.db 0x00, 0x00, 0x80, 0x3f, 0x1f, 0x20, 0x03, 0xd5
+.L2:
+	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f

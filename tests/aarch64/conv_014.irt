@@ -1,0 +1,26 @@
+--TEST--
+014: type conversion SEXT and ZEXT constants
+--TARGET--
+aarch64
+--ARGS--
+-S -O0
+--CODE--
+{
+	int32_t signed_bits = -1;
+	uint32_t unsigned_bits = 0xffffffff;
+	l_1 = START(l_5);
+	int64_t signed_result = SEXT(signed_bits);
+	uint64_t unsigned_result = ZEXT(unsigned_bits);
+	l_5 = RETURN(l_1, signed_result);
+}
+--EXPECT--
+test:
+	sub sp, sp, #0x10
+	movn x0, #0
+	str x0, [sp]
+	movz x0, #0xffff
+	movk x0, #0xffff, lsl #16
+	str x0, [sp, #8]
+	ldr x0, [sp]
+	add sp, sp, #0x10
+	ret

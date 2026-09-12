@@ -1,0 +1,17 @@
+--TEST--
+015: type conversion BITCAST uint32 to float register
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	uint32_t x = PARAM(l_1, "x", 1);
+	float ret = BITCAST(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	fmov s0, w0
+	ret

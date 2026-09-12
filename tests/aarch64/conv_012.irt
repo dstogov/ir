@@ -1,0 +1,25 @@
+--TEST--
+012: type conversion BITCAST int-fp round trip
+--TARGET--
+aarch64
+--ARGS--
+-S -O0
+--CODE--
+{
+	l_1 = START(l_4);
+	uint32_t x = PARAM(l_1, "x", 1);
+	float f = BITCAST(x);
+	uint32_t y = BITCAST(f);
+	l_4 = RETURN(l_1, y);
+}
+--EXPECT--
+test:
+	sub sp, sp, #0x10
+	str w0, [sp]
+	ldr s0, [sp]
+	str s0, [sp, #4]
+	ldr w0, [sp, #4]
+	str w0, [sp, #8]
+	ldr w0, [sp, #8]
+	add sp, sp, #0x10
+	ret

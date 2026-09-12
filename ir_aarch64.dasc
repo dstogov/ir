@@ -4277,7 +4277,7 @@ static void ir_emit_sext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			|	sxtw Rx(def_reg), Rw(op1_reg)
 		}
 	} else if (IR_IS_CONST_REF(insn->op1)) {
-		IR_ASSERT(0);
+		ir_emit_load(ctx, dst_type, def_reg, insn->op1);
 	} else {
 		ir_reg fp;
 		int32_t offset = ir_ref_spill_slot_offset(ctx, insn->op1, &fp);
@@ -4363,7 +4363,7 @@ static void ir_emit_zext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			|	mov Rw(def_reg), Rw(op1_reg)
 		}
 	} else if (IR_IS_CONST_REF(insn->op1)) {
-		IR_ASSERT(0);
+		ir_emit_load(ctx, dst_type, def_reg, insn->op1);
 	} else {
 		ir_reg fp;
 		int32_t offset = ir_ref_spill_slot_offset(ctx, insn->op1, &fp);
@@ -4484,7 +4484,7 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|	fmov Rw(def_reg), Rs(op1_reg-IR_REG_FP_FIRST)
 			}
 		} else if (IR_IS_CONST_REF(insn->op1)) {
-			IR_ASSERT(0); //???
+				ir_emit_load(ctx, dst_type, def_reg, insn->op1);
 		} else {
 			ir_reg fp;
 			int32_t offset = ir_ref_spill_slot_offset(ctx, insn->op1, &fp);
@@ -4520,7 +4520,7 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|	fmov Rs(def_reg-IR_REG_FP_FIRST), Rw(op1_reg)
 			}
 		} else if (IR_IS_CONST_REF(insn->op1)) {
-			IR_ASSERT(0); //???
+			ir_emit_load(ctx, dst_type, def_reg, insn->op1);
 		} else {
 			ir_reg fp;
 			int32_t offset = ir_ref_spill_slot_offset(ctx, insn->op1, &fp);
@@ -9414,7 +9414,33 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				IR_ASSERT(0);
 			}
 		} else {
-			IR_ASSERT(0);
+			IR_ASSERT(IR_IS_TYPE_INT(insn->type));
+			int label = ctx->cfg_blocks_count + i;
+
+			if (!data.rodata_label) {
+				data.rodata_label = ctx->cfg_blocks_count + ctx->consts_count + 2;
+
+				|.rodata
+				|=>data.rodata_label:
+			}
+			if (ir_type_size[insn->type] == 8) {
+				|.align 8
+				|=>label:
+				|.long insn->val.u32, insn->val.u32_hi
+			} else if (ir_type_size[insn->type] == 4) {
+				|.align 4
+				|=>label:
+				|.long insn->val.u32
+			} else if (ir_type_size[insn->type] == 2) {
+				|.align 2
+				|=>label:
+				|.long insn->val.u16
+			} else if (ir_type_size[insn->type] == 1) {
+				|=>label:
+				|.long insn->val.u8
+			} else {
+				IR_ASSERT(0);
+			}
 		}
 	} IR_BITSET_FOREACH_END();
 	if (data.rodata_label) {
