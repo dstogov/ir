@@ -4438,8 +4438,9 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 	ir_reg op1_reg = ctx->regs[def][1];
+	uint32_t size = ir_get_type_size(src_type);
 
-	IR_ASSERT(ir_get_type_size(dst_type) == ir_get_type_size(src_type));
+	IR_ASSERT(ir_get_type_size(dst_type) == size);
 	IR_ASSERT(def_reg != IR_REG_NONE);
 	if (op1_reg != IR_REG_NONE && IR_REG_SPILLED(op1_reg)) {
 		op1_reg = IR_REG_NUM(op1_reg);
@@ -4477,10 +4478,10 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				op1_reg = IR_REG_NUM(op1_reg);
 				ir_emit_load(ctx, src_type, op1_reg, insn->op1);
 			}
-			if (src_type == IR_DOUBLE) {
+			if (size == 8) {
 				|	fmov Rx(def_reg), Rd(op1_reg-IR_REG_FP_FIRST)
 			} else {
-				IR_ASSERT(src_type == IR_FLOAT);
+				IR_ASSERT(size == 4);
 				|	fmov Rw(def_reg), Rs(op1_reg-IR_REG_FP_FIRST)
 			}
 		} else if (IR_IS_CONST_REF(insn->op1)) {
@@ -4490,18 +4491,18 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			int32_t offset = ir_ref_spill_slot_offset(ctx, insn->op1, &fp);
 
 			if (aarch64_may_encode_addr_offset(offset, ir_get_type_size(src_type))) {
-				if (src_type == IR_DOUBLE) {
+				if (size == 8) {
 					|	ldr Rx(def_reg), [Rx(fp), #offset]
 				} else {
-					IR_ASSERT(src_type == IR_FLOAT);
+					IR_ASSERT(size == 4);
 					|	ldr Rw(def_reg), [Rx(fp), #offset]
 				}
 			} else {
 				ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset);
-				if (src_type == IR_DOUBLE) {
+				if (size == 8) {
 					|	ldr Rx(def_reg), [Rx(fp), Rx(IR_REG_INT_TMP)]
 				} else {
-					IR_ASSERT(src_type == IR_FLOAT);
+					IR_ASSERT(size == 4);
 					|	ldr Rw(def_reg), [Rx(fp), Rx(IR_REG_INT_TMP)]
 				}
 			}
@@ -4513,10 +4514,10 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				op1_reg = IR_REG_NUM(op1_reg);
 				ir_emit_load(ctx, src_type, op1_reg, insn->op1);
 			}
-			if (dst_type == IR_DOUBLE) {
+			if (size == 8) {
 				|	fmov Rd(def_reg-IR_REG_FP_FIRST), Rx(op1_reg)
 			} else {
-				IR_ASSERT(dst_type == IR_FLOAT);
+				IR_ASSERT(size == 4);
 				|	fmov Rs(def_reg-IR_REG_FP_FIRST), Rw(op1_reg)
 			}
 		} else if (IR_IS_CONST_REF(insn->op1)) {
@@ -4526,19 +4527,19 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			int32_t offset = ir_ref_spill_slot_offset(ctx, insn->op1, &fp);
 
 			if (aarch64_may_encode_addr_offset(offset, ir_get_type_size(src_type))) {
-				if (dst_type == IR_DOUBLE) {
-					|	ldr Rd(def_reg), [Rx(fp), #offset]
+				if (size == 8) {
+					|	ldr Rd(def_reg-IR_REG_FP_FIRST), [Rx(fp), #offset]
 				} else {
-					IR_ASSERT(dst_type == IR_FLOAT);
-					|	ldr Rs(def_reg), [Rx(fp), #offset]
+					IR_ASSERT(size == 4);
+					|	ldr Rs(def_reg-IR_REG_FP_FIRST), [Rx(fp), #offset]
 				}
 			 } else {
 				ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset);
-				if (dst_type == IR_DOUBLE) {
-					|	ldr Rd(def_reg), [Rx(fp), Rx(IR_REG_INT_TMP)]
+				if (size == 8) {
+					|	ldr Rd(def_reg-IR_REG_FP_FIRST), [Rx(fp), Rx(IR_REG_INT_TMP)]
 				} else {
-					IR_ASSERT(dst_type == IR_FLOAT);
-					|	ldr Rs(def_reg), [Rx(fp), Rx(IR_REG_INT_TMP)]
+					IR_ASSERT(size == 4);
+					|	ldr Rs(def_reg-IR_REG_FP_FIRST), [Rx(fp), Rx(IR_REG_INT_TMP)]
 				}
 			 }
 		}

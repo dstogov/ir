@@ -1,0 +1,22 @@
+--TEST--
+018: type conversion BITCAST vector to uint64
+--TARGET--
+aarch64
+--ARGS--
+-S -O0
+--CODE--
+{
+	l_1 = START(l_4);
+	<int32_t*2> v = PARAM(l_1, "v", 1);
+	uint64_t ret = BITCAST(v);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	sub sp, sp, #0x10
+	str d0, [sp]
+	ldr x0, [sp]
+	str x0, [sp, #8]
+	ldr x0, [sp, #8]
+	add sp, sp, #0x10
+	ret
