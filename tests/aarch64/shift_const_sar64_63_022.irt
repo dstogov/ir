@@ -1,0 +1,18 @@
+--TEST--
+022: aarch64 constant SAR64 by 63 keeps immediates in range
+--TARGET--
+aarch64
+--ARGS--
+-O1 -S
+--CODE--
+{
+	int64_t c = 63;
+	l_1 = START(l_4);
+	int64_t x = PARAM(l_1, "x", 1);
+	int64_t ret = SAR(x, c);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	asr x0, x0, #0x3f
+	ret

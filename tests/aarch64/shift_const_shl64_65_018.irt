@@ -1,0 +1,18 @@
+--TEST--
+018: aarch64 constant SHL64 by 65 keeps immediates in range
+--TARGET--
+aarch64
+--ARGS--
+-O1 -S
+--CODE--
+{
+	uint64_t c = 65;
+	l_1 = START(l_4);
+	uint64_t x = PARAM(l_1, "x", 1);
+	uint64_t ret = SHL(x, c);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	lsl x0, x0, #1
+	ret
