@@ -1,0 +1,33 @@
+--TEST--
+FP compare: distinct float constants in an O0 branch
+--ARGS--
+-O0 --run
+--CODE--
+extern func @printf(uintptr_t, ...): void;
+static const @format[4] = "%x\n\000";
+func @test(): float
+{
+	float c_1 = 7;
+	float c_2 = 8;
+	l_1 = START(ret);
+	bool d_2 = LT(c_1, c_2);
+	l_3 = IF(l_1, d_2);
+	l_4 = IF_TRUE(l_3);
+	ret1 = RETURN(l_4, c_1);
+	l_6 = IF_FALSE(l_3);
+	ret = RETURN(l_6, c_2, ret1);
+}
+func @main(): int32_t
+{
+	uintptr_t c_1 = func @test(): float;
+	uintptr_t c_2 = func @printf(uintptr_t, ...): void;
+	uintptr_t c_3 = sym(@format);
+	int32_t c_4 = 0;
+	l_1 = START(l_6);
+	float d_2, l_2 = CALL/0(l_1, c_1);
+	uint32_t d_4 = BITCAST(d_2);
+	l_5 = CALL/2(l_2, c_2, c_3, d_4);
+	l_6 = RETURN(l_5, c_4);
+}
+--EXPECT--
+40e00000

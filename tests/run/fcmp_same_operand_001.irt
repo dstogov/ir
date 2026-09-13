@@ -1,0 +1,28 @@
+--TEST--
+FP compare: identical double constants at O0
+--ARGS--
+-O0 --run
+--CODE--
+extern func @printf(uintptr_t, ...): void;
+static const @format[4] = "%d\n\000";
+func @test(): bool
+{
+	double c_1 = 7;
+	l_1 = START(l_3);
+	bool d_2 = LT(c_1, c_1);
+	l_3 = RETURN(l_1, d_2);
+}
+func @main(): int32_t
+{
+	uintptr_t c_1 = func @test(): bool;
+	uintptr_t c_2 = func @printf(uintptr_t, ...): void;
+	uintptr_t c_3 = sym(@format);
+	int32_t c_4 = 0;
+	l_1 = START(l_6);
+	bool d_2, l_2 = CALL/0(l_1, c_1);
+	int32_t d_4 = ZEXT(d_2);
+	l_5 = CALL/2(l_2, c_2, c_3, d_4);
+	l_6 = RETURN(l_5, c_4);
+}
+--EXPECT--
+0
