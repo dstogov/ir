@@ -1651,17 +1651,6 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 
 	scratch = ir_scratch_regset[data.cc->scratch_reg - IR_REG_NUM];
 
-#ifdef IR_TARGET_X86
-	if (ctx->flags2 & IR_HAS_FP_RET_SLOT) {
-		ctx->ret_slot = ir_allocate_spill_slot(ctx, IR_DOUBLE);
-	} else if ((ctx->ret_type == IR_FLOAT || ctx->ret_type == IR_DOUBLE)
-			&& data.cc->fp_ret_reg == IR_REG_NONE) {
-		ctx->ret_slot = ir_allocate_spill_slot(ctx, ctx->ret_type);
-	} else {
-		ctx->ret_slot = -1;
-	}
-#endif
-
 	ctx->regs = ir_mem_malloc(sizeof(ir_regs) * ctx->insns_count);
 	memset(ctx->regs, IR_REG_NONE, sizeof(ir_regs) * ctx->insns_count);
 
@@ -1697,19 +1686,6 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					}
 				}
 			} else {
-#ifdef IR_TARGET_X86
-				if ((*rule & IR_RULE_MASK) == IR_CALL) {
-					if (ctx->ret_slot == -1
-					 && (insn->type == IR_FLOAT || insn->type == IR_DOUBLE)) {
-						const ir_proto_t *proto = ir_call_proto(ctx, insn);
-						const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(proto ? proto->flags : IR_CC_DEFAULT);
-
-						if (cc->fp_ret_reg == IR_REG_NONE) {
-							ctx->ret_slot = ir_allocate_spill_slot(ctx, IR_DOUBLE);
-						}
-					}
-				}
-#endif
 				x.num = 0;
 				for (j = 0; j < IR_SUB_REFS_COUNT; j++) {
 					x.clobbered[j] = IR_REGSET_EMPTY;
@@ -1926,6 +1902,17 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 			ir_gen_dessa_moves(ctx, b, ir_fix_dessa_tmps, (void*)(intptr_t)b);
 		}
 	}
+
+#ifdef IR_TARGET_X86
+	if (ctx->flags2 & IR_HAS_FP_RET_SLOT) {
+		ctx->ret_slot = ir_allocate_spill_slot(ctx, IR_DOUBLE);
+	} else if ((ctx->ret_type == IR_FLOAT || ctx->ret_type == IR_DOUBLE)
+			&& data.cc->fp_ret_reg == IR_REG_NONE) {
+		ctx->ret_slot = ir_allocate_spill_slot(ctx, ctx->ret_type);
+	} else {
+		ctx->ret_slot = -1;
+	}
+#endif
 
 	ctx->used_preserved_regs = ctx->fixed_save_regset;
 	ctx->flags |= IR_NO_STACK_COMBINE;
