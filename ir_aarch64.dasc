@@ -4481,7 +4481,7 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			if (size == 8) {
 				|	fmov Rx(def_reg), Rd(op1_reg-IR_REG_FP_FIRST)
 			} else {
-				IR_ASSERT(size == 4);
+				IR_ASSERT(size <= 4);
 				|	fmov Rw(def_reg), Rs(op1_reg-IR_REG_FP_FIRST)
 			}
 		} else if (IR_IS_CONST_REF(insn->op1)) {
@@ -4494,7 +4494,7 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				if (size == 8) {
 					|	ldr Rx(def_reg), [Rx(fp), #offset]
 				} else {
-					IR_ASSERT(size == 4);
+					IR_ASSERT(size <= 4);
 					|	ldr Rw(def_reg), [Rx(fp), #offset]
 				}
 			} else {
@@ -4502,7 +4502,7 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				if (size == 8) {
 					|	ldr Rx(def_reg), [Rx(fp), Rx(IR_REG_INT_TMP)]
 				} else {
-					IR_ASSERT(size == 4);
+					IR_ASSERT(size <= 4);
 					|	ldr Rw(def_reg), [Rx(fp), Rx(IR_REG_INT_TMP)]
 				}
 			}
@@ -4517,7 +4517,7 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			if (size == 8) {
 				|	fmov Rd(def_reg-IR_REG_FP_FIRST), Rx(op1_reg)
 			} else {
-				IR_ASSERT(size == 4);
+				IR_ASSERT(size <= 4);
 				|	fmov Rs(def_reg-IR_REG_FP_FIRST), Rw(op1_reg)
 			}
 		} else if (IR_IS_CONST_REF(insn->op1)) {
@@ -4530,7 +4530,7 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				if (size == 8) {
 					|	ldr Rd(def_reg-IR_REG_FP_FIRST), [Rx(fp), #offset]
 				} else {
-					IR_ASSERT(size == 4);
+					IR_ASSERT(size <= 4);
 					|	ldr Rs(def_reg-IR_REG_FP_FIRST), [Rx(fp), #offset]
 				}
 			 } else {
@@ -4538,7 +4538,7 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				if (size == 8) {
 					|	ldr Rd(def_reg-IR_REG_FP_FIRST), [Rx(fp), Rx(IR_REG_INT_TMP)]
 				} else {
-					IR_ASSERT(size == 4);
+					IR_ASSERT(size <= 4);
 					|	ldr Rs(def_reg-IR_REG_FP_FIRST), [Rx(fp), Rx(IR_REG_INT_TMP)]
 				}
 			 }
