@@ -3,28 +3,39 @@
 --ARGS--
 --run
 --CODE--
-extern func printf(uintptr_t, ...): int32_t;
-func vec16_roundtrip(uint16_t): uint32_t;
-func vec16_roundtrip(uint16_t): uint32_t
+func vec16_to_int(<int8_t*2>): uint16_t
 {
-	l_1 = START(l_5);
+	l_1 = START(l_3);
+	<int8_t*2> v = PARAM(l_1, "v", 1);
+	uint16_t ret = BITCAST(v);
+	l_3 = RETURN(l_1, ret);
+}
+func int_to_vec16(uint16_t): <int8_t*2>
+{
+	l_1 = START(l_4);
 	uint16_t x = PARAM(l_1, "x", 1);
-	<uint8_t*2> v = BITCAST(x);
-	uint16_t y = BITCAST(v);
-	uint32_t ret = ZEXT(y);
-	l_5 = RETURN(l_1, ret);
+	<int8_t*2> ret = BITCAST(x);
+	l_4 = RETURN(l_1, ret);
 }
 func main(void): int32_t
 {
 	int32_t c_0 = 0;
-	uint16_t c_0x1234 = 4660;
+	int32_t c_1 = 1;
+	uint64_t c_0x1234 = 0x1234;
 	uintptr_t c_printf = func printf(uintptr_t, ...): int32_t;
-	uintptr_t c_fmt = "%u\n";
-	uintptr_t c_vec16_roundtrip = func vec16_roundtrip(uint16_t): uint32_t;
-	l_1 = START(l_4);
-	uint32_t r_1, l_2 = CALL/1(l_1, c_vec16_roundtrip, c_0x1234);
-	int32_t r_2, l_3 = CALL/2(l_2, c_printf, c_fmt, r_1);
-	l_4 = RETURN(l_3, c_0);
+	uintptr_t c_fmt = "0x%x 0x%x 0x%x\n";
+	uintptr_t c_vec16_to_int = func vec16_to_int(<int8_t*2>): uint16_t;
+	uintptr_t c_int_to_vec16 = func int_to_vec16(uint16_t): <int8_t*2>;
+	l_1 = START(l_5);
+	<int8_t*2> vx, l_2 = CALL/1(l_1, c_int_to_vec16, c_0x1234);
+	uint16_t r_1, l_3 = CALL/1(l_2, c_vec16_to_int, vx);
+	int8_t r_2 = EXTRACT(vx, c_0);
+	int8_t r_3 = EXTRACT(vx, c_1);
+	uint32_t t_1 = ZEXT(r_1);
+	uint32_t t_2 = SEXT(r_2);
+	uint32_t t_3 = SEXT(r_3);
+	l_4 = CALL/4(l_3, c_printf, c_fmt, t_1, t_2, t_3);
+	l_5 = RETURN(l_4, c_0);
 }
 --EXPECT--
-4660
+0x1234 0x34 0x12

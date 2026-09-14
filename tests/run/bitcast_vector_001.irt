@@ -4,8 +4,6 @@
 --run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
-func vec64_to_int(<int32_t*2>): uint64_t;
-func int_vec64_roundtrip(uint64_t): uint64_t;
 func vec64_to_int(<int32_t*2>): uint64_t
 {
 	l_1 = START(l_3);
@@ -13,28 +11,29 @@ func vec64_to_int(<int32_t*2>): uint64_t
 	uint64_t ret = BITCAST(v);
 	l_3 = RETURN(l_1, ret);
 }
-func int_vec64_roundtrip(uint64_t): uint64_t
+func int_to_vec64(uint64_t): <int32_t*2>
 {
 	l_1 = START(l_4);
 	uint64_t x = PARAM(l_1, "x", 1);
-	<int32_t*2> v = BITCAST(x);
-	uint64_t ret = BITCAST(v);
+	<int32_t*2> ret = BITCAST(x);
 	l_4 = RETURN(l_1, ret);
 }
 func main(void): int32_t
 {
 	int32_t c_0 = 0;
+	int32_t c_1 = 1;
 	uint64_t c_0x1234567889abcdef = 1311768467177459183;
 	uintptr_t c_printf = func printf(uintptr_t, ...): int32_t;
-	uintptr_t c_fmt = "%llu %llu\n";
+	uintptr_t c_fmt = "0x%llx 0x%x 0x%x\n";
 	uintptr_t c_vec64_to_int = func vec64_to_int(<int32_t*2>): uint64_t;
-	uintptr_t c_int_vec64_roundtrip = func int_vec64_roundtrip(uint64_t): uint64_t;
+	uintptr_t c_int_to_vec64 = func int_to_vec64(uint64_t): <int32_t*2>;
 	l_1 = START(l_5);
-	<int32_t*2> vx = BITCAST(c_0x1234567889abcdef);
-	uint64_t r_1, l_2 = CALL/1(l_1, c_vec64_to_int, vx);
-	uint64_t r_2, l_3 = CALL/1(l_2, c_int_vec64_roundtrip, c_0x1234567889abcdef);
-	int32_t r_3, l_4 = CALL/3(l_3, c_printf, c_fmt, r_1, r_2);
+	<int32_t*2> vx, l_2 = CALL/1(l_1, c_int_to_vec64, c_0x1234567889abcdef);
+	uint64_t r_1, l_3 = CALL/1(l_2, c_vec64_to_int, vx);
+	int32_t r_2 = EXTRACT(vx, c_0);
+	int32_t r_3 = EXTRACT(vx, c_1);
+	l_4 = CALL/4(l_3, c_printf, c_fmt, r_1, r_2, r_3);
 	l_5 = RETURN(l_4, c_0);
 }
 --EXPECT--
-1311768467177459183 1311768467177459183
+0x1234567889abcdef 0x89abcdef 0x12345678
