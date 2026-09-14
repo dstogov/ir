@@ -60,4 +60,44 @@ func tls_store_dynamic(): void
 	l_4 = RETURN(l_2);
 }
 --EXPECT--
-???
+thread_pointer:
+	movl %fs:0x2c, %eax
+	movl -1(%eax), %eax
+	retl
+
+tls_addr_static:
+	movl %fs:0x2c, %eax
+	movl -1(%eax), %eax
+	addl $0x10, %eax
+	retl
+
+tls_addr_dynamic0:
+	movl %fs:0x2c, %eax
+	movl 0x10(%eax), %eax
+	retl
+
+tls_addr_dynamic:
+	movl %fs:0x2c, %eax
+	movl 0x10(%eax), %eax
+	addl $0x20, %eax
+	retl
+
+tls_load_static:
+	movl %fs:0x10, %eax
+	retl
+
+tls_load_dynamic:
+	movl %fs:0x2c, %eax
+	movl 0x10(%eax), %eax
+	movl 0x20(%eax), %eax
+	retl
+
+tls_store_static:
+	movl $0x2a, %fs:0x10
+	retl
+
+tls_store_dynamic:
+	movl %fs:0x2c, %eax
+	movl 0x10(%eax), %eax
+	movl $0x2a, 0x20(%eax)
+	retl
