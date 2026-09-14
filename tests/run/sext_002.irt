@@ -1,0 +1,22 @@
+--TEST--
+SEXT 002: extended paths for signed 8-bit and 16-bit constants
+--ARGS--
+-O0 --run
+--CODE--
+extern func @printf(uintptr_t, ...): void;
+static const @format[11] = "%lld %lld\n\000";
+func @main(): int32_t
+{
+	int8_t c_1 = -1;
+	int16_t c_2 = -2;
+	uintptr_t c_3 = func @printf(uintptr_t, ...): void;
+	uintptr_t c_4 = sym(@format);
+	int32_t c_5 = 0;
+	l_1 = START(l_5);
+	int64_t d_2 = SEXT(c_1);
+	int64_t d_3 = SEXT(c_2);
+	l_4 = CALL/3(l_1, c_3, c_4, d_2, d_3);
+	l_5 = RETURN(l_4, c_5);
+}
+--EXPECT--
+-1 -2

@@ -1,0 +1,20 @@
+--TEST--
+BITCAST 004: regression integer constant to double
+--ARGS--
+-O0 --run
+--CODE--
+extern func @printf(uintptr_t, ...): void;
+static const @format[4] = "%g\n\000";
+func @main(): int32_t
+{
+	uint64_t c_1 = 4607182418800017408;
+	uintptr_t c_2 = func @printf(uintptr_t, ...): void;
+	uintptr_t c_3 = sym(@format);
+	int32_t c_4 = 0;
+	l_1 = START(l_4);
+	double d_2 = BITCAST(c_1);
+	l_3 = CALL/2(l_1, c_2, c_3, d_2);
+	l_4 = RETURN(l_3, c_4);
+}
+--EXPECT--
+1
