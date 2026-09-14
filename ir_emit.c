@@ -1871,12 +1871,37 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 						available = IR_REGSET_DIFFERENCE(available, x.clobbered[n]);
 					}
 					reg = x.regs[j].hint;
+#if IR_X86_I64
+					if (reg != IR_REG_NONE && (x.regs[j].type == IR_I64 || x.regs[j].type == IR_U64)) {
+						reg = IR_REG_I64_LO(reg);
+					}
+#endif
 					if (reg == IR_REG_NONE || !IR_REGSET_IN(available, reg)) {
 						reg = _get_free_reg(x.regs[j].type, available);
 					}
 					for (n = x.regs[j].start; n < x.regs[j].end; n++) {
 						IR_REGSET_INCL(x.clobbered[n], reg);
 					}
+#if IR_X86_I64
+					if (x.regs[j].type == IR_I64 || x.regs[j].type == IR_U64) {
+						ir_reg reg2 = x.regs[j].hint;
+
+						IR_REGSET_EXCL(available, reg);
+						if (reg2 != IR_REG_NONE) {
+							reg2 = IR_REG_I64_LO(reg2);
+						}
+						if (reg2 == IR_REG_NONE || !IR_REGSET_IN(available, reg2)) {
+							reg2 = _get_free_reg(x.regs[j].type, available);
+						}
+						for (n = x.regs[j].start; n < x.regs[j].end; n++) {
+							IR_REGSET_INCL(x.clobbered[n], reg2);
+						}
+						if (reg > reg2) {
+							SWAP_REGS(reg, reg2);
+						}
+						reg = IR_REG_I64_PAIR(reg2, reg);
+					}
+#endif
 					reg = reg | x.regs[j].flags;
 					if (x.regs[j].op == 4 && insn->inputs_count < 4) {
 						if (!ctx->tmp_regs) {
