@@ -1,0 +1,21 @@
+--TEST--
+BITCAST 003: regression integer constant to float
+--ARGS--
+--run -O0
+--CODE--
+extern func @printf(uintptr_t, ...): void;
+static const @format[4] = "%g\n\000";
+func @main(): int32_t
+{
+	uint32_t c_1 = 1065353216;
+	uintptr_t c_2 = func @printf(uintptr_t, ...): void;
+	uintptr_t c_3 = sym(@format);
+	int32_t c_4 = 0;
+	l_1 = START(l_5);
+	float d_2 = BITCAST(c_1);
+	double d_3 = FP2FP(d_2);
+	l_4 = CALL/2(l_1, c_2, c_3, d_3);
+	l_5 = RETURN(l_4, c_4);
+}
+--EXPECT--
+1

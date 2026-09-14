@@ -1,0 +1,22 @@
+--TEST--
+ZEXT 002: extended paths for unsigned 8-bit and 16-bit constants
+--ARGS--
+--run -O0
+--CODE--
+extern func @printf(uintptr_t, ...): void;
+static const @format[11] = "%llu %llu\n\000";
+func @main(): int32_t
+{
+	uint8_t c_1 = 255;
+	uint16_t c_2 = 65280;
+	uintptr_t c_3 = func @printf(uintptr_t, ...): void;
+	uintptr_t c_4 = sym(@format);
+	int32_t c_5 = 0;
+	l_1 = START(l_5);
+	uint64_t d_2 = ZEXT(c_1);
+	uint64_t d_3 = ZEXT(c_2);
+	l_4 = CALL/3(l_1, c_3, c_4, d_2, d_3);
+	l_5 = RETURN(l_4, c_5);
+}
+--EXPECT--
+255 65280
