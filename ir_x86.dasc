@@ -14054,17 +14054,19 @@ static void ir_emit_tls_prefix(ir_ctx *ctx)
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
-|.if X64WIN
+||#if defined(_WIN64)
 |	gs
-|.elif WIN
+||#elif defined(_WIN32)
 |	fs
-|.elif X64APPLE
+||#elif defined(__APPLE__)
 |	gs
-|.elif X64
+||#else
+|.if X64
 |	fs
 |.else
 |	gs
 |.endif
+||#endif
 }
 
 static void ir_emit_tls_base_addr(ir_ctx *ctx, ir_reg reg, int mod)
@@ -14072,24 +14074,25 @@ static void ir_emit_tls_base_addr(ir_ctx *ctx, ir_reg reg, int mod)
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
-|.if X64WIN
+||#if defined(_WIN64)
 |	gs
 |	mov Ra(reg), aword [0x58]
 ||	IR_ASSERT(mod >= 0);
 |	mov Ra(reg), aword [Ra(reg)+mod]
-|.elif WIN
+||#elif defined(_WIN32)
 |	fs
 |	mov Ra(reg), aword [0x2c]
 ||	IR_ASSERT(mod >= 0);
 |	mov Ra(reg), aword [Ra(reg)+mod]
-|.elif X64APPLE
+||#elif defined(__APPLE__)
 |	gs
 ||	if (mod < 0) {
 |		mov Ra(reg), [0]
 ||	} else {
 |		mov Ra(reg), aword [mod]
 ||	}
-|.elif X64
+||#else
+|.if X64
 |	fs
 ||	if (mod < 0) {
 |		mov Ra(reg), [0]
@@ -14106,6 +14109,7 @@ static void ir_emit_tls_base_addr(ir_ctx *ctx, ir_reg reg, int mod)
 |		mov Ra(reg), aword [Ra(reg)+mod]
 ||	}
 |.endif
+||#endif
 }
 
 static void ir_emit_tls_addr(ir_ctx *ctx, ir_ref def, ir_insn *insn)
