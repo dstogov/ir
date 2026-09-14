@@ -25597,8 +25597,10 @@ static void ir_remap_param_spill_slot(ir_ctx *ctx, ir_ref param, int32_t spill_s
 				ir_insn *insn = &ctx->ir_base[use];
 
 				if (insn->op == IR_VADDR) {
-					IR_ASSERT(insn->op3 == var_insn->op3);
-					insn->op3 = spill_slot;
+					if (ctx->rules[use] == IR_STATIC_ALLOCA) {
+						IR_ASSERT(insn->op3 == var_insn->op3);
+						insn->op3 = spill_slot;
+					}
 				} else if (insn->op == IR_VLOAD) {
 					if (ctx->vregs[use]) {
 						ir_live_interval *ival = ctx->live_intervals[ctx->vregs[use]];
