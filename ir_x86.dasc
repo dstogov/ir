@@ -5413,6 +5413,7 @@ static void ir_emit_load_imm_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref sr
 						} else {
 							// TODO: 4-byte read may be unsafe ???
 							// IR_ASSERT(width >= 4 && width <= 16);
+							IR_ASSERT(width <= 4);
 							|	vmovd xmm(reg-IR_REG_FP_FIRST), dword [=>label]
 						}
 					} else if (element_type == IR_DOUBLE) {
@@ -5460,6 +5461,7 @@ static void ir_emit_load_imm_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref sr
 					} else {
 						// TODO: 4-byte read may be unsafe ???
 						// IR_ASSERT(width >= 4 && width <= 16);
+						IR_ASSERT(width <= 4);
 						|	movd xmm(reg-IR_REG_FP_FIRST), dword [=>label]
 					}
 				} else if (element_type == IR_DOUBLE) {
@@ -5511,6 +5513,7 @@ static void ir_emit_load_mem_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_mem me
 					} else {
 						// TODO: 4-byte read may be unsafe ???
 						// IR_ASSERT(width >= 4 && width <= 16);
+						IR_ASSERT(width <= 4);
 						|	ASM_TXT_TMEM_OP vmovd, xmm(reg-IR_REG_FP_FIRST), dword, mem
 					}
 				} else if (element_type == IR_DOUBLE) {
@@ -5559,6 +5562,7 @@ static void ir_emit_load_mem_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_mem me
 				} else {
 					// TODO: 4-byte read may be unsafe ???
 					// IR_ASSERT(width >= 4 && width <= 16);
+					IR_ASSERT(width <= 4);
 					|	ASM_TXT_TMEM_OP movd, xmm(reg-IR_REG_FP_FIRST), dword, mem
 				}
 			} else if (element_type == IR_DOUBLE) {
@@ -5717,6 +5721,7 @@ static void ir_emit_store_mem_fp(ir_ctx *ctx, ir_type type, ir_mem mem, ir_reg r
 					} else {
 						// TODO: 4-byte write may be unsafe ???
 						// IR_ASSERT(width >= 4 && width <= 16);
+						IR_ASSERT(width <= 4);
 						|	ASM_TMEM_TXT_OP vmovd, dword, mem, xmm(reg-IR_REG_FP_FIRST)
 					}
 				} else if (element_type == IR_DOUBLE) {
@@ -5763,6 +5768,7 @@ static void ir_emit_store_mem_fp(ir_ctx *ctx, ir_type type, ir_mem mem, ir_reg r
 				} else {
 					// TODO: 4-byte write may be unsafe ???
 					// IR_ASSERT(width >= 4 && width <= 16);
+					IR_ASSERT(width <= 4);
 					|	ASM_TMEM_TXT_OP movd, dword, mem, xmm(reg-IR_REG_FP_FIRST)
 				}
 			} else if (element_type == IR_DOUBLE) {
