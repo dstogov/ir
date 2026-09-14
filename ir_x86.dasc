@@ -5714,10 +5714,10 @@ static void ir_emit_store_mem_fp(ir_ctx *ctx, ir_type type, ir_mem mem, ir_reg r
 						|	ASM_TMEM_TXT_OP vmovdqa, oword, mem, xmm(reg-IR_REG_FP_FIRST)
 					} else if (width == 8) {
 						|	ASM_TMEM_TXT_OP vmovq, qword, mem, xmm(reg-IR_REG_FP_FIRST)
-					} else if (width == 4) {
-						|	ASM_TMEM_TXT_OP vmovd, dword, mem, xmm(reg-IR_REG_FP_FIRST)
 					} else {
-						IR_ASSERT(width >= 4 && width <= 16);
+						// TODO: 4-byte write may be unsafe ???
+						// IR_ASSERT(width >= 4 && width <= 16);
+						|	ASM_TMEM_TXT_OP vmovd, dword, mem, xmm(reg-IR_REG_FP_FIRST)
 					}
 				} else if (element_type == IR_DOUBLE) {
 					if (width == 16) {
@@ -5760,10 +5760,10 @@ static void ir_emit_store_mem_fp(ir_ctx *ctx, ir_type type, ir_mem mem, ir_reg r
 |.else
 					|	ASM_TMEM_TXT_OP movlpd, qword, mem, xmm(reg-IR_REG_FP_FIRST)
 |.endif
-				} else if (width == 4) {
-					|	ASM_TMEM_TXT_OP movd, dword, mem, xmm(reg-IR_REG_FP_FIRST)
 				} else {
-					IR_ASSERT(width >= 4 && width <= 16);
+					// TODO: 4-byte write may be unsafe ???
+					// IR_ASSERT(width >= 4 && width <= 16);
+					|	ASM_TMEM_TXT_OP movd, dword, mem, xmm(reg-IR_REG_FP_FIRST)
 				}
 			} else if (element_type == IR_DOUBLE) {
 				if (width == 16) {

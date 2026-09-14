@@ -2817,8 +2817,12 @@ int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type)
 	if (IR_IS_TYPE_SCALAR(type)) {
 		return ir_allocate_small_spill_slot(ctx, ir_type_size[type]);
 	} else {
+		int32_t size;
+
 		IR_ASSERT(IR_IS_TYPE_VECTOR(type));
-		return ir_allocate_big_spill_slot(ctx, IR_VECTOR_SIZE(type));
+		size = IR_VECTOR_SIZE(type);
+		size = IR_MAX(size, 4);
+		return ir_allocate_big_spill_slot(ctx, size);
 	}
 }
 
