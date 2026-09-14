@@ -207,8 +207,8 @@ jobs:
           nmake -nologo -f win32\Makefile capstone
       - name: Build
         shell: cmd
-        run: nmake -nologo -f win32/Makefile
+        run: nmake -nologo -f win32/Makefile BUILD=debug
       - name: Test
         shell: cmd
         run: |
-          nmake -nologo -f win32/Makefile test-ci
+          nmake -nologo -f win32/Makefile BUILD=debug test-ci
