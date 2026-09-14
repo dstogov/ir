@@ -1611,6 +1611,7 @@ const ir_call_conv_dsc ir_call_conv_x86_fastcall = {
 	_(SMOD_PWR2)           \
 	_(BOOL_NOT)            \
 	_(BOOL_NOT_INT)        \
+	_(BOOL_NOT_FP)         \
 	_(ABS_INT)             \
 	_(OP_INT)              \
 	_(OP_FP)               \
@@ -2152,6 +2153,16 @@ get_arg_hints:
 		case IR_OP_FP:
 		case IR_BIT_OP:
 			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
+			break;
+		case IR_BOOL_NOT_FP:
+			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG;
+			insn = &ctx->ir_base[ref];
+			if (IR_IS_CONST_REF(insn->op1)) {
+				constraints->tmp_regs[0] = IR_TMP_REG(1, ctx->ir_base[insn->op1].type, IR_LOAD_SUB_REF, IR_USE_SUB_REF);
+				n = 1;
+			}
+			constraints->tmp_regs[n] = IR_SCRATCH_REG(IR_REG_RDX, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
+			n++;
 			break;
 		case IR_MOD_PWR2:
 			flags = IR_DEF_REUSES_OP1_REG | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
@@ -4087,8 +4098,10 @@ binop_fp:
 			if (insn->type == IR_BOOL) {
 				if (ctx->ir_base[insn->op1].type == IR_BOOL) {
 					return IR_BOOL_NOT;
+				} else if (IR_IS_TYPE_FP(ctx->ir_base[insn->op1].type)) {
+					return IR_BOOL_NOT_FP;
 				} else {
-					IR_ASSERT(IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)); // TODO: IR_BOOL_NOT_FP
+					IR_ASSERT(IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type));
 					return IR_BOOL_NOT_INT;
 				}
 #if IR_SIMD
@@ -8042,6 +8055,40 @@ static void ir_emit_bool_not_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, type, def, def_reg);
+	}
+}
+
+static void ir_emit_bool_not_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_type type = ctx->ir_base[insn->op1].type;
+	ir_ref op1 = insn->op1;
+	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
+	ir_reg op1_reg = ctx->regs[def][1];
+	ir_reg tmp_reg = IR_REG_RDX;
+
+	IR_ASSERT(def_reg != IR_REG_NONE && op1_reg != IR_REG_NONE && tmp_reg != IR_REG_NONE);
+
+	if (IR_REG_SPILLED(op1_reg)) {
+		op1_reg = IR_REG_NUM(op1_reg);
+		ir_emit_load(ctx, type, op1_reg, op1);
+	}
+	if (!data->double_zero_const) {
+		data->double_zero_const = 1;
+		ir_rodata(ctx);
+		|.align 16
+		|->double_zero_const:
+		|.dword 0, 0
+		|.code
+	}
+	|	ASM_FP_REG_TXT_OP ucomis, type, op1_reg, [->double_zero_const]
+	|	setnp Rb(def_reg)
+	|	mov Rd(tmp_reg), 0
+	|	cmovne Rd(def_reg), Rd(tmp_reg)
+
+	if (IR_REG_SPILLED(ctx->regs[def][0])) {
+		ir_emit_store(ctx, IR_BOOL, def, def_reg);
 	}
 }
 
@@ -26080,6 +26127,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					break;
 				case IR_BOOL_NOT_INT:
 					ir_emit_bool_not_int(ctx, i, insn);
+					break;
+				case IR_BOOL_NOT_FP:
+					ir_emit_bool_not_fp(ctx, i, insn);
 					break;
 				case IR_OP_FP:
 					ir_emit_op_fp(ctx, i, insn);

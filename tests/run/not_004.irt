@@ -1,0 +1,30 @@
+--TEST--
+004: floating-point NOT on float
+--ARGS--
+--run
+--CODE--
+extern func @putchar(int32_t): int32_t;
+func @test(float): int32_t;
+func @main(): int32_t
+{
+	uintptr_t c_1 = func @putchar(int32_t): int32_t;
+	uintptr_t c_2 = func @test(float): int32_t;
+	int32_t c_3 = 48;
+	float c_4 = 0.0;
+	int32_t c_7 = 0;
+	l_1 = START(l_5);
+	int32_t d_2, l_2 = CALL/1(l_1, c_2, c_4);
+	int32_t d_3 = ADD(d_2, c_3);
+	int32_t d_4, l_4 = CALL/1(l_2, c_1, d_3);
+	l_5 = RETURN(l_4, c_7);
+}
+func @test(float): int32_t
+{
+	l_1 = START(l_4);
+	float d_2 = PARAM(l_1, "x", 1);
+	bool d_3 = NOT(d_2);
+	int32_t d_4 = ZEXT(d_3);
+	l_4 = RETURN(l_1, d_4);
+}
+--EXPECT--
+1

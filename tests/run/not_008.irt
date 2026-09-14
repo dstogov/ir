@@ -1,0 +1,26 @@
+--TEST--
+008: floating-point NOT on double constants
+--ARGS--
+--run
+--CODE--
+extern func @putchar(int32_t): int32_t;
+func @main(): int32_t
+{
+	uintptr_t c_1 = func @putchar(int32_t): int32_t;
+	int32_t c_2 = 48;
+	double c_3 = 0.0;
+	double c_4 = 1.0;
+	int32_t c_9 = 0;
+	l_1 = START(l_8);
+	bool d_2 = NOT(c_3);
+	int32_t d_3 = ZEXT(d_2);
+	int32_t d_4 = ADD(d_3, c_2);
+	int32_t d_5, l_5 = CALL/1(l_1, c_1, d_4);
+	bool d_6 = NOT(c_4);
+	int32_t d_7 = ZEXT(d_6);
+	int32_t d_8 = ADD(d_7, c_2);
+	int32_t d_9, l_9 = CALL/1(l_5, c_1, d_8);
+	l_8 = RETURN(l_9, c_9);
+}
+--EXPECT--
+10
