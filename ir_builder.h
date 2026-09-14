@@ -639,8 +639,8 @@ extern "C" {
 #define ir_MERGE_WITH_EMPTY_FALSE(_if)    do {ir_ref end = ir_END(); ir_IF_FALSE(_if); ir_MERGE_2(end, ir_END());} while (0)
 
 /* for backward compatibility only */
-#define ir_TLS(_index, _offset)           ir_LOAD_A(ir_TLS_ADDR((_offset) < 0 ? -1 : (_index), \
-                                              (_offset) < 0 ? (_index) : (_offset)))
+#define ir_TLS(_index, _offset)           ir_LOAD_A(ir_TLS_ADDR((_offset) == IR_NULL ? -1 : (_index), \
+                                              (_offset) == IR_NULL ? (_index) : (_offset)))
 
 ir_ref _ir_DIV(ir_ctx *ctx, ir_type type, ir_ref op1, ir_ref op2);
 ir_ref _ir_MOD(ir_ctx *ctx, ir_type type, ir_ref op1, ir_ref op2);
