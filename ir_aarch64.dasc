@@ -2438,10 +2438,9 @@ static void ir_emit_fp_mov(ir_ctx *ctx, ir_type type, ir_reg dst, ir_reg src)
 			|	.long code
 		} else if (width == 8) {
 			|	fmov Rd(dst-IR_REG_FP_FIRST), Rd(src-IR_REG_FP_FIRST)
-		} else if (width == 4) {
-			|	fmov Rs(dst-IR_REG_FP_FIRST), Rs(src-IR_REG_FP_FIRST)
 		} else {
-			IR_ASSERT(0 && "unsupported vector width");
+			IR_ASSERT(width <= 4);
+			|	fmov Rs(dst-IR_REG_FP_FIRST), Rs(src-IR_REG_FP_FIRST)
 		}
 #endif
 	} else {
