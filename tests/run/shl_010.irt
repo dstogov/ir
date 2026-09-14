@@ -1,0 +1,25 @@
+--TEST--
+SHL 010: uint64_t constant shift count 65
+--ARGS--
+-O1 --run
+--CODE--
+func test(uint64_t): int32_t
+{
+	int32_t c_1 = 65;
+	uint64_t c_2 = 2;
+	l_1 = START(l_5);
+	uint64_t d_2 = PARAM(l_1, "x", 1);
+	uint64_t d_3 = SHL(d_2, c_1);
+	bool d_4 = NE(d_3, c_2);
+	int32_t d_5 = ZEXT(d_4);
+	l_5 = RETURN(l_1, d_5);
+}
+func main(): int32_t
+{
+	uintptr_t c_1 = func test(uint64_t): int32_t;
+	uint64_t c_2 = 1;
+	l_1 = START(l_3);
+	int32_t d_2, l_2 = CALL/1(l_1, c_1, c_2);
+	l_3 = RETURN(l_2, d_2);
+}
+--EXPECT--
