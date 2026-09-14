@@ -2391,7 +2391,7 @@ get_arg_hints:
 			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG | IR_DEF_CONFLICTS_WITH_INPUT_REGS;
 			insn = &ctx->ir_base[ref];
 			if (insn->op == IR_EQ || insn->op == IR_NE) {
-				constraints->tmp_regs[0] = IR_TMP_REG(3, IR_U32, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				constraints->tmp_regs[0] = IR_TMP_REG(3, IR_U32, IR_USE_SUB_REF, IR_DEF_SUB_REF);
 				n = 1;
 				break;
 			}
