@@ -14080,14 +14080,20 @@ static void ir_emit_tls_base_addr(ir_ctx *ctx, ir_reg reg, int mod)
 
 ||#if defined(_WIN64)
 |	gs
-|	mov Ra(reg), aword [0x58]
-||	IR_ASSERT(mod >= 0);
-|	mov Ra(reg), aword [Ra(reg)+mod]
+||	if (mod < 0) {
+|		mov Ra(reg), [0]
+||	} else {
+|		mov Ra(reg), aword [0x58]
+|		mov Ra(reg), aword [Ra(reg)+mod]
+||	}
 ||#elif defined(_WIN32)
 |	fs
-|	mov Ra(reg), aword [0x2c]
-||	IR_ASSERT(mod >= 0);
-|	mov Ra(reg), aword [Ra(reg)+mod]
+||	if (mod < 0) {
+|		mov Ra(reg), [0]
+||	} else {
+|		mov Ra(reg), aword [0x2c]
+|		mov Ra(reg), aword [Ra(reg)+mod]
+||	}
 ||#elif defined(__APPLE__)
 |	gs
 ||	if (mod < 0) {
