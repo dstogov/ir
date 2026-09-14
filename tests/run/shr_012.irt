@@ -3,16 +3,19 @@ SHR 012: uint16_t constant shift count 16
 --ARGS--
 -O1 --run
 --CODE--
+extern func printf(uintptr_t, ...): int32_t;
 func test(uint16_t): int32_t
 {
+	int32_t c_0 = 0;
 	int32_t c_1 = 16;
-	uint16_t c_2 = 0;
-	l_1 = START(l_5);
+	uintptr_t c_2 = "%x\n";
+	uintptr_t c_3 = func printf(uintptr_t, ...): int32_t;
+	l_1 = START(l_4);
 	uint16_t d_2 = PARAM(l_1, "x", 1);
 	uint16_t d_3 = SHR(d_2, c_1);
-	bool d_4 = NE(d_3, c_2);
-	int32_t d_5 = ZEXT(d_4);
-	l_5 = RETURN(l_1, d_5);
+	int32_t d_4 = ZEXT(d_3);
+	int32_t d_5, l_5 = CALL/2(l_1, c_3, c_2, d_4);
+	l_4 = RETURN(l_5, c_0);
 }
 func main(): int32_t
 {
@@ -23,3 +26,4 @@ func main(): int32_t
 	l_3 = RETURN(l_2, d_2);
 }
 --EXPECT--
+0

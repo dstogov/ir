@@ -3,16 +3,20 @@ SHL 004: uint32_t constant shift count 33
 --ARGS--
 -O1 --run
 --CODE--
+extern func printf(uintptr_t, ...): int32_t;
 func test(uint32_t): int32_t
 {
 	int32_t c_1 = 33;
 	uint32_t c_2 = 2;
+	uintptr_t c_3 = "%x\n";
+	uintptr_t c_4 = func printf(uintptr_t, ...): int32_t;
 	l_1 = START(l_5);
 	uint32_t d_2 = PARAM(l_1, "x", 1);
 	uint32_t d_3 = SHL(d_2, c_1);
 	bool d_4 = NE(d_3, c_2);
 	int32_t d_5 = ZEXT(d_4);
-	l_5 = RETURN(l_1, d_5);
+	int32_t d_6, l_6 = CALL/2(l_1, c_4, c_3, d_3);
+	l_5 = RETURN(l_6, d_5);
 }
 func main(): int32_t
 {
@@ -23,3 +27,4 @@ func main(): int32_t
 	l_3 = RETURN(l_2, d_2);
 }
 --EXPECT--
+2
