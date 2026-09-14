@@ -910,7 +910,7 @@ val(ir_parser_ctx *p, uint8_t op, uint32_t n, ir_ref *ref):
 		{*ref = ir_stringl(p->ctx, str, len);}
 	|	DECNUMBER(IR_I32, &val)
 		{if (kind != IR_OPND_NUM && kind != IR_OPND_PROB) yy_error("unexpected number");}
-		{if (val.i64 < 0 || val.i64 > 0x7fffffff) yy_error("number out of range");}
+		{if (val.i64 < (int32_t)0x80000000 || val.i64 > 0x7fffffff) yy_error("number out of range");}
 		{*ref = val.i32;}
 	|	"null"
 		{*ref = IR_UNUSED;}

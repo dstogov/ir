@@ -379,6 +379,8 @@ typedef enum _ir_type {
 	\
 	/* data-flow and miscellaneous ops                                  */ \
 	_(VADDR,        d1,   var, ___, ___) /* load address of local var   */ \
+	_(TLS_ADDR,     d0X2, num, num, ___) /* TLS(module, offset)         */ \
+	                                     /* for static TLS module is -1 */ \
 	_(FRAME_ADDR,   d0,   ___, ___, ___) /* function frame address      */ \
 	_(PHI,          pN,   reg, def, def) /* SSA Phi function            */ \
 	_(COPY,         d1X1, def, opt, ___) /* COPY (last foldable op)     */ \
@@ -416,7 +418,6 @@ typedef enum _ir_type {
 	_(LOAD_v,       l2,   src, ref, ___) /* volatile variant of VLOAD   */ \
 	_(STORE,        s3,   src, ref, def) /* store to memory             */ \
 	_(STORE_v,      s3,   src, ref, def) /* volatile variant of VSTORE  */ \
-	_(TLS,          l1X2, src, num, num) /* thread local variable       */ \
 	_(TRAP,         x1,   src, ___, ___) /* DebugBreak                  */ \
 	/* memory reference ops (A, H, U, S, TMP, STR, NEW, X, V) ???       */ \
 	\

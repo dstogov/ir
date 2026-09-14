@@ -1,0 +1,63 @@
+--TEST--
+001: TLS_ADDR
+--TARGET--
+x86_64-windows
+--ARGS--
+-S
+--CODE--
+func thread_pointer(): uintptr_t
+{
+	l_1 = START(l_4);
+	uintptr_t ret = TLS_ADDR(-1, 0);
+	l_4 = RETURN(l_1, ret);
+}
+func tls_addr_static(): uintptr_t
+{
+	l_1 = START(l_4);
+	uintptr_t ret = TLS_ADDR(-1, 16);
+	l_4 = RETURN(l_1, ret);
+}
+func tls_addr_dynamic0(): uintptr_t
+{
+	l_1 = START(l_4);
+	uintptr_t ret = TLS_ADDR(16, 0);
+	l_4 = RETURN(l_1, ret);
+}
+func tls_addr_dynamic(): uintptr_t
+{
+	l_1 = START(l_4);
+	uintptr_t ret = TLS_ADDR(16, 32);
+	l_4 = RETURN(l_1, ret);
+}
+func tls_load_static(): int32_t
+{
+	l_1 = START(l_4);
+	uintptr_t addr = TLS_ADDR(-1, 16);
+	int32_t ret, l_2 = LOAD(l_1, addr);
+	l_4 = RETURN(l_2, ret);
+}
+func tls_load_dynamic(): int32_t
+{
+	l_1 = START(l_4);
+	uintptr_t addr = TLS_ADDR(16, 32);
+	int32_t ret, l_2 = LOAD(l_1, addr);
+	l_4 = RETURN(l_2, ret);
+}
+func tls_store_static(): void
+{
+	int32_t val = 42;
+	l_1 = START(l_4);
+	uintptr_t addr = TLS_ADDR(-1, 16);
+	l_2 = STORE(l_1, addr, val);
+	l_4 = RETURN(l_2);
+}
+func tls_store_dynamic(): void
+{
+	int32_t val = 42;
+	l_1 = START(l_4);
+	uintptr_t addr = TLS_ADDR(16, 32);
+	l_2 = STORE(l_1, addr, val);
+	l_4 = RETURN(l_2);
+}
+--EXPECT--
+???
