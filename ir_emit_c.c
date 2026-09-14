@@ -1016,6 +1016,17 @@ static void ir_emit_store(ir_ctx *ctx, FILE *f, ir_insn *insn)
 	fprintf(f, ";\n");
 }
 
+static void ir_emit_tls_addr(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
+{
+	if (insn->op1 == IR_NULL && insn->op2 == 0) {
+		ir_emit_def_ref(ctx, f, def);
+		fprintf(f, "__builtin_thread_pointer();\n");
+	} else {
+		fprintf(stderr, "ERROR: IR_%s is not implemented yet\n", ir_op_name[insn->op]);
+		exit(1);
+	}
+}
+
 static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 {
 	ir_ref i, n, *p;
@@ -1445,9 +1456,11 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 				case IR_SHUFFLE:
 					ir_emit_shuffle(ctx, f, i, insn);
 					break;
+				case IR_TLS_ADDR:
+					ir_emit_tls_addr(ctx, f, i, insn);
+					break;
 				case IR_RLOAD:
 				case IR_RSTORE:
-				case IR_TLS:
 				case IR_ASM:
 				case IR_ASM_OUT:
 				case IR_ASM_GOTO:

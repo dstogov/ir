@@ -2195,7 +2195,7 @@ static int parse_val(int sym, ir_parser_ctx *p, uint8_t op, uint32_t n, ir_ref *
 		case YY_DECNUMBER:
 			sym = parse_DECNUMBER(sym, IR_I32, &val);
 			if (kind != IR_OPND_NUM && kind != IR_OPND_PROB) yy_error("unexpected number");
-			if (val.i64 < 0 || val.i64 > 0x7fffffff) yy_error("number out of range");
+			if (val.i64 < (int32_t)0x80000000 || val.i64 > 0x7fffffff) yy_error("number out of range");
 			*ref = val.i32;
 			break;
 		case YY_NULL:

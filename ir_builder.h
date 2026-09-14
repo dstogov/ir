@@ -534,6 +534,7 @@ extern "C" {
 #define ir_ALLOCA(_size)                  _ir_ALLOCA(_ir_CTX, (_size))
 #define ir_AFREE(_size)                   _ir_AFREE(_ir_CTX, (_size))
 #define ir_VADDR(_var)                    ir_fold1(_ir_CTX, IR_OPT(IR_VADDR, IR_ADDR), (_var))
+#define ir_TLS_ADDR(_module, _offset)     ir_fold2(_ir_CTX, IR_OPT(IR_TLS_ADDR, IR_ADDR), (_module), (_offset))
 #define ir_VLOAD(_type, _var)             _ir_VLOAD(_ir_CTX, (_type), (_var))
 #define ir_VLOAD_B(_var)                  _ir_VLOAD(_ir_CTX, IR_BOOL, (_var))
 #define ir_VLOAD_U8(_var)                 _ir_VLOAD(_ir_CTX, IR_U8, (_var))
@@ -583,7 +584,6 @@ extern "C" {
 #define ir_STORE(_addr, _val)             _ir_STORE(_ir_CTX, (_addr), (_val))
 #define ir_LOAD_v(_type, _addr)           _ir_LOAD_v(_ir_CTX, (_type), (_addr))
 #define ir_STORE_v(_addr, _val)           _ir_STORE_v(_ir_CTX, (_addr), (_val))
-#define ir_TLS(_index, _offset)           _ir_TLS(_ir_CTX, (_index), (_offset))
 #define ir_TRAP()                         do {_ir_CTX->control = ir_emit1(_ir_CTX, IR_TRAP, _ir_CTX->control);} while (0)
 
 #define ir_FRAME_ADDR()                   ir_fold0(_ir_CTX, IR_OPT(IR_FRAME_ADDR, IR_ADDR))
@@ -637,6 +637,10 @@ extern "C" {
 #define ir_MERGE_WITH(_src2)              do {ir_ref end = ir_END(); ir_MERGE_2(end, _src2);} while (0)
 #define ir_MERGE_WITH_EMPTY_TRUE(_if)     do {ir_ref end = ir_END(); ir_IF_TRUE(_if); ir_MERGE_2(end, ir_END());} while (0)
 #define ir_MERGE_WITH_EMPTY_FALSE(_if)    do {ir_ref end = ir_END(); ir_IF_FALSE(_if); ir_MERGE_2(end, ir_END());} while (0)
+
+/* for backward compatibility only */
+#define ir_TLS(_index, _offset)           ir_LOAD_A(ir_TLS_ADDR((_offset) < 0 ? -1 : (_index), \
+                                              (_offset) < 0 ? (_index) : (_offset)))
 
 ir_ref _ir_DIV(ir_ctx *ctx, ir_type type, ir_ref op1, ir_ref op2);
 ir_ref _ir_MOD(ir_ctx *ctx, ir_type type, ir_ref op1, ir_ref op2);
@@ -697,7 +701,6 @@ void   _ir_MERGE_LIST(ir_ctx *ctx, ir_ref list);
 ir_ref _ir_PHI_LIST(ir_ctx *ctx, ir_ref list);
 ir_ref _ir_LOOP_BEGIN(ir_ctx *ctx, ir_ref src1);
 ir_ref _ir_LOOP_END(ir_ctx *ctx);
-ir_ref _ir_TLS(ir_ctx *ctx, ir_ref index, ir_ref offset);
 void   _ir_UNREACHABLE(ir_ctx *ctx);
 ir_ref _ir_SWITCH(ir_ctx *ctx, ir_ref val);
 void   _ir_CASE_VAL(ir_ctx *ctx, ir_ref switch_ref, ir_ref val);
