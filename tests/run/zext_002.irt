@@ -1,7 +1,7 @@
 --TEST--
 ZEXT 002: extended paths for unsigned 8-bit and 16-bit constants
 --ARGS--
---run -O0
+-O0 --run
 --CODE--
 extern func @printf(uintptr_t, ...): void;
 static const @format[11] = "%llu %llu\n\000";

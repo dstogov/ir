@@ -1,7 +1,7 @@
 --TEST--
 BITCAST 002: regression double constant to integer bits
 --ARGS--
---run -O0
+-O0 --run
 --CODE--
 extern func @printf(uintptr_t, ...): void;
 static const @format[6] = "%llx\n\000";
