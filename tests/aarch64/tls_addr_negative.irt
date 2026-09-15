@@ -1,0 +1,22 @@
+--TEST--
+TLS_ADDR with negative offset
+--TARGET--
+aarch64-linux-sysv
+--ARGS--
+-O0 -S
+--CODE--
+func test(): uintptr_t
+{
+	l_1 = START(l_2);
+	uintptr_t a = TLS_ADDR(-1, -8);
+	l_2 = RETURN(l_1, a);
+}
+--EXPECT--
+test:
+	sub sp, sp, #0x10
+	mrs x0, tpidr_el0
+	sub x0, x0, #8
+	str x0, [sp]
+	ldr x0, [sp]
+	add sp, sp, #0x10
+	ret

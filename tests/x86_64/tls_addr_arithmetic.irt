@@ -1,0 +1,35 @@
+--TEST--
+TLS_ADDR folding in ADD and EQ
+--TARGET--
+x86_64-linux-sysv
+--ARGS--
+-O2 -S
+--CODE--
+func tls_add(int32_t): int32_t
+{
+	l_1 = START(l_3);
+	int32_t x = PARAM(l_1, "x", 1);
+	uintptr_t a = TLS_ADDR(-1, 24);
+	int32_t value, l_2 = LOAD(l_1, a);
+	int32_t ret = ADD(x, value);
+	l_3 = RETURN(l_2, ret);
+}
+func tls_cmp(int32_t): bool
+{
+	l_1 = START(l_3);
+	int32_t x = PARAM(l_1, "x", 1);
+	uintptr_t a = TLS_ADDR(-1, 24);
+	int32_t value, l_2 = LOAD(l_1, a);
+	bool ret = EQ(x, value);
+	l_3 = RETURN(l_2, ret);
+}
+--EXPECT--
+tls_add:
+	movl %edi, %eax
+	addl %fs:0x18, %eax
+	retq
+
+tls_cmp:
+	cmpl %fs:0x18, %edi
+	sete %al
+	retq

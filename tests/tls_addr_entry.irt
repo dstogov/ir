@@ -1,0 +1,14 @@
+--TEST--
+TLS_ADDR across ENTRY
+--ARGS--
+-O2 --run
+--CODE--
+func test(): uintptr_t
+{
+	l_1 = START(l_4);
+	uintptr_t addr = TLS_ADDR(-1, 24);
+	l_2 = RETURN(l_1, addr);
+	l_3 = ENTRY(l_2, 1);
+	l_4 = RETURN(l_3, addr, l_2);
+}
+--EXPECT--

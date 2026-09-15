@@ -1,0 +1,21 @@
+--TEST--
+TLS_ADDR numeric offset operand
+--ARGS--
+-O1 --save
+--CODE--
+func test(): uintptr_t
+{
+	l_1 = START(l_2);
+	uintptr_t addr = TLS_ADDR(-1, 2147483647);
+	l_2 = RETURN(l_1, addr);
+}
+--EXPECT--
+func test(): uintptr_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	l_1 = START(l_3);
+	uintptr_t d_2 = TLS_ADDR(-1, 2147483647);
+	l_3 = RETURN(l_1, d_2);
+}
