@@ -3818,6 +3818,9 @@ static ir_op ir_emit_cmp_fp_common(ir_ctx *ctx, ir_ref root, ir_ref cmp_ref, ir_
 		op1_reg = ctx->regs[cmp_ref][1];
 		op2_reg = ctx->regs[cmp_ref][2];
 	}
+	if (op2_reg == IR_REG_NONE && op1 == op2) {
+		op2_reg = op1_reg;
+	}
 
 	IR_ASSERT(op1_reg != IR_REG_NONE && op2_reg != IR_REG_NONE);
 	if (IR_REG_SPILLED(op1_reg)) {
