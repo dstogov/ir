@@ -3459,7 +3459,7 @@ static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-	ir_type type = insn->type;
+	ir_type src_type = ctx->ir_base[insn->op1].type;
 	ir_ref op1 = insn->op1;
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 	ir_reg op1_reg = ctx->regs[def][1];
@@ -3468,19 +3468,19 @@ static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	if (IR_REG_SPILLED(op1_reg)) {
 		op1_reg = IR_REG_NUM(op1_reg);
-		ir_emit_load(ctx, type, op1_reg, op1);
+		ir_emit_load(ctx, src_type, op1_reg, op1);
 	}
 	if (insn->op == IR_NOT) {
-		if (insn->type == IR_BOOL) {
-			|	ASM_REG_IMM_OP cmp, type, op1_reg, 0
+		if (src_type == IR_BOOL) {
+			|	ASM_REG_IMM_OP cmp, src_type, op1_reg, 0
 			|	cset Rw(def_reg), eq
 		} else {
-			|	ASM_REG_REG_OP mvn, insn->type, def_reg, op1_reg
+			|	ASM_REG_REG_OP mvn, src_type, def_reg, op1_reg
 		}
 	} else if (insn->op == IR_NEG) {
-		|	ASM_REG_REG_OP neg, insn->type, def_reg, op1_reg
+		|	ASM_REG_REG_OP neg, src_type, def_reg, op1_reg
 	} else if (insn->op == IR_ABS) {
-		if (ir_type_size[type] == 8) {
+		if (ir_type_size[src_type] == 8) {
 			|	cmp Rx(op1_reg), #0
 			|	cneg Rx(def_reg), Rx(op1_reg), lt
 		} else {
@@ -3488,26 +3488,26 @@ static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			|	cneg Rw(def_reg), Rw(op1_reg), lt
 		}
 	} else if (insn->op == IR_CTLZ) {
-		if (ir_type_size[type] == 1) {
+		if (ir_type_size[src_type] == 1) {
 			|	and	Rw(def_reg), Rw(op1_reg), #0xff
 			|	clz Rw(def_reg), Rw(def_reg)
 			|	sub Rw(def_reg), Rw(def_reg), #24
-		} else if (ir_type_size[type] == 2) {
+		} else if (ir_type_size[src_type] == 2) {
 			|	and	Rw(def_reg), Rw(op1_reg), #0xffff
 			|	clz Rw(def_reg), Rw(def_reg)
 			|	sub Rw(def_reg), Rw(def_reg), #16
 		} else {
-			|	ASM_REG_REG_OP clz, type, def_reg, op1_reg
+			|	ASM_REG_REG_OP clz, src_type, def_reg, op1_reg
 		}
 	} else if (insn->op == IR_CTTZ) {
-		|	ASM_REG_REG_OP rbit, insn->type, def_reg, op1_reg
-		|	ASM_REG_REG_OP clz, insn->type, def_reg, def_reg
+		|	ASM_REG_REG_OP rbit, src_type, def_reg, op1_reg
+		|	ASM_REG_REG_OP clz, src_type, def_reg, def_reg
 	} else {
 		IR_ASSERT(insn->op == IR_BSWAP);
-		|	ASM_REG_REG_OP rev, insn->type, def_reg, op1_reg
+		|	ASM_REG_REG_OP rev, src_type, def_reg, op1_reg
 	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
-		ir_emit_store(ctx, type, def, def_reg);
+		ir_emit_store(ctx, insn->type, def, def_reg);
 	}
 }
 
@@ -3515,7 +3515,7 @@ static void ir_emit_ctpop(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-	ir_type type = insn->type;
+	ir_type src_type = ctx->ir_base[insn->op1].type;
 	ir_ref op1 = insn->op1;
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 	ir_reg op1_reg = ctx->regs[def][1];
@@ -3527,9 +3527,9 @@ static void ir_emit_ctpop(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	if (IR_REG_SPILLED(op1_reg)) {
 		op1_reg = IR_REG_NUM(op1_reg);
-		ir_emit_load(ctx, type, op1_reg, op1);
+		ir_emit_load(ctx, src_type, op1_reg, op1);
 	}
-	switch (ir_type_size[insn->type]) {
+	switch (ir_type_size[src_type]) {
 		default:
 			IR_ASSERT(0);
 		case 1:
@@ -3560,7 +3560,7 @@ static void ir_emit_ctpop(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			break;
 	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
-		ir_emit_store(ctx, type, def, def_reg);
+		ir_emit_store(ctx, insn->type, def, def_reg);
 	}
 }
 
