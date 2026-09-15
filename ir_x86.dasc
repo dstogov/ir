@@ -14165,7 +14165,7 @@ static void ir_emit_tls_load(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_emit_load_mem(ctx, insn->type, def_reg, mem);
 
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
-		ir_emit_store(ctx, IR_ADDR, def, reg);
+		ir_emit_store(ctx, insn->type, def, reg);
 	}
 }
 
