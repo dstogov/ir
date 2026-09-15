@@ -3358,6 +3358,7 @@ static void ir_emit_shift_const(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 	ir_reg op1_reg = ctx->regs[def][1];
 	ir_reg tmp_reg;
+	uint32_t type_bits = ir_type_size[type] * 8;
 
 	IR_ASSERT(IR_IS_CONST_REF(insn->op2));
 	IR_ASSERT(!IR_IS_SYM_CONST(ctx->ir_base[insn->op2].op));
@@ -3366,6 +3367,25 @@ static void ir_emit_shift_const(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (IR_REG_SPILLED(op1_reg)) {
 		op1_reg = IR_REG_NUM(op1_reg);
 		ir_emit_load(ctx, type, op1_reg, op1);
+	}
+	if (insn->op == IR_ROL || insn->op == IR_ROR) {
+		shift %= type_bits;
+	} else {
+		shift %= IR_MAX(type_bits, 32);
+	}
+	if (shift == 0) {
+		if (def_reg != op1_reg) {
+			|	ASM_REG_REG_OP mov, type, def_reg, op1_reg
+		}
+		goto done;
+	}
+	if (shift >= type_bits) {
+		if (insn->op == IR_SAR) {
+			shift = type_bits - 1;
+		} else {
+			|	mov Rw(def_reg), wzr
+			goto done;
+		}
 	}
 	switch (insn->op) {
 		default:
@@ -3428,6 +3448,8 @@ static void ir_emit_shift_const(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 			break;
 	}
+
+done:
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, type, def, def_reg);
 	}
