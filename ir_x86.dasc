@@ -5103,6 +5103,12 @@ store_int:
 				return insn->op;
 			}
 #endif
+#ifdef IR_TARGET_X86
+			if (ir_type_size[insn->type] == 1) {
+				/* disable register reuse, becuse in 32-bit mode some 32-bit registers (%ebp) don't have 8-bit part */
+				return insn->op;
+			}
+#endif
 			return insn->op | IR_MAY_REUSE;
 		case IR_PROTO:
 			ir_match_fuse_load(ctx, insn->op1, ref);
