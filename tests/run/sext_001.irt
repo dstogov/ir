@@ -1,7 +1,7 @@
 --TEST--
 SEXT 001: regression signed 32-bit constant extension
 --ARGS--
--O0 --run
+--run
 --CODE--
 extern func @printf(uintptr_t, ...): void;
 static const @format[6] = "%lld\n\000";
