@@ -1888,6 +1888,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					} else if (!x.regs[j].root || ctx->regs[x.regs[j].ref][x.regs[j].op] == IR_REG_NONE) {
 						ctx->regs[x.regs[j].ref][x.regs[j].op] = reg;
 					} else if (ctx->regs[x.regs[j].ref][x.regs[j].op] != reg) {
+						ctx->rules[x.regs[j].ref] |= IR_FUSED_REG;
 						ir_set_fused_reg(ctx, x.regs[j].root, x.regs[j].ref * sizeof(ir_ref) + x.regs[j].op, reg);
 					}
 				}
