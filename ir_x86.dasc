@@ -15171,17 +15171,21 @@ static void ir_emit_binop_helper_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_mem mem, mem_hi;
 
 		if (ir_rule(ctx, op2) & IR_FUSED) {
-			mem_hi = IR_MEM_I64_HI(ir_fuse_load(ctx, def, op2));
-			ctx->call_stack_size += 4;
 			mem = ir_fuse_load(ctx, def, op2);
-		} else {
-			mem_hi = IR_MEM_I64_HI(ir_ref_spill_slot(ctx, op2));
+			mem_hi = IR_MEM_I64_HI(mem);
 			ctx->call_stack_size += 4;
+		} else {
 			mem = ir_ref_spill_slot(ctx, op2);
+			mem_hi = IR_MEM_I64_HI(mem);
+			ctx->call_stack_size += 4;
 		}
 		ctx->call_stack_size += 4;
 		|	ASM_MEM_PUSH_OP push, IR_U32, mem_hi
-		|	ASM_MEM_PUSH_OP push, IR_U32, mem
+		if (IR_MEM_BASE(mem) == IR_REG_RSP) {
+			|	ASM_MEM_PUSH_OP push, IR_U32, mem_hi
+		} else {
+			|	ASM_MEM_PUSH_OP push, IR_U32, mem
+		}
 	}
 
 	if (op1_reg != IR_REG_NONE) {
@@ -15208,17 +15212,21 @@ static void ir_emit_binop_helper_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_mem mem, mem_hi;
 
 		if (ir_rule(ctx, op1) & IR_FUSED) {
-			mem_hi = IR_MEM_I64_HI(ir_fuse_load(ctx, def, op1));
-			ctx->call_stack_size += 4;
 			mem = ir_fuse_load(ctx, def, op1);
-		} else {
-			mem_hi = IR_MEM_I64_HI(ir_ref_spill_slot(ctx, op1));
+			mem_hi = IR_MEM_I64_HI(mem);
 			ctx->call_stack_size += 4;
+		} else {
 			mem = ir_ref_spill_slot(ctx, op1);
+			mem_hi = IR_MEM_I64_HI(mem);
+			ctx->call_stack_size += 4;
 		}
 		ctx->call_stack_size += 4;
 		|	ASM_MEM_PUSH_OP push, IR_U32, mem_hi
-		|	ASM_MEM_PUSH_OP push, IR_U32, mem
+		if (IR_MEM_BASE(mem) == IR_REG_RSP) {
+			|	ASM_MEM_PUSH_OP push, IR_U32, mem_hi
+		} else {
+			|	ASM_MEM_PUSH_OP push, IR_U32, mem
+		}
 	}
 
 	if (insn->opt == IR_OPT(IR_DIV, IR_I64)) {
