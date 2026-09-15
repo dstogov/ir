@@ -1,5 +1,5 @@
 --TEST--
-SAR 001:
+SAR 001: shift by const
 --ARGS--
 --run
 --CODE--
@@ -39,6 +39,17 @@ func sar32(int32_t): int32_t
 	int32_t d_3 = SAR(d_2, c_4);
 	l_4 = RETURN(l_1, d_3);
 }
+func sar64(int64_t): int64_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int64_t c_4 = 3;
+	l_1 = START(l_4);
+	int64_t d_2 = PARAM(l_1, "arg_1", 1);
+	int64_t d_3 = SAR(d_2, c_4);
+	l_4 = RETURN(l_1, d_3);
+}
 func main(): int32_t
 {
 	uintptr_t c_1 = 0;
@@ -63,7 +74,13 @@ func main(): int32_t
 	int32_t c_20 = 15;
 	int32_t c_21 = -268435456;
 	uintptr_t c_22 = "i32: %x %x %x %x\n";
-	l_1 = START(l_20);
+	uintptr_t c_23 = func sar64(int64_t): int64_t;
+	int64_t c_24 = 0;
+	int64_t c_25 = -1;
+	int64_t c_26 = 15;
+	int64_t c_27 = 0xf000000000000000;
+	uintptr_t c_28 = "i64: %llx %llx %llx %llx\n";
+	l_1 = START(l_24);
 	int32_t d_2, l_2 = CALL/1(l_1, c_5, c_4);
 	int32_t d_3, l_3 = CALL/1(l_2, c_5, c_6);
 	int32_t d_4, l_4 = CALL/1(l_3, c_5, c_7);
@@ -79,9 +96,15 @@ func main(): int32_t
 	int32_t d_16, l_16 = CALL/1(l_15, c_18, c_20);
 	int32_t d_17, l_17 = CALL/1(l_16, c_18, c_21);
 	int32_t d_18, l_18 = CALL/5(l_17, c_10, c_22, d_14, d_15, d_16, d_17);
-	l_20 = RETURN(l_18, c_17);
+	int64_t d_19, l_19 = CALL/1(l_18, c_23, c_24);
+	int64_t d_20, l_20 = CALL/1(l_19, c_23, c_25);
+	int64_t d_21, l_21 = CALL/1(l_20, c_23, c_26);
+	int64_t d_22, l_22 = CALL/1(l_21, c_23, c_27);
+	int32_t d_23, l_23 = CALL/5(l_22, c_10, c_28, d_19, d_20, d_21, d_22);
+	l_24 = RETURN(l_23, c_17);
 }
 --EXPECT--
 i8:  0 ff 1 fe
 i16: 0 ffff 1 fe00
 i32: 0 ffffffff 1 fe000000
+i64: 0 ffffffffffffffff 1 fe00000000000000

@@ -1,5 +1,5 @@
 --TEST--
-SHR 002:
+SHR 002: shift by var
 --ARGS--
 --run
 --CODE--
@@ -39,6 +39,17 @@ func shr32(int32_t, int32_t): int32_t
 	int32_t d_4 = SHR(d_2, d_3);
 	l_5 = RETURN(l_1, d_4);
 }
+func shr64(int64_t, int64_t): int64_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	l_1 = START(l_5);
+	int64_t d_2 = PARAM(l_1, "arg_1", 1);
+	int64_t d_3 = PARAM(l_1, "arg_2", 2);
+	int64_t d_4 = SHR(d_2, d_3);
+	l_5 = RETURN(l_1, d_4);
+}
 func main(): int32_t
 {
 	uintptr_t c_1 = 0;
@@ -66,7 +77,14 @@ func main(): int32_t
 	int32_t c_23 = 15;
 	int32_t c_24 = -268435456;
 	uintptr_t c_25 = "i32: %x %x %x %x\n";
-	l_1 = START(l_32);
+	uintptr_t c_26 = func shr64(int64_t, int64_t): int64_t;
+	int64_t c_27 = 0;
+	int64_t c_28 = 3;
+	int64_t c_29 = -1;
+	int64_t c_30 = 15;
+	int64_t c_31 = 0xf000000000000000;
+	uintptr_t c_32 = "i64: %llx %llx %llx %llx\n";
+	l_1 = START(l_36);
 	int32_t d_2, l_2 = CALL/2(l_1, c_6, c_4, c_5);
 	int32_t d_4, l_4 = CALL/2(l_2, c_6, c_7, c_5);
 	int32_t d_6, l_6 = CALL/2(l_4, c_6, c_8, c_5);
@@ -82,9 +100,15 @@ func main(): int32_t
 	int32_t d_26, l_26 = CALL/2(l_24, c_21, c_23, c_20);
 	int32_t d_28, l_28 = CALL/2(l_26, c_21, c_24, c_20);
 	int32_t d_30, l_30 = CALL/5(l_28, c_11, c_25, d_22, d_24, d_26, d_28);
-	l_32 = RETURN(l_30, c_19);
+	int64_t d_31, l_31 = CALL/2(l_30, c_26, c_27, c_28);
+	int64_t d_32, l_32 = CALL/2(l_31, c_26, c_29, c_28);
+	int64_t d_33, l_33 = CALL/2(l_32, c_26, c_30, c_28);
+	int64_t d_34, l_34 = CALL/2(l_33, c_26, c_31, c_28);
+	int32_t d_35, l_35 = CALL/5(l_34, c_11, c_32, d_31, d_32, d_33, d_34);
+	l_36 = RETURN(l_35, c_19);
 }
 --EXPECT--
 i8:  0 1f 1 1e
 i16: 0 1fff 1 1e00
 i32: 0 1fffffff 1 1e000000
+i64: 0 1fffffffffffffff 1 1e00000000000000
