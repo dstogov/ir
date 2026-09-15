@@ -25489,7 +25489,7 @@ static void ir_emit_load_params(ir_ctx *ctx)
 		insn = &ctx->ir_base[use];
 		if (insn->op == IR_PARAM) {
 			if (IR_IS_TYPE_INT(insn->type)) {
-				if (ctx->value_params && ctx->value_params[insn->op3 - 1].align) {
+				if (ctx->value_params && ctx->value_params[insn->op3 - 1].align && cc->pass_struct_by_val) {
 					/* struct passed by value on stack */
 					uint32_t align = ctx->value_params[insn->op3 - 1].align;
 
