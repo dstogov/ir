@@ -33,9 +33,8 @@ func cttz64(int64_t): int32_t
 {
 	l_1 = START(l_5);
 	int64_t d_2 = PARAM(l_1, "arg_1", 1);
-	int64_t d_3 = CTTZ(d_2);
-	int32_t d_4 = TRUNC(d_3);
-	l_5 = RETURN(l_1, d_4);
+	int32_t d_3 = CTTZ(d_2);
+	l_5 = RETURN(l_1, d_3);
 }
 func main(void): int32_t
 {

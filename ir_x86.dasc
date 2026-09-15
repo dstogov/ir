@@ -2205,7 +2205,7 @@ get_arg_hints:
 			insn = &ctx->ir_base[ref];
 			constraints->tmp_regs[0] = IR_TMP_REG(2, insn->type, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
 			n = 1;
-			if (ir_type_size[insn->type] == 8) {
+			if (ir_type_size[ctx->ir_base[insn->op1].type] == 8) {
 				constraints->tmp_regs[1] = IR_TMP_REG(3, insn->type, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
 				n = 2;
 			}
@@ -5130,6 +5130,7 @@ store_int:
 			ir_match_fuse_load(ctx, insn->op1, ref);
 #if IR_X86_I64
 			if (ctx->ir_base[insn->op1].type == IR_I64 || ctx->ir_base[insn->op1].type == IR_U64) {
+				IR_ASSERT(IR_IS_TYPE_INT(insn->type) && ir_type_size[insn->type] <= sizeof(void*));
 				return IR_BIT_COUNT_I64;
 			}
 #endif
@@ -5138,6 +5139,7 @@ store_int:
 			ir_match_fuse_load(ctx, insn->op1, ref);
 #if IR_X86_I64
 			if (ctx->ir_base[insn->op1].type == IR_I64 || ctx->ir_base[insn->op1].type == IR_U64) {
+				IR_ASSERT(IR_IS_TYPE_INT(insn->type) && ir_type_size[insn->type] <= sizeof(void*));
 				return (ctx->mflags & IR_X86_BMI1) ? IR_BIT_COUNT_I64 : IR_BIT_COUNT_HELPER_I64;
 			}
 #endif
@@ -7780,7 +7782,7 @@ static void ir_emit_ctpop(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-	ir_type type = insn->type;
+	ir_type src_type = ctx->ir_base[insn->op1].type;
 	ir_ref op1 = insn->op1;
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 	ir_reg op1_reg = ctx->regs[def][1];
@@ -7791,18 +7793,18 @@ static void ir_emit_ctpop(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	IR_ASSERT(def_reg != IR_REG_NONE && tmp_reg != IR_REG_NONE);
 	if (op1_reg == IR_REG_NONE) {
-		ir_emit_load(ctx, type, def_reg, op1);
-		if (ir_type_size[insn->type] == 1) {
+		ir_emit_load(ctx, src_type, def_reg, op1);
+		if (ir_type_size[src_type] == 1) {
 			|	movzx Rd(def_reg), Rb(def_reg)
-		} else if (ir_type_size[insn->type] == 2) {
+		} else if (ir_type_size[src_type] == 2) {
 			|	movzx Rd(def_reg), Rw(def_reg)
 		}
 	} else {
 		if (IR_REG_SPILLED(op1_reg)) {
 			op1_reg = IR_REG_NUM(op1_reg);
-			ir_emit_load(ctx, type, op1_reg, op1);
+			ir_emit_load(ctx, src_type, op1_reg, op1);
 		}
-		switch (ir_type_size[insn->type]) {
+		switch (ir_type_size[src_type]) {
 			default:
 				IR_ASSERT(0);
 			case 1:
@@ -7821,7 +7823,7 @@ static void ir_emit_ctpop(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |.endif
 		}
 	}
-	switch (ir_type_size[insn->type]) {
+	switch (ir_type_size[src_type]) {
 		default:
 			IR_ASSERT(0);
 		case 1:
@@ -7902,7 +7904,7 @@ static void ir_emit_ctpop(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
-		ir_emit_store(ctx, type, def, def_reg);
+		ir_emit_store(ctx, insn->type, def, def_reg);
 	}
 }
 
