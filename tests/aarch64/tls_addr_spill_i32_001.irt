@@ -1,0 +1,338 @@
+--TEST--
+001: Dynamic TLS int32 spill
+--TARGET--
+aarch64-*-darwin
+--ARGS--
+-S
+--CODE--
+func tls_load_dynamic_spill(): int32_t
+{
+	l_1 = START(l_42);
+	uintptr_t a0 = TLS_ADDR(16, 0);
+	uintptr_t a1 = TLS_ADDR(16, 8);
+	uintptr_t a2 = TLS_ADDR(16, 16);
+	uintptr_t a3 = TLS_ADDR(16, 24);
+	uintptr_t a4 = TLS_ADDR(16, 32);
+	uintptr_t a5 = TLS_ADDR(16, 40);
+	uintptr_t a6 = TLS_ADDR(16, 48);
+	uintptr_t a7 = TLS_ADDR(16, 56);
+	uintptr_t a8 = TLS_ADDR(16, 64);
+	uintptr_t a9 = TLS_ADDR(16, 72);
+	uintptr_t a10 = TLS_ADDR(16, 80);
+	uintptr_t a11 = TLS_ADDR(16, 88);
+	uintptr_t a12 = TLS_ADDR(16, 96);
+	uintptr_t a13 = TLS_ADDR(16, 104);
+	uintptr_t a14 = TLS_ADDR(16, 112);
+	uintptr_t a15 = TLS_ADDR(16, 120);
+	uintptr_t a16 = TLS_ADDR(16, 128);
+	uintptr_t a17 = TLS_ADDR(16, 136);
+	uintptr_t a18 = TLS_ADDR(16, 144);
+	uintptr_t a19 = TLS_ADDR(16, 152);
+	uintptr_t a20 = TLS_ADDR(16, 160);
+	uintptr_t a21 = TLS_ADDR(16, 168);
+	uintptr_t a22 = TLS_ADDR(16, 176);
+	uintptr_t a23 = TLS_ADDR(16, 184);
+	uintptr_t a24 = TLS_ADDR(16, 192);
+	uintptr_t a25 = TLS_ADDR(16, 200);
+	uintptr_t a26 = TLS_ADDR(16, 208);
+	uintptr_t a27 = TLS_ADDR(16, 216);
+	uintptr_t a28 = TLS_ADDR(16, 224);
+	uintptr_t a29 = TLS_ADDR(16, 232);
+	uintptr_t a30 = TLS_ADDR(16, 240);
+	uintptr_t a31 = TLS_ADDR(16, 248);
+	uintptr_t a32 = TLS_ADDR(16, 256);
+	uintptr_t a33 = TLS_ADDR(16, 264);
+	uintptr_t a34 = TLS_ADDR(16, 272);
+	uintptr_t a35 = TLS_ADDR(16, 280);
+	uintptr_t a36 = TLS_ADDR(16, 288);
+	uintptr_t a37 = TLS_ADDR(16, 296);
+	uintptr_t a38 = TLS_ADDR(16, 304);
+	uintptr_t a39 = TLS_ADDR(16, 312);
+	int32_t v0, l_2 = LOAD(l_1, a0);
+	int32_t v1, l_3 = LOAD(l_2, a1);
+	int32_t v2, l_4 = LOAD(l_3, a2);
+	int32_t v3, l_5 = LOAD(l_4, a3);
+	int32_t v4, l_6 = LOAD(l_5, a4);
+	int32_t v5, l_7 = LOAD(l_6, a5);
+	int32_t v6, l_8 = LOAD(l_7, a6);
+	int32_t v7, l_9 = LOAD(l_8, a7);
+	int32_t v8, l_10 = LOAD(l_9, a8);
+	int32_t v9, l_11 = LOAD(l_10, a9);
+	int32_t v10, l_12 = LOAD(l_11, a10);
+	int32_t v11, l_13 = LOAD(l_12, a11);
+	int32_t v12, l_14 = LOAD(l_13, a12);
+	int32_t v13, l_15 = LOAD(l_14, a13);
+	int32_t v14, l_16 = LOAD(l_15, a14);
+	int32_t v15, l_17 = LOAD(l_16, a15);
+	int32_t v16, l_18 = LOAD(l_17, a16);
+	int32_t v17, l_19 = LOAD(l_18, a17);
+	int32_t v18, l_20 = LOAD(l_19, a18);
+	int32_t v19, l_21 = LOAD(l_20, a19);
+	int32_t v20, l_22 = LOAD(l_21, a20);
+	int32_t v21, l_23 = LOAD(l_22, a21);
+	int32_t v22, l_24 = LOAD(l_23, a22);
+	int32_t v23, l_25 = LOAD(l_24, a23);
+	int32_t v24, l_26 = LOAD(l_25, a24);
+	int32_t v25, l_27 = LOAD(l_26, a25);
+	int32_t v26, l_28 = LOAD(l_27, a26);
+	int32_t v27, l_29 = LOAD(l_28, a27);
+	int32_t v28, l_30 = LOAD(l_29, a28);
+	int32_t v29, l_31 = LOAD(l_30, a29);
+	int32_t v30, l_32 = LOAD(l_31, a30);
+	int32_t v31, l_33 = LOAD(l_32, a31);
+	int32_t v32, l_34 = LOAD(l_33, a32);
+	int32_t v33, l_35 = LOAD(l_34, a33);
+	int32_t v34, l_36 = LOAD(l_35, a34);
+	int32_t v35, l_37 = LOAD(l_36, a35);
+	int32_t v36, l_38 = LOAD(l_37, a36);
+	int32_t v37, l_39 = LOAD(l_38, a37);
+	int32_t v38, l_40 = LOAD(l_39, a38);
+	int32_t v39, l_41 = LOAD(l_40, a39);
+	int32_t s0_0 = ADD(v0, v1);
+	int32_t s0_1 = ADD(v2, v3);
+	int32_t s0_2 = ADD(v4, v5);
+	int32_t s0_3 = ADD(v6, v7);
+	int32_t s0_4 = ADD(v8, v9);
+	int32_t s0_5 = ADD(v10, v11);
+	int32_t s0_6 = ADD(v12, v13);
+	int32_t s0_7 = ADD(v14, v15);
+	int32_t s0_8 = ADD(v16, v17);
+	int32_t s0_9 = ADD(v18, v19);
+	int32_t s0_10 = ADD(v20, v21);
+	int32_t s0_11 = ADD(v22, v23);
+	int32_t s0_12 = ADD(v24, v25);
+	int32_t s0_13 = ADD(v26, v27);
+	int32_t s0_14 = ADD(v28, v29);
+	int32_t s0_15 = ADD(v30, v31);
+	int32_t s0_16 = ADD(v32, v33);
+	int32_t s0_17 = ADD(v34, v35);
+	int32_t s0_18 = ADD(v36, v37);
+	int32_t s0_19 = ADD(v38, v39);
+	int32_t s1_0 = ADD(s0_0, s0_1);
+	int32_t s1_1 = ADD(s0_2, s0_3);
+	int32_t s1_2 = ADD(s0_4, s0_5);
+	int32_t s1_3 = ADD(s0_6, s0_7);
+	int32_t s1_4 = ADD(s0_8, s0_9);
+	int32_t s1_5 = ADD(s0_10, s0_11);
+	int32_t s1_6 = ADD(s0_12, s0_13);
+	int32_t s1_7 = ADD(s0_14, s0_15);
+	int32_t s1_8 = ADD(s0_16, s0_17);
+	int32_t s1_9 = ADD(s0_18, s0_19);
+	int32_t s2_0 = ADD(s1_0, s1_1);
+	int32_t s2_1 = ADD(s1_2, s1_3);
+	int32_t s2_2 = ADD(s1_4, s1_5);
+	int32_t s2_3 = ADD(s1_6, s1_7);
+	int32_t s2_4 = ADD(s1_8, s1_9);
+	int32_t s3_0 = ADD(s2_0, s2_1);
+	int32_t s3_1 = ADD(s2_2, s2_3);
+	int32_t s4_0 = ADD(s3_0, s3_1);
+	int32_t s5_0 = ADD(s4_0, s2_4);
+	int32_t ret = COPY(s5_0);
+	l_42 = RETURN(l_41, ret);
+}
+--EXPECT--
+tls_load_dynamic_spill:
+	sub sp, sp, #0x90
+	stp x19, x20, [sp, #0x80]
+	stp x21, x22, [sp, #0x70]
+	stp x23, x24, [sp, #0x60]
+	stp x25, x26, [sp, #0x50]
+	stp x27, x28, [sp, #0x40]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr w0, [x0]
+	mrs x1, tpidrro_el0
+	and x1, x1, #0xfffffffffffffff8
+	ldr w1, [x1, #8]
+	mrs x2, tpidrro_el0
+	and x2, x2, #0xfffffffffffffff8
+	ldr w2, [x2, #0x10]
+	mrs x3, tpidrro_el0
+	and x3, x3, #0xfffffffffffffff8
+	ldr w3, [x3, #0x18]
+	mrs x4, tpidrro_el0
+	and x4, x4, #0xfffffffffffffff8
+	ldr w4, [x4, #0x20]
+	mrs x5, tpidrro_el0
+	and x5, x5, #0xfffffffffffffff8
+	ldr w5, [x5, #0x28]
+	mrs x6, tpidrro_el0
+	and x6, x6, #0xfffffffffffffff8
+	ldr w6, [x6, #0x30]
+	mrs x7, tpidrro_el0
+	and x7, x7, #0xfffffffffffffff8
+	ldr w7, [x7, #0x38]
+	mrs x8, tpidrro_el0
+	and x8, x8, #0xfffffffffffffff8
+	ldr w8, [x8, #0x40]
+	mrs x9, tpidrro_el0
+	and x9, x9, #0xfffffffffffffff8
+	ldr w9, [x9, #0x48]
+	mrs x10, tpidrro_el0
+	and x10, x10, #0xfffffffffffffff8
+	ldr w10, [x10, #0x50]
+	mrs x11, tpidrro_el0
+	and x11, x11, #0xfffffffffffffff8
+	ldr w11, [x11, #0x58]
+	mrs x12, tpidrro_el0
+	and x12, x12, #0xfffffffffffffff8
+	ldr w12, [x12, #0x60]
+	mrs x13, tpidrro_el0
+	and x13, x13, #0xfffffffffffffff8
+	ldr w13, [x13, #0x68]
+	mrs x14, tpidrro_el0
+	and x14, x14, #0xfffffffffffffff8
+	ldr w14, [x14, #0x70]
+	mrs x15, tpidrro_el0
+	and x15, x15, #0xfffffffffffffff8
+	ldr w15, [x15, #0x78]
+	mrs x16, tpidrro_el0
+	and x16, x16, #0xfffffffffffffff8
+	ldr w16, [x16, #0x80]
+	mrs x19, tpidrro_el0
+	and x19, x19, #0xfffffffffffffff8
+	ldr w19, [x19, #0x88]
+	mrs x20, tpidrro_el0
+	and x20, x20, #0xfffffffffffffff8
+	ldr w20, [x20, #0x90]
+	mrs x21, tpidrro_el0
+	and x21, x21, #0xfffffffffffffff8
+	ldr w21, [x21, #0x98]
+	mrs x22, tpidrro_el0
+	and x22, x22, #0xfffffffffffffff8
+	ldr w22, [x22, #0xa0]
+	mrs x23, tpidrro_el0
+	and x23, x23, #0xfffffffffffffff8
+	ldr w23, [x23, #0xa8]
+	mrs x24, tpidrro_el0
+	and x24, x24, #0xfffffffffffffff8
+	ldr w24, [x24, #0xb0]
+	mrs x25, tpidrro_el0
+	and x25, x25, #0xfffffffffffffff8
+	ldr w25, [x25, #0xb8]
+	mrs x26, tpidrro_el0
+	and x26, x26, #0xfffffffffffffff8
+	ldr w26, [x26, #0xc0]
+	mrs x27, tpidrro_el0
+	and x27, x27, #0xfffffffffffffff8
+	ldr w27, [x27, #0xc8]
+	mrs x28, tpidrro_el0
+	and x28, x28, #0xfffffffffffffff8
+	ldr w28, [x28, #0xd0]
+	str w28, [sp]
+	mrs x28, tpidrro_el0
+	and x28, x28, #0xfffffffffffffff8
+	ldr w28, [x28, #0xd8]
+	mov x17, #4
+	str w28, [sp, x17]
+	mrs x28, tpidrro_el0
+	and x28, x28, #0xfffffffffffffff8
+	ldr w28, [x28, #0xe0]
+	str w28, [sp, #8]
+	mrs x28, tpidrro_el0
+	and x28, x28, #0xfffffffffffffff8
+	ldr w28, [x28, #0xe8]
+	mov x17, #0xc
+	str w28, [sp, x17]
+	mrs x28, tpidrro_el0
+	and x28, x28, #0xfffffffffffffff8
+	ldr w28, [x28, #0xf0]
+	str w28, [sp, #0x10]
+	mrs x28, tpidrro_el0
+	and x28, x28, #0xfffffffffffffff8
+	ldr w28, [x28, #0xf8]
+	mov x17, #0x14
+	str w28, [sp, x17]
+	mrs x28, tpidrro_el0
+	and x28, x28, #0xfffffffffffffff8
+	ldr w28, [x28, #0x100]
+	str w28, [sp, #0x18]
+	mrs x28, tpidrro_el0
+	and x28, x28, #0xfffffffffffffff8
+	ldr w28, [x28, #0x108]
+	mov x17, #0x1c
+	str w28, [sp, x17]
+	mrs x28, tpidrro_el0
+	and x28, x28, #0xfffffffffffffff8
+	ldr w28, [x28, #0x110]
+	str w28, [sp, #0x20]
+	mrs x28, tpidrro_el0
+	and x28, x28, #0xfffffffffffffff8
+	ldr w28, [x28, #0x118]
+	mov x17, #0x24
+	str w28, [sp, x17]
+	mrs x28, tpidrro_el0
+	and x28, x28, #0xfffffffffffffff8
+	ldr w28, [x28, #0x120]
+	str w28, [sp, #0x28]
+	mrs x28, tpidrro_el0
+	and x28, x28, #0xfffffffffffffff8
+	ldr w28, [x28, #0x128]
+	mov x17, #0x2c
+	str w28, [sp, x17]
+	mrs x28, tpidrro_el0
+	and x28, x28, #0xfffffffffffffff8
+	ldr w28, [x28, #0x130]
+	str w28, [sp, #0x30]
+	mrs x28, tpidrro_el0
+	and x28, x28, #0xfffffffffffffff8
+	ldr w28, [x28, #0x138]
+	add w0, w1, w0
+	add w1, w3, w2
+	add w2, w5, w4
+	add w3, w7, w6
+	add w4, w9, w8
+	add w5, w11, w10
+	add w6, w13, w12
+	add w7, w15, w14
+	add w8, w19, w16
+	add w9, w21, w20
+	add w10, w23, w22
+	add w11, w25, w24
+	add w12, w27, w26
+	ldr w13, [sp, #4]
+	ldr w14, [sp]
+	add w13, w13, w14
+	ldr w14, [sp, #0xc]
+	ldr w15, [sp, #8]
+	add w14, w14, w15
+	ldr w15, [sp, #0x14]
+	ldr w16, [sp, #0x10]
+	add w15, w15, w16
+	ldr w16, [sp, #0x1c]
+	ldr w19, [sp, #0x18]
+	add w16, w16, w19
+	ldr w19, [sp, #0x24]
+	ldr w20, [sp, #0x20]
+	add w19, w19, w20
+	ldr w20, [sp, #0x2c]
+	ldr w21, [sp, #0x28]
+	add w20, w20, w21
+	ldr w21, [sp, #0x30]
+	add w21, w28, w21
+	add w0, w1, w0
+	add w1, w3, w2
+	add w2, w5, w4
+	add w3, w7, w6
+	add w4, w9, w8
+	add w5, w11, w10
+	add w6, w13, w12
+	add w7, w15, w14
+	add w8, w19, w16
+	add w9, w21, w20
+	add w0, w1, w0
+	add w1, w3, w2
+	add w2, w5, w4
+	add w3, w7, w6
+	add w4, w9, w8
+	add w0, w1, w0
+	add w1, w3, w2
+	add w0, w1, w0
+	add w0, w0, w4
+	ldp x19, x20, [sp, #0x80]
+	ldp x21, x22, [sp, #0x70]
+	ldp x23, x24, [sp, #0x60]
+	ldp x25, x26, [sp, #0x50]
+	ldp x27, x28, [sp, #0x40]
+	add sp, sp, #0x90
+	ret

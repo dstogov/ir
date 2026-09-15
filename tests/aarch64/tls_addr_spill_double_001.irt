@@ -1,0 +1,320 @@
+--TEST--
+001: Dynamic TLS double spill
+--TARGET--
+aarch64-*-darwin
+--ARGS--
+-S
+--CODE--
+func tls_load_dynamic_spill(): double
+{
+	l_1 = START(l_42);
+	uintptr_t a0 = TLS_ADDR(16, 0);
+	uintptr_t a1 = TLS_ADDR(16, 8);
+	uintptr_t a2 = TLS_ADDR(16, 16);
+	uintptr_t a3 = TLS_ADDR(16, 24);
+	uintptr_t a4 = TLS_ADDR(16, 32);
+	uintptr_t a5 = TLS_ADDR(16, 40);
+	uintptr_t a6 = TLS_ADDR(16, 48);
+	uintptr_t a7 = TLS_ADDR(16, 56);
+	uintptr_t a8 = TLS_ADDR(16, 64);
+	uintptr_t a9 = TLS_ADDR(16, 72);
+	uintptr_t a10 = TLS_ADDR(16, 80);
+	uintptr_t a11 = TLS_ADDR(16, 88);
+	uintptr_t a12 = TLS_ADDR(16, 96);
+	uintptr_t a13 = TLS_ADDR(16, 104);
+	uintptr_t a14 = TLS_ADDR(16, 112);
+	uintptr_t a15 = TLS_ADDR(16, 120);
+	uintptr_t a16 = TLS_ADDR(16, 128);
+	uintptr_t a17 = TLS_ADDR(16, 136);
+	uintptr_t a18 = TLS_ADDR(16, 144);
+	uintptr_t a19 = TLS_ADDR(16, 152);
+	uintptr_t a20 = TLS_ADDR(16, 160);
+	uintptr_t a21 = TLS_ADDR(16, 168);
+	uintptr_t a22 = TLS_ADDR(16, 176);
+	uintptr_t a23 = TLS_ADDR(16, 184);
+	uintptr_t a24 = TLS_ADDR(16, 192);
+	uintptr_t a25 = TLS_ADDR(16, 200);
+	uintptr_t a26 = TLS_ADDR(16, 208);
+	uintptr_t a27 = TLS_ADDR(16, 216);
+	uintptr_t a28 = TLS_ADDR(16, 224);
+	uintptr_t a29 = TLS_ADDR(16, 232);
+	uintptr_t a30 = TLS_ADDR(16, 240);
+	uintptr_t a31 = TLS_ADDR(16, 248);
+	uintptr_t a32 = TLS_ADDR(16, 256);
+	uintptr_t a33 = TLS_ADDR(16, 264);
+	uintptr_t a34 = TLS_ADDR(16, 272);
+	uintptr_t a35 = TLS_ADDR(16, 280);
+	uintptr_t a36 = TLS_ADDR(16, 288);
+	uintptr_t a37 = TLS_ADDR(16, 296);
+	uintptr_t a38 = TLS_ADDR(16, 304);
+	uintptr_t a39 = TLS_ADDR(16, 312);
+	double v0, l_2 = LOAD(l_1, a0);
+	double v1, l_3 = LOAD(l_2, a1);
+	double v2, l_4 = LOAD(l_3, a2);
+	double v3, l_5 = LOAD(l_4, a3);
+	double v4, l_6 = LOAD(l_5, a4);
+	double v5, l_7 = LOAD(l_6, a5);
+	double v6, l_8 = LOAD(l_7, a6);
+	double v7, l_9 = LOAD(l_8, a7);
+	double v8, l_10 = LOAD(l_9, a8);
+	double v9, l_11 = LOAD(l_10, a9);
+	double v10, l_12 = LOAD(l_11, a10);
+	double v11, l_13 = LOAD(l_12, a11);
+	double v12, l_14 = LOAD(l_13, a12);
+	double v13, l_15 = LOAD(l_14, a13);
+	double v14, l_16 = LOAD(l_15, a14);
+	double v15, l_17 = LOAD(l_16, a15);
+	double v16, l_18 = LOAD(l_17, a16);
+	double v17, l_19 = LOAD(l_18, a17);
+	double v18, l_20 = LOAD(l_19, a18);
+	double v19, l_21 = LOAD(l_20, a19);
+	double v20, l_22 = LOAD(l_21, a20);
+	double v21, l_23 = LOAD(l_22, a21);
+	double v22, l_24 = LOAD(l_23, a22);
+	double v23, l_25 = LOAD(l_24, a23);
+	double v24, l_26 = LOAD(l_25, a24);
+	double v25, l_27 = LOAD(l_26, a25);
+	double v26, l_28 = LOAD(l_27, a26);
+	double v27, l_29 = LOAD(l_28, a27);
+	double v28, l_30 = LOAD(l_29, a28);
+	double v29, l_31 = LOAD(l_30, a29);
+	double v30, l_32 = LOAD(l_31, a30);
+	double v31, l_33 = LOAD(l_32, a31);
+	double v32, l_34 = LOAD(l_33, a32);
+	double v33, l_35 = LOAD(l_34, a33);
+	double v34, l_36 = LOAD(l_35, a34);
+	double v35, l_37 = LOAD(l_36, a35);
+	double v36, l_38 = LOAD(l_37, a36);
+	double v37, l_39 = LOAD(l_38, a37);
+	double v38, l_40 = LOAD(l_39, a38);
+	double v39, l_41 = LOAD(l_40, a39);
+	double s0_0 = ADD(v0, v1);
+	double s0_1 = ADD(v2, v3);
+	double s0_2 = ADD(v4, v5);
+	double s0_3 = ADD(v6, v7);
+	double s0_4 = ADD(v8, v9);
+	double s0_5 = ADD(v10, v11);
+	double s0_6 = ADD(v12, v13);
+	double s0_7 = ADD(v14, v15);
+	double s0_8 = ADD(v16, v17);
+	double s0_9 = ADD(v18, v19);
+	double s0_10 = ADD(v20, v21);
+	double s0_11 = ADD(v22, v23);
+	double s0_12 = ADD(v24, v25);
+	double s0_13 = ADD(v26, v27);
+	double s0_14 = ADD(v28, v29);
+	double s0_15 = ADD(v30, v31);
+	double s0_16 = ADD(v32, v33);
+	double s0_17 = ADD(v34, v35);
+	double s0_18 = ADD(v36, v37);
+	double s0_19 = ADD(v38, v39);
+	double s1_0 = ADD(s0_0, s0_1);
+	double s1_1 = ADD(s0_2, s0_3);
+	double s1_2 = ADD(s0_4, s0_5);
+	double s1_3 = ADD(s0_6, s0_7);
+	double s1_4 = ADD(s0_8, s0_9);
+	double s1_5 = ADD(s0_10, s0_11);
+	double s1_6 = ADD(s0_12, s0_13);
+	double s1_7 = ADD(s0_14, s0_15);
+	double s1_8 = ADD(s0_16, s0_17);
+	double s1_9 = ADD(s0_18, s0_19);
+	double s2_0 = ADD(s1_0, s1_1);
+	double s2_1 = ADD(s1_2, s1_3);
+	double s2_2 = ADD(s1_4, s1_5);
+	double s2_3 = ADD(s1_6, s1_7);
+	double s2_4 = ADD(s1_8, s1_9);
+	double s3_0 = ADD(s2_0, s2_1);
+	double s3_1 = ADD(s2_2, s2_3);
+	double s4_0 = ADD(s3_0, s3_1);
+	double s5_0 = ADD(s4_0, s2_4);
+	double ret = COPY(s5_0);
+	l_42 = RETURN(l_41, ret);
+}
+--EXPECT--
+tls_load_dynamic_spill:
+	sub sp, sp, #0x80
+	stp d8, d9, [sp, #0x70]
+	stp d10, d11, [sp, #0x60]
+	stp d12, d13, [sp, #0x50]
+	stp d14, d15, [sp, #0x40]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d0, [x0]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d1, [x0, #8]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d2, [x0, #0x10]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d3, [x0, #0x18]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d4, [x0, #0x20]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d5, [x0, #0x28]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d6, [x0, #0x30]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d7, [x0, #0x38]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d16, [x0, #0x40]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d17, [x0, #0x48]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d18, [x0, #0x50]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d19, [x0, #0x58]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d20, [x0, #0x60]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d21, [x0, #0x68]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d22, [x0, #0x70]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d23, [x0, #0x78]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d24, [x0, #0x80]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d25, [x0, #0x88]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d26, [x0, #0x90]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d27, [x0, #0x98]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d28, [x0, #0xa0]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d29, [x0, #0xa8]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d30, [x0, #0xb0]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d31, [x0, #0xb8]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d8, [x0, #0xc0]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d9, [x0, #0xc8]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d10, [x0, #0xd0]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d11, [x0, #0xd8]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d12, [x0, #0xe0]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d13, [x0, #0xe8]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d14, [x0, #0xf0]
+	str d14, [sp]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d15, [x0, #0xf8]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d14, [x0, #0x100]
+	str d14, [sp, #8]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d14, [x0, #0x108]
+	str d14, [sp, #0x10]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d14, [x0, #0x110]
+	str d14, [sp, #0x18]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d14, [x0, #0x118]
+	str d14, [sp, #0x20]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d14, [x0, #0x120]
+	str d14, [sp, #0x28]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d14, [x0, #0x128]
+	str d14, [sp, #0x30]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d14, [x0, #0x130]
+	str d14, [sp, #0x38]
+	mrs x0, tpidrro_el0
+	and x0, x0, #0xfffffffffffffff8
+	ldr d14, [x0, #0x138]
+	fadd d0, d1, d0
+	fadd d1, d3, d2
+	fadd d2, d5, d4
+	fadd d3, d7, d6
+	fadd d4, d17, d16
+	fadd d5, d19, d18
+	fadd d6, d21, d20
+	fadd d7, d23, d22
+	fadd d16, d25, d24
+	fadd d17, d27, d26
+	fadd d18, d29, d28
+	fadd d19, d31, d30
+	fadd d20, d9, d8
+	fadd d21, d11, d10
+	fadd d22, d13, d12
+	ldr d23, [sp]
+	fadd d23, d15, d23
+	ldr d24, [sp, #0x10]
+	ldr d25, [sp, #8]
+	fadd d24, d24, d25
+	ldr d25, [sp, #0x20]
+	ldr d26, [sp, #0x18]
+	fadd d25, d25, d26
+	ldr d26, [sp, #0x30]
+	ldr d27, [sp, #0x28]
+	fadd d26, d26, d27
+	ldr d27, [sp, #0x38]
+	fadd d27, d14, d27
+	fadd d0, d1, d0
+	fadd d1, d3, d2
+	fadd d2, d5, d4
+	fadd d3, d7, d6
+	fadd d4, d17, d16
+	fadd d5, d19, d18
+	fadd d6, d21, d20
+	fadd d7, d23, d22
+	fadd d16, d25, d24
+	fadd d17, d27, d26
+	fadd d0, d1, d0
+	fadd d1, d3, d2
+	fadd d2, d5, d4
+	fadd d3, d7, d6
+	fadd d4, d17, d16
+	fadd d0, d1, d0
+	fadd d1, d3, d2
+	fadd d0, d1, d0
+	fadd d0, d0, d4
+	ldp d8, d9, [sp, #0x70]
+	ldp d10, d11, [sp, #0x60]
+	ldp d12, d13, [sp, #0x50]
+	ldp d14, d15, [sp, #0x40]
+	add sp, sp, #0x80
+	ret
