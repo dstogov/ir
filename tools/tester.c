@@ -42,6 +42,7 @@ typedef enum _color {GREEN, YELLOW, RED} color;
 
 typedef struct _test {
 	int   id;
+	int   optimization_level;
 	char *name;
 	char *target;
 	char *args;
@@ -308,11 +309,11 @@ static char *replace_extension(const char *filename, size_t len, const char *ext
 	return ret;
 }
 
-static int run_test(const char *filename, test *t, int show_diff)
+static int run_test(const char *filename, test *t, int show_diff, int optimization_level)
 {
 	size_t len;
 	int ret;
-	char cmd[4096];
+	char cmd[4096], optimization_arg[4] = "";
 	char *code_filename, *out_filename, *exp_filename, *diff_filename;
 
 	len = strlen(filename);
@@ -339,11 +340,16 @@ static int run_test(const char *filename, test *t, int show_diff)
 		return 0;
 	}
 
-	if ((size_t)snprintf(cmd, sizeof(cmd), "%s %s %s %s > %s 2>&1",
+	if (optimization_level >= 0) {
+		snprintf(optimization_arg, sizeof(optimization_arg), "-O%d", optimization_level);
+	}
+
+	if ((size_t)snprintf(cmd, sizeof(cmd), "%s %s %s %s %s > %s 2>&1",
 			test_cmd, code_filename,
 			additional_args,
+			optimization_arg,
 			t->args ? t->args : default_args,
-			out_filename) > sizeof(cmd)) {
+			out_filename) >= sizeof(cmd)) {
 		free(code_filename);
 		free(out_filename);
 		free(exp_filename);
@@ -421,6 +427,21 @@ static int run_test(const char *filename, test *t, int show_diff)
 	free(diff_filename);
 
 	return ret;
+}
+
+static int is_run_test(const char *filename)
+{
+	const char *p = filename;
+
+	while (*p) {
+		if ((p == filename || p[-1] == '/' || p[-1] == '\\')
+		 && strncmp(p, "run", 3) == 0
+		 && (p[3] == '/' || p[3] == '\\')) {
+			return 1;
+		}
+		p++;
+	}
+	return 0;
 }
 
 static void add_file(char *name)
@@ -597,6 +618,7 @@ int main(int argc, char **argv)
 	char **tests = alloca(sizeof(char*) * argc);
 #endif
 	int i, tests_count = 0;
+	int total;
 	int skipped = 0;
 	int passed = 0;
 	int xfailed = 0, xfailed_limit = 0;
@@ -670,9 +692,15 @@ int main(int argc, char **argv)
 	init_console();
 
 	find_files(tests, tests_count);
+	total = files_count;
 
-	// Run each test
+	// Run each test. Runtime tests are executed at every optimization level.
 	for (i = 0; i < files_count; i++) {
+		int optimization_level;
+		int optimization_levels = is_run_test(files[i]) ? 3 : 1;
+
+		total += optimization_levels - 1;
+
 		t = parse_file(files[i], i);
 		if (!t) {
 			printf("\r");
@@ -685,48 +713,73 @@ int main(int argc, char **argv)
 			broken_tests[broken++] = files[i];
 			continue;
 		}
-		printf("TEST: %s [%s]", t->name, files[i]);
-		fflush(stdout);
 		if (skip_test(t)) {
 			printf("\r");
 			print_color("SKIP", YELLOW);
 			printf(": %s [%s]\n", t->name, files[i]);
-			skipped++;
+			skipped += optimization_levels;
 			free(t);
-		} else if (run_test(files[i], t, show_diff)) {
-			printf("\r");
-			passed++;
-			if (t->xfail) {
-				print_color("WARN", YELLOW);
-				printf(": %s [%s] (warn: XFAIL section but test passes)\n", t->name, files[i]);
-				if (warned >= warned_limit) {
-					warned_limit += 1024;
-					warned_tests = realloc(warned_tests, sizeof(test*) * warned_limit);
+			continue;
+		}
+
+		for (optimization_level = 0; optimization_level < optimization_levels; optimization_level++) {
+			int level = optimization_levels == 1 ? -1 : optimization_level;
+
+			t->optimization_level = level;
+			printf("TEST: %s%s [%s]", t->name,
+				level >= 0 ? (level == 0 ? " [-O0]" : level == 1 ? " [-O1]" : " [-O2]") : "",
+				files[i]);
+			fflush(stdout);
+			if (run_test(files[i], t, show_diff, level)) {
+				printf("\r");
+				passed++;
+				if (t->xfail) {
+					print_color("WARN", YELLOW);
+					printf(": %s [%s] (warn: XFAIL section but test passes)\n", t->name, files[i]);
+					if (warned >= warned_limit) {
+						warned_limit += 1024;
+						warned_tests = realloc(warned_tests, sizeof(test*) * warned_limit);
+					}
+					warned_tests[warned++] = t;
+				} else {
+					print_color("PASS", GREEN);
+					printf(": %s [%s]\n", t->name, files[i]);
+					free(t);
 				}
-				warned_tests[warned++] = t;
-			} else {
-				print_color("PASS", GREEN);
+			} else if (t->xfail) {
+				printf("\r");
+				print_color("XFAIL", RED);
 				printf(": %s [%s]\n", t->name, files[i]);
-				free(t);
+				if (xfailed >= xfailed_limit) {
+					xfailed_limit += 1024;
+					xfailed_tests = realloc(xfailed_tests, sizeof(test*) * xfailed_limit);
+				}
+				xfailed_tests[xfailed++] = t;
+			} else {
+				printf("\r");
+				print_color("FAIL", RED);
+				printf(": %s [%s]\n", t->name, files[i]);
+				if (failed >= failed_limit) {
+					failed_limit += 1024;
+					failed_tests = realloc(failed_tests, sizeof(test*) * failed_limit);
+				}
+				failed_tests[failed++] = t;
 			}
-		} else if (t->xfail) {
-			printf("\r");
-			print_color("XFAIL", RED);
-			printf(": %s [%s]\n", t->name, files[i]);
-			if (xfailed >= xfailed_limit) {
-				xfailed_limit += 1024;
-				xfailed_tests = realloc(xfailed_tests, sizeof(test*) * xfailed_limit);
+
+			if (optimization_level + 1 < optimization_levels) {
+				t = parse_file(files[i], i);
+				if (!t) {
+					printf("\r");
+					print_color("BROK", RED);
+					printf(": [%s]\n", files[i]);
+					if (broken >= broken_limit) {
+						broken_limit += 1024;
+						broken_tests = realloc(broken_tests, sizeof(char*) * broken_limit);
+					}
+					broken_tests[broken++] = files[i];
+					break;
+				}
 			}
-			xfailed_tests[xfailed++] = t;
-		} else {
-			printf("\r");
-			print_color("FAIL", RED);
-			printf(": %s [%s]\n", t->name, files[i]);
-			if (failed >= failed_limit) {
-				failed_limit += 1024;
-				failed_tests = realloc(failed_tests, sizeof(test*) * failed_limit);
-			}
-			failed_tests[failed++] = t;
 		}
 	}
 
@@ -734,7 +787,7 @@ int main(int argc, char **argv)
 	printf("-------------------------------\n");
 	printf("Test Sumary\n");
 	printf("-------------------------------\n");
-	printf("Total: %d\n", files_count);
+	printf("Total: %d\n", total);
 	printf("Passed: %d\n", passed);
 	printf("Skipped: %d\n", skipped);
 	printf("Expected fail: %d\n", xfailed);
@@ -749,7 +802,11 @@ int main(int argc, char **argv)
 		printf("-------------------------------\n");
 		for (i = 0; i < xfailed; i++) {
 			t = xfailed_tests[i];
-			printf("%s [%s] XFAIL REASON: %s\n", t->name, files[t->id], t->xfail);
+			printf("%s [%s]", t->name, files[t->id]);
+			if (t->optimization_level >= 0) {
+				printf(" [-O%d]", t->optimization_level);
+			}
+			printf(" XFAIL REASON: %s\n", t->xfail);
 			free(t);
 		}
 		free(xfailed_tests);
@@ -760,7 +817,11 @@ int main(int argc, char **argv)
 		printf("-------------------------------\n");
 		for (i = 0; i < warned; i++) {
 			t = warned_tests[i];
-			printf("%s [%s] WARN: XFAIL reason \"%s\" but test passes\n", t->name, files[t->id], t->xfail);
+			printf("%s [%s]", t->name, files[t->id]);
+			if (t->optimization_level >= 0) {
+				printf(" [-O%d]", t->optimization_level);
+			}
+			printf(" WARN: XFAIL reason \"%s\" but test passes\n", t->xfail);
 			free(t);
 		}
 		free(warned_tests);
@@ -771,7 +832,11 @@ int main(int argc, char **argv)
 		printf("-------------------------------\n");
 		for (i = 0; i < failed; i++) {
 			t = failed_tests[i];
-			printf("%s [%s]\n", t->name, files[t->id]);
+			printf("%s [%s]", t->name, files[t->id]);
+			if (t->optimization_level >= 0) {
+				printf(" [-O%d]", t->optimization_level);
+			}
+			printf("\n");
 			free(t);
 		}
 		free(failed_tests);
