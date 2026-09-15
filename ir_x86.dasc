@@ -15237,7 +15237,12 @@ static void ir_emit_binop_helper_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 	|	call aword &addr
 #ifdef _WIN32
-	|	add esp, 12
+	if (insn->op == IR_ROL || insn->op == IR_ROR) {
+		|	add esp, 28
+	} else {
+		/* Windows helpers use fastcall calling convention */
+		|	add esp, 12
+	}
 #else
 	|	add esp, 28
 #endif
