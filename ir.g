@@ -76,6 +76,20 @@ static ir_strtab op_tab;
 #define IR_DECODE_UNRESOLVED_REF(ref) \
 	((ir_ref)0xc0000000 - (ref))
 
+#if defined(IR_TARGET_X64)
+# define IR_SET_WIN64_CC(flags)  do {*flags = IR_CC_X86_64_MS;} while (0)
+# define IR_SET_SYSV_CC(flags)   do {*flags = IR_CC_X86_64_SYSV;} while (0)
+# define IR_SET_DARWIN_CC(flags) yy_error("__darwin calling-convention is not supported on this target")
+#elif defined(IR_TARGET_AARCH64)
+# define IR_SET_WIN64_CC(flags)  yy_error("__win64 calling-convention is not supported on this target")
+# define IR_SET_SYSV_CC(flags)   do {*flags = IR_CC_AARCH64_SYSV;} while (0)
+# define IR_SET_DARWIN_CC(flags) do {*flags = IR_CC_AARCH64_SYSV;} while (0)
+#else
+# define IR_SET_WIN64_CC(flags)  yy_error("__win64 calling-convention is not supported on this target")
+# define IR_SET_SYSV_CC(flags)   yy_error("__sysv calling-convention is not supported on this target")
+# define IR_SET_DARWIN_CC(flags) yy_error("__darwin calling-convention is not supported on this target")
+#endif
+
 static ir_ref ir_use_var(ir_parser_ctx *p, uint32_t n, const char *str, size_t len) {
 	ir_ref ref;
 	uint32_t len32;
@@ -557,6 +571,15 @@ ir_func_proto(ir_parser_ctx *p, uint32_t *flags, uint8_t *ret_type, uint32_t *pa
 	|
 		"__preserve_none"
 		{*flags |= IR_CC_PRESERVE_NONE;}
+	|
+		"__win64"
+		{IR_SET_WIN64_CC(flags);}
+	|
+		"__sysv"
+		{IR_SET_SYSV_CC(flags);}
+	|
+		"__darwin"
+		{IR_SET_DARWIN_CC(flags);}
 	|
 		"__builtin"
 		{*flags |= IR_CC_BUILTIN;}
