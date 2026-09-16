@@ -4417,6 +4417,13 @@ static void assign_regs(ir_ctx *ctx)
 									 && (ival->flags & IR_LIVE_INTERVAL_MEM_PARAM)) {
 										/* Stack PARAM var is passed through memory */
 										reg = IR_REG_NONE;
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
+										if (use_pos->next
+										 && ctx->ir_base[IR_LIVE_POS_TO_REF(use_pos->next->pos)].op == IR_VSTORE) {
+											/* skip VSTORE (VAR is going to be remapped to PARAM on x86) */
+											use_pos = use_pos->next;
+										}
+#endif
 									} else {
 										uint32_t use_b = ctx->cfg_map[ref];
 
