@@ -13225,6 +13225,9 @@ static void ir_emit_call_ex(ir_ctx *ctx, ir_ref def, ir_insn *insn, const ir_pro
 						ir_emit_store(ctx, insn->type, def, def_reg);
 					}
 				}
+			} else {
+				/* discard return value on top of FPU stack */
+				|	fstp st0
 			}
 #endif
 		}
