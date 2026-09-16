@@ -1,0 +1,33 @@
+--TEST--
+002: GUARD must not reuse clobbered flags
+--TARGET--
+x86_64-*-sysv
+--ARGS--
+-S
+--CODE--
+{
+	uintptr_t addr = func abort(): void;
+	int32_t c = 42;
+	int32_t one = 1;
+	int32_t zero = 0;
+	l_1 = START(l_99);
+	uintptr_t p = PARAM(l_1, "a", 1);
+	uintptr_t q = PARAM(l_1, "b", 2);
+	int32_t x_1, l_2 = LOAD(l_1, p);
+	int32_t x_2 = SUB(x_1, one);
+	l_3 = STORE(l_2, p, x_2);
+	bool cond = EQ(x_2, zero);
+	int32_t y, l_4 = LOAD(l_3, q);
+	int32_t ret = MUL(y, c);
+	l_5 = GUARD_NOT(l_4, cond, addr);
+	l_99 = RETURN(l_5, ret);
+}
+--EXPECT--
+test:
+	movl (%rdi), %eax
+	leal -1(%rax), %ecx
+	movl %ecx, (%rdi)
+	imull $0x2a, (%rsi), %eax
+	testl %ecx, %ecx
+	je abort
+	retq

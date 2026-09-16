@@ -4948,7 +4948,8 @@ store_int:
 							 && ctx->use_lists[insn->op2].count == 1
 							 && op2_insn->op1 == insn->op2 - 2 /* before previous instruction */
 							 && ir_in_same_block(ctx, op2_insn->op1)
-							 && ctx->use_lists[op2_insn->op1].count == 2) {
+							 && ctx->use_lists[op2_insn->op1].count == 2
+							 && !ir_match_has_flags_deps(ctx, insn->op2, ref)) {
 								ir_insn *store_insn = &ctx->ir_base[insn->op2 - 1];
 
 								if (store_insn->op == IR_STORE && store_insn->op3 == op2_insn->op1) {
