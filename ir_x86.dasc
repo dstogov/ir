@@ -12324,7 +12324,8 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 					} else {
 						|	movsxd Ra(op2_reg), Rd(op2_reg)
 					}
-				} else {
+				} else if (ctx->ir_base[insn->op2].op == IR_TRUNC && IR_REG_NUM(ctx->regs[insn->op2][1]) == op2_reg) {
+					/* Explicit zero extnsion need in very rare case. */
 					|	mov Rd(op2_reg), Rd(op2_reg)
 				}
 				break;
