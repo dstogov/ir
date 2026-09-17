@@ -1082,7 +1082,8 @@ bool ir_may_fuse_tls_addr(ir_ctx *ctx, ir_ref ref)
 	for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
 		ir_ref use = *p;
 		ir_op op = ctx->ir_base[use].op;
-		if (op != IR_LOAD && op != IR_LOAD_v && op != IR_STORE && op != IR_STORE_v) {
+		if (op != IR_LOAD && op != IR_LOAD_v
+		 && ((op != IR_STORE && op != IR_STORE_v) || ctx->ir_base[use].op3 == ref)) {
 			return 0;
 		}
 	}
@@ -6682,7 +6683,7 @@ static void ir_emit_tls_load(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_emit_load_mem(ctx, insn->type, def_reg, mem);
 
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
-		ir_emit_store(ctx, insn->type, def, reg);
+		ir_emit_store(ctx, insn->type, def, def_reg);
 	}
 }
 

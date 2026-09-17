@@ -1,0 +1,86 @@
+--TEST--
+TLS_ADDR float and double spills
+--TARGET--
+x86_64-*-sysv
+--ARGS--
+-O2 -S
+--CODE--
+func double_static(uintptr_t): double
+{
+	l_1 = START(l_4);
+	uintptr_t fn = PARAM(l_1, "fn", 1);
+	uintptr_t addr = TLS_ADDR(-1, 24);
+	double value, l_2 = LOAD(l_1, addr);
+	l_3 = CALL(l_2, fn);
+	l_4 = RETURN(l_3, value);
+}
+
+func float_static(uintptr_t): float
+{
+	l_1 = START(l_4);
+	uintptr_t fn = PARAM(l_1, "fn", 1);
+	uintptr_t addr = TLS_ADDR(-1, 24);
+	float value, l_2 = LOAD(l_1, addr);
+	l_3 = CALL(l_2, fn);
+	l_4 = RETURN(l_3, value);
+}
+
+func double_dynamic(uintptr_t): double
+{
+	l_1 = START(l_4);
+	uintptr_t fn = PARAM(l_1, "fn", 1);
+	uintptr_t addr = TLS_ADDR(16, 24);
+	double value, l_2 = LOAD(l_1, addr);
+	l_3 = CALL(l_2, fn);
+	l_4 = RETURN(l_3, value);
+}
+
+func float_dynamic(uintptr_t): float
+{
+	l_1 = START(l_4);
+	uintptr_t fn = PARAM(l_1, "fn", 1);
+	uintptr_t addr = TLS_ADDR(16, 24);
+	float value, l_2 = LOAD(l_1, addr);
+	l_3 = CALL(l_2, fn);
+	l_4 = RETURN(l_3, value);
+}
+--EXPECT--
+double_static:
+	subq $8, %rsp
+	movsd %fs:0x18, %xmm0
+	movsd %xmm0, (%rsp)
+	callq *%rdi
+	movsd (%rsp), %xmm0
+	addq $8, %rsp
+	retq
+
+float_static:
+	subq $8, %rsp
+	movss %fs:0x18, %xmm0
+	movss %xmm0, (%rsp)
+	callq *%rdi
+	movss (%rsp), %xmm0
+	addq $8, %rsp
+	retq
+
+double_dynamic:
+	subq $8, %rsp
+	movq %fs:8, %rax
+	movq 0x10(%rax), %rax
+	movsd 0x18(%rax), %xmm0
+	movsd %xmm0, (%rsp)
+	callq *%rdi
+	movsd (%rsp), %xmm0
+	addq $8, %rsp
+	retq
+
+float_dynamic:
+	subq $8, %rsp
+	movq %fs:8, %rax
+	movq 0x10(%rax), %rax
+	movss 0x18(%rax), %xmm0
+	movss %xmm0, (%rsp)
+	callq *%rdi
+	movss (%rsp), %xmm0
+	addq $8, %rsp
+	retq
