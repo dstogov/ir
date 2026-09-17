@@ -1065,6 +1065,18 @@ IR_FOLD(NOT(C_I64))
 	IR_FOLD_CONST_U(~op1_insn->val.u64);
 }
 
+IR_FOLD(NOT(C_DOUBLE))
+{
+	IR_ASSERT(IR_OPT_TYPE(opt) == IR_BOOL);
+	IR_FOLD_BOOL(op1_insn->val.d == 0.0);
+}
+
+IR_FOLD(NOT(C_FLOAT))
+{
+	IR_ASSERT(IR_OPT_TYPE(opt) == IR_BOOL);
+	IR_FOLD_BOOL(op1_insn->val.f == 0.0f);
+}
+
 IR_FOLD(OR(C_BOOL, C_BOOL))
 {
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
@@ -2044,6 +2056,20 @@ IR_FOLD(BSWAP(BSWAP))
 {
 	/* f(f(y)) => y */
 	IR_FOLD_COPY(op1_insn->op1);
+}
+
+IR_FOLD(NOT(_))
+{
+	if (IR_OPT_TYPE(opt) == IR_BOOL && IR_IS_TYPE_FP(op1_insn->type)) {
+		opt = IR_OPT(IR_EQ, IR_BOOL);
+		if (op1_insn->type == IR_DOUBLE) {
+			op2 = ir_const_double(ctx, 0.0);
+		} else {
+			op2 = ir_const_float(ctx, 0.0f);
+		}
+		IR_FOLD_RESTART;
+	}
+	IR_FOLD_NEXT;
 }
 
 IR_FOLD(EQ(_, C_BOOL))

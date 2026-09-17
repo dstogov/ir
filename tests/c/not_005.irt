@@ -1,18 +1,18 @@
 --TEST--
-NOT 004: double boolean NOT emits zero comparison
+NOT 005: float boolean NOT emits zero comparison
 --ARGS--
 --emit-c
 --CODE--
 {
 	l_1 = START(l_4);
-	double x = PARAM(l_1, "x", 1);
+	float x = PARAM(l_1, "x", 1);
 	bool ret = NOT(x);
 	l_4 = RETURN(l_1, ret);
 }
 --EXPECT--
-bool test(double x)
+bool test(float x)
 {
-	double d_1 = x;
+	float d_1 = x;
 	bool d_2;
 	d_2 = d_1 == 0;
 	return d_2;
