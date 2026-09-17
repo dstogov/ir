@@ -4092,7 +4092,7 @@ binop_fp:
 				if (ctx->ir_base[insn->op1].type == IR_BOOL) {
 					return IR_BOOL_NOT;
 				} else {
-					IR_ASSERT(IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type)); // TODO: IR_BOOL_NOT_FP
+					IR_ASSERT(IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type));
 					return IR_BOOL_NOT_INT;
 				}
 #if IR_SIMD
