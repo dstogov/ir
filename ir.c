@@ -3592,8 +3592,8 @@ void _ir_VSTORE_v(ir_ctx *ctx, ir_ref var, ir_ref val)
 
 ir_ref _ir_TLS_ADDR(ir_ctx *ctx, ir_ref index, ir_ref offset)
 {
-       IR_ASSERT(ctx->control);
-       return ctx->control = ir_emit3(ctx, IR_OPT(IR_TLS_ADDR, IR_ADDR), ctx->control, index, offset);
+	IR_ASSERT(ctx->control);
+	return ctx->control = ir_emit3(ctx, IR_OPT(IR_TLS_ADDR, IR_ADDR), ctx->control, index, offset);
 }
 
 ir_ref _ir_RLOAD(ir_ctx *ctx, ir_type type, ir_ref reg)
