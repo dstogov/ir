@@ -1,7 +1,7 @@
 --TEST--
-004: not function
+NOT must reject double operands
 --ARGS--
---emit-llvm
+-fsyntax-only
 --CODE--
 {
 	l_1 = START(l_4);
@@ -10,8 +10,6 @@
 	l_4 = RETURN(l_1, ret);
 }
 --EXPECT--
-define i1 @test(double %d2)
-{
-	%d3 = fcmp oeq double %d2, 0.0
-	ret i1 %d3
-}
+ERROR: unexpected floating-point NOT operand at line 4
+
+exit code = 2

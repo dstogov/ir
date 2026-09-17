@@ -755,6 +755,9 @@ ir_insn(ir_parser_ctx *p):
 							goto fallback;
 						}
 					}
+					if (op == IR_NOT && t == IR_BOOL && IR_IS_TYPE_FP(p->ctx->ir_base[op1].type)) {
+						yy_error("unexpected floating-point NOT operand");
+					}
 					ref = ir_fold(p->ctx, IR_OPT(op, t), op1, op2, op3);
 				/* Folding for control and memory instructions */
 #if 0
