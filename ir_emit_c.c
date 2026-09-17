@@ -1018,7 +1018,7 @@ static void ir_emit_store(ir_ctx *ctx, FILE *f, ir_insn *insn)
 
 static void ir_emit_tls_addr(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 {
-	if (insn->op1 == IR_NULL && insn->op2 == 0) {
+	if (insn->op2 < 0 && insn->op3 == 0) {
 		ir_emit_def_ref(ctx, f, def);
 		fprintf(f, "__builtin_thread_pointer();\n");
 	} else {
