@@ -1,0 +1,23 @@
+--TEST--
+TLS_ADDR shared by LOAD and STORE
+--TARGET--
+x86_64-*-sysv
+--ARGS--
+-O2 -S
+--CODE--
+func test(int32_t): int32_t
+{
+	l_1 = START(l_5);
+	int32_t x = PARAM(l_1, "x", 1);
+	uintptr_t a, l_2 = TLS_ADDR(l_1, -1, 24);
+	int32_t value, l_3 = LOAD(l_2, a);
+	int32_t result = ADD(x, value);
+	l_4 = STORE(l_3, a, result);
+	l_5 = RETURN(l_4, result);
+}
+--EXPECT--
+test:
+	movl %fs:0x18, %eax
+	addl %edi, %eax
+	movl %eax, %fs:0x18
+	retq
