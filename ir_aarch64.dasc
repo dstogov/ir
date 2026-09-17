@@ -6633,11 +6633,13 @@ static void ir_emit_tls_base_addr(ir_ctx *ctx, ir_reg reg, int mod)
 |	.long code
 ||# ifndef __MUSL__
 ||	if (mod >= 0) {
+||		IR_ASSERT(aarch64_may_encode_addr_offset(mod, sizeof(void*)));
 |		ldr Rx(reg), [Rx(reg), #0]
 |		ldr Rx(reg), [Rx(reg), #mod]
 ||	}
 ||# else
 ||	if (mod >= 0) {
+||		IR_ASSERT(aarch64_may_encode_addr_offset(mod, sizeof(void*)));
 |		ldr Rx(reg), [Rx(reg), #-8]
 |		ldr Rx(reg), [Rx(reg), #mod]
 ||	}
@@ -6656,7 +6658,14 @@ static void ir_emit_tls_addr(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_emit_tls_base_addr(ctx, reg, insn->op1);
 
 	if (insn->op2) {
-		|	add Rx(reg), Rx(reg), #insn->op2
+		if (aarch64_may_encode_imm12(insn->op2)) {
+			|	add Rx(reg), Rx(reg), #insn->op2
+		} else if (aarch64_may_encode_imm12(-insn->op2)) {
+			|	sub Rx(reg), Rx(reg), #(-insn->op2)
+		} else {
+			ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, insn->op2);
+			|	add Rx(reg), Rx(reg), Rx(IR_REG_INT_TMP)
+		}
 	}
 
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
