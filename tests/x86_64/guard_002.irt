@@ -5,6 +5,8 @@ x86_64-*-sysv
 --ARGS--
 -S
 --CODE--
+extern func abort(): void;
+func test(uintptr_t, uintptr_t): int32_t
 {
 	uintptr_t addr = func abort(): void;
 	int32_t c = 42;
