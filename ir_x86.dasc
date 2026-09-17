@@ -2450,6 +2450,10 @@ get_arg_hints:
 			constraints->tmp_regs[1] = IR_SCRATCH_REG(IR_REG_RDX, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 			constraints->tmp_regs[2] = IR_TMP_REG(3, IR_U32, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 			n = 3;
+			if ((rule & IR_RULE_MASK) == IR_MUL_OV_I64) {
+				constraints->tmp_regs[3] = IR_TMP_REG(4, IR_U32, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n = 4;
+			}
 			insn = &ctx->ir_base[ref];
 			if (insn->op1 != insn->op2) {
 				// TODO: hint for op1 removs inference between op1 and tmp(3), but op1 also used for op2 ???
@@ -14883,6 +14887,7 @@ static void ir_emit_mul_ov_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg op1_reg = ctx->regs[def][1];
 	ir_reg op2_reg = ctx->regs[def][2];
 	ir_reg tmp_reg = ctx->regs[def][3];
+	ir_reg tmp2_reg = ctx->tmp_regs[def];
 	ir_reg def_reg_hi, op1_reg_hi, op2_reg_hi;
 
 	if (op1_reg != IR_REG_NONE) {
@@ -14917,116 +14922,90 @@ static void ir_emit_mul_ov_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		IR_ASSERT(op2_reg != IR_REG_RDX && tmp_reg != op2_reg_hi && tmp_reg != op2_reg);
 
 		if (type == IR_I64) {
-			|	mov Rd(tmp_reg), Rd(op2_reg_hi)                    // expected sign = sign A ^ sign B
-			|	xor Rd(tmp_reg), edx
+			|	mov Rd(tmp2_reg), Rd(op2_reg_hi)                   // expected sign = sign A ^ sign B
+			|	xor Rd(tmp2_reg), edx
+			|	and Rd(tmp2_reg), 0x80000000
+		} else {
+			|	xor Rd(tmp2_reg), Rd(tmp2_reg)
+		}
+
+		|	mov Rd(tmp_reg), edx
+		|	imul Rd(tmp_reg), Rd(op2_reg_hi)                       // hi(Ah * Bh) == 0
+		|	adc Rd(tmp2_reg), 0
+		|	add Rd(tmp_reg), -1                                    // lo(Ah * Bh) == 0 ; set C flag if tmp_reg != 0
+		|	adc Rd(tmp2_reg), 0
+		|	mov Rd(tmp_reg), Rd(op2_reg_hi)
+		|	imul edx, Rd(op2_reg)                                  // hi(Ah * Bl) == 0
+		|	adc Rd(tmp2_reg), 0
+		|	imul Rd(tmp_reg), eax                                  // hi(Al * Bh) == 0
+		|	adc Rd(tmp2_reg), 0
+		|	add Rd(tmp_reg), edx                                   // c = lo(Ah * Bl) + lo(Al * Bh)
+		|	adc Rd(tmp2_reg), 0
+		|	mul Rd(op2_reg)                                        // Al * Bl + c
+		|	add edx, Rd(tmp_reg)
+
+		if (type == IR_I64) {
+			|	adc Rd(tmp2_reg), 0
+			|	mov Rd(tmp_reg), edx                               // check sign of result
+			|	xor Rd(tmp_reg), Rd(tmp2_reg)
+			|	and Rd(tmp2_reg), 0x7f
 			|	and Rd(tmp_reg), 0x80000000
-			|	push Rd(tmp_reg)                                   // remember expected sign
-			|	mov Rd(tmp_reg), edx
-			|	imul Rd(tmp_reg), Rd(op2_reg_hi)                   // hi(Ah * Bh) == 0
-			|	jo >1
-			|	neg Rd(tmp_reg)                                    // lo(Ah * Bh) == 0 ; set OV flag if tmp_reg != 0
-			|	jo >1
-			|	mov Rd(tmp_reg), Rd(op2_reg_hi)
-			|	imul edx, Rd(op2_reg)                              // hi(Ah * Bl) == 0
-			|	jo >1
-			|	imul Rd(tmp_reg), eax                              // hi(Al * Bh) == 0
-			|	jo >1
-			|	add Rd(tmp_reg), edx                               // c = lo(Ah * Bl) + lo(Al * Bh)
-			|	jo >1
-			|	mul Rd(op2_reg)                                    // Al * Bl + c
-			|	add edx, Rd(tmp_reg)
-			|	jo >1
-			|	mov Rd(tmp_reg), dword [esp]                       // restore expected sign
-			|	xor Rd(tmp_reg), edx                               // check sign of result
-			|	and Rd(tmp_reg), 0x80000000
-			|	neg Rd(tmp_reg)                                    // set OV flag if tmp_reg != 0
-			|1:
-			|	pop Rd(tmp_reg)
+			|	add Rd(tmp_reg), -1
+			|	adc Rd(tmp2_reg), 0x7fffffff                       // set OV flag if tmp2_reg != 0
 	    } else {
-			|	mov Rd(tmp_reg), edx
-			|	imul Rd(tmp_reg), Rd(op2_reg_hi)                   // hi(Ah * Bh) == 0
-			|	jc >1
-			|	add Rd(tmp_reg), -1                                // lo(Ah * Bh) == 0 ; set C flag if tmp_reg != 0
-			|	jc >1
-			|	mov Rd(tmp_reg), Rd(op2_reg_hi)
-			|	imul edx, Rd(op2_reg)                              // hi(Ah * Bl) == 0
-			|	jc >1
-			|	imul Rd(tmp_reg), eax                              // hi(Al * Bh) == 0
-			|	jc >1
-			|	add Rd(tmp_reg), edx                               // c = lo(Ah * Bl) + lo(Al * Bh)
-			|	jc >1
-			|	mul Rd(op2_reg)                                    // Al * Bl + c
-			|	add edx, Rd(tmp_reg)
-			|1:
+			|	adc Rd(tmp2_reg), -1                               // set C flag if UMUL overflow
 		}
 	} else if (IR_IS_CONST_REF(op2)) {
 		ir_insn *val = &ctx->ir_base[op2];
 
 		if (type == IR_I64) {
-			|	mov Rd(tmp_reg), edx                               // expected sign = sign A ^ sign B
+			|	mov Rd(tmp2_reg), edx                              // expected sign = sign A ^ sign B
 			if (val->val.i64 >= 0) {
-				|	and Rd(tmp_reg), 0x80000000
+				|	and Rd(tmp2_reg), 0x80000000
 			} else {
-				|	not Rd(tmp_reg)
-				|	and Rd(tmp_reg), 0x80000000
+				|	not Rd(tmp2_reg)
+				|	and Rd(tmp2_reg), 0x80000000
 			}
-			|	push Rd(tmp_reg)                                   // remember expected sign
-			if (val->val.u32_hi) {
-				|	mov Rd(tmp_reg), edx
-				|	imul Rd(tmp_reg), edx, val->val.u32_hi         // hi(Ah * Bh) == 0
-				|	jo >1
-				|	neg Rd(tmp_reg)                                // lo(Ah * Bh) == 0 ; set OV flag if tmp_reg != 0
-				|	jo >1
-				|	mov Rd(tmp_reg), val->val.u32_hi
-				|	imul edx, val->val.u32                         // hi(Ah * Bl) == 0
-				|	jo >1
-				|	imul Rd(tmp_reg), eax                          // hi(Al * Bh) == 0
-				|	jo >1
-				|	add Rd(tmp_reg), edx                           // c = lo(Ah * Bl) + lo(Al * Bh)
-				|	jo >1
-			} else {
-				|	imul Rd(tmp_reg), val->val.u32                 // hi(Ah * Bl) == 0, c = lo(Ah + Bl)
-				|	jo >1
-			}
-			|	mov edx, val->val.u32                              // Al * Bl + c
-			|   mul edx
-			|	add edx, Rd(tmp_reg)
-			|	jo >1
-			|	mov Rd(tmp_reg), dword [esp]                       // restore expected sign
-			|	xor Rd(tmp_reg), edx                               // check sign of result
-			|	and Rd(tmp_reg), 0x80000000
-			|	neg Rd(tmp_reg)                                    // set OV flag if tmp_reg != 0
-			|1:
-			|	pop Rd(tmp_reg)
 	    } else {
-			if (val->val.u32_hi) {
-				|	mov Rd(tmp_reg), edx
-				|	imul Rd(tmp_reg), edx, val->val.u32_hi         // hi(Ah * Bh) == 0
-				|	jc >1
-				|	neg Rd(tmp_reg)                                // lo(Ah * Bh) == 0 ; set OV flag if tmp_reg != 0
-				|	jc >1
-				|	mov Rd(tmp_reg), val->val.u32_hi
-				|	imul edx, val->val.u32                         // hi(Ah * Bl) == 0
-				|	jc >1
-				|	imul Rd(tmp_reg), eax                          // hi(Al * Bh) == 0
-				|	jc >1
-				|	add Rd(tmp_reg), edx                           // c = lo(Ah * Bl) + lo(Al * Bh)
-				|	jc >1
-			} else {
-				|	imul Rd(tmp_reg), val->val.u32                 // hi(Ah * Bl) == 0, c = lo(Ah * Bl)
-				|	jc >1
-			}
-			|	mov edx, val->val.u32                              // Al * Bl + c
-			|	mul edx
-			|	add edx, Rd(tmp_reg)
-			|1:
+			|	xor Rd(tmp2_reg), Rd(tmp2_reg)
+		}
+
+		if (val->val.u32_hi) {
+			|	mov Rd(tmp_reg), edx
+			|	imul Rd(tmp_reg), edx, val->val.u32_hi             // hi(Ah * Bh) == 0
+			|	adc Rd(tmp2_reg), 0
+			|	add Rd(tmp_reg), -1                                // lo(Ah * Bh) == 0; set C flag if tmp_reg != 0
+			|	adc Rd(tmp2_reg), 0
+			|	mov Rd(tmp_reg), val->val.u32_hi
+			|	imul edx, val->val.u32                             // hi(Ah * Bl) == 0
+			|	adc Rd(tmp2_reg), 0
+			|	imul Rd(tmp_reg), eax                              // hi(Al * Bh) == 0
+			|	adc Rd(tmp2_reg), 0
+			|	add Rd(tmp_reg), edx                               // c = lo(Ah * Bl) + lo(Al * Bh)
+			|	adc Rd(tmp2_reg), 0
+		} else {
+			|	mov Rd(tmp_reg), edx
+			|	imul Rd(tmp_reg), val->val.u32                     // hi(Ah * Bl) == 0, c = lo(Ah * Bl)
+			|	adc Rd(tmp2_reg), 0
+		}
+		|	mov edx, val->val.u32                                  // Al * Bl + c
+		|	mul edx
+		|	add edx, Rd(tmp_reg)
+		|	adc Rd(tmp2_reg), -1                                   // set C flag if UMUL overflow
+
+		if (type == IR_I64) {
+			|	adc Rd(tmp2_reg), 0
+			|	mov Rd(tmp_reg), edx                               // check sign of result
+			|	xor Rd(tmp_reg), Rd(tmp2_reg)
+			|	and Rd(tmp2_reg), 0x7f
+			|	and Rd(tmp_reg), 0x80000000
+			|	add Rd(tmp_reg), -1
+			|	adc Rd(tmp2_reg), 0x7fffffff                       // set OV flag if tmp2_reg != 0
+	    } else {
+			|   adc Rd(tmp2_reg), -1                               // set C flag if UMUL overflow
 		}
 	} else {
 		ir_mem mem, mem_hi;
-
-		if (type == IR_I64) {
-			ctx->call_stack_size += 4;
-		}
 
 		if (ir_rule(ctx, op2) & IR_FUSED) {
 			mem = ir_fuse_load(ctx, def, op2);
@@ -15036,48 +15015,38 @@ static void ir_emit_mul_ov_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		mem_hi = IR_MEM_I64_HI(mem);
 
 		if (type == IR_I64) {
-			|	ASM_TXT_TMEM_OP mov, Rd(tmp_reg), dword, mem       // expected sign = sign A ^ sign B
-			|	xor Rd(tmp_reg), edx
+			|	ASM_TXT_TMEM_OP mov, Rd(tmp2_reg), dword, mem_hi   // expected sign = sign A ^ sign B
+			|	xor Rd(tmp2_reg), edx
+			|	and Rd(tmp2_reg), 0x80000000
+		} else {
+			|	xor Rd(tmp2_reg), Rd(tmp2_reg)
+		}
+
+		|	mov Rd(tmp_reg), edx
+		|	ASM_TXT_TMEM_OP imul, Rd(tmp_reg), dword, mem_hi       // hi(Ah * Bh) == 0
+		|	adc Rd(tmp2_reg), 0
+		|	add Rd(tmp_reg), -1                                    // lo(Ah * Bh) == 0 ; set C flag if tmp_reg != 0
+		|	adc Rd(tmp2_reg), 0
+		|	ASM_TXT_TMEM_OP mov, Rd(tmp_reg), dword, mem_hi
+		|	ASM_TXT_TMEM_OP imul, edx, dword, mem                  // hi(Ah * Bl) == 0
+		|	adc Rd(tmp2_reg), 0
+		|	imul Rd(tmp_reg), eax                                  // hi(Al * Bh) == 0
+		|	adc Rd(tmp2_reg), 0
+		|	add Rd(tmp_reg), edx                                   // c = lo(Ah * Bl) + lo(Al * Bh)
+		|	adc Rd(tmp2_reg), 0
+		|	ASM_TMEM_OP mul, dword, mem                            // Al * Bl + c
+		|	add edx, Rd(tmp_reg)
+
+		if (type == IR_I64) {
+			|	adc Rd(tmp2_reg), 0
+			|	mov Rd(tmp_reg), edx                               // check sign of result
+			|	xor Rd(tmp_reg), Rd(tmp2_reg)
+			|	and Rd(tmp2_reg), 0x7f
 			|	and Rd(tmp_reg), 0x80000000
-			|	push Rd(tmp_reg)                                   // remember expected sign
-			|	mov Rd(tmp_reg), edx
-			|	ASM_TXT_TMEM_OP imul, Rd(tmp_reg), dword, mem_hi   // hi(Ah * Bh) == 0
-			|	jo >1
-			|	neg Rd(tmp_reg)                                    // lo(Ah * Bh) == 0 ; set OV flag if tmp_reg != 0
-			|	jo >1
-			|	ASM_TXT_TMEM_OP mov, Rd(tmp_reg), dword, mem_hi
-			|	ASM_TXT_TMEM_OP imul, edx, dword, mem              // hi(Ah * Bl) == 0
-			|	jo >1
-			|	imul Rd(tmp_reg), eax                              // hi(Al * Bh) == 0
-			|	jo >1
-			|	add Rd(tmp_reg), edx                               // c = lo(Ah * Bl) + lo(Al * Bh)
-			|	jo >1
-			|	ASM_TMEM_OP mul, dword, mem                        // Al * Bl + c
-			|	add edx, Rd(tmp_reg)
-			|	jo >1
-			|	mov Rd(tmp_reg), dword [esp]                       // restore expected sign
-			|	xor Rd(tmp_reg), edx                               // check sign of result
-			|	and Rd(tmp_reg), 0x80000000
-			|	neg Rd(tmp_reg)                                    // set OV flag if tmp_reg != 0
-			|1:
-			|	pop Rd(tmp_reg)
-			ctx->call_stack_size -= 4;
+			|	add Rd(tmp_reg), -1
+			|	adc Rd(tmp2_reg), 0x7fffffff                       // set OV flag if tmp2_reg != 0
 	    } else {
-			|	mov Rd(tmp_reg), edx
-			|	ASM_TXT_TMEM_OP imul, Rd(tmp_reg), dword, mem_hi   // hi(Ah * Bh) == 0
-			|	jc >1
-			|	add Rd(tmp_reg), -1                                // lo(Ah * Bh) == 0 ; set C flag if tmp_reg != 0
-			|	jc >1
-			|	ASM_TXT_TMEM_OP mov, Rd(tmp_reg), dword, mem_hi
-			|	ASM_TXT_TMEM_OP imul, edx, dword, mem              // hi(Ah * Bl) == 0
-			|	jc >1
-			|	imul Rd(tmp_reg), eax                              // hi(Al * Bh) == 0
-			|	jc >1
-			|	add Rd(tmp_reg), edx                               // c = lo(Ah * Bl) + lo(Al * Bh)
-			|	jc >1
-			|	ASM_TMEM_OP mul, dword, mem                        // Al * Bl + c
-			|	add edx, Rd(tmp_reg)
-			|1:
+			|   adc Rd(tmp2_reg), -1                               // set C flag if UMUL overflow
 		}
 	}
 
