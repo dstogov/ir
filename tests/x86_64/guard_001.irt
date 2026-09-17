@@ -5,10 +5,14 @@ x86_64-*-sysv
 --ARGS--
 -S
 --CODE--
-extern func abort(): void;
+func guard(): void
+{
+	l_1 = START(l_99);
+	l_99 = RETURN(l_1);
+}
 func test(int64_t, int64_t, int64_t): int64_t
 {
-	uintptr_t addr = func abort(): void;
+	uintptr_t addr = func guard(): void;
 	int64_t zero = 0;
 	int64_t one = 1;
 	l_1 = START(l_99);
@@ -30,12 +34,15 @@ func test(int64_t, int64_t, int64_t): int64_t
 	l_99 = RETURN(l_7, v);
 }
 --EXPECT--
+guard:
+	retq
+
 test:
 	leaq (%rsi, %rdi), %rax
 	xorq %rcx, %rcx
 .L1:
 	testq %rax, %rax
-	jl abort
+	jl guard
 	leaq 1(%rcx), %rcx
 	cmpq %rdx, %rcx
 	jl .L1
