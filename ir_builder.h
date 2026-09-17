@@ -534,7 +534,6 @@ extern "C" {
 #define ir_ALLOCA(_size)                  _ir_ALLOCA(_ir_CTX, (_size))
 #define ir_AFREE(_size)                   _ir_AFREE(_ir_CTX, (_size))
 #define ir_VADDR(_var)                    ir_fold1(_ir_CTX, IR_OPT(IR_VADDR, IR_ADDR), (_var))
-#define ir_TLS_ADDR(_module, _offset)     ir_fold2(_ir_CTX, IR_OPT(IR_TLS_ADDR, IR_ADDR), (_module), (_offset))
 #define ir_VLOAD(_type, _var)             _ir_VLOAD(_ir_CTX, (_type), (_var))
 #define ir_VLOAD_B(_var)                  _ir_VLOAD(_ir_CTX, IR_BOOL, (_var))
 #define ir_VLOAD_U8(_var)                 _ir_VLOAD(_ir_CTX, IR_U8, (_var))
@@ -584,6 +583,7 @@ extern "C" {
 #define ir_STORE(_addr, _val)             _ir_STORE(_ir_CTX, (_addr), (_val))
 #define ir_LOAD_v(_type, _addr)           _ir_LOAD_v(_ir_CTX, (_type), (_addr))
 #define ir_STORE_v(_addr, _val)           _ir_STORE_v(_ir_CTX, (_addr), (_val))
+#define ir_TLS_ADDR(_index, _offset)      _ir_TLS_ADDR(_ir_CTX, (_index), (_offset))
 #define ir_TRAP()                         do {_ir_CTX->control = ir_emit1(_ir_CTX, IR_TRAP, _ir_CTX->control);} while (0)
 
 #define ir_FRAME_ADDR()                   ir_fold0(_ir_CTX, IR_OPT(IR_FRAME_ADDR, IR_ADDR))
@@ -701,6 +701,7 @@ void   _ir_MERGE_LIST(ir_ctx *ctx, ir_ref list);
 ir_ref _ir_PHI_LIST(ir_ctx *ctx, ir_ref list);
 ir_ref _ir_LOOP_BEGIN(ir_ctx *ctx, ir_ref src1);
 ir_ref _ir_LOOP_END(ir_ctx *ctx);
+ir_ref _ir_TLS_ADDR(ir_ctx *ctx, ir_ref index, ir_ref offset);
 void   _ir_UNREACHABLE(ir_ctx *ctx);
 ir_ref _ir_SWITCH(ir_ctx *ctx, ir_ref val);
 void   _ir_CASE_VAL(ir_ctx *ctx, ir_ref switch_ref, ir_ref val);

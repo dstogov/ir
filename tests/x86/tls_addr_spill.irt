@@ -7,42 +7,42 @@ x86-*-sysv
 --CODE--
 func double_static(uintptr_t): double
 {
-	l_1 = START(l_4);
+	l_1 = START(l_5);
 	uintptr_t fn = PARAM(l_1, "fn", 1);
-	uintptr_t addr = TLS_ADDR(-1, 24);
-	double value, l_2 = LOAD(l_1, addr);
-	l_3 = CALL(l_2, fn);
-	l_4 = RETURN(l_3, value);
+	uintptr_t addr, l_2 = TLS_ADDR(l_1, -1, 24);
+	double value, l_3 = LOAD(l_2, addr);
+	l_4 = CALL(l_3, fn);
+	l_5 = RETURN(l_4, value);
 }
 
 func float_static(uintptr_t): float
 {
-	l_1 = START(l_4);
+	l_1 = START(l_5);
 	uintptr_t fn = PARAM(l_1, "fn", 1);
-	uintptr_t addr = TLS_ADDR(-1, 24);
-	float value, l_2 = LOAD(l_1, addr);
-	l_3 = CALL(l_2, fn);
-	l_4 = RETURN(l_3, value);
+	uintptr_t addr, l_2 = TLS_ADDR(l_1, -1, 24);
+	float value, l_3 = LOAD(l_2, addr);
+	l_4 = CALL(l_3, fn);
+	l_5 = RETURN(l_4, value);
 }
 
 func double_dynamic(uintptr_t): double
 {
-	l_1 = START(l_4);
+	l_1 = START(l_5);
 	uintptr_t fn = PARAM(l_1, "fn", 1);
-	uintptr_t addr = TLS_ADDR(16, 24);
-	double value, l_2 = LOAD(l_1, addr);
-	l_3 = CALL(l_2, fn);
-	l_4 = RETURN(l_3, value);
+	uintptr_t addr, l_2 = TLS_ADDR(l_1, 16, 24);
+	double value, l_3 = LOAD(l_2, addr);
+	l_4 = CALL(l_3, fn);
+	l_5 = RETURN(l_4, value);
 }
 
 func float_dynamic(uintptr_t): float
 {
-	l_1 = START(l_4);
+	l_1 = START(l_5);
 	uintptr_t fn = PARAM(l_1, "fn", 1);
-	uintptr_t addr = TLS_ADDR(16, 24);
-	float value, l_2 = LOAD(l_1, addr);
-	l_3 = CALL(l_2, fn);
-	l_4 = RETURN(l_3, value);
+	uintptr_t addr, l_2 = TLS_ADDR(l_1, 16, 24);
+	float value, l_3 = LOAD(l_2, addr);
+	l_4 = CALL(l_3, fn);
+	l_5 = RETURN(l_4, value);
 }
 --EXPECT--
 double_static:

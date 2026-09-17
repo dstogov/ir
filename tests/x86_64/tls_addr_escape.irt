@@ -7,19 +7,19 @@ x86_64-*-sysv
 --CODE--
 func store_address_to_itself(): void
 {
-	l_1 = START(l_3);
-	uintptr_t a = TLS_ADDR(-1, 24);
-	l_2 = STORE(l_1, a, a);
-	l_3 = RETURN(l_2);
+	l_1 = START(l_4);
+	uintptr_t a, l_2 = TLS_ADDR(l_1, -1, 24);
+	l_3 = STORE(l_2, a, a);
+	l_4 = RETURN(l_3);
 }
 func load_and_escape_address(uintptr_t): int32_t
 {
-	l_1 = START(l_4);
+	l_1 = START(l_5);
 	uintptr_t out = PARAM(l_1, "out", 1);
-	uintptr_t a = TLS_ADDR(-1, 24);
-	int32_t value, l_2 = LOAD_v(l_1, a);
-	l_3 = STORE(l_2, out, a);
-	l_4 = RETURN(l_3, value);
+	uintptr_t a, l_2 = TLS_ADDR(l_1, -1, 24);
+	int32_t value, l_3 = LOAD_v(l_2, a);
+	l_4 = STORE(l_3, out, a);
+	l_5 = RETURN(l_4, value);
 }
 --EXPECT--
 store_address_to_itself:

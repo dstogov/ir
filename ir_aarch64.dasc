@@ -6655,15 +6655,15 @@ static void ir_emit_tls_addr(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	IR_ASSERT(reg != IR_REG_NONE);
 
-	ir_emit_tls_base_addr(ctx, reg, insn->op1);
+	ir_emit_tls_base_addr(ctx, reg, insn->op2);
 
-	if (insn->op2) {
-		if (aarch64_may_encode_imm12(insn->op2)) {
-			|	add Rx(reg), Rx(reg), #insn->op2
-		} else if (aarch64_may_encode_imm12(-insn->op2)) {
-			|	sub Rx(reg), Rx(reg), #(-insn->op2)
+	if (insn->op3) {
+		if (aarch64_may_encode_imm12(insn->op3)) {
+			|	add Rx(reg), Rx(reg), #insn->op3
+		} else if (aarch64_may_encode_imm12(-insn->op3)) {
+			|	sub Rx(reg), Rx(reg), #(-insn->op3)
 		} else {
-			ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, insn->op2);
+			ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, insn->op3);
 			|	add Rx(reg), Rx(reg), Rx(IR_REG_INT_TMP)
 		}
 	}
@@ -6687,8 +6687,8 @@ static void ir_emit_tls_load(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	IR_ASSERT(def_reg != IR_REG_NONE && reg != IR_REG_NONE);
 	IR_ASSERT(addr_insn->op == IR_TLS_ADDR);
-	ir_emit_tls_base_addr(ctx, reg, addr_insn->op1);
-	mem = IR_MEM_BO(reg, addr_insn->op2);
+	ir_emit_tls_base_addr(ctx, reg, addr_insn->op2);
+	mem = IR_MEM_BO(reg, addr_insn->op3);
 	ir_emit_load_mem(ctx, insn->type, def_reg, mem);
 
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
@@ -6712,8 +6712,8 @@ static void ir_emit_tls_store(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 		ir_emit_load(ctx, type, op3_reg, insn->op3);
 	}
 
-	ir_emit_tls_base_addr(ctx, reg, addr_insn->op1);
-	mem = IR_MEM_BO(reg, addr_insn->op2);
+	ir_emit_tls_base_addr(ctx, reg, addr_insn->op2);
+	mem = IR_MEM_BO(reg, addr_insn->op3);
 	ir_emit_store_mem(ctx, type, mem, op3_reg);
 }
 

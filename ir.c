@@ -328,7 +328,6 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted
 #define ir_op_flag_v0X3    (0 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_d       IR_OP_FLAG_DATA
 #define ir_op_flag_d0      ir_op_flag_d
-#define ir_op_flag_d0X2    (ir_op_flag_d | 0 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_d1      (ir_op_flag_d | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_d1X1    (ir_op_flag_d | 1 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_d1X2    (ir_op_flag_d | 1 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
@@ -1070,16 +1069,14 @@ static ir_ref _ir_fold_cse(ir_ctx *ctx, uint32_t opt, ir_ref op1, ir_ref op2, ir
 	if (ref) {
 		ir_ref limit = ctx->fold_cse_limit;
 
-		if ((opt & IR_OPT_OP_MASK) != IR_TLS_ADDR) {
-			if (op1 > limit) {
-				limit = op1;
-			}
-			if (op2 > limit) {
-				limit = op2;
-			}
-			if (op3 > limit) {
-				limit = op3;
-			}
+		if (op1 > limit) {
+			limit = op1;
+		}
+		if (op2 > limit) {
+			limit = op2;
+		}
+		if (op3 > limit) {
+			limit = op3;
 		}
 		while (ref >= limit) {
 			insn = &ctx->ir_base[ref];
@@ -3591,6 +3588,12 @@ void _ir_VSTORE_v(ir_ctx *ctx, ir_ref var, ir_ref val)
 {
 	IR_ASSERT(ctx->control);
 	ctx->control = ir_emit3(ctx, IR_VSTORE_v, ctx->control, var, val);
+}
+
+ir_ref _ir_TLS_ADDR(ir_ctx *ctx, ir_ref index, ir_ref offset)
+{
+       IR_ASSERT(ctx->control);
+       return ctx->control = ir_emit3(ctx, IR_OPT(IR_TLS_ADDR, IR_ADDR), ctx->control, index, offset);
 }
 
 ir_ref _ir_RLOAD(ir_ctx *ctx, ir_type type, ir_ref reg)

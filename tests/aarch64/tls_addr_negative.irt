@@ -7,9 +7,9 @@ aarch64-*-sysv
 --CODE--
 func test(): uintptr_t
 {
-	l_1 = START(l_2);
-	uintptr_t a = TLS_ADDR(-1, -8);
-	l_2 = RETURN(l_1, a);
+	l_1 = START(l_3);
+	uintptr_t a, l_2 = TLS_ADDR(l_1, -1, -8);
+	l_3 = RETURN(l_2, a);
 }
 --EXPECT--
 test:

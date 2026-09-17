@@ -7,27 +7,27 @@ aarch64-*-sysv
 --CODE--
 func test(uintptr_t): double
 {
-	l_1 = START(l_12);
+	l_1 = START(l_21);
 	uintptr_t fn = PARAM(l_1, "fn", 1);
-	uintptr_t a_0 = TLS_ADDR(-1, 24);
-	double v_0, l_2 = LOAD(l_1, a_0);
-	uintptr_t a_1 = TLS_ADDR(-1, 32);
-	double v_1, l_3 = LOAD(l_2, a_1);
-	uintptr_t a_2 = TLS_ADDR(-1, 40);
-	double v_2, l_4 = LOAD(l_3, a_2);
-	uintptr_t a_3 = TLS_ADDR(-1, 48);
-	double v_3, l_5 = LOAD(l_4, a_3);
-	uintptr_t a_4 = TLS_ADDR(-1, 56);
-	double v_4, l_6 = LOAD(l_5, a_4);
-	uintptr_t a_5 = TLS_ADDR(-1, 64);
-	double v_5, l_7 = LOAD(l_6, a_5);
-	uintptr_t a_6 = TLS_ADDR(-1, 72);
-	double v_6, l_8 = LOAD(l_7, a_6);
-	uintptr_t a_7 = TLS_ADDR(-1, 80);
-	double v_7, l_9 = LOAD(l_8, a_7);
-	uintptr_t a_8 = TLS_ADDR(-1, 88);
-	double v_8, l_10 = LOAD(l_9, a_8);
-	l_11 = CALL(l_10, fn);
+	uintptr_t a_0, l_2 = TLS_ADDR(l_1, -1, 24);
+	double v_0, l_3 = LOAD(l_2, a_0);
+	uintptr_t a_1, l_4 = TLS_ADDR(l_3, -1, 32);
+	double v_1, l_5 = LOAD(l_4, a_1);
+	uintptr_t a_2, l_6 = TLS_ADDR(l_5, -1, 40);
+	double v_2, l_7 = LOAD(l_6, a_2);
+	uintptr_t a_3, l_8 = TLS_ADDR(l_7, -1, 48);
+	double v_3, l_9 = LOAD(l_8, a_3);
+	uintptr_t a_4, l_10 = TLS_ADDR(l_9, -1, 56);
+	double v_4, l_11 = LOAD(l_10, a_4);
+	uintptr_t a_5, l_12 = TLS_ADDR(l_11, -1, 64);
+	double v_5, l_13 = LOAD(l_12, a_5);
+	uintptr_t a_6, l_14 = TLS_ADDR(l_13, -1, 72);
+	double v_6, l_15 = LOAD(l_14, a_6);
+	uintptr_t a_7, l_16 = TLS_ADDR(l_15, -1, 80);
+	double v_7, l_17 = LOAD(l_16, a_7);
+	uintptr_t a_8, l_18 = TLS_ADDR(l_17, -1, 88);
+	double v_8, l_19 = LOAD(l_18, a_8);
+	l_20 = CALL(l_19, fn);
 	double s_1 = ADD(v_0, v_1);
 	double s_2 = ADD(s_1, v_2);
 	double s_3 = ADD(s_2, v_3);
@@ -36,7 +36,7 @@ func test(uintptr_t): double
 	double s_6 = ADD(s_5, v_6);
 	double s_7 = ADD(s_6, v_7);
 	double s_8 = ADD(s_7, v_8);
-	l_12 = RETURN(l_11, s_8);
+	l_21 = RETURN(l_20, s_8);
 }
 --EXPECT--
 test:
