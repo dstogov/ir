@@ -1084,7 +1084,12 @@ bool ir_may_fuse_tls_addr(ir_ctx *ctx, ir_ref ref)
 		ir_op op = ctx->ir_base[use].op;
 		if (op != IR_LOAD && op != IR_LOAD_v
 		 && ((op != IR_STORE && op != IR_STORE_v) || ctx->ir_base[use].op3 == ref)) {
-			return 0;
+			ir_insn *use_insn = &ctx->ir_base[use];
+			for (ir_ref i = 1; i <= ir_input_edges_count(ctx, use_insn); i++) {
+				if (IR_OPND_KIND(ir_op_flags[op], i) == IR_OPND_DATA && ir_insn_op(use_insn, i) == ref) {
+					return 0;
+				}
+			}
 		}
 	}
 	return 1;
