@@ -1,0 +1,36 @@
+--TEST--
+TLS_ADDR stored as a value
+--TARGET--
+x86_64-*-sysv
+--ARGS--
+-O2 -S
+--CODE--
+func store_address_to_itself(): void
+{
+	l_1 = START(l_4);
+	uintptr_t a, l_2 = TLS_ADDR(l_1, -1, 24);
+	l_3 = STORE(l_2, a, a);
+	l_4 = RETURN(l_3);
+}
+func load_and_escape_address(uintptr_t): int32_t
+{
+	l_1 = START(l_5);
+	uintptr_t out = PARAM(l_1, "out", 1);
+	uintptr_t a, l_2 = TLS_ADDR(l_1, -1, 24);
+	int32_t value, l_3 = LOAD_v(l_2, a);
+	l_4 = STORE(l_3, out, a);
+	l_5 = RETURN(l_4, value);
+}
+--EXPECT--
+store_address_to_itself:
+	movq %fs:0, %rax
+	addq $0x18, %rax
+	movq %rax, (%rax)
+	retq
+
+load_and_escape_address:
+	movq %fs:0, %rcx
+	addq $0x18, %rcx
+	movl (%rcx), %eax
+	movq %rcx, (%rdi)
+	retq

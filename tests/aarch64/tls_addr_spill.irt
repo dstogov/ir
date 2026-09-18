@@ -1,0 +1,83 @@
+--TEST--
+TLS_ADDR double spill
+--TARGET--
+aarch64-*-sysv
+--ARGS--
+-O2 -S
+--CODE--
+func test(uintptr_t): double
+{
+	l_1 = START(l_21);
+	uintptr_t fn = PARAM(l_1, "fn", 1);
+	uintptr_t a_0, l_2 = TLS_ADDR(l_1, -1, 24);
+	double v_0, l_3 = LOAD(l_2, a_0);
+	uintptr_t a_1, l_4 = TLS_ADDR(l_3, -1, 32);
+	double v_1, l_5 = LOAD(l_4, a_1);
+	uintptr_t a_2, l_6 = TLS_ADDR(l_5, -1, 40);
+	double v_2, l_7 = LOAD(l_6, a_2);
+	uintptr_t a_3, l_8 = TLS_ADDR(l_7, -1, 48);
+	double v_3, l_9 = LOAD(l_8, a_3);
+	uintptr_t a_4, l_10 = TLS_ADDR(l_9, -1, 56);
+	double v_4, l_11 = LOAD(l_10, a_4);
+	uintptr_t a_5, l_12 = TLS_ADDR(l_11, -1, 64);
+	double v_5, l_13 = LOAD(l_12, a_5);
+	uintptr_t a_6, l_14 = TLS_ADDR(l_13, -1, 72);
+	double v_6, l_15 = LOAD(l_14, a_6);
+	uintptr_t a_7, l_16 = TLS_ADDR(l_15, -1, 80);
+	double v_7, l_17 = LOAD(l_16, a_7);
+	uintptr_t a_8, l_18 = TLS_ADDR(l_17, -1, 88);
+	double v_8, l_19 = LOAD(l_18, a_8);
+	l_20 = CALL(l_19, fn);
+	double s_1 = ADD(v_0, v_1);
+	double s_2 = ADD(s_1, v_2);
+	double s_3 = ADD(s_2, v_3);
+	double s_4 = ADD(s_3, v_4);
+	double s_5 = ADD(s_4, v_5);
+	double s_6 = ADD(s_5, v_6);
+	double s_7 = ADD(s_6, v_7);
+	double s_8 = ADD(s_7, v_8);
+	l_21 = RETURN(l_20, s_8);
+}
+--EXPECT--
+test:
+	stp x29, x30, [sp, #-0x60]!
+	mov x29, sp
+	stp d8, d9, [x29, #0x50]
+	stp d10, d11, [x29, #0x40]
+	stp d12, d13, [x29, #0x30]
+	stp d14, d15, [x29, #0x20]
+	mrs x1, tpidr_el0
+	ldr d8, [x1, #0x18]
+	mrs x1, tpidr_el0
+	ldr d9, [x1, #0x20]
+	mrs x1, tpidr_el0
+	ldr d10, [x1, #0x28]
+	mrs x1, tpidr_el0
+	ldr d11, [x1, #0x30]
+	mrs x1, tpidr_el0
+	ldr d12, [x1, #0x38]
+	mrs x1, tpidr_el0
+	ldr d13, [x1, #0x40]
+	mrs x1, tpidr_el0
+	ldr d14, [x1, #0x48]
+	mrs x1, tpidr_el0
+	ldr d15, [x1, #0x50]
+	str d15, [x29, #0x10]
+	mrs x1, tpidr_el0
+	ldr d15, [x1, #0x58]
+	blr x0
+	fadd d0, d9, d8
+	fadd d0, d0, d10
+	fadd d0, d0, d11
+	fadd d0, d0, d12
+	fadd d0, d0, d13
+	fadd d0, d0, d14
+	ldr d1, [x29, #0x10]
+	fadd d0, d0, d1
+	fadd d0, d0, d15
+	ldp d8, d9, [x29, #0x50]
+	ldp d10, d11, [x29, #0x40]
+	ldp d12, d13, [x29, #0x30]
+	ldp d14, d15, [x29, #0x20]
+	ldp x29, x30, [sp], #0x60
+	ret
