@@ -136,6 +136,9 @@ test:
 	movl 0x58(%rsp), %eax
 	addl $1, %eax
 	movl %eax, 0x5c(%rsp)
+	movl 0x58(%rsp), %eax
+	addl $1, %eax
+	movl %eax, 0x5c(%rsp)
 	cmpl $0, 0xd0(%rsp)
 	je .L4
 	movl 0x40(%rsp), %eax
@@ -150,8 +153,8 @@ test:
 	movl %eax, 0x20(%rsp)
 	jmp .L1
 .L4:
- 	movl 0x40(%rsp), %eax
- 	addl 4(%rsp), %eax
+	movl 0x40(%rsp), %eax
+	addl 4(%rsp), %eax
 	movl %eax, 0x5c(%rsp)
 	movl 0x5c(%rsp), %eax
 	addl 8(%rsp), %eax
@@ -159,7 +162,6 @@ test:
 	movl 0x60(%rsp), %eax
 	movl %eax, 0x64(%rsp)
 	movl 0x64(%rsp), %eax
-	addl 0x48(%rsp), %eax
 	movl %eax, 0x68(%rsp)
 	movl 0x68(%rsp), %eax
 	addl 0x4c(%rsp), %eax
