@@ -1248,14 +1248,14 @@ static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref)
 		case IR_ADD:
 		case IR_SUB:
 			if (IR_IS_TYPE_INT(insn->type)) {
-				if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
+				if (IR_IS_CONST_REF(insn->op2)) {
 					op2_insn = &ctx->ir_base[insn->op2];
 					if (IR_IS_SYM_CONST(op2_insn->op)) {
 						/* pass */
 					} else if (IR_IS_CONST_REF(insn->op1)) {
 						// const
 					} else if (op2_insn->val.i64 == 0) {
-						// return IR_COPY_INT;
+						return IR_COPY_INT | IR_MAY_REUSE;
 					}
 				}
 binop_int:
@@ -1273,7 +1273,7 @@ binop_fp:
 			break;
 		case IR_MUL:
 			if (IR_IS_TYPE_INT(insn->type)) {
-				if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
+				if (IR_IS_CONST_REF(insn->op2)) {
 					op2_insn = &ctx->ir_base[insn->op2];
 					if (IR_IS_SYM_CONST(op2_insn->op)) {
 						/* pass */
@@ -1282,7 +1282,7 @@ binop_fp:
 					} else if (op2_insn->val.u64 == 0) {
 						// 0
 					} else if (op2_insn->val.u64 == 1) {
-						// return IR_COPY_INT;
+						return IR_COPY_INT | IR_MAY_REUSE;
 					} else if (IR_IS_POWER_OF_TWO(op2_insn->val.u64)) {
 						return IR_MUL_PWR2;
 					}
@@ -1301,14 +1301,14 @@ binop_fp:
 			goto binop_int;
 		case IR_DIV:
 			if (IR_IS_TYPE_INT(insn->type)) {
-				if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
+				if (IR_IS_CONST_REF(insn->op2)) {
 					op2_insn = &ctx->ir_base[insn->op2];
 					if (IR_IS_SYM_CONST(op2_insn->op)) {
 						/* pass */
 					} else if (IR_IS_CONST_REF(insn->op1)) {
 						// const
 					} else if (op2_insn->val.u64 == 1) {
-						// return IR_COPY_INT;
+						return IR_COPY_INT | IR_MAY_REUSE;
 					} else if (IR_IS_POWER_OF_TWO(op2_insn->val.u64)) {
 						if (IR_IS_TYPE_UNSIGNED(insn->type)) {
 							return IR_DIV_PWR2;
@@ -1328,12 +1328,14 @@ binop_fp:
 				return IR_VECTOR_BINOP;
 			}
 #endif
-			if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
+			if (IR_IS_CONST_REF(insn->op2)) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (IR_IS_SYM_CONST(op2_insn->op)) {
 					/* pass */
 				} else if (IR_IS_CONST_REF(insn->op1)) {
 					// const
+				} else if (op2_insn->val.u64 == 1) {
+					// 0
 				} else if (IR_IS_POWER_OF_TWO(op2_insn->val.u64)) {
 					if (IR_IS_TYPE_UNSIGNED(insn->type)) {
 						return IR_MOD_PWR2;
@@ -1373,14 +1375,14 @@ binop_fp:
 				return IR_VECTOR_BINOP;
 			}
 #endif
-			if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
+			if (IR_IS_CONST_REF(insn->op2)) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (IR_IS_SYM_CONST(op2_insn->op)) {
 					/* pass */
 				} else if (IR_IS_CONST_REF(insn->op1)) {
 					// const
 				} else if (op2_insn->val.i64 == 0) {
-					// return IR_COPY_INT;
+					return IR_COPY_INT | IR_MAY_REUSE;
 				} else if (op2_insn->val.i64 == -1) {
 					// -1
 				}
@@ -1392,7 +1394,7 @@ binop_fp:
 				return IR_VECTOR_BINOP;
 			}
 #endif
-			if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
+			if (IR_IS_CONST_REF(insn->op2)) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (IR_IS_SYM_CONST(op2_insn->op)) {
 					/* pass */
@@ -1401,7 +1403,7 @@ binop_fp:
 				} else if (op2_insn->val.i64 == 0) {
 					// 0
 				} else if (op2_insn->val.i64 == -1) {
-					// return IR_COPY_INT;
+					return IR_COPY_INT | IR_MAY_REUSE;
 				}
 			}
 			goto binop_int;
@@ -1411,7 +1413,7 @@ binop_fp:
 				return IR_VECTOR_BINOP;
 			}
 #endif
-			if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
+			if (IR_IS_CONST_REF(insn->op2)) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (IR_IS_SYM_CONST(op2_insn->op)) {
 					/* pass */
@@ -1427,22 +1429,20 @@ binop_fp:
 			}
 #endif
 			if (IR_IS_CONST_REF(insn->op2)) {
-				if (ctx->flags & IR_OPT_CODEGEN) {
-					op2_insn = &ctx->ir_base[insn->op2];
-					if (IR_IS_SYM_CONST(op2_insn->op)) {
-						/* pass */
-					} else if (IR_IS_CONST_REF(insn->op1)) {
-						// const
-					} else if (op2_insn->val.u64 == 0) {
-						// return IR_COPY_INT;
-					} else if (ir_type_size[insn->type] >= 4) {
-						if (op2_insn->val.u64 == 1) {
-							// lea [op1*2]
-						} else if (op2_insn->val.u64 == 2) {
-							// lea [op1*4]
-						} else if (op2_insn->val.u64 == 3) {
-							// lea [op1*8]
-						}
+				op2_insn = &ctx->ir_base[insn->op2];
+				if (IR_IS_SYM_CONST(op2_insn->op)) {
+					/* pass */
+				} else if (IR_IS_CONST_REF(insn->op1)) {
+					// const
+				} else if (op2_insn->val.u64 == 0) {
+					return IR_COPY_INT | IR_MAY_REUSE;
+				} else if (ir_type_size[insn->type] >= 4) {
+					if (op2_insn->val.u64 == 1) {
+						// lea [op1*2]
+					} else if (op2_insn->val.u64 == 2) {
+						// lea [op1*4]
+					} else if (op2_insn->val.u64 == 3) {
+						// lea [op1*8]
 					}
 				}
 				return IR_SHIFT_CONST;
@@ -1459,15 +1459,13 @@ binop_fp:
 		case IR_ROL:
 		case IR_ROR:
 			if (IR_IS_CONST_REF(insn->op2)) {
-				if (ctx->flags & IR_OPT_CODEGEN) {
-					op2_insn = &ctx->ir_base[insn->op2];
-					if (IR_IS_SYM_CONST(op2_insn->op)) {
-						/* pass */
-					} else if (IR_IS_CONST_REF(insn->op1)) {
-						// const
-					} else if (op2_insn->val.u64 == 0) {
-						// return IR_COPY_INT;
-					}
+				op2_insn = &ctx->ir_base[insn->op2];
+				if (IR_IS_SYM_CONST(op2_insn->op)) {
+					/* pass */
+				} else if (IR_IS_CONST_REF(insn->op1)) {
+					// const
+				} else if (op2_insn->val.u64 == 0) {
+					return IR_COPY_INT | IR_MAY_REUSE;
 				}
 				return IR_SHIFT_CONST;
 			}
@@ -1558,7 +1556,7 @@ binop_fp:
 			return IR_RLOAD;
 		case IR_RSTORE:
 			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
-				if ((ctx->flags & IR_OPT_CODEGEN) && ir_in_same_block(ctx, insn->op2) && ctx->use_lists[insn->op2].count == 1) {
+				if (ir_in_same_block(ctx, insn->op2) && ctx->use_lists[insn->op2].count == 1) {
 					ir_insn *op_insn = &ctx->ir_base[insn->op2];
 
 					if (!ctx->rules[insn->op2]) {

@@ -3750,7 +3750,7 @@ binop_vector:
 					}
 				}
 #endif
-				if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
+				if (IR_IS_CONST_REF(insn->op2)) {
 					op2_insn = &ctx->ir_base[insn->op2];
 					if (IR_IS_CONST_REF(insn->op1)) {
 						ir_insn *op1_insn = &ctx->ir_base[insn->op1];
@@ -3774,7 +3774,7 @@ binop_vector:
 						}
 						/* pass */
 					} else if (op2_insn->val.i64 == 0) {
-						// return IR_COPY_INT;
+						return IR_COPY_INT | IR_MAY_REUSE;
 					} else if ((ir_type_size[insn->type] >= 4 && insn->op == IR_ADD && IR_IS_SIGNED_32BIT(op2_insn->val.i64)) ||
 							(ir_type_size[insn->type] >= 4 && insn->op == IR_SUB && IR_IS_SIGNED_NEG_32BIT(op2_insn->val.i64))) {
 lea:
@@ -3825,7 +3825,7 @@ lea:
 						    }
 						}
 					}
-				} else if ((ctx->flags & IR_OPT_CODEGEN) && insn->op == IR_ADD && ir_type_size[insn->type] >= 4) {
+				} else if (insn->op == IR_ADD && ir_type_size[insn->type] >= 4 && EXPECTED(!IR_IS_CONST_REF(insn->op1))) {
 					if (insn->op1 != insn->op2) {
 						if (ctx->use_lists[insn->op1].count == 1 || ir_match_fuse_addr_all_useges(ctx, insn->op1)) {
 							uint32_t rule =ctx->rules[insn->op1];
@@ -3922,7 +3922,7 @@ binop_fp:
 					return IR_TWO_REGS | IR_MUL_I64;
 				}
 #endif
-				if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
+				if (IR_IS_CONST_REF(insn->op2)) {
 					op2_insn = &ctx->ir_base[insn->op2];
 					if (IR_IS_SYM_CONST(op2_insn->op)) {
 						/* pass */
@@ -3931,7 +3931,7 @@ binop_fp:
 					} else if (op2_insn->val.u64 == 0) {
 						// 0
 					} else if (op2_insn->val.u64 == 1) {
-						// return IR_COPY_INT;
+						return IR_COPY_INT | IR_MAY_REUSE;
 					} else if (ir_type_size[insn->type] >= 4 &&
 							(op2_insn->val.u64 == 2 || op2_insn->val.u64 == 4 || op2_insn->val.u64 == 8)) {
 						/* MUL(X, 2|4|8) => LEA [X*2|4|8] */
@@ -3996,7 +3996,7 @@ binop_fp:
 			}
 #endif
 			if (IR_IS_TYPE_SIGNED(insn->type) && ir_type_size[insn->type] != 1) {
-				if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
+				if (IR_IS_CONST_REF(insn->op2)) {
 					op2_insn = &ctx->ir_base[insn->op2];
 					if (!IR_IS_SYM_CONST(op2_insn->op)
 					 && IR_IS_SIGNED_32BIT(op2_insn->val.i64)
@@ -4019,14 +4019,14 @@ binop_fp:
 					return IR_TWO_REGS | IR_BINOP_HELPER_I64;
 				}
 #endif
-				if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
+				if (IR_IS_CONST_REF(insn->op2)) {
 					op2_insn = &ctx->ir_base[insn->op2];
 					if (IR_IS_SYM_CONST(op2_insn->op)) {
 						/* pass */
 					} else if (IR_IS_CONST_REF(insn->op1)) {
 						// const
 					} else if (op2_insn->val.u64 == 1) {
-						// return IR_COPY_INT;
+						return IR_COPY_INT | IR_MAY_REUSE;
 					} else if (IR_IS_POWER_OF_TWO(op2_insn->val.u64)) {
 						/* DIV(X, PWR2) => SHR */
 						if (IR_IS_TYPE_UNSIGNED(insn->type)) {
@@ -4062,12 +4062,14 @@ binop_fp:
 				return IR_TWO_REGS | IR_BINOP_HELPER_I64;
 			}
 #endif
-			if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
+			if (IR_IS_CONST_REF(insn->op2)) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (IR_IS_SYM_CONST(op2_insn->op)) {
 					/* pass */
 				} else if (IR_IS_CONST_REF(insn->op1)) {
 					// const
+				} else if (op2_insn->val.u64 == 1) {
+					// 0
 				} else if (IR_IS_POWER_OF_TWO(op2_insn->val.u64)) {
 					/* MOD(X, PWR2) => AND */
 					if (IR_IS_TYPE_UNSIGNED(insn->type)) {
@@ -4159,14 +4161,14 @@ binop_fp:
 				return IR_TWO_REGS | IR_BINOP_I64 | IR_MAY_SWAP;
 			}
 #endif
-			if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
+			if (IR_IS_CONST_REF(insn->op2)) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (IR_IS_SYM_CONST(op2_insn->op)) {
 					/* pass */
 				} else if (IR_IS_CONST_REF(insn->op1)) {
 					// const
 				} else if (op2_insn->val.i64 == 0) {
-					// return IR_COPY_INT;
+					return IR_COPY_INT | IR_MAY_REUSE;
 				} else if (op2_insn->val.i64 == -1) {
 					// -1
 				} else if (ir_type_size[insn->type] == 8
@@ -4189,7 +4191,7 @@ binop_fp:
 				return IR_TWO_REGS | IR_BINOP_I64 | IR_MAY_SWAP;
 			}
 #endif
-			if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
+			if (IR_IS_CONST_REF(insn->op2)) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (IR_IS_SYM_CONST(op2_insn->op)) {
 					/* pass */
@@ -4198,7 +4200,7 @@ binop_fp:
 				} else if (op2_insn->val.i64 == 0) {
 					// 0
 				} else if (op2_insn->val.i64 == -1) {
-					// return IR_COPY_INT;
+					return IR_COPY_INT | IR_MAY_REUSE;
 				} else if (ir_type_size[insn->type] == 8
 						&& !IR_IS_SIGNED_32BIT(op2_insn->val.i64)
 						&& IR_IS_POWER_OF_TWO(~op2_insn->val.u64)) {
@@ -4210,7 +4212,11 @@ binop_fp:
 				} else if (op2_insn->val.u64 == 0xffff) {
 #endif
 					/* AND(X, 0xff) => MOVZX */
-					return IR_AND_ZEXT;
+					if ((1U << (ir_type_size[insn->type] * 8)) - 1 == op2_insn->val.u64) {
+						return IR_COPY_INT | IR_MAY_REUSE;
+					} else {
+						return IR_AND_ZEXT;
+					}
 				}
 			}
 			goto binop_int;
@@ -4226,7 +4232,7 @@ binop_fp:
 				return IR_TWO_REGS | IR_BINOP_I64 | IR_MAY_SWAP;
 			}
 #endif
-			if ((ctx->flags & IR_OPT_CODEGEN) && IR_IS_CONST_REF(insn->op2)) {
+			if (IR_IS_CONST_REF(insn->op2)) {
 				op2_insn = &ctx->ir_base[insn->op2];
 				if (IR_IS_SYM_CONST(op2_insn->op)) {
 					/* pass */
@@ -4248,22 +4254,20 @@ binop_fp:
 			}
 #endif
 			if (IR_IS_CONST_REF(insn->op2)) {
-				if (ctx->flags & IR_OPT_CODEGEN) {
-					op2_insn = &ctx->ir_base[insn->op2];
-					if (IR_IS_SYM_CONST(op2_insn->op)) {
-						/* pass */
-					} else if (IR_IS_CONST_REF(insn->op1)) {
-						// const
-					} else if (op2_insn->val.u64 == 0) {
-						// return IR_COPY_INT;
-					} else if (ir_type_size[insn->type] >= 4) {
-						if (op2_insn->val.u64 == 1) {
-							// lea [op1*2]
-						} else if (op2_insn->val.u64 == 2) {
-							// lea [op1*4]
-						} else if (op2_insn->val.u64 == 3) {
-							// lea [op1*8]
-						}
+				op2_insn = &ctx->ir_base[insn->op2];
+				if (IR_IS_SYM_CONST(op2_insn->op)) {
+					/* pass */
+				} else if (IR_IS_CONST_REF(insn->op1)) {
+					// const
+				} else if (op2_insn->val.u64 == 0) {
+					return IR_COPY_INT | IR_MAY_REUSE;
+				} else if (ir_type_size[insn->type] >= 4) {
+					if (op2_insn->val.u64 == 1) {
+						// lea [op1*2]
+					} else if (op2_insn->val.u64 == 2) {
+						// lea [op1*4]
+					} else if (op2_insn->val.u64 == 3) {
+						// lea [op1*8]
 					}
 				}
 #if IR_X86_I64
@@ -4304,15 +4308,13 @@ binop_fp:
 			}
 #endif
 			if (IR_IS_CONST_REF(insn->op2)) {
-				if (ctx->flags & IR_OPT_CODEGEN) {
-					op2_insn = &ctx->ir_base[insn->op2];
-					if (IR_IS_SYM_CONST(op2_insn->op)) {
-						/* pass */
-					} else if (IR_IS_CONST_REF(insn->op1)) {
-						// const
-					} else if (op2_insn->val.u64 == 0) {
-						// return IR_COPY_INT;
-					}
+				op2_insn = &ctx->ir_base[insn->op2];
+				if (IR_IS_SYM_CONST(op2_insn->op)) {
+					/* pass */
+				} else if (IR_IS_CONST_REF(insn->op1)) {
+					// const
+				} else if (op2_insn->val.u64 == 0) {
+					return IR_COPY_INT | IR_MAY_REUSE;
 				}
 #if IR_X86_I64
 				if (insn->type == IR_I64 || insn->type == IR_U64) {
@@ -4439,12 +4441,12 @@ binop_fp:
 				store_rule = IR_VSTORE_INT;
 				load_op = IR_VLOAD;
 store_int:
-				if ((ctx->flags & IR_OPT_CODEGEN)
-				 && ir_in_same_block(ctx, insn->op3)
+				if (ir_in_same_block(ctx, insn->op3)
 				 && (ctx->use_lists[insn->op3].count == 1 ||
 				     (ctx->use_lists[insn->op3].count == 2
 				   && (ctx->ir_base[insn->op3].op == IR_ADD_OV ||
-				       ctx->ir_base[insn->op3].op == IR_SUB_OV)))) {
+				       ctx->ir_base[insn->op3].op == IR_SUB_OV)
+				   && insn->op3 == ref - 1 /* OVERFLOW must no be between ADD_OV and STORE */))) {
 					ir_insn *op_insn = &ctx->ir_base[insn->op3];
 					uint32_t rule = ctx->rules[insn->op3];
 
@@ -4461,7 +4463,7 @@ store_int:
 							ctx->rules[op_insn->op1] = IR_SKIPPED | load_op;
 							if (!IR_IS_CONST_REF(op_insn->op2)
 							 && ctx->rules[op_insn->op2] == (IR_FUSED|IR_SIMPLE|IR_LOAD)) {
-								ctx->rules[op_insn->op2] = IR_LOAD_INT;
+								ctx->rules[op_insn->op2] = ctx->ir_base[op_insn->op2].op == IR_VLOAD ? IR_VLOAD : IR_LOAD_INT;
 							}
 							return IR_MEM_BINOP_INT;
 						} else if ((ir_op_flags[op_insn->op] & IR_OP_FLAG_COMMUTATIVE)
@@ -4612,8 +4614,7 @@ store_int:
 			return IR_RLOAD;
 		case IR_RSTORE:
 			if (IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
-				if ((ctx->flags & IR_OPT_CODEGEN)
-				 && ir_in_same_block(ctx, insn->op2)
+				if (ir_in_same_block(ctx, insn->op2)
 				 && ctx->use_lists[insn->op2].count == 1
 				 && IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
 					ir_insn *op_insn = &ctx->ir_base[insn->op2];
@@ -4798,8 +4799,7 @@ store_int:
 						}
 						return IR_JCC_INT;
 					}
-				} else if ((ctx->flags & IR_OPT_CODEGEN)
-				 && insn->op1 == ref - 1 /* previous instruction */
+				} else if (insn->op1 == ref - 1 /* previous instruction */
 				 && insn->op2 == ref - 2 /* previous instruction */
 				 && ctx->use_lists[insn->op2].count == 2
 				 && IR_IS_TYPE_INT(ctx->ir_base[insn->op2].type)) {
@@ -4948,8 +4948,7 @@ store_int:
 									ctx->rules[insn->op2] = IR_FUSED | IR_CMP_INT;
 									return IR_GUARD_JCC_INT;
 								}
-							} else if ((ctx->flags & IR_OPT_CODEGEN)
-							 && ctx->use_lists[insn->op2].count == 1
+							} else if (ctx->use_lists[insn->op2].count == 1
 							 && op2_insn->op1 == insn->op2 - 2 /* before previous instruction */
 							 && ir_in_same_block(ctx, op2_insn->op1)
 							 && ctx->use_lists[op2_insn->op1].count == 2
@@ -5252,7 +5251,10 @@ store_int:
 static void ir_match_insn2(ir_ctx *ctx, ir_ref ref, uint32_t rule)
 {
 	if (rule == IR_LEA_IB) {
-		ir_match_try_revert_lea_to_add(ctx, ref);
+		if (!ir_match_try_revert_lea_to_add(ctx, ref) && !(ctx->flags & IR_OPT_CODEGEN)) {
+			/* revert to ADD to avoid extra register spill load with -O0 */
+			ctx->rules[ref] = IR_BINOP_INT | IR_MAY_SWAP;
+		}
 	}
 }
 
@@ -10341,7 +10343,10 @@ static void ir_emit_and_zext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		IR_ASSERT(ctx->ir_base[insn->op2].val.u64 == 0xffffffff);
 		src_size = 4;
 	}
-	ir_emit_zext_common(ctx, def, insn, insn->type, src_type, src_size, IR_REG_NUM(ctx->regs[def][0]), 1);
+	if (src_size != ir_type_size[insn->type]) {
+		ir_emit_zext_common(ctx, def, insn, insn->type, src_type, src_size, IR_REG_NUM(ctx->regs[def][0]), 1);
+	} else {
+	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, insn->type, def, IR_REG_NUM(ctx->regs[def][0]));
 	}

@@ -66,7 +66,7 @@ test:
 	movl $0, 0x18(%esp)
 .L1:
 	movl 0x18(%esp), %eax
-	addl $1, %eax
+	leal 1(%eax), %eax
 	movl %eax, 0x1c(%esp)
 	movsd 0x10(%esp), %xmm0
 	mulsd 8(%esp), %xmm0
