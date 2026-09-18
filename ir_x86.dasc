@@ -10343,10 +10343,7 @@ static void ir_emit_and_zext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		IR_ASSERT(ctx->ir_base[insn->op2].val.u64 == 0xffffffff);
 		src_size = 4;
 	}
-	if (src_size != ir_type_size[insn->type]) {
-		ir_emit_zext_common(ctx, def, insn, insn->type, src_type, src_size, IR_REG_NUM(ctx->regs[def][0]), 1);
-	} else {
-	}
+	ir_emit_zext_common(ctx, def, insn, insn->type, src_type, src_size, IR_REG_NUM(ctx->regs[def][0]), 1);
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, insn->type, def, IR_REG_NUM(ctx->regs[def][0]));
 	}
