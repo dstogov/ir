@@ -21854,6 +21854,7 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		if (op1 == op2) {
 			op2_reg = op1_reg;
 			src2_mem = src1_mem;
+			ptr2 = ptr1;
 		} else if (op2_reg != IR_REG_NONE) {
 			if (IR_REG_SPILLED(op2_reg)) {
 				op2_reg = IR_REG_NUM(op2_reg);
