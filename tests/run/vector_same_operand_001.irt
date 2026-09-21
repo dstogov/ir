@@ -1,0 +1,28 @@
+--TEST--
+Vector division: identical constant operands at O0
+--ARGS--
+-O0 --run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func test(void): uint32_t
+{
+	<uint32_t*4> c_1 = { 17, 23, 42, 99 };
+	uint32_t c_0 = 0;
+	l_1 = START(l_3);
+	<uint32_t*4> v = DIV(c_1, c_1);
+	uint32_t ret = EXTRACT(v, c_0);
+	l_3 = RETURN(l_1, ret);
+}
+func main(void): int32_t
+{
+	uintptr_t c_1 = func test(void): uint32_t;
+	uintptr_t c_2 = "%u\n";
+	uintptr_t c_3 = func printf(uintptr_t, ...): int32_t;
+	int32_t c_4 = 0;
+	l_1 = START(l_5);
+	uint32_t d_2, l_2 = CALL/0(l_1, c_1);
+	int32_t d_3, l_4 = CALL/2(l_2, c_3, c_2, d_2);
+	l_5 = RETURN(l_4, c_4);
+}
+--EXPECT--
+1
