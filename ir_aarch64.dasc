@@ -1082,7 +1082,7 @@ bool ir_may_fuse_tls_addr(ir_ctx *ctx, ir_ref ref)
 	for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
 		ir_ref use = *p;
 		ir_op op = ctx->ir_base[use].op;
-		if (op == IR_LOAD && op == IR_LOAD_v) {
+		if (op == IR_LOAD || op == IR_LOAD_v) {
 			/* pass */
 		} else if (op == IR_STORE || op == IR_STORE_v) {
 			if (ctx->ir_base[use].op3 == ref) {
