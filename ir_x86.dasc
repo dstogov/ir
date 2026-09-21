@@ -1729,6 +1729,7 @@ const ir_call_conv_dsc ir_call_conv_x86_fastcall = {
 	_(COND_I64_CMP_FP)     \
 	_(COND_CMP_I64)        \
 	_(PARAM_I64)           \
+	_(LOAD_I64)            \
 	_(RETURN_I64)          \
 
 #endif
@@ -2555,6 +2556,18 @@ get_arg_hints:
 			break;
 		case IR_PARAM_I64:
 			flags = 0;
+			break;
+		case IR_LOAD_I64:
+			flags = IR_USE_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+			insn = &ctx->ir_base[ref];
+			if (!IR_IS_CONST_REF(insn->op2) && (ir_rule(ctx, insn->op2) & IR_FUSED)) {
+				uint32_t addr_rule = ir_rule(ctx, insn->op2) & IR_RULE_MASK;
+				/* For rules that use Base and Index */
+				if (addr_rule >= IR_LEA_SIB && addr_rule <= IR_LEA_SI_B_O && addr_rule != IR_LEA_SI_O) {
+					/* Base and Index registers used for LOAD inferes with at least one of the result registers */
+					flags |= IR_DEF_CONFLICTS_WITH_INPUT_REGS;
+				}
+			}
 			break;
 		case IR_RETURN_I64:
 			flags = IR_OP1_SHOULD_BE_IN_REG | IR_OP2_HINT_TWO_REGS;
@@ -4320,6 +4333,11 @@ binop_fp:
 				} else if (IR_IS_CONST_REF(insn->op1)) {
 					// const
 				} else if (op2_insn->val.u64 == 0) {
+#if IR_X86_I64
+					if (insn->type == IR_I64 || insn->type == IR_U64) {
+						return IR_TWO_REGS | IR_OP_I64;
+					}
+#endif
 					return IR_COPY_INT | IR_MAY_REUSE;
 				} else if (ir_type_size[insn->type] >= 4) {
 					if (op2_insn->val.u64 == 1) {
@@ -4374,6 +4392,11 @@ binop_fp:
 				} else if (IR_IS_CONST_REF(insn->op1)) {
 					// const
 				} else if (op2_insn->val.u64 == 0) {
+#if IR_X86_I64
+					if (insn->type == IR_I64 || insn->type == IR_U64) {
+						return IR_TWO_REGS | IR_OP_I64;
+					}
+#endif
 					return IR_COPY_INT | IR_MAY_REUSE;
 				}
 #if IR_X86_I64
@@ -4645,7 +4668,7 @@ store_int:
 			if (IR_IS_TYPE_INT(insn->type)) {
 #if IR_X86_I64
 				if (insn->type == IR_I64 || insn->type == IR_U64) {
-					return IR_TWO_REGS | IR_LOAD_INT;
+					return IR_TWO_REGS | IR_LOAD_I64;
 				}
 #endif
 				return IR_LOAD_INT;
@@ -15565,7 +15588,8 @@ static void ir_emit_op_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	ir_emit_load_i64(ctx, def, def_reg, def_reg_hi, op1_reg, op1_reg_hi, op1);
 
-	if (insn->op == IR_COPY || insn->op == IR_BITCAST) {
+	if (insn->op == IR_COPY || insn->op == IR_BITCAST ||
+		insn->op == IR_SHL || insn->op == IR_SHR || insn->op == IR_SAR) {
 	} else if (insn->op == IR_NOT) {
 		|	not Rd(def_reg)
 		|	not Rd(def_reg_hi)
@@ -26493,6 +26517,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					ir_emit_rstore(ctx, i, insn);
 					break;
 				case IR_LOAD_INT:
+#if IR_X86_I64
+				case IR_LOAD_I64:
+#endif
 					ir_emit_load_int(ctx, i, insn);
 					break;
 				case IR_LOAD_FP:
