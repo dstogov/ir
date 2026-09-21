@@ -13322,7 +13322,9 @@ static void ir_emit_call_ex(ir_ctx *ctx, ir_ref def, ir_insn *insn, const ir_pro
 				}
 			}
 #ifdef IR_TARGET_X86
-			if (ctx->use_lists[def].count > 1 && ret_reg == IR_REG_NONE) {
+			if (insn->op == IR_TAILCALL) {
+				/* pass */
+			} else if (ctx->use_lists[def].count > 1 && ret_reg == IR_REG_NONE) {
 				int32_t offset;
 				ir_reg fp;
 
