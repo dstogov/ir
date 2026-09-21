@@ -2397,7 +2397,7 @@ get_arg_hints:
 					n++;
 				}
 			}
-			if (insn->op1 >= 0) {
+			if (ctx->ir_base[insn->op2].op2 >= 0) { /* we need an extra register to access dynamic TLS */
 				constraints->tmp_regs[n] = IR_TMP_REG(0, IR_ADDR, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 				n++;
 			}

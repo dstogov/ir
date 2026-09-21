@@ -857,7 +857,8 @@ get_arg_hints:
 		case IR_TLS_LOAD:
 			insn = &ctx->ir_base[ref];
 			flags = IR_USE_MUST_BE_IN_REG;
-			if (insn->op1 >= 0 && !IR_IS_TYPE_INT(insn->type)) {
+			if (ctx->ir_base[insn->op2].op2 >= 0 /* we need an extra register to access dynamic TLS */
+			 && !IR_IS_TYPE_INT(insn->type)) {
 				constraints->tmp_regs[0] = IR_TMP_REG(3, IR_ADDR, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 				n = 1;
 			}
