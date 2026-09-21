@@ -3508,15 +3508,22 @@ bool ir_may_fuse_tls_addr(ir_ctx *ctx, ir_ref ref)
 	ir_use_list *use_list = &ctx->use_lists[ref];
 	ir_ref n, *p;
 
-	if (use_list->count == 1 || (ctx->rules[ref] & IR_FUSED)) {
+	if (use_list->count == 2 || (ctx->rules[ref] & IR_FUSED)) {
 		return 1;
 	}
 	n = use_list->count;
 	for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
 		ir_ref use = *p;
 		ir_op op = ctx->ir_base[use].op;
-		if (op != IR_LOAD && op != IR_LOAD_v
-		 && ((op != IR_STORE && op != IR_STORE_v) || ctx->ir_base[use].op3 == ref)) {
+		if (op == IR_LOAD && op == IR_LOAD_v) {
+			/* pass */
+		} else if (op == IR_STORE || op == IR_STORE_v) {
+			if (ctx->ir_base[use].op3 == ref) {
+				return 0;
+			}
+		} else if (ctx->ir_base[use].op1 == ref && (ir_op_flags[op] & (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM))) {
+			/* ignore control link */
+		} else {
 			return 0;
 		}
 	}
