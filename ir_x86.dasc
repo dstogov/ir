@@ -17774,8 +17774,10 @@ static void ir_emit_vector_replace(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		if (IR_IS_TYPE_INT(element_type)) {
 			if (element_type == IR_I8 || element_type == IR_U8) {
 				if (ctx->mflags & IR_X86_AVX) {
+					|	movzx Rd(op3_reg), Rb(op3_reg)
 					|	vpinsrb xmm(tmp_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), Rd(op3_reg), (lane%16)
 				} else if (ctx->mflags & IR_X86_SSE42) {
+					|	movzx Rd(op3_reg), Rb(op3_reg)
 					|	pinsrb xmm(tmp_reg-IR_REG_FP_FIRST), Rd(op3_reg), (lane%16)
 				} else {
 					/* modify through stack memory */
@@ -17994,6 +17996,7 @@ static void ir_emit_vector_splat(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 		if (IR_IS_TYPE_INT(element_type)) {
 			if (element_type == IR_I8 || element_type == IR_U8) {
+				|	movzx Rd(op1_reg), Rb(op1_reg)
 				if (ctx->mflags & IR_X86_AVX) {
 					IR_ASSERT(width <= 32);
 					|	vmovd xmm(def_reg-IR_REG_FP_FIRST), Rd(op1_reg)
