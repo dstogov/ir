@@ -1431,6 +1431,7 @@ const ir_call_conv_dsc *ir_get_call_conv_dsc(uint32_t flags)
 /* Simple Register Allocator */
 typedef struct {
 	int32_t  num;
+	ir_regset preserved_regs;
 	ir_regset clobbered[IR_SUB_REFS_COUNT];
 	struct {
 		uint8_t type;
@@ -1485,8 +1486,51 @@ static ir_reg _get_free_reg(ir_type type, ir_regset available)
 		IR_ASSERT(IR_IS_TYPE_FP(type) || IR_IS_TYPE_VECTOR(type));
 		available = IR_REGSET_INTERSECTION(available, IR_REGSET_FP);
 	}
-	IR_ASSERT(!IR_REGSET_IS_EMPTY(available));
-	return IR_REGSET_FIRST(available);
+	if (!IR_REGSET_IS_EMPTY(available)) {
+		return IR_REGSET_FIRST(available);
+	} else {
+		return IR_REG_NONE;
+	}
+}
+
+static ir_reg _get_free_reg2(ir_ctx *ctx, ir_type type, ir_reg_alloc_simple_data *x, int j)
+{
+	int n;
+	ir_regset available;
+	ir_reg reg;
+
+	if (IR_IS_TYPE_INT(type)) {
+		available = IR_REGSET_GP;
+		if (ctx->flags & IR_USE_FRAME_POINTER) {
+			IR_REGSET_EXCL(available, IR_REG_FRAME_POINTER);
+		}
+
+#if defined(IR_TARGET_X86)
+		if (ir_type_size[type] == 1) {
+			/* TODO: if no registers avialivle, we may use of one this register for already allocated interval ??? */
+			IR_REGSET_EXCL(available, IR_REG_RBP);
+			IR_REGSET_EXCL(available, IR_REG_RSI);
+			IR_REGSET_EXCL(available, IR_REG_RDI);
+		}
+#endif
+	} else {
+		IR_ASSERT(IR_IS_TYPE_FP(type) || IR_IS_TYPE_VECTOR(type));
+		available = IR_REGSET_FP;
+	}
+	for (n = x->regs[j].start; n < x->regs[j].end; n++) {
+		available = IR_REGSET_DIFFERENCE(available, x->clobbered[n]);
+	}
+	if (IR_REGSET_IS_EMPTY(available)) {
+		fprintf(stderr, "Internal Error: No registers available. Allocation is not possible\n");
+		IR_ASSERT(0);
+		exit(-1);
+	}
+
+	reg = IR_REGSET_FIRST(available);
+	if (IR_REGSET_IN(x->preserved_regs, reg)) {
+		IR_REGSET_INCL(ctx->used_preserved_regs, reg);
+	}
+	return reg;
 }
 
 static void ir_set_fused_reg(ir_ctx *ctx, ir_ref root, ir_ref ref_and_op, int8_t reg)
@@ -1648,8 +1692,10 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 	ctx->stack_frame_size = 0;
 	ctx->call_stack_size = 0;
 	ctx->used_preserved_regs = 0;
+	ctx->used_preserved_regs = ctx->fixed_save_regset;
 
 	scratch = ir_scratch_regset[data.cc->scratch_reg - IR_REG_NUM];
+	x.preserved_regs = IR_REGSET_DIFFERENCE(data.cc->preserved_regs, ctx->fixed_save_regset);
 
 	ctx->regs = ir_mem_malloc(sizeof(ir_regs) * ctx->insns_count);
 	memset(ctx->regs, IR_REG_NONE, sizeof(ir_regs) * ctx->insns_count);
@@ -1854,6 +1900,9 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 #endif
 					if (reg == IR_REG_NONE || !IR_REGSET_IN(available, reg)) {
 						reg = _get_free_reg(x.regs[j].type, available);
+						if (UNEXPECTED(reg == IR_REG_NONE)) {
+							reg = _get_free_reg2(ctx, x.regs[j].type, &x, j);
+						}
 					}
 					for (n = x.regs[j].start; n < x.regs[j].end; n++) {
 						IR_REGSET_INCL(x.clobbered[n], reg);
@@ -1868,6 +1917,9 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 						}
 						if (reg2 == IR_REG_NONE || !IR_REGSET_IN(available, reg2)) {
 							reg2 = _get_free_reg(x.regs[j].type, available);
+							if (UNEXPECTED(reg2 == IR_REG_NONE)) {
+								reg2 = _get_free_reg2(ctx, x.regs[j].type, &x, j);
+							}
 						}
 						for (n = x.regs[j].start; n < x.regs[j].end; n++) {
 							IR_REGSET_INCL(x.clobbered[n], reg2);
@@ -1875,7 +1927,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 						if (reg > reg2) {
 							SWAP_REGS(reg, reg2);
 						}
-						reg = IR_REG_I64_PAIR(reg2, reg);
+						reg = IR_REG_I64_PAIR(reg, reg2);
 					}
 #endif
 					reg = reg | x.regs[j].flags;
@@ -1915,7 +1967,6 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 	}
 #endif
 
-	ctx->used_preserved_regs = ctx->fixed_save_regset;
 	ctx->flags |= IR_NO_STACK_COMBINE;
 	ir_fix_stack_frame(ctx);
 	ctx->data = NULL;
