@@ -1,0 +1,26 @@
+--TEST--
+MAX CONST SELF 001: integer max constant by itself
+--ARGS--
+-O0 --run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func test_max(void): int32_t
+{
+	int32_t c_1 = -2147483648;
+	l_1 = START(l_2);
+	int32_t ret = MAX(c_1, c_1);
+	l_2 = RETURN(l_1, ret);
+}
+func main(void): int32_t
+{
+	uintptr_t c_1 = func test_max(void): int32_t;
+	uintptr_t c_2 = "0x%x\n";
+	uintptr_t c_3 = func printf(uintptr_t, ...): int32_t;
+	int32_t c_4 = 0;
+	l_1 = START(l_5);
+	int32_t d_2, l_2 = CALL/0(l_1, c_1);
+	int32_t d_3, l_3 = CALL/2(l_2, c_3, c_2, d_2);
+	l_5 = RETURN(l_3, c_4);
+}
+--EXPECT--
+0x80000000
