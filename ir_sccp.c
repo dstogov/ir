@@ -1844,10 +1844,15 @@ static bool ir_may_promote_trunc(const ir_ctx *ctx, ir_type type, ir_ref ref)
 			case IR_OR:
 			case IR_AND:
 			case IR_XOR:
-			case IR_SHL:
 				return ctx->use_lists[ref].count == 1 &&
 					ir_may_promote_trunc(ctx, type, insn->op1) &&
 					ir_may_promote_trunc(ctx, type, insn->op2);
+			case IR_SHL:
+				return ctx->use_lists[ref].count == 1 &&
+					ir_may_promote_trunc(ctx, type, insn->op1) &&
+					IR_IS_CONST_REF(insn->op2) &&
+					(IR_IS_TYPE_UNSIGNED(ctx->ir_base[insn->op2].type) || ctx->ir_base[insn->op2].val.i64 >= 0) &&
+					ctx->ir_base[insn->op2].val.u64 < ir_type_size[type] * 8;
 //			case IR_SHR:
 //			case IR_SAR:
 //			case IR_DIV:
