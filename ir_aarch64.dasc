@@ -3684,6 +3684,10 @@ static void ir_emit_cmp_int_common(ir_ctx *ctx, ir_type type, ir_reg op1_reg, ir
 	dasm_State **Dst = &data->dasm_state;
 
 	IR_ASSERT(op1_reg != IR_REG_NONE);
+	if (op2_reg == IR_REG_NONE && op1 == op2) {
+		op2_reg = op1_reg;
+	}
+
 	if (ir_type_size[type] < 4) {
 		ir_emit_fix_type(ctx, type, op1_reg);
 	}

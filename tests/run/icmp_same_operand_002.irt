@@ -1,0 +1,60 @@
+--TEST--
+Integer comparisons: identical large constants at O0
+--ARGS--
+-O0 --run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func guard_target(void): int32_t
+{
+	int32_t c_1 = 0;
+	l_1 = START(l_2);
+	l_2 = RETURN(l_1, c_1);
+}
+func value_test(void): int32_t
+{
+	uint64_t c_1 = 4294967296;
+	l_1 = START(l_3);
+	bool d_2 = EQ(c_1, c_1);
+	int32_t d_3 = ZEXT(d_2);
+	l_3 = RETURN(l_1, d_3);
+}
+func if_test(void): int32_t
+{
+	uint64_t c_1 = 4294967296;
+	int32_t c_2 = 1;
+	int32_t c_3 = 0;
+	l_1 = START(l_7);
+	bool d_2 = EQ(c_1, c_1);
+	l_3 = IF(l_1, d_2);
+	l_4 = IF_TRUE(l_3);
+	l_5 = RETURN(l_4, c_2);
+	l_6 = IF_FALSE(l_3);
+	l_7 = RETURN(l_6, c_3, l_5);
+}
+func guard_test(void): int32_t
+{
+	uintptr_t c_1 = func guard_target(void): int32_t;
+	uint64_t c_2 = 4294967296;
+	int32_t c_3 = 1;
+	l_1 = START(l_4);
+	bool d_2 = EQ(c_2, c_2);
+	l_3 = GUARD(l_1, d_2, c_1);
+	l_4 = RETURN(l_3, c_3);
+}
+func main(void): int32_t
+{
+	uintptr_t c_1 = func value_test(void): int32_t;
+	uintptr_t c_2 = func if_test(void): int32_t;
+	uintptr_t c_3 = func guard_test(void): int32_t;
+	uintptr_t c_4 = "%d %d %d\n";
+	uintptr_t c_5 = func printf(uintptr_t, ...): int32_t;
+	int32_t c_6 = 0;
+	l_1 = START(l_7);
+	int32_t d_2, l_2 = CALL/0(l_1, c_1);
+	int32_t d_3, l_3 = CALL/0(l_2, c_2);
+	int32_t d_4, l_4 = CALL/0(l_3, c_3);
+	int32_t d_5, l_6 = CALL/4(l_4, c_5, c_4, d_2, d_3, d_4);
+	l_7 = RETURN(l_6, c_6);
+}
+--EXPECT--
+1 1 1
