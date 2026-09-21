@@ -1,0 +1,23 @@
+--TEST--
+TLS_ADDR with large offset
+--TARGET--
+aarch64-*-sysv
+--ARGS--
+-O0 -S
+--CODE--
+func test(): uintptr_t
+{
+	l_1 = START(l_3);
+	uintptr_t a, l_2 = TLS_ADDR(l_1, -1, 5000);
+	l_3 = RETURN(l_2, a);
+}
+--EXPECT--
+test:
+	sub sp, sp, #0x10
+	mrs x0, tpidr_el0
+	movz x17, #0x1388
+	add x0, x0, x17
+	str x0, [sp]
+	ldr x0, [sp]
+	add sp, sp, #0x10
+	ret
