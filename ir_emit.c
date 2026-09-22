@@ -1888,13 +1888,18 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 
 				for (j = 0; j < x.num; j++) {
 					ir_regset available = scratch;
+#if IR_X86_I64
+					ir_reg reg2;
+#endif
 
 					for (n = x.regs[j].start; n < x.regs[j].end; n++) {
 						available = IR_REGSET_DIFFERENCE(available, x.clobbered[n]);
 					}
 					reg = x.regs[j].hint;
 #if IR_X86_I64
+					reg2 = IR_REG_NONE;
 					if (reg != IR_REG_NONE && (x.regs[j].type == IR_I64 || x.regs[j].type == IR_U64)) {
+						reg2 = IR_REG_I64_HI(reg);
 						reg = IR_REG_I64_LO(reg);
 					}
 #endif
@@ -1909,12 +1914,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					}
 #if IR_X86_I64
 					if (x.regs[j].type == IR_I64 || x.regs[j].type == IR_U64) {
-						ir_reg reg2 = x.regs[j].hint;
-
 						IR_REGSET_EXCL(available, reg);
-						if (reg2 != IR_REG_NONE) {
-							reg2 = IR_REG_I64_LO(reg2);
-						}
 						if (reg2 == IR_REG_NONE || !IR_REGSET_IN(available, reg2)) {
 							reg2 = _get_free_reg(x.regs[j].type, available);
 							if (UNEXPECTED(reg2 == IR_REG_NONE)) {
