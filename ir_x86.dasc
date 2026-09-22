@@ -1284,7 +1284,6 @@ typedef struct _ir_backend_data {
 	bool               float_abs_const;
 	bool               double_zero_const;
 	bool               u2d_const;      /* 0, 0x41e00000 */
-	bool               u2f_const;      /*    0x4f000000 */
 	bool               ull2d_const;    /* 0, 0x43e00000 */
 	bool               ull2f_const;    /*    0x5f000000 */
 	bool               ull2fp_const;   /*    0x5f800000 */
@@ -10851,7 +10850,7 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 		}
 		if (!src64) {
-			if (dst_type == IR_DOUBLE) {
+			if (dst_type == IR_DOUBLE || (sizeof(void*) == 4 && IR_IS_TYPE_UNSIGNED(src_type) && ir_type_size[src_type] == 4)) {
 				if (ctx->mflags & IR_X86_AVX) {
 					|	vxorps xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	vcvtsi2sd xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), Rd(op1_reg)
@@ -10894,34 +10893,21 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 		|2:
 		if (sizeof(void*) == 4 && IR_IS_TYPE_UNSIGNED(src_type) && ir_type_size[src_type] >= sizeof(void*)) {
-			if (dst_type == IR_DOUBLE) {
-				if (!data->u2d_const) {
-					data->u2d_const = 1;
-					ir_rodata(ctx);
-					|.align 8
-					|->u2d_const:
-					|.dword 0, 0x41e00000
-					|.code
-				}
-				if (ctx->mflags & IR_X86_AVX) {
-					|	vaddsd	xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), qword [->u2d_const]
-				} else {
-					|	addsd	xmm(def_reg-IR_REG_FP_FIRST), qword [->u2d_const]
-				}
+			if (!data->u2d_const) {
+				data->u2d_const = 1;
+				ir_rodata(ctx);
+				|.align 8
+				|->u2d_const:
+				|.dword 0, 0x41e00000
+				|.code
+			}
+			if (ctx->mflags & IR_X86_AVX) {
+				|	vaddsd	xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), qword [->u2d_const]
 			} else {
-				if (!data->u2f_const) {
-					data->u2f_const = 1;
-					ir_rodata(ctx);
-					|.align 4
-					|->u2f_const:
-					|.dword 0x4f000000
-					|.code
-				}
-				if (ctx->mflags & IR_X86_AVX) {
-					|	vaddss	xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), dword [->u2f_const]
-				} else {
-					|	addss	xmm(def_reg-IR_REG_FP_FIRST), dword [->u2f_const]
-				}
+				|	addsd	xmm(def_reg-IR_REG_FP_FIRST), qword [->u2d_const]
+			}
+			if (dst_type == IR_FLOAT) {
+				|	cvtsd2ss xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 			}
 		}
 	} else if (IR_IS_CONST_REF(insn->op1)) {
