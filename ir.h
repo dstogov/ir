@@ -1097,7 +1097,8 @@ int ir_patch(const void *code, size_t size, uint32_t jmp_table_size, const void 
 # define IR_X86_AVX      (1<<5)
 # define IR_X86_AVX2     (1<<6)
 # define IR_X86_BMI1     (1<<7)
-# define IR_X86_CLDEMOTE (1<<8)
+# define IR_X86_BMI2     (1<<8)
+# define IR_X86_CLDEMOTE (1<<9)
 #endif
 
 uint32_t ir_cpuinfo(void);
