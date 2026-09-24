@@ -1851,9 +1851,10 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 			break;
 		case IR_SHIFT:
 			if (rule & IR_FUSED) {
-				flags = IR_OP2_MUST_BE_IN_REG;
+				flags = IR_OP2_MUST_BE_IN_REG | IR_OP2_HINT_NEEDS_HOLE;
 			} else {
-				flags = IR_DEF_REUSES_OP1_REG | IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG;
+				flags = IR_DEF_REUSES_OP1_REG | IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_USE_MUST_BE_IN_REG |
+					IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG | IR_OP2_HINT_NEEDS_HOLE;
 			}
 			constraints->hints[1] = IR_REG_NONE;
 			constraints->hints[2] = IR_REG_RCX;

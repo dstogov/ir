@@ -1,0 +1,25 @@
+--TEST--
+004: Register Allocation (allocate %rcx for vreg used as SHIFT.op2 and alive after the SHIFT)
+--TARGET--
+x86_64-*-sysv
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_9);
+	int32_t d_2 = PARAM(l_1, "x", 1);
+	int32_t d_3 = PARAM(l_1, "y", 2);
+	int32_t d_4 = PARAM(l_1, "_", 3);
+	int32_t d_5 = PARAM(l_1, "n", 4);
+	int32_t d_6 = SAR(d_2, d_5);
+	int32_t d_7 = SHL(d_3, d_5);
+	int32_t d_8 = OR(d_7, d_6);
+	l_9 = RETURN(l_1, d_8);
+}
+--EXPECT--
+test:
+	sarl %cl, %edi
+	movl %esi, %eax
+	shll %cl, %eax
+	orl %edi, %eax
+	retq
