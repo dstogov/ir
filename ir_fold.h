@@ -3212,7 +3212,7 @@ IR_FOLD(LT(ABS, C_FLOAT))
 IR_FOLD(LT(ABS, C_DOUBLE))
 {
 	if (op2_insn->val.u64 == 0) {
-		/* abs() < 0 => false */
+		/* abs() < 0 => false (abs(INT_MIN) is UB, so this optimization may change the result) */
 		IR_FOLD_COPY(IR_FALSE);
 	}
 	IR_FOLD_NEXT;
@@ -3226,7 +3226,7 @@ IR_FOLD(GE(ABS, C_FLOAT))
 IR_FOLD(GE(ABS, C_DOUBLE))
 {
 	if (op2_insn->val.u64 == 0) {
-		/* abs() >= 0 => true */
+		/* abs() >= 0 => true (abs(INT_MIN) is UB, so this optimization may change the result) */
 		IR_FOLD_COPY(IR_TRUE);
 	}
 	IR_FOLD_NEXT;
