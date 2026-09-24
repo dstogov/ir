@@ -696,14 +696,15 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						if (input > 0) {
 							uint32_t v = ctx->vregs[input];
 
-							/* live.add(phi.inputOf(b)) */
-							IR_ASSERT(v);
-							ir_bitset_incl(live, v);
-							/* intervals[phi.inputOf(b)].addRange(b.from, b.to) */
-							ival = ir_add_prev_live_range(ctx, v,
-								IR_START_LIVE_POS_FROM_REF(bb->start),
-								IR_END_LIVE_POS_FROM_REF(bb->end));
-							ir_add_phi_use(ctx, ival, k, IR_DEF_LIVE_POS_FROM_REF(bb->end), use);
+							if (v) {
+								/* live.add(phi.inputOf(b)) */
+								ir_bitset_incl(live, v);
+								/* intervals[phi.inputOf(b)].addRange(b.from, b.to) */
+								ival = ir_add_prev_live_range(ctx, v,
+									IR_START_LIVE_POS_FROM_REF(bb->start),
+									IR_END_LIVE_POS_FROM_REF(bb->end));
+								ir_add_phi_use(ctx, ival, k, IR_DEF_LIVE_POS_FROM_REF(bb->end), use);
+							}
 						}
 					}
 				}
@@ -770,8 +771,6 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 			insn = &ctx->ir_base[ref];
 			v = ctx->vregs[ref];
 			if (v) {
-				IR_ASSERT(ir_bitset_in(live, v));
-
 				if (insn->op != IR_PHI) {
 					ir_live_pos def_pos;
 					ir_ref hint_ref = 0;
