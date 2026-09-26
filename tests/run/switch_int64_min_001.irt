@@ -1,0 +1,97 @@
+--TEST--
+SWITCH with INT64_MIN and unsigned cases near the sign bit
+--ARGS--
+-O1 --run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func select(int64_t): int32_t
+{
+	int64_t c_1 = -9223372036854775808;
+	int64_t c_2 = -9223372036854775807;
+	int64_t c_3 = -9223372036854775806;
+	int32_t c_4 = 11;
+	int32_t c_5 = 12;
+	int32_t c_6 = 13;
+	int32_t c_7 = 99;
+	l_1 = START(l_16);
+	int64_t d_2 = PARAM(l_1, "x", 1);
+	l_4 = SWITCH(l_1, d_2);
+	l_5 = CASE_VAL(l_4, c_1);
+	int32_t x_1 = COPY(c_4);
+	l_6 = END(l_5);
+	l_7 = CASE_VAL(l_4, c_2);
+	int32_t x_2 = COPY(c_5);
+	l_8 = END(l_7);
+	l_9 = CASE_VAL(l_4, c_3);
+	int32_t x_3 = COPY(c_6);
+	l_10 = END(l_9);
+	l_11 = CASE_DEFAULT(l_4);
+	int32_t x_4 = COPY(c_7);
+	l_12 = END(l_11);
+	l_13 = MERGE/4(l_6, l_8, l_10, l_12);
+	int32_t ret = PHI/4(l_13, x_1, x_2, x_3, x_4);
+	l_16 = RETURN(l_13, ret);
+}
+func select_u(uint64_t): int32_t
+{
+	uint64_t c_1 = 9223372036854775808;
+	uint64_t c_2 = 9223372036854775809;
+	uint64_t c_3 = 9223372036854775810;
+	int32_t c_4 = 21;
+	int32_t c_5 = 22;
+	int32_t c_6 = 23;
+	int32_t c_7 = 99;
+	l_1 = START(l_16);
+	uint64_t d_2 = PARAM(l_1, "x", 1);
+	l_4 = SWITCH(l_1, d_2);
+	l_5 = CASE_VAL(l_4, c_1);
+	int32_t x_1 = COPY(c_4);
+	l_6 = END(l_5);
+	l_7 = CASE_VAL(l_4, c_2);
+	int32_t x_2 = COPY(c_5);
+	l_8 = END(l_7);
+	l_9 = CASE_VAL(l_4, c_3);
+	int32_t x_3 = COPY(c_6);
+	l_10 = END(l_9);
+	l_11 = CASE_DEFAULT(l_4);
+	int32_t x_4 = COPY(c_7);
+	l_12 = END(l_11);
+	l_13 = MERGE/4(l_6, l_8, l_10, l_12);
+	int32_t ret = PHI/4(l_13, x_1, x_2, x_3, x_4);
+	l_16 = RETURN(l_13, ret);
+}
+func main(void): int32_t
+{
+	int64_t c_1 = -9223372036854775808;
+	int64_t c_2 = -9223372036854775807;
+	int64_t c_3 = -9223372036854775806;
+	int64_t c_4 = 9223372036854775807;
+	int64_t c_14 = -9223372036854775805;
+	uint64_t c_9 = 9223372036854775808;
+	uint64_t c_10 = 9223372036854775809;
+	uint64_t c_11 = 9223372036854775810;
+	uint64_t c_12 = 0;
+	uint64_t c_15 = 9223372036854775811;
+	uint64_t c_16 = 9223372036854775807;
+	int32_t c_5 = 0;
+	uintptr_t c_6 = func select(int64_t): int32_t;
+	uintptr_t c_13 = func select_u(uint64_t): int32_t;
+	uintptr_t c_7 = "%d %d %d %d %d %d %d %d %d %d %d\n";
+	uintptr_t c_8 = func printf(uintptr_t, ...): int32_t;
+	l_1 = START(l_14);
+	int32_t d_2, l_2 = CALL/1(l_1, c_6, c_1);
+	int32_t d_3, l_3 = CALL/1(l_2, c_6, c_2);
+	int32_t d_4, l_4 = CALL/1(l_3, c_6, c_3);
+	int32_t d_5, l_5 = CALL/1(l_4, c_6, c_14);
+	int32_t d_6, l_6 = CALL/1(l_5, c_6, c_4);
+	int32_t d_7, l_7 = CALL/1(l_6, c_13, c_9);
+	int32_t d_8, l_8 = CALL/1(l_7, c_13, c_10);
+	int32_t d_9, l_9 = CALL/1(l_8, c_13, c_11);
+	int32_t d_10, l_10 = CALL/1(l_9, c_13, c_15);
+	int32_t d_11, l_11 = CALL/1(l_10, c_13, c_16);
+	int32_t d_12, l_12 = CALL/1(l_11, c_13, c_12);
+	int32_t d_13, l_13 = CALL/12(l_12, c_8, c_7, d_2, d_3, d_4, d_5, d_6, d_7, d_8, d_9, d_10, d_11, d_12);
+	l_14 = RETURN(l_13, c_5);
+}
+--EXPECT--
+11 12 13 99 99 21 22 23 99 99 99
