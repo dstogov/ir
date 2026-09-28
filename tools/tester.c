@@ -43,6 +43,7 @@ typedef enum _color {GREEN, YELLOW, RED} color;
 typedef struct _test {
 	int   id;
 	int   optimization_level;
+	int   disable_inline;
 	char *name;
 	char *target;
 	char *args;
@@ -309,11 +310,11 @@ static char *replace_extension(const char *filename, size_t len, const char *ext
 	return ret;
 }
 
-static int run_test(const char *filename, test *t, int show_diff, int optimization_level)
+static int run_test(const char *filename, test *t, int show_diff, int optimization_level, int disable_inline)
 {
 	size_t len;
 	int ret;
-	char cmd[4096], optimization_arg[4] = "";
+	char cmd[4096], optimization_arg[20] = "";
 	char *code_filename, *out_filename, *exp_filename, *diff_filename;
 
 	len = strlen(filename);
@@ -341,7 +342,8 @@ static int run_test(const char *filename, test *t, int show_diff, int optimizati
 	}
 
 	if (optimization_level >= 0) {
-		snprintf(optimization_arg, sizeof(optimization_arg), "-O%d", optimization_level);
+		snprintf(optimization_arg, sizeof(optimization_arg), "-O%d%s", optimization_level,
+			disable_inline ? " -fno-inline" : "");
 	}
 
 	if ((size_t)snprintf(cmd, sizeof(cmd), "%s %s %s %s %s > %s 2>&1",
@@ -694,12 +696,12 @@ int main(int argc, char **argv)
 	find_files(tests, tests_count);
 	total = files_count;
 
-	// Run each test. Runtime tests are executed at every optimization level.
+	// Run each test. Runtime tests also run at -O2 with inlining disabled.
 	for (i = 0; i < files_count; i++) {
-		int optimization_level;
-		int optimization_levels = is_run_test(files[i]) ? 3 : 1;
+		int variant;
+		int variants_count = is_run_test(files[i]) ? 4 : 1;
 
-		total += optimization_levels - 1;
+		total += variants_count - 1;
 
 		t = parse_file(files[i], i);
 		if (!t) {
@@ -717,20 +719,24 @@ int main(int argc, char **argv)
 			printf("\r");
 			print_color("SKIP", YELLOW);
 			printf(": %s [%s]\n", t->name, files[i]);
-			skipped += optimization_levels;
+			skipped += variants_count;
 			free(t);
 			continue;
 		}
 
-		for (optimization_level = 0; optimization_level < optimization_levels; optimization_level++) {
-			int level = optimization_levels == 1 ? -1 : optimization_level;
+		for (variant = 0; variant < variants_count; variant++) {
+			int level = variants_count == 1 ? -1 : variant == 3 ? 2 : variant;
+			int disable_inline = variant == 3;
 
 			t->optimization_level = level;
-			printf("TEST: %s%s [%s]", t->name,
-				level >= 0 ? (level == 0 ? " [-O0]" : level == 1 ? " [-O1]" : " [-O2]") : "",
-				files[i]);
+			t->disable_inline = disable_inline;
+			printf("TEST: %s", t->name);
+			if (level >= 0) {
+				printf(" [-O%d%s]", level, disable_inline ? " -fno-inline" : "");
+			}
+			printf(" [%s]", files[i]);
 			fflush(stdout);
-			if (run_test(files[i], t, show_diff, level)) {
+			if (run_test(files[i], t, show_diff, level, disable_inline)) {
 				printf("\r");
 				passed++;
 				if (t->xfail) {
@@ -766,7 +772,7 @@ int main(int argc, char **argv)
 				failed_tests[failed++] = t;
 			}
 
-			if (optimization_level + 1 < optimization_levels) {
+			if (variant + 1 < variants_count) {
 				t = parse_file(files[i], i);
 				if (!t) {
 					printf("\r");
@@ -804,7 +810,7 @@ int main(int argc, char **argv)
 			t = xfailed_tests[i];
 			printf("%s [%s]", t->name, files[t->id]);
 			if (t->optimization_level >= 0) {
-				printf(" [-O%d]", t->optimization_level);
+				printf(" [-O%d%s]", t->optimization_level, t->disable_inline ? " -fno-inline" : "");
 			}
 			printf(" XFAIL REASON: %s\n", t->xfail);
 			free(t);
@@ -819,7 +825,7 @@ int main(int argc, char **argv)
 			t = warned_tests[i];
 			printf("%s [%s]", t->name, files[t->id]);
 			if (t->optimization_level >= 0) {
-				printf(" [-O%d]", t->optimization_level);
+				printf(" [-O%d%s]", t->optimization_level, t->disable_inline ? " -fno-inline" : "");
 			}
 			printf(" WARN: XFAIL reason \"%s\" but test passes\n", t->xfail);
 			free(t);
@@ -834,7 +840,7 @@ int main(int argc, char **argv)
 			t = failed_tests[i];
 			printf("%s [%s]", t->name, files[t->id]);
 			if (t->optimization_level >= 0) {
-				printf(" [-O%d]", t->optimization_level);
+				printf(" [-O%d%s]", t->optimization_level, t->disable_inline ? " -fno-inline" : "");
 			}
 			printf("\n");
 			free(t);
