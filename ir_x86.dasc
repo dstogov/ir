@@ -5349,7 +5349,12 @@ static void ir_match_insn2(ir_ctx *ctx, ir_ref ref, uint32_t rule)
 	if (rule == IR_LEA_IB) {
 		if (!ir_match_try_revert_lea_to_add(ctx, ref) && !(ctx->flags & IR_OPT_CODEGEN)) {
 			/* revert to ADD to avoid extra register spill load with -O0 */
-			ctx->rules[ref] = IR_BINOP_INT | IR_MAY_SWAP;
+			ir_insn *insn = &ctx->ir_base[ref];
+
+			if ((IR_IS_CONST_REF(insn->op1) || ir_rule(ctx, insn->op1) != IR_STATIC_ALLOCA)
+			 && (IR_IS_CONST_REF(insn->op2) || ir_rule(ctx, insn->op2) != IR_STATIC_ALLOCA)) {
+				ctx->rules[ref] = IR_BINOP_INT | IR_MAY_SWAP;
+			}
 		}
 	}
 }
