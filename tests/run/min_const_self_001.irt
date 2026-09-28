@@ -1,7 +1,7 @@
 --TEST--
 MIN CONST SELF 001: integer min constant by itself
 --ARGS--
--O0 --run
+--run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func test_min(void): int32_t
