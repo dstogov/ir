@@ -39,7 +39,7 @@ guard:
 
 test:
 	leaq (%rsi, %rdi), %rax
-	xorq %rcx, %rcx
+	xorl %ecx, %ecx
 .L1:
 	testq %rax, %rax
 	jl guard
