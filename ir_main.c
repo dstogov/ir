@@ -1282,6 +1282,8 @@ int main(int argc, char **argv)
 			dump |= IR_DUMP_AFTER_GCM;
 		} else if (strcmp(argv[i], "--save-ir-after-scheduling") == 0) {
 			dump |= IR_DUMP_AFTER_SCHEDULING;
+		} else if (strcmp(argv[i], "--save-ir-after-matching") == 0) {
+			dump |= IR_DUMP_AFTER_CODE_MATCHING;
 		} else if (strcmp(argv[i], "--save-ir-after-live-ranges") == 0) {
 			dump |= IR_DUMP_AFTER_LIVE_RANGES;
 		} else if (strcmp(argv[i], "--save-ir-after-coalescing") == 0) {
