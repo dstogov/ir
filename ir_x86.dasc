@@ -685,6 +685,15 @@ IR_ALWAYS_INLINE ir_mem IR_MEM(ir_reg base, int32_t offset, ir_reg index, int32_
 ||	}
 |.endmacro
 
+/* Zero a register. A 32-bit xor has a shorter encoding and also clears the upper 32 bits. */
+|.macro ASM_REG_ZERO, type, reg
+||	if (ir_type_size[type] == 8) {
+|		xor Rd(reg), Rd(reg)
+||	} else {
+|		ASM_REG_REG_OP xor, type, reg, reg
+||	}
+|.endmacro
+
 |.macro ASM_REG_REG_OP2, op, type, op1, op2
 ||	switch (ir_type_size[type]) {
 || 		default:
@@ -5468,7 +5477,7 @@ static void ir_emit_load_imm_int(ir_ctx *ctx, ir_type type, ir_reg reg, int64_t 
 
 	IR_ASSERT(IR_IS_TYPE_INT(type));
 	if (val == 0) {
-		|	ASM_REG_REG_OP xor, type, reg, reg
+		|	ASM_REG_ZERO type, reg
 	} else {
 		ir_emit_mov_imm_int(ctx, type, reg, val);
 	}
@@ -8244,7 +8253,7 @@ static void ir_emit_mul_div_mod(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			if (ir_type_size[type] == 1) {
 				|	movzx ax, al
 			} else {
-				|	ASM_REG_REG_OP xor, type, IR_REG_RDX, IR_REG_RDX
+				|	ASM_REG_ZERO type, IR_REG_RDX
 			}
 			if (op2_reg != IR_REG_NONE) {
 				|	ASM_REG_OP div, type, op2_reg
@@ -8811,7 +8820,7 @@ static void ir_emit_cmp_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (IR_IS_CONST_REF(op2) && !IR_IS_SYM_CONST(ctx->ir_base[op2].op) && ctx->ir_base[op2].val.u64 == 0) {
 		if (op == IR_ULT) {
 			/* always false */
-			|	xor Ra(def_reg), Ra(def_reg)
+			|	xor Rd(def_reg), Rd(def_reg)
 			if (IR_REG_SPILLED(ctx->regs[def][0])) {
 				ir_emit_store(ctx, insn->type, def, def_reg);
 			}
@@ -14582,7 +14591,7 @@ static void ir_emit_cmp_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (IR_IS_CONST_REF(op2) && !IR_IS_SYM_CONST(ctx->ir_base[op2].op) && ctx->ir_base[op2].val.u64 == 0) {
 		if (op == IR_ULT) {
 			/* always false */
-			|	xor Ra(def_reg), Ra(def_reg)
+			|	xor Rd(def_reg), Rd(def_reg)
 			if (IR_REG_SPILLED(ctx->regs[def][0])) {
 				ir_emit_store(ctx, insn->type, def, def_reg);
 			}
@@ -22215,7 +22224,7 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						} else if (element_size == 1) {
 							|	movzx ax, al
 						} else {
-							|	ASM_REG_REG_OP xor, element_type, IR_REG_RDX, IR_REG_RDX
+							|	ASM_REG_ZERO element_type, IR_REG_RDX
 						}
 						if (IR_IS_TYPE_SIGNED(element_type)) {
 							|	ASM_REG_OP idiv, element_type, tmp2_reg
@@ -22662,7 +22671,7 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					} else if (element_size == 1) {
 						|	movzx ax, al
 					} else {
-						|	ASM_REG_REG_OP xor, element_type, IR_REG_RDX, IR_REG_RDX
+						|	ASM_REG_ZERO element_type, IR_REG_RDX
 					}
 					if (IR_IS_TYPE_SIGNED(element_type)) {
 						|	ASM_MEM_OP idiv, element_type, mem
