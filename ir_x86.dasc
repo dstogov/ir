@@ -687,11 +687,7 @@ IR_ALWAYS_INLINE ir_mem IR_MEM(ir_reg base, int32_t offset, ir_reg index, int32_
 
 /* Zero a register. A 32-bit xor has a shorter encoding and also clears the upper 32 bits. */
 |.macro ASM_REG_ZERO, type, reg
-||	if (ir_type_size[type] == 8) {
-|		xor Rd(reg), Rd(reg)
-||	} else {
-|		ASM_REG_REG_OP xor, type, reg, reg
-||	}
+|	xor Rd(reg), Rd(reg)
 |.endmacro
 
 |.macro ASM_REG_REG_OP2, op, type, op1, op2

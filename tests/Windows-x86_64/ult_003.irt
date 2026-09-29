@@ -14,5 +14,5 @@ x86_64-windows
 }
 --EXPECT--
 test:
-	xorb %al, %al
+	xorl %eax, %eax
 	retq
