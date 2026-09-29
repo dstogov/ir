@@ -1,7 +1,5 @@
 --TEST--
-SWITCH with INT32_MIN dense cases on x86-32
---TARGET--
-x86
+SWITCH with INT32_MIN dense cases
 --ARGS--
 -O1 --run
 --CODE--
