@@ -1,0 +1,21 @@
+--TEST--
+001: Fuse load from constant address that doesn't fit a displacement
+--TARGET--
+x86_64-*-sysv
+--ARGS--
+-S
+--CODE--
+{
+	uintptr_t c_1 = 0x123456789a;
+	int8_t c_2 = 0;
+	l_1 = START(l_3);
+	int8_t d_2, l_2 = LOAD(l_1, c_1);
+	bool d_3 = EQ(d_2, c_2);
+	l_3 = RETURN(l_2, d_3);
+}
+--EXPECT--
+test:
+	movabsq $0x123456789a, %rax
+	cmpb $0, (%rax)
+	sete %al
+	retq
