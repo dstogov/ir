@@ -26003,8 +26003,10 @@ void ir_fix_stack_frame(ir_ctx *ctx)
 
 #ifdef IR_TARGET_X86
 	if (ctx->flags2 & IR_HAS_MEMCPY) {
-		IR_REGSET_INCL(ctx->used_preserved_regs, IR_REG_RSI);
-		IR_REGSET_INCL(ctx->used_preserved_regs, IR_REG_RDI);
+		ir_regset tmp = ctx->used_preserved_regs;
+		IR_REGSET_INCL(tmp, IR_REG_RSI);
+		IR_REGSET_INCL(tmp, IR_REG_RDI);
+		ctx->used_preserved_regs = tmp;
 	}
 #endif
 
