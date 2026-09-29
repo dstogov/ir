@@ -1665,8 +1665,8 @@ finish:
 
 	if ((dump & IR_RUN) && loader.main) {
 		int jit_argc = 1;
-		char **jit_argv;
-		int (*func)(int, char**) = loader.main;
+		const char **jit_argv;
+		int (*func)(int, const char**) = loader.main;
 
 		if (dump_time) {
 			ir_atexit_start = start;
