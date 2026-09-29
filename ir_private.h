@@ -1324,6 +1324,11 @@ struct _ir_live_range {
 #define IR_LIVE_INTERVAL_SPLIT_CHILD     (1<<8)
 #define IR_LIVE_INTERVAL_TWO_REGS        (1<<9)
 
+/* macros to encode and decode stack offset stored in ctx->vregs[] */
+#define IR_VREG_IS_STACK_SLOT(vreg)      ((vreg) < 0)
+#define IR_VREG_TO_STACK_SLOT(vreg)      ((vreg) + 0x40000000)
+#define IR_STACK_SLOT_TO_VREG(offset)    ((int32_t)0xc0000000 + (offset))
+
 struct _ir_live_interval {
 	uint8_t           type;
 	int8_t            reg;

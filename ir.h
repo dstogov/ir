@@ -712,7 +712,6 @@ typedef struct _ir_code_buffer {
 typedef struct {
 	int   size;
 	int   align;
-	int   offset;
 } ir_value_param;
 
 typedef struct _ir_bitqueue ir_bitqueue;
@@ -747,8 +746,8 @@ struct _ir_ctx {
 	uint32_t          *cfg_map;                 /* map of instructions to basic block number */
 	uint32_t          *cfg_schedule;            /* BB order for code generation */
 	uint32_t          *rules;                   /* array of target specific code-generation rules (for each instruction) */
-	uint32_t          *vregs;
-	ir_ref             vregs_count;
+	int32_t           *vregs;                   /* map of insns to virtual regs (positive) or stack slots (negative) */
+	int32_t            vregs_count;
 	ir_str             func_name;               /* Function name (should be set through ir_string()/ir_stringl()) */
 	int32_t            spill_base;              /* base register for special spill area (e.g. PHP VM frame pointer) */
 	uint64_t           fixed_regset;            /* fixed registers, excluded for regular register allocation */
