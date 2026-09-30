@@ -176,6 +176,8 @@ jobs:
         run: make BUILD=debug test-ci
 
   Windows:
+    env:
+      CFLAGS: '/W3 /WX /wd4018 /wd4146 /wd4244 /wd4267 /wd4995 /wd4996 /wd5287'
     strategy:
       fail-fast: false
       matrix:
