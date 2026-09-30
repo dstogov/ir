@@ -12402,6 +12402,7 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 	if ((sizeof(void*) == 8 || ir_type_size[type] <= 4)
 	 && !has_case_range && count > 2 && (max.u64 - min.u64) < count * 8) {
 		int *labels = ir_mem_malloc(sizeof(int) * (size_t)(max.u64 - min.u64 + 1));
+		ir_reg idx_reg;
 
 		for (i = 0; i <= (max.i64 - min.i64); i++) {
 			labels[i] = default_label;
@@ -12464,21 +12465,22 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 				|	add Ra(tmp_reg), Ra(op2_reg)
 |.endif
 			}
+			idx_reg = tmp_reg;
 		} else {
-			tmp_reg = op2_reg;
+			idx_reg = op2_reg;
 		}
 
 		if (default_label) {
 			int64_t offset = max.u64 - min.u64;
 
 			IR_ASSERT(IR_IS_SIGNED_32BIT(offset));
-			|	cmp Ra(tmp_reg), (int32_t)offset
+			|	cmp Ra(idx_reg), (int32_t)offset
 			|	ja =>default_label
 		}
 
 #ifdef IR_TARGET_X86
 |.if not X64
-		|	jmp aword [Ra(tmp_reg)*4+>1]
+		|	jmp aword [Ra(idx_reg)*4+>1]
 |.endif
 #else
 |.if X64
@@ -12488,7 +12490,7 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 		 && IR_IS_SIGNED_32BIT((char*)ctx->code_buffer->start)
 		 && IR_IS_SIGNED_32BIT((char*)ctx->code_buffer->end))) {
 			/* Use SIB with absolute jmp_table displacement */
-			|	jmp aword [Ra(tmp_reg)*8+>1]
+			|	jmp aword [Ra(idx_reg)*8+>1]
 
 		} else {
 			/* Use IP-relative addressing mode to get the jmp_table address */
@@ -12497,14 +12499,19 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 //			ir_reg op1_reg = ctx->regs[def][1];
 //			if (op1_reg != IR_REG_NONE) {
 //				|	lea Ra(op1_reg), aword [>1]
-//				|	jmp aword [Ra(op1_reg)+Ra(tmp_reg)*8]
+//				|	jmp aword [Ra(op1_reg)+Ra(idx_reg)*8]
 //			} else
 			if ((min.i64 >= (INT32_MIN+1)/8) && (min.i64 <= INT32_MAX/8)) {
+				tmp_reg = ctx->regs[def][3];
 				|	lea Ra(tmp_reg), aword [>1]
 				|	jmp aword [Ra(tmp_reg)+Ra(op2_reg)*8+(-min.i32 * 8)]
 			} else {
 				use_table_address = 1;
-				|	shl Ra(tmp_reg), 3
+				if (idx_reg == tmp_reg) {
+					|	shl Ra(tmp_reg), 3
+				} else {
+					|	lea Ra(tmp_reg), aword [Ra(idx_reg)*8]
+				}
 				|	add Ra(tmp_reg), aword [>2]
 				|	jmp aword [Ra(tmp_reg)]
 			}
