@@ -1,7 +1,7 @@
 --TEST--
 BITCAST 003: regression integer constant to float
 --ARGS--
--O0 --run
+--run
 --CODE--
 extern func @printf(uintptr_t, ...): void;
 static const @format[4] = "%g\n\000";
