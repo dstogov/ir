@@ -250,7 +250,7 @@ static bool ir_is_same_mem_var(const ir_ctx *ctx, ir_ref r1, int32_t offset)
 		return 0;
 	}
 
-	IR_ASSERT(ctx->vregs[r1]);
+	IR_ASSERT(ctx->vregs[r1] > 0);
 	ival1 = ctx->live_intervals[ctx->vregs[r1]];
 	IR_ASSERT(ival1);
 	o1 = ival1->stack_spill_pos;
@@ -439,7 +439,7 @@ static IR_NEVER_INLINE void ir_emit_osr_entry_loads(ir_ctx *ctx, int b, ir_block
 
 	for (i = 0; i < count; i++, pos++) {
 		ref = ir_list_at(list, pos);
-		IR_ASSERT(ref >= 0 && ctx->vregs[ref] && ctx->live_intervals[ctx->vregs[ref]]);
+		IR_ASSERT(ref >= 0 && ctx->vregs[ref] > 0 && ctx->live_intervals[ctx->vregs[ref]]);
 		if (!(ctx->live_intervals[ctx->vregs[ref]]->flags & IR_LIVE_INTERVAL_SPILLED)) {
 			/* not spilled */
 			ir_reg reg = ctx->live_intervals[ctx->vregs[ref]]->reg;
@@ -1393,7 +1393,7 @@ int32_t ir_get_spill_slot_offset(const ir_ctx *ctx, ir_ref ref)
 {
 	int32_t offset;
 
-	IR_ASSERT(ref >= 0 && ctx->vregs[ref] && ctx->live_intervals[ctx->vregs[ref]]);
+	IR_ASSERT(ref >= 0 && ctx->vregs[ref] > 0 && ctx->live_intervals[ctx->vregs[ref]]);
 	offset = ctx->live_intervals[ctx->vregs[ref]]->stack_spill_pos;
 	IR_ASSERT(offset != -1);
 	return IR_SPILL_POS_TO_OFFSET(offset);
@@ -1528,7 +1528,9 @@ static ir_reg _get_free_reg2(ir_ctx *ctx, ir_type type, ir_reg_alloc_simple_data
 
 	reg = IR_REGSET_FIRST(available);
 	if (IR_REGSET_IN(x->preserved_regs, reg)) {
-		IR_REGSET_INCL(ctx->used_preserved_regs, reg);
+		ir_regset tmp = ctx->used_preserved_regs;
+		IR_REGSET_INCL(tmp, reg);
+		ctx->used_preserved_regs = tmp;
 	}
 	return reg;
 }
@@ -1648,7 +1650,7 @@ static void ir_add_fusion_data(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_reg_all
 			IR_ASSERT(IR_OPND_KIND(flags, j) == IR_OPND_DATA);
 			child = *p;
 			if (child > 0) {
-				if (ctx->vregs[child]) {
+				if (ctx->vregs[child] > 0) {
 					if (IR_USE_FLAGS(def_flags, j) & IR_USE_MUST_BE_IN_REG) {
 						ir_reg reg = (j < constraints.hints_count) ? constraints.hints[j] : IR_REG_NONE;
 						int8_t use_pos = EXPECTED(reg == IR_REG_NONE) ? IR_USE_SUB_REF : IR_LOAD_SUB_REF;
@@ -1684,6 +1686,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 	ir_reg reg;
 	ir_regset scratch;
 	ir_reg_alloc_simple_data x;
+	int32_t offset;
 
 	memset(&data, 0, sizeof(data));
 	data.cc = ir_get_call_conv_dsc(ctx->flags);
@@ -1714,7 +1717,8 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 				if ((*rule & IR_RULE_MASK) == IR_ALLOCA) {
 					if (insn->op == IR_VAR) {
 						if (ctx->use_lists[i].count > 0) {
-							insn->op3 = ir_allocate_spill_slot(ctx, insn->type);
+							offset = ir_allocate_spill_slot(ctx, ir_get_type_size(insn->type), insn->op3);
+							ctx->vregs[i] = IR_STACK_SLOT_TO_VREG(offset);
 						}
 					} else if (insn->op == IR_ALLOCA) {
 						if (ctx->use_lists[i].count > 0) {
@@ -1725,10 +1729,11 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 							IR_ASSERT(!IR_IS_SYM_CONST(val->op));
 							IR_ASSERT(IR_IS_TYPE_UNSIGNED(val->type) || val->val.i64 >= 0);
 							IR_ASSERT(val->val.i64 < 0x7fffffff);
-							insn->op3 = ir_allocate_big_spill_slot(ctx, val->val.i32);
+							offset = ir_allocate_spill_slot(ctx, val->val.i32, insn->op3);
+							ctx->vregs[i] = IR_STACK_SLOT_TO_VREG(offset);
 						}
 					} else if (insn->op == IR_VADDR) {
-						insn->op3 = ctx->ir_base[insn->op1].op3;
+						ctx->vregs[i] = ctx->vregs[insn->op1];
 					}
 				}
 			} else {
@@ -1767,7 +1772,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					}
 				}
 
-				if (ctx->vregs[i]) {
+				if (ctx->vregs[i] > 0) {
 					reg = constraints.def_reg;
 					if (!ctx->live_intervals[ctx->vregs[i]]) {
 						ir_live_interval *ival = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
@@ -1779,7 +1784,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 						ival->stack_spill_pos = -1;
 						if ((insn->op == IR_VLOAD || insn->op == IR_VLOAD_v)
 						 && ir_load_may_reuse_var_slot(ctx, bb, insn->op2, i)) {
-							ival->stack_spill_pos = ctx->ir_base[insn->op2].op3;
+							ival->stack_spill_pos = IR_VREG_TO_STACK_SLOT(ctx->vregs[insn->op2]);
 							reg = IR_REG_NONE;
 							def_flags &= ~IR_USE_MUST_BE_IN_REG;
 						} else if (insn->op == IR_PARAM && reg == IR_REG_NONE) {
@@ -1792,16 +1797,16 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 							 && use_insn->op3 == i
 							 && ir_store_may_reuse_var_slot(ctx, bb, use_insn->op2, use, i)) {
 								if (use_insn->op2 < i) {
-									ival->stack_spill_pos = ctx->ir_base[use_insn->op2].op3;
+									ival->stack_spill_pos = IR_VREG_TO_STACK_SLOT(ctx->vregs[use_insn->op2]);
 								} else {
-									ival->stack_spill_pos = ctx->ir_base[use_insn->op2].op3 =
-										ir_allocate_spill_slot(ctx, ival->type);
+									ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ir_get_type_size(ival->type), 0);
+									ctx->vregs[use_insn->op2] = IR_STACK_SLOT_TO_VREG(ival->stack_spill_pos);
 								}
 							} else {
-								ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type);
+								ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ir_get_type_size(ival->type), 0);
 							}
 						} else {
-							ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type);
+							ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ir_get_type_size(ival->type), 0);
 						}
 					} else if (insn->op == IR_PARAM) {
 						IR_ASSERT(0 && "unexpected PARAM");
@@ -1849,7 +1854,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					uint32_t use_flags = IR_USE_FLAGS(def_flags, j);
 
 					if (input > 0) {
-						if (ctx->vregs[input]) {
+						if (ctx->vregs[input] > 0) {
 							use_pos = IR_USE_SUB_REF;
 							if (reg != IR_REG_NONE) {
 								use_pos = IR_LOAD_SUB_REF;
@@ -1958,10 +1963,10 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 
 #ifdef IR_TARGET_X86
 	if (ctx->flags2 & IR_HAS_FP_RET_SLOT) {
-		ctx->ret_slot = ir_allocate_spill_slot(ctx, IR_DOUBLE);
+		ctx->ret_slot = ir_allocate_spill_slot(ctx, ir_type_size[IR_DOUBLE], 0);
 	} else if ((ctx->ret_type == IR_FLOAT || ctx->ret_type == IR_DOUBLE)
 			&& data.cc->fp_ret_reg == IR_REG_NONE) {
-		ctx->ret_slot = ir_allocate_spill_slot(ctx, ctx->ret_type);
+		ctx->ret_slot = ir_allocate_spill_slot(ctx, ir_type_size[ctx->ret_type], 0);
 	} else {
 		ctx->ret_slot = -1;
 	}

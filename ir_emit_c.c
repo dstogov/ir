@@ -189,7 +189,7 @@ static void ir_emit_ref(ir_ctx *ctx, FILE *f, ir_ref ref)
 
 static void ir_emit_def_ref(ir_ctx *ctx, FILE *f, ir_ref def)
 {
-	IR_ASSERT(ctx->vregs[def]);
+	IR_ASSERT(ctx->vregs[def] > 0);
 	fprintf(f, "\td_%d = ", ctx->vregs[def]);
 }
 
@@ -871,7 +871,7 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 	int j, n;
 	const ir_proto_t *proto = ir_call_proto(ctx, insn);
 
-	if (insn->type != IR_VOID && ctx->vregs[def] != IR_UNUSED) {
+	if (insn->type != IR_VOID && ctx->vregs[def] > 0) {
 		ir_emit_def_ref(ctx, f, def);
 	} else {
 		fprintf(f, "\t");
@@ -948,7 +948,7 @@ static void ir_emit_ijmp(ir_ctx *ctx, FILE *f, ir_insn *insn)
 
 static void ir_emit_alloca(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 {
-	if (ctx->vregs[def]) {
+	if (ctx->vregs[def] > 0) {
 		ir_emit_def_ref(ctx, f, def);
 	} else {
 		fprintf(f, "\t");
@@ -983,7 +983,7 @@ static void ir_emit_vstore(ir_ctx *ctx, FILE *f, ir_insn *insn)
 
 static void ir_emit_load(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 {
-	if (ctx->vregs[def]) {
+	if (ctx->vregs[def] > 0) {
 		ir_emit_def_ref(ctx, f, def);
 	} else {
 		fprintf(f, "\t");
@@ -1110,7 +1110,7 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 					ir_emit_c_type_name(insn->type, f);
 					fprintf(f, " %s;\n", ir_get_str(ctx, insn->op2));
 				}
-			} else if (ctx->vregs[i]) {
+			} else if (ctx->vregs[i] > 0) {
 				if (!ir_bitset_in(vars, ctx->vregs[i])) {
 					ir_bitset_incl(vars, ctx->vregs[i]);
 					if (insn->op == IR_PARAM) {
@@ -1426,7 +1426,7 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 					fprintf(f, ");\n");
 					break;
 				case IR_VA_ARG:
-					if (ctx->vregs[i]) {
+					if (ctx->vregs[i] > 0) {
 						ir_emit_def_ref(ctx, f, i);
 					} else {
 						fprintf(f, "\t");
