@@ -1,0 +1,60 @@
+--TEST--
+SWITCH with uint32_t dense cases above the sign bit
+--ARGS--
+-O1 --run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func select(uint32_t): int32_t
+{
+	uint32_t c_1 = 2147483648;
+	uint32_t c_2 = 2147483649;
+	uint32_t c_3 = 2147483650;
+	int32_t c_4 = 21;
+	int32_t c_5 = 22;
+	int32_t c_6 = 23;
+	int32_t c_7 = 99;
+	l_1 = START(l_16);
+	uint32_t d_2 = PARAM(l_1, "x", 1);
+	l_4 = SWITCH(l_1, d_2);
+	l_5 = CASE_VAL(l_4, c_1);
+	int32_t x_1 = COPY(c_4);
+	l_6 = END(l_5);
+	l_7 = CASE_VAL(l_4, c_2);
+	int32_t x_2 = COPY(c_5);
+	l_8 = END(l_7);
+	l_9 = CASE_VAL(l_4, c_3);
+	int32_t x_3 = COPY(c_6);
+	l_10 = END(l_9);
+	l_11 = CASE_DEFAULT(l_4);
+	int32_t x_4 = COPY(c_7);
+	l_12 = END(l_11);
+	l_13 = MERGE/4(l_6, l_8, l_10, l_12);
+	int32_t ret = PHI/4(l_13, x_1, x_2, x_3, x_4);
+	l_16 = RETURN(l_13, ret);
+}
+func main(void): int32_t
+{
+	uint32_t c_1 = 2147483648;
+	uint32_t c_2 = 2147483649;
+	uint32_t c_3 = 2147483650;
+	uint32_t c_4 = 2147483651;
+	uint32_t c_5 = 2147483647;
+	uint32_t c_6 = 0;
+	uint32_t c_7 = 4294967295;
+	int32_t c_8 = 0;
+	uintptr_t c_9 = func select(uint32_t): int32_t;
+	uintptr_t c_10 = "%d %d %d %d %d %d %d\n";
+	uintptr_t c_11 = func printf(uintptr_t, ...): int32_t;
+	l_1 = START(l_10);
+	int32_t d_2, l_2 = CALL/1(l_1, c_9, c_1);
+	int32_t d_3, l_3 = CALL/1(l_2, c_9, c_2);
+	int32_t d_4, l_4 = CALL/1(l_3, c_9, c_3);
+	int32_t d_5, l_5 = CALL/1(l_4, c_9, c_4);
+	int32_t d_6, l_6 = CALL/1(l_5, c_9, c_5);
+	int32_t d_7, l_7 = CALL/1(l_6, c_9, c_6);
+	int32_t d_8, l_8 = CALL/1(l_7, c_9, c_7);
+	int32_t d_9, l_9 = CALL/8(l_8, c_11, c_10, d_2, d_3, d_4, d_5, d_6, d_7, d_8);
+	l_10 = RETURN(l_9, c_8);
+}
+--EXPECT--
+21 22 23 99 99 99 99

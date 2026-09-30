@@ -5700,10 +5700,12 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 			IR_ASSERT(!IR_IS_SYM_CONST(val2->op));
 			if (IR_IS_TYPE_SIGNED(type)) {
 				IR_ASSERT(IR_IS_TYPE_SIGNED(val->type));
+				IR_ASSERT(IR_IS_TYPE_SIGNED(val2->type));
 				min.i64 = IR_MIN(min.i64, val->val.i64);
 				max.i64 = IR_MAX(max.i64, val2->val.i64);
 			} else {
 				IR_ASSERT(!IR_IS_TYPE_SIGNED(val->type));
+				IR_ASSERT(!IR_IS_TYPE_SIGNED(val2->type));
 				min.u64 = (int64_t)IR_MIN(min.u64, val->val.u64);
 				max.u64 = (int64_t)IR_MAX(max.u64, val2->val.u64);
 			}

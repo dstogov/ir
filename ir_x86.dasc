@@ -12318,7 +12318,7 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 	uint32_t n, *p, use_block;
 	int i;
 	int label, default_label = 0;
-	int count = 0;
+	uint32_t count = 0;
 	ir_val min, max;
 	ir_reg op2_reg = ctx->regs[def][2];
 	ir_reg tmp_reg = ctx->regs[def][3];
@@ -12351,8 +12351,8 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 				max.i64 = IR_MAX(max.i64, val->val.i64);
 			} else {
 				IR_ASSERT(!IR_IS_TYPE_SIGNED(val->type));
-				min.u64 = (int64_t)IR_MIN(min.u64, val->val.u64);
-				max.u64 = (int64_t)IR_MAX(max.u64, val->val.u64);
+				min.u64 = IR_MIN(min.u64, val->val.u64);
+				max.u64 = IR_MAX(max.u64, val->val.u64);
 			}
 			count++;
 		} else if (use_insn->op == IR_CASE_RANGE) {
@@ -12363,12 +12363,14 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 			IR_ASSERT(!IR_IS_SYM_CONST(val2->op));
 			if (IR_IS_TYPE_SIGNED(type)) {
 				IR_ASSERT(IR_IS_TYPE_SIGNED(val->type));
+				IR_ASSERT(IR_IS_TYPE_SIGNED(val2->type));
 				min.i64 = IR_MIN(min.i64, val->val.i64);
 				max.i64 = IR_MAX(max.i64, val2->val.i64);
 			} else {
 				IR_ASSERT(!IR_IS_TYPE_SIGNED(val->type));
-				min.u64 = (int64_t)IR_MIN(min.u64, val->val.u64);
-				max.u64 = (int64_t)IR_MAX(max.u64, val2->val.u64);
+				IR_ASSERT(!IR_IS_TYPE_SIGNED(val2->type));
+				min.u64 = IR_MIN(min.u64, val->val.u64);
+				max.u64 = IR_MAX(max.u64, val2->val.u64);
 			}
 		} else {
 			IR_ASSERT(use_insn->op == IR_CASE_DEFAULT);
@@ -12397,8 +12399,9 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 	}
 
 	/* Generate a table jmp or a seqence of calls */
-	if (!has_case_range && count > 2 && (max.i64-min.i64) < count * 8) {
-		int *labels = ir_mem_malloc(sizeof(int) * (size_t)(max.i64 - min.i64 + 1));
+	if ((sizeof(void*) == 8 || ir_type_size[type] <= 4)
+	 && !has_case_range && count > 2 && (max.u64 - min.u64) < count * 8) {
+		int *labels = ir_mem_malloc(sizeof(int) * (size_t)(max.u64 - min.u64 + 1));
 
 		for (i = 0; i <= (max.i64 - min.i64); i++) {
 			labels[i] = default_label;
@@ -12451,62 +12454,63 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 		}
 
 		if (min.i64 != 0) {
-			int64_t offset = -min.i64;
+			int64_t offset = 0 - min.u64;
 
 			if (IR_IS_SIGNED_32BIT(offset)) {
 				|	lea Ra(tmp_reg), [Ra(op2_reg)+(int32_t)offset]
 			} else {
-				IR_ASSERT(sizeof(void*) == 8);
 |.if X64
 				|	mov64 Rq(tmp_reg), offset
 				|	add Ra(tmp_reg), Ra(op2_reg)
 |.endif
 			}
-			if (default_label) {
-				offset = max.i64 - min.i64;
-
-				IR_ASSERT(IR_IS_SIGNED_32BIT(offset));
-				|	cmp Ra(tmp_reg), (int32_t)offset
-				|	ja =>default_label
-			}
-|.if X64
-			if (ctx->code_buffer
-			 && IR_IS_SIGNED_32BIT((char*)ctx->code_buffer->start)
-			 && IR_IS_SIGNED_32BIT((char*)ctx->code_buffer->end)) {
-				|	jmp aword [Ra(tmp_reg)*8+>1]
-			} else {
-				int64_t offset = -min.i64;
-
-				IR_ASSERT(IR_IS_SIGNED_32BIT(offset));
-				offset *= 8;
-				IR_ASSERT(IR_IS_SIGNED_32BIT(offset));
-				|	lea Ra(tmp_reg), aword [>1]
-				|	jmp aword [Ra(tmp_reg)+Ra(op2_reg)*8+offset]
-			}
-|.else
-			|	jmp aword [Ra(tmp_reg)*4+>1]
-|.endif
 		} else {
-			if (default_label) {
-				int64_t offset = max.i64;
-
-				IR_ASSERT(IR_IS_SIGNED_32BIT(offset));
-				|	cmp Ra(op2_reg), (int32_t)offset
-				|	ja =>default_label
-			}
-|.if X64
-			if (ctx->code_buffer
-			 && IR_IS_SIGNED_32BIT((char*)ctx->code_buffer->start)
-			 && IR_IS_SIGNED_32BIT((char*)ctx->code_buffer->end)) {
-				|	jmp aword [Ra(op2_reg)*8+>1]
-			} else {
-				|	lea Ra(tmp_reg), aword [>1]
-				|	jmp aword [Ra(tmp_reg)+Ra(op2_reg)*8]
-			}
-|.else
-			|	jmp aword [Ra(op2_reg)*4+>1]
-|.endif
+			tmp_reg = op2_reg;
 		}
+
+		if (default_label) {
+			int64_t offset = max.u64 - min.u64;
+
+			IR_ASSERT(IR_IS_SIGNED_32BIT(offset));
+			|	cmp Ra(tmp_reg), (int32_t)offset
+			|	ja =>default_label
+		}
+
+#ifdef IR_TARGET_X86
+|.if not X64
+		|	jmp aword [Ra(tmp_reg)*4+>1]
+|.endif
+#else
+|.if X64
+		bool use_table_address = 0;
+
+		if ((ctx->code_buffer
+		 && IR_IS_SIGNED_32BIT((char*)ctx->code_buffer->start)
+		 && IR_IS_SIGNED_32BIT((char*)ctx->code_buffer->end))) {
+			/* Use SIB with absolute jmp_table displacement */
+			|	jmp aword [Ra(tmp_reg)*8+>1]
+
+		} else {
+			/* Use IP-relative addressing mode to get the jmp_table address */
+
+			// TODO: it's possible to use an extra temporary register (not conflicting with "killed" op2) ???
+//			ir_reg op1_reg = ctx->regs[def][1];
+//			if (op1_reg != IR_REG_NONE) {
+//				|	lea Ra(op1_reg), aword [>1]
+//				|	jmp aword [Ra(op1_reg)+Ra(tmp_reg)*8]
+//			} else
+			if ((min.i64 >= (INT32_MIN+1)/8) && (min.i64 <= INT32_MAX/8)) {
+				|	lea Ra(tmp_reg), aword [>1]
+				|	jmp aword [Ra(tmp_reg)+Ra(op2_reg)*8+(-min.i32 * 8)]
+			} else {
+				use_table_address = 1;
+				|	shl Ra(tmp_reg), 3
+				|	add Ra(tmp_reg), aword [>2]
+				|	jmp aword [Ra(tmp_reg)]
+			}
+		}
+|.endif
+#endif
 
 		|.jmp_table
 		if (!data->jmp_table_label) {
@@ -12514,6 +12518,12 @@ static void ir_emit_switch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn)
 			|=>data->jmp_table_label:
 		}
 		|.align aword
+#ifndef IR_TARGET_X86
+		if (use_table_address) {
+			|2:
+			|	.aword >1
+		}
+#endif
 		|1:
 		for (i = 0; i <= (max.i64 - min.i64); i++) {
 			int b = labels[i];
