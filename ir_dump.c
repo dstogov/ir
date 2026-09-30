@@ -746,7 +746,7 @@ void ir_dump_codegen(const ir_ctx *ctx, FILE *f)
 							fprintf(f, "%sfunc ", first ? "(" : ", ");
 							ir_print_proto(ctx, ref, f);
 							break;
-						case IR_OPND_PROB:
+						case IR_OPND_OPT:
 							if (ref == 0) {
 								break;
 							}

@@ -383,7 +383,7 @@ void ir_save(const ir_ctx *ctx, uint32_t save_flags, FILE *f)
 						fprintf(f, "%sfunc ", first ? "(" : ", ");
 						ir_print_proto(ctx, ref, f);
 						break;
-					case IR_OPND_PROB:
+					case IR_OPND_OPT:
 						if (ref == 0) {
 							break;
 						}

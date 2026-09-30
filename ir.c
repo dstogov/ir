@@ -391,8 +391,8 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted
 #define ir_op_kind_num     IR_OPND_NUM
 #define ir_op_kind_fld     IR_OPND_STR
 #define ir_op_kind_var     IR_OPND_DATA
-#define ir_op_kind_prb     IR_OPND_PROB
-#define ir_op_kind_opt     IR_OPND_PROB
+#define ir_op_kind_opt     IR_OPND_OPT
+#define ir_op_kind_prb     IR_OPND_OPT
 #define ir_op_kind_pro     IR_OPND_PROTO
 #define ir_op_kind_lbl     IR_OPND_LABEL_REF
 
