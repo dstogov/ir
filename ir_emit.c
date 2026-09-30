@@ -1717,7 +1717,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 				if ((*rule & IR_RULE_MASK) == IR_ALLOCA) {
 					if (insn->op == IR_VAR) {
 						if (ctx->use_lists[i].count > 0) {
-							offset = ir_allocate_spill_slot(ctx, insn->type);
+							offset = ir_allocate_spill_slot(ctx, ir_get_type_size(insn->type), insn->op3);
 							ctx->vregs[i] = IR_STACK_SLOT_TO_VREG(offset);
 						}
 					} else if (insn->op == IR_ALLOCA) {
@@ -1729,7 +1729,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 							IR_ASSERT(!IR_IS_SYM_CONST(val->op));
 							IR_ASSERT(IR_IS_TYPE_UNSIGNED(val->type) || val->val.i64 >= 0);
 							IR_ASSERT(val->val.i64 < 0x7fffffff);
-							offset = ir_allocate_big_spill_slot(ctx, val->val.i32);
+							offset = ir_allocate_spill_slot(ctx, val->val.i32, insn->op3);
 							ctx->vregs[i] = IR_STACK_SLOT_TO_VREG(offset);
 						}
 					} else if (insn->op == IR_VADDR) {
@@ -1799,14 +1799,14 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 								if (use_insn->op2 < i) {
 									ival->stack_spill_pos = IR_VREG_TO_STACK_SLOT(ctx->vregs[use_insn->op2]);
 								} else {
-									ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type);
+									ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ir_get_type_size(ival->type), 0);
 									ctx->vregs[use_insn->op2] = IR_STACK_SLOT_TO_VREG(ival->stack_spill_pos);
 								}
 							} else {
-								ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type);
+								ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ir_get_type_size(ival->type), 0);
 							}
 						} else {
-							ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type);
+							ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ir_get_type_size(ival->type), 0);
 						}
 					} else if (insn->op == IR_PARAM) {
 						IR_ASSERT(0 && "unexpected PARAM");
@@ -1963,10 +1963,10 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 
 #ifdef IR_TARGET_X86
 	if (ctx->flags2 & IR_HAS_FP_RET_SLOT) {
-		ctx->ret_slot = ir_allocate_spill_slot(ctx, IR_DOUBLE);
+		ctx->ret_slot = ir_allocate_spill_slot(ctx, ir_type_size[IR_DOUBLE], 0);
 	} else if ((ctx->ret_type == IR_FLOAT || ctx->ret_type == IR_DOUBLE)
 			&& data.cc->fp_ret_reg == IR_REG_NONE) {
-		ctx->ret_slot = ir_allocate_spill_slot(ctx, ctx->ret_type);
+		ctx->ret_slot = ir_allocate_spill_slot(ctx, ir_type_size[ctx->ret_type], 0);
 	} else {
 		ctx->ret_slot = -1;
 	}

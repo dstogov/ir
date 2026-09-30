@@ -1483,8 +1483,7 @@ typedef struct _ir_reg_alloc_data {
 	ir_live_interval **handled;
 } ir_reg_alloc_data;
 
-int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type);
-int32_t ir_allocate_big_spill_slot(ir_ctx *ctx, int32_t size);
+int32_t ir_allocate_spill_slot(ir_ctx *ctx, size_t size, size_t align);
 void ir_dump_reg(const ir_ctx *ctx, int8_t reg, ir_ref ref, bool store, FILE *f);
 
 IR_ALWAYS_INLINE void ir_set_alocated_reg(ir_ctx *ctx, ir_ref ref, int op_num, int8_t reg)

@@ -2808,18 +2808,9 @@ static int32_t ir_allocate_small_spill_slot(ir_ctx *ctx, size_t size)
 	return ret;
 }
 
-int32_t ir_allocate_big_spill_slot(ir_ctx *ctx, int32_t size)
+static int32_t ir_allocate_big_spill_slot(ir_ctx *ctx, size_t size, size_t align)
 {
 	int32_t ret;
-
-	if (size <= 8) {
-		if (size == 3) {
-			size = 4;
-		} else if (size > 4 && size < 8) {
-			size = 8;
-		}
-		return ir_allocate_small_spill_slot(ctx, size);
-	}
 
 	if (size <= 64 && (size & (size - 1)) == 0) {
 		uint32_t n = ir_ntz(size);
@@ -2833,6 +2824,7 @@ int32_t ir_allocate_big_spill_slot(ir_ctx *ctx, int32_t size)
 	}
 
 	/* Align stack allocated data to 16 byte */
+	// TODO: support for alignment larger than 16 ???
 	ctx->flags2 |= IR_16B_FRAME_ALIGNMENT;
 	ret = IR_ALIGNED_SIZE(ctx->stack_frame_size, 16);
 	size = IR_ALIGNED_SIZE(size, 8);
@@ -2841,17 +2833,18 @@ int32_t ir_allocate_big_spill_slot(ir_ctx *ctx, int32_t size)
 	return ret;
 }
 
-int32_t ir_allocate_spill_slot(ir_ctx *ctx, ir_type type)
+int32_t ir_allocate_spill_slot(ir_ctx *ctx, size_t size, size_t align)
 {
-	if (IR_IS_TYPE_SCALAR(type)) {
-		return ir_allocate_small_spill_slot(ctx, ir_type_size[type]);
+	IR_ASSERT(align == 0 || (align & (align -1)) == 0); /* align must be a power of 2 */
+	if (size <= 8 && align < 16) {
+		if (align > size) {
+			size = align;
+		} else if ((size & (size - 1)) != 0) {
+			size = (size == 3) ? 4 : 8;
+		}
+		return ir_allocate_small_spill_slot(ctx, size);
 	} else {
-		int32_t size;
-
-		IR_ASSERT(IR_IS_TYPE_VECTOR(type));
-		size = IR_VECTOR_SIZE(type);
-		size = IR_MAX(size, 4);
-		return ir_allocate_big_spill_slot(ctx, size);
+		return ir_allocate_big_spill_slot(ctx, size, align);
 	}
 }
 
@@ -3987,7 +3980,7 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 		vars = IR_VREG_TO_STACK_SLOT(ctx->vregs[var]); /* list next */
 
 		if (insn->op == IR_VAR) {
-			ir_ref slot = ir_allocate_spill_slot(ctx, insn->type);
+			ir_ref slot = ir_allocate_spill_slot(ctx, ir_get_type_size(insn->type), insn->op3);
 			ir_use_list *use_list;
 			ir_ref n, *p;
 
@@ -4011,7 +4004,7 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 			IR_ASSERT(IR_IS_TYPE_UNSIGNED(val->type) || val->val.i64 >= 0);
 			IR_ASSERT(val->val.i64 < 0x7fffffff);
 
-			offset = ir_allocate_big_spill_slot(ctx, val->val.i32);
+			offset = ir_allocate_spill_slot(ctx, val->val.i32, insn->op3);
 			ctx->vregs[var] = IR_STACK_SLOT_TO_VREG(offset);
 		}
 	}
@@ -4230,7 +4223,7 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 					other = prev ? prev->list_next : active;
 				}
 
-				ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ival->type);
+				ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ir_get_type_size(ival->type), 0);
 				if (unhandled && ival->end > unhandled->range.start) {
 					ival->list_next = active;
 					active = ival;
@@ -4258,10 +4251,10 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 
 #ifdef IR_TARGET_X86
 	if (ctx->flags2 & IR_HAS_FP_RET_SLOT) {
-		ctx->ret_slot = ir_allocate_spill_slot(ctx, IR_DOUBLE);
+		ctx->ret_slot = ir_allocate_spill_slot(ctx, ir_type_size[IR_DOUBLE], 0);
 	} else if ((ctx->ret_type == IR_FLOAT || ctx->ret_type == IR_DOUBLE)
 			&& ((ir_reg_alloc_data*)(ctx->data))->cc->fp_ret_reg == IR_REG_NONE) {
-		ctx->ret_slot = ir_allocate_spill_slot(ctx, ctx->ret_type);
+		ctx->ret_slot = ir_allocate_spill_slot(ctx, ir_type_size[ctx->ret_type], 0);
 	} else {
 		ctx->ret_slot = -1;
 	}
