@@ -8,6 +8,12 @@
 #include "ir.h"
 #include "ir_private.h"
 
+#ifdef _MSC_VER
+# pragma warning(push)
+/* silence false positive MSVC warning, see https://github.com/dstogov/ir/pull/221#issuecomment-5895476914 */
+# pragma warning(disable : 5287)
+#endif
+
 void ir_consistency_check(void)
 {
 	IR_ASSERT(IR_UNUSED == 0);
@@ -40,6 +46,10 @@ void ir_consistency_check(void)
 
 	IR_ASSERT(IR_ADD + 1 == IR_SUB);
 }
+
+#ifdef _MSC_VER
+# pragma warning(pop)
+#endif
 
 typedef struct {
 	ir_arena  *arena;
