@@ -25,7 +25,7 @@ CAPSTONE_ARTIFACTS_DIR=$(CAPSTONE_DIR)\msvc\$(BUILD)
 !endif
 PATH=$(PATH);$(CAPSTONE_ARTIFACTS_DIR)
 
-CFLAGS=/nologo /utf-8 /W3 /EHsc /Zi /I$(BUILD_DIR) /I$(CAPSTONE_DIR)\include
+CFLAGS=$(CFLAGS) /nologo /utf-8 /EHsc /Zi /I$(BUILD_DIR) /I$(CAPSTONE_DIR)\include
 LDFLAGS=/nologo
 !if "$(BUILD)" == "release"
 CFLAGS=$(CFLAGS) /MT /Ox
