@@ -990,7 +990,7 @@ IR_ALWAYS_INLINE bool ir_ref_is_true(const ir_ctx *ctx, ir_ref ref)
 #define IR_OPND_CONTROL_GUARD     0x6U
 #define IR_OPND_STR               0x7U
 #define IR_OPND_NUM               0x8U
-#define IR_OPND_OPT               0x9U /* optional number (flags, branch propability, size+align) */
+#define IR_OPND_OPT               0x9U /* optional number (flags, branch propability, align, size+align) */
 #define IR_OPND_PROTO             0xaU
 
 #define IR_OP_FLAGS(op_flags, op1_flags, op2_flags, op3_flags) \

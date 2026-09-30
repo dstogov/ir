@@ -279,6 +279,7 @@ typedef enum _ir_type {
  * num - number: argument number (PARAM)
  * prb - branch probability 1-99 (0 - unspecified): (IF_TRUE, IF_FALSE, CASE_VAL, CASE_DEFAULT)
  * opt - optional number
+ * alg - optional alignment
  * pro - function prototype
  * lbl - label used as value (a reference to constant): (BEGIN)
  *
@@ -389,7 +390,7 @@ typedef enum _ir_type {
 	\
 	/* data ops                                                         */ \
 	_(PARAM,        p1X2, reg, str, num) /* incoming parameter proj.    */ \
-	_(VAR,	        p1X1, reg, str, ___) /* local variable              */ \
+	_(VAR,	        p1X2, reg, str, alg) /* local variable              */ \
 	_(FUNC_ADDR,    r0,   ___, ___, ___) /* constant func ref           */ \
 	_(FUNC,         r0,   ___, ___, ___) /* constant func ref           */ \
 	_(SYM,          r0,   ___, ___, ___) /* constant symbol ref         */ \
@@ -402,7 +403,7 @@ typedef enum _ir_type {
 	_(TAILCALL,     xN,   src, def, def) /* CALL+RETURN                 */ \
 	\
 	/* memory reference and load/store ops                              */ \
-	_(ALLOCA,       a2,   src, def, ___) /* alloca(def)                 */ \
+	_(ALLOCA,       a2X1, src, def, alg) /* alloca(def)                 */ \
 	_(AFREE,        a2,   src, def, ___) /* revert alloca(def)          */ \
 	_(BLOCK_BEGIN,  a1,   src, ___, ___) /* stacksave                   */ \
 	_(BLOCK_END,    a2,   src, def, ___) /* stackrestore                */ \

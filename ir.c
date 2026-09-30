@@ -379,6 +379,7 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted
 #define ir_op_flag_xN      (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_CALL | IR_OP_FLAG_VAR_INPUTS)
 #define ir_op_flag_a1      (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_ALLOC | 1 | (1 << IR_OP_FLAG_OPERANDS_SHIFT))
 #define ir_op_flag_a2      (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_ALLOC | 2 | (2 << IR_OP_FLAG_OPERANDS_SHIFT))
+#define ir_op_flag_a2X1    (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_ALLOC | 2 | (3 << IR_OP_FLAG_OPERANDS_SHIFT))
 
 #define ir_op_kind____     IR_OPND_UNUSED
 #define ir_op_kind_def     IR_OPND_DATA
@@ -393,6 +394,7 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted
 #define ir_op_kind_var     IR_OPND_DATA
 #define ir_op_kind_opt     IR_OPND_OPT
 #define ir_op_kind_prb     IR_OPND_OPT
+#define ir_op_kind_alg     IR_OPND_OPT
 #define ir_op_kind_pro     IR_OPND_PROTO
 #define ir_op_kind_lbl     IR_OPND_LABEL_REF
 
