@@ -802,7 +802,7 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 		return llvm2ir_binary_expr(ctx, IR_MUL_OV, type, insn);
 	} else if (STR_START(name, name_len, "llvm.sadd.sat.")) {
 		ir_ref ref, overflow, op0, op1, limit;
-		ir_val val;
+		ir_val val = {0};
 
 		IR_ASSERT(count == 2);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
@@ -870,7 +870,7 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 		return ir_COND(type, overflow, limit, ref);
 	} else if (STR_START(name, name_len, "llvm.uadd.sat.")) {
 		ir_ref ref, overflow;
-		ir_val val;
+		ir_val val = {0};
 
 		IR_ASSERT(count == 2);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));
@@ -888,7 +888,7 @@ static ir_ref llvm2ir_intrinsic(ir_ctx *ctx, LLVMValueRef insn, LLVMTypeRef ftyp
 		return ir_COND(type, overflow, ir_const(ctx, val, type), ref);
 	} else if (STR_START(name, name_len, "llvm.ssub.sat.")) {
 		ir_ref ref, overflow, op0, op1, limit;
-		ir_val val;
+		ir_val val = {0};
 
 		IR_ASSERT(count == 2);
 		type = llvm2ir_type(LLVMGetReturnType(ftype));

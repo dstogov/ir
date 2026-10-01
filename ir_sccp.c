@@ -3752,7 +3752,7 @@ static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref con
 		 && ctx->use_lists[condition].count == 1
 		 && ctx->use_lists[condition_insn->op1].count == 1
 		 && (op1_insn->op == IR_ZEXT || op1_insn->op == IR_SEXT)
-		 && val_insn->val.u64 <= (((uint64_t)-1ULL) >> (64 - ir_type_size[ctx->ir_base[op1_insn->op1].type] * 8))) {
+		 && val_insn->val.u64 <= (((uint64_t)(0-1ULL)) >> (64 - ir_type_size[ctx->ir_base[op1_insn->op1].type] * 8))) {
 			/* IF(AND(ZEXT(X), C)) => IF(AND(X, C)) */
 			if (op1_insn->op1 > 0) {
 				ir_use_list_replace_one(ctx, op1_insn->op1, condition_insn->op1, condition);

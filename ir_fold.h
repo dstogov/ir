@@ -890,7 +890,7 @@ IR_FOLD(ABS(C_I32))
 	if (op1_insn->val.i64 >= 0) {
 		IR_FOLD_COPY(op1);
 	} else {
-		IR_FOLD_CONST_I((int32_t)-op1_insn->val.u32);
+		IR_FOLD_CONST_I((int32_t)(0 - op1_insn->val.u32));
 	}
 }
 
@@ -900,7 +900,7 @@ IR_FOLD(ABS(C_I64))
 	if (op1_insn->val.i64 >= 0) {
 		IR_FOLD_COPY(op1);
 	} else {
-		IR_FOLD_CONST_I(-op1_insn->val.u64);
+		IR_FOLD_CONST_I(0 - op1_insn->val.u64);
 	}
 }
 
@@ -2675,7 +2675,7 @@ IR_FOLD(DIV(NEG, C_I32))
 IR_FOLD(DIV(NEG, C_I64))
 {
 	op1 = op1_insn->op1;
-	val.i64 = -(uint64_t)op2_insn->val.i64;
+	val.u64 = (0 - op2_insn->val.u64);
 	op2 = ir_const(ctx, val, op2_insn->type);
 	IR_FOLD_RESTART;
 }

@@ -1359,11 +1359,11 @@ int ir_schedule(ir_ctx *ctx)
 				*dst = *src;
 				_xlat[i] = j;
 				if (dst->op == IR_LONG_CONST) {
-					uintptr_t n;
+					ir_ref n;
 
 					memset(dst + 1, 0, dst->long_const_size);
 					memcpy(dst + 1, src + 1, dst->long_const_size);
-					n = IR_ALIGNED_SIZE(dst->long_const_size, sizeof(ir_insn)) / sizeof(ir_insn);
+					n = (ir_ref)IR_ALIGNED_SIZE(dst->long_const_size, sizeof(ir_insn)) / sizeof(ir_insn);
 					dst += n + 1;
 					src += n + 1;
 					i += n + 1;

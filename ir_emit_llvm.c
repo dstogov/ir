@@ -1766,10 +1766,11 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 		} else if (insn->op == IR_STR) {
 			const char *str = ir_get_str(ctx, insn->val.str);
 			// TODO: strlen != size ???
-			int len = strlen(str);
-			int j;
+			size_t len = strlen(str);
+			size_t j;
 
-			fprintf(f, "@.str%d = private unnamed_addr constant [%d x i8] c\"", i, len + 1);
+			IR_ASSERT(len < 0x7fffffff);
+			fprintf(f, "@.str%d = private unnamed_addr constant [%d x i8] c\"", i, (int)len + 1);
 			for (j = 0; j < len; j++) {
 				char c = str[j];
 

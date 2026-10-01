@@ -6213,6 +6213,7 @@ static ir_mem ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 	ir_ref base_reg_ref, index_reg_ref;
 	ir_reg base_reg = IR_REG_NONE, index_reg;
 	int32_t offset = 0, scale;
+	intptr_t long_offset;
 
 	IR_ASSERT(((rule & IR_RULE_MASK) >= IR_LEA_FIRST &&
 			(rule & IR_RULE_MASK) <= IR_LEA_LAST) ||
@@ -6416,7 +6417,9 @@ static ir_mem ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 		case IR_LEA_SYM_O:
 			op1_insn = &ctx->ir_base[insn->op1];
 			op2_insn = &ctx->ir_base[insn->op2];
-			offset = (intptr_t)ir_sym_val(ctx, op1_insn) + (intptr_t)op2_insn->val.i64;
+			long_offset = (intptr_t)ir_sym_val(ctx, op1_insn) + (intptr_t)op2_insn->val.i64;
+			IR_ASSERT(IR_IS_SIGNED_32BIT(long_offset));
+			offset = (int32_t)long_offset;
 			base_reg_ref = index_reg_ref = IR_UNUSED;
 			scale = 1;
 			offset_insn = NULL;
@@ -6424,7 +6427,9 @@ static ir_mem ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 		case IR_LEA_O_SYM:
 			op1_insn = &ctx->ir_base[insn->op1];
 			op2_insn = &ctx->ir_base[insn->op2];
-			offset = (intptr_t)ir_sym_val(ctx, op2_insn) + (intptr_t)op1_insn->val.i64;
+			long_offset = (intptr_t)ir_sym_val(ctx, op2_insn) + (intptr_t)op1_insn->val.i64;
+			IR_ASSERT(IR_IS_SIGNED_32BIT(long_offset));
+			offset = (int32_t)long_offset;
 			base_reg_ref = index_reg_ref = IR_UNUSED;
 			scale = 1;
 			offset_insn = NULL;
@@ -12275,9 +12280,9 @@ static void ir_emit_va_arg(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			|2:
 			if (def_reg != IR_REG_NONE) {
 				if (ir_type_size[type] == 8) {
-					|	mov Rq(def_reg), qword [Ra(tmp_reg)-sizeof(void*)]
+					|	mov Rq(def_reg), qword [Ra(tmp_reg)+(0-sizeof(void*))]
 				} else {
-					|	mov Rd(def_reg), dword [Ra(tmp_reg)-sizeof(void*)]
+					|	mov Rd(def_reg), dword [Ra(tmp_reg)+(0-sizeof(void*))]
 				}
 			}
 		} else {
@@ -17686,7 +17691,7 @@ static void ir_emit_vector_extract(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 
 		/* extract through stack memory */
-		int offset = -width;
+		int offset = 0 - width;
 		ir_mem mem = IR_MEM(IR_REG_RSP, offset, IR_REG_NONE, 1);
 		ir_mem mem2 = IR_MEM(IR_REG_RSP, offset, op2_reg, ir_type_size[element_type]);
 
@@ -17815,7 +17820,7 @@ static void ir_emit_vector_replace(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 					int offset = width;
 
 					|	movdqu [Ra(IR_REG_RSP)-offset], xmm(tmp_reg-IR_REG_FP_FIRST)
-					|	mov [Ra(IR_REG_RSP)-(offset-(lane%16))], Rb(op3_reg)
+					|	mov [Ra(IR_REG_RSP)+((lane%16)-offset)], Rb(op3_reg)
 					|	movdqu xmm(tmp_reg-IR_REG_FP_FIRST), [Ra(IR_REG_RSP)-offset]
 				}
 			} else if (element_type == IR_I16 || element_type == IR_U16) {
@@ -17962,7 +17967,7 @@ static void ir_emit_vector_replace(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 
 		/* modify through stack memory */
-		int offset = -width;
+		int offset = 0 - width;
 		ir_mem mem = IR_MEM(IR_REG_RSP, offset, IR_REG_NONE, 1);
 		ir_mem mem2 = IR_MEM(IR_REG_RSP, offset, op2_reg, ir_type_size[element_type]);
 
@@ -18816,7 +18821,7 @@ static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_type mask_element_type = IR_VECTOR_BASE_TYPE(mask_type);
 		uint32_t mask_element_size = ir_type_size[mask_element_type];
 		uint32_t mask_len = IR_VECTOR_LENGTH(mask_type);
-		int dst_offset = -width;
+		int dst_offset = 0 - width;
 		int src_offset = dst_offset;
 		uint32_t mod = 0;
 		ir_reg tmp_reg = ctx->tmp_regs[def];
@@ -18844,22 +18849,22 @@ static void ir_emit_vector_shuffle(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				ir_mem src, dst;
 
 				if (mask_element_size == 1) {
-					j = *(uint8_t*)ptr;
+					j = *(uint8_t*)ptr % mod;
 					ptr = ((uint8_t*)ptr) + 1;
 				} else if (mask_element_size == 2) {
-					j = *(uint16_t*)ptr;
+					j = *(uint16_t*)ptr % mod;
 					ptr = ((uint16_t*)ptr) + 1;
 				} else if (mask_element_size == 4) {
-					j = *(uint32_t*)ptr;
+					j = *(uint32_t*)ptr % mod;
 					ptr = ((uint32_t*)ptr) + 1;
 				} else if (mask_element_size == 8) {
-					j = *(uint64_t*)ptr;
+					j = *(uint64_t*)ptr % mod;
 					ptr = ((uint64_t*)ptr) + 1;
 				} else {
 					IR_ASSERT(0);
 					j = 0;
 				}
-				src = IR_MEM(IR_REG_RSP, src_offset + (j % mod) * element_size, IR_REG_NONE, 1);
+				src = IR_MEM(IR_REG_RSP, src_offset + j * element_size, IR_REG_NONE, 1);
 				dst = IR_MEM(IR_REG_RSP, dst_offset + i * element_size, IR_REG_NONE, 1);
 #if IR_X86_I64
 				if (element_type == IR_I64 || element_type == IR_U64) {
@@ -22004,7 +22009,7 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		dst_mem = ir_ref_spill_slot(ctx, def);
 		def_reg = IR_REG_NUM(def_reg);
 	} else {
-		offset = -width;
+		offset = 0 - width;
 		dst_mem = IR_MEM(IR_REG_RSP, offset, IR_REG_NONE, 1);
 	}
 
@@ -22017,7 +22022,7 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			if (offset != 0) {
 				src1_mem = dst_mem;
 			} else {
-				offset = -width;
+				offset = 0 - width;
 				src1_mem = IR_MEM(IR_REG_RSP, offset, IR_REG_NONE, 1);
 			}
 			ir_emit_store_mem_fp(ctx, type, src1_mem, op1_reg);
@@ -22170,7 +22175,7 @@ static void ir_emit_vector_binop_expand(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			if (!scalar_shift) {
 				if (element_size == 8) {
 					if (IR_IS_SIGNED_32BIT(((int64_t*)ptr2)[i])) {
-						val = ((int64_t*)ptr2)[i];
+						val = ((int64_t*)ptr2)[i] & 0xffffffff;
 					} else {
 #if IR_X86_I64
 						val_hi = ((uint64_t*)ptr2)[i] >> 32;
@@ -26030,7 +26035,7 @@ void ir_fix_stack_frame(ir_ctx *ctx)
 
 #ifdef IR_TARGET_X86
 	if (ctx->flags2 & IR_HAS_MEMCPY) {
-		ir_regset tmp = ctx->used_preserved_regs;
+		ir_regset tmp = (ir_regset)ctx->used_preserved_regs;
 		IR_REGSET_INCL(tmp, IR_REG_RSI);
 		IR_REGSET_INCL(tmp, IR_REG_RDI);
 		ctx->used_preserved_regs = tmp;

@@ -2712,7 +2712,7 @@ static int32_t ir_allocate_small_spill_slot(ir_ctx *ctx, size_t size)
 	}
 
 	IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8);
-	n = ir_ntz(size);
+	n = IR_LOG2(size);
 	if (data->handled && data->handled[n]) {
 		ret = data->handled[n]->stack_spill_pos;
 		data->handled[n] = data->handled[n]->list_next;
@@ -2812,8 +2812,9 @@ static int32_t ir_allocate_big_spill_slot(ir_ctx *ctx, size_t size, size_t align
 {
 	int32_t ret;
 
+	IR_ASSERT(size < 0xfffffff);
 	if (size <= 64 && (size & (size - 1)) == 0) {
-		uint32_t n = ir_ntz(size);
+		uint32_t n = IR_LOG2(size);
 		ir_reg_alloc_data *data = ctx->data;
 
 		if (data->handled && data->handled[n]) {
@@ -2828,7 +2829,7 @@ static int32_t ir_allocate_big_spill_slot(ir_ctx *ctx, size_t size, size_t align
 	ctx->flags2 |= IR_16B_FRAME_ALIGNMENT;
 	ret = IR_ALIGNED_SIZE(ctx->stack_frame_size, 16);
 	size = IR_ALIGNED_SIZE(size, 8);
-	ctx->stack_frame_size = ret + size;
+	ctx->stack_frame_size = ret + (int32_t)size;
 
 	return ret;
 }
