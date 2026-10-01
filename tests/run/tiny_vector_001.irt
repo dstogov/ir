@@ -1,5 +1,5 @@
 --TEST--
-LOAD and STORE vectors of 2-bytes vectors
+LOAD and STORE of 2-bytes vectors
 --ARGS--
 --run
 --CODE--

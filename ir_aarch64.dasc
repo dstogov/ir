@@ -1016,7 +1016,7 @@ static void ir_match_fuse_addr(ir_ctx *ctx, ir_ref addr_ref, ir_type type)
 		 && !IR_IS_CONST_REF(addr_insn->op1)
 		 && IR_IS_CONST_REF(addr_insn->op2)  // TODO: temporary workaround
 		 && !IR_IS_SYM_CONST(ctx->ir_base[addr_insn->op2].op)
-		 && aarch64_may_encode_addr_offset(ctx->ir_base[addr_insn->op2].val.i64, ir_type_size[type])) {
+		 && aarch64_may_encode_addr_offset(ctx->ir_base[addr_insn->op2].val.i64, ir_get_type_size(type))) {
 			ir_use_list *use_list = &ctx->use_lists[addr_ref];
 			ir_ref j = use_list->count;
 
