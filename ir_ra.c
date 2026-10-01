@@ -3981,10 +3981,19 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 		vars = IR_VREG_TO_STACK_SLOT(ctx->vregs[var]); /* list next */
 
 		if (insn->op == IR_VAR) {
-			ir_ref slot = ir_allocate_spill_slot(ctx, ir_get_type_size(insn->type), insn->op3);
+			ir_ref slot;
 			ir_use_list *use_list;
 			ir_ref n, *p;
+			size_t size = ir_get_type_size(insn->type);
+			size_t align = insn->op3;
 
+#if IR_SIMD
+			if (IR_IS_TYPE_VECTOR(insn->type) && size < 4) {
+				size = 4;
+				align = IR_MAX(align, 4);
+			}
+#endif
+			slot = ir_allocate_spill_slot(ctx, size, align);
 			ctx->vregs[var] = IR_STACK_SLOT_TO_VREG(slot);
 			use_list = &ctx->use_lists[var];
 			n = use_list->count;
@@ -4224,7 +4233,13 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 					other = prev ? prev->list_next : active;
 				}
 
-				ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ir_get_type_size(ival->type), 0);
+				size_t size = ir_get_type_size(ival->type);
+#if IR_SIMD
+				if (IR_IS_TYPE_VECTOR(ival->type) && size < 4) {
+					size = 4;
+				}
+#endif
+				ival->stack_spill_pos = ir_allocate_spill_slot(ctx, size, 0);
 				if (unhandled && ival->end > unhandled->range.start) {
 					ival->list_next = active;
 					active = ival;

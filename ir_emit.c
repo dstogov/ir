@@ -1673,6 +1673,23 @@ static void ir_add_fusion_data(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_reg_all
 	}
 }
 
+static void ir_allocate_var_spill_slot(ir_ctx *ctx, ir_ref var, ir_insn *var_insn)
+{
+	size_t size = ir_get_type_size(var_insn->type);
+	size_t align = var_insn->op3;
+	int32_t offset;
+
+#if IR_SIMD
+	if (IR_IS_TYPE_VECTOR(var_insn->type) && size < 4) {
+		size = 4;
+		align = IR_MAX(align, 4);
+	}
+#endif
+
+	offset = ir_allocate_spill_slot(ctx, size, align);
+	ctx->vregs[var] = IR_STACK_SLOT_TO_VREG(offset);
+}
+
 int ir_reg_alloc_simple(ir_ctx *ctx)
 {
 	ir_reg_alloc_data data;
@@ -1719,8 +1736,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 						/* spill slot already allocated */
 					} else if (insn->op == IR_VAR) {
 						if (ctx->use_lists[i].count > 0) {
-							offset = ir_allocate_spill_slot(ctx, ir_get_type_size(insn->type), insn->op3);
-							ctx->vregs[i] = IR_STACK_SLOT_TO_VREG(offset);
+							ir_allocate_var_spill_slot(ctx, i, insn);
 						}
 					} else if (insn->op == IR_ALLOCA) {
 						if (ctx->use_lists[i].count > 0) {
@@ -1736,9 +1752,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 						}
 					} else if (insn->op == IR_VADDR) {
 						if (!IR_VREG_IS_STACK_SLOT(ctx->vregs[insn->op1])) {
-							ir_insn *var_insn = &ctx->ir_base[insn->op1];
-							offset = ir_allocate_spill_slot(ctx, ir_get_type_size(var_insn->type), var_insn->op3);
-							ctx->vregs[insn->op1] = IR_STACK_SLOT_TO_VREG(offset);
+							ir_allocate_var_spill_slot(ctx, insn->op1, &ctx->ir_base[insn->op1]);
 						}
 						ctx->vregs[i] = ctx->vregs[insn->op1];
 					}
@@ -1793,9 +1807,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 
 							if (insn->op == IR_VLOAD || insn->op == IR_VLOAD_v) {
 								if (!IR_VREG_IS_STACK_SLOT(ctx->vregs[insn->op2])) {
-									ir_insn *var_insn = &ctx->ir_base[insn->op2];
-									offset = ir_allocate_spill_slot(ctx, ir_get_type_size(var_insn->type), var_insn->op3);
-									ctx->vregs[insn->op2] = IR_STACK_SLOT_TO_VREG(offset);
+									ir_allocate_var_spill_slot(ctx, insn->op2, &ctx->ir_base[insn->op2]);
 								}
 								if (ir_load_may_reuse_var_slot(ctx, bb, insn->op2, i)) {
 									ival->stack_spill_pos = IR_VREG_TO_STACK_SLOT(ctx->vregs[insn->op2]);
@@ -1816,17 +1828,20 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 								 && use_insn->op3 == i
 								 && ir_store_may_reuse_var_slot(ctx, bb, use_insn->op2, use, i)) {
 									if (!IR_VREG_IS_STACK_SLOT(ctx->vregs[use_insn->op2])) {
-										ir_insn *var_insn = &ctx->ir_base[use_insn->op2];
-										offset = ir_allocate_spill_slot(ctx, ir_get_type_size(var_insn->type), var_insn->op3);
-										ctx->vregs[use_insn->op2] = IR_STACK_SLOT_TO_VREG(offset);
+										ir_allocate_var_spill_slot(ctx, use_insn->op2, &ctx->ir_base[use_insn->op2]);
 									}
 									ival->stack_spill_pos = IR_VREG_TO_STACK_SLOT(ctx->vregs[use_insn->op2]);
-								} else {
-									ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ir_get_type_size(ival->type), 0);
+									break;
 								}
-							} else {
-								ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ir_get_type_size(ival->type), 0);
 							}
+
+							size_t size = ir_get_type_size(ival->type);
+#if IR_SIMD
+							if (IR_IS_TYPE_VECTOR(ival->type) && size < 4) {
+								size = 4;
+							}
+#endif
+							ival->stack_spill_pos = ir_allocate_spill_slot(ctx, size, 0);
 						} while (0);
 					}
 
@@ -1856,9 +1871,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					}
 				} else if (insn->op == IR_VSTORE || insn->op == IR_VSTORE_v) {
 					if (!IR_VREG_IS_STACK_SLOT(ctx->vregs[insn->op2])) {
-						ir_insn *var_insn = &ctx->ir_base[insn->op2];
-						offset = ir_allocate_spill_slot(ctx, ir_get_type_size(var_insn->type), var_insn->op3);
-						ctx->vregs[insn->op2] = IR_STACK_SLOT_TO_VREG(offset);
+						ir_allocate_var_spill_slot(ctx, insn->op2, &ctx->ir_base[insn->op2]);
 					}
 				}
 

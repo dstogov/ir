@@ -2031,7 +2031,6 @@ op2_const:
 				n = 1;
 			}
 			break;
-		case IR_LOAD_FP:
 		case IR_LOAD_INT:
 		case IR_MEM_OP_INT:
 		case IR_MEM_INC:
@@ -2049,6 +2048,19 @@ op2_const:
 				n = ir_add_const_tmp_reg(ctx, insn->op2, 2, n, constraints);
 			}
 			break;
+		case IR_LOAD_FP:
+			flags = IR_USE_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
+			insn = &ctx->ir_base[ref];
+			if (IR_IS_CONST_REF(insn->op2)) {
+				n = ir_add_const_tmp_reg(ctx, insn->op2, 2, n, constraints);
+			}
+#if IR_SIMD
+			if (IR_IS_TYPE_VECTOR(insn->type) && IR_VECTOR_SIZE(insn->type) < 4) {
+				constraints->tmp_regs[n] = IR_TMP_REG(3, IR_U32, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n++;
+			}
+#endif
+			break;
 		case IR_STORE_FP:
 			flags = IR_OP2_MUST_BE_IN_REG | IR_OP3_MUST_BE_IN_REG;
 			insn = &ctx->ir_base[ref];
@@ -2060,6 +2072,13 @@ op2_const:
 				constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 				n++;
 			}
+#if IR_SIMD
+			else if (IR_IS_TYPE_VECTOR(ctx->ir_base[insn->op3].type)
+			 && IR_VECTOR_SIZE(ctx->ir_base[insn->op3].type) < 4) {
+				constraints->tmp_regs[n] = IR_TMP_REG(1, IR_U32, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n++;
+			}
+#endif
 			break;
 		case IR_SWITCH:
 			flags = IR_OP2_MUST_BE_IN_REG;
@@ -3288,6 +3307,11 @@ static void ir_match_fuse_load(ir_ctx *ctx, ir_ref ref, ir_ref root)
 	if (ir_in_same_block(ctx, ref) &&
 	    (ctx->ir_base[ref].op == IR_LOAD || ctx->ir_base[ref].op == IR_LOAD_v ||
 	     ctx->ir_base[ref].op == IR_VLOAD || ctx->ir_base[ref].op == IR_VLOAD_v)) {
+#if IR_SIMD
+		if (IR_IS_TYPE_VECTOR(ctx->ir_base[ref].type) && IR_VECTOR_SIZE(ctx->ir_base[ref].type) < 2) {
+			return;
+		}
+#endif
 		if (ctx->use_lists[ref].count == 2
 		 && !ir_match_has_mem_deps(ctx, ref, root)) {
 			ir_ref addr_ref = ctx->ir_base[ref].op2;
@@ -3314,6 +3338,11 @@ static bool ir_match_try_fuse_load(ir_ctx *ctx, ir_ref ref, ir_ref root)
 
 	if (ir_in_same_block(ctx, ref)
 	 && (insn->op == IR_LOAD || insn->op == IR_LOAD_v || insn->op == IR_VLOAD || insn->op == IR_VLOAD_v)) {
+#if IR_SIMD
+		if (IR_IS_TYPE_VECTOR(ctx->ir_base[ref].type) && IR_VECTOR_SIZE(ctx->ir_base[ref].type) < 2) {
+			return 0;
+		}
+#endif
 		if (ctx->use_lists[ref].count == 2
 		 && !ir_match_has_mem_deps(ctx, ref, root)) {
 			ir_ref addr_ref = ctx->ir_base[ref].op2;
@@ -5671,6 +5700,49 @@ static void ir_emit_load_imm_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_ref sr
 	}
 }
 
+#if IR_SIMD
+/* Vectos with size less than 4 have to be loaded throug general purpose register */
+static void ir_emit_load_short_vector(ir_ctx *ctx, uint32_t width, ir_reg reg, ir_mem mem, ir_reg tmp_reg)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	bool do_pop = 0;
+
+	IR_ASSERT(width == 1 || width == 2);
+	if (tmp_reg == IR_REG_NONE) {
+		IR_ASSERT(0 && "this is not expected");
+		if (IR_MEM_BASE(mem) != IR_REG_RAX && IR_MEM_INDEX(mem) != IR_REG_RAX) {
+			tmp_reg = IR_REG_RAX;
+		} else if (IR_MEM_BASE(mem) != IR_REG_RCX && IR_MEM_INDEX(mem) != IR_REG_RCX) {
+			tmp_reg = IR_REG_RCX;
+		} else if (IR_MEM_BASE(mem) != IR_REG_RDX && IR_MEM_INDEX(mem) != IR_REG_RDX) {
+			tmp_reg = IR_REG_RDX;
+		}
+		if (IR_MEM_BASE(mem) == IR_REG_RSP) {
+			mem = IR_MEM_ADD(mem, sizeof(void*));
+		}
+
+		|	push Ra(tmp_reg)
+		do_pop = 1;
+	}
+
+	if (width == 1) {
+		|	ASM_TXT_TMEM_OP movzx, Rd(tmp_reg), byte, mem
+	} else {
+		|	ASM_TXT_TMEM_OP movzx, Rd(tmp_reg), word, mem
+	}
+	if (ctx->mflags & IR_X86_AVX) {
+		|	vmovd xmm(reg-IR_REG_FP_FIRST), Rd(tmp_reg)
+	} else {
+		|	movd xmm(reg-IR_REG_FP_FIRST), Rd(tmp_reg)
+	}
+
+	if (do_pop) {
+		|	pop Ra(tmp_reg)
+	}
+}
+#endif
+
 static void ir_emit_load_mem_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_mem mem)
 {
 	ir_backend_data *data = ctx->data;
@@ -5688,13 +5760,13 @@ static void ir_emit_load_mem_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_mem me
 						|	ASM_TXT_TMEM_OP vmovdqa, xmm(reg-IR_REG_FP_FIRST), oword, mem
 					} else if (width == 8) {
 						|	ASM_TXT_TMEM_OP vmovq, xmm(reg-IR_REG_FP_FIRST), qword, mem
-					} else if (width == 4) {
+					} else if (width == 4 ||
+							(IR_MEM_BASE(mem) == IR_REG_RSP && IR_MEM_INDEX(mem) == IR_REG_NONE) ||
+							((ctx->flags & IR_USE_FRAME_POINTER) &&
+								IR_MEM_BASE(mem) == IR_REG_RBP && IR_MEM_INDEX(mem) == IR_REG_NONE)) {
 						|	ASM_TXT_TMEM_OP vmovd, xmm(reg-IR_REG_FP_FIRST), dword, mem
 					} else {
-						// TODO: 4-byte read may be unsafe ???
-						// IR_ASSERT(width >= 4 && width <= 16);
-						IR_ASSERT(width <= 4);
-						|	ASM_TXT_TMEM_OP vmovd, xmm(reg-IR_REG_FP_FIRST), dword, mem
+						ir_emit_load_short_vector(ctx, width, reg, mem, IR_REG_NONE);
 					}
 				} else if (element_type == IR_DOUBLE) {
 					if (width == 16) {
@@ -5737,13 +5809,13 @@ static void ir_emit_load_mem_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_mem me
 |.else
 					|	ASM_TXT_TMEM_OP movlpd, xmm(reg-IR_REG_FP_FIRST), qword, mem
 |.endif
-				} else if (width == 4) {
+				} else if (width == 4 ||
+						(IR_MEM_BASE(mem) == IR_REG_RSP && IR_MEM_INDEX(mem) == IR_REG_NONE) ||
+						((ctx->flags & IR_USE_FRAME_POINTER) &&
+							IR_MEM_BASE(mem) == IR_REG_RBP && IR_MEM_INDEX(mem) == IR_REG_NONE)) {
 					|	ASM_TXT_TMEM_OP movd, xmm(reg-IR_REG_FP_FIRST), dword, mem
 				} else {
-					// TODO: 4-byte read may be unsafe ???
-					// IR_ASSERT(width >= 4 && width <= 16);
-					IR_ASSERT(width <= 4);
-					|	ASM_TXT_TMEM_OP movd, xmm(reg-IR_REG_FP_FIRST), dword, mem
+					ir_emit_load_short_vector(ctx, width, reg, mem, IR_REG_NONE);
 				}
 			} else if (element_type == IR_DOUBLE) {
 				if (width == 16) {
@@ -5849,6 +5921,49 @@ static void ir_emit_store_mem_int(ir_ctx *ctx, ir_type type, ir_mem mem, ir_reg 
 	|	ASM_MEM_REG_OP mov, type, mem, reg
 }
 
+#if IR_SIMD
+/* Vectos with size less than 4 have to be stored throug general purpose register */
+static void ir_emit_store_short_vector(ir_ctx *ctx, uint32_t width, ir_mem mem, ir_reg reg, ir_reg tmp_reg)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	bool do_pop = 0;
+
+	IR_ASSERT(width == 1 || width == 2);
+	if (tmp_reg == IR_REG_NONE) {
+		IR_ASSERT(0 && "this is not expected");
+		if (IR_MEM_BASE(mem) != IR_REG_RAX && IR_MEM_INDEX(mem) != IR_REG_RAX) {
+			tmp_reg = IR_REG_RAX;
+		} else if (IR_MEM_BASE(mem) != IR_REG_RCX && IR_MEM_INDEX(mem) != IR_REG_RCX) {
+			tmp_reg = IR_REG_RCX;
+		} else if (IR_MEM_BASE(mem) != IR_REG_RDX && IR_MEM_INDEX(mem) != IR_REG_RDX) {
+			tmp_reg = IR_REG_RDX;
+		}
+		if (IR_MEM_BASE(mem) == IR_REG_RSP) {
+			mem = IR_MEM_ADD(mem, sizeof(void*));
+		}
+
+		|	push Ra(tmp_reg)
+		do_pop = 1;
+	}
+
+	if (ctx->mflags & IR_X86_AVX) {
+		|	vmovd Rd(tmp_reg), xmm(reg-IR_REG_FP_FIRST)
+	} else {
+		|	movd Rd(tmp_reg), xmm(reg-IR_REG_FP_FIRST)
+	}
+	if (width == 1) {
+		|	ASM_TMEM_TXT_OP mov, byte, mem, Rb(tmp_reg)
+	} else {
+		|	ASM_TMEM_TXT_OP mov, word, mem, Rw(tmp_reg)
+	}
+
+	if (do_pop) {
+		|	pop Ra(tmp_reg)
+	}
+}
+#endif
+
 static void ir_emit_store_mem_fp(ir_ctx *ctx, ir_type type, ir_mem mem, ir_reg reg)
 {
 	ir_backend_data *data = ctx->data;
@@ -5866,11 +5981,13 @@ static void ir_emit_store_mem_fp(ir_ctx *ctx, ir_type type, ir_mem mem, ir_reg r
 						|	ASM_TMEM_TXT_OP vmovdqa, oword, mem, xmm(reg-IR_REG_FP_FIRST)
 					} else if (width == 8) {
 						|	ASM_TMEM_TXT_OP vmovq, qword, mem, xmm(reg-IR_REG_FP_FIRST)
-					} else {
-						// TODO: 4-byte write may be unsafe ???
-						// IR_ASSERT(width >= 4 && width <= 16);
-						IR_ASSERT(width <= 4);
+					} else if (width == 4 ||
+							(IR_MEM_BASE(mem) == IR_REG_RSP && IR_MEM_INDEX(mem) == IR_REG_NONE) ||
+							((ctx->flags & IR_USE_FRAME_POINTER) &&
+								IR_MEM_BASE(mem) == IR_REG_RBP && IR_MEM_INDEX(mem) == IR_REG_NONE)) {
 						|	ASM_TMEM_TXT_OP vmovd, dword, mem, xmm(reg-IR_REG_FP_FIRST)
+					} else {
+						ir_emit_store_short_vector(ctx, width, mem, reg, IR_REG_NONE);
 					}
 				} else if (element_type == IR_DOUBLE) {
 					if (width == 16) {
@@ -5913,11 +6030,13 @@ static void ir_emit_store_mem_fp(ir_ctx *ctx, ir_type type, ir_mem mem, ir_reg r
 |.else
 					|	ASM_TMEM_TXT_OP movlpd, qword, mem, xmm(reg-IR_REG_FP_FIRST)
 |.endif
-				} else {
-					// TODO: 4-byte write may be unsafe ???
-					// IR_ASSERT(width >= 4 && width <= 16);
-					IR_ASSERT(width <= 4);
+				} else if (width == 4 ||
+						(IR_MEM_BASE(mem) == IR_REG_RSP && IR_MEM_INDEX(mem) == IR_REG_NONE) ||
+						((ctx->flags & IR_USE_FRAME_POINTER) &&
+							IR_MEM_BASE(mem) == IR_REG_RBP && IR_MEM_INDEX(mem) == IR_REG_NONE)) {
 					|	ASM_TMEM_TXT_OP movd, dword, mem, xmm(reg-IR_REG_FP_FIRST)
+				} else {
+					ir_emit_store_short_vector(ctx, width, mem, reg, IR_REG_NONE);
 				}
 			} else if (element_type == IR_DOUBLE) {
 				if (width == 16) {
@@ -11579,6 +11698,7 @@ static void ir_emit_load_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg op2_reg = ctx->regs[def][2];
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 	ir_mem mem;
+	bool avoid_spill_store = 0;
 
 	if (ctx->use_lists[def].count == 1) {
 		/* dead load */
@@ -11598,16 +11718,38 @@ static void ir_emit_load_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		IR_ASSERT(ir_rule(ctx, insn->op2) & IR_FUSED);
 		mem = ir_fuse_addr(ctx, def, insn->op2);
 		if (IR_REG_SPILLED(ctx->regs[def][0]) && ir_is_same_spill_slot(ctx, def, mem)) {
-			if (!ir_may_avoid_spill_load(ctx, def, def)) {
-				ir_emit_load_mem_fp(ctx, type, def_reg, mem);
+
+			if (ir_may_avoid_spill_load(ctx, def, def)) {
+				avoid_spill_store = 1;
 			}
-			/* avoid load to the same location (valid only when register is not reused) */
-			return;
 		}
 	}
 
+#if IR_SIMD
+	if (IR_IS_TYPE_VECTOR(type) && IR_VECTOR_SIZE(type) < 4) {
+		uint32_t width = IR_VECTOR_SIZE(type);
+		ir_backend_data *data = ctx->data;
+		dasm_State **Dst = &data->dasm_state;
+		ir_reg tmp_reg = ctx->regs[def][3];
+
+		IR_ASSERT(tmp_reg != IR_REG_NONE);
+		IR_ASSERT(width == 1 || width == 2);
+		if (width == 1) {
+			|	ASM_TXT_TMEM_OP movzx, Rd(tmp_reg), byte, mem
+		} else {
+			|	ASM_TXT_TMEM_OP movzx, Rd(tmp_reg), word, mem
+		}
+		if (ctx->mflags & IR_X86_AVX) {
+			|	vmovd xmm(def_reg-IR_REG_FP_FIRST), Rd(tmp_reg)
+		} else {
+			|	movd xmm(def_reg-IR_REG_FP_FIRST), Rd(tmp_reg)
+		}
+	} else
+#endif
+
 	ir_emit_load_mem_fp(ctx, type, def_reg, mem);
-	if (IR_REG_SPILLED(ctx->regs[def][0])) {
+
+	if (IR_REG_SPILLED(ctx->regs[def][0]) && !avoid_spill_store) {
 		ir_emit_store(ctx, type, def, def_reg);
 	}
 }
@@ -11752,6 +11894,20 @@ static void ir_emit_store_fp(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 	}
 
 	if (IR_IS_CONST_REF(insn->op3)) {
+#if IR_SIMD
+		if (IR_IS_TYPE_VECTOR(type) && IR_VECTOR_SIZE(type) < 4) {
+			uint32_t width = IR_VECTOR_SIZE(type);
+			ir_backend_data *data = ctx->data;
+			dasm_State **Dst = &data->dasm_state;
+
+			IR_ASSERT(width == 1 || width == 2);
+			if (width == 1) {
+				|	ASM_TMEM_TXT_OP mov, byte, mem, 0
+			} else {
+				|	ASM_TMEM_TXT_OP mov, word, mem, 0
+			}
+		}
+#endif
 		ir_emit_store_mem_fp_const(ctx, type, mem, insn->op3, IR_REG_NONE, op3_reg);
 	} else {
 		IR_ASSERT(op3_reg != IR_REG_NONE);
@@ -11759,6 +11915,28 @@ static void ir_emit_store_fp(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 			op3_reg = IR_REG_NUM(op3_reg);
 			ir_emit_load(ctx, type, op3_reg, insn->op3);
 		}
+
+#if IR_SIMD
+		if (IR_IS_TYPE_VECTOR(type) && IR_VECTOR_SIZE(type) < 4) {
+			uint32_t width = IR_VECTOR_SIZE(type);
+			ir_backend_data *data = ctx->data;
+			dasm_State **Dst = &data->dasm_state;
+			ir_reg tmp_reg = ctx->regs[ref][1];
+
+			IR_ASSERT(width == 1 || width == 2);
+			IR_ASSERT(tmp_reg != IR_REG_NONE);
+			if (ctx->mflags & IR_X86_AVX) {
+				|	vmovd Rd(tmp_reg), xmm(op3_reg-IR_REG_FP_FIRST)
+			} else {
+				|	movd Rd(tmp_reg), xmm(op3_reg-IR_REG_FP_FIRST)
+			}
+			if (width == 1) {
+				|	ASM_TMEM_TXT_OP mov, byte, mem, Rb(tmp_reg)
+			} else {
+				|	ASM_TMEM_TXT_OP mov, word, mem, Rw(tmp_reg)
+			}
+		} else
+#endif
 		ir_emit_store_mem_fp(ctx, type, mem, op3_reg);
 	}
 }
