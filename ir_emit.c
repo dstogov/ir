@@ -1815,12 +1815,12 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 								if ((use_insn->op == IR_VSTORE || use_insn->op == IR_VSTORE_v)
 								 && use_insn->op3 == i
 								 && ir_store_may_reuse_var_slot(ctx, bb, use_insn->op2, use, i)) {
-									if (use_insn->op2 < i) {
-										ival->stack_spill_pos = IR_VREG_TO_STACK_SLOT(ctx->vregs[use_insn->op2]);
-									} else {
-										ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ir_get_type_size(ival->type), 0);
-										ctx->vregs[use_insn->op2] = IR_STACK_SLOT_TO_VREG(ival->stack_spill_pos);
+									if (!IR_VREG_IS_STACK_SLOT(ctx->vregs[use_insn->op2])) {
+										ir_insn *var_insn = &ctx->ir_base[use_insn->op2];
+										offset = ir_allocate_spill_slot(ctx, ir_get_type_size(var_insn->type), var_insn->op3);
+										ctx->vregs[use_insn->op2] = IR_STACK_SLOT_TO_VREG(offset);
 									}
+									ival->stack_spill_pos = IR_VREG_TO_STACK_SLOT(ctx->vregs[use_insn->op2]);
 								} else {
 									ival->stack_spill_pos = ir_allocate_spill_slot(ctx, ir_get_type_size(ival->type), 0);
 								}
