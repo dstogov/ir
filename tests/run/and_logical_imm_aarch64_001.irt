@@ -1,0 +1,79 @@
+--TEST--
+AArch64 AND with 32-bit and 64-bit logical immediates
+--ARGS--
+-O1 --run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func test32_one(uint32_t): uint32_t
+{
+	uint32_t c_1 = 1;
+	l_1 = START(l_4);
+	uint32_t d_2 = PARAM(l_1, "x", 1);
+	uint32_t d_3 = AND(d_2, c_1);
+	l_4 = RETURN(l_1, d_3);
+}
+func test32_high(uint32_t): uint32_t
+{
+	uint32_t c_1 = 2147483648;
+	l_1 = START(l_4);
+	uint32_t d_2 = PARAM(l_1, "x", 1);
+	uint32_t d_3 = AND(d_2, c_1);
+	l_4 = RETURN(l_1, d_3);
+}
+func test32_alternating(uint32_t): uint32_t
+{
+	uint32_t c_1 = 2863311530;
+	l_1 = START(l_4);
+	uint32_t d_2 = PARAM(l_1, "x", 1);
+	uint32_t d_3 = AND(d_2, c_1);
+	l_4 = RETURN(l_1, d_3);
+}
+func test32_repeated_bytes(uint32_t): uint32_t
+{
+	uint32_t c_1 = 16711935;
+	l_1 = START(l_4);
+	uint32_t d_2 = PARAM(l_1, "x", 1);
+	uint32_t d_3 = AND(d_2, c_1);
+	l_4 = RETURN(l_1, d_3);
+}
+func test64_high(uint64_t): uint64_t
+{
+	uint64_t c_1 = 9223372036854775808;
+	l_1 = START(l_4);
+	uint64_t d_2 = PARAM(l_1, "x", 1);
+	uint64_t d_3 = AND(d_2, c_1);
+	l_4 = RETURN(l_1, d_3);
+}
+func test64_alternating(uint64_t): uint64_t
+{
+	uint64_t c_1 = 12297829382473034410;
+	l_1 = START(l_4);
+	uint64_t d_2 = PARAM(l_1, "x", 1);
+	uint64_t d_3 = AND(d_2, c_1);
+	l_4 = RETURN(l_1, d_3);
+}
+func main(void): int32_t
+{
+	uint32_t c_1 = 4294967295;
+	uint64_t c_2 = 18446744073709551615;
+	int32_t c_3 = 0;
+	uintptr_t c_4 = func test32_one(uint32_t): uint32_t;
+	uintptr_t c_5 = func test32_high(uint32_t): uint32_t;
+	uintptr_t c_6 = func test32_alternating(uint32_t): uint32_t;
+	uintptr_t c_7 = func test32_repeated_bytes(uint32_t): uint32_t;
+	uintptr_t c_8 = func test64_high(uint64_t): uint64_t;
+	uintptr_t c_9 = func test64_alternating(uint64_t): uint64_t;
+	uintptr_t c_10 = "%x %x %x %x %llx %llx\n";
+	uintptr_t c_11 = func printf(uintptr_t, ...): int32_t;
+	l_1 = START(l_9);
+	uint32_t d_2, l_2 = CALL/1(l_1, c_4, c_1);
+	uint32_t d_3, l_3 = CALL/1(l_2, c_5, c_1);
+	uint32_t d_4, l_4 = CALL/1(l_3, c_6, c_1);
+	uint32_t d_5, l_5 = CALL/1(l_4, c_7, c_1);
+	uint64_t d_6, l_6 = CALL/1(l_5, c_8, c_2);
+	uint64_t d_7, l_7 = CALL/1(l_6, c_9, c_2);
+	int32_t d_8, l_8 = CALL/7(l_7, c_11, c_10, d_2, d_3, d_4, d_5, d_6, d_7);
+	l_9 = RETURN(l_8, c_3);
+}
+--EXPECT--
+1 80000000 aaaaaaaa ff00ff 8000000000000000 aaaaaaaaaaaaaaaa
