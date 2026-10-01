@@ -11902,11 +11902,17 @@ static void ir_emit_store_fp(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 
 			IR_ASSERT(width == 1 || width == 2);
 			if (width == 1) {
-				|	ASM_TMEM_TXT_OP mov, byte, mem, 0
+				uint8_t *p = ir_long_const_ptr(ctx, insn->op3);
+				int32_t val = *p;
+
+				|	ASM_TMEM_TXT_OP mov, byte, mem, val
 			} else {
-				|	ASM_TMEM_TXT_OP mov, word, mem, 0
+				uint16_t *p = ir_long_const_ptr(ctx, insn->op3);
+				int32_t val = *p;
+
+				|	ASM_TMEM_TXT_OP mov, word, mem, val
 			}
-		}
+		} else
 #endif
 		ir_emit_store_mem_fp_const(ctx, type, mem, insn->op3, IR_REG_NONE, op3_reg);
 	} else {
