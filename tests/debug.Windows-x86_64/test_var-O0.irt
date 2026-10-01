@@ -75,57 +75,55 @@ x86_64-windows
 }
 --EXPECT--
 test:
-	subq $0x68, %rsp
+	subq $0x60, %rsp
 	movsd %xmm0, (%rsp)
 	movsd %xmm1, 8(%rsp)
 	movsd 8(%rsp), %xmm0
 	subsd .L3(%rip), %xmm0
 	movsd %xmm0, 0x10(%rsp)
-	movsd (%rsp), %xmm0
-	movsd %xmm0, 0x18(%rsp)
+	movq $0, 0x18(%rsp)
 	movq $0, 0x20(%rsp)
-	movq $0, 0x28(%rsp)
-	movl $0, 0x30(%rsp)
+	movl $0, 0x28(%rsp)
 .L1:
-	addl $1, 0x30(%rsp)
-	movsd 0x28(%rsp), %xmm0
-	mulsd 0x20(%rsp), %xmm0
-	movsd %xmm0, 0x38(%rsp)
-	movsd 0x28(%rsp), %xmm0
-	mulsd %xmm0, %xmm0
-	movsd %xmm0, 0x40(%rsp)
+	addl $1, 0x28(%rsp)
+	movsd 0x20(%rsp), %xmm0
+	mulsd 0x18(%rsp), %xmm0
+	movsd %xmm0, 0x30(%rsp)
 	movsd 0x20(%rsp), %xmm0
 	mulsd %xmm0, %xmm0
+	movsd %xmm0, 0x38(%rsp)
+	movsd 0x18(%rsp), %xmm0
+	mulsd %xmm0, %xmm0
+	movsd %xmm0, 0x40(%rsp)
+	movsd 0x38(%rsp), %xmm0
+	subsd 0x40(%rsp), %xmm0
 	movsd %xmm0, 0x48(%rsp)
-	movsd 0x40(%rsp), %xmm0
-	subsd 0x48(%rsp), %xmm0
+	movsd 0x48(%rsp), %xmm0
+	addsd 0x10(%rsp), %xmm0
+	movsd %xmm0, 0x20(%rsp)
+	movsd 0x30(%rsp), %xmm0
+	addsd %xmm0, %xmm0
 	movsd %xmm0, 0x50(%rsp)
 	movsd 0x50(%rsp), %xmm0
-	addsd 0x10(%rsp), %xmm0
-	movsd %xmm0, 0x28(%rsp)
-	movsd 0x38(%rsp), %xmm0
-	addsd %xmm0, %xmm0
+	addsd (%rsp), %xmm0
+	movsd %xmm0, 0x18(%rsp)
+	movsd 0x40(%rsp), %xmm0
+	addsd 0x38(%rsp), %xmm0
 	movsd %xmm0, 0x58(%rsp)
 	movsd 0x58(%rsp), %xmm0
-	addsd 0x18(%rsp), %xmm0
-	movsd %xmm0, 0x20(%rsp)
-	movsd 0x48(%rsp), %xmm0
-	addsd 0x40(%rsp), %xmm0
-	movsd %xmm0, 0x60(%rsp)
-	movsd 0x60(%rsp), %xmm0
 	ucomisd .L4(%rip), %xmm0
 	jbe .L2
-	movl 0x30(%rsp), %eax
-	addq $0x68, %rsp
+	movl 0x28(%rsp), %eax
+	addq $0x60, %rsp
 	retq
 .L2:
-	cmpl $0x3e8, 0x30(%rsp)
+	cmpl $0x3e8, 0x28(%rsp)
 	jle .L1
 	xorl %eax, %eax
-	addq $0x68, %rsp
+	addq $0x60, %rsp
 	retq
 .rodata
-	.db 0x90, 0x90, 0x90
+	.db 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
 .L3:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f
 .L4:
