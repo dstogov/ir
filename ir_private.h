@@ -975,11 +975,14 @@ IR_ALWAYS_INLINE bool ir_ref_is_true(const ir_ctx *ctx, ir_ref ref)
 #define IR_OP_FLAG_TERMINATOR     (1<<14)
 #define IR_OP_FLAG_PINNED         (1<<15)
 
-#define IR_OP_FLAG_MEM_LOAD       ((0<<6)|(0<<7))
-#define IR_OP_FLAG_MEM_STORE      ((0<<6)|(1<<7))
-#define IR_OP_FLAG_MEM_CALL       ((1<<6)|(0<<7))
-#define IR_OP_FLAG_MEM_ALLOC      ((1<<6)|(1<<7))
+#define IR_OP_FLAG_MEM_CALL       ((0<<6)|(0<<7))
+#define IR_OP_FLAG_MEM_LOAD       ((0<<6)|(1<<7)) /* no side effect (may be removed if not used) */
+#define IR_OP_FLAG_MEM_STORE      ((1<<6)|(0<<7))
+#define IR_OP_FLAG_MEM_ALLOC      ((1<<6)|(1<<7)) /* no side effect (may be removed if not used) */
 #define IR_OP_FLAG_MEM_MASK       ((1<<6)|(1<<7))
+
+#define IR_OP_FLAG_NO_SIDE_EFFECT ((0<<6)|(1<<7))
+
 
 #define IR_OPND_UNUSED            0x0U
 #define IR_OPND_DATA              0x1U

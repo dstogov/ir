@@ -520,25 +520,13 @@ make_bottom:
 
 static bool ir_is_dead_load_ex(const ir_ctx *ctx, ir_ref ref, uint32_t flags, const ir_insn *insn)
 {
-	if ((flags & (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_MASK)) == (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_LOAD)) {
-		return ctx->use_lists[ref].count == 1;
-	} else if (insn->op == IR_ALLOCA || insn->op == IR_BLOCK_BEGIN) {
-		return ctx->use_lists[ref].count == 1;
-	}
-	return 0;
+	return (flags & IR_OP_FLAG_NO_SIDE_EFFECT) && ctx->use_lists[ref].count == 1;
 }
 
 static bool ir_is_dead_load(const ir_ctx *ctx, ir_ref ref)
 {
 	if (ctx->use_lists[ref].count == 1) {
-		const ir_insn *insn = &ctx->ir_base[ref];
-		uint32_t flags = ir_op_flags[insn->op];
-
-		if ((flags & (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_MASK)) == (IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_LOAD)) {
-			return 1;
-		} else if (insn->op == IR_ALLOCA || insn->op == IR_BLOCK_BEGIN) {
-			return 1;
-		}
+		return (ir_op_flags[ctx->ir_base[ref].op] & IR_OP_FLAG_NO_SIDE_EFFECT) != 0;
 	}
 	return 0;
 }

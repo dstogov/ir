@@ -256,9 +256,9 @@ typedef enum _ir_type {
  * E     - control   IR_OP_FLAG_CONTROL + IR_OP_FLAG_BB_END
  * T     - control   IR_OP_FLAG_CONTROL + IR_OP_FLAG_BB_END + IR_OP_FLAG_TERMINATOR
  * l     - load      IR_OP_FLAG_MEM + IR_OP_FLAG_MEM_LOAD
- * s     - store     IR_OP_FLAG_MEM + IR_OP_FLAG_STORE
- * x     - call      IR_OP_FLAG_MEM + IR_OP_FLAG_CALL
- * a     - alloc     IR_OP_FLAG_MEM + IR_OP_FLAG_ALLOC
+ * s     - store     IR_OP_FLAG_MEM + IR_OP_FLAG_MEM_STORE
+ * x     - call      IR_OP_FLAG_MEM + IR_OP_FLAG_MEM_CALL
+ * a     - alloc     IR_OP_FLAG_MEM + IR_OP_FLAG_MEM_ALLOC
  * 0-3   - number of input edges
  * N     - number of arguments is defined in the insn->inputs_count (MERGE, PHI, CALL)
  * X1-X3 - number of extra data ops
@@ -404,9 +404,9 @@ typedef enum _ir_type {
 	\
 	/* memory reference and load/store ops                              */ \
 	_(ALLOCA,       a2X1, src, def, alg) /* alloca(def)                 */ \
-	_(AFREE,        a2,   src, def, ___) /* revert alloca(def)          */ \
+	_(AFREE,        s2,   src, def, ___) /* revert alloca(def)          */ \
 	_(BLOCK_BEGIN,  a1,   src, ___, ___) /* stacksave                   */ \
-	_(BLOCK_END,    a2,   src, def, ___) /* stackrestore                */ \
+	_(BLOCK_END,    s2,   src, def, ___) /* stackrestore                */ \
 	_(VLOAD,        l2,   src, var, ___) /* load value of local var     */ \
 	_(VLOAD_v,      l2,   src, var, ___) /* volatile variant of VLOAD   */ \
 	_(VSTORE,       s3,   src, var, def) /* store value to local var    */ \
