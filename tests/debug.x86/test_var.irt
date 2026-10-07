@@ -76,10 +76,9 @@ x86
 --EXPECT--
 test:
 	subl $0x3c, %esp
-	movsd 0x40(%esp), %xmm0
-	movsd 0x48(%esp), %xmm1
-	subsd .L3, %xmm1
-	movsd %xmm1, (%esp)
+	movsd 0x48(%esp), %xmm0
+	subsd .L3, %xmm0
+	movsd %xmm0, (%esp)
 	xorpd %xmm0, %xmm0
 	movsd %xmm0, 0x10(%esp)
 	xorpd %xmm0, %xmm0
@@ -117,7 +116,7 @@ test:
 	addl $0x3c, %esp
 	retl
 .rodata
-	.db 0x90, 0x90, 0x90, 0x90
+	.db 0x90, 0x90
 .L3:
 	.db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f
 .L4:

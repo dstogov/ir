@@ -799,6 +799,17 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						if (insn->op == IR_PARAM) {
 							/* We may reuse parameter stack slot for spilling */
 							ctx->live_intervals[v]->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
+							if (param_ival->use_pos) {
+								ir_use_pos *use_pos = param_ival->use_pos;
+								ir_ref use = IR_LIVE_POS_TO_REF(use_pos->pos);
+								ir_insn *use_insn = &ctx->ir_base[use];
+								if (use_insn->op == IR_VSTORE) {
+									/* skip VSTORE (VAR is going to be remapped to PARAM on x86) */
+									param_ival->use_pos = use_pos->next;
+								}
+							}
+#endif
 						}
 						def_pos = IR_DEF_LIVE_POS_FROM_REF(ref);
 					}
@@ -1498,7 +1509,20 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					} else {
 						if (insn->op == IR_PARAM) {
 							/* We may reuse parameter stack slot for spilling */
-							ctx->live_intervals[v]->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
+							ir_live_interval *param_ival = ctx->live_intervals[v];
+
+							param_ival->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
+							if (param_ival->use_pos) {
+								ir_use_pos *use_pos = param_ival->use_pos;
+								ir_ref use = IR_LIVE_POS_TO_REF(use_pos->pos);
+								ir_insn *use_insn = &ctx->ir_base[use];
+								if (use_insn->op == IR_VSTORE) {
+									/* skip VSTORE (VAR is going to be remapped to PARAM on x86) */
+									param_ival->use_pos = use_pos->next;
+								}
+							}
+#endif
 						}
 						def_pos = IR_DEF_LIVE_POS_FROM_REF(ref);
 					}
@@ -4457,13 +4481,6 @@ static void assign_regs(ir_ctx *ctx)
 									 && (ival->flags & IR_LIVE_INTERVAL_MEM_PARAM)) {
 										/* Stack PARAM var is passed through memory */
 										reg = IR_REG_NONE;
-#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
-										if (use_pos->next
-										 && ctx->ir_base[IR_LIVE_POS_TO_REF(use_pos->next->pos)].op == IR_VSTORE) {
-											/* skip VSTORE (VAR is going to be remapped to PARAM on x86) */
-											use_pos = use_pos->next;
-										}
-#endif
 									} else {
 										uint32_t use_b = ctx->cfg_map[ref];
 
