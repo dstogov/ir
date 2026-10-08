@@ -2401,6 +2401,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 				 && ctx->use_lists[insn->op3].count == 1
 				 && ir_store_may_reuse_var_slot(ctx, bb, insn->op2, i, insn->op3)) {
 					ir_live_interval *ival = _add_live_range(ctx, insn->op3, insn->op3, i);
+					IR_ASSERT(ival->stack_spill_pos == -1);
 					ival->stack_spill_pos = IR_VREG_TO_STACK_SLOT(ctx->vregs[insn->op2]);
 					continue;
 				}
