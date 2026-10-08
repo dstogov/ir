@@ -1683,6 +1683,74 @@ static bool ir_store_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, i
 	return 1;
 }
 
+static ir_live_interval *_add_live_range(ir_ctx *ctx, ir_ref ref, ir_ref start, ir_ref end)
+{
+	int32_t vreg = ctx->vregs[ref];
+	ir_live_interval *ival;
+
+	IR_ASSERT(vreg > 0);
+	ival = ctx->live_intervals[vreg];
+	if (!ival) {
+		ival = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
+		memset(ival, 0, sizeof(ir_live_interval));
+		ctx->live_intervals[vreg] = ival;
+		ival->type = ctx->ir_base[ref].type;
+		ival->reg = IR_REG_NONE;
+		ival->vreg = vreg;
+		ival->stack_spill_pos = -1;
+	}
+
+	ival->range.start = start;
+	ival->range.end = end;
+
+	return ival;
+}
+
+static void ir_allocate_var_spill_slot(ir_ctx *ctx, ir_ref var, ir_insn *var_insn)
+{
+	size_t size = ir_get_type_size(var_insn->type);
+	size_t align = var_insn->op3;
+	int32_t offset;
+
+#if IR_SIMD
+	if (IR_IS_TYPE_VECTOR(var_insn->type) && size < 4) {
+		size = 4;
+		align = IR_MAX(align, 4);
+	}
+#endif
+
+	offset = ir_allocate_spill_slot(ctx, size, align);
+	ctx->vregs[var] = IR_STACK_SLOT_TO_VREG(offset);
+}
+
+static bool _may_coalesce(ir_ctx *ctx, ir_ref input, ir_ref def)
+{
+	ir_use_list *use_list;
+	ir_ref *p, n, use;
+
+	use_list = &ctx->use_lists[input];
+	n = use_list->count;
+	for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
+		use = *p;
+		if (use > def) {
+			/* may overlap */
+			return 0;
+		}
+	}
+
+	use_list = &ctx->use_lists[def];
+	n = use_list->count;
+	for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
+		use = *p;
+		if (use < def && use != input) {
+			/* may overlap */
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
 static void ir_add_fusion_data(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_reg_alloc_simple_data *x, ir_ref start)
 {
 	ir_ref stack[4];
@@ -1742,28 +1810,12 @@ static void ir_add_fusion_data(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_reg_all
 			child = *p;
 			if (child > 0) {
 				if (ctx->vregs[child] > 0) {
-					ir_live_interval *ival = ctx->live_intervals[ctx->vregs[child]];
-
-					if (!ival) {
-						ival = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
-						memset(ival, 0, sizeof(ir_live_interval));
-						ctx->live_intervals[ctx->vregs[child]] = ival;
-						ival->type = ctx->ir_base[child].type;
-						ival->reg = IR_REG_NONE;
-						ival->vreg = ctx->vregs[child];
-						ival->stack_spill_pos = -1;
-					}
+					ir_live_interval *ival = _add_live_range(ctx, child, child, ref);
 					if (child < start || child >= ref) {
 						/* live before BB start - spill it */
-
-						size_t size = ir_get_type_size(ival->type);
-#if IR_SIMD
-						if (IR_IS_TYPE_VECTOR(ival->type) && size < 4) {
-							size = 4;
+						if (ival->stack_spill_pos == -1) {
+							_pick_spill(ctx, ival);
 						}
-#endif
-						ival->stack_spill_pos = ir_allocate_spill_slot(ctx, size, 0);
-
 						if (!(IR_USE_FLAGS(def_flags, j) & IR_USE_MUST_BE_IN_REG)) {
 							continue;
 						}
@@ -1787,23 +1839,6 @@ static void ir_add_fusion_data(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_reg_all
 		}
 		input = stack[--stack_pos];
 	}
-}
-
-static void ir_allocate_var_spill_slot(ir_ctx *ctx, ir_ref var, ir_insn *var_insn)
-{
-	size_t size = ir_get_type_size(var_insn->type);
-	size_t align = var_insn->op3;
-	int32_t offset;
-
-#if IR_SIMD
-	if (IR_IS_TYPE_VECTOR(var_insn->type) && size < 4) {
-		size = 4;
-		align = IR_MAX(align, 4);
-	}
-#endif
-
-	offset = ir_allocate_spill_slot(ctx, size, align);
-	ctx->vregs[var] = IR_STACK_SLOT_TO_VREG(offset);
 }
 
 #if 0
@@ -2133,57 +2168,6 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 }
 #endif
 
-static ir_live_interval *_add_live_range(ir_ctx *ctx, ir_ref ref, ir_ref start, ir_ref end)
-{
-	int32_t vreg = ctx->vregs[ref];
-	ir_live_interval *ival;
-
-	IR_ASSERT(vreg > 0);
-	ival = ctx->live_intervals[vreg];
-	if (!ival) {
-		ival = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
-		memset(ival, 0, sizeof(ir_live_interval));
-		ctx->live_intervals[vreg] = ival;
-		ival->type = ctx->ir_base[ref].type;
-		ival->vreg = vreg;
-		ival->stack_spill_pos = -1;
-	}
-
-	ival->reg = IR_REG_NONE;
-	ival->range.start = start;
-	ival->range.end = end;
-
-	return ival;
-}
-
-static bool _may_coalesce(ir_ctx *ctx, ir_ref input, ir_ref def)
-{
-	ir_use_list *use_list;
-	ir_ref *p, n, use;
-
-	use_list = &ctx->use_lists[input];
-	n = use_list->count;
-	for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
-		use = *p;
-		if (use > def) {
-			/* may overlap */
-			return 0;
-		}
-	}
-
-	use_list = &ctx->use_lists[def];
-	n = use_list->count;
-	for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
-		use = *p;
-		if (use < def && use != input) {
-			/* may overlap */
-			return 0;
-		}
-	}
-
-	return 1;
-}
-
 /* Fast Local Botton-Up Regester Allocator */
 int ir_reg_alloc_simple(ir_ctx *ctx)
 {
@@ -2416,17 +2400,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 				 && ctx->vregs[insn->op3] > 0
 				 && ctx->use_lists[insn->op3].count == 1
 				 && ir_store_may_reuse_var_slot(ctx, bb, insn->op2, i, insn->op3)) {
-					ir_live_interval *ival = ctx->live_intervals[ctx->vregs[insn->op3]];
-
-					if (!ival) {
-						ival = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
-						memset(ival, 0, sizeof(ir_live_interval));
-						ctx->live_intervals[ctx->vregs[insn->op3]] = ival;
-						ival->type = ctx->ir_base[insn->op3].type;
-						ival->reg = IR_REG_NONE;
-						ival->vreg = ctx->vregs[insn->op3];
-						ival->stack_spill_pos = -1;
-					}
+					ir_live_interval *ival = _add_live_range(ctx, insn->op3, insn->op3, i);
 					ival->stack_spill_pos = IR_VREG_TO_STACK_SLOT(ctx->vregs[insn->op2]);
 					continue;
 				}
@@ -2488,28 +2462,12 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 
 				if (input > 0) {
 					if (ctx->vregs[input] > 0) {
-						ir_live_interval *ival = ctx->live_intervals[ctx->vregs[input]];
-
-						if (!ival) {
-							ival = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
-							memset(ival, 0, sizeof(ir_live_interval));
-							ctx->live_intervals[ctx->vregs[input]] = ival;
-							ival->type = ctx->ir_base[input].type;
-							ival->reg = IR_REG_NONE;
-							ival->vreg = ctx->vregs[input];
-							ival->stack_spill_pos = -1;
-						}
+						ir_live_interval *ival = _add_live_range(ctx, input, input, i);
 						if (input < bb->start || input >= i) {
 							/* live before BB start - spill it */
-
-							size_t size = ir_get_type_size(ival->type);
-#if IR_SIMD
-							if (IR_IS_TYPE_VECTOR(ival->type) && size < 4) {
-								size = 4;
+							if (ival->stack_spill_pos == -1) {
+								_pick_spill(ctx, ival);
 							}
-#endif
-							ival->stack_spill_pos = ir_allocate_spill_slot(ctx, size, 0);
-
 							if (!(use_flags & IR_USE_MUST_BE_IN_REG)) {
 								continue;
 							}
@@ -2551,7 +2509,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 
 			/* allocate output register */
 			if (ctx->vregs[i] > 0) {
-				ir_live_interval *ival = ctx->live_intervals[ctx->vregs[i]];
+				ir_live_interval *ival;
 				ir_live_pos def_pos;
 				ir_regset used;
 
@@ -2579,16 +2537,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					used = IR_REGSET_UNION(used, x.clobbered[n]);
 				}
 
-				if (!ival) {
-					ival = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
-					memset(ival, 0, sizeof(ir_live_interval));
-					ctx->live_intervals[ctx->vregs[i]] = ival;
-					ival->type = insn->type;
-					ival->reg = IR_REG_NONE;
-					ival->vreg = ctx->vregs[i];
-					ival->stack_spill_pos = -1;
-				}
-
+				ival = _add_live_range(ctx, i, i, i);
 				if (ival->reg != IR_REG_NONE) {
 					if (!IR_REGSET_IN(used, ival->reg)) {
 						if (ival->reg != constraints.def_reg
