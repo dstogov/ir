@@ -26039,10 +26039,17 @@ static void ir_remap_param_spill_slot(ir_ctx *ctx, ir_ref param, int32_t spill_s
 						IR_ASSERT(ctx->vregs[use] == ctx->vregs[var]);
 						ctx->vregs[use] = IR_STACK_SLOT_TO_VREG(spill_slot);
 					}
-				} else if (insn->op == IR_VLOAD) {
+				} else if (insn->op == IR_VLOAD || insn->op == IR_VLOAD_v) {
 					if (ctx->vregs[use] > 0) {
 						ir_live_interval *ival = ctx->live_intervals[ctx->vregs[use]];
-						if (ival->stack_spill_pos == old_slot) {
+						if (ival && ival->stack_spill_pos == old_slot) {
+							ival->stack_spill_pos = spill_slot;
+						}
+					}
+				} else if (insn->op == IR_VSTORE || insn->op == IR_VSTORE_v) {
+					if (insn->op3 > 0 && ctx->vregs[insn->op3] > 0) {
+						ir_live_interval *ival = ctx->live_intervals[ctx->vregs[insn->op3]];
+						if (ival && ival->stack_spill_pos == old_slot) {
 							ival->stack_spill_pos = spill_slot;
 						}
 					}
