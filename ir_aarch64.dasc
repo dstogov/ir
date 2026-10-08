@@ -6231,7 +6231,7 @@ static void ir_emit_call_ex(ir_ctx *ctx, ir_ref def, ir_insn *insn, const ir_cal
 				if (IR_REG_SPILLED(ctx->regs[def][0])) {
 					ir_emit_store(ctx, insn->type, def, def_reg);
 				}
-			} else if (ctx->use_lists[def].count > 1) {
+			} else if (ctx->vregs[def] > 0) {
 				ir_emit_store(ctx, insn->type, def, cc->int_ret_reg);
 			}
 		} else {
@@ -6244,7 +6244,7 @@ static void ir_emit_call_ex(ir_ctx *ctx, ir_ref def, ir_insn *insn, const ir_cal
 				if (IR_REG_SPILLED(ctx->regs[def][0])) {
 					ir_emit_store(ctx, insn->type, def, def_reg);
 				}
-			} else if (ctx->use_lists[def].count > 1) {
+			} else if (ctx->vregs[def] > 0) {
 				ir_emit_store(ctx, insn->type, def, cc->fp_ret_reg);
 			}
 		}
