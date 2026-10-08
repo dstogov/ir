@@ -1593,7 +1593,7 @@ static ir_reg _pick_free_reg(ir_ctx *ctx, ir_reg_alloc_simple_data *x, ir_type t
 	return IR_REG_NONE;
 }
 
-static ir_reg _pick_reg(ir_ctx *ctx, ir_reg_alloc_simple_data *x, ir_type type, ir_regset used)
+static ir_reg _pick_reg(ir_ctx *ctx, ir_reg_alloc_simple_data *x, ir_type type, ir_regset used, uint8_t flags)
 {
 	ir_regset available;
 	ir_reg reg, best_reg;
@@ -1619,6 +1619,10 @@ static ir_reg _pick_reg(ir_ctx *ctx, ir_reg_alloc_simple_data *x, ir_type type, 
 			return IR_REGSET_FIRST(available_unused);
 		}
 
+		if (!(flags & IR_USE_MUST_BE_IN_REG)) {
+			return IR_REG_NONE;
+		}
+
 		/* select best reg to evict */
 		available = IR_REGSET_INTERSECTION(available, x->allocated);
 		best_cost = 0x7fffffff;
@@ -1632,6 +1636,10 @@ static ir_reg _pick_reg(ir_ctx *ctx, ir_reg_alloc_simple_data *x, ir_type type, 
 
 		_evict_reg(ctx, x, best_reg);
 		return best_reg;
+	}
+
+	if (!(flags & IR_USE_MUST_BE_IN_REG)) {
+		return IR_REG_NONE;
 	}
 
 	fprintf(stderr, "Internal Error: No registers available. Allocation is not possible\n");
@@ -1810,13 +1818,15 @@ static void ir_add_fusion_data(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_reg_all
 			child = *p;
 			if (child > 0) {
 				if (ctx->vregs[child] > 0) {
+					uint32_t use_flags = IR_USE_FLAGS(def_flags, j);
 					ir_live_interval *ival = _add_live_range(ctx, child, child, ref);
+
 					if (child < start || child >= ref) {
 						/* live before BB start - spill it */
 						if (ival->stack_spill_pos == -1) {
 							_pick_spill(ctx, ival);
 						}
-						if (!(IR_USE_FLAGS(def_flags, j) & IR_USE_MUST_BE_IN_REG)) {
+						if (!(use_flags & IR_USE_MUST_BE_IN_REG)) {
 							continue;
 						}
 					}
@@ -1824,7 +1834,7 @@ static void ir_add_fusion_data(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_reg_all
 					ir_reg reg = (j < constraints.hints_count) ? constraints.hints[j] : IR_REG_NONE;
 					int8_t use_pos = EXPECTED(reg == IR_REG_NONE) ? IR_USE_SUB_REF : IR_LOAD_SUB_REF;
 
-					_add_reg(x, ctx->ir_base[child].type, IR_LOAD_SUB_REF, use_pos, reg, IR_REG_SPILL_LOAD,
+					_add_reg(x, ctx->ir_base[child].type, IR_LOAD_SUB_REF, use_pos, reg, use_flags,
 						ref, input, j, child);
 				} else if (ctx->rules[child] & IR_FUSED) {
 					IR_ASSERT(stack_pos < (int)(sizeof(stack)/sizeof(stack_pos)));
@@ -2286,10 +2296,10 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 
 			/* Add tmp registers for MEM->MEM DESSA moves */
 			if (needs_tmp_gp) {
-				ctx->regs[bb->end][0] = _pick_reg(ctx, &x, IR_I32, IR_REGSET_EMPTY);
+				ctx->regs[bb->end][0] = _pick_reg(ctx, &x, IR_I32, IR_REGSET_EMPTY, IR_USE_MUST_BE_IN_REG);
 			}
 			if (needs_tmp_fp) {
-				ctx->regs[bb->end][1] = _pick_reg(ctx, &x, IR_DOUBLE, IR_REGSET_EMPTY);
+				ctx->regs[bb->end][1] = _pick_reg(ctx, &x, IR_DOUBLE, IR_REGSET_EMPTY, IR_USE_MUST_BE_IN_REG);
 			}
 
 			// TODO : Add tmp registers for DESSA cycle resolution ???
@@ -2496,7 +2506,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 								use_pos = IR_LOAD_SUB_REF;
 							}
 						}
-						_add_reg(&x, ctx->ir_base[input].type, IR_LOAD_SUB_REF, use_pos, reg, IR_REG_SPILL_LOAD,
+						_add_reg(&x, ctx->ir_base[input].type, IR_LOAD_SUB_REF, use_pos, reg, use_flags,
 							IR_UNUSED, i, j, input);
 					} else {
 						if ((ctx->rules[input] & (IR_FUSED|IR_SKIPPED)) == IR_FUSED) {
@@ -2556,7 +2566,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 						if (reg != IR_REG_NONE && !IR_REGSET_IN(IR_REGSET_INTERSECTION(used, x.allocated), reg)) {
 							/* use fixed regiset hint */
 						} else if (def_flags & IR_USE_MUST_BE_IN_REG) {
-							reg = _pick_reg(ctx, &x, insn->type, used);
+							reg = _pick_reg(ctx, &x, insn->type, used, IR_USE_MUST_BE_IN_REG);
 						} else {
 							reg = IR_REG_NONE;
 						}
@@ -2566,7 +2576,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					if (reg != IR_REG_NONE && !IR_REGSET_IN(IR_REGSET_INTERSECTION(used, x.allocated), reg)) {
 						/* use fixed regiset hint */
 					} else if (def_flags & IR_USE_MUST_BE_IN_REG) {
-						reg = _pick_reg(ctx, &x, insn->type, used);
+						reg = _pick_reg(ctx, &x, insn->type, used, IR_USE_MUST_BE_IN_REG);
 					} else {
 						reg = IR_REG_NONE;
 					}
@@ -2618,14 +2628,14 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					used = IR_REGSET_UNION(used, x.clobbered[n]);
 				}
 
-				reg = _pick_reg(ctx, &x, x.tmp_regs[j].type, used);
+				reg = _pick_reg(ctx, &x, x.tmp_regs[j].type, used, IR_USE_MUST_BE_IN_REG);
 				for (n = x.tmp_regs[j].start; n < x.tmp_regs[j].end; n++) {
 					IR_REGSET_INCL(x.clobbered[n], reg);
 				}
 #if IR_X86_I64
 				if (x.tmp_regs[j].type == IR_I64 || x.tmp_regs[j].type == IR_U64) {
 					IR_REGSET_INCL(used, reg);
-					reg2 = _pick_reg(ctx, &x, x.tmp_regs[j].type, used);
+					reg2 = _pick_reg(ctx, &x, x.tmp_regs[j].type, used, IR_USE_MUST_BE_IN_REG);
 					for (n = x.tmp_regs[j].start; n < x.tmp_regs[j].end; n++) {
 						IR_REGSET_INCL(x.clobbered[n], reg2);
 					}
@@ -2696,7 +2706,10 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 						/* reuse for op1 the register allocated for instruction result (lightweigh coalescing) */
 						reg = IR_REG_NUM(ctx->regs[i][0]);
 					} else {
-						reg = _pick_reg(ctx, &x, x.regs[j].type, used);
+						reg = _pick_reg(ctx, &x, x.regs[j].type, used, x.regs[j].flags);
+						if (reg == IR_REG_NONE) {
+							break;
+						}
 					}
 					x.state[reg].def = x.regs[j].def;
 					x.state[reg].root = x.regs[j].root;
@@ -2711,7 +2724,15 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 						IR_REGSET_EXCL(available, reg);
 						if (reg2 == IR_REG_NONE
 						 || IR_REGSET_IN(IR_REGSET_INTERSECTION(used, x.allocated), reg2)) {
-							reg2 = _pick_reg(ctx, &x, x.regs[j].type, used);
+							reg2 = _pick_reg(ctx, &x, x.regs[j].type, used, x.regs[j].flags);
+							if (reg2 == IR_REG_NONE) {
+								IR_REGSET_INCL(available, reg);
+								for (n = x.regs[j].start; n < x.regs[j].end; n++) {
+									IR_REGSET_EXCL(x.clobbered[n], reg);
+								}
+								reg = IR_REG_NONE;
+								break;
+							}
 						}
 						x.state[reg2].def = x.regs[j].def;
 						x.state[reg2].root = x.regs[j].root;
@@ -2729,18 +2750,22 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 #endif
 				} while (0);
 
-				if (ival->stack_spill_pos != -1) {
-					reg = reg | IR_REG_SPILL_LOAD;
-				} else {
-					ival->reg = reg;
-				}
+				if (reg != IR_REG_NONE) {
+					if (ival->stack_spill_pos != -1) {
+						reg = reg | IR_REG_SPILL_LOAD;
+					} else {
+						ival->reg = reg;
+					}
 
-				if (!x.regs[j].root
-				 || ir_get_alocated_reg(ctx, x.regs[j].ref, x.regs[j].op) == IR_REG_NONE) {
-					ir_set_alocated_reg(ctx, x.regs[j].ref, x.regs[j].op, reg);
-				} else if (ir_get_alocated_reg(ctx, x.regs[j].ref, x.regs[j].op) != reg) {
-					ctx->rules[x.regs[j].ref] |= IR_FUSED_REG;
-					ir_set_fused_reg(ctx, x.regs[j].root, x.regs[j].ref * sizeof(ir_ref) + x.regs[j].op, reg);
+					if (!x.regs[j].root
+					 || ir_get_alocated_reg(ctx, x.regs[j].ref, x.regs[j].op) == IR_REG_NONE) {
+						ir_set_alocated_reg(ctx, x.regs[j].ref, x.regs[j].op, reg);
+					} else if (ir_get_alocated_reg(ctx, x.regs[j].ref, x.regs[j].op) != reg) {
+						ctx->rules[x.regs[j].ref] |= IR_FUSED_REG;
+						ir_set_fused_reg(ctx, x.regs[j].root, x.regs[j].ref * sizeof(ir_ref) + x.regs[j].op, reg);
+					}
+				} else if (ival->stack_spill_pos == -1) {
+					_pick_spill(ctx, ival);
 				}
 			}
 		}
