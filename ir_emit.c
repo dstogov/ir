@@ -1703,7 +1703,9 @@ static ir_reg _pick_reg(ir_ctx *ctx, ir_reg_alloc_simple_data *x, ir_type type, 
 			if (!IR_REGSET_IS_EMPTY(available_scratch)) {
 				return IR_REGSET_FIRST(available_scratch);
 			}
-			return IR_REGSET_FIRST(available_unused);
+			reg = IR_REGSET_FIRST(available_unused);
+			IR_REGSET_INCL(ctx->used_preserved_regs, reg);
+			return reg;
 		}
 
 		if (!(flags & IR_USE_MUST_BE_IN_REG)) {
