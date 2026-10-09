@@ -1434,6 +1434,7 @@ typedef struct {
 	int32_t  tmp_num;
 	ir_regset scratch;
 	ir_regset preserved;
+	ir_regset fixed;
 	ir_regset allocated;
 	ir_regset clobbered_args;
 	ir_regset clobbered[IR_SUB_REFS_COUNT];
@@ -2296,11 +2297,11 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 
 	ctx->stack_frame_size = 0;
 	ctx->call_stack_size = 0;
-	ctx->used_preserved_regs = 0;
 	ctx->used_preserved_regs = ctx->fixed_save_regset;
 
-	x.scratch = ir_scratch_regset[data.cc->scratch_reg - IR_REG_NUM];
-	x.preserved = IR_REGSET_DIFFERENCE(data.cc->preserved_regs, ctx->fixed_save_regset);
+	x.scratch = IR_REGSET_DIFFERENCE(ir_scratch_regset[data.cc->scratch_reg - IR_REG_NUM], ctx->fixed_regset);
+	x.preserved = IR_REGSET_DIFFERENCE(data.cc->preserved_regs, ctx->fixed_regset);
+	x.fixed = ctx->fixed_regset;
 	param_regs = IR_REGSET_EMPTY;
 
 	ctx->regs = ir_mem_malloc(sizeof(ir_regs) * ctx->insns_count);
