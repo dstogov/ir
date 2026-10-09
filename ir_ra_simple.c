@@ -144,6 +144,8 @@ static bool ir_load_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, ir
 		for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
 			use = *p;
 			if (use < load || use > bb->end) return 0;
+			/* fused instructions are emitted at their root, later in the block */
+			if (ctx->rules[use] & IR_FUSED) use = bb->end;
 			if (use > last_use) last_use = use;
 		}
 		/* Check if the result of VLOAD can not be clobbered between VLOAD and the last use */
@@ -176,7 +178,8 @@ static bool ir_load_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, ir
 
 static bool ir_store_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, ir_ref store, ir_ref val)
 {
-	ir_ref i, n;
+	ir_use_list *use_list;
+	ir_ref *p, i, n;
 	ir_insn *insn;
 	int address_taken = -1; /* unknown */
 
@@ -209,6 +212,24 @@ static bool ir_store_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, i
 		n = ir_insn_len(insn);
 		i += n;
 		insn += n;
+	}
+
+	/* Check if the result of an earlier VLOAD of the same VAR is not used between the "producer" and VSTORE */
+	use_list = &ctx->use_lists[var];
+	for (p = ctx->use_edges + use_list->refs, n = use_list->count; n > 0; p++, n--) {
+		ir_ref load = *p;
+
+		insn = &ctx->ir_base[load];
+		if ((insn->op == IR_VLOAD || insn->op == IR_VLOAD_v) && load < val) {
+			ir_use_list *load_use_list = &ctx->use_lists[load];
+			ir_ref *q, k = load_use_list->count;
+
+			for (q = ctx->use_edges + load_use_list->refs; k > 0; q++, k--) {
+				if (*q > val && *q < store) {
+					return 0;
+				}
+			}
+		}
 	}
 	return 1;
 }
