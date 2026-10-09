@@ -1435,6 +1435,7 @@ typedef struct {
 	ir_regset scratch;
 	ir_regset preserved;
 	ir_regset allocated;
+	ir_regset clobbered_args;
 	ir_regset clobbered[IR_SUB_REFS_COUNT];
 	struct {
 		ir_ref def;
@@ -1459,7 +1460,15 @@ static void _add_scratch(ir_reg_alloc_simple_data *x, ir_reg reg, int8_t start, 
 {
 	int8_t j;
 
-	if (start < 0) start = 0; // TODO: ARGVAL support ???
+	if (start < 0) {
+		/* ARGVAL support */
+		if (reg >= IR_REG_NUM) {
+			x->clobbered_args = IR_REGSET_UNION(x->clobbered_args, ir_scratch_regset[reg - IR_REG_NUM]);
+		} else {
+			IR_REGSET_INCL(x->clobbered_args, reg);
+		}
+		start = 0;
+	}
 	IR_ASSERT(start >= 0 && end <= IR_SUB_REFS_COUNT);
 	if (reg >= IR_REG_NUM) {
 		for (j = start; j < end; j++) {
@@ -1473,35 +1482,39 @@ static void _add_scratch(ir_reg_alloc_simple_data *x, ir_reg reg, int8_t start, 
 }
 
 static void _add_tmp_reg(ir_reg_alloc_simple_data *x, ir_type type,
-                     int8_t start, int8_t end, int8_t flags,
+                     int8_t start, int8_t end, uint8_t flags,
                      ir_ref root, ir_ref ref, ir_ref op)
 {
+	uintptr_t n;
+
 	IR_ASSERT(start >= 0 && end <= IR_SUB_REFS_COUNT && x->num < 32);
-	x->tmp_regs[x->tmp_num].type = type;
-	x->tmp_regs[x->tmp_num].start = start;
-	x->tmp_regs[x->tmp_num].end = end;
-	x->tmp_regs[x->tmp_num].flags = flags;
-	x->tmp_regs[x->tmp_num].root = root;
-	x->tmp_regs[x->tmp_num].ref = ref;
-	x->tmp_regs[x->tmp_num].op = op;
-	x->tmp_num++;
+	n = x->tmp_num++;
+	x->tmp_regs[n].type = type;
+	x->tmp_regs[n].start = start;
+	x->tmp_regs[n].end = end;
+	x->tmp_regs[n].flags = flags;
+	x->tmp_regs[n].root = root;
+	x->tmp_regs[n].ref = ref;
+	x->tmp_regs[n].op = op;
 }
 
 static void _add_reg(ir_reg_alloc_simple_data *x, ir_type type,
                      int8_t start, int8_t end, ir_reg hint, int8_t flags,
                      ir_ref root, ir_ref ref, ir_ref op, ir_ref def)
 {
+	uintptr_t n;
+
 	IR_ASSERT(start >= 0 && end <= IR_SUB_REFS_COUNT && x->num < 32);
-	x->regs[x->num].type = type;
-	x->regs[x->num].start = start;
-	x->regs[x->num].end = end;
-	x->regs[x->num].hint = hint;
-	x->regs[x->num].flags = flags;
-	x->regs[x->num].root = root;
-	x->regs[x->num].ref = ref;
-	x->regs[x->num].op = op;
-	x->regs[x->num].def = def;
-	x->num++;
+	n = x->num++;
+	x->regs[n].type = type;
+	x->regs[n].start = start;
+	x->regs[n].end = end;
+	x->regs[n].hint = hint;
+	x->regs[n].flags = flags;
+	x->regs[n].root = root;
+	x->regs[n].ref = ref;
+	x->regs[n].op = op;
+	x->regs[n].def = def;
 }
 
 static void ir_set_fused_reg(ir_ctx *ctx, ir_ref root, ir_ref ref_and_op, int8_t reg)
@@ -1691,7 +1704,20 @@ static bool ir_store_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, i
 	return 1;
 }
 
-static ir_live_interval *_add_live_range(ir_ctx *ctx, ir_ref ref, ir_ref start, ir_ref end)
+static ir_live_interval *_create_ival(ir_ctx *ctx, uint32_t vreg, ir_type type)
+{
+	ir_live_interval *ival = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
+
+	memset(ival, 0, sizeof(ir_live_interval));
+	ctx->live_intervals[vreg] = ival;
+	ival->type = type;
+	ival->reg = IR_REG_NONE;
+	ival->vreg = vreg;
+	ival->stack_spill_pos = -1;
+	return ival;
+}
+
+IR_ALWAYS_INLINE ir_live_interval *_get_ival(ir_ctx *ctx, ir_ref ref)
 {
 	int32_t vreg = ctx->vregs[ref];
 	ir_live_interval *ival;
@@ -1699,18 +1725,8 @@ static ir_live_interval *_add_live_range(ir_ctx *ctx, ir_ref ref, ir_ref start, 
 	IR_ASSERT(vreg > 0);
 	ival = ctx->live_intervals[vreg];
 	if (!ival) {
-		ival = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
-		memset(ival, 0, sizeof(ir_live_interval));
-		ctx->live_intervals[vreg] = ival;
-		ival->type = ctx->ir_base[ref].type;
-		ival->reg = IR_REG_NONE;
-		ival->vreg = vreg;
-		ival->stack_spill_pos = -1;
+		return _create_ival(ctx, vreg, ctx->ir_base[ref].type);
 	}
-
-	ival->range.start = start;
-	ival->range.end = end;
-
 	return ival;
 }
 
@@ -1765,7 +1781,7 @@ static void ir_add_fusion_data(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_reg_all
 	int stack_pos = 0;
 	ir_target_constraints constraints;
 	ir_insn *insn;
-	uint32_t j, n, flags, def_flags;
+	uint32_t j, n, def_flags;
 	ir_ref *p, child;
 
 	while (1) {
@@ -1777,7 +1793,7 @@ static void ir_add_fusion_data(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_reg_all
 			while (n > 0) {
 				n--;
 				if (constraints.tmp_regs[n].type) {
-					ir_reg flags = 0;
+					uint8_t flags = 0;
 					ir_ref op = constraints.tmp_regs[n].num;
 
 					if (op > 0 && op <= ctx->ir_base[input].inputs_count) {
@@ -1805,22 +1821,24 @@ static void ir_add_fusion_data(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_reg_all
 		}
 
 		insn = &ctx->ir_base[input];
-		flags = ir_op_flags[insn->op];
-		n = IR_INPUT_EDGES_COUNT(flags);
+		n = insn->inputs_count;
 		j = 1;
 		p = insn->ops + j;
-		if (flags & (IR_OP_FLAG_CONTROL|IR_OP_FLAG_PINNED)) {
+		if (ir_op_flags[insn->op] & (IR_OP_FLAG_CONTROL|IR_OP_FLAG_PINNED)) {
 			j++;
 			p++;
 		}
 		for (; j <= n; j++, p++) {
-			IR_ASSERT(IR_OPND_KIND(flags, j) == IR_OPND_DATA);
+			IR_ASSERT(IR_OPND_KIND(ir_op_flags[insn->op], j) == IR_OPND_DATA);
 			child = *p;
 			if (child > 0) {
 				if (ctx->vregs[child] > 0) {
 					uint32_t use_flags = IR_USE_FLAGS(def_flags, j);
-					ir_live_interval *ival = _add_live_range(ctx, child, child, ref);
+					ir_live_interval *ival = ctx->live_intervals[ctx->vregs[child]];
 
+					if (!ival) {
+						ival = _create_ival(ctx, ctx->vregs[child], ctx->ir_base[child].type);
+					}
 					if (child < start || child >= ref) {
 						/* live before BB start - spill it */
 						if (ival->stack_spill_pos == -1) {
@@ -2186,7 +2204,6 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 	ir_block *bb;
 	ir_insn *insn;
 	ir_ref i, n, j, *p;
-	uint32_t *rule, insn_flags;
 	ir_target_constraints constraints;
 	uint32_t def_flags;
 	ir_reg reg;
@@ -2250,19 +2267,22 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					}
 
 					if (input > 0 && ctx->vregs[input] > 0) {
-						ir_live_interval *ival = _add_live_range(ctx, input, input, bb->end);
+						ir_live_interval *ival = ctx->live_intervals[ctx->vregs[input]];
+
+						if (!ival) {
+							ival = _create_ival(ctx, ctx->vregs[input], ctx->ir_base[input].type);
+						}
 
 						/* If input of PHI, coming from this block, is defined in this block
 						 * (otherwise it's treated as "global" and spilled).
 						 */
 						if (input > bb->start && input < bb->end) {
-							if (use > bb->end
-							 && ctx->vregs[use] > 0
+							if (ctx->vregs[use] > 0
 							 && ctx->live_intervals[ctx->vregs[use]]
 							 && ctx->live_intervals[ctx->vregs[use]]->reg != IR_REG_NONE
 							 && _may_coalesce(ctx, input, use)) {
 								/* lightweight register coalescing */
-								ival->reg = ctx->live_intervals[ctx->vregs[use]]->reg;
+								reg = ctx->live_intervals[ctx->vregs[use]]->reg;
 							} else {
 								reg = _pick_free_reg(ctx, &x, ival->type);
 							}
@@ -2279,8 +2299,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 						}
 
 						if (ival->stack_spill_pos == -1) {
-							if (use > bb->end
-							 && ctx->vregs[use] > 0
+							if (ctx->vregs[use] > 0
 							 && ctx->live_intervals[ctx->vregs[use]]
 							 && ctx->live_intervals[ctx->vregs[use]]->stack_spill_pos != -1
 							 && _may_coalesce(ctx, input, use)) {
@@ -2308,11 +2327,12 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 
 		/* For all basic block's instructions in reverse order */
 		for (i = bb->end; i != bb->start; i = ctx->prev_ref[i]) {
-			insn = ctx->ir_base + i;
-			rule = ctx->rules + i;
+			uint32_t rule = ctx->rules[i];
 
-			if (*rule & (IR_FUSED|IR_SKIPPED)) {
-				if ((*rule & IR_RULE_MASK) == IR_ALLOCA) {
+			if (rule & (IR_FUSED|IR_SKIPPED)) {
+				if ((rule & IR_RULE_MASK) == IR_ALLOCA) {
+					insn = ctx->ir_base + i;
+
 					/* assign "static" spill slots for VARs and ALLOCAs */
 					if (IR_VREG_IS_STACK_SLOT(ctx->vregs[i])) {
 						/* spill slot already allocated */
@@ -2343,6 +2363,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 				continue;
 			}
 
+			insn = ctx->ir_base + i;
 			if (ctx->vregs[i] > 0) {
 				ir_live_interval *ival = ctx->live_intervals[ctx->vregs[i]];
 
@@ -2350,7 +2371,9 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					if (insn->op == IR_PHI) {
 						/* dead PHI (we have to keep it) */
 						// TODO: remove dead PHI ???
-						ival = _add_live_range(ctx, i, i, i);
+						if (!ival) {
+							ival = _create_ival(ctx, ctx->vregs[i], insn->type);
+						}
 						_pick_spill(ctx, ival);
 						continue;
 					} else if (IR_IS_FOLDABLE_OP(insn->op) || (ir_op_flags[insn->op] & IR_OP_FLAG_NO_SIDE_EFFECT)) {
@@ -2371,7 +2394,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 				/* Handle PHI specially (allocate only the output register or spill slot) */
 				} else if (insn->op == IR_PHI) {
 					if (!ival) {
-						ival = _add_live_range(ctx, i, i, i);
+						ival = _create_ival(ctx, ctx->vregs[i], insn->type);
 					}
 					if (ival->reg != IR_REG_NONE) {
 						/* use the previously allocated register */
@@ -2388,7 +2411,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					continue;
 
 				/* An attempt to swap instruction operands for better op1 register reuse */
-				} else if ((*rule & IR_MAY_SWAP)
+				} else if ((rule & IR_MAY_SWAP)
 				 && insn->op2 > 0
 				 && ctx->vregs[insn->op2] > 0
 				 && insn->op2 > bb->start
@@ -2410,7 +2433,11 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 				 && ctx->vregs[insn->op3] > 0
 				 && ctx->use_lists[insn->op3].count == 1
 				 && ir_store_may_reuse_var_slot(ctx, bb, insn->op2, i, insn->op3)) {
-					ir_live_interval *ival = _add_live_range(ctx, insn->op3, insn->op3, i);
+					ir_live_interval *ival = ctx->live_intervals[ctx->vregs[insn->op3]];
+
+					if (!ival) {
+						ival = _create_ival(ctx, ctx->vregs[insn->op3], ctx->ir_base[insn->op3].type);
+					}
 					IR_ASSERT(ival->stack_spill_pos == -1);
 					ival->stack_spill_pos = IR_VREG_TO_STACK_SLOT(ctx->vregs[insn->op2]);
 					continue;
@@ -2420,6 +2447,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 
 			/* Reset information for the current instruction */
 			x.num = x.tmp_num = 0;
+			x.clobbered_args = IR_REGSET_EMPTY;
 			for (j = 0; j < IR_SUB_REFS_COUNT; j++) {
 				x.clobbered[j] = IR_REGSET_EMPTY;
 			}
@@ -2458,10 +2486,9 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 
 			/* Collect information about necessary input registers and related constaints */
 			n = insn->inputs_count;
-			insn_flags = ir_op_flags[insn->op];
 			j = 1;
 			p = insn->ops + 1;
-			if (insn_flags & (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_PINNED)) {
+			if (ir_op_flags[insn->op] & (IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_PINNED)) {
 				j++;
 				p++;
 			}
@@ -2473,7 +2500,11 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 
 				if (input > 0) {
 					if (ctx->vregs[input] > 0) {
-						ir_live_interval *ival = _add_live_range(ctx, input, input, i);
+						ir_live_interval *ival = ctx->live_intervals[ctx->vregs[input]];
+
+						if (!ival) {
+							ival = _create_ival(ctx, ctx->vregs[input], ctx->ir_base[input].type);
+						}
 						if (input < bb->start || input >= i) {
 							/* live before BB start - spill it */
 							if (ival->stack_spill_pos == -1) {
@@ -2548,7 +2579,11 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					used = IR_REGSET_UNION(used, x.clobbered[n]);
 				}
 
-				ival = _add_live_range(ctx, i, i, i);
+				ival = ctx->live_intervals[ctx->vregs[i]];
+				if (!ival) {
+					ival = _create_ival(ctx, ctx->vregs[i], insn->type);
+				}
+
 				if (ival->reg != IR_REG_NONE) {
 					if (!IR_REGSET_IN(used, ival->reg)) {
 						if (ival->reg != constraints.def_reg
@@ -2563,7 +2598,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					} else {
 						_evict_reg(ctx, &x, ival->reg);
 						reg = constraints.def_reg;
-						if (reg != IR_REG_NONE && !IR_REGSET_IN(IR_REGSET_INTERSECTION(used, x.allocated), reg)) {
+						if (reg != IR_REG_NONE && !IR_REGSET_IN(IR_REGSET_UNION(used, x.allocated), reg)) {
 							/* use fixed regiset hint */
 						} else if (def_flags & IR_USE_MUST_BE_IN_REG) {
 							reg = _pick_reg(ctx, &x, insn->type, used, IR_USE_MUST_BE_IN_REG);
@@ -2573,7 +2608,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					}
 				} else {
 					reg = constraints.def_reg;
-					if (reg != IR_REG_NONE && !IR_REGSET_IN(IR_REGSET_INTERSECTION(used, x.allocated), reg)) {
+					if (reg != IR_REG_NONE && !IR_REGSET_IN(IR_REGSET_UNION(used, x.allocated), reg)) {
 						/* use fixed regiset hint */
 					} else if (def_flags & IR_USE_MUST_BE_IN_REG) {
 						reg = _pick_reg(ctx, &x, insn->type, used, IR_USE_MUST_BE_IN_REG);
@@ -2663,7 +2698,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 
 			/* allocate input registers */
 			for (j = 0; j < x.num; j++) {
-				ir_regset used = IR_REGSET_EMPTY;
+				ir_regset used = x.clobbered_args;
 				ir_live_interval *ival;
 
 #if IR_X86_I64
@@ -2695,13 +2730,13 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 						reg = IR_REG_I64_LO(reg);
 					}
 #endif
-					if (reg != IR_REG_NONE && !IR_REGSET_IN(IR_REGSET_INTERSECTION(used, x.allocated), reg)) {
+					if (reg != IR_REG_NONE && !IR_REGSET_IN(IR_REGSET_UNION(used, x.allocated), reg)) {
 						/* use fixed register hint */
 					} else if ((def_flags & IR_DEF_REUSES_OP1_REG)
 					 && x.regs[j].op == 1
 					 && x.regs[j].root == IR_UNUSED
 					 && ctx->regs[i][0] != IR_REG_NONE
-					 && !IR_REGSET_IN(IR_REGSET_INTERSECTION(used, x.allocated), IR_REG_NUM(ctx->regs[i][0]))
+					 && !IR_REGSET_IN(IR_REGSET_UNION(used, x.allocated), IR_REG_NUM(ctx->regs[i][0]))
 					 && _may_coalesce(ctx, insn->op1, i)) {
 						/* reuse for op1 the register allocated for instruction result (lightweigh coalescing) */
 						reg = IR_REG_NUM(ctx->regs[i][0]);
@@ -2723,7 +2758,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					if (x.regs[j].type == IR_I64 || x.regs[j].type == IR_U64) {
 						IR_REGSET_EXCL(available, reg);
 						if (reg2 == IR_REG_NONE
-						 || IR_REGSET_IN(IR_REGSET_INTERSECTION(used, x.allocated), reg2)) {
+						 || IR_REGSET_IN(IR_REGSET_UNION(used, x.allocated), reg2)) {
 							reg2 = _pick_reg(ctx, &x, x.regs[j].type, used, x.regs[j].flags);
 							if (reg2 == IR_REG_NONE) {
 								IR_REGSET_INCL(available, reg);
