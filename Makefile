@@ -14,8 +14,12 @@ CC         = gcc
 BUILD_CC   = gcc
 override CFLAGS += -Wall -Wextra -Wno-unused-parameter
 override BUILD_CFLAGS += -Wall -Wextra -Wno-unused-parameter
-LDFLAGS    = -lm -ldl
+LDFLAGS    = -lm
 LLK        = llk
+
+ifneq (OpenBSD, $(OS))
+LDFLAGS   += -ldl
+endif
 
 ifeq (debug, $(BUILD))
  override CFLAGS += -O0 -g -DIR_DEBUG=1
@@ -62,7 +66,7 @@ endif
 override CFLAGS += -DIR_TARGET_TRIPLET=\"$(TARGET_TRIPLET)\"
 override BUILD_CFLAGS += -DIR_TARGET_TRIPLET=\"$(TARGET_TRIPLET)\"
 
-ifeq (FreeBSD, $(OS))
+ifneq (,$(filter FreeBSD OpenBSD,$(OS)))
   CC=cc
   BUILD_CC=$(CC)
   override CFLAGS += -I/usr/local/include
