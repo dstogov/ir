@@ -1456,6 +1456,87 @@ typedef struct {
 	} regs[32], tmp_regs[32];;
 } ir_reg_alloc_simple_data;
 
+#ifdef IR_DEBUG
+# define IR_DEBUG_SPILLS 0
+# if IR_X86_I64
+#  define IR_REG_NAME_FMT        "%s%s%s"
+#  define IR_REG_NAME_VAL(_ival) ((_ival->flags & IR_LIVE_INTERVAL_TWO_REGS) ? \
+									ir_reg_name((_ival)->reg, IR_U32) : \
+									ir_reg_name((_ival)->reg, (_ival)->type)), \
+                                 ((_ival->flags & IR_LIVE_INTERVAL_TWO_REGS) ? " and " : ""), \
+                                 ((_ival->flags & IR_LIVE_INTERVAL_TWO_REGS) ? \
+									ir_reg_name((_ival)->reg_hi, IR_U32) : "")
+# else
+#  define IR_REG_NAME_FMT        "%s"
+#  define IR_REG_NAME_VAL(_ival) ir_reg_name((_ival)->reg, (_ival)->type)
+# endif
+# define IR_LOG(comment) do { \
+		if (ctx->flags & IR_DEBUG_RA) { \
+			fprintf(stderr, "---- %s\n", comment); \
+		} \
+	} while (0)
+# define IR_LOG_ASSIGN(_ref, _pos, _x, _y, _reg) do { \
+		if (ctx->flags & IR_DEBUG_RA) { \
+			fprintf(stderr, "  ---- Assign R%d (d_%d) to %s%s at %d (%d.%d)\n", \
+				ctx->vregs[_ref], _ref, \
+				ir_reg_name(IR_REG_NUM(_reg), ctx->ir_base[_ref].type), \
+				(((_reg) & IR_REG_SPILL_LOAD) ? " (spill)" : ""), \
+				_pos, _x, _y); \
+		} \
+	} while (0)
+# define IR_LOG_ASSIGN_TMP(_type, _pos, _x, _y, _reg) do { \
+		if (ctx->flags & IR_DEBUG_RA) { \
+			fprintf(stderr, "  ---- Assign TMP to %s%s at %d (%d.%d)\n", \
+				ir_reg_name(IR_REG_NUM(_reg), _type), \
+				(((_reg) & IR_REG_SPILL_LOAD) ? " (spill)" : ""), \
+				_pos, _x, _y); \
+		} \
+	} while (0)
+# define IR_LOG_ASSIGN_VAR(_var, _spill) do { \
+		if (IR_DEBUG_SPILLS && (ctx->flags & IR_DEBUG_RA)) { \
+			fprintf(stderr, "  ---- Assign VAR d_%d to 0x%x\n", \
+				_var, _spill); \
+		} \
+	} while (0)
+# define IR_LOG_ASSIGN_SPILL(_vreg, _spill) do { \
+		if (IR_DEBUG_SPILLS && (ctx->flags & IR_DEBUG_RA)) { \
+			fprintf(stderr, "  ---- Spill R%d to 0x%x\n", \
+				_vreg, _spill); \
+		} \
+	} while (0)
+# define IR_LOG_FREE(_ref, _reg) do { \
+		if (ctx->flags & IR_DEBUG_RA) { \
+			fprintf(stderr, "  ---- Free R%d(d_%d) assigned to %s\n", \
+				ctx->vregs[_ref], _ref, \
+				ir_reg_name(IR_REG_NUM(_reg), ctx->ir_base[_ref].type)); \
+		} \
+	} while (0)
+# define IR_LOG_EVICT(_ref, _reg) do { \
+		if (ctx->flags & IR_DEBUG_RA) { \
+			fprintf(stderr, "  ---- Evict R%d(d_%d) assigned to %s\n", \
+				ctx->vregs[_ref], _ref, \
+				ir_reg_name(IR_REG_NUM(_reg), ctx->ir_base[_ref].type)); \
+		} \
+	} while (0)
+# define IR_LOG_SPILL_LOAD(_ref, _pos, _x, _y, _reg) do { \
+		if (ctx->flags & IR_DEBUG_RA) { \
+			fprintf(stderr, "  ---- Add Spill Load R%d (d_%d) to %s at %d (%d.%d)\n", \
+				ctx->vregs[_ref], _ref, \
+				ir_reg_name(IR_REG_NUM(_reg), ctx->ir_base[_ref].type), \
+				_pos, _x, _y); \
+		} \
+	} while (0)
+#else
+# define IR_LOG(comment)
+# define IR_LOG_ASSIGN(_ref, _pos, _x, _y, _reg)
+# define IR_LOG_ASSIGN_TMP(_type, _pos, _x, _y, _reg)
+# define IR_LOG_ASSIGN_VAR(_vreg, _spill)
+# define IR_LOG_ASSIGN_SPILL(_vreg, _spill)
+# define IR_LOG_FREE(_ref, _reg)
+# define IR_LOG_EVICT(_ref, _reg)
+# define IR_LOG_SPILL_LOAD(_ref, _pos, _x, _y, _reg)
+#endif
+
 static void _add_scratch(ir_reg_alloc_simple_data *x, ir_reg reg, int8_t start, int8_t end)
 {
 	int8_t j;
@@ -1541,6 +1622,7 @@ static void _pick_spill(ir_ctx *ctx, ir_live_interval *ival)
 	}
 #endif
 	ival->stack_spill_pos = ir_allocate_spill_slot(ctx, size, 0);
+	IR_LOG_ASSIGN_SPILL(ival->vreg, ival->stack_spill_pos);
 }
 
 static void _evict_reg(ir_ctx *ctx, ir_reg_alloc_simple_data *x, ir_reg reg)
@@ -1553,6 +1635,7 @@ static void _evict_reg(ir_ctx *ctx, ir_reg_alloc_simple_data *x, ir_reg reg)
 	}
 
 	IR_ASSERT(ctx->vregs[ref] > 0);
+	IR_LOG_EVICT(ref, reg);
 	ival = ctx->live_intervals[ctx->vregs[ref]];
 
 	/* allocate spill slot */
@@ -1563,6 +1646,7 @@ static void _evict_reg(ir_ctx *ctx, ir_reg_alloc_simple_data *x, ir_reg reg)
 	if (x->state[reg].def == 0x7fffffff) {
 		/* add spill store for the def */
 		ir_set_alocated_reg(ctx, ref, 0, reg | IR_REG_SPILL_LOAD);
+		IR_LOG_SPILL_LOAD(ref, ref, ref, 0, reg);
 		return;
 	}
 
@@ -1580,6 +1664,7 @@ static void _evict_reg(ir_ctx *ctx, ir_reg_alloc_simple_data *x, ir_reg reg)
 			ir_set_fused_reg(ctx, x->state[reg].root, x->state[reg].use * sizeof(ir_ref) + x->state[reg].op,
 				reg | IR_REG_SPILL_LOAD);
 		}
+		IR_LOG_SPILL_LOAD(ref, x->state[reg].root, x->state[reg].use, x->state[reg].use, reg);
 	}
 }
 
@@ -1745,6 +1830,7 @@ static void ir_allocate_var_spill_slot(ir_ctx *ctx, ir_ref var, ir_insn *var_ins
 
 	offset = ir_allocate_spill_slot(ctx, size, align);
 	ctx->vregs[var] = IR_STACK_SLOT_TO_VREG(offset);
+	IR_LOG_ASSIGN_VAR(var, offset);
 }
 
 static bool _may_coalesce(ir_ctx *ctx, ir_ref input, ir_ref def)
@@ -2210,6 +2296,8 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 	ir_reg_alloc_simple_data x;
 	int32_t offset;
 
+	IR_LOG("Start Local Bottom-Up RA");
+
 	memset(&data, 0, sizeof(data));
 	data.cc = ir_get_call_conv_dsc(ctx->flags);
 	ctx->data = &data;
@@ -2294,6 +2382,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 								IR_REGSET_INCL(x.allocated, reg);
 								ival->reg = reg;
 								ir_set_alocated_reg(ctx, use, k, reg);
+								IR_LOG_ASSIGN(input, bb->end, use, k, reg);
 								continue;
 							}
 						}
@@ -2305,6 +2394,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 							 && _may_coalesce(ctx, input, use)) {
 								/* lightweight spill slot coalescing */
 								ival->stack_spill_pos = ctx->live_intervals[ctx->vregs[use]]->stack_spill_pos;
+								IR_LOG_ASSIGN_SPILL(ival->vreg, ival->stack_spill_pos);
 							} else {
 								_pick_spill(ctx, ival);
 							}
@@ -2351,6 +2441,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 							IR_ASSERT(val->val.i64 < 0x7fffffff);
 							offset = ir_allocate_spill_slot(ctx, val->val.i32, insn->op3);
 							ctx->vregs[i] = IR_STACK_SLOT_TO_VREG(offset);
+							IR_LOG_ASSIGN_VAR(i, offset);
 						}
 					} else if (insn->op == IR_VADDR) {
 						if (!IR_VREG_IS_STACK_SLOT(ctx->vregs[insn->op1])) {
@@ -2405,6 +2496,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 							reg |= IR_REG_SPILL_STORE;
 						}
 						ir_set_alocated_reg(ctx, i, 0, reg);
+						IR_LOG_ASSIGN(i, i, i, 0, reg);
 					} else if (ival->stack_spill_pos == -1) {
 						_pick_spill(ctx, ival);
 					}
@@ -2440,6 +2532,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					}
 					IR_ASSERT(ival->stack_spill_pos == -1);
 					ival->stack_spill_pos = IR_VREG_TO_STACK_SLOT(ctx->vregs[insn->op2]);
+					IR_LOG_ASSIGN_SPILL(ival->vreg, ival->stack_spill_pos);
 					continue;
 				}
 #endif
@@ -2568,8 +2661,10 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 				} else {
 					if (insn->op == IR_PARAM) {
 						/* We may reuse parameter stack slot for spilling */
-						ctx->live_intervals[ctx->vregs[i]]->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
-						ctx->live_intervals[ctx->vregs[i]]->stack_spill_pos = -1; // ???
+						ir_live_interval *ival = ctx->live_intervals[ctx->vregs[i]];
+						ival->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
+						ival->stack_spill_pos = -1; // ???
+						IR_LOG_ASSIGN_SPILL(ival->vreg, ival->stack_spill_pos);
 					}
 					def_pos = IR_DEF_SUB_REF;
 				}
@@ -2595,6 +2690,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 						reg = ival->reg;
 						IR_REGSET_EXCL(x.allocated, reg);
 						ival->reg = IR_REG_NONE;
+						IR_LOG_FREE(i, reg);
 					} else {
 						_evict_reg(ctx, &x, ival->reg);
 						reg = constraints.def_reg;
@@ -2634,6 +2730,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 						reg |= IR_REG_SPILL_STORE;
 					}
 					ir_set_alocated_reg(ctx, i, 0, reg);
+					IR_LOG_ASSIGN(i, i, i, 0, reg);
 				}
 			}
 
@@ -2694,6 +2791,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					ctx->rules[x.tmp_regs[j].ref] |= IR_FUSED_REG;
 					ir_set_fused_reg(ctx, x.tmp_regs[j].root, x.tmp_regs[j].ref * sizeof(ir_ref) + x.tmp_regs[j].op, reg);
 				}
+				IR_LOG_ASSIGN_TMP(x.tmp_regs[j].type, i, x.tmp_regs[j].ref, x.tmp_regs[j].op, reg);
 			}
 
 			/* allocate input registers */
@@ -2799,6 +2897,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 						ctx->rules[x.regs[j].ref] |= IR_FUSED_REG;
 						ir_set_fused_reg(ctx, x.regs[j].root, x.regs[j].ref * sizeof(ir_ref) + x.regs[j].op, reg);
 					}
+					IR_LOG_ASSIGN(x.regs[j].def, i, x.regs[j].ref, x.regs[j].op, reg);
 				} else if (ival->stack_spill_pos == -1) {
 					_pick_spill(ctx, ival);
 				}
@@ -2820,6 +2919,8 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 	ctx->flags |= IR_NO_STACK_COMBINE;
 	ir_fix_stack_frame(ctx);
 	ctx->data = NULL;
+
+	IR_LOG("Finish Local Bottom-Up RA");
 
 	return 1;
 }
