@@ -65,6 +65,8 @@ extern "C" {
 #   define IR_TARGET_TRIPLET "x86-freebsd-sysv"
 #  elif defined(__NetBSD__)
 #   define IR_TARGET_TRIPLET "x86-netbsd-sysv"
+#  elif defined(__OpenBSD__)
+#   define IR_TARGET_TRIPLET "x86-openbsd-sysv"
 #  else
 #   define IR_TARGET_TRIPLET "x86-unknown-sysv"
 #  endif
@@ -79,6 +81,8 @@ extern "C" {
 #   define IR_TARGET_TRIPLET "x86_64-freebsd-sysv"
 #  elif defined(__NetBSD__)
 #   define IR_TARGET_TRIPLET "x86_64-netbsd-sysv"
+#  elif defined(__OpenBSD__)
+#   define IR_TARGET_TRIPLET "x86_64-openbsd-sysv"
 #  else
 #   define IR_TARGET_TRIPLET "x86_64-unknown-sysv"
 #  endif
@@ -93,6 +97,8 @@ extern "C" {
 #   define IR_TARGET_TRIPLET "aarch64-freebsd-sysv"
 #  elif defined(__NetBSD__)
 #   define IR_TARGET_TRIPLET "aarch64-netbsd-sysv"
+#  elif defined(__OpenBSD__)
+#   define IR_TARGET_TRIPLET "aarch64-openbsd-sysv"
 #  else
 #   define IR_TARGET_TRIPLET "aarch64-unknown-sysv"
 #  endif
