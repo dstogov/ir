@@ -1457,7 +1457,7 @@ typedef struct {
 } ir_reg_alloc_simple_data;
 
 #ifdef IR_DEBUG
-# define IR_DEBUG_SPILLS 0
+# define IR_DEBUG_SPILLS 1
 # if IR_X86_I64
 #  define IR_REG_NAME_FMT        "%s%s%s"
 #  define IR_REG_NAME_VAL(_ival) ((_ival->flags & IR_LIVE_INTERVAL_TWO_REGS) ? \
@@ -1494,7 +1494,7 @@ typedef struct {
 	} while (0)
 # define IR_LOG_ASSIGN_VAR(_var, _spill) do { \
 		if (IR_DEBUG_SPILLS && (ctx->flags & IR_DEBUG_RA)) { \
-			fprintf(stderr, "  ---- Assign VAR d_%d to 0x%x\n", \
+			fprintf(stderr, "  ---- Spill VAR d_%d to 0x%x\n", \
 				_var, _spill); \
 		} \
 	} while (0)
@@ -1630,10 +1630,6 @@ static void _evict_reg(ir_ctx *ctx, ir_reg_alloc_simple_data *x, ir_reg reg)
 	ir_live_interval *ival;
 	ir_ref ref = x->state[reg].def;
 
-	if (ref == 0x7fffffff) {
-		ref = x->state[reg].root;
-	}
-
 	IR_ASSERT(ctx->vregs[ref] > 0);
 	IR_LOG_EVICT(ref, reg);
 	ival = ctx->live_intervals[ctx->vregs[ref]];
@@ -1641,13 +1637,6 @@ static void _evict_reg(ir_ctx *ctx, ir_reg_alloc_simple_data *x, ir_reg reg)
 	/* allocate spill slot */
 	if (ival->stack_spill_pos == -1) {
 		_pick_spill(ctx, ival);
-	}
-
-	if (x->state[reg].def == 0x7fffffff) {
-		/* add spill store for the def */
-		ir_set_alocated_reg(ctx, ref, 0, reg | IR_REG_SPILL_LOAD);
-		IR_LOG_SPILL_LOAD(ref, ref, ref, 0, reg);
-		return;
 	}
 
 	/* free reg */
@@ -2293,6 +2282,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 	ir_target_constraints constraints;
 	uint32_t def_flags;
 	ir_reg reg;
+	ir_regset param_regs;
 	ir_reg_alloc_simple_data x;
 	int32_t offset;
 
@@ -2309,6 +2299,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 
 	x.scratch = ir_scratch_regset[data.cc->scratch_reg - IR_REG_NUM];
 	x.preserved = IR_REGSET_DIFFERENCE(data.cc->preserved_regs, ctx->fixed_save_regset);
+	param_regs = IR_REGSET_EMPTY;
 
 	ctx->regs = ir_mem_malloc(sizeof(ir_regs) * ctx->insns_count);
 	memset(ctx->regs, IR_REG_NONE, sizeof(ir_regs) * ctx->insns_count);
@@ -2650,6 +2641,10 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 
 				if (constraints.def_reg != IR_REG_NONE) {
 					def_pos = IR_SAVE_SUB_REF;
+					if (insn->op == IR_PARAM) {
+						/* parameter register must not be used before its loaded */
+						IR_REGSET_INCL(param_regs, constraints.def_reg);
+					}
 				} else if (def_flags & IR_DEF_REUSES_OP1_REG) {
 					if (def_flags & IR_DEF_CONFLICTS_WITH_INPUT_REGS) {
 						def_pos = IR_USE_SUB_REF;
@@ -2679,48 +2674,35 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					ival = _create_ival(ctx, ctx->vregs[i], insn->type);
 				}
 
-				if (ival->reg != IR_REG_NONE) {
-					if (!IR_REGSET_IN(used, ival->reg)) {
-						if (ival->reg != constraints.def_reg
-						 && constraints.def_reg != IR_REG_NONE
-						 && IR_REGSET_IN(x.allocated, constraints.def_reg)) {
-							_evict_reg(ctx, &x, constraints.def_reg);
-						}
-						/* use the previously allocated register */
-						reg = ival->reg;
-						IR_REGSET_EXCL(x.allocated, reg);
-						ival->reg = IR_REG_NONE;
-						IR_LOG_FREE(i, reg);
-					} else {
-						_evict_reg(ctx, &x, ival->reg);
-						reg = constraints.def_reg;
-						if (reg != IR_REG_NONE && !IR_REGSET_IN(IR_REGSET_UNION(used, x.allocated), reg)) {
-							/* use fixed regiset hint */
-						} else if (def_flags & IR_USE_MUST_BE_IN_REG) {
-							reg = _pick_reg(ctx, &x, insn->type, used, IR_USE_MUST_BE_IN_REG);
+				do {
+					if (ival->reg != IR_REG_NONE) {
+						if (!IR_REGSET_IN(used, ival->reg)) {
+							if (ival->reg != constraints.def_reg
+							 && constraints.def_reg != IR_REG_NONE
+							 && IR_REGSET_IN(x.allocated, constraints.def_reg)) {
+								_evict_reg(ctx, &x, constraints.def_reg);
+							}
+							/* use the previously allocated register */
+							reg = ival->reg;
+							IR_REGSET_EXCL(x.allocated, reg);
+							ival->reg = IR_REG_NONE;
+							IR_LOG_FREE(i, reg);
+							break;
 						} else {
-							reg = IR_REG_NONE;
+							_evict_reg(ctx, &x, ival->reg);
 						}
 					}
-				} else {
-					reg = constraints.def_reg;
-					if (reg != IR_REG_NONE && !IR_REGSET_IN(IR_REGSET_UNION(used, x.allocated), reg)) {
-						/* use fixed regiset hint */
-					} else if (def_flags & IR_USE_MUST_BE_IN_REG) {
-						reg = _pick_reg(ctx, &x, insn->type, used, IR_USE_MUST_BE_IN_REG);
+					if (def_flags & IR_USE_MUST_BE_IN_REG) {
+						reg = constraints.def_reg;
+						if (reg != IR_REG_NONE && !IR_REGSET_IN(IR_REGSET_UNION(used, x.allocated), reg)) {
+							/* use fixed register hint */
+						} else {
+							reg = _pick_reg(ctx, &x, insn->type, used, IR_USE_MUST_BE_IN_REG);
+						}
 					} else {
 						reg = IR_REG_NONE;
 					}
-				}
-
-				if (constraints.def_reg != IR_REG_NONE
-				 && insn->op == IR_PARAM) {
-					IR_REGSET_INCL(x.allocated, constraints.def_reg);
-					x.state[constraints.def_reg].def = 0x7fffffff; /* disable eviction */
-					x.state[constraints.def_reg].root = i;
-					x.state[constraints.def_reg].use = IR_UNUSED;
-					x.state[constraints.def_reg].op = 0;
-				}
+				} while (0);
 
 				if (reg != IR_REG_NONE) {
 					for (n = def_pos; n <= IR_SAVE_SUB_REF; n++) {
@@ -2736,7 +2718,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 
 			/* evict clobbered registers */
 			if (x.allocated != IR_REGSET_EMPTY) {
-				ir_regset used = IR_REGSET_EMPTY;
+				ir_regset used = param_regs;
 
 				for (n = 0; n < IR_SUB_REFS_COUNT; n++) {
 					used = IR_REGSET_UNION(used, x.clobbered[n]);
