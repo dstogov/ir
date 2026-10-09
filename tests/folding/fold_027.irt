@@ -1,0 +1,27 @@
+--TEST--
+027: FOLD: (x << 1) | ((x >>s 63) & 1) => rotate by 1
+--ARGS--
+-O2 --save
+--CODE--
+{
+	int64_t c_1 = 1;
+	int64_t c_2 = 63;
+	l_1 = START(l_8);
+	int64_t d_2 = PARAM(l_1, "x", 1);
+	int64_t d_3 = SHL(d_2, c_1);
+	int64_t d_4 = SAR(d_2, c_2);
+	int64_t d_5 = AND(d_4, c_1);
+	int64_t d_6 = OR(d_3, d_5);
+	l_8 = RETURN(l_1, d_6);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int64_t c_4 = 63;
+	l_1 = START(l_4);
+	int64_t d_2 = PARAM(l_1, "x", 1);
+	int64_t d_3 = ROR(d_2, c_4);
+	l_4 = RETURN(l_1, d_3);
+}
