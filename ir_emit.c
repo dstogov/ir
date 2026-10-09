@@ -2796,7 +2796,8 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					IR_ASSERT(x.regs[j].def > 0 && ctx->vregs[x.regs[j].def] > 0);
 					ival = ctx->live_intervals[ctx->vregs[x.regs[j].def]];
 					reg = ival->reg;
-					if (reg != IR_REG_NONE && !IR_REGSET_IN(used, reg)) {
+					if (reg != IR_REG_NONE
+					 && (!IR_REGSET_IN(used, reg) || x.state[reg].def == x.regs[j].def)) {
 						IR_ASSERT(x.state[reg].def == x.regs[j].def);
 						x.state[reg].root = x.regs[j].root;
 						x.state[reg].use = x.regs[j].ref;
