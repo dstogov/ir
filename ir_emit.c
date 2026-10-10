@@ -1596,7 +1596,7 @@ static bool ir_store_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, i
 	if (store > bb->end || ir_var_addr_is_taken(ctx, var)) return 0;
 
 	/* The slot must be free from the value's definition through its VSTORE. */
-	for (uint32_t i = 0; i < uses->count; i++) {
+	for (ir_ref i = 0; i < uses->count; i++) {
 		ir_ref ref = ctx->use_edges[uses->refs + i];
 		ir_insn *insn = &ctx->ir_base[ref];
 
@@ -1607,7 +1607,7 @@ static bool ir_store_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, i
 
 		/* Earlier loads may use the slot until their last use before this store. */
 		ir_use_list *load_uses = &ctx->use_lists[ref];
-		for (uint32_t j = 0; j < load_uses->count; j++) {
+		for (ir_ref j = 0; j < load_uses->count; j++) {
 			ir_ref load_use = ctx->use_edges[load_uses->refs + j];
 			if (load_use > val && load_use < store) return 0;
 		}
