@@ -1548,6 +1548,19 @@ static void ir_set_fused_reg(ir_ctx *ctx, ir_ref root, ir_ref ref_and_op, int8_t
 	ir_strtab_lookup(ctx->fused_regs, key, 8, 0x10000000 | (uint8_t)reg);
 }
 
+static bool ir_var_addr_is_taken(ir_ctx *ctx, ir_ref var)
+{
+	ir_use_list *use_list = &ctx->use_lists[var];
+	ir_ref *p, n = use_list->count;
+
+	for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
+		if (ctx->ir_base[*p].op == IR_VADDR) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
 static bool ir_load_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, ir_ref load)
 {
 	ir_use_list *use_list = &ctx->use_lists[load];
@@ -1555,10 +1568,13 @@ static bool ir_load_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, ir
 	ir_ref last_use = IR_UNUSED;
 	ir_insn *insn;
 
+	if (ir_var_addr_is_taken(ctx, var)) return 0;
 	if (n) {
 		for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
 			use = *p;
 			if (use < load || use > bb->end) return 0;
+			/* fused instructions are emitted at their root, later in the block */
+			if (ctx->rules[use] & IR_FUSED) use = bb->end;
 			if (use > last_use) last_use = use;
 		}
 		for (i = load + 1, insn = &ctx->ir_base[i]; i < last_use;) {
@@ -1575,19 +1591,26 @@ static bool ir_load_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, ir
 
 static bool ir_store_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, ir_ref store, ir_ref val)
 {
-	ir_ref i, n;
-	ir_insn *insn;
+	ir_use_list *uses = &ctx->use_lists[var];
 
-	if (val < bb->start && val > store) return 0;
+	if (store > bb->end || ir_var_addr_is_taken(ctx, var)) return 0;
 
-	for (i = val, insn = &ctx->ir_base[i]; i < store;) {
-		if ((insn->op == IR_VLOAD || insn->op == IR_VLOAD_v || insn->op == IR_VSTORE || insn->op == IR_VSTORE_v)
-		 && insn->op2 == var) {
-			return 0;
+	/* The slot must be free from the value's definition through its VSTORE. */
+	for (ir_ref i = 0; i < uses->count; i++) {
+		ir_ref ref = ctx->use_edges[uses->refs + i];
+		ir_insn *insn = &ctx->ir_base[ref];
+
+		if (insn->op != IR_VLOAD && insn->op != IR_VLOAD_v
+		 && insn->op != IR_VSTORE && insn->op != IR_VSTORE_v) continue;
+		if (ref >= val && ref < store) return 0;
+		if (ref >= val || (insn->op != IR_VLOAD && insn->op != IR_VLOAD_v)) continue;
+
+		/* Earlier loads may use the slot until their last use before this store. */
+		ir_use_list *load_uses = &ctx->use_lists[ref];
+		for (ir_ref j = 0; j < load_uses->count; j++) {
+			ir_ref load_use = ctx->use_edges[load_uses->refs + j];
+			if (load_use > val && load_use < store) return 0;
 		}
-		n = ir_insn_len(insn);
-		i += n;
-		insn += n;
 	}
 	return 1;
 }
