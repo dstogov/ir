@@ -77,10 +77,10 @@ test:
 	fmul d0, d0, d1
 	str d0, [sp, #0x30]
 	ldr d0, [sp, #0x20]
-	fmul d0, d0, d1
+	fmul d0, d0, d0
 	str d0, [sp, #0x38]
 	ldr d0, [sp, #0x18]
-	fmul d0, d0, d1
+	fmul d0, d0, d0
 	str d0, [sp, #0x40]
 	ldr d0, [sp, #0x38]
 	ldr d1, [sp, #0x40]
@@ -91,7 +91,7 @@ test:
 	fadd d0, d0, d1
 	str d0, [sp, #0x50]
 	ldr d0, [sp, #0x30]
-	fadd d0, d0, d1
+	fadd d0, d0, d0
 	str d0, [sp, #0x58]
 	ldr d0, [sp, #0x58]
 	ldr d1, [sp]
