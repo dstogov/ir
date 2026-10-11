@@ -1,0 +1,136 @@
+--TEST--
+Simple register allocator: the same value used as both operands of a fused compare
+--ARGS--
+-O0 --run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @f0(int32_t): int32_t;
+func @f0(int32_t): int32_t
+{
+	int32_t c_1 = 1;
+	int32_t c_2 = 2;
+	l_1 = START(l_6);
+	int32_t x = PARAM(l_1, "x", 1);
+	bool b = EQ(x, x);
+	l_2 = IF(l_1, b);
+	l_3 = IF_TRUE(l_2);
+	l_4 = RETURN(l_3, c_1);
+	l_5 = IF_FALSE(l_2);
+	l_6 = RETURN(l_5, c_2, l_4);
+}
+func @f1(int32_t): int32_t;
+func @f1(int32_t): int32_t
+{
+	int32_t c_1 = 1;
+	int32_t c_2 = 2;
+	l_1 = START(l_6);
+	int32_t x = PARAM(l_1, "x", 1);
+	bool b = GE(x, x);
+	l_2 = IF(l_1, b);
+	l_3 = IF_TRUE(l_2);
+	l_4 = RETURN(l_3, c_1);
+	l_5 = IF_FALSE(l_2);
+	l_6 = RETURN(l_5, c_2, l_4);
+}
+func @f2(int32_t): int32_t;
+func @f2(int32_t): int32_t
+{
+	int32_t c_1 = 1;
+	int32_t c_2 = 2;
+	l_1 = START(l_6);
+	int32_t x = PARAM(l_1, "x", 1);
+	bool b = LT(x, x);
+	l_2 = IF(l_1, b);
+	l_3 = IF_TRUE(l_2);
+	l_4 = RETURN(l_3, c_1);
+	l_5 = IF_FALSE(l_2);
+	l_6 = RETURN(l_5, c_2, l_4);
+}
+func @f3(uint8_t): int32_t;
+func @f3(uint8_t): int32_t
+{
+	int32_t c_1 = 1;
+	int32_t c_2 = 2;
+	l_1 = START(l_6);
+	uint8_t x = PARAM(l_1, "x", 1);
+	bool b = ULE(x, x);
+	l_2 = IF(l_1, b);
+	l_3 = IF_TRUE(l_2);
+	l_4 = RETURN(l_3, c_1);
+	l_5 = IF_FALSE(l_2);
+	l_6 = RETURN(l_5, c_2, l_4);
+}
+func @f4(int64_t): int32_t;
+func @f4(int64_t): int32_t
+{
+	int32_t c_1 = 1;
+	int32_t c_2 = 2;
+	l_1 = START(l_6);
+	int64_t x = PARAM(l_1, "x", 1);
+	bool b = NE(x, x);
+	l_2 = IF(l_1, b);
+	l_3 = IF_TRUE(l_2);
+	l_4 = RETURN(l_3, c_1);
+	l_5 = IF_FALSE(l_2);
+	l_6 = RETURN(l_5, c_2, l_4);
+}
+func @f5(double): int32_t;
+func @f5(double): int32_t
+{
+	int32_t c_1 = 1;
+	int32_t c_2 = 2;
+	l_1 = START(l_6);
+	double x = PARAM(l_1, "x", 1);
+	bool b = EQ(x, x);
+	l_2 = IF(l_1, b);
+	l_3 = IF_TRUE(l_2);
+	l_4 = RETURN(l_3, c_1);
+	l_5 = IF_FALSE(l_2);
+	l_6 = RETURN(l_5, c_2, l_4);
+}
+func @f6(double): int32_t;
+func @f6(double): int32_t
+{
+	int32_t c_1 = 1;
+	int32_t c_2 = 2;
+	l_1 = START(l_6);
+	double x = PARAM(l_1, "x", 1);
+	bool b = LE(x, x);
+	l_2 = IF(l_1, b);
+	l_3 = IF_TRUE(l_2);
+	l_4 = RETURN(l_3, c_1);
+	l_5 = IF_FALSE(l_2);
+	l_6 = RETURN(l_5, c_2, l_4);
+}
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%d %d %d %d %d %d %d\n";
+	int32_t z = 0;
+	uintptr_t ff0 = func @f0(int32_t): int32_t;
+	int32_t a0 = 7;
+	uintptr_t ff1 = func @f1(int32_t): int32_t;
+	int32_t a1 = 7;
+	uintptr_t ff2 = func @f2(int32_t): int32_t;
+	int32_t a2 = 7;
+	uintptr_t ff3 = func @f3(uint8_t): int32_t;
+	uint8_t a3 = 7;
+	uintptr_t ff4 = func @f4(int64_t): int32_t;
+	int64_t a4 = 7;
+	uintptr_t ff5 = func @f5(double): int32_t;
+	double a5 = 7.5;
+	uintptr_t ff6 = func @f6(double): int32_t;
+	double a6 = 7.5;
+	l_1 = START(l_r);
+	int32_t r0, l_2 = CALL/1(l_1, ff0, a0);
+	int32_t r1, l_3 = CALL/1(l_2, ff1, a1);
+	int32_t r2, l_4 = CALL/1(l_3, ff2, a2);
+	int32_t r3, l_5 = CALL/1(l_4, ff3, a3);
+	int32_t r4, l_6 = CALL/1(l_5, ff4, a4);
+	int32_t r5, l_7 = CALL/1(l_6, ff5, a5);
+	int32_t r6, l_8 = CALL/1(l_7, ff6, a6);
+	l_p = CALL/8(l_8, fp, fmt, r0, r1, r2, r3, r4, r5, r6);
+	l_r = RETURN(l_p, z);
+}
+--EXPECT--
+1 1 2 1 2 1 1
