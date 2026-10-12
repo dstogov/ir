@@ -322,10 +322,13 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	ir_hashtab_init(&hash, use_list->count);
 	n = use_list->count;
 	for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
+		ir_ref src;
+
 		use = *p;
+		src = ctx->cfg_map[use];
 		insn = &ctx->ir_base[use];
-		/* dead PHIs are not scheduled, so they go together with other unscheduled uses */
-		if (insn->op == IR_PHI && ctx->cfg_map[use]) {
+		/* dead PHIs (src == NULL) are not scheduled, so they go together with other unscheduled uses */
+		if (src && insn->op == IR_PHI) {
 			ir_ref *p = insn->ops + 2; /* PHI data inputs */
 			ir_ref *q = ctx->ir_base[insn->op1].ops + 1; /* MERGE inputs */
 			ir_ref n = insn->inputs_count - 1;
@@ -360,9 +363,9 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 				}
 			}
 		} else {
-			j = i = ctx->cfg_map[use];
-			if (i) {
-				IR_ASSERT(i > 0);
+			j = src;
+			if (j) {
+				IR_ASSERT(j > 0);
 				while (ir_sparse_set_in(&data->totally_useful, ctx->cfg_blocks[j].idom)) {
 					j = ctx->cfg_blocks[j].idom;
 				}
@@ -372,14 +375,14 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 				clone = clones_count++;
 				ir_hashtab_add(&hash, j, clone);
 				clones[clone].block = j;
-				clones[clone].lca = i;
+				clones[clone].lca = src;
 				clones[clone].use_count = 0;
 				clones[clone].use = -1;
 			} else {
-				clones[clone].lca = ir_gcm_find_lca(ctx, clones[clone].lca, i);
+				clones[clone].lca = ir_gcm_find_lca(ctx, clones[clone].lca, src);
 			}
 			uses[uses_count].ref = use;
-			uses[uses_count].block = i;
+			uses[uses_count].block = src;
 			uses[uses_count].next = clones[clone].use;
 			clones[clone].use_count++;
 			clones[clone].use = uses_count++;
@@ -479,7 +482,7 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 				ir_insn *insn = &ctx->ir_base[use];
 				ir_ref k, l = insn->inputs_count;
 
-				if (insn->op == IR_PHI && src) {
+				if (src && insn->op == IR_PHI) {
 					ir_insn *merge = &ctx->ir_base[insn->op1];
 					for (k = 2; k <= l; k++) {
 						j = ctx->cfg_map[ir_insn_op(merge, k - 1)];
