@@ -390,6 +390,7 @@ const ir_call_conv_dsc ir_call_conv_aarch64_preserve_none = {
 	_(OP_INT)              \
 	_(OP_FP)               \
 	_(BINOP_INT)           \
+	_(BIC)                 \
 	_(BINOP_FP)            \
 	_(SHIFT)               \
 	_(SHIFT_CONST)         \
@@ -476,6 +477,7 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 	constraints->hints_count = 0;
 	switch (rule & IR_RULE_MASK) {
 		case IR_BINOP_INT:
+		case IR_BIC:
 			insn = &ctx->ir_base[ref];
 			n = 0;
 			if (IR_IS_CONST_REF(insn->op1)) {
@@ -1043,6 +1045,53 @@ static uint32_t ir_match_builtin_call(ir_ctx *ctx, const ir_insn *func)
 	return 0;
 }
 
+/* AND(x, NOT(y)) -> bic */
+static bool ir_match_fuse_bic(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
+{
+	ir_ref not_ref, prev;
+	ir_insn *not_insn;
+
+	if (!IR_IS_TYPE_INT(insn->type) || insn->type == IR_BOOL) {
+		return 0;
+	}
+	if (ir_type_size[insn->type] != 4 && ir_type_size[insn->type] != 8) {
+		return 0;
+	}
+	if (IR_IS_CONST_REF(insn->op1) || IR_IS_CONST_REF(insn->op2)) {
+		return 0;
+	}
+
+	not_ref = insn->op2;
+	if (ctx->ir_base[not_ref].op != IR_NOT) {
+		not_ref = insn->op1;
+		if (ctx->ir_base[not_ref].op != IR_NOT) {
+			return 0;
+		}
+	}
+	not_insn = &ctx->ir_base[not_ref];
+	if (not_insn->type != insn->type || IR_IS_CONST_REF(not_insn->op1)) {
+		return 0;
+	}
+	if (ctx->rules[not_ref] || ctx->use_lists[not_ref].count != 1) {
+		return 0;
+	}
+	if (!ir_in_same_block(ctx, not_ref)) {
+		return 0;
+	}
+	/* Don't extend the live range of the NOT operand over a call */
+	for (prev = ctx->prev_ref[ref]; prev > not_ref; prev = ctx->prev_ref[prev]) {
+		if (ctx->ir_base[prev].op == IR_CALL) {
+			return 0;
+		}
+	}
+
+	if (not_ref == insn->op1) {
+		SWAP_REFS(insn->op1, insn->op2);
+	}
+	ctx->rules[not_ref] = IR_FUSED | IR_SIMPLE | IR_NOT;
+	return 1;
+}
+
 static bool all_usages_are_fusable(ir_ctx *ctx, ir_ref ref)
 {
 	ir_insn *insn = &ctx->ir_base[ref];
@@ -1452,6 +1501,9 @@ binop_fp:
 				} else if (op2_insn->val.i64 == -1) {
 					return IR_COPY_INT | IR_MAY_REUSE;
 				}
+			}
+			if (ir_match_fuse_bic(ctx, ref, insn)) {
+				return IR_BIC;
 			}
 			goto binop_int;
 		case IR_XOR:
@@ -2964,6 +3016,45 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 		}
 	}
+	if (IR_REG_SPILLED(ctx->regs[def][0])) {
+		ir_emit_store(ctx, type, def, def_reg);
+	}
+}
+
+static void ir_emit_bic(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_type type = insn->type;
+	ir_ref op1 = insn->op1;
+	ir_ref not_ref = insn->op2;
+	ir_ref op2 = ctx->ir_base[not_ref].op1;
+	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
+	ir_reg op1_reg = ctx->regs[def][1];
+	ir_reg op2_reg;
+
+	IR_ASSERT(ctx->ir_base[not_ref].op == IR_NOT);
+	if (UNEXPECTED(ctx->rules[not_ref] & IR_FUSED_REG)) {
+		op2_reg = ir_get_fused_reg(ctx, def, not_ref * sizeof(ir_ref) + 1);
+	} else {
+		op2_reg = ctx->regs[not_ref][1];
+	}
+
+	IR_ASSERT(def_reg != IR_REG_NONE && op1_reg != IR_REG_NONE && op2_reg != IR_REG_NONE);
+
+	if (IR_REG_SPILLED(op1_reg)) {
+		op1_reg = IR_REG_NUM(op1_reg);
+		ir_emit_load(ctx, type, op1_reg, op1);
+	}
+	if (IR_REG_SPILLED(op2_reg)) {
+		op2_reg = IR_REG_NUM(op2_reg);
+		if (op1 != op2) {
+			ir_emit_load(ctx, type, op2_reg, op2);
+		} else {
+			op2_reg = op1_reg;
+		}
+	}
+	|	ASM_REG_REG_REG_OP bic, type, def_reg, op1_reg, op2_reg
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, type, def, def_reg);
 	}
@@ -9198,6 +9289,9 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					break;
 				case IR_BINOP_INT:
 					ir_emit_binop_int(ctx, i, insn);
+					break;
+				case IR_BIC:
+					ir_emit_bic(ctx, i, insn);
 					break;
 				case IR_BINOP_FP:
 					ir_emit_binop_fp(ctx, i, insn);
