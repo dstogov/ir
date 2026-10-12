@@ -1,0 +1,104 @@
+--TEST--
+BIC 001: AND(x, NOT(y)) results
+--ARGS--
+--run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func bic32(int32_t, int32_t): int32_t
+{
+	l_1 = START(l_4);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t y = PARAM(l_1, "y", 2);
+	int32_t n = NOT(y);
+	int32_t r = AND(x, n);
+	l_4 = RETURN(l_1, r);
+}
+func bic32r(int32_t, int32_t): int32_t
+{
+	l_1 = START(l_4);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t y = PARAM(l_1, "y", 2);
+	int32_t n = NOT(y);
+	int32_t r = AND(n, x);
+	l_4 = RETURN(l_1, r);
+}
+func not32x2(int32_t, int32_t): int32_t
+{
+	l_1 = START(l_4);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t y = PARAM(l_1, "y", 2);
+	int32_t n = NOT(y);
+	int32_t a = AND(x, n);
+	int32_t r = ADD(a, n);
+	l_4 = RETURN(l_1, r);
+}
+func bic64(int64_t, int64_t): int64_t
+{
+	l_1 = START(l_4);
+	int64_t x = PARAM(l_1, "x", 1);
+	int64_t y = PARAM(l_1, "y", 2);
+	int64_t n = NOT(y);
+	int64_t r = AND(x, n);
+	l_4 = RETURN(l_1, r);
+}
+func bic64r(int64_t, int64_t): int64_t
+{
+	l_1 = START(l_4);
+	int64_t x = PARAM(l_1, "x", 1);
+	int64_t y = PARAM(l_1, "y", 2);
+	int64_t n = NOT(y);
+	int64_t r = AND(n, x);
+	l_4 = RETURN(l_1, r);
+}
+func not64x2(int64_t, int64_t): int64_t
+{
+	l_1 = START(l_4);
+	int64_t x = PARAM(l_1, "x", 1);
+	int64_t y = PARAM(l_1, "y", 2);
+	int64_t n = NOT(y);
+	int64_t a = AND(x, n);
+	int64_t r = ADD(a, n);
+	l_4 = RETURN(l_1, r);
+}
+func main(void): int32_t
+{
+	uintptr_t pf = func printf(uintptr_t, ...): int32_t;
+	int32_t ra = 305419896;
+	int32_t rb = 267390960;
+	int64_t qa = 1311768467463790320;
+	int64_t qb = 1148435428713435120;
+	int32_t zero = 0;
+	uintptr_t f_bic32 = func bic32(int32_t, int32_t): int32_t;
+	uintptr_t s_bic32 = "bic32: %x\n";
+	uintptr_t f_bic32r = func bic32r(int32_t, int32_t): int32_t;
+	uintptr_t s_bic32r = "bic32r: %x\n";
+	uintptr_t f_not32x2 = func not32x2(int32_t, int32_t): int32_t;
+	uintptr_t s_not32x2 = "not32x2: %x\n";
+	uintptr_t f_bic64 = func bic64(int64_t, int64_t): int64_t;
+	uintptr_t s_bic64 = "bic64: %llx\n";
+	uintptr_t f_bic64r = func bic64r(int64_t, int64_t): int64_t;
+	uintptr_t s_bic64r = "bic64r: %llx\n";
+	uintptr_t f_not64x2 = func not64x2(int64_t, int64_t): int64_t;
+	uintptr_t s_not64x2 = "not64x2: %llx\n";
+	l_1 = START(l_end);
+	int32_t d_0, l_c0 = CALL/2(l_1, f_bic32, ra, rb);
+	int32_t d_p0, l_p0 = CALL/2(l_c0, pf, s_bic32, d_0);
+	int32_t d_1, l_c1 = CALL/2(l_p0, f_bic32r, ra, rb);
+	int32_t d_p1, l_p1 = CALL/2(l_c1, pf, s_bic32r, d_1);
+	int32_t d_2, l_c2 = CALL/2(l_p1, f_not32x2, ra, rb);
+	int32_t d_p2, l_p2 = CALL/2(l_c2, pf, s_not32x2, d_2);
+	int64_t d_3, l_c3 = CALL/2(l_p2, f_bic64, qa, qb);
+	int32_t d_p3, l_p3 = CALL/2(l_c3, pf, s_bic64, d_3);
+	int64_t d_4, l_c4 = CALL/2(l_p3, f_bic64r, qa, qb);
+	int32_t d_p4, l_p4 = CALL/2(l_c4, pf, s_bic64r, d_4);
+	int64_t d_5, l_c5 = CALL/2(l_p4, f_not64x2, qa, qb);
+	int32_t d_p5, l_p5 = CALL/2(l_c5, pf, s_not64x2, d_5);
+	l_end = RETURN(l_p5, zero);
+}
+--EXPECT--
+bic32: 10045008
+bic32r: 10045008
+not32x2: 144017
+bic64: 10045008900cd000
+bic64r: 10045008900cd000
+not64x2: 144018801cc00f

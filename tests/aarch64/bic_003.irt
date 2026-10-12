@@ -1,0 +1,22 @@
+--TEST--
+003: NOT with multiple uses is not fused
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t y = PARAM(l_1, "y", 2);
+	int32_t n = NOT(y);
+	int32_t a = AND(x, n);
+	int32_t r = ADD(a, n);
+	l_4 = RETURN(l_1, r);
+}
+--EXPECT--
+test:
+	mvn w1, w1
+	and w0, w1, w0
+	add w0, w0, w1
+	ret

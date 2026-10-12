@@ -1,0 +1,19 @@
+--TEST--
+002: AND(NOT(y), x) 64-bit
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	int64_t x = PARAM(l_1, "x", 1);
+	int64_t y = PARAM(l_1, "y", 2);
+	int64_t n = NOT(y);
+	int64_t r = AND(n, x);
+	l_4 = RETURN(l_1, r);
+}
+--EXPECT--
+test:
+	bic x0, x0, x1
+	ret
