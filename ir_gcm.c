@@ -324,7 +324,8 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
 		use = *p;
 		insn = &ctx->ir_base[use];
-		if (insn->op == IR_PHI) {
+		/* dead PHIs are not scheduled, so they go together with other unscheduled uses */
+		if (insn->op == IR_PHI && ctx->cfg_map[use]) {
 			ir_ref *p = insn->ops + 2; /* PHI data inputs */
 			ir_ref *q = ctx->ir_base[insn->op1].ops + 1; /* MERGE inputs */
 			ir_ref n = insn->inputs_count - 1;
@@ -478,7 +479,7 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 				ir_insn *insn = &ctx->ir_base[use];
 				ir_ref k, l = insn->inputs_count;
 
-				if (insn->op == IR_PHI) {
+				if (insn->op == IR_PHI && src) {
 					ir_insn *merge = &ctx->ir_base[insn->op1];
 					for (k = 2; k <= l; k++) {
 						j = ctx->cfg_map[ir_insn_op(merge, k - 1)];

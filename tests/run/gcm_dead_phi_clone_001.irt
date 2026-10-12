@@ -1,0 +1,60 @@
+--TEST--
+GCM: partially dead node must not be cloned for an unused PHI
+--ARGS--
+-O1 --run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @test(uint8_t, uint8_t, int64_t, int32_t): int64_t;
+func @test(uint8_t, uint8_t, int64_t, int32_t): int64_t
+{
+	uint8_t c1 = 64;
+	uint8_t c8 = 0;
+	int32_t c_zero = 0;
+	l_start = START(l_ret);
+	uint8_t p2 = PARAM(l_start, "p2", 1);
+	uint8_t p3 = PARAM(l_start, "p3", 2);
+	int64_t p6 = PARAM(l_start, "p6", 3);
+	int32_t n = PARAM(l_start, "n", 4);
+	uint8_t v2 = XOR(p3, c1);
+	l_e0 = END(l_start);
+	l_loop = LOOP_BEGIN(l_e0, l_le);
+	uint8_t m42 = PHI(l_loop, c8, v2);
+	l_if2 = IF(l_loop, m42);
+	l_t2 = IF_TRUE(l_if2);
+	l_te2 = END(l_t2);
+	l_f2 = IF_FALSE(l_if2);
+	l_fe2 = END(l_f2);
+	l_mg2 = MERGE(l_te2, l_fe2);
+	uint8_t m62 = PHI(l_mg2, p2, v2);
+	l_if3 = IF(l_mg2, p6);
+	l_t3 = IF_TRUE(l_if3);
+	l_te3 = END(l_t3);
+	l_f3 = IF_FALSE(l_if3);
+	l_fe3 = END(l_f3);
+	l_mg3 = MERGE(l_te3, l_fe3);
+	uint8_t m82 = PHI(l_mg3, p2, v2);
+	bool v87 = LE(p3, m82);
+	l_lif = IF(l_mg3, n);
+	l_lt = IF_TRUE(l_lif);
+	l_le = LOOP_END(l_lt);
+	l_lf = IF_FALSE(l_lif);
+	int64_t x_phi0 = ZEXT(m82);
+	l_ret = RETURN(l_lf, x_phi0);
+}
+func @main(): int32_t
+{
+	uintptr_t ft = func @test(uint8_t, uint8_t, int64_t, int32_t): int64_t;
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%lld\n";
+	uint8_t a = 5;
+	uint8_t b = 1;
+	int64_t c = 1;
+	int32_t n = 0;
+	int32_t z = 0;
+	l_1 = START(l_4);
+	int64_t r, l_2 = CALL/4(l_1, ft, a, b, c, n);
+	l_3 = CALL/2(l_2, fp, fmt, r);
+	l_4 = RETURN(l_3, z);
+}
+--EXPECT--
+5
