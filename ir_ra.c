@@ -4599,10 +4599,12 @@ static void assign_regs(ir_ctx *ctx)
 
 				if (ival->tmp_op_num <= insn->inputs_count) {
 					ir_ref *ops = insn->ops;
+
 					if (IR_IS_CONST_REF(ops[ival->tmp_op_num])) {
 						/* constant rematerialization */
 						reg |= IR_REG_SPILL_LOAD;
-					} else if (ctx->rules[ops[ival->tmp_op_num]] == (IR_SKIPPED|IR_FUSED|IR_SIMPLE|IR_ALLOCA)) {
+					} else if (ctx->rules[ops[ival->tmp_op_num]] == (IR_SKIPPED|IR_FUSED|IR_SIMPLE|IR_ALLOCA)
+							&& IR_OPND_KIND(ir_op_flags[insn->op], ival->tmp_op_num) == IR_OPND_DATA) {
 						/* local address rematerialization */
 						reg |= IR_REG_SPILL_LOAD;
 					}
