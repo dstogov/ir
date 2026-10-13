@@ -1,0 +1,22 @@
+--TEST--
+004: AND(x, NOT(y)) when NOT is defined before x (NOT is op2)
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	int64_t a = PARAM(l_1, "a", 1);
+	int64_t b = PARAM(l_1, "b", 2);
+	int64_t y = PARAM(l_1, "y", 3);
+	int64_t n = NOT(y);
+	int64_t x = ADD(a, b);
+	int64_t r = AND(x, n);
+	l_4 = RETURN(l_1, r);
+}
+--EXPECT--
+test:
+	add x0, x1, x0
+	bic x0, x0, x2
+	ret
