@@ -629,42 +629,23 @@ static void ir_emit_overflow_math(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, 
 			break;
 		}
 	}
-	IR_ASSERT(overflow != IR_UNUSED);
 
 	IR_ASSERT(IR_IS_TYPE_INT(type));
-	if (ir_type_size[type] == 4 || ir_type_size[type] == 8) {
+	if (overflow) {
 		ir_emit_def_ref(ctx, f, overflow);
-		fprintf(f, "__builtin_%s%s%s_overflow(",
-			IR_IS_TYPE_SIGNED(type) ? "s" : "u",
-			func,
-			ir_type_size[type] == 8 ? "ll" : "");
-		ir_emit_ref(ctx, f, insn->op1);
-		fprintf(f, ", ");
-		ir_emit_ref(ctx, f, insn->op2);
-		fprintf(f, ", &");
-		ir_emit_ref(ctx, f, def);
-		fprintf(f, ");\n");
 	} else {
-		ir_emit_binary_op(ctx, f, def, insn, op);
-		ir_emit_def_ref(ctx, f, overflow);
-		if (IR_IS_TYPE_SIGNED(type)) {
-			fprintf(f, "(int32_t)");
-			ir_emit_ref(ctx, f, def);
-			fprintf(f, " != (int32_t)");
-			ir_emit_ref(ctx, f, insn->op1);
-			fprintf(f, " %s (int32_t)", op);
-			ir_emit_ref(ctx, f, insn->op2);
-			fprintf(f, ";\n");
-		} else {
-			fprintf(f, "(uint32_t)");
-			ir_emit_ref(ctx, f, def);
-			fprintf(f, " != (uint32_t)");
-			ir_emit_ref(ctx, f, insn->op1);
-			fprintf(f, " %s (uint32_t)", op);
-			ir_emit_ref(ctx, f, insn->op2);
-			fprintf(f, ";\n");
-		}
+		fprintf(f, "\t");
 	}
+	fprintf(f, "__builtin_%s%s%s_overflow(",
+		IR_IS_TYPE_SIGNED(type) ? "s" : "u",
+		func,
+		ir_type_size[type] == 8 ? "ll" : "");
+	ir_emit_ref(ctx, f, insn->op1);
+	fprintf(f, ", ");
+	ir_emit_ref(ctx, f, insn->op2);
+	fprintf(f, ", &");
+	ir_emit_ref(ctx, f, def);
+	fprintf(f, ");\n");
 }
 
 static void ir_emit_if(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn *insn, uint32_t next_block)
