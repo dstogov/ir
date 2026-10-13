@@ -3138,8 +3138,11 @@ static void ir_emit_overflow(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		|	cset Rw(def_reg), ne
 	} else if (IR_IS_TYPE_SIGNED(type)) {
 		|	cset Rw(def_reg), vs
-	} else {
+	} else if (math_insn->op == IR_ADD_OV) {
 		|	cset Rw(def_reg), cs
+	} else {
+		IR_ASSERT(math_insn->op == IR_SUB_OV);
+		|	cset Rw(def_reg), cc
 	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, insn->type, def, def_reg);
@@ -3177,11 +3180,18 @@ static void ir_emit_overflow_and_branch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_
 		} else {
 			|	bvs =>true_block
 		}
-	} else {
+	} else if (math_insn->op == IR_ADD_OV) {
 		if (reverse) {
 			|	bcc =>true_block
 		} else {
 			|	bcs =>true_block
+		}
+	} else {
+		IR_ASSERT(math_insn->op == IR_SUB_OV);
+		if (reverse) {
+			|	bcs =>true_block
+		} else {
+			|	bcc =>true_block
 		}
 	}
 	if (false_block) {
