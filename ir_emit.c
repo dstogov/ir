@@ -1554,16 +1554,34 @@ static bool ir_load_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, ir
 	ir_ref *p, use, i, n = use_list->count;
 	ir_ref last_use = IR_UNUSED;
 	ir_insn *insn;
+	int address_taken = -1; /* unknown */
 
 	if (n) {
+		/* Check if all uses of the result of VLOAD are in the same basic block (after VLOAD) */
 		for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
 			use = *p;
 			if (use < load || use > bb->end) return 0;
 			if (use > last_use) last_use = use;
 		}
+		/* Check if the result of VLOAD can not be clobbered between VLOAD and the last use */
 		for (i = load + 1, insn = &ctx->ir_base[i]; i < last_use;) {
 			if ((insn->op == IR_VSTORE || insn->op == IR_VSTORE_v) && insn->op2 == var) {
 				return 0;
+			} else if (address_taken
+			 && (insn->op == IR_STORE
+			  || insn->op == IR_STORE_v
+			  || insn->op == IR_CALL)) {
+				if (address_taken == -1) {
+					ir_use_list *use_list = &ctx->use_lists[var];
+					ir_ref *p, n = use_list->count;
+
+					for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
+						if (ctx->ir_base[*p].op == IR_VADDR) {
+							return 0;
+						}
+					}
+					address_taken = 0;
+				}
 			}
 			n = ir_insn_len(insn);
 			i += n;
@@ -1577,13 +1595,33 @@ static bool ir_store_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, i
 {
 	ir_ref i, n;
 	ir_insn *insn;
+	int address_taken = -1; /* unknown */
 
-	if (val < bb->start && val > store) return 0;
+	/* Check if the value stored by VSTORE is produced in the same basic block (before VSTORE) */
+	if (val < bb->start || val > store || store > bb->end) return 0;
 
+	/* Check if the instructions between the "producer" and VSTORE can not access the same VAR */
 	for (i = val, insn = &ctx->ir_base[i]; i < store;) {
 		if ((insn->op == IR_VLOAD || insn->op == IR_VLOAD_v || insn->op == IR_VSTORE || insn->op == IR_VSTORE_v)
 		 && insn->op2 == var) {
 			return 0;
+		} else if (address_taken
+		 && (insn->op == IR_LOAD
+		  || insn->op == IR_LOAD_v
+		  || insn->op == IR_STORE
+		  || insn->op == IR_STORE_v
+		  || insn->op == IR_CALL)) {
+			if (address_taken == -1) {
+				ir_use_list *use_list = &ctx->use_lists[var];
+				ir_ref *p, n = use_list->count;
+
+				for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
+					if (ctx->ir_base[*p].op == IR_VADDR) {
+						return 0;
+					}
+				}
+				address_taken = 0;
+			}
 		}
 		n = ir_insn_len(insn);
 		i += n;

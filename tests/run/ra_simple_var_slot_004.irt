@@ -1,0 +1,36 @@
+--TEST--
+Simple register allocator: VAR is accessed through VADDR
+--ARGS--
+-O0 --run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @main(): int32_t
+{
+	uintptr_t c_p = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t c_f = "%d %d %d %d\n";
+	int32_t c_0 = 0;
+	int32_t c_1 = 1;
+	int32_t c_5 = 5;
+	int32_t c_7 = 7;
+	l_1 = START(l_ret);
+	int32_t x = VAR(l_1, "x");
+	int32_t y = VAR(l_1, "y");
+	int32_t z = VAR(l_1, "z");
+	l_2 = VSTORE(l_1, x, c_5);
+	int32_t a, l_3 = VLOAD(l_2, x);
+	uintptr_t px = VADDR(x);
+	l_4 = STORE(l_3, px, c_7);
+	int32_t b, l_5 = VLOAD(l_4, x);
+	l_6 = VSTORE(l_5, z, c_5);
+	l_7 = VSTORE(l_6, y, c_5);
+	int32_t c, l_8 = VLOAD(l_7, y);
+	int32_t v = ADD(c, c_1);
+	uintptr_t pz = VADDR(z);
+	int32_t old, l_9 = LOAD(l_8, pz);
+	l_10 = VSTORE(l_9, z, v);
+	int32_t d, l_11 = VLOAD(l_10, z);
+	int32_t r, l_12 = CALL/5(l_11, c_p, c_f, a, b, old, d);
+	l_ret = RETURN(l_12, c_0);
+}
+--EXPECT--
+5 7 5 6

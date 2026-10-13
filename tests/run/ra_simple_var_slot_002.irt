@@ -1,0 +1,43 @@
+--TEST--
+Simple register allocator: value stored to VAR in a loop header
+--ARGS--
+-O0 --run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+static const @format[4] = "%d\n\000";
+func @main(): int32_t
+{
+	uintptr_t c_p = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t c_f = sym(@format);
+	int32_t c_0 = 0;
+	int32_t c_1 = 1;
+	int32_t c_3 = 3;
+	int32_t c_7 = 7;
+	int32_t c_42 = 42;
+	l_1 = START(l_ret);
+	int32_t x = VAR(l_1, "x");
+	int32_t y = VAR(l_1, "y");
+	int32_t i = VAR(l_1, "i");
+	l_2 = VSTORE(l_1, x, c_0);
+	l_3 = VSTORE(l_2, i, c_0);
+	l_4 = VSTORE(l_3, y, c_42);
+	int32_t a, l_5 = VLOAD(l_4, y);
+	int32_t v = ADD(a, c_1);
+	l_6 = END(l_5);
+	l_7 = LOOP_BEGIN(l_6, l_le);
+	l_8 = VSTORE(l_7, x, v);
+	int32_t iv, l_9 = VLOAD(l_8, i);
+	bool cond = LT(iv, c_3);
+	l_10 = IF(l_9, cond);
+	l_11 = IF_TRUE(l_10);
+	int32_t iv1 = ADD(iv, c_1);
+	l_12 = VSTORE(l_11, i, iv1);
+	l_13 = VSTORE(l_12, x, c_7);
+	l_le = LOOP_END(l_13);
+	l_14 = IF_FALSE(l_10);
+	int32_t xv, l_15 = VLOAD(l_14, x);
+	int32_t r, l_16 = CALL/2(l_15, c_p, c_f, xv);
+	l_ret = RETURN(l_16, c_0);
+}
+--EXPECT--
+43
