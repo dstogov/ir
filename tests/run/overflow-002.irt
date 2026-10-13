@@ -1,0 +1,232 @@
+--TEST--
+OVERFLOW and branch (32-bit)
+--ARGS--
+--run
+--CODE--
+func @main(): int32_t;
+extern func @printf(uintptr_t, ...): int32_t;
+func @add_ov_i(int32_t, int32_t): int32_t;
+func @sub_ov_i(int32_t, int32_t): int32_t;
+func @mul_ov_i(int32_t, int32_t): int32_t;
+func @add_ov_u(uint32_t, uint32_t): int32_t;
+func @sub_ov_u(uint32_t, uint32_t): int32_t;
+func @mul_ov_u(uint32_t, uint32_t): int32_t;
+static const @str.1[10] = "%d %d %d\n\000";
+func @main(): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uintptr_t c_4 = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t c_5 = func @add_ov_i(int32_t, int32_t): int32_t;
+	int32_t c_6 = 2147483647;
+	int32_t c_7 = -1;
+	int32_t c_8 = 1;
+	int32_t c_9 = -2147483647;
+	int32_t c_10 = -2;
+	uintptr_t c_11 = sym(@str.1);
+	uintptr_t c_12 = func @sub_ov_i(int32_t, int32_t): int32_t;
+	int32_t c_13 = 2;
+	uintptr_t c_14 = func @mul_ov_i(int32_t, int32_t): int32_t;
+	int32_t c_15 = 536870912;
+	int32_t c_16 = 1073741824;
+	int32_t c_17 = 4;
+	int32_t c_18 = -1073741824;
+	int32_t c_19 = -4;
+	uintptr_t c_20 = func @add_ov_u(uint32_t, uint32_t): int32_t;
+	uint32_t c_21 = 2147483647;
+	uint32_t c_22 = 1;
+	uint32_t c_23 = 4294967295;
+	uintptr_t c_24 = func @sub_ov_u(uint32_t, uint32_t): int32_t;
+	uint32_t c_25 = 0;
+	uintptr_t c_26 = func @mul_ov_u(uint32_t, uint32_t): int32_t;
+	uint32_t c_27 = 536870912;
+	uint32_t c_28 = 2;
+	uint32_t c_29 = 1073741824;
+	uint32_t c_30 = 8;
+	int32_t c_31 = 0;
+#BB1: end=l_50
+	l_1 = START(l_50);
+	int32_t d_2, l_2 = CALL/2(l_1, c_5, c_6, c_7);
+	int32_t d_4, l_4 = CALL/2(l_2, c_5, c_6, c_8);
+	int32_t d_6, l_6 = CALL/2(l_4, c_5, c_9, c_10);
+	int32_t d_8, l_8 = CALL/4(l_6, c_4, c_11, d_2, d_4, d_6);
+	int32_t d_10, l_10 = CALL/2(l_8, c_12, c_6, c_8);
+	int32_t d_12, l_12 = CALL/2(l_10, c_12, c_6, c_7);
+	int32_t d_14, l_14 = CALL/2(l_12, c_12, c_9, c_13);
+	int32_t d_16, l_16 = CALL/4(l_14, c_4, c_11, d_10, d_12, d_14);
+	int32_t d_18, l_18 = CALL/2(l_16, c_14, c_15, c_13);
+	int32_t d_20, l_20 = CALL/2(l_18, c_14, c_16, c_17);
+	int32_t d_22, l_22 = CALL/2(l_20, c_14, c_18, c_19);
+	int32_t d_24, l_24 = CALL/4(l_22, c_4, c_11, d_18, d_20, d_22);
+	int32_t d_26, l_26 = CALL/2(l_24, c_20, c_21, c_22);
+	int32_t d_28, l_28 = CALL/2(l_26, c_20, c_21, c_22);
+	int32_t d_30, l_30 = CALL/2(l_28, c_20, c_23, c_22);
+	int32_t d_32, l_32 = CALL/4(l_30, c_4, c_11, d_26, d_28, d_30);
+	int32_t d_34, l_34 = CALL/2(l_32, c_24, c_23, c_22);
+	int32_t d_36, l_36 = CALL/2(l_34, c_24, c_22, c_22);
+	int32_t d_38, l_38 = CALL/2(l_36, c_24, c_25, c_22);
+	int32_t d_40, l_40 = CALL/4(l_38, c_4, c_11, d_34, d_36, d_38);
+	int32_t d_42, l_42 = CALL/2(l_40, c_26, c_27, c_28);
+	int32_t d_44, l_44 = CALL/2(l_42, c_26, c_29, c_28);
+	int32_t d_46, l_46 = CALL/2(l_44, c_26, c_29, c_30);
+	int32_t d_48, l_48 = CALL/4(l_46, c_4, c_11, d_42, d_44, d_46);
+	l_50 = RETURN(l_48, c_31);
+}
+func @add_ov_i(int32_t, int32_t): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 0;
+	int32_t c_5 = 7;
+#BB1: end=l_6, succ(2)=[BB2, BB3]
+	l_1 = START(l_13);
+	int32_t d_2 = PARAM(l_1, "x", 1);
+	int32_t d_3 = PARAM(l_1, "y", 2);
+	int32_t d_4 = ADD_OV(d_3, d_2);
+	bool d_5 = OVERFLOW(d_4);
+	l_6 = IF(l_1, d_5);
+#BB2: end=l_8, idom=BB1(1), pred(1)=[BB1], succ(1)=[BB4]
+	l_7 = IF_TRUE(l_6);
+	l_8 = END(l_7);
+#BB3: end=l_10, idom=BB1(1), pred(1)=[BB1], succ(1)=[BB4]
+	l_9 = IF_FALSE(l_6);
+	l_10 = END(l_9);
+#BB4: end=l_13, idom=BB1(1), pred(2)=[BB2, BB3]
+	l_11 = MERGE(l_8, l_10);
+	int32_t d_12 = PHI(l_11, c_4, c_5);
+	l_13 = RETURN(l_11, d_12);
+}
+func @sub_ov_i(int32_t, int32_t): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 0;
+	int32_t c_5 = 7;
+#BB1: end=l_6, succ(2)=[BB2, BB3]
+	l_1 = START(l_13);
+	int32_t d_2 = PARAM(l_1, "x", 1);
+	int32_t d_3 = PARAM(l_1, "y", 2);
+	int32_t d_4 = SUB_OV(d_2, d_3);
+	bool d_5 = OVERFLOW(d_4);
+	l_6 = IF(l_1, d_5);
+#BB2: end=l_8, idom=BB1(1), pred(1)=[BB1], succ(1)=[BB4]
+	l_7 = IF_TRUE(l_6);
+	l_8 = END(l_7);
+#BB3: end=l_10, idom=BB1(1), pred(1)=[BB1], succ(1)=[BB4]
+	l_9 = IF_FALSE(l_6);
+	l_10 = END(l_9);
+#BB4: end=l_13, idom=BB1(1), pred(2)=[BB2, BB3]
+	l_11 = MERGE(l_8, l_10);
+	int32_t d_12 = PHI(l_11, c_4, c_5);
+	l_13 = RETURN(l_11, d_12);
+}
+func @mul_ov_i(int32_t, int32_t): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 0;
+	int32_t c_5 = 7;
+#BB1: end=l_6, succ(2)=[BB2, BB3]
+	l_1 = START(l_13);
+	int32_t d_2 = PARAM(l_1, "x", 1);
+	int32_t d_3 = PARAM(l_1, "y", 2);
+	int32_t d_4 = MUL_OV(d_3, d_2);
+	bool d_5 = OVERFLOW(d_4);
+	l_6 = IF(l_1, d_5);
+#BB2: end=l_8, idom=BB1(1), pred(1)=[BB1], succ(1)=[BB4]
+	l_7 = IF_TRUE(l_6);
+	l_8 = END(l_7);
+#BB3: end=l_10, idom=BB1(1), pred(1)=[BB1], succ(1)=[BB4]
+	l_9 = IF_FALSE(l_6);
+	l_10 = END(l_9);
+#BB4: end=l_13, idom=BB1(1), pred(2)=[BB2, BB3]
+	l_11 = MERGE(l_8, l_10);
+	int32_t d_12 = PHI(l_11, c_4, c_5);
+	l_13 = RETURN(l_11, d_12);
+}
+func @add_ov_u(uint32_t, uint32_t): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 0;
+	int32_t c_5 = 7;
+#BB1: end=l_6, succ(2)=[BB2, BB3]
+	l_1 = START(l_13);
+	uint32_t d_2 = PARAM(l_1, "x", 1);
+	uint32_t d_3 = PARAM(l_1, "y", 2);
+	uint32_t d_4 = ADD_OV(d_3, d_2);
+	bool d_5 = OVERFLOW(d_4);
+	l_6 = IF(l_1, d_5);
+#BB2: end=l_8, idom=BB1(1), pred(1)=[BB1], succ(1)=[BB4]
+	l_7 = IF_TRUE(l_6);
+	l_8 = END(l_7);
+#BB3: end=l_10, idom=BB1(1), pred(1)=[BB1], succ(1)=[BB4]
+	l_9 = IF_FALSE(l_6);
+	l_10 = END(l_9);
+#BB4: end=l_13, idom=BB1(1), pred(2)=[BB2, BB3]
+	l_11 = MERGE(l_8, l_10);
+	int32_t d_12 = PHI(l_11, c_4, c_5);
+	l_13 = RETURN(l_11, d_12);
+}
+func @sub_ov_u(uint32_t, uint32_t): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 0;
+	int32_t c_5 = 7;
+#BB1: end=l_6, succ(2)=[BB2, BB3]
+	l_1 = START(l_13);
+	uint32_t d_2 = PARAM(l_1, "x", 1);
+	uint32_t d_3 = PARAM(l_1, "y", 2);
+	uint32_t d_4 = SUB_OV(d_2, d_3);
+	bool d_5 = OVERFLOW(d_4);
+	l_6 = IF(l_1, d_5);
+#BB2: end=l_8, idom=BB1(1), pred(1)=[BB1], succ(1)=[BB4]
+	l_7 = IF_TRUE(l_6);
+	l_8 = END(l_7);
+#BB3: end=l_10, idom=BB1(1), pred(1)=[BB1], succ(1)=[BB4]
+	l_9 = IF_FALSE(l_6);
+	l_10 = END(l_9);
+#BB4: end=l_13, idom=BB1(1), pred(2)=[BB2, BB3]
+	l_11 = MERGE(l_8, l_10);
+	int32_t d_12 = PHI(l_11, c_4, c_5);
+	l_13 = RETURN(l_11, d_12);
+}
+func @mul_ov_u(uint32_t, uint32_t): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 0;
+	int32_t c_5 = 7;
+#BB1: end=l_6, succ(2)=[BB2, BB3]
+	l_1 = START(l_13);
+	uint32_t d_2 = PARAM(l_1, "x", 1);
+	uint32_t d_3 = PARAM(l_1, "y", 2);
+	uint32_t d_4 = MUL_OV(d_3, d_2);
+	bool d_5 = OVERFLOW(d_4);
+	l_6 = IF(l_1, d_5);
+#BB2: end=l_8, idom=BB1(1), pred(1)=[BB1], succ(1)=[BB4]
+	l_7 = IF_TRUE(l_6);
+	l_8 = END(l_7);
+#BB3: end=l_10, idom=BB1(1), pred(1)=[BB1], succ(1)=[BB4]
+	l_9 = IF_FALSE(l_6);
+	l_10 = END(l_9);
+#BB4: end=l_13, idom=BB1(1), pred(2)=[BB2, BB3]
+	l_11 = MERGE(l_8, l_10);
+	int32_t d_12 = PHI(l_11, c_4, c_5);
+	l_13 = RETURN(l_11, d_12);
+}
+--EXPECT--
+7 0 0
+7 0 0
+7 0 0
+7 7 0
+7 7 0
+7 7 0
