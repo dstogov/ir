@@ -5488,8 +5488,18 @@ static void ir_emit_va_start(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			fp = IR_REG_STACK_POINTER;
 			arg_area_offset = ctx->call_stack_size + ctx->stack_frame_size + ctx->param_stack_size;
 		}
-		|	add Rx(tmp_reg), Rx(fp), #arg_area_offset
-		|	str Rx(tmp_reg), [Rx(op2_reg), #offset]
+		if (aarch64_may_encode_imm12(arg_area_offset)) {
+			|	add Rx(tmp_reg), Rx(fp), #arg_area_offset
+		} else {
+			ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, arg_area_offset);
+			|	add Rx(tmp_reg), Rx(fp), Rx(IR_REG_INT_TMP)
+		}
+		if (aarch64_may_encode_addr_offset(offset, sizeof(void*))) {
+			|	str Rx(tmp_reg), [Rx(op2_reg), #offset]
+		} else {
+			ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset);
+			|	str Rx(tmp_reg), [Rx(op2_reg), Rx(IR_REG_INT_TMP)]
+		}
 	} else {
 		ir_reg fp;
 		int reg_save_area_offset;
@@ -5522,35 +5532,85 @@ static void ir_emit_va_start(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 
 		/* Set va_list.stack */
-		|	add Rx(tmp_reg), Rx(fp), #overflow_arg_area_offset
-		|	str Rx(tmp_reg), [Rx(op2_reg), #(offset+offsetof(ir_aarch64_sysv_va_list, stack))]
+		if (aarch64_may_encode_imm12(overflow_arg_area_offset)) {
+			|	add Rx(tmp_reg), Rx(fp), #overflow_arg_area_offset
+		} else {
+			ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, overflow_arg_area_offset);
+			|	add Rx(tmp_reg), Rx(fp), Rx(IR_REG_INT_TMP)
+		}
+		if (aarch64_may_encode_addr_offset(offset+offsetof(ir_aarch64_sysv_va_list, stack), sizeof(void*))) {
+			|	str Rx(tmp_reg), [Rx(op2_reg), #(offset+offsetof(ir_aarch64_sysv_va_list, stack))]
+		} else {
+			ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset+offsetof(ir_aarch64_sysv_va_list, stack));
+			|	str Rx(tmp_reg), [Rx(op2_reg), Rx(IR_REG_INT_TMP)]
+		}
 		if ((ctx->flags2 & (IR_HAS_VA_ARG_GP|IR_HAS_VA_COPY)) && ctx->gp_reg_params < cc->int_param_regs_count) {
 			reg_save_area_offset += sizeof(void*) * cc->int_param_regs_count;
 			/* Set va_list.gr_top */
 			if (overflow_arg_area_offset != reg_save_area_offset) {
-				|	add Rx(tmp_reg), Rx(fp), #reg_save_area_offset
+				if (aarch64_may_encode_imm12(reg_save_area_offset)) {
+					|	add Rx(tmp_reg), Rx(fp), #reg_save_area_offset
+				} else {
+					ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, reg_save_area_offset);
+					|	add Rx(tmp_reg), Rx(fp), Rx(IR_REG_INT_TMP)
+				}
 			}
-			|	str Rx(tmp_reg), [Rx(op2_reg), #(offset+offsetof(ir_aarch64_sysv_va_list, gr_top))]
+			if (aarch64_may_encode_addr_offset(offset+offsetof(ir_aarch64_sysv_va_list, gr_top), sizeof(void*))) {
+				|	str Rx(tmp_reg), [Rx(op2_reg), #(offset+offsetof(ir_aarch64_sysv_va_list, gr_top))]
+			} else {
+				ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset+offsetof(ir_aarch64_sysv_va_list, gr_top));
+				|	str Rx(tmp_reg), [Rx(op2_reg), Rx(IR_REG_INT_TMP)]
+			}
 			/* Set va_list.gr_offset */
 			|	movn Rw(tmp_reg), #~(0 - (sizeof(void*) * (cc->int_param_regs_count - ctx->gp_reg_params)))
-			|	str Rw(tmp_reg),  [Rx(op2_reg), #(offset+offsetof(ir_aarch64_sysv_va_list, gr_offset))]
+			if (aarch64_may_encode_addr_offset(offset+offsetof(ir_aarch64_sysv_va_list, gr_offset), sizeof(void*))) {
+				|	str Rw(tmp_reg),  [Rx(op2_reg), #(offset+offsetof(ir_aarch64_sysv_va_list, gr_offset))]
+			} else {
+				ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset+offsetof(ir_aarch64_sysv_va_list, gr_offset));
+				|	str Rw(tmp_reg),  [Rx(op2_reg), Rx(IR_REG_INT_TMP)]
+			}
 		} else {
 			/* Set va_list.gr_offset */
-			|	str wzr,  [Rx(op2_reg), #(offset+offsetof(ir_aarch64_sysv_va_list, gr_offset))]
+			if (aarch64_may_encode_addr_offset(offset+offsetof(ir_aarch64_sysv_va_list, gr_offset), sizeof(void*))) {
+				|	str wzr, [Rx(op2_reg), #(offset+offsetof(ir_aarch64_sysv_va_list, gr_offset))]
+			} else {
+				ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset+offsetof(ir_aarch64_sysv_va_list, gr_offset));
+				|	str wzr, [Rx(op2_reg), Rx(IR_REG_INT_TMP)]
+			}
 		}
 		if ((ctx->flags2 & (IR_HAS_VA_ARG_FP|IR_HAS_VA_COPY)) && ctx->fp_reg_params < cc->fp_param_regs_count) {
 			reg_save_area_offset += 16 * cc->fp_param_regs_count;
 			/* Set va_list.vr_top */
 			if (overflow_arg_area_offset != reg_save_area_offset || ctx->gp_reg_params < cc->int_param_regs_count) {
-				|	add Rx(tmp_reg), Rx(fp), #reg_save_area_offset
+				if (aarch64_may_encode_imm12(reg_save_area_offset)) {
+					|	add Rx(tmp_reg), Rx(fp), #reg_save_area_offset
+				} else {
+					ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, reg_save_area_offset);
+					|	add Rx(tmp_reg), Rx(fp), Rx(IR_REG_INT_TMP)
+				}
 			}
-			|	str Rx(tmp_reg), [Rx(op2_reg), #(offset+offsetof(ir_aarch64_sysv_va_list, vr_top))]
+			if (aarch64_may_encode_addr_offset(offset+offsetof(ir_aarch64_sysv_va_list, vr_top), sizeof(void*))) {
+				|	str Rx(tmp_reg), [Rx(op2_reg), #(offset+offsetof(ir_aarch64_sysv_va_list, vr_top))]
+			} else {
+				ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset+offsetof(ir_aarch64_sysv_va_list, vr_top));
+				|	str Rx(tmp_reg), [Rx(op2_reg), Rx(IR_REG_INT_TMP)]
+			}
 			/* Set va_list.vr_offset */
 			|	movn Rw(tmp_reg), #~(0 - (16 * (cc->fp_param_regs_count - ctx->fp_reg_params)))
-			|	str Rw(tmp_reg),  [Rx(op2_reg), #(offset+offsetof(ir_aarch64_sysv_va_list, vr_offset))]
+			if (aarch64_may_encode_addr_offset(offset+offsetof(ir_aarch64_sysv_va_list, vr_offset), sizeof(void*))) {
+				|	str Rw(tmp_reg),  [Rx(op2_reg), #(offset+offsetof(ir_aarch64_sysv_va_list, vr_offset))]
+			} else {
+				ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset+offsetof(ir_aarch64_sysv_va_list, vr_offset));
+				|	str Rw(tmp_reg),  [Rx(op2_reg), Rx(IR_REG_INT_TMP)]
+			}
 		} else {
 			/* Set va_list.vr_offset */
-			|	str wzr,  [Rx(op2_reg), #(offset+offsetof(ir_aarch64_sysv_va_list, vr_offset))]
+			if (aarch64_may_encode_addr_offset(offset+offsetof(ir_aarch64_sysv_va_list, vr_offset), sizeof(void*))) {
+				|	str wzr,  [Rx(op2_reg), #(offset+offsetof(ir_aarch64_sysv_va_list, vr_offset))]
+			} else {
+				ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset+offsetof(ir_aarch64_sysv_va_list, vr_offset));
+				|	str wzr,  [Rx(op2_reg), Rx(IR_REG_INT_TMP)]
+			}
 		}
 	}
 }
