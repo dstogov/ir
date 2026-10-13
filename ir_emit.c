@@ -1927,18 +1927,21 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					ir_live_pos use_pos;
 					uint32_t use_flags = IR_USE_FLAGS(def_flags, j);
 
+					if (reg != IR_REG_NONE) {
+#if IR_X86_I64
+						if (use_flags & IR_HINT_TWO_REGS) {
+							IR_REGSET_INCL(x.clobbered[IR_LOAD_SUB_REF], IR_REG_I64_LO(reg));
+							IR_REGSET_INCL(x.clobbered[IR_LOAD_SUB_REF], IR_REG_I64_HI(reg));
+						} else
+#endif
+						IR_REGSET_INCL(x.clobbered[IR_LOAD_SUB_REF], reg);
+					}
+
 					if (input > 0) {
 						if (ctx->vregs[input] > 0) {
 							use_pos = IR_USE_SUB_REF;
 							if (reg != IR_REG_NONE) {
 								use_pos = IR_LOAD_SUB_REF;
-#if IR_X86_I64
-								if (use_flags & IR_HINT_TWO_REGS) {
-									IR_REGSET_INCL(x.clobbered[IR_LOAD_SUB_REF], IR_REG_I64_LO(reg));
-									IR_REGSET_INCL(x.clobbered[IR_LOAD_SUB_REF], IR_REG_I64_HI(reg));
-								} else
-#endif
-								IR_REGSET_INCL(x.clobbered[IR_LOAD_SUB_REF], reg);
 							} else if (def_flags & IR_DEF_REUSES_OP1_REG) {
 								if (j == 1) {
 									if (def_flags & IR_DEF_CONFLICTS_WITH_INPUT_REGS) {
@@ -1962,14 +1965,6 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 								ctx->regs[i][j] = ctx->ir_base[input].op2;
 							}
 						}
-					} else if (reg != IR_REG_NONE) {
-#if IR_X86_I64
-						if (use_flags & IR_HINT_TWO_REGS) {
-							_add_scratch(&x, IR_REG_I64_LO(reg), IR_LOAD_SUB_REF, IR_USE_SUB_REF);
-							_add_scratch(&x, IR_REG_I64_HI(reg), IR_LOAD_SUB_REF, IR_USE_SUB_REF);
-						} else
-#endif
-						_add_scratch(&x, reg, IR_LOAD_SUB_REF, IR_USE_SUB_REF);
 					}
 				}
 
