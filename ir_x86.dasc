@@ -1711,7 +1711,8 @@ const ir_call_conv_dsc ir_call_conv_x86_fastcall = {
 	_(CMP_I64)             \
 	_(BINOP_I64)           \
 	_(MUL_I64)             \
-	_(MUL_OV_I64)          \
+	_(IMUL_OV_I64)         \
+	_(UMUL_OV_I64)         \
 	_(BINOP_HELPER_I64)    \
 	_(OP_I64)              \
 	_(SHIFT_I64)           \
@@ -2495,14 +2496,14 @@ get_arg_hints:
 			ctx->flags2 |= IR_HAS_FP_RET_SLOT;
 			break;
 		case IR_MUL_I64:
-		case IR_MUL_OV_I64:
+		case IR_IMUL_OV_I64:
 			flags = IR_USE_SHOULD_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG | IR_HINT_TWO_REGS;
 			constraints->def_reg = IR_REG_I64_PAIR(IR_REG_RAX, IR_REG_RDX);
 			constraints->tmp_regs[0] = IR_SCRATCH_REG(IR_REG_RAX, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 			constraints->tmp_regs[1] = IR_SCRATCH_REG(IR_REG_RDX, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 			constraints->tmp_regs[2] = IR_TMP_REG(3, IR_U32, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 			n = 3;
-			if ((rule & IR_RULE_MASK) == IR_MUL_OV_I64) {
+			if ((rule & IR_RULE_MASK) == IR_IMUL_OV_I64) {
 				constraints->tmp_regs[3] = IR_TMP_REG(4, IR_U32, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 				n = 4;
 			}
@@ -2513,6 +2514,15 @@ get_arg_hints:
 				constraints->hints[1] = IR_REG_I64_PAIR(IR_REG_RAX, IR_REG_RDX);
 				constraints->hints_count = 2;
 			}
+			break;
+		case IR_UMUL_OV_I64:
+			flags = IR_USE_SHOULD_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG | IR_OP2_SHOULD_BE_IN_REG | IR_HINT_TWO_REGS;
+			constraints->def_reg = IR_REG_I64_PAIR(IR_REG_RAX, IR_REG_RDX);
+			constraints->tmp_regs[0] = IR_SCRATCH_REG(IR_REG_RAX, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+			constraints->tmp_regs[1] = IR_SCRATCH_REG(IR_REG_RDX, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+			constraints->tmp_regs[2] = IR_TMP_REG(3, IR_U32, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+			constraints->tmp_regs[3] = IR_TMP_REG(4, IR_U32, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+			n = 4;
 			break;
 		case IR_BIT_COUNT_I64:
 			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_SHOULD_BE_IN_REG;
@@ -4102,9 +4112,12 @@ binop_fp:
 		case IR_MUL_OV:
 			IR_ASSERT(IR_IS_TYPE_INT(insn->type));
 #if IR_X86_I64
-			if (insn->type == IR_I64 || insn->type == IR_U64) {
+			if (insn->type == IR_I64) {
 				ir_match_fuse_load(ctx, insn->op2, ref);
-				return IR_TWO_REGS | IR_MUL_OV_I64;
+				return IR_TWO_REGS | IR_IMUL_OV_I64;
+			} else if (insn->type == IR_U64) {
+				ir_match_fuse_load(ctx, insn->op2, ref);
+				return IR_TWO_REGS | IR_UMUL_OV_I64;
 			}
 #endif
 			if (IR_IS_TYPE_SIGNED(insn->type) && ir_type_size[insn->type] != 1) {
@@ -15297,11 +15310,10 @@ static void ir_emit_mul_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
-static void ir_emit_mul_ov_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+static void ir_emit_imul_ov_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
-	ir_type type = insn->type;
 	ir_ref op1 = insn->op1;
 	ir_ref op2 = insn->op2;
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
@@ -15342,14 +15354,9 @@ static void ir_emit_mul_ov_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 		IR_ASSERT(op2_reg != IR_REG_RDX && tmp_reg != op2_reg_hi && tmp_reg != op2_reg);
 
-		if (type == IR_I64) {
-			|	mov Rd(tmp2_reg), Rd(op2_reg_hi)                   // expected sign = sign A ^ sign B
-			|	xor Rd(tmp2_reg), edx
-			|	and Rd(tmp2_reg), 0x80000000
-		} else {
-			|	xor Rd(tmp2_reg), Rd(tmp2_reg)
-		}
-
+		|	mov Rd(tmp2_reg), Rd(op2_reg_hi)                       // expected sign = sign A ^ sign B
+		|	xor Rd(tmp2_reg), edx
+		|	and Rd(tmp2_reg), 0x80000000
 		|	mov Rd(tmp_reg), edx
 		|	imul Rd(tmp_reg), Rd(op2_reg_hi)                       // hi(Ah * Bh) == 0
 		|	adc Rd(tmp2_reg), 0
@@ -15364,31 +15371,22 @@ static void ir_emit_mul_ov_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		|	adc Rd(tmp2_reg), 0
 		|	mul Rd(op2_reg)                                        // Al * Bl + c
 		|	add edx, Rd(tmp_reg)
-
-		if (type == IR_I64) {
-			|	adc Rd(tmp2_reg), 0
-			|	mov Rd(tmp_reg), edx                               // check sign of result
-			|	xor Rd(tmp_reg), Rd(tmp2_reg)
-			|	and Rd(tmp2_reg), 0x7f
-			|	and Rd(tmp_reg), 0x80000000
-			|	add Rd(tmp_reg), -1
-			|	adc Rd(tmp2_reg), 0x7fffffff                       // set OV flag if tmp2_reg != 0
-	    } else {
-			|	adc Rd(tmp2_reg), -1                               // set C flag if UMUL overflow
-		}
+		|	adc Rd(tmp2_reg), 0
+		|	mov Rd(tmp_reg), edx                                   // check sign of result
+		|	xor Rd(tmp_reg), Rd(tmp2_reg)
+		|	and Rd(tmp2_reg), 0x7f
+		|	and Rd(tmp_reg), 0x80000000
+		|	add Rd(tmp_reg), -1
+		|	adc Rd(tmp2_reg), 0x7fffffff                           // set OV flag if tmp2_reg != 0
 	} else if (IR_IS_CONST_REF(op2)) {
 		ir_insn *val = &ctx->ir_base[op2];
 
-		if (type == IR_I64) {
-			|	mov Rd(tmp2_reg), edx                              // expected sign = sign A ^ sign B
-			if (val->val.i64 >= 0) {
-				|	and Rd(tmp2_reg), 0x80000000
-			} else {
-				|	not Rd(tmp2_reg)
-				|	and Rd(tmp2_reg), 0x80000000
-			}
-	    } else {
-			|	xor Rd(tmp2_reg), Rd(tmp2_reg)
+		|	mov Rd(tmp2_reg), edx                                  // expected sign = sign A ^ sign B
+		if (val->val.i64 >= 0) {
+			|	and Rd(tmp2_reg), 0x80000000
+		} else {
+			|	not Rd(tmp2_reg)
+			|	and Rd(tmp2_reg), 0x80000000
 		}
 
 		if (val->val.u32_hi) {
@@ -15409,22 +15407,18 @@ static void ir_emit_mul_ov_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			|	imul Rd(tmp_reg), val->val.u32                     // hi(Ah * Bl) == 0, c = lo(Ah * Bl)
 			|	adc Rd(tmp2_reg), 0
 		}
+
 		|	mov edx, val->val.u32                                  // Al * Bl + c
 		|	mul edx
 		|	add edx, Rd(tmp_reg)
 		|	adc Rd(tmp2_reg), -1                                   // set C flag if UMUL overflow
-
-		if (type == IR_I64) {
-			|	adc Rd(tmp2_reg), 0
-			|	mov Rd(tmp_reg), edx                               // check sign of result
-			|	xor Rd(tmp_reg), Rd(tmp2_reg)
-			|	and Rd(tmp2_reg), 0x7f
-			|	and Rd(tmp_reg), 0x80000000
-			|	add Rd(tmp_reg), -1
-			|	adc Rd(tmp2_reg), 0x7fffffff                       // set OV flag if tmp2_reg != 0
-	    } else {
-			|   adc Rd(tmp2_reg), -1                               // set C flag if UMUL overflow
-		}
+		|	adc Rd(tmp2_reg), 0
+		|	mov Rd(tmp_reg), edx                                   // check sign of result
+		|	xor Rd(tmp_reg), Rd(tmp2_reg)
+		|	and Rd(tmp2_reg), 0x7f
+		|	and Rd(tmp_reg), 0x80000000
+		|	add Rd(tmp_reg), -1
+		|	adc Rd(tmp2_reg), 0x7fffffff                           // set OV flag if tmp2_reg != 0
 	} else {
 		ir_mem mem, mem_hi;
 
@@ -15435,14 +15429,9 @@ static void ir_emit_mul_ov_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 		mem_hi = IR_MEM_I64_HI(mem);
 
-		if (type == IR_I64) {
-			|	ASM_TXT_TMEM_OP mov, Rd(tmp2_reg), dword, mem_hi   // expected sign = sign A ^ sign B
-			|	xor Rd(tmp2_reg), edx
-			|	and Rd(tmp2_reg), 0x80000000
-		} else {
-			|	xor Rd(tmp2_reg), Rd(tmp2_reg)
-		}
-
+		|	ASM_TXT_TMEM_OP mov, Rd(tmp2_reg), dword, mem_hi       // expected sign = sign A ^ sign B
+		|	xor Rd(tmp2_reg), edx
+		|	and Rd(tmp2_reg), 0x80000000
 		|	mov Rd(tmp_reg), edx
 		|	ASM_TXT_TMEM_OP imul, Rd(tmp_reg), dword, mem_hi       // hi(Ah * Bh) == 0
 		|	adc Rd(tmp2_reg), 0
@@ -15457,18 +15446,204 @@ static void ir_emit_mul_ov_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		|	adc Rd(tmp2_reg), 0
 		|	ASM_TMEM_OP mul, dword, mem                            // Al * Bl + c
 		|	add edx, Rd(tmp_reg)
+		|	adc Rd(tmp2_reg), 0
+		|	mov Rd(tmp_reg), edx                                   // check sign of result
+		|	xor Rd(tmp_reg), Rd(tmp2_reg)
+		|	and Rd(tmp2_reg), 0x7f
+		|	and Rd(tmp_reg), 0x80000000
+		|	add Rd(tmp_reg), -1
+		|	adc Rd(tmp2_reg), 0x7fffffff                           // set OV flag if tmp2_reg != 0
+	}
 
-		if (type == IR_I64) {
-			|	adc Rd(tmp2_reg), 0
-			|	mov Rd(tmp_reg), edx                               // check sign of result
-			|	xor Rd(tmp_reg), Rd(tmp2_reg)
-			|	and Rd(tmp2_reg), 0x7f
-			|	and Rd(tmp_reg), 0x80000000
-			|	add Rd(tmp_reg), -1
-			|	adc Rd(tmp2_reg), 0x7fffffff                       // set OV flag if tmp2_reg != 0
-	    } else {
-			|   adc Rd(tmp2_reg), -1                               // set C flag if UMUL overflow
+	if (def_reg != IR_REG_NONE) {
+		def_reg_hi = IR_REG_I64_HI(def_reg);
+		def_reg = IR_REG_I64_LO(def_reg);
+		if (def_reg != IR_REG_RDX) {
+			if (def_reg != IR_REG_RAX) {
+				|	mov Rd(def_reg), eax
+			}
+			if (def_reg_hi != IR_REG_RDX) {
+				|	mov Rd(def_reg_hi), edx
+			}
+		} else {
+			if (def_reg_hi != IR_REG_RDX) {
+				|	mov Rd(def_reg_hi), edx
+			}
+			if (def_reg != IR_REG_RAX) {
+				IR_ASSERT(def_reg_hi != IR_REG_RAX);
+				|	mov Rd(def_reg), eax
+			}
 		}
+
+		if (IR_REG_SPILLED(ctx->regs[def][0])) {
+			ir_emit_store_i64_lo(ctx, def, def_reg);
+			ir_emit_store_i64_hi(ctx, def, def_reg_hi);
+		}
+	} else {
+		ir_emit_store_i64_lo(ctx, def, IR_REG_RAX);
+		ir_emit_store_i64_hi(ctx, def, IR_REG_RDX);
+	}
+}
+
+static void ir_emit_umul_ov_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+	ir_ref op1 = insn->op1;
+	ir_ref op2 = insn->op2;
+	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
+	ir_reg op1_reg = ctx->regs[def][1];
+	ir_reg op2_reg = ctx->regs[def][2];
+	ir_reg tmp_reg = ctx->regs[def][3];
+	ir_reg tmp2_reg = ctx->tmp_regs[def];
+	ir_reg def_reg_hi, op1_reg_hi, op2_reg_hi;
+	ir_mem op1_mem = IR_MEM_NONE, op1_mem_hi = IR_MEM_NONE, op2_mem = IR_MEM_NONE, op2_mem_hi = IR_MEM_NONE;
+	ir_val op1_val = {0};
+
+	if (IR_IS_CONST_REF(op1) && IR_IS_CONST_REF(op2)) {
+		op1_val.u64 = ctx->ir_base[op1].val.u64 * ctx->ir_base[op2].val.u64;
+		|	mov edx,  op1_val.u32_hi
+		|	mov eax,  op1_val.u32
+		if (ctx->ir_base[op1].val.u64 == 0 || (op1_val.u64 / ctx->ir_base[op1].val.u64) == ctx->ir_base[op2].val.u64) {
+			|	clc
+		} else {
+			|	stc
+		}
+	} else {
+		if (op1_reg != IR_REG_NONE) {
+			if (IR_REG_SPILLED(op1_reg)) {
+				op1_reg = IR_REG_NUM(op1_reg);
+				op1_reg_hi = IR_REG_I64_HI(op1_reg);
+				op1_reg = IR_REG_I64_LO(op1_reg);
+				ir_emit_load_i64_lo(ctx, op1_reg, op1);
+				ir_emit_load_i64_hi(ctx, op1_reg_hi, op1);
+			} else {
+				op1_reg_hi = IR_REG_I64_HI(op1_reg);
+				op1_reg = IR_REG_I64_LO(op1_reg);
+			}
+			if (op1 == op2) {
+				op2_reg_hi = op1_reg_hi;
+				op2_reg = op1_reg;
+			}
+		} else {
+			op1_reg_hi = IR_REG_NONE;
+		}
+
+		if (op2_reg != IR_REG_NONE) {
+			if (IR_REG_SPILLED(op2_reg)) {
+				op2_reg = IR_REG_NUM(op2_reg);
+				op2_reg_hi = IR_REG_I64_HI(op2_reg);
+				op2_reg = IR_REG_I64_LO(op2_reg);
+				ir_emit_load_i64_lo(ctx, op2_reg, op2);
+				ir_emit_load_i64_hi(ctx, op2_reg_hi, op2);
+			} else {
+				op2_reg_hi = IR_REG_I64_HI(op2_reg);
+				op2_reg = IR_REG_I64_LO(op2_reg);
+			}
+		} else {
+			op2_reg_hi = IR_REG_NONE;
+		}
+
+		if (op2_reg == IR_REG_NONE && (IR_IS_CONST_REF(op2) || op1_reg != IR_REG_NONE)) {
+			IR_ASSERT(op1_reg != IR_REG_NONE || !IR_IS_CONST_REF(op1));
+			SWAP_REFS(op1, op2);
+			SWAP_REGS(op1_reg, op2_reg);
+			SWAP_REGS(op1_reg_hi, op2_reg_hi);
+		}
+
+		if (op1_reg == IR_REG_NONE) {
+			if (IR_IS_CONST_REF(op1)) {
+				op1_val = ctx->ir_base[op1].val;
+			} else {
+				if (ir_rule(ctx, op1) & IR_FUSED) {
+					op1_mem = ir_fuse_load(ctx, def, op1);
+				} else {
+					op1_mem = ir_ref_spill_slot(ctx, op1);
+				}
+				op1_mem_hi = IR_MEM_I64_HI(op1_mem);
+			}
+		}
+
+		if (op2_reg == IR_REG_NONE) {
+			IR_ASSERT(!IR_IS_CONST_REF(op2));
+			if (ir_rule(ctx, op2) & IR_FUSED) {
+				op2_mem = ir_fuse_load(ctx, def, op2);
+			} else {
+				op2_mem = ir_ref_spill_slot(ctx, op2);
+			}
+			op2_mem_hi = IR_MEM_I64_HI(op2_mem);
+		}
+
+		|	xor Rd(tmp2_reg), Rd(tmp2_reg)
+
+		if (op1_reg != IR_REG_NONE) {
+			|	mov eax, Rd(op1_reg_hi)
+		} else if (IR_IS_CONST_REF(op1)) {
+			|	mov eax, op1_val.u32_hi
+		} else {
+			|	ASM_TXT_TMEM_OP mov, eax, dword, op1_mem_hi
+	    }
+
+		if (op2_reg != IR_REG_NONE) {
+			|	mul Rd(op2_reg_hi)                                     // hi(Ah * Bh) == 0
+		} else {
+			|	ASM_TMEM_OP mul, dword, op2_mem_hi                     // hi(Ah * Bh) == 0
+		}
+
+		|	adc Rd(tmp2_reg), 0
+		|	add eax, -1                                                // lo(Ah * Bh) == 0 ; set C flag if tmp_reg != 0
+		|	adc Rd(tmp2_reg), 0
+
+		if (op1_reg != IR_REG_NONE) {
+			|	mov eax, Rd(op1_reg_hi)
+		} else if (IR_IS_CONST_REF(op1)) {
+			|	mov eax, op1_val.u32_hi
+		} else {
+			|	ASM_TXT_TMEM_OP mov, eax, dword, op1_mem_hi
+	    }
+
+		if (op2_reg != IR_REG_NONE) {
+			|	mul Rd(op2_reg)                                        // hi(Ah * Bl) == 0
+		} else {
+			|	ASM_TMEM_OP mul, dword, op2_mem                        // hi(Ah * Bl) == 0
+		}
+
+		|	adc Rd(tmp2_reg), 0
+		|	mov Rd(tmp_reg), eax                                       // c = lo(Ah * Bl)
+
+		if (op1_reg != IR_REG_NONE) {
+			|	mov eax, Rd(op1_reg)
+		} else if (IR_IS_CONST_REF(op1)) {
+			|	mov eax, op1_val.u32
+		} else {
+			|	ASM_TXT_TMEM_OP mov, eax, dword, op1_mem
+	    }
+		if (op2_reg != IR_REG_NONE) {
+			|	mul Rd(op2_reg_hi)                                     // hi(Al * Bh) == 0
+		} else {
+			|	ASM_TMEM_OP mul, dword, op2_mem_hi                     // hi(Al * Bh) == 0
+		}
+
+		|	adc Rd(tmp2_reg), 0
+		|	add Rd(tmp_reg), eax                                       // c = lo(Ah * Bl) + lo(Al * Bh)
+		|	adc Rd(tmp2_reg), 0
+
+		if (op1_reg != IR_REG_NONE) {
+			|	mov eax, Rd(op1_reg)
+		} else if (IR_IS_CONST_REF(op1)) {
+			|	mov eax, op1_val.u32
+		} else {
+			|	ASM_TXT_TMEM_OP mov, eax, dword, op1_mem
+	    }
+
+		if (op2_reg != IR_REG_NONE) {
+			|	mul Rd(op2_reg)                                        // Al * Bl
+		} else {
+			|	ASM_TMEM_OP mul, dword, op2_mem                        // Al * Bl
+		}
+
+		|	add edx, Rd(tmp_reg)                                       // Al * Bl + c
+		|   adc Rd(tmp2_reg), -1                                       // set C flag if UMUL overflow
 	}
 
 	if (def_reg != IR_REG_NONE) {
@@ -26909,8 +27084,11 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 				case IR_MUL_I64:
 					ir_emit_mul_i64(ctx, i, insn);
 					break;
-				case IR_MUL_OV_I64:
-					ir_emit_mul_ov_i64(ctx, i, insn);
+				case IR_IMUL_OV_I64:
+					ir_emit_imul_ov_i64(ctx, i, insn);
+					break;
+				case IR_UMUL_OV_I64:
+					ir_emit_umul_ov_i64(ctx, i, insn);
 					break;
 				case IR_BINOP_HELPER_I64:
 					ir_emit_binop_helper_i64(ctx, i, insn);

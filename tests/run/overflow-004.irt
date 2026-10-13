@@ -1,5 +1,5 @@
 --TEST--
-OVERFLOW and branch (32-bit)
+OVERFLOW and branch (64-bit)
 --ARGS--
 --run
 --CODE--
@@ -43,7 +43,7 @@ func @main(): int32_t
 	uintptr_t c_27 = func @mul_ov_u(uint64_t, uint64_t): int32_t;
 	uint64_t c_28 = 2305843009213693952;
 	uint64_t c_29 = 2;
-	uint64_t c_30 = 1073741824;
+	uint64_t c_30 = 4611686018427387904;
 	uint64_t c_31 = 4611686018427387904;
 	uint64_t c_32 = 8;
 	int32_t c_33 = 0;
