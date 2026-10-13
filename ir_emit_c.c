@@ -633,8 +633,7 @@ static void ir_emit_overflow_math(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, 
 
 	IR_ASSERT(IR_IS_TYPE_INT(type));
 	if (ir_type_size[type] == 4 || ir_type_size[type] == 8) {
-		fprintf(f, "\tint overflow_%d;\n", overflow);
-		ir_emit_def_ref(ctx, f, def);
+		ir_emit_def_ref(ctx, f, overflow);
 		fprintf(f, "__builtin_%s%s%s_overflow(",
 			IR_IS_TYPE_SIGNED(type) ? "s" : "u",
 			func,
@@ -642,9 +641,9 @@ static void ir_emit_overflow_math(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, 
 		ir_emit_ref(ctx, f, insn->op1);
 		fprintf(f, ", ");
 		ir_emit_ref(ctx, f, insn->op2);
-		fprintf(f, ", &overflow_%d);\n", overflow);
-		ir_emit_def_ref(ctx, f, def);
-		fprintf(f, "overflow_%d;\n", overflow);
+		fprintf(f, ", &");
+		ir_emit_ref(ctx, f, def);
+		fprintf(f, ");\n");
 	} else {
 		ir_emit_binary_op(ctx, f, def, insn, op);
 		ir_emit_def_ref(ctx, f, overflow);
