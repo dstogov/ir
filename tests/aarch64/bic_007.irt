@@ -1,0 +1,20 @@
+--TEST--
+007: AND(NOT(x), CONST) is not fused if the constant is a logical immediate
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_4);
+	int64_t x = PARAM(l_1, "x", 1);
+	int64_t c = 0xff;
+	int64_t n = NOT(x);
+	int64_t r = AND(n, c);
+	l_4 = RETURN(l_1, r);
+}
+--EXPECT--
+test:
+	mvn x0, x0
+	and x0, x0, #0xff
+	ret

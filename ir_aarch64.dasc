@@ -1478,7 +1478,7 @@ binop_fp:
 					/* AND(NOT(X), Y) => BIC */
 					ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_NOT;
 					return IR_BIC;
-				} else if (ctx->ir_base[insn->op2].op2 == IR_NOT
+				} else if (ctx->ir_base[insn->op2].op == IR_NOT
 				 && !IR_IS_CONST_REF(ctx->ir_base[insn->op2].op1)
 				 && ir_in_same_block(ctx, insn->op2)
 				 && ctx->use_lists[insn->op2].count == 1
