@@ -137,6 +137,7 @@ static void _add_input_reg(ir_ctx *ctx, ir_reg_alloc_simple_data *data, ir_type 
                            int8_t start, int8_t end, ir_reg hint, ir_ref root, ir_ref ref, ir_ref op)
 {
 	int32_t k;
+	int8_t reuse_reg_from = -1;
 
 	if (hint == IR_REG_NONE && op <= 3) {
 		ir_ref input = ir_insn_op(&ctx->ir_base[ref], op);
@@ -146,16 +147,66 @@ static void _add_input_reg(ir_ctx *ctx, ir_reg_alloc_simple_data *data, ir_type 
 			 && data->regs[k].op > 0 && data->regs[k].op < op
 			 && data->regs[k].hint == IR_REG_NONE && data->regs[k].reuse_reg_from < 0
 			 && ir_insn_op(&ctx->ir_base[ref], data->regs[k].op) == input) {
+				/* The same value is already used by another operand, share its register */
 				if (data->regs[k].end < end) {
 					data->regs[k].end = end;
 				}
-				_add_reg(data, type, start, end, hint, IR_REG_SPILL_LOAD, root, ref, op);
-				data->regs[data->num - 1].reuse_reg_from = k;
-				return;
+				reuse_reg_from = k;
+				break;
 			}
 		}
 	}
 	_add_reg(data, type, start, end, hint, IR_REG_SPILL_LOAD, root, ref, op);
+	data->regs[data->num - 1].reuse_reg_from = reuse_reg_from;
+}
+
+static ir_reg _alloc_reg(ir_ctx *ctx, ir_reg_alloc_simple_data *data, int j, ir_regset available)
+{
+	ir_reg reg;
+	int n;
+#if IR_X86_I64
+	ir_reg reg2;
+#endif
+
+	for (n = data->regs[j].start; n < data->regs[j].end; n++) {
+		available = IR_REGSET_DIFFERENCE(available, data->clobbered[n]);
+	}
+	reg = data->regs[j].hint;
+#if IR_X86_I64
+	reg2 = IR_REG_NONE;
+	if (reg != IR_REG_NONE && (data->regs[j].type == IR_I64 || data->regs[j].type == IR_U64)) {
+		reg2 = IR_REG_I64_HI(reg);
+		reg = IR_REG_I64_LO(reg);
+	}
+#endif
+	if (reg == IR_REG_NONE || !IR_REGSET_IN(available, reg)) {
+		reg = _get_free_reg(data->regs[j].type, available);
+		if (UNEXPECTED(reg == IR_REG_NONE)) {
+			reg = _get_free_reg2(ctx, data->regs[j].type, data, j);
+		}
+	}
+	for (n = data->regs[j].start; n < data->regs[j].end; n++) {
+		IR_REGSET_INCL(data->clobbered[n], reg);
+	}
+#if IR_X86_I64
+	if (data->regs[j].type == IR_I64 || data->regs[j].type == IR_U64) {
+		IR_REGSET_EXCL(available, reg);
+		if (reg2 == IR_REG_NONE || !IR_REGSET_IN(available, reg2)) {
+			reg2 = _get_free_reg(data->regs[j].type, available);
+			if (UNEXPECTED(reg2 == IR_REG_NONE)) {
+				reg2 = _get_free_reg2(ctx, data->regs[j].type, data, j);
+			}
+		}
+		for (n = data->regs[j].start; n < data->regs[j].end; n++) {
+			IR_REGSET_INCL(data->clobbered[n], reg2);
+		}
+		if (reg > reg2) {
+			SWAP_REGS(reg, reg2);
+		}
+		reg = IR_REG_I64_PAIR(reg, reg2);
+	}
+#endif
+	return reg;
 }
 
 static bool ir_load_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, ir_ref load)
@@ -591,52 +642,11 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 				}
 
 				for (j = 0; j < data.num; j++) {
-					ir_regset available = scratch;
-#if IR_X86_I64
-					ir_reg reg2;
-#endif
-
 					if (data.regs[j].reuse_reg_from >= 0) {
 						reg = data.regs[data.regs[j].reuse_reg_from].hint;
 					} else {
-						for (n = data.regs[j].start; n < data.regs[j].end; n++) {
-							available = IR_REGSET_DIFFERENCE(available, data.clobbered[n]);
-						}
-						reg = data.regs[j].hint;
-	#if IR_X86_I64
-						reg2 = IR_REG_NONE;
-						if (reg != IR_REG_NONE && (data.regs[j].type == IR_I64 || data.regs[j].type == IR_U64)) {
-							reg2 = IR_REG_I64_HI(reg);
-							reg = IR_REG_I64_LO(reg);
-						}
-	#endif
-						if (reg == IR_REG_NONE || !IR_REGSET_IN(available, reg)) {
-							reg = _get_free_reg(data.regs[j].type, available);
-							if (UNEXPECTED(reg == IR_REG_NONE)) {
-								reg = _get_free_reg2(ctx, data.regs[j].type, &data, j);
-							}
-						}
-						for (n = data.regs[j].start; n < data.regs[j].end; n++) {
-							IR_REGSET_INCL(data.clobbered[n], reg);
-						}
-	#if IR_X86_I64
-						if (data.regs[j].type == IR_I64 || data.regs[j].type == IR_U64) {
-							IR_REGSET_EXCL(available, reg);
-							if (reg2 == IR_REG_NONE || !IR_REGSET_IN(available, reg2)) {
-								reg2 = _get_free_reg(data.regs[j].type, available);
-								if (UNEXPECTED(reg2 == IR_REG_NONE)) {
-									reg2 = _get_free_reg2(ctx, data.regs[j].type, &data, j);
-								}
-							}
-							for (n = data.regs[j].start; n < data.regs[j].end; n++) {
-								IR_REGSET_INCL(data.clobbered[n], reg2);
-							}
-							if (reg > reg2) {
-								SWAP_REGS(reg, reg2);
-							}
-							reg = IR_REG_I64_PAIR(reg, reg2);
-						}
-	#endif
+						reg = _alloc_reg(ctx, &data, j, scratch);
+						/* Remember the allocated register for operands that share it */
 						data.regs[j].hint = reg;
 					}
 					reg = reg | data.regs[j].flags;
