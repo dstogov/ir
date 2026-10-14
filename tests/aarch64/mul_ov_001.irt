@@ -15,9 +15,8 @@ aarch64
 }
 --EXPECT--
 test:
-	movz w2, #0x2
-	smull x0, w0, w2
-	asr x1, x0, #0x20
-	cmp x1, x0, asr #31
+	movz w1, #0x2
+	smull x0, w0, w1
+	cmp x0, w0, sxtw
 	cset w0, ne
 	ret

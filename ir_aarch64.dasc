@@ -525,7 +525,7 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 			if (insn->op == IR_MOD) {
 				constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 				n++;
-			} else if (insn->op == IR_MUL_OV && (ir_type_size[insn->type] == 8 || IR_IS_TYPE_SIGNED(insn->type))) {
+			} else if (insn->op == IR_MUL_OV && ir_type_size[insn->type] != 4) {
 				constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 				n++;
 			}
@@ -2890,13 +2890,73 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|	ASM_REG_REG_REG_OP add, type, def_reg, op1_reg, op2_reg
 				break;
 			case IR_ADD_OV:
-				|	ASM_REG_REG_REG_OP adds, type, def_reg, op1_reg, op2_reg
+				if (ir_type_size[type] >= 4) {
+					|	ASM_REG_REG_REG_OP adds, type, def_reg, op1_reg, op2_reg
+				} else {
+					if (def_reg == op2_reg) {
+						SWAP_REGS(op1_reg, op2_reg);
+					}
+					if (ir_type_size[type] == 2) {
+						if (IR_IS_TYPE_SIGNED(type)) {
+							|	sxth Rw(def_reg), Rw(op1_reg)
+							|	add Rw(def_reg), Rw(def_reg), Rw(op2_reg), sxth
+							|	cmp	Rw(def_reg), Rw(def_reg), sxth
+						} else {
+							|	and	Rw(def_reg), Rw(op1_reg), #0xffff
+							|	add Rw(def_reg), Rw(def_reg), Rw(op2_reg), uxth
+							|	cmp	Rw(def_reg), Rw(def_reg), uxth
+						}
+						|	and	Rw(def_reg), Rw(def_reg), #0xffff
+					} else {
+						IR_ASSERT(ir_type_size[type] == 1);
+						if (IR_IS_TYPE_SIGNED(type)) {
+							|	sxtb Rw(def_reg), Rw(op1_reg)
+							|	add Rw(def_reg), Rw(def_reg), Rw(op2_reg), sxtb
+							|	cmp	Rw(def_reg), Rw(def_reg), sxtb
+						} else {
+							|	and	Rw(def_reg), Rw(op1_reg), #0xff
+							|	add Rw(def_reg), Rw(def_reg), Rw(op2_reg), uxtb
+							|	cmp	Rw(def_reg), Rw(def_reg), uxtb
+						}
+						|	and	Rw(def_reg), Rw(def_reg), #0xff
+					}
+				}
 				break;
 			case IR_SUB:
 				|	ASM_REG_REG_REG_OP sub, type, def_reg, op1_reg, op2_reg
 				break;
 			case IR_SUB_OV:
-				|	ASM_REG_REG_REG_OP subs, type, def_reg, op1_reg, op2_reg
+				if (ir_type_size[type] >= 4) {
+					|	ASM_REG_REG_REG_OP subs, type, def_reg, op1_reg, op2_reg
+				} else {
+					if (def_reg == op2_reg) {
+						SWAP_REGS(op1_reg, op2_reg);
+					}
+					if (ir_type_size[type] == 2) {
+						if (IR_IS_TYPE_SIGNED(type)) {
+							|	sxth Rw(def_reg), Rw(op1_reg)
+							|	sub Rw(def_reg), Rw(def_reg), Rw(op2_reg), sxth
+							|	cmp	Rw(def_reg), Rw(def_reg), sxth
+						} else {
+							|	and	Rw(def_reg), Rw(op1_reg), #0xffff
+							|	sub Rw(def_reg), Rw(def_reg), Rw(op2_reg), uxth
+							|	cmp	Rw(def_reg), Rw(def_reg), uxth
+						}
+						|	and	Rw(def_reg), Rw(def_reg), #0xffff
+					} else {
+						IR_ASSERT(ir_type_size[type] == 1);
+						if (IR_IS_TYPE_SIGNED(type)) {
+							|	sxtb Rw(def_reg), Rw(op1_reg)
+							|	sub Rw(def_reg), Rw(def_reg), Rw(op2_reg), sxtb
+							|	cmp	Rw(def_reg), Rw(def_reg), sxtb
+						} else {
+							|	and	Rw(def_reg), Rw(op1_reg), #0xff
+							|	sub Rw(def_reg), Rw(def_reg), Rw(op2_reg), uxtb
+							|	cmp	Rw(def_reg), Rw(def_reg), uxtb
+						}
+						|	and	Rw(def_reg), Rw(def_reg), #0xff
+					}
+				}
 				break;
 			case IR_MUL:
 				|	ASM_REG_REG_REG_OP mul, type, def_reg, op1_reg, op2_reg
@@ -2916,17 +2976,51 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	mul Rx(def_reg), Rx(op1_reg), Rx(op2_reg)
 						|	cmp Rx(tmp_reg), xzr
 					}
-				} else {
+				} else if (ir_type_size[type] == 4) {
 					if (IR_IS_TYPE_SIGNED(type)) {
-						tmp_reg = ctx->regs[def][3];
-						IR_ASSERT(tmp_reg != IR_REG_NONE);
 						|	smull Rx(def_reg), Rw(op1_reg), Rw(op2_reg)
-						|	asr Rx(tmp_reg), Rx(def_reg), #32
-						|	cmp Rx(tmp_reg), Rx(def_reg), asr #31
+						|	cmp	Rx(def_reg), Rw(def_reg), sxtw
 					} else {
 						|	umull Rx(def_reg), Rw(op1_reg), Rw(op2_reg)
-						|	cmp xzr, Rx(def_reg), lsr #32
+						|	tst	Rx(def_reg), #0xffffffff00000000
 					}
+				} else if (ir_type_size[type] == 2) {
+					if (def_reg == op2_reg) {
+						SWAP_REGS(op1_reg, op2_reg);
+					}
+					tmp_reg = ctx->regs[def][3];
+					IR_ASSERT(tmp_reg != IR_REG_NONE && tmp_reg != def_reg);
+					if (IR_IS_TYPE_SIGNED(type)) {
+						|	sxth Rw(def_reg), Rw(op1_reg)
+						|	sxth Rw(tmp_reg), Rw(op2_reg)
+						|	mul Rw(def_reg), Rw(def_reg), Rw(tmp_reg)
+						|	cmp	Rw(def_reg), Rw(def_reg), sxth
+					} else {
+						|	and Rw(def_reg), Rw(op1_reg), #0xffff
+						|	and Rw(tmp_reg), Rw(op2_reg), #0xffff
+						|	mul Rw(def_reg), Rw(def_reg), Rw(tmp_reg)
+						|	cmp	Rw(def_reg), Rw(def_reg), uxth
+					}
+					|	and	Rw(def_reg), Rw(def_reg), #0xffff
+				} else {
+					IR_ASSERT(ir_type_size[type] == 1);
+					if (def_reg == op2_reg) {
+						SWAP_REGS(op1_reg, op2_reg);
+					}
+					tmp_reg = ctx->regs[def][3];
+					IR_ASSERT(tmp_reg != IR_REG_NONE && tmp_reg != def_reg);
+					if (IR_IS_TYPE_SIGNED(type)) {
+						|	sxtb Rw(def_reg), Rw(op1_reg)
+						|	sxtb Rw(tmp_reg), Rw(op2_reg)
+						|	mul Rw(def_reg), Rw(def_reg), Rw(tmp_reg)
+						|	cmp	Rw(def_reg), Rw(def_reg), sxtb
+					} else {
+						|	and Rw(def_reg), Rw(op1_reg), #0xff
+						|	and Rw(tmp_reg), Rw(op2_reg), #0xff
+						|	mul Rw(def_reg), Rw(def_reg), Rw(tmp_reg)
+						|	cmp	Rw(def_reg), Rw(def_reg), uxtb
+					}
+					|	and	Rw(def_reg), Rw(def_reg), #0xff
 				}
 				break;
 			case IR_DIV:
@@ -2968,13 +3062,73 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|	ASM_REG_REG_IMM_OP add, type, def_reg, op1_reg, val
 				break;
 			case IR_ADD_OV:
-				|	ASM_REG_REG_IMM_OP adds, type, def_reg, op1_reg, val
+				if (ir_type_size[type] >= 4) {
+					|	ASM_REG_REG_IMM_OP adds, type, def_reg, op1_reg, val
+				} else {
+					if (def_reg == op2_reg) {
+						SWAP_REGS(op1_reg, op2_reg);
+					}
+					if (ir_type_size[type] == 2) {
+						if (IR_IS_TYPE_SIGNED(type)) {
+							|	sxth Rw(def_reg), Rw(op1_reg)
+							|	add Rw(def_reg), Rw(def_reg), #((int32_t)(int16_t)val)
+							|	cmp	Rw(def_reg), Rw(def_reg), sxth
+						} else {
+							|	and	Rw(def_reg), Rw(op1_reg), #0xffff
+							|	add Rw(def_reg), Rw(def_reg), #((uint32_t)(uint16_t)val)
+							|	cmp	Rw(def_reg), Rw(def_reg), uxth
+						}
+						|	and	Rw(def_reg), Rw(def_reg), #0xffff
+					} else {
+						IR_ASSERT(ir_type_size[type] == 1);
+						if (IR_IS_TYPE_SIGNED(type)) {
+							|	sxtb Rw(def_reg), Rw(op1_reg)
+							|	add Rw(def_reg), Rw(def_reg), #((int32_t)(int8_t)val)
+							|	cmp	Rw(def_reg), Rw(def_reg), sxtb
+						} else {
+							|	and	Rw(def_reg), Rw(op1_reg), #0xff
+							|	add Rw(def_reg), Rw(def_reg), #((uint32_t)(uint8_t)val)
+							|	cmp	Rw(def_reg), Rw(def_reg), uxtb
+						}
+						|	and	Rw(def_reg), Rw(def_reg), #0xff
+					}
+				}
 				break;
 			case IR_SUB:
 				|	ASM_REG_REG_IMM_OP sub, type, def_reg, op1_reg, val
 				break;
 			case IR_SUB_OV:
-				|	ASM_REG_REG_IMM_OP subs, type, def_reg, op1_reg, val
+				if (ir_type_size[type] >= 4) {
+					|	ASM_REG_REG_IMM_OP subs, type, def_reg, op1_reg, val
+				} else {
+					if (def_reg == op2_reg) {
+						SWAP_REGS(op1_reg, op2_reg);
+					}
+					if (ir_type_size[type] == 2) {
+						if (IR_IS_TYPE_SIGNED(type)) {
+							|	sxth Rw(def_reg), Rw(op1_reg)
+							|	sub Rw(def_reg), Rw(def_reg), #((int32_t)(int16_t)val)
+							|	cmp	Rw(def_reg), Rw(def_reg), sxth
+						} else {
+							|	and	Rw(def_reg), Rw(op1_reg), #0xffff
+							|	sub Rw(def_reg), Rw(def_reg), #((uint32_t)(uint16_t)val)
+							|	cmp	Rw(def_reg), Rw(def_reg), uxth
+						}
+						|	and	Rw(def_reg), Rw(def_reg), #0xffff
+					} else {
+						IR_ASSERT(ir_type_size[type] == 1);
+						if (IR_IS_TYPE_SIGNED(type)) {
+							|	sxtb Rw(def_reg), Rw(op1_reg)
+							|	sub Rw(def_reg), Rw(def_reg), #((int32_t)(int8_t)val)
+							|	cmp	Rw(def_reg), Rw(def_reg), sxtb
+						} else {
+							|	and	Rw(def_reg), Rw(op1_reg), #0xff
+							|	sub Rw(def_reg), Rw(def_reg), #((uint32_t)(uint8_t)val)
+							|	cmp	Rw(def_reg), Rw(def_reg), uxtb
+						}
+						|	and	Rw(def_reg), Rw(def_reg), #0xff
+					}
+				}
 				break;
 			case IR_OR:
 				if (ir_type_size[type] == 8) {
@@ -3134,7 +3288,7 @@ static void ir_emit_overflow(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	IR_ASSERT(def_reg != IR_REG_NONE);
 	IR_ASSERT(IR_IS_TYPE_INT(type));
-	if (math_insn->op == IR_MUL_OV) {
+	if (math_insn->op == IR_MUL_OV || ir_type_size[math_insn->type] < 4) {
 		|	cset Rw(def_reg), ne
 	} else if (IR_IS_TYPE_SIGNED(type)) {
 		|	cset Rw(def_reg), vs
@@ -3168,7 +3322,7 @@ static void ir_emit_overflow_and_branch(ir_ctx *ctx, uint32_t b, ir_ref def, ir_
 		false_block = 0;
 	}
 
-	if (math_insn->op == IR_MUL_OV) {
+	if (math_insn->op == IR_MUL_OV || ir_type_size[math_insn->type] < 4) {
 		if (reverse) {
 			|	beq =>true_block
 		} else {

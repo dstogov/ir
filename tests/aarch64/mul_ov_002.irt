@@ -17,6 +17,6 @@ aarch64
 test:
 	movz w1, #0x2
 	umull x0, w0, w1
-	cmp xzr, x0, lsr #32
+	tst x0, #0xffffffff00000000
 	cset w0, ne
 	ret
