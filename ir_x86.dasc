@@ -1744,8 +1744,6 @@ const ir_call_conv_dsc ir_call_conv_x86_fastcall = {
 
 #define IR_RULE_ENUM(name) IR_ ## name,
 
-#define IR_STATIC_ALLOCA   (IR_SKIPPED | IR_FUSED | IR_SIMPLE | IR_ALLOCA)
-
 enum _ir_rule {
 	IR_FIRST_RULE = IR_LAST_OP,
 	IR_RULES(IR_RULE_ENUM)
@@ -26205,65 +26203,6 @@ static int ir_fix_dessa_tmps(ir_ctx *ctx, uint8_t type, ir_ref from, ir_ref to, 
 	return 1;
 }
 
-/* This remaps spill slot of the VAR, where PARAM is stored, to the PARAMs slot.
- * This eliminates copying, but more important, this fixes va_start() compilation
- * on systems, where it's defined through address calculation macro (e.g. MSVC x86).
- */
-static void ir_remap_param_spill_slot(ir_ctx *ctx, ir_ref param, int32_t spill_slot)
-{
-	ir_use_list *param_use_list = &ctx->use_lists[param];
-
-	if (param_use_list->count >= 1) {
-		ir_ref param_store = ctx->use_edges[param_use_list->refs];
-		ir_insn *param_store_insn = &ctx->ir_base[param_store];
-
-		if (param_store_insn->op == IR_VSTORE) {
-			ir_ref var = param_store_insn->op2;
-
-			IR_ASSERT(param_store_insn->op3 == param);
-			IR_ASSERT(ctx->ir_base[var].op == IR_VAR);
-
-			/* Remap all related VADDR and VLOAD */
-			ir_use_list *var_use_list = &ctx->use_lists[var];
-			ir_ref n = var_use_list->count;
-			ir_ref *p = &ctx->use_edges[var_use_list->refs];
-			int32_t old_slot = IR_VREG_TO_STACK_SLOT(ctx->vregs[var]);
-
-			for (; n > 0; p++, n--) {
-				ir_ref use = *p;
-				ir_insn *insn = &ctx->ir_base[use];
-
-				if (insn->op == IR_VADDR) {
-					if (ctx->rules[use] == IR_STATIC_ALLOCA) {
-						IR_ASSERT(ctx->vregs[use] == ctx->vregs[var]);
-						ctx->vregs[use] = IR_STACK_SLOT_TO_VREG(spill_slot);
-					}
-				} else if (insn->op == IR_VLOAD || insn->op == IR_VLOAD_v) {
-					if (ctx->vregs[use] > 0) {
-						ir_live_interval *ival = ctx->live_intervals[ctx->vregs[use]];
-						if (ival && ival->stack_spill_pos == old_slot) {
-							ival->stack_spill_pos = spill_slot;
-						}
-					}
-				} else if (insn->op == IR_VSTORE || insn->op == IR_VSTORE_v) {
-					if (insn->op3 > 0 && ctx->vregs[insn->op3] > 0) {
-						ir_live_interval *ival = ctx->live_intervals[ctx->vregs[insn->op3]];
-						if (ival && ival->stack_spill_pos == old_slot) {
-							ival->stack_spill_pos = spill_slot;
-						}
-					}
-				}
-			}
-
-			/* Remap VAR itself */
-			ctx->vregs[var] = IR_STACK_SLOT_TO_VREG(spill_slot);
-
-			/* Avoid copying to itself */
-			ctx->rules[param_store] = IR_SKIPPED | IR_NOP;
-		}
-	}
-}
-
 static void ir_fix_param_spills(ir_ctx *ctx)
 {
 	ir_use_list *use_list = &ctx->use_lists[1];
@@ -26347,11 +26286,13 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 			if (src_reg == IR_REG_NONE) {
 				if (ctx->vregs[use] > 0) {
 					ir_live_interval *ival = ctx->live_intervals[ctx->vregs[use]];
-					if ((ival->flags & IR_LIVE_INTERVAL_MEM_PARAM)
-					 && ival->stack_spill_pos == -1) {
+					if (ival->flags & IR_LIVE_INTERVAL_MEM_PARAM) {
+						IR_ASSERT(ival->stack_spill_pos == -1);
 						ival->stack_spill_pos = stack_start + stack_offset;
-						/* Remap VAR to PARAM stack slot */
-						ir_remap_param_spill_slot(ctx, use, stack_start + stack_offset);
+						if (ival->flags & IR_LIVE_INTERVAL_VAR_MEM_PARAM) {
+							/* Remap VAR to PARAM stack slot */
+							ir_remap_param_spill_slot(ctx, use, stack_start + stack_offset);
+						}
 					}
 				}
 				if (sizeof(void*) == 8) {

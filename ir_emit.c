@@ -176,6 +176,62 @@ static ir_reg ir_get_param_reg(const ir_ctx *ctx, ir_ref ref)
 	return IR_REG_NONE;
 }
 
+/* This remaps spill slot of the VAR, where PARAM is stored, to the PARAMs slot.
+ * This eliminates copying, but more important, this fixes va_start() compilation
+ * on systems, where it's defined through address calculation macro (e.g. MSVC x86).
+ */
+static void ir_remap_param_spill_slot(ir_ctx *ctx, ir_ref param, int32_t spill_slot)
+{
+	ir_use_list *param_use_list = &ctx->use_lists[param];
+
+	if (param_use_list->count >= 1) {
+		ir_ref param_store = ctx->use_edges[param_use_list->refs];
+		ir_insn *param_store_insn = &ctx->ir_base[param_store];
+
+		if (param_store_insn->op == IR_VSTORE && (ctx->rules[param_store] & IR_SKIPPED)) {
+			ir_ref var = param_store_insn->op2;
+
+			IR_ASSERT(param_store_insn->op3 == param);
+			IR_ASSERT(ctx->ir_base[var].op == IR_VAR);
+
+			/* Remap all related VADDR and VLOAD */
+			ir_use_list *var_use_list = &ctx->use_lists[var];
+			ir_ref n = var_use_list->count;
+			ir_ref *p = &ctx->use_edges[var_use_list->refs];
+			int32_t old_slot = IR_VREG_TO_STACK_SLOT(ctx->vregs[var]);
+
+			for (; n > 0; p++, n--) {
+				ir_ref use = *p;
+				ir_insn *insn = &ctx->ir_base[use];
+
+				if (insn->op == IR_VADDR) {
+					if (ctx->rules[use] == IR_STATIC_ALLOCA) {
+						IR_ASSERT(ctx->vregs[use] == ctx->vregs[var]);
+						ctx->vregs[use] = IR_STACK_SLOT_TO_VREG(spill_slot);
+					}
+				} else if (insn->op == IR_VLOAD || insn->op == IR_VLOAD_v) {
+					if (ctx->vregs[use] > 0) {
+						ir_live_interval *ival = ctx->live_intervals[ctx->vregs[use]];
+						if (ival && ival->stack_spill_pos == old_slot) {
+							ival->stack_spill_pos = spill_slot;
+						}
+					}
+				} else if (insn->op == IR_VSTORE || insn->op == IR_VSTORE_v) {
+					if (insn->op3 > 0 && ctx->vregs[insn->op3] > 0) {
+						ir_live_interval *ival = ctx->live_intervals[ctx->vregs[insn->op3]];
+						if (ival && ival->stack_spill_pos == old_slot) {
+							ival->stack_spill_pos = spill_slot;
+						}
+					}
+				}
+			}
+
+			/* Remap VAR itself */
+			ctx->vregs[var] = IR_STACK_SLOT_TO_VREG(spill_slot);
+		}
+	}
+}
+
 static int ir_get_args_regs(const ir_ctx *ctx, const ir_insn *insn, const ir_call_conv_dsc *cc, int8_t *regs)
 {
 	int j, n;
@@ -1854,7 +1910,24 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 									break;
 								}
 							} else if (insn->op == IR_PARAM && reg == IR_REG_NONE) {
+								/* We may reuse parameter stack slot for spilling */
 								ival->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
+								if (ctx->use_lists[i].count == 1) {
+									ir_ref use = ctx->use_edges[ctx->use_lists[i].refs];
+									if (use < bb->end) {
+										ir_insn *use_insn = &ctx->ir_base[use];
+										if (use_insn->op == IR_VSTORE
+										 && !(ctx->rules[use] & IR_SKIPPED)
+										 /* first use of VAR is VSTORE(_, VAR, PARAM) */
+										 && ctx->use_edges[ctx->use_lists[use_insn->op2].refs] == use) {
+											IR_ASSERT(use_insn->op3 == i);
+											/* skip VSTORE (VAR is going to be remapped to PARAM) */
+											ival->flags |= IR_LIVE_INTERVAL_VAR_MEM_PARAM;
+											ival->use_pos = NULL;
+											ctx->rules[use] = IR_SKIPPED | IR_NOP;
+										}
+									}
+								}
 								break;
 							}
 
@@ -1897,10 +1970,6 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 						} else if (def_flags & IR_DEF_CONFLICTS_WITH_INPUT_REGS) {
 							def_pos = IR_LOAD_SUB_REF;
 						} else {
-							if (insn->op == IR_PARAM) {
-								/* We may reuse parameter stack slot for spilling */
-								ctx->live_intervals[ctx->vregs[i]]->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
-							}
 							def_pos = IR_DEF_SUB_REF;
 						}
 

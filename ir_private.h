@@ -1320,12 +1320,13 @@ struct _ir_live_range {
 #define IR_LIVE_INTERVAL_TEMP            (1<<1)
 #define IR_LIVE_INTERVAL_HAS_HINT_REGS   (1<<2)
 #define IR_LIVE_INTERVAL_HAS_HINT_REFS   (1<<3)
-#define IR_LIVE_INTERVAL_MEM_PARAM       (1<<4)
+#define IR_LIVE_INTERVAL_MEM_PARAM       (1<<4) /* PARAM passed on stack */
 #define IR_LIVE_INTERVAL_COALESCED       (1<<5)
 #define IR_LIVE_INTERVAL_SPILL_SPECIAL   (1<<6) /* spill slot is pre-allocated in a special area (see ir_ctx.spill_reserved_base) */
 #define IR_LIVE_INTERVAL_SPILLED         (1<<7)
 #define IR_LIVE_INTERVAL_SPLIT_CHILD     (1<<8)
 #define IR_LIVE_INTERVAL_TWO_REGS        (1<<9)
+#define IR_LIVE_INTERVAL_VAR_MEM_PARAM   (1<<10) /* PARAM stack slot reused by VAR used in VSTORE(_, VAR, PARAM) */
 
 /* macros to encode and decode stack offset stored in ctx->vregs[] */
 #define IR_VREG_IS_STACK_SLOT(vreg)      ((vreg) < 0)
@@ -1535,6 +1536,8 @@ IR_ALWAYS_INLINE int8_t ir_get_alocated_reg(const ir_ctx *ctx, ir_ref ref, int o
 #define IR_MAY_SWAP  (1U<<26) /* Allow swapping operands for better register allocation */
 #define IR_MAY_REUSE (1U<<25) /* Result may reuse register of the source */
 #define IR_TWO_REGS  (1U<<24) /* Result needs two registers (used for 64-bit integers on x86) */
+
+#define IR_STATIC_ALLOCA   (IR_SKIPPED | IR_FUSED | IR_SIMPLE | IR_ALLOCA)
 
 #define IR_RULE_MASK 0xffff
 

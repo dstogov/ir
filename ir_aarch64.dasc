@@ -440,8 +440,6 @@ const ir_call_conv_dsc ir_call_conv_aarch64_preserve_none = {
 
 #define IR_RULE_ENUM(name) IR_ ## name,
 
-#define IR_STATIC_ALLOCA   (IR_SKIPPED | IR_FUSED | IR_SIMPLE | IR_ALLOCA)
-
 enum _ir_rule {
 	IR_FIRST_RULE = IR_LAST_OP,
 	IR_RULES(IR_RULE_ENUM)
@@ -9247,10 +9245,13 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 			if (src_reg == IR_REG_NONE) {
 				if (ctx->vregs[use] > 0) {
 					ir_live_interval *ival = ctx->live_intervals[ctx->vregs[use]];
-					if ((ival->flags & IR_LIVE_INTERVAL_MEM_PARAM)
-					 && ival->stack_spill_pos == -1
-					 && (ival->next || ival->reg == IR_REG_NONE)) {
+					if (ival->flags & IR_LIVE_INTERVAL_MEM_PARAM) {
+						IR_ASSERT(ival->stack_spill_pos == -1);
 						ival->stack_spill_pos = stack_start + stack_offset;
+						if (ival->flags & IR_LIVE_INTERVAL_VAR_MEM_PARAM) {
+							/* Remap VAR to PARAM stack slot */
+							ir_remap_param_spill_slot(ctx, use, stack_start + stack_offset);
+						}
 					}
 				}
 				if (sizeof(void*) == 8) {
