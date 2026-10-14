@@ -119,11 +119,11 @@ static const char *ir_type_llvm_name[IR_LAST_LLVM_TYPE] = {
 	_(SSUB_OV_I8,   "llvm.ssub.with.overflow.i8",  I8B,  2, I8,  I8,  ___, ___) \
 	_(SSUB_OV_I16,  "llvm.ssub.with.overflow.i16", I16B, 2, I16, I16, ___, ___) \
 	_(SSUB_OV_I32,  "llvm.ssub.with.overflow.i32", I32B, 2, I32, I32, ___, ___) \
+	_(SSUB_OV_I64,  "llvm.ssub.with.overflow.i64", I64B, 2, I64, I64, ___, ___) \
 	_(USUB_OV_I8,   "llvm.usub.with.overflow.i8",  I8B,  2, I8,  I8,  ___, ___) \
 	_(USUB_OV_I16,  "llvm.usub.with.overflow.i16", I16B, 2, I16, I16, ___, ___) \
 	_(USUB_OV_I32,  "llvm.usub.with.overflow.i32", I32B, 2, I32, I32, ___, ___) \
 	_(USUB_OV_I64,  "llvm.usub.with.overflow.i64", I64B, 2, I64, I64, ___, ___) \
-	_(SSUB_OV_I64,  "llvm.ssub.with.overflow.i64", I64B, 2, I64, I64, ___, ___) \
 	_(SMUL_OV_I8,   "llvm.smul.with.overflow.i8",  I8B,  2, I8,  I8,  ___, ___) \
 	_(SMUL_OV_I16,  "llvm.smul.with.overflow.i16", I16B, 2, I16, I16, ___, ___) \
 	_(SMUL_OV_I32,  "llvm.smul.with.overflow.i32", I32B, 2, I32, I32, ___, ___) \

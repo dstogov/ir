@@ -637,7 +637,7 @@ static void ir_emit_overflow_math(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, 
 		fprintf(f, "\t");
 	}
 	fprintf(f, "__builtin_%s%s%s_overflow(",
-		IR_IS_TYPE_SIGNED(type) ? "s" : "u",
+		ir_type_size[type] < 4 ? "" : (IR_IS_TYPE_SIGNED(type) ? "s" : "u"),
 		func,
 		ir_type_size[type] == 8 ? "ll" : "");
 	ir_emit_ref(ctx, f, insn->op1);
