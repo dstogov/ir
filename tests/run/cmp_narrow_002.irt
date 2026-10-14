@@ -1,0 +1,295 @@
+--TEST--
+All integer comparison conditions on narrow integers with not normalized upper bits (non-zero constant)
+--ARGS--
+-O1 --run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @cmp_all_u8(uint8_t, uint8_t): int32_t;
+func @cmp_all_u8(uint8_t, uint8_t): int32_t
+{
+	uint8_t c = 5;
+	int32_t w0 = 1;
+	int32_t w1 = 2;
+	int32_t w2 = 4;
+	int32_t w3 = 8;
+	int32_t w4 = 16;
+	int32_t w5 = 32;
+	l_1 = START(l_E);
+	uint8_t x = PARAM(l_1, "x", 1);
+	uint8_t y = PARAM(l_1, "y", 2);
+	uint8_t s = ADD(x, y);
+	bool b0 = EQ(s, c);
+	int32_t v0 = ZEXT(b0);
+	int32_t m0 = MUL(v0, w0);
+	bool b1 = NE(s, c);
+	int32_t v1 = ZEXT(b1);
+	int32_t m1 = MUL(v1, w1);
+	bool b2 = ULT(s, c);
+	int32_t v2 = ZEXT(b2);
+	int32_t m2 = MUL(v2, w2);
+	bool b3 = UGE(s, c);
+	int32_t v3 = ZEXT(b3);
+	int32_t m3 = MUL(v3, w3);
+	bool b4 = ULE(s, c);
+	int32_t v4 = ZEXT(b4);
+	int32_t m4 = MUL(v4, w4);
+	bool b5 = UGT(s, c);
+	int32_t v5 = ZEXT(b5);
+	int32_t m5 = MUL(v5, w5);
+	int32_t a1 = ADD(m0, m1);
+	int32_t a2 = ADD(a1, m2);
+	int32_t a3 = ADD(a2, m3);
+	int32_t a4 = ADD(a3, m4);
+	int32_t a5 = ADD(a4, m5);
+	l_E = RETURN(l_1, a5);
+}
+func @cmp_all_i8(int8_t, int8_t): int32_t;
+func @cmp_all_i8(int8_t, int8_t): int32_t
+{
+	int8_t c = 5;
+	int32_t w0 = 1;
+	int32_t w1 = 2;
+	int32_t w2 = 4;
+	int32_t w3 = 8;
+	int32_t w4 = 16;
+	int32_t w5 = 32;
+	int32_t w6 = 64;
+	int32_t w7 = 128;
+	int32_t w8 = 256;
+	int32_t w9 = 512;
+	l_1 = START(l_E);
+	int8_t x = PARAM(l_1, "x", 1);
+	int8_t y = PARAM(l_1, "y", 2);
+	int8_t s = ADD(x, y);
+	bool b0 = EQ(s, c);
+	int32_t v0 = ZEXT(b0);
+	int32_t m0 = MUL(v0, w0);
+	bool b1 = NE(s, c);
+	int32_t v1 = ZEXT(b1);
+	int32_t m1 = MUL(v1, w1);
+	bool b2 = LT(s, c);
+	int32_t v2 = ZEXT(b2);
+	int32_t m2 = MUL(v2, w2);
+	bool b3 = GE(s, c);
+	int32_t v3 = ZEXT(b3);
+	int32_t m3 = MUL(v3, w3);
+	bool b4 = LE(s, c);
+	int32_t v4 = ZEXT(b4);
+	int32_t m4 = MUL(v4, w4);
+	bool b5 = GT(s, c);
+	int32_t v5 = ZEXT(b5);
+	int32_t m5 = MUL(v5, w5);
+	bool b6 = ULT(s, c);
+	int32_t v6 = ZEXT(b6);
+	int32_t m6 = MUL(v6, w6);
+	bool b7 = UGE(s, c);
+	int32_t v7 = ZEXT(b7);
+	int32_t m7 = MUL(v7, w7);
+	bool b8 = ULE(s, c);
+	int32_t v8 = ZEXT(b8);
+	int32_t m8 = MUL(v8, w8);
+	bool b9 = UGT(s, c);
+	int32_t v9 = ZEXT(b9);
+	int32_t m9 = MUL(v9, w9);
+	int32_t a1 = ADD(m0, m1);
+	int32_t a2 = ADD(a1, m2);
+	int32_t a3 = ADD(a2, m3);
+	int32_t a4 = ADD(a3, m4);
+	int32_t a5 = ADD(a4, m5);
+	int32_t a6 = ADD(a5, m6);
+	int32_t a7 = ADD(a6, m7);
+	int32_t a8 = ADD(a7, m8);
+	int32_t a9 = ADD(a8, m9);
+	l_E = RETURN(l_1, a9);
+}
+func @cmp_all_u16(uint16_t, uint16_t): int32_t;
+func @cmp_all_u16(uint16_t, uint16_t): int32_t
+{
+	uint16_t c = 5;
+	int32_t w0 = 1;
+	int32_t w1 = 2;
+	int32_t w2 = 4;
+	int32_t w3 = 8;
+	int32_t w4 = 16;
+	int32_t w5 = 32;
+	l_1 = START(l_E);
+	uint16_t x = PARAM(l_1, "x", 1);
+	uint16_t y = PARAM(l_1, "y", 2);
+	uint16_t s = ADD(x, y);
+	bool b0 = EQ(s, c);
+	int32_t v0 = ZEXT(b0);
+	int32_t m0 = MUL(v0, w0);
+	bool b1 = NE(s, c);
+	int32_t v1 = ZEXT(b1);
+	int32_t m1 = MUL(v1, w1);
+	bool b2 = ULT(s, c);
+	int32_t v2 = ZEXT(b2);
+	int32_t m2 = MUL(v2, w2);
+	bool b3 = UGE(s, c);
+	int32_t v3 = ZEXT(b3);
+	int32_t m3 = MUL(v3, w3);
+	bool b4 = ULE(s, c);
+	int32_t v4 = ZEXT(b4);
+	int32_t m4 = MUL(v4, w4);
+	bool b5 = UGT(s, c);
+	int32_t v5 = ZEXT(b5);
+	int32_t m5 = MUL(v5, w5);
+	int32_t a1 = ADD(m0, m1);
+	int32_t a2 = ADD(a1, m2);
+	int32_t a3 = ADD(a2, m3);
+	int32_t a4 = ADD(a3, m4);
+	int32_t a5 = ADD(a4, m5);
+	l_E = RETURN(l_1, a5);
+}
+func @cmp_all_i16(int16_t, int16_t): int32_t;
+func @cmp_all_i16(int16_t, int16_t): int32_t
+{
+	int16_t c = 5;
+	int32_t w0 = 1;
+	int32_t w1 = 2;
+	int32_t w2 = 4;
+	int32_t w3 = 8;
+	int32_t w4 = 16;
+	int32_t w5 = 32;
+	int32_t w6 = 64;
+	int32_t w7 = 128;
+	int32_t w8 = 256;
+	int32_t w9 = 512;
+	l_1 = START(l_E);
+	int16_t x = PARAM(l_1, "x", 1);
+	int16_t y = PARAM(l_1, "y", 2);
+	int16_t s = ADD(x, y);
+	bool b0 = EQ(s, c);
+	int32_t v0 = ZEXT(b0);
+	int32_t m0 = MUL(v0, w0);
+	bool b1 = NE(s, c);
+	int32_t v1 = ZEXT(b1);
+	int32_t m1 = MUL(v1, w1);
+	bool b2 = LT(s, c);
+	int32_t v2 = ZEXT(b2);
+	int32_t m2 = MUL(v2, w2);
+	bool b3 = GE(s, c);
+	int32_t v3 = ZEXT(b3);
+	int32_t m3 = MUL(v3, w3);
+	bool b4 = LE(s, c);
+	int32_t v4 = ZEXT(b4);
+	int32_t m4 = MUL(v4, w4);
+	bool b5 = GT(s, c);
+	int32_t v5 = ZEXT(b5);
+	int32_t m5 = MUL(v5, w5);
+	bool b6 = ULT(s, c);
+	int32_t v6 = ZEXT(b6);
+	int32_t m6 = MUL(v6, w6);
+	bool b7 = UGE(s, c);
+	int32_t v7 = ZEXT(b7);
+	int32_t m7 = MUL(v7, w7);
+	bool b8 = ULE(s, c);
+	int32_t v8 = ZEXT(b8);
+	int32_t m8 = MUL(v8, w8);
+	bool b9 = UGT(s, c);
+	int32_t v9 = ZEXT(b9);
+	int32_t m9 = MUL(v9, w9);
+	int32_t a1 = ADD(m0, m1);
+	int32_t a2 = ADD(a1, m2);
+	int32_t a3 = ADD(a2, m3);
+	int32_t a4 = ADD(a3, m4);
+	int32_t a5 = ADD(a4, m5);
+	int32_t a6 = ADD(a5, m6);
+	int32_t a7 = ADD(a6, m7);
+	int32_t a8 = ADD(a7, m8);
+	int32_t a9 = ADD(a8, m9);
+	l_E = RETURN(l_1, a9);
+}
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%d\n";
+	int32_t z = 0;
+	uintptr_t f_cmp_all_u8 = func @cmp_all_u8(uint8_t, uint8_t): int32_t;
+	uintptr_t f_cmp_all_i8 = func @cmp_all_i8(int8_t, int8_t): int32_t;
+	uintptr_t f_cmp_all_u16 = func @cmp_all_u16(uint16_t, uint16_t): int32_t;
+	uintptr_t f_cmp_all_i16 = func @cmp_all_i16(int16_t, int16_t): int32_t;
+	uint8_t a0 = 255;
+	uint8_t b0 = 5;
+	uint8_t a1 = 255;
+	uint8_t b1 = 6;
+	uint8_t a2 = 255;
+	uint8_t b2 = 7;
+	uint8_t a3 = 255;
+	uint8_t b3 = 252;
+	int8_t a4 = -128;
+	int8_t b4 = -124;
+	int8_t a5 = -128;
+	int8_t b5 = -123;
+	int8_t a6 = -128;
+	int8_t b6 = -122;
+	int8_t a7 = 127;
+	int8_t b7 = 124;
+	uint16_t a8 = 65535;
+	uint16_t b8 = 5;
+	uint16_t a9 = 65535;
+	uint16_t b9 = 6;
+	uint16_t a10 = 65535;
+	uint16_t b10 = 7;
+	uint16_t a11 = 65535;
+	uint16_t b11 = 65532;
+	int16_t a12 = -32768;
+	int16_t b12 = -32764;
+	int16_t a13 = -32768;
+	int16_t b13 = -32763;
+	int16_t a14 = -32768;
+	int16_t b14 = -32762;
+	int16_t a15 = 32767;
+	int16_t b15 = 32764;
+	l_0 = START(l_end);
+	int32_t r0, c0 = CALL/2(l_0, f_cmp_all_u8, a0, b0);
+	p0 = CALL/2(c0, fp, fmt, r0);
+	int32_t r1, c1 = CALL/2(p0, f_cmp_all_u8, a1, b1);
+	p1 = CALL/2(c1, fp, fmt, r1);
+	int32_t r2, c2 = CALL/2(p1, f_cmp_all_u8, a2, b2);
+	p2 = CALL/2(c2, fp, fmt, r2);
+	int32_t r3, c3 = CALL/2(p2, f_cmp_all_u8, a3, b3);
+	p3 = CALL/2(c3, fp, fmt, r3);
+	int32_t r4, c4 = CALL/2(p3, f_cmp_all_i8, a4, b4);
+	p4 = CALL/2(c4, fp, fmt, r4);
+	int32_t r5, c5 = CALL/2(p4, f_cmp_all_i8, a5, b5);
+	p5 = CALL/2(c5, fp, fmt, r5);
+	int32_t r6, c6 = CALL/2(p5, f_cmp_all_i8, a6, b6);
+	p6 = CALL/2(c6, fp, fmt, r6);
+	int32_t r7, c7 = CALL/2(p6, f_cmp_all_i8, a7, b7);
+	p7 = CALL/2(c7, fp, fmt, r7);
+	int32_t r8, c8 = CALL/2(p7, f_cmp_all_u16, a8, b8);
+	p8 = CALL/2(c8, fp, fmt, r8);
+	int32_t r9, c9 = CALL/2(p8, f_cmp_all_u16, a9, b9);
+	p9 = CALL/2(c9, fp, fmt, r9);
+	int32_t r10, c10 = CALL/2(p9, f_cmp_all_u16, a10, b10);
+	p10 = CALL/2(c10, fp, fmt, r10);
+	int32_t r11, c11 = CALL/2(p10, f_cmp_all_u16, a11, b11);
+	p11 = CALL/2(c11, fp, fmt, r11);
+	int32_t r12, c12 = CALL/2(p11, f_cmp_all_i16, a12, b12);
+	p12 = CALL/2(c12, fp, fmt, r12);
+	int32_t r13, c13 = CALL/2(p12, f_cmp_all_i16, a13, b13);
+	p13 = CALL/2(c13, fp, fmt, r13);
+	int32_t r14, c14 = CALL/2(p13, f_cmp_all_i16, a14, b14);
+	p14 = CALL/2(c14, fp, fmt, r14);
+	int32_t r15, c15 = CALL/2(p14, f_cmp_all_i16, a15, b15);
+	p15 = CALL/2(c15, fp, fmt, r15);
+	l_end = RETURN(p15, z);
+}
+--EXPECT--
+22
+25
+42
+42
+342
+409
+682
+662
+22
+25
+42
+42
+342
+409
+682
+662
