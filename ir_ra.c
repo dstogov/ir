@@ -2280,6 +2280,7 @@ int ir_compute_dessa_moves(ir_ctx *ctx)
 					insn = &ctx->ir_base[use];
 					if (insn->op == IR_PHI) {
 						if (ctx->use_lists[use].count == 0) {
+							ctx->rules[use] = IR_SKIPPED | IR_NOP;
 							ctx->vregs[use] = 0;
 							continue;
 						}
