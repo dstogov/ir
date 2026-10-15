@@ -438,7 +438,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 							} else if (insn->op == IR_PARAM && reg == IR_REG_NONE) {
 								/* We may reuse parameter stack slot for spilling */
 								ival->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
-								if (ctx->use_lists[i].count == 1) {
+								if (ctx->use_lists[i].count > 0) {
 									ir_ref use = ctx->use_edges[ctx->use_lists[i].refs];
 									if (use < bb->end) {
 										ir_insn *use_insn = &ctx->ir_base[use];
