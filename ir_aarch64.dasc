@@ -3943,8 +3943,18 @@ static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			|	ASM_REG_REG_OP clz, src_type, def_reg, op1_reg
 		}
 	} else if (insn->op == IR_CTTZ) {
-		|	ASM_REG_REG_OP rbit, src_type, def_reg, op1_reg
-		|	ASM_REG_REG_OP clz, src_type, def_reg, def_reg
+		if (ir_type_size[src_type] == 1) {
+			|	orr Rw(def_reg), Rw(op1_reg), #0x100
+			|	rbit Rw(def_reg), Rw(def_reg)
+			|	clz Rw(def_reg), Rw(def_reg)
+		} else if (ir_type_size[src_type] == 2) {
+			|	orr Rw(def_reg), Rw(op1_reg), #0x10000
+			|	rbit Rw(def_reg), Rw(def_reg)
+			|	clz Rw(def_reg), Rw(def_reg)
+		} else {
+			|	ASM_REG_REG_OP rbit, src_type, def_reg, op1_reg
+			|	ASM_REG_REG_OP clz, src_type, def_reg, def_reg
+		}
 	} else {
 		IR_ASSERT(insn->op == IR_BSWAP);
 		if (ir_type_size[src_type] == 2) {
