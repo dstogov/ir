@@ -922,7 +922,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 						ival->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
 						ival->stack_spill_pos = -1; // ???
 						IR_LOG_ASSIGN_SPILL(ival->vreg, ival->stack_spill_pos);
-						if (ctx->use_lists[i].count == 1) {
+						if (ctx->use_lists[i].count > 0) {
 							ir_ref use = ctx->use_edges[ctx->use_lists[i].refs];
 							if (use < bb->end) {
 								ir_insn *use_insn = &ctx->ir_base[use];
