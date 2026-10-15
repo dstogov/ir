@@ -968,6 +968,8 @@ int ir_compute_dessa_moves(ir_ctx *ctx);
 int ir_reg_alloc(ir_ctx *ctx);
 int ir_reg_alloc_simple(ir_ctx *ctx);
 
+#define ir_reg_alloc_O0(_ctx) ir_reg_alloc_simple(_ctx)
+
 int ir_regs_number(void);
 bool ir_reg_is_int(int32_t reg);
 const char *ir_reg_name(int8_t reg, ir_type type);
@@ -1128,7 +1130,7 @@ IR_ALWAYS_INLINE void *ir_jit_compile(ir_ctx *ctx, int opt_level, size_t *size)
 		 || !ir_match(ctx)
 		 || !ir_assign_virtual_registers(ctx)
 		 || !ir_compute_dessa_moves(ctx)
-		 || !ir_reg_alloc_simple(ctx)) {
+		 || !ir_reg_alloc_O0(ctx)) {
 			return NULL;
 		}
 
