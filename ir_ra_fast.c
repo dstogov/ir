@@ -582,7 +582,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 				ir_ref use = *p;
 				ir_insn *use_insn = &ctx->ir_base[use];
 
-				if (use_insn->op == IR_PHI) {
+				if (use_insn->op == IR_PHI && ctx->vregs[use] > 0) {
 					ir_ref input = ir_insn_op(use_insn, k);
 
 					/* Require tmp register for potential MEM->MEM DESSA move */
@@ -696,15 +696,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 				ir_live_interval *ival = ctx->live_intervals[ctx->vregs[i]];
 
 				if (!ival || (ival->reg == IR_REG_NONE && ival->stack_spill_pos == -1)) {
-					if (insn->op == IR_PHI) {
-						/* dead PHI (we have to keep it) */
-						// TODO: remove dead PHI ???
-						if (!ival) {
-							ival = _create_ival(ctx, ctx->vregs[i], insn->type);
-						}
-						_pick_spill(ctx, ival);
-						continue;
-					} else if (IR_IS_FOLDABLE_OP(insn->op) || (ir_op_flags[insn->op] & IR_OP_FLAG_NO_SIDE_EFFECT)) {
+					if (IR_IS_FOLDABLE_OP(insn->op) || (ir_op_flags[insn->op] & IR_OP_FLAG_NO_SIDE_EFFECT)) {
 						/* lightweigh dead code elimination */
 						ctx->rules[i] = IR_SKIPPED | IR_NOP;
 						ctx->vregs[i] = 0;
@@ -1100,7 +1092,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 					 && ctx->regs[i][0] != IR_REG_NONE
 					 && !IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), IR_REG_NUM(ctx->regs[i][0]))
 					 && IR_IS_TYPE_INT(insn->type) == IR_IS_TYPE_INT(data.regs[j].type)
-					 && _may_coalesce(ctx, insn->op1, i)) {
+					 && (ival->reg == IR_REG_NONE && ival->stack_spill_pos == -1)) {
 						/* reuse for op1 the register allocated for instruction result (lightweigh coalescing) */
 						reg = IR_REG_NUM(ctx->regs[i][0]);
 					} else {
