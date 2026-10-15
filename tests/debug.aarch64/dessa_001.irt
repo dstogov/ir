@@ -25,6 +25,7 @@ aarch64
 }
 --EXPECT--
 test:
+	uxtb w2, w2
 	cbz w2, .L1
 	mov w0, w1
 .L1:

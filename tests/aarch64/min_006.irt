@@ -14,7 +14,8 @@ aarch64
 }
 --EXPECT--
 test:
+	uxtb w0, w0
 	uxtb w1, w1
-	cmp w1, w0, uxtb
+	cmp w1, w0
 	csel w0, w1, w0, ls
 	ret

@@ -13,6 +13,7 @@ aarch64
 }
 --EXPECT--
 test:
+	uxtb w0, w0
 	cmp w0, #0
 	cset w0, eq
 	ret
