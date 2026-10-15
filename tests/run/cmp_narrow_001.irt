@@ -1,0 +1,267 @@
+--TEST--
+Integer comparison of narrow integers with not normalized upper bits
+--ARGS--
+-O1 --run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @cmp_u8(uint8_t, uint8_t): int32_t;
+func @cmp_u8(uint8_t, uint8_t): int32_t
+{
+	l_1 = START(l_E);
+	uint8_t x = PARAM(l_1, "x", 1);
+	uint8_t y = PARAM(l_1, "y", 2);
+	uint8_t s = ADD(x, y);
+	uint8_t c = 3;
+	bool b1 = ULT(s, y);
+	bool b2 = UGT(s, c);
+	int32_t v1 = ZEXT(b1);
+	int32_t v2 = ZEXT(b2);
+	int32_t v = ADD(v1, v1);
+	int32_t r = ADD(v, v2);
+	l_E = RETURN(l_1, r);
+}
+func @cmp_br_u8(uint8_t, uint8_t): int32_t;
+func @cmp_br_u8(uint8_t, uint8_t): int32_t
+{
+	int32_t one = 1;
+	int32_t zero = 0;
+	l_1 = START(l_E);
+	uint8_t x = PARAM(l_1, "x", 1);
+	uint8_t y = PARAM(l_1, "y", 2);
+	uint8_t s = ADD(x, y);
+	uint8_t c = 3;
+	bool b = ULT(s, c);
+	l_2 = IF(l_1, b);
+	l_3 = IF_TRUE(l_2);
+	l_4 = IF_FALSE(l_2);
+	l_5 = END(l_3);
+	l_6 = END(l_4);
+	l_7 = MERGE(l_5, l_6);
+	int32_t r = PHI(l_7, one, zero);
+	l_E = RETURN(l_7, r);
+}
+func @cmp_i8(int8_t, int8_t): int32_t;
+func @cmp_i8(int8_t, int8_t): int32_t
+{
+	l_1 = START(l_E);
+	int8_t x = PARAM(l_1, "x", 1);
+	int8_t y = PARAM(l_1, "y", 2);
+	int8_t s = ADD(x, y);
+	int8_t c = 3;
+	bool b1 = LT(s, y);
+	bool b2 = GT(s, c);
+	int32_t v1 = ZEXT(b1);
+	int32_t v2 = ZEXT(b2);
+	int32_t v = ADD(v1, v1);
+	int32_t r = ADD(v, v2);
+	l_E = RETURN(l_1, r);
+}
+func @cmp_br_i8(int8_t, int8_t): int32_t;
+func @cmp_br_i8(int8_t, int8_t): int32_t
+{
+	int32_t one = 1;
+	int32_t zero = 0;
+	l_1 = START(l_E);
+	int8_t x = PARAM(l_1, "x", 1);
+	int8_t y = PARAM(l_1, "y", 2);
+	int8_t s = ADD(x, y);
+	int8_t c = 3;
+	bool b = LT(s, c);
+	l_2 = IF(l_1, b);
+	l_3 = IF_TRUE(l_2);
+	l_4 = IF_FALSE(l_2);
+	l_5 = END(l_3);
+	l_6 = END(l_4);
+	l_7 = MERGE(l_5, l_6);
+	int32_t r = PHI(l_7, one, zero);
+	l_E = RETURN(l_7, r);
+}
+func @cmp_u16(uint16_t, uint16_t): int32_t;
+func @cmp_u16(uint16_t, uint16_t): int32_t
+{
+	l_1 = START(l_E);
+	uint16_t x = PARAM(l_1, "x", 1);
+	uint16_t y = PARAM(l_1, "y", 2);
+	uint16_t s = ADD(x, y);
+	uint16_t c = 3;
+	bool b1 = ULT(s, y);
+	bool b2 = UGT(s, c);
+	int32_t v1 = ZEXT(b1);
+	int32_t v2 = ZEXT(b2);
+	int32_t v = ADD(v1, v1);
+	int32_t r = ADD(v, v2);
+	l_E = RETURN(l_1, r);
+}
+func @cmp_br_u16(uint16_t, uint16_t): int32_t;
+func @cmp_br_u16(uint16_t, uint16_t): int32_t
+{
+	int32_t one = 1;
+	int32_t zero = 0;
+	l_1 = START(l_E);
+	uint16_t x = PARAM(l_1, "x", 1);
+	uint16_t y = PARAM(l_1, "y", 2);
+	uint16_t s = ADD(x, y);
+	uint16_t c = 3;
+	bool b = ULT(s, c);
+	l_2 = IF(l_1, b);
+	l_3 = IF_TRUE(l_2);
+	l_4 = IF_FALSE(l_2);
+	l_5 = END(l_3);
+	l_6 = END(l_4);
+	l_7 = MERGE(l_5, l_6);
+	int32_t r = PHI(l_7, one, zero);
+	l_E = RETURN(l_7, r);
+}
+func @cmp_i16(int16_t, int16_t): int32_t;
+func @cmp_i16(int16_t, int16_t): int32_t
+{
+	l_1 = START(l_E);
+	int16_t x = PARAM(l_1, "x", 1);
+	int16_t y = PARAM(l_1, "y", 2);
+	int16_t s = ADD(x, y);
+	int16_t c = 3;
+	bool b1 = LT(s, y);
+	bool b2 = GT(s, c);
+	int32_t v1 = ZEXT(b1);
+	int32_t v2 = ZEXT(b2);
+	int32_t v = ADD(v1, v1);
+	int32_t r = ADD(v, v2);
+	l_E = RETURN(l_1, r);
+}
+func @cmp_br_i16(int16_t, int16_t): int32_t;
+func @cmp_br_i16(int16_t, int16_t): int32_t
+{
+	int32_t one = 1;
+	int32_t zero = 0;
+	l_1 = START(l_E);
+	int16_t x = PARAM(l_1, "x", 1);
+	int16_t y = PARAM(l_1, "y", 2);
+	int16_t s = ADD(x, y);
+	int16_t c = 3;
+	bool b = LT(s, c);
+	l_2 = IF(l_1, b);
+	l_3 = IF_TRUE(l_2);
+	l_4 = IF_FALSE(l_2);
+	l_5 = END(l_3);
+	l_6 = END(l_4);
+	l_7 = MERGE(l_5, l_6);
+	int32_t r = PHI(l_7, one, zero);
+	l_E = RETURN(l_7, r);
+}
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%d\n";
+	int32_t z = 0;
+	uint8_t a0 = 255;
+	uint8_t b0 = 1;
+	uint8_t a1 = 255;
+	uint8_t b1 = 1;
+	uint8_t a2 = 200;
+	uint8_t b2 = 100;
+	uint8_t a3 = 200;
+	uint8_t b3 = 100;
+	uint8_t a4 = 1;
+	uint8_t b4 = 1;
+	uint8_t a5 = 1;
+	uint8_t b5 = 1;
+	int8_t a6 = 127;
+	int8_t b6 = 127;
+	int8_t a7 = 127;
+	int8_t b7 = 127;
+	int8_t a8 = -128;
+	int8_t b8 = -128;
+	int8_t a9 = -128;
+	int8_t b9 = -128;
+	int8_t a10 = 100;
+	int8_t b10 = -101;
+	int8_t a11 = 100;
+	int8_t b11 = -101;
+	uint16_t a12 = 65535;
+	uint16_t b12 = 1;
+	uint16_t a13 = 65535;
+	uint16_t b13 = 1;
+	uint16_t a14 = 40000;
+	uint16_t b14 = 40000;
+	uint16_t a15 = 40000;
+	uint16_t b15 = 40000;
+	int16_t a16 = -32768;
+	int16_t b16 = -32768;
+	int16_t a17 = -32768;
+	int16_t b17 = -32768;
+	int16_t a18 = 30000;
+	int16_t b18 = 30000;
+	int16_t a19 = 30000;
+	int16_t b19 = 30000;
+	uintptr_t f_cmp_br_i16 = func @cmp_br_i16(int16_t, int16_t): int32_t;
+	uintptr_t f_cmp_br_i8 = func @cmp_br_i8(int8_t, int8_t): int32_t;
+	uintptr_t f_cmp_br_u16 = func @cmp_br_u16(uint16_t, uint16_t): int32_t;
+	uintptr_t f_cmp_br_u8 = func @cmp_br_u8(uint8_t, uint8_t): int32_t;
+	uintptr_t f_cmp_i16 = func @cmp_i16(int16_t, int16_t): int32_t;
+	uintptr_t f_cmp_i8 = func @cmp_i8(int8_t, int8_t): int32_t;
+	uintptr_t f_cmp_u16 = func @cmp_u16(uint16_t, uint16_t): int32_t;
+	uintptr_t f_cmp_u8 = func @cmp_u8(uint8_t, uint8_t): int32_t;
+	l_0 = START(l_end);
+	int32_t r0, c0 = CALL/2(l_0, f_cmp_u8, a0, b0);
+	p0 = CALL/2(c0, fp, fmt, r0);
+	int32_t r1, c1 = CALL/2(p0, f_cmp_br_u8, a1, b1);
+	p1 = CALL/2(c1, fp, fmt, r1);
+	int32_t r2, c2 = CALL/2(p1, f_cmp_u8, a2, b2);
+	p2 = CALL/2(c2, fp, fmt, r2);
+	int32_t r3, c3 = CALL/2(p2, f_cmp_br_u8, a3, b3);
+	p3 = CALL/2(c3, fp, fmt, r3);
+	int32_t r4, c4 = CALL/2(p3, f_cmp_u8, a4, b4);
+	p4 = CALL/2(c4, fp, fmt, r4);
+	int32_t r5, c5 = CALL/2(p4, f_cmp_br_u8, a5, b5);
+	p5 = CALL/2(c5, fp, fmt, r5);
+	int32_t r6, c6 = CALL/2(p5, f_cmp_i8, a6, b6);
+	p6 = CALL/2(c6, fp, fmt, r6);
+	int32_t r7, c7 = CALL/2(p6, f_cmp_br_i8, a7, b7);
+	p7 = CALL/2(c7, fp, fmt, r7);
+	int32_t r8, c8 = CALL/2(p7, f_cmp_i8, a8, b8);
+	p8 = CALL/2(c8, fp, fmt, r8);
+	int32_t r9, c9 = CALL/2(p8, f_cmp_br_i8, a9, b9);
+	p9 = CALL/2(c9, fp, fmt, r9);
+	int32_t r10, c10 = CALL/2(p9, f_cmp_i8, a10, b10);
+	p10 = CALL/2(c10, fp, fmt, r10);
+	int32_t r11, c11 = CALL/2(p10, f_cmp_br_i8, a11, b11);
+	p11 = CALL/2(c11, fp, fmt, r11);
+	int32_t r12, c12 = CALL/2(p11, f_cmp_u16, a12, b12);
+	p12 = CALL/2(c12, fp, fmt, r12);
+	int32_t r13, c13 = CALL/2(p12, f_cmp_br_u16, a13, b13);
+	p13 = CALL/2(c13, fp, fmt, r13);
+	int32_t r14, c14 = CALL/2(p13, f_cmp_u16, a14, b14);
+	p14 = CALL/2(c14, fp, fmt, r14);
+	int32_t r15, c15 = CALL/2(p14, f_cmp_br_u16, a15, b15);
+	p15 = CALL/2(c15, fp, fmt, r15);
+	int32_t r16, c16 = CALL/2(p15, f_cmp_i16, a16, b16);
+	p16 = CALL/2(c16, fp, fmt, r16);
+	int32_t r17, c17 = CALL/2(p16, f_cmp_br_i16, a17, b17);
+	p17 = CALL/2(c17, fp, fmt, r17);
+	int32_t r18, c18 = CALL/2(p17, f_cmp_i16, a18, b18);
+	p18 = CALL/2(c18, fp, fmt, r18);
+	int32_t r19, c19 = CALL/2(p18, f_cmp_br_i16, a19, b19);
+	p19 = CALL/2(c19, fp, fmt, r19);
+	l_end = RETURN(p19, z);
+}
+--EXPECT--
+2
+1
+3
+0
+0
+1
+2
+1
+0
+1
+0
+1
+2
+1
+3
+0
+0
+1
+2
+1

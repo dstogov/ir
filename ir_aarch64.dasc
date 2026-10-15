@@ -2857,6 +2857,112 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 	}
 }
 
+static void ir_emit_fix_type(ir_ctx *ctx, ir_type type, ir_reg reg)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+
+	if (ir_type_size[type] == 2) {
+		if (IR_IS_TYPE_SIGNED(type)) {
+			|	sxth Rw(reg), Rw(reg)
+		} else {
+			|	uxth Rw(reg), Rw(reg)
+		}
+	} else if (ir_type_size[type] == 1) {
+		if (IR_IS_TYPE_SIGNED(type)) {
+			|	sxtb Rw(reg), Rw(reg)
+		} else {
+			|	uxtb Rw(reg), Rw(reg)
+		}
+	}
+}
+
+static bool ir_narrow_high_bits_unused(ir_ctx *ctx, ir_ref def)
+{
+	ir_use_list *use_list = &ctx->use_lists[def];
+	ir_ref *p = &ctx->use_edges[use_list->refs];
+	ir_ref n = use_list->count;
+
+	if (n == 0) {
+		return 0;
+	}
+	for (; n > 0; p++, n--) {
+		ir_ref use = *p;
+		ir_insn *use_insn = &ctx->ir_base[use];
+		uint32_t rule = ctx->rules[use];
+
+		switch (use_insn->op) {
+			case IR_STORE:
+			case IR_VSTORE:
+				if (use_insn->op3 != def || use_insn->op2 == def) {
+					return 0;
+				}
+				break;
+			case IR_TRUNC:
+			case IR_ZEXT:
+			case IR_SEXT:
+				break;
+			case IR_EQ:
+			case IR_NE:
+			case IR_LT:
+			case IR_GE:
+			case IR_LE:
+			case IR_GT:
+			case IR_ULT:
+			case IR_UGE:
+			case IR_ULE:
+			case IR_UGT:
+				if ((rule & IR_RULE_MASK) != IR_CMP_INT ||
+				   use_insn->op2 != def ||
+				   use_insn->op1 == def ||
+				   IR_IS_CONST_REF(use_insn->op1)) {
+					return 0;
+				}
+				break;
+			case IR_ADD_OV:
+			case IR_SUB_OV:
+				if ((rule & IR_FUSED) || (rule & IR_RULE_MASK) != IR_BINOP_INT ||
+				   ir_type_size[use_insn->type] >= 4) {
+					return 0;
+				}
+				break;
+			case IR_ADD:
+			case IR_SUB:
+			case IR_MUL:
+				if ((rule & IR_FUSED) ||
+				   ((rule & IR_RULE_MASK) != IR_BINOP_INT && (rule & IR_RULE_MASK) != IR_MUL_PWR2) ||
+				   !IR_IS_TYPE_INT(use_insn->type)) {
+					return 0;
+				}
+				break;
+			case IR_NEG:
+			case IR_NOT:
+				if ((rule & IR_FUSED) || (rule & IR_RULE_MASK) != IR_OP_INT ||
+				   use_insn->type == IR_BOOL) {
+					return 0;
+				}
+				break;
+			case IR_SHL:
+				if ((rule & IR_FUSED) ||
+				   ((rule & IR_RULE_MASK) != IR_SHIFT && (rule & IR_RULE_MASK) != IR_SHIFT_CONST) ||
+				   use_insn->op1 != def || use_insn->op2 == def) {
+					return 0;
+				}
+				break;
+			default:
+				return 0;
+		}
+	}
+	return 1;
+}
+
+static void ir_emit_fix_def_type(ir_ctx *ctx, ir_ref def, ir_type type, ir_reg reg)
+{
+	if (!ir_narrow_high_bits_unused(ctx, def)) {
+		ir_emit_fix_type(ctx, type, reg);
+	}
+}
+
 static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
@@ -3158,6 +3264,20 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 		}
 	}
+	switch (insn->op) {
+		case IR_ADD:
+		case IR_ADD_OV:
+		case IR_SUB:
+		case IR_SUB_OV:
+		case IR_MUL:
+		case IR_MUL_OV:
+		case IR_DIV:
+		case IR_MOD:
+			ir_emit_fix_def_type(ctx, def, type, def_reg);
+			break;
+		default:
+			break;
+	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, type, def, def_reg);
 	}
@@ -3420,6 +3540,9 @@ static void ir_emit_reg_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 		}
 	}
+	if (op_insn->op == IR_ADD || op_insn->op == IR_SUB || op_insn->op == IR_MUL) {
+		ir_emit_fix_type(ctx, type, reg);
+	}
 }
 
 static void ir_emit_mul_div_mod_pwr2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
@@ -3446,6 +3569,7 @@ static void ir_emit_mul_div_mod_pwr2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		} else {
 			|	ASM_REG_REG_IMM_OP lsl, type, def_reg, op1_reg, shift
 		}
+		ir_emit_fix_def_type(ctx, def, type, def_reg);
 	} else if (insn->op == IR_DIV) {
 		uint32_t shift = IR_LOG2(ctx->ir_base[insn->op2].val.u64);
 		|	ASM_REG_REG_IMM_OP lsr, type, def_reg, op1_reg, shift
@@ -3506,10 +3630,10 @@ static void ir_emit_sdiv_pwr2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		if (ir_type_size[type] == 4) {
 			|	asr Rw(def_reg), Rw(def_reg), #shift
 		} else if (ir_type_size[type] == 2) {
-			|	ubfx Rw(def_reg), Rw(def_reg), #shift, #16
+			|	sbfx Rw(def_reg), Rw(def_reg), #shift, #16
 		} else {
 			IR_ASSERT(ir_type_size[type] == 1);
-			|	ubfx Rw(def_reg), Rw(def_reg), #shift, #8
+			|	sbfx Rw(def_reg), Rw(def_reg), #shift, #8
 		}
 	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
@@ -3626,13 +3750,11 @@ static void ir_emit_shift(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|	add Rw(def_reg), Rw(def_reg), Rw(def_reg), lsl #16
 				|	neg Rw(tmp_reg), Rw(op2_reg)
 				|	ror Rw(def_reg), Rw(def_reg), Rw(tmp_reg)
-				|	and Rw(def_reg), Rw(def_reg), #0xff
 			} else if (ir_type_size[type] == 2) {
 				|	and Rw(def_reg), Rw(op1_reg), #0xffff
 				|	add Rw(def_reg), Rw(def_reg), Rw(def_reg), lsl #16
 				|	neg Rw(tmp_reg), Rw(op2_reg)
 				|	ror Rw(def_reg), Rw(def_reg), Rw(tmp_reg)
-				|	and Rw(def_reg), Rw(def_reg), #0xffff
 			} else if (ir_type_size[type] == 8) {
 				|	neg Rx(tmp_reg), Rx(op2_reg)
 				|	ror Rx(def_reg), Rx(op1_reg), Rx(tmp_reg)
@@ -3649,18 +3771,19 @@ static void ir_emit_shift(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|	add Rw(tmp_reg), Rw(tmp_reg), Rw(tmp_reg), lsl #8
 				|	add Rw(tmp_reg), Rw(tmp_reg), Rw(tmp_reg), lsl #16
 				|	ror Rw(def_reg), Rw(tmp_reg), Rw(op2_reg)
-				|	and Rw(def_reg), Rw(def_reg), #0xff
 			} else if (ir_type_size[type] == 2) {
 				tmp_reg = ctx->regs[def][3];
 				IR_ASSERT(tmp_reg != IR_REG_NONE);
 				|	and Rw(tmp_reg), Rw(op1_reg), #0xffff
 				|	add Rw(tmp_reg), Rw(tmp_reg), Rw(tmp_reg), lsl #16
 				|	ror Rw(def_reg), Rw(tmp_reg), Rw(op2_reg)
-				|	and Rw(def_reg), Rw(def_reg), #0xffff
 			} else {
 				|	ASM_REG_REG_REG_OP ror, type, def_reg, op1_reg, op2_reg
 			}
 			break;
+	}
+	if (insn->op != IR_SAR) {
+		ir_emit_fix_def_type(ctx, def, type, def_reg);
 	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, type, def, def_reg);
@@ -3769,6 +3892,9 @@ static void ir_emit_shift_const(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 
 done:
+	if (insn->op != IR_SAR) {
+		ir_emit_fix_def_type(ctx, def, type, def_reg);
+	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, type, def, def_reg);
 	}
@@ -3795,9 +3921,11 @@ static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			|	cset Rw(def_reg), eq
 		} else {
 			|	ASM_REG_REG_OP mvn, src_type, def_reg, op1_reg
+			ir_emit_fix_def_type(ctx, def, src_type, def_reg);
 		}
 	} else if (insn->op == IR_NEG) {
 		|	ASM_REG_REG_OP neg, src_type, def_reg, op1_reg
+		ir_emit_fix_def_type(ctx, def, src_type, def_reg);
 	} else if (insn->op == IR_ABS) {
 		if (ir_type_size[src_type] == 8) {
 			|	cmp Rx(op1_reg), #0
@@ -3805,6 +3933,7 @@ static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		} else {
 			|	cmp Rw(op1_reg), #0
 			|	cneg Rw(def_reg), Rw(op1_reg), lt
+			ir_emit_fix_def_type(ctx, def, src_type, def_reg);
 		}
 	} else if (insn->op == IR_CTLZ) {
 		if (ir_type_size[src_type] == 1) {
@@ -3819,11 +3948,26 @@ static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			|	ASM_REG_REG_OP clz, src_type, def_reg, op1_reg
 		}
 	} else if (insn->op == IR_CTTZ) {
-		|	ASM_REG_REG_OP rbit, src_type, def_reg, op1_reg
-		|	ASM_REG_REG_OP clz, src_type, def_reg, def_reg
+		if (ir_type_size[src_type] == 1) {
+			|	orr Rw(def_reg), Rw(op1_reg), #0x100
+			|	rbit Rw(def_reg), Rw(def_reg)
+			|	clz Rw(def_reg), Rw(def_reg)
+		} else if (ir_type_size[src_type] == 2) {
+			|	orr Rw(def_reg), Rw(op1_reg), #0x10000
+			|	rbit Rw(def_reg), Rw(def_reg)
+			|	clz Rw(def_reg), Rw(def_reg)
+		} else {
+			|	ASM_REG_REG_OP rbit, src_type, def_reg, op1_reg
+			|	ASM_REG_REG_OP clz, src_type, def_reg, def_reg
+		}
 	} else {
 		IR_ASSERT(insn->op == IR_BSWAP);
-		|	ASM_REG_REG_OP rev, src_type, def_reg, op1_reg
+		if (ir_type_size[src_type] == 2) {
+			|	rev16 Rw(def_reg), Rw(op1_reg)
+			ir_emit_fix_def_type(ctx, def, src_type, def_reg);
+		} else {
+			|	ASM_REG_REG_OP rev, src_type, def_reg, op1_reg
+		}
 	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, insn->type, def, def_reg);
@@ -3972,27 +4116,6 @@ static void ir_emit_binop_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
-static void ir_emit_fix_type(ir_ctx *ctx, ir_type type, ir_reg op1_reg)
-{
-	ir_backend_data *data = ctx->data;
-	dasm_State **Dst = &data->dasm_state;
-
-	// TODO: prevent repeatable sign/zero extension ???
-	if (ir_type_size[type] == 2) {
-		if (IR_IS_TYPE_SIGNED(type)) {
-			|	sxth Rw(op1_reg), Rw(op1_reg)
-		} else {
-			|	uxth Rw(op1_reg), Rw(op1_reg)
-		}
-	} else if (ir_type_size[type] == 1) {
-		if (IR_IS_TYPE_SIGNED(type)) {
-			|	sxtb Rw(op1_reg), Rw(op1_reg)
-		} else {
-			|	uxtb Rw(op1_reg), Rw(op1_reg)
-		}
-	}
-}
-
 static void ir_emit_cmp_int_common(ir_ctx *ctx, ir_type type, ir_reg op1_reg, ir_ref op1, ir_reg op2_reg, ir_ref op2)
 {
 	ir_backend_data *data = ctx->data;
@@ -4003,9 +4126,6 @@ static void ir_emit_cmp_int_common(ir_ctx *ctx, ir_type type, ir_reg op1_reg, ir
 		op2_reg = op1_reg;
 	}
 
-	if (ir_type_size[type] < 4) {
-		ir_emit_fix_type(ctx, type, op1_reg);
-	}
 	if (op2_reg != IR_REG_NONE) {
 		if (ir_type_size[type] == 8) {
 			|	cmp Rx(op1_reg), Rx(op2_reg)
@@ -4017,14 +4137,13 @@ static void ir_emit_cmp_int_common(ir_ctx *ctx, ir_type type, ir_reg op1_reg, ir
 			} else {
 				|	cmp Rw(op1_reg), Rw(op2_reg), uxth
 			}
-		} else if (ir_type_size[type] == 1) {
+		} else {
+			IR_ASSERT(ir_type_size[type] == 1);
 			if (IR_IS_TYPE_SIGNED(type)) {
 				|	cmp Rw(op1_reg), Rw(op2_reg), sxtb
 			} else {
 				|	cmp Rw(op1_reg), Rw(op2_reg), uxtb
 			}
-		} else {
-			IR_ASSERT(0);
 		}
 	} else {
 		IR_ASSERT(IR_IS_CONST_REF(op2));
@@ -4695,6 +4814,9 @@ static void ir_emit_sext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 		}
 	}
+	if (!IR_IS_TYPE_SIGNED(dst_type)) {
+		ir_emit_fix_type(ctx, dst_type, def_reg);
+	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, dst_type, def, def_reg);
 	}
@@ -4791,9 +4913,17 @@ static void ir_emit_trunc(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 	if (op1_reg != IR_REG_NONE) {
 		if (ir_type_size[dst_type] == 1) {
-			|	and Rw(def_reg), Rw(op1_reg), #0xff
+			if (IR_IS_TYPE_SIGNED(dst_type)) {
+				|	sxtb Rw(def_reg), Rw(op1_reg)
+			} else {
+				|	uxtb Rw(def_reg), Rw(op1_reg)
+			}
 		} else if (ir_type_size[dst_type] == 2) {
-			|	and Rw(def_reg), Rw(op1_reg), #0xffff
+			if (IR_IS_TYPE_SIGNED(dst_type)) {
+				|	sxth Rw(def_reg), Rw(op1_reg)
+			} else {
+				|	uxth Rw(def_reg), Rw(op1_reg)
+			}
 		} else if (op1_reg != def_reg) {
 			ir_emit_mov(ctx, dst_type, def_reg, op1_reg);
 		}
@@ -4829,6 +4959,9 @@ static void ir_emit_bitcast(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 			if (op1_reg != def_reg) {
 				ir_emit_mov(ctx, dst_type, def_reg, op1_reg);
+			}
+			if (IR_IS_TYPE_SIGNED(src_type) != IR_IS_TYPE_SIGNED(dst_type)) {
+				ir_emit_fix_type(ctx, dst_type, def_reg);
 			}
 		} else {
 			ir_emit_load(ctx, dst_type, def_reg, insn->op1);
@@ -4970,11 +5103,6 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		}
 	} else {
 		if (IR_IS_TYPE_SIGNED(src_type)) {
-			if (ir_type_size[src_type] == 2) {
-				ir_emit_fix_type(ctx, IR_I16, op1_reg);
-			} else if (ir_type_size[src_type] == 1) {
-				ir_emit_fix_type(ctx, IR_I8, op1_reg);
-			}
 			if (dst_type == IR_DOUBLE) {
 				|	scvtf Rd(def_reg-IR_REG_FP_FIRST), Rw(op1_reg)
 			} else {
@@ -4982,11 +5110,6 @@ static void ir_emit_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				|	scvtf Rs(def_reg-IR_REG_FP_FIRST), Rw(op1_reg)
 			}
 		} else {
-			if (ir_type_size[src_type] == 2) {
-				ir_emit_fix_type(ctx, IR_U16, op1_reg);
-			} else if (ir_type_size[src_type] == 1) {
-				ir_emit_fix_type(ctx, IR_U8, op1_reg);
-			}
 			if (dst_type == IR_DOUBLE) {
 				|	ucvtf Rd(def_reg-IR_REG_FP_FIRST), Rw(op1_reg)
 			} else {
@@ -5049,6 +5172,7 @@ static void ir_emit_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 		}
 	}
+	ir_emit_fix_type(ctx, dst_type, def_reg);
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, dst_type, def, def_reg);
 	}
@@ -6538,6 +6662,7 @@ static void ir_emit_call_ex(ir_ctx *ctx, ir_ref def, ir_insn *insn, const ir_cal
 				if (def_reg != cc->int_ret_reg) {
 					ir_emit_mov(ctx, insn->type, def_reg, cc->int_ret_reg);
 				}
+				ir_emit_fix_type(ctx, insn->type, def_reg);
 				if (IR_REG_SPILLED(ctx->regs[def][0])) {
 					ir_emit_store(ctx, insn->type, def, def_reg);
 				}
@@ -9163,6 +9288,9 @@ static void ir_emit_load_params(ir_ctx *ctx)
 					stack_start + stack_offset == ctx->live_intervals[ctx->vregs[use]]->stack_spill_pos);
 				if (src_reg != dst_reg) {
 					ir_emit_param_move(ctx, insn->type, src_reg, dst_reg, use, stack_start + stack_offset);
+				}
+				if (dst_reg != IR_REG_NONE && IR_IS_TYPE_INT(insn->type) && src_reg != IR_REG_NONE) {
+					ir_emit_fix_def_type(ctx, use, insn->type, dst_reg);
 				}
 				if (dst_reg != IR_REG_NONE && IR_REG_SPILLED(ctx->regs[use][0])) {
 					ir_emit_store(ctx, insn->type, use, dst_reg);

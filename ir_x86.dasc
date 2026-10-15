@@ -7879,6 +7879,9 @@ static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn, uint32_t rule
 		switch (ir_type_size[insn->type]) {
 			default:
 				IR_ASSERT(0);
+			case 2:
+				|	rol Rw(def_reg), 8
+				break;
 			case 4:
 				|	bswap Rd(def_reg)
 				break;
@@ -7923,10 +7926,11 @@ static void ir_emit_bit_count(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	xor Rw(def_reg), 0xf
 					}
 				} else if (insn->op == IR_CTTZ) {
+					|	or Rd(op1_reg), 0x10000
 					if (ctx->mflags & IR_X86_BMI1) {
-						|	tzcnt Rw(def_reg), Rw(op1_reg)
+						|	tzcnt Rd(def_reg), Rd(op1_reg)
 					} else {
-						|	bsf Rw(def_reg), Rw(op1_reg)
+						|	bsf Rd(def_reg), Rd(op1_reg)
 					}
 				} else {
 					IR_ASSERT(insn->op == IR_CTPOP);
@@ -7944,6 +7948,10 @@ static void ir_emit_bit_count(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	xor Rw(def_reg), 0x7
 					}
 					break;
+				}
+				if (insn->op == IR_CTTZ) {
+					/* make CTTZ(0) == 8 */
+					|	or Rd(op1_reg), 0x100
 				}
 				IR_FALLTHROUGH;
 			case 4:

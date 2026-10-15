@@ -1,0 +1,79 @@
+--TEST--
+BSWAP and CTTZ of narrow integers
+--ARGS--
+-O1 --run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @bswap_u16(uint16_t): int32_t;
+func @bswap_u16(uint16_t): int32_t
+{
+	l_1 = START(l_E);
+	uint16_t x = PARAM(l_1, "x", 1);
+	uint16_t b = BSWAP(x);
+	int32_t r = ZEXT(b);
+	l_E = RETURN(l_1, r);
+}
+func @bswap_i16(int16_t): int32_t;
+func @bswap_i16(int16_t): int32_t
+{
+	l_1 = START(l_E);
+	int16_t x = PARAM(l_1, "x", 1);
+	int16_t b = BSWAP(x);
+	int32_t r = SEXT(b);
+	l_E = RETURN(l_1, r);
+}
+func @cttz_u8(uint8_t): int32_t;
+func @cttz_u8(uint8_t): int32_t
+{
+	l_1 = START(l_E);
+	uint8_t x = PARAM(l_1, "x", 1);
+	uint8_t c = CTTZ(x);
+	int32_t r = ZEXT(c);
+	l_E = RETURN(l_1, r);
+}
+func @cttz_u16(uint16_t): int32_t;
+func @cttz_u16(uint16_t): int32_t
+{
+	l_1 = START(l_E);
+	uint16_t x = PARAM(l_1, "x", 1);
+	uint16_t c = CTTZ(x);
+	int32_t r = ZEXT(c);
+	l_E = RETURN(l_1, r);
+}
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%d\n";
+	int32_t z = 0;
+	uint16_t a0 = 4660;
+	int16_t a1 = -2;
+	uint8_t a2 = 0;
+	uint8_t a3 = 8;
+	uint16_t a4 = 0;
+	uint16_t a5 = 256;
+	uintptr_t f_bswap_u16 = func @bswap_u16(uint16_t): int32_t;
+	uintptr_t f_bswap_i16 = func @bswap_i16(int16_t): int32_t;
+	uintptr_t f_cttz_u8 = func @cttz_u8(uint8_t): int32_t;
+	uintptr_t f_cttz_u16 = func @cttz_u16(uint16_t): int32_t;
+	l_0 = START(l_end);
+	int32_t r0, c0 = CALL/1(l_0, f_bswap_u16, a0);
+	p0 = CALL/2(c0, fp, fmt, r0);
+	int32_t r1, c1 = CALL/1(p0, f_bswap_i16, a1);
+	p1 = CALL/2(c1, fp, fmt, r1);
+	int32_t r2, c2 = CALL/1(p1, f_cttz_u8, a2);
+	p2 = CALL/2(c2, fp, fmt, r2);
+	int32_t r3, c3 = CALL/1(p2, f_cttz_u8, a3);
+	p3 = CALL/2(c3, fp, fmt, r3);
+	int32_t r4, c4 = CALL/1(p3, f_cttz_u16, a4);
+	p4 = CALL/2(c4, fp, fmt, r4);
+	int32_t r5, c5 = CALL/1(p4, f_cttz_u16, a5);
+	p5 = CALL/2(c5, fp, fmt, r5);
+	l_end = RETURN(p5, z);
+}
+--EXPECT--
+13330
+-257
+8
+3
+16
+8
