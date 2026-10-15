@@ -3823,7 +3823,11 @@ static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		|	ASM_REG_REG_OP clz, src_type, def_reg, def_reg
 	} else {
 		IR_ASSERT(insn->op == IR_BSWAP);
-		|	ASM_REG_REG_OP rev, src_type, def_reg, op1_reg
+		if (ir_type_size[src_type] == 2) {
+			|	rev16 Rw(def_reg), Rw(op1_reg)
+		} else {
+			|	ASM_REG_REG_OP rev, src_type, def_reg, op1_reg
+		}
 	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, insn->type, def, def_reg);

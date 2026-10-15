@@ -1,0 +1,71 @@
+--TEST--
+BSWAP 001:
+--ARGS--
+-O1 --run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @bswap_u16(uint16_t): int32_t;
+func @bswap_u16(uint16_t): int32_t
+{
+	l_1 = START(l_E);
+	uint16_t x = PARAM(l_1, "x", 1);
+	uint16_t b = BSWAP(x);
+	int32_t r = ZEXT(b);
+	l_E = RETURN(l_1, r);
+}
+func @bswap_i16(int16_t): int32_t;
+func @bswap_i16(int16_t): int32_t
+{
+	l_1 = START(l_E);
+	int16_t x = PARAM(l_1, "x", 1);
+	int16_t b = BSWAP(x);
+	int32_t r = SEXT(b);
+	l_E = RETURN(l_1, r);
+}
+func @bswap_u32(uint32_t): int32_t;
+func @bswap_u32(uint32_t): int32_t
+{
+	l_1 = START(l_E);
+	uint32_t x = PARAM(l_1, "x", 1);
+	uint32_t b = BSWAP(x);
+	int32_t r = BITCAST(b);
+	l_E = RETURN(l_1, r);
+}
+func @bswap_u64(uint64_t): uint64_t;
+func @bswap_u64(uint64_t): uint64_t
+{
+	l_1 = START(l_E);
+	uint64_t x = PARAM(l_1, "x", 1);
+	uint64_t b = BSWAP(x);
+	l_E = RETURN(l_1, b);
+}
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "0c%x\n";
+	uintptr_t fmt64 = "0c%llx\n";
+	int32_t z = 0;
+	uint16_t a0 = 0x1234;
+	int16_t a1 = 0xfffe;
+	uint32_t a2 = 0x12345678;
+	uint64_t a3 = 0x0123456789abcdef;
+	uintptr_t f_bswap_u32 = func @bswap_u32(uint32_t): int32_t;
+	uintptr_t f_bswap_u64 = func @bswap_u64(uint64_t): uint64_t;
+	uintptr_t f_bswap_u16 = func @bswap_u16(uint16_t): int32_t;
+	uintptr_t f_bswap_i16 = func @bswap_i16(int16_t): int32_t;
+	l_0 = START(l_end);
+	int32_t r0, c0 = CALL/1(l_0, f_bswap_u16, a0);
+	p0 = CALL/2(c0, fp, fmt, r0);
+	int32_t r1, c1 = CALL/1(p0, f_bswap_i16, a1);
+	p1 = CALL/2(c1, fp, fmt, r1);
+	int32_t r2, c2 = CALL/1(p1, f_bswap_u32, a2);
+	p2 = CALL/2(c2, fp, fmt, r2);
+	uint64_t r3, c3 = CALL/1(p2, f_bswap_u64, a3);
+	p3 = CALL/2(c3, fp, fmt64, r3);
+	l_end = RETURN(p3, z);
+}
+--EXPECT--
+0c3412
+0cfffffeff
+0c78563412
+0cefcdab8967452301
