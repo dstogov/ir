@@ -28,7 +28,7 @@ typedef uint64_t ir_mem;
 
 # define IR_MEM_NONE                0
 # define IR_MEM_VAL(loc)            (loc)
-# define IR_MEM_ADD(mem, offset)    ((mem) + (offset))
+# define IR_MEM_ADD(mem, offset)    (((mem) & 0xffffffff00000000) | (((mem)+ (offset)) & 0xffffffff))
 #endif
 
 #define IR_MEM_OFFSET(loc)          ((int32_t)(IR_MEM_VAL(loc) & 0xffffffff))
