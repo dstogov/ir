@@ -2279,6 +2279,11 @@ int ir_compute_dessa_moves(ir_ctx *ctx)
 					use = *p;
 					insn = &ctx->ir_base[use];
 					if (insn->op == IR_PHI) {
+						if (ctx->use_lists[use].count == 0) {
+							ctx->vregs[use] = 0;
+							continue;
+						}
+						IR_ASSERT(ctx->vregs[use] > 0);
 						for (j = 2; j <= k; j++) {
 							ir_ref input = ir_insn_op(insn, j);
 
