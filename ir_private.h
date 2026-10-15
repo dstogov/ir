@@ -1568,8 +1568,9 @@ typedef struct {
 #define IR_SCRATCH_REG(_reg, _start, _end) \
 	(ir_tmp_reg){.reg=(_reg), .type=IR_VOID, .start=(_start), .end=(_end)}
 
-int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *constraints);
 
+int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *constraints);
+void ir_set_fused_reg(ir_ctx *ctx, ir_ref root, ir_ref ref, ir_ref op, int8_t reg);
 void ir_fix_stack_frame(ir_ctx *ctx);
 
 /* Utility */

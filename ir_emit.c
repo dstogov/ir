@@ -403,7 +403,21 @@ static void *ir_jmp_addr(ir_ctx *ctx, ir_insn *insn, ir_insn *addr_insn)
 	return addr;
 }
 
-static int8_t ir_get_fused_reg(ir_ctx *ctx, ir_ref root, ir_ref ref_and_op)
+void ir_set_fused_reg(ir_ctx *ctx, ir_ref root, ir_ref ref, ir_ref op, int8_t reg)
+{
+	char key[10];
+	ir_ref ref_and_op = ref * sizeof(ir_ref) + op;
+
+	if (!ctx->fused_regs) {
+		ctx->fused_regs = ir_mem_malloc(sizeof(ir_strtab));
+		ir_strtab_init(ctx->fused_regs, 8, 128);
+	}
+	memcpy(key, &root, sizeof(ir_ref));
+	memcpy(key + 4, &ref_and_op, sizeof(ir_ref));
+	ir_strtab_lookup(ctx->fused_regs, key, 8, 0x10000000 | (uint8_t)reg);
+}
+
+static int8_t ir_get_fused_reg_ex(ir_ctx *ctx, ir_ref root, ir_ref ref_and_op)
 {
 	if (ctx->fused_regs) {
 		char key[10];
@@ -418,6 +432,11 @@ static int8_t ir_get_fused_reg(ir_ctx *ctx, ir_ref root, ir_ref ref_and_op)
 		}
 	}
 	return ((int8_t*)ctx->regs)[ref_and_op];
+}
+
+static int8_t ir_get_fused_reg(ir_ctx *ctx, ir_ref root, ir_ref ref, ir_ref op)
+{
+	return ir_get_fused_reg_ex(ctx, root, ref * sizeof(ir_ref) + op);
 }
 
 #if defined(__GNUC__)
@@ -1486,6 +1505,7 @@ const ir_call_conv_dsc *ir_get_call_conv_dsc(uint32_t flags)
 
 /* Simple Register Allocator */
 typedef struct {
+	ir_reg_alloc_data ra_data;
 	int32_t  num;
 	ir_regset preserved_regs;
 	ir_regset clobbered[IR_SUB_REFS_COUNT];
@@ -1501,7 +1521,7 @@ typedef struct {
 	} regs[32];
 } ir_reg_alloc_simple_data;
 
-static void _add_scratch(ir_reg_alloc_simple_data *x, ir_reg reg, int8_t start, int8_t end)
+static void _add_scratch(ir_reg_alloc_simple_data *data, ir_reg reg, int8_t start, int8_t end)
 {
 	int8_t j;
 
@@ -1509,29 +1529,29 @@ static void _add_scratch(ir_reg_alloc_simple_data *x, ir_reg reg, int8_t start, 
 	IR_ASSERT(start >= 0 && end <= IR_SUB_REFS_COUNT);
 	if (reg >= IR_REG_NUM) {
 		for (j = start; j < end; j++) {
-			x->clobbered[j] = IR_REGSET_UNION(x->clobbered[j], ir_scratch_regset[reg - IR_REG_NUM]);
+			data->clobbered[j] = IR_REGSET_UNION(data->clobbered[j], ir_scratch_regset[reg - IR_REG_NUM]);
 		}
 	} else {
 		for (j = start; j < end; j++) {
-			IR_REGSET_INCL(x->clobbered[j], reg);
+			IR_REGSET_INCL(data->clobbered[j], reg);
 		}
 	}
 }
 
-static void _add_reg(ir_reg_alloc_simple_data *x, ir_type type,
+static void _add_reg(ir_reg_alloc_simple_data *data, ir_type type,
                      int8_t start, int8_t end, ir_reg hint, int8_t flags,
                      ir_ref root, ir_ref ref, ir_ref op)
 {
-	IR_ASSERT(start >= 0 && end <= IR_SUB_REFS_COUNT && x->num < 32);
-	x->regs[x->num].type = type;
-	x->regs[x->num].start = start;
-	x->regs[x->num].end = end;
-	x->regs[x->num].hint = hint;
-	x->regs[x->num].flags = flags;
-	x->regs[x->num].root = root;
-	x->regs[x->num].ref = ref;
-	x->regs[x->num].op = op;
-	x->num++;
+	IR_ASSERT(start >= 0 && end <= IR_SUB_REFS_COUNT && data->num < 32);
+	data->regs[data->num].type = type;
+	data->regs[data->num].start = start;
+	data->regs[data->num].end = end;
+	data->regs[data->num].hint = hint;
+	data->regs[data->num].flags = flags;
+	data->regs[data->num].root = root;
+	data->regs[data->num].ref = ref;
+	data->regs[data->num].op = op;
+	data->num++;
 }
 
 static ir_reg _get_free_reg(ir_type type, ir_regset available)
@@ -1549,7 +1569,7 @@ static ir_reg _get_free_reg(ir_type type, ir_regset available)
 	}
 }
 
-static ir_reg _get_free_reg2(ir_ctx *ctx, ir_type type, ir_reg_alloc_simple_data *x, int j)
+static ir_reg _get_free_reg2(ir_ctx *ctx, ir_type type, ir_reg_alloc_simple_data *data, int j)
 {
 	int n;
 	ir_regset available;
@@ -1573,8 +1593,8 @@ static ir_reg _get_free_reg2(ir_ctx *ctx, ir_type type, ir_reg_alloc_simple_data
 		IR_ASSERT(IR_IS_TYPE_FP(type) || IR_IS_TYPE_VECTOR(type));
 		available = IR_REGSET_FP;
 	}
-	for (n = x->regs[j].start; n < x->regs[j].end; n++) {
-		available = IR_REGSET_DIFFERENCE(available, x->clobbered[n]);
+	for (n = data->regs[j].start; n < data->regs[j].end; n++) {
+		available = IR_REGSET_DIFFERENCE(available, data->clobbered[n]);
 	}
 	if (IR_REGSET_IS_EMPTY(available)) {
 		fprintf(stderr, "Internal Error: No registers available. Allocation is not possible\n");
@@ -1583,25 +1603,12 @@ static ir_reg _get_free_reg2(ir_ctx *ctx, ir_type type, ir_reg_alloc_simple_data
 	}
 
 	reg = IR_REGSET_FIRST(available);
-	if (IR_REGSET_IN(x->preserved_regs, reg)) {
+	if (IR_REGSET_IN(data->preserved_regs, reg)) {
 		ir_regset tmp = (ir_regset)ctx->used_preserved_regs;
 		IR_REGSET_INCL(tmp, reg);
 		ctx->used_preserved_regs = tmp;
 	}
 	return reg;
-}
-
-static void ir_set_fused_reg(ir_ctx *ctx, ir_ref root, ir_ref ref_and_op, int8_t reg)
-{
-	char key[10];
-
-	if (!ctx->fused_regs) {
-		ctx->fused_regs = ir_mem_malloc(sizeof(ir_strtab));
-		ir_strtab_init(ctx->fused_regs, 8, 128);
-	}
-	memcpy(key, &root, sizeof(ir_ref));
-	memcpy(key + 4, &ref_and_op, sizeof(ir_ref));
-	ir_strtab_lookup(ctx->fused_regs, key, 8, 0x10000000 | (uint8_t)reg);
 }
 
 static bool ir_load_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, ir_ref load)
@@ -1686,7 +1693,7 @@ static bool ir_store_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, i
 	return 1;
 }
 
-static void ir_add_fusion_data(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_reg_alloc_simple_data *x)
+static void ir_add_fusion_data(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_reg_alloc_simple_data *data)
 {
 	ir_ref stack[4];
 	int stack_pos = 0;
@@ -1718,11 +1725,11 @@ static void ir_add_fusion_data(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_reg_all
 							flags = IR_REG_SPILL_LOAD;
 						}
 					}
-					_add_reg(x, constraints.tmp_regs[n].type,
+					_add_reg(data, constraints.tmp_regs[n].type,
 						constraints.tmp_regs[n].start, constraints.tmp_regs[n].end, IR_REG_NONE, flags,
 						IR_UNUSED, input, op);
 				} else {
-					_add_scratch(x, constraints.tmp_regs[n].reg,
+					_add_scratch(data, constraints.tmp_regs[n].reg,
 						constraints.tmp_regs[n].start, constraints.tmp_regs[n].end);
 				}
 			}
@@ -1749,7 +1756,7 @@ static void ir_add_fusion_data(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_reg_all
 						ir_reg reg = (j < constraints.hints_count) ? constraints.hints[j] : IR_REG_NONE;
 						int8_t use_pos = EXPECTED(reg == IR_REG_NONE) ? IR_USE_SUB_REF : IR_LOAD_SUB_REF;
 
-						_add_reg(x, ctx->ir_base[child].type, IR_LOAD_SUB_REF, use_pos, reg, IR_REG_SPILL_LOAD,
+						_add_reg(data, ctx->ir_base[child].type, IR_LOAD_SUB_REF, use_pos, reg, IR_REG_SPILL_LOAD,
 							ref, input, j);
 					}
 				} else if (ctx->rules[child] & IR_FUSED) {
@@ -1786,7 +1793,6 @@ static void ir_allocate_var_spill_slot(ir_ctx *ctx, ir_ref var, ir_insn *var_ins
 
 int ir_reg_alloc_simple(ir_ctx *ctx)
 {
-	ir_reg_alloc_data data;
 	uint32_t b;
 	ir_block *bb;
 	ir_insn *insn;
@@ -1796,20 +1802,20 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 	uint32_t def_flags;
 	ir_reg reg;
 	ir_regset scratch;
-	ir_reg_alloc_simple_data x;
+	ir_reg_alloc_simple_data data;
 	int32_t offset;
 
-	memset(&data, 0, sizeof(data));
-	data.cc = ir_get_call_conv_dsc(ctx->flags);
-	ctx->data = &data;
+	memset(&data.ra_data, 0, sizeof(data.ra_data));
+	data.ra_data.cc = ir_get_call_conv_dsc(ctx->flags);
+	ctx->data = &data.ra_data;
 
 	ctx->stack_frame_size = 0;
 	ctx->call_stack_size = 0;
 	ctx->used_preserved_regs = 0;
 	ctx->used_preserved_regs = ctx->fixed_save_regset;
 
-	scratch = ir_scratch_regset[data.cc->scratch_reg - IR_REG_NUM];
-	x.preserved_regs = IR_REGSET_DIFFERENCE(data.cc->preserved_regs, ctx->fixed_save_regset);
+	scratch = ir_scratch_regset[data.ra_data.cc->scratch_reg - IR_REG_NUM];
+	data.preserved_regs = IR_REGSET_DIFFERENCE(data.ra_data.cc->preserved_regs, ctx->fixed_save_regset);
 
 	ctx->regs = ir_mem_malloc(sizeof(ir_regs) * ctx->insns_count);
 	memset(ctx->regs, IR_REG_NONE, sizeof(ir_regs) * ctx->insns_count);
@@ -1852,9 +1858,9 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					}
 				}
 			} else {
-				x.num = 0;
+				data.num = 0;
 				for (j = 0; j < IR_SUB_REFS_COUNT; j++) {
-					x.clobbered[j] = IR_REGSET_EMPTY;
+					data.clobbered[j] = IR_REGSET_EMPTY;
 				}
 
 				def_flags = ir_get_target_constraints(ctx, i, &constraints);
@@ -1878,11 +1884,11 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 								flags = IR_REG_SPILL_LOAD;
 							}
 						}
-						_add_reg(&x, constraints.tmp_regs[n].type,
+						_add_reg(&data, constraints.tmp_regs[n].type,
 							constraints.tmp_regs[n].start, constraints.tmp_regs[n].end, IR_REG_NONE, flags,
 							IR_UNUSED, i, op);
 					} else {
-						_add_scratch(&x, constraints.tmp_regs[n].reg,
+						_add_scratch(&data, constraints.tmp_regs[n].reg,
 							constraints.tmp_regs[n].start, constraints.tmp_regs[n].end);
 					}
 				}
@@ -1973,7 +1979,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 							def_pos = IR_DEF_SUB_REF;
 						}
 
-						_add_reg(&x, insn->type, def_pos, IR_SUB_REFS_COUNT, reg, IR_REG_SPILL_STORE,
+						_add_reg(&data, insn->type, def_pos, IR_SUB_REFS_COUNT, reg, IR_REG_SPILL_STORE,
 							IR_UNUSED, i, 0);
 					}
 				} else if (insn->op == IR_VSTORE || insn->op == IR_VSTORE_v) {
@@ -1999,11 +2005,11 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					if (reg != IR_REG_NONE) {
 #if IR_X86_I64
 						if (use_flags & IR_HINT_TWO_REGS) {
-							IR_REGSET_INCL(x.clobbered[IR_LOAD_SUB_REF], IR_REG_I64_LO(reg));
-							IR_REGSET_INCL(x.clobbered[IR_LOAD_SUB_REF], IR_REG_I64_HI(reg));
+							IR_REGSET_INCL(data.clobbered[IR_LOAD_SUB_REF], IR_REG_I64_LO(reg));
+							IR_REGSET_INCL(data.clobbered[IR_LOAD_SUB_REF], IR_REG_I64_HI(reg));
 						} else
 #endif
-						IR_REGSET_INCL(x.clobbered[IR_LOAD_SUB_REF], reg);
+						IR_REGSET_INCL(data.clobbered[IR_LOAD_SUB_REF], reg);
 					}
 
 					if (input > 0) {
@@ -2024,12 +2030,12 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 								}
 							}
 							if (use_flags & IR_USE_MUST_BE_IN_REG) {
-								_add_reg(&x, ctx->ir_base[input].type, IR_LOAD_SUB_REF, use_pos, reg, IR_REG_SPILL_LOAD,
+								_add_reg(&data, ctx->ir_base[input].type, IR_LOAD_SUB_REF, use_pos, reg, IR_REG_SPILL_LOAD,
 									IR_UNUSED, i, j);
 							}
 						} else {
 							if ((ctx->rules[input] & (IR_FUSED|IR_SKIPPED)) == IR_FUSED) {
-								ir_add_fusion_data(ctx, i, input, &x);
+								ir_add_fusion_data(ctx, i, input, &data);
 							} else if (ctx->rules[input] == (IR_SKIPPED|IR_RLOAD)) {
 								ctx->regs[i][j] = ctx->ir_base[input].op2;
 							}
@@ -2037,43 +2043,43 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 					}
 				}
 
-				for (j = 0; j < x.num; j++) {
+				for (j = 0; j < data.num; j++) {
 					ir_regset available = scratch;
 #if IR_X86_I64
 					ir_reg reg2;
 #endif
 
-					for (n = x.regs[j].start; n < x.regs[j].end; n++) {
-						available = IR_REGSET_DIFFERENCE(available, x.clobbered[n]);
+					for (n = data.regs[j].start; n < data.regs[j].end; n++) {
+						available = IR_REGSET_DIFFERENCE(available, data.clobbered[n]);
 					}
-					reg = x.regs[j].hint;
+					reg = data.regs[j].hint;
 #if IR_X86_I64
 					reg2 = IR_REG_NONE;
-					if (reg != IR_REG_NONE && (x.regs[j].type == IR_I64 || x.regs[j].type == IR_U64)) {
+					if (reg != IR_REG_NONE && (data.regs[j].type == IR_I64 || data.regs[j].type == IR_U64)) {
 						reg2 = IR_REG_I64_HI(reg);
 						reg = IR_REG_I64_LO(reg);
 					}
 #endif
 					if (reg == IR_REG_NONE || !IR_REGSET_IN(available, reg)) {
-						reg = _get_free_reg(x.regs[j].type, available);
+						reg = _get_free_reg(data.regs[j].type, available);
 						if (UNEXPECTED(reg == IR_REG_NONE)) {
-							reg = _get_free_reg2(ctx, x.regs[j].type, &x, j);
+							reg = _get_free_reg2(ctx, data.regs[j].type, &data, j);
 						}
 					}
-					for (n = x.regs[j].start; n < x.regs[j].end; n++) {
-						IR_REGSET_INCL(x.clobbered[n], reg);
+					for (n = data.regs[j].start; n < data.regs[j].end; n++) {
+						IR_REGSET_INCL(data.clobbered[n], reg);
 					}
 #if IR_X86_I64
-					if (x.regs[j].type == IR_I64 || x.regs[j].type == IR_U64) {
+					if (data.regs[j].type == IR_I64 || data.regs[j].type == IR_U64) {
 						IR_REGSET_EXCL(available, reg);
 						if (reg2 == IR_REG_NONE || !IR_REGSET_IN(available, reg2)) {
-							reg2 = _get_free_reg(x.regs[j].type, available);
+							reg2 = _get_free_reg(data.regs[j].type, available);
 							if (UNEXPECTED(reg2 == IR_REG_NONE)) {
-								reg2 = _get_free_reg2(ctx, x.regs[j].type, &x, j);
+								reg2 = _get_free_reg2(ctx, data.regs[j].type, &data, j);
 							}
 						}
-						for (n = x.regs[j].start; n < x.regs[j].end; n++) {
-							IR_REGSET_INCL(x.clobbered[n], reg2);
+						for (n = data.regs[j].start; n < data.regs[j].end; n++) {
+							IR_REGSET_INCL(data.clobbered[n], reg2);
 						}
 						if (reg > reg2) {
 							SWAP_REGS(reg, reg2);
@@ -2081,18 +2087,18 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 						reg = IR_REG_I64_PAIR(reg, reg2);
 					}
 #endif
-					reg = reg | x.regs[j].flags;
-					if (x.regs[j].op == 4 && insn->inputs_count < 4) {
+					reg = reg | data.regs[j].flags;
+					if (data.regs[j].op == 4 && insn->inputs_count < 4) {
 						if (!ctx->tmp_regs) {
 							ctx->tmp_regs = ir_mem_malloc(ctx->insns_count);
 							memset(ctx->tmp_regs, -1, ctx->insns_count);
 						}
-						ctx->tmp_regs[x.regs[j].ref] = reg;
-					} else if (!x.regs[j].root || ctx->regs[x.regs[j].ref][x.regs[j].op] == IR_REG_NONE) {
-						ctx->regs[x.regs[j].ref][x.regs[j].op] = reg;
-					} else if (ctx->regs[x.regs[j].ref][x.regs[j].op] != reg) {
-						ctx->rules[x.regs[j].ref] |= IR_FUSED_REG;
-						ir_set_fused_reg(ctx, x.regs[j].root, x.regs[j].ref * sizeof(ir_ref) + x.regs[j].op, reg);
+						ctx->tmp_regs[data.regs[j].ref] = reg;
+					} else if (!data.regs[j].root || ctx->regs[data.regs[j].ref][data.regs[j].op] == IR_REG_NONE) {
+						ctx->regs[data.regs[j].ref][data.regs[j].op] = reg;
+					} else if (ctx->regs[data.regs[j].ref][data.regs[j].op] != reg) {
+						ctx->rules[data.regs[j].ref] |= IR_FUSED_REG;
+						ir_set_fused_reg(ctx, data.regs[j].root, data.regs[j].ref, data.regs[j].op, reg);
 					}
 				}
 			}
@@ -2103,7 +2109,15 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 			rule += n;
 		}
 		if (bb->flags & IR_BB_DESSA_MOVES) {
-			ir_gen_dessa_moves(ctx, b, ir_fix_dessa_tmps, (void*)(intptr_t)b);
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
+			ctx->regs[bb->end][0] = IR_REG_RAX;
+			ctx->regs[bb->end][1] = IR_REG_XMM0;
+#elif defined(IR_TARGET_AARCH64)
+			ctx->regs[bb->end][0] = IR_REG_X0;
+			ctx->regs[bb->end][1] = IR_REG_V0;
+#else
+# error "Unknown IR target"
+#endif
 		}
 	}
 
@@ -2111,7 +2125,7 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 	if (ctx->flags2 & IR_HAS_FP_RET_SLOT) {
 		ctx->ret_slot = ir_allocate_spill_slot(ctx, ir_type_size[IR_DOUBLE], 0);
 	} else if ((ctx->ret_type == IR_FLOAT || ctx->ret_type == IR_DOUBLE)
-			&& data.cc->fp_ret_reg == IR_REG_NONE) {
+			&& data.ra_data.cc->fp_ret_reg == IR_REG_NONE) {
 		ctx->ret_slot = ir_allocate_spill_slot(ctx, ir_type_size[ctx->ret_type], 0);
 	} else {
 		ctx->ret_slot = -1;

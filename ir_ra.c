@@ -4367,19 +4367,6 @@ static bool needs_spill_load(ir_ctx *ctx, ir_live_interval *ival, ir_use_pos *us
 	return use_pos->next && use_pos->next->op_num != 0;
 }
 
-static void ir_set_fused_reg(ir_ctx *ctx, ir_ref root, ir_ref ref_and_op, int8_t reg)
-{
-	char key[10];
-
-	if (!ctx->fused_regs) {
-		ctx->fused_regs = ir_mem_malloc(sizeof(ir_strtab));
-		ir_strtab_init(ctx->fused_regs, 8, 128);
-	}
-	memcpy(key, &root, sizeof(ir_ref));
-	memcpy(key + 4, &ref_and_op, sizeof(ir_ref));
-	ir_strtab_lookup(ctx->fused_regs, key, 8, 0x10000000 | (uint8_t)reg);
-}
-
 static void assign_regs(ir_ctx *ctx)
 {
 	ir_ref i;
@@ -4560,7 +4547,7 @@ static void assign_regs(ir_ctx *ctx)
 											old_reg = ir_get_alocated_reg(ctx, -use_pos->hint_ref, use_pos->op_num);
 											if ((old_reg != IR_REG_NONE && reg != old_reg) || reg == IR_REG_NONE) {
 												ctx->rules[-use_pos->hint_ref] |= IR_FUSED_REG;
-												ir_set_fused_reg(ctx, ref, -use_pos->hint_ref * sizeof(ir_ref) + use_pos->op_num, reg);
+												ir_set_fused_reg(ctx, ref, -use_pos->hint_ref, use_pos->op_num, reg);
 												use_pos = use_pos->next;
 												continue;
 											}
@@ -4586,7 +4573,7 @@ static void assign_regs(ir_ctx *ctx)
 								} else if (use_pos->hint_ref < 0 && !(use_pos->flags & IR_PHI_USE)) {
 									IR_ASSERT(ctx->rules[-use_pos->hint_ref] & IR_FUSED);
 									ctx->rules[-use_pos->hint_ref] |= IR_FUSED_REG;
-									ir_set_fused_reg(ctx, ref, -use_pos->hint_ref * sizeof(ir_ref) + use_pos->op_num, IR_REG_NONE);
+									ir_set_fused_reg(ctx, ref, -use_pos->hint_ref, use_pos->op_num, IR_REG_NONE);
 								}
 								use_pos = use_pos->next;
 							}
