@@ -94,7 +94,7 @@ OBJS_COMMON = $(BUILD_DIR)/ir.o $(BUILD_DIR)/ir_strtab.o $(BUILD_DIR)/ir_cfg.o \
 	$(BUILD_DIR)/ir_load.o $(BUILD_DIR)/ir_save.o $(BUILD_DIR)/ir_emit_c.o $(BUILD_DIR)/ir_dump.o \
 	$(BUILD_DIR)/ir_disasm.o $(BUILD_DIR)/ir_gdb.o $(BUILD_DIR)/ir_perf.o $(BUILD_DIR)/ir_check.o \
 	$(BUILD_DIR)/ir_cpuinfo.o $(BUILD_DIR)/ir_emit_llvm.o $(BUILD_DIR)/ir_mem2ssa.o \
-	$(BUILD_DIR)/ir_ra_simple.o
+	$(BUILD_DIR)/ir_ra_simple.o $(BUILD_DIR)/ir_ra_fast.o
 OBJS_IR = $(BUILD_DIR)/ir_main.o $(LLVM_OBJS)
 
 all: $(BUILD_DIR) $(BUILD_DIR)/ir $(BUILD_DIR)/tester
@@ -114,6 +114,7 @@ $(BUILD_DIR)/ir_main.o: $(SRC_DIR)/ir.h
 $(BUILD_DIR)/ir.o: $(SRC_DIR)/ir_fold.h $(BUILD_DIR)/ir_fold_hash.h
 $(BUILD_DIR)/ir_ra.o: $(SRC_DIR)/ir_$(DASM_ARCH).h
 $(BUILD_DIR)/ir_ra_simple.o: $(SRC_DIR)/ir_$(DASM_ARCH).h
+$(BUILD_DIR)/ir_ra_fast.o: $(SRC_DIR)/ir_$(DASM_ARCH).h
 $(BUILD_DIR)/ir_emit.o: $(SRC_DIR)/ir_$(DASM_ARCH).h $(BUILD_DIR)/ir_emit_$(DASM_ARCH).h
 $(BUILD_DIR)/ir_gdb.o: $(SRC_DIR)/ir_elf.h
 $(BUILD_DIR)/ir_perf.o: $(SRC_DIR)/ir_elf.h
