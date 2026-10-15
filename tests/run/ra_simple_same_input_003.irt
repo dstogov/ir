@@ -1,0 +1,23 @@
+--TEST--
+Simple register allocator: one value used three times in COND
+--ARGS--
+-O0 --run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%d\n";
+	int32_t zero = 0;
+	bool one = 1;
+	l_1 = START(l_ret);
+	bool slot = VAR(l_1, "slot");
+	l_2 = VSTORE(l_1, slot, one);
+	bool x, l_3 = VLOAD(l_2, slot);
+	bool result = COND(x, x, x);
+	int32_t printed = ZEXT(result);
+	int32_t ignored, l_4 = CALL/2(l_3, fp, fmt, printed);
+	l_ret = RETURN(l_4, zero);
+}
+--EXPECT--
+1

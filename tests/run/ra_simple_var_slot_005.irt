@@ -1,0 +1,33 @@
+--TEST--
+Simple register allocator: VLOAD value used by a fused compare after a VSTORE
+--ARGS--
+-O0 --run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @main(): int32_t
+{
+	uintptr_t c_p = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t c_f = "%d\n";
+	int32_t c_0 = 0;
+	int32_t c_1 = 1;
+	int32_t c_2 = 2;
+	int32_t c_5 = 5;
+	int32_t c_7 = 7;
+	l_1 = START(l_ret);
+	int32_t x = VAR(l_1, "x");
+	l_2 = VSTORE(l_1, x, c_5);
+	int32_t a, l_3 = VLOAD(l_2, x);
+	bool c = EQ(a, c_5);
+	l_4 = VSTORE(l_3, x, c_7);
+	l_5 = IF(l_4, c);
+	l_6 = IF_TRUE(l_5);
+	int32_t r1, l_7 = CALL/2(l_6, c_p, c_f, c_1);
+	l_8 = END(l_7);
+	l_9 = IF_FALSE(l_5);
+	int32_t r2, l_10 = CALL/2(l_9, c_p, c_f, c_2);
+	l_11 = END(l_10);
+	l_12 = MERGE(l_8, l_11);
+	l_ret = RETURN(l_12, c_0);
+}
+--EXPECT--
+1
