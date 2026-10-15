@@ -8013,8 +8013,26 @@ static void ir_emit_bit_count(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_ref op1 = insn->op1;
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 	ir_reg op1_reg = ctx->regs[def][1];
+	bool zero_extended = 0;
 
 	IR_ASSERT(def_reg != IR_REG_NONE);
+
+	if (op1_reg == IR_REG_NONE && ir_type_size[src_type] < 4) {
+		ir_mem mem;
+
+		if (ir_rule(ctx, op1) & IR_FUSED) {
+			mem = ir_fuse_load(ctx, def, op1);
+		} else {
+			mem = ir_ref_spill_slot(ctx, op1);
+		}
+		if (ir_type_size[src_type] == 1) {
+			|	ASM_TXT_TMEM_OP movzx, Rd(def_reg), byte, mem
+		} else {
+			|	ASM_TXT_TMEM_OP movzx, Rd(def_reg), word, mem
+		}
+		op1_reg = def_reg;
+		zero_extended = 1;
+	}
 
 	if (op1_reg != IR_REG_NONE) {
 		if (IR_REG_SPILLED(op1_reg)) {
@@ -8024,34 +8042,24 @@ static void ir_emit_bit_count(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		switch (ir_type_size[src_type]) {
 			default:
 				IR_ASSERT(0);
-			case 2:
-				if (insn->op == IR_CTLZ) {
-					if (ctx->mflags & IR_X86_BMI1) {
-						|	lzcnt Rw(def_reg), Rw(op1_reg)
-					} else {
-						|	bsr Rw(def_reg), Rw(op1_reg)
-						|	xor Rw(def_reg), 0xf
-					}
-				} else if (insn->op == IR_CTTZ) {
-					if (ctx->mflags & IR_X86_BMI1) {
-						|	tzcnt Rw(def_reg), Rw(op1_reg)
-					} else {
-						|	bsf Rw(def_reg), Rw(op1_reg)
-					}
-				} else {
-					IR_ASSERT(insn->op == IR_CTPOP);
-					|	popcnt Rw(def_reg), Rw(op1_reg)
-				}
-				break;
 			case 1:
-				|   movzx Rd(op1_reg), Rb(op1_reg)
+			case 2:
+				/* upper bits don't affect CTTZ of a non-zero value */
+				if (insn->op != IR_CTTZ && !zero_extended) {
+					if (ir_type_size[src_type] == 1) {
+						|	movzx Rd(def_reg), Rb(op1_reg)
+					} else {
+						|	movzx Rd(def_reg), Rw(op1_reg)
+					}
+					op1_reg = def_reg;
+				}
 				if (insn->op == IR_CTLZ) {
 					if (ctx->mflags & IR_X86_BMI1) {
 						|	lzcnt Rd(def_reg), Rd(op1_reg)
-						|	sub Rd(def_reg), 24
+						|	sub Rd(def_reg), (32 - ir_type_size[src_type] * 8)
 					} else {
 						|	bsr Rd(def_reg), Rd(op1_reg)
-						|	xor Rw(def_reg), 0x7
+						|	xor Rd(def_reg), (ir_type_size[src_type] * 8 - 1)
 					}
 					break;
 				}
@@ -8108,24 +8116,6 @@ static void ir_emit_bit_count(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		switch (ir_type_size[src_type]) {
 			default:
 				IR_ASSERT(0);
-			case 2:
-				if (insn->op == IR_CTLZ) {
-					if (ctx->mflags & IR_X86_BMI1) {
-						|	ASM_TXT_TMEM_OP lzcnt, Rw(def_reg), word, mem
-					} else {
-						|	ASM_TXT_TMEM_OP bsr, Rw(def_reg), word, mem
-						|	xor Rw(def_reg), 0xf
-					}
-				} else if (insn->op == IR_CTTZ) {
-					if (ctx->mflags & IR_X86_BMI1) {
-						|	ASM_TXT_TMEM_OP tzcnt, Rw(def_reg), word, mem
-					} else {
-						|	ASM_TXT_TMEM_OP bsf, Rw(def_reg), word, mem
-					}
-				} else {
-					|	ASM_TXT_TMEM_OP popcnt, Rw(def_reg), word, mem
-				}
-				break;
 			case 4:
 				if (insn->op == IR_CTLZ) {
 					if (ctx->mflags & IR_X86_BMI1) {
