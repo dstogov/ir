@@ -1,0 +1,37 @@
+--TEST--
+029: FOLD: LT/GE/LE/GT on uintptr_t constants are signed comparisons
+--ARGS--
+-O2 --save
+--CODE--
+{
+	uintptr_t c_m1 = -1;
+	uintptr_t c_1 = 1;
+	int32_t c_s1 = 1;
+	int32_t c_s2 = 2;
+	int32_t c_s3 = 3;
+	l_1 = START(l_2);
+	bool d_lt = LT(c_m1, c_1);
+	bool d_ge = GE(c_m1, c_1);
+	bool d_le = LE(c_m1, c_1);
+	bool d_gt = GT(c_m1, c_1);
+	int32_t d_0 = ZEXT(d_lt);
+	int32_t d_1 = ZEXT(d_ge);
+	int32_t d_2 = ZEXT(d_le);
+	int32_t d_3 = ZEXT(d_gt);
+	int32_t d_4 = SHL(d_1, c_s1);
+	int32_t d_5 = SHL(d_2, c_s2);
+	int32_t d_6 = SHL(d_3, c_s3);
+	int32_t d_7 = OR(d_0, d_4);
+	int32_t d_8 = OR(d_7, d_5);
+	int32_t d_9 = OR(d_8, d_6);
+	l_2 = RETURN(l_1, d_9);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 5;
+	l_1 = START(l_2);
+	l_2 = RETURN(l_1, c_4);
+}
