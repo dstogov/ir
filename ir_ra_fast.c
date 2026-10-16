@@ -317,45 +317,6 @@ static ir_reg _pick_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_type type,
 	exit(-1);
 }
 
-static bool ir_store_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, ir_ref store, ir_ref val)
-{
-	ir_ref i, n;
-	ir_insn *insn;
-	int address_taken = -1; /* unknown */
-
-	/* Check if the value stored by VSTORE is produced in the same basic block (before VSTORE) */
-	if (val < bb->start || val > store || store > bb->end) return 0;
-
-	/* Check if the instructions between the "producer" and VSTORE can not access the same VAR */
-	for (i = val, insn = &ctx->ir_base[i]; i < store;) {
-		if ((insn->op == IR_VLOAD || insn->op == IR_VLOAD_v || insn->op == IR_VSTORE || insn->op == IR_VSTORE_v)
-		 && insn->op2 == var) {
-			return 0;
-		} else if (address_taken
-		 && (insn->op == IR_LOAD
-		  || insn->op == IR_LOAD_v
-		  || insn->op == IR_STORE
-		  || insn->op == IR_STORE_v
-		  || insn->op == IR_CALL)) {
-			if (address_taken == -1) {
-				ir_use_list *use_list = &ctx->use_lists[var];
-				ir_ref *p, n = use_list->count;
-
-				for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
-					if (ctx->ir_base[*p].op == IR_VADDR) {
-						return 0;
-					}
-				}
-				address_taken = 0;
-			}
-		}
-		n = ir_insn_len(insn);
-		i += n;
-		insn += n;
-	}
-	return 1;
-}
-
 static ir_live_interval *_create_ival(ir_ctx *ctx, uint32_t vreg, ir_type type)
 {
 	ir_live_interval *ival = ir_arena_alloc(&ctx->arena, sizeof(ir_live_interval));
@@ -751,15 +712,16 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 				   || ctx->live_intervals[ctx->vregs[insn->op1]]->reg == IR_REG_NONE))) {
 					SWAP_REFS(insn->op1, insn->op2);
 				}
-#if 1
 			} else if (insn->op == IR_VSTORE || insn->op == IR_VSTORE_v) {
 				if (!IR_VREG_IS_STACK_SLOT(ctx->vregs[insn->op2])) {
 					ir_allocate_var_spill_slot(ctx, insn->op2, &ctx->ir_base[insn->op2]);
 				}
-				if (insn->op3 > bb->start
-				 && ctx->vregs[insn->op3] > 0
+				if (b == 1
+				 && !IR_IS_CONST_REF(insn->op3)
+				 && ctx->ir_base[insn->op3].op == IR_PARAM
 				 && ctx->use_lists[insn->op3].count == 1
-				 && ir_store_may_reuse_var_slot(ctx, bb, insn->op2, i, insn->op3)) {
+				 /* first use of VAR is VSTORE(_, VAR, PARAM) */
+				 && ctx->use_edges[ctx->use_lists[insn->op2].refs] == i) {
 					ir_live_interval *ival = ctx->live_intervals[ctx->vregs[insn->op3]];
 
 					if (!ival) {
@@ -770,7 +732,6 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 					IR_LOG_ASSIGN_SPILL(ival->vreg, ival->stack_spill_pos);
 					continue;
 				}
-#endif
 			}
 
 			/* Reset information for the current instruction */
