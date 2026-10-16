@@ -1,7 +1,7 @@
 --TEST--
 GCM: partially dead node must not be cloned for an unused PHI
 --ARGS--
--O1 --run
+--run
 --CODE--
 extern func @printf(uintptr_t, ...): int32_t;
 func @test(uint8_t, uint8_t, int64_t, int32_t): int64_t;
