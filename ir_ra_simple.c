@@ -131,6 +131,27 @@ static ir_reg _get_free_reg2(ir_ctx *ctx, ir_type type, ir_reg_alloc_simple_data
 	return reg;
 }
 
+static ir_ref ir_last_fusion_root(ir_ctx *ctx, ir_block *bb, ir_ref ref, ir_ref load)
+{
+	ir_use_list *use_list = &ctx->use_lists[ref];
+	ir_ref *p, use, n = use_list->count;
+	ir_ref last_use = IR_UNUSED;
+
+	for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
+		use = *p;
+		if (use < load || use > bb->end) {
+			/* usage is not in the same block */
+			return 0;
+		}
+		if (ctx->rules[use] & IR_FUSED) {
+			use = ir_last_fusion_root(ctx, bb, use, load);
+			if (use == 0) return 0;
+		}
+		if (use > last_use) last_use = use;
+	}
+	return last_use;
+}
+
 static bool ir_load_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, ir_ref load)
 {
 	ir_use_list *use_list = &ctx->use_lists[load];
@@ -144,6 +165,11 @@ static bool ir_load_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, ir
 		for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
 			use = *p;
 			if (use < load || use > bb->end) return 0;
+			if (ctx->rules[use] & IR_FUSED) {
+				/* fused instructions should be lifted to their "root" */
+				use = ir_last_fusion_root(ctx, bb, use, load);
+				if (use == 0) return 0;
+			}
 			if (use > last_use) last_use = use;
 		}
 		/* Check if the result of VLOAD can not be clobbered between VLOAD and the last use */
@@ -172,6 +198,32 @@ static bool ir_load_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, ir
 		}
 	}
 	return 1;
+}
+
+static bool ir_insn_uses_var_load(ir_ctx *ctx, ir_block *bb, ir_insn *insn, ir_ref var)
+{
+	ir_ref j, n = ir_input_edges_count(ctx, insn);
+	ir_ref *p = insn->ops + 1;
+	ir_insn *input;
+
+	if (ir_op_flags[insn->op] & (IR_OP_FLAG_CONTROL|IR_OP_FLAG_PINNED)) {
+		/* skip control input */
+		p++;
+		n--;
+	}
+	for (j = 0; j < n; j++, p++) {
+		if (*p > 0) {
+			input = &ctx->ir_base[*p];
+			if ((input->op == IR_VLOAD || input->op == IR_VLOAD_v) && input->op2 == var) {
+				/* VLOADs from other blocks don't reuse VAR slot */
+				if (*p > bb->start) return 1;
+			} else if ((ctx->rules[*p] & IR_FUSED) && ir_insn_uses_var_load(ctx, bb, input, var)) {
+				/* fused instructions are emitted together with their root */
+				return 1;
+			}
+		}
+	}
+	return 0;
 }
 
 static bool ir_store_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, ir_ref store, ir_ref val)
@@ -205,6 +257,10 @@ static bool ir_store_may_reuse_var_slot(ir_ctx *ctx, ir_block *bb, ir_ref var, i
 				}
 				address_taken = 0;
 			}
+		}
+		if (i > val && ir_insn_uses_var_load(ctx, bb, insn, var)) {
+			/* the result of an earlier VLOAD of the same VAR is still used (anti-dependency) */
+			return 0;
 		}
 		n = ir_insn_len(insn);
 		i += n;
