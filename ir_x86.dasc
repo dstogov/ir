@@ -27146,7 +27146,7 @@ next_block:;
 			|.align 8
 			|=>label:
 			while (str[i]) {
-				char c = str[i];
+				uint8_t c = (uint8_t)str[i];
 
 				|.byte c
 				i++;
