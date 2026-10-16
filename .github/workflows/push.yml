@@ -125,8 +125,8 @@ jobs:
             pkg install -y capstone gmake
 
           run: |
-            gmake all
-            gmake test-ci
+            gmake BUILD=debug all
+            gmake BUILD=debug test-ci
 
   MACOS_aarch64:
     name: 'macOS arm64'
