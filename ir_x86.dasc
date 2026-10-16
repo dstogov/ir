@@ -7879,6 +7879,9 @@ static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn, uint32_t rule
 		switch (ir_type_size[insn->type]) {
 			default:
 				IR_ASSERT(0);
+			case 2:
+				|	rol Rw(def_reg), 8
+				break;
 			case 4:
 				|	bswap Rd(def_reg)
 				break;
