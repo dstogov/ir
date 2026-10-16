@@ -325,6 +325,8 @@ int ir_reg_alloc_simple(ir_ctx *ctx)
 	ir_reg_alloc_simple_data data;
 	int32_t offset;
 
+	ir_compute_dessa_moves(ctx);
+
 	memset(&data.ra_data, 0, sizeof(data.ra_data));
 	data.ra_data.cc = ir_get_call_conv_dsc(ctx->flags);
 	ctx->data = &data.ra_data;

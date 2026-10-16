@@ -181,7 +181,7 @@ int main(int argc, char **argv)
 		ir_reg_alloc(&ctx);
 		ir_schedule_blocks(&ctx);
 	} else {
-		ir_compute_dessa_moves(&ctx);
+		ir_reg_alloc_O0(&ctx);
 	}
 
 	ir_truncate(&ctx);
