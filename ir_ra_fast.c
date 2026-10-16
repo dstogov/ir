@@ -526,6 +526,11 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 	/* For all basic blocks in reverse order */
 	for (b = ctx->cfg_blocks_count, bb = ctx->cfg_blocks + b; b > 0; bb--, b--) {
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
+
+		if (bb->flags & IR_BB_EMPTY) {
+			continue;
+		}
+
 		data.allocated = IR_REGSET_EMPTY;
 
 		if (bb->flags & IR_BB_DESSA_MOVES) {
