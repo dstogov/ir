@@ -1,7 +1,7 @@
 --TEST--
-FP compare: distinct double constants in an O0 branch
+FP compare: distinct double constants in a branch
 --ARGS--
--O0 --run
+--run
 --CODE--
 extern func @printf(uintptr_t, ...): void;
 static const @format[6] = "%llx\n\000";
