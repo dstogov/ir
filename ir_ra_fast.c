@@ -535,6 +535,8 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 	ir_reg_alloc_fast_data data;
 	int32_t offset;
 
+	ir_compute_dessa_moves(ctx);
+
 	IR_LOG("Start Fast Local RA");
 
 	memset(&data.ra_data, 0, sizeof(data.ra_data));
