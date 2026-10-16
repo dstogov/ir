@@ -711,11 +711,9 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 						ctx->vregs[i] = 0;
 					}
 
-				/* Handle PHI specially (allocate only the output register or spill slot) */
+				/* Handle PHI specially (inputs come from other blocks) */
 				} else if (insn->op == IR_PHI) {
-					if (!ival) {
-						ival = _create_ival(ctx, ctx->vregs[i], insn->type);
-					}
+					IR_ASSERT(ival);
 					if (ival->reg != IR_REG_NONE) {
 						/* use the previously allocated register */
 						reg = ival->reg;
@@ -732,8 +730,8 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 						}
 						ir_set_alocated_reg(ctx, i, 0, reg);
 						IR_LOG_ASSIGN(i, i, i, 0, reg);
-					} else if (ival->stack_spill_pos == -1) {
-						_pick_spill(ctx, ival);
+					} else {
+						IR_ASSERT(ival->stack_spill_pos != -1);
 					}
 					continue;
 
