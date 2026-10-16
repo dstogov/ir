@@ -1,0 +1,27 @@
+--TEST--
+Simple register allocator: VAR slot is still used by a previously loaded value
+--ARGS--
+-O0 --run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+static const @format[7] = "%d %d\n\000";
+func @main(): int32_t
+{
+	uintptr_t c_p = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t c_f = sym(@format);
+	int32_t c_0 = 0;
+	int32_t c_1 = 1;
+	int32_t c_5 = 5;
+	l_1 = START(l_ret);
+	int32_t x = VAR(l_1, "x");
+	l_2 = VSTORE(l_1, x, c_5);
+	int32_t a, l_3 = VLOAD(l_2, x);
+	int32_t v = ADD(a, c_1);
+	int32_t w = MUL(a, c_5);
+	l_4 = VSTORE(l_3, x, v);
+	int32_t xv, l_5 = VLOAD(l_4, x);
+	int32_t r, l_6 = CALL/3(l_5, c_p, c_f, xv, w);
+	l_ret = RETURN(l_6, c_0);
+}
+--EXPECT--
+6 25

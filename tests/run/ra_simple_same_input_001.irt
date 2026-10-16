@@ -1,0 +1,41 @@
+--TEST--
+Simple register allocator: the same value used as both operands
+--ARGS--
+-O0 --run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @main(): int32_t
+{
+	uintptr_t c_p = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t c_f1 = "%d %d %d %d %d %d %d %d\n";
+	uintptr_t c_f2 = "%g %g %g %g %g\n";
+	int32_t c_0 = 0;
+	int32_t c_5 = 5;
+	double c_d = 1.5;
+	l_1 = START(l_ret);
+	int32_t x = VAR(l_1, "x");
+	double y = VAR(l_1, "y");
+	l_2 = VSTORE(l_1, x, c_5);
+	l_3 = VSTORE(l_2, y, c_d);
+	int32_t a, l_4 = VLOAD(l_3, x);
+	double b, l_5 = VLOAD(l_4, y);
+	int32_t i1 = ADD(a, a);
+	int32_t i2 = SUB(a, a);
+	int32_t i3 = MUL(a, a);
+	int32_t i4 = AND(a, a);
+	int32_t i5 = OR(a, a);
+	int32_t i6 = XOR(a, a);
+	int32_t i7 = DIV(a, a);
+	int32_t i8 = MOD(a, a);
+	double f1 = ADD(b, b);
+	double f2 = SUB(b, b);
+	double f3 = MUL(b, b);
+	double f4 = DIV(b, b);
+	double f5 = MIN(b, b);
+	int32_t r1, l_6 = CALL/9(l_5, c_p, c_f1, i1, i2, i3, i4, i5, i6, i7, i8);
+	int32_t r2, l_7 = CALL/6(l_6, c_p, c_f2, f1, f2, f3, f4, f5);
+	l_ret = RETURN(l_7, c_0);
+}
+--EXPECT--
+10 0 25 5 5 0 1 0
+3 0 2.25 1 1.5
