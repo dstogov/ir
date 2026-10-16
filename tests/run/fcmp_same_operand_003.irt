@@ -1,7 +1,7 @@
 --TEST--
 Unordered comparisons with identical operands preserve floating NaN
 --ARGS--
--O2 --run
+--run
 --CODE--
 extern func @printf(uintptr_t, ...): void;
 static const @format[7] = "%d %d\n\000";

@@ -1,7 +1,7 @@
 --TEST--
 AArch64 AND with 32-bit and 64-bit logical immediates
 --ARGS--
--O1 --run
+--run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func test32_one(uint32_t): uint32_t

@@ -1,7 +1,7 @@
 --TEST--
 Simple register allocator: value stored to VAR on a not-taken branch
 --ARGS--
--O0 --run
+--run
 --CODE--
 extern func @printf(uintptr_t, ...): int32_t;
 static const @format[4] = "%d\n\000";

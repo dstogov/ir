@@ -1,7 +1,7 @@
 --TEST--
 Simple register allocator: the same value used as both operands of a fused compare
 --ARGS--
--O0 --run
+--run
 --CODE--
 extern func @printf(uintptr_t, ...): int32_t;
 func @f0(int32_t): int32_t;

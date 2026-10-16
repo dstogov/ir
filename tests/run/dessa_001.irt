@@ -3,7 +3,7 @@ DESSA 001: DESSA and spill load
 --TARGET--
 *64-*
 --ARGS--
--O0 --run
+--run
 --CODE--
 extern func @printf(uintptr_t, ...): int32_t;
 static const @str.1[4] = "%d\n\000";

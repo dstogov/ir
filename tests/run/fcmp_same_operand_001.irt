@@ -1,7 +1,7 @@
 --TEST--
-FP compare: identical double constants at O0
+FP compare: identical double constants
 --ARGS--
--O0 --run
+--run
 --CODE--
 extern func @printf(uintptr_t, ...): void;
 static const @format[4] = "%d\n\000";
