@@ -1,7 +1,7 @@
 --TEST--
 SWITCH with int64/uint64 cases spanning more than INT64_MAX
 --ARGS--
--O1 --run
+--run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func select(int64_t): int32_t

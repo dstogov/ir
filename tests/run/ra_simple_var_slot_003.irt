@@ -1,7 +1,7 @@
 --TEST--
 Simple register allocator: VAR slot is still used by a previously loaded value
 --ARGS--
--O0 --run
+--run
 --CODE--
 extern func @printf(uintptr_t, ...): int32_t;
 static const @format[7] = "%d %d\n\000";

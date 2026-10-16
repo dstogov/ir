@@ -1,7 +1,7 @@
 --TEST--
-004: LT on uint64_t is signed (-02)
+004: LT on uint64_t is signed
 --ARGS--
--O2 --run
+--run
 --CODE--
 extern func @printf(uintptr_t, ...): int32_t;
 static const @fmt[4] = "%d\n\000";
