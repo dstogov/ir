@@ -23,6 +23,7 @@
 
 typedef struct {
 	ir_reg_alloc_data ra_data;
+	ir_block *bb;
 	int32_t  num;
 	int32_t  tmp_num;
 	ir_regset scratch;
@@ -238,9 +239,25 @@ static void _evict_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_reg reg)
 	}
 }
 
-static ir_reg _pick_free_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_type type)
+static ir_regset _preferred_regset(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_ref use, ir_ref def)
+{
+	ir_ref ref;
+
+	if (!use || def < data->bb->start || def >= use) {
+		return data->scratch;
+	}
+	for (ref = ctx->prev_ref[use]; ref != def; ref = ctx->prev_ref[ref]) {
+		if (ctx->ir_base[ref].op == IR_CALL) {
+			return data->preserved;
+		}
+	}
+	return data->scratch;
+}
+
+static ir_reg _pick_free_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_type type, ir_ref use, ir_ref def)
 {
 	ir_regset available;
+	ir_ref reg;
 
 	if (IR_IS_TYPE_INT(type)) {
 		available = IR_REGSET_GP;
@@ -250,18 +267,25 @@ static ir_reg _pick_free_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_type 
 	}
 	available = IR_REGSET_DIFFERENCE(available, data->allocated);
 	if (!IR_REGSET_IS_EMPTY(available)) {
-		ir_regset available_scratch = IR_REGSET_INTERSECTION(available, data->scratch);
+		ir_regset preferred = IR_REGSET_INTERSECTION(_preferred_regset(ctx, data, use, def), available);
 
-		/* prefer scratch reg */
-		if (!IR_REGSET_IS_EMPTY(available_scratch)) {
-			return IR_REGSET_FIRST(available_scratch);
+		if (!IR_REGSET_IS_EMPTY(preferred)) {
+			reg = IR_REGSET_FIRST(preferred);
+			if (IR_REGSET_IN(data->preserved, reg)) {
+				IR_REGSET_INCL(ctx->used_preserved_regs, reg);
+			}
+			return reg;
 		}
-		return IR_REGSET_FIRST(available);
+		reg = IR_REGSET_FIRST(available);
+		if (IR_REGSET_IN(data->preserved, reg)) {
+			IR_REGSET_INCL(ctx->used_preserved_regs, reg);
+		}
+		return reg;
 	}
 	return IR_REG_NONE;
 }
 
-static ir_reg _pick_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_type type, ir_regset used, uint8_t flags)
+static ir_reg _pick_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_type type, ir_regset used, uint8_t flags, ir_ref use, ir_ref def)
 {
 	ir_regset available;
 	ir_reg reg, best_reg;
@@ -276,16 +300,22 @@ static ir_reg _pick_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_type type,
 	available = IR_REGSET_DIFFERENCE(available, used);
 	if (!IR_REGSET_IS_EMPTY(available)) {
 		ir_regset available_unused = IR_REGSET_DIFFERENCE(available, data->allocated);
+		ir_regset preferred = IR_REGSET_INTERSECTION(_preferred_regset(ctx, data, use, def), available);
 
 		if (!IR_REGSET_IS_EMPTY(available_unused)) {
-			ir_regset available_scratch = IR_REGSET_INTERSECTION(available_unused, data->scratch);
+			ir_regset available_preferred = IR_REGSET_INTERSECTION(available_unused, preferred);
 
-			/* prefer scratch reg */
-			if (!IR_REGSET_IS_EMPTY(available_scratch)) {
-				return IR_REGSET_FIRST(available_scratch);
+			if (!IR_REGSET_IS_EMPTY(available_preferred)) {
+				reg = IR_REGSET_FIRST(available_preferred);
+				if (IR_REGSET_IN(data->preserved, reg)) {
+					IR_REGSET_INCL(ctx->used_preserved_regs, reg);
+				}
+				return reg;
 			}
 			reg = IR_REGSET_FIRST(available_unused);
-			IR_REGSET_INCL(ctx->used_preserved_regs, reg);
+			if (IR_REGSET_IN(data->preserved, reg)) {
+				IR_REGSET_INCL(ctx->used_preserved_regs, reg);
+			}
 			return reg;
 		}
 
@@ -532,6 +562,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 		}
 
 		data.allocated = IR_REGSET_EMPTY;
+		data.bb = bb;
 
 		if (bb->flags & IR_BB_DESSA_MOVES) {
 			ir_block *succ_bb;
@@ -580,7 +611,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 								/* lightweight register coalescing */
 								reg = ctx->live_intervals[ctx->vregs[use]]->reg;
 							} else {
-								reg = _pick_free_reg(ctx, &data, ival->type);
+								reg = _pick_free_reg(ctx, &data, ival->type, bb->end, input);
 							}
 							if (reg != IR_REG_NONE) {
 								data.state[reg].def = input;
@@ -613,10 +644,10 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 
 			/* Add tmp registers for MEM->MEM DESSA moves */
 			if (needs_tmp_gp) {
-				ctx->regs[bb->end][0] = _pick_reg(ctx, &data, IR_I32, IR_REGSET_EMPTY, IR_USE_MUST_BE_IN_REG);
+				ctx->regs[bb->end][0] = _pick_reg(ctx, &data, IR_I32, IR_REGSET_EMPTY, IR_USE_MUST_BE_IN_REG, 0, 0);
 			}
 			if (needs_tmp_fp) {
-				ctx->regs[bb->end][1] = _pick_reg(ctx, &data, IR_DOUBLE, IR_REGSET_EMPTY, IR_USE_MUST_BE_IN_REG);
+				ctx->regs[bb->end][1] = _pick_reg(ctx, &data, IR_DOUBLE, IR_REGSET_EMPTY, IR_USE_MUST_BE_IN_REG, 0, 0);
 			}
 		}
 
@@ -933,7 +964,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 						if (reg != IR_REG_NONE && !IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), reg)) {
 							/* use fixed register hint */
 						} else {
-							reg = _pick_reg(ctx, &data, insn->type, used, IR_USE_MUST_BE_IN_REG);
+							reg = _pick_reg(ctx, &data, insn->type, used, IR_USE_MUST_BE_IN_REG, 0, 0);
 						}
 					} else {
 						reg = IR_REG_NONE;
@@ -978,14 +1009,14 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 					used = IR_REGSET_UNION(used, data.clobbered[n]);
 				}
 
-				reg = _pick_reg(ctx, &data, data.tmp_regs[j].type, used, IR_USE_MUST_BE_IN_REG);
+				reg = _pick_reg(ctx, &data, data.tmp_regs[j].type, used, IR_USE_MUST_BE_IN_REG, 0, 0);
 				for (n = data.tmp_regs[j].start; n < data.tmp_regs[j].end; n++) {
 					IR_REGSET_INCL(data.clobbered[n], reg);
 				}
 #if IR_X86_I64
 				if (data.tmp_regs[j].type == IR_I64 || data.tmp_regs[j].type == IR_U64) {
 					IR_REGSET_INCL(used, reg);
-					reg2 = _pick_reg(ctx, &data, data.tmp_regs[j].type, used, IR_USE_MUST_BE_IN_REG);
+					reg2 = _pick_reg(ctx, &data, data.tmp_regs[j].type, used, IR_USE_MUST_BE_IN_REG, 0, 0);
 					for (n = data.tmp_regs[j].start; n < data.tmp_regs[j].end; n++) {
 						IR_REGSET_INCL(data.clobbered[n], reg2);
 					}
@@ -1062,7 +1093,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 						/* reuse for op1 the register allocated for instruction result (lightweigh coalescing) */
 						reg = IR_REG_NUM(ctx->regs[i][0]);
 					} else {
-						reg = _pick_reg(ctx, &data, data.regs[j].type, used, data.regs[j].flags);
+						reg = _pick_reg(ctx, &data, data.regs[j].type, used, data.regs[j].flags, i, data.regs[j].def);
 						if (reg == IR_REG_NONE) {
 							break;
 						}
@@ -1080,7 +1111,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 						IR_REGSET_EXCL(available, reg);
 						if (reg2 == IR_REG_NONE
 						 || IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), reg2)) {
-							reg2 = _pick_reg(ctx, &data, data.regs[j].type, used, data.regs[j].flags);
+							reg2 = _pick_reg(ctx, &data, data.regs[j].type, used, data.regs[j].flags, i, data.regs[j].def);
 							if (reg2 == IR_REG_NONE) {
 								IR_REGSET_INCL(available, reg);
 								for (n = data.regs[j].start; n < data.regs[j].end; n++) {
