@@ -48,7 +48,7 @@ typedef struct {
 		ir_ref  ref;
 		ir_ref  op;
 		ir_ref  def;
-	} regs[32], tmp_regs[32];;
+	} regs[32], tmp_regs[32];
 } ir_reg_alloc_fast_data;
 
 #ifdef IR_DEBUG
@@ -272,13 +272,17 @@ static ir_reg _pick_free_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_type 
 		if (!IR_REGSET_IS_EMPTY(preferred)) {
 			reg = IR_REGSET_FIRST(preferred);
 			if (IR_REGSET_IN(data->preserved, reg)) {
-				IR_REGSET_INCL(ctx->used_preserved_regs, reg);
+				ir_regset tmp = (ir_regset)ctx->used_preserved_regs;
+				IR_REGSET_INCL(tmp, reg);
+				ctx->used_preserved_regs = tmp;
 			}
 			return reg;
 		}
 		reg = IR_REGSET_FIRST(available);
 		if (IR_REGSET_IN(data->preserved, reg)) {
-			IR_REGSET_INCL(ctx->used_preserved_regs, reg);
+			ir_regset tmp = (ir_regset)ctx->used_preserved_regs;
+			IR_REGSET_INCL(tmp, reg);
+			ctx->used_preserved_regs = tmp;
 		}
 		return reg;
 	}
@@ -308,13 +312,17 @@ static ir_reg _pick_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_type type,
 			if (!IR_REGSET_IS_EMPTY(available_preferred)) {
 				reg = IR_REGSET_FIRST(available_preferred);
 				if (IR_REGSET_IN(data->preserved, reg)) {
-					IR_REGSET_INCL(ctx->used_preserved_regs, reg);
+					ir_regset tmp = (ir_regset)ctx->used_preserved_regs;
+					IR_REGSET_INCL(tmp, reg);
+					ctx->used_preserved_regs = tmp;
 				}
 				return reg;
 			}
 			reg = IR_REGSET_FIRST(available_unused);
 			if (IR_REGSET_IN(data->preserved, reg)) {
-				IR_REGSET_INCL(ctx->used_preserved_regs, reg);
+				ir_regset tmp = (ir_regset)ctx->used_preserved_regs;
+				IR_REGSET_INCL(tmp, reg);
+				ctx->used_preserved_regs = tmp;
 			}
 			return reg;
 		}
@@ -540,12 +548,12 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 
 	data.scratch = IR_REGSET_DIFFERENCE(ir_scratch_regset[data.ra_data.cc->scratch_reg - IR_REG_NUM], ctx->fixed_regset);
 	data.preserved = IR_REGSET_DIFFERENCE(data.ra_data.cc->preserved_regs, ctx->fixed_regset);
-	data.fixed = ctx->fixed_regset;
+	data.fixed = (ir_regset)ctx->fixed_regset;
 	param_regs = IR_REGSET_EMPTY;
 
 	ctx->regs = ir_mem_malloc(sizeof(ir_regs) * ctx->insns_count);
 	memset(ctx->regs, IR_REG_NONE, sizeof(ir_regs) * ctx->insns_count);
-
+	
 	/* vregs + tmp + fixed + SRATCH + ALL */
 	ctx->live_intervals = ir_mem_calloc(ctx->vregs_count + 1 + IR_REG_SET_NUM, sizeof(ir_live_interval*));
 
