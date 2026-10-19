@@ -1,0 +1,36 @@
+--TEST--
+003: LE on uint16_t constants after PHI is signed
+--ARGS--
+--run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+static const @fmt[4] = "%d\n\000";
+func @main(int32_t): int32_t
+{
+	uint16_t c_1 = 0xffff;
+	uint16_t c_2 = 1;
+	uint16_t c_3 = 16;
+	uintptr_t c_4 = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t c_5 = sym(@fmt);
+	int32_t c_6 = 1;
+	int32_t c_7 = 0;
+	l_1 = START(l_16);
+	int32_t d_2 = PARAM(l_1, "argc", 1);
+	l_3 = IF(l_1, d_2);
+	l_4 = IF_TRUE(l_3);
+	l_5 = END(l_4);
+	l_6 = IF_FALSE(l_3);
+	l_7 = END(l_6);
+	l_8 = MERGE(l_5, l_7);
+	uint16_t d_9 = PHI(l_8, c_1, c_2);
+	bool d_10 = LE(d_9, c_3);
+	l_11 = IF(l_8, d_10);
+	l_12 = IF_TRUE(l_11);
+	int32_t d_13, l_13 = CALL/2(l_12, c_4, c_5, c_6);
+	l_14 = RETURN(l_13, c_7);
+	l_15 = IF_FALSE(l_11);
+	int32_t d_16, l_17 = CALL/2(l_15, c_4, c_5, c_7);
+	l_16 = RETURN(l_17, c_7, l_14);
+}
+--EXPECT--
+1
