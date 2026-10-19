@@ -66,129 +66,67 @@ aarch64
 }
 --EXPECT--
 test:
-	sub sp, sp, #0x90
-	str w0, [sp]
-	str w1, [sp, #4]
-	str w2, [sp, #8]
-	str w3, [sp, #0xc]
-	str w5, [sp, #0x10]
-	str w6, [sp, #0x14]
-	str w7, [sp, #0x18]
-	ldr w0, [sp]
+	sub sp, sp, #0x30
+	str w1, [sp, #0x20]
+	str w2, [sp, #0x18]
+	mov w1, w3
+	mov w2, w5
+	mov w3, w6
+	mov w4, w7
 	str w0, [sp, #0x1c]
-	ldr w0, [sp, #0xc]
-	str w0, [sp, #0x20]
-	ldr w0, [sp, #0x10]
-	str w0, [sp, #0x24]
-	ldr w0, [sp, #0x14]
-	str w0, [sp, #0x28]
-	ldr w0, [sp, #0x18]
-	str w0, [sp, #0x2c]
+	str w1, [sp, #0x14]
+	str w2, [sp, #0xc]
+	str w3, [sp, #8]
+	str w4, [sp, #4]
 .L1:
-	ldr w0, [sp, #0x90]
+	ldr w0, [sp, #0x30]
 	cbz w0, .L2
-	ldr w0, [sp, #8]
-	ldr w1, [sp, #4]
-	mul w0, w0, w1
-	str w0, [sp, #0x30]
-	ldr w0, [sp, #0x30]
-	add w0, w0, #4
-	str w0, [sp, #0x34]
-	ldr w0, [sp, #8]
-	str w0, [sp, #0x38]
-	ldr w0, [sp, #0x38]
-	str w0, [sp, #0x4c]
-	ldr w0, [sp, #0x20]
-	str w0, [sp, #0x50]
-	ldr w0, [sp, #0x30]
-	str w0, [sp, #0x54]
-	ldr w0, [sp, #0x34]
-	str w0, [sp, #0x58]
-	ldr w0, [sp, #0x28]
-	str w0, [sp, #0x5c]
-	ldr w0, [sp, #0x2c]
-	str w0, [sp, #0x60]
+	ldr w0, [sp, #0x18]
+	ldr w1, [sp, #0x20]
+	mul w1, w0, w1
+	add w2, w1, #4
+	ldr w0, [sp, #0x18]
+	str w0, [sp, #0x1c]
+	str w1, [sp, #0x10]
+	str w2, [sp, #0xc]
 	b .L3
 .L2:
-	ldr w0, [sp, #8]
-	str w0, [sp, #0x3c]
-	ldr w0, [sp, #0x3c]
-	ldr w1, [sp, #4]
-	mul w0, w0, w1
-	str w0, [sp, #0x40]
-	ldr w0, [sp, #0x1c]
-	ldr w1, [sp, #4]
-	mul w0, w0, w1
-	str w0, [sp, #0x44]
-	ldr w0, [sp, #0x44]
-	add w0, w0, #1
-	str w0, [sp, #0x48]
-	ldr w0, [sp, #0x1c]
-	str w0, [sp, #0x4c]
-	ldr w0, [sp, #0x3c]
-	str w0, [sp, #0x50]
-	ldr w0, [sp, #0x40]
-	str w0, [sp, #0x54]
-	ldr w0, [sp, #0x24]
-	str w0, [sp, #0x58]
-	ldr w0, [sp, #0x44]
-	str w0, [sp, #0x5c]
-	ldr w0, [sp, #0x48]
-	str w0, [sp, #0x60]
+	ldr w0, [sp, #0x18]
+	ldr w3, [sp, #0x20]
+	mul w1, w0, w3
+	ldr w2, [sp, #0x1c]
+	mul w2, w2, w3
+	add w3, w2, #1
+	str w0, [sp, #0x14]
+	str w1, [sp, #0x10]
+	str w2, [sp, #8]
+	str w3, [sp, #4]
 .L3:
-	ldr w0, [sp, #0x4c]
-	ldr w1, [sp, #4]
-	mul w0, w0, w1
-	str w0, [sp, #0x64]
-	ldr w0, [sp, #0x64]
-	add w0, w0, #1
-	str w0, [sp, #0x68]
-	ldr w0, [sp, #0x98]
+	ldr w1, [sp, #0x1c]
+	ldr w2, [sp, #0x20]
+	mul w1, w1, w2
+	add w1, w1, #1
+	str w1, [sp]
+	ldr w0, [sp, #0x38]
 	cbz w0, .L4
-	ldr w0, [sp, #0x4c]
-	str w0, [sp, #0x1c]
-	ldr w0, [sp, #0x50]
-	str w0, [sp, #0x20]
-	ldr w0, [sp, #0x58]
-	str w0, [sp, #0x24]
-	ldr w0, [sp, #0x5c]
-	str w0, [sp, #0x28]
-	ldr w0, [sp, #0x60]
-	str w0, [sp, #0x2c]
 	b .L1
 .L4:
-	ldr w0, [sp, #0x4c]
-	ldr w1, [sp, #4]
+	ldr w0, [sp, #0x1c]
+	ldr w8, [sp, #0x20]
+	add w0, w0, w8
+	ldr w7, [sp, #0x18]
+	add w0, w0, w7
+	ldr w6, [sp, #0x14]
+	add w0, w0, w6
+	ldr w5, [sp, #0x10]
+	add w0, w0, w5
+	ldr w4, [sp, #0xc]
+	add w0, w0, w4
+	ldr w3, [sp, #8]
+	add w0, w0, w3
+	ldr w2, [sp, #4]
+	add w0, w0, w2
+	ldr w1, [sp]
 	add w0, w0, w1
-	str w0, [sp, #0x6c]
-	ldr w0, [sp, #0x6c]
-	ldr w1, [sp, #8]
-	add w0, w0, w1
-	str w0, [sp, #0x70]
-	ldr w0, [sp, #0x70]
-	ldr w1, [sp, #0x50]
-	add w0, w0, w1
-	str w0, [sp, #0x74]
-	ldr w0, [sp, #0x74]
-	ldr w1, [sp, #0x54]
-	add w0, w0, w1
-	str w0, [sp, #0x78]
-	ldr w0, [sp, #0x78]
-	ldr w1, [sp, #0x58]
-	add w0, w0, w1
-	str w0, [sp, #0x7c]
-	ldr w0, [sp, #0x7c]
-	ldr w1, [sp, #0x5c]
-	add w0, w0, w1
-	str w0, [sp, #0x80]
-	ldr w0, [sp, #0x80]
-	ldr w1, [sp, #0x60]
-	add w0, w0, w1
-	str w0, [sp, #0x84]
-	ldr w0, [sp, #0x84]
-	ldr w1, [sp, #0x68]
-	add w0, w0, w1
-	str w0, [sp, #0x88]
-	ldr w0, [sp, #0x88]
-	add sp, sp, #0x90
+	add sp, sp, #0x30
 	ret
