@@ -1108,12 +1108,12 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 					}
 #if IR_X86_I64
 					if (data.regs[j].type == IR_I64 || data.regs[j].type == IR_U64) {
-						IR_REGSET_EXCL(available, reg);
+						IR_REGSET_INCL(used, reg);
 						if (reg2 == IR_REG_NONE
 						 || IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), reg2)) {
 							reg2 = _pick_reg(ctx, &data, data.regs[j].type, used, data.regs[j].flags, i, data.regs[j].def);
 							if (reg2 == IR_REG_NONE) {
-								IR_REGSET_INCL(available, reg);
+								IR_REGSET_EXCL(used, reg);
 								for (n = data.regs[j].start; n < data.regs[j].end; n++) {
 									IR_REGSET_EXCL(data.clobbered[n], reg);
 								}
