@@ -1,5 +1,5 @@
 --TEST--
-001: LT on uint32_t is signed
+001: LT on uint32_t is signed (-O0)
 --ARGS--
 -O0 --run
 --CODE--

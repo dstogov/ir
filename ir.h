@@ -321,10 +321,10 @@ typedef enum _ir_type {
 	_(NE,           d2C,  def, def, ___) /* not equal                   */ \
 	\
 	/* comparison ops (order matters, LT must be a modulo of 4 !!!)     */ \
-	_(LT,           d2,   def, def, ___) /* less                        */ \
-	_(GE,           d2,   def, def, ___) /* greater or equal            */ \
-	_(LE,           d2,   def, def, ___) /* less or equal               */ \
-	_(GT,           d2,   def, def, ___) /* greater                     */ \
+	_(LT,           d2,   def, def, ___) /* less (signed)               */ \
+	_(GE,           d2,   def, def, ___) /* greater or equal (signed)   */ \
+	_(LE,           d2,   def, def, ___) /* less or equal (signed)      */ \
+	_(GT,           d2,   def, def, ___) /* greater (signed)            */ \
 	_(ULT,          d2,   def, def, ___) /* unsigned less               */ \
 	_(UGE,          d2,   def, def, ___) /* unsigned greater or equal   */ \
 	_(ULE,          d2,   def, def, ___) /* unsigned less or equal      */ \
