@@ -61,11 +61,11 @@ func tls_store_dynamic(): void
 }
 --EXPECT--
 thread_pointer:
-	movq %gs:0, %rax
+	movq %gs:0x30, %rax
 	retq
 
 tls_addr_static:
-	movq %gs:0, %rax
+	movq %gs:0x30, %rax
 	addq $0x10, %rax
 	retq
 

@@ -14420,7 +14420,7 @@ static void ir_emit_tls_base_addr(ir_ctx *ctx, ir_reg reg, int mod)
 ||#if defined(_WIN64)
 |	gs
 ||	if (mod < 0) {
-|		mov Ra(reg), [0]
+|		mov Ra(reg), [0x30]
 ||	} else {
 |		mov Ra(reg), aword [0x58]
 |		mov Ra(reg), aword [Ra(reg)+mod]
@@ -14428,7 +14428,7 @@ static void ir_emit_tls_base_addr(ir_ctx *ctx, ir_reg reg, int mod)
 ||#elif defined(_WIN32)
 |	fs
 ||	if (mod < 0) {
-|		mov Ra(reg), [0]
+|		mov Ra(reg), [0x18]
 ||	} else {
 |		mov Ra(reg), aword [0x2c]
 |		mov Ra(reg), aword [Ra(reg)+mod]
