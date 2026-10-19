@@ -1,0 +1,66 @@
+--TEST--
+SWITCH with CASE_VAL and CASE_RANGE on reserved constants (true, false, NULL)
+--ARGS--
+--run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func select_bool(bool): int32_t
+{
+	bool c_1 = 1;
+	bool c_2 = 0;
+	int32_t c_3 = 11;
+	int32_t c_4 = 12;
+	int32_t c_5 = 99;
+	l_1 = START(l_12);
+	bool d_2 = PARAM(l_1, "x", 1);
+	l_3 = SWITCH(l_1, d_2);
+	l_4 = CASE_VAL(l_3, c_1);
+	l_5 = END(l_4);
+	l_6 = CASE_VAL(l_3, c_2);
+	l_7 = END(l_6);
+	l_8 = CASE_DEFAULT(l_3);
+	l_9 = END(l_8);
+	l_10 = MERGE/3(l_5, l_7, l_9);
+	int32_t d_11 = PHI/3(l_10, c_3, c_4, c_5);
+	l_12 = RETURN(l_10, d_11);
+}
+func select_addr(uintptr_t): int32_t
+{
+	uintptr_t c_1 = 0;
+	uintptr_t c_2 = 3;
+	int32_t c_3 = 21;
+	int32_t c_4 = 99;
+	l_1 = START(l_10);
+	uintptr_t d_2 = PARAM(l_1, "p", 1);
+	l_3 = SWITCH(l_1, d_2);
+	l_4 = CASE_RANGE(l_3, c_1, c_2);
+	l_5 = END(l_4);
+	l_6 = CASE_DEFAULT(l_3);
+	l_7 = END(l_6);
+	l_8 = MERGE/2(l_5, l_7);
+	int32_t d_9 = PHI/2(l_8, c_3, c_4);
+	l_10 = RETURN(l_8, d_9);
+}
+func main(void): int32_t
+{
+	bool c_1 = 1;
+	bool c_2 = 0;
+	uintptr_t c_3 = 0;
+	uintptr_t c_4 = 3;
+	uintptr_t c_5 = 4;
+	int32_t c_6 = 0;
+	uintptr_t c_7 = func select_bool(bool): int32_t;
+	uintptr_t c_8 = func select_addr(uintptr_t): int32_t;
+	uintptr_t c_9 = "%d %d %d %d %d\n";
+	uintptr_t c_10 = func printf(uintptr_t, ...): int32_t;
+	l_1 = START(l_8);
+	int32_t d_2, l_2 = CALL/1(l_1, c_7, c_1);
+	int32_t d_3, l_3 = CALL/1(l_2, c_7, c_2);
+	int32_t d_4, l_4 = CALL/1(l_3, c_8, c_3);
+	int32_t d_5, l_5 = CALL/1(l_4, c_8, c_4);
+	int32_t d_6, l_6 = CALL/1(l_5, c_8, c_5);
+	int32_t d_7, l_7 = CALL/6(l_6, c_10, c_9, d_2, d_3, d_4, d_5, d_6);
+	l_8 = RETURN(l_7, c_6);
+}
+--EXPECT--
+11 12 21 21 99
