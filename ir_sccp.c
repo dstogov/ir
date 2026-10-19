@@ -3040,6 +3040,7 @@ static bool ir_cmp_is_true(ir_op op, const ir_insn *op1, const ir_insn *op2)
 				return op1->val.i8 < op2->val.i8;
 			} else {
 				IR_ASSERT(0);
+				return 0;
 			}
 		} else if (op == IR_GE) {
 			if (IR_IS_TYPE_SIGNED(op1->type)) {
@@ -3056,6 +3057,7 @@ static bool ir_cmp_is_true(ir_op op, const ir_insn *op1, const ir_insn *op2)
 				return op1->val.i8 >= op2->val.i8;
 			} else {
 				IR_ASSERT(0);
+				return 0;
 			}
 		} else if (op == IR_LE) {
 			if (IR_IS_TYPE_SIGNED(op1->type)) {
@@ -3072,6 +3074,7 @@ static bool ir_cmp_is_true(ir_op op, const ir_insn *op1, const ir_insn *op2)
 				return op1->val.i8 <= op2->val.i8;
 			} else {
 				IR_ASSERT(0);
+				return 0;
 			}
 		} else if (op == IR_GT) {
 			if (IR_IS_TYPE_SIGNED(op1->type)) {
@@ -3088,6 +3091,7 @@ static bool ir_cmp_is_true(ir_op op, const ir_insn *op1, const ir_insn *op2)
 				return op1->val.i8 > op2->val.i8;
 			} else {
 				IR_ASSERT(0);
+				return 0;
 			}
 		} else if (op == IR_ULT) {
 			return op1->val.u64 < op2->val.u64;
