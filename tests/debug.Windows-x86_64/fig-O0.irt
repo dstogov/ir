@@ -66,112 +66,58 @@ x86_64-windows
 }
 --EXPECT--
 test:
-	subq $0x80, %rsp
-	movl %ecx, (%rsp)
-	movl %edx, 4(%rsp)
-	movl %r8d, 8(%rsp)
-	movl %r9d, 0xc(%rsp)
-	movl (%rsp), %eax
-	movl %eax, 0x10(%rsp)
-	movl 0xc(%rsp), %eax
-	movl %eax, 0x14(%rsp)
-	movl 0xb0(%rsp), %eax
-	movl %eax, 0x18(%rsp)
-	movl 0xb8(%rsp), %eax
+	subq $0x30, %rsp
+	movl %ecx, %eax
+	movl %edx, 0x20(%rsp)
+	movl %r8d, 0x18(%rsp)
+	movl %r9d, %ecx
+	movl 0x60(%rsp), %edx
+	movl 0x68(%rsp), %r8d
+	movl 0x70(%rsp), %r9d
 	movl %eax, 0x1c(%rsp)
-	movl 0xc0(%rsp), %eax
-	movl %eax, 0x20(%rsp)
+	movl %ecx, 0x14(%rsp)
+	movl %edx, 0xc(%rsp)
+	movl %r8d, 8(%rsp)
+	movl %r9d, 4(%rsp)
 .L1:
-	cmpl $0, 0xc8(%rsp)
+	cmpl $0, 0x78(%rsp)
 	je .L2
-	movl 8(%rsp), %eax
-	imull 4(%rsp), %eax
-	movl %eax, 0x24(%rsp)
-	movl 0x24(%rsp), %eax
-	leal 4(%rax), %eax
-	movl %eax, 0x28(%rsp)
-	movl 8(%rsp), %eax
-	movl %eax, 0x2c(%rsp)
-	movl 0x2c(%rsp), %eax
-	movl %eax, 0x40(%rsp)
-	movl 0x14(%rsp), %eax
-	movl %eax, 0x44(%rsp)
-	movl 0x24(%rsp), %eax
-	movl %eax, 0x48(%rsp)
-	movl 0x28(%rsp), %eax
-	movl %eax, 0x4c(%rsp)
-	movl 0x1c(%rsp), %eax
-	movl %eax, 0x50(%rsp)
-	movl 0x20(%rsp), %eax
-	movl %eax, 0x54(%rsp)
+	movl 0x18(%rsp), %ecx
+	imull 0x20(%rsp), %ecx
+	leal 4(%rcx), %edx
+	movl 0x18(%rsp), %eax
+	movl %eax, 0x1c(%rsp)
+	movl %ecx, 0x10(%rsp)
+	movl %edx, 0xc(%rsp)
 	jmp .L3
 .L2:
-	movl 8(%rsp), %eax
-	movl %eax, 0x30(%rsp)
-	movl 0x30(%rsp), %eax
-	imull 4(%rsp), %eax
-	movl %eax, 0x34(%rsp)
-	movl 0x10(%rsp), %eax
-	imull 4(%rsp), %eax
-	movl %eax, 0x38(%rsp)
-	movl 0x38(%rsp), %eax
-	leal 1(%rax), %eax
-	movl %eax, 0x3c(%rsp)
-	movl 0x10(%rsp), %eax
-	movl %eax, 0x40(%rsp)
-	movl 0x30(%rsp), %eax
-	movl %eax, 0x44(%rsp)
-	movl 0x34(%rsp), %eax
-	movl %eax, 0x48(%rsp)
 	movl 0x18(%rsp), %eax
-	movl %eax, 0x4c(%rsp)
-	movl 0x38(%rsp), %eax
-	movl %eax, 0x50(%rsp)
-	movl 0x3c(%rsp), %eax
-	movl %eax, 0x54(%rsp)
-.L3:
-	movl 0x40(%rsp), %eax
-	imull 4(%rsp), %eax
-	movl %eax, 0x58(%rsp)
-	cmpl $0, 0xd0(%rsp)
-	je .L4
-	movl 0x40(%rsp), %eax
-	movl %eax, 0x10(%rsp)
-	movl 0x44(%rsp), %eax
+	movl %eax, %ecx
+	imull 0x20(%rsp), %ecx
+	movl 0x1c(%rsp), %edx
+	imull 0x20(%rsp), %edx
+	leal 1(%rdx), %r8d
 	movl %eax, 0x14(%rsp)
-	movl 0x4c(%rsp), %eax
-	movl %eax, 0x18(%rsp)
-	movl 0x50(%rsp), %eax
-	movl %eax, 0x1c(%rsp)
-	movl 0x54(%rsp), %eax
-	movl %eax, 0x20(%rsp)
+	movl %ecx, 0x10(%rsp)
+	movl %edx, 8(%rsp)
+	movl %r8d, 4(%rsp)
+.L3:
+	movl 0x1c(%rsp), %eax
+	imull 0x20(%rsp), %eax
+	movl %eax, (%rsp)
+	cmpl $0, 0x80(%rsp)
+	je .L4
 	jmp .L1
 .L4:
-	movl 0x40(%rsp), %eax
-	addl 4(%rsp), %eax
-	movl %eax, 0x5c(%rsp)
-	movl 0x5c(%rsp), %eax
+	movl 0x1c(%rsp), %eax
+	addl 0x20(%rsp), %eax
+	addl 0x18(%rsp), %eax
+	addl 0x14(%rsp), %eax
+	addl 0x10(%rsp), %eax
+	addl 0xc(%rsp), %eax
 	addl 8(%rsp), %eax
-	movl %eax, 0x60(%rsp)
-	movl 0x60(%rsp), %eax
-	addl 0x44(%rsp), %eax
-	movl %eax, 0x64(%rsp)
-	movl 0x64(%rsp), %eax
-	addl 0x48(%rsp), %eax
-	movl %eax, 0x68(%rsp)
-	movl 0x68(%rsp), %eax
-	addl 0x4c(%rsp), %eax
-	movl %eax, 0x6c(%rsp)
-	movl 0x6c(%rsp), %eax
-	addl 0x50(%rsp), %eax
-	movl %eax, 0x70(%rsp)
-	movl 0x70(%rsp), %eax
-	addl 0x54(%rsp), %eax
-	movl %eax, 0x74(%rsp)
-	movl 0x74(%rsp), %eax
-	movl 0x58(%rsp), %ecx
+	addl 4(%rsp), %eax
+	movl (%rsp), %ecx
 	leal 1(%rax, %rcx), %eax
-	movl %eax, 0x78(%rsp)
-	movl 0x78(%rsp), %eax
-	addq $0x80, %rsp
+	addq $0x30, %rsp
 	retq
