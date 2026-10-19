@@ -15,7 +15,7 @@ jobs:
     container:
       image: ubuntu:22.04
     env:
-      CFLAGS: '-fsanitize=address,undefined'
+      CFLAGS: '-fsanitize=address,undefined -Werror=duplicated-cond -Werror=logical-op'
     steps:
       - uses: actions/checkout@v7
       - name: apt
@@ -36,7 +36,7 @@ jobs:
     container:
       image: ubuntu:22.04
     env:
-      CFLAGS: '-fsanitize=address,undefined'
+      CFLAGS: '-fsanitize=address,undefined -Werror=duplicated-cond -Werror=logical-op'
     steps:
       - uses: actions/checkout@v7
       - name: apt
@@ -48,16 +48,16 @@ jobs:
             libcapstone4 \
             make
       - name: make
-        run: make BUILD=debug CFLAGS=-std=c11 all
+        run: make BUILD=debug CFLAGS="-std=c11 -Werror=duplicated-cond -Werror=logical-op" all
       - name: test
-        run: make BUILD=debug CFLAGS=-std=c11 test-ci
+        run: make BUILD=debug CFLAGS="-std=c11 -Werror=duplicated-cond -Werror=logical-op" test-ci
   Linux_i386:
     name: 'Linux i386'
     runs-on: ubuntu-22.04
     container:
       image: ubuntu:22.04
     env:
-      CFLAGS: '-fsanitize=address,undefined'
+      CFLAGS: '-fsanitize=address,undefined -Werror=duplicated-cond -Werror=logical-op'
     steps:
       - uses: actions/checkout@v7
       - name: apt
@@ -89,6 +89,8 @@ jobs:
     runs-on: ubuntu-22.04-arm
     container:
       image: ubuntu:22.04
+    env:
+      CFLAGS: '-Werror=duplicated-cond -Werror=logical-op'
     steps:
       - uses: actions/checkout@v7
       - name: apt
