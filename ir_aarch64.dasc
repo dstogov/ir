@@ -9825,7 +9825,7 @@ void *ir_emit_code(ir_ctx *ctx, size_t *size_ptr)
 					if (!c) {
 						break;
 					}
-					w |= c << (8 * j);
+					w |= (uint32_t)(uint8_t)c << (8 * j);
 					i++;
 				}
 				|	.long w
