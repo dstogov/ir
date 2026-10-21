@@ -1051,32 +1051,18 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 
 #if IR_X86_I64
 				if (insn->type == IR_I64 || insn->type == IR_U64) {
+					/* allocate output register pair */
 					ir_reg reg_lo, reg_hi;
+
 					do {
 						if (ival->reg != IR_REG_NONE) {
 							if (!IR_REGSET_IN(used, ival->reg) && !IR_REGSET_IN(used, ival->reg_hi)) {
+								/* use the previously allocated register */
 								reg_lo = ival->reg;
 								reg_hi = ival->reg_hi;
 								reg = IR_REG_I64_PAIR(ival->reg, ival->reg_hi);
-#if 0
-								if (reg != constraints.def_reg && constraints.def_reg != IR_REG_NONE) {
-									ir_reg reg_lo = IR_REG_I64_LO(constraints.def_reg);
-									ir_reg reg_hi = IR_REG_I64_HI(constraints.def_reg);
-									if (IR_REGSET_IN(data.allocated, reg_lo)) {
-										_evict_reg(ctx, &data, reg_lo);
-									}
-									if (IR_REGSET_IN(data.allocated, reg_hi)) {
-										_evict_reg(ctx, &data, reg_hi);
-									}
-								}
-#endif
-								/* use the previously allocated register */
-//								if (ival->reg != IR_REG_NONE) {
-									IR_REGSET_EXCL(data.allocated, ival->reg);
-//								}
-//								if (ival->reg_hi != IR_REG_NONE) {
-									IR_REGSET_EXCL(data.allocated, ival->reg_hi);
-//								}
+								IR_REGSET_EXCL(data.allocated, ival->reg);
+								IR_REGSET_EXCL(data.allocated, ival->reg_hi);
 								ival->reg = ival->reg_hi = IR_REG_NONE;
 								IR_LOG_FREE(i, reg);
 								break;
@@ -1124,14 +1110,10 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 				} else
 #endif
 				do {
+					/* allocate output register */
 					do {
 						if (ival->reg != IR_REG_NONE) {
 							if (!IR_REGSET_IN(used, ival->reg)) {
-								if (ival->reg != constraints.def_reg
-								 && constraints.def_reg != IR_REG_NONE
-								 && IR_REGSET_IN(data.allocated, constraints.def_reg)) {
-									_evict_reg(ctx, &data, constraints.def_reg);
-								}
 								/* use the previously allocated register */
 								reg = ival->reg;
 								IR_REGSET_EXCL(data.allocated, reg);
@@ -1185,9 +1167,6 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 			/* allocate temporary registers */
 			for (j = 0; j < data.tmp_num; j++) {
 				ir_regset used = data.fixed;
-#if IR_X86_I64
-				ir_reg reg2;
-#endif
 
 				for (n = data.tmp_regs[j].start; n < data.tmp_regs[j].end; n++) {
 					used = IR_REGSET_UNION(used, data.clobbered[n]);
@@ -1199,15 +1178,18 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 				}
 #if IR_X86_I64
 				if (data.tmp_regs[j].type == IR_I64 || data.tmp_regs[j].type == IR_U64) {
+					ir_reg reg_hi;
+
 					IR_REGSET_INCL(used, reg);
-					reg2 = _pick_reg(ctx, &data, data.tmp_regs[j].type, used, IR_USE_MUST_BE_IN_REG, 0, 0);
+					reg_hi = _pick_reg(ctx, &data, data.tmp_regs[j].type, used, IR_USE_MUST_BE_IN_REG, 0, 0);
 					for (n = data.tmp_regs[j].start; n < data.tmp_regs[j].end; n++) {
-						IR_REGSET_INCL(data.clobbered[n], reg2);
+						IR_REGSET_INCL(data.clobbered[n], reg_hi);
 					}
-					if (reg > reg2) {
-						SWAP_REGS(reg, reg2);
+					IR_ASSERT(reg != reg_hi);
+					if (reg > reg_hi) {
+						SWAP_REGS(reg, reg_hi);
 					}
-					reg = IR_REG_I64_PAIR(reg, reg2);
+					reg = IR_REG_I64_PAIR(reg, reg_hi);
 				}
 #endif
 				reg = reg | data.tmp_regs[j].flags;
@@ -1350,7 +1332,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 				}
 #endif
 
-					/* allocate input register */
+				/* allocate input register */
 				do {
 					IR_ASSERT(data.regs[j].def > 0 && ctx->vregs[data.regs[j].def] > 0);
 					ival = ctx->live_intervals[ctx->vregs[data.regs[j].def]];
