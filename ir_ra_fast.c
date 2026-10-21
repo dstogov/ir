@@ -54,16 +54,16 @@ typedef struct {
 #ifdef IR_DEBUG
 # define IR_DEBUG_SPILLS 1
 # if IR_X86_I64
-#  define IR_REG_NAME_FMT        "%s%s%s"
-#  define IR_REG_NAME_VAL(_ival) ((_ival->flags & IR_LIVE_INTERVAL_TWO_REGS) ? \
-									ir_reg_name((_ival)->reg, IR_U32) : \
-									ir_reg_name((_ival)->reg, (_ival)->type)), \
-                                 ((_ival->flags & IR_LIVE_INTERVAL_TWO_REGS) ? " and " : ""), \
-                                 ((_ival->flags & IR_LIVE_INTERVAL_TWO_REGS) ? \
-									ir_reg_name((_ival)->reg_hi, IR_U32) : "")
+#  define IR_REG_NAME_FMT              "%s%s%s"
+#  define IR_REG_NAME_VAL(_reg, _type) (((_type) == IR_I64 || (_type) == IR_U64) ? \
+                                        ir_reg_name(IR_REG_I64_LO(IR_REG_NUM(_reg)), IR_U32) : \
+										ir_reg_name(IR_REG_NUM(_reg), _type)), \
+                                       (((_type) == IR_I64 || (_type) == IR_U64) ? " and " : ""), \
+                                       (((_type) == IR_I64 || (_type) == IR_U64) ? \
+                                        ir_reg_name(IR_REG_I64_HI(IR_REG_NUM(_reg)), IR_U32) : "")
 # else
-#  define IR_REG_NAME_FMT        "%s"
-#  define IR_REG_NAME_VAL(_ival) ir_reg_name((_ival)->reg, (_ival)->type)
+#  define IR_REG_NAME_FMT              "%s"
+#  define IR_REG_NAME_VAL(_reg, _type) ir_reg_name(IR_REG_NUM(_reg), _type)
 # endif
 # define IR_LOG(comment) do { \
 		if (ctx->flags & IR_DEBUG_RA) { \
@@ -72,17 +72,17 @@ typedef struct {
 	} while (0)
 # define IR_LOG_ASSIGN(_ref, _pos, _x, _y, _reg) do { \
 		if (ctx->flags & IR_DEBUG_RA) { \
-			fprintf(stderr, "  ---- Assign R%d (d_%d) to %s%s at %d (%d.%d)\n", \
+			fprintf(stderr, "  ---- Assign R%d (d_%d) to " IR_REG_NAME_FMT "%s at %d (%d.%d)\n", \
 				ctx->vregs[_ref], _ref, \
-				ir_reg_name(IR_REG_NUM(_reg), ctx->ir_base[_ref].type), \
+				IR_REG_NAME_VAL(_reg, ctx->ir_base[_ref].type), \
 				(((_reg) & IR_REG_SPILL_LOAD) ? " (spill)" : ""), \
 				_pos, _x, _y); \
 		} \
 	} while (0)
 # define IR_LOG_ASSIGN_TMP(_type, _pos, _x, _y, _reg) do { \
 		if (ctx->flags & IR_DEBUG_RA) { \
-			fprintf(stderr, "  ---- Assign TMP to %s%s at %d (%d.%d)\n", \
-				ir_reg_name(IR_REG_NUM(_reg), _type), \
+			fprintf(stderr, "  ---- Assign TMP to " IR_REG_NAME_FMT "%s at %d (%d.%d)\n", \
+				IR_REG_NAME_VAL(_reg, _type), \
 				(((_reg) & IR_REG_SPILL_LOAD) ? " (spill)" : ""), \
 				_pos, _x, _y); \
 		} \
@@ -101,23 +101,23 @@ typedef struct {
 	} while (0)
 # define IR_LOG_FREE(_ref, _reg) do { \
 		if (ctx->flags & IR_DEBUG_RA) { \
-			fprintf(stderr, "  ---- Free R%d(d_%d) assigned to %s\n", \
+			fprintf(stderr, "  ---- Free R%d(d_%d) assigned to " IR_REG_NAME_FMT "\n", \
 				ctx->vregs[_ref], _ref, \
-				ir_reg_name(IR_REG_NUM(_reg), ctx->ir_base[_ref].type)); \
+				IR_REG_NAME_VAL(_reg, ctx->ir_base[_ref].type)); \
 		} \
 	} while (0)
 # define IR_LOG_EVICT(_ref, _reg) do { \
 		if (ctx->flags & IR_DEBUG_RA) { \
-			fprintf(stderr, "  ---- Evict R%d(d_%d) assigned to %s\n", \
+			fprintf(stderr, "  ---- Evict R%d(d_%d) assigned to " IR_REG_NAME_FMT "\n", \
 				ctx->vregs[_ref], _ref, \
-				ir_reg_name(IR_REG_NUM(_reg), ctx->ir_base[_ref].type)); \
+				IR_REG_NAME_VAL(_reg, ctx->ir_base[_ref].type)); \
 		} \
 	} while (0)
 # define IR_LOG_SPILL_LOAD(_ref, _pos, _x, _y, _reg) do { \
 		if (ctx->flags & IR_DEBUG_RA) { \
-			fprintf(stderr, "  ---- Add Spill Load R%d (d_%d) to %s at %d (%d.%d)\n", \
+			fprintf(stderr, "  ---- Add Spill Load R%d (d_%d) to " IR_REG_NAME_FMT " at %d (%d.%d)\n", \
 				ctx->vregs[_ref], _ref, \
-				ir_reg_name(IR_REG_NUM(_reg), ctx->ir_base[_ref].type), \
+				IR_REG_NAME_VAL(_reg, ctx->ir_base[_ref].type), \
 				_pos, _x, _y); \
 		} \
 	} while (0)
@@ -213,7 +213,6 @@ static void _evict_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_reg reg)
 	ir_ref ref = data->state[reg].def;
 
 	IR_ASSERT(ctx->vregs[ref] > 0);
-	IR_LOG_EVICT(ref, reg);
 	ival = ctx->live_intervals[ctx->vregs[ref]];
 
 	/* allocate spill slot */
@@ -222,8 +221,40 @@ static void _evict_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_reg reg)
 	}
 
 	/* free reg */
-	ival->reg = IR_REG_NONE;
+#if IR_X86_I64
+	if (ival->type == IR_I64 || ival->type == IR_U64) {
+		if (ival->reg == IR_REG_NONE && ival->reg_hi == IR_REG_NONE) {
+			/* already evicted */
+			return;
+		}
+
+		IR_ASSERT(ival->reg != IR_REG_NONE && ival->reg_hi != IR_REG_NONE && (ival->reg == reg || ival->reg_hi == reg));
+
+		ir_reg pair = IR_REG_I64_PAIR(ival->reg, ival->reg_hi);
+		IR_LOG_EVICT(ref, pair);
+		IR_REGSET_EXCL(data->allocated, ival->reg);
+		IR_REGSET_EXCL(data->allocated, ival->reg_hi);
+		ival->reg = ival->reg_hi = IR_REG_NONE;
+
+		if (data->state[reg].use) {
+			/* add spill load for the previous use */
+			if (!data->state[reg].root
+			 || ctx->use_lists[data->state[reg].use].count == 1) { // ???
+				ir_set_alocated_reg(ctx, data->state[reg].use, data->state[reg].op, pair | IR_REG_SPILL_LOAD);
+			} else {
+				ctx->rules[data->state[reg].use] |= IR_FUSED_REG;
+				ir_set_fused_reg(ctx, data->state[reg].root, data->state[reg].use, data->state[reg].op,
+					pair | IR_REG_SPILL_LOAD);
+			}
+			IR_LOG_SPILL_LOAD(ref, data->state[reg].root, data->state[reg].use, data->state[reg].op, pair);
+		}
+		return;
+	}
+#endif
+	IR_ASSERT(ival->reg == reg);
+	IR_LOG_EVICT(ref, reg);
 	IR_REGSET_EXCL(data->allocated, reg);
+	ival->reg = IR_REG_NONE;
 
 	if (data->state[reg].use) {
 		/* add spill load for the previous use */
@@ -235,7 +266,7 @@ static void _evict_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_reg reg)
 			ir_set_fused_reg(ctx, data->state[reg].root, data->state[reg].use, data->state[reg].op,
 				reg | IR_REG_SPILL_LOAD);
 		}
-		IR_LOG_SPILL_LOAD(ref, data->state[reg].root, data->state[reg].use, data->state[reg].use, reg);
+		IR_LOG_SPILL_LOAD(ref, data->state[reg].root, data->state[reg].use, data->state[reg].op, reg);
 	}
 }
 
@@ -546,14 +577,18 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 	ctx->call_stack_size = 0;
 	ctx->used_preserved_regs = ctx->fixed_save_regset;
 
-	data.scratch = IR_REGSET_DIFFERENCE(ir_scratch_regset[data.ra_data.cc->scratch_reg - IR_REG_NUM], ctx->fixed_regset);
-	data.preserved = IR_REGSET_DIFFERENCE(data.ra_data.cc->preserved_regs, ctx->fixed_regset);
 	data.fixed = (ir_regset)ctx->fixed_regset;
+	if (ctx->flags & IR_USE_FRAME_POINTER) {
+		IR_REGSET_INCL(data.fixed, IR_REG_FRAME_POINTER);
+	}
+
+	data.scratch = IR_REGSET_DIFFERENCE(ir_scratch_regset[data.ra_data.cc->scratch_reg - IR_REG_NUM], data.fixed);
+	data.preserved = IR_REGSET_DIFFERENCE(data.ra_data.cc->preserved_regs, data.fixed);
 	param_regs = IR_REGSET_EMPTY;
 
 	ctx->regs = ir_mem_malloc(sizeof(ir_regs) * ctx->insns_count);
 	memset(ctx->regs, IR_REG_NONE, sizeof(ir_regs) * ctx->insns_count);
-	
+
 	/* vregs + tmp + fixed + SRATCH + ALL */
 	ctx->live_intervals = ir_mem_calloc(ctx->vregs_count + 1 + IR_REG_SET_NUM, sizeof(ir_live_interval*));
 
@@ -617,11 +652,53 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 							 && ctx->live_intervals[ctx->vregs[use]]->reg != IR_REG_NONE
 							 && _may_coalesce(ctx, input, use)) {
 								/* lightweight register coalescing */
-								reg = ctx->live_intervals[ctx->vregs[use]]->reg;
+								ir_live_interval *use_ival = ctx->live_intervals[ctx->vregs[use]];
+#if IR_X86_I64
+								if (use_ival->type == IR_I64 || use_ival->type == IR_U64) {
+									reg = IR_REG_I64_PAIR(use_ival->reg, use_ival->reg_hi);
+								} else
+#endif
+								reg = use_ival->reg;
 							} else {
 								reg = _pick_free_reg(ctx, &data, ival->type, bb->end, input);
+#if IR_X86_I64
+								if (ival->type == IR_I64 || ival->type == IR_U64) {
+									IR_REGSET_INCL(data.allocated, reg);
+									ir_reg reg_hi = _pick_free_reg(ctx, &data, ival->type, bb->end, input);
+									if (reg_hi == IR_REG_NONE) {
+										IR_REGSET_EXCL(data.allocated, reg);
+										reg = IR_REG_NONE;
+									} else {
+										if (reg > reg_hi) {
+											SWAP_REGS(reg, reg_hi);
+										}
+										reg = IR_REG_I64_PAIR(reg, reg_hi);
+									}
+								}
+#endif
 							}
 							if (reg != IR_REG_NONE) {
+#if IR_X86_I64
+								if (ival->type == IR_I64 || ival->type == IR_U64) {
+									ir_reg reg_hi = IR_REG_I64_HI(reg);
+									ir_reg reg_lo = IR_REG_I64_LO(reg);
+									data.state[reg_hi].def = input;
+									data.state[reg_hi].root = IR_UNUSED;
+									data.state[reg_hi].use = use;
+									data.state[reg_hi].op = k;
+									IR_REGSET_INCL(data.allocated, reg_hi);
+									ival->reg_hi = reg_hi;
+									data.state[reg_lo].def = input;
+									data.state[reg_lo].root = IR_UNUSED;
+									data.state[reg_lo].use = use;
+									data.state[reg_lo].op = k;
+									IR_REGSET_INCL(data.allocated, reg_lo);
+									ival->reg = reg_lo;
+									ir_set_alocated_reg(ctx, use, k, reg);
+									IR_LOG_ASSIGN(input, bb->end, use, k, reg);
+									continue;
+								}
+#endif
 								data.state[reg].def = input;
 								data.state[reg].root = IR_UNUSED;
 								data.state[reg].use = use;
@@ -723,9 +800,29 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 					IR_ASSERT(ival);
 					if (ival->reg != IR_REG_NONE) {
 						/* use the previously allocated register */
+#if IR_X86_I64
+						if (ival->type == IR_I64 || ival->type == IR_U64) {
+							IR_REGSET_EXCL(data.allocated, ival->reg);
+							IR_REGSET_EXCL(data.allocated, ival->reg_hi);
+							reg = IR_REG_I64_PAIR(ival->reg, ival->reg_hi);
+							if (ival->stack_spill_pos != -1) {
+#if 1
+								/* Spilled PHI var is passed through memory */
+								_evict_reg(ctx, &data, reg);
+								reg = IR_REG_NONE;
+#else
+
+								reg |= IR_REG_SPILL_STORE;
+#endif
+							}
+							ival->reg = ival->reg_hi = IR_REG_NONE;
+							ir_set_alocated_reg(ctx, i, 0, reg);
+							IR_LOG_ASSIGN(i, i, i, 0, reg);
+							continue;
+						}
+#endif
 						reg = ival->reg;
 						IR_REGSET_EXCL(data.allocated, reg);
-						ival->reg = IR_REG_NONE;
 						if (ival->stack_spill_pos != -1) {
 #if 1
 							/* Spilled PHI var is passed through memory */
@@ -735,6 +832,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 							reg |= IR_REG_SPILL_STORE;
 #endif
 						}
+						ival->reg = IR_REG_NONE;
 						ir_set_alocated_reg(ctx, i, 0, reg);
 						IR_LOG_ASSIGN(i, i, i, 0, reg);
 					} else {
@@ -761,9 +859,10 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 					ir_allocate_var_spill_slot(ctx, insn->op2, &ctx->ir_base[insn->op2]);
 				}
 				if (b == 1
+				 && insn->op == IR_VSTORE
 				 && !IR_IS_CONST_REF(insn->op3)
 				 && ctx->ir_base[insn->op3].op == IR_PARAM
-				 && ctx->use_lists[insn->op3].count == 1
+				 && ctx->use_lists[insn->op3].count > 0
 				 /* first use of VAR is VSTORE(_, VAR, PARAM) */
 				 && ctx->use_edges[ctx->use_lists[insn->op2].refs] == i) {
 					ir_live_interval *ival = ctx->live_intervals[ctx->vregs[insn->op3]];
@@ -780,7 +879,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 
 			/* Reset information for the current instruction */
 			data.num = data.tmp_num = 0;
-			data.clobbered_args = IR_REGSET_EMPTY;
+			data.clobbered_args = data.fixed;
 			for (j = 0; j < IR_SUB_REFS_COUNT; j++) {
 				data.clobbered[j] = IR_REGSET_EMPTY;
 			}
@@ -939,7 +1038,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 					def_pos = IR_DEF_SUB_REF;
 				}
 
-				used = IR_REGSET_EMPTY;
+				used = data.fixed;
 				for (n = def_pos; n <= IR_SAVE_SUB_REF; n++) {
 					used = IR_REGSET_UNION(used, data.clobbered[n]);
 				}
@@ -949,46 +1048,123 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 					ival = _create_ival(ctx, ctx->vregs[i], insn->type);
 				}
 
-				do {
-					if (ival->reg != IR_REG_NONE) {
-						if (!IR_REGSET_IN(used, ival->reg)) {
-							if (ival->reg != constraints.def_reg
-							 && constraints.def_reg != IR_REG_NONE
-							 && IR_REGSET_IN(data.allocated, constraints.def_reg)) {
-								_evict_reg(ctx, &data, constraints.def_reg);
+
+#if IR_X86_I64
+				if (insn->type == IR_I64 || insn->type == IR_U64) {
+					ir_reg reg_lo, reg_hi;
+					do {
+						if (ival->reg != IR_REG_NONE) {
+							if (!IR_REGSET_IN(used, ival->reg) && !IR_REGSET_IN(used, ival->reg_hi)) {
+								reg_lo = ival->reg;
+								reg_hi = ival->reg_hi;
+								reg = IR_REG_I64_PAIR(ival->reg, ival->reg_hi);
+#if 0
+								if (reg != constraints.def_reg && constraints.def_reg != IR_REG_NONE) {
+									ir_reg reg_lo = IR_REG_I64_LO(constraints.def_reg);
+									ir_reg reg_hi = IR_REG_I64_HI(constraints.def_reg);
+									if (IR_REGSET_IN(data.allocated, reg_lo)) {
+										_evict_reg(ctx, &data, reg_lo);
+									}
+									if (IR_REGSET_IN(data.allocated, reg_hi)) {
+										_evict_reg(ctx, &data, reg_hi);
+									}
+								}
+#endif
+								/* use the previously allocated register */
+//								if (ival->reg != IR_REG_NONE) {
+									IR_REGSET_EXCL(data.allocated, ival->reg);
+//								}
+//								if (ival->reg_hi != IR_REG_NONE) {
+									IR_REGSET_EXCL(data.allocated, ival->reg_hi);
+//								}
+								ival->reg = ival->reg_hi = IR_REG_NONE;
+								IR_LOG_FREE(i, reg);
+								break;
+							} else {
+								_evict_reg(ctx, &data, ival->reg);
 							}
-							/* use the previously allocated register */
-							reg = ival->reg;
-							IR_REGSET_EXCL(data.allocated, reg);
-							ival->reg = IR_REG_NONE;
-							IR_LOG_FREE(i, reg);
-							break;
-						} else {
-							_evict_reg(ctx, &data, ival->reg);
 						}
+
+						if (def_flags & IR_USE_MUST_BE_IN_REG) {
+							reg = constraints.def_reg;
+
+							if (reg != IR_REG_NONE
+							 && !IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), IR_REG_I64_LO(reg))
+							 && !IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), IR_REG_I64_HI(reg))) {
+								/* use fixed register hint */
+								reg_hi = IR_REG_I64_HI(reg);
+								reg_lo = IR_REG_I64_LO(reg);
+							} else {
+								reg_lo = _pick_reg(ctx, &data, insn->type, used, IR_USE_MUST_BE_IN_REG, 0, 0);
+								IR_REGSET_INCL(used, reg_lo);
+								reg_hi = _pick_reg(ctx, &data, insn->type, used, IR_USE_MUST_BE_IN_REG, 0, 0);
+								reg = IR_REG_I64_PAIR(ival->reg, ival->reg_hi);
+								IR_ASSERT(reg_lo != reg_hi);
+								if (reg_lo > reg_hi) {
+									SWAP_REGS(reg_lo, reg_hi);
+								}
+								reg = IR_REG_I64_PAIR(reg_lo, reg_hi);
+							}
+						} else {
+							reg = IR_REG_NONE;
+						}
+					} while (0);
+
+					if (reg != IR_REG_NONE) {
+						for (n = def_pos; n <= IR_SAVE_SUB_REF; n++) {
+							IR_REGSET_INCL(data.clobbered[n], reg_lo);
+							IR_REGSET_INCL(data.clobbered[n], reg_hi);
+						}
+						if (ival && ival->stack_spill_pos != -1) {
+							reg |= IR_REG_SPILL_STORE;
+						}
+						ir_set_alocated_reg(ctx, i, 0, reg);
+						IR_LOG_ASSIGN(i, i, i, 0, reg);
 					}
-					if (def_flags & IR_USE_MUST_BE_IN_REG) {
-						reg = constraints.def_reg;
-						if (reg != IR_REG_NONE && !IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), reg)) {
-							/* use fixed register hint */
-						} else {
-							reg = _pick_reg(ctx, &data, insn->type, used, IR_USE_MUST_BE_IN_REG, 0, 0);
+				} else
+#endif
+				do {
+					do {
+						if (ival->reg != IR_REG_NONE) {
+							if (!IR_REGSET_IN(used, ival->reg)) {
+								if (ival->reg != constraints.def_reg
+								 && constraints.def_reg != IR_REG_NONE
+								 && IR_REGSET_IN(data.allocated, constraints.def_reg)) {
+									_evict_reg(ctx, &data, constraints.def_reg);
+								}
+								/* use the previously allocated register */
+								reg = ival->reg;
+								IR_REGSET_EXCL(data.allocated, reg);
+								ival->reg = IR_REG_NONE;
+								IR_LOG_FREE(i, reg);
+								break;
+							} else {
+								_evict_reg(ctx, &data, ival->reg);
+							}
 						}
-					} else {
-						reg = IR_REG_NONE;
+						if (def_flags & IR_USE_MUST_BE_IN_REG) {
+							reg = constraints.def_reg;
+							if (reg != IR_REG_NONE && !IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), reg)) {
+								/* use fixed register hint */
+							} else {
+								reg = _pick_reg(ctx, &data, insn->type, used, IR_USE_MUST_BE_IN_REG, 0, 0);
+							}
+						} else {
+							reg = IR_REG_NONE;
+						}
+					} while (0);
+
+					if (reg != IR_REG_NONE) {
+						for (n = def_pos; n <= IR_SAVE_SUB_REF; n++) {
+							IR_REGSET_INCL(data.clobbered[n], reg);
+						}
+						if (ival && ival->stack_spill_pos != -1) {
+							reg |= IR_REG_SPILL_STORE;
+						}
+						ir_set_alocated_reg(ctx, i, 0, reg);
+						IR_LOG_ASSIGN(i, i, i, 0, reg);
 					}
 				} while (0);
-
-				if (reg != IR_REG_NONE) {
-					for (n = def_pos; n <= IR_SAVE_SUB_REF; n++) {
-						IR_REGSET_INCL(data.clobbered[n], reg);
-					}
-					if (ival && ival->stack_spill_pos != -1) {
-						reg |= IR_REG_SPILL_STORE;
-					}
-					ir_set_alocated_reg(ctx, i, 0, reg);
-					IR_LOG_ASSIGN(i, i, i, 0, reg);
-				}
 			}
 
 			/* evict clobbered registers */
@@ -1008,7 +1184,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 
 			/* allocate temporary registers */
 			for (j = 0; j < data.tmp_num; j++) {
-				ir_regset used = IR_REGSET_EMPTY;
+				ir_regset used = data.fixed;
 #if IR_X86_I64
 				ir_reg reg2;
 #endif
@@ -1056,18 +1232,131 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 				ir_regset used = data.clobbered_args;
 				ir_live_interval *ival;
 
-#if IR_X86_I64
-				ir_reg reg2;
-#endif
-
 				for (n = data.regs[j].start; n < data.regs[j].end; n++) {
 					used = IR_REGSET_UNION(used, data.clobbered[n]);
 				}
 
+#if IR_X86_I64
+				if (data.regs[j].type == IR_I64 || data.regs[j].type == IR_U64) {
+					ir_reg reg_lo, reg_hi;
+
+					/* allocate input register pair */
+					do {
+						IR_ASSERT(data.regs[j].def > 0 && ctx->vregs[data.regs[j].def] > 0);
+						ival = ctx->live_intervals[ctx->vregs[data.regs[j].def]];
+						reg_lo = ival->reg;
+						reg_hi = ival->reg_hi;
+
+						/* reuse previously allocated registers if possible */
+						if (reg_lo != IR_REG_NONE && reg_hi != IR_REG_NONE) {
+							if (!IR_REGSET_IN(used, reg_lo) && !IR_REGSET_IN(used, ival->reg_hi)) {
+								IR_ASSERT(data.state[reg_lo].def == data.regs[j].def);
+								data.state[reg_lo].root = data.regs[j].root;
+								data.state[reg_lo].use = data.regs[j].ref;
+								data.state[reg_lo].op = data.regs[j].op;
+								data.state[reg_hi].root = data.regs[j].root;
+								data.state[reg_hi].use = data.regs[j].ref;
+								data.state[reg_hi].op = data.regs[j].op;
+								reg = IR_REG_I64_PAIR(reg_lo, reg_hi);
+								break;
+							} else if (data.state[reg_lo].def == data.regs[j].def) {
+								reg = IR_REG_I64_PAIR(reg_lo, reg_hi);
+								break;
+							}
+						}
+
+						/* try fixed register hint */
+						reg = data.regs[j].hint;
+						reg_hi = IR_REG_NONE;
+						reg_lo = IR_REG_NONE;
+						if (reg != IR_REG_NONE) {
+							if (data.regs[j].flags & IR_HINT_TWO_REGS) {
+								reg_hi = IR_REG_I64_HI(reg);
+								reg_lo = IR_REG_I64_LO(reg);
+							} else {
+								reg_lo = reg;
+							}
+						}
+
+						if (reg_lo != IR_REG_NONE
+						 && reg_hi != IR_REG_NONE
+						 && !IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), reg_lo)
+						 && !IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), reg_hi)) {
+							/* use fixed register hint */
+						} else if ((def_flags & IR_DEF_REUSES_OP1_REG)
+						 && data.regs[j].op == 1
+						 && data.regs[j].root == IR_UNUSED
+						 && ctx->regs[i][0] != IR_REG_NONE
+						 && (insn->type == IR_I64 || insn->type == IR_U64)
+						 && !IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), IR_REG_I64_LO(IR_REG_NUM(ctx->regs[i][0])))
+						 && !IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), IR_REG_I64_HI(IR_REG_NUM(ctx->regs[i][0])))
+						 && (ival->reg == IR_REG_NONE && ival->stack_spill_pos == -1)) {
+							/* reuse for op1 the register allocated for instruction result (lightweigh coalescing) */
+							reg = IR_REG_NUM(ctx->regs[i][0]);
+							reg_hi = IR_REG_I64_HI(reg);
+							reg_lo = IR_REG_I64_LO(reg);
+						} else {
+							reg_lo = _pick_reg(ctx, &data, data.regs[j].type, used, data.regs[j].flags, i, data.regs[j].def);
+							if (reg_lo == IR_REG_NONE) {
+								reg = IR_REG_NONE;
+								break;
+							}
+							IR_REGSET_INCL(data.allocated, reg_lo);
+							reg_hi = _pick_reg(ctx, &data, data.regs[j].type, used, data.regs[j].flags, i, data.regs[j].def);
+							if (reg_hi == IR_REG_NONE) {
+								IR_REGSET_EXCL(data.allocated, reg_lo);
+								reg = IR_REG_NONE;
+								break;
+							}
+							IR_ASSERT(reg_lo != reg_hi);
+							if (reg_lo > reg_hi) {
+								SWAP_REGS(reg_lo, reg_hi);
+							}
+							reg = IR_REG_I64_PAIR(reg_lo, reg_hi);
+						}
+
+						data.state[reg_lo].def = data.regs[j].def;
+						data.state[reg_lo].root = data.regs[j].root;
+						data.state[reg_lo].use = data.regs[j].ref;
+						data.state[reg_lo].op = data.regs[j].op;
+						data.state[reg_hi].def = data.regs[j].def;
+						data.state[reg_hi].root = data.regs[j].root;
+						data.state[reg_hi].use = data.regs[j].ref;
+						data.state[reg_hi].op = data.regs[j].op;
+						IR_REGSET_INCL(data.allocated, reg_lo);
+						IR_REGSET_INCL(data.allocated, reg_hi);
+						for (n = data.regs[j].start; n < data.regs[j].end; n++) {
+							IR_REGSET_INCL(data.clobbered[n], reg_lo);
+							IR_REGSET_INCL(data.clobbered[n], reg_hi);
+						}
+					} while (0);
+
+					if (reg != IR_REG_NONE) {
+						ival->reg = reg_lo;
+						ival->reg_hi = reg_hi;
+						if (!data.regs[j].root
+						 || ir_get_alocated_reg(ctx, data.regs[j].ref, data.regs[j].op) == IR_REG_NONE) {
+							ir_set_alocated_reg(ctx, data.regs[j].ref, data.regs[j].op, reg);
+						} else if (ir_get_alocated_reg(ctx, data.regs[j].ref, data.regs[j].op) != reg) {
+							ctx->rules[data.regs[j].ref] |= IR_FUSED_REG;
+							ir_set_fused_reg(ctx, data.regs[j].root, data.regs[j].ref, data.regs[j].op, reg);
+						}
+						IR_LOG_ASSIGN(data.regs[j].def, i, data.regs[j].ref, data.regs[j].op, reg);
+					} else if (ival->stack_spill_pos == -1) {
+						_pick_spill(ctx, ival);
+					}
+
+					continue;
+				}
+#endif
+
+					/* allocate input register */
 				do {
 					IR_ASSERT(data.regs[j].def > 0 && ctx->vregs[data.regs[j].def] > 0);
 					ival = ctx->live_intervals[ctx->vregs[data.regs[j].def]];
 					reg = ival->reg;
+
+					/* reuse previously allocated registers if possible */
 					if (reg != IR_REG_NONE) {
 						if (!IR_REGSET_IN(used, reg)) {
 							IR_ASSERT(data.state[reg].def == data.regs[j].def);
@@ -1080,26 +1369,29 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 						}
 					}
 
-
 					reg = data.regs[j].hint;
-#if IR_X86_I64
-					reg2 = IR_REG_NONE;
-					if (reg != IR_REG_NONE && (data.regs[j].type == IR_I64 || data.regs[j].type == IR_U64)) {
-						reg2 = IR_REG_I64_HI(reg);
-						reg = IR_REG_I64_LO(reg);
-					}
-#endif
 					if (reg != IR_REG_NONE && !IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), reg)) {
 						/* use fixed register hint */
 					} else if ((def_flags & IR_DEF_REUSES_OP1_REG)
 					 && data.regs[j].op == 1
 					 && data.regs[j].root == IR_UNUSED
 					 && ctx->regs[i][0] != IR_REG_NONE
-					 && !IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), IR_REG_NUM(ctx->regs[i][0]))
 					 && IR_IS_TYPE_INT(insn->type) == IR_IS_TYPE_INT(data.regs[j].type)
+#if IR_X86_I64
+					 && ((insn->type == IR_I64 || insn->type == IR_U64) ?
+						 !IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), IR_REG_I64_LO(IR_REG_NUM(ctx->regs[i][0]))) :
+						 !IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), IR_REG_NUM(ctx->regs[i][0])))
+#else
+					 && !IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), IR_REG_NUM(ctx->regs[i][0]))
+#endif
 					 && (ival->reg == IR_REG_NONE && ival->stack_spill_pos == -1)) {
 						/* reuse for op1 the register allocated for instruction result (lightweigh coalescing) */
 						reg = IR_REG_NUM(ctx->regs[i][0]);
+#if IR_X86_I64
+						if (insn->type == IR_I64 || insn->type == IR_U64) {
+							reg = IR_REG_I64_LO(reg);
+						}
+#endif
 					} else {
 						reg = _pick_reg(ctx, &data, data.regs[j].type, used, data.regs[j].flags, i, data.regs[j].def);
 						if (reg == IR_REG_NONE) {
@@ -1114,35 +1406,6 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 					for (n = data.regs[j].start; n < data.regs[j].end; n++) {
 						IR_REGSET_INCL(data.clobbered[n], reg);
 					}
-#if IR_X86_I64
-					if (data.regs[j].type == IR_I64 || data.regs[j].type == IR_U64) {
-						IR_REGSET_INCL(used, reg);
-						if (reg2 == IR_REG_NONE
-						 || IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), reg2)) {
-							reg2 = _pick_reg(ctx, &data, data.regs[j].type, used, data.regs[j].flags, i, data.regs[j].def);
-							if (reg2 == IR_REG_NONE) {
-								IR_REGSET_EXCL(used, reg);
-								for (n = data.regs[j].start; n < data.regs[j].end; n++) {
-									IR_REGSET_EXCL(data.clobbered[n], reg);
-								}
-								reg = IR_REG_NONE;
-								break;
-							}
-						}
-						data.state[reg2].def = data.regs[j].def;
-						data.state[reg2].root = data.regs[j].root;
-						data.state[reg2].use = data.regs[j].ref;
-						data.state[reg2].op = data.regs[j].op;
-						IR_REGSET_INCL(data.allocated, reg2);
-						for (n = data.regs[j].start; n < data.regs[j].end; n++) {
-							IR_REGSET_INCL(data.clobbered[n], reg2);
-						}
-						if (reg > reg2) {
-							SWAP_REGS(reg, reg2);
-						}
-						reg = IR_REG_I64_PAIR(reg, reg2);
-					}
-#endif
 				} while (0);
 
 				if (reg != IR_REG_NONE) {
