@@ -239,7 +239,7 @@ static void _evict_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_reg reg)
 		if (data->state[reg].use) {
 			/* add spill load for the previous use */
 			if (!data->state[reg].root
-			 || ctx->use_lists[data->state[reg].use].count == 1) { // ???
+			 || ctx->use_lists[data->state[reg].use].count == 1) {
 				ir_set_alocated_reg(ctx, data->state[reg].use, data->state[reg].op, pair | IR_REG_SPILL_LOAD);
 			} else {
 				ctx->rules[data->state[reg].use] |= IR_FUSED_REG;
@@ -259,7 +259,7 @@ static void _evict_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_reg reg)
 	if (data->state[reg].use) {
 		/* add spill load for the previous use */
 		if (!data->state[reg].root
-		 || ctx->use_lists[data->state[reg].use].count == 1) { // ???
+		 || ctx->use_lists[data->state[reg].use].count == 1) {
 			ir_set_alocated_reg(ctx, data->state[reg].use, data->state[reg].op, reg | IR_REG_SPILL_LOAD);
 		} else {
 			ctx->rules[data->state[reg].use] |= IR_FUSED_REG;
@@ -647,41 +647,42 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 						 * (otherwise it's treated as "global" and spilled).
 						 */
 						if (input > bb->start && input < bb->end) {
-							if (ctx->vregs[use] > 0
-							 && ctx->live_intervals[ctx->vregs[use]]
-							 && ctx->live_intervals[ctx->vregs[use]]->reg != IR_REG_NONE
-							 && _may_coalesce(ctx, input, use)) {
-								/* lightweight register coalescing */
-								ir_live_interval *use_ival = ctx->live_intervals[ctx->vregs[use]];
 #if IR_X86_I64
-								if (use_ival->type == IR_I64 || use_ival->type == IR_U64) {
-									reg = IR_REG_I64_PAIR(use_ival->reg, use_ival->reg_hi);
-								} else
-#endif
-								reg = use_ival->reg;
-							} else {
-								reg = _pick_free_reg(ctx, &data, ival->type, bb->end, input);
-#if IR_X86_I64
-								if (ival->type == IR_I64 || ival->type == IR_U64) {
-									IR_REGSET_INCL(data.allocated, reg);
-									ir_reg reg_hi = _pick_free_reg(ctx, &data, ival->type, bb->end, input);
-									if (reg_hi == IR_REG_NONE) {
-										IR_REGSET_EXCL(data.allocated, reg);
+							if (use_insn->type == IR_I64 || use_insn->type == IR_U64) {
+								ir_reg reg_hi, reg_lo;
+
+								if (ctx->vregs[use] > 0
+								 && ctx->live_intervals[ctx->vregs[use]]
+								 && ctx->live_intervals[ctx->vregs[use]]->reg != IR_REG_NONE
+								 && _may_coalesce(ctx, input, use)) {
+									/* lightweight register coalescing */
+									ir_live_interval *use_ival = ctx->live_intervals[ctx->vregs[use]];
+
+									reg_lo = use_ival->reg;
+									reg_hi = use_ival->reg_hi;
+									IR_ASSERT(!IR_REGSET_IN(data.allocated, reg_lo));
+									IR_ASSERT(!IR_REGSET_IN(data.allocated, reg_hi));
+									reg = IR_REG_I64_PAIR(reg_lo, reg_hi);
+								} else {
+									reg_lo = _pick_free_reg(ctx, &data, ival->type, bb->end, input);
+									if (reg_lo == IR_REG_NONE) {
 										reg = IR_REG_NONE;
 									} else {
-										if (reg > reg_hi) {
-											SWAP_REGS(reg, reg_hi);
+										IR_REGSET_INCL(data.allocated, reg_lo);
+										reg_hi = _pick_free_reg(ctx, &data, ival->type, bb->end, input);
+										if (reg_hi == IR_REG_NONE) {
+											IR_REGSET_EXCL(data.allocated, reg_lo);
+											reg = IR_REG_NONE;
+										} else {
+											IR_ASSERT(reg_lo != reg_hi);
+											if (reg_lo > reg_hi) {
+												SWAP_REGS(reg_lo, reg_hi);
+											}
+											reg = IR_REG_I64_PAIR(reg_lo, reg_hi);
 										}
-										reg = IR_REG_I64_PAIR(reg, reg_hi);
 									}
 								}
-#endif
-							}
-							if (reg != IR_REG_NONE) {
-#if IR_X86_I64
-								if (ival->type == IR_I64 || ival->type == IR_U64) {
-									ir_reg reg_hi = IR_REG_I64_HI(reg);
-									ir_reg reg_lo = IR_REG_I64_LO(reg);
+								if (reg != IR_REG_NONE) {
 									data.state[reg_hi].def = input;
 									data.state[reg_hi].root = IR_UNUSED;
 									data.state[reg_hi].use = use;
@@ -698,16 +699,31 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 									IR_LOG_ASSIGN(input, bb->end, use, k, reg);
 									continue;
 								}
+							} else
 #endif
-								data.state[reg].def = input;
-								data.state[reg].root = IR_UNUSED;
-								data.state[reg].use = use;
-								data.state[reg].op = k;
-								IR_REGSET_INCL(data.allocated, reg);
-								ival->reg = reg;
-								ir_set_alocated_reg(ctx, use, k, reg);
-								IR_LOG_ASSIGN(input, bb->end, use, k, reg);
-								continue;
+							{
+								if (ctx->vregs[use] > 0
+								 && ctx->live_intervals[ctx->vregs[use]]
+								 && ctx->live_intervals[ctx->vregs[use]]->reg != IR_REG_NONE
+								 && _may_coalesce(ctx, input, use)) {
+									/* lightweight register coalescing */
+									ir_live_interval *use_ival = ctx->live_intervals[ctx->vregs[use]];
+									reg = use_ival->reg;
+									IR_ASSERT(!IR_REGSET_IN(data.allocated, reg));
+								} else {
+									reg = _pick_free_reg(ctx, &data, ival->type, bb->end, input);
+								}
+								if (reg != IR_REG_NONE) {
+									data.state[reg].def = input;
+									data.state[reg].root = IR_UNUSED;
+									data.state[reg].use = use;
+									data.state[reg].op = k;
+									IR_REGSET_INCL(data.allocated, reg);
+									ival->reg = reg;
+									ir_set_alocated_reg(ctx, use, k, reg);
+									IR_LOG_ASSIGN(input, bb->end, use, k, reg);
+									continue;
+								}
 							}
 						}
 
@@ -808,7 +824,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 							if (ival->stack_spill_pos != -1) {
 #if 1
 								/* Spilled PHI var is passed through memory */
-								_evict_reg(ctx, &data, reg);
+								_evict_reg(ctx, &data, ival->reg);
 								reg = IR_REG_NONE;
 #else
 
