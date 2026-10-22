@@ -238,8 +238,7 @@ static void _evict_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_reg reg)
 
 		if (data->state[reg].use) {
 			/* add spill load for the previous use */
-			if (!data->state[reg].root
-			 || ctx->use_lists[data->state[reg].use].count == 1) {
+			if (!data->state[reg].root) {
 				ir_set_alocated_reg(ctx, data->state[reg].use, data->state[reg].op, pair | IR_REG_SPILL_LOAD);
 			} else {
 				ctx->rules[data->state[reg].use] |= IR_FUSED_REG;
@@ -258,8 +257,7 @@ static void _evict_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_reg reg)
 
 	if (data->state[reg].use) {
 		/* add spill load for the previous use */
-		if (!data->state[reg].root
-		 || ctx->use_lists[data->state[reg].use].count == 1) {
+		if (!data->state[reg].root) {
 			ir_set_alocated_reg(ctx, data->state[reg].use, data->state[reg].op, reg | IR_REG_SPILL_LOAD);
 		} else {
 			ctx->rules[data->state[reg].use] |= IR_FUSED_REG;
