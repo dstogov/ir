@@ -414,7 +414,7 @@ void ir_set_fused_reg(ir_ctx *ctx, ir_ref root, ir_ref ref, ir_ref op, int8_t re
 	}
 	memcpy(key, &root, sizeof(ir_ref));
 	memcpy(key + 4, &ref_and_op, sizeof(ir_ref));
-	ir_strtab_lookup(ctx->fused_regs, key, 8, 0x10000000 | (uint8_t)reg);
+	ir_strtab_set(ctx->fused_regs, key, 8, 0x10000000 | (uint8_t)reg);
 }
 
 static int8_t ir_get_fused_reg_ex(ir_ctx *ctx, ir_ref root, ir_ref ref_and_op)
