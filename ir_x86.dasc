@@ -2750,6 +2750,11 @@ get_arg_hints:
 				constraints->tmp_regs[n] = IR_TMP_REG(2, ctx->ir_base[insn->op2].type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 				n++;
 			}
+#if IR_X86_I64
+			if (IR_VECTOR_BASE_TYPE(insn->type) == IR_I64 || IR_VECTOR_BASE_TYPE(insn->type) == IR_U64) {
+				constraints->tmp_regs[n] = IR_TMP_REG(4, IR_U32, IR_USE_SUB_REF, IR_DEF_SUB_REF);
+			} else
+#endif
 			constraints->tmp_regs[n] = IR_TMP_REG(4, IR_VECTOR_BASE_TYPE(insn->type), IR_USE_SUB_REF, IR_DEF_SUB_REF);
 			n++;
 			if (!IR_IS_CONST_REF(insn->op3)) {
