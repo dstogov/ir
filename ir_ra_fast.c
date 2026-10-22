@@ -852,7 +852,9 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 							}
 							ival->reg = ival->reg_hi = IR_REG_NONE;
 							ir_set_alocated_reg(ctx, i, 0, reg);
-							IR_LOG_ASSIGN(i, i, i, 0, reg);
+							if (reg != IR_REG_NONE) {
+								IR_LOG_ASSIGN(i, i, i, 0, reg);
+							}
 							continue;
 						}
 #endif
@@ -869,7 +871,9 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 						}
 						ival->reg = IR_REG_NONE;
 						ir_set_alocated_reg(ctx, i, 0, reg);
-						IR_LOG_ASSIGN(i, i, i, 0, reg);
+						if (reg != IR_REG_NONE) {
+							IR_LOG_ASSIGN(i, i, i, 0, reg);
+						}
 					} else {
 						IR_ASSERT(ival->stack_spill_pos != -1);
 					}
