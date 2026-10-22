@@ -1,0 +1,89 @@
+--TEST--
+ABS of narrow integers with not normalized upper bits
+--ARGS--
+-O1 --run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @abs_i8(int8_t, int8_t): int32_t;
+func @abs_i8(int8_t, int8_t): int32_t
+{
+	l_1 = START(l_E);
+	int8_t x = PARAM(l_1, "x", 1);
+	int8_t y = PARAM(l_1, "y", 2);
+	int8_t s = ADD(x, y);
+	int8_t a = ABS(s);
+	int32_t r = SEXT(a);
+	l_E = RETURN(l_1, r);
+}
+func @abs_i16(int16_t, int16_t): int32_t;
+func @abs_i16(int16_t, int16_t): int32_t
+{
+	l_1 = START(l_E);
+	int16_t x = PARAM(l_1, "x", 1);
+	int16_t y = PARAM(l_1, "y", 2);
+	int16_t s = ADD(x, y);
+	int16_t a = ABS(s);
+	int32_t r = SEXT(a);
+	l_E = RETURN(l_1, r);
+}
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%d\n";
+	int32_t z = 0;
+	int8_t a0 = 100;
+	int8_t b0 = 100;
+	int8_t a1 = -100;
+	int8_t b1 = -100;
+	int8_t a2 = -128;
+	int8_t b2 = 0;
+	int8_t a3 = 5;
+	int8_t b3 = -10;
+	int8_t a4 = -128;
+	int8_t b4 = -128;
+	int16_t a5 = 20000;
+	int16_t b5 = 20000;
+	int16_t a6 = -20000;
+	int16_t b6 = -20000;
+	int16_t a7 = -32768;
+	int16_t b7 = 0;
+	int16_t a8 = 5;
+	int16_t b8 = -10;
+	int16_t a9 = -32768;
+	int16_t b9 = -32768;
+	uintptr_t f_abs_i16 = func @abs_i16(int16_t, int16_t): int32_t;
+	uintptr_t f_abs_i8 = func @abs_i8(int8_t, int8_t): int32_t;
+	l_0 = START(l_end);
+	int32_t r0, c0 = CALL/2(l_0, f_abs_i8, a0, b0);
+	p0 = CALL/2(c0, fp, fmt, r0);
+	int32_t r1, c1 = CALL/2(p0, f_abs_i8, a1, b1);
+	p1 = CALL/2(c1, fp, fmt, r1);
+	int32_t r2, c2 = CALL/2(p1, f_abs_i8, a2, b2);
+	p2 = CALL/2(c2, fp, fmt, r2);
+	int32_t r3, c3 = CALL/2(p2, f_abs_i8, a3, b3);
+	p3 = CALL/2(c3, fp, fmt, r3);
+	int32_t r4, c4 = CALL/2(p3, f_abs_i8, a4, b4);
+	p4 = CALL/2(c4, fp, fmt, r4);
+	int32_t r5, c5 = CALL/2(p4, f_abs_i16, a5, b5);
+	p5 = CALL/2(c5, fp, fmt, r5);
+	int32_t r6, c6 = CALL/2(p5, f_abs_i16, a6, b6);
+	p6 = CALL/2(c6, fp, fmt, r6);
+	int32_t r7, c7 = CALL/2(p6, f_abs_i16, a7, b7);
+	p7 = CALL/2(c7, fp, fmt, r7);
+	int32_t r8, c8 = CALL/2(p7, f_abs_i16, a8, b8);
+	p8 = CALL/2(c8, fp, fmt, r8);
+	int32_t r9, c9 = CALL/2(p8, f_abs_i16, a9, b9);
+	p9 = CALL/2(c9, fp, fmt, r9);
+	l_end = RETURN(p9, z);
+}
+--EXPECT--
+56
+56
+-128
+5
+0
+25536
+25536
+-32768
+5
+0
