@@ -7283,9 +7283,14 @@ static void ir_emit_mem_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_insn *op_insn = &ctx->ir_base[insn->op3];
 	ir_type type = op_insn->type;
 	ir_ref op2 = op_insn->op2;
-	ir_reg op2_reg = ctx->regs[insn->op3][2];
+	ir_reg op2_reg;
 	ir_mem mem;
 
+	if (UNEXPECTED(ctx->rules[insn->op3] & IR_FUSED_REG)) {
+		op2_reg = ir_get_fused_reg(ctx, def, insn->op3, 2);
+	} else {
+		op2_reg = ctx->regs[insn->op3][2];
+	}
 	if (insn->op == IR_STORE) {
 		mem = ir_fuse_mem(ctx, def, def, insn, ctx->regs[def][2]);
 	} else {
