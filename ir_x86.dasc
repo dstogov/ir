@@ -6363,6 +6363,7 @@ static ir_mem ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 	ir_reg base_reg = IR_REG_NONE, index_reg;
 	int32_t offset = 0, scale;
 	intptr_t long_offset;
+	bool base_loaded = 0;
 
 	IR_ASSERT(((rule & IR_RULE_MASK) >= IR_LEA_FIRST &&
 			(rule & IR_RULE_MASK) <= IR_LEA_LAST) ||
@@ -6618,24 +6619,21 @@ static ir_mem ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 		if (IR_REG_SPILLED(base_reg)) {
 			base_reg = IR_REG_NUM(base_reg);
 			ir_emit_load(ctx, insn->type, base_reg, ((ir_ref*)ctx->ir_base)[base_reg_ref]);
+			base_loaded = 1;
 		}
 	}
 
 	index_reg = IR_REG_NONE;
 	if (index_reg_ref) {
-		if (base_reg_ref
-			&& ((ir_ref*)ctx->ir_base)[index_reg_ref]
-				== ((ir_ref*)ctx->ir_base)[base_reg_ref]) {
-			index_reg = base_reg;
+		if (UNEXPECTED(ctx->rules[index_reg_ref / sizeof(ir_ref)] & IR_FUSED_REG)) {
+			index_reg = ir_get_fused_reg_ex(ctx, root, index_reg_ref);
 		} else {
-			if (UNEXPECTED(ctx->rules[index_reg_ref / sizeof(ir_ref)] & IR_FUSED_REG)) {
-				index_reg = ir_get_fused_reg_ex(ctx, root, index_reg_ref);
-			} else {
-				index_reg = ((int8_t*)ctx->regs)[index_reg_ref];
-			}
-			IR_ASSERT(index_reg != IR_REG_NONE);
-			if (IR_REG_SPILLED(index_reg)) {
-				index_reg = IR_REG_NUM(index_reg);
+			index_reg = ((int8_t*)ctx->regs)[index_reg_ref];
+		}
+		IR_ASSERT(index_reg != IR_REG_NONE);
+		if (IR_REG_SPILLED(index_reg)) {
+			index_reg = IR_REG_NUM(index_reg);
+			if (index_reg != base_reg || !base_loaded) {
 				ir_emit_load(ctx, insn->type, index_reg, ((ir_ref*)ctx->ir_base)[index_reg_ref]);
 			}
 		}
