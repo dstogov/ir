@@ -663,18 +663,21 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 							if (use_insn->type == IR_I64 || use_insn->type == IR_U64) {
 								ir_reg reg_hi, reg_lo;
 
-								if (ctx->vregs[use] > 0
-								 && ctx->live_intervals[ctx->vregs[use]]
-								 && ctx->live_intervals[ctx->vregs[use]]->reg != IR_REG_NONE
+								if (ival->reg != IR_REG_NONE) {
+									/* reuse previously allocated registers */
+									reg = IR_REG_I64_PAIR(ival->reg, ival->reg_hi);
+									ir_set_alocated_reg(ctx, use, k, reg);
+									IR_LOG_ASSIGN(input, bb->end, use, k, reg);
+									continue;
+								} else if (ctx->regs[use][0] != IR_REG_NONE
+								 && !IR_REG_SPILLED(ctx->regs[use][0])
+								 && !IR_REGSET_IN(data.allocated, IR_REG_I64_LO(ctx->regs[use][0]))
+								 && !IR_REGSET_IN(data.allocated, IR_REG_I64_HI(ctx->regs[use][0]))
 								 && _may_coalesce(ctx, input, use)) {
 									/* lightweight register coalescing */
-									ir_live_interval *use_ival = ctx->live_intervals[ctx->vregs[use]];
-
-									reg_lo = use_ival->reg;
-									reg_hi = use_ival->reg_hi;
-									IR_ASSERT(!IR_REGSET_IN(data.allocated, reg_lo));
-									IR_ASSERT(!IR_REGSET_IN(data.allocated, reg_hi));
-									reg = IR_REG_I64_PAIR(reg_lo, reg_hi);
+									reg = ctx->regs[use][0];
+									reg_lo = IR_REG_I64_LO(reg);
+									reg_hi = IR_REG_I64_HI(reg);
 								} else {
 									reg_lo = _pick_free_reg(ctx, &data, ival->type, bb->end, input);
 									if (reg_lo == IR_REG_NONE) {
@@ -714,14 +717,18 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 							} else
 #endif
 							{
-								if (ctx->vregs[use] > 0
-								 && ctx->live_intervals[ctx->vregs[use]]
-								 && ctx->live_intervals[ctx->vregs[use]]->reg != IR_REG_NONE
+								if (ival->reg != IR_REG_NONE) {
+									/* reuse previously allocated register */
+									reg = ival->reg;
+									ir_set_alocated_reg(ctx, use, k, reg);
+									IR_LOG_ASSIGN(input, bb->end, use, k, reg);
+									continue;
+								} else if (ctx->regs[use][0] != IR_REG_NONE
+								 && !IR_REG_SPILLED(ctx->regs[use][0])
+								 && !IR_REGSET_IN(data.allocated, ctx->regs[use][0])
 								 && _may_coalesce(ctx, input, use)) {
 									/* lightweight register coalescing */
-									ir_live_interval *use_ival = ctx->live_intervals[ctx->vregs[use]];
-									reg = use_ival->reg;
-									IR_ASSERT(!IR_REGSET_IN(data.allocated, reg));
+									reg = ctx->regs[use][0];
 								} else {
 									reg = _pick_free_reg(ctx, &data, ival->type, bb->end, input);
 								}
