@@ -290,6 +290,13 @@ static ir_reg _pick_free_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_type 
 
 	if (IR_IS_TYPE_INT(type)) {
 		available = IR_REGSET_GP;
+#if defined(IR_TARGET_X86)
+		if (ir_type_size[type] == 1) {
+			IR_REGSET_EXCL(available, IR_REG_RBP);
+			IR_REGSET_EXCL(available, IR_REG_RSI);
+			IR_REGSET_EXCL(available, IR_REG_RDI);
+		}
+#endif
 	} else {
 		IR_ASSERT(IR_IS_TYPE_FP(type) || IR_IS_TYPE_VECTOR(type));
 		available = IR_REGSET_FP;
@@ -326,6 +333,13 @@ static ir_reg _pick_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_type type,
 
 	if (IR_IS_TYPE_INT(type)) {
 		available = IR_REGSET_GP;
+#if defined(IR_TARGET_X86)
+		if (ir_type_size[type] == 1) {
+			IR_REGSET_EXCL(available, IR_REG_RBP);
+			IR_REGSET_EXCL(available, IR_REG_RSI);
+			IR_REGSET_EXCL(available, IR_REG_RDI);
+		}
+#endif
 	} else {
 		IR_ASSERT(IR_IS_TYPE_FP(type) || IR_IS_TYPE_VECTOR(type));
 		available = IR_REGSET_FP;
@@ -1373,6 +1387,12 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 					 && data.regs[j].root == IR_UNUSED
 					 && ctx->regs[i][0] != IR_REG_NONE
 					 && IR_IS_TYPE_INT(insn->type) == IR_IS_TYPE_INT(data.regs[j].type)
+#if defined(IR_TARGET_X86)
+					 && (ir_type_size[data.regs[j].type] != 1
+					  || (IR_REG_NUM(ctx->regs[i][0]) != IR_REG_RBP
+					   && IR_REG_NUM(ctx->regs[i][0]) != IR_REG_RSI
+					   && IR_REG_NUM(ctx->regs[i][0]) != IR_REG_RDI))
+#endif
 #if IR_X86_I64
 					 && ((insn->type == IR_I64 || insn->type == IR_U64) ?
 						 !IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), IR_REG_I64_LO(IR_REG_NUM(ctx->regs[i][0]))) :
