@@ -909,10 +909,11 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 					if (!ival) {
 						ival = _create_ival(ctx, ctx->vregs[insn->op3], ctx->ir_base[insn->op3].type);
 					}
-					IR_ASSERT(ival->stack_spill_pos == -1);
-					ival->stack_spill_pos = IR_VREG_TO_STACK_SLOT(ctx->vregs[insn->op2]);
-					IR_LOG_ASSIGN_SPILL(ival->vreg, ival->stack_spill_pos);
-					continue;
+					if (ival->stack_spill_pos == -1) {
+						ival->stack_spill_pos = IR_VREG_TO_STACK_SLOT(ctx->vregs[insn->op2]);
+						IR_LOG_ASSIGN_SPILL(ival->vreg, ival->stack_spill_pos);
+						continue;
+					}
 				}
 			}
 
