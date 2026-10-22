@@ -540,6 +540,7 @@ static void ir_add_fusion_data(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_reg_all
 							_pick_spill(ctx, ival);
 						}
 						if (!(use_flags & IR_USE_MUST_BE_IN_REG)) {
+							ctx->rules[input] |= IR_FUSED_REG;
 							continue;
 						}
 					}
@@ -1361,7 +1362,8 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 						ival->reg = reg_lo;
 						ival->reg_hi = reg_hi;
 						if (!data.regs[j].root
-						 || ir_get_alocated_reg(ctx, data.regs[j].ref, data.regs[j].op) == IR_REG_NONE) {
+						 || (!(ctx->rules[data.regs[j].ref] & IR_FUSED_REG)
+						  && ir_get_alocated_reg(ctx, data.regs[j].ref, data.regs[j].op) == IR_REG_NONE)) {
 							ir_set_alocated_reg(ctx, data.regs[j].ref, data.regs[j].op, reg);
 						} else if (ir_get_alocated_reg(ctx, data.regs[j].ref, data.regs[j].op) != reg) {
 							ctx->rules[data.regs[j].ref] |= IR_FUSED_REG;
@@ -1447,7 +1449,8 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 				if (reg != IR_REG_NONE) {
 					ival->reg = reg;
 					if (!data.regs[j].root
-					 || ir_get_alocated_reg(ctx, data.regs[j].ref, data.regs[j].op) == IR_REG_NONE) {
+					 || (!(ctx->rules[data.regs[j].ref] & IR_FUSED_REG)
+					  && ir_get_alocated_reg(ctx, data.regs[j].ref, data.regs[j].op) == IR_REG_NONE)) {
 						ir_set_alocated_reg(ctx, data.regs[j].ref, data.regs[j].op, reg);
 					} else if (ir_get_alocated_reg(ctx, data.regs[j].ref, data.regs[j].op) != reg) {
 						ctx->rules[data.regs[j].ref] |= IR_FUSED_REG;
