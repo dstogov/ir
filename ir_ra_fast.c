@@ -1271,17 +1271,21 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 
 						/* reuse previously allocated registers if possible */
 						if (reg_lo != IR_REG_NONE && reg_hi != IR_REG_NONE) {
-							if (!IR_REGSET_IN(used, reg_lo) && !IR_REGSET_IN(used, ival->reg_hi)) {
-								IR_ASSERT(data.state[reg_lo].def == data.regs[j].def);
+							IR_ASSERT(data.state[reg_lo].def == data.regs[j].def);
+							IR_ASSERT(data.state[reg_hi].def == data.regs[j].def);
+							if ((data.state[reg_lo].root == 0 && data.state[reg_lo].use == i)
+							 || data.state[reg_lo].root == i) {
+								/* keep previous operand of the same instraction as "last use" */
+								break;
+							} else {
+								/* update "last use" */
+								IR_ASSERT(!IR_REGSET_IN(used, reg_lo) && !IR_REGSET_IN(used, ival->reg_hi));
 								data.state[reg_lo].root = data.regs[j].root;
 								data.state[reg_lo].use = data.regs[j].ref;
 								data.state[reg_lo].op = data.regs[j].op;
 								data.state[reg_hi].root = data.regs[j].root;
 								data.state[reg_hi].use = data.regs[j].ref;
 								data.state[reg_hi].op = data.regs[j].op;
-								reg = IR_REG_I64_PAIR(reg_lo, reg_hi);
-								break;
-							} else if (data.state[reg_lo].def == data.regs[j].def) {
 								reg = IR_REG_I64_PAIR(reg_lo, reg_hi);
 								break;
 							}
@@ -1380,13 +1384,17 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 
 					/* reuse previously allocated registers if possible */
 					if (reg != IR_REG_NONE) {
-						if (!IR_REGSET_IN(used, reg)) {
-							IR_ASSERT(data.state[reg].def == data.regs[j].def);
+						IR_ASSERT(data.state[reg].def == data.regs[j].def);
+						if ((data.state[reg].root == 0 && data.state[reg].use == i)
+						 || data.state[reg].root == i) {
+							/* keep previous operand of the same instraction as "last use" */
+							break;
+						} else {
+							/* update "last use" */
+							IR_ASSERT(!IR_REGSET_IN(used, reg));
 							data.state[reg].root = data.regs[j].root;
 							data.state[reg].use = data.regs[j].ref;
 							data.state[reg].op = data.regs[j].op;
-							break;
-						} else if (data.state[reg].def == data.regs[j].def) {
 							break;
 						}
 					}
