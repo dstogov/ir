@@ -182,7 +182,7 @@ static uint32_t llvm2ir_call_conv(uint32_t cconv)
 	} else if (cconv == LLVMX8664SysVCallConv) {
 		return IR_CC_X86_64_SYSV;
 	} else if (cconv == LLVMWin64CallConv) {
-		return IR_CC_X86_64_SYSV;
+		return IR_CC_X86_64_MS;
 #endif
 	} else {
 		fprintf(stderr, "Unsupported Calling Convention: %d\n", cconv);
