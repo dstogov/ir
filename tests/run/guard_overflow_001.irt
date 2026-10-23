@@ -1,0 +1,117 @@
+--TEST--
+Unsigned SUB_OV with GUARD and GUARD_NOT (32-bit and 64-bit)
+--ARGS--
+--run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func exit_0(): int32_t
+{
+	int32_t c = 0;
+	l_1 = START(l_2);
+	l_2 = RETURN(l_1, c);
+}
+func exit_1(): int32_t
+{
+	int32_t c = 1;
+	l_1 = START(l_2);
+	l_2 = RETURN(l_1, c);
+}
+func sub_32_guard(uint32_t, uint32_t): int32_t
+{
+	uintptr_t exit = func exit_0(): int32_t;
+	int32_t result = 1;
+	l_1 = START(l_7);
+	uint32_t x = PARAM(l_1, "x", 1);
+	uint32_t y = PARAM(l_1, "y", 2);
+	uint32_t diff = SUB_OV(x, y);
+	bool overflow = OVERFLOW(diff);
+	l_6 = GUARD(l_1, overflow, exit);
+	l_7 = RETURN(l_6, result);
+}
+func sub_32_guard_not(uint32_t, uint32_t): int32_t
+{
+	uintptr_t exit = func exit_1(): int32_t;
+	int32_t result = 0;
+	l_1 = START(l_7);
+	uint32_t x = PARAM(l_1, "x", 1);
+	uint32_t y = PARAM(l_1, "y", 2);
+	uint32_t diff = SUB_OV(x, y);
+	bool overflow = OVERFLOW(diff);
+	l_6 = GUARD_NOT(l_1, overflow, exit);
+	l_7 = RETURN(l_6, result);
+}
+func sub_64_guard(uint64_t, uint64_t): int32_t
+{
+	uintptr_t exit = func exit_0(): int32_t;
+	int32_t result = 1;
+	l_1 = START(l_7);
+	uint64_t x = PARAM(l_1, "x", 1);
+	uint64_t y = PARAM(l_1, "y", 2);
+	uint64_t diff = SUB_OV(x, y);
+	bool overflow = OVERFLOW(diff);
+	l_6 = GUARD(l_1, overflow, exit);
+	l_7 = RETURN(l_6, result);
+}
+func sub_64_guard_not(uint64_t, uint64_t): int32_t
+{
+	uintptr_t exit = func exit_1(): int32_t;
+	int32_t result = 0;
+	l_1 = START(l_7);
+	uint64_t x = PARAM(l_1, "x", 1);
+	uint64_t y = PARAM(l_1, "y", 2);
+	uint64_t diff = SUB_OV(x, y);
+	bool overflow = OVERFLOW(diff);
+	l_6 = GUARD_NOT(l_1, overflow, exit);
+	l_7 = RETURN(l_6, result);
+}
+func main(): int32_t
+{
+	uintptr_t format = "%d %d %d %d %d %d\n";
+	uintptr_t print = func printf(uintptr_t, ...): int32_t;
+	int32_t zero = 0;
+	uint32_t zero32 = 0;
+	uint32_t one32 = 1;
+	uint32_t max32 = 4294967295;
+	uintptr_t sub32_guard = func sub_32_guard(uint32_t, uint32_t): int32_t;
+	uintptr_t sub32_guard_not = func sub_32_guard_not(uint32_t, uint32_t): int32_t;
+	uint64_t zero64 = 0;
+	uint64_t one64 = 1;
+	uint64_t max64 = 18446744073709551615;
+	uintptr_t sub64_guard = func sub_64_guard(uint64_t, uint64_t): int32_t;
+	uintptr_t sub64_guard_not = func sub_64_guard_not(uint64_t, uint64_t): int32_t;
+	l_1 = START(l_30);
+	int32_t d_2, l_2 = CALL/2(l_1, sub32_guard, zero32, zero32);
+	int32_t d_3, l_3 = CALL/2(l_2, sub32_guard, zero32, one32);
+	int32_t d_4, l_4 = CALL/2(l_3, sub32_guard, one32, zero32);
+	int32_t d_5, l_5 = CALL/2(l_4, sub32_guard, max32, one32);
+	int32_t d_6, l_6 = CALL/2(l_5, sub32_guard, zero32, max32);
+	int32_t d_7, l_7 = CALL/2(l_6, sub32_guard, max32, max32);
+	int32_t d_8, l_8 = CALL/7(l_7, print, format, d_2, d_3, d_4, d_5, d_6, d_7);
+	int32_t d_9, l_9 = CALL/2(l_8, sub32_guard_not, zero32, zero32);
+	int32_t d_10, l_10 = CALL/2(l_9, sub32_guard_not, zero32, one32);
+	int32_t d_11, l_11 = CALL/2(l_10, sub32_guard_not, one32, zero32);
+	int32_t d_12, l_12 = CALL/2(l_11, sub32_guard_not, max32, one32);
+	int32_t d_13, l_13 = CALL/2(l_12, sub32_guard_not, zero32, max32);
+	int32_t d_14, l_14 = CALL/2(l_13, sub32_guard_not, max32, max32);
+	int32_t d_15, l_15 = CALL/7(l_14, print, format, d_9, d_10, d_11, d_12, d_13, d_14);
+	int32_t d_16, l_16 = CALL/2(l_15, sub64_guard, zero64, zero64);
+	int32_t d_17, l_17 = CALL/2(l_16, sub64_guard, zero64, one64);
+	int32_t d_18, l_18 = CALL/2(l_17, sub64_guard, one64, zero64);
+	int32_t d_19, l_19 = CALL/2(l_18, sub64_guard, max64, one64);
+	int32_t d_20, l_20 = CALL/2(l_19, sub64_guard, zero64, max64);
+	int32_t d_21, l_21 = CALL/2(l_20, sub64_guard, max64, max64);
+	int32_t d_22, l_22 = CALL/7(l_21, print, format, d_16, d_17, d_18, d_19, d_20, d_21);
+	int32_t d_23, l_23 = CALL/2(l_22, sub64_guard_not, zero64, zero64);
+	int32_t d_24, l_24 = CALL/2(l_23, sub64_guard_not, zero64, one64);
+	int32_t d_25, l_25 = CALL/2(l_24, sub64_guard_not, one64, zero64);
+	int32_t d_26, l_26 = CALL/2(l_25, sub64_guard_not, max64, one64);
+	int32_t d_27, l_27 = CALL/2(l_26, sub64_guard_not, zero64, max64);
+	int32_t d_28, l_28 = CALL/2(l_27, sub64_guard_not, max64, max64);
+	int32_t d_29, l_29 = CALL/7(l_28, print, format, d_23, d_24, d_25, d_26, d_27, d_28);
+	l_30 = RETURN(l_29, zero);
+}
+--EXPECT--
+0 1 0 0 1 0
+0 1 0 0 1 0
+0 1 0 0 1 0
+0 1 0 0 1 0
