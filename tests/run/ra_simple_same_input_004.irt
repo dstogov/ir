@@ -1,0 +1,37 @@
+--TEST--
+Simple register allocator: repeated input in a fused branch tree
+--ARGS--
+-O0 --run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @check(int32_t): int32_t;
+func @check(int32_t): int32_t
+{
+	int32_t zero = 0;
+	int32_t one = 1;
+	int32_t two = 2;
+	l_1 = START(l_6);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t masked = AND(x, x);
+	bool equal = EQ(masked, zero);
+	l_2 = IF(l_1, equal);
+	l_3 = IF_TRUE(l_2);
+	l_4 = RETURN(l_3, one);
+	l_5 = IF_FALSE(l_2);
+	l_6 = RETURN(l_5, two, l_4);
+}
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fc = func @check(int32_t): int32_t;
+	uintptr_t fmt = "%d %d\n";
+	int32_t zero = 0;
+	int32_t seven = 7;
+	l_1 = START(l_ret);
+	int32_t a, l_2 = CALL/1(l_1, fc, zero);
+	int32_t b, l_3 = CALL/1(l_2, fc, seven);
+	int32_t ignored, l_4 = CALL/3(l_3, fp, fmt, a, b);
+	l_ret = RETURN(l_4, zero);
+}
+--EXPECT--
+1 2

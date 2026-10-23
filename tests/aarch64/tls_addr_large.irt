@@ -13,11 +13,7 @@ func test(): uintptr_t
 }
 --EXPECT--
 test:
-	sub sp, sp, #0x10
 	mrs x0, tpidr_el0
 	movz x17, #0x1388
 	add x0, x0, x17
-	str x0, [sp]
-	ldr x0, [sp]
-	add sp, sp, #0x10
 	ret
