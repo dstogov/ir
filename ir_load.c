@@ -59,13 +59,13 @@ static ir_strtab op_tab;
 	((ir_ref)0xc0000000 - (ref))
 
 #if defined(IR_TARGET_X64)
-# define IR_SET_WIN64_CC(flags)  do {*flags = IR_CC_X86_64_MS;} while (0)
-# define IR_SET_SYSV_CC(flags)   do {*flags = IR_CC_X86_64_SYSV;} while (0)
+# define IR_SET_WIN64_CC(flags)  do {*flags |= IR_CC_X86_64_MS;} while (0)
+# define IR_SET_SYSV_CC(flags)   do {*flags |= IR_CC_X86_64_SYSV;} while (0)
 # define IR_SET_DARWIN_CC(flags) yy_error("__darwin calling-convention is not supported on this target")
 #elif defined(IR_TARGET_AARCH64)
 # define IR_SET_WIN64_CC(flags)  yy_error("__win64 calling-convention is not supported on this target")
-# define IR_SET_SYSV_CC(flags)   do {*flags = IR_CC_AARCH64_SYSV;} while (0)
-# define IR_SET_DARWIN_CC(flags) do {*flags = IR_CC_AARCH64_SYSV;} while (0)
+# define IR_SET_SYSV_CC(flags)   do {*flags |= IR_CC_AARCH64_SYSV;} while (0)
+# define IR_SET_DARWIN_CC(flags) do {*flags |= IR_CC_AARCH64_DARWIN;} while (0)
 #else
 # define IR_SET_WIN64_CC(flags)  yy_error("__win64 calling-convention is not supported on this target")
 # define IR_SET_SYSV_CC(flags)   yy_error("__sysv calling-convention is not supported on this target")
