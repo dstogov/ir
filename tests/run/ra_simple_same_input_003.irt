@@ -1,0 +1,37 @@
+--TEST--
+Simple register allocator: the same value used as both operands of a compare producing a value
+--ARGS--
+-O0 --run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%d %d %d %d %d %d\n";
+	int32_t zero = 0;
+	double c_d = 2.5;
+	int64_t c_q = 9;
+	l_1 = START(l_ret);
+	double v = VAR(l_1, "v");
+	int64_t w = VAR(l_1, "w");
+	l_2 = VSTORE(l_1, v, c_d);
+	l_3 = VSTORE(l_2, w, c_q);
+	double a, l_4 = VLOAD(l_3, v);
+	int64_t q, l_5 = VLOAD(l_4, w);
+	bool b1 = EQ(a, a);
+	bool b2 = LT(a, a);
+	bool b3 = UGE(a, a);
+	bool b4 = EQ(q, q);
+	bool b5 = ULT(q, q);
+	bool b6 = GE(q, q);
+	int32_t r1 = ZEXT(b1);
+	int32_t r2 = ZEXT(b2);
+	int32_t r3 = ZEXT(b3);
+	int32_t r4 = ZEXT(b4);
+	int32_t r5 = ZEXT(b5);
+	int32_t r6 = ZEXT(b6);
+	int32_t ignored, l_6 = CALL/7(l_5, fp, fmt, r1, r2, r3, r4, r5, r6);
+	l_ret = RETURN(l_6, zero);
+}
+--EXPECT--
+1 0 1 1 0 1
