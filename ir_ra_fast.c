@@ -673,8 +673,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 								} else if (ctx->regs[use][0] != IR_REG_NONE
 								 && !IR_REG_SPILLED(ctx->regs[use][0])
 								 && !IR_REGSET_IN(data.allocated, IR_REG_I64_LO(ctx->regs[use][0]))
-								 && !IR_REGSET_IN(data.allocated, IR_REG_I64_HI(ctx->regs[use][0]))
-								 && _may_coalesce(ctx, input, use)) {
+								 && !IR_REGSET_IN(data.allocated, IR_REG_I64_HI(ctx->regs[use][0]))) {
 									/* lightweight register coalescing */
 									reg = ctx->regs[use][0];
 									reg_lo = IR_REG_I64_LO(reg);
@@ -726,8 +725,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 									continue;
 								} else if (ctx->regs[use][0] != IR_REG_NONE
 								 && !IR_REG_SPILLED(ctx->regs[use][0])
-								 && !IR_REGSET_IN(data.allocated, ctx->regs[use][0])
-								 && _may_coalesce(ctx, input, use)) {
+								 && !IR_REGSET_IN(data.allocated, ctx->regs[use][0])) {
 									/* lightweight register coalescing */
 									reg = ctx->regs[use][0];
 								} else {
