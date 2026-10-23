@@ -6984,7 +6984,7 @@ static void ir_emit_guard_overflow(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	void *addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op3]);
 
 	IR_ASSERT(IR_IS_TYPE_INT(type));
-	if (math_insn->op == IR_MUL_OV) {
+	if (math_insn->op == IR_MUL_OV || ir_type_size[math_insn->type] < 4) {
 		if (insn->op == IR_GUARD) {
 			|	beq &addr
 		} else {
@@ -6996,11 +6996,18 @@ static void ir_emit_guard_overflow(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		} else {
 			|	bvs &addr
 		}
-	} else {
+	} else if (math_insn->op == IR_ADD_OV) {
 		if (insn->op == IR_GUARD) {
 			|	bcc &addr
 		} else {
 			|	bcs &addr
+		}
+	} else {
+		IR_ASSERT(math_insn->op == IR_SUB_OV);
+		if (insn->op == IR_GUARD) {
+			|	bcs &addr
+		} else {
+			|	bcc &addr
 		}
 	}
 }

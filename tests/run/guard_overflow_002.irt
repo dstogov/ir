@@ -1,0 +1,379 @@
+--TEST--
+8-bit and 16-bit ADD_OV/SUB_OV with GUARD and GUARD_NOT
+--ARGS--
+--run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func exit_0(): int32_t
+{
+	int32_t c = 0;
+	l_1 = START(l_2);
+	l_2 = RETURN(l_1, c);
+}
+func exit_1(): int32_t
+{
+	int32_t c = 1;
+	l_1 = START(l_2);
+	l_2 = RETURN(l_1, c);
+}
+func add_i8_guard(int8_t, int8_t): int32_t
+{
+	uintptr_t exit = func exit_0(): int32_t;
+	int32_t result = 1;
+	l_1 = START(l_7);
+	int8_t x = PARAM(l_1, "x", 1);
+	int8_t y = PARAM(l_1, "y", 2);
+	int8_t r = ADD_OV(x, y);
+	bool overflow = OVERFLOW(r);
+	l_6 = GUARD(l_1, overflow, exit);
+	l_7 = RETURN(l_6, result);
+}
+func add_i8_guard_not(int8_t, int8_t): int32_t
+{
+	uintptr_t exit = func exit_1(): int32_t;
+	int32_t result = 0;
+	l_1 = START(l_7);
+	int8_t x = PARAM(l_1, "x", 1);
+	int8_t y = PARAM(l_1, "y", 2);
+	int8_t r = ADD_OV(x, y);
+	bool overflow = OVERFLOW(r);
+	l_6 = GUARD_NOT(l_1, overflow, exit);
+	l_7 = RETURN(l_6, result);
+}
+func sub_i8_guard(int8_t, int8_t): int32_t
+{
+	uintptr_t exit = func exit_0(): int32_t;
+	int32_t result = 1;
+	l_1 = START(l_7);
+	int8_t x = PARAM(l_1, "x", 1);
+	int8_t y = PARAM(l_1, "y", 2);
+	int8_t r = SUB_OV(x, y);
+	bool overflow = OVERFLOW(r);
+	l_6 = GUARD(l_1, overflow, exit);
+	l_7 = RETURN(l_6, result);
+}
+func sub_i8_guard_not(int8_t, int8_t): int32_t
+{
+	uintptr_t exit = func exit_1(): int32_t;
+	int32_t result = 0;
+	l_1 = START(l_7);
+	int8_t x = PARAM(l_1, "x", 1);
+	int8_t y = PARAM(l_1, "y", 2);
+	int8_t r = SUB_OV(x, y);
+	bool overflow = OVERFLOW(r);
+	l_6 = GUARD_NOT(l_1, overflow, exit);
+	l_7 = RETURN(l_6, result);
+}
+func add_u8_guard(uint8_t, uint8_t): int32_t
+{
+	uintptr_t exit = func exit_0(): int32_t;
+	int32_t result = 1;
+	l_1 = START(l_7);
+	uint8_t x = PARAM(l_1, "x", 1);
+	uint8_t y = PARAM(l_1, "y", 2);
+	uint8_t r = ADD_OV(x, y);
+	bool overflow = OVERFLOW(r);
+	l_6 = GUARD(l_1, overflow, exit);
+	l_7 = RETURN(l_6, result);
+}
+func add_u8_guard_not(uint8_t, uint8_t): int32_t
+{
+	uintptr_t exit = func exit_1(): int32_t;
+	int32_t result = 0;
+	l_1 = START(l_7);
+	uint8_t x = PARAM(l_1, "x", 1);
+	uint8_t y = PARAM(l_1, "y", 2);
+	uint8_t r = ADD_OV(x, y);
+	bool overflow = OVERFLOW(r);
+	l_6 = GUARD_NOT(l_1, overflow, exit);
+	l_7 = RETURN(l_6, result);
+}
+func sub_u8_guard(uint8_t, uint8_t): int32_t
+{
+	uintptr_t exit = func exit_0(): int32_t;
+	int32_t result = 1;
+	l_1 = START(l_7);
+	uint8_t x = PARAM(l_1, "x", 1);
+	uint8_t y = PARAM(l_1, "y", 2);
+	uint8_t r = SUB_OV(x, y);
+	bool overflow = OVERFLOW(r);
+	l_6 = GUARD(l_1, overflow, exit);
+	l_7 = RETURN(l_6, result);
+}
+func sub_u8_guard_not(uint8_t, uint8_t): int32_t
+{
+	uintptr_t exit = func exit_1(): int32_t;
+	int32_t result = 0;
+	l_1 = START(l_7);
+	uint8_t x = PARAM(l_1, "x", 1);
+	uint8_t y = PARAM(l_1, "y", 2);
+	uint8_t r = SUB_OV(x, y);
+	bool overflow = OVERFLOW(r);
+	l_6 = GUARD_NOT(l_1, overflow, exit);
+	l_7 = RETURN(l_6, result);
+}
+func add_i16_guard(int16_t, int16_t): int32_t
+{
+	uintptr_t exit = func exit_0(): int32_t;
+	int32_t result = 1;
+	l_1 = START(l_7);
+	int16_t x = PARAM(l_1, "x", 1);
+	int16_t y = PARAM(l_1, "y", 2);
+	int16_t r = ADD_OV(x, y);
+	bool overflow = OVERFLOW(r);
+	l_6 = GUARD(l_1, overflow, exit);
+	l_7 = RETURN(l_6, result);
+}
+func add_i16_guard_not(int16_t, int16_t): int32_t
+{
+	uintptr_t exit = func exit_1(): int32_t;
+	int32_t result = 0;
+	l_1 = START(l_7);
+	int16_t x = PARAM(l_1, "x", 1);
+	int16_t y = PARAM(l_1, "y", 2);
+	int16_t r = ADD_OV(x, y);
+	bool overflow = OVERFLOW(r);
+	l_6 = GUARD_NOT(l_1, overflow, exit);
+	l_7 = RETURN(l_6, result);
+}
+func sub_i16_guard(int16_t, int16_t): int32_t
+{
+	uintptr_t exit = func exit_0(): int32_t;
+	int32_t result = 1;
+	l_1 = START(l_7);
+	int16_t x = PARAM(l_1, "x", 1);
+	int16_t y = PARAM(l_1, "y", 2);
+	int16_t r = SUB_OV(x, y);
+	bool overflow = OVERFLOW(r);
+	l_6 = GUARD(l_1, overflow, exit);
+	l_7 = RETURN(l_6, result);
+}
+func sub_i16_guard_not(int16_t, int16_t): int32_t
+{
+	uintptr_t exit = func exit_1(): int32_t;
+	int32_t result = 0;
+	l_1 = START(l_7);
+	int16_t x = PARAM(l_1, "x", 1);
+	int16_t y = PARAM(l_1, "y", 2);
+	int16_t r = SUB_OV(x, y);
+	bool overflow = OVERFLOW(r);
+	l_6 = GUARD_NOT(l_1, overflow, exit);
+	l_7 = RETURN(l_6, result);
+}
+func add_u16_guard(uint16_t, uint16_t): int32_t
+{
+	uintptr_t exit = func exit_0(): int32_t;
+	int32_t result = 1;
+	l_1 = START(l_7);
+	uint16_t x = PARAM(l_1, "x", 1);
+	uint16_t y = PARAM(l_1, "y", 2);
+	uint16_t r = ADD_OV(x, y);
+	bool overflow = OVERFLOW(r);
+	l_6 = GUARD(l_1, overflow, exit);
+	l_7 = RETURN(l_6, result);
+}
+func add_u16_guard_not(uint16_t, uint16_t): int32_t
+{
+	uintptr_t exit = func exit_1(): int32_t;
+	int32_t result = 0;
+	l_1 = START(l_7);
+	uint16_t x = PARAM(l_1, "x", 1);
+	uint16_t y = PARAM(l_1, "y", 2);
+	uint16_t r = ADD_OV(x, y);
+	bool overflow = OVERFLOW(r);
+	l_6 = GUARD_NOT(l_1, overflow, exit);
+	l_7 = RETURN(l_6, result);
+}
+func sub_u16_guard(uint16_t, uint16_t): int32_t
+{
+	uintptr_t exit = func exit_0(): int32_t;
+	int32_t result = 1;
+	l_1 = START(l_7);
+	uint16_t x = PARAM(l_1, "x", 1);
+	uint16_t y = PARAM(l_1, "y", 2);
+	uint16_t r = SUB_OV(x, y);
+	bool overflow = OVERFLOW(r);
+	l_6 = GUARD(l_1, overflow, exit);
+	l_7 = RETURN(l_6, result);
+}
+func sub_u16_guard_not(uint16_t, uint16_t): int32_t
+{
+	uintptr_t exit = func exit_1(): int32_t;
+	int32_t result = 0;
+	l_1 = START(l_7);
+	uint16_t x = PARAM(l_1, "x", 1);
+	uint16_t y = PARAM(l_1, "y", 2);
+	uint16_t r = SUB_OV(x, y);
+	bool overflow = OVERFLOW(r);
+	l_6 = GUARD_NOT(l_1, overflow, exit);
+	l_7 = RETURN(l_6, result);
+}
+func main(): int32_t
+{
+	uintptr_t format = "%d %d %d %d %d %d\n";
+	uintptr_t print = func printf(uintptr_t, ...): int32_t;
+	int32_t zero = 0;
+	int8_t zero_i8 = 0;
+	int8_t one_i8 = 1;
+	int8_t m1_i8 = -1;
+	int8_t max_i8 = 127;
+	int8_t min_i8 = -128;
+	uintptr_t add_i8_guard_ptr = func add_i8_guard(int8_t, int8_t): int32_t;
+	uintptr_t add_i8_guard_not_ptr = func add_i8_guard_not(int8_t, int8_t): int32_t;
+	uintptr_t sub_i8_guard_ptr = func sub_i8_guard(int8_t, int8_t): int32_t;
+	uintptr_t sub_i8_guard_not_ptr = func sub_i8_guard_not(int8_t, int8_t): int32_t;
+	uint8_t zero_u8 = 0;
+	uint8_t one_u8 = 1;
+	uint8_t max_u8 = 255;
+	uintptr_t add_u8_guard_ptr = func add_u8_guard(uint8_t, uint8_t): int32_t;
+	uintptr_t add_u8_guard_not_ptr = func add_u8_guard_not(uint8_t, uint8_t): int32_t;
+	uintptr_t sub_u8_guard_ptr = func sub_u8_guard(uint8_t, uint8_t): int32_t;
+	uintptr_t sub_u8_guard_not_ptr = func sub_u8_guard_not(uint8_t, uint8_t): int32_t;
+	int16_t zero_i16 = 0;
+	int16_t one_i16 = 1;
+	int16_t m1_i16 = -1;
+	int16_t max_i16 = 32767;
+	int16_t min_i16 = -32768;
+	uintptr_t add_i16_guard_ptr = func add_i16_guard(int16_t, int16_t): int32_t;
+	uintptr_t add_i16_guard_not_ptr = func add_i16_guard_not(int16_t, int16_t): int32_t;
+	uintptr_t sub_i16_guard_ptr = func sub_i16_guard(int16_t, int16_t): int32_t;
+	uintptr_t sub_i16_guard_not_ptr = func sub_i16_guard_not(int16_t, int16_t): int32_t;
+	uint16_t zero_u16 = 0;
+	uint16_t one_u16 = 1;
+	uint16_t max_u16 = 65535;
+	uintptr_t add_u16_guard_ptr = func add_u16_guard(uint16_t, uint16_t): int32_t;
+	uintptr_t add_u16_guard_not_ptr = func add_u16_guard_not(uint16_t, uint16_t): int32_t;
+	uintptr_t sub_u16_guard_ptr = func sub_u16_guard(uint16_t, uint16_t): int32_t;
+	uintptr_t sub_u16_guard_not_ptr = func sub_u16_guard_not(uint16_t, uint16_t): int32_t;
+	l_1 = START(l_114);
+	int32_t d_2, l_2 = CALL/2(l_1, add_i8_guard_ptr, zero_i8, zero_i8);
+	int32_t d_3, l_3 = CALL/2(l_2, add_i8_guard_ptr, max_i8, one_i8);
+	int32_t d_4, l_4 = CALL/2(l_3, add_i8_guard_ptr, min_i8, m1_i8);
+	int32_t d_5, l_5 = CALL/2(l_4, add_i8_guard_ptr, min_i8, one_i8);
+	int32_t d_6, l_6 = CALL/2(l_5, add_i8_guard_ptr, m1_i8, min_i8);
+	int32_t d_7, l_7 = CALL/2(l_6, add_i8_guard_ptr, max_i8, m1_i8);
+	int32_t d_8, l_8 = CALL/7(l_7, print, format, d_2, d_3, d_4, d_5, d_6, d_7);
+	int32_t d_9, l_9 = CALL/2(l_8, add_i8_guard_not_ptr, zero_i8, zero_i8);
+	int32_t d_10, l_10 = CALL/2(l_9, add_i8_guard_not_ptr, max_i8, one_i8);
+	int32_t d_11, l_11 = CALL/2(l_10, add_i8_guard_not_ptr, min_i8, m1_i8);
+	int32_t d_12, l_12 = CALL/2(l_11, add_i8_guard_not_ptr, min_i8, one_i8);
+	int32_t d_13, l_13 = CALL/2(l_12, add_i8_guard_not_ptr, m1_i8, min_i8);
+	int32_t d_14, l_14 = CALL/2(l_13, add_i8_guard_not_ptr, max_i8, m1_i8);
+	int32_t d_15, l_15 = CALL/7(l_14, print, format, d_9, d_10, d_11, d_12, d_13, d_14);
+	int32_t d_16, l_16 = CALL/2(l_15, sub_i8_guard_ptr, zero_i8, zero_i8);
+	int32_t d_17, l_17 = CALL/2(l_16, sub_i8_guard_ptr, max_i8, one_i8);
+	int32_t d_18, l_18 = CALL/2(l_17, sub_i8_guard_ptr, min_i8, m1_i8);
+	int32_t d_19, l_19 = CALL/2(l_18, sub_i8_guard_ptr, min_i8, one_i8);
+	int32_t d_20, l_20 = CALL/2(l_19, sub_i8_guard_ptr, m1_i8, min_i8);
+	int32_t d_21, l_21 = CALL/2(l_20, sub_i8_guard_ptr, max_i8, m1_i8);
+	int32_t d_22, l_22 = CALL/7(l_21, print, format, d_16, d_17, d_18, d_19, d_20, d_21);
+	int32_t d_23, l_23 = CALL/2(l_22, sub_i8_guard_not_ptr, zero_i8, zero_i8);
+	int32_t d_24, l_24 = CALL/2(l_23, sub_i8_guard_not_ptr, max_i8, one_i8);
+	int32_t d_25, l_25 = CALL/2(l_24, sub_i8_guard_not_ptr, min_i8, m1_i8);
+	int32_t d_26, l_26 = CALL/2(l_25, sub_i8_guard_not_ptr, min_i8, one_i8);
+	int32_t d_27, l_27 = CALL/2(l_26, sub_i8_guard_not_ptr, m1_i8, min_i8);
+	int32_t d_28, l_28 = CALL/2(l_27, sub_i8_guard_not_ptr, max_i8, m1_i8);
+	int32_t d_29, l_29 = CALL/7(l_28, print, format, d_23, d_24, d_25, d_26, d_27, d_28);
+	int32_t d_30, l_30 = CALL/2(l_29, add_u8_guard_ptr, zero_u8, zero_u8);
+	int32_t d_31, l_31 = CALL/2(l_30, add_u8_guard_ptr, zero_u8, one_u8);
+	int32_t d_32, l_32 = CALL/2(l_31, add_u8_guard_ptr, one_u8, zero_u8);
+	int32_t d_33, l_33 = CALL/2(l_32, add_u8_guard_ptr, max_u8, one_u8);
+	int32_t d_34, l_34 = CALL/2(l_33, add_u8_guard_ptr, zero_u8, max_u8);
+	int32_t d_35, l_35 = CALL/2(l_34, add_u8_guard_ptr, max_u8, max_u8);
+	int32_t d_36, l_36 = CALL/7(l_35, print, format, d_30, d_31, d_32, d_33, d_34, d_35);
+	int32_t d_37, l_37 = CALL/2(l_36, add_u8_guard_not_ptr, zero_u8, zero_u8);
+	int32_t d_38, l_38 = CALL/2(l_37, add_u8_guard_not_ptr, zero_u8, one_u8);
+	int32_t d_39, l_39 = CALL/2(l_38, add_u8_guard_not_ptr, one_u8, zero_u8);
+	int32_t d_40, l_40 = CALL/2(l_39, add_u8_guard_not_ptr, max_u8, one_u8);
+	int32_t d_41, l_41 = CALL/2(l_40, add_u8_guard_not_ptr, zero_u8, max_u8);
+	int32_t d_42, l_42 = CALL/2(l_41, add_u8_guard_not_ptr, max_u8, max_u8);
+	int32_t d_43, l_43 = CALL/7(l_42, print, format, d_37, d_38, d_39, d_40, d_41, d_42);
+	int32_t d_44, l_44 = CALL/2(l_43, sub_u8_guard_ptr, zero_u8, zero_u8);
+	int32_t d_45, l_45 = CALL/2(l_44, sub_u8_guard_ptr, zero_u8, one_u8);
+	int32_t d_46, l_46 = CALL/2(l_45, sub_u8_guard_ptr, one_u8, zero_u8);
+	int32_t d_47, l_47 = CALL/2(l_46, sub_u8_guard_ptr, max_u8, one_u8);
+	int32_t d_48, l_48 = CALL/2(l_47, sub_u8_guard_ptr, zero_u8, max_u8);
+	int32_t d_49, l_49 = CALL/2(l_48, sub_u8_guard_ptr, max_u8, max_u8);
+	int32_t d_50, l_50 = CALL/7(l_49, print, format, d_44, d_45, d_46, d_47, d_48, d_49);
+	int32_t d_51, l_51 = CALL/2(l_50, sub_u8_guard_not_ptr, zero_u8, zero_u8);
+	int32_t d_52, l_52 = CALL/2(l_51, sub_u8_guard_not_ptr, zero_u8, one_u8);
+	int32_t d_53, l_53 = CALL/2(l_52, sub_u8_guard_not_ptr, one_u8, zero_u8);
+	int32_t d_54, l_54 = CALL/2(l_53, sub_u8_guard_not_ptr, max_u8, one_u8);
+	int32_t d_55, l_55 = CALL/2(l_54, sub_u8_guard_not_ptr, zero_u8, max_u8);
+	int32_t d_56, l_56 = CALL/2(l_55, sub_u8_guard_not_ptr, max_u8, max_u8);
+	int32_t d_57, l_57 = CALL/7(l_56, print, format, d_51, d_52, d_53, d_54, d_55, d_56);
+	int32_t d_58, l_58 = CALL/2(l_57, add_i16_guard_ptr, zero_i16, zero_i16);
+	int32_t d_59, l_59 = CALL/2(l_58, add_i16_guard_ptr, max_i16, one_i16);
+	int32_t d_60, l_60 = CALL/2(l_59, add_i16_guard_ptr, min_i16, m1_i16);
+	int32_t d_61, l_61 = CALL/2(l_60, add_i16_guard_ptr, min_i16, one_i16);
+	int32_t d_62, l_62 = CALL/2(l_61, add_i16_guard_ptr, m1_i16, min_i16);
+	int32_t d_63, l_63 = CALL/2(l_62, add_i16_guard_ptr, max_i16, m1_i16);
+	int32_t d_64, l_64 = CALL/7(l_63, print, format, d_58, d_59, d_60, d_61, d_62, d_63);
+	int32_t d_65, l_65 = CALL/2(l_64, add_i16_guard_not_ptr, zero_i16, zero_i16);
+	int32_t d_66, l_66 = CALL/2(l_65, add_i16_guard_not_ptr, max_i16, one_i16);
+	int32_t d_67, l_67 = CALL/2(l_66, add_i16_guard_not_ptr, min_i16, m1_i16);
+	int32_t d_68, l_68 = CALL/2(l_67, add_i16_guard_not_ptr, min_i16, one_i16);
+	int32_t d_69, l_69 = CALL/2(l_68, add_i16_guard_not_ptr, m1_i16, min_i16);
+	int32_t d_70, l_70 = CALL/2(l_69, add_i16_guard_not_ptr, max_i16, m1_i16);
+	int32_t d_71, l_71 = CALL/7(l_70, print, format, d_65, d_66, d_67, d_68, d_69, d_70);
+	int32_t d_72, l_72 = CALL/2(l_71, sub_i16_guard_ptr, zero_i16, zero_i16);
+	int32_t d_73, l_73 = CALL/2(l_72, sub_i16_guard_ptr, max_i16, one_i16);
+	int32_t d_74, l_74 = CALL/2(l_73, sub_i16_guard_ptr, min_i16, m1_i16);
+	int32_t d_75, l_75 = CALL/2(l_74, sub_i16_guard_ptr, min_i16, one_i16);
+	int32_t d_76, l_76 = CALL/2(l_75, sub_i16_guard_ptr, m1_i16, min_i16);
+	int32_t d_77, l_77 = CALL/2(l_76, sub_i16_guard_ptr, max_i16, m1_i16);
+	int32_t d_78, l_78 = CALL/7(l_77, print, format, d_72, d_73, d_74, d_75, d_76, d_77);
+	int32_t d_79, l_79 = CALL/2(l_78, sub_i16_guard_not_ptr, zero_i16, zero_i16);
+	int32_t d_80, l_80 = CALL/2(l_79, sub_i16_guard_not_ptr, max_i16, one_i16);
+	int32_t d_81, l_81 = CALL/2(l_80, sub_i16_guard_not_ptr, min_i16, m1_i16);
+	int32_t d_82, l_82 = CALL/2(l_81, sub_i16_guard_not_ptr, min_i16, one_i16);
+	int32_t d_83, l_83 = CALL/2(l_82, sub_i16_guard_not_ptr, m1_i16, min_i16);
+	int32_t d_84, l_84 = CALL/2(l_83, sub_i16_guard_not_ptr, max_i16, m1_i16);
+	int32_t d_85, l_85 = CALL/7(l_84, print, format, d_79, d_80, d_81, d_82, d_83, d_84);
+	int32_t d_86, l_86 = CALL/2(l_85, add_u16_guard_ptr, zero_u16, zero_u16);
+	int32_t d_87, l_87 = CALL/2(l_86, add_u16_guard_ptr, zero_u16, one_u16);
+	int32_t d_88, l_88 = CALL/2(l_87, add_u16_guard_ptr, one_u16, zero_u16);
+	int32_t d_89, l_89 = CALL/2(l_88, add_u16_guard_ptr, max_u16, one_u16);
+	int32_t d_90, l_90 = CALL/2(l_89, add_u16_guard_ptr, zero_u16, max_u16);
+	int32_t d_91, l_91 = CALL/2(l_90, add_u16_guard_ptr, max_u16, max_u16);
+	int32_t d_92, l_92 = CALL/7(l_91, print, format, d_86, d_87, d_88, d_89, d_90, d_91);
+	int32_t d_93, l_93 = CALL/2(l_92, add_u16_guard_not_ptr, zero_u16, zero_u16);
+	int32_t d_94, l_94 = CALL/2(l_93, add_u16_guard_not_ptr, zero_u16, one_u16);
+	int32_t d_95, l_95 = CALL/2(l_94, add_u16_guard_not_ptr, one_u16, zero_u16);
+	int32_t d_96, l_96 = CALL/2(l_95, add_u16_guard_not_ptr, max_u16, one_u16);
+	int32_t d_97, l_97 = CALL/2(l_96, add_u16_guard_not_ptr, zero_u16, max_u16);
+	int32_t d_98, l_98 = CALL/2(l_97, add_u16_guard_not_ptr, max_u16, max_u16);
+	int32_t d_99, l_99 = CALL/7(l_98, print, format, d_93, d_94, d_95, d_96, d_97, d_98);
+	int32_t d_100, l_100 = CALL/2(l_99, sub_u16_guard_ptr, zero_u16, zero_u16);
+	int32_t d_101, l_101 = CALL/2(l_100, sub_u16_guard_ptr, zero_u16, one_u16);
+	int32_t d_102, l_102 = CALL/2(l_101, sub_u16_guard_ptr, one_u16, zero_u16);
+	int32_t d_103, l_103 = CALL/2(l_102, sub_u16_guard_ptr, max_u16, one_u16);
+	int32_t d_104, l_104 = CALL/2(l_103, sub_u16_guard_ptr, zero_u16, max_u16);
+	int32_t d_105, l_105 = CALL/2(l_104, sub_u16_guard_ptr, max_u16, max_u16);
+	int32_t d_106, l_106 = CALL/7(l_105, print, format, d_100, d_101, d_102, d_103, d_104, d_105);
+	int32_t d_107, l_107 = CALL/2(l_106, sub_u16_guard_not_ptr, zero_u16, zero_u16);
+	int32_t d_108, l_108 = CALL/2(l_107, sub_u16_guard_not_ptr, zero_u16, one_u16);
+	int32_t d_109, l_109 = CALL/2(l_108, sub_u16_guard_not_ptr, one_u16, zero_u16);
+	int32_t d_110, l_110 = CALL/2(l_109, sub_u16_guard_not_ptr, max_u16, one_u16);
+	int32_t d_111, l_111 = CALL/2(l_110, sub_u16_guard_not_ptr, zero_u16, max_u16);
+	int32_t d_112, l_112 = CALL/2(l_111, sub_u16_guard_not_ptr, max_u16, max_u16);
+	int32_t d_113, l_113 = CALL/7(l_112, print, format, d_107, d_108, d_109, d_110, d_111, d_112);
+	l_114 = RETURN(l_113, zero);
+}
+--EXPECT--
+0 1 1 0 1 0
+0 1 1 0 1 0
+0 0 0 1 0 1
+0 0 0 1 0 1
+0 0 0 1 0 1
+0 0 0 1 0 1
+0 1 0 0 1 0
+0 1 0 0 1 0
+0 1 1 0 1 0
+0 1 1 0 1 0
+0 0 0 1 0 1
+0 0 0 1 0 1
+0 0 0 1 0 1
+0 0 0 1 0 1
+0 1 0 0 1 0
+0 1 0 0 1 0
