@@ -1084,7 +1084,7 @@ static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb)
 					if (insn->type == IR_I64 || insn->type == IR_U64) {
 						ir_reg reg_hi = IR_REG_I64_HI(src);
 						ir_reg reg_lo = IR_REG_I64_LO(src);
-						ir_emit_load_i64_lo(ctx, reg_lp, input);
+						ir_emit_load_i64_lo(ctx, reg_lo, input);
 						ir_emit_load_i64_hi(ctx, reg_hi, input);
 					} else
 #endif
