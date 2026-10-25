@@ -1,0 +1,38 @@
+--TEST--
+036: FOLD: (x - c1) - c2 => x - (c1 + c2) truncates c1 + c2 to the type width
+--ARGS--
+-O2 --save
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int8_t c_4 = -56;
+	int8_t c_5 = 100;
+	uint8_t c_6 = 100;
+	uint8_t c_7 = 200;
+	uint8_t c_8 = 44;
+	l_1 = START(l_13);
+	int8_t d_2 = PARAM(l_1, "x", 1);
+	uint8_t d_3 = PARAM(l_1, "u", 2);
+	int8_t d_4 = SUB(d_2, c_5);
+	int8_t d_5 = SUB(d_4, c_5);
+	int8_t d_6 = SUB(d_2, d_5);
+	bool d_7 = EQ(d_6, c_4);
+	uint8_t d_8 = SUB(d_3, c_7);
+	uint8_t d_9 = SUB(d_8, c_6);
+	uint8_t d_10 = SUB(d_3, d_9);
+	bool d_11 = EQ(d_10, c_8);
+	bool d_12 = AND(d_7, d_11);
+	l_13 = RETURN(l_1, d_12);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	l_1 = START(l_4);
+	int8_t d_2 = PARAM(l_1, "x", 1);
+	uint8_t d_3 = PARAM(l_1, "u", 2);
+	l_4 = RETURN(l_1, c_3);
+}
