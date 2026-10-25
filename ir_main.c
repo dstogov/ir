@@ -811,7 +811,11 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 		}
 
 		if (!ir_loader_add_sym(loader, name, data)) {
-			ir_mem_free(data);
+			if (flags & IR_CONST) {
+				l->code_buffer.pos = data;
+			} else {
+				ir_mem_free(data);
+			}
 			return 0;
 		}
 		memset(data, 0, size);
