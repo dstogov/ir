@@ -635,6 +635,26 @@ static IR_NEVER_INLINE void ir_const_hash_rehash(ir_ctx *ctx)
 	}
 }
 
+#ifdef IR_DEBUG
+/* Narrow integer constants are kept sign/zero extended to 64 bits, FLOAT has zero upper half */
+static bool ir_const_is_canonical(ir_val val, uint8_t type)
+{
+	uint32_t shift;
+
+	if (type == IR_FLOAT) {
+		return val.u32_hi == 0;
+	}
+	if (!IR_IS_TYPE_INT(type) || ir_type_size[type] == 8) {
+		return 1;
+	}
+	shift = (8 - ir_type_size[type]) * 8;
+	if (IR_IS_TYPE_SIGNED(type)) {
+		return val.i64 == (int64_t)(val.u64 << shift) >> shift;
+	}
+	return val.u64 == (val.u64 << shift) >> shift;
+}
+#endif
+
 ir_ref ir_const_ex(ir_ctx *ctx, ir_val val, uint8_t type, uint32_t optx)
 {
 	ir_insn *insn;
@@ -646,6 +666,8 @@ ir_ref ir_const_ex(ir_ctx *ctx, ir_val val, uint8_t type, uint32_t optx)
 	} else if (type == IR_ADDR && val.u64 == 0) {
 		return IR_NULL;
 	}
+
+	IR_ASSERT(ir_const_is_canonical(val, type));
 
 	hash = ir_const_hash(val, optx) & ctx->const_hash_mask;
 	ref = ctx->const_hash[hash];
