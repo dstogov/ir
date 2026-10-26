@@ -1,0 +1,40 @@
+--TEST--
+001: IF(SHR(AND(ZEXT(X), C)) => IF(AND(X', MASK)) keeps a signed MASK sign extended
+--ARGS--
+-O2 --save
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 65280;
+	int32_t c_5 = 0;
+	int16_t c_6 = 0;
+	int16_t c_7 = 2;
+	l_1 = START(l_23);
+	int16_t d_2 = PARAM(l_1, "arg_1", 1);
+	int32_t d_5 = ZEXT(d_2);
+	int32_t d_6 = AND(d_5, c_4);
+	bool d_7 = EQ(d_6, c_5);
+	l_8 = IF(l_1, d_7);
+	l_9 = IF_FALSE(l_8);
+	l_10 = END(l_9);
+	l_11 = IF_TRUE(l_8);
+	l_20 = END(l_11);
+	l_21 = MERGE(l_10, l_20);
+	int16_t d_25 = PHI(l_21, d_2, c_7);
+	l_23 = RETURN(l_21, d_25);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int16_t c_4 = 2;
+	int16_t c_5 = -256;
+	l_1 = START(l_5);
+	int16_t d_2 = PARAM(l_1, "arg_1", 1);
+	int16_t d_3 = AND(d_2, c_5);
+	int16_t d_4 = COND(d_3, d_2, c_4);
+	l_5 = RETURN(l_1, d_4);
+}
