@@ -66,20 +66,20 @@ aarch64
 }
 --EXPECT--
 test:
-	sub sp, sp, #0x30
+	sub sp, sp, #0x40
 	str w1, [sp, #0x20]
 	str w2, [sp, #0x18]
 	mov w1, w3
 	mov w2, w5
 	mov w3, w6
 	mov w4, w7
-	str w0, [sp, #0x1c]
-	str w1, [sp, #0x14]
-	str w2, [sp, #0xc]
-	str w3, [sp, #8]
-	str w4, [sp, #4]
+	str w0, [sp, #0x28]
+	str w1, [sp, #0x30]
+	str w2, [sp, #0x2c]
+	str w3, [sp, #0x34]
+	str w4, [sp, #0x38]
 .L1:
-	ldr w0, [sp, #0x30]
+	ldr w0, [sp, #0x40]
 	cbz w0, .L2
 	ldr w0, [sp, #0x18]
 	ldr w1, [sp, #0x20]
@@ -87,18 +87,28 @@ test:
 	add w2, w1, #4
 	ldr w0, [sp, #0x18]
 	str w0, [sp, #0x1c]
+	ldr w3, [sp, #0x30]
+	str w3, [sp, #0x14]
 	str w1, [sp, #0x10]
 	str w2, [sp, #0xc]
+	ldr w3, [sp, #0x34]
+	str w3, [sp, #8]
+	ldr w3, [sp, #0x38]
+	str w3, [sp, #4]
 	b .L3
 .L2:
 	ldr w0, [sp, #0x18]
 	ldr w3, [sp, #0x20]
 	mul w1, w0, w3
-	ldr w2, [sp, #0x1c]
+	ldr w2, [sp, #0x28]
 	mul w2, w2, w3
 	add w3, w2, #1
+	ldr w4, [sp, #0x28]
+	str w4, [sp, #0x1c]
 	str w0, [sp, #0x14]
 	str w1, [sp, #0x10]
+	ldr w4, [sp, #0x2c]
+	str w4, [sp, #0xc]
 	str w2, [sp, #8]
 	str w3, [sp, #4]
 .L3:
@@ -107,8 +117,18 @@ test:
 	mul w1, w1, w2
 	add w1, w1, #1
 	str w1, [sp]
-	ldr w0, [sp, #0x38]
+	ldr w0, [sp, #0x48]
 	cbz w0, .L4
+	ldr w0, [sp, #0x1c]
+	str w0, [sp, #0x28]
+	ldr w0, [sp, #0x14]
+	str w0, [sp, #0x30]
+	ldr w0, [sp, #0xc]
+	str w0, [sp, #0x2c]
+	ldr w0, [sp, #8]
+	str w0, [sp, #0x34]
+	ldr w0, [sp, #4]
+	str w0, [sp, #0x38]
 	b .L1
 .L4:
 	ldr w0, [sp, #0x1c]
@@ -128,5 +148,5 @@ test:
 	add w0, w0, w2
 	ldr w1, [sp]
 	add w0, w0, w1
-	add sp, sp, #0x30
+	add sp, sp, #0x40
 	ret

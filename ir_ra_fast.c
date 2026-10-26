@@ -444,30 +444,8 @@ static void ir_allocate_var_spill_slot(ir_ctx *ctx, ir_ref var, ir_insn *var_ins
 
 static bool _may_coalesce(ir_ctx *ctx, ir_ref input, ir_ref def)
 {
-	ir_use_list *use_list;
-	ir_ref *p, n, use;
-
-	use_list = &ctx->use_lists[input];
-	n = use_list->count;
-	for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
-		use = *p;
-		if (use > def) {
-			/* may overlap */
-			return 0;
-		}
-	}
-
-	use_list = &ctx->use_lists[def];
-	n = use_list->count;
-	for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
-		use = *p;
-		if (use < def && use != input) {
-			/* may overlap */
-			return 0;
-		}
-	}
-
-	return 1;
+	/* Coalescing of values connected trough PHI requires global live range analyzes */
+	return 0;
 }
 
 static void ir_add_fusion_data(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_reg_alloc_fast_data *data, ir_ref start)
