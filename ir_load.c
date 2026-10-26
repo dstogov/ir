@@ -1839,12 +1839,14 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 		case YY_INF:
 		case YY_NAN:
 		case YY__MINUS:
+			if (IR_IS_TYPE_VECTOR(t)) yy_error("scalar type expected");
 			val.u64 = 0;
 			sym = parse_const(sym, t, &val);
 			ref = ir_const(p->ctx, val, t);
 			break;
 		case YY__LBRACE:
 			sym = get_sym();
+			if (!IR_IS_TYPE_VECTOR(t)) yy_error("vector type expected");
 			ref = ir_const_vector(p->ctx, t);
 			ptr = ir_long_const_ptr(p->ctx, ref);
 			memset(ptr, 0, IR_VECTOR_SIZE(t));
@@ -2117,7 +2119,10 @@ emit:
 			yy_error_sym("unexpected", sym);
 	}
 	ir_define_var(p, str, len, ref);
-	if (str2) ir_define_var(p, str2, len2, ref2);
+	if (str2) {
+		if (!ref2) yy_error("unexpected second result");
+		ir_define_var(p, str2, len2, ref2);
+	}
 	return sym;
 }
 

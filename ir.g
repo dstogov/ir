@@ -637,10 +637,12 @@ ir_insn(ir_parser_ctx *p):
 		ID(&str, &len)
 	)
 	"="
-	(	{val.u64 = 0;}
+	(	{if (IR_IS_TYPE_VECTOR(t)) yy_error("scalar type expected");}
+		{val.u64 = 0;}
 		const(t, &val)
 		{ref = ir_const(p->ctx, val, t);}
 	|	"{"
+		{if (!IR_IS_TYPE_VECTOR(t)) yy_error("vector type expected");}
 		{ref = ir_const_vector(p->ctx, t);}
 		{ptr = ir_long_const_ptr(p->ctx, ref);}
 		{memset(ptr, 0, IR_VECTOR_SIZE(t));}
@@ -868,7 +870,10 @@ emit:
 		)
 	)
 	{ir_define_var(p, str, len, ref);}
-	{if (str2) ir_define_var(p, str2, len2, ref2);}
+	{if (str2) {
+		if (!ref2) yy_error("unexpected second result");
+		ir_define_var(p, str2, len2, ref2);
+	}}
 ;
 
 ir_modifier(ir_parser_ctx *p):
