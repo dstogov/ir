@@ -2685,6 +2685,7 @@ IR_FOLD(DIV(NEG, C_FLOAT))
 {
 	op1 = op1_insn->op1;
 	val.f = -op2_insn->val.f;
+	val.u32_hi = 0;
 	op2 = ir_const(ctx, val, op2_insn->type);
 	IR_FOLD_RESTART;
 }
