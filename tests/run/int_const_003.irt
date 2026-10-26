@@ -1,0 +1,23 @@
+--TEST--
+Character literal is extended from its type width
+--ARGS--
+--run
+--CODE--
+{
+	uint8_t c_1 = '\377';
+	uint8_t c_2 = 0;
+	uint8_t c_3 = 1;
+	int32_t c_4 = 42;
+	int32_t c_5 = 24;
+	int32_t c_6 = 0;
+	uintptr_t c_7 = func printf(uintptr_t, ...): int32_t;
+	uintptr_t c_8 = "%d\n";
+	l_1 = START(l_3);
+	uint8_t d_1 = SUB(c_2, c_3);
+	bool d_2 = EQ(c_1, d_1);
+	int32_t d_3 = COND(d_2, c_4, c_5);
+	l_2 = CALL/2(l_1, c_7, c_8, d_3);
+	l_3 = RETURN(l_2, c_6);
+}
+--EXPECT--
+42

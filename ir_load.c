@@ -281,6 +281,19 @@ static uint64_t read_hex(const char *p, const char *e)
 	return ret;
 }
 
+static void ext_int_const(uint32_t t, ir_val *val)
+{
+	if (IR_IS_TYPE_INT(t) && ir_type_size[t] < 8) {
+		uint32_t shift = (8 - ir_type_size[t]) * 8;
+
+		if (IR_IS_TYPE_SIGNED(t)) {
+			val->i64 = (int64_t)(val->u64 << shift) >> shift;
+		} else {
+			val->u64 = (val->u64 << shift) >> shift;
+		}
+	}
+}
+
 #define YYPOS cpos
 #define YYEND cend
 
@@ -2342,7 +2355,7 @@ static int parse_DECNUMBER(int sym, uint32_t t, ir_val *val) {
 	}
 	if (t == IR_DOUBLE) val->d = atof((const char*)yy_text);
 	else if (t == IR_FLOAT) {val->f = strtof((const char*)yy_text, NULL); val->u32_hi = 0;}
-	else val->u64 = read_dec((const char*)yy_text, (const char*)yy_pos);
+	else {val->u64 = read_dec((const char*)yy_text, (const char*)yy_pos); ext_int_const(t, val);}
 	sym = get_sym();
 	return sym;
 }
@@ -2351,7 +2364,7 @@ static int parse_HEXNUMBER(int sym, uint32_t t, ir_val *val) {
 	if (sym != YY_HEXNUMBER) {
 		yy_error_sym("<HEXNUMBER> expected, got", sym);
 	}
-	val->u64 = read_hex((const char*)yy_text + 2, (const char*)yy_pos);
+	val->u64 = read_hex((const char*)yy_text + 2, (const char*)yy_pos); ext_int_const(t, val);
 	sym = get_sym();
 	return sym;
 }
@@ -2378,6 +2391,7 @@ static int parse_CHARACTER(int sym, uint32_t t, ir_val *val) {
 		size_t l = 1;
 		val->i64 = (signed char)yy_unescape_char((const char*)yy_text + 2, &l);
 	}
+	ext_int_const(t, val);
 	sym = get_sym();
 	return sym;
 }
