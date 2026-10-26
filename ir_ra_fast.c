@@ -1304,10 +1304,10 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 								reg = IR_REG_NONE;
 								break;
 							}
-							IR_REGSET_INCL(data.allocated, reg_lo);
+							IR_REGSET_INCL(used, reg_lo);
 							reg_hi = _pick_reg(ctx, &data, data.regs[j].type, used, data.regs[j].flags, i, data.regs[j].def);
+							IR_REGSET_EXCL(used, reg_lo);
 							if (reg_hi == IR_REG_NONE) {
-								IR_REGSET_EXCL(data.allocated, reg_lo);
 								reg = IR_REG_NONE;
 								break;
 							}
@@ -1386,7 +1386,8 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 					 && ctx->regs[i][0] != IR_REG_NONE
 					 && IR_IS_TYPE_INT(insn->type) == IR_IS_TYPE_INT(data.regs[j].type)
 #if defined(IR_TARGET_X86)
-					 && (ir_type_size[data.regs[j].type] != 1
+					 && (!IR_IS_TYPE_INT(data.regs[j].type)
+					  || ir_type_size[data.regs[j].type] != 1
 					  || (IR_REG_NUM(ctx->regs[i][0]) != IR_REG_RBP
 					   && IR_REG_NUM(ctx->regs[i][0]) != IR_REG_RSI
 					   && IR_REG_NUM(ctx->regs[i][0]) != IR_REG_RDI))
