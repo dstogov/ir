@@ -1300,12 +1300,7 @@ ir_fold_const:
 		/* Extend a narrow integer result to its type width so no
 		 * fold rule sees garbage in the upper bits. */
 		if (IR_IS_TYPE_INT(type) && ir_type_size[type] < 8) {
-			uint32_t shift = (8 - ir_type_size[type]) * 8;
-			if (IR_IS_TYPE_SIGNED(type)) {
-				val.i64 = (int64_t)(val.u64 << shift) >> shift;
-			} else {
-				val.u64 = (val.u64 << shift) >> shift;
-			}
+			val.u64 = ir_fix_int(type, val.u64);
 		}
 
 		if (!ctx->use_lists) {
