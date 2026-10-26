@@ -302,13 +302,7 @@ static uint64_t read_hex(const char *p, const char *e)
 static void ext_int_const(uint32_t t, ir_val *val)
 {
 	if (IR_IS_TYPE_INT(t) && ir_type_size[t] < 8) {
-		uint32_t shift = (8 - ir_type_size[t]) * 8;
-
-		if (IR_IS_TYPE_SIGNED(t)) {
-			val->i64 = (int64_t)(val->u64 << shift) >> shift;
-		} else {
-			val->u64 = (val->u64 << shift) >> shift;
-		}
+		val->u64 = ir_fix_int(t, val->u64);
 	}
 }
 

@@ -3762,9 +3762,7 @@ static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref con
 				IR_ASSERT(0);
 		}
 		if (IR_IS_TYPE_SIGNED(condition_insn->type)) {
-			uint32_t shift = (8 - ir_type_size[condition_insn->type]) * 8;
-
-			val.i64 = (int64_t)(val.u64 << shift) >> shift;
+			val.u64 = ir_fix_signed(condition_insn->type, val.u64);
 		}
 
 		ir_ref c = ir_const(ctx, val, condition_insn->type);
@@ -3792,9 +3790,7 @@ static ir_ref ir_iter_optimize_condition(ir_ctx *ctx, ir_ref control, ir_ref con
 			condition_insn->op1 = op1_insn->op1;
 			ir_val val = val_insn->val;
 			if (IR_IS_TYPE_SIGNED(condition_insn->type)) {
-				uint32_t shift = (8 - ir_type_size[condition_insn->type]) * 8;
-
-				val.i64 = (int64_t)(val.u64 << shift) >> shift;
+				val.u64 = ir_fix_signed(condition_insn->type, val.u64);
 			}
 			ir_ref c = ir_const(ctx, val, condition_insn->type);
 			condition_insn = &ctx->ir_base[condition];
