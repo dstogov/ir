@@ -667,7 +667,7 @@ ir_ref ir_const_ex(ir_ctx *ctx, ir_val val, uint8_t type, uint32_t optx)
 		return IR_NULL;
 	}
 
-	IR_ASSERT(ir_const_is_canonical(val, type));
+	IR_ASSERT(IR_IS_SYM_CONST(optx & IR_OPT_OP_MASK) || ir_const_is_canonical(val, type));
 
 	hash = ir_const_hash(val, optx) & ctx->const_hash_mask;
 	ref = ctx->const_hash[hash];
