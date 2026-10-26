@@ -679,6 +679,7 @@ ir_insn(ir_parser_ctx *p):
 		"}"
 		{ref = ir_long_const_commit(p->ctx, ref);}
 	|	"func"
+		{if (t != IR_VOID && t != IR_ADDR) yy_error("uintptr_t type expected");}
 		(	ID(&func, &func_len)
 			{flags = 0;}
 			ir_func_proto(p, &flags, &ret_type, &params_count, param_types)
@@ -693,11 +694,16 @@ ir_insn(ir_parser_ctx *p):
 			{ref = ir_proto(p->ctx, flags, ret_type, params_count, param_types);}
 			{ref = ir_const_func_addr(p->ctx, val.addr, ref);}
 		)
-	|	"sym" "(" ID(&func, &func_len) ")"
+	|	"sym"
+		{if (t != IR_VOID && t != IR_ADDR) yy_error("uintptr_t type expected");}
+		"(" ID(&func, &func_len) ")"
 		{ref = ir_const_sym(p->ctx, ir_stringl(p->ctx, func, func_len));}
-	|	"label" "(" ID(&func, &func_len) ")"
+	|	"label"
+		{if (t != IR_VOID && t != IR_ADDR) yy_error("uintptr_t type expected");}
+		"(" ID(&func, &func_len) ")"
 		{ref = ir_const_label(p->ctx, ir_stringl(p->ctx, func, func_len));}
 	|   STRING(&func, &func_len)
+		{if (t != IR_VOID && t != IR_ADDR) yy_error("uintptr_t type expected");}
 		{ref = ir_make_const_str(p->ctx, func, func_len);}
 	|	func(&op)
 		(
@@ -871,7 +877,16 @@ emit:
 	)
 	{ir_define_var(p, str, len, ref);}
 	{if (str2) {
-		if (!ref2) yy_error("unexpected second result");
+		if (!ref2) {
+			if (IR_IS_CONST_REF(ref)) {
+				yy_error("constant provides a single output");
+			} else {
+				char buf[64];
+
+				snprintf(buf, sizeof(buf), "instruction %s provides a single output", ir_op_name[op]);
+				yy_error(buf);
+			}
+		}
 		ir_define_var(p, str2, len2, ref2);
 	}}
 ;

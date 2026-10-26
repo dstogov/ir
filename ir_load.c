@@ -1884,6 +1884,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 			break;
 		case YY_FUNC:
 			sym = get_sym();
+			if (t != IR_VOID && t != IR_ADDR) yy_error("uintptr_t type expected");
 			if (sym == YY_ID) {
 				sym = parse_ID(sym, &func, &func_len);
 				flags = 0;
@@ -1909,6 +1910,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 			break;
 		case YY_SYM:
 			sym = get_sym();
+			if (t != IR_VOID && t != IR_ADDR) yy_error("uintptr_t type expected");
 			if (sym != YY__LPAREN) {
 				yy_error_sym("'(' expected, got", sym);
 			}
@@ -1922,6 +1924,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 			break;
 		case YY_LABEL:
 			sym = get_sym();
+			if (t != IR_VOID && t != IR_ADDR) yy_error("uintptr_t type expected");
 			if (sym != YY__LPAREN) {
 				yy_error_sym("'(' expected, got", sym);
 			}
@@ -1935,6 +1938,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 			break;
 		case YY_STRING:
 			sym = parse_STRING(sym, &func, &func_len);
+			if (t != IR_VOID && t != IR_ADDR) yy_error("uintptr_t type expected");
 			ref = ir_make_const_str(p->ctx, func, func_len);
 			break;
 		case YY_ID:
@@ -2120,7 +2124,16 @@ emit:
 	}
 	ir_define_var(p, str, len, ref);
 	if (str2) {
-		if (!ref2) yy_error("unexpected second result");
+		if (!ref2) {
+			if (IR_IS_CONST_REF(ref)) {
+				yy_error("constant provides a single output");
+			} else {
+				char buf[64];
+
+				snprintf(buf, sizeof(buf), "instruction %s provides a single output", ir_op_name[op]);
+				yy_error(buf);
+			}
+		}
 		ir_define_var(p, str2, len2, ref2);
 	}
 	return sym;
