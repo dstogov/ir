@@ -140,7 +140,19 @@ static void ir_emit_c_fp_const(double v, FILE *f)
 	} else {
 		snprintf(buf, sizeof(buf), "%g", v);
 		if (strtod(buf, NULL) != v) {
-			fprintf(f, "%a", v);
+			char *p, *end;
+
+			snprintf(buf, sizeof(buf), "%a", v);
+			/* MSVC pads the mantissa with trailing zeros */
+			p = strchr(buf, 'p');
+			end = p;
+			while (end[-1] == '0') {
+				end--;
+			}
+			if (end[-1] == '.') {
+				end--;
+			}
+			fprintf(f, "%.*s%s", (int)(end - buf), buf, p);
 		} else if (strpbrk(buf, ".e")) {
 			fprintf(f, "%s", buf);
 		} else {
