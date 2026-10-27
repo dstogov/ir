@@ -7,6 +7,7 @@
 
 #include "ir.h"
 #include "ir_private.h"
+#include <math.h>
 
 #define IR_TYPE_TNAME(name, type, field, flags) #field,
 
@@ -128,6 +129,44 @@ static void ir_emit_c_func_proto(const char *name, uint32_t flags, ir_type ret_t
 	fprintf(f, ")");
 }
 
+static void ir_emit_c_fp_const(double v, FILE *f)
+{
+	char buf[64];
+
+	if (isnan(v)) {
+		fprintf(f, signbit(v) ? "-__builtin_nan(\"\")" : "__builtin_nan(\"\")");
+	} else if (isinf(v)) {
+		fprintf(f, v < 0 ? "-__builtin_inf()" : "__builtin_inf()");
+	} else {
+		snprintf(buf, sizeof(buf), "%g", v);
+		if (strtod(buf, NULL) != v) {
+			fprintf(f, "%a", v);
+		} else if (strpbrk(buf, ".e")) {
+			fprintf(f, "%s", buf);
+		} else {
+			/* Keep integral values (and -0) from being parsed as integer literals */
+			fprintf(f, "%s.0", buf);
+		}
+	}
+}
+
+static void ir_emit_c_fp_vector_const(ir_insn *insn, FILE *f)
+{
+	const double *d = (const double*)(insn + 1);
+	const float *s = (const float*)(insn + 1);
+	bool is_double = IR_VECTOR_BASE_TYPE(insn->type) == IR_DOUBLE;
+	uint32_t i, n = IR_VECTOR_LENGTH(insn->type);
+
+	fprintf(f, "{");
+	for (i = 0; i < n; i++) {
+		if (i) {
+			fprintf(f, ", ");
+		}
+		ir_emit_c_fp_const(is_double ? d[i] : s[i], f);
+	}
+	fprintf(f, "}");
+}
+
 static void ir_emit_c_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 {
 	if (insn->op == IR_LABEL) {
@@ -138,13 +177,20 @@ static void ir_emit_c_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 			ir_resolve_label_syms(ctx);
 		}
 		fprintf(f, "&&bb%d", insn->val.u32_hi);
+	} else if (IR_IS_TYPE_FP(insn->type)) {
+		ir_emit_c_fp_const(insn->type == IR_DOUBLE ? insn->val.d : insn->val.f, f);
+	} else if (IR_IS_TYPE_VECTOR(insn->type)) {
+		fprintf(f, "(");
+		ir_emit_c_type_name(insn->type, f);
+		fprintf(f, ")");
+		if (IR_IS_TYPE_FP(IR_VECTOR_BASE_TYPE(insn->type))) {
+			ir_emit_c_fp_vector_const(insn, f);
+		} else {
+			ir_print_const(ctx, insn, f, true);
+		}
 	} else {
 		if (insn->op == IR_SYM) {
 			fprintf(f, "&");
-		} else if (IR_IS_TYPE_VECTOR(insn->type)) {
-			fprintf(f, "(");
-			ir_emit_c_type_name(insn->type, f);
-			fprintf(f, ")");
 		}
 		ir_print_const(ctx, insn, f, true);
 	}

@@ -1,0 +1,26 @@
+--TEST--
+001: Infinity and NaN constants
+--ARGS--
+--emit-c
+--CODE--
+{
+	uintptr_t c_1 = func fd(double, double, double): void;
+	uintptr_t c_2 = func ff(float, float, float): void;
+	double c_3 = inf;
+	double c_4 = -inf;
+	double c_5 = nan;
+	float c_6 = inf;
+	float c_7 = -inf;
+	float c_8 = nan;
+	l_1 = START(l_4);
+	l_2 = CALL/3(l_1, c_1, c_3, c_4, c_5);
+	l_3 = CALL/3(l_2, c_2, c_6, c_7, c_8);
+	l_4 = RETURN(l_3);
+}
+--EXPECT--
+void test(void)
+{
+	fd(__builtin_inf(), -__builtin_inf(), __builtin_nan(""));
+	ff(__builtin_inf(), -__builtin_inf(), __builtin_nan(""));
+	return;
+}
