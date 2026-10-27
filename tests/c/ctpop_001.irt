@@ -1,0 +1,19 @@
+--TEST--
+001: CTPOP int8_t function
+--ARGS--
+--emit-c
+--CODE--
+{
+	l_1 = START(l_4);
+	int8_t x = PARAM(l_1, "x", 1);
+	int8_t ret = CTPOP(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+int8_t test(int8_t x)
+{
+	int8_t d_1 = x;
+	int8_t d_2;
+	d_2 = __builtin_popcount((uint32_t)(uint8_t)d_1);
+	return d_2;
+}
