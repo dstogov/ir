@@ -1385,20 +1385,6 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 					 && data.regs[j].root == IR_UNUSED
 					 && ctx->regs[i][0] != IR_REG_NONE
 					 && IR_IS_TYPE_INT(insn->type) == IR_IS_TYPE_INT(data.regs[j].type)
-#if defined(IR_TARGET_X86)
-					 && (!IR_IS_TYPE_INT(data.regs[j].type)
-					  || ir_type_size[data.regs[j].type] != 1
-					  || (IR_REG_NUM(ctx->regs[i][0]) != IR_REG_RBP
-					   && IR_REG_NUM(ctx->regs[i][0]) != IR_REG_RSI
-					   && IR_REG_NUM(ctx->regs[i][0]) != IR_REG_RDI))
-#endif
-#if IR_X86_I64
-					 && ((insn->type == IR_I64 || insn->type == IR_U64) ?
-						 !IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), IR_REG_I64_LO(IR_REG_NUM(ctx->regs[i][0]))) :
-						 !IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), IR_REG_NUM(ctx->regs[i][0])))
-#else
-					 && !IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), IR_REG_NUM(ctx->regs[i][0]))
-#endif
 					 && (ival->reg == IR_REG_NONE && ival->stack_spill_pos == -1)) {
 						/* reuse for op1 the register allocated for instruction result (lightweigh coalescing) */
 						reg = IR_REG_NUM(ctx->regs[i][0]);
@@ -1407,7 +1393,18 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 							reg = IR_REG_I64_LO(reg);
 						}
 #endif
+						if (IR_REGSET_IN(IR_REGSET_UNION(used, data.allocated), reg)) {
+							goto pick;
+						}
+#if defined(IR_TARGET_X86)
+						if (IR_IS_TYPE_INT(data.regs[j].type)
+						  && ir_type_size[data.regs[j].type] == 1
+						  && (reg == IR_REG_RBP || reg == IR_REG_RSI || reg == IR_REG_RDI)) {
+							goto pick;
+						}
+#endif
 					} else {
+pick:
 						reg = _pick_reg(ctx, &data, data.regs[j].type, used, data.regs[j].flags, i, data.regs[j].def);
 						if (reg == IR_REG_NONE) {
 							break;
