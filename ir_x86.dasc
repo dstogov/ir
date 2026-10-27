@@ -17070,7 +17070,7 @@ static void ir_emit_cond_cmp_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 		IR_ASSERT(tmp_reg != IR_REG_NONE);
 
-		if (!IR_IS_CONST_REF(insn->op2) && UNEXPECTED(ctx->rules[insn->op2] & IR_FUSED_REG)) {
+		if (!IR_IS_CONST_REF(insn->op1) && UNEXPECTED(ctx->rules[insn->op1] & IR_FUSED_REG)) {
 			op1_reg = ir_get_fused_reg(ctx, def, insn->op1, 1);
 			op2_reg = ir_get_fused_reg(ctx, def, insn->op1, 2);
 		} else {
@@ -17232,7 +17232,7 @@ static void ir_emit_cond_i64_cmp_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 		IR_ASSERT(tmp_reg != IR_REG_NONE);
 
-		if (UNEXPECTED(ctx->rules[insn->op2] & IR_FUSED_REG)) {
+		if (UNEXPECTED(ctx->rules[insn->op1] & IR_FUSED_REG)) {
 			op1_reg = ir_get_fused_reg(ctx, def, insn->op1, 1);
 			op2_reg = ir_get_fused_reg(ctx, def, insn->op1, 2);
 		} else {
