@@ -600,7 +600,7 @@ static void ir_emit_abs(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 			fprintf(f, "fabsf(");
 		}
 		ir_emit_ref(ctx, f, insn->op1);
-		fprintf(f, ")\n");
+		fprintf(f, ");\n");
 	} else {
 		if (IR_IS_TYPE_SIGNED(type)) {
 			ir_emit_ref(ctx, f, insn->op1);
