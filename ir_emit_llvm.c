@@ -514,7 +514,7 @@ static void ir_emit_unary_neg(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 		} else  {
 			fprintf(f, "sub ");
 			ir_emit_llvm_type_name(type, f);
-			fprintf(f, " zeroinitialized, ");
+			fprintf(f, " zeroinitializer, ");
 		}
 	}
 	ir_emit_ref(ctx, f, insn->op1);

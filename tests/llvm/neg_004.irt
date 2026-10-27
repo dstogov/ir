@@ -1,0 +1,17 @@
+--TEST--
+004: neg function (int vector)
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	l_1 = START(l_3);
+	<int32_t*4> x = PARAM(l_1, "x", 1);
+	<int32_t*4> ret = NEG(x);
+	l_3 = RETURN(l_1, ret);
+}
+--EXPECT--
+define <4 x i32> @test(<4 x i32> %d2)
+{
+	%d3 = sub <4 x i32> zeroinitializer, %d2
+	ret <4 x i32> %d3
+}
