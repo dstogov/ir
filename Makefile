@@ -7,6 +7,9 @@ BUILD_DIR  = .
 SRC_DIR    = .
 HAVE_LLVM  = no
 TESTS      = $(SRC_DIR)/tests
+# ROUNDTRIP_EMIT can be "c" or "llvm"
+ROUNDTRIP_EMIT = c
+ROUNDTRIP_CC   = clang
 
 PREFIX     = /usr/local
 
@@ -147,6 +150,13 @@ test: $(BUILD_DIR)/ir $(BUILD_DIR)/tester
 test-ci: $(BUILD_DIR)/ir $(BUILD_DIR)/tester
 	$(BUILD_DIR)/tester --test-cmd $(BUILD_DIR)/ir --target $(TARGET_TRIPLET) --default-args "--save" \
 		--test-extension ".irt" --code-extension ".ir" --show-diff $(TESTS)
+
+# Only tests whose expected output is the program output alone
+test-roundtrip: $(BUILD_DIR)/ir $(BUILD_DIR)/tester
+	$(BUILD_DIR)/tester \
+		--test-cmd "sh $(SRC_DIR)/tools/roundtrip.sh $(BUILD_DIR)/ir $(ROUNDTRIP_EMIT) $(ROUNDTRIP_CC)" \
+		--target $(TARGET_TRIPLET) --test-extension ".irt" --code-extension ".ir" --show-diff \
+		$(shell grep -rlxE --include='*.irt' -e '(-O[012] )?--run' $(TESTS))
 
 clean:
 	rm -rf $(BUILD_DIR)/ir $(BUILD_DIR)/libir.a $(BUILD_DIR)/*.o \
