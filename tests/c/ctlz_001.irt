@@ -14,6 +14,6 @@ int8_t test(int8_t x)
 {
 	int8_t d_1 = x;
 	int8_t d_2;
-	d_2 = __builtin_clz((uint32_t)(uint8_t)d_1) - 24;
+	d_2 = __builtin_clz((uint8_t)d_1) - 24;
 	return d_2;
 }

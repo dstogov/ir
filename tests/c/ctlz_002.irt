@@ -14,6 +14,6 @@ uint16_t test(uint16_t x)
 {
 	uint16_t d_1 = x;
 	uint16_t d_2;
-	d_2 = __builtin_clz((uint32_t)(uint16_t)d_1) - 16;
+	d_2 = __builtin_clz(d_1) - 16;
 	return d_2;
 }
