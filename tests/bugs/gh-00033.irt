@@ -17,12 +17,4 @@ x86_64-*-sysv
 }
 --EXPECT--
 test:
-	subq $8, %rsp
-	movl %edi, (%rsp)
-	movl (%rsp), %eax
-	movl $0xa, %ecx
-	cltd
-	idivl %ecx
-	movl %eax, 4(%rsp)
-	addq $8, %rsp
 	retq
