@@ -1,0 +1,20 @@
+--TEST--
+002: builtin copysignf (float)
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	uintptr_t c_1 = func copysignf(float, float): float __builtin;
+	l_1 = START(l_4);
+	float x = PARAM(l_1, "x", 1);
+	float y = PARAM(l_1, "y", 2);
+	float d_4, l_2 = CALL/2(l_1, c_1, x, y);
+	l_4 = RETURN(l_2, d_4);
+}
+--EXPECT--
+define float @test(float %d2, float %d3)
+{
+	%d4 = call float @llvm.copysign.f32(float %d2, float %d3)
+	ret float %d4
+}
+declare float @llvm.copysign.f32(float, float)

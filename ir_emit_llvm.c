@@ -203,8 +203,8 @@ static const char *ir_type_llvm_name[IR_LAST_LLVM_TYPE] = {
 	_(LOG2_F32,     "llvm.log2.f32",               F32,  1, F32, ___, ___, ___) \
 	_(LOG10_F64,    "llvm.log10.f64",              F64,  1, F64, ___, ___, ___) \
 	_(LOG10_F32,    "llvm.log10.f32",              F32,  1, F32, ___, ___, ___) \
-	_(COPYSIGN_F64, "llvm.copysign.f64",           F32,  2, F32, F32, ___, ___) \
-	_(COPYSIGN_F32, "llvm.copysign.f32",           F64,  2, F64, F64, ___, ___) \
+	_(COPYSIGN_F64, "llvm.copysign.f64",           F64,  2, F64, F64, ___, ___) \
+	_(COPYSIGN_F32, "llvm.copysign.f32",           F32,  2, F32, F32, ___, ___) \
 	_(FLOOR_F64,    "llvm.floor.f64",              F64,  1, F64, ___, ___, ___) \
 	_(FLOOR_F32,    "llvm.floor.f32",              F32,  1, F32, ___, ___, ___) \
 	_(CEIL_F64,     "llvm.ceil.f64",               F64,  1, F64, ___, ___, ___) \
@@ -514,7 +514,7 @@ static void ir_emit_unary_neg(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 		} else  {
 			fprintf(f, "sub ");
 			ir_emit_llvm_type_name(type, f);
-			fprintf(f, " zeroinitialized, ");
+			fprintf(f, " zeroinitializer, ");
 		}
 	}
 	ir_emit_ref(ctx, f, insn->op1);
@@ -776,19 +776,21 @@ static void ir_emit_conditional_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 {
 	ir_type type = ctx->ir_base[insn->op1].type;
 
-	ir_emit_def_ref(ctx, f, def);
 	if (type == IR_BOOL) {
+		ir_emit_def_ref(ctx, f, def);
 		fprintf(f, "select i1 ");
 		ir_emit_ref(ctx, f, insn->op1);
 	} else if (IR_IS_TYPE_FP(type)) {
 		fprintf(f, "\t%%t%d = fcmp une %s ", def, ir_type_llvm_name[type]);
 		ir_emit_ref(ctx, f, insn->op1);
 		fprintf(f, ", 0.0\n");
+		ir_emit_def_ref(ctx, f, def);
 		fprintf(f, "select i1 %%t%d", def);
 	} else {
 		fprintf(f, "\t%%t%d = icmp ne %s ", def, ir_type_llvm_name[type]);
 		ir_emit_ref(ctx, f, insn->op1);
 		fprintf(f, ", 0\n");
+		ir_emit_def_ref(ctx, f, def);
 		fprintf(f, "select i1 %%t%d", def);
 	}
 
@@ -1149,7 +1151,6 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn, ir_bit
 	if (IR_IS_CONST_REF(insn->op2)) {
 		const ir_insn *func = &ctx->ir_base[insn->op2];
 		if (func->op == IR_FUNC) {
-			name = ir_get_str(ctx, func->val.name);
 			fprintf(f, "@%s", name);
 		} else {
 			IR_ASSERT(func->op == IR_FUNC_ADDR);
