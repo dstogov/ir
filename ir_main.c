@@ -1478,6 +1478,7 @@ int main(int argc, char **argv)
 	if (dump & IR_GEN_CODE) {
 		if ((dump & (IR_DUMP_C|IR_DUMP_LLVM)) == (IR_DUMP_C|IR_DUMP_LLVM)) {
 			fprintf(stderr, "ERROR: --emit-c and --emit-llvm are incompatible\n");
+			return 1;
 		}
 	}
 	if (dump & IR_GEN_NATIVE) {
