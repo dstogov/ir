@@ -646,7 +646,7 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 #endif
 			IR_ASSERT(tmp_reg != IR_REG_NONE);
 			IR_ASSERT(tmp_reg >= IR_REG_GP_FIRST && tmp_reg <= IR_REG_GP_LAST);
-			ir_emit_mov(ctx, type, tmp_reg, to);
+			ir_emit_mov(ctx, types[to], tmp_reg, to);
 			loc[to] = tmp_reg;
 		} else {
 #ifdef IR_HAVE_SWAP_FP
@@ -660,7 +660,7 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 #endif
 			IR_ASSERT(tmp_fp_reg != IR_REG_NONE);
 			IR_ASSERT(tmp_fp_reg >= IR_REG_FP_FIRST && tmp_fp_reg <= IR_REG_FP_LAST);
-			ir_emit_fp_mov(ctx, type, tmp_fp_reg, to);
+			ir_emit_fp_mov(ctx, types[to], tmp_fp_reg, to);
 			loc[to] = tmp_fp_reg;
 		}
 		while (1) {

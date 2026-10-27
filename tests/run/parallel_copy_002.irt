@@ -1,0 +1,42 @@
+--TEST--
+PARALLEL_COPY 002: cycle of mixed float/double arguments keeps the full double
+--ARGS--
+--run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @main(): int32_t;
+func @test(double, float): void;
+func @check(float, double): void;
+static const @fmt[11] = "%.1f %.9f\n\000";
+func @main(): int32_t
+{
+	uintptr_t c_1 = func @test(double, float): void;
+	double c_2 = 1.000000001;
+	float c_3 = 2.5;
+	int32_t c_4 = 0;
+	l_1 = START(l_3);
+	l_2 = CALL/2(l_1, c_1, c_2, c_3);
+	l_3 = RETURN(l_2, c_4);
+}
+func @test(double, float): void
+{
+	uintptr_t c_1 = func @check(float, double): void;
+	l_1 = START(l_3);
+	double a = PARAM(l_1, "a", 1);
+	float b = PARAM(l_1, "b", 2);
+	l_2 = CALL/2(l_1, c_1, b, a);
+	l_3 = RETURN(l_2);
+}
+func @check(float, double): void
+{
+	uintptr_t c_1 = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t c_2 = sym(@fmt);
+	l_1 = START(l_3);
+	float b = PARAM(l_1, "b", 1);
+	double a = PARAM(l_1, "a", 2);
+	double b2 = FP2FP(b);
+	l_2 = CALL/3(l_1, c_1, c_2, b2, a);
+	l_3 = RETURN(l_2);
+}
+--EXPECT--
+2.5 1.000000001

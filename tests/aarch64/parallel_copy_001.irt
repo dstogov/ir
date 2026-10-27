@@ -1,0 +1,25 @@
+--TEST--
+001: parallel copy saves the cycle head with its own (wider) type
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_3);
+	int64_t a = PARAM(l_1, "a", 1);
+	int32_t b = PARAM(l_1, "b", 2);
+	uintptr_t f = PARAM(l_1, "f", 3);
+	l_2 = CALL/2(l_1, f, b, a);
+	l_3 = RETURN(l_2);
+}
+--EXPECT--
+test:
+	stp x29, x30, [sp, #-0x10]!
+	mov x29, sp
+	mov x3, x0
+	mov w0, w1
+	mov x1, x3
+	blr x2
+	ldp x29, x30, [sp], #0x10
+	ret
