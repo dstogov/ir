@@ -14,6 +14,6 @@ double test(double x)
 {
 	double d_1 = x;
 	double d_2;
-	d_2 = fabs(d_1)
+	d_2 = fabs(d_1);
 	return d_2;
 }
