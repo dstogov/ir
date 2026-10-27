@@ -1,0 +1,36 @@
+name: Roundtrip
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - "**"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  Roundtrip:
+    name: '${{ matrix.os }} --emit-${{ matrix.emit }}'
+    runs-on: ${{ matrix.os }}
+    # Prototype: the emitters are incomplete, so failures don't block the PR
+    continue-on-error: true
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-26]
+        emit: [c, llvm]
+    steps:
+      - uses: actions/checkout@v7
+      - name: apt
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang libcapstone-dev
+      - name: brew
+        if: runner.os == 'macOS'
+        run: |
+          brew install capstone
+          echo "CPATH=$(brew --prefix)/include" >> "$GITHUB_ENV"
+          echo "LIBRARY_PATH=$(brew --prefix)/lib" >> "$GITHUB_ENV"
+      - name: test
+        run: make BUILD=debug ROUNDTRIP_EMIT=${{ matrix.emit }} test-roundtrip
