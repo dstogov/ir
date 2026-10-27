@@ -203,8 +203,8 @@ static const char *ir_type_llvm_name[IR_LAST_LLVM_TYPE] = {
 	_(LOG2_F32,     "llvm.log2.f32",               F32,  1, F32, ___, ___, ___) \
 	_(LOG10_F64,    "llvm.log10.f64",              F64,  1, F64, ___, ___, ___) \
 	_(LOG10_F32,    "llvm.log10.f32",              F32,  1, F32, ___, ___, ___) \
-	_(COPYSIGN_F64, "llvm.copysign.f64",           F32,  2, F32, F32, ___, ___) \
-	_(COPYSIGN_F32, "llvm.copysign.f32",           F64,  2, F64, F64, ___, ___) \
+	_(COPYSIGN_F64, "llvm.copysign.f64",           F64,  2, F64, F64, ___, ___) \
+	_(COPYSIGN_F32, "llvm.copysign.f32",           F32,  2, F32, F32, ___, ___) \
 	_(FLOOR_F64,    "llvm.floor.f64",              F64,  1, F64, ___, ___, ___) \
 	_(FLOOR_F32,    "llvm.floor.f32",              F32,  1, F32, ___, ___, ___) \
 	_(CEIL_F64,     "llvm.ceil.f64",               F64,  1, F64, ___, ___, ___) \
