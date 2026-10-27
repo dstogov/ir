@@ -776,19 +776,21 @@ static void ir_emit_conditional_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 {
 	ir_type type = ctx->ir_base[insn->op1].type;
 
-	ir_emit_def_ref(ctx, f, def);
 	if (type == IR_BOOL) {
+		ir_emit_def_ref(ctx, f, def);
 		fprintf(f, "select i1 ");
 		ir_emit_ref(ctx, f, insn->op1);
 	} else if (IR_IS_TYPE_FP(type)) {
 		fprintf(f, "\t%%t%d = fcmp une %s ", def, ir_type_llvm_name[type]);
 		ir_emit_ref(ctx, f, insn->op1);
 		fprintf(f, ", 0.0\n");
+		ir_emit_def_ref(ctx, f, def);
 		fprintf(f, "select i1 %%t%d", def);
 	} else {
 		fprintf(f, "\t%%t%d = icmp ne %s ", def, ir_type_llvm_name[type]);
 		ir_emit_ref(ctx, f, insn->op1);
 		fprintf(f, ", 0\n");
+		ir_emit_def_ref(ctx, f, def);
 		fprintf(f, "select i1 %%t%d", def);
 	}
 
