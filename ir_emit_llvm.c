@@ -1151,7 +1151,6 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn, ir_bit
 	if (IR_IS_CONST_REF(insn->op2)) {
 		const ir_insn *func = &ctx->ir_base[insn->op2];
 		if (func->op == IR_FUNC) {
-			name = ir_get_str(ctx, func->val.name);
 			fprintf(f, "@%s", name);
 		} else {
 			IR_ASSERT(func->op == IR_FUNC_ADDR);

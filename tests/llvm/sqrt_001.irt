@@ -1,0 +1,19 @@
+--TEST--
+001: builtin sqrt
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	uintptr_t c_1 = func sqrt(double): double __builtin;
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	double d_3, l_2 = CALL/1(l_1, c_1, x);
+	l_4 = RETURN(l_2, d_3);
+}
+--EXPECT--
+define double @test(double %d2)
+{
+	%d3 = call double @llvm.sqrt.f64(double %d2)
+	ret double %d3
+}
+declare double @llvm.sqrt.f64(double)
