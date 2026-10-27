@@ -238,7 +238,8 @@ static void _evict_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_reg reg)
 
 		if (data->state[reg].use) {
 			/* add spill load for the previous use */
-			if (!data->state[reg].root) {
+			if (!data->state[reg].root
+			 || ctx->ir_base[data->state[reg].use].op == IR_ARGVAL) {
 				ir_set_alocated_reg(ctx, data->state[reg].use, data->state[reg].op, pair | IR_REG_SPILL_LOAD);
 			} else {
 				ctx->rules[data->state[reg].use] |= IR_FUSED_REG;
@@ -257,7 +258,8 @@ static void _evict_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_reg reg)
 
 	if (data->state[reg].use) {
 		/* add spill load for the previous use */
-		if (!data->state[reg].root) {
+		if (!data->state[reg].root
+		 || ctx->ir_base[data->state[reg].use].op == IR_ARGVAL) {
 			ir_set_alocated_reg(ctx, data->state[reg].use, data->state[reg].op, reg | IR_REG_SPILL_LOAD);
 		} else {
 			ctx->rules[data->state[reg].use] |= IR_FUSED_REG;
@@ -379,6 +381,14 @@ static ir_reg _pick_reg(ir_ctx *ctx, ir_reg_alloc_fast_data *data, ir_type type,
 		best_cost = 0x7fffffff;
 		best_reg = IR_REG_NONE;
 		IR_REGSET_FOREACH(available, reg) {
+			if (use) {
+				/* skip registers allocated for the same instruction */
+				if (data->state[reg].root) {
+					if (data->state[reg].root == use) continue;
+				} else {
+					if (data->state[reg].use == use) continue;
+				}
+			}
 			if (data->state[reg].def < best_cost) {
 				best_cost = data->state[reg].def;
 				best_reg = reg;
