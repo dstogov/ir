@@ -19,6 +19,6 @@ void test(uintptr_t p, uintptr_t q)
 	uintptr_t d_1 = p;
 	uintptr_t d_2 = q;
 	*((double __attribute__((__vector_size__(16)))*)d_1) = (double __attribute__((__vector_size__(16)))){-__builtin_inf(), -0.0};
-	*((float __attribute__((__vector_size__(16)))*)d_2) = (float __attribute__((__vector_size__(16)))){__builtin_nan(""), -0.0, 3.0, 1.5};
+	*((float __attribute__((__vector_size__(16)))*)d_2) = (float __attribute__((__vector_size__(16)))){__builtin_nanf(""), -0.0f, 3.0f, 1.5f};
 	return;
 }

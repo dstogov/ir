@@ -17,6 +17,6 @@
 void test(void)
 {
 	fd(-0.0);
-	ff(-0.0);
+	ff(-0.0f);
 	return;
 }

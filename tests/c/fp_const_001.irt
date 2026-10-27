@@ -21,6 +21,6 @@
 void test(void)
 {
 	fd(__builtin_inf(), -__builtin_inf(), __builtin_nan(""));
-	ff(__builtin_inf(), -__builtin_inf(), __builtin_nan(""));
+	ff(__builtin_inff(), -__builtin_inff(), __builtin_nanf(""));
 	return;
 }

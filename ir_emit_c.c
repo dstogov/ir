@@ -129,17 +129,18 @@ static void ir_emit_c_func_proto(const char *name, uint32_t flags, ir_type ret_t
 	fprintf(f, ")");
 }
 
-static void ir_emit_c_fp_const(double v, FILE *f)
+static void ir_emit_c_fp_const(double v, bool is_float, FILE *f)
 {
+	const char *suffix = is_float ? "f" : "";
 	char buf[64];
 
 	if (isnan(v)) {
-		fprintf(f, signbit(v) ? "-__builtin_nan(\"\")" : "__builtin_nan(\"\")");
+		fprintf(f, "%s__builtin_nan%s(\"\")", signbit(v) ? "-" : "", suffix);
 	} else if (isinf(v)) {
-		fprintf(f, v < 0 ? "-__builtin_inf()" : "__builtin_inf()");
+		fprintf(f, "%s__builtin_inf%s()", v < 0 ? "-" : "", suffix);
 	} else {
 		snprintf(buf, sizeof(buf), "%g", v);
-		if (strtod(buf, NULL) != v) {
+		if (is_float ? strtof(buf, NULL) != (float)v : strtod(buf, NULL) != v) {
 			char *p, *end;
 
 			snprintf(buf, sizeof(buf), "%a", v);
@@ -152,12 +153,12 @@ static void ir_emit_c_fp_const(double v, FILE *f)
 			if (end[-1] == '.') {
 				end--;
 			}
-			fprintf(f, "%.*s%s", (int)(end - buf), buf, p);
+			fprintf(f, "%.*s%s%s", (int)(end - buf), buf, p, suffix);
 		} else if (strpbrk(buf, ".e")) {
-			fprintf(f, "%s", buf);
+			fprintf(f, "%s%s", buf, suffix);
 		} else {
 			/* Keep integral values (and -0) from being parsed as integer literals */
-			fprintf(f, "%s.0", buf);
+			fprintf(f, "%s.0%s", buf, suffix);
 		}
 	}
 }
@@ -174,7 +175,7 @@ static void ir_emit_c_fp_vector_const(ir_insn *insn, FILE *f)
 		if (i) {
 			fprintf(f, ", ");
 		}
-		ir_emit_c_fp_const(is_double ? d[i] : s[i], f);
+		ir_emit_c_fp_const(is_double ? d[i] : s[i], !is_double, f);
 	}
 	fprintf(f, "}");
 }
@@ -190,7 +191,7 @@ static void ir_emit_c_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 		}
 		fprintf(f, "&&bb%d", insn->val.u32_hi);
 	} else if (IR_IS_TYPE_FP(insn->type)) {
-		ir_emit_c_fp_const(insn->type == IR_DOUBLE ? insn->val.d : insn->val.f, f);
+		ir_emit_c_fp_const(insn->type == IR_DOUBLE ? insn->val.d : insn->val.f, insn->type == IR_FLOAT, f);
 	} else if (IR_IS_TYPE_VECTOR(insn->type)) {
 		fprintf(f, "(");
 		ir_emit_c_type_name(insn->type, f);
