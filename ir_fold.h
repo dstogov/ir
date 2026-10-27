@@ -30,7 +30,7 @@ IR_FOLD(EQ(C_DOUBLE, C_DOUBLE))
 
 IR_FOLD(EQ(C_FLOAT, C_FLOAT))
 {
-	IR_FOLD_BOOL(op1_insn->val.d == op2_insn->val.d);
+	IR_FOLD_BOOL(op1_insn->val.f == op2_insn->val.f);
 }
 
 IR_FOLD(NE(C_BOOL, C_BOOL))
