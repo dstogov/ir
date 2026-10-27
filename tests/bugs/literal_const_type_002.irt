@@ -1,0 +1,16 @@
+--TEST--
+Abort on inf literal with an integer type
+--ARGS--
+--run
+--CODE--
+func main(): int32_t
+{
+	uint8_t c = -inf;
+	int32_t r = 0;
+	l_1 = START(l_2);
+	l_2 = RETURN(l_1, r);
+}
+--EXPECT--
+ERROR: floating-point constant is incompatible with uint8_t at line 3
+
+exit code = 2

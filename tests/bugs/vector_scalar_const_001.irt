@@ -1,0 +1,16 @@
+--TEST--
+Abort on scalar constant initializer with an integer vector type
+--ARGS--
+--run
+--CODE--
+func main(): int32_t
+{
+	<int32_t * 4> c = 1;
+	int32_t r = 0;
+	l_1 = START(l_2);
+	l_2 = RETURN(l_1, r);
+}
+--EXPECT--
+ERROR: scalar constant is incompatible with <int32_t*4> at line 3
+
+exit code = 2

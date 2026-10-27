@@ -1,0 +1,16 @@
+--TEST--
+Abort on constant definition with two results
+--ARGS--
+--run
+--CODE--
+func main(): int32_t
+{
+	int32_t d_1, l_1 = 12;
+	int32_t r = 0;
+	l_1 = START(l_2);
+	l_2 = RETURN(l_1, r);
+}
+--EXPECT--
+ERROR: constant provides a single output at line 3
+
+exit code = 2

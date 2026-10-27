@@ -1,0 +1,18 @@
+--TEST--
+Abort on GUARD definition with two results
+--ARGS--
+--run
+--CODE--
+func main(int32_t): int32_t
+{
+	uintptr_t addr = 0x1000;
+	l_1 = START(l_3);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t d_2, l_2 = GUARD(l_1, x, addr);
+	int32_t r = 0;
+	l_3 = RETURN(l_2, r);
+}
+--EXPECT--
+ERROR: instruction GUARD provides a single output at line 6
+
+exit code = 2

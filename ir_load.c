@@ -20,6 +20,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <math.h>
 #include <setjmp.h>
 #ifndef _WIN32
@@ -136,10 +137,18 @@ static void ir_check_indefined_vars(ir_parser_ctx *p)
 	longjmp(yy_jmp_buf, 2);
 }
 
+#if __has_attribute(format)
+# define YY_PRINTF_FORMAT(fmt_pos, args_pos) __attribute__((format(printf, fmt_pos, args_pos)))
+#else
+# define YY_PRINTF_FORMAT(fmt_pos, args_pos)
+#endif
+
 /* forward declarations */
 static void yy_error(const char *msg);
 static void yy_error_sym(const char *msg, int sym);
 static void yy_error_str(const char *msg, const char *str);
+static void yy_error_fmt(const char *fmt, ...) YY_PRINTF_FORMAT(1, 2);
+static void yy_error_const_type(const char *kind, ir_type t);
 
 static char yy_unescape_char(const char *str, size_t *len)
 {
@@ -1833,12 +1842,14 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 		case YY_INF:
 		case YY_NAN:
 		case YY__MINUS:
+			if (IR_IS_TYPE_VECTOR(t)) yy_error_const_type("scalar", t);
 			val.u64 = 0;
 			sym = parse_const(sym, t, &val);
 			ref = ir_const(p->ctx, val, t);
 			break;
 		case YY__LBRACE:
 			sym = get_sym();
+			if (!IR_IS_TYPE_VECTOR(t)) yy_error_const_type("vector", t);
 			ref = ir_const_vector(p->ctx, t);
 			ptr = ir_long_const_ptr(p->ctx, ref);
 			memset(ptr, 0, IR_VECTOR_SIZE(t));
@@ -1876,6 +1887,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 			break;
 		case YY_FUNC:
 			sym = get_sym();
+			if (t != IR_VOID && t != IR_ADDR) yy_error_const_type("function address", t);
 			if (sym == YY_ID) {
 				sym = parse_ID(sym, &func, &func_len);
 				flags = 0;
@@ -1901,6 +1913,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 			break;
 		case YY_SYM:
 			sym = get_sym();
+			if (t != IR_VOID && t != IR_ADDR) yy_error_const_type("symbol address", t);
 			if (sym != YY__LPAREN) {
 				yy_error_sym("'(' expected, got", sym);
 			}
@@ -1914,6 +1927,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 			break;
 		case YY_LABEL:
 			sym = get_sym();
+			if (t != IR_VOID && t != IR_ADDR) yy_error_const_type("label address", t);
 			if (sym != YY__LPAREN) {
 				yy_error_sym("'(' expected, got", sym);
 			}
@@ -1927,6 +1941,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 			break;
 		case YY_STRING:
 			sym = parse_STRING(sym, &func, &func_len);
+			if (t != IR_VOID && t != IR_ADDR) yy_error_const_type("string", t);
 			ref = ir_make_const_str(p->ctx, func, func_len);
 			break;
 		case YY_ID:
@@ -2111,7 +2126,16 @@ emit:
 			yy_error_sym("unexpected", sym);
 	}
 	ir_define_var(p, str, len, ref);
-	if (str2) ir_define_var(p, str2, len2, ref2);
+	if (str2) {
+		if (!ref2) {
+			if (IR_IS_CONST_REF(ref)) {
+				yy_error("constant provides a single output");
+			} else {
+				yy_error_fmt("instruction %s provides a single output", ir_op_name[op]);
+			}
+		}
+		ir_define_var(p, str2, len2, ref2);
+	}
 	return sym;
 }
 
@@ -2310,13 +2334,13 @@ static int parse_const(int sym, uint8_t t, ir_val *val) {
 			sym = get_sym();
 			if (t == IR_DOUBLE) val->d = INFINITY;
 		else if (t == IR_FLOAT) {val->f = INFINITY; val->u32_hi = 0;}
-		else yy_error("Unexpected \"inf\"");
+		else yy_error_const_type("floating-point", t);
 			break;
 		case YY_NAN:
 			sym = get_sym();
 			if (t == IR_DOUBLE) val->d = NAN;
 		else if (t == IR_FLOAT) {val->f = NAN; val->u32_hi = 0;}
-		else yy_error("Unexpected \"nan\"");
+		else yy_error_const_type("floating-point", t);
 			break;
 		case YY__MINUS:
 			sym = get_sym();
@@ -2326,7 +2350,7 @@ static int parse_const(int sym, uint8_t t, ir_val *val) {
 			sym = get_sym();
 			if (t == IR_DOUBLE) val->d = -INFINITY;
 		else if (t == IR_FLOAT) {val->f = -INFINITY; val->u32_hi = 0;}
-		else yy_error("Unexpected \"-inf\"");
+		else yy_error_const_type("floating-point", t);
 			break;
 		default:
 			yy_error_sym("unexpected", sym);
@@ -2369,7 +2393,7 @@ static int parse_FLOATNUMBER(int sym, uint32_t t, ir_val *val) {
 	}
 	if (t == IR_DOUBLE) val->d = atof((const char*)yy_text);
 	else if (t == IR_FLOAT) {val->f = strtof((const char*)yy_text, NULL); val->u32_hi = 0;}
-	else yy_error("Unexpected <FLOATNUMBER>");
+	else yy_error_const_type("floating-point", t);
 	sym = get_sym();
 	return sym;
 }
@@ -2378,7 +2402,7 @@ static int parse_CHARACTER(int sym, uint32_t t, ir_val *val) {
 	if (sym != YY_CHARACTER) {
 		yy_error_sym("<CHARACTER> expected, got", sym);
 	}
-	if (!IR_IS_TYPE_INT(t)) yy_error("Unexpected <CHARACTER>");
+	if (!IR_IS_TYPE_INT(t)) yy_error_const_type("character", t);
 	if ((char)yy_text[1] != '\\') {
 		val->i64 = (signed char)yy_text[1];
 	} else {
@@ -2438,6 +2462,31 @@ static void yy_error_str(const char *msg, const char *str) {
 		yy_ctx = NULL;
 	}
 	longjmp(yy_jmp_buf, 2);
+}
+
+static void yy_error_fmt(const char *fmt, ...) {
+	va_list args;
+
+	va_start(args, fmt);
+	fprintf(stderr, "ERROR: ");
+	vfprintf(stderr, fmt, args);
+	fprintf(stderr, " at line %d\n", yy_line);
+	va_end(args);
+	if (yy_ctx) {
+		ir_strtab_free(&yy_ctx->var_tab);
+		ir_free(yy_ctx->ctx);
+		yy_ctx = NULL;
+	}
+	longjmp(yy_jmp_buf, 2);
+}
+
+static void yy_error_const_type(const char *kind, ir_type t) {
+	if (IR_IS_TYPE_VECTOR(t)) {
+		yy_error_fmt("%s constant is incompatible with <%s*%d>", kind,
+			ir_type_cname[IR_VECTOR_BASE_TYPE(t)], IR_VECTOR_LENGTH(t));
+	} else {
+		yy_error_fmt("%s constant is incompatible with %s", kind, ir_type_cname[t]);
+	}
 }
 
 int ir_load(ir_loader *loader, FILE *f) {
