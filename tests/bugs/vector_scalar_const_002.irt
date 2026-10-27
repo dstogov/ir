@@ -11,6 +11,6 @@ func main(): int32_t
 	l_2 = RETURN(l_1, r);
 }
 --EXPECT--
-ERROR: scalar type expected at line 3
+ERROR: scalar constant is incompatible with <float*4> at line 3
 
 exit code = 2

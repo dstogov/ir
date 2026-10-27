@@ -11,6 +11,6 @@ func main(): int32_t
 	l_2 = RETURN(l_1, r);
 }
 --EXPECT--
-ERROR: vector type expected at line 3
+ERROR: vector constant is incompatible with float at line 3
 
 exit code = 2

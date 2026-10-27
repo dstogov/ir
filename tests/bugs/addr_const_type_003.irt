@@ -11,6 +11,6 @@ func main(): int32_t
 	l_2 = RETURN(l_1, r);
 }
 --EXPECT--
-ERROR: uintptr_t type expected at line 3
+ERROR: symbol address constant is incompatible with double at line 3
 
 exit code = 2
