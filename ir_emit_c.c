@@ -431,8 +431,15 @@ static void ir_emit_count(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const ch
 	IR_ASSERT(!IR_IS_TYPE_VECTOR(insn->type));
 	ir_emit_def_ref(ctx, f, def);
 	fprintf(f, "__builtin_%s%s(", name, ir_type_size[insn->type] == 8 ? "ll" : "");
+	if (IR_IS_TYPE_SIGNED(insn->type)) {
+		fprintf(f, "(uint%d_t)", ir_type_size[insn->type] * 8);
+	}
 	ir_emit_ref(ctx, f, insn->op1);
-	fprintf(f, ");\n");
+	fprintf(f, ")");
+	if (insn->op == IR_CTLZ && ir_type_size[insn->type] < 4) {
+		fprintf(f, " - %d", 32 - ir_type_size[insn->type] * 8);
+	}
+	fprintf(f, ";\n");
 }
 
 static void ir_emit_sext(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
