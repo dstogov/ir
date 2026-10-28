@@ -1,0 +1,32 @@
+--TEST--
+043: FOLD: signed MUL_OV of minus one by INT64_MIN not folded
+--ARGS--
+-O2 --save
+--CODE--
+{
+	int64_t c_1 = -1;
+	int64_t c_2 = -9223372036854775808;
+	int64_t c_3 = 5;
+	l_1 = START(l_7);
+	int64_t d_2 = MUL_OV(c_1, c_2);
+	int64_t d_3 = MUL_OV(c_2, c_1);
+	int64_t d_4 = MUL_OV(c_1, c_3);
+	int64_t d_5 = ADD(d_2, d_3);
+	int64_t d_6 = ADD(d_5, d_4);
+	l_7 = RETURN(l_1, d_6);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int64_t c_4 = -1;
+	int64_t c_5 = -9223372036854775808;
+	int64_t c_6 = -5;
+	l_1 = START(l_6);
+	int64_t d_2 = MUL_OV(c_4, c_5);
+	int64_t d_3 = MUL_OV(c_4, c_5);
+	int64_t d_4 = ADD(d_3, d_2);
+	int64_t d_5 = ADD(d_4, c_6);
+	l_6 = RETURN(l_1, d_5);
+}
