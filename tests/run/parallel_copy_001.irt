@@ -1,0 +1,47 @@
+--TEST--
+PARALLEL_COPY 001: cycle of mixed int32/int64 arguments keeps the upper half
+--ARGS--
+--run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @main(): int32_t;
+func @test(int64_t, int32_t, int32_t, int64_t): void;
+func @check(int32_t, int64_t, int64_t, int32_t): void;
+static const @fmt[17] = "%d %llx %llx %d\n\000";
+func @main(): int32_t
+{
+	uintptr_t c_1 = func @test(int64_t, int32_t, int32_t, int64_t): void;
+	int64_t c_2 = 0x1111111122222222;
+	int32_t c_3 = 3;
+	int32_t c_4 = 4;
+	int64_t c_5 = 0x3333333344444444;
+	int32_t c_6 = 0;
+	l_1 = START(l_3);
+	l_2 = CALL/4(l_1, c_1, c_2, c_3, c_4, c_5);
+	l_3 = RETURN(l_2, c_6);
+}
+func @test(int64_t, int32_t, int32_t, int64_t): void
+{
+	uintptr_t c_1 = func @check(int32_t, int64_t, int64_t, int32_t): void;
+	l_1 = START(l_3);
+	int64_t a = PARAM(l_1, "a", 1);
+	int32_t b = PARAM(l_1, "b", 2);
+	int32_t c = PARAM(l_1, "c", 3);
+	int64_t d = PARAM(l_1, "d", 4);
+	l_2 = CALL/4(l_1, c_1, b, d, a, c);
+	l_3 = RETURN(l_2);
+}
+func @check(int32_t, int64_t, int64_t, int32_t): void
+{
+	uintptr_t c_1 = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t c_2 = sym(@fmt);
+	l_1 = START(l_3);
+	int32_t b = PARAM(l_1, "b", 1);
+	int64_t d = PARAM(l_1, "d", 2);
+	int64_t a = PARAM(l_1, "a", 3);
+	int32_t c = PARAM(l_1, "c", 4);
+	l_2 = CALL/5(l_1, c_1, c_2, b, d, a, c);
+	l_3 = RETURN(l_2);
+}
+--EXPECT--
+3 3333333344444444 1111111122222222 4

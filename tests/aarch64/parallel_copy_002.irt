@@ -1,0 +1,25 @@
+--TEST--
+002: parallel copy saves the FP cycle head with its own (wider) type
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	l_1 = START(l_3);
+	double a = PARAM(l_1, "a", 1);
+	float b = PARAM(l_1, "b", 2);
+	uintptr_t f = PARAM(l_1, "f", 3);
+	l_2 = CALL/2(l_1, f, b, a);
+	l_3 = RETURN(l_2);
+}
+--EXPECT--
+test:
+	stp x29, x30, [sp, #-0x10]!
+	mov x29, sp
+	fmov d31, d0
+	fmov s0, s1
+	fmov d1, d31
+	blr x0
+	ldp x29, x30, [sp], #0x10
+	ret
