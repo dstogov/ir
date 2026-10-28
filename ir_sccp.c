@@ -2758,6 +2758,7 @@ static bool ir_optimize_phi(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_re
 				}
 
 				if (is_cmp
+				 && !IR_IS_TYPE_FP(type)
 				 && ((insn->op2 == cond->op1
 				   && (insn->op3 == cond->op2
 				    || (IR_IS_CONST_REF(cond->op2)
