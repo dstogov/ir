@@ -135,7 +135,7 @@ static ir_reg _get_free_reg2(ir_ctx *ctx, ir_type type, ir_reg_alloc_simple_data
  * Some of the unsupported edge cases are demonstrated at https://github.com/dstogov/ir/pull/232
  * and https://github.com/dstogov/ir/pull/230 (there are may be other problems).
  * Unfortunatly, the attempts to fix the problems break the simplicity of this allocator and make it ridiculous.
- * The complete remving of VAR slot reuse makes the already bad generated code significanly worse.
+ * The complete removing of VAR slot reuse makes the already bad generated code significanly worse.
  *
  * A better appoach is implemented in ir_ra_fast.c
  */
