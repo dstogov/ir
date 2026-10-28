@@ -7945,7 +7945,6 @@ static void ir_emit_bit_count(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	lzcnt Rw(def_reg), Rw(op1_reg)
 					} else {
 						|	bsr Rw(def_reg), Rw(op1_reg)
-						|	xor Rw(def_reg), 0xf
 					}
 				} else if (insn->op == IR_CTTZ) {
 					if (ctx->mflags & IR_X86_BMI1) {
@@ -7959,14 +7958,17 @@ static void ir_emit_bit_count(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 				break;
 			case 1:
-				|   movzx Rd(op1_reg), Rb(op1_reg)
+				if (insn->op == IR_CTTZ && (ctx->mflags & IR_X86_BMI1)) {
+					|	or Rd(op1_reg), 0x100
+				} else {
+					|   movzx Rd(op1_reg), Rb(op1_reg)
+				}
 				if (insn->op == IR_CTLZ) {
 					if (ctx->mflags & IR_X86_BMI1) {
 						|	lzcnt Rd(def_reg), Rd(op1_reg)
 						|	sub Rd(def_reg), 24
 					} else {
 						|	bsr Rd(def_reg), Rd(op1_reg)
-						|	xor Rw(def_reg), 0x7
 					}
 					break;
 				}
@@ -7977,7 +7979,6 @@ static void ir_emit_bit_count(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	lzcnt Rd(def_reg), Rd(op1_reg)
 					} else {
 						|	bsr Rd(def_reg), Rd(op1_reg)
-						|	xor Rw(def_reg), 0x1f
 					}
 				} else if (insn->op == IR_CTTZ) {
 					if (ctx->mflags & IR_X86_BMI1) {
@@ -7997,7 +7998,6 @@ static void ir_emit_bit_count(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	lzcnt Rq(def_reg), Rq(op1_reg)
 					} else {
 						|	bsr Rq(def_reg), Rq(op1_reg)
-						|	xor Rw(def_reg), 0x3f
 					}
 				} else if (insn->op == IR_CTTZ) {
 					if (ctx->mflags & IR_X86_BMI1) {
@@ -8029,7 +8029,6 @@ static void ir_emit_bit_count(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	ASM_TXT_TMEM_OP lzcnt, Rw(def_reg), word, mem
 					} else {
 						|	ASM_TXT_TMEM_OP bsr, Rw(def_reg), word, mem
-						|	xor Rw(def_reg), 0xf
 					}
 				} else if (insn->op == IR_CTTZ) {
 					if (ctx->mflags & IR_X86_BMI1) {
@@ -8047,7 +8046,6 @@ static void ir_emit_bit_count(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	ASM_TXT_TMEM_OP lzcnt, Rd(def_reg), dword, mem
 					} else {
 						|	ASM_TXT_TMEM_OP bsr, Rd(def_reg), dword, mem
-						|	xor Rw(def_reg), 0x1f
 					}
 				} else if (insn->op == IR_CTTZ) {
 					if (ctx->mflags & IR_X86_BMI1) {
@@ -8066,7 +8064,6 @@ static void ir_emit_bit_count(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	ASM_TXT_TMEM_OP lzcnt, Rq(def_reg), qword, mem
 					} else {
 						|	ASM_TXT_TMEM_OP bsr, Rq(def_reg), qword, mem
-						|	xor Rw(def_reg), 0x3f
 					}
 				} else if (insn->op == IR_CTTZ) {
 					if (ctx->mflags & IR_X86_BMI1) {
@@ -8079,6 +8076,20 @@ static void ir_emit_bit_count(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				}
 				break;
 |.endif
+		}
+	}
+
+	if (!(ctx->mflags & IR_X86_BMI1) && insn->op != IR_CTPOP) {
+		int bits = ir_type_size[src_type] * 8;
+
+		|	jnz >1
+		if (insn->op == IR_CTLZ) {
+			|	mov Rd(def_reg), bits * 2 - 1
+			|1:
+			|	xor Rd(def_reg), bits - 1
+		} else {
+			|	mov Rd(def_reg), bits
+			|1:
 		}
 	}
 
@@ -16709,13 +16720,19 @@ static void ir_emit_bit_count_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 			case IR_CTLZ:
 				|   bsr Rd(tmp_reg), Rd(op1_reg)
-				|	or Rd(tmp_reg), 32
+				|	jnz >1
+				|	mov Rd(tmp_reg), 127
+				|1:
+				|	xor Rd(tmp_reg), 32
 				|	bsr Rd(def_reg), Rd(op1_reg_hi)
 				|	cmovz Rd(def_reg), Rd(tmp_reg)
 				|	xor Rd(def_reg), 31
 				break;
 			case IR_CTTZ:
 				|	bsf Rd(tmp_reg), Rd(op1_reg_hi)
+				|	jnz >1
+				|	mov Rd(tmp_reg), 32
+				|1:
 				|	add Rd(tmp_reg), 32
 				|	bsf Rd(def_reg), Rd(op1_reg)
 				|	cmovz Rd(def_reg), Rd(tmp_reg)
@@ -16743,13 +16760,19 @@ static void ir_emit_bit_count_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				break;
 			case IR_CTLZ:
 				|   ASM_TXT_TMEM_OP bsr, Rd(tmp_reg), dword, mem
-				|	or Rd(tmp_reg), 32
+				|	jnz >1
+				|	mov Rd(tmp_reg), 127
+				|1:
+				|	xor Rd(tmp_reg), 32
 				|	ASM_TXT_TMEM_OP bsr, Rd(def_reg), dword, mem_hi
 				|	cmovz Rd(def_reg), Rd(tmp_reg)
 				|	xor Rd(def_reg), 31
 				break;
 			case IR_CTTZ:
 				|	ASM_TXT_TMEM_OP bsf, Rd(tmp_reg), dword, mem_hi
+				|	jnz >1
+				|	mov Rd(tmp_reg), 32
+				|1:
 				|	add Rd(tmp_reg), 32
 				|	ASM_TXT_TMEM_OP bsf, Rd(def_reg), dword, mem
 				|	cmovz Rd(def_reg), Rd(tmp_reg)

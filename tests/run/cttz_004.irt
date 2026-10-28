@@ -1,0 +1,59 @@
+--TEST--
+CTTZ 004: zero input
+--ARGS--
+--run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func cttz8(int8_t): int32_t
+{
+	l_1 = START(l_4);
+	int8_t d_2 = PARAM(l_1, "x", 1);
+	int8_t d_3 = CTTZ(d_2);
+	int32_t d_4 = ZEXT(d_3);
+	l_4 = RETURN(l_1, d_4);
+}
+func cttz16(int16_t): int32_t
+{
+	l_1 = START(l_4);
+	int16_t d_2 = PARAM(l_1, "x", 1);
+	int16_t d_3 = CTTZ(d_2);
+	int32_t d_4 = ZEXT(d_3);
+	l_4 = RETURN(l_1, d_4);
+}
+func cttz32(int32_t): int32_t
+{
+	l_1 = START(l_4);
+	int32_t d_2 = PARAM(l_1, "x", 1);
+	int32_t d_3 = CTTZ(d_2);
+	l_4 = RETURN(l_1, d_3);
+}
+func cttz64(int64_t): int32_t
+{
+	l_1 = START(l_4);
+	int64_t d_2 = PARAM(l_1, "x", 1);
+	int32_t d_3 = CTTZ(d_2);
+	l_4 = RETURN(l_1, d_3);
+}
+func main(void): int32_t
+{
+	uintptr_t c_1 = func printf(uintptr_t, ...): int32_t;
+	uintptr_t c_2 = "%d %d %d %d\n";
+	int32_t c_3 = 0;
+	int8_t c_z8 = 0;
+	uintptr_t c_f8 = func cttz8(int8_t): int32_t;
+	int16_t c_z16 = 0;
+	uintptr_t c_f16 = func cttz16(int16_t): int32_t;
+	int32_t c_z32 = 0;
+	uintptr_t c_f32 = func cttz32(int32_t): int32_t;
+	int64_t c_z64 = 0;
+	uintptr_t c_f64 = func cttz64(int64_t): int32_t;
+	l_1 = START(l_99);
+	int32_t d_2, l_2 = CALL/1(l_1, c_f8, c_z8);
+	int32_t d_3, l_3 = CALL/1(l_2, c_f16, c_z16);
+	int32_t d_4, l_4 = CALL/1(l_3, c_f32, c_z32);
+	int32_t d_5, l_5 = CALL/1(l_4, c_f64, c_z64);
+	int32_t d_6, l_6 = CALL/5(l_5, c_1, c_2, d_2, d_3, d_4, d_5);
+	l_99 = RETURN(l_6, c_3);
+}
+--EXPECT--
+8 16 32 64

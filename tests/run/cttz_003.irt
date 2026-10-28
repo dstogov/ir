@@ -1,0 +1,102 @@
+--TEST--
+CTTZ 003: zero input with -mno-bmi1
+--TARGET--
+x86*
+--ARGS--
+-mno-bmi1 --run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func cttz8(int8_t): int32_t
+{
+	l_1 = START(l_4);
+	int8_t d_2 = PARAM(l_1, "x", 1);
+	int8_t d_3 = CTTZ(d_2);
+	int32_t d_4 = ZEXT(d_3);
+	l_4 = RETURN(l_1, d_4);
+}
+func cttz16(int16_t): int32_t
+{
+	l_1 = START(l_4);
+	int16_t d_2 = PARAM(l_1, "x", 1);
+	int16_t d_3 = CTTZ(d_2);
+	int32_t d_4 = ZEXT(d_3);
+	l_4 = RETURN(l_1, d_4);
+}
+func cttz16_mem(uintptr_t): int32_t
+{
+	l_1 = START(l_4);
+	uintptr_t d_2 = PARAM(l_1, "p", 1);
+	int16_t d_3, l_2 = LOAD(l_1, d_2);
+	int16_t d_4 = CTTZ(d_3);
+	int32_t d_5 = ZEXT(d_4);
+	l_4 = RETURN(l_2, d_5);
+}
+func cttz32(int32_t): int32_t
+{
+	l_1 = START(l_4);
+	int32_t d_2 = PARAM(l_1, "x", 1);
+	int32_t d_3 = CTTZ(d_2);
+	l_4 = RETURN(l_1, d_3);
+}
+func cttz32_mem(uintptr_t): int32_t
+{
+	l_1 = START(l_4);
+	uintptr_t d_2 = PARAM(l_1, "p", 1);
+	int32_t d_3, l_2 = LOAD(l_1, d_2);
+	int32_t d_4 = CTTZ(d_3);
+	l_4 = RETURN(l_2, d_4);
+}
+func cttz64(int64_t): int32_t
+{
+	l_1 = START(l_4);
+	int64_t d_2 = PARAM(l_1, "x", 1);
+	int32_t d_3 = CTTZ(d_2);
+	l_4 = RETURN(l_1, d_3);
+}
+func cttz64_mem(uintptr_t): int32_t
+{
+	l_1 = START(l_4);
+	uintptr_t d_2 = PARAM(l_1, "p", 1);
+	int64_t d_3, l_2 = LOAD(l_1, d_2);
+	int32_t d_4 = CTTZ(d_3);
+	l_4 = RETURN(l_2, d_4);
+}
+func main(void): int32_t
+{
+	uintptr_t c_1 = func printf(uintptr_t, ...): int32_t;
+	uintptr_t c_2 = "%2d %2d\n";
+	int32_t c_3 = 0;
+	int8_t c_z8 = 0;
+	uintptr_t c_f8 = func cttz8(int8_t): int32_t;
+	int16_t c_z16 = 0;
+	uintptr_t c_f16 = func cttz16(int16_t): int32_t;
+	uintptr_t c_m16 = func cttz16_mem(uintptr_t): int32_t;
+	int32_t c_z32 = 0;
+	uintptr_t c_f32 = func cttz32(int32_t): int32_t;
+	uintptr_t c_m32 = func cttz32_mem(uintptr_t): int32_t;
+	int64_t c_z64 = 0;
+	uintptr_t c_f64 = func cttz64(int64_t): int32_t;
+	uintptr_t c_m64 = func cttz64_mem(uintptr_t): int32_t;
+	uintptr_t c_4 = 8;
+	int64_t c_5 = 0;
+	l_1 = START(l_99);
+	uintptr_t d_2, l_2 = ALLOCA(l_1, c_4);
+	l_3 = STORE(l_2, d_2, c_5);
+	int32_t d_7, l_7 = CALL/1(l_3, c_f8, c_z8);
+	int32_t d_8, l_8 = CALL/3(l_7, c_1, c_2, d_7, d_7);
+	int32_t d_10, l_10 = CALL/1(l_8, c_f16, c_z16);
+	int32_t d_11, l_11 = CALL/1(l_10, c_m16, d_2);
+	int32_t d_12, l_12 = CALL/3(l_11, c_1, c_2, d_10, d_11);
+	int32_t d_13, l_13 = CALL/1(l_12, c_f32, c_z32);
+	int32_t d_14, l_14 = CALL/1(l_13, c_m32, d_2);
+	int32_t d_15, l_15 = CALL/3(l_14, c_1, c_2, d_13, d_14);
+	int32_t d_16, l_16 = CALL/1(l_15, c_f64, c_z64);
+	int32_t d_17, l_17 = CALL/1(l_16, c_m64, d_2);
+	int32_t d_18, l_18 = CALL/3(l_17, c_1, c_2, d_16, d_17);
+	l_99 = RETURN(l_18, c_3);
+}
+--EXPECT--
+ 8  8
+16 16
+32 32
+64 64
