@@ -1,0 +1,50 @@
+--TEST--
+Register allocator: stack PARAM copied to VAR is used after the VAR is overwritten through its address
+--ARGS--
+-O2 --run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+static const @format[7] = "%d %d\n\000";
+func @set(uintptr_t): void
+{
+	int32_t c_7 = 7;
+	l_1 = START(l_ret);
+	uintptr_t a = PARAM(l_1, "a", 1);
+	l_2 = STORE(l_1, a, c_7);
+	l_ret = RETURN(l_2);
+}
+func @test(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t): int32_t
+{
+	uintptr_t c_p = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t c_s = func @set(uintptr_t): void;
+	uintptr_t c_f = sym(@format);
+	int32_t c_0 = 0;
+	l_1 = START(l_ret);
+	int32_t a1 = PARAM(l_1, "a1", 1);
+	int32_t a2 = PARAM(l_1, "a2", 2);
+	int32_t a3 = PARAM(l_1, "a3", 3);
+	int32_t a4 = PARAM(l_1, "a4", 4);
+	int32_t a5 = PARAM(l_1, "a5", 5);
+	int32_t a6 = PARAM(l_1, "a6", 6);
+	int32_t a7 = PARAM(l_1, "a7", 7);
+	int32_t a8 = PARAM(l_1, "a8", 8);
+	int32_t p = PARAM(l_1, "p", 9);
+	int32_t x = VAR(l_1, "x");
+	l_2 = VSTORE(l_1, x, p);
+	uintptr_t xa = VADDR(x);
+	l_3 = CALL/1(l_2, c_s, xa);
+	int32_t xv, l_4 = VLOAD(l_3, x);
+	int32_t r, l_5 = CALL/3(l_4, c_p, c_f, xv, p);
+	l_ret = RETURN(l_5, c_0);
+}
+func @main(): int32_t
+{
+	uintptr_t c_t = func @test(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t): int32_t;
+	int32_t c_0 = 0;
+	int32_t c_42 = 42;
+	l_1 = START(l_ret);
+	int32_t r, l_2 = CALL/9(l_1, c_t, c_0, c_0, c_0, c_0, c_0, c_0, c_0, c_0, c_42);
+	l_ret = RETURN(l_2, c_0);
+}
+--EXPECT--
+7 42

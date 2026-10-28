@@ -888,9 +888,9 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 				 && insn->op == IR_VSTORE
 				 && !IR_IS_CONST_REF(insn->op3)
 				 && ctx->ir_base[insn->op3].op == IR_PARAM
-				 /* first use of VAR and PARAM is VSTORE(_, VAR, PARAM) */
+				 /* first use of VAR and the only use of PARAM is VSTORE(_, VAR, PARAM) */
 				 && ctx->use_edges[ctx->use_lists[insn->op2].refs] == i
-				 && ctx->use_edges[ctx->use_lists[insn->op3].refs] == i) {
+				 && ctx->use_lists[insn->op3].count == 1) {
 					ir_live_interval *ival = ctx->live_intervals[ctx->vregs[insn->op3]];
 
 					if (!ival) {
