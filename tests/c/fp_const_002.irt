@@ -1,0 +1,22 @@
+--TEST--
+002: Negative zero constants
+--ARGS--
+--emit-c
+--CODE--
+{
+	uintptr_t c_1 = func fd(double): void;
+	uintptr_t c_2 = func ff(float): void;
+	double c_3 = -0.0;
+	float c_4 = -0.0;
+	l_1 = START(l_4);
+	l_2 = CALL/1(l_1, c_1, c_3);
+	l_3 = CALL/1(l_2, c_2, c_4);
+	l_4 = RETURN(l_3);
+}
+--EXPECT--
+void test(void)
+{
+	fd(-0.0);
+	ff(-0.0f);
+	return;
+}

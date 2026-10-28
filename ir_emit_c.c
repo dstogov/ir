@@ -7,6 +7,7 @@
 
 #include "ir.h"
 #include "ir_private.h"
+#include <math.h>
 
 #define IR_TYPE_TNAME(name, type, field, flags) #field,
 
@@ -128,6 +129,57 @@ static void ir_emit_c_func_proto(const char *name, uint32_t flags, ir_type ret_t
 	fprintf(f, ")");
 }
 
+static void ir_emit_c_fp_const(double v, bool is_float, FILE *f)
+{
+	const char *suffix = is_float ? "f" : "";
+	char buf[64];
+
+	if (isnan(v)) {
+		fprintf(f, "%s__builtin_nan%s(\"\")", signbit(v) ? "-" : "", suffix);
+	} else if (isinf(v)) {
+		fprintf(f, "%s__builtin_inf%s()", v < 0 ? "-" : "", suffix);
+	} else {
+		snprintf(buf, sizeof(buf), "%g", v);
+		if (is_float ? strtof(buf, NULL) != (float)v : strtod(buf, NULL) != v) {
+			char *p, *end;
+
+			snprintf(buf, sizeof(buf), "%a", v);
+			/* MSVC pads the mantissa with trailing zeros */
+			p = strchr(buf, 'p');
+			end = p;
+			while (end[-1] == '0') {
+				end--;
+			}
+			if (end[-1] == '.') {
+				end--;
+			}
+			fprintf(f, "%.*s%s%s", (int)(end - buf), buf, p, suffix);
+		} else if (strpbrk(buf, ".e")) {
+			fprintf(f, "%s%s", buf, suffix);
+		} else {
+			/* Keep integral values (and -0) from being parsed as integer literals */
+			fprintf(f, "%s.0%s", buf, suffix);
+		}
+	}
+}
+
+static void ir_emit_c_fp_vector_const(ir_insn *insn, FILE *f)
+{
+	const double *d = (const double*)(insn + 1);
+	const float *s = (const float*)(insn + 1);
+	bool is_double = IR_VECTOR_BASE_TYPE(insn->type) == IR_DOUBLE;
+	uint32_t i, n = IR_VECTOR_LENGTH(insn->type);
+
+	fprintf(f, "{");
+	for (i = 0; i < n; i++) {
+		if (i) {
+			fprintf(f, ", ");
+		}
+		ir_emit_c_fp_const(is_double ? d[i] : s[i], !is_double, f);
+	}
+	fprintf(f, "}");
+}
+
 static void ir_emit_c_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 {
 	if (insn->op == IR_LABEL) {
@@ -138,13 +190,20 @@ static void ir_emit_c_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 			ir_resolve_label_syms(ctx);
 		}
 		fprintf(f, "&&bb%d", insn->val.u32_hi);
+	} else if (IR_IS_TYPE_FP(insn->type)) {
+		ir_emit_c_fp_const(insn->type == IR_DOUBLE ? insn->val.d : insn->val.f, insn->type == IR_FLOAT, f);
+	} else if (IR_IS_TYPE_VECTOR(insn->type)) {
+		fprintf(f, "(");
+		ir_emit_c_type_name(insn->type, f);
+		fprintf(f, ")");
+		if (IR_IS_TYPE_FP(IR_VECTOR_BASE_TYPE(insn->type))) {
+			ir_emit_c_fp_vector_const(insn, f);
+		} else {
+			ir_print_const(ctx, insn, f, true);
+		}
 	} else {
 		if (insn->op == IR_SYM) {
 			fprintf(f, "&");
-		} else if (IR_IS_TYPE_VECTOR(insn->type)) {
-			fprintf(f, "(");
-			ir_emit_c_type_name(insn->type, f);
-			fprintf(f, ")");
 		}
 		ir_print_const(ctx, insn, f, true);
 	}
