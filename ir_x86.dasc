@@ -9514,7 +9514,11 @@ static void ir_emit_cmp_and_branch_int(ir_ctx *ctx, uint32_t b, ir_ref def, ir_i
 
 	bool same_comparison = 0;
 	ir_insn *prev_insn = &ctx->ir_base[insn->op1];
-	if (prev_insn->op == IR_IF_TRUE || prev_insn->op == IR_IF_FALSE) {
+	ir_ref prev = ctx->prev_ref[def];
+	if (prev == insn->op2) {
+		prev = ctx->prev_ref[prev];
+	}
+	if (prev == insn->op1 && (prev_insn->op == IR_IF_TRUE || prev_insn->op == IR_IF_FALSE)) {
 		if (ir_rule(ctx, prev_insn->op1) == IR_CMP_AND_BRANCH_INT) {
 			prev_insn = &ctx->ir_base[prev_insn->op1];
 			prev_insn = &ctx->ir_base[prev_insn->op2];
@@ -15005,7 +15009,11 @@ static void ir_emit_cmp_and_branch_i64(ir_ctx *ctx, uint32_t b, ir_ref def, ir_i
 
 	bool same_comparison = 0;
 	ir_insn *prev_insn = &ctx->ir_base[insn->op1];
-	if (prev_insn->op == IR_IF_TRUE || prev_insn->op == IR_IF_FALSE) {
+	ir_ref prev = ctx->prev_ref[def];
+	if (prev == insn->op2) {
+		prev = ctx->prev_ref[prev];
+	}
+	if (prev == insn->op1 && (prev_insn->op == IR_IF_TRUE || prev_insn->op == IR_IF_FALSE)) {
 		if (ir_rule(ctx, prev_insn->op1) == IR_CMP_AND_BRANCH_INT) {
 			prev_insn = &ctx->ir_base[prev_insn->op1];
 			prev_insn = &ctx->ir_base[prev_insn->op2];
