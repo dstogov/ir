@@ -1,0 +1,103 @@
+--TEST--
+FP PHI(a, b) for a<b / a>b is not converted to MIN/MAX
+--ARGS--
+--run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func dmin(double, double): double
+{
+	l_1 = START(l_9);
+	double d_2 = PARAM(l_1, "a", 1);
+	double d_3 = PARAM(l_1, "b", 2);
+	bool d_4 = LT(d_2, d_3);
+	l_5 = IF(l_1, d_4);
+	l_6 = IF_TRUE(l_5);
+	l_7 = END(l_6);
+	l_8 = IF_FALSE(l_5);
+	l_10 = END(l_8);
+	l_11 = MERGE(l_7, l_10);
+	double d_12 = PHI(l_11, d_2, d_3);
+	l_9 = RETURN(l_11, d_12);
+}
+func dmax(double, double): double
+{
+	l_1 = START(l_9);
+	double d_2 = PARAM(l_1, "a", 1);
+	double d_3 = PARAM(l_1, "b", 2);
+	bool d_4 = GT(d_2, d_3);
+	l_5 = IF(l_1, d_4);
+	l_6 = IF_TRUE(l_5);
+	l_7 = END(l_6);
+	l_8 = IF_FALSE(l_5);
+	l_10 = END(l_8);
+	l_11 = MERGE(l_7, l_10);
+	double d_12 = PHI(l_11, d_2, d_3);
+	l_9 = RETURN(l_11, d_12);
+}
+func fmin(float, float): float
+{
+	l_1 = START(l_9);
+	float d_2 = PARAM(l_1, "a", 1);
+	float d_3 = PARAM(l_1, "b", 2);
+	bool d_4 = LT(d_2, d_3);
+	l_5 = IF(l_1, d_4);
+	l_6 = IF_TRUE(l_5);
+	l_7 = END(l_6);
+	l_8 = IF_FALSE(l_5);
+	l_10 = END(l_8);
+	l_11 = MERGE(l_7, l_10);
+	float d_12 = PHI(l_11, d_2, d_3);
+	l_9 = RETURN(l_11, d_12);
+}
+func fmax(float, float): float
+{
+	l_1 = START(l_9);
+	float d_2 = PARAM(l_1, "a", 1);
+	float d_3 = PARAM(l_1, "b", 2);
+	bool d_4 = GT(d_2, d_3);
+	l_5 = IF(l_1, d_4);
+	l_6 = IF_TRUE(l_5);
+	l_7 = END(l_6);
+	l_8 = IF_FALSE(l_5);
+	l_10 = END(l_8);
+	l_11 = MERGE(l_7, l_10);
+	float d_12 = PHI(l_11, d_2, d_3);
+	l_9 = RETURN(l_11, d_12);
+}
+func main(void): int32_t
+{
+	double c_1 = 0.0;
+	double c_2 = 7.0;
+	double c_3 = -0.0;
+	float c_4 = 0.0;
+	float c_5 = 7.0;
+	float c_6 = -0.0;
+	uintptr_t c_7 = func dmin(double, double): double;
+	uintptr_t c_8 = func dmax(double, double): double;
+	uintptr_t c_9 = func fmin(float, float): float;
+	uintptr_t c_10 = func fmax(float, float): float;
+	uintptr_t c_11 = "%g %g %g %g\n";
+	uintptr_t c_12 = func printf(uintptr_t, ...): int32_t;
+	int32_t c_13 = 0;
+	l_1 = START(l_40);
+	double d_2 = DIV(c_1, c_1);
+	float d_3 = DIV(c_4, c_4);
+	double d_4, l_4 = CALL/2(l_1, c_7, d_2, c_2);
+	double d_5, l_5 = CALL/2(l_4, c_7, c_3, c_1);
+	double d_6, l_6 = CALL/2(l_5, c_8, d_2, c_2);
+	double d_7, l_7 = CALL/2(l_6, c_8, c_1, c_3);
+	int32_t d_8, l_8 = CALL/5(l_7, c_12, c_11, d_4, d_5, d_6, d_7);
+	float d_9, l_9 = CALL/2(l_8, c_9, d_3, c_5);
+	float d_10, l_10 = CALL/2(l_9, c_9, c_6, c_4);
+	float d_11, l_11 = CALL/2(l_10, c_10, d_3, c_5);
+	float d_12, l_12 = CALL/2(l_11, c_10, c_4, c_6);
+	double d_13 = FP2FP(d_9);
+	double d_14 = FP2FP(d_10);
+	double d_15 = FP2FP(d_11);
+	double d_16 = FP2FP(d_12);
+	int32_t d_17, l_17 = CALL/5(l_12, c_12, c_11, d_13, d_14, d_15, d_16);
+	l_40 = RETURN(l_17, c_13);
+}
+--EXPECT--
+7 0 7 -0
+7 0 7 -0
