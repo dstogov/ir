@@ -988,13 +988,25 @@ const(uint8_t t, ir_val *val):
 		else if (t == IR_FLOAT) {val->f = INFINITY; val->u32_hi = 0;}
 		else yy_error_const_type("floating-point", t);}
 	|	"nan"
-		{if (t == IR_DOUBLE) val->d = NAN;
-		else if (t == IR_FLOAT) {val->f = NAN; val->u32_hi = 0;}
-		else yy_error_const_type("floating-point", t);}
-	|	"-" "inf"
-		{if (t == IR_DOUBLE) val->d = -INFINITY;
-		else if (t == IR_FLOAT) {val->f = -INFINITY; val->u32_hi = 0;}
-		else yy_error_const_type("floating-point", t);}
+		(	{ir_type t2 = (t == IR_DOUBLE) ? IR_U64 : IR_U32;}
+			"("
+			HEXNUMBER(t2, val)
+			")"
+		|	/* empty */
+			{if (t == IR_DOUBLE) val->d = NAN;
+			else if (t == IR_FLOAT) {val->f = NAN; val->u32_hi = 0;}
+			else yy_error_const_type("floating-point", t);}
+		)
+	|	"-"
+		(	"inf"
+			{if (t == IR_DOUBLE) val->d = -INFINITY;
+			else if (t == IR_FLOAT) {val->f = -INFINITY; val->u32_hi = 0;}
+			else yy_error_const_type("floating-point", t);}
+		|	"nan"
+			{if (t == IR_DOUBLE) val->d = -NAN;
+			else if (t == IR_FLOAT) {val->f = -NAN; val->u32_hi = 0;}
+			else yy_error_const_type("floating-point", t);}
+		)
 ;
 
 /* scanner rules */

@@ -1,0 +1,44 @@
+--TEST--
+001: Infinity and NaN constants
+--ARGS--
+--emit-c
+--CODE--
+extern func @test_d(double, double, double, double, double, double, double): void;
+extern func @test_f(float, float, float, float, float, float, float): void;
+func @main(): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uintptr_t c_4 = func @test_d(double, double, double, double, double, double): void;
+	double c_5 = -nan;
+	double c_6 = nan;
+	double c_7 = nan(0x7FF8000000000001);
+	double c_8 = -inf;
+	double c_9 = inf;
+	double c_10 = -0;
+	double c_11 = 0;
+	uintptr_t c_12 = func @test_f(float, float, float, float, float, float): void;
+	float c_13 = -nan;
+	float c_14 = nan;
+	float c_15 = nan(0x7FC00001);
+	float c_16 = -inf;
+	float c_17 = inf;
+	float c_18 = -0;
+	float c_19 = 0;
+	int32_t c_20 = 0;
+#BB1: end=l_8
+	l_1 = START(l_8);
+	l_2 = CALL/7(l_1, c_4, c_5, c_6, c_7, c_8, c_9, c_10, c_11);
+	l_5 = CALL/7(l_2, c_12, c_13, c_14, c_15, c_16, c_17, c_18, c_19);
+	l_8 = RETURN(l_5, c_20);
+}
+--EXPECT--
+extern void test_d(double, double, double, double, double, double, double);
+extern void test_f(float, float, float, float, float, float, float);
+int32_t main(void)
+{
+	test_d(-__builtin_nan(""), __builtin_nan(""), __builtin_nan("0x7ff8000000000001"), -__builtin_inf(), __builtin_inf(), -0.0, 0.0);
+	test_f(-__builtin_nanf(""), __builtin_nanf(""), __builtin_nanf("0x7fc00001"), -__builtin_inff(), __builtin_inff(), -0.0f, 0.0f);
+	return 0;
+}

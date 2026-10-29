@@ -1679,7 +1679,7 @@ static int parse_ir_func_proto(int sym, ir_parser_ctx *p, uint32_t *flags, uint8
 	const unsigned char *save_pos;
 	const unsigned char *save_text;
 	int save_line;
-	int alt94;
+	int alt98;
 	uint8_t t = 0;
 	uint32_t n = 0;
 	if (sym != YY__LPAREN) {
@@ -1699,32 +1699,32 @@ static int parse_ir_func_proto(int sym, ir_parser_ctx *p, uint32_t *flags, uint8
 				save_pos  = yy_pos;
 				save_text = yy_text;
 				save_line = yy_line;
-				alt94 = -2;
+				alt98 = -2;
 				sym2 = sym;
 				if (sym2 == YY__COMMA) {
 					sym2 = get_sym();
-					goto _yy_state_94_1;
+					goto _yy_state_98_1;
 				} else if (sym2 == YY__RPAREN) {
-					alt94 = 99;
-					goto _yy_state_94;
+					alt98 = 103;
+					goto _yy_state_98;
 				} else {
 					yy_error_sym("unexpected", sym2);
 				}
-_yy_state_94_1:
+_yy_state_98_1:
 				if (YY_IN_SET(sym2, (YY__LESS,YY_BOOL,YY_UINT8_T,YY_UINT16_T,YY_UINT32_T,YY_UINT64_T,YY_UINTPTR_T,YY_CHAR,YY_INT8_T,YY_INT16_T,YY_INT32_T,YY_INT64_T,YY_DOUBLE,YY_FLOAT), "\000\000\000\000\376\177\000\000")) {
-					alt94 = 95;
-					goto _yy_state_94;
+					alt98 = 99;
+					goto _yy_state_98;
 				} else if (sym2 == YY__POINT_POINT_POINT) {
-					alt94 = 97;
-					goto _yy_state_94;
+					alt98 = 101;
+					goto _yy_state_98;
 				} else {
 					yy_error_sym("unexpected", sym2);
 				}
-_yy_state_94:
+_yy_state_98:
 				yy_pos  = save_pos;
 				yy_text = save_text;
 				yy_line = save_line;
-				if (alt94 != 95) {
+				if (alt98 != 99) {
 					break;
 				}
 				sym = get_sym();
@@ -1732,7 +1732,7 @@ _yy_state_94:
 				param_types[n++] = t;
 				if (n > 256) yy_error("name too params");
 			}
-			if (alt94 == 97) {
+			if (alt98 == 101) {
 				sym = get_sym();
 				if (sym != YY__POINT_POINT_POINT) {
 					yy_error_sym("'...' expected, got", sym);
@@ -2338,19 +2338,37 @@ static int parse_const(int sym, uint8_t t, ir_val *val) {
 			break;
 		case YY_NAN:
 			sym = get_sym();
-			if (t == IR_DOUBLE) val->d = NAN;
-		else if (t == IR_FLOAT) {val->f = NAN; val->u32_hi = 0;}
-		else yy_error_const_type("floating-point", t);
+			if (sym == YY__LPAREN) {
+				ir_type t2 = (t == IR_DOUBLE) ? IR_U64 : IR_U32;
+				sym = get_sym();
+				sym = parse_HEXNUMBER(sym, t2, val);
+				if (sym != YY__RPAREN) {
+					yy_error_sym("')' expected, got", sym);
+				}
+				sym = get_sym();
+			} else if (YY_IN_SET(sym, (YY__COMMA,YY__RBRACE,YY__RPAREN,YY_BYVAL,YY__SEMICOLON), "\304\100\000\000\001\000\000\000")) {
+				if (t == IR_DOUBLE) val->d = NAN;
+			else if (t == IR_FLOAT) {val->f = NAN; val->u32_hi = 0;}
+			else yy_error_const_type("floating-point", t);
+			} else {
+				yy_error_sym("unexpected", sym);
+			}
 			break;
 		case YY__MINUS:
 			sym = get_sym();
-			if (sym != YY_INF) {
-				yy_error_sym("'inf' expected, got", sym);
+			if (sym == YY_INF) {
+				sym = get_sym();
+				if (t == IR_DOUBLE) val->d = -INFINITY;
+			else if (t == IR_FLOAT) {val->f = -INFINITY; val->u32_hi = 0;}
+			else yy_error_const_type("floating-point", t);
+			} else if (sym == YY_NAN) {
+				sym = get_sym();
+				if (t == IR_DOUBLE) val->d = -NAN;
+			else if (t == IR_FLOAT) {val->f = -NAN; val->u32_hi = 0;}
+			else yy_error_const_type("floating-point", t);
+			} else {
+				yy_error_sym("unexpected", sym);
 			}
-			sym = get_sym();
-			if (t == IR_DOUBLE) val->d = -INFINITY;
-		else if (t == IR_FLOAT) {val->f = -INFINITY; val->u32_hi = 0;}
-		else yy_error_const_type("floating-point", t);
 			break;
 		default:
 			yy_error_sym("unexpected", sym);

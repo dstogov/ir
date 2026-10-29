@@ -135,7 +135,37 @@ static void ir_emit_c_fp_const(double v, bool is_float, FILE *f)
 	char buf[64];
 
 	if (isnan(v)) {
-		fprintf(f, "%s__builtin_nan%s(\"\")", signbit(v) ? "-" : "", suffix);
+		if (is_float) {
+			union {
+				float f;
+				int i;
+			} u1, u2, u3;
+			u1.f = v;
+			u2.f = NAN;
+			u3.f = -NAN;
+			if (u1.i == u2.i) {
+				fprintf(f, "__builtin_nanf(\"\")");
+			} else if (u1.i == u3.i) {
+				fprintf(f, "-__builtin_nanf(\"\")");
+			} else {
+				fprintf(f, "__builtin_nanf(\"0x%x\")", u1.i);
+			}
+		} else {
+			union {
+				double d;
+				long long i;
+			} u1, u2, u3;
+			u1.d = v;
+			u2.d = NAN;
+			u3.d = -NAN;
+			if (u1.i == u2.i) {
+				fprintf(f, "__builtin_nan(\"\")");
+			} else if (u1.i == u3.i) {
+				fprintf(f, "-__builtin_nan(\"\")");
+			} else {
+				fprintf(f, "__builtin_nan(\"0x%llx\")", u1.i);
+			}
+		}
 	} else if (isinf(v)) {
 		fprintf(f, "%s__builtin_inf%s()", v < 0 ? "-" : "", suffix);
 	} else {
