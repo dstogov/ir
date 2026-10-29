@@ -1,0 +1,213 @@
+--TEST--
+MAX 002:
+--ARGS--
+-O0 --run
+--XFAIL--
+Native code generation for MIN/MAX for floating point numbers is incorrect
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+static const @str.1[13] = "%g %g %g %g\n\000";
+func @max1(double, double): double
+{
+	l_1 = START(l_6);
+	double d_2 = PARAM(l_1, "x", 1);
+	double d_3 = PARAM(l_1, "y", 2);
+	bool d_4 = GT(d_2, d_3);
+	double d_5 = COND(d_4, d_2, d_3);
+	l_6 = RETURN(l_1, d_5);
+}
+func @max2(double, double): double
+{
+	l_1 = START(l_6);
+	double d_2 = PARAM(l_1, "x", 1);
+	double d_3 = PARAM(l_1, "y", 2);
+	bool d_4 = GT(d_3, d_2);
+	double d_5 = COND(d_4, d_3, d_2);
+	l_6 = RETURN(l_1, d_5);
+}
+func @max3(double, double): double
+{
+	l_1 = START(l_6);
+	double d_2 = PARAM(l_1, "x", 1);
+	double d_3 = PARAM(l_1, "y", 2);
+	bool d_4 = LT(d_2, d_3);
+	double d_5 = COND(d_4, d_3, d_2);
+	l_6 = RETURN(l_1, d_5);
+}
+func @max4(double, double): double
+{
+	l_1 = START(l_6);
+	double d_2 = PARAM(l_1, "x", 1);
+	double d_3 = PARAM(l_1, "y", 2);
+	bool d_4 = LT(d_3, d_2);
+	double d_5 = COND(d_4, d_2, d_3);
+	l_6 = RETURN(l_1, d_5);
+}
+func @max5(double, double): double
+{
+	l_1 = START(l_5);
+	double d_2 = PARAM(l_1, "x", 1);
+	double d_3 = PARAM(l_1, "y", 2);
+	double d_4 = MAX(d_2, d_3);
+	l_5 = RETURN(l_1, d_4);
+}
+func @max6(double, double): double
+{
+	l_1 = START(l_5);
+	double d_2 = PARAM(l_1, "x", 1);
+	double d_3 = PARAM(l_1, "y", 2);
+	double d_4 = MAX(d_3, d_2);
+	l_5 = RETURN(l_1, d_4);
+}
+func @min1(double, double): double
+{
+	l_1 = START(l_6);
+	double d_2 = PARAM(l_1, "x", 1);
+	double d_3 = PARAM(l_1, "y", 2);
+	bool d_4 = LT(d_2, d_3);
+	double d_5 = COND(d_4, d_2, d_3);
+	l_6 = RETURN(l_1, d_5);
+}
+func @min2(double, double): double
+{
+	l_1 = START(l_6);
+	double d_2 = PARAM(l_1, "x", 1);
+	double d_3 = PARAM(l_1, "y", 2);
+	bool d_4 = LT(d_3, d_2);
+	double d_5 = COND(d_4, d_3, d_2);
+	l_6 = RETURN(l_1, d_5);
+}
+func @min3(double, double): double
+{
+	l_1 = START(l_6);
+	double d_2 = PARAM(l_1, "x", 1);
+	double d_3 = PARAM(l_1, "y", 2);
+	bool d_4 = GT(d_2, d_3);
+	double d_5 = COND(d_4, d_3, d_2);
+	l_6 = RETURN(l_1, d_5);
+}
+func @min4(double, double): double
+{
+	l_1 = START(l_6);
+	double d_2 = PARAM(l_1, "x", 1);
+	double d_3 = PARAM(l_1, "y", 2);
+	bool d_4 = GT(d_3, d_2);
+	double d_5 = COND(d_4, d_2, d_3);
+	l_6 = RETURN(l_1, d_5);
+}
+func @min5(double, double): double
+{
+	l_1 = START(l_5);
+	double d_2 = PARAM(l_1, "x", 1);
+	double d_3 = PARAM(l_1, "y", 2);
+	double d_4 = MIN(d_3, d_2);
+	l_5 = RETURN(l_1, d_4);
+}
+func @min6(double, double): double
+{
+	l_1 = START(l_5);
+	double d_2 = PARAM(l_1, "x", 1);
+	double d_3 = PARAM(l_1, "y", 2);
+	double d_4 = MIN(d_3, d_2);
+	l_5 = RETURN(l_1, d_4);
+}
+func @main(): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uintptr_t c_4 = func @max1(double, double): double;
+	double c_5 = 24.24;
+	double c_6 = 42.42;
+	double c_7 = nan;
+	uintptr_t c_8 = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t c_9 = sym(@str.1);
+	uintptr_t c_10 = func @max2(double, double): double;
+	uintptr_t c_11 = func @max3(double, double): double;
+	uintptr_t c_12 = func @max4(double, double): double;
+	uintptr_t c_13 = func @max5(double, double): double;
+	uintptr_t c_14 = func @max6(double, double): double;
+	uintptr_t c_15 = func @min1(double, double): double;
+	uintptr_t c_16 = func @min2(double, double): double;
+	uintptr_t c_17 = func @min3(double, double): double;
+	uintptr_t c_18 = func @min4(double, double): double;
+	uintptr_t c_19 = func @min5(double, double): double;
+	uintptr_t c_20 = func @min6(double, double): double;
+	int32_t c_21 = 0;
+#BB1: end=l_122
+	l_1 = START(l_122);
+	double d_2, l_2 = CALL/2(l_1, c_4, c_5, c_6);
+	double d_4, l_4 = CALL/2(l_2, c_4, c_5, c_7);
+	double d_6, l_6 = CALL/2(l_4, c_4, c_7, c_6);
+	double d_8, l_8 = CALL/2(l_6, c_4, c_7, c_7);
+	int32_t d_10, l_10 = CALL/5(l_8, c_8, c_9, d_2, d_4, d_6, d_8);
+	double d_12, l_12 = CALL/2(l_10, c_10, c_5, c_6);
+	double d_14, l_14 = CALL/2(l_12, c_10, c_5, c_7);
+	double d_16, l_16 = CALL/2(l_14, c_10, c_7, c_6);
+	double d_18, l_18 = CALL/2(l_16, c_10, c_7, c_7);
+	int32_t d_20, l_20 = CALL/5(l_18, c_8, c_9, d_12, d_14, d_16, d_18);
+	double d_22, l_22 = CALL/2(l_20, c_11, c_5, c_6);
+	double d_24, l_24 = CALL/2(l_22, c_11, c_5, c_7);
+	double d_26, l_26 = CALL/2(l_24, c_11, c_7, c_6);
+	double d_28, l_28 = CALL/2(l_26, c_11, c_7, c_7);
+	int32_t d_30, l_30 = CALL/5(l_28, c_8, c_9, d_22, d_24, d_26, d_28);
+	double d_32, l_32 = CALL/2(l_30, c_12, c_5, c_6);
+	double d_34, l_34 = CALL/2(l_32, c_12, c_5, c_7);
+	double d_36, l_36 = CALL/2(l_34, c_12, c_7, c_6);
+	double d_38, l_38 = CALL/2(l_36, c_12, c_7, c_7);
+	int32_t d_40, l_40 = CALL/5(l_38, c_8, c_9, d_32, d_34, d_36, d_38);
+	double d_42, l_42 = CALL/2(l_40, c_13, c_5, c_6);
+	double d_44, l_44 = CALL/2(l_42, c_13, c_5, c_7);
+	double d_46, l_46 = CALL/2(l_44, c_13, c_7, c_6);
+	double d_48, l_48 = CALL/2(l_46, c_13, c_7, c_7);
+	int32_t d_50, l_50 = CALL/5(l_48, c_8, c_9, d_42, d_44, d_46, d_48);
+	double d_52, l_52 = CALL/2(l_50, c_14, c_5, c_6);
+	double d_54, l_54 = CALL/2(l_52, c_14, c_5, c_7);
+	double d_56, l_56 = CALL/2(l_54, c_14, c_7, c_6);
+	double d_58, l_58 = CALL/2(l_56, c_14, c_7, c_7);
+	int32_t d_60, l_60 = CALL/5(l_58, c_8, c_9, d_52, d_54, d_56, d_58);
+	double d_62, l_62 = CALL/2(l_60, c_15, c_5, c_6);
+	double d_64, l_64 = CALL/2(l_62, c_15, c_5, c_7);
+	double d_66, l_66 = CALL/2(l_64, c_15, c_7, c_6);
+	double d_68, l_68 = CALL/2(l_66, c_15, c_7, c_7);
+	int32_t d_70, l_70 = CALL/5(l_68, c_8, c_9, d_62, d_64, d_66, d_68);
+	double d_72, l_72 = CALL/2(l_70, c_16, c_5, c_6);
+	double d_74, l_74 = CALL/2(l_72, c_16, c_5, c_7);
+	double d_76, l_76 = CALL/2(l_74, c_16, c_7, c_6);
+	double d_78, l_78 = CALL/2(l_76, c_16, c_7, c_7);
+	int32_t d_80, l_80 = CALL/5(l_78, c_8, c_9, d_72, d_74, d_76, d_78);
+	double d_82, l_82 = CALL/2(l_80, c_17, c_5, c_6);
+	double d_84, l_84 = CALL/2(l_82, c_17, c_5, c_7);
+	double d_86, l_86 = CALL/2(l_84, c_17, c_7, c_6);
+	double d_88, l_88 = CALL/2(l_86, c_17, c_7, c_7);
+	int32_t d_90, l_90 = CALL/5(l_88, c_8, c_9, d_82, d_84, d_86, d_88);
+	double d_92, l_92 = CALL/2(l_90, c_18, c_5, c_6);
+	double d_94, l_94 = CALL/2(l_92, c_18, c_5, c_7);
+	double d_96, l_96 = CALL/2(l_94, c_18, c_7, c_6);
+	double d_98, l_98 = CALL/2(l_96, c_18, c_7, c_7);
+	int32_t d_100, l_100 = CALL/5(l_98, c_8, c_9, d_92, d_94, d_96, d_98);
+	double d_102, l_102 = CALL/2(l_100, c_19, c_5, c_6);
+	double d_104, l_104 = CALL/2(l_102, c_19, c_5, c_7);
+	double d_106, l_106 = CALL/2(l_104, c_19, c_7, c_6);
+	double d_108, l_108 = CALL/2(l_106, c_19, c_7, c_7);
+	int32_t d_110, l_110 = CALL/5(l_108, c_8, c_9, d_102, d_104, d_106, d_108);
+	double d_112, l_112 = CALL/2(l_110, c_20, c_5, c_6);
+	double d_114, l_114 = CALL/2(l_112, c_20, c_5, c_7);
+	double d_116, l_116 = CALL/2(l_114, c_20, c_7, c_6);
+	double d_118, l_118 = CALL/2(l_116, c_20, c_7, c_7);
+	int32_t d_120, l_120 = CALL/5(l_118, c_8, c_9, d_112, d_114, d_116, d_118);
+	l_122 = RETURN(l_120, c_21);
+}
+--EXPECT--
+42.42 nan 42.42 nan
+42.42 24.24 nan nan
+42.42 24.24 nan nan
+42.42 nan 42.42 nan
+42.42 24.24 42.42 nan
+42.42 24.24 42.42 nan
+24.24 nan 42.42 nan
+24.24 24.24 nan nan
+24.24 24.24 nan nan
+24.24 nan 42.42 nan
+24.24 24.24 42.42 nan
+24.24 24.24 42.42 nan
