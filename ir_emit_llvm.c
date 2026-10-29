@@ -283,10 +283,19 @@ static void ir_print_double(double v, FILE *f)
 {
 	char buf[128];
 
-	if (isnan(v)) {
-		fprintf(f, "nan");
+	if (!isfinite(v)) {
+		union {
+			double d;
+			long long i;
+		} u;
+		u.d = v;
+		fprintf(f, "0x%llx", u.i);
 	} else if (v == 0.0) {
-		fprintf(f, "0.0");
+		if (signbit(v)) {
+			fprintf(f, "-0.0");
+		} else {
+			fprintf(f, "0.0");
+		}
 	} else {
 		double e = log10(v);
 		if (e < -4 || e >= 6) {
@@ -310,10 +319,19 @@ static void ir_print_float(float v, FILE *f)
 {
 	char buf[128];
 
-	if (isnan(v)) {
-		fprintf(f, "nan");
+	if (!isfinite(v)) {
+		union {
+			double d;
+			long long i;
+		} u;
+		u.d = v;
+		fprintf(f, "0x%llx", u.i);
 	} else if (v == 0.0) {
-		fprintf(f, "0.0");
+		if (signbit(v)) {
+			fprintf(f, "-0.0");
+		} else {
+			fprintf(f, "0.0");
+		}
 	} else {
 		double e = log10(v);
 		if (e < -4 || e >= 6) {
