@@ -1,7 +1,7 @@
 --TEST--
 BSWAP 001:
 --ARGS--
--O1 --run
+--run
 --CODE--
 extern func @printf(uintptr_t, ...): int32_t;
 func @bswap_u16(uint16_t): int32_t;
