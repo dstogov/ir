@@ -9469,6 +9469,20 @@ static void ir_emit_jcc(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn, uint
 	}
 }
 
+static bool ir_insns_may_change_cmp_flags(ir_ctx *ctx, ir_ref from, ir_ref to)
+{
+	ir_ref ref;
+
+	for (ref = ctx->prev_ref[to]; ref != from; ref = ctx->prev_ref[ref]) {
+		if (!(ctx->rules[ref] & (IR_FUSED|IR_SKIPPED))
+		 && ctx->ir_base[ref].op != IR_VAR
+		 && ctx->ir_base[ref].op != IR_PHI) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
 static void ir_emit_cmp_and_branch_int(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *insn, uint32_t next_block)
 {
 	ir_insn *cmp_insn = &ctx->ir_base[insn->op2];
@@ -9518,7 +9532,9 @@ static void ir_emit_cmp_and_branch_int(ir_ctx *ctx, uint32_t b, ir_ref def, ir_i
 		if (ir_rule(ctx, prev_insn->op1) == IR_CMP_AND_BRANCH_INT) {
 			prev_insn = &ctx->ir_base[prev_insn->op1];
 			prev_insn = &ctx->ir_base[prev_insn->op2];
-			if (prev_insn->op1 == cmp_insn->op1 && prev_insn->op2 == cmp_insn->op2) {
+			if (prev_insn->op1 == cmp_insn->op1
+			 && prev_insn->op2 == cmp_insn->op2
+			 && !ir_insns_may_change_cmp_flags(ctx, insn->op1, def)) {
 				same_comparison = true;
 			}
 		}
@@ -15009,7 +15025,9 @@ static void ir_emit_cmp_and_branch_i64(ir_ctx *ctx, uint32_t b, ir_ref def, ir_i
 		if (ir_rule(ctx, prev_insn->op1) == IR_CMP_AND_BRANCH_INT) {
 			prev_insn = &ctx->ir_base[prev_insn->op1];
 			prev_insn = &ctx->ir_base[prev_insn->op2];
-			if (prev_insn->op1 == cmp_insn->op1 && prev_insn->op2 == cmp_insn->op2) {
+			if (prev_insn->op1 == cmp_insn->op1
+			 && prev_insn->op2 == cmp_insn->op2
+			 && !ir_insns_may_change_cmp_flags(ctx, insn->op1, def)) {
 				same_comparison = true;
 			}
 		}
