@@ -1,0 +1,44 @@
+--TEST--
+MUL_OV(-1, INT64_MIN) leads to FPE
+--ARGS--
+-O2 --save
+--CODE--
+{
+	int64_t c_1 = -1;
+	int64_t c_2 = -9223372036854775808;
+	int64_t c_3 = 5;
+	int64_t c_4 = 0;
+	l_1 = START(l_13);
+	int64_t d_2 = MUL_OV(c_1, c_2); 
+	int64_t d_3 = OVERFLOW(d_2); 
+	int64_t d_4 = COND(d_3, c_4, d_2); 
+	int64_t d_5 = MUL_OV(c_2, c_1);
+	int64_t d_6 = OVERFLOW(d_5); 
+	int64_t d_7 = COND(d_6, c_4, d_5); 
+	int64_t d_8 = MUL_OV(c_1, c_3);
+	int64_t d_9 = OVERFLOW(d_8); 
+	int64_t d_10 = COND(d_9, c_4, d_8); 
+	int64_t d_11 = ADD(d_7, d_4);
+	int64_t d_12 = ADD(d_11, d_10);
+	l_13 = RETURN(l_1, d_12);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int64_t c_4 = -1;
+	int64_t c_5 = -9223372036854775808;
+	int64_t c_6 = 0;
+	int64_t c_7 = -5;
+	l_1 = START(l_10);
+	int64_t d_2 = MUL_OV(c_4, c_5);
+	int64_t d_3 = OVERFLOW(d_2);
+	int64_t d_4 = COND(d_3, c_6, d_2);
+	int64_t d_5 = MUL_OV(c_4, c_5);
+	int64_t d_6 = OVERFLOW(d_5);
+	int64_t d_7 = COND(d_6, c_6, d_5);
+	int64_t d_8 = ADD(d_7, d_4);
+	int64_t d_9 = ADD(d_8, c_7);
+	l_10 = RETURN(l_1, d_9);
+}
