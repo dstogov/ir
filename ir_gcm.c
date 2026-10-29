@@ -527,7 +527,6 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 }
 #endif
 
-#ifdef IR_DEBUG
 static bool ir_gcm_dominates(ir_ctx *ctx, uint32_t b1, uint32_t b2)
 {
 	uint32_t b1_depth = ctx->cfg_blocks[b1].dom_depth;
@@ -539,12 +538,12 @@ static bool ir_gcm_dominates(ir_ctx *ctx, uint32_t b1, uint32_t b2)
 	}
 	return b1 == b2;
 }
-#endif
 
-static void ir_gcm_schedule_late(ir_ctx *ctx, ir_ref ref, uint32_t b)
+static void ir_gcm_schedule_late(ir_ctx *ctx, ir_ref ref, uint32_t b, const ir_list *entries)
 {
 	ir_ref n, use;
 	uint32_t lca = 0;
+	bool entry_pinned = 0;
 
 	IR_ASSERT(ctx->ir_base[ref].op != IR_PARAM && ctx->ir_base[ref].op != IR_VAR);
 	IR_ASSERT(ctx->ir_base[ref].op != IR_PHI && ctx->ir_base[ref].op != IR_PI);
@@ -557,7 +556,7 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, ir_ref ref, uint32_t b)
 		use = ctx->use_edges[ctx->use_lists[ref].refs + n];
 		b = ctx->cfg_map[use];
 		if (IR_GCM_IS_SCHEDULED_EARLY(b)) {
-			ir_gcm_schedule_late(ctx, use, b);
+			ir_gcm_schedule_late(ctx, use, b, entries);
 			b = ctx->cfg_map[use];
 			IR_ASSERT(b != 0);
 		} else if (!b) {
@@ -582,8 +581,24 @@ static void ir_gcm_schedule_late(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	IR_ASSERT(lca != 0 && "No Common Ancestor");
 	IR_ASSERT(ir_gcm_dominates(ctx, ctx->cfg_map[ref], lca) && "Early placement doesn't dominate the late");
 
+	if (entries && ir_binding_find(ctx, ref)) {
+		uint32_t i, entry_b;
+
+		for (i = 0; i < ir_list_len(entries); i++) {
+			entry_b = ir_list_at(entries, i);
+			if (ref < ctx->cfg_blocks[entry_b].start
+			 && ir_gcm_dominates(ctx, ctx->cfg_map[ref], entry_b)) {
+				entry_pinned = 1;
+				if (!ir_gcm_dominates(ctx, lca, entry_b)) {
+					lca = ir_gcm_find_lca(ctx, lca, entry_b);
+				}
+			}
+		}
+	}
+
 #if IR_GCM_SPLIT
-	if (ctx->use_lists[ref].count > 1
+	if (!entry_pinned
+	 && ctx->use_lists[ref].count > 1
 	 && ir_split_partially_dead_node(ctx, ref, lca)) {
 		return;
 	}
@@ -755,14 +770,31 @@ int ir_gcm(ir_ctx *ctx)
 	ctx->data = &data;
 #endif
 
+	ir_list entries;
+	ir_list *entries_ptr = NULL;
+
+	if (ctx->entries_count && ctx->binding) {
+		ir_list_init(&entries, ctx->entries_count);
+		for (b = 1, bb = ctx->cfg_blocks + 1; b <= ctx->cfg_blocks_count; b++, bb++) {
+			if (bb->flags & IR_BB_ENTRY) {
+				ir_list_push(&entries, b);
+			}
+		}
+		entries_ptr = &entries;
+	}
+
 	n = ir_list_len(&queue_late);
 	while (n > 0) {
 		n--;
 		ref = ir_list_at(&queue_late, n);
 		b = ctx->cfg_map[ref];
 		if (IR_GCM_IS_SCHEDULED_EARLY(b)) {
-			ir_gcm_schedule_late(ctx, ref, b);
+			ir_gcm_schedule_late(ctx, ref, b, entries_ptr);
 		}
+	}
+
+	if (entries_ptr) {
+		ir_list_free(&entries);
 	}
 
 #if IR_GCM_SPLIT
