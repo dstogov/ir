@@ -2398,6 +2398,33 @@ IR_FOLD(NE(SUB, C_ADDR))
 	IR_FOLD_NEXT;
 }
 
+IR_FOLD(SUB(CTLZ, C_U8))
+IR_FOLD(SUB(CTLZ, C_U16))
+IR_FOLD(SUB(CTLZ, C_U32))
+IR_FOLD(SUB(CTLZ, C_U64))
+IR_FOLD(SUB(CTLZ, C_I8))
+IR_FOLD(SUB(CTLZ, C_I16))
+IR_FOLD(SUB(CTLZ, C_I32))
+IR_FOLD(SUB(CTLZ, C_I64))
+{
+	const ir_insn *zext_insn = &ctx->ir_base[op1_insn->op1];
+
+	if (zext_insn->op == IR_ZEXT) {
+		ir_ref x = zext_insn->op1;
+		ir_type src_type = ctx->ir_base[x].type;
+
+		if (src_type != IR_BOOL
+		 && op2_insn->val.u64 == (uint64_t)(ir_type_size[zext_insn->type] - ir_type_size[src_type]) * 8) {
+			/* CTLZ result type may differ from its operand type */
+			opt = IR_OPT(IR_CTLZ, IR_OPT_TYPE(opt));
+			op1 = x;
+			op2 = IR_UNUSED;
+			IR_FOLD_RESTART;
+		}
+	}
+	IR_FOLD_NEXT;
+}
+
 IR_FOLD(ADD(_, C_U8))
 IR_FOLD(ADD(_, C_U16))
 IR_FOLD(ADD(_, C_U32))
