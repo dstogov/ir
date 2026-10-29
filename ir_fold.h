@@ -2351,6 +2351,39 @@ IR_FOLD(NE(SUB, C_ADDR))
 	IR_FOLD_NEXT;
 }
 
+IR_FOLD(SUB(CTLZ, C_U8))
+IR_FOLD(SUB(CTLZ, C_U16))
+IR_FOLD(SUB(CTLZ, C_U32))
+IR_FOLD(SUB(CTLZ, C_U64))
+IR_FOLD(SUB(CTLZ, C_I8))
+IR_FOLD(SUB(CTLZ, C_I16))
+IR_FOLD(SUB(CTLZ, C_I32))
+IR_FOLD(SUB(CTLZ, C_I64))
+{
+	const ir_insn *zext_insn = &ctx->ir_base[op1_insn->op1];
+
+	if (!ctx->use_lists && zext_insn->op == IR_ZEXT) {
+		ir_ref x = zext_insn->op1;
+		ir_type src_type = ctx->ir_base[x].type;
+		ir_type type = IR_OPT_TYPE(opt);
+
+		if (src_type != IR_BOOL
+		 && op2_insn->val.u64 == (uint64_t)(ir_type_size[zext_insn->type] - ir_type_size[src_type]) * 8) {
+			if (ir_type_size[type] > ir_type_size[src_type]) {
+				op1 = ir_fold1(ctx, IR_OPT(IR_CTLZ, src_type), x);
+				opt = IR_OPT(IR_ZEXT, type);
+			} else {
+				/* CTLZ may return a type narrower than its operand */
+				op1 = x;
+				opt = IR_OPT(IR_CTLZ, type);
+			}
+			op2 = IR_UNUSED;
+			IR_FOLD_RESTART;
+		}
+	}
+	IR_FOLD_NEXT;
+}
+
 IR_FOLD(ADD(_, C_U8))
 IR_FOLD(ADD(_, C_U16))
 IR_FOLD(ADD(_, C_U32))

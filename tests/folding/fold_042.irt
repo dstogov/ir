@@ -1,0 +1,66 @@
+--TEST--
+042: FOLD: CTLZ(ZEXT(x)) - c is not folded for bool x or a mismatched c
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uint32_t c_4 = 31;
+	uint64_t c_5 = 31;
+	uint32_t c_6 = 8;
+	uint32_t c_7 = 16;
+	l_1 = START(l_22);
+	bool d_2 = PARAM(l_1, "a", 1);
+	uint32_t d_3 = PARAM(l_1, "b", 2);
+	uint16_t d_4 = PARAM(l_1, "c", 3);
+	uint16_t d_5 = PARAM(l_1, "d", 4);
+	uint32_t d_6 = ZEXT(d_2);
+	uint32_t d_7 = CTLZ(d_6);
+	uint32_t d_8 = SUB(d_7, c_4);
+	uint64_t d_9 = ZEXT(d_3);
+	uint64_t d_10 = CTLZ(d_9);
+	uint64_t d_11 = SUB(d_10, c_5);
+	uint32_t d_12 = ZEXT(d_4);
+	uint32_t d_13 = CTLZ(d_12);
+	uint32_t d_14 = SUB(d_13, c_6);
+	uint64_t d_15 = ZEXT(d_5);
+	uint32_t d_16 = CTLZ(d_15);
+	uint32_t d_17 = SUB(d_16, c_7);
+	uint32_t d_18 = ADD(d_8, d_14);
+	uint32_t d_19 = ADD(d_18, d_17);
+	uint64_t d_20 = ZEXT(d_19);
+	uint64_t d_21 = ADD(d_20, d_11);
+	l_22 = RETURN(l_1, d_21);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uint32_t c_4 = 31;
+	uint64_t c_5 = 31;
+	uint32_t c_6 = 8;
+	uint32_t c_7 = 16;
+	l_1 = START(l_22);
+	bool d_2 = PARAM(l_1, "a", 1);
+	uint32_t d_3 = PARAM(l_1, "b", 2);
+	uint16_t d_4 = PARAM(l_1, "c", 3);
+	uint16_t d_5 = PARAM(l_1, "d", 4);
+	uint32_t d_6 = ZEXT(d_2);
+	uint32_t d_7 = CTLZ(d_6);
+	uint32_t d_8 = SUB(d_7, c_4);
+	uint64_t d_9 = ZEXT(d_3);
+	uint64_t d_10 = CTLZ(d_9);
+	uint64_t d_11 = SUB(d_10, c_5);
+	uint32_t d_12 = ZEXT(d_4);
+	uint32_t d_13 = CTLZ(d_12);
+	uint32_t d_14 = SUB(d_13, c_6);
+	uint64_t d_15 = ZEXT(d_5);
+	uint32_t d_16 = CTLZ(d_15);
+	uint32_t d_17 = SUB(d_16, c_7);
+	uint32_t d_18 = ADD(d_14, d_8);
+	uint32_t d_19 = ADD(d_18, d_17);
+	uint64_t d_20 = ZEXT(d_19);
+	uint64_t d_21 = ADD(d_20, d_11);
+	l_22 = RETURN(l_1, d_21);
+}
