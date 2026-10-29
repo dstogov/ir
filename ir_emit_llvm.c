@@ -724,26 +724,39 @@ static void ir_emit_bitop(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, ir_llvm_
                           bool poison, ir_bitset used_intrinsics)
 {
 	ir_type type = insn->type;
+	ir_type src_type = ctx->ir_base[insn->op1].type;
+	bool resize = ir_type_size[type] != ir_type_size[src_type];
 
 	IR_ASSERT(IR_IS_TYPE_INT(type));
 	if (id == IR_LLVM_INTR_BSWAP_I16) {
 		id -= 1;
 	}
-	switch (ir_type_size[type]) {
+	switch (ir_type_size[src_type]) {
 		case 1: break;
 		case 2: id += 1; break;
 		case 4: id += 2; break;
 		case 8: id += 3; break;
 	}
 	ir_bitset_incl(used_intrinsics, id);
-	ir_emit_def_ref(ctx, f, def);
+	if (resize) {
+		fprintf(f, "\t%%t%d = ", def);
+	} else {
+		ir_emit_def_ref(ctx, f, def);
+	}
 	fprintf(f, "call %s @%s(%s ",
-		ir_type_llvm_name[type], ir_llvm_intrinsic_desc[id].name, ir_type_llvm_name[type]);
+		ir_type_llvm_name[src_type], ir_llvm_intrinsic_desc[id].name, ir_type_llvm_name[src_type]);
 	ir_emit_ref(ctx, f, insn->op1);
 	if (poison) {
-		fprintf(f, ", 0");
+		/* CTLZ/CTTZ of zero is undefined in IR */
+		fprintf(f, ", i1 true");
 	}
 	fprintf(f, ")\n");
+	if (resize) {
+		ir_emit_def_ref(ctx, f, def);
+		fprintf(f, "%s %s %%t%d to %s\n",
+			ir_type_size[type] < ir_type_size[src_type] ? "trunc" : "zext",
+			ir_type_llvm_name[src_type], def, ir_type_llvm_name[type]);
+	}
 }
 
 static void ir_emit_conv(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *op)
