@@ -656,21 +656,43 @@ static void ir_emit_conv(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 
 static void ir_emit_minmax_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 {
-//	fprintf(f, "\td_%d = ", ctx->vregs[def]);
 	ir_emit_def_ref(ctx, f, def);
-	ir_emit_ref(ctx, f, insn->op1);
-	if (insn->op == IR_MIN) {
-		fprintf(f, " < ");
+	if (IR_IS_TYPE_FP(insn->type)) {
+		if (insn->type == IR_DOUBLE) {
+			if (insn->op == IR_MIN) {
+				fprintf(f, "__builtin_fmin(");
+			} else {
+				IR_ASSERT(insn->op == IR_MAX);
+				fprintf(f, "__builtin_fmax(");
+			}
+		} else {
+			IR_ASSERT(insn->type == IR_FLOAT);
+			if (insn->op == IR_MIN) {
+				fprintf(f, "__builtin_fminf(");
+			} else {
+				IR_ASSERT(insn->op == IR_MAX);
+				fprintf(f, "__builtin_fmaxf(");
+			}
+		}
+		ir_emit_ref(ctx, f, insn->op1);
+		fprintf(f, ", ");
+		ir_emit_ref(ctx, f, insn->op2);
+		fprintf(f, ");\n");
 	} else {
-		IR_ASSERT(insn->op == IR_MAX);
-		fprintf(f, " > ");
+		ir_emit_ref(ctx, f, insn->op1);
+		if (insn->op == IR_MIN) {
+			fprintf(f, " < ");
+		} else {
+			IR_ASSERT(insn->op == IR_MAX);
+			fprintf(f, " > ");
+		}
+		ir_emit_ref(ctx, f, insn->op2);
+		fprintf(f, " ? ");
+		ir_emit_ref(ctx, f, insn->op1);
+		fprintf(f, " : ");
+		ir_emit_ref(ctx, f, insn->op2);
+		fprintf(f, ";\n");
 	}
-	ir_emit_ref(ctx, f, insn->op2);
-	fprintf(f, " ? ");
-	ir_emit_ref(ctx, f, insn->op1);
-	fprintf(f, " : ");
-	ir_emit_ref(ctx, f, insn->op2);
-	fprintf(f, ";\n");
 }
 
 static void ir_emit_conditional_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)

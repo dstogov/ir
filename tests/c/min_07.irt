@@ -1,0 +1,21 @@
+--TEST--
+007: max function
+--ARGS--
+--emit-c
+--CODE--
+{
+	l_1 = START(l_4);
+	float x = PARAM(l_1, "x", 1);
+	float y = PARAM(l_1, "y", 2);
+	float ret = MIN(x, y);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+float test(float x, float y)
+{
+	float d_1 = x;
+	float d_2 = y;
+	float d_3;
+	d_3 = __builtin_fminf(d_2, d_1);
+	return d_3;
+}
