@@ -1717,7 +1717,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 		if (!ctx->loader || !ctx->loader->has_sym || !ctx->loader->has_sym(ctx->loader, name)) {
 			ir_emit_llvm_func_decl(name, IR_LLVM_SPEC_TYPE, ir_llvm_intrinsic_desc[i].ret_type,
 				ir_llvm_intrinsic_desc[i].params_count, ir_llvm_intrinsic_desc[i].param_types, f);
-			if (ctx->loader->add_sym) {
+			if (ctx->loader && ctx->loader->add_sym) {
 				ctx->loader->add_sym(ctx->loader, name, NULL);
 			}
 		}
@@ -1745,7 +1745,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				if (!ctx->loader || !ctx->loader->has_sym || !ctx->loader->has_sym(ctx->loader, name)) {
 					ir_emit_llvm_func_decl(name, proto->flags, proto->ret_type,
 						proto->params_count, proto->param_types, f);
-					if (ctx->loader->add_sym) {
+					if (ctx->loader && ctx->loader->add_sym) {
 						ctx->loader->add_sym(ctx->loader, name, NULL);
 					}
 				}
@@ -1760,7 +1760,7 @@ static int ir_emit_func(ir_ctx *ctx, const char *name, FILE *f)
 				// TODO: symbol "global" or "constant" ???
 				// TODO: symbol type ???
 				fprintf(f, "@%s = external global ptr\n", name);
-				if (ctx->loader->add_sym) {
+				if (ctx->loader && ctx->loader->add_sym) {
 					ctx->loader->add_sym(ctx->loader, name, NULL);
 				}
 			}
