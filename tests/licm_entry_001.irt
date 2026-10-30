@@ -1,0 +1,59 @@
+--TEST--
+Loop invariant hoisting into a common preheader after an entry
+--ARGS--
+--save --save-cfg --save-cfg-map --save-ir-after-gcm
+--CODE--
+{
+	int32_t c_1 = 0;
+	int32_t c_2 = 128;
+	uintptr_t c_3 = "%d\n";
+	uintptr_t c_4 = func printf(uintptr_t, ...): int32_t;
+	l_1 = START(l_15);
+	l_2 = END(l_1);
+	l_3 = ENTRY(l_2, 1);
+	l_4 = END(l_3);
+	l_5 = MERGE(l_2, l_4);
+	l_6 = CALL/2(l_5, c_4, c_3, c_1);
+	l_7 = END(l_6);
+	l_8 = LOOP_BEGIN(l_7, l_13);
+	int32_t d_9 = COPY(c_2, 1);
+	int32_t d_10, l_10 = CALL/2(l_8, c_4, c_3, d_9);
+	bool d_11 = LT(d_10, c_1);
+	l_11 = IF(l_10, d_11);
+	l_12 = IF_TRUE(l_11);
+	l_13 = LOOP_END(l_12);
+	l_14 = IF_FALSE(l_11);
+	l_15 = RETURN(l_14, c_1);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 0;
+	int32_t c_5 = 128;
+	uintptr_t c_6 = "%d\n";
+	uintptr_t c_7 = func printf(uintptr_t, ...): int32_t;
+#BB1: end=l_2, succ(2)=[BB2, BB3]
+	l_1 = START(l_18); # BLOCK=BB1;
+	l_2 = END(l_1); # BLOCK=BB1;
+#BB2: end=l_4, idom=BB1(1), pred(1)=[BB1], succ(1)=[BB3]
+	l_3 = ENTRY(l_2, 1); # BLOCK=BB2;
+	l_4 = END(l_3); # BLOCK=BB2;
+#BB3: end=l_8, idom=BB1(1), pred(2)=[BB1, BB2], succ(1)=[BB4]
+	l_5 = MERGE(l_2, l_4); # BLOCK=BB3;
+	l_6 = CALL/2(l_5, c_7, c_6, c_4); # BLOCK=BB3;
+	l_8 = END(l_6); # BLOCK=BB3;
+#BB4: end=l_14, idom=BB3(2), loop=HDR(1), pred(2)=[BB3, BB5], succ(2)=[BB5, BB6]
+	l_9 = LOOP_BEGIN(l_8, l_16); # BLOCK=BB4;
+	int32_t d_10 = COPY(c_5, 1); # BLOCK=BB3;
+	int32_t d_11, l_11 = CALL/2(l_9, c_7, c_6, d_10); # BLOCK=BB4;
+	bool d_13 = LT(d_11, c_4); # BLOCK=BB4;
+	l_14 = IF(l_11, d_13); # BLOCK=BB4;
+#BB5: end=l_16, idom=BB4(3), loop=BB4(1), pred(1)=[BB4], succ(1)=[BB4]
+	l_15 = IF_TRUE(l_14); # BLOCK=BB5;
+	l_16 = LOOP_END(l_15); # BLOCK=BB5;
+#BB6: end=l_18, idom=BB4(3), pred(1)=[BB4]
+	l_17 = IF_FALSE(l_14); # BLOCK=BB6;
+	l_18 = RETURN(l_17, c_4); # BLOCK=BB6;
+}

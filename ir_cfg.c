@@ -1327,6 +1327,32 @@ next:
 				bb->flags |= IR_BB_LOOP_WITH_ENTRY;
 			}
 		}
+
+		if (ctx->entries_count) {
+			for (b = 1; b < n; b++) {
+				if ((blocks[b].flags & (IR_BB_LOOP_HEADER|IR_BB_LOOP_WITH_ENTRY)) != IR_BB_LOOP_HEADER) {
+					continue;
+				}
+				ir_worklist_clear(&work);
+				ir_bitset_incl(work.visited, blocks[b].idom);
+				ir_worklist_push(&work, b);
+				while (ir_worklist_len(&work)) {
+					bb = &blocks[ir_worklist_pop(&work)];
+					if (bb->flags & IR_BB_ENTRY) {
+						blocks[b].flags |= IR_BB_LOOP_WITH_ENTRY_IN_PREDS;
+						break;
+					}
+					uint32_t *p = &edges[bb->predecessors];
+					uint32_t count = bb->predecessors_count;
+
+					for (; count > 0; p++, count--) {
+						if (!ir_dominates(blocks, b, *p)) {
+							ir_worklist_push(&work, *p);
+						}
+					}
+				}
+			}
+		}
 	}
 
 	ir_mem_free(times);
