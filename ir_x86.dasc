@@ -4179,7 +4179,8 @@ binop_fp:
 						// const
 					} else if (op2_insn->val.u64 == 1) {
 						return IR_COPY_INT | IR_MAY_REUSE;
-					} else if (IR_IS_POWER_OF_TWO(op2_insn->val.u64)) {
+					} else if (IR_IS_POWER_OF_TWO(op2_insn->val.u64)
+							&& (IR_IS_TYPE_UNSIGNED(insn->type) || op2_insn->val.i64 > 0)) {
 						/* DIV(X, PWR2) => SHR */
 						if (IR_IS_TYPE_UNSIGNED(insn->type)) {
 							return IR_DIV_PWR2;

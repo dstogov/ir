@@ -1,0 +1,31 @@
+--TEST--
+Signed DIV by INT64_MIN
+--ARGS--
+--run
+--CODE--
+func div_min(int64_t): int64_t
+{
+	int64_t c = -9223372036854775808;
+	l_1 = START(l_3);
+	int64_t x = PARAM(l_1, "x", 0);
+	int64_t r = DIV(x, c);
+	l_3 = RETURN(l_1, r);
+}
+func main(): int32_t
+{
+	int32_t c_0 = 0;
+	int64_t a = -9223372036854775808;
+	int64_t b = -1;
+	int64_t m = 9223372036854775807;
+	uintptr_t f = func printf(uintptr_t, ...): int32_t;
+	uintptr_t d = func div_min(int64_t): int64_t;
+	uintptr_t fmt = "%lld %lld %lld\n";
+	l_1 = START(l_9);
+	int64_t r1, l_2 = CALL/1(l_1, d, a);
+	int64_t r2, l_3 = CALL/1(l_2, d, b);
+	int64_t r3, l_4 = CALL/1(l_3, d, m);
+	int32_t z, l_5 = CALL/4(l_4, f, fmt, r1, r2, r3);
+	l_9 = RETURN(l_5, c_0);
+}
+--EXPECT--
+1 0 0
