@@ -1413,8 +1413,9 @@ binop_fp:
 			if (IR_IS_TYPE_VECTOR(insn->type)) {
 				return IR_VECTOR_OP;
 			}
-			IR_FALLTHROUGH;
 #endif
+			IR_ASSERT(IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type));
+			IR_FALLTHROUGH;
 		case IR_BSWAP:
 		case IR_CTLZ:
 		case IR_CTTZ:
