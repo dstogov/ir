@@ -1,0 +1,10 @@
+--TEST--
+001: static const string symbol is emitted as an initialized const byte array
+--ARGS--
+--emit-c
+--CODE--
+static const @fmt[4] = "%d\n\000";
+--EXPECT--
+static const uint8_t fmt[4] = {
+	0x25, 0x64, 0x0a, 0x00,
+};

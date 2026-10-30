@@ -1082,7 +1082,9 @@ void ir_dump_codegen(const ir_ctx *ctx, FILE *f);
 /* IR to C conversion (implementation in ir_emit_c.c) */
 int ir_emit_c(ir_ctx *ctx, const char *name, FILE *f);
 void ir_emit_c_func_decl(const char *name, uint32_t flags, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, FILE *f);
-void ir_emit_c_sym_decl(const char *name, uint32_t flags, FILE *f);
+void ir_emit_c_sym_decl(const char *name, uint32_t flags, size_t size, FILE *f);
+void ir_emit_c_sym_data(const void *data, size_t size, FILE *f);
+void ir_emit_c_sym_data_end(FILE *f);
 
 /* IR to LLVM conversion (implementation in ir_emit_llvm.c) */
 int ir_emit_llvm(ir_ctx *ctx, const char *name, FILE *f);
