@@ -14,5 +14,12 @@ x86_64-windows
 }
 --EXPECT--
 test:
-	minsd %xmm1, %xmm0
+	movapd %xmm1, %xmm2
+	minsd %xmm0, %xmm2
+	movapd %xmm0, %xmm3
+	cmpordsd %xmm3, %xmm3
+	andpd %xmm3, %xmm2
+	andnpd %xmm1, %xmm3
+	orpd %xmm3, %xmm2
+	movapd %xmm2, %xmm0
 	retq

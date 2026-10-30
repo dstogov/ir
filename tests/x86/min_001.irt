@@ -15,9 +15,16 @@ x86
 --EXPECT--
 test:
 	subl $4, %esp
-	movss 0xc(%esp), %xmm0
-	minss 8(%esp), %xmm0
-	movss %xmm0, (%esp)
+	movss 8(%esp), %xmm0
+	movss 0xc(%esp), %xmm1
+	movaps %xmm1, %xmm2
+	minss %xmm0, %xmm2
+	movaps %xmm0, %xmm3
+	cmpordss %xmm3, %xmm3
+	andps %xmm3, %xmm2
+	andnps %xmm1, %xmm3
+	orps %xmm3, %xmm2
+	movss %xmm2, (%esp)
 	flds (%esp)
 	addl $4, %esp
 	retl

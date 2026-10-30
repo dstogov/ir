@@ -14,5 +14,5 @@ aarch64
 }
 --EXPECT--
 test:
-	fmin s0, s1, s0
+	fminnm s0, s1, s0
 	ret
