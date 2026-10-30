@@ -627,7 +627,7 @@ ir_insn(ir_parser_ctx *p):
 	{uint32_t flags;}
 	{uint32_t params_count;}
 	{uint8_t param_types[IR_MAX_OPERANDS + 1];}
-	{void *ptr;}
+	{void *ptr, *end;}
 	{ir_type t2;}
 	(
 		type(&t)
@@ -649,6 +649,7 @@ ir_insn(ir_parser_ctx *p):
 		{ref = ir_const_vector(p->ctx, t);}
 		{ptr = ir_long_const_ptr(p->ctx, ref);}
 		{memset(ptr, 0, IR_VECTOR_SIZE(t));}
+		{end = (char*)ptr + IR_VECTOR_SIZE(t);}
 		{t2 = IR_VECTOR_BASE_TYPE(t);}
 		(
 			const(t2, &val)
@@ -665,6 +666,8 @@ ir_insn(ir_parser_ctx *p):
 			}
 			(
 				","
+				{if (ptr == end) yy_error_fmt("too many elements in <%s*%d> constant",
+					ir_type_cname[t2], IR_VECTOR_LENGTH(t));}
 				const(t2, &val)
 				{
 					switch (ir_type_size[t2]) {
