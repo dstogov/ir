@@ -4767,7 +4767,12 @@ static void ir_emit_zext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 
 	if (op1_reg != IR_REG_NONE) {
-		if (ir_type_size[src_type] == 1) {
+		if (ctx->ir_base[insn->op1].op == IR_CTLZ) {
+			/* CTLZ result is already zero-extended, and narrow moves and reloads keep it so */
+			if (def_reg != op1_reg) {
+				|	mov Rw(def_reg), Rw(op1_reg)
+			}
+		} else if (ir_type_size[src_type] == 1) {
 			|	uxtb Rw(def_reg), Rw(op1_reg)
 		} else if (ir_type_size[src_type] == 2) {
 			|	uxth Rw(def_reg), Rw(op1_reg)
