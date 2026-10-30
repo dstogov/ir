@@ -1,0 +1,45 @@
+--TEST--
+001: CTLZ/CTTZ/CTPOP with a result narrower or wider than the operand
+--ARGS--
+--emit-llvm
+--CODE--
+{
+	l_1 = START(l_11);
+	int64_t x = PARAM(l_1, "x", 1);
+	int16_t y = PARAM(l_1, "y", 2);
+	int32_t a = CTLZ(x);
+	int32_t b = CTTZ(x);
+	int32_t c = CTPOP(x);
+	int8_t d = CTLZ(y);
+	int32_t e = SEXT(d);
+	int32_t w = CTLZ(y);
+	int32_t r1 = ADD(a, b);
+	int32_t r2 = ADD(r1, c);
+	int32_t r3 = ADD(r2, e);
+	int32_t r4 = ADD(r3, w);
+	l_11 = RETURN(l_1, r4);
+}
+--EXPECT--
+define i32 @test(i64 %d2, i16 %d3)
+{
+	%t4 = call i64 @llvm.ctlz.i64(i64 %d2, i1 true)
+	%d4 = trunc i64 %t4 to i32
+	%t5 = call i64 @llvm.cttz.i64(i64 %d2, i1 true)
+	%d5 = trunc i64 %t5 to i32
+	%t6 = call i64 @llvm.ctpop.i64(i64 %d2)
+	%d6 = trunc i64 %t6 to i32
+	%t7 = call i16 @llvm.ctlz.i16(i16 %d3, i1 true)
+	%d7 = trunc i16 %t7 to i8
+	%d8 = sext i8 %d7 to i32
+	%t9 = call i16 @llvm.ctlz.i16(i16 %d3, i1 true)
+	%d9 = zext i16 %t9 to i32
+	%d10 = add i32 %d5, %d4
+	%d11 = add i32 %d10, %d6
+	%d12 = add i32 %d11, %d8
+	%d13 = add i32 %d12, %d9
+	ret i32 %d13
+}
+declare i64 @llvm.ctpop.i64(i64)
+declare i16 @llvm.ctlz.i16(i16, i1)
+declare i64 @llvm.ctlz.i64(i64, i1)
+declare i64 @llvm.cttz.i64(i64, i1)
