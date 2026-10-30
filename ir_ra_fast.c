@@ -888,9 +888,9 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 				 && insn->op == IR_VSTORE
 				 && !IR_IS_CONST_REF(insn->op3)
 				 && ctx->ir_base[insn->op3].op == IR_PARAM
-				 /* first use of VAR and PARAM is VSTORE(_, VAR, PARAM) */
+				 /* first use of VAR and the only use of PARAM is VSTORE(_, VAR, PARAM) */
 				 && ctx->use_edges[ctx->use_lists[insn->op2].refs] == i
-				 && ctx->use_edges[ctx->use_lists[insn->op3].refs] == i) {
+				 && ctx->use_lists[insn->op3].count == 1) {
 					ir_live_interval *ival = ctx->live_intervals[ctx->vregs[insn->op3]];
 
 					if (!ival) {
@@ -1045,7 +1045,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 						ival->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
 						ival->stack_spill_pos = -1; // ???
 						IR_LOG_ASSIGN_SPILL(ival->vreg, ival->stack_spill_pos);
-						if (ctx->use_lists[i].count > 0) {
+						if (ctx->use_lists[i].count == 1) {
 							ir_ref use = ctx->use_edges[ctx->use_lists[i].refs];
 							if (use < bb->end) {
 								ir_insn *use_insn = &ctx->ir_base[use];

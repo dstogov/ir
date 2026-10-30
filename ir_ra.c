@@ -801,7 +801,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							ir_live_interval *param_ival = ctx->live_intervals[v];
 
 							param_ival->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
-							if (ctx->rules && ctx->use_lists[ref].count > 0) {
+							if (ctx->rules && ctx->use_lists[ref].count == 1) {
 								ir_ref use = ctx->use_edges[ctx->use_lists[ref].refs];
 								if (use < bb->end) {
 									ir_insn *use_insn = &ctx->ir_base[use];
@@ -1519,7 +1519,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							ir_live_interval *param_ival = ctx->live_intervals[v];
 
 							param_ival->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
-							if (ctx->rules && ctx->use_lists[ref].count > 0) {
+							if (ctx->rules && ctx->use_lists[ref].count == 1) {
 								ir_ref use = ctx->use_edges[ctx->use_lists[ref].refs];
 								if (use < bb->end) {
 									ir_insn *use_insn = &ctx->ir_base[use];
