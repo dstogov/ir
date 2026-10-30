@@ -1842,6 +1842,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 		case YY_INF:
 		case YY_NAN:
 		case YY__MINUS:
+			if (t == IR_VOID) yy_error_fmt("missing type for constant '%.*s'", (int)len, str);
 			if (IR_IS_TYPE_VECTOR(t)) yy_error_const_type("scalar", t);
 			val.u64 = 0;
 			sym = parse_const(sym, t, &val);
