@@ -2,8 +2,6 @@
 MAX 002:
 --ARGS--
 -O0 --run
---XFAIL--
-Native code generation for MIN/MAX for floating point numbers is incorrect
 --CODE--
 extern func @printf(uintptr_t, ...): int32_t;
 static const @str.1[13] = "%g %g %g %g\n\000";

@@ -3965,10 +3965,10 @@ static void ir_emit_binop_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			|	ASM_FP_REG_REG_REG_OP fdiv, type, def_reg, op1_reg, op2_reg
 			break;
 		case IR_MIN:
-			|	ASM_FP_REG_REG_REG_OP fmin, type, def_reg, op1_reg, op2_reg
+			|	ASM_FP_REG_REG_REG_OP fminnm, type, def_reg, op1_reg, op2_reg
 			break;
 		case IR_MAX:
-			|	ASM_FP_REG_REG_REG_OP fmax, type, def_reg, op1_reg, op2_reg
+			|	ASM_FP_REG_REG_REG_OP fmaxnm, type, def_reg, op1_reg, op2_reg
 			break;
 	}
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {

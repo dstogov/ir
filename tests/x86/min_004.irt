@@ -15,9 +15,12 @@ x86
 --EXPECT--
 test:
 	subl $8, %esp
-	vmovsd 0x14(%esp), %xmm0
-	vminsd 0xc(%esp), %xmm0, %xmm0
-	vmovsd %xmm0, (%esp)
+	vmovsd 0xc(%esp), %xmm0
+	vmovsd 0x14(%esp), %xmm1
+	vminsd %xmm0, %xmm1, %xmm2
+	vcmpordsd %xmm0, %xmm0, %xmm3
+	vblendvpd %xmm3, %xmm2, %xmm1, %xmm2
+	vmovsd %xmm2, (%esp)
 	fldl (%esp)
 	addl $8, %esp
 	retl
