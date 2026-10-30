@@ -9773,7 +9773,7 @@ static void ir_emit_cond(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		op3_reg = IR_REG_NUM(op3_reg);
 		ir_emit_load(ctx, type, op3_reg, op3);
 		if (op1 == op3) {
-			op1_reg = op2_reg;
+			op1_reg = op3_reg;
 		}
 	}
 	if (op1_reg != IR_REG_NONE && IR_REG_SPILLED(op1_reg)) {
