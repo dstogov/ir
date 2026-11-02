@@ -7573,6 +7573,30 @@ static void ir_emit_sdiv_pwr2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |.if X64
 ||		}
 |.endif
+		|	ASM_REG_IMM_OP sar, type, def_reg, shift
+	} else if (shift == (uint32_t)ir_type_size[type] * 8 - 1) {
+|.if X64
+||		if (ir_type_size[type] == 8) {
+			|	mov64 Rq(def_reg), 0x8000000000000000
+			|	cmp Rq(def_reg), Rq(op1_reg)
+			|	sete Rb(def_reg)
+			|	movzx Rd(def_reg), Rb(def_reg)
+||		} else {
+|.endif
+			|	xor Rd(def_reg), Rd(def_reg)
+			|	cmp Rd(op1_reg), 0x80000000
+|.if X64
+			|	sete Rb(def_reg)
+||		}
+|.else
+		if (def_reg < IR_REG_R3) {
+			|	sete Rb(def_reg)
+		} else {
+			|	jne >1
+			|	mov Rb(def_reg), 1
+			|1:
+		}
+|.endif
 	} else {
 |.if X64
 ||		if (ir_type_size[type] == 8) {
@@ -7593,8 +7617,8 @@ static void ir_emit_sdiv_pwr2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 |.endif
 		|	ASM_REG_REG_OP test, type, op1_reg, op1_reg
 		|	ASM_REG_REG_OP2 cmovns, type, def_reg, op1_reg
+		|	ASM_REG_IMM_OP sar, type, def_reg, shift
 	}
-	|	ASM_REG_IMM_OP sar, type, def_reg, shift
 
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
 		ir_emit_store(ctx, type, def, def_reg);
