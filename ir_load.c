@@ -1816,7 +1816,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 	uint32_t flags;
 	uint32_t params_count;
 	uint8_t param_types[IR_MAX_OPERANDS + 1];
-	void *ptr;
+	void *ptr, *end;
 	ir_type t2;
 	if (YY_IN_SET(sym, (YY_BOOL,YY_UINT8_T,YY_UINT16_T,YY_UINT32_T,YY_UINT64_T,YY_UINTPTR_T,YY_CHAR,YY_INT8_T,YY_INT16_T,YY_INT32_T,YY_INT64_T,YY_DOUBLE,YY_FLOAT,YY__LESS), "\000\000\000\000\376\177\000\000")) {
 		sym = parse_type(sym, &t);
@@ -1853,6 +1853,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 			ref = ir_const_vector(p->ctx, t);
 			ptr = ir_long_const_ptr(p->ctx, ref);
 			memset(ptr, 0, IR_VECTOR_SIZE(t));
+			end = (char*)ptr + IR_VECTOR_SIZE(t);
 			t2 = IR_VECTOR_BASE_TYPE(t);
 			if (YY_IN_SET(sym, (YY_DECNUMBER,YY_HEXNUMBER,YY_FLOATNUMBER,YY_CHARACTER,YY_INF,YY_NAN,YY__MINUS), "\000\000\000\000\000\000\356\001")) {
 				sym = parse_const(sym, t2, &val);
@@ -1867,6 +1868,8 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 				}
 				while (sym == YY__COMMA) {
 					sym = get_sym();
+					if (ptr == end) yy_error_fmt("too many elements in <%s*%d> constant",
+						ir_type_cname[t2], IR_VECTOR_LENGTH(t));
 					sym = parse_const(sym, t2, &val);
 					switch (ir_type_size[t2]) {
 						case 1: *(uint8_t*)ptr  = val.u8;  ptr = (char*)ptr + 1; break;
