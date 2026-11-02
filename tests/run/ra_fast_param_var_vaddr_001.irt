@@ -1,0 +1,45 @@
+--TEST--
+Fast register allocator: next stack argument is read through the address of a VAR holding a stack PARAM
+--ARGS--
+-O0 --run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+static const @format[7] = "%g %g\n\000";
+func @test(double, double, double, double, double, double, double, double, double, double): int32_t
+{
+	uintptr_t c_p = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t c_f = sym(@format);
+	uintptr_t c_8 = 8;
+	int32_t c_0 = 0;
+	l_1 = START(l_ret);
+	double a1 = PARAM(l_1, "a1", 1);
+	double a2 = PARAM(l_1, "a2", 2);
+	double a3 = PARAM(l_1, "a3", 3);
+	double a4 = PARAM(l_1, "a4", 4);
+	double a5 = PARAM(l_1, "a5", 5);
+	double a6 = PARAM(l_1, "a6", 6);
+	double a7 = PARAM(l_1, "a7", 7);
+	double a8 = PARAM(l_1, "a8", 8);
+	double p = PARAM(l_1, "p", 9);
+	double q = PARAM(l_1, "q", 10);
+	double x = VAR(l_1, "x");
+	l_2 = VSTORE(l_1, x, p);
+	uintptr_t xa = VADDR(x);
+	uintptr_t next = ADD(xa, c_8);
+	double v, l_3 = LOAD(l_2, next);
+	int32_t r, l_4 = CALL/3(l_3, c_p, c_f, p, v);
+	l_ret = RETURN(l_4, c_0);
+}
+func @main(): int32_t
+{
+	uintptr_t c_t = func @test(double, double, double, double, double, double, double, double, double, double): int32_t;
+	double c_0d = 0.0;
+	double c_1 = 1.5;
+	double c_2 = 2.5;
+	int32_t c_0 = 0;
+	l_1 = START(l_ret);
+	int32_t r, l_2 = CALL/10(l_1, c_t, c_0d, c_0d, c_0d, c_0d, c_0d, c_0d, c_0d, c_0d, c_1, c_2);
+	l_ret = RETURN(l_2, c_0);
+}
+--EXPECT--
+1.5 2.5
