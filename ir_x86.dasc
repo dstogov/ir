@@ -7593,7 +7593,7 @@ static void ir_emit_sdiv_pwr2(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			|	sete Rb(def_reg)
 		} else {
 			|	jne >1
-			|	mov Rb(def_reg), 1
+			|	mov Rd(def_reg), 1
 			|1:
 		}
 |.endif
