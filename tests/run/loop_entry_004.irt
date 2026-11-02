@@ -1,0 +1,37 @@
+--TEST--
+Loop invariant initialization in an irreducible loop entered after an entry
+--ARGS--
+--run
+--CODE--
+{
+	int32_t c_1 = 0;
+	int32_t c_2 = 128;
+	uintptr_t c_3 = "%d\n";
+	uintptr_t c_4 = func printf(uintptr_t, ...): int32_t;
+	l_1 = START(l_24);
+	int32_t d_2, l_2 = CALL/2(l_1, c_4, c_3, c_1);
+	bool d_3 = GT(d_2, c_1);
+	l_3 = IF(l_2, d_3);
+	l_4 = IF_TRUE(l_3);
+	l_5 = END(l_4);
+	l_6 = IF_FALSE(l_3);
+	l_7 = END(l_6);
+	l_8 = ENTRY(l_7, 1);
+	l_9 = END(l_8);
+	l_10 = MERGE(l_7, l_9);
+	l_11 = END(l_10);
+	l_12 = LOOP_BEGIN(l_5, l_22);
+	l_13 = END(l_12);
+	l_14 = MERGE(l_11, l_13);
+	int32_t d_15 = COPY(c_2, 1);
+	int32_t d_16, l_16 = CALL/2(l_14, c_4, c_3, d_15);
+	bool d_17 = LT(d_16, c_1);
+	l_17 = IF(l_16, d_17);
+	l_18 = IF_TRUE(l_17);
+	l_22 = LOOP_END(l_18);
+	l_23 = IF_FALSE(l_17);
+	l_24 = RETURN(l_23, c_1);
+}
+--EXPECT--
+0
+128
