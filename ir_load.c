@@ -1842,7 +1842,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 		case YY_INF:
 		case YY_NAN:
 		case YY__MINUS:
-			if (t == IR_VOID) yy_error_fmt("missing type for constant '%.*s'", (int)len, str);
+			if (t == IR_VOID) yy_error_fmt("constant '%.*s' has no type", (int)len, str);
 			if (IR_IS_TYPE_VECTOR(t)) yy_error_const_type("scalar", t);
 			val.u64 = 0;
 			sym = parse_const(sym, t, &val);
@@ -1870,7 +1870,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 				while (sym == YY__COMMA) {
 					sym = get_sym();
 					if (ptr == end) yy_error_fmt("too many elements in <%s*%d> constant",
-						ir_type_cname[t2], IR_VECTOR_LENGTH(t));
+					ir_type_cname[t2], IR_VECTOR_LENGTH(t));
 					sym = parse_const(sym, t2, &val);
 					switch (ir_type_size[t2]) {
 						case 1: *(uint8_t*)ptr  = val.u8;  ptr = (char*)ptr + 1; break;

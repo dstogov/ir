@@ -11,6 +11,6 @@ func main(): int32_t
 	l_2 = RETURN(l_1, r);
 }
 --EXPECT--
-ERROR: missing type for constant 'c' at line 3
+ERROR: constant 'c' has no type at line 3
 
 exit code = 2
