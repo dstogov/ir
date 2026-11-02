@@ -640,7 +640,8 @@ ir_insn(ir_parser_ctx *p):
 		ID(&str, &len)
 	)
 	"="
-	(	{if (IR_IS_TYPE_VECTOR(t)) yy_error_const_type("scalar", t);}
+	(	{if (t == IR_VOID) yy_error_fmt("missing type for constant '%.*s'", (int)len, str);}
+		{if (IR_IS_TYPE_VECTOR(t)) yy_error_const_type("scalar", t);}
 		{val.u64 = 0;}
 		const(t, &val)
 		{ref = ir_const(p->ctx, val, t);}
