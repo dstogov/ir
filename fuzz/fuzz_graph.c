@@ -181,7 +181,7 @@ static void fuzz_build(ir_ctx *ctx, fuzz_cursor *c)
 			case IR_I8:  val.i64 = (int8_t)val.u64; break;
 			case IR_I16: val.i64 = (int16_t)val.u64; break;
 			case IR_I32: val.i64 = (int32_t)val.u64; break;
-			case IR_FLOAT:  val.f = (float)(int64_t)val.u64; break;
+			case IR_FLOAT:  val.f = (float)(int64_t)val.u64; val.u32_hi = 0; break;
 			case IR_DOUBLE: val.d = (double)(int64_t)val.u64; break;
 			default: break;
 		}
