@@ -1042,25 +1042,31 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 					if (insn->op == IR_PARAM) {
 						/* We may reuse parameter stack slot for spilling */
 						ir_live_interval *ival = ctx->live_intervals[ctx->vregs[i]];
-						ival->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
-						ival->stack_spill_pos = -1; // ???
-						IR_LOG_ASSIGN_SPILL(ival->vreg, ival->stack_spill_pos);
-						if (ctx->use_lists[i].count > 0) {
-							ir_ref use = ctx->use_edges[ctx->use_lists[i].refs];
-							if (use < bb->end) {
-								ir_insn *use_insn = &ctx->ir_base[use];
-								if (use_insn->op == IR_VSTORE
-								 && !(ctx->rules[use] & IR_SKIPPED)
-								 /* first use of VAR is VSTORE(_, VAR, PARAM) */
-								 && ctx->use_edges[ctx->use_lists[use_insn->op2].refs] == use) {
-									IR_ASSERT(use_insn->op3 == i);
-									/* skip VSTORE (VAR is going to be remapped to PARAM) */
-									ival->flags |= IR_LIVE_INTERVAL_VAR_MEM_PARAM;
-									ival->use_pos = NULL;
-									ctx->rules[use] = IR_SKIPPED | IR_NOP;
+
+						do {
+							if (ctx->use_lists[i].count > 0) {
+								ir_ref use = ctx->use_edges[ctx->use_lists[i].refs];
+								if (use < bb->end) {
+									ir_insn *use_insn = &ctx->ir_base[use];
+									if (use_insn->op == IR_VSTORE
+									 && !(ctx->rules[use] & IR_SKIPPED)
+									 /* first use of VAR is VSTORE(_, VAR, PARAM) */
+									 && ctx->use_edges[ctx->use_lists[use_insn->op2].refs] == use) {
+										IR_ASSERT(use_insn->op3 == i);
+										/* skip VSTORE (VAR is going to be remapped to PARAM) */
+										ival->flags |= IR_LIVE_INTERVAL_VAR_MEM_PARAM;
+										ival->use_pos = NULL;
+										ctx->rules[use] = IR_SKIPPED | IR_NOP;
+										if (ctx->use_lists[i].count != 1) {
+											break;
+										}
+									}
 								}
 							}
-						}
+							ival->flags |= IR_LIVE_INTERVAL_MEM_PARAM;
+							ival->stack_spill_pos = -1; // ???
+							IR_LOG_ASSIGN_SPILL(ival->vreg, ival->stack_spill_pos);
+						} while (0);
 					}
 					def_pos = IR_DEF_SUB_REF;
 				}

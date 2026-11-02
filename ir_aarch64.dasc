@@ -9285,10 +9285,10 @@ static void ir_fix_param_spills(ir_ctx *ctx)
 					if (ival->flags & IR_LIVE_INTERVAL_MEM_PARAM) {
 						IR_ASSERT(ival->stack_spill_pos == -1);
 						ival->stack_spill_pos = stack_start + stack_offset;
-						if (ival->flags & IR_LIVE_INTERVAL_VAR_MEM_PARAM) {
-							/* Remap VAR to PARAM stack slot */
-							ir_remap_param_spill_slot(ctx, use, stack_start + stack_offset);
-						}
+					}
+					if (ival->flags & IR_LIVE_INTERVAL_VAR_MEM_PARAM) {
+						/* Remap VAR to PARAM stack slot */
+						ir_remap_param_spill_slot(ctx, use, stack_start + stack_offset);
 					}
 				}
 				if (sizeof(void*) == 8) {
