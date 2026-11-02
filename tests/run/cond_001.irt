@@ -1,0 +1,32 @@
+--TEST--
+001: COND with the same value as condition and false operand
+--ARGS--
+-O0 --run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @test(int32_t, int32_t): int32_t;
+static const @fmt[4] = "%d\n\000";
+func @test(int32_t, int32_t): int32_t
+{
+	l_1 = START(l_5);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t y = PARAM(l_1, "y", 2);
+	l_2 = END(l_1);
+	l_3 = BEGIN(l_2);
+	int32_t r = COND(x, y, x);
+	l_5 = RETURN(l_3, r);
+}
+func @main(): int32_t
+{
+	uintptr_t t = func @test(int32_t, int32_t): int32_t;
+	uintptr_t p = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = sym(@fmt);
+	int32_t c_0 = 0;
+	int32_t c_7 = 7;
+	l_1 = START(l_4);
+	int32_t r, l_2 = CALL/2(l_1, t, c_0, c_7);
+	l_3 = CALL/2(l_2, p, fmt, r);
+	l_4 = RETURN(l_3, c_0);
+}
+--EXPECT--
+0
