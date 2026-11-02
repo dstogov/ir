@@ -1,0 +1,106 @@
+--TEST--
+MIN/MAX with adjusted constant at the type boundary
+--ARGS--
+--run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @ule(uint64_t): uint64_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uint64_t c_4 = 0xffffffffffffffff;
+	uint64_t c_5 = 0;
+	l_1 = START(l_9);
+	uint64_t d_2 = PARAM(l_1, "x", 1);
+	bool d_3 = ULE(d_2, c_4);
+	l_2 = IF(l_1, d_3);
+	l_3 = IF_TRUE(l_2);
+	l_4 = END(l_3);
+	l_5 = IF_FALSE(l_2);
+	l_6 = END(l_5);
+	l_7 = MERGE(l_4, l_6);
+	uint64_t d_4 = PHI(l_7, c_5, d_2);
+	l_9 = RETURN(l_7, d_4);
+}
+func @uge(uint64_t): uint64_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uint64_t c_4 = 0;
+	uint64_t c_5 = 0xffffffffffffffff;
+	l_1 = START(l_9);
+	uint64_t d_2 = PARAM(l_1, "x", 1);
+	bool d_3 = UGE(d_2, c_4);
+	l_2 = IF(l_1, d_3);
+	l_3 = IF_TRUE(l_2);
+	l_4 = END(l_3);
+	l_5 = IF_FALSE(l_2);
+	l_6 = END(l_5);
+	l_7 = MERGE(l_4, l_6);
+	uint64_t d_4 = PHI(l_7, c_5, d_2);
+	l_9 = RETURN(l_7, d_4);
+}
+func @le(int64_t): int64_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int64_t c_4 = 9223372036854775807;
+	int64_t c_5 = -9223372036854775808;
+	l_1 = START(l_9);
+	int64_t d_2 = PARAM(l_1, "x", 1);
+	bool d_3 = LE(d_2, c_4);
+	l_2 = IF(l_1, d_3);
+	l_3 = IF_TRUE(l_2);
+	l_4 = END(l_3);
+	l_5 = IF_FALSE(l_2);
+	l_6 = END(l_5);
+	l_7 = MERGE(l_4, l_6);
+	int64_t d_4 = PHI(l_7, c_5, d_2);
+	l_9 = RETURN(l_7, d_4);
+}
+func @ge(int64_t): int64_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int64_t c_4 = -9223372036854775808;
+	int64_t c_5 = 9223372036854775807;
+	l_1 = START(l_9);
+	int64_t d_2 = PARAM(l_1, "x", 1);
+	bool d_3 = GE(d_2, c_4);
+	l_2 = IF(l_1, d_3);
+	l_3 = IF_TRUE(l_2);
+	l_4 = END(l_3);
+	l_5 = IF_FALSE(l_2);
+	l_6 = END(l_5);
+	l_7 = MERGE(l_4, l_6);
+	int64_t d_4 = PHI(l_7, c_5, d_2);
+	l_9 = RETURN(l_7, d_4);
+}
+func @main(): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uintptr_t c_4 = func @ule(uint64_t): uint64_t;
+	uintptr_t c_5 = func @uge(uint64_t): uint64_t;
+	uintptr_t c_6 = func @le(int64_t): int64_t;
+	uintptr_t c_7 = func @ge(int64_t): int64_t;
+	uintptr_t c_8 = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t c_9 = "%llu %llu %lld %lld\n";
+	uint64_t c_10 = 7;
+	int64_t c_11 = 7;
+	int32_t c_12 = 0;
+	l_1 = START(l_7);
+	uint64_t d_2, l_2 = CALL/1(l_1, c_4, c_10);
+	uint64_t d_3, l_3 = CALL/1(l_2, c_5, c_10);
+	int64_t d_4, l_4 = CALL/1(l_3, c_6, c_11);
+	int64_t d_5, l_5 = CALL/1(l_4, c_7, c_11);
+	int32_t d_6, l_6 = CALL/5(l_5, c_8, c_9, d_2, d_3, d_4, d_5);
+	l_7 = RETURN(l_6, c_12);
+}
+--EXPECT--
+0 18446744073709551615 -9223372036854775808 9223372036854775807

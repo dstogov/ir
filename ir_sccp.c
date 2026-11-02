@@ -2680,6 +2680,7 @@ static bool ir_fix_min_max_const(ir_ctx *ctx, ir_insn *cond, ir_ref ref)
 		/* (x <= 3 ? x : 4) => (x < 4 ? x : 4) =>  min(x, 4) */
 		if (!IR_IS_SYM_CONST(ctx->ir_base[cond->op2].op)
 		 && !IR_IS_SYM_CONST(ctx->ir_base[ref].op)
+		 && ctx->ir_base[ref].val.u64 != 0
 		 && ctx->ir_base[cond->op2].val.u64 == ctx->ir_base[ref].val.u64 - 1
 		 && ctx->ir_base[cond->op2].type == ctx->ir_base[ref].type) {
 			cond->op2 = ref;
@@ -2690,6 +2691,7 @@ static bool ir_fix_min_max_const(ir_ctx *ctx, ir_insn *cond, ir_ref ref)
 		/* (x >= 3 ? x : 2) => (x > 2 ? x : 2) =>  max(x, 2) */
 		if (!IR_IS_SYM_CONST(ctx->ir_base[cond->op2].op)
 		 && !IR_IS_SYM_CONST(ctx->ir_base[ref].op)
+		 && ctx->ir_base[ref].val.u64 != UINT64_MAX
 		 && ctx->ir_base[cond->op2].val.u64 == ctx->ir_base[ref].val.u64 + 1
 		 && ctx->ir_base[cond->op2].type == ctx->ir_base[ref].type) {
 			cond->op2 = ref;
@@ -2700,7 +2702,8 @@ static bool ir_fix_min_max_const(ir_ctx *ctx, ir_insn *cond, ir_ref ref)
 		/* (x <= 3 ? x : 4) => (x < 4 ? x : 4) =>  min(x, 4) */
 		if (!IR_IS_SYM_CONST(ctx->ir_base[cond->op2].op)
 		 && !IR_IS_SYM_CONST(ctx->ir_base[ref].op)
-		 && ctx->ir_base[cond->op2].val.u64 == ctx->ir_base[ref].val.u64 - 1
+		 && ctx->ir_base[ref].val.i64 != INT64_MIN
+		 && ctx->ir_base[cond->op2].val.i64 == ctx->ir_base[ref].val.i64 - 1
 		 && ctx->ir_base[cond->op2].type == ctx->ir_base[ref].type) {
 			cond->op2 = ref;
 			return 1;
@@ -2710,6 +2713,7 @@ static bool ir_fix_min_max_const(ir_ctx *ctx, ir_insn *cond, ir_ref ref)
 		/* (x >= 3 ? x : 2) => (x > 2 ? x : 2) =>  max(x, 2) */
 		if (!IR_IS_SYM_CONST(ctx->ir_base[cond->op2].op)
 		 && !IR_IS_SYM_CONST(ctx->ir_base[ref].op)
+		 && ctx->ir_base[ref].val.i64 != INT64_MAX
 		 && ctx->ir_base[cond->op2].val.i64 == ctx->ir_base[ref].val.i64 + 1
 		 && ctx->ir_base[cond->op2].type == ctx->ir_base[ref].type) {
 			cond->op2 = ref;
