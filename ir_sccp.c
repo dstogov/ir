@@ -2673,7 +2673,7 @@ static bool ir_is_zero(const ir_ctx *ctx, ir_ref ref)
 		&& ctx->ir_base[ref].val.u32 == 0;
 }
 
-static bool ir_fix_min_max_const(ir_ctx *ctx, ir_insn *cond, ir_ref ref)
+static bool ir_is_min_max_const(const ir_ctx *ctx, const ir_insn *cond, ir_ref ref)
 {
 	if (cond->op == IR_ULE) {
 		/* (x <= 3 ? 4 : x) => (x < 4 ? 4 : x) =>  max(x, 4) */
@@ -2683,7 +2683,6 @@ static bool ir_fix_min_max_const(ir_ctx *ctx, ir_insn *cond, ir_ref ref)
 		 && ctx->ir_base[ref].val.u64 != 0
 		 && ctx->ir_base[cond->op2].val.u64 == ctx->ir_base[ref].val.u64 - 1
 		 && ctx->ir_base[cond->op2].type == ctx->ir_base[ref].type) {
-			cond->op2 = ref;
 			return 1;
 		}
 	} else if (cond->op == IR_UGE) {
@@ -2694,7 +2693,6 @@ static bool ir_fix_min_max_const(ir_ctx *ctx, ir_insn *cond, ir_ref ref)
 		 && ctx->ir_base[ref].val.u64 != UINT64_MAX
 		 && ctx->ir_base[cond->op2].val.u64 == ctx->ir_base[ref].val.u64 + 1
 		 && ctx->ir_base[cond->op2].type == ctx->ir_base[ref].type) {
-			cond->op2 = ref;
 			return 1;
 		}
 	} else if (cond->op == IR_LE) {
@@ -2705,7 +2703,6 @@ static bool ir_fix_min_max_const(ir_ctx *ctx, ir_insn *cond, ir_ref ref)
 		 && ctx->ir_base[ref].val.i64 != INT64_MIN
 		 && ctx->ir_base[cond->op2].val.i64 == ctx->ir_base[ref].val.i64 - 1
 		 && ctx->ir_base[cond->op2].type == ctx->ir_base[ref].type) {
-			cond->op2 = ref;
 			return 1;
 		}
 	} else if (cond->op == IR_GE) {
@@ -2716,7 +2713,6 @@ static bool ir_fix_min_max_const(ir_ctx *ctx, ir_insn *cond, ir_ref ref)
 		 && ctx->ir_base[ref].val.i64 != INT64_MAX
 		 && ctx->ir_base[cond->op2].val.i64 == ctx->ir_base[ref].val.i64 + 1
 		 && ctx->ir_base[cond->op2].type == ctx->ir_base[ref].type) {
-			cond->op2 = ref;
 			return 1;
 		}
 	}
@@ -2768,13 +2764,13 @@ static bool ir_optimize_phi(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_re
 				    || (IR_IS_CONST_REF(cond->op2)
 				     && (IR_IS_CONST_REF(insn->op3)
 					 && IR_IS_TYPE_INT(insn->type)
-				     && ir_fix_min_max_const(ctx, cond, insn->op3)))))
+				     && ir_is_min_max_const(ctx, cond, insn->op3)))))
 				  || (insn->op3 == cond->op1
 				   && (insn->op2 == cond->op2
 				    || (IR_IS_CONST_REF(cond->op2)
 				     && (IR_IS_CONST_REF(insn->op2)
 					 && IR_IS_TYPE_INT(insn->type)
-				     && ir_fix_min_max_const(ctx, cond, insn->op2))))))) {
+				     && ir_is_min_max_const(ctx, cond, insn->op2))))))) {
 					/* MAX/MIN
 					 *
 					 *    prev                     prev
@@ -2809,11 +2805,16 @@ static bool ir_optimize_phi(ir_ctx *ctx, ir_ref merge_ref, ir_insn *merge, ir_re
 						ir_remove_unused_vars(ctx, start2_ref, end2_ref);
 					}
 
-					insn->op = (
-						(is_less ? cond->op1 : cond->op2)
-						==
-						((start1->op == IR_IF_TRUE) ? insn->op2 : insn->op3)
-						) ? IR_MIN : IR_MAX;
+					if (start1->op != IR_IF_TRUE) {
+						IR_ASSERT(start1->op == IR_IF_FALSE);
+						is_less = !is_less;
+					}
+					if (cond->op1 != insn->op2) {
+						IR_ASSERT(cond->op1 == insn->op3);
+						is_less = !is_less;
+					}
+
+					insn->op = is_less ? IR_MIN : IR_MAX;
 					insn->inputs_count = 2;
 					if (insn->op2 > insn->op3) {
 						insn->op1 = insn->op2;

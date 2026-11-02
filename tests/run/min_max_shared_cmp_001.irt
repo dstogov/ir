@@ -1,0 +1,77 @@
+--TEST--
+MIN/MAX with adjusted constant keeps shared compare
+--ARGS--
+--run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+static const @str.1[19] = "%u %u %u %d %d %d\n\000";
+func @max_ule(uint32_t): uint32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uint32_t c_4 = 3;
+	uint32_t c_5 = 4;
+	l_1 = START(l_9);
+	uint32_t d_2 = PARAM(l_1, "x", 1);
+	bool d_3 = ULE(d_2, c_4);
+	l_2 = IF(l_1, d_3);
+	l_3 = IF_TRUE(l_2);
+	l_4 = END(l_3);
+	l_5 = IF_FALSE(l_2);
+	l_6 = END(l_5);
+	l_7 = MERGE(l_4, l_6);
+	uint32_t d_4 = PHI(l_7, c_5, d_2);
+	uint32_t d_5 = ZEXT(d_3);
+	uint32_t d_6 = ADD(d_4, d_5);
+	l_9 = RETURN(l_7, d_6);
+}
+func @min_ge(int32_t): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 3;
+	int32_t c_5 = 2;
+	l_1 = START(l_9);
+	int32_t d_2 = PARAM(l_1, "x", 1);
+	bool d_3 = GE(d_2, c_4);
+	l_2 = IF(l_1, d_3);
+	l_3 = IF_TRUE(l_2);
+	l_4 = END(l_3);
+	l_5 = IF_FALSE(l_2);
+	l_6 = END(l_5);
+	l_7 = MERGE(l_4, l_6);
+	int32_t d_4 = PHI(l_7, c_5, d_2);
+	int32_t d_5 = ZEXT(d_3);
+	int32_t d_6 = ADD(d_4, d_5);
+	l_9 = RETURN(l_7, d_6);
+}
+func @main(): int32_t
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uintptr_t c_4 = func @max_ule(uint32_t): uint32_t;
+	uintptr_t c_5 = func @min_ge(int32_t): int32_t;
+	uintptr_t c_6 = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t c_7 = sym(@str.1);
+	uint32_t c_8 = 3;
+	uint32_t c_9 = 4;
+	uint32_t c_10 = 5;
+	int32_t c_11 = 2;
+	int32_t c_12 = 3;
+	int32_t c_13 = 4;
+	int32_t c_14 = 0;
+	l_1 = START(l_9);
+	uint32_t d_2, l_2 = CALL/1(l_1, c_4, c_8);
+	uint32_t d_3, l_3 = CALL/1(l_2, c_4, c_9);
+	uint32_t d_4, l_4 = CALL/1(l_3, c_4, c_10);
+	int32_t d_5, l_5 = CALL/1(l_4, c_5, c_11);
+	int32_t d_6, l_6 = CALL/1(l_5, c_5, c_12);
+	int32_t d_7, l_7 = CALL/1(l_6, c_5, c_13);
+	int32_t d_8, l_8 = CALL/7(l_7, c_6, c_7, d_2, d_3, d_4, d_5, d_6, d_7);
+	l_9 = RETURN(l_8, c_14);
+}
+--EXPECT--
+5 4 5 2 3 3
