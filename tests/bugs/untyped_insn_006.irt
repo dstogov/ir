@@ -1,0 +1,17 @@
+--TEST--
+Abort on STORE with a type
+--ARGS--
+--run
+--CODE--
+func test(uintptr_t): int32_t
+{
+	int32_t c = 0;
+	l_1 = START(l_3);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	int32_t l_2 = STORE(l_1, p, c);
+	l_3 = RETURN(l_2, c);
+}
+--EXPECT--
+ERROR: instruction 'l_2' must not have a type at line 6
+
+exit code = 2

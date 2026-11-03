@@ -1950,7 +1950,17 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 			break;
 		case YY_ID:
 			sym = parse_func(sym, &op);
-			if (t == IR_VOID && (ir_op_flags[op] & IR_OP_FLAG_DATA)) yy_error_fmt("instruction '%.*s' has no type", (int)len, str);
+			switch (ir_op_flags[op] & (IR_OP_FLAG_DATA|IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_MASK)) {
+				case IR_OP_FLAG_DATA:
+				case IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_LOAD:
+				case IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_ALLOC:
+					if (t == IR_VOID) yy_error_fmt("instruction '%.*s' has no type", (int)len, str);
+					break;
+				case IR_OP_FLAG_CONTROL:
+				case IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_STORE:
+					if (t != IR_VOID) yy_error_fmt("instruction '%.*s' must not have a type", (int)len, str);
+					break;
+			}
 			if (sym == YY__SLASH) {
 				sym = get_sym();
 				sym = parse_DECNUMBER(sym, IR_I32, &count);
