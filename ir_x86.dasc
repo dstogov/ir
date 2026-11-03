@@ -26447,6 +26447,12 @@ static void ir_emit_load_params(ir_ctx *ctx)
 					ir_emit_param_move(ctx, insn->type, src_reg, dst_reg, use, stack_start + stack_offset);
 				}
 				if (dst_reg != IR_REG_NONE && IR_REG_SPILLED(ctx->regs[use][0])) {
+#if IR_X86_I64
+					if (insn->type == IR_I64 || insn->type == IR_U64) {
+						ir_emit_store_i64_lo(ctx, use, IR_REG_I64_LO(dst_reg));
+						ir_emit_store_i64_hi(ctx, use, IR_REG_I64_HI(dst_reg));
+					} else
+#endif
 					ir_emit_store(ctx, insn->type, use, dst_reg);
 				}
 			}
