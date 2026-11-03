@@ -1,0 +1,24 @@
+--TEST--
+Abort on PHI without a type
+--ARGS--
+--run
+--CODE--
+func test(bool): int32_t
+{
+	int32_t c_1 = 0;
+	int32_t c_2 = 1;
+	l_1 = START(l_9);
+	bool d_2 = PARAM(l_1, "cond", 1);
+	l_3 = IF(l_1, d_2);
+	l_4 = IF_TRUE(l_3);
+	l_5 = END(l_4);
+	l_6 = IF_FALSE(l_3);
+	l_7 = END(l_6);
+	l_8 = MERGE(l_5, l_7);
+	d_8 = PHI/2(l_8, c_1, c_2);
+	l_9 = RETURN(l_8, d_8);
+}
+--EXPECT--
+ERROR: instruction 'd_8' has no type at line 13
+
+exit code = 2

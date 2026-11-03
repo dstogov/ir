@@ -1950,6 +1950,7 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 			break;
 		case YY_ID:
 			sym = parse_func(sym, &op);
+			if (t == IR_VOID && (ir_op_flags[op] & IR_OP_FLAG_DATA)) yy_error_fmt("instruction '%.*s' has no type", (int)len, str);
 			if (sym == YY__SLASH) {
 				sym = get_sym();
 				sym = parse_DECNUMBER(sym, IR_I32, &count);

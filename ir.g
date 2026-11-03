@@ -713,6 +713,7 @@ ir_insn(ir_parser_ctx *p):
 		{if (t != IR_VOID && t != IR_ADDR) yy_error_const_type("string", t);}
 		{ref = ir_make_const_str(p->ctx, func, func_len);}
 	|	func(&op)
+		{if (t == IR_VOID && (ir_op_flags[op] & IR_OP_FLAG_DATA)) yy_error_fmt("instruction '%.*s' has no type", (int)len, str);}
 		(
 			"/"
 			DECNUMBER(IR_I32, &count)
