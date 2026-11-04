@@ -1,0 +1,30 @@
+--TEST--
+DIV(NEG(x), NEG(y)) with x = INT32_MIN
+--ARGS--
+--run
+--CODE--
+func div_neg_neg(int32_t, int32_t): int32_t
+{
+	l_1 = START(l_3);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t y = PARAM(l_1, "y", 2);
+	int32_t n = NEG(x);
+	int32_t m = NEG(y);
+	int32_t r = DIV(n, m);
+	l_3 = RETURN(l_1, r);
+}
+func main(): int32_t
+{
+	int32_t c_0 = 0;
+	int32_t a = -2147483648;
+	int32_t b = 2;
+	uintptr_t f = func printf(uintptr_t, ...): int32_t;
+	uintptr_t d = func div_neg_neg(int32_t, int32_t): int32_t;
+	uintptr_t fmt = "%d\n";
+	l_1 = START(l_9);
+	int32_t r, l_2 = CALL/2(l_1, d, a, b);
+	int32_t z, l_3 = CALL/2(l_2, f, fmt, r);
+	l_9 = RETURN(l_3, c_0);
+}
+--EXPECT--
+1073741824
