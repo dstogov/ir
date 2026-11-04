@@ -421,19 +421,6 @@ static ir_live_interval *_create_ival(ir_ctx *ctx, uint32_t vreg, ir_type type)
 	return ival;
 }
 
-IR_ALWAYS_INLINE ir_live_interval *_get_ival(ir_ctx *ctx, ir_ref ref)
-{
-	int32_t vreg = ctx->vregs[ref];
-	ir_live_interval *ival;
-
-	IR_ASSERT(vreg > 0);
-	ival = ctx->live_intervals[vreg];
-	if (!ival) {
-		return _create_ival(ctx, vreg, ctx->ir_base[ref].type);
-	}
-	return ival;
-}
-
 static void ir_allocate_var_spill_slot(ir_ctx *ctx, ir_ref var, ir_insn *var_insn)
 {
 	size_t size = ir_get_type_size(var_insn->type);
