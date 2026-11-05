@@ -1,0 +1,142 @@
+--TEST--
+Unordered comparisons with identical operands preserve floating NaN
+--ARGS--
+-O2 --run
+--CODE--
+extern func @printf(uintptr_t, ...): void;
+static const @format[7] = "%d %d\n\000";
+func @check_float(float): int32_t
+{
+	int32_t c_1 = 2;
+	int32_t c_2 = 4;
+	int32_t c_3 = 8;
+	l_1 = START(l_17);
+	float d_2 = PARAM(l_1, "x", 0);
+	bool d_3 = ULT(d_2, d_2);
+	bool d_4 = UGT(d_2, d_2);
+	bool d_5 = ULE(d_2, d_2);
+	bool d_6 = UGE(d_2, d_2);
+	int32_t d_7 = ZEXT(d_3);
+	int32_t d_8 = ZEXT(d_4);
+	int32_t d_9 = ZEXT(d_5);
+	int32_t d_10 = ZEXT(d_6);
+	int32_t d_11 = MUL(d_8, c_1);
+	int32_t d_12 = MUL(d_9, c_2);
+	int32_t d_13 = MUL(d_10, c_3);
+	int32_t d_14 = ADD(d_7, d_11);
+	int32_t d_15 = ADD(d_12, d_13);
+	int32_t d_16 = ADD(d_14, d_15);
+	l_17 = RETURN(l_1, d_16);
+}
+func @check_double(double): int32_t
+{
+	int32_t c_1 = 2;
+	int32_t c_2 = 4;
+	int32_t c_3 = 8;
+	l_1 = START(l_17);
+	double d_2 = PARAM(l_1, "x", 0);
+	bool d_3 = ULT(d_2, d_2);
+	bool d_4 = UGT(d_2, d_2);
+	bool d_5 = ULE(d_2, d_2);
+	bool d_6 = UGE(d_2, d_2);
+	int32_t d_7 = ZEXT(d_3);
+	int32_t d_8 = ZEXT(d_4);
+	int32_t d_9 = ZEXT(d_5);
+	int32_t d_10 = ZEXT(d_6);
+	int32_t d_11 = MUL(d_8, c_1);
+	int32_t d_12 = MUL(d_9, c_2);
+	int32_t d_13 = MUL(d_10, c_3);
+	int32_t d_14 = ADD(d_7, d_11);
+	int32_t d_15 = ADD(d_12, d_13);
+	int32_t d_16 = ADD(d_14, d_15);
+	l_17 = RETURN(l_1, d_16);
+}
+func @check_uint32_t(uint32_t): int32_t
+{
+	int32_t c_1 = 2;
+	int32_t c_2 = 4;
+	int32_t c_3 = 8;
+	l_1 = START(l_17);
+	uint32_t d_2 = PARAM(l_1, "x", 0);
+	bool d_3 = ULT(d_2, d_2);
+	bool d_4 = UGT(d_2, d_2);
+	bool d_5 = ULE(d_2, d_2);
+	bool d_6 = UGE(d_2, d_2);
+	int32_t d_7 = ZEXT(d_3);
+	int32_t d_8 = ZEXT(d_4);
+	int32_t d_9 = ZEXT(d_5);
+	int32_t d_10 = ZEXT(d_6);
+	int32_t d_11 = MUL(d_8, c_1);
+	int32_t d_12 = MUL(d_9, c_2);
+	int32_t d_13 = MUL(d_10, c_3);
+	int32_t d_14 = ADD(d_7, d_11);
+	int32_t d_15 = ADD(d_12, d_13);
+	int32_t d_16 = ADD(d_14, d_15);
+	l_17 = RETURN(l_1, d_16);
+}
+func @check_uintptr_t(uintptr_t): int32_t
+{
+	int32_t c_1 = 2;
+	int32_t c_2 = 4;
+	int32_t c_3 = 8;
+	l_1 = START(l_17);
+	uintptr_t d_2 = PARAM(l_1, "x", 0);
+	bool d_3 = ULT(d_2, d_2);
+	bool d_4 = UGT(d_2, d_2);
+	bool d_5 = ULE(d_2, d_2);
+	bool d_6 = UGE(d_2, d_2);
+	int32_t d_7 = ZEXT(d_3);
+	int32_t d_8 = ZEXT(d_4);
+	int32_t d_9 = ZEXT(d_5);
+	int32_t d_10 = ZEXT(d_6);
+	int32_t d_11 = MUL(d_8, c_1);
+	int32_t d_12 = MUL(d_9, c_2);
+	int32_t d_13 = MUL(d_10, c_3);
+	int32_t d_14 = ADD(d_7, d_11);
+	int32_t d_15 = ADD(d_12, d_13);
+	int32_t d_16 = ADD(d_14, d_15);
+	l_17 = RETURN(l_1, d_16);
+}
+func @main(): int32_t
+{
+	uintptr_t c_1 = func @printf(uintptr_t, ...): void;
+	uintptr_t c_2 = sym(@format);
+	int32_t c_3 = 0;
+	uintptr_t c_4 = func @check_float(float): int32_t;
+	uintptr_t c_5 = func @check_double(double): int32_t;
+	uintptr_t c_6 = func @check_uint32_t(uint32_t): int32_t;
+	uintptr_t c_7 = func @check_uintptr_t(uintptr_t): int32_t;
+	float c_8 = nan;
+	double c_9 = nan;
+	float c_10 = 0;
+	double c_11 = 0;
+	float c_12 = inf;
+	double c_13 = inf;
+	float c_14 = 1;
+	double c_15 = 1;
+	uint32_t c_16 = 42;
+	uintptr_t c_17 = 42;
+	l_1 = START(l_27);
+	int32_t d_2, l_2 = CALL/1(l_1, c_4, c_8);
+	int32_t d_4, l_4 = CALL/1(l_2, c_5, c_9);
+	l_6 = CALL/3(l_4, c_1, c_2, d_2, d_4);
+	int32_t d_7, l_7 = CALL/1(l_6, c_4, c_10);
+	int32_t d_9, l_9 = CALL/1(l_7, c_5, c_11);
+	l_11 = CALL/3(l_9, c_1, c_2, d_7, d_9);
+	int32_t d_12, l_12 = CALL/1(l_11, c_4, c_12);
+	int32_t d_14, l_14 = CALL/1(l_12, c_5, c_13);
+	l_16 = CALL/3(l_14, c_1, c_2, d_12, d_14);
+	int32_t d_17, l_17 = CALL/1(l_16, c_4, c_14);
+	int32_t d_19, l_19 = CALL/1(l_17, c_5, c_15);
+	l_21 = CALL/3(l_19, c_1, c_2, d_17, d_19);
+	int32_t d_22, l_22 = CALL/1(l_21, c_6, c_16);
+	int32_t d_24, l_24 = CALL/1(l_22, c_7, c_17);
+	l_26 = CALL/3(l_24, c_1, c_2, d_22, d_24);
+	l_27 = RETURN(l_26, c_3);
+}
+--EXPECT--
+15 15
+12 12
+12 12
+12 12
+12 12
