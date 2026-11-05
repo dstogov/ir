@@ -1,0 +1,39 @@
+--TEST--
+Induction variable ZEXT 006: signed GE of the incremented value is not widened
+--ARGS--
+--run
+--CODE--
+extern func @printf(uintptr_t, ...): void;
+static const @format[6] = "%llu\n\000";
+func @main(): int32_t
+{
+	uint8_t c_a = 130;
+	uint8_t c_b = 1;
+	uint8_t c_n = 50;
+	uint8_t c_m = 100;
+	uintptr_t c_f = func @printf(uintptr_t, ...): void;
+	uintptr_t c_s = sym(@format);
+	int32_t c_r = 0;
+	l_1 = START(l_20);
+	l_2 = END(l_1);
+	l_3 = LOOP_BEGIN(l_2, l_12);
+	uint8_t d_4 = PHI(l_3, c_a, d_6);
+	uint8_t d_6 = SUB(d_4, c_b);
+	bool d_7 = UGT(d_6, c_n);
+	l_8 = IF(l_3, d_7);
+	l_9 = IF_TRUE(l_8);
+	bool d_10 = GE(d_6, c_m);
+	l_10 = IF(l_9, d_10);
+	l_11 = IF_FALSE(l_10);
+	l_12 = LOOP_END(l_11);
+	l_13 = IF_FALSE(l_8);
+	l_14 = END(l_13);
+	l_15 = IF_TRUE(l_10);
+	l_16 = END(l_15);
+	l_17 = MERGE(l_14, l_16);
+	uint64_t d_18 = ZEXT(d_6);
+	l_19 = CALL/2(l_17, c_f, c_s, d_18);
+	l_20 = RETURN(l_19, c_r);
+}
+--EXPECT--
+127
