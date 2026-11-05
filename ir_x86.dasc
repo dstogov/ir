@@ -27650,7 +27650,7 @@ next_block:;
 
 	ir_mem_flush(entry, size);
 
-#if defined(__GNUC__)
+#if defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__))
 	if ((ctx->flags & IR_GEN_CACHE_DEMOTE) && (ctx->mflags & IR_X86_CLDEMOTE)) {
 		uintptr_t start = (uintptr_t)entry;
 		uintptr_t p = (uintptr_t)start & ~0x3F;
