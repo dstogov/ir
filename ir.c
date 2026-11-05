@@ -259,13 +259,6 @@ void ir_print_const(const ir_ctx *ctx, const ir_insn *insn, FILE *f, bool quoted
 					fprintf(f, ", %" PRIu64, *(uint64_t*)p);
 				}
 				break;
-			case IR_ADDR:
-				fprintf(f, "%" PRIuPTR, *(uintptr_t*)p);
-				while (--n) {
-					p = (char*)p + sizeof(uintptr_t);
-					fprintf(f, ", %" PRIuPTR, *(uintptr_t*)p);
-				}
-				break;
 			case IR_DOUBLE:
 				ir_print_double(*(double*)p, f);
 				while (--n) {
