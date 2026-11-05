@@ -1,0 +1,15 @@
+--TEST--
+Abort on PARAM without a type
+--ARGS--
+--run
+--CODE--
+func test(int32_t): int32_t
+{
+	l_1 = START(l_2);
+	x = PARAM(l_1, "x", 1);
+	l_2 = RETURN(l_1, x);
+}
+--EXPECT--
+ERROR: instruction 'x' has no type at line 4
+
+exit code = 2

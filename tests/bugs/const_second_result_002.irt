@@ -13,6 +13,6 @@ func main(int32_t): int32_t
 	l_3 = RETURN(l_2, r);
 }
 --EXPECT--
-ERROR: instruction GUARD provides a single output at line 6
+ERROR: instruction 'd_2' must not have a type at line 6
 
 exit code = 2
