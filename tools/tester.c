@@ -404,8 +404,7 @@ static int run_test(const char *filename, test *t, int show_diff)
 		if (write_file(exp_filename, t->expect, strlen(t->expect))) {
 			if ((size_t)snprintf(cmd, sizeof(cmd), "%s %s %s > %s",
 					diff_cmd, exp_filename, out_filename, diff_filename) < sizeof(cmd)) {
-				system(cmd);
-				if (show_diff && !t->xfail) {
+				if (system(cmd) != -1 && show_diff && !t->xfail) {
 					char *diff = read_file(diff_filename);
 					printf("\n");
 					printf("%s", diff);
