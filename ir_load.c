@@ -2272,6 +2272,7 @@ static int parse_type(int sym, uint8_t *t) {
 			yy_error_sym("'>' expected, got", sym);
 		}
 		sym = get_sym();
+		if (*t == IR_ADDR) yy_error_fmt("unsupported vector element type %s", ir_type_cname[*t]);
 		if (val.u64 == 0 || val.u64 > 64 || (val.u64 & (val.u64 - 1)) != 0) yy_error("unsupported vector length");
 		*t = ir_make_vector_type(*t, val.u32);
 	} else {
