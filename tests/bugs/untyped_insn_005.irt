@@ -10,6 +10,6 @@ func main(): int32_t
 	l_2 = RETURN(l_1, c);
 }
 --EXPECT--
-ERROR: instruction 'l_1' must not have a type at line 4
+ERROR: instruction START must not have data output at line 4
 
 exit code = 2

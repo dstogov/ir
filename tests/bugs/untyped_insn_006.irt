@@ -12,6 +12,6 @@ func test(uintptr_t): int32_t
 	l_3 = RETURN(l_2, c);
 }
 --EXPECT--
-ERROR: instruction 'l_2' must not have a type at line 6
+ERROR: instruction STORE must not have data output at line 6
 
 exit code = 2

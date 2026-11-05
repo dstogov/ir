@@ -19,6 +19,6 @@ func test(bool): int32_t
 	l_9 = RETURN(l_8, d_8);
 }
 --EXPECT--
-ERROR: instruction 'd_8' has no type at line 13
+ERROR: instruction PHI has no type at line 13
 
 exit code = 2

@@ -10,6 +10,6 @@ func test(int32_t): int32_t
 	l_2 = RETURN(l_1, x);
 }
 --EXPECT--
-ERROR: instruction 'x' has no type at line 4
+ERROR: instruction PARAM has no type at line 4
 
 exit code = 2

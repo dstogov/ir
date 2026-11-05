@@ -12,6 +12,6 @@ func main(int32_t): int32_t
 	l_3 = RETURN(l_1, r);
 }
 --EXPECT--
-ERROR: instruction ADD provides a single output at line 5
+ERROR: instruction ADD must not have control output at line 5
 
 exit code = 2

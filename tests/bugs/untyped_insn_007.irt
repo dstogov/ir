@@ -11,6 +11,6 @@ func test(uintptr_t): int32_t
 	l_3 = RETURN(l_2, l_2);
 }
 --EXPECT--
-ERROR: instruction 'l_2' has no type at line 5
+ERROR: instruction LOAD has no type at line 5
 
 exit code = 2

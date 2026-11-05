@@ -11,6 +11,6 @@ func main(): int32_t
 	l_3 = RETURN(l_2, c);
 }
 --EXPECT--
-ERROR: instruction 'l_2' has no type at line 5
+ERROR: instruction ALLOCA has no type at line 5
 
 exit code = 2

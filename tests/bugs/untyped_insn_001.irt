@@ -11,6 +11,6 @@ func main(): int32_t
 	l_2 = RETURN(l_1, c);
 }
 --EXPECT--
-ERROR: instruction 'd' has no type at line 5
+ERROR: instruction DIV has no type at line 5
 
 exit code = 2

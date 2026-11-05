@@ -716,13 +716,17 @@ ir_insn(ir_parser_ctx *p):
 		{
 			switch (ir_op_flags[op] & (IR_OP_FLAG_DATA|IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_MASK)) {
 				case IR_OP_FLAG_DATA:
+					if (t == IR_VOID) yy_error_fmt("instruction %s has no type", ir_op_name[op]);
+					if (str2) yy_error_fmt("instruction %s must not have control output", ir_op_name[op]);
+					break;
 				case IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_LOAD:
 				case IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_ALLOC:
-					if (t == IR_VOID) yy_error_fmt("instruction '%.*s' has no type", (int)len, str);
+					if (t == IR_VOID) yy_error_fmt("instruction %s has no type", ir_op_name[op]);
+					if (!str) yy_error_fmt("instruction %s has no control output", ir_op_name[op]);
 					break;
 				case IR_OP_FLAG_CONTROL:
 				case IR_OP_FLAG_CONTROL|IR_OP_FLAG_MEM|IR_OP_FLAG_MEM_STORE:
-					if (t != IR_VOID) yy_error_fmt("instruction '%.*s' must not have a type", (int)len, str);
+					if (t != IR_VOID) yy_error_fmt("instruction %s must not have data output", ir_op_name[op]);
 					break;
 			}
 		}
@@ -899,9 +903,9 @@ emit:
 	{if (str2) {
 		if (!ref2) {
 			if (IR_IS_CONST_REF(ref)) {
-				yy_error("constant provides a single output");
+				yy_error("constant must not have control output");
 			} else {
-				yy_error_fmt("instruction %s provides a single output", ir_op_name[op]);
+				yy_error_fmt("instruction %s must have control output", ir_op_name[op]);
 			}
 		}
 		ir_define_var(p, str2, len2, ref2);
