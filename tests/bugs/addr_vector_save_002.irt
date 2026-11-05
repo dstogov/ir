@@ -1,0 +1,25 @@
+--TEST--
+Save address-vector constants with 64-bit values
+--ARGS--
+-O0 --save
+--TARGET--
+*64-*
+--CODE--
+{
+	<uintptr_t*1> c_4 = {18446744073709551615};
+	<uintptr_t*2> c_5 = {18446744073709551615, 9223372036854775807};
+	<uintptr_t*4> c_6 = {0, 1, 18446744073709551615, 9223372036854775807};
+	l_1 = START(l_2);
+	l_2 = RETURN(l_1);
+}
+--EXPECT--
+{
+	<uintptr_t*4> c_10 = {0, 1, 18446744073709551615, 9223372036854775807};
+	<uintptr_t*2> c_7 = {18446744073709551615, 9223372036854775807};
+	<uintptr_t*1> c_5 = {18446744073709551615};
+	bool c_3 = 1;
+	bool c_2 = 0;
+	uintptr_t c_1 = 0;
+	l_1 = START(l_2);
+	l_2 = RETURN(l_1, null);
+}
