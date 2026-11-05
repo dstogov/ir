@@ -3599,33 +3599,33 @@ static void ir_emit_shift(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			IR_ASSERT(0);
 		case IR_SHL:
 			if (ir_type_size[type] == 1) {
-				|	and Rw(def_reg), Rw(op1_reg), #0xff
-				|	lsl Rw(def_reg), Rw(def_reg), Rw(op2_reg)
+				|	and Rw(IR_REG_INT_TMP), Rw(op1_reg), #0xff
+				|	lsl Rw(def_reg), Rw(IR_REG_INT_TMP), Rw(op2_reg)
 			} else if (ir_type_size[type] == 2) {
-				|	and Rw(def_reg), Rw(op1_reg), #0xffff
-				|	lsl Rw(def_reg), Rw(def_reg), Rw(op2_reg)
+				|	and Rw(IR_REG_INT_TMP), Rw(op1_reg), #0xffff
+				|	lsl Rw(def_reg), Rw(IR_REG_INT_TMP), Rw(op2_reg)
 			} else {
 				|	ASM_REG_REG_REG_OP lsl, type, def_reg, op1_reg, op2_reg
 			}
 			break;
 		case IR_SHR:
 			if (ir_type_size[type] == 1) {
-				|	and Rw(def_reg), Rw(op1_reg), #0xff
-				|	lsr Rw(def_reg), Rw(def_reg), Rw(op2_reg)
+				|	and Rw(IR_REG_INT_TMP), Rw(op1_reg), #0xff
+				|	lsr Rw(def_reg), Rw(IR_REG_INT_TMP), Rw(op2_reg)
 			} else if (ir_type_size[type] == 2) {
-				|	and Rw(def_reg), Rw(op1_reg), #0xffff
-				|	lsr Rw(def_reg), Rw(def_reg), Rw(op2_reg)
+				|	and Rw(IR_REG_INT_TMP), Rw(op1_reg), #0xffff
+				|	lsr Rw(def_reg), Rw(IR_REG_INT_TMP), Rw(op2_reg)
 			} else {
 				|	ASM_REG_REG_REG_OP lsr, type, def_reg, op1_reg, op2_reg
 			}
 			break;
 		case IR_SAR:
 			if (ir_type_size[type] == 1) {
-				|	sxtb Rw(def_reg), Rw(op1_reg)
-				|	asr Rw(def_reg), Rw(def_reg), Rw(op2_reg)
+				|	sxtb Rw(IR_REG_INT_TMP), Rw(op1_reg)
+				|	asr Rw(def_reg), Rw(IR_REG_INT_TMP), Rw(op2_reg)
 			} else if (ir_type_size[type] == 2) {
-				|	sxth Rw(def_reg), Rw(op1_reg)
-				|	asr Rw(def_reg), Rw(def_reg), Rw(op2_reg)
+				|	sxth Rw(IR_REG_INT_TMP), Rw(op1_reg)
+				|	asr Rw(def_reg), Rw(IR_REG_INT_TMP), Rw(op2_reg)
 			} else {
 				|	ASM_REG_REG_REG_OP asr, type, def_reg, op1_reg, op2_reg
 			}
