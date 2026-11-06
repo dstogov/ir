@@ -1,0 +1,127 @@
+--TEST--
+COND on narrow integers with not normalized upper bits
+--ARGS--
+-O1 --run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @cond_u8(uint8_t, uint8_t): int32_t;
+func @cond_u8(uint8_t, uint8_t): int32_t
+{
+	int32_t one = 11;
+	int32_t zero = 22;
+	l_1 = START(l_E);
+	uint8_t x = PARAM(l_1, "x", 1);
+	uint8_t y = PARAM(l_1, "y", 2);
+	uint8_t s = ADD(x, y);
+	int32_t r = COND(s, one, zero);
+	l_E = RETURN(l_1, r);
+}
+func @cond_i8(int8_t, int8_t): int32_t;
+func @cond_i8(int8_t, int8_t): int32_t
+{
+	int32_t one = 11;
+	int32_t zero = 22;
+	l_1 = START(l_E);
+	int8_t x = PARAM(l_1, "x", 1);
+	int8_t y = PARAM(l_1, "y", 2);
+	int8_t s = ADD(x, y);
+	int32_t r = COND(s, one, zero);
+	l_E = RETURN(l_1, r);
+}
+func @cond_u16(uint16_t, uint16_t): int32_t;
+func @cond_u16(uint16_t, uint16_t): int32_t
+{
+	int32_t one = 11;
+	int32_t zero = 22;
+	l_1 = START(l_E);
+	uint16_t x = PARAM(l_1, "x", 1);
+	uint16_t y = PARAM(l_1, "y", 2);
+	uint16_t s = ADD(x, y);
+	int32_t r = COND(s, one, zero);
+	l_E = RETURN(l_1, r);
+}
+func @cond_i16(int16_t, int16_t): int32_t;
+func @cond_i16(int16_t, int16_t): int32_t
+{
+	int32_t one = 11;
+	int32_t zero = 22;
+	l_1 = START(l_E);
+	int16_t x = PARAM(l_1, "x", 1);
+	int16_t y = PARAM(l_1, "y", 2);
+	int16_t s = ADD(x, y);
+	int32_t r = COND(s, one, zero);
+	l_E = RETURN(l_1, r);
+}
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%d\n";
+	int32_t z = 0;
+	uint8_t a0 = 255;
+	uint8_t b0 = 1;
+	uint8_t a1 = 1;
+	uint8_t b1 = 1;
+	uint8_t a2 = 0;
+	uint8_t b2 = 0;
+	uint8_t a3 = 200;
+	uint8_t b3 = 56;
+	int8_t a4 = 127;
+	int8_t b4 = 127;
+	int8_t a5 = -128;
+	int8_t b5 = -128;
+	int8_t a6 = 3;
+	int8_t b6 = 4;
+	uint16_t a7 = 65535;
+	uint16_t b7 = 1;
+	uint16_t a8 = 65535;
+	uint16_t b8 = 2;
+	uint16_t a9 = 0;
+	uint16_t b9 = 0;
+	int16_t a10 = -32768;
+	int16_t b10 = -32768;
+	int16_t a11 = 3;
+	int16_t b11 = 4;
+	uintptr_t f_cond_i16 = func @cond_i16(int16_t, int16_t): int32_t;
+	uintptr_t f_cond_i8 = func @cond_i8(int8_t, int8_t): int32_t;
+	uintptr_t f_cond_u16 = func @cond_u16(uint16_t, uint16_t): int32_t;
+	uintptr_t f_cond_u8 = func @cond_u8(uint8_t, uint8_t): int32_t;
+	l_0 = START(l_end);
+	int32_t r0, c0 = CALL/2(l_0, f_cond_u8, a0, b0);
+	p0 = CALL/2(c0, fp, fmt, r0);
+	int32_t r1, c1 = CALL/2(p0, f_cond_u8, a1, b1);
+	p1 = CALL/2(c1, fp, fmt, r1);
+	int32_t r2, c2 = CALL/2(p1, f_cond_u8, a2, b2);
+	p2 = CALL/2(c2, fp, fmt, r2);
+	int32_t r3, c3 = CALL/2(p2, f_cond_u8, a3, b3);
+	p3 = CALL/2(c3, fp, fmt, r3);
+	int32_t r4, c4 = CALL/2(p3, f_cond_i8, a4, b4);
+	p4 = CALL/2(c4, fp, fmt, r4);
+	int32_t r5, c5 = CALL/2(p4, f_cond_i8, a5, b5);
+	p5 = CALL/2(c5, fp, fmt, r5);
+	int32_t r6, c6 = CALL/2(p5, f_cond_i8, a6, b6);
+	p6 = CALL/2(c6, fp, fmt, r6);
+	int32_t r7, c7 = CALL/2(p6, f_cond_u16, a7, b7);
+	p7 = CALL/2(c7, fp, fmt, r7);
+	int32_t r8, c8 = CALL/2(p7, f_cond_u16, a8, b8);
+	p8 = CALL/2(c8, fp, fmt, r8);
+	int32_t r9, c9 = CALL/2(p8, f_cond_u16, a9, b9);
+	p9 = CALL/2(c9, fp, fmt, r9);
+	int32_t r10, c10 = CALL/2(p9, f_cond_i16, a10, b10);
+	p10 = CALL/2(c10, fp, fmt, r10);
+	int32_t r11, c11 = CALL/2(p10, f_cond_i16, a11, b11);
+	p11 = CALL/2(c11, fp, fmt, r11);
+	l_end = RETURN(p11, z);
+}
+--EXPECT--
+22
+11
+22
+22
+11
+22
+11
+22
+11
+22
+22
+11

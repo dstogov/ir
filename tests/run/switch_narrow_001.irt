@@ -1,0 +1,327 @@
+--TEST--
+SWITCH on narrow integers with not normalized upper bits
+--ARGS--
+-O1 --run
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @switch_u8_0(uint8_t, uint8_t): int32_t;
+func @switch_u8_0(uint8_t, uint8_t): int32_t
+{
+	uint8_t k0 = 0;
+	int32_t r0 = 10;
+	uint8_t k1 = 1;
+	int32_t r1 = 11;
+	uint8_t k2 = 2;
+	int32_t r2 = 12;
+	int32_t rd = 99;
+	l_1 = START(l_E);
+	uint8_t x = PARAM(l_1, "x", 1);
+	uint8_t y = PARAM(l_1, "y", 2);
+	uint8_t s = ADD(x, y);
+	l_4 = SWITCH(l_1, s);
+	l_c0 = CASE_VAL(l_4, k0);
+	int32_t x0 = COPY(r0);
+	l_e0 = END(l_c0);
+	l_c1 = CASE_VAL(l_4, k1);
+	int32_t x1 = COPY(r1);
+	l_e1 = END(l_c1);
+	l_c2 = CASE_VAL(l_4, k2);
+	int32_t x2 = COPY(r2);
+	l_e2 = END(l_c2);
+	l_cd = CASE_DEFAULT(l_4);
+	int32_t xd = COPY(rd);
+	l_ed = END(l_cd);
+	l_m = MERGE/4(l_e0, l_e1, l_e2, l_ed);
+	int32_t r = PHI/4(l_m, x0, x1, x2, xd);
+	l_E = RETURN(l_m, r);
+}
+func @switch_u8_1(uint8_t, uint8_t): int32_t;
+func @switch_u8_1(uint8_t, uint8_t): int32_t
+{
+	uint8_t k0 = 0;
+	int32_t r0 = 10;
+	uint8_t k1 = 7;
+	int32_t r1 = 11;
+	int32_t rd = 99;
+	l_1 = START(l_E);
+	uint8_t x = PARAM(l_1, "x", 1);
+	uint8_t y = PARAM(l_1, "y", 2);
+	uint8_t s = ADD(x, y);
+	l_4 = SWITCH(l_1, s);
+	l_c0 = CASE_VAL(l_4, k0);
+	int32_t x0 = COPY(r0);
+	l_e0 = END(l_c0);
+	l_c1 = CASE_VAL(l_4, k1);
+	int32_t x1 = COPY(r1);
+	l_e1 = END(l_c1);
+	l_cd = CASE_DEFAULT(l_4);
+	int32_t xd = COPY(rd);
+	l_ed = END(l_cd);
+	l_m = MERGE/3(l_e0, l_e1, l_ed);
+	int32_t r = PHI/3(l_m, x0, x1, xd);
+	l_E = RETURN(l_m, r);
+}
+func @switch_i8_2(int8_t, int8_t): int32_t;
+func @switch_i8_2(int8_t, int8_t): int32_t
+{
+	int8_t k0 = -1;
+	int32_t r0 = 10;
+	int8_t k1 = 0;
+	int32_t r1 = 11;
+	int8_t k2 = 1;
+	int32_t r2 = 12;
+	int32_t rd = 99;
+	l_1 = START(l_E);
+	int8_t x = PARAM(l_1, "x", 1);
+	int8_t y = PARAM(l_1, "y", 2);
+	int8_t s = ADD(x, y);
+	l_4 = SWITCH(l_1, s);
+	l_c0 = CASE_VAL(l_4, k0);
+	int32_t x0 = COPY(r0);
+	l_e0 = END(l_c0);
+	l_c1 = CASE_VAL(l_4, k1);
+	int32_t x1 = COPY(r1);
+	l_e1 = END(l_c1);
+	l_c2 = CASE_VAL(l_4, k2);
+	int32_t x2 = COPY(r2);
+	l_e2 = END(l_c2);
+	l_cd = CASE_DEFAULT(l_4);
+	int32_t xd = COPY(rd);
+	l_ed = END(l_cd);
+	l_m = MERGE/4(l_e0, l_e1, l_e2, l_ed);
+	int32_t r = PHI/4(l_m, x0, x1, x2, xd);
+	l_E = RETURN(l_m, r);
+}
+func @switch_u16_3(uint16_t, uint16_t): int32_t;
+func @switch_u16_3(uint16_t, uint16_t): int32_t
+{
+	uint16_t k0 = 0;
+	int32_t r0 = 10;
+	uint16_t k1 = 1;
+	int32_t r1 = 11;
+	uint16_t k2 = 2;
+	int32_t r2 = 12;
+	int32_t rd = 99;
+	l_1 = START(l_E);
+	uint16_t x = PARAM(l_1, "x", 1);
+	uint16_t y = PARAM(l_1, "y", 2);
+	uint16_t s = ADD(x, y);
+	l_4 = SWITCH(l_1, s);
+	l_c0 = CASE_VAL(l_4, k0);
+	int32_t x0 = COPY(r0);
+	l_e0 = END(l_c0);
+	l_c1 = CASE_VAL(l_4, k1);
+	int32_t x1 = COPY(r1);
+	l_e1 = END(l_c1);
+	l_c2 = CASE_VAL(l_4, k2);
+	int32_t x2 = COPY(r2);
+	l_e2 = END(l_c2);
+	l_cd = CASE_DEFAULT(l_4);
+	int32_t xd = COPY(rd);
+	l_ed = END(l_cd);
+	l_m = MERGE/4(l_e0, l_e1, l_e2, l_ed);
+	int32_t r = PHI/4(l_m, x0, x1, x2, xd);
+	l_E = RETURN(l_m, r);
+}
+func @switch_u16_4(uint16_t, uint16_t): int32_t;
+func @switch_u16_4(uint16_t, uint16_t): int32_t
+{
+	uint16_t k0 = 0;
+	int32_t r0 = 10;
+	uint16_t k1 = 7;
+	int32_t r1 = 11;
+	int32_t rd = 99;
+	l_1 = START(l_E);
+	uint16_t x = PARAM(l_1, "x", 1);
+	uint16_t y = PARAM(l_1, "y", 2);
+	uint16_t s = ADD(x, y);
+	l_4 = SWITCH(l_1, s);
+	l_c0 = CASE_VAL(l_4, k0);
+	int32_t x0 = COPY(r0);
+	l_e0 = END(l_c0);
+	l_c1 = CASE_VAL(l_4, k1);
+	int32_t x1 = COPY(r1);
+	l_e1 = END(l_c1);
+	l_cd = CASE_DEFAULT(l_4);
+	int32_t xd = COPY(rd);
+	l_ed = END(l_cd);
+	l_m = MERGE/3(l_e0, l_e1, l_ed);
+	int32_t r = PHI/3(l_m, x0, x1, xd);
+	l_E = RETURN(l_m, r);
+}
+func @switch_i16_5(int16_t, int16_t): int32_t;
+func @switch_i16_5(int16_t, int16_t): int32_t
+{
+	int16_t k0 = -1;
+	int32_t r0 = 10;
+	int16_t k1 = 0;
+	int32_t r1 = 11;
+	int16_t k2 = 1;
+	int32_t r2 = 12;
+	int32_t rd = 99;
+	l_1 = START(l_E);
+	int16_t x = PARAM(l_1, "x", 1);
+	int16_t y = PARAM(l_1, "y", 2);
+	int16_t s = ADD(x, y);
+	l_4 = SWITCH(l_1, s);
+	l_c0 = CASE_VAL(l_4, k0);
+	int32_t x0 = COPY(r0);
+	l_e0 = END(l_c0);
+	l_c1 = CASE_VAL(l_4, k1);
+	int32_t x1 = COPY(r1);
+	l_e1 = END(l_c1);
+	l_c2 = CASE_VAL(l_4, k2);
+	int32_t x2 = COPY(r2);
+	l_e2 = END(l_c2);
+	l_cd = CASE_DEFAULT(l_4);
+	int32_t xd = COPY(rd);
+	l_ed = END(l_cd);
+	l_m = MERGE/4(l_e0, l_e1, l_e2, l_ed);
+	int32_t r = PHI/4(l_m, x0, x1, x2, xd);
+	l_E = RETURN(l_m, r);
+}
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%d\n";
+	int32_t z = 0;
+	uint8_t a0 = 255;
+	uint8_t b0 = 1;
+	uint8_t a1 = 255;
+	uint8_t b1 = 2;
+	uint8_t a2 = 255;
+	uint8_t b2 = 3;
+	uint8_t a3 = 1;
+	uint8_t b3 = 1;
+	uint8_t a4 = 100;
+	uint8_t b4 = 100;
+	uint8_t a5 = 255;
+	uint8_t b5 = 1;
+	uint8_t a6 = 250;
+	uint8_t b6 = 13;
+	uint8_t a7 = 1;
+	uint8_t b7 = 1;
+	uint8_t a8 = 100;
+	uint8_t b8 = 100;
+	int8_t a9 = -128;
+	int8_t b9 = -128;
+	int8_t a10 = 100;
+	int8_t b10 = -101;
+	int8_t a11 = 1;
+	int8_t b11 = 0;
+	int8_t a12 = 5;
+	int8_t b12 = 5;
+	int8_t a13 = 127;
+	int8_t b13 = 127;
+	uint16_t a14 = 65535;
+	uint16_t b14 = 1;
+	uint16_t a15 = 65535;
+	uint16_t b15 = 2;
+	uint16_t a16 = 65535;
+	uint16_t b16 = 3;
+	uint16_t a17 = 1;
+	uint16_t b17 = 1;
+	uint16_t a18 = 40000;
+	uint16_t b18 = 40000;
+	uint16_t a19 = 65535;
+	uint16_t b19 = 1;
+	uint16_t a20 = 65530;
+	uint16_t b20 = 13;
+	uint16_t a21 = 1;
+	uint16_t b21 = 1;
+	int16_t a22 = -32768;
+	int16_t b22 = -32768;
+	int16_t a23 = 1000;
+	int16_t b23 = -1001;
+	int16_t a24 = 1;
+	int16_t b24 = 0;
+	int16_t a25 = 5;
+	int16_t b25 = 5;
+	uintptr_t f_switch_i16_5 = func @switch_i16_5(int16_t, int16_t): int32_t;
+	uintptr_t f_switch_i8_2 = func @switch_i8_2(int8_t, int8_t): int32_t;
+	uintptr_t f_switch_u16_3 = func @switch_u16_3(uint16_t, uint16_t): int32_t;
+	uintptr_t f_switch_u16_4 = func @switch_u16_4(uint16_t, uint16_t): int32_t;
+	uintptr_t f_switch_u8_0 = func @switch_u8_0(uint8_t, uint8_t): int32_t;
+	uintptr_t f_switch_u8_1 = func @switch_u8_1(uint8_t, uint8_t): int32_t;
+	l_0 = START(l_end);
+	int32_t r0, c0 = CALL/2(l_0, f_switch_u8_0, a0, b0);
+	p0 = CALL/2(c0, fp, fmt, r0);
+	int32_t r1, c1 = CALL/2(p0, f_switch_u8_0, a1, b1);
+	p1 = CALL/2(c1, fp, fmt, r1);
+	int32_t r2, c2 = CALL/2(p1, f_switch_u8_0, a2, b2);
+	p2 = CALL/2(c2, fp, fmt, r2);
+	int32_t r3, c3 = CALL/2(p2, f_switch_u8_0, a3, b3);
+	p3 = CALL/2(c3, fp, fmt, r3);
+	int32_t r4, c4 = CALL/2(p3, f_switch_u8_0, a4, b4);
+	p4 = CALL/2(c4, fp, fmt, r4);
+	int32_t r5, c5 = CALL/2(p4, f_switch_u8_1, a5, b5);
+	p5 = CALL/2(c5, fp, fmt, r5);
+	int32_t r6, c6 = CALL/2(p5, f_switch_u8_1, a6, b6);
+	p6 = CALL/2(c6, fp, fmt, r6);
+	int32_t r7, c7 = CALL/2(p6, f_switch_u8_1, a7, b7);
+	p7 = CALL/2(c7, fp, fmt, r7);
+	int32_t r8, c8 = CALL/2(p7, f_switch_u8_1, a8, b8);
+	p8 = CALL/2(c8, fp, fmt, r8);
+	int32_t r9, c9 = CALL/2(p8, f_switch_i8_2, a9, b9);
+	p9 = CALL/2(c9, fp, fmt, r9);
+	int32_t r10, c10 = CALL/2(p9, f_switch_i8_2, a10, b10);
+	p10 = CALL/2(c10, fp, fmt, r10);
+	int32_t r11, c11 = CALL/2(p10, f_switch_i8_2, a11, b11);
+	p11 = CALL/2(c11, fp, fmt, r11);
+	int32_t r12, c12 = CALL/2(p11, f_switch_i8_2, a12, b12);
+	p12 = CALL/2(c12, fp, fmt, r12);
+	int32_t r13, c13 = CALL/2(p12, f_switch_i8_2, a13, b13);
+	p13 = CALL/2(c13, fp, fmt, r13);
+	int32_t r14, c14 = CALL/2(p13, f_switch_u16_3, a14, b14);
+	p14 = CALL/2(c14, fp, fmt, r14);
+	int32_t r15, c15 = CALL/2(p14, f_switch_u16_3, a15, b15);
+	p15 = CALL/2(c15, fp, fmt, r15);
+	int32_t r16, c16 = CALL/2(p15, f_switch_u16_3, a16, b16);
+	p16 = CALL/2(c16, fp, fmt, r16);
+	int32_t r17, c17 = CALL/2(p16, f_switch_u16_3, a17, b17);
+	p17 = CALL/2(c17, fp, fmt, r17);
+	int32_t r18, c18 = CALL/2(p17, f_switch_u16_3, a18, b18);
+	p18 = CALL/2(c18, fp, fmt, r18);
+	int32_t r19, c19 = CALL/2(p18, f_switch_u16_4, a19, b19);
+	p19 = CALL/2(c19, fp, fmt, r19);
+	int32_t r20, c20 = CALL/2(p19, f_switch_u16_4, a20, b20);
+	p20 = CALL/2(c20, fp, fmt, r20);
+	int32_t r21, c21 = CALL/2(p20, f_switch_u16_4, a21, b21);
+	p21 = CALL/2(c21, fp, fmt, r21);
+	int32_t r22, c22 = CALL/2(p21, f_switch_i16_5, a22, b22);
+	p22 = CALL/2(c22, fp, fmt, r22);
+	int32_t r23, c23 = CALL/2(p22, f_switch_i16_5, a23, b23);
+	p23 = CALL/2(c23, fp, fmt, r23);
+	int32_t r24, c24 = CALL/2(p23, f_switch_i16_5, a24, b24);
+	p24 = CALL/2(c24, fp, fmt, r24);
+	int32_t r25, c25 = CALL/2(p24, f_switch_i16_5, a25, b25);
+	p25 = CALL/2(c25, fp, fmt, r25);
+	l_end = RETURN(p25, z);
+}
+--EXPECT--
+10
+11
+12
+12
+99
+10
+11
+99
+99
+11
+10
+12
+99
+99
+10
+11
+12
+12
+99
+10
+11
+99
+11
+10
+12
+99
