@@ -1611,7 +1611,7 @@ void ir_emit_c_func_decl(const char *name, uint32_t flags, ir_type ret_type, uin
 	fprintf(f, ";\n");
 }
 
-void ir_emit_c_sym_decl(const char *name, uint32_t flags, FILE *f)
+void ir_emit_c_sym_decl(const char *name, uint32_t flags, size_t size, FILE *f)
 {
 	if (flags & IR_EXTERN) {
 		fprintf(f, "extern ");
@@ -1619,13 +1619,32 @@ void ir_emit_c_sym_decl(const char *name, uint32_t flags, FILE *f)
 		fprintf(f, "static ");
 	}
 	if (flags & IR_CONST) {
-		fprintf(f, "static ");
+		fprintf(f, "const ");
 	}
-	// TODO: type
-	fprintf(f, "uintptr_t %s", name);
-	if (flags & IR_INITIALIZED) {
-		fprintf(f, " =\n");
+	// TODO: alignment (native data is aligned up to 16 bytes by size)
+	if (flags & IR_EXTERN) {
+		fprintf(f, "uint8_t %s[];\n", name);
+	} else if (flags & IR_INITIALIZED) {
+		fprintf(f, "uint8_t %s[%" PRIuPTR "] = {\n", name, size);
 	} else {
-		fprintf(f, ";\n");
+		fprintf(f, "uint8_t %s[%" PRIuPTR "];\n", name, size);
 	}
+}
+
+void ir_emit_c_sym_data(const void *data, size_t size, FILE *f)
+{
+	const uint8_t *p = data;
+	size_t i;
+
+	for (i = 0; i < size; i++) {
+		fprintf(f, "%s0x%02x,", (i % 16) ? " " : "\t", p ? p[i] : 0);
+		if (i % 16 == 15 || i == size - 1) {
+			fprintf(f, "\n");
+		}
+	}
+}
+
+void ir_emit_c_sym_data_end(FILE *f)
+{
+	fprintf(f, "};\n");
 }

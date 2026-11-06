@@ -1,0 +1,18 @@
+--TEST--
+002: extern, initialized and uninitialized var symbols are emitted as byte arrays
+--ARGS--
+--emit-c
+--CODE--
+extern var @ext;
+var @tbl[4] = {
+	uint8_t 1,
+	uint16_t 0xffff,
+};
+var @bss[8];
+--EXPECT--
+extern uint8_t ext[];
+uint8_t tbl[4] = {
+	0x01,
+	0xff, 0xff,
+};
+uint8_t bss[8];
