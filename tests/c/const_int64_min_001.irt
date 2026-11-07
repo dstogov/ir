@@ -1,0 +1,36 @@
+--TEST--
+001: INT64_MIN and large uint64_t constants
+--ARGS--
+-O0 --emit-c
+--CODE--
+{
+	int64_t c_1 = -9223372036854775808;
+	uint64_t c_2 = 18446744073709551615;
+	uint64_t c_3 = 9223372036854775807;
+	l_1 = START(l_4);
+	int64_t x = PARAM(l_1, "x", 1);
+	uint64_t y = PARAM(l_1, "y", 2);
+	bool d_1 = GE(x, c_1);
+	bool d_2 = ULT(y, c_2);
+	bool d_3 = ULT(y, c_3);
+	bool d_4 = AND(d_1, d_2);
+	bool ret = AND(d_4, d_3);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+bool test(int64_t x, uint64_t y)
+{
+	int64_t d_1 = x;
+	uint64_t d_2 = y;
+	bool d_3;
+	bool d_4;
+	bool d_5;
+	bool d_6;
+	bool d_7;
+	d_3 = d_1 >= (-9223372036854775807-1);
+	d_4 = d_2 < 18446744073709551615ULL;
+	d_5 = d_2 < 9223372036854775807;
+	d_6 = d_3 && d_4;
+	d_7 = d_6 && d_5;
+	return d_7;
+}
