@@ -444,6 +444,9 @@ static void ir_emit_bswap(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 	switch (ir_type_size[insn->type]) {
 		default:
 			IR_ASSERT(0);
+		case 2:
+			fprintf(f, "__builtin_bswap16(");
+			break;
 		case 4:
 			fprintf(f, "__builtin_bswap32(");
 			break;
