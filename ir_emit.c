@@ -1032,7 +1032,7 @@ static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_dessa_copy *copies, int count,
 					if (!IR_MEM_VAL(tmp_spill_slot)) {
 						/* Free a register, saving it in a temporary spill slot */
 						tmp_spill_slot = IR_MEM_BO(IR_REG_STACK_POINTER, -16);
-						ir_emit_store_mem(ctx, tmp_type, tmp_spill_slot, tmp_reg);
+						ir_emit_store_mem(ctx, tmp_type, tmp_spill_slot, tmp_fp_reg);
 					}
 				}
 				ir_emit_dessa_move(ctx, mem_slots, type, to, from, tmp_reg, tmp_fp_reg);
@@ -1044,7 +1044,7 @@ static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_dessa_copy *copies, int count,
 					if (!IR_MEM_VAL(tmp_spill_slot)) {
 						/* Free a register, saving it in a temporary spill slot */
 						tmp_spill_slot = IR_MEM_BO(IR_REG_STACK_POINTER, -16);
-						ir_emit_store_mem(ctx, tmp_type, tmp_spill_slot, tmp_reg);
+						ir_emit_store_mem(ctx, tmp_type, tmp_spill_slot, tmp_fp_reg);
 					}
 				}
 				ir_emit_dessa_move(ctx, mem_slots, type, to, r, tmp_reg, tmp_fp_reg);
