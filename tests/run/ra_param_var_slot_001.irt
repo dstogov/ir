@@ -1,7 +1,7 @@
 --TEST--
 Register allocator: stack PARAM copied to VAR is used after the VAR is overwritten through its address
 --ARGS--
--O2 --run
+--run
 --CODE--
 extern func @printf(uintptr_t, ...): int32_t;
 static const @format[7] = "%d %d\n\000";

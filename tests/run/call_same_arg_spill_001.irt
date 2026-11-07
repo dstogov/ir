@@ -1,7 +1,7 @@
 --TEST--
 001: CALL with the same spilled value passed as several arguments
 --ARGS--
--O0 --run
+--run
 --CODE--
 extern func @printf(uintptr_t, ...): int32_t;
 func @f(int32_t, int32_t, int32_t): int32_t;

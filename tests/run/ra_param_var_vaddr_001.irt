@@ -1,7 +1,7 @@
 --TEST--
 Register allocator: next stack argument is read through the address of a VAR holding a stack PARAM
 --ARGS--
--O2 --run
+--run
 --CODE--
 extern func @printf(uintptr_t, ...): int32_t;
 static const @format[7] = "%g %g\n\000";

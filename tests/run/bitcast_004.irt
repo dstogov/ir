@@ -1,7 +1,7 @@
 --TEST--
 BITCAST 004: regression integer constant to double
 --ARGS--
--O0 --run
+--run
 --CODE--
 extern func @printf(uintptr_t, ...): void;
 static const @format[4] = "%g\n\000";

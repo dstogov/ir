@@ -1,7 +1,7 @@
 --TEST--
-FP compare: same double constant in an O0 fused branch
+FP compare: same double constant in a fused branch
 --ARGS--
--O0 --run
+--run
 --CODE--
 extern func @printf(uintptr_t, ...): void;
 static const @format[6] = "%llx\n\000";

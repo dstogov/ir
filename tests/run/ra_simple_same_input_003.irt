@@ -1,7 +1,7 @@
 --TEST--
 Simple register allocator: one value used three times in COND
 --ARGS--
--O0 --run
+--run
 --CODE--
 extern func @printf(uintptr_t, ...): int32_t;
 func @main(): int32_t

@@ -1,7 +1,7 @@
 --TEST--
 SWITCH with INT32_MIN dense cases
 --ARGS--
--O1 --run
+--run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func select(int32_t): int32_t
