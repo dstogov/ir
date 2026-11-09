@@ -50,6 +50,7 @@ typedef struct _test {
 	char *xfail;
 	char *ext;
 	char *run_args;
+	int   run_args_len;
 } test;
 
 static int colorize = 1;
@@ -100,7 +101,7 @@ static void init_console(void)
 #endif
 }
 
-static test *parse_file(const char *filename, int id)
+static test *parse_file(const char *filename)
 {
 	test *t;
 	char *buf, **section, **last_section = NULL;
@@ -171,6 +172,16 @@ static test *parse_file(const char *filename, int id)
 			last_section = section;
 		}
 	}
+	return t;
+}
+
+static test *parse_test(const char *filename, int id)
+{
+	test *t = parse_file(filename);
+
+	if (!t) {
+		return NULL;
+	}
 	if (!t->name || !t->code || !t->expect) {
 		free(t);
 		return NULL;
@@ -179,7 +190,42 @@ static test *parse_file(const char *filename, int id)
 	return t;
 }
 
-static test *dup_test(const test *t, const char *args)
+static test *parse_rc(const char *dir_name, int dir_len)
+{
+	char *filename;
+	struct stat stat_buf;
+	test *t;
+
+#ifdef _WIN32
+	filename = _alloca(dir_len + strlen("tester.rc") + 1);
+#else
+	filename = alloca(dir_len + strlen("tester.rc") + 1);
+#endif
+
+	if (dir_len) {
+		memcpy(filename, dir_name, dir_len);
+	}
+	memcpy(filename + dir_len, "tester.rc", strlen("tester.rc") + 1);
+
+
+	if (stat(filename, &stat_buf) != 0) {
+		return NULL;
+	}
+
+	t = parse_file(filename);
+	if (!t || t->name || t->code || t->expect || t->xfail) {
+		print_color("BROK", RED);
+		printf(": [%s]\n", filename);
+		if (t) {
+			free(t);
+		}
+		return NULL;
+	}
+
+	return t;
+}
+
+static test *dup_test(const test *t, const char *args, int args_len)
 {
 	test *copy;
 	size_t size = strlen(t->name) + 1;
@@ -189,7 +235,7 @@ static test *dup_test(const test *t, const char *args)
 		size += strlen(t->target) + 1;
 	}
 	if (args) {
-		size += strlen(args) + 1;
+		size += args_len + 1;
 	}
 	if (t->code) {
 		size += strlen(t->code) + 1;
@@ -227,9 +273,10 @@ static test *dup_test(const test *t, const char *args)
 
 	if (args) {
 		copy->args = copy->run_args = buf;
-		size = strlen(args);
-		memcpy(buf, args, size + 1);
-		buf += size + 1;
+		copy->run_args_len = args_len;
+		memcpy(buf, args, args_len);
+		buf[args_len] = 0;
+		buf += args_len + 1;
 	}
 
 	if (t->code) {
@@ -393,7 +440,7 @@ static char *replace_extension(const char *filename, size_t len, const char *ext
 	return ret;
 }
 
-static int run_test(const char *filename, test *t, int show_diff, const char *args)
+static int run_test(const char *filename, test *t, int show_diff, const char *args, int args_len)
 {
 	size_t len;
 	int ret;
@@ -424,10 +471,10 @@ static int run_test(const char *filename, test *t, int show_diff, const char *ar
 		return 0;
 	}
 
-	if ((size_t)snprintf(cmd, sizeof(cmd), "%s %s %s %s > %s 2>&1",
+	if ((size_t)snprintf(cmd, sizeof(cmd), "%s %s %s %.*s > %s 2>&1",
 			test_cmd, code_filename,
 			additional_args,
-			args,
+			args_len, args,
 			out_filename) > sizeof(cmd)) {
 		free(code_filename);
 		free(out_filename);
@@ -690,6 +737,10 @@ int main(int argc, char **argv)
 	test *t, **xfailed_tests = NULL, **warned_tests = NULL, **failed_tests = NULL;
 	char **broken_tests = NULL;
 	char *args, *next_args;
+	const char *last_dir = NULL;
+	int default_args_len, args_len, last_dir_len = -1;
+	test *rc = NULL, **rcs = NULL;
+	int rcs_count = 0, rcs_limit = 0;
 	int may_free;
 
 	for (i = 1; i < argc; i++) {
@@ -732,6 +783,9 @@ int main(int argc, char **argv)
 
 	if (!default_args) {
 		default_args = "";
+		default_args_len = 0;
+	} else {
+		default_args_len = strlen(default_args);
 	}
 	if (!additional_args) {
 		additional_args = "";
@@ -759,7 +813,30 @@ int main(int argc, char **argv)
 
 	// Run each test
 	for (i = 0; i < files_count; i++) {
-		t = parse_file(files[i], i);
+		const char *file = files[i];
+		int dir_len;
+
+		dir_len = strlen(file);
+		while (dir_len > 0
+#ifdef _WIN32
+		 && file[dir_len-1] != PATH_SEP
+#endif
+		 && file[dir_len-1] != '/') {
+			dir_len--;
+		}
+		if (dir_len != last_dir_len || strncmp(file, last_dir, dir_len)) {
+			rc = parse_rc(file, dir_len);
+			if (rc) {
+				if (rcs_count >= rcs_limit) {
+					rcs_limit += 32;
+					rcs = realloc(rcs, sizeof(test*) * rcs_limit);
+				}
+				rcs[rcs_count++] = rc;
+			}
+			last_dir = file;
+			last_dir_len = dir_len;
+		}
+		t = parse_test(file, i);
 		if (!t) {
 			printf("\r");
 			print_color("BROK", RED);
@@ -771,8 +848,19 @@ int main(int argc, char **argv)
 			broken_tests[broken++] = files[i];
 			continue;
 		}
-		printf("TEST: %s [%s]", t->name, files[i]);
-		fflush(stdout);
+
+		if (rc) {
+			if (rc->target && !t->target) {
+				t->target = rc->target;
+			}
+			if (rc->args && !t->args) {
+				t->args = rc->args;
+			}
+			if (rc->ext && !t->ext) {
+				t->ext = rc->ext;
+			}
+		}
+
 		if (skip_test(t)) {
 			printf("\r");
 			print_color("SKIP", YELLOW);
@@ -798,7 +886,6 @@ try_args:
 					next_args = NULL;
 				}
 				do {
-					*s = '\0';
 					s--;
 					if (s == args) {
 						if (!next_args) continue;
@@ -806,18 +893,29 @@ try_args:
 						goto try_args;
 					}
 				} while (*s == '\r' || *s == ' ' || *s == '\t');
+				args_len = s + 1 - args;
+			} else {
+				args_len = strlen(args);
 			}
 		} else {
 			args = (char*)default_args;
+			args_len = default_args_len;
 		}
 
-		if (run_test(files[i], t, show_diff, args)) {
+		if (args_len) {
+			printf("TEST: %s [%s] (%.*s)", t->name, files[i], args_len, args);
+		} else {
+			printf("TEST: %s [%s]", t->name, files[i]);
+		}
+		fflush(stdout);
+
+		if (run_test(files[i], t, show_diff, args, args_len)) {
 			printf("\r");
 			passed++;
 			if (t->xfail) {
 				print_color("WARN", YELLOW);
-				if (args) {
-					printf(": %s [%s] (%s) (warn: XFAIL section but test passes)\n", t->name, files[i], args);
+				if (args_len) {
+					printf(": %s [%s] (%.*s) (warn: XFAIL section but test passes)\n", t->name, files[i], args_len, args);
 				} else {
 					printf(": %s [%s] (warn: XFAIL section but test passes)\n", t->name, files[i]);
 				}
@@ -826,7 +924,7 @@ try_args:
 					warned_tests = realloc(warned_tests, sizeof(test*) * warned_limit);
 				}
 				if (t->run_args) {
-					t = dup_test(t, args);
+					t = dup_test(t, args, args_len);
 				} else {
 					t->run_args = args;
 				}
@@ -834,8 +932,8 @@ try_args:
 				may_free = 0;
 			} else {
 				print_color("PASS", GREEN);
-				if (args) {
-					printf(": %s [%s] (%s)\n", t->name, files[i], args);
+				if (args_len) {
+					printf(": %s [%s] (%.*s)\n", t->name, files[i], args_len, args);
 				} else {
 					printf(": %s [%s]\n", t->name, files[i]);
 				}
@@ -843,8 +941,8 @@ try_args:
 		} else if (t->xfail) {
 			printf("\r");
 			print_color("XFAIL", RED);
-			if (args) {
-				printf(": %s [%s] (%s)\n", t->name, files[i], args);
+			if (args_len) {
+				printf(": %s [%s] (%.*s)\n", t->name, files[i], args_len, args);
 			} else {
 				printf(": %s [%s]\n", t->name, files[i]);
 			}
@@ -853,7 +951,7 @@ try_args:
 				xfailed_tests = realloc(xfailed_tests, sizeof(test*) * xfailed_limit);
 			}
 			if (t->run_args) {
-				t = dup_test(t, args);
+				t = dup_test(t, args, args_len);
 			} else {
 				t->run_args = args;
 			}
@@ -862,8 +960,8 @@ try_args:
 		} else {
 			printf("\r");
 			print_color("FAIL", RED);
-			if (args) {
-				printf(": %s [%s] (%s)\n", t->name, files[i], args);
+			if (args_len) {
+				printf(": %s [%s] (%.*s)\n", t->name, files[i], args_len, args);
 			} else {
 				printf(": %s [%s]\n", t->name, files[i]);
 			}
@@ -872,9 +970,10 @@ try_args:
 				failed_tests = realloc(failed_tests, sizeof(test*) * failed_limit);
 			}
 			if (t->run_args) {
-				t = dup_test(t, args);
+				t = dup_test(t, args, args_len);
 			} else {
 				t->run_args = args;
+				t->run_args_len = args_len;
 			}
 			failed_tests[failed++] = t;
 			may_free = 0;
@@ -909,8 +1008,9 @@ try_args:
 		printf("-------------------------------\n");
 		for (i = 0; i < xfailed; i++) {
 			t = xfailed_tests[i];
-			if (t->run_args) {
-				printf("%s [%s] (%s) XFAIL REASON: %s\n", t->name, files[t->id], t->run_args, t->xfail);
+			if (t->run_args_len) {
+				printf("%s [%s] (%.*s) XFAIL REASON: %s\n",
+					t->name, files[t->id], t->run_args_len, t->run_args, t->xfail);
 			} else {
 				printf("%s [%s] XFAIL REASON: %s\n", t->name, files[t->id], t->xfail);
 			}
@@ -924,8 +1024,9 @@ try_args:
 		printf("-------------------------------\n");
 		for (i = 0; i < warned; i++) {
 			t = warned_tests[i];
-			if (t->run_args) {
-				printf("%s [%s] (%s) WARN: XFAIL reason \"%s\" but test passes\n", t->name, files[t->id], t->run_args, t->xfail);
+			if (t->run_args_len) {
+				printf("%s [%s] (%.*s) WARN: XFAIL reason \"%s\" but test passes\n",
+					t->name, files[t->id], t->run_args_len, t->run_args, t->xfail);
 			} else {
 				printf("%s [%s] WARN: XFAIL reason \"%s\" but test passes\n", t->name, files[t->id], t->xfail);
 			}
@@ -939,8 +1040,8 @@ try_args:
 		printf("-------------------------------\n");
 		for (i = 0; i < failed; i++) {
 			t = failed_tests[i];
-			if (t->run_args) {
-				printf("%s [%s] (%s)\n", t->name, files[t->id], t->run_args);
+			if (t->run_args_len) {
+				printf("%s [%s] (%.*s)\n", t->name, files[t->id], t->run_args_len, t->run_args);
 			} else {
 				printf("%s [%s]\n", t->name, files[t->id]);
 			}
@@ -963,6 +1064,13 @@ try_args:
 		free(files[i]);
 	}
 	free(files);
+
+	if (rcs_count) {
+		for (i = 0; i < rcs_count; i++) {
+			free(rcs[i]);
+		}
+		free(rcs);
+	}
 
 	return failed > 0 ? 1 : 0;
 }
