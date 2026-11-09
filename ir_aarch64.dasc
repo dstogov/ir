@@ -550,6 +550,9 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 			if (IR_IS_CONST_REF(insn->op1)) {
 				constraints->tmp_regs[n] = IR_TMP_REG(1, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 				n++;
+			} else if (ir_rule(ctx, insn->op1) == IR_STATIC_ALLOCA) {
+				constraints->tmp_regs[n] = IR_TMP_REG(1, IR_ADDR, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n++;
 			}
 			if (rule == IR_SHIFT_CONST
 			 && (insn->op == IR_ROL || insn->op == IR_ROR)
@@ -3803,8 +3806,15 @@ static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_emit_load(ctx, src_type, op1_reg, op1);
 	}
 	if (insn->op == IR_NOT) {
-		if (src_type == IR_BOOL) {
-			|	ASM_REG_IMM_OP cmp, src_type, op1_reg, 0
+		if (insn->type == IR_BOOL) {
+			/* upper bits of narrow operands are undefined */
+			if (ir_type_size[src_type] == 1) {
+				|	tst Rw(op1_reg), #0xff
+			} else if (ir_type_size[src_type] == 2) {
+				|	tst Rw(op1_reg), #0xffff
+			} else {
+				|	ASM_REG_IMM_OP cmp, src_type, op1_reg, 0
+			}
 			|	cset Rw(def_reg), eq
 		} else {
 			|	ASM_REG_REG_OP mvn, src_type, def_reg, op1_reg

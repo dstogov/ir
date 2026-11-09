@@ -1,0 +1,112 @@
+--TEST--
+Boolean NOT of integer values
+--ARGS--
+--run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func not_i32(int32_t): int32_t
+{
+	l_1 = START(l_2);
+	int32_t d_1 = PARAM(l_1, "x", 1);
+	bool d_2 = NOT(d_1);
+	int32_t d_3 = ZEXT(d_2);
+	l_2 = RETURN(l_1, d_3);
+}
+func not_u8(uint8_t): int32_t
+{
+	l_1 = START(l_2);
+	uint8_t d_1 = PARAM(l_1, "x", 1);
+	bool d_2 = NOT(d_1);
+	int32_t d_3 = ZEXT(d_2);
+	l_2 = RETURN(l_1, d_3);
+}
+func not_i16(int16_t): int32_t
+{
+	l_1 = START(l_2);
+	int16_t d_1 = PARAM(l_1, "x", 1);
+	bool d_2 = NOT(d_1);
+	int32_t d_3 = ZEXT(d_2);
+	l_2 = RETURN(l_1, d_3);
+}
+func not_add_u8(uint8_t, uint8_t): int32_t
+{
+	l_1 = START(l_2);
+	uint8_t d_1 = PARAM(l_1, "x", 1);
+	uint8_t d_2 = PARAM(l_1, "y", 2);
+	uint8_t d_3 = ADD(d_1, d_2);
+	bool d_4 = NOT(d_3);
+	int32_t d_5 = ZEXT(d_4);
+	l_2 = RETURN(l_1, d_5);
+}
+func not_add_u16(uint16_t, uint16_t): int32_t
+{
+	l_1 = START(l_2);
+	uint16_t d_1 = PARAM(l_1, "x", 1);
+	uint16_t d_2 = PARAM(l_1, "y", 2);
+	uint16_t d_3 = ADD(d_1, d_2);
+	bool d_4 = NOT(d_3);
+	int32_t d_5 = ZEXT(d_4);
+	l_2 = RETURN(l_1, d_5);
+}
+func not_not_add_u8(uint8_t, uint8_t): int32_t
+{
+	l_1 = START(l_2);
+	uint8_t d_1 = PARAM(l_1, "x", 1);
+	uint8_t d_2 = PARAM(l_1, "y", 2);
+	uint8_t d_3 = ADD(d_1, d_2);
+	bool d_4 = NOT(d_3);
+	bool d_5 = NOT(d_4);
+	int32_t d_6 = ZEXT(d_5);
+	l_2 = RETURN(l_1, d_6);
+}
+func not_alloca(void): int32_t
+{
+	int32_t c_16 = 16;
+	l_1 = START(l_2);
+	uintptr_t d_1, l_3 = ALLOCA(l_1, c_16);
+	bool d_2 = NOT(d_1);
+	int32_t d_3 = ZEXT(d_2);
+	l_2 = RETURN(l_3, d_3);
+}
+func main(void): int32_t
+{
+	uintptr_t c_printf = func printf(uintptr_t, ...): int32_t;
+	uintptr_t c_fmt = "%d%d%d %d%d %d%d %d%d %d%d %d\n";
+	uintptr_t c_not_i32 = func not_i32(int32_t): int32_t;
+	uintptr_t c_not_u8 = func not_u8(uint8_t): int32_t;
+	uintptr_t c_not_i16 = func not_i16(int16_t): int32_t;
+	uintptr_t c_not_add_u8 = func not_add_u8(uint8_t, uint8_t): int32_t;
+	uintptr_t c_not_add_u16 = func not_add_u16(uint16_t, uint16_t): int32_t;
+	uintptr_t c_not_not_add_u8 = func not_not_add_u8(uint8_t, uint8_t): int32_t;
+	uintptr_t c_not_alloca = func not_alloca(void): int32_t;
+	int32_t c_v1 = 0;
+	int32_t c_v2 = 5;
+	int32_t c_v3 = -1;
+	uint8_t c_v4 = 0;
+	uint8_t c_v5 = 255;
+	int16_t c_v6 = 0;
+	int16_t c_v7 = 256;
+	uint8_t c_u8_1 = 1;
+	uint8_t c_u8_2 = 2;
+	uint8_t c_u8_255 = 255;
+	uint16_t c_u16_1 = 1;
+	uint16_t c_u16_65535 = 65535;
+	int32_t c_ret = 0;
+	l_1 = START(l_99);
+	int32_t r_1, l_2 = CALL/1(l_1, c_not_i32, c_v1);
+	int32_t r_2, l_3 = CALL/1(l_2, c_not_i32, c_v2);
+	int32_t r_3, l_4 = CALL/1(l_3, c_not_i32, c_v3);
+	int32_t r_4, l_5 = CALL/1(l_4, c_not_u8, c_v4);
+	int32_t r_5, l_6 = CALL/1(l_5, c_not_u8, c_v5);
+	int32_t r_6, l_7 = CALL/1(l_6, c_not_i16, c_v6);
+	int32_t r_7, l_8 = CALL/1(l_7, c_not_i16, c_v7);
+	int32_t r_8, l_9 = CALL/2(l_8, c_not_add_u8, c_u8_255, c_u8_1);
+	int32_t r_9, l_10 = CALL/2(l_9, c_not_add_u16, c_u16_65535, c_u16_1);
+	int32_t r_10, l_11 = CALL/2(l_10, c_not_not_add_u8, c_u8_255, c_u8_1);
+	int32_t r_11, l_12 = CALL/2(l_11, c_not_not_add_u8, c_u8_255, c_u8_2);
+	int32_t r_12, l_13 = CALL(l_12, c_not_alloca);
+	int32_t d_p, l_50 = CALL/13(l_13, c_printf, c_fmt, r_1, r_2, r_3, r_4, r_5, r_6, r_7, r_8, r_9, r_10, r_11, r_12);
+	l_99 = RETURN(l_50, c_ret);
+}
+--EXPECT--
+100 10 10 11 01 0

@@ -9,6 +9,6 @@
 }
 --EXPECT--
 test:
-	cmp w0, #0
+	tst w0, #0xff
 	cset w0, eq
 	ret
