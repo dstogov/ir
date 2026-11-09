@@ -15,7 +15,7 @@ aarch64
         l_4 = RETURN(l_3, d_3);
 }
 --EXPECT--
-main:
+test:
 	sub sp, sp, #0x10
 	movz w0, #0x2a
 	str w0, [sp]
