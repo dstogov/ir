@@ -2,8 +2,6 @@
 001: proto values keep typed function-pointer casts in C emission
 --TARGET--
 x86
---ARGS--
---emit-c
 --CODE--
 {
 	uintptr_t c_1 = 0x1234;

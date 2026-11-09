@@ -1,7 +1,5 @@
 --TEST--
 Mandelbrot Test (-O0)
---TARGET--
-x86_64-windows
 --ARGS--
 -S -O0
 --CODE--

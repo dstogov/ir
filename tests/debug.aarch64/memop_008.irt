@@ -1,7 +1,5 @@
 --TEST--
 008: Memory update (LOAD/STORE)
---TARGET--
-aarch64
 --ARGS--
 -S
 --CODE--

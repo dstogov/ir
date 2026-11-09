@@ -1,9 +1,5 @@
 --TEST--
 TLS_ADDR float and double spills
---TARGET--
-x86_64-*-sysv
---ARGS--
--O2 -S
 --CODE--
 func double_static(uintptr_t): double
 {

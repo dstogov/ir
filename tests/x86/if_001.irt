@@ -1,7 +1,5 @@
 --TEST--
 001: if function
---TARGET--
-x86
 --ARGS--
 -O1 -S
 --CODE--

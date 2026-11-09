@@ -1,7 +1,5 @@
 --TEST--
 007: sub function
---TARGET--
-x86_64-*-sysv
 --ARGS--
 -S -mavx
 --CODE--

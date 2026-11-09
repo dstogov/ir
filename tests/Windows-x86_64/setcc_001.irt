@@ -1,9 +1,5 @@
 --TEST--
 001: EQ(ADD(_,_), 0) -> SETCC
---TARGET--
-x86_64-windows
---ARGS--
--S
 --CODE--
 {
 	int32_t c1 = 0;

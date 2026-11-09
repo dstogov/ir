@@ -1,9 +1,5 @@
 --TEST--
 001: Fuse load from constant address that doesn't fit a displacement
---TARGET--
-x86_64-*-sysv
---ARGS--
--S
 --CODE--
 {
 	uintptr_t c_1 = 0x123456789a;

@@ -1,7 +1,5 @@
 --TEST--
 Test
---TARGET--
-x86_64-*-sysv
 --ARGS--
 --debug-regset 0x3ffff --save --save-live-ranges -S
 --CODE--

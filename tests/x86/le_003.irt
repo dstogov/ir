@@ -1,9 +1,5 @@
 --TEST--
 003: le function
---TARGET--
-x86
---ARGS--
--S
 --CODE--
 {
 	int32_t c = 0;

@@ -1,7 +1,5 @@
 --TEST--
 Simple TAILCALL
---ARGS--
---emit-llvm
 --CODE--
 {
 	uintptr_t c_1 = 0;

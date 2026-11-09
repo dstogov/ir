@@ -1,7 +1,5 @@
 --TEST--
 DESSA 003
---ARGS--
---emit-c
 --CODE--
 # Figure 8 (swap problem) from "Translating Out of Static Single Assignment Form" by Sreedhar
 {

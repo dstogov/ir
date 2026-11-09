@@ -1,7 +1,5 @@
 --TEST--
 004: Memory update (inc/dec)
---TARGET--
-x86_64-*-sysv
 --ARGS--
 -S
 --CODE--

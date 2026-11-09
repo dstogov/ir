@@ -1,7 +1,5 @@
 --TEST--
 002: mul_ov function
---ARGS--
---emit-llvm
 --CODE--
 {
 	uint32_t c = 2;

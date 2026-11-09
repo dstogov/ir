@@ -1,7 +1,5 @@
 --TEST--
 Simple CALL -O0
---TARGET--
-aarch64-darwin
 --ARGS--
 -S -O0 --run
 --CODE--

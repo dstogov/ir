@@ -1,7 +1,5 @@
 --TEST--
 003: BLOCK_BEGIN/BLOCK_END
---ARGS--
---emit-c
 --CODE--
 func test(int32_t, uintptr_t): void
 {

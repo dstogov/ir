@@ -1,7 +1,5 @@
 --TEST--
 001: IF(SHR(X, C)) => IF(AND(X, MASK)) keeps a signed MASK sign extended
---ARGS--
--O2 --save
 --CODE--
 {
 	int32_t c_1 = 4;

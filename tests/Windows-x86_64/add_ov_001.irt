@@ -1,9 +1,5 @@
 --TEST--
 001: add_ov function
---TARGET--
-x86_64-windows
---ARGS--
--S
 --CODE--
 {
 	int32_t c = 2;

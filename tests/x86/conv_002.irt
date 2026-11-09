@@ -1,9 +1,5 @@
 --TEST--
 002: type conversion ZEXT
---TARGET--
-x86
---ARGS--
--S
 --CODE--
 {
 	l_1 = START(l_4);

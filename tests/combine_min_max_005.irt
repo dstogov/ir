@@ -1,7 +1,5 @@
 --TEST--
 005: Combine MIN/MAX (FP PHI is not combined)
---ARGS--
---save
 --CODE--
 {
 	uintptr_t c_1 = 0;

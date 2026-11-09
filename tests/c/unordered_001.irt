@@ -1,7 +1,5 @@
 --TEST--
 001: UNORDERED
---ARGS--
---emit-c
 --CODE--
 {
 	float c = 0;

@@ -1,9 +1,5 @@
 --TEST--
 004: ne function
---TARGET--
-x86_64-*-sysv
---ARGS--
--S
 --CODE--
 {
 	double c = 0;

@@ -1,7 +1,5 @@
 --TEST--
 023: FOLD: OR(OR(X, Y), X) and OR(OR(X, Y), Y) fold to OR(X, Y)
---ARGS--
--O2 --save
 --CODE--
 {
 	uintptr_t c_1 = 0;

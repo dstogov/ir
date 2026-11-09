@@ -1,7 +1,5 @@
 --TEST--
 Mandelbrot Test (-O0)
---TARGET--
-aarch64
 --ARGS--
 -S -O0
 --CODE--

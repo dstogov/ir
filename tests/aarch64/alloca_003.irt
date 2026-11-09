@@ -1,9 +1,5 @@
 --TEST--
 003: BLOCK_BEGIN/BLOCK_END
---TARGET--
-aarch64
---ARGS--
--S
 --CODE--
 func test(int32_t, uintptr_t): void
 {

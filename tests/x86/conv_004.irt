@@ -1,7 +1,5 @@
 --TEST--
 004: type conversion BITCAST
---TARGET--
-x86
 --ARGS--
 -S -msse4.1
 --CODE--

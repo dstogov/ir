@@ -1,7 +1,5 @@
 --TEST--
 Fig
---TARGET--
-aarch64
 --ARGS--
 -S
 --CODE--

@@ -1,7 +1,5 @@
 --TEST--
 027: FOLD: (x << 1) | ((x >>s 63) & 1) => rotate by 1
---ARGS--
--O2 --save
 --CODE--
 {
 	int64_t c_1 = 1;

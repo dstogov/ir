@@ -1,7 +1,5 @@
 --TEST--
 002: add_ov function
---ARGS--
---emit-c
 --CODE--
 {
 	uint32_t c = 2;

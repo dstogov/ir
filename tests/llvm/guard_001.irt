@@ -1,7 +1,5 @@
 --TEST--
 GUARD
---ARGS--
---emit-llvm
 --CODE--
 {
 	uintptr_t exit = 0xbaddad;

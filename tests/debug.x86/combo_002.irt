@@ -1,7 +1,5 @@
 --TEST--
 Combo 002
---TARGET--
-x86
 --ARGS--
 -S
 --CODE--

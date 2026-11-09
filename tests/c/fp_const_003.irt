@@ -1,7 +1,5 @@
 --TEST--
 003: Integral floating point constants
---ARGS--
---emit-c
 --CODE--
 {
 	uintptr_t c_1 = func fd(double, double, double): void;

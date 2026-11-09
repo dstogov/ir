@@ -1,7 +1,5 @@
 --TEST--
 001: proto values keep typed function-pointer casts in C emission
---ARGS--
---emit-llvm
 --CODE--
 {
 	uintptr_t c_1 = 0x1234;

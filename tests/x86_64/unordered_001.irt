@@ -1,9 +1,5 @@
 --TEST--
 001: UNORDERED
---TARGET--
-x86_64-*-sysv
---ARGS--
--S
 --CODE--
 {
 	float c = 0;

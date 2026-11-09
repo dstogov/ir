@@ -1,7 +1,5 @@
 --TEST--
 001: Parameter Loading
---TARGET--
-x86_64-*-sysv
 --ARGS--
 -S
 --CODE--

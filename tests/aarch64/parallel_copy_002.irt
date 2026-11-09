@@ -1,9 +1,5 @@
 --TEST--
 002: parallel copy saves the FP cycle head with its own (wider) type
---TARGET--
-aarch64
---ARGS--
--S
 --CODE--
 {
 	l_1 = START(l_3);

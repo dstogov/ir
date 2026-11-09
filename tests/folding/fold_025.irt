@@ -1,7 +1,5 @@
 --TEST--
 025: FOLD: MAX(MAX(X, Y), X) and MAX(MAX(X, Y), Y) fold to MAX(X, Y)
---ARGS--
--O2 --save
 --CODE--
 {
 	uintptr_t c_1 = 0;

@@ -2,8 +2,6 @@
 001: parameter-backed proto call emits typed fastcall function-pointer casts
 --TARGET--
 x86
---ARGS--
---emit-c
 --CODE--
 {
 	uintptr_t c_1 = 0;

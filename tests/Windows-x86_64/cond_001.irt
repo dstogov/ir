@@ -1,9 +1,5 @@
 --TEST--
 001: COND(I,I,I)
---TARGET--
-x86_64-windows
---ARGS--
--S
 --CODE--
 {
 	l_1 = START(ret);

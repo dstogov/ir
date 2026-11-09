@@ -1,7 +1,5 @@
 --TEST--
 010: Memory update (shift with mem)
---TARGET--
-x86_64-*-sysv
 --ARGS--
 -S
 --CODE--

@@ -2,8 +2,6 @@
 TLS_ADDR with negative offset
 --TARGET--
 aarch64-*-sysv
---ARGS--
--O0 -S
 --CODE--
 func test(): uintptr_t
 {

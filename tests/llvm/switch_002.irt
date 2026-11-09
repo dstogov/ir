@@ -1,7 +1,5 @@
 --TEST--
 SWITCH 001
---ARGS--
---emit-llvm
 --CODE--
 {
 	uintptr_t c_1 = 0;

@@ -1,7 +1,5 @@
 --TEST--
 015: FOLD: IF condition optimizer constant pool growth
---ARGS--
--O2 --save
 --CODE--
 {
 	int32_t c_p0 = 1000;

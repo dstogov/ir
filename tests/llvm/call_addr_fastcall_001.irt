@@ -1,7 +1,5 @@
 --TEST--
 001: constant function address call emits a typed function pointer with calling convention
---ARGS--
---emit-llvm
 --CODE--
 {
 	int32_t c_1 = 7;

@@ -1,7 +1,5 @@
 --TEST--
 SCCP 002
---TARGET--
-aarch64
 --ARGS--
 -S
 --CODE--

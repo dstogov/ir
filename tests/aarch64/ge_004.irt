@@ -1,9 +1,5 @@
 --TEST--
 004: ge function
---TARGET--
-aarch64
---ARGS--
--S
 --CODE--
 {
 	double c = 0;

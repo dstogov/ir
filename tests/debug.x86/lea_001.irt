@@ -1,7 +1,5 @@
 --TEST--
 LEA 001
---TARGET--
-x86
 --ARGS--
 -S
 --CODE--

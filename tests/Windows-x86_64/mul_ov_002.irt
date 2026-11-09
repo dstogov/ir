@@ -1,9 +1,5 @@
 --TEST--
 002: mul_ov function
---TARGET--
-x86_64-windows
---ARGS--
--S
 --CODE--
 {
 	uint32_t c = 2;

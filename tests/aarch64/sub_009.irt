@@ -1,9 +1,5 @@
 --TEST--
 009: sub function
---TARGET--
-aarch64
---ARGS--
--S
 --CODE--
 {
 	uint64_t c = 0x100000000;

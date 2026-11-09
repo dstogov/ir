@@ -1,9 +1,5 @@
 --TEST--
 004: sub_ov function
---TARGET--
-aarch64
---ARGS--
--S
 --CODE--
 {
 	uint32_t c_1 = 0;

@@ -1,7 +1,5 @@
 --TEST--
 002: Memory update (binary op with reg)
---TARGET--
-x86_64-*-sysv
 --ARGS--
 -S
 --CODE--

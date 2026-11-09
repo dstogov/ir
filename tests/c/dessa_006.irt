@@ -1,7 +1,5 @@
 --TEST--
 DESSA 006 (swap & tmp register)
---ARGS--
---emit-c
 --CODE--
 {
 	uintptr_t c_1 = 0;

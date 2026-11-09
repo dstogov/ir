@@ -1,7 +1,5 @@
 --TEST--
 007: Memory update (shift const)
---TARGET--
-aarch64
 --ARGS--
 -S
 --CODE--

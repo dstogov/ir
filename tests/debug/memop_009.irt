@@ -1,7 +1,5 @@
 --TEST--
 009: Memory update (binary op with mem)
---TARGET--
-x86_64-*-sysv
 --ARGS--
 -S
 --CODE--

@@ -1,7 +1,5 @@
 --TEST--
 001: IJMP - computed goto
---TARGET--
-x86
 --ARGS--
 -S
 --CODE--

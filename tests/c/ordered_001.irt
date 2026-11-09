@@ -1,7 +1,5 @@
 --TEST--
 001: ORDERED
---ARGS--
---emit-c
 --CODE--
 {
 	double c = 0;

@@ -1,9 +1,5 @@
 --TEST--
 TLS_ADDR shared by LOAD and STORE
---TARGET--
-x86_64-*-sysv
---ARGS--
--O2 -S
 --CODE--
 func test(int32_t): int32_t
 {

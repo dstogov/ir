@@ -1,7 +1,5 @@
 --TEST--
 001: Infinity and NaN constants
---ARGS--
---emit-llvm
 --CODE--
 extern func @test_d(double, double, double, double, double, double, double): void;
 extern func @test_f(float, float, float, float, float, float, float): void;

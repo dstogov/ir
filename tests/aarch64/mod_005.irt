@@ -1,9 +1,5 @@
 --TEST--
 005: mod function
---TARGET--
-aarch64
---ARGS--
--S
 --CODE--
 {
 	uint32_t c = 16;

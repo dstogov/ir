@@ -1,7 +1,5 @@
 --TEST--
 005: le function
---TARGET--
-x86_64-windows
 --ARGS--
 -S -mavx
 --CODE--

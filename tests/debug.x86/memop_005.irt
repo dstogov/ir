@@ -1,7 +1,5 @@
 --TEST--
 005: Memory update (mul pwr2)
---TARGET--
-x86
 --ARGS--
 -S
 --CODE--

@@ -1,9 +1,5 @@
 --TEST--
 005: mul function
---TARGET--
-x86
---ARGS--
--S
 --CODE--
 {
 	uint32_t c = 2;

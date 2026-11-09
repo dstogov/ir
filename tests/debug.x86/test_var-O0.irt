@@ -1,7 +1,5 @@
 --TEST--
 Mandelbrot Test (var)
---TARGET--
-x86
 --ARGS--
 -S -O0
 --CODE--

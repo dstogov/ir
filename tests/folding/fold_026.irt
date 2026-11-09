@@ -1,7 +1,5 @@
 --TEST--
 026: FOLD: (x << 3) | ((x >>s 61) & 7) => ROL(x, 3)
---ARGS--
--O2 --save
 --CODE--
 {
 	int64_t c_1 = 3;

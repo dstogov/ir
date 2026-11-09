@@ -1,9 +1,5 @@
 --TEST--
 003: ARGVAL:
---TARGET--
-x86_64-*-sysv
---ARGS--
--S
 --CODE--
 func test(uintptr_t): int32_t
 {

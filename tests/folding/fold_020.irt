@@ -1,7 +1,5 @@
 --TEST--
 020: FOLD: signed MOD INT32_MIN by minus one not folded
---ARGS--
--O2 --save
 --CODE--
 {
 	int32_t c_1 = -2147483648;

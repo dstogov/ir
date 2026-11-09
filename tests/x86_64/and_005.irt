@@ -1,9 +1,5 @@
 --TEST--
 005: and function
---TARGET--
-x86_64-*-sysv
---ARGS--
--S
 --CODE--
 {
 	uint64_t c = 0x7ffffbffffffffff; /* ~((1<<63) | (1<<42)) */

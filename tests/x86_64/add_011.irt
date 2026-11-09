@@ -1,9 +1,5 @@
 --TEST--
 011: add function
---TARGET--
-x86_64-*-sysv
---ARGS--
--S
 --CODE--
 {
 	double c = 0.5;

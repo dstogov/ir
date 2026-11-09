@@ -1,7 +1,5 @@
 --TEST--
 009: type conversion FP2FP
---ARGS--
---emit-c
 --CODE--
 {
 	l_1 = START(l_4);

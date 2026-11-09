@@ -1,9 +1,5 @@
 --TEST--
 010: add function
---TARGET--
-aarch64
---ARGS--
--S
 --CODE--
 {
 	uint16_t c = 1;

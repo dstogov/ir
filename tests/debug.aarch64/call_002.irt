@@ -1,7 +1,5 @@
 --TEST--
 Indirect CALL
---TARGET--
-aarch64
 --ARGS--
 -S
 --CODE--

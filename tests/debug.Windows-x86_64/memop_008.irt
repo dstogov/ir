@@ -1,7 +1,5 @@
 --TEST--
 008: Memory update (LOAD/STORE)
---TARGET--
-x86_64-windows
 --ARGS--
 -S
 --CODE--

@@ -1,7 +1,5 @@
 --TEST--
 021: FOLD: signed MOD INT64_MIN by minus one not folded
---ARGS--
--O2 --save
 --CODE--
 {
 	int64_t c_1 = -9223372036854775808;

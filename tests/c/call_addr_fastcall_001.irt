@@ -2,8 +2,6 @@
 001: constant function address call emits a typed function pointer with calling convention
 --TARGET--
 x86
---ARGS--
---emit-c
 --CODE--
 {
 	int32_t c_1 = 7;

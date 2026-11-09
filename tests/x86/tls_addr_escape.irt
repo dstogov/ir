@@ -2,8 +2,6 @@
 TLS_ADDR stored as a value
 --TARGET--
 x86-*-sysv
---ARGS--
--O2 -S
 --CODE--
 func store_address_to_itself(): void
 {

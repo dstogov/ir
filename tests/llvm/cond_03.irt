@@ -1,7 +1,5 @@
 --TEST--
 003: cond function (double condition)
---ARGS--
---emit-llvm
 --CODE--
 {
 	l_1 = START(l_4);

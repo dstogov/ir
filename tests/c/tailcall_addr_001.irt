@@ -1,7 +1,5 @@
 --TEST--
 001: constant function address tailcall emits a typed function pointer
---ARGS--
---emit-c
 --CODE--
 {
 	uintptr_t c_1 = func *0x1234(void): int32_t;

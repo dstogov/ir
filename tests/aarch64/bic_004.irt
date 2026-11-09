@@ -1,9 +1,5 @@
 --TEST--
 004: AND(x, NOT(y)) when NOT is defined before x (NOT is op2)
---TARGET--
-aarch64
---ARGS--
--S
 --CODE--
 {
 	l_1 = START(l_4);

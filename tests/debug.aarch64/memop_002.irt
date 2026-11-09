@@ -1,7 +1,5 @@
 --TEST--
 002: Memory update (binary op with reg)
---TARGET--
-aarch64
 --ARGS--
 -S
 --CODE--

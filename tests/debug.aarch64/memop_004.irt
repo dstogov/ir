@@ -1,7 +1,5 @@
 --TEST--
 004: Memory update (inc/dec)
---TARGET--
-aarch64
 --ARGS--
 -S
 --CODE--

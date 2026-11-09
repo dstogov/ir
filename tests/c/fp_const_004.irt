@@ -1,7 +1,5 @@
 --TEST--
 004: Floating point constants that need a hex literal
---ARGS--
---emit-c
 --CODE--
 {
 	uintptr_t c_1 = func fd(double, double, double): void;

@@ -1,7 +1,5 @@
 --TEST--
 005: Register Allocation (allocate %rcx for vreg used as SHIFT.op2 and alive after the SHIFT)
---TARGET--
-x86_64-*-sysv
 --ARGS--
 -S
 --CODE--

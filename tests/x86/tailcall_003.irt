@@ -1,9 +1,5 @@
 --TEST--
 003: tailcall: epilogue does not override op2: fuse load
---TARGET--
-x86
---ARGS--
--S
 --CODE--
 {
 	l_1 = START(l_30);

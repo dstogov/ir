@@ -1,7 +1,5 @@
 --TEST--
 Simple CALL
---TARGET--
-x86
 --ARGS--
 -S --run
 --CODE--

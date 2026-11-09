@@ -1,7 +1,5 @@
 --TEST--
 002: builtin copysignf (float)
---ARGS--
---emit-llvm
 --CODE--
 {
 	uintptr_t c_1 = func copysignf(float, float): float __builtin;

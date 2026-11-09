@@ -1,7 +1,5 @@
 --TEST--
 018: FOLD: signed MOD INT8_MIN by minus one not folded
---ARGS--
--O2 --save
 --CODE--
 {
 	int8_t c_1 = -128;
