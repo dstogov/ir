@@ -1,7 +1,5 @@
 --TEST--
 RA: dead PHI coalesced into a live interval breaks splitting of inactive intervals (FP registers)
---ARGS--
--O1 --run
 --CODE--
 func f0(): double
 {

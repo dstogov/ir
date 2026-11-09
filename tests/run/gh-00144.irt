@@ -1,7 +1,5 @@
 --TEST--
 GH-144: incorrect Switch =>default_label not emitted
---ARGS--
---run
 --CODE--
 func test(int32_t): void
 {

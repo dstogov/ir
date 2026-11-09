@@ -1,7 +1,5 @@
 --TEST--
 RA: dead PHIs of the same merge must not share a register
---ARGS--
--O1 --run
 --CODE--
 func h(double, double): double
 {

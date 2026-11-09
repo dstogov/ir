@@ -1,7 +1,5 @@
 --TEST--
 GH-107: incorrect compilation of VADDR at -O0
---ARGS--
--O0 --run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func print_i32(int32_t): void;

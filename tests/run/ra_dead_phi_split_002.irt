@@ -1,7 +1,5 @@
 --TEST--
 RA: dead PHI coalesced into a live interval breaks splitting of inactive intervals (GP registers)
---ARGS--
--O1 --run
 --CODE--
 func f0(): int32_t
 {
