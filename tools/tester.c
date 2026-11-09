@@ -172,6 +172,14 @@ static test *parse_file(const char *filename)
 			last_section = section;
 		}
 	}
+
+	if (last_section && last_section != &t->code) {
+		/* Trim terminating EOL(s) */
+		size_t last_section_start = *last_section - buf;
+		size_t end = last_section_start + strlen(*last_section);
+		while (end > last_section_start && (buf[end - 1] == '\r' || buf[end - 1] == '\n')) end--;
+		buf[end] = 0;
+	}
 	return t;
 }
 
