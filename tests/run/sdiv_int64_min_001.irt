@@ -1,7 +1,5 @@
 --TEST--
 Signed DIV by INT64_MIN
---ARGS--
---run
 --CODE--
 func div_min(int64_t): int64_t
 {

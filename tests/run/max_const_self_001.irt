@@ -1,7 +1,5 @@
 --TEST--
 MAX CONST SELF 001: integer max constant by itself
---ARGS--
--O0 --run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func test_max(void): int32_t

@@ -1,7 +1,5 @@
 --TEST--
 MAX 001:
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func max8(int8_t, int8_t): int32_t

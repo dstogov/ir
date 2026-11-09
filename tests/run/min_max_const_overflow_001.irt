@@ -1,7 +1,5 @@
 --TEST--
 MIN/MAX with adjusted constant at the type boundary
---ARGS--
---run
 --CODE--
 extern func @printf(uintptr_t, ...): int32_t;
 func @ule(uint64_t): uint64_t

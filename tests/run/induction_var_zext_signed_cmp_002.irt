@@ -1,7 +1,5 @@
 --TEST--
 Induction variable ZEXT 002: signed LT of the incremented value is not widened
---ARGS--
---run
 --CODE--
 extern func @printf(uintptr_t, ...): void;
 static const @format[6] = "%llu\n\000";

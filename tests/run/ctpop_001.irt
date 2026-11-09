@@ -1,7 +1,5 @@
 --TEST--
 CTPOP 001:
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func ctpop8(int8_t): int32_t

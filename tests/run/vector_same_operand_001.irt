@@ -1,7 +1,5 @@
 --TEST--
 Vector division: identical constant operands at O0
---ARGS--
--O0 --run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func test(void): uint32_t

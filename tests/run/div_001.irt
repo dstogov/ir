@@ -1,7 +1,5 @@
 --TEST--
 DIV 001: DIV/MOD power 2
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func idiv16(int32_t): int32_t

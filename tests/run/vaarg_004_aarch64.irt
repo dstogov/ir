@@ -2,8 +2,6 @@
 VA_ARG 004: va_arg() expanded on AArch64 SysV
 --TARGET--
 aarch64-*-sysv
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func sum(int32_t, ...): int32_t

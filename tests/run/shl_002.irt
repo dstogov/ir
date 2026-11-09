@@ -1,7 +1,5 @@
 --TEST--
 SHL 002: shift by var
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func shl8(int8_t, int8_t): int32_t

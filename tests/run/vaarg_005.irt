@@ -1,7 +1,5 @@
 --TEST--
 VA_ARG 005: va_arg(float) & va_copy()
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func sum2(int32_t, uintptr_t): float

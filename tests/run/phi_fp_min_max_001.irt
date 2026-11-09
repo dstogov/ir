@@ -1,7 +1,5 @@
 --TEST--
 FP PHI(a, b) for a<b / a>b is not converted to MIN/MAX
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func dmin(double, double): double

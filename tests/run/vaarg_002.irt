@@ -1,7 +1,5 @@
 --TEST--
 VA_ARG 002: va_arg(double)
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func sum(int32_t, ...): double

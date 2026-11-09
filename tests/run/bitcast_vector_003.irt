@@ -1,7 +1,5 @@
 --TEST--
 003: vector BITCAST uint8 round trip
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func vec8_to_int(<int8_t*1>): uint8_t

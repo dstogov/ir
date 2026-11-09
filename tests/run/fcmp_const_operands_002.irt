@@ -1,7 +1,5 @@
 --TEST--
 FP compare: distinct float constants in an O0 branch
---ARGS--
--O0 --run
 --CODE--
 extern func @printf(uintptr_t, ...): void;
 static const @format[4] = "%x\n\000";

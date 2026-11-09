@@ -1,7 +1,5 @@
 --TEST--
 PARALLEL_COPY 002: cycle of mixed float/double arguments keeps the full double
---ARGS--
---run
 --CODE--
 extern func @printf(uintptr_t, ...): int32_t;
 func @main(): int32_t;

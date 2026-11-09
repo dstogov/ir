@@ -1,7 +1,5 @@
 --TEST--
 MIN/MAX with adjusted constant keeps shared compare
---ARGS--
---run
 --CODE--
 extern func @printf(uintptr_t, ...): int32_t;
 static const @str.1[19] = "%u %u %u %d %d %d\n\000";

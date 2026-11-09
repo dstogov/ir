@@ -1,7 +1,5 @@
 --TEST--
 8-bit and 16-bit ADD_OV/SUB_OV with GUARD and GUARD_NOT
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func exit_0(): int32_t

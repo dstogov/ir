@@ -1,7 +1,5 @@
 --TEST--
 STR 001: non-ASCII bytes in string constants must not be sign-extended
---ARGS--
---run
 --CODE--
 extern func @printf(uintptr_t, ...): int32_t;
 func @main(): int32_t

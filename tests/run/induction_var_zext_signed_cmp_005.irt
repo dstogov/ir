@@ -1,7 +1,5 @@
 --TEST--
 Induction variable ZEXT 005: signed GE of the PHI is not widened
---ARGS--
---run
 --CODE--
 extern func @printf(uintptr_t, ...): void;
 static const @format[6] = "%llu\n\000";

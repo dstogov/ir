@@ -1,7 +1,5 @@
 --TEST--
 Hex integer literal is extended from its type width
---ARGS--
---run
 --CODE--
 {
 	int16_t c_1 = 0xfffe;

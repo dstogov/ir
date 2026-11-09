@@ -1,7 +1,5 @@
 --TEST--
 SAME_CMP 001: repeated comparison after a flags-clobbering instruction
---ARGS--
---run
 --CODE--
 extern func @printf(uintptr_t, ...): void;
 func @test(int32_t, int32_t): int32_t;

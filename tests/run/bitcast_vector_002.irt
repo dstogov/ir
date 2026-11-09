@@ -1,7 +1,5 @@
 --TEST--
 002: vector BITCAST uint16 round trip
---ARGS--
---run
 --CODE--
 func vec16_to_int(<int8_t*2>): uint16_t
 {

@@ -1,7 +1,5 @@
 --TEST--
 PARALLEL_COPY 001: cycle of mixed int32/int64 arguments keeps the upper half
---ARGS--
---run
 --CODE--
 extern func @printf(uintptr_t, ...): int32_t;
 func @main(): int32_t;

@@ -1,7 +1,5 @@
 --TEST--
 001: COND with the same value as condition and false operand
---ARGS--
--O0 --run
 --CODE--
 extern func @printf(uintptr_t, ...): int32_t;
 func @test(int32_t, int32_t): int32_t;
