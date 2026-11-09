@@ -1,7 +1,5 @@
 --TEST--
 Abort on LOAD without a type
---ARGS--
---run
 --CODE--
 func test(uintptr_t): int32_t
 {

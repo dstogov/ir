@@ -1,7 +1,5 @@
 --TEST--
 Abort on PHI without a type
---ARGS--
---run
 --CODE--
 func test(bool): int32_t
 {

@@ -1,7 +1,5 @@
 --TEST--
 Abort on PARAM without a type
---ARGS--
---run
 --CODE--
 func test(int32_t): int32_t
 {

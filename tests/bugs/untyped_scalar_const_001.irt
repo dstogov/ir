@@ -1,7 +1,5 @@
 --TEST--
 Abort on scalar constant initializer without a type
---ARGS--
---run
 --CODE--
 func main(): int32_t
 {

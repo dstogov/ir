@@ -1,7 +1,5 @@
 --TEST--
 Reject vectors of uintptr_t
---ARGS--
---run
 --CODE--
 func main(): int32_t
 {

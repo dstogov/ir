@@ -1,7 +1,7 @@
 --TEST--
 Abort on invalid free of const data when a const symbol is declared twice
 --ARGS--
---run
+-S
 --CODE--
 const c1[4] = {
 	int32_t 1,

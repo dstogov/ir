@@ -1,7 +1,5 @@
 --TEST--
 Abort on vector constant initializer with too many elements
---ARGS--
---run
 --CODE--
 func main(): int32_t
 {
