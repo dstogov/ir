@@ -308,7 +308,7 @@ static char *replace_extension(const char *filename, size_t len, const char *ext
 	return ret;
 }
 
-static int run_test(const char *filename, test *t, int show_diff)
+static int run_test(const char *filename, test *t, int show_diff, const char *args)
 {
 	size_t len;
 	int ret;
@@ -342,7 +342,7 @@ static int run_test(const char *filename, test *t, int show_diff)
 	if ((size_t)snprintf(cmd, sizeof(cmd), "%s %s %s %s > %s 2>&1",
 			test_cmd, code_filename,
 			additional_args,
-			t->args ? t->args : default_args,
+			args,
 			out_filename) > sizeof(cmd)) {
 		free(code_filename);
 		free(out_filename);
@@ -604,6 +604,7 @@ int main(int argc, char **argv)
 	int broken = 0, broken_limit = 0;
 	test *t, **xfailed_tests = NULL, **warned_tests = NULL, **failed_tests = NULL;
 	char **broken_tests = NULL;
+	char *args, *next_args;
 
 	for (i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
@@ -672,6 +673,8 @@ int main(int argc, char **argv)
 
 	// Run each test
 	for (i = 0; i < files_count; i++) {
+		int ok = 0;
+
 		t = parse_file(files[i], i);
 		if (!t) {
 			printf("\r");
@@ -692,12 +695,46 @@ int main(int argc, char **argv)
 			printf(": %s [%s]\n", t->name, files[i]);
 			skipped++;
 			free(t);
-		} else if (run_test(files[i], t, show_diff)) {
+			continue;
+		}
+
+		if (t->args) {
+			args = t->args;
+try_args:
+			next_args = strchr(args, '\n');
+			if (next_args) {
+				char *s = next_args;
+				next_args++;
+				while (*next_args == '\r' || *next_args == '\n' || *next_args == ' ' || *next_args == '\t') {
+					next_args++;
+				}
+				if (*next_args == '\0') {
+					next_args = NULL;
+				}
+				do {
+					*s = '\0';
+					s--;
+					if (s == args) {
+						if (!next_args) continue;
+						args = next_args;
+						goto try_args;
+					}
+				} while (*s == '\r' || *s == ' ' || *s == '\t');
+			}
+		} else {
+			args = (char*)default_args;
+		}
+
+		if (run_test(files[i], t, show_diff, args)) {
 			printf("\r");
 			passed++;
 			if (t->xfail) {
 				print_color("WARN", YELLOW);
-				printf(": %s [%s] (warn: XFAIL section but test passes)\n", t->name, files[i]);
+				if (args) {
+					printf(": %s [%s] (%s) (warn: XFAIL section but test passes)\n", t->name, files[i], args);
+				} else {
+					printf(": %s [%s] (warn: XFAIL section but test passes)\n", t->name, files[i]);
+				}
 				if (warned >= warned_limit) {
 					warned_limit += 1024;
 					warned_tests = realloc(warned_tests, sizeof(test*) * warned_limit);
@@ -705,13 +742,21 @@ int main(int argc, char **argv)
 				warned_tests[warned++] = t;
 			} else {
 				print_color("PASS", GREEN);
-				printf(": %s [%s]\n", t->name, files[i]);
-				free(t);
+				if (args) {
+					printf(": %s [%s] (%s)\n", t->name, files[i], args);
+				} else {
+					printf(": %s [%s]\n", t->name, files[i]);
+				}
+				ok = 1;
 			}
 		} else if (t->xfail) {
 			printf("\r");
 			print_color("XFAIL", RED);
-			printf(": %s [%s]\n", t->name, files[i]);
+			if (args) {
+				printf(": %s [%s] (%s)\n", t->name, files[i], args);
+			} else {
+				printf(": %s [%s]\n", t->name, files[i]);
+			}
 			if (xfailed >= xfailed_limit) {
 				xfailed_limit += 1024;
 				xfailed_tests = realloc(xfailed_tests, sizeof(test*) * xfailed_limit);
@@ -720,12 +765,24 @@ int main(int argc, char **argv)
 		} else {
 			printf("\r");
 			print_color("FAIL", RED);
-			printf(": %s [%s]\n", t->name, files[i]);
+			if (args) {
+				printf(": %s [%s] (%s)\n", t->name, files[i], args);
+			} else {
+				printf(": %s [%s]\n", t->name, files[i]);
+			}
 			if (failed >= failed_limit) {
 				failed_limit += 1024;
 				failed_tests = realloc(failed_tests, sizeof(test*) * failed_limit);
 			}
 			failed_tests[failed++] = t;
+		}
+
+		if (next_args) {
+			args = next_args;
+			goto try_args;
+		}
+		if (ok) {
+			free(t);
 		}
 	}
 
@@ -733,15 +790,16 @@ int main(int argc, char **argv)
 	printf("-------------------------------\n");
 	printf("Test Sumary\n");
 	printf("-------------------------------\n");
-	printf("Total: %d\n", files_count);
-	printf("Passed: %d\n", passed);
-	printf("Skipped: %d\n", skipped);
-	printf("Expected fail: %d\n", xfailed);
-	printf("Warned: %d\n", warned);
-	printf("Failed: %d\n", failed);
+	printf("Test Files: %d\n", files_count);
 	if (broken) {
 		printf("Broken: %d\n", broken);
 	}
+	printf("Skipped: %d\n", skipped);
+	printf("Test Runs: %d\n", passed + xfailed + failed);
+	printf("Passed: %d\n", passed);
+	printf("Expected fail: %d\n", xfailed);
+	printf("Warned: %d\n", warned);
+	printf("Failed: %d\n", failed);
 	if (xfailed > 0) {
 		printf("-------------------------------\n");
 		printf("EXPECTED FAILED TESTS\n");

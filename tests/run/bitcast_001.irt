@@ -2,6 +2,10 @@
 BITCAST 001: regression float constant to integer bits
 --ARGS--
 -O0 --run
+-O1 --run
+-O2 --run
+-O2 -fno-inline --run
+-O2 -fno-inline -fno-mem2ssa --run
 --CODE--
 extern func @printf(uintptr_t, ...): void;
 static const @format[4] = "%x\n\000";
