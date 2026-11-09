@@ -49,6 +49,7 @@ typedef struct _test {
 	char *expect;
 	char *xfail;
 	char *ext;
+	char *run_args;
 } test;
 
 static int colorize = 1;
@@ -176,6 +177,90 @@ static test *parse_file(const char *filename, int id)
 	}
 	t->id = id;
 	return t;
+}
+
+static test *dup_test(const test *t, const char *args)
+{
+	test *copy;
+	size_t size = strlen(t->name) + 1;
+	char *buf;
+
+	if (t->target) {
+		size += strlen(t->target) + 1;
+	}
+	if (args) {
+		size += strlen(args) + 1;
+	}
+	if (t->code) {
+		size += strlen(t->code) + 1;
+	}
+	if (t->expect) {
+		size += strlen(t->expect) + 1;
+	}
+	if (t->ext) {
+		size += strlen(t->ext) + 1;
+	}
+	if (t->xfail) {
+		size += strlen(t->xfail) + 1;
+	}
+
+	copy = malloc(sizeof(test) + size);
+	if (!copy) {
+		return NULL;
+	}
+	buf = (char*)copy + sizeof(test);
+
+	memset(copy, 0, sizeof(test));
+	copy->id = t->id;
+
+	copy->name = buf;
+	size = strlen(t->name);
+	memcpy(buf, t->name, size + 1);
+	buf += size + 1;
+
+	if (t->target) {
+		copy->target = buf;
+		size = strlen(t->target);
+		memcpy(buf, t->target, size + 1);
+		buf += size + 1;
+	}
+
+	if (args) {
+		copy->args = copy->run_args = buf;
+		size = strlen(args);
+		memcpy(buf, args, size + 1);
+		buf += size + 1;
+	}
+
+	if (t->code) {
+		copy->code = buf;
+		size = strlen(t->code);
+		memcpy(buf, t->code, size + 1);
+		buf += size + 1;
+	}
+
+	if (t->expect) {
+		copy->expect = buf;
+		size = strlen(t->expect);
+		memcpy(buf, t->expect, size + 1);
+		buf += size + 1;
+	}
+
+	if (t->ext) {
+		copy->ext = buf;
+		size = strlen(t->ext);
+		memcpy(buf, t->ext, size + 1);
+		buf += size + 1;
+	}
+
+	if (t->xfail) {
+		copy->xfail = buf;
+		size = strlen(t->xfail);
+		memcpy(buf, t->xfail, size + 1);
+		buf += size + 1;
+	}
+
+	return copy;
 }
 
 static int match(const char *pattern, const char *str, int single)
@@ -605,6 +690,7 @@ int main(int argc, char **argv)
 	test *t, **xfailed_tests = NULL, **warned_tests = NULL, **failed_tests = NULL;
 	char **broken_tests = NULL;
 	char *args, *next_args;
+	int may_free;
 
 	for (i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
@@ -673,8 +759,6 @@ int main(int argc, char **argv)
 
 	// Run each test
 	for (i = 0; i < files_count; i++) {
-		int ok = 0;
-
 		t = parse_file(files[i], i);
 		if (!t) {
 			printf("\r");
@@ -698,6 +782,8 @@ int main(int argc, char **argv)
 			continue;
 		}
 
+		may_free = 1;
+		next_args = NULL;
 		if (t->args) {
 			args = t->args;
 try_args:
@@ -739,7 +825,13 @@ try_args:
 					warned_limit += 1024;
 					warned_tests = realloc(warned_tests, sizeof(test*) * warned_limit);
 				}
+				if (t->run_args) {
+					t = dup_test(t, args);
+				} else {
+					t->run_args = args;
+				}
 				warned_tests[warned++] = t;
+				may_free = 0;
 			} else {
 				print_color("PASS", GREEN);
 				if (args) {
@@ -747,7 +839,6 @@ try_args:
 				} else {
 					printf(": %s [%s]\n", t->name, files[i]);
 				}
-				ok = 1;
 			}
 		} else if (t->xfail) {
 			printf("\r");
@@ -761,7 +852,13 @@ try_args:
 				xfailed_limit += 1024;
 				xfailed_tests = realloc(xfailed_tests, sizeof(test*) * xfailed_limit);
 			}
+			if (t->run_args) {
+				t = dup_test(t, args);
+			} else {
+				t->run_args = args;
+			}
 			xfailed_tests[xfailed++] = t;
+			may_free = 0;
 		} else {
 			printf("\r");
 			print_color("FAIL", RED);
@@ -774,14 +871,20 @@ try_args:
 				failed_limit += 1024;
 				failed_tests = realloc(failed_tests, sizeof(test*) * failed_limit);
 			}
+			if (t->run_args) {
+				t = dup_test(t, args);
+			} else {
+				t->run_args = args;
+			}
 			failed_tests[failed++] = t;
+			may_free = 0;
 		}
 
 		if (next_args) {
 			args = next_args;
 			goto try_args;
 		}
-		if (ok) {
+		if (may_free) {
 			free(t);
 		}
 	}
@@ -806,7 +909,11 @@ try_args:
 		printf("-------------------------------\n");
 		for (i = 0; i < xfailed; i++) {
 			t = xfailed_tests[i];
-			printf("%s [%s] XFAIL REASON: %s\n", t->name, files[t->id], t->xfail);
+			if (t->run_args) {
+				printf("%s [%s] (%s) XFAIL REASON: %s\n", t->name, files[t->id], t->run_args, t->xfail);
+			} else {
+				printf("%s [%s] XFAIL REASON: %s\n", t->name, files[t->id], t->xfail);
+			}
 			free(t);
 		}
 		free(xfailed_tests);
@@ -817,7 +924,11 @@ try_args:
 		printf("-------------------------------\n");
 		for (i = 0; i < warned; i++) {
 			t = warned_tests[i];
-			printf("%s [%s] WARN: XFAIL reason \"%s\" but test passes\n", t->name, files[t->id], t->xfail);
+			if (t->run_args) {
+				printf("%s [%s] (%s) WARN: XFAIL reason \"%s\" but test passes\n", t->name, files[t->id], t->run_args, t->xfail);
+			} else {
+				printf("%s [%s] WARN: XFAIL reason \"%s\" but test passes\n", t->name, files[t->id], t->xfail);
+			}
 			free(t);
 		}
 		free(warned_tests);
@@ -828,7 +939,11 @@ try_args:
 		printf("-------------------------------\n");
 		for (i = 0; i < failed; i++) {
 			t = failed_tests[i];
-			printf("%s [%s]\n", t->name, files[t->id]);
+			if (t->run_args) {
+				printf("%s [%s] (%s)\n", t->name, files[t->id], t->run_args);
+			} else {
+				printf("%s [%s]\n", t->name, files[t->id]);
+			}
 			free(t);
 		}
 		free(failed_tests);
