@@ -1,0 +1,54 @@
+--TEST--
+DESSA 002: FP temporary spill around a constant move in a blocked blade
+--ARGS--
+-O1 --run
+--CODE--
+func h(double, double): double
+{
+	l_1 = START(l_5);
+	double d_2 = PARAM(l_1, "a", 1);
+	double d_3 = PARAM(l_1, "b", 2);
+	double d_4 = ADD(d_2, d_3);
+	l_5 = RETURN(l_1, d_4);
+}
+func test(double, double, double, double): double
+{
+	double c_1 = -4.5;
+	uintptr_t c_2 = func h(double, double): double;
+	l_1 = START(l_15);
+	double d_2 = PARAM(l_1, "p1", 1);
+	double d_3 = PARAM(l_1, "p2", 2);
+	double d_4 = PARAM(l_1, "p3", 3);
+	double d_5 = PARAM(l_1, "p4", 4);
+	bool d_6 = LT(d_3, d_2);
+	l_7 = IF(l_1, d_6);
+	l_8 = IF_TRUE(l_7);
+	double d_9, l_9 = CALL/2(l_8, c_2, d_5, d_3);
+	l_10 = END(l_9);
+	l_11 = IF_FALSE(l_7);
+	l_12 = END(l_11);
+	l_13 = MERGE(l_10, l_12);
+	double d_14 = PHI(l_13, c_1, d_4);
+	double d_15 = PHI(l_13, d_4, c_1);
+	double d_16 = MUL(d_15, d_2);
+	double d_17 = MUL(d_14, d_14);
+	double d_18 = ADD(d_16, d_17);
+	l_15 = RETURN(l_13, d_18);
+}
+func main(): int32_t
+{
+	int32_t c_1 = 0;
+	double c_2 = 3;
+	double c_3 = 5;
+	double c_4 = 7;
+	double c_5 = 11;
+	uintptr_t c_6 = func printf(uintptr_t, ...): int32_t;
+	uintptr_t c_7 = func test(double, double, double, double): double;
+	uintptr_t c_8 = "%g\n";
+	l_1 = START(l_4);
+	double d_2, l_2 = CALL/4(l_1, c_7, c_2, c_3, c_4, c_5);
+	int32_t d_3, l_3 = CALL/2(l_2, c_6, c_8, d_2);
+	l_4 = RETURN(l_3, c_1);
+}
+--EXPECT--
+35.5
