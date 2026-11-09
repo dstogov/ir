@@ -1,0 +1,105 @@
+--TEST--
+RA: dead PHI coalesced into a live interval breaks splitting of inactive intervals (FP registers)
+--ARGS--
+-O1 --run
+--CODE--
+func f0(): double
+{
+	double c = 2;
+	l_1 = START(l_2);
+	l_2 = RETURN(l_1, c);
+}
+func f4(double, double, double, double): double
+{
+	l_1 = START(l_2);
+	double a = PARAM(l_1, "a", 1);
+	double b = PARAM(l_1, "b", 2);
+	double c = PARAM(l_1, "c", 3);
+	double d = PARAM(l_1, "d", 4);
+	l_2 = RETURN(l_1, a);
+}
+func test(double, double, double, double): double
+{
+	uintptr_t c_1 = func f0(): double;
+	uintptr_t c_2 = func f4(double, double, double, double): double;
+	l_1 = START(l_63);
+	double d_2 = PARAM(l_1, "p0", 1);
+	double d_3 = PARAM(l_1, "p1", 2);
+	double d_4 = PARAM(l_1, "p2", 3);
+	double d_5 = PARAM(l_1, "p3", 4);
+	l_6 = END(l_1);
+	l_7 = LOOP_BEGIN(l_6, l_12);
+	double d_8 = MIN(d_2, d_5);
+	bool d_9 = NE(d_8, d_5);
+	l_10 = IF(l_7, d_9);
+	l_11 = IF_TRUE(l_10);
+	l_12 = LOOP_END(l_11);
+	l_13 = IF_FALSE(l_10);
+	l_14 = END(l_13);
+	l_15 = LOOP_BEGIN(l_14, l_20);
+	double d_16 = PHI(l_15, d_2, d_3);
+	double d_17 = MUL(d_16, d_2);
+	l_18 = IF(l_15, d_9);
+	l_19 = IF_TRUE(l_18);
+	l_20 = LOOP_END(l_19);
+	l_21 = IF_FALSE(l_18);
+	double d_22, l_22 = CALL(l_21, c_1);
+	l_23 = IF(l_22, d_9);
+	l_24 = IF_TRUE(l_23);
+	l_25 = END(l_24);
+	l_26 = IF_FALSE(l_23);
+	l_27 = END(l_26);
+	l_28 = MERGE(l_25, l_27);
+	double d_29 = PHI(l_28, d_2, d_3);
+	double d_30, l_30 = CALL(l_28, c_1);
+	l_31 = END(l_30);
+	l_32 = LOOP_BEGIN(l_31, l_37);
+	double d_33 = PHI(l_32, d_2, d_34);
+	double d_34 = MUL(d_33, d_30);
+	l_35 = IF(l_32, d_9);
+	l_36 = IF_TRUE(l_35);
+	l_37 = LOOP_END(l_36);
+	l_38 = IF_FALSE(l_35);
+	double d_39, l_39 = CALL(l_38, c_1);
+	bool d_40 = EQ(d_30, d_2);
+	l_41 = IF(l_39, d_40);
+	l_42 = IF_TRUE(l_41);
+	l_43 = END(l_42);
+	l_44 = IF_FALSE(l_41);
+	l_45 = END(l_44);
+	l_46 = MERGE(l_43, l_45);
+	double d_47 = PHI(l_46, d_2, d_30);
+	double d_48, l_48 = CALL/4(l_46, c_2, d_17, d_22, d_29, d_4);
+	bool d_49 = LE(d_34, d_2);
+	l_50 = IF(l_48, d_49);
+	l_51 = IF_TRUE(l_50);
+	l_52 = END(l_51);
+	l_53 = IF_FALSE(l_50);
+	l_54 = END(l_53);
+	l_55 = MERGE(l_52, l_54);
+	float d_56 = FP2FP(d_47);
+	l_57 = END(l_55);
+	l_58 = LOOP_BEGIN(l_57, l_61);
+	l_59 = IF(l_58, d_9);
+	l_60 = IF_TRUE(l_59);
+	l_61 = LOOP_END(l_60);
+	l_62 = IF_FALSE(l_59);
+	l_63 = RETURN(l_62, d_3);
+}
+func main(): int32_t
+{
+	int32_t c_0 = 0;
+	double a = 3;
+	double b = 5;
+	double c = 7;
+	double d = -1e19;
+	uintptr_t f = func printf(uintptr_t, ...): int32_t;
+	uintptr_t t = func test(double, double, double, double): double;
+	uintptr_t fmt = "%g\n";
+	l_1 = START(l_4);
+	double r, l_2 = CALL/4(l_1, t, a, b, c, d);
+	int32_t z, l_3 = CALL/2(l_2, f, fmt, r);
+	l_4 = RETURN(l_3, c_0);
+}
+--EXPECT--
+5
