@@ -231,11 +231,17 @@ static void ir_emit_c_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 		} else {
 			ir_print_const(ctx, insn, f, true);
 		}
+	} else if (insn->type == IR_I64 && insn->val.i64 == INT64_MIN) {
+		/* "-9223372036854775808" would negate an unsigned literal */
+		fprintf(f, "(-9223372036854775807-1)");
 	} else {
 		if (insn->op == IR_SYM) {
 			fprintf(f, "&");
 		}
 		ir_print_const(ctx, insn, f, true);
+		if (insn->type == IR_U64 && insn->val.u64 > INT64_MAX) {
+			fprintf(f, "ULL");
+		}
 	}
 }
 
