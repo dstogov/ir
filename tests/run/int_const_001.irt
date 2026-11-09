@@ -1,7 +1,5 @@
 --TEST--
 Decimal integer literal is extended from its type width
---ARGS--
---run
 --CODE--
 {
 	int8_t c_1 = 200;

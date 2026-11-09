@@ -1,7 +1,5 @@
 --TEST--
 Nested loop invariant initialization after an entry predecessor
---ARGS--
---run
 --CODE--
 {
 	int32_t c_1 = 0;

@@ -1,7 +1,5 @@
 --TEST--
 001: vector DIV expand keeps scalar args live
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func test(<uint32_t*4>, <uint32_t*4>, uint32_t, uint32_t, uint32_t, uint32_t): uint32_t;

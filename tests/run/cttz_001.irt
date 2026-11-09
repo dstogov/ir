@@ -1,7 +1,5 @@
 --TEST--
 CTTZ 001:
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func cttz8(int8_t): int32_t

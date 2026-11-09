@@ -1,7 +1,5 @@
 --TEST--
 003: LE on uint16_t constants after PHI is signed
---ARGS--
---run
 --CODE--
 extern func @printf(uintptr_t, ...): int32_t;
 static const @fmt[4] = "%d\n\000";

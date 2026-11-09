@@ -1,7 +1,5 @@
 --TEST--
 LOAD and STORE of 2-bytes vectors
---ARGS--
---run
 --CODE--
 extern func @printf(uintptr_t, ...): int32_t;
 static const @str.1[13] = "%d %d %d %d\n\000";

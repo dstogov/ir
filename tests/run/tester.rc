@@ -1,0 +1,6 @@
+--ARGS--
+-O0 --run
+-O1 --run
+-O2 --run
+-O2 -fno-inline --run
+-O2 -fno-inline -fno-mem2ssa --run

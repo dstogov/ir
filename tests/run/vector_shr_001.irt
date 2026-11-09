@@ -1,7 +1,5 @@
 --TEST--
 001: vector SHR expand keeps scalar args live
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func test(<uint8_t*16>, <uint8_t*16>, uint32_t, uint32_t, uint32_t, uint32_t): uint32_t;

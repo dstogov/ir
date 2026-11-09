@@ -1,7 +1,5 @@
 --TEST--
 Unsigned DIV(NEG(x), NEG(y))
---ARGS--
---run
 --CODE--
 func div_neg_neg(uint32_t, uint32_t): uint32_t
 {

@@ -1,7 +1,5 @@
 --TEST--
 ROL 001: shift by const
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func rol8(int8_t): int32_t

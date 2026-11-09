@@ -1,7 +1,7 @@
 --TEST--
 Unsigned SUB_OV with GUARD and GUARD_NOT (32-bit and 64-bit)
 --ARGS--
---run
+-O2 --run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func exit_0(): int32_t

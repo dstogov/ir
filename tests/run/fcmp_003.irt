@@ -1,7 +1,5 @@
 --TEST--
 Floating Point number comparison (003: CMP+IF edge cases)
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 extern func putchar(int32_t): int32_t;

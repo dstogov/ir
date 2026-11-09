@@ -1,7 +1,5 @@
 --TEST--
 Character literal is extended from its type width
---ARGS--
---run
 --CODE--
 {
 	uint8_t c_1 = '\377';

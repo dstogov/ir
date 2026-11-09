@@ -1,7 +1,5 @@
 --TEST--
 DIV(NEG(x), NEG(y)) with x = INT32_MIN
---ARGS--
---run
 --CODE--
 func div_neg_neg(int32_t, int32_t): int32_t
 {

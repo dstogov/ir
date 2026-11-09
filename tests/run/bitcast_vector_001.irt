@@ -1,7 +1,5 @@
 --TEST--
 001: vector BITCAST uint64 round trip
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func vec64_to_int(<int32_t*2>): uint64_t

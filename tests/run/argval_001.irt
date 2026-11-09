@@ -1,7 +1,5 @@
 --TEST--
 001: ARGVAL:
---ARGS--
---run
 --CODE--
 extern func @memcpy(uintptr_t, uintptr_t, uint64_t): uintptr_t;
 extern func @memset(uintptr_t, int32_t, uint64_t): uintptr_t;

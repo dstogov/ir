@@ -1,7 +1,5 @@
 --TEST--
 Loop invariant initialization in an irreducible loop entered after an entry
---ARGS--
---run
 --CODE--
 {
 	int32_t c_1 = 0;

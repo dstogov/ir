@@ -1,7 +1,5 @@
 --TEST--
 SHR 003: shuif by const (out of range)
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func shr8(int8_t): int32_t

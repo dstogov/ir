@@ -1,7 +1,5 @@
 --TEST--
 DESSA 002: FP temporary spill around a constant move in a blocked blade
---ARGS--
--O1 --run
 --CODE--
 func h(double, double): double
 {

@@ -1,7 +1,5 @@
 --TEST--
 INT2FP 002:
---ARGS--
---run
 --CODE--
 func @main(): int32_t;
 extern func @printf(uintptr_t, ...): int32_t;

@@ -1,7 +1,5 @@
 --TEST--
 ROL 003: shift by const (out of range)
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func rol8(int8_t): int32_t

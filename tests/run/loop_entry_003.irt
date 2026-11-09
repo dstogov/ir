@@ -1,7 +1,5 @@
 --TEST--
 Loop invariant initialization after an indirect entry predecessor
---ARGS--
---run
 --CODE--
 {
 	int32_t c_1 = 0;

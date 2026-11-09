@@ -1,7 +1,5 @@
 --TEST--
 SWITCH with CASE_VAL and CASE_RANGE on reserved constants (true, false, NULL)
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func select_bool(bool): int32_t

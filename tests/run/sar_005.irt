@@ -1,7 +1,5 @@
 --TEST--
 SAR 005: shift by var computed from op1
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func sar8(int8_t): int32_t

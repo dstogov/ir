@@ -1,7 +1,5 @@
 --TEST--
 BIC 001: AND(x, NOT(y)) results
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func bic32(int32_t, int32_t): int32_t
