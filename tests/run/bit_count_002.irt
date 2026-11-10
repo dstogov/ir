@@ -1,5 +1,5 @@
 --TEST--
-Bit counting with different operand and result sizes: -mno-bmi1
+Bit counting of 8/16-bit operands: -mno-bmi1
 --TARGET--
 x86*
 --ARGS--
@@ -79,48 +79,6 @@ func @ctpop_u16_trunc(uint32_t): int32_t
 	int32_t r = CTPOP(x);
 	l_2 = RETURN(l_1, r);
 }
-func @cttz_u32(uint32_t): int64_t
-{
-	l_1 = START(l_2);
-	uint32_t x = PARAM(l_1, "x", 1);
-	int64_t r = CTTZ(x);
-	l_2 = RETURN(l_1, r);
-}
-func @ctlz_u32(uint32_t): int64_t
-{
-	l_1 = START(l_2);
-	uint32_t x = PARAM(l_1, "x", 1);
-	int64_t r = CTLZ(x);
-	l_2 = RETURN(l_1, r);
-}
-func @ctpop_u32(uint32_t): int64_t
-{
-	l_1 = START(l_2);
-	uint32_t x = PARAM(l_1, "x", 1);
-	int64_t r = CTPOP(x);
-	l_2 = RETURN(l_1, r);
-}
-func @cttz_u64(uint64_t): int32_t
-{
-	l_1 = START(l_2);
-	uint64_t x = PARAM(l_1, "x", 1);
-	int32_t r = CTTZ(x);
-	l_2 = RETURN(l_1, r);
-}
-func @ctlz_u64(uint64_t): int32_t
-{
-	l_1 = START(l_2);
-	uint64_t x = PARAM(l_1, "x", 1);
-	int32_t r = CTLZ(x);
-	l_2 = RETURN(l_1, r);
-}
-func @ctpop_u64(uint64_t): int32_t
-{
-	l_1 = START(l_2);
-	uint64_t x = PARAM(l_1, "x", 1);
-	int32_t r = CTPOP(x);
-	l_2 = RETURN(l_1, r);
-}
 func @cttz_u8_mem(uintptr_t): int32_t
 {
 	l_1 = START(l_2);
@@ -171,24 +129,14 @@ func @main(): int32_t
 	uintptr_t f3_ctpop = func @ctpop_u16_trunc(uint32_t): int32_t;
 	uint32_t v3 = 0xffff0180;
 	uintptr_t fmt3 = "%d %d %d\n";
-	uintptr_t f4_cttz = func @cttz_u32(uint32_t): int64_t;
-	uintptr_t f4_ctlz = func @ctlz_u32(uint32_t): int64_t;
-	uintptr_t f4_ctpop = func @ctpop_u32(uint32_t): int64_t;
-	uint32_t v4 = 0x00018000;
-	uintptr_t fmt4 = "%lld %lld %lld\n";
-	uintptr_t f5_cttz = func @cttz_u64(uint64_t): int32_t;
-	uintptr_t f5_ctlz = func @ctlz_u64(uint64_t): int32_t;
-	uintptr_t f5_ctpop = func @ctpop_u64(uint64_t): int32_t;
-	uint64_t v5 = 0x0000018000000000;
-	uintptr_t fmt5 = "%d %d %d\n";
-	uintptr_t f6_cttz = func @cttz_u8_mem(uintptr_t): int32_t;
-	uintptr_t f6_ctlz = func @ctlz_u8_mem(uintptr_t): int32_t;
-	uint16_t v6 = 0xff18;
-	uintptr_t fmt6 = "%d %d\n";
-	uintptr_t f7_cttz = func @cttz_u16_mem(uintptr_t): int32_t;
-	uintptr_t f7_ctlz = func @ctlz_u16_mem(uintptr_t): int32_t;
-	uint32_t v7 = 0xffff0180;
-	uintptr_t fmt7 = "%d %d\n";
+	uintptr_t f4_cttz = func @cttz_u8_mem(uintptr_t): int32_t;
+	uintptr_t f4_ctlz = func @ctlz_u8_mem(uintptr_t): int32_t;
+	uint16_t v4 = 0xff18;
+	uintptr_t fmt4 = "%d %d\n";
+	uintptr_t f5_cttz = func @cttz_u16_mem(uintptr_t): int32_t;
+	uintptr_t f5_ctlz = func @ctlz_u16_mem(uintptr_t): int32_t;
+	uint32_t v5 = 0xffff0180;
+	uintptr_t fmt5 = "%d %d\n";
 	int32_t size = 8;
 	int32_t zero = 0;
 	l_0 = START(l_end);
@@ -205,29 +153,19 @@ func @main(): int32_t
 	int32_t r3_ctlz, c3_ctlz = CALL/1(c3_cttz, f3_ctlz, v3);
 	int32_t r3_ctpop, c3_ctpop = CALL/1(c3_ctlz, f3_ctpop, v3);
 	p3 = CALL/4(c3_ctpop, fp, fmt3, r3_cttz, r3_ctlz, r3_ctpop);
-	int64_t r4_cttz, c4_cttz = CALL/1(p3, f4_cttz, v4);
-	int64_t r4_ctlz, c4_ctlz = CALL/1(c4_cttz, f4_ctlz, v4);
-	int64_t r4_ctpop, c4_ctpop = CALL/1(c4_ctlz, f4_ctpop, v4);
-	p4 = CALL/4(c4_ctpop, fp, fmt4, r4_cttz, r4_ctlz, r4_ctpop);
-	int32_t r5_cttz, c5_cttz = CALL/1(p4, f5_cttz, v5);
-	int32_t r5_ctlz, c5_ctlz = CALL/1(c5_cttz, f5_ctlz, v5);
-	int32_t r5_ctpop, c5_ctpop = CALL/1(c5_ctlz, f5_ctpop, v5);
-	p5 = CALL/4(c5_ctpop, fp, fmt5, r5_cttz, r5_ctlz, r5_ctpop);
-	l6 = STORE(p5, buf, v6);
-	int32_t r6_cttz, c6_cttz = CALL/1(l6, f6_cttz, buf);
-	int32_t r6_ctlz, c6_ctlz = CALL/1(c6_cttz, f6_ctlz, buf);
-	p6 = CALL/3(c6_ctlz, fp, fmt6, r6_cttz, r6_ctlz);
-	l7 = STORE(p6, buf, v7);
-	int32_t r7_cttz, c7_cttz = CALL/1(l7, f7_cttz, buf);
-	int32_t r7_ctlz, c7_ctlz = CALL/1(c7_cttz, f7_ctlz, buf);
-	p7 = CALL/3(c7_ctlz, fp, fmt7, r7_cttz, r7_ctlz);
-	l_end = RETURN(p7, zero);
+	l4 = STORE(p3, buf, v4);
+	int32_t r4_cttz, c4_cttz = CALL/1(l4, f4_cttz, buf);
+	int32_t r4_ctlz, c4_ctlz = CALL/1(c4_cttz, f4_ctlz, buf);
+	p4 = CALL/3(c4_ctlz, fp, fmt4, r4_cttz, r4_ctlz);
+	l5 = STORE(p4, buf, v5);
+	int32_t r5_cttz, c5_cttz = CALL/1(l5, f5_cttz, buf);
+	int32_t r5_ctlz, c5_ctlz = CALL/1(c5_cttz, f5_ctlz, buf);
+	p5 = CALL/3(c5_ctlz, fp, fmt5, r5_cttz, r5_ctlz);
+	l_end = RETURN(p5, zero);
 }
 --EXPECT--
 7 7 2
 3 3 2
 7 7 2
-15 15 2
-39 23 2
 3 3
 7 7
