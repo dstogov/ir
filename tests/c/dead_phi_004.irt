@@ -25,14 +25,14 @@ int32_t test(int32_t n)
 {
 	int32_t d_1 = n;
 	int32_t d_2;
-	bool d_4;
-	int32_t d_5;
+	bool d_3;
+	int32_t d_4;
 	d_2 = 0;
 bb2:
-	d_4 = d_2 < d_1;
-	if (!d_4) goto bb4;
-	d_5 = d_2 + 1;
-	d_2 = d_5;
+	d_3 = d_2 < d_1;
+	if (!d_3) goto bb4;
+	d_4 = d_2 + 1;
+	d_2 = d_4;
 	goto bb2;
 bb4:
 	return d_2;
