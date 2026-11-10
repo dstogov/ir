@@ -1,0 +1,74 @@
+--TEST--
+041: FOLD: CTLZ(ZEXT(x)) - (dst_bits - src_bits) => ZEXT(CTLZ(x))
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uint32_t c_4 = 24;
+	uint64_t c_5 = 48;
+	int32_t c_6 = 16;
+	uint64_t c_7 = 32;
+	int32_t c_8 = 32;
+	uint32_t c_9 = 48;
+	l_1 = START(l_30);
+	uint8_t d_2 = PARAM(l_1, "w", 1);
+	uint16_t d_3 = PARAM(l_1, "x", 2);
+	int16_t d_4 = PARAM(l_1, "y", 3);
+	uint32_t d_5 = PARAM(l_1, "z", 4);
+	uint32_t d_6 = ZEXT(d_2);
+	uint32_t d_7 = CTLZ(d_6);
+	uint32_t d_8 = SUB(d_7, c_4);
+	uint64_t d_9 = ZEXT(d_3);
+	uint64_t d_10 = CTLZ(d_9);
+	uint64_t d_11 = SUB(d_10, c_5);
+	int32_t d_12 = ZEXT(d_4);
+	int32_t d_13 = CTLZ(d_12);
+	int32_t d_14 = SUB(d_13, c_6);
+	uint32_t d_15 = BITCAST(d_14);
+	uint64_t d_16 = ZEXT(d_5);
+	uint64_t d_17 = CTLZ(d_16);
+	uint64_t d_18 = SUB(d_17, c_7);
+	int32_t d_19 = CTLZ(d_16);
+	int32_t d_20 = SUB(d_19, c_8);
+	uint32_t d_21 = BITCAST(d_20);
+	uint32_t d_22 = CTLZ(d_9);
+	uint32_t d_23 = SUB(d_22, c_9);
+	uint32_t d_24 = ADD(d_8, d_15);
+	uint32_t d_25 = ADD(d_24, d_21);
+	uint32_t d_26 = ADD(d_25, d_23);
+	uint64_t d_27 = ZEXT(d_26);
+	uint64_t d_28 = ADD(d_27, d_11);
+	uint64_t d_29 = ADD(d_28, d_18);
+	l_30 = RETURN(l_1, d_29);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	l_1 = START(l_24);
+	uint8_t d_2 = PARAM(l_1, "w", 1);
+	uint16_t d_3 = PARAM(l_1, "x", 2);
+	int16_t d_4 = PARAM(l_1, "y", 3);
+	uint32_t d_5 = PARAM(l_1, "z", 4);
+	uint8_t d_6 = CTLZ(d_2);
+	uint32_t d_7 = ZEXT(d_6);
+	uint16_t d_8 = CTLZ(d_3);
+	uint64_t d_9 = ZEXT(d_8);
+	int16_t d_10 = CTLZ(d_4);
+	int32_t d_11 = ZEXT(d_10);
+	uint32_t d_12 = BITCAST(d_11);
+	uint32_t d_13 = CTLZ(d_5);
+	uint64_t d_14 = ZEXT(d_13);
+	int32_t d_15 = CTLZ(d_5);
+	uint32_t d_16 = BITCAST(d_15);
+	uint32_t d_17 = ZEXT(d_8);
+	uint32_t d_18 = ADD(d_12, d_7);
+	uint32_t d_19 = ADD(d_18, d_16);
+	uint32_t d_20 = ADD(d_19, d_17);
+	uint64_t d_21 = ZEXT(d_20);
+	uint64_t d_22 = ADD(d_21, d_9);
+	uint64_t d_23 = ADD(d_22, d_14);
+	l_24 = RETURN(l_1, d_23);
+}

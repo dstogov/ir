@@ -1,0 +1,80 @@
+--TEST--
+CTLZ 003: CTLZ(ZEXT(x)) - (dst_bits - src_bits)
+--ARGS--
+--run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func ctlz16(uint16_t): uint32_t
+{
+	uint32_t c_1 = 16;
+	l_1 = START(l_6);
+	uint16_t d_2 = PARAM(l_1, "arg_1", 1);
+	uint32_t d_3 = ZEXT(d_2);
+	uint32_t d_4 = CTLZ(d_3);
+	uint32_t d_5 = SUB(d_4, c_1);
+	l_6 = RETURN(l_1, d_5);
+}
+func ctlz8(uint8_t): uint32_t
+{
+	uint32_t c_1 = 24;
+	l_1 = START(l_6);
+	uint8_t d_2 = PARAM(l_1, "arg_1", 1);
+	uint32_t d_3 = ZEXT(d_2);
+	uint32_t d_4 = CTLZ(d_3);
+	uint32_t d_5 = SUB(d_4, c_1);
+	l_6 = RETURN(l_1, d_5);
+}
+func ctlz32(uint32_t): int32_t
+{
+	int32_t c_1 = 32;
+	l_1 = START(l_6);
+	uint32_t d_2 = PARAM(l_1, "arg_1", 1);
+	uint64_t d_3 = ZEXT(d_2);
+	int32_t d_4 = CTLZ(d_3);
+	int32_t d_5 = SUB(d_4, c_1);
+	l_6 = RETURN(l_1, d_5);
+}
+func main(void): int32_t
+{
+	uintptr_t c_1 = func ctlz16(uint16_t): uint32_t;
+	uint16_t c_2 = 0;
+	uint16_t c_3 = 1;
+	uint16_t c_4 = 1536;
+	uint16_t c_5 = 32768;
+	uintptr_t c_6 = "u16: %u %u %u %u\n";
+	uintptr_t c_7 = func printf(uintptr_t, ...): int32_t;
+	uintptr_t c_8 = func ctlz8(uint8_t): uint32_t;
+	uint8_t c_9 = 0;
+	uint8_t c_10 = 1;
+	uint8_t c_11 = 96;
+	uint8_t c_12 = 128;
+	uintptr_t c_13 = "u8 : %u %u %u %u\n";
+	int32_t c_14 = 0;
+	uintptr_t c_15 = func ctlz32(uint32_t): int32_t;
+	uint32_t c_16 = 0;
+	uint32_t c_17 = 1;
+	uint32_t c_18 = 393216;
+	uint32_t c_19 = 2147483648;
+	uintptr_t c_20 = "u32: %d %d %d %d\n";
+	l_1 = START(l_17);
+	uint32_t d_2, l_2 = CALL/1(l_1, c_1, c_2);
+	uint32_t d_3, l_3 = CALL/1(l_2, c_1, c_3);
+	uint32_t d_4, l_4 = CALL/1(l_3, c_1, c_4);
+	uint32_t d_5, l_5 = CALL/1(l_4, c_1, c_5);
+	int32_t d_6, l_6 = CALL/5(l_5, c_7, c_6, d_2, d_3, d_4, d_5);
+	uint32_t d_7, l_7 = CALL/1(l_6, c_8, c_9);
+	uint32_t d_8, l_8 = CALL/1(l_7, c_8, c_10);
+	uint32_t d_9, l_9 = CALL/1(l_8, c_8, c_11);
+	uint32_t d_10, l_10 = CALL/1(l_9, c_8, c_12);
+	int32_t d_11, l_11 = CALL/5(l_10, c_7, c_13, d_7, d_8, d_9, d_10);
+	int32_t d_12, l_12 = CALL/1(l_11, c_15, c_16);
+	int32_t d_13, l_13 = CALL/1(l_12, c_15, c_17);
+	int32_t d_14, l_14 = CALL/1(l_13, c_15, c_18);
+	int32_t d_15, l_15 = CALL/1(l_14, c_15, c_19);
+	int32_t d_16, l_16 = CALL/5(l_15, c_7, c_20, d_12, d_13, d_14, d_15);
+	l_17 = RETURN(l_16, c_14);
+}
+--EXPECT--
+u16: 16 15 5 0
+u8 : 8 7 1 0
+u32: 32 31 13 0
