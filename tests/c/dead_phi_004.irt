@@ -1,0 +1,39 @@
+--TEST--
+C: dead loop PHI at -O0
+--ARGS--
+-O0 --emit-c
+--CODE--
+{
+	int32_t c_0 = 0;
+	int32_t c_1 = 1;
+	l_1 = START(l_20);
+	int32_t n = PARAM(l_1, "n", 0);
+	l_3 = END(l_1);
+	l_4 = LOOP_BEGIN(l_3, l_12);
+	int32_t d_5 = PHI(l_4, c_0, d_9);
+	int32_t d_6 = PHI(l_4, c_1, n);
+	bool d_7 = LT(d_5, n);
+	l_8 = IF(l_4, d_7);
+	l_11 = IF_TRUE(l_8);
+	int32_t d_9 = ADD(d_5, c_1);
+	l_12 = LOOP_END(l_11);
+	l_13 = IF_FALSE(l_8);
+	l_20 = RETURN(l_13, d_5);
+}
+--EXPECT--
+int32_t test(int32_t n)
+{
+	int32_t d_1 = n;
+	int32_t d_2;
+	bool d_4;
+	int32_t d_5;
+	d_2 = 0;
+bb2:
+	d_4 = d_2 < d_1;
+	if (!d_4) goto bb4;
+	d_5 = d_2 + 1;
+	d_2 = d_5;
+	goto bb2;
+bb4:
+	return d_2;
+}

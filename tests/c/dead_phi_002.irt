@@ -1,0 +1,39 @@
+--TEST--
+C: dead PHIs with constant and variable inputs at -O0
+--ARGS--
+-O0 --emit-c
+--CODE--
+func test(int32_t, int32_t): int32_t
+{
+	int32_t c_1 = 7;
+	l_1 = START(l_12);
+	int32_t d_2 = PARAM(l_1, "a", 1);
+	int32_t d_3 = PARAM(l_1, "b", 2);
+	bool d_4 = NE(d_2, d_3);
+	l_5 = IF(l_1, d_4);
+	l_6 = IF_TRUE(l_5);
+	l_7 = END(l_6);
+	l_8 = IF_FALSE(l_5);
+	l_9 = END(l_8);
+	l_10 = MERGE(l_7, l_9);
+	int32_t d_11 = PHI(l_10, d_2, d_3);
+	int32_t d_13 = PHI(l_10, c_1, d_2);
+	int32_t d_14 = PHI(l_10, d_3, d_2);
+	l_12 = RETURN(l_10, d_11);
+}
+--EXPECT--
+int32_t test(int32_t a, int32_t b)
+{
+	int32_t d_1 = a;
+	int32_t d_2 = b;
+	bool d_3;
+	int32_t d_4;
+	d_3 = d_1 != d_2;
+	if (!d_3) goto bb3;
+	d_4 = d_1;
+	goto bb4;
+bb3:
+	d_4 = d_2;
+bb4:
+	return d_4;
+}

@@ -2286,7 +2286,9 @@ int ir_compute_dessa_moves(ir_ctx *ctx)
 					insn = &ctx->ir_base[use];
 					if (insn->op == IR_PHI) {
 						if (ctx->use_lists[use].count == 0) {
-							ctx->rules[use] = IR_SKIPPED | IR_NOP;
+							if (ctx->rules) {
+								ctx->rules[use] = IR_SKIPPED | IR_NOP;
+							}
 							ctx->vregs[use] = 0;
 							continue;
 						}
@@ -2371,7 +2373,8 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy, void *dat
 	for (i = use_list->count, p = &ctx->use_edges[use_list->refs]; i > 0; p++, i--) {
 		ref = *p;
 		insn = &ctx->ir_base[ref];
-		if (insn->op == IR_PHI) {
+		/* dead PHIs have no vreg */
+		if (insn->op == IR_PHI && ctx->vregs[ref] > 0) {
 			input = ir_insn_op(insn, k);
 			if (IR_IS_CONST_REF(input) || !(ctx->vregs[input] > 0)) {
 				have_constants_or_addresses = 1;
@@ -2440,7 +2443,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy, void *dat
 		for (i = use_list->count, p = &ctx->use_edges[use_list->refs]; i > 0; p++, i--) {
 			ref = *p;
 			insn = &ctx->ir_base[ref];
-			if (insn->op == IR_PHI) {
+			if (insn->op == IR_PHI && ctx->vregs[ref] > 0) {
 				input = ir_insn_op(insn, k);
 				if (IR_IS_CONST_REF(input) || !(ctx->vregs[input] > 0)) {
 					emit_copy(ctx, insn->type, input, ref, data);
