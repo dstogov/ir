@@ -62,7 +62,7 @@ static int ir_assign_virtual_registers_slow(ir_ctx *ctx)
 		insn += n;
 		while (i < bb->end) {
 			flags = ir_op_flags[insn->op];
-			if (((flags & IR_OP_FLAG_DATA) && insn->op != IR_VAR && (insn->op != IR_PARAM || ctx->use_lists[i].count > 0))
+			if (((flags & IR_OP_FLAG_DATA) && insn->op != IR_VAR && ((insn->op != IR_PARAM && insn->op != IR_PHI) || ctx->use_lists[i].count > 0))
 			 || ((flags & IR_OP_FLAG_MEM) && ctx->use_lists[i].count > 1)) {
 				if (!ctx->rules || !(ctx->rules[i] & (IR_FUSED|IR_SKIPPED|IR_NO_REG))) {
 					vregs[i] = ++vregs_count;
@@ -1588,6 +1588,9 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					}
 				}
 				continue;
+			} else if (insn->op == IR_PHI) {
+				/* dead PHI */
+				continue;
 			}
 
 			IR_ASSERT(insn->op != IR_PHI && (!ctx->rules || !(ctx->rules[ref] & (IR_FUSED|IR_SKIPPED))));
@@ -2129,6 +2132,8 @@ int ir_coalesce(ir_ctx *ctx)
 
 					if (v1 == v2) {
 						/* already coalesced */
+					} else if (v2 == 0) {
+						/* dead PHI */
 					} else {
 						if (!ir_vregs_overlap(ctx, v1, v2)) {
 							ir_vregs_coalesce(ctx, v1, v2, input, use);
@@ -4551,7 +4556,11 @@ static void assign_regs(ir_ctx *ctx)
 									if (use_pos->hint_ref < 0) {
 										if (use_pos->flags & IR_PHI_USE) {
 											IR_ASSERT(use_pos->hint_ref < 0);
-											IR_ASSERT(ctx->vregs[-use_pos->hint_ref] > 0);
+											if (ctx->vregs[-use_pos->hint_ref] == 0) {
+												/* dead PHI */
+												use_pos = use_pos->next;
+												continue;
+											}
 											IR_ASSERT(ctx->live_intervals[ctx->vregs[-use_pos->hint_ref]]);
 											if (ctx->live_intervals[ctx->vregs[-use_pos->hint_ref]]->flags & IR_LIVE_INTERVAL_SPILLED) {
 												/* Spilled PHI var is passed through memory */

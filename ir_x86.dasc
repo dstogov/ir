@@ -5461,8 +5461,13 @@ store_int:
 		case IR_SHUFFLE:
 			return ir_match_shuffle(ctx, insn);
 #endif
-#if IR_X86_I64
 		case IR_PHI:
+			if (ctx->use_lists[ref].count == 0) {
+				/* Dead PHI */
+				return IR_SKIPPED | IR_NOP;
+			}
+			IR_FALLTHROUGH;
+#if IR_X86_I64
 		case IR_VLOAD:
 		case IR_VLOAD_v:
 		case IR_VA_ARG:
