@@ -165,6 +165,157 @@ bool ir_check(const ir_ctx *ctx)
 			break;
 		}
 		flags = ir_op_flags[insn->op];
+
+		if (flags & IR_OP_FLAG_DATA) {
+			IR_ASSERT((flags & (IR_OP_FLAG_MEM|IR_OP_FLAG_CONTROL)) == 0);
+			if (insn->type == IR_VOID) {
+				fprintf(stderr, "ir_base[%d].type must be set (instruction %s)\n", i, ir_op_name[insn->op]);
+				ok = 0;
+			} else {
+				switch (insn->op) {
+					case IR_EQ:
+					case IR_NE:
+					case IR_LT:
+					case IR_GE:
+					case IR_LE:
+					case IR_GT:
+					case IR_ULT:
+					case IR_UGE:
+					case IR_ULE:
+					case IR_UGT:
+					case IR_ORDERED:
+					case IR_UNORDERED:
+						if (insn->type != IR_BOOL && !IR_IS_TYPE_VECTOR(insn->type)) {
+							fprintf(stderr, "ir_base[%d].type must be bool or vector (instruction %s)\n", i, ir_op_name[insn->op]);
+							ok = 0;
+						}
+						break;
+					case IR_SEXT:
+					case IR_ZEXT:
+					case IR_TRUNC:
+					case IR_FP2INT:
+						if (!IR_IS_TYPE_INT(insn->type)
+						 && (!IR_IS_TYPE_VECTOR(insn->type) || !IR_IS_TYPE_INT(IR_VECTOR_BASE_TYPE(insn->type)))) {
+							fprintf(stderr, "ir_base[%d].type must be integet or vector (instruction %s)\n", i, ir_op_name[insn->op]);
+							ok = 0;
+						}
+						break;
+					case IR_INT2FP:
+					case IR_FP2FP:
+						if (!IR_IS_TYPE_FP(insn->type)
+						 && (!IR_IS_TYPE_VECTOR(insn->type) || !IR_IS_TYPE_FP(IR_VECTOR_BASE_TYPE(insn->type)))) {
+							fprintf(stderr, "ir_base[%d].type must be real number or vector (instruction %s)\n", i, ir_op_name[insn->op]);
+							ok = 0;
+						}
+						break;
+					case IR_PROTO:
+					case IR_VADDR:
+					case IR_FRAME_ADDR:
+					case IR_ARGVAL:
+						if (insn->type != IR_ADDR) {
+							fprintf(stderr, "ir_base[%d].type must be uintptr_t (instruction %s)\n", i, ir_op_name[insn->op]);
+							ok = 0;
+						}
+						break;
+					case IR_ADD_OV:
+					case IR_SUB_OV:
+					case IR_MUL_OV:
+						if (!IR_IS_TYPE_INT(insn->type)) {
+							fprintf(stderr, "ir_base[%d].type must be integer (instruction %s)\n", i, ir_op_name[insn->op]);
+							ok = 0;
+						}
+						break;
+					case IR_OVERFLOW:
+						if (insn->type != IR_BOOL) {
+							fprintf(stderr, "ir_base[%d].type must be bool (instruction %s)\n", i, ir_op_name[insn->op]);
+							ok = 0;
+						}
+						break;
+					case IR_NOT:
+						if (insn->type != IR_BOOL && !IR_IS_TYPE_INT(insn->type) && !IR_IS_TYPE_VECTOR(insn->type)) {
+							fprintf(stderr, "ir_base[%d].type must be bool, integer or vector (instruction %s)\n", i, ir_op_name[insn->op]);
+							ok = 0;
+						}
+						break;
+					case IR_OR:
+					case IR_AND:
+					case IR_XOR:
+					case IR_SHL:
+					case IR_SHR:
+					case IR_SAR:
+						if (!IR_IS_TYPE_INT(insn->type)
+						 && (!IR_IS_TYPE_VECTOR(insn->type) || !IR_IS_TYPE_INT(IR_VECTOR_BASE_TYPE(insn->type)))) {
+							fprintf(stderr, "ir_base[%d].type must be integet or vector (instruction %s)\n", i, ir_op_name[insn->op]);
+							ok = 0;
+						}
+						break;
+					case IR_ROL:
+					case IR_ROR:
+					case IR_BSWAP:
+						if (!IR_IS_TYPE_INT(insn->type)) {
+							fprintf(stderr, "ir_base[%d].type must be integer (instruction %s)\n", i, ir_op_name[insn->op]);
+							ok = 0;
+						}
+						break;
+					case IR_CTPOP:
+					case IR_CTLZ:
+					case IR_CTTZ:
+						if (!IR_IS_TYPE_INT(insn->type)) {
+							fprintf(stderr, "ir_base[%d].type must be integer (instruction %s)\n", i, ir_op_name[insn->op]);
+							ok = 0;
+						} else if (ir_type_size[insn->type] > sizeof(void*)) {
+							fprintf(stderr, "ir_base[%d].type size must fit into %d-bits integer (instruction %s)\n", i, (int)sizeof(void*) * 8, ir_op_name[insn->op]);
+							ok = 0;
+						}
+						break;
+					case IR_EXTRACT:
+						if (!IR_IS_TYPE_INT(insn->type) && !IR_IS_TYPE_FP(insn->type)) {
+							fprintf(stderr, "ir_base[%d].type must be integer or real (instruction %s)\n", i, ir_op_name[insn->op]);
+							ok = 0;
+						}
+						break;
+					case IR_REPLACE:
+					case IR_SPLAT:
+					case IR_SHUFFLE:
+						if (!IR_IS_TYPE_VECTOR(insn->type)) {
+							fprintf(stderr, "ir_base[%d].type must be vector (instruction %s)\n", i, ir_op_name[insn->op]);
+							ok = 0;
+						}
+						break;
+					default:
+						break;
+				}
+			}
+		} else if (flags & IR_OP_FLAG_MEM) {
+			IR_ASSERT(flags & IR_OP_FLAG_CONTROL);
+			if ((flags & IR_OP_FLAG_MEM_MASK) == IR_OP_FLAG_MEM_LOAD) {
+				if (insn->type == IR_VOID) {
+					fprintf(stderr, "ir_base[%d].type must be set (instruction %s)\n", i, ir_op_name[insn->op]);
+					ok = 0;
+				}
+			} else if ((flags & IR_OP_FLAG_MEM_MASK) == IR_OP_FLAG_MEM_ALLOC) {
+				if (insn->type == IR_VOID) {
+					fprintf(stderr, "ir_base[%d].type must be set (instruction %s)\n", i, ir_op_name[insn->op]);
+					ok = 0;
+				} else if (insn->type != IR_ADDR) {
+					fprintf(stderr, "ir_base[%d].type must be uintptr_t (instruction %s)\n", i, ir_op_name[insn->op]);
+					ok = 0;
+				}
+			} else if ((flags & IR_OP_FLAG_MEM_MASK) == IR_OP_FLAG_MEM_STORE) {
+				if (insn->type != IR_VOID) {
+					fprintf(stderr, "ir_base[%d].type must be empty (instruction %s)\n", i, ir_op_name[insn->op]);
+					ok = 0;
+				}
+			} else {
+				IR_ASSERT((flags & IR_OP_FLAG_MEM_MASK) == IR_OP_FLAG_MEM_CALL);
+			}
+		} else if (flags & IR_OP_FLAG_CONTROL) {
+			if (insn->type != IR_VOID) {
+				fprintf(stderr, "ir_base[%d].type must be empty (instruction %s)\n", i, ir_op_name[insn->op]);
+				ok = 0;
+			}
+		}
+
 		n = ir_input_edges_count(ctx, insn);
 		for (j = 1, p = insn->ops + 1; j <= n; j++, p++) {
 			use = *p;
