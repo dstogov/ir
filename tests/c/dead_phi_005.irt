@@ -1,0 +1,40 @@
+--TEST--
+C: dead PHI with a constant input as the only PHI of a merge
+--ARGS--
+-O1 --emit-c
+--CODE--
+{
+	int32_t c_0 = 0;
+	int32_t c_7 = 7;
+	l_1 = START(l_20);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t y = PARAM(l_1, "y", 2);
+	uintptr_t ptr = PARAM(l_1, "ptr", 3);
+	bool d_4 = GT(x, c_0);
+	l_5 = IF(l_1, d_4);
+	l_6 = IF_TRUE(l_5);
+	l_7 = STORE(l_6, ptr, y);
+	l_8 = END(l_7);
+	l_9 = IF_FALSE(l_5);
+	l_10 = END(l_9);
+	l_11 = MERGE(l_8, l_10);
+	int32_t q = PHI(l_11, c_7, x);
+	int64_t e = SEXT(q);
+	int32_t r = ADD(x, y);
+	l_20 = RETURN(l_11, r);
+}
+--EXPECT--
+int32_t test(int32_t x, int32_t y, uintptr_t ptr)
+{
+	int32_t d_1 = x;
+	int32_t d_2 = y;
+	uintptr_t d_3 = ptr;
+	bool d_4;
+	int32_t d_5;
+	d_4 = d_1 > 0;
+	if (!d_4) goto bb4;
+	*((int32_t*)d_3) = d_2;
+bb4:
+	d_5 = d_2 + d_1;
+	return d_5;
+}

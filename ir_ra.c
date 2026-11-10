@@ -2124,7 +2124,8 @@ int ir_coalesce(ir_ctx *ctx)
 		for (p = &ctx->use_edges[use_list->refs]; n > 0; p++, n--) {
 			use = *p;
 			insn = &ctx->ir_base[use];
-			if (insn->op == IR_PHI) {
+			/* dead PHIs have no vreg */
+			if (insn->op == IR_PHI && ctx->vregs[use] > 0) {
 				input = ir_insn_op(insn, k);
 				if (input > 0 && ctx->vregs[input] > 0) {
 					uint32_t v1 = ctx->vregs[input];
@@ -2132,8 +2133,6 @@ int ir_coalesce(ir_ctx *ctx)
 
 					if (v1 == v2) {
 						/* already coalesced */
-					} else if (v2 == 0) {
-						/* dead PHI */
 					} else {
 						if (!ir_vregs_overlap(ctx, v1, v2)) {
 							ir_vregs_coalesce(ctx, v1, v2, input, use);
