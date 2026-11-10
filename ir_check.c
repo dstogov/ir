@@ -196,7 +196,7 @@ bool ir_check(const ir_ctx *ctx)
 					case IR_FP2INT:
 						if (!IR_IS_TYPE_INT(insn->type)
 						 && (!IR_IS_TYPE_VECTOR(insn->type) || !IR_IS_TYPE_INT(IR_VECTOR_BASE_TYPE(insn->type)))) {
-							fprintf(stderr, "ir_base[%d].type must be integet or vector (instruction %s)\n", i, ir_op_name[insn->op]);
+							fprintf(stderr, "ir_base[%d].type must be integer or vector (instruction %s)\n", i, ir_op_name[insn->op]);
 							ok = 0;
 						}
 						break;
@@ -245,7 +245,7 @@ bool ir_check(const ir_ctx *ctx)
 					case IR_SAR:
 						if (!IR_IS_TYPE_INT(insn->type)
 						 && (!IR_IS_TYPE_VECTOR(insn->type) || !IR_IS_TYPE_INT(IR_VECTOR_BASE_TYPE(insn->type)))) {
-							fprintf(stderr, "ir_base[%d].type must be integet or vector (instruction %s)\n", i, ir_op_name[insn->op]);
+							fprintf(stderr, "ir_base[%d].type must be integer or vector (instruction %s)\n", i, ir_op_name[insn->op]);
 							ok = 0;
 						}
 						break;
@@ -264,7 +264,7 @@ bool ir_check(const ir_ctx *ctx)
 							fprintf(stderr, "ir_base[%d].type must be integer (instruction %s)\n", i, ir_op_name[insn->op]);
 							ok = 0;
 						} else if (ir_type_size[insn->type] > sizeof(void*)) {
-							fprintf(stderr, "ir_base[%d].type size must fit into %d-bits integer (instruction %s)\n", i, (int)sizeof(void*) * 8, ir_op_name[insn->op]);
+							fprintf(stderr, "ir_base[%d].type size must fit into a %d-bit integer (instruction %s)\n", i, (int)sizeof(void*) * 8, ir_op_name[insn->op]);
 							ok = 0;
 						}
 						break;
