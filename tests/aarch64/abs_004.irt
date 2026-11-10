@@ -1,0 +1,14 @@
+--TEST--
+004: abs function
+--CODE--
+{
+	l_1 = START(l_4);
+	int8_t x = PARAM(l_1, "x", 1);
+	int8_t ret = ABS(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	tst w0, #0x80
+	cneg w0, w0, ne
+	ret

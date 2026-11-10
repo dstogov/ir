@@ -3831,9 +3831,14 @@ static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		if (ir_type_size[src_type] == 8) {
 			|	cmp Rx(op1_reg), #0
 			|	cneg Rx(def_reg), Rx(op1_reg), lt
-		} else {
+		} else if (ir_type_size[src_type] == 4) {
 			|	cmp Rw(op1_reg), #0
 			|	cneg Rw(def_reg), Rw(op1_reg), lt
+		} else {
+			/* upper bits of narrow operands are undefined */
+			uint32_t sign_bit = 1U << (ir_type_size[src_type] * 8 - 1);
+			|	tst Rw(op1_reg), #sign_bit
+			|	cneg Rw(def_reg), Rw(op1_reg), ne
 		}
 	} else if (insn->op == IR_CTLZ) {
 		if (ir_type_size[src_type] == 1) {
