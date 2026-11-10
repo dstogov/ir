@@ -1,9 +1,5 @@
 --TEST--
 Boolean NOT of 64-bit integer values
---TARGET--
-*64-*
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func not_i64(int64_t): int32_t
@@ -17,16 +13,18 @@ func not_i64(int64_t): int32_t
 func main(void): int32_t
 {
 	uintptr_t c_printf = func printf(uintptr_t, ...): int32_t;
-	uintptr_t c_fmt = "%d%d\n";
+	uintptr_t c_fmt = "%d%d%d\n";
 	uintptr_t c_not_i64 = func not_i64(int64_t): int32_t;
 	int64_t c_v1 = 0;
 	int64_t c_v2 = 4294967296;
+	int64_t c_v3 = 1;
 	int32_t c_ret = 0;
 	l_1 = START(l_99);
 	int32_t r_1, l_2 = CALL/1(l_1, c_not_i64, c_v1);
 	int32_t r_2, l_3 = CALL/1(l_2, c_not_i64, c_v2);
-	int32_t d_p, l_50 = CALL/3(l_3, c_printf, c_fmt, r_1, r_2);
+	int32_t r_3, l_4 = CALL/1(l_3, c_not_i64, c_v3);
+	int32_t d_p, l_50 = CALL/4(l_4, c_printf, c_fmt, r_1, r_2, r_3);
 	l_99 = RETURN(l_50, c_ret);
 }
 --EXPECT--
-10
+100

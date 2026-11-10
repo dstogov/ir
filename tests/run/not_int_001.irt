@@ -1,7 +1,5 @@
 --TEST--
 Boolean NOT of integer values
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func not_i32(int32_t): int32_t

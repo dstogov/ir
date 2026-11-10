@@ -1,7 +1,5 @@
 --TEST--
 Boolean NOT of integer constants
---ARGS--
---run
 --CODE--
 extern func printf(uintptr_t, ...): int32_t;
 func main(void): int32_t
