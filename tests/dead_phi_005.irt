@@ -1,0 +1,43 @@
+--TEST--
+005: PHI used only by dead code is removed with its inputs -O1
+--ARGS--
+-O1 --save
+--CODE--
+{
+	int32_t c_0 = 0;
+	int32_t c_3 = 3;
+	l_1 = START(l_20);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t y = PARAM(l_1, "y", 2);
+	int32_t v = MUL(x, c_3);
+	bool d_4 = GT(x, c_0);
+	l_5 = IF(l_1, d_4);
+	l_6 = IF_TRUE(l_5);
+	l_7 = END(l_6);
+	l_8 = IF_FALSE(l_5);
+	l_9 = END(l_8);
+	l_10 = MERGE(l_7, l_9);
+	int32_t q = PHI(l_10, v, y);
+	int32_t s = PHI(l_10, y, x);
+	int64_t e = SEXT(q);
+	l_20 = RETURN(l_10, s);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 0;
+	l_1 = START(l_12);
+	int32_t d_2 = PARAM(l_1, "x", 1);
+	int32_t d_3 = PARAM(l_1, "y", 2);
+	bool d_4 = GT(d_2, c_4);
+	l_5 = IF(l_1, d_4);
+	l_6 = IF_TRUE(l_5);
+	l_7 = END(l_6);
+	l_8 = IF_FALSE(l_5);
+	l_9 = END(l_8);
+	l_10 = MERGE(l_7, l_9);
+	int32_t d_11 = PHI(l_10, d_3, d_2);
+	l_12 = RETURN(l_10, d_11);
+}

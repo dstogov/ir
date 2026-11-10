@@ -37,18 +37,16 @@ l1:
 	%d4 = mul i32 %d2, 4
 	br label %l2
 l4:
-	%d14 = 	call ptr @llvm.stacksave()
-	%d15 = alloca i8, i32 %d4, align 16
-	%d16 = call i32 %d3(ptr %d15)
-	%d17 = add i32 %d16, %d8
-	call void @llvm.stackrestore(ptr %d14)
-	%d19 = add i32 %d7, 1
+	%d13 = 	call ptr @llvm.stacksave()
+	%d14 = alloca i8, i32 %d4, align 16
+	%d15 = call i32 %d3(ptr %d14)
+	call void @llvm.stackrestore(ptr %d13)
+	%d17 = add i32 %d7, 1
 	br label %l2
 l2:
-	%d7 = phi i32 [0, %l1], [%d19, %l4]
-	%d8 = phi i32 [0, %l1], [%d17, %l4]
-	%d9 = icmp slt i32 %d7, %d2
-	br i1 %d9, label %l4, label %l3
+	%d7 = phi i32 [0, %l1], [%d17, %l4]
+	%d8 = icmp slt i32 %d7, %d2
+	br i1 %d8, label %l4, label %l3
 l3:
 	ret void
 }
