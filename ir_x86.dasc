@@ -2771,8 +2771,10 @@ get_arg_hints:
 				constraints->tmp_regs[n] = IR_TMP_REG(2, IR_DOUBLE, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 				n++;
 			}
-			constraints->tmp_regs[n] = IR_TMP_REG(4, IR_DOUBLE, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
-			n++;
+			if (!(ctx->mflags & IR_X86_AVX)) {
+				constraints->tmp_regs[n] = IR_TMP_REG(4, IR_DOUBLE, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
+				n++;
+			}
 			break;
 		case IR_SHUFPS_2_12:
 			flags = IR_DEF_CONFLICTS_WITH_INPUT_REGS | IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG;
@@ -2785,8 +2787,10 @@ get_arg_hints:
 				constraints->tmp_regs[n] = IR_TMP_REG(2, IR_DOUBLE, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 				n++;
 			}
-			constraints->tmp_regs[n] = IR_TMP_REG(4, IR_DOUBLE, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
-			n++;
+			if (!(ctx->mflags & IR_X86_AVX)) {
+				constraints->tmp_regs[n] = IR_TMP_REG(4, IR_DOUBLE, IR_USE_SUB_REF, IR_SAVE_SUB_REF);
+				n++;
+			}
 			break;
 		case IR_SHUFFLE:
 			flags = IR_USE_MUST_BE_IN_REG | IR_OP1_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG | IR_OP3_MUST_BE_IN_REG;
@@ -19662,22 +19666,18 @@ static void ir_emit_vector_shuffle_avx(ir_ctx *ctx, ir_ref def, ir_insn *insn, u
 			ir_emit_vshufps(ctx, def_reg, def_reg, op2_reg, mask >> 8);
 			break;
 		case IR_SHUFPS_1_21:
-			tmp_reg = ctx->tmp_regs[def];
-			IR_ASSERT(tmp_reg != IR_REG_NONE);
 			op1_reg = ir_emit_load_reg(ctx, type, op1_reg, insn->op1);
 			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
 			mask = ir_shufps_mask_n_12(ctx, insn->op3);
-			ir_emit_vshufps(ctx, tmp_reg, op1_reg, op2_reg, mask & 0xff);
-			ir_emit_vshufps(ctx, def_reg, op1_reg, tmp_reg, mask >> 8);
+			ir_emit_vshufps(ctx, def_reg, op1_reg, op2_reg, mask & 0xff);
+			ir_emit_vshufps(ctx, def_reg, op1_reg, def_reg, mask >> 8);
 			break;
 		case IR_SHUFPS_2_12:
-			tmp_reg = ctx->tmp_regs[def];
-			IR_ASSERT(tmp_reg != IR_REG_NONE);
 			op1_reg = ir_emit_load_reg(ctx, type, op1_reg, insn->op1);
 			op2_reg = ir_emit_load_reg(ctx, type, op2_reg, insn->op2);
 			mask = ir_shufps_mask_n_12(ctx, insn->op3);
-			ir_emit_vshufps(ctx, tmp_reg, op1_reg, op2_reg, mask & 0xff);
-			ir_emit_vshufps(ctx, def_reg, op2_reg, tmp_reg, mask >> 8);
+			ir_emit_vshufps(ctx, def_reg, op1_reg, op2_reg, mask & 0xff);
+			ir_emit_vshufps(ctx, def_reg, op2_reg, def_reg, mask >> 8);
 			break;
 		case IR_BLENDPS_12:
 			op1_reg = ir_emit_load_reg(ctx, type, op1_reg, insn->op1);
