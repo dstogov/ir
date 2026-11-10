@@ -17,7 +17,18 @@
 #define IR_GCM_SPLIT 1
 #define IR_SCHEDULE_SWAP_OPS 1
 
-static uint32_t ir_gcm_schedule_early(ir_ctx *ctx, ir_ref ref, ir_list *queue_late)
+/* PHIs are pinned only when a live node uses them, so PHIs that feed only dead code are dropped */
+static uint32_t ir_gcm_pin_phi(ir_ctx *ctx, ir_ref ref, ir_list *queue_early)
+{
+	uint32_t b = ctx->cfg_map[ctx->ir_base[ref].op1];
+
+	IR_ASSERT(b && !IR_GCM_IS_SCHEDULED_EARLY(b));
+	ctx->cfg_map[ref] = b;
+	ir_list_push_unchecked(queue_early, ref);
+	return b;
+}
+
+static uint32_t ir_gcm_schedule_early(ir_ctx *ctx, ir_ref ref, ir_list *queue_early, ir_list *queue_late)
 {
 	ir_ref n, *p, input;
 	ir_insn *insn;
@@ -40,7 +51,11 @@ static uint32_t ir_gcm_schedule_early(ir_ctx *ctx, ir_ref ref, ir_list *queue_la
 			if (IR_GCM_IS_SCHEDULED_EARLY(b)) {
 				b = IR_GCM_EARLY_BLOCK(b);
 			} else if (!b) {
-				b = ir_gcm_schedule_early(ctx, input, queue_late);
+				if (ctx->ir_base[input].op == IR_PHI) {
+					b = ir_gcm_pin_phi(ctx, input, queue_early);
+				} else {
+					b = ir_gcm_schedule_early(ctx, input, queue_early, queue_late);
+				}
 			}
 			if (dom_depth < ctx->cfg_blocks[b].dom_depth) {
 				dom_depth = ctx->cfg_blocks[b].dom_depth;
@@ -707,8 +722,10 @@ int ir_gcm(ir_ctx *ctx)
 			for (p = &ctx->use_edges[use_list->refs]; n > 0; n--, p++) {
 				ref = *p;
 				use_insn = &ctx->ir_base[ref];
-				if (use_insn->op == IR_PHI || use_insn->op == IR_PI) {
-					bb->flags |= (use_insn->op == IR_PHI) ? IR_BB_HAS_PHI : IR_BB_HAS_PI;
+				if (use_insn->op == IR_PHI) {
+					bb->flags |= IR_BB_HAS_PHI;
+				} else if (use_insn->op == IR_PI) {
+					bb->flags |= IR_BB_HAS_PI;
 					if (EXPECTED(ctx->use_lists[ref].count != 0)) {
 						_blocks[ref] = b; /* pin to block */
 						ir_list_push_unchecked(&queue_early, ref);
@@ -724,16 +741,18 @@ int ir_gcm(ir_ctx *ctx)
 		}
 	}
 
-	n = ir_list_len(&queue_early);
-	while (n > 0) {
-		n--;
-		ref = ir_list_at(&queue_early, n);
+	while (ir_list_len(&queue_early)) {
+		ref = ir_list_pop(&queue_early);
 		insn = &ctx->ir_base[ref];
 		k = insn->inputs_count - 1;
 		for (p = insn->ops + 2; k > 0; p++, k--) {
 			ref = *p;
 			if (ref > 0 && _blocks[ref] == 0) {
-				ir_gcm_schedule_early(ctx, ref, &queue_late);
+				if (ctx->ir_base[ref].op == IR_PHI) {
+					ir_gcm_pin_phi(ctx, ref, &queue_early);
+				} else {
+					ir_gcm_schedule_early(ctx, ref, &queue_early, &queue_late);
+				}
 			}
 		}
 	}
