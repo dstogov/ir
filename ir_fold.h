@@ -1025,36 +1025,54 @@ IR_FOLD(NOT(C_BOOL))
 IR_FOLD(NOT(C_U8))
 IR_FOLD(NOT(C_CHAR))
 {
+	if (IR_OPT_TYPE(opt) == IR_BOOL) {
+		IR_FOLD_BOOL(!op1_insn->val.u8);
+	}
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
 	IR_FOLD_CONST_U(~op1_insn->val.u8);
 }
 
 IR_FOLD(NOT(C_I8))
 {
+	if (IR_OPT_TYPE(opt) == IR_BOOL) {
+		IR_FOLD_BOOL(!op1_insn->val.i8);
+	}
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
 	IR_FOLD_CONST_I(~op1_insn->val.i8);
 }
 
 IR_FOLD(NOT(C_U16))
 {
+	if (IR_OPT_TYPE(opt) == IR_BOOL) {
+		IR_FOLD_BOOL(!op1_insn->val.u16);
+	}
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
 	IR_FOLD_CONST_U(~op1_insn->val.u16);
 }
 
 IR_FOLD(NOT(C_I16))
 {
+	if (IR_OPT_TYPE(opt) == IR_BOOL) {
+		IR_FOLD_BOOL(!op1_insn->val.i16);
+	}
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
 	IR_FOLD_CONST_I(~op1_insn->val.i16);
 }
 
 IR_FOLD(NOT(C_U32))
 {
+	if (IR_OPT_TYPE(opt) == IR_BOOL) {
+		IR_FOLD_BOOL(!op1_insn->val.u32);
+	}
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
 	IR_FOLD_CONST_U(~op1_insn->val.u32);
 }
 
 IR_FOLD(NOT(C_I32))
 {
+	if (IR_OPT_TYPE(opt) == IR_BOOL) {
+		IR_FOLD_BOOL(!op1_insn->val.i32);
+	}
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
 	IR_FOLD_CONST_I(~op1_insn->val.i32);
 }
@@ -1062,8 +1080,19 @@ IR_FOLD(NOT(C_I32))
 IR_FOLD(NOT(C_U64))
 IR_FOLD(NOT(C_I64))
 {
+	if (IR_OPT_TYPE(opt) == IR_BOOL) {
+		IR_FOLD_BOOL(!op1_insn->val.u64);
+	}
 	IR_ASSERT(IR_OPT_TYPE(opt) == op1_insn->type);
 	IR_FOLD_CONST_U(~op1_insn->val.u64);
+}
+
+IR_FOLD(NOT(C_ADDR))
+{
+	if (IR_OPT_TYPE(opt) == IR_BOOL) {
+		IR_FOLD_BOOL(!op1_insn->val.u64);
+	}
+	IR_FOLD_NEXT;
 }
 
 IR_FOLD(OR(C_BOOL, C_BOOL))
@@ -2038,11 +2067,29 @@ IR_FOLD(ABS(NEG))
 }
 
 IR_FOLD(NEG(NEG))
-IR_FOLD(NOT(NOT))
 IR_FOLD(BSWAP(BSWAP))
 {
 	/* f(f(y)) => y */
 	IR_FOLD_COPY(op1_insn->op1);
+}
+
+IR_FOLD(NOT(NOT))
+{
+	ir_type type = ctx->ir_base[op1_insn->op1].type;
+
+	if (type == IR_OPT_TYPE(opt)) {
+		IR_FOLD_COPY(op1_insn->op1);
+	} else if (IR_OPT_TYPE(opt) == IR_BOOL && op1_insn->type == IR_BOOL && IR_IS_TYPE_INT(type)) {
+		/* !!y => y != 0 */
+		ir_val val;
+
+		val.u64 = 0;
+		opt = IR_OPT(IR_NE, IR_BOOL);
+		op1 = op1_insn->op1;
+		op2 = ir_const(ctx, val, type);
+		IR_FOLD_RESTART;
+	}
+	IR_FOLD_NEXT;
 }
 
 IR_FOLD(EQ(_, C_BOOL))
