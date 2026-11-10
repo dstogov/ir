@@ -71,6 +71,14 @@ LDFLAGS=$(LDFLAGS) /libpath:$(CAPSTONE_DIR)\msvc\$(BUILD)
 
 LIBS=psapi.lib capstone.lib
 
+CHECK_C=clang.exe -fsyntax-only -Werror=implicit-function-declaration -Werror=int-conversion \
+	-include stdint.h -include stdbool.h -include stddef.h -include stdlib.h -include malloc.h \
+	-include stdio.h -include math.h -x c
+!if "$(TARGET)" == "x86"
+CHECK_C=$(CHECK_C) -m32
+!endif
+CHECK_LLVM=clang.exe -x ir -S -emit-llvm -o NUL
+
 OBJS_COMMON=$(BUILD_DIR)\ir.obj $(BUILD_DIR)\ir_strtab.obj $(BUILD_DIR)\ir_cfg.obj \
 	$(BUILD_DIR)\ir_sccp.obj $(BUILD_DIR)\ir_gcm.obj $(BUILD_DIR)\ir_ra.obj $(BUILD_DIR)\ir_emit.obj \
 	$(BUILD_DIR)\ir_load.obj $(BUILD_DIR)\ir_save.obj $(BUILD_DIR)\ir_emit_c.obj $(BUILD_DIR)\ir_dump.obj \
@@ -165,7 +173,8 @@ test: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\tester.exe
 test-ci: $(BUILD_DIR)\ir.exe $(BUILD_DIR)\tester.exe
 	$(BUILD_DIR)\tester.exe --test-cmd $(BUILD_DIR)\ir.exe --target $(TARGET_TRIPLET) --default-args "--save" \
 	    --additional-args "--no-abort-fault" --diff-cmd "diff --strip-trailing-cr -u" \
-		--test-extension ".irt" --code-extension ".ir" --show-diff $(TESTS)
+		--test-extension ".irt" --code-extension ".ir" --show-diff \
+		--check --emit-c "$(CHECK_C)" --check --emit-llvm "$(CHECK_LLVM)" $(TESTS)
 
 examples: $(OBJS_COMMON) $(EXAMPLES_BUILD_DIR) $(EXAMPLE_EXES)
 

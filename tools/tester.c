@@ -61,6 +61,16 @@ static const char *default_args = NULL;
 static const char *additional_args = NULL;
 static const char *diff_cmd = NULL;
 
+#define MAX_CHECKS 8
+
+typedef struct _check {
+	const char *arg;
+	const char *cmd;
+} check;
+
+static check checks[MAX_CHECKS];
+static int checks_count = 0;
+
 static const char *test_extension = NULL;
 static int test_extension_len = 0;
 
@@ -448,6 +458,35 @@ static char *replace_extension(const char *filename, size_t len, const char *ext
 	return ret;
 }
 
+static int has_arg(const char *args, int args_len, const char *arg)
+{
+	int arg_len = (int)strlen(arg);
+	int i = 0;
+
+	while (i < args_len) {
+		int start;
+
+		while (i < args_len && (args[i] == ' ' || args[i] == '\t')) i++;
+		start = i;
+		while (i < args_len && args[i] != ' ' && args[i] != '\t') i++;
+		if (i - start == arg_len && memcmp(args + start, arg, arg_len) == 0) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static int check_output(const char *check_cmd, const char *out_filename, const char *log_filename)
+{
+	char cmd[4096];
+
+	if ((size_t)snprintf(cmd, sizeof(cmd), "%s %s > %s 2>&1",
+			check_cmd, out_filename, log_filename) >= sizeof(cmd)) {
+		return 0;
+	}
+	return system(cmd) == 0;
+}
+
 static int run_test(const char *filename, test *t, int show_diff, const char *args, int args_len)
 {
 	size_t len;
@@ -538,6 +577,25 @@ static int run_test(const char *filename, test *t, int show_diff, const char *ar
 	}
 
 	if (ret) {
+		int i;
+
+		for (i = 0; i < checks_count; i++) {
+			if (!has_arg(args, args_len, checks[i].arg)) {
+				continue;
+			}
+			if (!check_output(checks[i].cmd, out_filename, diff_filename)) {
+				if (show_diff && !t->xfail) {
+					char *log = read_file(diff_filename);
+					printf("\nOutput check failed (%s %s):\n%s", checks[i].cmd, out_filename, log ? log : "");
+					free(log);
+				}
+				free(code_filename);
+				free(out_filename);
+				free(exp_filename);
+				free(diff_filename);
+				return 0;
+			}
+		}
 		unlink(code_filename);
 		unlink(out_filename);
 	} else {
@@ -702,6 +760,8 @@ static void print_help(const char *exe_name)
 	    "  --diff-cmd <cmd>         - diff command\n"
 	    "  --test-extension <ext>   - search test files with the given extension\n"
 	    "  --code-extension <ext>   - produce code files with the given extension\n"
+	    "  --check <arg> <cmd>      - run \"<cmd> <output file>\" for passed tests whose arguments\n"
+	    "                             include <arg>; fail the test if it exits non-zero (repeatable)\n"
 	    "  --show-diff              - show diff of the failed tests\n"
 	    "  --no-color               - disable color output\n"
 	    , exe_name);
@@ -762,6 +822,19 @@ int main(int argc, char **argv)
 		} else if (check_arg("--diff-cmd",        &diff_cmd,        argc, argv, &i, &bad_opt)) {
 		} else if (check_arg("--test-extension",  &test_extension,  argc, argv, &i, &bad_opt)) {
 		} else if (check_arg("--code-extension",  &code_extension,  argc, argv, &i, &bad_opt)) {
+		} else if (strcmp(argv[i], "--check") == 0) {
+			if (i + 2 >= argc) {
+				bad_opt = 1;
+				fprintf(stderr, "ERROR: Missing --check value\n");
+			} else if (checks_count >= MAX_CHECKS) {
+				bad_opt = 1;
+				fprintf(stderr, "ERROR: Too many --check options\n");
+				i += 2;
+			} else {
+				checks[checks_count].arg = argv[++i];
+				checks[checks_count].cmd = argv[++i];
+				checks_count++;
+			}
 		} else if (strcmp(argv[i], "--show-diff") == 0) {
 			show_diff = 1;
 		} else if (strcmp(argv[i], "--no-color") == 0) {
