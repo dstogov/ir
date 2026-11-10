@@ -1,0 +1,35 @@
+--TEST--
+C: dead PHI with a constant input next to a live PHI with a constant input at -O0
+--ARGS--
+-O0 --emit-c
+--CODE--
+{
+	int32_t c_5 = 5;
+	int32_t c_7 = 7;
+	l_1 = START(l_12);
+	int32_t d_2 = PARAM(l_1, "x", 0);
+	int32_t d_3 = PARAM(l_1, "y", 1);
+	l_4 = IF(l_1, d_2);
+	l_5 = IF_TRUE(l_4);
+	l_6 = END(l_5);
+	l_7 = IF_FALSE(l_4);
+	l_8 = END(l_7);
+	l_9 = MERGE(l_6, l_8);
+	int32_t d_10 = PHI(l_9, c_5, d_3);
+	int32_t d_11 = PHI(l_9, c_7, d_2);
+	l_12 = RETURN(l_9, d_10);
+}
+--EXPECT--
+int32_t test(int32_t x, int32_t y)
+{
+	int32_t d_1 = x;
+	int32_t d_2 = y;
+	int32_t d_3;
+	if (!d_1) goto bb3;
+	d_3 = 5;
+	goto bb4;
+bb3:
+	d_3 = d_2;
+bb4:
+	return d_3;
+}
