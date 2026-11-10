@@ -1,0 +1,163 @@
+--TEST--
+Bit counting of 8/16-bit operands
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @cttz_u16(uint16_t): int32_t
+{
+	l_1 = START(l_2);
+	uint16_t x = PARAM(l_1, "x", 1);
+	int32_t r = CTTZ(x);
+	l_2 = RETURN(l_1, r);
+}
+func @ctlz_u16(uint16_t): int32_t
+{
+	l_1 = START(l_2);
+	uint16_t x = PARAM(l_1, "x", 1);
+	int32_t r = CTLZ(x);
+	l_2 = RETURN(l_1, r);
+}
+func @ctpop_u16(uint16_t): int32_t
+{
+	l_1 = START(l_2);
+	uint16_t x = PARAM(l_1, "x", 1);
+	int32_t r = CTPOP(x);
+	l_2 = RETURN(l_1, r);
+}
+func @cttz_u8_trunc(uint32_t): int32_t
+{
+	l_1 = START(l_2);
+	uint32_t a = PARAM(l_1, "a", 1);
+	uint8_t x = TRUNC(a);
+	int32_t r = CTTZ(x);
+	l_2 = RETURN(l_1, r);
+}
+func @ctlz_u8_trunc(uint32_t): int32_t
+{
+	l_1 = START(l_2);
+	uint32_t a = PARAM(l_1, "a", 1);
+	uint8_t x = TRUNC(a);
+	int32_t r = CTLZ(x);
+	l_2 = RETURN(l_1, r);
+}
+func @ctpop_u8_trunc(uint32_t): int32_t
+{
+	l_1 = START(l_2);
+	uint32_t a = PARAM(l_1, "a", 1);
+	uint8_t x = TRUNC(a);
+	int32_t r = CTPOP(x);
+	l_2 = RETURN(l_1, r);
+}
+func @cttz_u16_trunc(uint32_t): int32_t
+{
+	l_1 = START(l_2);
+	uint32_t a = PARAM(l_1, "a", 1);
+	uint16_t x = TRUNC(a);
+	int32_t r = CTTZ(x);
+	l_2 = RETURN(l_1, r);
+}
+func @ctlz_u16_trunc(uint32_t): int32_t
+{
+	l_1 = START(l_2);
+	uint32_t a = PARAM(l_1, "a", 1);
+	uint16_t x = TRUNC(a);
+	int32_t r = CTLZ(x);
+	l_2 = RETURN(l_1, r);
+}
+func @ctpop_u16_trunc(uint32_t): int32_t
+{
+	l_1 = START(l_2);
+	uint32_t a = PARAM(l_1, "a", 1);
+	uint16_t x = TRUNC(a);
+	int32_t r = CTPOP(x);
+	l_2 = RETURN(l_1, r);
+}
+func @cttz_u8_mem(uintptr_t): int32_t
+{
+	l_1 = START(l_2);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	uint8_t x, l_3 = LOAD(l_1, p);
+	int32_t r = CTTZ(x);
+	l_2 = RETURN(l_3, r);
+}
+func @ctlz_u8_mem(uintptr_t): int32_t
+{
+	l_1 = START(l_2);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	uint8_t x, l_3 = LOAD(l_1, p);
+	int32_t r = CTLZ(x);
+	l_2 = RETURN(l_3, r);
+}
+func @cttz_u16_mem(uintptr_t): int32_t
+{
+	l_1 = START(l_2);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	uint16_t x, l_3 = LOAD(l_1, p);
+	int32_t r = CTTZ(x);
+	l_2 = RETURN(l_3, r);
+}
+func @ctlz_u16_mem(uintptr_t): int32_t
+{
+	l_1 = START(l_2);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	uint16_t x, l_3 = LOAD(l_1, p);
+	int32_t r = CTLZ(x);
+	l_2 = RETURN(l_3, r);
+}
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t f1_cttz = func @cttz_u16(uint16_t): int32_t;
+	uintptr_t f1_ctlz = func @ctlz_u16(uint16_t): int32_t;
+	uintptr_t f1_ctpop = func @ctpop_u16(uint16_t): int32_t;
+	uint16_t v1 = 0x0180;
+	uintptr_t fmt1 = "%d %d %d\n";
+	uintptr_t f2_cttz = func @cttz_u8_trunc(uint32_t): int32_t;
+	uintptr_t f2_ctlz = func @ctlz_u8_trunc(uint32_t): int32_t;
+	uintptr_t f2_ctpop = func @ctpop_u8_trunc(uint32_t): int32_t;
+	uint32_t v2 = 0xffffff18;
+	uintptr_t fmt2 = "%d %d %d\n";
+	uintptr_t f3_cttz = func @cttz_u16_trunc(uint32_t): int32_t;
+	uintptr_t f3_ctlz = func @ctlz_u16_trunc(uint32_t): int32_t;
+	uintptr_t f3_ctpop = func @ctpop_u16_trunc(uint32_t): int32_t;
+	uint32_t v3 = 0xffff0180;
+	uintptr_t fmt3 = "%d %d %d\n";
+	uintptr_t f4_cttz = func @cttz_u8_mem(uintptr_t): int32_t;
+	uintptr_t f4_ctlz = func @ctlz_u8_mem(uintptr_t): int32_t;
+	uint16_t v4 = 0xff18;
+	uintptr_t fmt4 = "%d %d\n";
+	uintptr_t f5_cttz = func @cttz_u16_mem(uintptr_t): int32_t;
+	uintptr_t f5_ctlz = func @ctlz_u16_mem(uintptr_t): int32_t;
+	uint32_t v5 = 0xffff0180;
+	uintptr_t fmt5 = "%d %d\n";
+	int32_t size = 8;
+	int32_t zero = 0;
+	l_0 = START(l_end);
+	uintptr_t buf, l_buf = ALLOCA(l_0, size);
+	int32_t r1_cttz, c1_cttz = CALL/1(l_buf, f1_cttz, v1);
+	int32_t r1_ctlz, c1_ctlz = CALL/1(c1_cttz, f1_ctlz, v1);
+	int32_t r1_ctpop, c1_ctpop = CALL/1(c1_ctlz, f1_ctpop, v1);
+	p1 = CALL/4(c1_ctpop, fp, fmt1, r1_cttz, r1_ctlz, r1_ctpop);
+	int32_t r2_cttz, c2_cttz = CALL/1(p1, f2_cttz, v2);
+	int32_t r2_ctlz, c2_ctlz = CALL/1(c2_cttz, f2_ctlz, v2);
+	int32_t r2_ctpop, c2_ctpop = CALL/1(c2_ctlz, f2_ctpop, v2);
+	p2 = CALL/4(c2_ctpop, fp, fmt2, r2_cttz, r2_ctlz, r2_ctpop);
+	int32_t r3_cttz, c3_cttz = CALL/1(p2, f3_cttz, v3);
+	int32_t r3_ctlz, c3_ctlz = CALL/1(c3_cttz, f3_ctlz, v3);
+	int32_t r3_ctpop, c3_ctpop = CALL/1(c3_ctlz, f3_ctpop, v3);
+	p3 = CALL/4(c3_ctpop, fp, fmt3, r3_cttz, r3_ctlz, r3_ctpop);
+	l4 = STORE(p3, buf, v4);
+	int32_t r4_cttz, c4_cttz = CALL/1(l4, f4_cttz, buf);
+	int32_t r4_ctlz, c4_ctlz = CALL/1(c4_cttz, f4_ctlz, buf);
+	p4 = CALL/3(c4_ctlz, fp, fmt4, r4_cttz, r4_ctlz);
+	l5 = STORE(p4, buf, v5);
+	int32_t r5_cttz, c5_cttz = CALL/1(l5, f5_cttz, buf);
+	int32_t r5_ctlz, c5_ctlz = CALL/1(c5_cttz, f5_ctlz, buf);
+	p5 = CALL/3(c5_ctlz, fp, fmt5, r5_cttz, r5_ctlz);
+	l_end = RETURN(p5, zero);
+}
+--EXPECT--
+7 7 2
+3 3 2
+7 7 2
+3 3
+7 7
