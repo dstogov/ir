@@ -1,7 +1,5 @@
 --TEST--
 Mandelbrot Test (-mavx)
---TARGET--
-x86
 --ARGS--
 -S -mavx
 --CODE--

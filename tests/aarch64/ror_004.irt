@@ -1,9 +1,5 @@
 --TEST--
 004: ror function
---TARGET--
-aarch64
---ARGS--
--S
 --CODE--
 {
 	int32_t c = 17;

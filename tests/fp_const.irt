@@ -1,7 +1,5 @@
 --TEST--
 Floating point constants
---ARGS--
---save
 --CODE--
 {
 	uintptr_t c_1 = func printf(uintptr_t, ...): int32_t;

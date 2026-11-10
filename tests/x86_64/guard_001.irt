@@ -1,9 +1,5 @@
 --TEST--
 001: GUARD must not reuse flags set in another basic block
---TARGET--
-x86_64-*-sysv
---ARGS--
--S
 --CODE--
 func guard(): void
 {

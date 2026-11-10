@@ -2,8 +2,6 @@
 001: constant function address call emits a preserve-none function pointer on x86_64
 --TARGET--
 x86_64
---ARGS--
---emit-c
 --CODE--
 {
 	int32_t c_1 = 7;

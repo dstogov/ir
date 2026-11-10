@@ -1,7 +1,5 @@
 --TEST--
 001: vstore function
---ARGS--
---emit-llvm
 --CODE--
 {
 	memcpy = func memcmp(uintptr_t, uintptr_t, uint32_t): void;

@@ -1,7 +1,5 @@
 --TEST--
 001: Swap operands of commutative instruction
---TARGET--
-x86
 --ARGS--
 -S
 --CODE--

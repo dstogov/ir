@@ -1,7 +1,5 @@
 --TEST--
 001: constant function address vararg call emits a typed function pointer
---ARGS--
---emit-c
 --CODE--
 {
 	uintptr_t c_1 = "x=%d\n";

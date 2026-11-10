@@ -1,7 +1,5 @@
 --TEST--
 001: register allocation
---TARGET--
-x86_64-windows
 --ARGS--
 -S
 --CODE--

@@ -1,9 +1,5 @@
 --TEST--
 002: and function
---TARGET--
-x86_64-*-sysv
---ARGS--
--S
 --CODE--
 {
 	uint64_t c = 0xfffffffffffffffd; /* ~2 (fits in sign-extended imm32) */

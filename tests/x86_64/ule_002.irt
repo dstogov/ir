@@ -1,9 +1,5 @@
 --TEST--
 002: ule function
---TARGET--
-x86_64-*-sysv
---ARGS--
--S
 --CODE--
 {
 	uint32_t c = 17;

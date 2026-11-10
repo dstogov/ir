@@ -1,7 +1,5 @@
 --TEST--
 001: builtin copysign (double)
---ARGS--
---emit-llvm
 --CODE--
 {
 	uintptr_t c_1 = func copysign(double, double): double __builtin;

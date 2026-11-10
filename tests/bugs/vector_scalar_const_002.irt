@@ -1,7 +1,5 @@
 --TEST--
 Abort on scalar constant initializer with a float vector type
---ARGS--
---run
 --CODE--
 func main(): int32_t
 {

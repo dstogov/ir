@@ -1,7 +1,5 @@
 --TEST--
 001: CTLZ/CTTZ/CTPOP with a result narrower or wider than the operand
---ARGS--
---emit-llvm
 --CODE--
 {
 	l_1 = START(l_11);

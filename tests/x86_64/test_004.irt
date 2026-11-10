@@ -1,9 +1,5 @@
 --TEST--
 004: IF(AND(_,_)) -> TEST
---TARGET--
-x86_64-*-sysv
---ARGS--
--S
 --CODE--
 {
 	int32_t c1 = 0;

@@ -1,7 +1,5 @@
 --TEST--
 Abort on symbol constant with a non-address type
---ARGS--
---run
 --CODE--
 func main(): int32_t
 {

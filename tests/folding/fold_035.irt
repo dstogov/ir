@@ -1,7 +1,5 @@
 --TEST--
 035: FOLD: c1 - (x + c2) => (c1 - c2) - x truncates c1 - c2 to the type width
---ARGS--
--O2 --save
 --CODE--
 {
 	uintptr_t c_1 = 0;

@@ -1,7 +1,5 @@
 --TEST--
 Abort on braced constant initializer with a scalar type
---ARGS--
---run
 --CODE--
 func main(): int32_t
 {

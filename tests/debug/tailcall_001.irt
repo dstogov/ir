@@ -1,7 +1,5 @@
 --TEST--
 Simple CALL
---TARGET--
-x86_64-*-sysv
 --ARGS--
 -S --run
 --CODE--

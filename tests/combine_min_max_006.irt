@@ -1,7 +1,5 @@
 --TEST--
 006: Combine MIN/MAX with adjusted constant keeps shared compare
---ARGS--
---save
 --CODE--
 {
 	uintptr_t c_1 = 0;

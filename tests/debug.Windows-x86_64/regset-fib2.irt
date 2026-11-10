@@ -1,7 +1,5 @@
 --TEST--
 Fib2
---TARGET--
-x86_64-windows
 --ARGS--
 --debug-regset 0x3ffff --save --save-live-ranges -S --run
 --CODE--

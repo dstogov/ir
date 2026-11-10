@@ -1,7 +1,5 @@
 --TEST--
 001: Argument Passing
---TARGET--
-aarch64-darwin
 --ARGS--
 -S --run
 --CODE--

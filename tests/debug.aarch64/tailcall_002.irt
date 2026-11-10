@@ -1,7 +1,5 @@
 --TEST--
 Indirect Tail CALL
---TARGET--
-aarch64
 --ARGS--
 -S
 --CODE--

@@ -1,9 +1,5 @@
 --TEST--
 004: COND(D,D,D)
---TARGET--
-x86_64-*-sysv
---ARGS--
--S
 --CODE--
 {
 	l_1 = START(ret);

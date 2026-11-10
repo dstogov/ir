@@ -1,7 +1,5 @@
 --TEST--
 Simple CALL with ALLOCA
---TARGET--
-aarch64-darwin
 --ARGS--
 -S --run
 --CODE--

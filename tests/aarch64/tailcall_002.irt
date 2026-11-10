@@ -1,7 +1,5 @@
 --TEST--
 002: tailcall: epilogue does not override op2: spilled non-preserved reg
---TARGET--
-aarch64
 --ARGS--
 -S --debug-regset 0x00000001
 --CODE--

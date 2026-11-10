@@ -1,7 +1,5 @@
 --TEST--
 008: sub function
---TARGET--
-x86
 --ARGS--
 -S -mavx
 --CODE--

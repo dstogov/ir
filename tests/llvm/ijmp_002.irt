@@ -1,7 +1,5 @@
 --TEST--
 002: IJMP - computed goto (constant addr)
---ARGS--
---emit-llvm
 --CODE--
 {
 	uintptr_t p = 0xbaddad;

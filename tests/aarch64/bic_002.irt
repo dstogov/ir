@@ -1,9 +1,5 @@
 --TEST--
 002: AND(NOT(y), x) 64-bit
---TARGET--
-aarch64
---ARGS--
--S
 --CODE--
 {
 	l_1 = START(l_4);

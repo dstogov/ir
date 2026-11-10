@@ -1,7 +1,5 @@
 --TEST--
 Combo 004
---TARGET--
-x86_64-*-sysv
 --ARGS--
 -S
 --CODE--

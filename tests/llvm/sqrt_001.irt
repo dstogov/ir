@@ -1,7 +1,5 @@
 --TEST--
 001: builtin sqrt
---ARGS--
---emit-llvm
 --CODE--
 {
 	uintptr_t c_1 = func sqrt(double): double __builtin;

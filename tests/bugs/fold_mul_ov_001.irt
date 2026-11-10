@@ -1,7 +1,5 @@
 --TEST--
 MUL_OV(-1, INT64_MIN) leads to FPE
---ARGS--
--O2 --save
 --CODE--
 {
 	int64_t c_1 = -1;

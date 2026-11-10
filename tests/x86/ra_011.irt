@@ -1,9 +1,5 @@
 --TEST--
 011: Register Allocation (ADD + DIV)
---TARGET--
-x86
---ARGS--
--S
 --CODE--
 {
 	l_1 = START(l_4);

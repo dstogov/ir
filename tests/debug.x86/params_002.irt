@@ -1,7 +1,5 @@
 --TEST--
 002: Parameter Loading
---TARGET--
-x86
 --ARGS--
 -S
 --CODE--

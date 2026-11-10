@@ -1,9 +1,5 @@
 --TEST--
 001: COND(I,I,I)
---TARGET--
-aarch64
---ARGS--
--S
 --CODE--
 {
 	l_1 = START(ret);

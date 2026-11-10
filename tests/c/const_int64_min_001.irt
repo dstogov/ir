@@ -1,7 +1,5 @@
 --TEST--
 001: INT64_MIN and large uint64_t constants
---ARGS--
--O0 --emit-c
 --CODE--
 {
 	int64_t c_1 = -9223372036854775808;
@@ -30,7 +28,7 @@ bool test(int64_t x, uint64_t y)
 	d_3 = d_1 >= (-9223372036854775807-1);
 	d_4 = d_2 < 18446744073709551615ULL;
 	d_5 = d_2 < 9223372036854775807;
-	d_6 = d_3 && d_4;
+	d_6 = d_4 && d_3;
 	d_7 = d_6 && d_5;
 	return d_7;
 }

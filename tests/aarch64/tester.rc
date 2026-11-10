@@ -1,0 +1,4 @@
+--TARGET--
+aarch64
+--ARGS--
+-S

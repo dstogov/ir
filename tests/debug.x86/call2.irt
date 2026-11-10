@@ -1,7 +1,5 @@
 --TEST--
 CALL with parallel argument passing
---TARGET--
-x86
 --ARGS--
 -S
 --CODE--

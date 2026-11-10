@@ -1,9 +1,5 @@
 --TEST--
 010: sub function
---TARGET--
-x86_64-windows
---ARGS--
--S
 --CODE--
 {
 	uint16_t c = 1;

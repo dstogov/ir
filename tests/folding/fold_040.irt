@@ -1,7 +1,5 @@
 --TEST--
 040: FOLD: (x - c1) + c2 => x + (c2 - c1) does not negate INT8_MIN
---ARGS--
--O2 --save
 --CODE--
 {
 	uintptr_t c_1 = 0;

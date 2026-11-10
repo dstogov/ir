@@ -1,7 +1,5 @@
 --TEST--
 Abort on character literal with a floating-point type
---ARGS--
---run
 --CODE--
 func main(): int32_t
 {

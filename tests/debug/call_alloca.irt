@@ -1,7 +1,5 @@
 --TEST--
 Simple CALL with ALLOCA
---TARGET--
-x86_64-*-sysv
 --ARGS--
 -S --run
 --CODE--

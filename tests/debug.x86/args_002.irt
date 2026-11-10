@@ -1,7 +1,5 @@
 --TEST--
 002: Argument Passing
---TARGET--
-x86
 --ARGS--
 -S --run
 --CODE--

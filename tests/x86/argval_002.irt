@@ -1,9 +1,5 @@
 --TEST--
 002: ARGVAL:
---TARGET--
-x86
---ARGS--
--S
 --CODE--
 extern func @test(uintptr_t, ...): int32_t;
 static const @str.1[1] = "\000";

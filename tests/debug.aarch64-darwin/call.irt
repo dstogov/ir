@@ -1,7 +1,5 @@
 --TEST--
 Simple CALL
---TARGET--
-aarch64-darwin
 --ARGS--
 -fno-tail-calls -S --run
 --CODE--

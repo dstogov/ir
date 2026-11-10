@@ -1,7 +1,5 @@
 --TEST--
 001: if function
---TARGET--
-aarch64
 --ARGS--
 -O1 -S
 --CODE--

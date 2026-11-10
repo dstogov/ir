@@ -1,7 +1,5 @@
 --TEST--
 DESSA 004 (swap of coalesced virtual registers)
---ARGS--
---emit-c
 --CODE--
 func foo(int32_t, uintptr_t, uintptr_t): int32_t
 {

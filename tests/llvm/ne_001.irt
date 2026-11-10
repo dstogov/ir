@@ -1,7 +1,5 @@
 --TEST--
 001: ne function
---ARGS--
---emit-llvm
 --CODE--
 {
 	l_1 = START(l_4);

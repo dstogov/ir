@@ -1,9 +1,5 @@
 --TEST--
 005: Register Allocation (DIV + DIV)
---TARGET--
-x86_64-windows
---ARGS--
--S
 --CODE--
 {
 	l_1 = START(l_4);

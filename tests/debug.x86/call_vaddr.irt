@@ -1,7 +1,5 @@
 --TEST--
 Simple CALL with VADDR
---TARGET--
-x86
 --ARGS--
 -S --run
 --CODE--

@@ -1,7 +1,5 @@
 --TEST--
 002: Parameter Loading
---TARGET--
-aarch64
 --ARGS--
 -S
 --CODE--

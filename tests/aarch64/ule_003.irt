@@ -1,9 +1,5 @@
 --TEST--
 003: ule function
---TARGET--
-aarch64
---ARGS--
--S
 --CODE--
 {
 	uint32_t c = 0;

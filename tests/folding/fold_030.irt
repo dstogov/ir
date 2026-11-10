@@ -1,7 +1,5 @@
 --TEST--
 030: FOLD: LT/GE/LE/GT on uintptr_t constants are signed comparisons
---ARGS--
--O2 --save
 --CODE--
 {
 	uintptr_t c_m1 = -1;

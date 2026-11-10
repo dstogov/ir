@@ -3,7 +3,7 @@ GH-100: incorrect stack alignment with VAR on aarch64
 --TARGET--
 aarch64
 --ARGS--
--O0 -S --run
+-O0 -S
 --CODE--
 {
         int32_t c_1 = 42;
@@ -15,13 +15,10 @@ aarch64
         l_4 = RETURN(l_3, d_3);
 }
 --EXPECT--
-main:
+test:
 	sub sp, sp, #0x10
 	movz w0, #0x2a
 	str w0, [sp]
 	ldr w0, [sp]
 	add sp, sp, #0x10
 	ret
-
-
-exit code = 42

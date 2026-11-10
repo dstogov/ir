@@ -1,7 +1,5 @@
 --TEST--
 Abort on floating-point literal in an integer vector constant
---ARGS--
---run
 --CODE--
 func main(): int32_t
 {

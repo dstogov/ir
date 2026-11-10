@@ -1,7 +1,5 @@
 --TEST--
 001: alloca function
---ARGS--
---emit-c
 --CODE--
 {
 	int32_t size = 10;

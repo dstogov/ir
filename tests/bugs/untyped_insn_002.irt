@@ -1,7 +1,5 @@
 --TEST--
 Abort on unary data instruction without a type
---ARGS--
---run
 --CODE--
 func main(): int32_t
 {

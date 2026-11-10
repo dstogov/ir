@@ -1,7 +1,5 @@
 --TEST--
 028: FOLD: (x >>s 4) & 0xff is not turned into SHR
---ARGS--
--O2 --save
 --CODE--
 {
 	int64_t c_1 = 4;

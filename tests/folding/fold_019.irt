@@ -1,7 +1,5 @@
 --TEST--
 019: FOLD: signed MOD INT16_MIN by minus one not folded
---ARGS--
--O2 --save
 --CODE--
 {
 	int16_t c_1 = -32768;

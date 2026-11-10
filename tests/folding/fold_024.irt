@@ -1,7 +1,5 @@
 --TEST--
 024: FOLD: MIN(MIN(X, Y), X) and MIN(MIN(X, Y), Y) fold to MIN(X, Y)
---ARGS--
--O2 --save
 --CODE--
 {
 	uintptr_t c_1 = 0;

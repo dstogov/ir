@@ -1,9 +1,5 @@
 --TEST--
 003: add_ov function
---TARGET--
-x86
---ARGS--
--S
 --CODE--
 {
 	int32_t c_1 = 0;

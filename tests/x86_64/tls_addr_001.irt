@@ -1,9 +1,5 @@
 --TEST--
 001: TLS_ADDR
---TARGET--
-x86_64-*-sysv
---ARGS--
--S
 --CODE--
 func thread_pointer(): uintptr_t
 {

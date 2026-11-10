@@ -1,7 +1,5 @@
 --TEST--
 005: ge function
---TARGET--
-x86
 --ARGS--
 -S -mavx
 --CODE--

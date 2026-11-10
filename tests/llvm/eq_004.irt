@@ -1,7 +1,5 @@
 --TEST--
 004: eq function
---ARGS--
---emit-llvm
 --CODE--
 {
 	double c = 0;

@@ -1,7 +1,5 @@
 --TEST--
 014: FOLD: AND(SHR(X, C), MASK) redundant mask with wide shift count
---ARGS--
--O2 --save
 --CODE--
 {
 	uintptr_t c_1 = 0;

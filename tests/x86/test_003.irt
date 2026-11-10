@@ -1,9 +1,5 @@
 --TEST--
 003: IF(EQ(AND(_,_), 0)) -> TEST
---TARGET--
-x86
---ARGS--
--S
 --CODE--
 {
 	int32_t c1 = 0;

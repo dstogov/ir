@@ -1,9 +1,5 @@
 --TEST--
 002: or function
---TARGET--
-x86_64-*-sysv
---ARGS--
--S
 --CODE--
 {
 	uint64_t c = 0x40000000000; /* 1<<42 */

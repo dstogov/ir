@@ -1,7 +1,5 @@
 --TEST--
 CALL with parallel argument passing
---TARGET--
-aarch64-darwin
 --ARGS--
 -S
 --CODE--

@@ -1,9 +1,5 @@
 --TEST--
 001: UNORDERED
---TARGET--
-aarch64
---ARGS--
--S
 --CODE--
 {
 	float c = 0;

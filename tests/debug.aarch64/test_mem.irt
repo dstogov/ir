@@ -1,7 +1,5 @@
 --TEST--
 Mandelbrot Test (mem)
---TARGET--
-aarch64
 --ARGS--
 -S -fno-mem2ssa
 --CODE--

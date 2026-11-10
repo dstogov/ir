@@ -1,9 +1,5 @@
 --TEST--
 001: and function
---TARGET--
-x86_64-*-sysv
---ARGS--
--S
 --CODE--
 {
 	uint64_t c = 1;

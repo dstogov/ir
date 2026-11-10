@@ -1,7 +1,5 @@
 --TEST--
 Abort on STORE with a type
---ARGS--
---run
 --CODE--
 func test(uintptr_t): int32_t
 {

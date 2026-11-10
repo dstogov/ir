@@ -1,9 +1,5 @@
 --TEST--
 010: add function
---TARGET--
-x86_64-*-sysv
---ARGS--
--S
 --CODE--
 {
 	uint16_t c = 1;

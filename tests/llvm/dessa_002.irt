@@ -1,7 +1,5 @@
 --TEST--
 DESSA 002
---ARGS--
---emit-llvm
 --CODE--
 {
 	uintptr_t c_1 = 0;

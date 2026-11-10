@@ -1,7 +1,5 @@
 --TEST--
 Test
---TARGET--
-x86
 --ARGS--
 --debug-regset 0x3ff --save --save-live-ranges -S
 --CODE--

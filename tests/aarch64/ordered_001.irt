@@ -1,9 +1,5 @@
 --TEST--
 001: ORDERED
---TARGET--
-aarch64
---ARGS--
--S
 --CODE--
 {
 	double c = 0;

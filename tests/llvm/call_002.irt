@@ -1,7 +1,5 @@
 --TEST--
 Indirect CALL
---ARGS--
---emit-llvm
 --CODE--
 {
 	uintptr_t c_6 = "hello %d!\n";

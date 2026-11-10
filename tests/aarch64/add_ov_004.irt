@@ -1,9 +1,5 @@
 --TEST--
 004: add_ov function (jmp probability)
---TARGET--
-aarch64
---ARGS--
--S
 --CODE--
 {
 	int32_t c_1 = 0;

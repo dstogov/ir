@@ -1,7 +1,5 @@
 --TEST--
 011: add function
---ARGS--
---emit-llvm
 --CODE--
 {
 	double c = 0.5;

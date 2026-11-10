@@ -1,7 +1,5 @@
 --TEST--
 LOOP 001
---TARGET--
-x86
 --ARGS--
 -S
 --CODE--

@@ -1,7 +1,5 @@
 --TEST--
 004: neg function (int vector)
---ARGS--
---emit-llvm
 --CODE--
 {
 	l_1 = START(l_3);

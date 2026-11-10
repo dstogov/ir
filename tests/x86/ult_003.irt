@@ -1,9 +1,5 @@
 --TEST--
 003: ult function
---TARGET--
-x86
---ARGS--
--S
 --CODE--
 {
 	uint32_t c = 0;

@@ -1,9 +1,5 @@
 --TEST--
 002: GUARD must not reuse clobbered flags
---TARGET--
-x86_64-*-sysv
---ARGS--
--S
 --CODE--
 func guard(): void
 {

@@ -1,9 +1,5 @@
 --TEST--
 001: ARGVAL:
---TARGET--
-x86_64-*-sysv
---ARGS--
--S
 --CODE--
 extern func @test(uintptr_t): int32_t;
 func @main(): int32_t

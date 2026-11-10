@@ -1,9 +1,5 @@
 --TEST--
 006: Register Allocation (DIV + MOD)
---TARGET--
-x86
---ARGS--
--S
 --CODE--
 {
 	l_1 = START(l_4);

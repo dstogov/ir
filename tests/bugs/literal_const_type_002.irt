@@ -1,7 +1,5 @@
 --TEST--
 Abort on inf literal with an integer type
---ARGS--
---run
 --CODE--
 func main(): int32_t
 {

@@ -1,7 +1,5 @@
 --TEST--
 017: FOLD: narrow MUL result canonicalized before EQ
---ARGS--
--O2 --save
 --CODE--
 {
 	uintptr_t c_1 = 0;

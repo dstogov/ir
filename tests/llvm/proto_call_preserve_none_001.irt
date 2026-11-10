@@ -1,7 +1,5 @@
 --TEST--
 001: proto values keep preserve-none function-pointer casts on aarch64
---ARGS--
---emit-llvm
 --CODE--
 {
 	uintptr_t c_1 = 0x1234;

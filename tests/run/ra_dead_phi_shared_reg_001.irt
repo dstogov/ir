@@ -1,0 +1,49 @@
+--TEST--
+RA: dead PHIs of the same merge must not share a register
+--CODE--
+func h(double, double): double
+{
+	l_1 = START(l_2);
+	double a = PARAM(l_1, "a", 1);
+	double b = PARAM(l_1, "b", 2);
+	double r = ADD(a, b);
+	l_2 = RETURN(l_1, r);
+}
+func test(double, double, double): double
+{
+	uintptr_t c_1 = func h(double, double): double;
+	l_1 = START(l_19);
+	double d_2 = PARAM(l_1, "p1", 1);
+	double d_3 = PARAM(l_1, "p2", 2);
+	double d_4 = PARAM(l_1, "p3", 3);
+	bool d_5 = LE(d_2, d_2);
+	l_6 = IF(l_1, d_5);
+	l_7 = IF_TRUE(l_6);
+	l_8 = END(l_7);
+	l_9 = IF_FALSE(l_6);
+	l_10 = END(l_9);
+	l_11 = MERGE(l_8, l_10);
+	double d_12 = PHI(l_11, d_3, d_2);
+	double d_13 = PHI(l_11, d_3, d_2);
+	float d_14 = FP2FP(d_12);
+	float d_15 = FP2FP(d_13);
+	double d_16, l_16 = CALL/2(l_11, c_1, d_2, d_2);
+	double d_17, l_17 = CALL/2(l_16, c_1, d_16, d_4);
+	l_19 = RETURN(l_17, d_2);
+}
+func main(): int32_t
+{
+	int32_t c_0 = 0;
+	double a = 3;
+	double b = 5;
+	double c = 7;
+	uintptr_t f = func printf(uintptr_t, ...): int32_t;
+	uintptr_t t = func test(double, double, double): double;
+	uintptr_t fmt = "%g\n";
+	l_1 = START(l_4);
+	double r, l_2 = CALL/3(l_1, t, a, b, c);
+	int32_t z, l_3 = CALL/2(l_2, f, fmt, r);
+	l_4 = RETURN(l_3, c_0);
+}
+--EXPECT--
+3

@@ -1,7 +1,5 @@
 --TEST--
 022: FOLD: AND(AND(X, Y), X) and AND(AND(X, Y), Y) fold to AND(X, Y)
---ARGS--
--O2 --save
 --CODE--
 {
 	uintptr_t c_1 = 0;

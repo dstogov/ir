@@ -1,7 +1,5 @@
 --TEST--
 Test
---TARGET--
-aarch64
 --ARGS--
 --debug-regset 0x3ffffffff --save --save-live-ranges -S
 --CODE--

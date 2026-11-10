@@ -1,7 +1,5 @@
 --TEST--
 002: min function
---TARGET--
-x86
 --ARGS--
 -S -mavx
 --CODE--

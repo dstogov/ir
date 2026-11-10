@@ -1,7 +1,5 @@
 --TEST--
 DESSA 001
---TARGET--
-aarch64
 --ARGS--
 -O1 -S
 --CODE--

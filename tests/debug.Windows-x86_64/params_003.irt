@@ -1,7 +1,5 @@
 --TEST--
 003: Parameter Loading and argument passing
---TARGET--
-x86_64-windows
 --ARGS--
 -S
 --CODE--

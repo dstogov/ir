@@ -1,7 +1,5 @@
 --TEST--
 FibI
---TARGET--
-x86
 --ARGS--
 --save --save-live-ranges -S --run
 --CODE--

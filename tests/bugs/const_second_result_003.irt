@@ -1,7 +1,5 @@
 --TEST--
 Abort on data instruction definition with two results
---ARGS--
---run
 --CODE--
 func main(int32_t): int32_t
 {

@@ -2,8 +2,6 @@
 TLS_ADDR double spill
 --TARGET--
 aarch64-*-sysv
---ARGS--
--O2 -S
 --CODE--
 func test(uintptr_t): double
 {

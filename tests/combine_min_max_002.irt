@@ -1,7 +1,5 @@
 --TEST--
 002: Combine MIN/MAX
---ARGS--
--O2 --save
 --CODE--
 {
 	uintptr_t c_1 = 0;
