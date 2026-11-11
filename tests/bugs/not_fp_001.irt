@@ -1,0 +1,13 @@
+--TEST--
+Reject boolean NOT of a floating-point value
+--CODE--
+{
+	l_1 = START(l_4);
+	double x = PARAM(l_1, "x", 1);
+	bool ret = NOT(x);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+ERROR: boolean NOT of a floating-point value is not supported at line 4
+
+exit code = 2

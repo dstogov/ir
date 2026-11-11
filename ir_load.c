@@ -2033,6 +2033,10 @@ static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 					}
 					sym = get_sym();
 				}
+				if (op == IR_NOT && t == IR_BOOL && n == 1 && !IR_IS_UNRESOLVED(op1)
+				 && IR_IS_TYPE_FP(p->ctx->ir_base[op1].type)) {
+					yy_error("boolean NOT of a floating-point value is not supported");
+				}
 				if (IR_IS_FOLDABLE_OP(op)) {
 					if (IR_IS_UNRESOLVED(op1) || IR_IS_UNRESOLVED(op2) || IR_IS_UNRESOLVED(op3)) {
 						if (op == IR_PHI) {

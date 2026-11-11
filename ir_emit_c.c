@@ -1348,6 +1348,7 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 					ir_emit_unary_op(ctx, f, i, insn, "-");
 					break;
 				case IR_NOT:
+					IR_ASSERT(insn->type != IR_BOOL || IR_IS_TYPE_INT(ctx->ir_base[insn->op1].type));
 					ir_emit_unary_op(ctx, f, i, insn, insn->type == IR_BOOL ? "!" : "~");
 					break;
 				case IR_OR:

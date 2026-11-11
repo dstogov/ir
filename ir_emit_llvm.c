@@ -545,16 +545,10 @@ static void ir_emit_unary_not(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 
 	ir_emit_def_ref(ctx, f, def);
 	if (insn->type == IR_BOOL) {
-		if (IR_IS_TYPE_FP(type)) {
-			fprintf(f, "fcmp oeq %s ", ir_type_llvm_name[type]);
-			ir_emit_ref(ctx, f, insn->op1);
-			fprintf(f, ", 0.0\n");
-		} else {
-			IR_ASSERT(IR_IS_TYPE_INT(type));
-			fprintf(f, "icmp eq %s ", ir_type_llvm_name[type]);
-			ir_emit_ref(ctx, f, insn->op1);
-			fprintf(f, ", 0\n");
-		}
+		IR_ASSERT(IR_IS_TYPE_INT(type));
+		fprintf(f, "icmp eq %s ", ir_type_llvm_name[type]);
+		ir_emit_ref(ctx, f, insn->op1);
+		fprintf(f, ", 0\n");
 	} else if (IR_IS_TYPE_INT(type)) {
 		IR_ASSERT(type == insn->type);
 		fprintf(f, "xor %s ", ir_type_llvm_name[type]);
