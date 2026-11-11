@@ -1447,6 +1447,27 @@ pick:
 		}
 	}
 
+	/* assign "static" spill slots for "unreachable" ALLOCAs (they are in the control chain followed the START) */
+	i = ir_next_control(ctx, 1);
+	while (ctx->rules[i] == IR_STATIC_ALLOCA) {
+		if (!IR_VREG_IS_STACK_SLOT(ctx->vregs[i])
+		 && ctx->use_lists[i].count > 0
+		 && ctx->ir_base[i].op == IR_ALLOCA) {
+			ir_insn *insn = &ctx->ir_base[i];
+			ir_insn *val = &ctx->ir_base[insn->op2];
+
+			IR_ASSERT(IR_IS_CONST_REF(insn->op2));
+			IR_ASSERT(IR_IS_TYPE_INT(val->type));
+			IR_ASSERT(!IR_IS_SYM_CONST(val->op));
+			IR_ASSERT(IR_IS_TYPE_UNSIGNED(val->type) || val->val.i64 >= 0);
+			IR_ASSERT(val->val.i64 < 0x7fffffff);
+			offset = ir_allocate_spill_slot(ctx, val->val.i32, insn->op3);
+			ctx->vregs[i] = IR_STACK_SLOT_TO_VREG(offset);
+			IR_LOG_ASSIGN_VAR(i, offset);
+		}
+		i = ir_next_control(ctx, i);
+	}
+
 #ifdef IR_TARGET_X86
 	if (ctx->flags2 & IR_HAS_FP_RET_SLOT) {
 		ctx->ret_slot = ir_allocate_spill_slot(ctx, ir_type_size[IR_DOUBLE], 0);
