@@ -6359,7 +6359,12 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 					|	stp x29, x30, [sp, # (-(ctx->stack_frame_size+16))]!
 					|	mov x29, sp
 				}
-				|	sub sp, sp, #used_stack
+				if (aarch64_may_encode_imm12(used_stack)) {
+					|	sub sp, sp, #used_stack
+				} else {
+					ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, used_stack);
+					|	sub sp, sp, Rx(IR_REG_INT_TMP)
+				}
 			}
 		}
 	}
@@ -6612,7 +6617,12 @@ static void ir_emit_call_ex(ir_ctx *ctx, ir_ref def, ir_insn *insn, const ir_cal
     }
 
 	if (used_stack) {
-		|	add sp, sp, #used_stack
+		if (aarch64_may_encode_imm12(used_stack)) {
+			|	add sp, sp, #used_stack
+		} else {
+			ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, used_stack);
+			|	add sp, sp, Rx(IR_REG_INT_TMP)
+		}
 		ctx->call_stack_size -= used_stack;
 	}
 
