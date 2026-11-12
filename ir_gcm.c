@@ -44,7 +44,7 @@ static uint32_t ir_gcm_schedule_early(ir_ctx *ctx, ir_ref ref, ir_list *queue_la
 			}
 		} else if (insn->op == IR_PI) {
 			ctx->cfg_blocks[b].flags |= IR_BB_HAS_PI;
-			ir_gcm_schedule_early(ctx, insn->op1, queue_late);
+			ir_gcm_schedule_early(ctx, insn->op2, queue_late);
 		} else {
 			IR_ASSERT(insn->op == IR_VAR);
 			ctx->cfg_blocks[b].flags |= IR_BB_HAS_VAR;
