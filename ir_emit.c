@@ -1559,6 +1559,20 @@ int ir_match(ir_ctx *ctx)
 		}
 	}
 
+	if (ctx->flags & IR_FUNCTION) {
+		/* Set rules for static "unreachable" ALLOCAs (they are in the control chain followed the START) */
+		ref = ir_next_control(ctx, 1);
+		while (ctx->ir_base[ref].op == IR_ALLOCA && IR_IS_CONST_REF(ctx->ir_base[ref].op2)) {
+			if (!ctx->rules[ref]) {
+				IR_ASSERT(!IR_IS_SYM_CONST(ctx->ir_base[ctx->ir_base[ref].op2].op));
+				ctx->rules[ref] = IR_STATIC_ALLOCA;
+				ctx->flags |= IR_USE_FRAME_POINTER;
+				ctx->flags2 |= IR_HAS_ALLOCA;
+			}
+			ref = ir_next_control(ctx, ref);
+		}
+	}
+
 	if (ctx->entries_count) {
 		ctx->entries_count = entries_count;
 		if (!entries_count) {

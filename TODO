@@ -4,6 +4,7 @@
 	- full ABI conformance
 -  MEMCPY, MEMSET
 -  Consider IR cleanup (VAR -> ALLOCA, VLOAD -> LOAD, VSTORE -> STORE, LOOP_END -> END, LOOP_BEGIN -> MERGE, PI)
+-  Consider splitting ALLOCA into ALLOCA (similar to CALL) and STATIC_ALLOCA or BIG_VAR (similar to VAR)
 -  long double
 
 -  revisit ir_bind()
