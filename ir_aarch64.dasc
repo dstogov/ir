@@ -3219,6 +3219,95 @@ static void ir_emit_bic(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
+static void ir_emit_cmp_int_common(ir_ctx *ctx, ir_op op, ir_type type, ir_reg op1_reg, ir_ref op1, ir_reg op2_reg, ir_ref op2)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+
+	IR_ASSERT(op1_reg != IR_REG_NONE);
+	if (op2_reg == IR_REG_NONE && op1 == op2) {
+		op2_reg = op1_reg;
+	}
+
+	if (ir_type_size[type] < 4) {
+		/* Short signed comparison */
+		if (ir_type_size[type] == 2) {
+			if (op >= IR_LT && op <= IR_GT) {
+				|	sxth Rw(IR_REG_INT_TMP), Rw(op1_reg)
+			} else {
+				|	uxth Rw(IR_REG_INT_TMP), Rw(op1_reg)
+			}
+			op1_reg = IR_REG_INT_TMP;
+		} else if (ir_type_size[type] == 1) {
+			if (op >= IR_LT && op <= IR_GT) {
+				|	sxtb Rw(IR_REG_INT_TMP), Rw(op1_reg)
+			} else {
+				|	uxtb Rw(IR_REG_INT_TMP), Rw(op1_reg)
+			}
+			op1_reg = IR_REG_INT_TMP;
+		} else {
+			IR_ASSERT(0);
+		}
+	}
+	if (op2_reg != IR_REG_NONE) {
+		if (ir_type_size[type] == 8) {
+			|	cmp Rx(op1_reg), Rx(op2_reg)
+		} else if (ir_type_size[type] == 4) {
+			|	cmp Rw(op1_reg), Rw(op2_reg)
+		} else if (ir_type_size[type] == 2) {
+			if (op >= IR_LT && op <= IR_GT) {
+				|	cmp Rw(op1_reg), Rw(op2_reg), sxth
+			} else {
+				|	cmp Rw(op1_reg), Rw(op2_reg), uxth
+			}
+		} else if (ir_type_size[type] == 1) {
+			if (op >= IR_LT && op <= IR_GT) {
+				|	cmp Rw(op1_reg), Rw(op2_reg), sxtb
+			} else {
+				|	cmp Rw(op1_reg), Rw(op2_reg), uxtb
+			}
+		} else {
+			IR_ASSERT(0);
+		}
+	} else {
+		IR_ASSERT(IR_IS_CONST_REF(op2));
+		IR_ASSERT(!IR_IS_SYM_CONST(ctx->ir_base[op2].op));
+		int32_t val = ctx->ir_base[op2].val.i32;
+
+		if (ir_type_size[type] == 8) {
+			|	cmp Rx(op1_reg), #val
+		} else if (ir_type_size[type] == 4) {
+			|	cmp Rw(op1_reg), #val
+		} else if (ir_type_size[type] == 2) {
+			if (op >= IR_LT && op <= IR_GT) {
+				val = (int32_t)(int16_t)(val & 0xffff);
+				if (val < 0) {
+					val = -val;
+					|	cmn Rw(op1_reg), #val
+				} else {
+					|	cmp Rw(op1_reg), #val
+				}
+			} else {
+				val = val & 0xffff;
+				|	cmp Rw(op1_reg), #val
+			}
+		} else if (ir_type_size[type] == 1) {
+			if (op >= IR_LT && op <= IR_GT) {
+				val = (int32_t)(int8_t)(val & 0xffff);
+				if (val < 0) {
+					val = -val;
+					|	cmn Rw(op1_reg), #val
+				} else {
+					|	cmp Rw(op1_reg), #val
+				}
+			} else {
+				val = val & 0xff;
+				|	cmp Rw(op1_reg), #val
+			}
+		}
+	}
+}
+
 static void ir_emit_min_max_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
@@ -3250,8 +3339,8 @@ static void ir_emit_min_max_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 		ir_emit_load(ctx, type, op2_reg, op2);
 	}
 
+	ir_emit_cmp_int_common(ctx, IR_IS_TYPE_SIGNED(type) ? IR_LT : IR_ULT, type, op1_reg, op1, op2_reg, op2);
 	if (ir_type_size[type] == 8) {
-		|	cmp Rx(op1_reg), Rx(op2_reg)
 		if (insn->op == IR_MIN) {
 			if (IR_IS_TYPE_SIGNED(type)) {
 				|	csel Rx(def_reg), Rx(op1_reg), Rx(op2_reg), le
@@ -3267,7 +3356,6 @@ static void ir_emit_min_max_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			}
 		}
 	} else {
-		|	cmp Rw(op1_reg), Rw(op2_reg)
 		if (insn->op == IR_MIN) {
 			if (IR_IS_TYPE_SIGNED(type)) {
 				|	csel Rw(def_reg), Rw(op1_reg), Rw(op2_reg), le
@@ -4027,95 +4115,6 @@ static void ir_emit_fix_type(ir_ctx *ctx, ir_type type, ir_reg op1_reg)
 			|	sxtb Rw(op1_reg), Rw(op1_reg)
 		} else {
 			|	uxtb Rw(op1_reg), Rw(op1_reg)
-		}
-	}
-}
-
-static void ir_emit_cmp_int_common(ir_ctx *ctx, ir_op op, ir_type type, ir_reg op1_reg, ir_ref op1, ir_reg op2_reg, ir_ref op2)
-{
-	ir_backend_data *data = ctx->data;
-	dasm_State **Dst = &data->dasm_state;
-
-	IR_ASSERT(op1_reg != IR_REG_NONE);
-	if (op2_reg == IR_REG_NONE && op1 == op2) {
-		op2_reg = op1_reg;
-	}
-
-	if (ir_type_size[type] < 4) {
-		/* Short signed comparison */
-		if (ir_type_size[type] == 2) {
-			if (op >= IR_LT && op <= IR_GT) {
-				|	sxth Rw(IR_REG_INT_TMP), Rw(op1_reg)
-			} else {
-				|	uxth Rw(IR_REG_INT_TMP), Rw(op1_reg)
-			}
-			op1_reg = IR_REG_INT_TMP;
-		} else if (ir_type_size[type] == 1) {
-			if (op >= IR_LT && op <= IR_GT) {
-				|	sxtb Rw(IR_REG_INT_TMP), Rw(op1_reg)
-			} else {
-				|	uxtb Rw(IR_REG_INT_TMP), Rw(op1_reg)
-			}
-			op1_reg = IR_REG_INT_TMP;
-		} else {
-			IR_ASSERT(0);
-		}
-	}
-	if (op2_reg != IR_REG_NONE) {
-		if (ir_type_size[type] == 8) {
-			|	cmp Rx(op1_reg), Rx(op2_reg)
-		} else if (ir_type_size[type] == 4) {
-			|	cmp Rw(op1_reg), Rw(op2_reg)
-		} else if (ir_type_size[type] == 2) {
-			if (op >= IR_LT && op <= IR_GT) {
-				|	cmp Rw(op1_reg), Rw(op2_reg), sxth
-			} else {
-				|	cmp Rw(op1_reg), Rw(op2_reg), uxth
-			}
-		} else if (ir_type_size[type] == 1) {
-			if (op >= IR_LT && op <= IR_GT) {
-				|	cmp Rw(op1_reg), Rw(op2_reg), sxtb
-			} else {
-				|	cmp Rw(op1_reg), Rw(op2_reg), uxtb
-			}
-		} else {
-			IR_ASSERT(0);
-		}
-	} else {
-		IR_ASSERT(IR_IS_CONST_REF(op2));
-		IR_ASSERT(!IR_IS_SYM_CONST(ctx->ir_base[op2].op));
-		int32_t val = ctx->ir_base[op2].val.i32;
-
-		if (ir_type_size[type] == 8) {
-			|	cmp Rx(op1_reg), #val
-		} else if (ir_type_size[type] == 4) {
-			|	cmp Rw(op1_reg), #val
-		} else if (ir_type_size[type] == 2) {
-			if (op >= IR_LT && op <= IR_GT) {
-				val = (int32_t)(int16_t)(val & 0xffff);
-				if (val < 0) {
-					val = -val;
-					|	cmn Rw(op1_reg), #val
-				} else {
-					|	cmp Rw(op1_reg), #val
-				}
-			} else {
-				val = val & 0xffff;
-				|	cmp Rw(op1_reg), #val
-			}
-		} else if (ir_type_size[type] == 1) {
-			if (op >= IR_LT && op <= IR_GT) {
-				val = (int32_t)(int8_t)(val & 0xffff);
-				if (val < 0) {
-					val = -val;
-					|	cmn Rw(op1_reg), #val
-				} else {
-					|	cmp Rw(op1_reg), #val
-				}
-			} else {
-				val = val & 0xff;
-				|	cmp Rw(op1_reg), #val
-			}
 		}
 	}
 }
