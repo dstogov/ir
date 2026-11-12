@@ -17,18 +17,7 @@
 #define IR_GCM_SPLIT 1
 #define IR_SCHEDULE_SWAP_OPS 1
 
-/* PHIs are pinned only when a live node uses them, so PHIs that feed only dead code are dropped */
-static uint32_t ir_gcm_pin_phi(ir_ctx *ctx, ir_ref ref, ir_list *queue_early)
-{
-	uint32_t b = ctx->cfg_map[ctx->ir_base[ref].op1];
-
-	IR_ASSERT(b && !IR_GCM_IS_SCHEDULED_EARLY(b));
-	ctx->cfg_map[ref] = b;
-	ir_list_push_unchecked(queue_early, ref);
-	return b;
-}
-
-static uint32_t ir_gcm_schedule_early(ir_ctx *ctx, ir_ref ref, ir_list *queue_early, ir_list *queue_late)
+static uint32_t ir_gcm_schedule_early(ir_ctx *ctx, ir_ref ref, ir_list *queue_late)
 {
 	ir_ref n, *p, input;
 	ir_insn *insn;
@@ -37,8 +26,31 @@ static uint32_t ir_gcm_schedule_early(ir_ctx *ctx, ir_ref ref, ir_list *queue_ea
 
 	insn = &ctx->ir_base[ref];
 
-	IR_ASSERT(insn->op != IR_PARAM && insn->op != IR_VAR);
-	IR_ASSERT(insn->op != IR_PHI && insn->op != IR_PI);
+	IR_ASSERT(insn->op != IR_PARAM);
+	if (ir_op_flags[insn->op] & IR_OP_FLAG_PINNED) {
+		/* Pinned instructions are handled aspecially */
+		b = ctx->cfg_map[ctx->ir_base[ref].op1];
+		IR_ASSERT(b && !IR_GCM_IS_SCHEDULED_EARLY(b));
+		ctx->cfg_map[ref] = b;
+
+		if (insn->op == IR_PHI) {
+			ctx->cfg_blocks[b].flags |= IR_BB_HAS_PHI;
+			n = insn->inputs_count - 1;
+			for (p = insn->ops + 2; n > 0; p++, n--) {
+				ref = *p;
+				if (ref > 0 && ctx->cfg_map[ref] == 0) {
+					ir_gcm_schedule_early(ctx, ref, queue_late);
+				}
+			}
+		} else if (insn->op == IR_PI) {
+			ctx->cfg_blocks[b].flags |= IR_BB_HAS_PI;
+			ir_gcm_schedule_early(ctx, insn->op1, queue_late);
+		} else {
+			IR_ASSERT(insn->op == IR_VAR);
+			ctx->cfg_blocks[b].flags |= IR_BB_HAS_VAR;
+		}
+		return b;
+	}
 
 	result = 1;
 	dom_depth = 0;
@@ -51,11 +63,7 @@ static uint32_t ir_gcm_schedule_early(ir_ctx *ctx, ir_ref ref, ir_list *queue_ea
 			if (IR_GCM_IS_SCHEDULED_EARLY(b)) {
 				b = IR_GCM_EARLY_BLOCK(b);
 			} else if (!b) {
-				if (ctx->ir_base[input].op == IR_PHI) {
-					b = ir_gcm_pin_phi(ctx, input, queue_early);
-				} else {
-					b = ir_gcm_schedule_early(ctx, input, queue_early, queue_late);
-				}
+				b = ir_gcm_schedule_early(ctx, input, queue_late);
 			}
 			if (dom_depth < ctx->cfg_blocks[b].dom_depth) {
 				dom_depth = ctx->cfg_blocks[b].dom_depth;
@@ -716,43 +724,40 @@ int ir_gcm(ir_ctx *ctx)
 		/* process the first instruction of the block */
 		_blocks[ref] = b; /* pin to block */
 
-		use_list = &ctx->use_lists[ref];
+		/* Disparate from the original C.Click algorithm decribed in "Global code motion, global value numbering",
+		 * PHI instructions ara not treated as "pinned" at this point (the same for PI and VAR).
+		 * These instruction are going to be "pinned" by special handling in ir_gcm_schedule_early().
+		 * As result GCM removes "dead" cycles (and arbitrary "dead" SCCs) created through PHIs.
+		 */
+	}
+
+	if (ctx->flags & IR_FUNCTION) {
+		/* pin function parameters to the first block */
+		use_list = &ctx->use_lists[1];
 		n = use_list->count;
 		if (n > 1) {
+			bb = &ctx->cfg_blocks[1];
 			for (p = &ctx->use_edges[use_list->refs]; n > 0; n--, p++) {
 				ref = *p;
 				use_insn = &ctx->ir_base[ref];
-				if (use_insn->op == IR_PHI) {
-					bb->flags |= IR_BB_HAS_PHI;
-				} else if (use_insn->op == IR_PI) {
-					bb->flags |= IR_BB_HAS_PI;
-					if (EXPECTED(ctx->use_lists[ref].count != 0)) {
-						_blocks[ref] = b; /* pin to block */
-						ir_list_push_unchecked(&queue_early, ref);
-					}
-				} else if (use_insn->op == IR_PARAM) {
+				if (use_insn->op == IR_PARAM) {
 					bb->flags |= IR_BB_HAS_PARAM;
-					_blocks[ref] = b; /* pin to block */
-				} else if (use_insn->op == IR_VAR) {
-					bb->flags |= IR_BB_HAS_VAR;
-					_blocks[ref] = b; /* pin to block */
+					_blocks[ref] = 1; /* pin to block */
 				}
 			}
 		}
 	}
 
-	while (ir_list_len(&queue_early)) {
-		ref = ir_list_pop(&queue_early);
+	n = ir_list_len(&queue_early);
+	while (n > 0) {
+		n--;
+		ref = ir_list_at(&queue_early, n);
 		insn = &ctx->ir_base[ref];
 		k = insn->inputs_count - 1;
 		for (p = insn->ops + 2; k > 0; p++, k--) {
 			ref = *p;
 			if (ref > 0 && _blocks[ref] == 0) {
-				if (ctx->ir_base[ref].op == IR_PHI) {
-					ir_gcm_pin_phi(ctx, ref, &queue_early);
-				} else {
-					ir_gcm_schedule_early(ctx, ref, &queue_early, &queue_late);
-				}
+				ir_gcm_schedule_early(ctx, ref, &queue_late);
 			}
 		}
 	}
