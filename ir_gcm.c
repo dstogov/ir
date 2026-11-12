@@ -724,8 +724,8 @@ int ir_gcm(ir_ctx *ctx)
 		/* process the first instruction of the block */
 		_blocks[ref] = b; /* pin to block */
 
-		/* Disparate from the original C.Click algorithm decribed in "Global code motion, global value numbering",
-		 * PHI instructions ara not treated as "pinned" at this point (the same for PI and VAR).
+		/* Disparate from the original C.Click algorithm described in "Global code motion, global value numbering",
+		 * PHI instructions are not treated as "pinned" at this point (the same for PI and VAR).
 		 * These instruction are going to be "pinned" by special handling in ir_gcm_schedule_early().
 		 * As result GCM removes "dead" cycles (and arbitrary "dead" SCCs) created through PHIs.
 		 */
