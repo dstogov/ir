@@ -13,6 +13,6 @@
 int32_t test(void)
 {
 	int32_t d_1;
-	d_1 = ((int32_t (*)(uintptr_t, ...))0x1234)("x=%d\n", 7);
+	d_1 = ((int32_t (*)(uintptr_t, ...))0x1234)((uintptr_t)"x=%d\n", 7);
 	return d_1;
 }
