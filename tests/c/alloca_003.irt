@@ -37,24 +37,20 @@ void test(int32_t arg_1, uintptr_t arg_2)
 	uintptr_t d_2 = arg_2;
 	int32_t d_3;
 	int32_t d_4;
-	int32_t d_5;
-	bool d_6;
+	bool d_5;
+	uintptr_t d_6;
 	uintptr_t d_7;
-	uintptr_t d_8;
-	int32_t d_9;
 	d_3 = d_1 * 4;
 	d_4 = 0;
-	d_5 = 0;
 	goto bb2;
 bb4:
 {
-	d_8 = (uintptr_t)alloca(d_3);
-	d_9 = d_2(d_8);
-	d_5 = d_9 + d_5;
+	d_7 = (uintptr_t)alloca(d_3);
+	d_2(d_7);
 }
 	d_4 = d_4 + 1;
 bb2:
-	d_6 = d_4 < d_1;
-	if (d_6) goto bb4;
+	d_5 = d_4 < d_1;
+	if (d_5) goto bb4;
 	return;
 }

@@ -26,8 +26,31 @@ static uint32_t ir_gcm_schedule_early(ir_ctx *ctx, ir_ref ref, ir_list *queue_la
 
 	insn = &ctx->ir_base[ref];
 
-	IR_ASSERT(insn->op != IR_PARAM && insn->op != IR_VAR);
-	IR_ASSERT(insn->op != IR_PHI && insn->op != IR_PI);
+	IR_ASSERT(insn->op != IR_PARAM);
+	if (ir_op_flags[insn->op] & IR_OP_FLAG_PINNED) {
+		/* Pinned instructions are handled especially */
+		b = ctx->cfg_map[ctx->ir_base[ref].op1];
+		IR_ASSERT(b && !IR_GCM_IS_SCHEDULED_EARLY(b));
+		ctx->cfg_map[ref] = b;
+
+		if (insn->op == IR_PHI) {
+			ctx->cfg_blocks[b].flags |= IR_BB_HAS_PHI;
+			n = insn->inputs_count - 1;
+			for (p = insn->ops + 2; n > 0; p++, n--) {
+				ref = *p;
+				if (ref > 0 && ctx->cfg_map[ref] == 0) {
+					ir_gcm_schedule_early(ctx, ref, queue_late);
+				}
+			}
+		} else if (insn->op == IR_PI) {
+			ctx->cfg_blocks[b].flags |= IR_BB_HAS_PI;
+			ir_gcm_schedule_early(ctx, insn->op2, queue_late);
+		} else {
+			IR_ASSERT(insn->op == IR_VAR);
+			ctx->cfg_blocks[b].flags |= IR_BB_HAS_VAR;
+		}
+		return b;
+	}
 
 	result = 1;
 	dom_depth = 0;
@@ -701,24 +724,25 @@ int ir_gcm(ir_ctx *ctx)
 		/* process the first instruction of the block */
 		_blocks[ref] = b; /* pin to block */
 
-		use_list = &ctx->use_lists[ref];
+		/* Disparate from the original C.Click algorithm described in "Global code motion, global value numbering",
+		 * PHI instructions are not treated as "pinned" at this point (the same for PI and VAR).
+		 * These instruction are going to be "pinned" by special handling in ir_gcm_schedule_early().
+		 * As result GCM removes "dead" cycles (and arbitrary "dead" SCCs) created through PHIs.
+		 */
+	}
+
+	if (ctx->flags & IR_FUNCTION) {
+		/* pin function parameters to the first block */
+		use_list = &ctx->use_lists[1];
 		n = use_list->count;
 		if (n > 1) {
+			bb = &ctx->cfg_blocks[1];
 			for (p = &ctx->use_edges[use_list->refs]; n > 0; n--, p++) {
 				ref = *p;
 				use_insn = &ctx->ir_base[ref];
-				if (use_insn->op == IR_PHI || use_insn->op == IR_PI) {
-					bb->flags |= (use_insn->op == IR_PHI) ? IR_BB_HAS_PHI : IR_BB_HAS_PI;
-					if (EXPECTED(ctx->use_lists[ref].count != 0)) {
-						_blocks[ref] = b; /* pin to block */
-						ir_list_push_unchecked(&queue_early, ref);
-					}
-				} else if (use_insn->op == IR_PARAM) {
+				if (use_insn->op == IR_PARAM) {
 					bb->flags |= IR_BB_HAS_PARAM;
-					_blocks[ref] = b; /* pin to block */
-				} else if (use_insn->op == IR_VAR) {
-					bb->flags |= IR_BB_HAS_VAR;
-					_blocks[ref] = b; /* pin to block */
+					_blocks[ref] = 1; /* pin to block */
 				}
 			}
 		}

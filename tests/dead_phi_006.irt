@@ -1,0 +1,44 @@
+--TEST--
+006: Dead loop PHI cycle -O2
+--ARGS--
+-O2 --save
+--CODE--
+{
+	int32_t c_0 = 0;
+	int32_t c_1 = 1;
+	int32_t c_10 = 10;
+	l_1 = START(l_20);
+	int32_t d_2 = PARAM(l_1, "n", 0);
+	l_3 = END(l_1);
+	l_4 = LOOP_BEGIN(l_3, l_12);
+	int32_t d_5 = PHI(l_4, c_0, d_9);
+	int32_t d_6 = PHI(l_4, c_0, d_10);
+	bool d_7 = LT(d_5, d_2);
+	l_8 = IF(l_4, d_7);
+	l_11 = IF_TRUE(l_8);
+	int32_t d_9 = ADD(d_5, c_1);
+	int32_t d_10 = ADD(d_6, c_10);
+	l_12 = LOOP_END(l_11);
+	l_13 = IF_FALSE(l_8);
+	l_20 = RETURN(l_13, d_5);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 0;
+	int32_t c_5 = 1;
+	l_1 = START(l_12);
+	int32_t d_2 = PARAM(l_1, "n", 0);
+	l_3 = END(l_1);
+	l_4 = LOOP_BEGIN(l_3, l_10);
+	int32_t d_5 = PHI(l_4, c_4, d_9);
+	bool d_6 = LT(d_5, d_2);
+	l_7 = IF(l_4, d_6);
+	l_8 = IF_TRUE(l_7);
+	int32_t d_9 = ADD(d_5, c_5);
+	l_10 = LOOP_END(l_8);
+	l_11 = IF_FALSE(l_7);
+	l_12 = RETURN(l_11, d_5);
+}
