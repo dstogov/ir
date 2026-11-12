@@ -4601,7 +4601,14 @@ static void ir_emit_cond(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 
 	if (IR_IS_TYPE_INT(op1_type)) {
-		|	ASM_REG_IMM_OP cmp, op1_type, op1_reg, 0
+		/* upper bits of narrow operands are undefined */
+		if (ir_type_size[op1_type] == 1) {
+			|	tst Rw(op1_reg), #0xff
+		} else if (ir_type_size[op1_type] == 2) {
+			|	tst Rw(op1_reg), #0xffff
+		} else {
+			|	ASM_REG_IMM_OP cmp, op1_type, op1_reg, 0
+		}
 	} else{
 		|	ASM_FP_REG_IMM_OP fcmp, op1_type, op1_reg, 0.0
 	}
