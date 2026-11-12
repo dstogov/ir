@@ -28,7 +28,7 @@ static uint32_t ir_gcm_schedule_early(ir_ctx *ctx, ir_ref ref, ir_list *queue_la
 
 	IR_ASSERT(insn->op != IR_PARAM);
 	if (ir_op_flags[insn->op] & IR_OP_FLAG_PINNED) {
-		/* Pinned instructions are handled aspecially */
+		/* Pinned instructions are handled especially */
 		b = ctx->cfg_map[ctx->ir_base[ref].op1];
 		IR_ASSERT(b && !IR_GCM_IS_SCHEDULED_EARLY(b));
 		ctx->cfg_map[ref] = b;
