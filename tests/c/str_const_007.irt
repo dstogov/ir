@@ -1,0 +1,18 @@
+--TEST--
+007: string arguments of a named vararg CALL stay C strings
+--CODE--
+{
+	uintptr_t c_1 = "%s\n";
+	uintptr_t c_2 = "abc";
+	uintptr_t c_3 = func printf(uintptr_t, ...): int32_t;
+	l_1 = START(l_3);
+	int32_t d_2, l_2 = CALL/2(l_1, c_3, c_1, c_2);
+	l_3 = RETURN(l_2, d_2);
+}
+--EXPECT--
+int32_t test(void)
+{
+	int32_t d_1;
+	d_1 = printf("%s\n", "abc");
+	return d_1;
+}

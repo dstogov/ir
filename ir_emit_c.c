@@ -253,6 +253,8 @@ static void ir_emit_c_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 	} else {
 		if (insn->op == IR_SYM) {
 			fprintf(f, "&");
+		} else if (insn->op == IR_STR) {
+			fprintf(f, "(uintptr_t)");
 		}
 		if (insn->op == IR_FUNC || insn->op == IR_SYM || insn->op == IR_LABEL) {
 			ir_emit_c_sym_name(ir_get_str(ctx, insn->val.name), f);
@@ -995,6 +997,19 @@ static void ir_emit_func_cast(ir_ctx *ctx, FILE *f, ir_ref ref, const ir_proto_t
 	fprintf(f, ")");
 }
 
+static void ir_emit_call_arg(ir_ctx *ctx, FILE *f, ir_insn *insn, ir_ref arg)
+{
+	/* A named callee may be declared by a C header (e.g. printf), so keep the literal's char* type */
+	if (IR_IS_CONST_REF(arg)
+	 && ctx->ir_base[arg].op == IR_STR
+	 && IR_IS_CONST_REF(insn->op2)
+	 && ctx->ir_base[insn->op2].op == IR_FUNC) {
+		ir_print_const(ctx, &ctx->ir_base[arg], f, true);
+	} else {
+		ir_emit_ref(ctx, f, arg);
+	}
+}
+
 static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 {
 	int j, n;
@@ -1027,7 +1042,7 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 		if (ctx->ir_base[arg].op == IR_ARGVAL) {
 			arg = ctx->ir_base[arg].op1;
 		}
-		ir_emit_ref(ctx, f, arg);
+		ir_emit_call_arg(ctx, f, insn, arg);
 	}
 	fprintf(f, ");\n");
 }
@@ -1060,7 +1075,7 @@ static void ir_emit_tailcall(ir_ctx *ctx, FILE *f, ir_insn *insn)
 		if (j != 3) {
 			fprintf(f, ", ");
 		}
-		ir_emit_ref(ctx, f, ir_insn_op(insn, j));
+		ir_emit_call_arg(ctx, f, insn, ir_insn_op(insn, j));
 	}
 	fprintf(f, ");\n");
 	if (insn->type == IR_VOID) {
