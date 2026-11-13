@@ -1,0 +1,52 @@
+--TEST--
+002: ror of 8/16/64-bit values
+--CODE--
+func ror8(int8_t, int8_t): int8_t
+{
+	l_1 = START(l_4);
+	int8_t x = PARAM(l_1, "x", 1);
+	int8_t y = PARAM(l_1, "y", 2);
+	int8_t ret = ROR(x, y);
+	l_4 = RETURN(l_1, ret);
+}
+func ror16(int16_t, int16_t): int16_t
+{
+	l_1 = START(l_4);
+	int16_t x = PARAM(l_1, "x", 1);
+	int16_t y = PARAM(l_1, "y", 2);
+	int16_t ret = ROR(x, y);
+	l_4 = RETURN(l_1, ret);
+}
+func ror64(int64_t, int64_t): int64_t
+{
+	l_1 = START(l_4);
+	int64_t x = PARAM(l_1, "x", 1);
+	int64_t y = PARAM(l_1, "y", 2);
+	int64_t ret = ROR(x, y);
+	l_4 = RETURN(l_1, ret);
+}
+--EXPECT--
+int8_t ror8(int8_t x, int8_t y)
+{
+	int8_t d_1 = x;
+	int8_t d_2 = y;
+	int8_t d_3;
+	d_3 = ((uint8_t)d_1 >> ((uint8_t)d_2 & 7)) | ((uint8_t)d_1 << (-(uint8_t)d_2 & 7));
+	return d_3;
+}
+int16_t ror16(int16_t x, int16_t y)
+{
+	int16_t d_1 = x;
+	int16_t d_2 = y;
+	int16_t d_3;
+	d_3 = ((uint16_t)d_1 >> ((uint16_t)d_2 & 15)) | ((uint16_t)d_1 << (-(uint16_t)d_2 & 15));
+	return d_3;
+}
+int64_t ror64(int64_t x, int64_t y)
+{
+	int64_t d_1 = x;
+	int64_t d_2 = y;
+	int64_t d_3;
+	d_3 = ((uint64_t)d_1 >> ((uint64_t)d_2 & 63)) | ((uint64_t)d_1 << (-(uint64_t)d_2 & 63));
+	return d_3;
+}
