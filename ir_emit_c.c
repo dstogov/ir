@@ -443,23 +443,24 @@ static void ir_emit_unordered(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
 static void ir_emit_rol_ror(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *op1, const char *op2)
 {
 	uint8_t t1 = ctx->ir_base[insn->op1].type;
+	int mask = ir_type_size[t1] * 8 - 1;
 
 	IR_ASSERT(!IR_IS_TYPE_VECTOR(insn->type) && !IR_IS_TYPE_VECTOR(t1));
+	/* Masked counts avoid UB of shifting by the full type width when the count is 0 */
 	ir_emit_def_ref(ctx, f, def);
 	fprintf(f, "(");
 	ir_emit_unsigned_cast(f, t1);
 	ir_emit_ref(ctx, f, insn->op1);
-	fprintf(f, " %s ", op1);
+	fprintf(f, " %s (", op1);
 	ir_emit_unsigned_cast(f, t1);
 	ir_emit_ref(ctx, f, insn->op2);
-	fprintf(f, ") | (");
+	fprintf(f, " & %d)) | (", mask);
 	ir_emit_unsigned_cast(f, t1);
 	ir_emit_ref(ctx, f, insn->op1);
-	fprintf(f, " %s (%d", op2, ir_type_size[t1] * 8);
-	fprintf(f, " - ");
+	fprintf(f, " %s (-", op2);
 	ir_emit_unsigned_cast(f, t1);
 	ir_emit_ref(ctx, f, insn->op2);
-	fprintf(f, "));\n");
+	fprintf(f, " & %d));\n", mask);
 }
 
 static void ir_emit_bswap(ir_ctx *ctx, FILE *f, int def, ir_insn *insn)
