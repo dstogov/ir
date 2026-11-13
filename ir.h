@@ -1087,12 +1087,22 @@ void ir_dump_codegen(const ir_ctx *ctx, FILE *f);
 /* IR to C conversion (implementation in ir_emit_c.c) */
 int ir_emit_c(ir_ctx *ctx, const char *name, FILE *f);
 void ir_emit_c_func_decl(const char *name, uint32_t flags, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, FILE *f);
-void ir_emit_c_sym_decl(const char *name, uint32_t flags, FILE *f);
+void ir_emit_c_sym_decl(const char *name, uint32_t flags, size_t size, FILE *f);
+void ir_emit_c_sym_data_str(size_t pos, const char *str, size_t len, FILE *f);
+void ir_emit_c_sym_data(size_t pos, const void *data, size_t size, FILE *f);
+void ir_emit_c_sym_data_pad(size_t pos, size_t size, FILE *f);
+void ir_emit_c_sym_data_ref(size_t pos, ir_op op, const char *ref, uintptr_t offset, FILE *f);
+void ir_emit_c_sym_data_end(uint32_t flags, FILE *f);
 
 /* IR to LLVM conversion (implementation in ir_emit_llvm.c) */
 int ir_emit_llvm(ir_ctx *ctx, const char *name, FILE *f);
 void ir_emit_llvm_func_decl(const char *name, uint32_t flags, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, FILE *f);
-void ir_emit_llvm_sym_decl(const char *name, uint32_t flags, FILE *f);
+void ir_emit_llvm_sym_decl(const char *name, uint32_t flags, size_t size, FILE *f);
+void ir_emit_llvm_sym_data_str(size_t pos, const char *str, size_t len, FILE *f);
+void ir_emit_llvm_sym_data(size_t pos, const void *data, size_t size, FILE *f);
+void ir_emit_llvm_sym_data_pad(size_t pos, size_t size, FILE *f);
+void ir_emit_llvm_sym_data_ref(size_t pos, ir_op op, const char *ref, uintptr_t offset, FILE *f);
+void ir_emit_llvm_sym_data_end(uint32_t flags, FILE *f);
 
 /* IR verification API (implementation in ir_check.c) */
 bool ir_check(const ir_ctx *ctx);

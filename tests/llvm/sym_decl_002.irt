@@ -1,0 +1,13 @@
+--TEST--
+002: extern, initialized and uninitialized var symbols are emitted as byte arrays
+--CODE--
+extern var @ext;
+var @tbl[3] = {
+	uint8_t 1,
+	uint16_t 0xffff,
+};
+var @bss[8];
+--EXPECT--
+@ext = external global [0 x i8]
+@tbl = global [3 x i8] [i8 u0x01, i8 u0xff, i8 u0xff]
+@bss = global [8 x i8] zeroinitializer

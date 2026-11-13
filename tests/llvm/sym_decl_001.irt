@@ -1,0 +1,6 @@
+--TEST--
+001: static const string symbol is emitted as an initialized const byte array
+--CODE--
+static const @fmt[4] = "%d\n\000";
+--EXPECT--
+@fmt = private constant [4 x i8] c"%d\0a\00"

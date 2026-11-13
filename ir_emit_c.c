@@ -210,6 +210,22 @@ static void ir_emit_c_fp_vector_const(ir_insn *insn, FILE *f)
 	fprintf(f, "}");
 }
 
+static void ir_emit_c_sym_name(const char *name, FILE *f)
+{
+	if (!strchr(name, '.')) {
+		fprintf(f, "%s", name);
+	} else {
+		while (*name) {
+			if (*name == '.') {
+				fprintf(f, "_");
+			} else {
+				fprintf(f, "%c", *name);
+			}
+			name++;
+		}
+	}
+}
+
 static void ir_emit_c_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 {
 	if (insn->op == IR_LABEL) {
@@ -238,7 +254,11 @@ static void ir_emit_c_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 		if (insn->op == IR_SYM) {
 			fprintf(f, "&");
 		}
-		ir_print_const(ctx, insn, f, true);
+		if (insn->op == IR_FUNC || insn->op == IR_SYM || insn->op == IR_LABEL) {
+			ir_emit_c_sym_name(ir_get_str(ctx, insn->val.name), f);
+		} else {
+			ir_print_const(ctx, insn, f, true);
+		}
 		if (insn->type == IR_U64 && insn->val.u64 > INT64_MAX) {
 			fprintf(f, "ULL");
 		}
@@ -1621,7 +1641,7 @@ void ir_emit_c_func_decl(const char *name, uint32_t flags, ir_type ret_type, uin
 	fprintf(f, ";\n");
 }
 
-void ir_emit_c_sym_decl(const char *name, uint32_t flags, FILE *f)
+void ir_emit_c_sym_decl(const char *name, uint32_t flags, size_t size, FILE *f)
 {
 	if (flags & IR_EXTERN) {
 		fprintf(f, "extern ");
@@ -1629,12 +1649,113 @@ void ir_emit_c_sym_decl(const char *name, uint32_t flags, FILE *f)
 		fprintf(f, "static ");
 	}
 	if (flags & IR_CONST) {
-		fprintf(f, "static ");
+		fprintf(f, "const ");
 	}
-	// TODO: type
-	fprintf(f, "uintptr_t %s", name);
+	// TODO: type, alignment, etc
+	fprintf(f, "uint8_t ");
+	ir_emit_c_sym_name(name, f);
+	if (size) {
+		fprintf(f, "[%" PRIuPTR "]", size);
+	} else {
+		fprintf(f, "[]");
+	}
 	if (flags & IR_INITIALIZED) {
-		fprintf(f, " =\n");
+		fprintf(f, " = ");
+		if (!(flags & IR_CONST_STRING)) {
+			fprintf(f, "{\n");
+		}
+	} else {
+		fprintf(f, ";\n");
+	}
+}
+
+void ir_emit_c_sym_data_str(size_t pos, const char *str, size_t len, FILE *f)
+{
+	if (len > 0 && str[len - 1] == 0) {
+		/* don't print terminatig zero */
+		len--;
+	}
+	if (pos == 0) {
+		/* pass */
+	} else if (pos % 16 == 0) {
+		fprintf(f, ",\n\t");
+	} else {
+		fprintf(f, ", ");
+	}
+	fprintf(f, "\"");
+	ir_print_escaped_str(str, len, f);
+	fprintf(f, "\"");
+}
+
+void ir_emit_c_sym_data(size_t pos, const void *data, size_t size, FILE *f)
+{
+	const uint8_t *p = data;
+
+	if (size > 0) {
+		if (pos == 0) {
+			fprintf(f, "\t");
+		} else if (pos % 16 == 0) {
+			fprintf(f, ",\n\t");
+		} else {
+			fprintf(f, ", ");
+		}
+		fprintf(f, "0x%02x", *p);
+		while (--size) {
+			p++;
+			pos++;
+			if (pos % 16 == 0) {
+				fprintf(f, ",\n\t");
+			} else {
+				fprintf(f, ", ");
+			}
+			fprintf(f, "0x%02x", *p);
+		}
+	}
+}
+
+void ir_emit_c_sym_data_pad(size_t pos, size_t size, FILE *f)
+{
+	if (size > 0) {
+		if (pos == 0) {
+			fprintf(f, "\t");
+		} else if (pos % 16 == 0) {
+			fprintf(f, ",\n\t");
+		} else {
+			fprintf(f, ", ");
+		}
+		fprintf(f, "0");
+		while (--size) {
+			pos++;
+			if (pos % 16 == 0) {
+				fprintf(f, ",\n\t0");
+			} else {
+				fprintf(f, ", 0");
+			}
+		}
+	}
+}
+
+void ir_emit_c_sym_data_ref(size_t pos, ir_op op, const char *ref, uintptr_t offset, FILE *f)
+{
+	if (pos == 0) {
+		fprintf(f, "\t");
+	} else if (pos % 16 == 0) {
+		fprintf(f, ",\n\t");
+	} else {
+		fprintf(f, ", ");
+	}
+	// TODO: encode reference into the byte array ???
+	fprintf(f, "&");
+	ir_emit_c_sym_name(ref, f);
+	if (offset) {
+		fprintf(f, "+ %" PRIuPTR, offset);
+	}
+}
+
+void ir_emit_c_sym_data_end(uint32_t flags, FILE *f)
+{
+	if (!(flags & IR_CONST_STRING)) {
+		fprintf(f, "};\n");
 	} else {
 		fprintf(f, ";\n");
 	}

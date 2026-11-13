@@ -673,10 +673,10 @@ static bool ir_loader_external_sym_dcl(ir_loader *loader, const char *name, uint
 			name);
 	}
 	if (l->dump & IR_DUMP_C) {
-		ir_emit_c_sym_decl(name, flags | IR_EXTERN, l->out_file);
+		ir_emit_c_sym_decl(name, flags | IR_EXTERN, 0, l->out_file);
 	}
 	if (l->dump & IR_DUMP_LLVM) {
-		ir_emit_llvm_sym_decl(name, flags | IR_EXTERN, l->out_file);
+		ir_emit_llvm_sym_decl(name, flags | IR_EXTERN, 0, l->out_file);
 	}
 	if (l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE|IR_RUN)) {
 		void *addr = ir_loader_resolve_sym_name(loader, name, IR_RESOLVE_SYM_SILENT);
@@ -781,10 +781,10 @@ static bool ir_loader_sym_dcl(ir_loader *loader, const char *name, uint32_t flag
 			(flags & IR_INITIALIZED) ? ((flags & IR_CONST_STRING) ? " = " : " = {\n") : ";\n");
 	}
 	if (l->dump & IR_DUMP_C) {
-		ir_emit_c_sym_decl(name, flags, l->out_file);
+		ir_emit_c_sym_decl(name, flags, size, l->out_file);
 	}
 	if (l->dump & IR_DUMP_LLVM) {
-		ir_emit_llvm_sym_decl(name, flags, l->out_file);
+		ir_emit_llvm_sym_decl(name, flags, size, l->out_file);
 	}
 	if (l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE|IR_RUN)) {
 		void *data;
@@ -887,10 +887,10 @@ static bool ir_loader_sym_data(ir_loader *loader, ir_type type, uint32_t count, 
 		}
 	}
 	if (l->dump & IR_DUMP_C) {
-		// TODO:
+		ir_emit_c_sym_data(l->data_pos, data, size * count, l->dump_file);
 	}
 	if (l->dump & IR_DUMP_LLVM) {
-		// TODO:
+		ir_emit_llvm_sym_data(l->data_pos, data, size * count, l->dump_file);
 	}
 	if (l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE|IR_RUN)) {
 		IR_ASSERT(l->data_start);
@@ -921,10 +921,10 @@ static bool ir_loader_sym_data_str(ir_loader *loader, const char *str, size_t le
 		fprintf(l->dump_file, "\"");
 	}
 	if (l->dump & IR_DUMP_C) {
-		// TODO:
+		ir_emit_c_sym_data_str(l->data_pos, str, len, l->dump_file);
 	}
 	if (l->dump & IR_DUMP_LLVM) {
-		// TODO:
+		ir_emit_llvm_sym_data_str(l->data_pos, str, len, l->dump_file);
 	}
 	if (l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE|IR_RUN)) {
 		IR_ASSERT(l->data_start);
@@ -948,10 +948,10 @@ static bool ir_loader_sym_data_pad(ir_loader *loader, size_t offset)
 			}
 		}
 		if (l->dump & IR_DUMP_C) {
-			// TODO:
+			ir_emit_c_sym_data_pad(l->data_pos, offset, l->dump_file);
 		}
 		if (l->dump & IR_DUMP_LLVM) {
-			// TODO:
+			ir_emit_llvm_sym_data_pad(l->data_pos, offset, l->dump_file);
 		}
 		if (l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE|IR_RUN)) {
 			IR_ASSERT(l->data_start);
@@ -984,10 +984,10 @@ static bool ir_loader_sym_data_ref(ir_loader *loader, ir_op op, const char *ref,
 		}
 	}
 	if (l->dump & IR_DUMP_C) {
-		// TODO:
+		ir_emit_c_sym_data_ref(l->data_pos, op, ref, offset, l->dump_file);
 	}
 	if (l->dump & IR_DUMP_LLVM) {
-		// TODO:
+		ir_emit_llvm_sym_data_ref(l->data_pos, op, ref, offset, l->dump_file);
 	}
 	if (l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE|IR_RUN)) {
 		void *data = (char*)l->data_start + l->data_pos;
@@ -1016,10 +1016,10 @@ static bool ir_loader_sym_data_end(ir_loader *loader, uint32_t flags)
 		}
 	}
 	if (l->dump & IR_DUMP_C) {
-		// TODO:
+		ir_emit_c_sym_data_end(flags, l->dump_file);
 	}
 	if (l->dump & IR_DUMP_LLVM) {
-		// TODO:
+		ir_emit_llvm_sym_data_end(flags, l->dump_file);
 	}
 	if (l->dump & (IR_DUMP_ASM|IR_DUMP_SIZE|IR_RUN)) {
 		if ((char*)l->data_start >= (char*)l->code_buffer.start

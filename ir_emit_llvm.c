@@ -440,6 +440,24 @@ static void ir_emit_vector_const(ir_type type, const void *p, FILE *f)
 	fprintf(f, ">");
 }
 
+void ir_emit_llvm_str(const char *s, size_t len, FILE *f)
+{
+	unsigned char ch;
+
+	while (len > 0) {
+		ch = *s;
+		if (ch < 32) {
+			fprintf(f, "\\%02x", ch);
+		} else if (ch == '\\') {
+			fprintf(f, "\\\\");
+		} else {
+			fputc(ch, f);
+		}
+		s++;
+		len--;
+	}
+}
+
 static void ir_emit_ref(ir_ctx *ctx, FILE *f, ir_ref ref)
 {
 	if (IR_IS_CONST_REF(ref)) {
@@ -1864,7 +1882,7 @@ void ir_emit_llvm_func_decl(const char *name, uint32_t flags, ir_type ret_type,
 	fprintf(f, ")\n");
 }
 
-void ir_emit_llvm_sym_decl(const char *name, uint32_t flags, FILE *f)
+void ir_emit_llvm_sym_decl(const char *name, uint32_t flags, size_t size, FILE *f)
 {
 	fprintf(f, "@%s = ", name);
 	if (flags & IR_EXTERN) {
@@ -1877,11 +1895,78 @@ void ir_emit_llvm_sym_decl(const char *name, uint32_t flags, FILE *f)
 	} else {
 		fprintf(f, "global ");
 	}
-	// TODO: type
-	fprintf(f, "ptr");
-	if (!(flags & IR_EXTERN)) {
-		// TODO: init
-		fprintf(f, " zeroinitializer");
+	// TODO: type, alignment, etc
+	fprintf(f, "[%" PRIuPTR " x i8]", size);
+	if (flags & IR_INITIALIZED) {
+		if (!(flags & IR_CONST_STRING)) {
+			// TODO: init
+			fprintf(f, " [");
+		}
+	} else if (!(flags & IR_EXTERN)) {
+		fprintf(f, " zeroinitializer\n");
+	} else {
+		fprintf(f, "\n");
 	}
-	fprintf(f, "\n");
+}
+
+void ir_emit_llvm_sym_data_str(size_t pos, const char *str, size_t len, FILE *f)
+{
+	if (pos == 0) {
+		fprintf(f, " c\"");
+	} else {
+		fprintf(f, ", [%" PRIuPTR " x i8] c\"", len);
+	}
+	ir_emit_llvm_str(str, len, f);
+	fprintf(f, "\"");
+}
+
+void ir_emit_llvm_sym_data(size_t pos, const void *data, size_t size, FILE *f)
+{
+	const uint8_t *p = data;
+
+	if (size > 0) {
+		if (pos != 0) {
+			fprintf(f, ", ");
+		}
+		fprintf(f, "i8 u0x%02x", *p);
+		while (--size) {
+			p++;
+			fprintf(f, ", i8 u0x%02x", *p);
+		}
+	}
+}
+
+void ir_emit_llvm_sym_data_pad(size_t pos, size_t size, FILE *f)
+{
+	if (size > 0) {
+		if (pos != 0) {
+			fprintf(f, ", ");
+		}
+		fprintf(f, "i8 0");
+		while (--size) {
+			fprintf(f, ", i8 0");
+		}
+	}
+}
+
+void ir_emit_llvm_sym_data_ref(size_t pos, ir_op op, const char *ref, uintptr_t offset, FILE *f)
+{
+	if (pos != 0) {
+		fprintf(f, ", ");
+	}
+
+	// TODO: encode reference into the byte array ???
+	fprintf(f, "ptr %s", ref);
+	if (offset) {
+		fprintf(f, "+ %" PRIuPTR, offset);
+	}
+}
+
+void ir_emit_llvm_sym_data_end(uint32_t flags, FILE *f)
+{
+	if (!(flags & IR_CONST_STRING)) {
+		fprintf(f, "]\n");
+	} else {
+		fprintf(f, "\n");
+	}
 }
