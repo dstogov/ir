@@ -139,6 +139,266 @@ static bool ir_check_domination(const ir_ctx *ctx, ir_ref def, ir_ref use)
 	return b1 == b2;
 }
 
+static bool ir_check_types_compatible(ir_type t1, ir_type t2)
+{
+	if (t1 == t2) {
+		return 1;
+	} else if (t1 == IR_ADDR) {
+		return t2 == IR_UINTPTR_T || t2 == IR_INTPTR_T;
+	} else if (t2 == IR_ADDR) {
+		return t1 == IR_UINTPTR_T || t1 == IR_INTPTR_T;
+	}
+	return 0;
+}
+
+/* vector elements of integer types may differ in signedness */
+static bool ir_check_element_types_compatible(ir_type t1, ir_type t2)
+{
+	return ir_check_types_compatible(t1, t2)
+		|| (IR_IS_TYPE_INT(t1) && IR_IS_TYPE_INT(t2) && ir_type_size[t1] == ir_type_size[t2]);
+}
+
+/* integer literal of another integer type is accepted if its value is representable in "type" */
+static bool ir_check_const_fits(const ir_insn *c, ir_type type)
+{
+	uint64_t max;
+
+	if (c->op != c->type || !IR_IS_TYPE_INT(c->type) || !IR_IS_TYPE_INT(type)) {
+		return 0;
+	} else if (type == IR_BOOL) {
+		return c->val.u64 <= 1;
+	}
+	max = UINT64_MAX >> (64 - ir_type_size[type] * 8);
+	if (IR_IS_TYPE_SIGNED(type)) {
+		max >>= 1;
+	}
+	if (IR_IS_TYPE_SIGNED(c->type) && c->val.i64 < 0) {
+		return IR_IS_TYPE_SIGNED(type) && c->val.i64 >= -(int64_t)max - 1;
+	}
+	return c->val.u64 <= max;
+}
+
+static bool ir_check_type_matches(const ir_ctx *ctx, ir_ref ref, ir_type type)
+{
+	return ir_check_types_compatible(ctx->ir_base[ref].type, type)
+		|| (IR_IS_CONST_REF(ref) && ir_check_const_fits(&ctx->ir_base[ref], type));
+}
+
+static bool ir_check_is_addr(ir_type type)
+{
+	return ir_check_types_compatible(IR_ADDR, type);
+}
+
+static bool ir_check_same_shape(ir_type t1, ir_type t2)
+{
+	if (IR_IS_TYPE_VECTOR(t1)) {
+		return IR_IS_TYPE_VECTOR(t2) && IR_VECTOR_LENGTH(t1) == IR_VECTOR_LENGTH(t2);
+	}
+	return IR_IS_TYPE_SCALAR(t2);
+}
+
+static const char *ir_check_shape_name(ir_type type)
+{
+	return IR_IS_TYPE_VECTOR(type) ? "a vector of the same length as result" : "a scalar";
+}
+
+static const char *ir_check_conversion(ir_op op, ir_type type, ir_type use_type)
+{
+	switch (op) {
+		case IR_SEXT:
+		case IR_ZEXT:
+			return (IR_IS_TYPE_INT(use_type) && ir_type_size[use_type] < ir_type_size[type])
+				? NULL : "an integer smaller than result";
+		case IR_TRUNC:
+			return (IR_IS_TYPE_INT(use_type) && ir_type_size[use_type] > ir_type_size[type])
+				? NULL : "an integer larger than result";
+		case IR_INT2FP:
+			return IR_IS_TYPE_INT(use_type) ? NULL : "an integer";
+		default:
+			IR_ASSERT(op == IR_FP2INT || op == IR_FP2FP);
+			return IR_IS_TYPE_FP(use_type) ? NULL : "a floating-point value";
+	}
+}
+
+/* returns the description of the expected input, or NULL if the input is valid */
+static const char *ir_check_input_type(const ir_ctx *ctx, const ir_insn *insn, int j, ir_ref use)
+{
+	ir_type type = insn->type;
+	ir_type use_type = ctx->ir_base[use].type;
+	ir_type base = IR_VECTOR_BASE_TYPE(type);
+	ir_type use_base = IR_VECTOR_BASE_TYPE(use_type);
+
+	switch (insn->op) {
+		case IR_SHL:
+		case IR_SHR:
+		case IR_SAR:
+		case IR_ROL:
+		case IR_ROR:
+			if (j == 2 && IR_IS_TYPE_INT(use_type)) {
+				/* shift amount may have any integer type */
+				return NULL;
+			}
+			return ir_check_type_matches(ctx, use, type) ? NULL : "the same type as result";
+		case IR_NOT:
+			if (type == IR_BOOL && IR_IS_TYPE_INT(use_type)) {
+				/* boolean NOT */
+				return NULL;
+			}
+			return ir_check_type_matches(ctx, use, type) ? NULL : "the same type as result";
+		case IR_COND:
+			if (j == 1) {
+				return IR_IS_TYPE_SCALAR(use_type) ? NULL : "a scalar";
+			}
+			IR_FALLTHROUGH;
+		case IR_ADD:
+		case IR_SUB:
+		case IR_MUL:
+		case IR_DIV:
+		case IR_MOD:
+		case IR_NEG:
+		case IR_ABS:
+		case IR_ADD_OV:
+		case IR_SUB_OV:
+		case IR_MUL_OV:
+		case IR_OR:
+		case IR_AND:
+		case IR_XOR:
+		case IR_BSWAP:
+		case IR_MIN:
+		case IR_MAX:
+		case IR_PHI:
+		case IR_COPY:
+		case IR_PI:
+			return ir_check_type_matches(ctx, use, type) ? NULL : "the same type as result";
+		case IR_EQ:
+		case IR_NE:
+		case IR_LT:
+		case IR_GE:
+		case IR_LE:
+		case IR_GT:
+		case IR_ULT:
+		case IR_UGE:
+		case IR_ULE:
+		case IR_UGT:
+		case IR_ORDERED:
+		case IR_UNORDERED:
+			if (!ir_check_same_shape(type, use_type)) {
+				return ir_check_shape_name(type);
+			} else if ((insn->op == IR_ORDERED || insn->op == IR_UNORDERED) && !IR_IS_TYPE_FP(use_base)) {
+				return "a floating-point value";
+			} else if (j == 2
+			 && !ir_check_type_matches(ctx, use, ctx->ir_base[insn->op1].type)
+			 && !ir_check_type_matches(ctx, insn->op1, use_type)) {
+				return "the same type as ops[1]";
+			}
+			return NULL;
+		case IR_SEXT:
+		case IR_ZEXT:
+		case IR_TRUNC:
+		case IR_INT2FP:
+		case IR_FP2INT:
+		case IR_FP2FP:
+			if (!ir_check_same_shape(type, use_type)) {
+				return ir_check_shape_name(type);
+			}
+			return ir_check_conversion(insn->op, base, use_base);
+		case IR_BITCAST:
+			return ir_get_type_size(use_type) == ir_get_type_size(type) ? NULL : "of the same size as result";
+		case IR_OVERFLOW:
+			switch (ctx->ir_base[use].op) {
+				case IR_ADD_OV:
+				case IR_SUB_OV:
+				case IR_MUL_OV:
+					return NULL;
+				default:
+					return "ADD_OV, SUB_OV or MUL_OV";
+			}
+		case IR_EXTRACT:
+			if (j == 2) {
+				return IR_IS_TYPE_INT(use_type) ? NULL : "an integer";
+			}
+			return (IR_IS_TYPE_VECTOR(use_type) && ir_check_element_types_compatible(use_base, type))
+				? NULL : "a vector of result elements";
+		case IR_REPLACE:
+			if (j == 1) {
+				return use_type == type ? NULL : "the same type as result";
+			} else if (j == 2) {
+				return IR_IS_TYPE_INT(use_type) ? NULL : "an integer";
+			}
+			IR_FALLTHROUGH;
+		case IR_SPLAT:
+			return ir_check_element_types_compatible(base, use_type) ? NULL : "a result element";
+		case IR_SHUFFLE:
+			if (j == 3) {
+				return (IR_IS_TYPE_VECTOR(use_type) && IR_IS_TYPE_INT(use_base)) ? NULL : "an integer vector";
+			}
+			return (IR_IS_TYPE_VECTOR(use_type) && ir_check_element_types_compatible(base, use_base))
+				? NULL : "a vector of result elements";
+		case IR_CALL:
+		case IR_TAILCALL:
+			if (j != 2) {
+				return NULL;
+			}
+			IR_FALLTHROUGH;
+		case IR_PROTO:
+		case IR_ARGVAL:
+		case IR_BLOCK_END:
+		case IR_VA_START:
+		case IR_VA_END:
+		case IR_VA_COPY:
+		case IR_VA_ARG:
+		case IR_IJMP:
+		case IR_IGOTO:
+		case IR_EXITCALL:
+			return ir_check_is_addr(use_type) ? NULL : "an address";
+		case IR_GUARD:
+		case IR_GUARD_NOT:
+			if (j == 3) {
+				return ir_check_is_addr(use_type) ? NULL : "an address";
+			}
+			IR_FALLTHROUGH;
+		case IR_IF:
+			return IR_IS_TYPE_SCALAR(use_type) ? NULL : "a scalar";
+		case IR_CTPOP:
+		case IR_CTLZ:
+		case IR_CTTZ:
+		case IR_ALLOCA:
+		case IR_AFREE:
+		case IR_SWITCH:
+			return IR_IS_TYPE_INT(use_type) ? NULL : "an integer";
+		case IR_CASE_VAL:
+		case IR_CASE_RANGE:
+			if (ctx->ir_base[insn->op1].op == IR_SWITCH) {
+				ir_type cond_type = ctx->ir_base[ctx->ir_base[insn->op1].op2].type;
+
+				return ir_check_type_matches(ctx, use, cond_type) ? NULL : "the same type as SWITCH condition";
+			}
+			return IR_IS_TYPE_INT(use_type) ? NULL : "an integer";
+		case IR_VADDR:
+			return ctx->ir_base[use].op == IR_VAR ? NULL : "VAR";
+		case IR_VSTORE:
+		case IR_VSTORE_v:
+			if (j == 3 && ctx->ir_base[insn->op2].op == IR_VAR) {
+				return ir_check_type_matches(ctx, use, ctx->ir_base[insn->op2].type) ? NULL : "the same type as VAR";
+			}
+			return NULL;
+		default:
+			return NULL;
+	}
+}
+
+static bool ir_check_input(const ir_ctx *ctx, ir_ref i, const ir_insn *insn, int j, ir_ref use)
+{
+	const char *expected = ir_check_input_type(ctx, insn, j, use);
+
+	if (expected) {
+		fprintf(stderr, "ir_base[%d].ops[%d] (%d) must be %s (instruction %s)\n",
+			i, j, use, expected, ir_op_name[insn->op]);
+		return 0;
+	}
+	return 1;
+}
+
 bool ir_check(const ir_ctx *ctx)
 {
 	ir_ref i, j, n, *p, use;
@@ -327,6 +587,8 @@ bool ir_check(const ir_ctx *ctx)
 					} else if (-use >= ctx->consts_count) {
 						fprintf(stderr, "ir_base[%d].ops[%d] constant reference (%d) is out of range\n", i, j, use);
 						ok = 0;
+					} else if (!ir_check_input(ctx, i, insn, j, use)) {
+						ok = 0;
 					}
 				} else {
 					if (use >= ctx->insns_count) {
@@ -350,65 +612,8 @@ bool ir_check(const ir_ctx *ctx)
 								fprintf(stderr, "ir_base[%d].ops[%d] invalid forward reference (%d)\n", i, j, use);
 								ok = 0;
 							}
-							if (flags & IR_OP_FLAG_DATA) {
-								switch (insn->op) {
-									case IR_COND:
-										if (j == 1) {
-											break;
-										}
-										IR_FALLTHROUGH;
-									case IR_ADD:
-									case IR_SUB:
-									case IR_MUL:
-									case IR_DIV:
-									case IR_MOD:
-									case IR_NEG:
-									case IR_ABS:
-									case IR_ADD_OV:
-									case IR_SUB_OV:
-									case IR_MUL_OV:
-									case IR_NOT:
-									case IR_OR:
-									case IR_AND:
-									case IR_XOR:
-									case IR_SHL:
-									case IR_SHR:
-									case IR_SAR:
-									case IR_ROL:
-									case IR_ROR:
-									case IR_BSWAP:
-									case IR_MIN:
-									case IR_MAX:
-									case IR_PHI:
-									case IR_COPY:
-									case IR_PI:
-										if (insn->type != use_insn->type) {
-											if (j == 2
-											 && (insn->op == IR_SHL
-											  || insn->op == IR_SHR
-											  || insn->op == IR_SAR
-											  || insn->op == IR_ROL
-											  || insn->op == IR_ROR)
-											 && IR_IS_TYPE_INT(use_insn->type)
-											 && (IR_IS_TYPE_INT(insn->type) || IR_IS_TYPE_VECTOR(insn->type))) {
-												/* second argument of SHIFT may be incompatible with result */
-												break;
-											}
-											if (insn->op == IR_NOT && insn->type == IR_BOOL && IR_IS_TYPE_INT(use_insn->type)) {
-												/* boolean not */
-												break;
-											}
-											if (insn->type == IR_ADDR && (use_insn->type == IR_UINTPTR_T || use_insn->type == IR_INTPTR_T)) {
-												break;
-											} else if (use_insn->type == IR_ADDR && (insn->type == IR_UINTPTR_T || insn->type == IR_INTPTR_T)) {
-												break;
-											}
-											fprintf(stderr, "ir_base[%d].ops[%d] (%d) type is incompatible with result type (%d != %d)\n",
-												i, j, use, use_insn->type, insn->type);
-											ok = 0;
-										}
-										break;
-								}
+							if (!ir_check_input(ctx, i, insn, j, use)) {
+								ok = 0;
 							}
 							if ((ctx->flags2 & IR_LINEAR)
 							 && ctx->cfg_map
