@@ -1186,7 +1186,12 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn, ir_bit
 	ir_emit_llvm_type_name(insn->type, f);
 	fprintf(f, " ");
 	if (proto && (proto->flags & IR_VARARG_FUNC)) {
-		fprintf(f, "(...) ");
+		fprintf(f, "(");
+		for (j = 0; j < proto->params_count; j++) {
+			ir_emit_llvm_type_name(proto->param_types[j], f);
+			fprintf(f, ", ");
+		}
+		fprintf(f, "...) ");
 	}
 
 	// TODO: function prototype ???

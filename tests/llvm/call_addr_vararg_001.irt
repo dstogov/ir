@@ -12,7 +12,7 @@
 --EXPECT--
 define i32 @test()
 {
-	%d2 = call i32 (...) inttoptr (i64 u0x1234 to ptr)(ptr @.str4, i32 7)
+	%d2 = call i32 (ptr, ...) inttoptr (i64 u0x1234 to ptr)(ptr @.str4, i32 7)
 	ret i32 %d2
 }
 @.str4 = private unnamed_addr constant [6 x i8] c"x=%d\0A\00"

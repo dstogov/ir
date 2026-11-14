@@ -1,0 +1,19 @@
+--TEST--
+002: vararg call with several fixed parameters
+--CODE--
+{
+	int32_t c_1 = 16;
+	double c_2 = 0.5;
+	int32_t c_3 = 42;
+	uintptr_t c_4 = func foo(int32_t, double, ...): int32_t;
+	l_1 = START(l_3);
+	int32_t d_2, l_2 = CALL/3(l_1, c_4, c_1, c_2, c_3);
+	l_3 = RETURN(l_2, d_2);
+}
+--EXPECT--
+define i32 @test()
+{
+	%d2 = call i32 (i32, double, ...) @foo(i32 16, double 0.5, i32 42)
+	ret i32 %d2
+}
+declare i32 @foo(i32, double, ...)
