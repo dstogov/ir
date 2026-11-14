@@ -16,6 +16,10 @@ override CFLAGS += -Wall -Wextra -Wno-unused-parameter
 override BUILD_CFLAGS += -Wall -Wextra -Wno-unused-parameter
 LDFLAGS    = -lm
 LLK        = llk
+CHECK_C    = clang $(BUILD_CFLAGS) -fsyntax-only -Werror=implicit-function-declaration -Werror=int-conversion \
+	-include stdint.h -include stdbool.h -include stddef.h -include stdlib.h -include stdio.h \
+	-include math.h -x c
+CHECK_LLVM = clang -x ir -S -emit-llvm -o /dev/null
 
 ifneq (OpenBSD, $(OS))
 LDFLAGS   += -ldl
@@ -146,7 +150,8 @@ test: $(BUILD_DIR)/ir $(BUILD_DIR)/tester
 
 test-ci: $(BUILD_DIR)/ir $(BUILD_DIR)/tester
 	$(BUILD_DIR)/tester --test-cmd $(BUILD_DIR)/ir --target $(TARGET_TRIPLET) --default-args "--save" \
-		--test-extension ".irt" --code-extension ".ir" --show-diff $(TESTS)
+		--test-extension ".irt" --code-extension ".ir" --show-diff \
+		--check --emit-c "$(CHECK_C)" --check --emit-llvm "$(CHECK_LLVM)" $(TESTS)
 
 clean:
 	rm -rf $(BUILD_DIR)/ir $(BUILD_DIR)/libir.a $(BUILD_DIR)/*.o \
