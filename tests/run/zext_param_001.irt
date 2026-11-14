@@ -1,0 +1,38 @@
+--TEST--
+ZEXT of a 32-bit parameter whose register has non-zero upper bits
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @show(uintptr_t, uint64_t): int32_t;
+func @show(uintptr_t, uint64_t): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	l_1 = START(l_E);
+	uintptr_t fmt = PARAM(l_1, "fmt", 1);
+	uint64_t v = PARAM(l_1, "v", 2);
+	int32_t r, c = CALL/2(l_1, fp, fmt, v);
+	l_E = RETURN(c, r);
+}
+func @pz(uintptr_t, uint32_t): int32_t;
+func @pz(uintptr_t, uint32_t): int32_t
+{
+	uintptr_t g = func @show(uintptr_t, uint64_t): int32_t;
+	l_1 = START(l_E);
+	uintptr_t fmt = PARAM(l_1, "fmt", 1);
+	uint32_t x = PARAM(l_1, "x", 2);
+	uint64_t z = ZEXT(x);
+	int32_t r, c = CALL/2(l_1, g, fmt, z);
+	l_E = RETURN(c, r);
+}
+func @main(): int32_t
+{
+	uintptr_t fmt = "%llx\n";
+	int32_t zero = 0;
+	uint64_t a = 0x1234567890abcdef;
+	uintptr_t f = func @pz(uintptr_t, uint32_t): int32_t;
+	l_0 = START(l_end);
+	uintptr_t g = BITCAST(f);
+	int32_t r0, c0 = CALL/2(l_0, g, fmt, a);
+	l_end = RETURN(c0, zero);
+}
+--EXPECT--
+90abcdef
