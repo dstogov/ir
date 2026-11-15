@@ -1587,6 +1587,8 @@ void ir_build_prev_refs(ir_ctx *ctx)
 	for (b = 1, bb = ctx->cfg_blocks + b; b <= ctx->cfg_blocks_count; b++, bb++) {
 		IR_ASSERT(!(bb->flags & IR_BB_UNREACHABLE));
 		for (i = bb->start, insn = ctx->ir_base + i; i < bb->end;) {
+			/* Unscheduled (-O0) IR must keep each block contiguous */
+			IR_ASSERT(ctx->cfg_map[i] == 0 || ctx->cfg_map[i] == b);
 			ctx->prev_ref[i] = prev;
 			n = ir_insn_len(insn);
 			prev = i;
