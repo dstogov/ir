@@ -1,0 +1,25 @@
+--TEST--
+GUARD with return value
+--CODE--
+extern func exit_stub(): int32_t;
+func test(double): int32_t
+{
+	uintptr_t exit = func exit_stub(): int32_t;
+	int32_t ret = 1;
+	l_1 = START(l_4);
+	double cond = PARAM(l_1, "cond", 1);
+	l_2 = GUARD(l_1, cond, exit);
+	l_4 = RETURN(l_2, ret);
+}
+--EXPECT--
+declare i32 @exit_stub()
+define i32 @test(double %d2)
+{
+	%t3 = fcmp une double %d2, 0.0
+	br i1 %t3, label %l3_true, label %l3_false
+l3_false:
+	%t3_ret = tail call i32 @exit_stub()
+	ret i32 %t3_ret
+l3_true:
+	ret i32 1
+}
