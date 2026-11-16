@@ -14,6 +14,6 @@ int32_t test(int32_t x, int32_t y)
 	int32_t d_1 = x;
 	int32_t d_2 = y;
 	int32_t d_3;
-	d_3 = ((uint32_t)d_1 << (uint32_t)d_2) | ((uint32_t)d_1 >> (32 - (uint32_t)d_2));
+	d_3 = ((uint32_t)d_1 << ((uint32_t)d_2 & 31)) | ((uint32_t)d_1 >> (-(uint32_t)d_2 & 31));
 	return d_3;
 }
