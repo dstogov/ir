@@ -10829,6 +10829,72 @@ static void ir_emit_sext(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 }
 
+static bool ir_result_is_zero_extended(ir_ctx *ctx, ir_reg reg, ir_ref ref)
+{
+	if (!IR_IS_CONST_REF(ref)) {
+		uint32_t rule = ctx->rules[ref] & IR_RULE_MASK;
+
+		IR_ASSERT(IR_IS_TYPE_INT(ctx->ir_base[ref].type) && ir_type_size[ctx->ir_base[ref].type] == 4);
+		/* 32-bit operations with register destinations implicitly perform zero extension */
+		switch (rule) {
+			case IR_SEXT:
+			case IR_ZEXT:
+			case IR_FP2INT:
+			case IR_COND:
+			case IR_VLOAD:
+			case IR_VA_ARG:
+			case IR_MUL_INT:
+			case IR_DIV_INT:
+			case IR_MOD_INT:
+			case IR_LEA_OB:
+			case IR_LEA_SI:
+			case IR_LEA_SIB:
+			case IR_LEA_IB:
+			case IR_LEA_SI_O:
+			case IR_LEA_SIB_O:
+			case IR_LEA_IB_O:
+			case IR_LEA_I_OB:
+			case IR_LEA_OB_I:
+			case IR_LEA_OB_SI:
+			case IR_LEA_SI_OB:
+			case IR_LEA_B_SI:
+			case IR_LEA_SI_B:
+			case IR_LEA_B_SI_O:
+			case IR_LEA_SI_B_O:
+			case IR_LEA_SYM_O:
+			case IR_LEA_O_SYM:
+			case IR_INC:
+			case IR_DEC:
+			case IR_MUL_PWR2:
+			case IR_DIV_PWR2:
+			case IR_MOD_PWR2:
+			case IR_SDIV_PWR2:
+			case IR_SMOD_PWR2:
+			case IR_ABS_INT:
+			case IR_OP_INT:
+			case IR_IMUL3:
+			case IR_BINOP_INT:
+			case IR_SHIFT:
+			case IR_SHIFT_CONST:
+			case IR_COND_TEST_INT:
+			case IR_COND_TEST_BIT:
+			case IR_COND_CMP_INT:
+			case IR_MIN_MAX_INT:
+			case IR_LOAD_INT:
+			case IR_BIT_COUNT:
+			case IR_BIT_OP:
+			case IR_AND_ZEXT:
+				return 1;
+			case IR_COPY_INT:
+			case IR_TRUNC:
+			case IR_BITCAST:
+				return ctx->regs[ref][1] != reg;
+		}
+	}
+
+	return 0;
+}
+
 static void ir_emit_zext_common(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_type dst_type, ir_type src_type, uint8_t src_size, ir_reg def_reg, bool force)
 {
 	ir_backend_data *data = ctx->data;
@@ -10872,8 +10938,7 @@ static void ir_emit_zext_common(ir_ctx *ctx, ir_ref def, ir_insn *insn, ir_type 
 			IR_ASSERT(ir_type_size[dst_type] == 8);
 			IR_ASSERT(sizeof(void*) == 8);
 |.if X64
-			/* Avoid zero extension to the same register. This may be not always safe ??? */
-			if (force || op1_reg != def_reg) {
+			if (force || op1_reg != def_reg || !ir_result_is_zero_extended(ctx, def_reg, insn->op1)) {
 				|	mov Rd(def_reg), Rd(op1_reg)
 			}
 |.endif
@@ -16485,7 +16550,7 @@ static void ir_emit_zext_i64(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	def_reg = IR_REG_I64_LO(def_reg);
 	if (ir_type_size[ctx->ir_base[insn->op1].type] < 4) {
 		ir_type src_type = ctx->ir_base[insn->op1].type;
-		ir_emit_zext_common(ctx, def, insn, IR_I32, src_type, ir_type_size[src_type], def_reg, 1);
+		ir_emit_zext_common(ctx, def, insn, IR_I32, src_type, ir_type_size[src_type], def_reg, 0);
 	} else if (op1_reg != def_reg) {
 		if (op1_reg != IR_REG_NONE && !IR_REG_SPILLED(op1_reg)) {
 			|	mov Rd(def_reg), Rd(op1_reg)

@@ -1,0 +1,43 @@
+--TEST--
+ZEXT of a 64-bit value truncated to 32 bits
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @tz(uint64_t): uint64_t;
+func @tz(uint64_t): uint64_t
+{
+	l_1 = START(l_E);
+	uint64_t x = PARAM(l_1, "x", 1);
+	uint32_t t = TRUNC(x);
+	uint64_t r = ZEXT(t);
+	l_E = RETURN(l_1, r);
+}
+func @tz_add(uint64_t, uint64_t): uint64_t;
+func @tz_add(uint64_t, uint64_t): uint64_t
+{
+	l_1 = START(l_E);
+	uint64_t x = PARAM(l_1, "x", 1);
+	uint64_t y = PARAM(l_1, "y", 2);
+	uint64_t s = ADD(x, y);
+	uint32_t t = TRUNC(s);
+	uint64_t r = ZEXT(t);
+	l_E = RETURN(l_1, r);
+}
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%llx\n";
+	int32_t z = 0;
+	uint64_t a = 0x1234567890abcdef;
+	uint64_t b = 0x0000000100000001;
+	uintptr_t f_tz = func @tz(uint64_t): uint64_t;
+	uintptr_t f_tz_add = func @tz_add(uint64_t, uint64_t): uint64_t;
+	l_0 = START(l_end);
+	uint64_t r0, c0 = CALL/1(l_0, f_tz, a);
+	p0 = CALL/2(c0, fp, fmt, r0);
+	uint64_t r1, c1 = CALL/2(p0, f_tz_add, a, b);
+	p1 = CALL/2(c1, fp, fmt, r1);
+	l_end = RETURN(p1, z);
+}
+--EXPECT--
+90abcdef
+90abcdf0
