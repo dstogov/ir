@@ -800,14 +800,14 @@ slow_case:
 			ir_list_push(&worklist, idom);
 			while (1) {
 				k--;
+				if (UNEXPECTED(k == 0)) {
+					// IR_ASSERT(0 && "Wrong blocks order: BB is before all its predecessors");
+					goto slow_case;
+				}
 				p++;
 				idom = *p;
 				if (idom < b) {
 					break;
-				}
-				if (UNEXPECTED(k == 0)) {
-					// IR_ASSERT(0 && "Wrong blocks order: BB is before all its predecessors");
-					goto slow_case;
 				}
 				ir_list_push(&worklist, idom);
 			}
