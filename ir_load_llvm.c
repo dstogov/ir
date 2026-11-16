@@ -1899,6 +1899,26 @@ static void llvm2ir_bb_start(ir_ctx *ctx, LLVMBasicBlockRef bb, LLVMBasicBlockRe
 	LLVMValueRef insn = LLVMGetLastInstruction(pred_bb);
 	LLVMOpcode opcode = LLVMGetInstructionOpcode(insn);
 
+#if LLVM_VERSION_MAJOR >= 23
+	if (opcode == LLVMUncondBr) {
+		ir_ref ref = ir_addrtab_find(ctx->binding, (uintptr_t)insn);
+
+		IR_ASSERT(ref != (ir_ref)IR_INVALID_VAL);
+		ir_BEGIN(ref);
+	} else if (opcode == LLVMCondBr) {
+		ir_ref ref = ir_addrtab_find(ctx->binding, (uintptr_t)insn);
+		LLVMBasicBlockRef true_bb;
+
+		IR_ASSERT(LLVMGetNumSuccessors(insn) == 2);
+		true_bb = LLVMGetSuccessor(insn, 0); /* true branch */
+		if (bb == true_bb) {
+			IR_ASSERT(bb != LLVMGetSuccessor(insn, 1)); /* false branch */
+			ir_IF_TRUE(ref);
+		} else {
+			IR_ASSERT(bb == LLVMGetSuccessor(insn, 1)); /* false branch */
+			ir_IF_FALSE(ref);
+		}
+#else
 	if (opcode == LLVMBr) {
 		ir_ref ref = ir_addrtab_find(ctx->binding, (uintptr_t)insn);
 
@@ -1918,6 +1938,7 @@ static void llvm2ir_bb_start(ir_ctx *ctx, LLVMBasicBlockRef bb, LLVMBasicBlockRe
 				ir_IF_FALSE(ref);
 			}
 		}
+#endif
 	} else if (opcode == LLVMSwitch) {
 		ir_ref ref = ir_addrtab_find(ctx->binding, (uintptr_t)insn);
 
@@ -1927,6 +1948,18 @@ static void llvm2ir_bb_start(ir_ctx *ctx, LLVMBasicBlockRef bb, LLVMBasicBlockRe
 				ir_CASE_DEFAULT(ref);
 			}
 		} else  {
+#if LLVM_VERSION_MAJOR >= 23
+			uint32_t i;
+			uint32_t count = LLVMGetNumSuccessors(insn);
+			for (i = 1; i < count; i++) {
+				if (LLVMGetSuccessor(insn, i) == bb) {
+					LLVMValueRef val = LLVMGetSwitchCaseValue(insn, i);
+					ir_type type = llvm2ir_type(LLVMTypeOf(val));
+					ir_CASE_VAL(ref, llvm2ir_op(ctx, val, type));
+					break;
+				}
+			}
+#else
 			uint32_t i;
 			uint32_t count = LLVMGetNumOperands(insn);
 
@@ -1938,6 +1971,7 @@ static void llvm2ir_bb_start(ir_ctx *ctx, LLVMBasicBlockRef bb, LLVMBasicBlockRe
 					break;
 				}
 			}
+#endif
 		}
 	} else if (opcode == LLVMIndirectBr) {
 		char buf[256];
@@ -2107,7 +2141,11 @@ next:
 		bb = bbs[b];
 		insn = LLVMGetLastInstruction(bb);
 		opcode = LLVMGetInstructionOpcode(insn);
+#if LLVM_VERSION_MAJOR >= 23
+		if (opcode == LLVMUncondBr || opcode == LLVMCondBr || opcode == LLVMSwitch || opcode == LLVMIndirectBr) {
+#else
 		if (opcode == LLVMBr || opcode == LLVMSwitch || opcode == LLVMIndirectBr) {
+#endif
 			n = LLVMGetNumSuccessors(insn);
 			/*
 			 * LLVM BB Successors are not aspecially ordered, but processing them in reverse order
@@ -2136,7 +2174,11 @@ next:
 		bb = bbs[b];
 		insn = LLVMGetLastInstruction(bb);
 		opcode = LLVMGetInstructionOpcode(insn);
+#if LLVM_VERSION_MAJOR >= 23
+		if (opcode == LLVMUncondBr || opcode == LLVMCondBr || opcode == LLVMSwitch || opcode == LLVMIndirectBr) {
+#else
 		if (opcode == LLVMBr || opcode == LLVMSwitch || opcode == LLVMIndirectBr) {
+#endif
 			count = LLVMGetNumSuccessors(insn);
 			for (j = 0; j < count; j++) {
 				succ = ir_addrtab_find(&bb_hash, (uintptr_t)LLVMGetSuccessor(insn, j));
@@ -2170,7 +2212,11 @@ next:
 		bb = bbs[b];
 		insn = LLVMGetLastInstruction(bb);
 		opcode = LLVMGetInstructionOpcode(insn);
+#if LLVM_VERSION_MAJOR >= 23
+		if (opcode == LLVMUncondBr || opcode == LLVMCondBr || opcode == LLVMSwitch || opcode == LLVMIndirectBr) {
+#else
 		if (opcode == LLVMBr || opcode == LLVMSwitch || opcode == LLVMIndirectBr) {
+#endif
 			count = LLVMGetNumSuccessors(insn);
 			for (j = 0; j < count; j++) {
 				succ = ir_addrtab_find(&bb_hash, (uintptr_t)LLVMGetSuccessor(insn, j));
@@ -2215,8 +2261,12 @@ next:
 						llvm2ir_ret(ctx, insn);
 					}
 					break;
+#if LLVM_VERSION_MAJOR >= 23
+				case LLVMUncondBr:
+#else
 				case LLVMBr:
 					if (!LLVMIsConditional(insn)) {
+#endif
 						ref = llvm2ir_jmp(ctx, insn);
 						b = ir_addrtab_find(&bb_hash, (uintptr_t)LLVMGetSuccessor(insn, 0));
 						IR_ASSERT(b < bb_count);
@@ -2229,7 +2279,12 @@ next:
 									predecessor_edges + predecessors[b].refs, predecessor_refs + predecessors[b].refs);
 							}
 						}
+#if LLVM_VERSION_MAJOR >= 23
+					break;
+				case LLVMCondBr:
+#else
 					} else {
+#endif
 						ref = llvm2ir_if(ctx, insn);
 						b = ir_addrtab_find(&bb_hash, (uintptr_t)LLVMGetSuccessor(insn, 0)); /* true branch */
 						IR_ASSERT(b < bb_count);
@@ -2257,7 +2312,9 @@ next:
 						} else {
 							IR_ASSERT(!ir_bitset_in(visited, b));
 						}
+#if LLVM_VERSION_MAJOR < 23
 					}
+#endif
 					break;
 				case LLVMSwitch:
 					ref = llvm2ir_switch(ctx, insn);
@@ -2274,6 +2331,26 @@ next:
 					} else {
 						IR_ASSERT(!ir_bitset_in(visited, b));
 					}
+#if LLVM_VERSION_MAJOR >= 23
+					count = LLVMGetNumSuccessors(insn);
+					for (j = 1; j < count; j++) {
+						b = ir_addrtab_find(&bb_hash, (uintptr_t)LLVMGetSuccessor(insn, j));
+						IR_ASSERT(b < bb_count);
+						if (predecessors[b].count > 1) {
+							LLVMValueRef val = LLVMGetSwitchCaseValue(insn, j);
+							ir_type type = llvm2ir_type(LLVMTypeOf(val));
+							ir_CASE_VAL(ref, llvm2ir_op(ctx, val, type));
+							if (ir_bitset_in(visited, b)) {
+								llvm2ir_patch_merge(ctx, bb_starts[b], ir_LOOP_END(), i, predecessor_edges + predecessors[b].refs);
+							} else {
+								llvm2ir_set_predecessor_ref(i, ir_END(), predecessors[b].count,
+									predecessor_edges + predecessors[b].refs, predecessor_refs + predecessors[b].refs);
+							}
+						} else {
+							IR_ASSERT(!ir_bitset_in(visited, b));
+						}
+					}
+#else
 					count = LLVMGetNumOperands(insn);
 					for (j = 2; j < count; j += 2) {
 						b = ir_addrtab_find(&bb_hash, (uintptr_t)LLVMValueAsBasicBlock(LLVMGetOperand(insn, j + 1)));
@@ -2292,6 +2369,7 @@ next:
 							IR_ASSERT(!ir_bitset_in(visited, b));
 						}
 					}
+#endif
 					break;
 				case LLVMIndirectBr:
 					ir_addrtab_set(ctx->binding, (uintptr_t)insn,
@@ -2506,7 +2584,8 @@ static int llvm2ir_external_func(ir_loader *loader, const char *name, LLVMValueR
 	return loader->external_func_dcl(loader, name, flags, ret_type, count, param_types);
 }
 
-static int llvm2ir_forward_func(ir_loader *loader, const char *name, LLVMValueRef func, LLVMBool is_static)
+static int llvm2ir_forward_func(ir_loader *loader, LLVMContextRef context,
+                                const char *name, LLVMValueRef func, LLVMBool is_static)
 {
 	uint32_t i, count, cconv, flags = 0;
 	LLVMTypeRef ftype;
@@ -2533,7 +2612,8 @@ static int llvm2ir_forward_func(ir_loader *loader, const char *name, LLVMValueRe
 	return loader->forward_func_dcl(loader, name, flags, ret_type, count, param_types);
 }
 
-static int llvm2ir_data(ir_loader *loader, LLVMTargetDataRef target_data, LLVMTypeRef type, LLVMValueRef op, size_t pos)
+static int llvm2ir_data(ir_loader *loader, LLVMContextRef context, LLVMTargetDataRef target_data,
+                        LLVMTypeRef type, LLVMValueRef op, size_t pos)
 {
 	LLVMTypeRef el_type;
 	LLVMValueRef el;
@@ -2593,7 +2673,7 @@ static int llvm2ir_data(ir_loader *loader, LLVMTargetDataRef target_data, LLVMTy
 					loader->sym_data_pad(loader, pos + offset);
 				}
 				el = LLVMGetAggregateElement(op, i);
-				if (!llvm2ir_data(loader, target_data, el_type, el, pos)) {
+				if (!llvm2ir_data(loader, context, target_data, el_type, el, pos)) {
 					return 0;
 				}
 				pos += el_size;
@@ -2608,7 +2688,7 @@ static int llvm2ir_data(ir_loader *loader, LLVMTargetDataRef target_data, LLVMTy
 				}
 				el_type = LLVMStructGetTypeAtIndex(type, i);
 				el = LLVMGetAggregateElement(op, i);
-				if (!llvm2ir_data(loader, target_data, el_type, el, pos + offset)) {
+				if (!llvm2ir_data(loader, context, target_data, el_type, el, pos + offset)) {
 					return 0;
 				}
 			}
@@ -2711,7 +2791,7 @@ static int llvm2ir_data(ir_loader *loader, LLVMTargetDataRef target_data, LLVMTy
 			IR_ASSERT(name);
 			/* disable inlining */
 			LLVMAddAttributeAtIndex(LLVMGetBlockAddressFunction(op), LLVMAttributeFunctionIndex,
-				LLVMCreateEnumAttribute(LLVMGetGlobalContext(), LLVMAttrNoInline, 1));
+				LLVMCreateEnumAttribute(context, LLVMAttrNoInline, 1));
 			return loader->sym_data_ref(loader, IR_SYM, name, 0);
 		default:
 			fprintf(stderr, "Unsupported LLVM value kind: %d\n", kind);
@@ -2722,7 +2802,7 @@ static int llvm2ir_data(ir_loader *loader, LLVMTargetDataRef target_data, LLVMTy
 	return 1;
 }
 
-static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
+static int ir_load_llvm_module(ir_loader *loader, LLVMContextRef context, LLVMModuleRef module)
 {
 	ir_ctx ctx;
 	LLVMValueRef sym, func;
@@ -2769,7 +2849,7 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 				}
 			} else {
 				if (loader->forward_func_dcl
-				 && !llvm2ir_forward_func(loader, name, func, is_static)) {
+				 && !llvm2ir_forward_func(loader, context, name, func, is_static)) {
 					fprintf(stderr, "Cannot declare forward LLVM function \"%s\"\n", name);
 					return 0;
 				}
@@ -2802,7 +2882,7 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 					fprintf(stderr, "Unsupported LLVM linkage: %d\n", linkage);
 					IR_ASSERT(0);
 			}
-			if (!llvm2ir_forward_func(loader, name, func, is_static)) {
+			if (!llvm2ir_forward_func(loader, context, name, func, is_static)) {
 				fprintf(stderr, "Cannot compile forward LLVM function \"%s\"\n", name);
 				return 0;
 			}
@@ -2880,7 +2960,7 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 						return 0;
 					}
 				} else if (flags & IR_INITIALIZED) {
-					if (!llvm2ir_data(loader, target_data, type, init, 0)
+					if (!llvm2ir_data(loader, context, target_data, type, init, 0)
 					 || !loader->sym_data_end(loader, flags)) {
 						fprintf(stderr, "Cannot compile LLVM symbol \"%s\"\n", name);
 						return 0;
@@ -2933,56 +3013,78 @@ static int ir_load_llvm_module(ir_loader *loader, LLVMModuleRef module)
 
 int ir_load_llvm_bitcode(ir_loader *loader, const char *filename)
 {
+	LLVMContextRef context;
 	LLVMMemoryBufferRef memory_buffer;
 	LLVMModuleRef module;
 	LLVMBool ret;
 	char *message;
+
+#if LLVM_VERSION_MAJOR >= 23
+	context = LLVMContextCreate();
+#else
+	context = LLVMGetGlobalContext();
+#endif
 
 	if (LLVMCreateMemoryBufferWithContentsOfFile(filename, &memory_buffer, &message)) {
 		fprintf(stderr, "Cannot open '%s': %s\n", filename, message);
 		free(message);
 		return 0;
 	}
-	ret = LLVMParseBitcodeInContext2(LLVMGetGlobalContext(), memory_buffer, &module);
+	ret = LLVMParseBitcodeInContext2(context, memory_buffer, &module);
 	LLVMDisposeMemoryBuffer(memory_buffer);
 	if (ret) {
 		fprintf(stderr, "Cannot parse LLVM bitcode\n");
 		return 0;
 	}
-	if (!ir_load_llvm_module(loader, module)) {
+	if (!ir_load_llvm_module(loader, context, module)) {
 		LLVMDisposeModule(module);
 		fprintf(stderr, "Cannot convert LLVM to IR\n");
 		return 0;
 	}
 	LLVMDisposeModule(module);
+
+#if LLVM_VERSION_MAJOR >= 23
+	LLVMContextDispose(context);
+#endif
 
 	return 1;
 }
 
 int ir_load_llvm_asm(ir_loader *loader, const char *filename)
 {
+	LLVMContextRef context;
 	LLVMMemoryBufferRef memory_buffer;
 	LLVMModuleRef module;
 	LLVMBool ret;
 	char *message;
+
+#if LLVM_VERSION_MAJOR >= 23
+	context = LLVMContextCreate();
+#else
+	context = LLVMGetGlobalContext();
+#endif
 
 	if (LLVMCreateMemoryBufferWithContentsOfFile(filename, &memory_buffer, &message)) {
 		fprintf(stderr, "Cannot open '%s': %s\n", filename, message);
 		free(message);
 		return 0;
 	}
-	ret = LLVMParseIRInContext(LLVMGetGlobalContext(), memory_buffer, &module, &message);
+	ret = LLVMParseIRInContext(context, memory_buffer, &module, &message);
 	if (ret) {
 		fprintf(stderr, "Cannot parse LLVM file: %s\n", message);
 		free(message);
 		return 0;
 	}
-	if (!ir_load_llvm_module(loader, module)) {
+	if (!ir_load_llvm_module(loader, context, module)) {
 		LLVMDisposeModule(module);
 		fprintf(stderr, "Cannot convert LLVM to IR\n");
 		return 0;
 	}
 	LLVMDisposeModule(module);
+
+#if LLVM_VERSION_MAJOR >= 23
+	LLVMContextDispose(context);
+#endif
 
 	return 1;
 }
