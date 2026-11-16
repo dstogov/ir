@@ -1,0 +1,54 @@
+--TEST--
+001: SWITCH(int8_t) sign-extends the operand
+--CODE--
+{
+	int8_t c_1 = 1;
+	int8_t c_2 = 2;
+	int8_t c_3 = 3;
+	l_1 = START(l_16);
+	int8_t x = PARAM(l_1, "x", 1);
+	int32_t a = PARAM(l_1, "a", 2);
+	int32_t b = PARAM(l_1, "b", 3);
+	int32_t c = PARAM(l_1, "c", 4);
+	int32_t d = PARAM(l_1, "d", 5);
+	l_4 = SWITCH(l_1, x);
+	l_5 = CASE_VAL(l_4, c_1);
+	l_6 = END(l_5);
+	l_7 = CASE_VAL(l_4, c_2);
+	l_8 = END(l_7);
+	l_9 = CASE_VAL(l_4, c_3);
+	l_10 = END(l_9);
+	l_11 = CASE_DEFAULT(l_4);
+	l_12 = END(l_11);
+	l_13 = MERGE/4(l_6, l_8, l_10, l_12);
+	int32_t ret = PHI/4(l_13, a, b, c, d);
+	l_16 = RETURN(l_13, ret);
+}
+--EXPECT--
+test:
+	sxtb w0, w0
+	cmp w0, #3
+	b.gt .L4
+	subs w6, w0, #1
+	b.lt .L4
+	adr x5, .L5
+	ldr x5, [x5, x6, lsl #3]
+	br x5
+.L1:
+	mov w4, w1
+	b .L4
+.L2:
+	mov w4, w2
+	b .L4
+.L3:
+	mov w4, w3
+.L4:
+	mov w0, w4
+	ret
+.rodata
+.align 8
+.L5:
+	.qword .L1
+	.qword .L2
+	.qword .L3
+
