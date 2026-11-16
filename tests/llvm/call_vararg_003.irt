@@ -1,0 +1,19 @@
+--TEST--
+003: vararg call with unused result
+--CODE--
+{
+	int32_t c_1 = 42;
+	uintptr_t c_2 = func printf(uintptr_t, ...): int32_t;
+	uintptr_t c_3 = "hello %d!\n";
+	l_1 = START(l_3);
+	l_2 = CALL/2(l_1, c_2, c_3, c_1);
+	l_3 = RETURN(l_2);
+}
+--EXPECT--
+define void @test()
+{
+	call void (ptr, ...) @printf(ptr @.str6, i32 42)
+	ret void
+}
+declare i32 @printf(ptr, ...)
+@.str6 = private unnamed_addr constant [11 x i8] c"hello %d!\0A\00"
