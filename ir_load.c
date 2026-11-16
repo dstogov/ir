@@ -1802,7 +1802,7 @@ _yy_state_98:
 static int parse_ir_insn(int sym, ir_parser_ctx *p) {
 	const char *str, *str2 = NULL, *func;
 	size_t len, len2 = 0, func_len;
-	uint8_t op;
+	uint8_t op = 0;
 	uint8_t t = 0;
 	ir_ref op1 = IR_UNUSED;
 	ir_ref op2 = IR_UNUSED;
