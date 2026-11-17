@@ -1465,6 +1465,8 @@ int main(int argc, char **argv)
 
 	if (opt_level > 0) {
 		flags |= IR_OPT_FOLDING | IR_OPT_CFG | IR_OPT_CODEGEN;
+	} else {
+		flags |= IR_NO_OPT;
 	}
 	if ((opt_level > 1 && !disable_inline) || force_inline) {
 		flags |= IR_OPT_INLINE;

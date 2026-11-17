@@ -665,6 +665,7 @@ void ir_strtab_free(ir_strtab *strtab);
 #define IR_OPT_MEM2SSA         (1<<22)
 #define IR_OPT_CODEGEN         (1<<23)
 #define IR_OPT_TAILCALL        (1<<24)
+#define IR_NO_OPT              (1<<25)
 
 /* debug related */
 #ifdef IR_DEBUG
@@ -1140,6 +1141,7 @@ IR_ALWAYS_INLINE void *ir_jit_compile(ir_ctx *ctx, int opt_level, size_t *size)
 			return NULL;
 		}
 		ctx->flags &= ~(IR_OPT_CFG | IR_OPT_CODEGEN | IR_OPT_TAILCALL);
+		ctx->flags |= IR_NO_OPT;
 
 		ir_build_def_use_lists(ctx);
 

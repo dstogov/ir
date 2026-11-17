@@ -147,6 +147,8 @@ bool ir_check(const ir_ctx *ctx)
 	uint32_t flags;
 	bool ok = 1;
 	ir_check_ctx check_ctx;
+	ir_ref last_bb_start = IR_UNUSED;
+	ir_ref last_control = IR_UNUSED;
 
 	if (ctx->insns_count < 1 || ctx->ir_base[1].op != IR_START) {
 		fprintf(stderr, "ir_base[1].op invalid opcode (%d)\n",
@@ -313,6 +315,57 @@ bool ir_check(const ir_ctx *ctx)
 			if (insn->type != IR_VOID) {
 				fprintf(stderr, "ir_base[%d].type must be empty (instruction %s)\n", i, ir_op_name[insn->op]);
 				ok = 0;
+			}
+		}
+
+		/* check the linear instruction order */
+		if ((ctx->flags2 & IR_LINEAR) || (ctx->flags & IR_NO_OPT)) {
+			if (flags & IR_OP_FLAG_BB_START) {
+				if (last_bb_start) {
+					fprintf(stderr, "ir_base[%d] starts basic block before %d ends\n", i, last_bb_start);
+					ok = 0;
+				}
+				last_bb_start = i;
+				last_control = i;
+			} else if (flags & IR_OP_FLAG_CONTROL) {
+				if (!last_bb_start) {
+					fprintf(stderr, "ir_base[%d] instruction between basic blocks\n", i);
+					ok = 0;
+				} else if (insn->op1 != last_control) {
+					if ((ctx->flags & IR_NO_OPT)
+					 && ((insn->op == IR_ALLOCA && IR_IS_CONST_REF(insn->op2))
+					  || (ctx->ir_base[insn->op1].op == IR_ALLOCA && IR_IS_CONST_REF(ctx->ir_base[insn->op1].op2))
+					  || (ctx->ir_base[last_control].op == IR_ALLOCA && IR_IS_CONST_REF(ctx->ir_base[last_control].op2)))) {
+						/* When compile with -O0, STATIC_ALLOCA may be anywere */
+					} else {
+						fprintf(stderr, "ir_base[%d].op1 incorrect control order (%d insted of %d)\n", i, insn->op1, last_control);
+						ok = 0;
+					}
+				} else if ((ctx->flags2 & IR_LINEAR) && ctx->cfg_map[i] != ctx->cfg_map[last_bb_start]) {
+					fprintf(stderr, "ir_base[%d] incorrect placement/mapping (%d insted of %d)\n", i, ctx->cfg_map[i], ctx->cfg_map[last_bb_start]);
+					ok = 0;
+				}
+				if (flags & IR_OP_FLAG_BB_END) {
+					last_bb_start = IR_UNUSED;
+					last_control = IR_UNUSED;
+				} else {
+					last_control = i;
+				}
+			} else {
+				if (!last_bb_start) {
+					fprintf(stderr, "ir_base[%d] instruction between basic blocks\n", i);
+					ok = 0;
+				} else if ((flags & IR_OP_FLAG_PINNED) && insn->op1 != last_bb_start) {
+					if ((ctx->flags & IR_NO_OPT) && insn->op == IR_VAR) {
+						/* When compile with -O0, VAR may be anywere */
+					} else {
+						fprintf(stderr, "ir_base[%d].op1 incorrect pinning (%d insted of %d)\n", i, insn->op1, last_bb_start);
+						ok = 0;
+					}
+				} else if ((ctx->flags2 & IR_LINEAR) && ctx->cfg_map[i] != ctx->cfg_map[last_bb_start]) {
+					fprintf(stderr, "ir_base[%d] incorrect placement/mapping (%d insted of %d)\n", i, ctx->cfg_map[i], ctx->cfg_map[last_bb_start]);
+					ok = 0;
+				}
 			}
 		}
 
