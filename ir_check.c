@@ -353,8 +353,12 @@ bool ir_check(const ir_ctx *ctx)
 				}
 			} else {
 				if (!last_bb_start) {
-					fprintf(stderr, "ir_base[%d] instruction between basic blocks\n", i);
-					ok = 0;
+					if ((ctx->flags & IR_NO_OPT) && insn->op == IR_NOP) {
+						/* When compile with -O0, NOP may be anywere */
+					} else {
+						fprintf(stderr, "ir_base[%d] instruction between basic blocks\n", i);
+						ok = 0;
+					}
 				} else if ((flags & IR_OP_FLAG_PINNED) && insn->op1 != last_bb_start) {
 					if ((ctx->flags & IR_NO_OPT) && insn->op == IR_VAR) {
 						/* When compile with -O0, VAR may be anywere */
