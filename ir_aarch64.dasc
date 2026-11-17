@@ -3308,6 +3308,20 @@ static void ir_emit_cmp_int_common(ir_ctx *ctx, ir_op op, ir_type type, ir_reg o
 	}
 }
 
+/* Test the low 8/16 bits for zero; upper bits are undefined */
+static void ir_emit_tst_narrow(ir_ctx *ctx, ir_type type, ir_reg reg)
+{
+	ir_backend_data *data = ctx->data;
+	dasm_State **Dst = &data->dasm_state;
+
+	if (ir_type_size[type] == 2) {
+		|	tst Rw(reg), #0xffff
+	} else {
+		IR_ASSERT(ir_type_size[type] == 1);
+		|	tst Rw(reg), #0xff
+	}
+}
+
 static void ir_emit_min_max_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
@@ -3901,11 +3915,8 @@ static void ir_emit_op_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 	if (insn->op == IR_NOT) {
 		if (insn->type == IR_BOOL) {
-			/* upper bits of narrow operands are undefined */
-			if (ir_type_size[src_type] == 1) {
-				|	tst Rw(op1_reg), #0xff
-			} else if (ir_type_size[src_type] == 2) {
-				|	tst Rw(op1_reg), #0xffff
+			if (ir_type_size[src_type] < 4) {
+				ir_emit_tst_narrow(ctx, src_type, op1_reg);
 			} else {
 				|	ASM_REG_IMM_OP cmp, src_type, op1_reg, 0
 			}
@@ -4343,7 +4354,15 @@ static void ir_emit_jz(ir_ctx *ctx, uint32_t b, uint32_t next_block, uint8_t op,
 		false_block = 0;
 	}
 
-	if (op == IR_EQ) {
+	if (ir_type_size[type] < 4 && type != IR_BOOL) {
+		ir_emit_tst_narrow(ctx, type, reg);
+		if (op == IR_EQ) {
+			|	beq =>true_block
+		} else {
+			IR_ASSERT(op == IR_NE);
+			|	bne =>true_block
+		}
+	} else if (op == IR_EQ) {
 		if (ir_type_size[type] == 8) {
 			|	cbz Rx(reg), =>true_block
 		} else {
@@ -4600,11 +4619,8 @@ static void ir_emit_cond(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 
 	if (IR_IS_TYPE_INT(op1_type)) {
-		/* upper bits of narrow operands are undefined */
-		if (ir_type_size[op1_type] == 1) {
-			|	tst Rw(op1_reg), #0xff
-		} else if (ir_type_size[op1_type] == 2) {
-			|	tst Rw(op1_reg), #0xffff
+		if (ir_type_size[op1_type] < 4) {
+			ir_emit_tst_narrow(ctx, op1_type, op1_reg);
 		} else {
 			|	ASM_REG_IMM_OP cmp, op1_type, op1_reg, 0
 		}
@@ -6822,7 +6838,14 @@ static void ir_emit_guard(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (IR_IS_CONST_REF(insn->op3)) {
 		void *addr = ir_jmp_addr(ctx, insn, &ctx->ir_base[insn->op3]);
 
-		if (insn->op == IR_GUARD) {
+		if (ir_type_size[type] < 4 && type != IR_BOOL) {
+			ir_emit_tst_narrow(ctx, type, op2_reg);
+			if (insn->op == IR_GUARD) {
+				|	beq &addr
+			} else {
+				|	bne &addr
+			}
+		} else if (insn->op == IR_GUARD) {
 			if (ir_type_size[type] == 8) {
 				|	cbz Rx(op2_reg), &addr
 			} else {
@@ -6845,7 +6868,15 @@ static void ir_emit_guard_jz(ir_ctx *ctx, uint8_t op, void *addr, ir_type type, 
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
-	if (op == IR_EQ) {
+	if (ir_type_size[type] < 4 && type != IR_BOOL) {
+		ir_emit_tst_narrow(ctx, type, reg);
+		if (op == IR_EQ) {
+			|	bne &addr
+		} else {
+			IR_ASSERT(op == IR_NE);
+			|	beq &addr
+		}
+	} else if (op == IR_EQ) {
 		if (ir_type_size[type] == 8) {
 			|	cbnz Rx(reg), &addr
 		} else {
