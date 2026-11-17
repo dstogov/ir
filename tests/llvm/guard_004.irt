@@ -1,0 +1,23 @@
+--TEST--
+GUARD_NOT with computed exit address
+--CODE--
+func test(int32_t, uintptr_t): int64_t
+{
+	int64_t ret = 1;
+	l_1 = START(l_4);
+	int32_t cond = PARAM(l_1, "cond", 1);
+	uintptr_t exit = PARAM(l_1, "exit", 2);
+	l_2 = GUARD_NOT(l_1, cond, exit);
+	l_4 = RETURN(l_2, ret);
+}
+--EXPECT--
+define i64 @test(i32 %d2, ptr %d3)
+{
+	%t4 = icmp ne i32 %d2, 0
+	br i1 %t4, label %l4_true, label %l4_false
+l4_true:
+	%t4_ret = tail call i64 %d3()
+	ret i64 %t4_ret
+l4_false:
+	ret i64 1
+}

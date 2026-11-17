@@ -903,6 +903,7 @@ static void ir_emit_if(ir_ctx *ctx, FILE *f, uint32_t b, ir_ref def, ir_insn *in
 static void ir_emit_guard(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 {
 	ir_type type = ctx->ir_base[insn->op2].type;
+	bool ret_void = ctx->ret_type == (ir_type)-1 || ctx->ret_type == IR_VOID;
 
 	// TODO: i1 @llvm.expect.i1(i1 <val>, i1 <expected_val>) ???
 	if (type == IR_BOOL) {
@@ -922,13 +923,26 @@ static void ir_emit_guard(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 	}
 	fprintf(f, ", label %%l%d_true, label %%l%d_false\n", def, def);
 	fprintf(f, "l%d_%s:\n", def, insn->op == IR_GUARD ? "false" : "true");
-	fprintf(f, "\tindirectbr ptr ");
+	// Treat guard as a function with the same return type and no arguments
+	if (ret_void) {
+		fprintf(f, "\ttail call void ");
+	} else {
+		fprintf(f, "\t%%t%d_ret = tail call ", def);
+		ir_emit_llvm_type_name(ctx->ret_type, f);
+		fprintf(f, " ");
+	}
 	if (IR_IS_CONST_REF(insn->op3) && ctx->ir_base[insn->op3].op == IR_ADDR) {
 		fprintf(f, "inttoptr(i64 u0x%" PRIxPTR " to ptr)", ctx->ir_base[insn->op3].val.addr);
 	} else {
 		ir_emit_ref(ctx, f, insn->op3);
 	}
-	fprintf(f, ", []\n");
+	if (ret_void) {
+		fprintf(f, "()\n\tret void\n");
+	} else {
+		fprintf(f, "()\n\tret ");
+		ir_emit_llvm_type_name(ctx->ret_type, f);
+		fprintf(f, " %%t%d_ret\n", def);
+	}
 	fprintf(f, "l%d_%s:\n", def, insn->op == IR_GUARD ? "true" : "false");
 }
 
