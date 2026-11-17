@@ -602,9 +602,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 	ir_bitqueue queue;
 	ir_live_interval *ival;
 
-	if (!(ctx->flags2 & IR_LINEAR) || !ctx->vregs) {
-		return 0;
-	}
+	IR_ASSERT((ctx->flags2 & IR_LINEAR) && ctx->vregs);
 
 	if (ctx->rules) {
 		ctx->regs = ir_mem_malloc(sizeof(ir_regs) * ctx->insns_count);
@@ -3999,9 +3997,7 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 	ir_live_pos position;
 	ir_reg reg;
 
-	if (!ctx->live_intervals) {
-		return 0;
-	}
+	IR_ASSERT(ctx->live_intervals);
 
 	if (ctx->flags2 & IR_LR_HAVE_DESSA_MOVES) {
 		/* Add fixed intervals for temporary registers used for DESSA moves */
