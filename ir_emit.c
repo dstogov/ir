@@ -1532,8 +1532,10 @@ int ir_match(ir_ctx *ctx)
 					ctx->rules[ref] = insn->op;
 				}
 				ref = prev_ref[ref];
-				if (ref == start && ctx->cfg_edges[bb->successors] != b) {
-					if (EXPECTED(!(bb->flags & IR_BB_ENTRY))) {
+				if (ref == start) {
+					if (ctx->cfg_edges[bb->successors] == b) {
+						/* pass */
+					} else if (EXPECTED(!(bb->flags & IR_BB_ENTRY))) {
 						bb->flags |= IR_BB_EMPTY;
 					} else if (ctx->flags & IR_MERGE_EMPTY_ENTRIES) {
 						bb->flags |= IR_BB_EMPTY;
@@ -1542,6 +1544,9 @@ int ir_match(ir_ctx *ctx)
 						}
 					}
 					continue;
+				} else if ((bb->flags & IR_BB_HAS_PHI) && ctx->ir_base[ref].op == IR_PHI) {
+					IR_ASSERT(ctx->cfg_edges[bb->successors] != b);
+					bb->flags |= IR_BB_EMPTY;
 				}
 			}
 		}

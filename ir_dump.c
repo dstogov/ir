@@ -614,7 +614,7 @@ void ir_dump_codegen(const ir_ctx *ctx, FILE *f)
 			b = _b;
 		}
 		bb = &ctx->cfg_blocks[b];
-		if ((bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY)) == IR_BB_EMPTY) {
+		if ((bb->flags & (IR_BB_START|IR_BB_ENTRY|IR_BB_EMPTY|IR_BB_HAS_PHI)) == IR_BB_EMPTY) {
 			continue;
 		}
 
