@@ -144,6 +144,16 @@ test: $(BUILD_DIR)/ir $(BUILD_DIR)/tester
 	$(BUILD_DIR)/tester --test-cmd $(BUILD_DIR)/ir --target $(TARGET_TRIPLET) --default-args "--save" \
 		--test-extension ".irt" --code-extension ".ir" $(TESTS)
 
+# LLVM importer tests use a separate extension so the default suite needs no LLVM.
+ifeq (yes, $(HAVE_LLVM))
+test-llvm: $(BUILD_DIR)/ir $(BUILD_DIR)/tester
+	$(BUILD_DIR)/tester --test-cmd "$(BUILD_DIR)/ir --llvm-asm" --target $(TARGET_TRIPLET) \
+		--test-extension ".lltest" --code-extension ".ll" $(TESTS)/llvm_import
+else
+test-llvm:
+	$(error test-llvm requires HAVE_LLVM=yes)
+endif
+
 test-ci: $(BUILD_DIR)/ir $(BUILD_DIR)/tester
 	$(BUILD_DIR)/tester --test-cmd $(BUILD_DIR)/ir --target $(TARGET_TRIPLET) --default-args "--save" \
 		--test-extension ".irt" --code-extension ".ir" --show-diff $(TESTS)

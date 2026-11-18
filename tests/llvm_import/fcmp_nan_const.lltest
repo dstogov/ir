@@ -1,0 +1,144 @@
+--TEST--
+LLVM import: UEQ and ONE const NaN semantics (float and double)
+--ARGS--
+-fno-inline --run
+--EXT--
+.ll
+--CODE--
+; Cases: NaN left/right/both, signed zero, equal/unequal finite, equal/opposite infinity.
+@format = private constant [4 x i8] c"%d\0A\00"
+declare i32 @printf(ptr, ...)
+
+; Result bits 0..1 are UEQ and ONE.
+define i32 @main() {
+  %u0 = fcmp ueq float 0x7FF8000000000000, 0.0
+  %o0 = fcmp one float 0x7FF8000000000000, 0.0
+  %zu0 = zext i1 %u0 to i32
+  %zo0 = zext i1 %o0 to i32
+  %so0 = shl i32 %zo0, 1
+  %r0 = or i32 %zu0, %so0
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r0)
+  %u1 = fcmp ueq float 0.0, 0x7FF8000000000000
+  %o1 = fcmp one float 0.0, 0x7FF8000000000000
+  %zu1 = zext i1 %u1 to i32
+  %zo1 = zext i1 %o1 to i32
+  %so1 = shl i32 %zo1, 1
+  %r1 = or i32 %zu1, %so1
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r1)
+  %u2 = fcmp ueq float 0x7FF8000000000000, 0x7FF8000000000000
+  %o2 = fcmp one float 0x7FF8000000000000, 0x7FF8000000000000
+  %zu2 = zext i1 %u2 to i32
+  %zo2 = zext i1 %o2 to i32
+  %so2 = shl i32 %zo2, 1
+  %r2 = or i32 %zu2, %so2
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r2)
+  %u3 = fcmp ueq float -0.0, 0.0
+  %o3 = fcmp one float -0.0, 0.0
+  %zu3 = zext i1 %u3 to i32
+  %zo3 = zext i1 %o3 to i32
+  %so3 = shl i32 %zo3, 1
+  %r3 = or i32 %zu3, %so3
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r3)
+  %u4 = fcmp ueq float 1.0, 1.0
+  %o4 = fcmp one float 1.0, 1.0
+  %zu4 = zext i1 %u4 to i32
+  %zo4 = zext i1 %o4 to i32
+  %so4 = shl i32 %zo4, 1
+  %r4 = or i32 %zu4, %so4
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r4)
+  %u5 = fcmp ueq float 1.0, 2.0
+  %o5 = fcmp one float 1.0, 2.0
+  %zu5 = zext i1 %u5 to i32
+  %zo5 = zext i1 %o5 to i32
+  %so5 = shl i32 %zo5, 1
+  %r5 = or i32 %zu5, %so5
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r5)
+  %u6 = fcmp ueq float 0x7FF0000000000000, 0x7FF0000000000000
+  %o6 = fcmp one float 0x7FF0000000000000, 0x7FF0000000000000
+  %zu6 = zext i1 %u6 to i32
+  %zo6 = zext i1 %o6 to i32
+  %so6 = shl i32 %zo6, 1
+  %r6 = or i32 %zu6, %so6
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r6)
+  %u7 = fcmp ueq float 0xFFF0000000000000, 0x7FF0000000000000
+  %o7 = fcmp one float 0xFFF0000000000000, 0x7FF0000000000000
+  %zu7 = zext i1 %u7 to i32
+  %zo7 = zext i1 %o7 to i32
+  %so7 = shl i32 %zo7, 1
+  %r7 = or i32 %zu7, %so7
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r7)
+  %u8 = fcmp ueq double 0x7FF8000000000000, 0.0
+  %o8 = fcmp one double 0x7FF8000000000000, 0.0
+  %zu8 = zext i1 %u8 to i32
+  %zo8 = zext i1 %o8 to i32
+  %so8 = shl i32 %zo8, 1
+  %r8 = or i32 %zu8, %so8
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r8)
+  %u9 = fcmp ueq double 0.0, 0x7FF8000000000000
+  %o9 = fcmp one double 0.0, 0x7FF8000000000000
+  %zu9 = zext i1 %u9 to i32
+  %zo9 = zext i1 %o9 to i32
+  %so9 = shl i32 %zo9, 1
+  %r9 = or i32 %zu9, %so9
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r9)
+  %u10 = fcmp ueq double 0x7FF8000000000000, 0x7FF8000000000000
+  %o10 = fcmp one double 0x7FF8000000000000, 0x7FF8000000000000
+  %zu10 = zext i1 %u10 to i32
+  %zo10 = zext i1 %o10 to i32
+  %so10 = shl i32 %zo10, 1
+  %r10 = or i32 %zu10, %so10
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r10)
+  %u11 = fcmp ueq double -0.0, 0.0
+  %o11 = fcmp one double -0.0, 0.0
+  %zu11 = zext i1 %u11 to i32
+  %zo11 = zext i1 %o11 to i32
+  %so11 = shl i32 %zo11, 1
+  %r11 = or i32 %zu11, %so11
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r11)
+  %u12 = fcmp ueq double 1.0, 1.0
+  %o12 = fcmp one double 1.0, 1.0
+  %zu12 = zext i1 %u12 to i32
+  %zo12 = zext i1 %o12 to i32
+  %so12 = shl i32 %zo12, 1
+  %r12 = or i32 %zu12, %so12
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r12)
+  %u13 = fcmp ueq double 1.0, 2.0
+  %o13 = fcmp one double 1.0, 2.0
+  %zu13 = zext i1 %u13 to i32
+  %zo13 = zext i1 %o13 to i32
+  %so13 = shl i32 %zo13, 1
+  %r13 = or i32 %zu13, %so13
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r13)
+  %u14 = fcmp ueq double 0x7FF0000000000000, 0x7FF0000000000000
+  %o14 = fcmp one double 0x7FF0000000000000, 0x7FF0000000000000
+  %zu14 = zext i1 %u14 to i32
+  %zo14 = zext i1 %o14 to i32
+  %so14 = shl i32 %zo14, 1
+  %r14 = or i32 %zu14, %so14
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r14)
+  %u15 = fcmp ueq double 0xFFF0000000000000, 0x7FF0000000000000
+  %o15 = fcmp one double 0xFFF0000000000000, 0x7FF0000000000000
+  %zu15 = zext i1 %u15 to i32
+  %zo15 = zext i1 %o15 to i32
+  %so15 = shl i32 %zo15, 1
+  %r15 = or i32 %zu15, %so15
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r15)
+  ret i32 0
+}
+--EXPECT--
+1
+1
+1
+1
+1
+2
+1
+2
+1
+1
+1
+1
+1
+2
+1
+2

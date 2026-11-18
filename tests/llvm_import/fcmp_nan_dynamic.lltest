@@ -1,0 +1,287 @@
+--TEST--
+LLVM import: UEQ and ONE dynamic NaN semantics (float and double)
+--ARGS--
+-fno-inline --run
+--EXT--
+.ll
+--CODE--
+; Cases: NaN left/right/both, signed zero, equal/unequal finite, equal/opposite infinity.
+@format = private constant [4 x i8] c"%d\0A\00"
+declare i32 @printf(ptr, ...)
+
+; Result bits 0..3 are UEQ, ONE, OEQ, UNE.
+define i32 @mask_float(float %a, float %b) {
+  %c0 = fcmp ueq float %a, %b
+  %z0 = zext i1 %c0 to i32
+  %c1 = fcmp one float %a, %b
+  %z1 = zext i1 %c1 to i32
+  %c2 = fcmp oeq float %a, %b
+  %z2 = zext i1 %c2 to i32
+  %c3 = fcmp une float %a, %b
+  %z3 = zext i1 %c3 to i32
+  %s1 = shl i32 %z1, 1
+  %s2 = shl i32 %z2, 2
+  %s3 = shl i32 %z3, 3
+  %m1 = or i32 %z0, %s1
+  %m2 = or i32 %m1, %s2
+  %m3 = or i32 %m2, %s3
+  ret i32 %m3
+}
+
+define i32 @branch_float(float %a, float %b) {
+  %eq = fcmp ueq float %a, %b
+  br i1 %eq, label %equal, label %different
+equal:
+  ret i32 11
+different:
+  %ne = fcmp one float %a, %b
+  br i1 %ne, label %ordered, label %unordered
+ordered:
+  ret i32 22
+unordered:
+  ret i32 33
+}
+
+define i32 @branch_one_float(float %a, float %b) {
+  %ne = fcmp one float %a, %b
+  br i1 %ne, label %different, label %other
+different:
+  ret i32 22
+other:
+  ret i32 11
+}
+
+define i32 @self_float(float %a) {
+  %u = fcmp ueq float %a, %a
+  %o = fcmp one float %a, %a
+  %zu = zext i1 %u to i32
+  %zo = zext i1 %o to i32
+  %so = shl i32 %zo, 1
+  %r = or i32 %zu, %so
+  ret i32 %r
+}
+
+; Result bits 0..3 are UEQ, ONE, OEQ, UNE.
+define i32 @mask_double(double %a, double %b) {
+  %c0 = fcmp ueq double %a, %b
+  %z0 = zext i1 %c0 to i32
+  %c1 = fcmp one double %a, %b
+  %z1 = zext i1 %c1 to i32
+  %c2 = fcmp oeq double %a, %b
+  %z2 = zext i1 %c2 to i32
+  %c3 = fcmp une double %a, %b
+  %z3 = zext i1 %c3 to i32
+  %s1 = shl i32 %z1, 1
+  %s2 = shl i32 %z2, 2
+  %s3 = shl i32 %z3, 3
+  %m1 = or i32 %z0, %s1
+  %m2 = or i32 %m1, %s2
+  %m3 = or i32 %m2, %s3
+  ret i32 %m3
+}
+
+define i32 @branch_double(double %a, double %b) {
+  %eq = fcmp ueq double %a, %b
+  br i1 %eq, label %equal, label %different
+equal:
+  ret i32 11
+different:
+  %ne = fcmp one double %a, %b
+  br i1 %ne, label %ordered, label %unordered
+ordered:
+  ret i32 22
+unordered:
+  ret i32 33
+}
+
+define i32 @branch_one_double(double %a, double %b) {
+  %ne = fcmp one double %a, %b
+  br i1 %ne, label %different, label %other
+different:
+  ret i32 22
+other:
+  ret i32 11
+}
+
+define i32 @self_double(double %a) {
+  %u = fcmp ueq double %a, %a
+  %o = fcmp one double %a, %a
+  %zu = zext i1 %u to i32
+  %zo = zext i1 %o to i32
+  %so = shl i32 %zo, 1
+  %r = or i32 %zu, %so
+  ret i32 %r
+}
+
+define i32 @main() {
+  %r0 = call i32 @mask_float(float 0x7FF8000000000000, float 0.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r0)
+  %b0 = call i32 @branch_float(float 0x7FF8000000000000, float 0.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %b0)
+  %ob0 = call i32 @branch_one_float(float 0x7FF8000000000000, float 0.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %ob0)
+  %r1 = call i32 @mask_float(float 0.0, float 0x7FF8000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r1)
+  %b1 = call i32 @branch_float(float 0.0, float 0x7FF8000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %b1)
+  %ob1 = call i32 @branch_one_float(float 0.0, float 0x7FF8000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %ob1)
+  %r2 = call i32 @mask_float(float 0x7FF8000000000000, float 0x7FF8000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r2)
+  %b2 = call i32 @branch_float(float 0x7FF8000000000000, float 0x7FF8000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %b2)
+  %ob2 = call i32 @branch_one_float(float 0x7FF8000000000000, float 0x7FF8000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %ob2)
+  %r3 = call i32 @mask_float(float -0.0, float 0.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r3)
+  %b3 = call i32 @branch_float(float -0.0, float 0.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %b3)
+  %ob3 = call i32 @branch_one_float(float -0.0, float 0.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %ob3)
+  %r4 = call i32 @mask_float(float 1.0, float 1.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r4)
+  %b4 = call i32 @branch_float(float 1.0, float 1.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %b4)
+  %ob4 = call i32 @branch_one_float(float 1.0, float 1.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %ob4)
+  %r5 = call i32 @mask_float(float 1.0, float 2.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r5)
+  %b5 = call i32 @branch_float(float 1.0, float 2.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %b5)
+  %ob5 = call i32 @branch_one_float(float 1.0, float 2.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %ob5)
+  %r6 = call i32 @mask_float(float 0x7FF0000000000000, float 0x7FF0000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r6)
+  %b6 = call i32 @branch_float(float 0x7FF0000000000000, float 0x7FF0000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %b6)
+  %ob6 = call i32 @branch_one_float(float 0x7FF0000000000000, float 0x7FF0000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %ob6)
+  %r7 = call i32 @mask_float(float 0xFFF0000000000000, float 0x7FF0000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r7)
+  %b7 = call i32 @branch_float(float 0xFFF0000000000000, float 0x7FF0000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %b7)
+  %ob7 = call i32 @branch_one_float(float 0xFFF0000000000000, float 0x7FF0000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %ob7)
+  %r8 = call i32 @mask_double(double 0x7FF8000000000000, double 0.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r8)
+  %b8 = call i32 @branch_double(double 0x7FF8000000000000, double 0.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %b8)
+  %ob8 = call i32 @branch_one_double(double 0x7FF8000000000000, double 0.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %ob8)
+  %r9 = call i32 @mask_double(double 0.0, double 0x7FF8000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r9)
+  %b9 = call i32 @branch_double(double 0.0, double 0x7FF8000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %b9)
+  %ob9 = call i32 @branch_one_double(double 0.0, double 0x7FF8000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %ob9)
+  %r10 = call i32 @mask_double(double 0x7FF8000000000000, double 0x7FF8000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r10)
+  %b10 = call i32 @branch_double(double 0x7FF8000000000000, double 0x7FF8000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %b10)
+  %ob10 = call i32 @branch_one_double(double 0x7FF8000000000000, double 0x7FF8000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %ob10)
+  %r11 = call i32 @mask_double(double -0.0, double 0.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r11)
+  %b11 = call i32 @branch_double(double -0.0, double 0.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %b11)
+  %ob11 = call i32 @branch_one_double(double -0.0, double 0.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %ob11)
+  %r12 = call i32 @mask_double(double 1.0, double 1.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r12)
+  %b12 = call i32 @branch_double(double 1.0, double 1.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %b12)
+  %ob12 = call i32 @branch_one_double(double 1.0, double 1.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %ob12)
+  %r13 = call i32 @mask_double(double 1.0, double 2.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r13)
+  %b13 = call i32 @branch_double(double 1.0, double 2.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %b13)
+  %ob13 = call i32 @branch_one_double(double 1.0, double 2.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %ob13)
+  %r14 = call i32 @mask_double(double 0x7FF0000000000000, double 0x7FF0000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r14)
+  %b14 = call i32 @branch_double(double 0x7FF0000000000000, double 0x7FF0000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %b14)
+  %ob14 = call i32 @branch_one_double(double 0x7FF0000000000000, double 0x7FF0000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %ob14)
+  %r15 = call i32 @mask_double(double 0xFFF0000000000000, double 0x7FF0000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %r15)
+  %b15 = call i32 @branch_double(double 0xFFF0000000000000, double 0x7FF0000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %b15)
+  %ob15 = call i32 @branch_one_double(double 0xFFF0000000000000, double 0x7FF0000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %ob15)
+  %self16 = call i32 @self_float(float 0x7FF8000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %self16)
+  %self17 = call i32 @self_float(float 0.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %self17)
+  %self18 = call i32 @self_float(float 0x7FF0000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %self18)
+  %self19 = call i32 @self_float(float 1.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %self19)
+  %self20 = call i32 @self_double(double 0x7FF8000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %self20)
+  %self21 = call i32 @self_double(double 0.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %self21)
+  %self22 = call i32 @self_double(double 0x7FF0000000000000)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %self22)
+  %self23 = call i32 @self_double(double 1.0)
+  call i32 (ptr, ...) @printf(ptr @format, i32 %self23)
+  ret i32 0
+}
+--EXPECT--
+9
+11
+11
+9
+11
+11
+9
+11
+11
+5
+11
+11
+5
+11
+11
+10
+22
+22
+5
+11
+11
+10
+22
+22
+9
+11
+11
+9
+11
+11
+9
+11
+11
+5
+11
+11
+5
+11
+11
+10
+22
+22
+5
+11
+11
+10
+22
+22
+1
+1
+1
+1
+1
+1
+1
+1
