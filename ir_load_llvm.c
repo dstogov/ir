@@ -577,6 +577,11 @@ static ir_ref llvm2ir_fcmp_op(ir_ctx *ctx, LLVMValueRef expr)
 		case LLVMRealOLE: op = IR_LE;  break;
 		case LLVMRealUNO: op = IR_UNORDERED; break;
 		case LLVMRealORD: op = IR_ORDERED;   break;
+		case LLVMRealPredicateFalse:
+		case LLVMRealPredicateTrue:
+			ref = predicate == LLVMRealPredicateTrue ? IR_TRUE : IR_FALSE;
+			ir_addrtab_set(ctx->binding, (uintptr_t)expr, ref);
+			return ref;
 		default: IR_ASSERT(0); return 0;
 	}
 	ref = ir_fold2(ctx, IR_OPT(op, IR_BOOL), llvm2ir_op(ctx, op0, type), llvm2ir_op(ctx, op1, type));

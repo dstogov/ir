@@ -1,0 +1,44 @@
+--TEST--
+LLVM constant floating comparison predicates
+--ARGS--
+-O2 --run
+--EXT--
+.ll
+--CODE--
+@fmt = private constant [13 x i8] c"%d %d %d %d\0A\00"
+declare i32 @printf(ptr, ...)
+define i32 @float_false(float %x, float %y) {
+entry:
+  %cmp = fcmp false float %x, %y
+  %result = zext i1 %cmp to i32
+  ret i32 %result
+}
+define i32 @float_true(float %x, float %y) {
+entry:
+  %cmp = fcmp true float %x, %y
+  %result = zext i1 %cmp to i32
+  ret i32 %result
+}
+define i32 @double_false(double %x, double %y) {
+entry:
+  %cmp = fcmp false double %x, %y
+  %result = zext i1 %cmp to i32
+  ret i32 %result
+}
+define i32 @double_true(double %x, double %y) {
+entry:
+  %cmp = fcmp true double %x, %y
+  %result = zext i1 %cmp to i32
+  ret i32 %result
+}
+define i32 @main() {
+entry:
+  %a = call i32 @float_false(float 0x7FF8000000000000, float 1.0)
+  %b = call i32 @float_true(float 0x7FF8000000000000, float 1.0)
+  %c = call i32 @double_false(double 1.0, double 0x7FF8000000000000)
+  %d = call i32 @double_true(double 1.0, double 0x7FF8000000000000)
+  %printed = call i32 (ptr, ...) @printf(ptr @fmt, i32 %a, i32 %b, i32 %c, i32 %d)
+  ret i32 0
+}
+--EXPECT--
+0 1 0 1
