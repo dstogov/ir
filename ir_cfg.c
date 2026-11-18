@@ -1949,12 +1949,14 @@ restart:
 	}
 
 	/* 5. Align loop headers */
-	for (b = 1; b <= ctx->cfg_blocks_count; b++) {
-		if (chains[b].head == b) {
-			bb = &ctx->cfg_blocks[b];
-			if (bb->loop_depth) {
-				if (ir_should_align_loop(ctx, chains, b, bb)) {
-					bb->flags |= IR_BB_ALIGN_LOOP;
+	if (ctx->flags2 & IR_CFG_HAS_LOOPS) {
+		for (b = 1; b <= ctx->cfg_blocks_count; b++) {
+			if (chains[b].head == b) {
+				bb = &ctx->cfg_blocks[b];
+				if (bb->loop_depth) {
+					if (ir_should_align_loop(ctx, chains, b, bb)) {
+						bb->flags |= IR_BB_ALIGN_LOOP;
+					}
 				}
 			}
 		}
