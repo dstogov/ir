@@ -92,7 +92,7 @@ static ir_type llvm2ir_type(LLVMTypeRef type)
 		case LLVMVectorTypeKind:
 			element_type = llvm2ir_type(LLVMGetElementType(type));
 			count = LLVMGetVectorSize(type);
-			if (!IR_IS_TYPE_SCALAR(element_type)) {
+			if (!IR_IS_TYPE_SCALAR(element_type) || element_type == IR_ADDR) {
 				fprintf(stderr, "Unsupported LLVM vector base type\n");
 				IR_ASSERT(0);
 			}
