@@ -773,6 +773,34 @@ static void ir_emit_dessa_move(ir_ctx *ctx, ir_mem *mem_slots,
 	}
 }
 
+/* Whether ir_emit_dessa_move() has to go through tmp_reg for this move */
+static bool ir_dessa_move_needs_tmp_reg(ir_ctx *ctx, ir_type type, int32_t to, int32_t from)
+{
+	if (to < IR_REG_NUM || !IR_IS_TYPE_INT(type)) {
+		return 0;
+	}
+	if (!IR_IS_CONST_REF(from)) {
+		return from >= IR_REG_NUM;
+	}
+	if (-from >= ctx->consts_count) {
+		/* local variable address */
+		return 1;
+	}
+#if IR_X86_I64
+	if (type == IR_U32_HI) {
+		return 0;
+	}
+#endif
+#if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
+	if (!IR_IS_SYM_CONST(ctx->ir_base[from].op)
+	 && (ir_type_size[type] != 8 || IR_IS_SIGNED_32BIT(ctx->ir_base[from].val.i64))) {
+		/* stored as an immediate */
+		return 0;
+	}
+#endif
+	return 1;
+}
+
 IR_ALWAYS_INLINE void ir_dessa_resolve_cycle(ir_ctx *ctx, ir_mem *mem_slots, int32_t *pred, int32_t *loc,
                                              int8_t *types, ir_bitset todo, int32_t root,
                                              ir_reg tmp_reg, ir_reg tmp_fp_reg)
@@ -968,7 +996,9 @@ static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_dessa_copy *copies, int count,
 	}
 
 	/* finally we resolve remaining "windmill blades" - trees that set temporary registers */
-	if (tmp_reg != IR_REG_NONE && ir_bitset_in(todo, tmp_reg)) {
+	bool tmp_reg_set = tmp_reg != IR_REG_NONE && ir_bitset_in(todo, tmp_reg);
+
+	if (tmp_reg_set) {
 		ir_mem tmp_spill_slot;
 		ir_type tmp_type;
 
@@ -1015,17 +1045,26 @@ static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_dessa_copy *copies, int count,
 	}
 
 	if (tmp_fp_reg != IR_REG_NONE && ir_bitset_in(todo, tmp_fp_reg)) {
-		ir_mem tmp_spill_slot;
+		ir_mem tmp_spill_slot, tmp_reg_spill_slot;
 		ir_type tmp_type;
+		bool restore_tmp_reg;
 
 		ir_bitset_clear(ready, len);
 		to = tmp_fp_reg;
 		tmp_type = types[to];
 		IR_MEM_VAL(tmp_spill_slot) = 0;
+		IR_MEM_VAL(tmp_reg_spill_slot) = 0;
 		do {
 			ir_bitset_excl(todo, to);
 			type = types[to];
 			from = pred[to];
+			restore_tmp_reg = tmp_reg_set
+				&& ir_dessa_move_needs_tmp_reg(ctx, type, to, IR_IS_CONST_REF(from) ? from : loc[from]);
+			if (restore_tmp_reg && !IR_MEM_VAL(tmp_reg_spill_slot)) {
+				/* The move goes through tmp_reg, which already holds the result of its own blade */
+				tmp_reg_spill_slot = IR_MEM_BO(IR_REG_STACK_POINTER, -24);
+				ir_emit_store_mem(ctx, IR_ADDR, tmp_reg_spill_slot, tmp_reg);
+			}
 			if (IR_IS_CONST_REF(from)) {
 				/* Immediate to memory move inside a "blocked" blade requres an additional temporary register */
 				if (to >= IR_REG_NUM) {
@@ -1052,6 +1091,10 @@ static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_dessa_copy *copies, int count,
 				if (from == r && ir_bitset_in(todo, from)) {
 					ir_bitset_incl(ready, from);
 				}
+			}
+			if (restore_tmp_reg) {
+				/* Later moves may read tmp_reg */
+				ir_emit_load_mem(ctx, IR_ADDR, tmp_reg, tmp_reg_spill_slot);
 			}
 		} while ((to = ir_bitset_pop_first(ready, len)) >= 0);
 
