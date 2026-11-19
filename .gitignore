@@ -18,6 +18,11 @@ tests/**/*.ir
 tests/**/*.out
 tests/**/*.log
 
+llvm_tests/**/*.diff
+llvm_tests/**/*.exp
+llvm_tests/**/*.ll
+llvm_tests/**/*.out
+
 win32/vcpkg
 win32/build_*
 
