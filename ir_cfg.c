@@ -1858,7 +1858,7 @@ restart:
 	qsort(edges, edges_count, sizeof(ir_edge_info), ir_edge_info_cmp);
 
 #ifdef IR_DEBUG
-	if (ctx->flags & IR_DEBUG_BB_SCHEDULE) {
+	if (ctx->debug_flags & IR_DEBUG_BB_SCHEDULE) {
 		ir_dump_edges(ctx, edges_count, edges);
 	}
 #endif
@@ -1907,7 +1907,7 @@ restart:
 	}
 
 #if IR_DEBUG_BB_SCHEDULE_GRAPH
-	if (ctx->flags & IR_DEBUG_BB_SCHEDULE) {
+	if (ctx->debug_flags & IR_DEBUG_BB_SCHEDULE) {
 		ir_dump_cfg_freq_graph(ctx, bb_freq, edges_count, edges, chains);
 	}
 #endif
@@ -1915,7 +1915,7 @@ restart:
 	ir_mem_free(bb_freq);
 
 #ifdef IR_DEBUG
-	if (ctx->flags & IR_DEBUG_BB_SCHEDULE) {
+	if (ctx->debug_flags & IR_DEBUG_BB_SCHEDULE) {
 		ir_dump_chains(ctx, chains);
 	}
 #endif
@@ -1942,7 +1942,7 @@ restart:
 		}
 
 #ifdef IR_DEBUG
-		if (ctx->flags & IR_DEBUG_BB_SCHEDULE) {
+		if (ctx->debug_flags & IR_DEBUG_BB_SCHEDULE) {
 			ir_dump_chains(ctx, chains);
 		}
 #endif
@@ -1980,7 +1980,7 @@ restart:
 	}
 
 #ifdef IR_DEBUG
-	if (ctx->flags & IR_DEBUG_BB_SCHEDULE) {
+	if (ctx->debug_flags & IR_DEBUG_BB_SCHEDULE) {
 		ir_dump_chains(ctx, chains);
 	}
 #endif

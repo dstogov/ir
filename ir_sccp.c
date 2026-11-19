@@ -866,7 +866,7 @@ static IR_NEVER_INLINE void ir_sccp_analyze(const ir_ctx *ctx, ir_sccp_val *_val
 	}
 
 #ifdef IR_DEBUG
-	if (ctx->flags & IR_DEBUG_SCCP) {
+	if (ctx->debug_flags & IR_DEBUG_SCCP) {
 		for (i = 1; i < ctx->insns_count; i++) {
 			if (IR_IS_CONST_OP(_values[i].op) || IR_IS_SYM_CONST(_values[i].op)) {
 				fprintf(stderr, "%d. CONST(", i);

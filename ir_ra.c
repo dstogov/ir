@@ -2473,7 +2473,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy, void *dat
 #  define IR_REG_NAME_VAL(_ival) ir_reg_name((_ival)->reg, (_ival)->type)
 # endif
 # define IR_LOG_LSRA(action, ival, comment) do { \
-		if (ctx->flags & IR_DEBUG_RA) { \
+		if (ctx->debug_flags & IR_DEBUG_RA) { \
 			ir_live_interval *_ival = (ival); \
 			ir_live_pos _start = _ival->range.start; \
 			ir_live_pos _end = _ival->end; \
@@ -2484,7 +2484,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy, void *dat
 		} \
 	} while (0)
 # define IR_LOG_LSRA_ASSIGN(action, ival, comment) do { \
-		if (ctx->flags & IR_DEBUG_RA) { \
+		if (ctx->debug_flags & IR_DEBUG_RA) { \
 			ir_live_interval *_ival = (ival); \
 			ir_live_pos _start = _ival->range.start; \
 			ir_live_pos _end = _ival->end; \
@@ -2496,7 +2496,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy, void *dat
 		} \
 	} while (0)
 # define IR_LOG_LSRA_SPLIT(ival, pos) do { \
-		if (ctx->flags & IR_DEBUG_RA) { \
+		if (ctx->debug_flags & IR_DEBUG_RA) { \
 			ir_live_interval *_ival = (ival); \
 			ir_live_pos _start = _ival->range.start; \
 			ir_live_pos _end = _ival->end; \
@@ -2509,7 +2509,7 @@ int ir_gen_dessa_moves(ir_ctx *ctx, uint32_t b, emit_copy_t emit_copy, void *dat
 		} \
 	} while (0)
 # define IR_LOG_LSRA_CONFLICT(action, ival, pos) do { \
-		if (ctx->flags & IR_DEBUG_RA) { \
+		if (ctx->debug_flags & IR_DEBUG_RA) { \
 			ir_live_interval *_ival = (ival); \
 			ir_live_pos _start = _ival->range.start; \
 			ir_live_pos _end = _ival->end; \
@@ -4101,7 +4101,7 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 	ctx->flags2 &= ~(IR_RA_HAVE_SPLITS|IR_RA_HAVE_SPILLS);
 
 #ifdef IR_DEBUG
-	if (ctx->flags & IR_DEBUG_RA) {
+	if (ctx->debug_flags & IR_DEBUG_RA) {
 		fprintf(stderr, "----\n");
 		ir_dump_live_ranges(ctx, stderr);
 		fprintf(stderr, "---- Start LSRA\n");
@@ -4331,7 +4331,7 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 #endif
 
 #ifdef IR_DEBUG
-	if (ctx->flags & IR_DEBUG_RA) {
+	if (ctx->debug_flags & IR_DEBUG_RA) {
 		fprintf(stderr, "---- Finish LSRA\n");
 		ir_dump_live_ranges(ctx, stderr);
 		fprintf(stderr, "----\n");

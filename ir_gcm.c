@@ -269,7 +269,7 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	}
 
 #ifdef IR_DEBUG
-	if (ctx->flags & IR_DEBUG_GCM_SPLIT) {
+	if (ctx->debug_flags & IR_DEBUG_GCM_SPLIT) {
 		bool first = 1;
 		fprintf(stderr, "*** Split partially dead node d_%d scheduled to BB%d\n", ref, b);
 		IR_SPARSE_SET_FOREACH(&data->totally_useful, i) {
@@ -311,7 +311,7 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	IR_ASSERT(!ir_sparse_set_in(&data->totally_useful, b));
 
 #ifdef IR_DEBUG
-	if (ctx->flags & IR_DEBUG_GCM_SPLIT) {
+	if (ctx->debug_flags & IR_DEBUG_GCM_SPLIT) {
 		bool first = 1;
 		IR_SPARSE_SET_FOREACH(&data->totally_useful, i) {
 			if (first) {
@@ -449,7 +449,7 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	//       (similar to SSAPRE)
 
 #ifdef IR_DEBUG
-	if (ctx->flags & IR_DEBUG_GCM_SPLIT) {
+	if (ctx->debug_flags & IR_DEBUG_GCM_SPLIT) {
 		for (i = 0; i < clones_count; i++) {
 			uint32_t u = clones[i].use;
 
@@ -541,7 +541,7 @@ static bool ir_split_partially_dead_node(ir_ctx *ctx, ir_ref ref, uint32_t b)
 	ir_hashtab_free(&hash);
 
 #ifdef IR_DEBUG
-	if (ctx->flags & IR_DEBUG_GCM_SPLIT) {
+	if (ctx->debug_flags & IR_DEBUG_GCM_SPLIT) {
 		ir_check(ctx);
 	}
 #endif
@@ -763,7 +763,7 @@ int ir_gcm(ir_ctx *ctx)
 	}
 
 #ifdef IR_DEBUG
-	if (ctx->flags & IR_DEBUG_GCM) {
+	if (ctx->debug_flags & IR_DEBUG_GCM) {
 		fprintf(stderr, "GCM Schedule Early\n");
 		for (n = 1; n < ctx->insns_count; n++) {
 			fprintf(stderr, "%d -> %d\n", n, ctx->cfg_map[n]);
@@ -799,7 +799,7 @@ int ir_gcm(ir_ctx *ctx)
 	ir_list_free(&queue_late);
 
 #ifdef IR_DEBUG
-	if (ctx->flags & IR_DEBUG_GCM) {
+	if (ctx->debug_flags & IR_DEBUG_GCM) {
 		fprintf(stderr, "GCM Schedule Late\n");
 		for (n = 1; n < ctx->insns_count; n++) {
 			fprintf(stderr, "%d -> %d\n", n, ctx->cfg_map[n]);
@@ -1109,7 +1109,7 @@ restart:
 					if (ctx->cfg_map[input] == b) {
 						/* "input" should be before "i" to satisfy dependency */
 #ifdef IR_DEBUG
-						if (ctx->flags & IR_DEBUG_SCHEDULE) {
+						if (ctx->debug_flags & IR_DEBUG_SCHEDULE) {
 							fprintf(stderr, "Wrong dependency %d:%d -> %d\n", b, input, i);
 						}
 #endif
@@ -1210,7 +1210,7 @@ int ir_schedule(ir_ctx *ctx)
 		ir_ref start;
 
 #ifdef IR_DEBUG
-		if (ctx->flags & IR_DEBUG_SCHEDULE) {
+		if (ctx->debug_flags & IR_DEBUG_SCHEDULE) {
 			fprintf(stderr, "BB%d\n", b);
 			ir_schedule_print_list(ctx, b, _next, bb->start, bb->end, "INITIAL");
 		}
@@ -1322,7 +1322,7 @@ int ir_schedule(ir_ctx *ctx)
 		}
 
 #ifdef IR_DEBUG
-		if (ctx->flags & IR_DEBUG_SCHEDULE) {
+		if (ctx->debug_flags & IR_DEBUG_SCHEDULE) {
 			ir_schedule_print_list(ctx, b, _next, start, bb->end, "  FINAL");
 		}
 #endif
