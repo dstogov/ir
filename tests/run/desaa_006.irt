@@ -1,0 +1,94 @@
+--TEST--
+32-bit x86 -O0: the de-SSA temporary register must not hold a PHI input
+--CODE--
+func g(double, uint64_t): double
+{
+	uint64_t c_1 = 65535;
+	l_1 = START(l_7);
+	double d_2 = PARAM(l_1, "x", 1);
+	uint64_t d_3 = PARAM(l_1, "y", 2);
+	uint64_t d_4 = AND(d_3, c_1);
+	double d_5 = INT2FP(d_4);
+	double d_6 = ADD(d_2, d_5);
+	l_7 = RETURN(l_1, d_6);
+}
+func h(uint64_t, double): uint64_t
+{
+	l_1 = START(l_5);
+	uint64_t d_2 = PARAM(l_1, "x", 1);
+	double d_3 = PARAM(l_1, "y", 2);
+	uint64_t d_4 = ADD(d_2, d_2);
+	l_5 = RETURN(l_1, d_4);
+}
+func test(double, uint32_t, double, uint32_t, uint64_t, uint32_t, bool): uint64_t
+{
+	uintptr_t c_1 = func g(double, uint64_t): double;
+	uintptr_t c_2 = func h(uint64_t, double): uint64_t;
+	uint64_t c_3 = 7;
+	uint64_t c_4 = 7;
+	float c_5 = 6;
+	float c_6 = -3.5;
+	l_1 = START(l_41);
+	double d_2 = PARAM(l_1, "p1", 1);
+	uint32_t d_3 = PARAM(l_1, "p2", 2);
+	double d_4 = PARAM(l_1, "p3", 3);
+	uint32_t d_5 = PARAM(l_1, "p4", 4);
+	uint64_t d_6 = PARAM(l_1, "p5", 5);
+	uint32_t d_7 = PARAM(l_1, "p6", 6);
+	bool d_8 = PARAM(l_1, "flag", 7);
+	l_9 = IF(l_1, d_8);
+	l_10 = IF_TRUE(l_9);
+	uint64_t d_11 = SUB(d_6, c_3);
+	uint32_t d_12 = XOR(d_5, d_3);
+	uint64_t d_13, l_13 = CALL/2(l_10, c_2, d_6, d_4);
+	uint64_t d_14 = OR(d_6, c_4);
+	l_15 = END(l_13);
+	l_16 = IF_FALSE(l_9);
+	l_17 = END(l_16);
+	l_18 = MERGE(l_15, l_17);
+	float d_19 = PHI(l_18, c_5, c_6);
+	uint64_t d_20 = PHI(l_18, d_13, d_6);
+	uint64_t d_21 = PHI(l_18, d_14, d_6);
+	uint64_t d_22 = PHI(l_18, d_11, d_6);
+	uint64_t d_23 = PHI(l_18, d_11, d_6);
+	uint32_t d_24 = PHI(l_18, d_12, d_3);
+	double d_25, l_25 = CALL/2(l_18, c_1, d_2, d_23);
+	uint64_t d_26 = ADD(d_20, d_21);
+	uint64_t d_27 = XOR(d_26, d_22);
+	uint64_t d_28 = ADD(d_27, d_6);
+	uint64_t d_29 = ADD(d_28, d_6);
+	uint64_t d_30 = ZEXT(d_24);
+	uint64_t d_31 = XOR(d_29, d_30);
+	uint64_t d_32 = XOR(d_31, d_6);
+	uint64_t d_33 = ADD(d_32, d_6);
+	uint64_t d_34 = ADD(d_33, d_6);
+	uint64_t d_35 = ADD(d_34, d_6);
+	uint64_t d_36 = XOR(d_35, d_6);
+	uint64_t d_37 = XOR(d_36, d_6);
+	uint64_t d_38 = XOR(d_37, d_6);
+	uint64_t d_39 = XOR(d_38, d_6);
+	uint64_t d_40 = XOR(d_39, d_6);
+	l_41 = RETURN(l_25, d_40);
+}
+func main(): int32_t
+{
+	int32_t c_1 = 0;
+	uintptr_t c_2 = func printf(uintptr_t, ...): int32_t;
+	uintptr_t c_3 = func test(double, uint32_t, double, uint32_t, uint64_t, uint32_t, bool): uint64_t;
+	uintptr_t c_4 = "%llx %llx\n";
+	double c_5 = 1.5;
+	uint32_t c_6 = 33818120;
+	double c_7 = 3.5;
+	uint32_t c_8 = 67636240;
+	uint64_t c_9 = 6148914691236517205;
+	uint32_t c_10 = 101454360;
+	bool c_11 = 1;
+	bool c_12 = 0;
+	l_1 = START(l_5);
+	uint64_t d_2, l_2 = CALL/7(l_1, c_3, c_5, c_6, c_7, c_8, c_9, c_10, c_11);
+	uint64_t d_3, l_3 = CALL/7(l_2, c_3, c_5, c_6, c_7, c_8, c_9, c_10, c_12);
+	int32_t d_4, l_4 = CALL/3(l_3, c_2, c_4, d_2, d_3);
+	l_5 = RETURN(l_4, c_1);
+}
+--EXPECT--
+fffffffff9f3f5e6 aaaaaaaaa8aeaca6

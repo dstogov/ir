@@ -738,10 +738,44 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 
 			/* Add tmp registers for MEM->MEM DESSA moves */
 			if (needs_tmp_gp) {
-				ctx->regs[bb->end][0] = _pick_reg(ctx, &data, IR_I32, IR_REGSET_EMPTY, IR_USE_MUST_BE_IN_REG, 0, 0);
+				reg = _pick_free_reg(ctx, &data, IR_I32, 0, 0);
+				if (reg == IR_REG_NONE) {
+					reg = _pick_reg(ctx, &data, IR_I32, IR_REGSET_EMPTY, IR_USE_MUST_BE_IN_REG, 0, 0);
+					/* clear the assignment or the evicted register */
+					n = use_list->count;
+					for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
+						ir_ref use = *p;
+						ir_reg old_reg = ir_get_alocated_reg(ctx, use, k);
+						if (old_reg == reg) {
+							ir_set_alocated_reg(ctx, use, k, IR_REG_NONE);
+						}
+#if IR_X86_I64
+						if (old_reg != IR_REG_NONE
+						 && (ctx->ir_base[use].type == IR_I64 || ctx->ir_base[use].type == IR_U64)) {
+							if (IR_REG_I64_LO(old_reg) == reg || IR_REG_I64_HI(old_reg) == reg) {
+								ir_set_alocated_reg(ctx, use, k, IR_REG_NONE);
+							}
+						}
+#endif
+					}
+				}
+				ctx->regs[bb->end][0] = reg;
 			}
 			if (needs_tmp_fp) {
-				ctx->regs[bb->end][1] = _pick_reg(ctx, &data, IR_DOUBLE, IR_REGSET_EMPTY, IR_USE_MUST_BE_IN_REG, 0, 0);
+				reg = _pick_free_reg(ctx, &data, IR_DOUBLE, 0, 0);
+				if (reg == IR_REG_NONE) {
+					reg = _pick_reg(ctx, &data, IR_DOUBLE, IR_REGSET_EMPTY, IR_USE_MUST_BE_IN_REG, 0, 0);
+					/* clear the assignment or the evicted register */
+					n = use_list->count;
+					for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
+						ir_ref use = *p;
+						ir_reg old_reg = ir_get_alocated_reg(ctx, use, k);
+						if (old_reg == reg) {
+							ir_set_alocated_reg(ctx, use, k, IR_REG_NONE);
+						}
+					}
+				}
+				ctx->regs[bb->end][1] = reg;
 			}
 		}
 
