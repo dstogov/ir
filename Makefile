@@ -7,6 +7,7 @@ BUILD_DIR  = .
 SRC_DIR    = .
 HAVE_LLVM  = no
 TESTS      = $(SRC_DIR)/tests
+LLVM_TESTS = $(SRC_DIR)/llvm_tests
 
 PREFIX     = /usr/local
 
@@ -143,6 +144,16 @@ $(BUILD_DIR)/tester: $(SRC_DIR)/tools/tester.c
 test: $(BUILD_DIR)/ir $(BUILD_DIR)/tester
 	$(BUILD_DIR)/tester --test-cmd $(BUILD_DIR)/ir --target $(TARGET_TRIPLET) --default-args "--save" \
 		--test-extension ".irt" --code-extension ".ir" $(TESTS)
+
+# LLVM importer tests are kept out of $(TESTS), so the default suite needs no LLVM.
+ifeq (yes, $(HAVE_LLVM))
+test-llvm: $(BUILD_DIR)/ir $(BUILD_DIR)/tester
+	$(BUILD_DIR)/tester --test-cmd "$(BUILD_DIR)/ir --llvm-asm" --target $(TARGET_TRIPLET) \
+		--test-extension ".test" --code-extension ".ll" $(LLVM_TESTS)
+else
+test-llvm:
+	$(error test-llvm requires HAVE_LLVM=yes)
+endif
 
 test-ci: $(BUILD_DIR)/ir $(BUILD_DIR)/tester
 	$(BUILD_DIR)/tester --test-cmd $(BUILD_DIR)/ir --target $(TARGET_TRIPLET) --default-args "--save" \

@@ -550,10 +550,22 @@ static ir_ref llvm2ir_fcmp_op(ir_ctx *ctx, LLVMValueRef expr)
 	ir_op op;
 	LLVMRealPredicate predicate = LLVMGetFCmpPredicate(expr);
 
+	/* IR EQ is ordered and IR NE is unordered, so neither matches UEQ or ONE:
+	 * UEQ(a, b) = UNORDERED(a, b) | EQ(a, b), ONE(a, b) = ORDERED(a, b) & NE(a, b) */
+	if (predicate == LLVMRealUEQ || predicate == LLVMRealONE) {
+		ir_ref left = llvm2ir_op(ctx, op0, type);
+		ir_ref right = llvm2ir_op(ctx, op1, type);
+		ir_ref comparison = ir_fold2(ctx,
+			IR_OPT(predicate == LLVMRealUEQ ? IR_EQ : IR_NE, IR_BOOL), left, right);
+		ir_ref order = ir_fold2(ctx,
+			IR_OPT(predicate == LLVMRealUEQ ? IR_UNORDERED : IR_ORDERED, IR_BOOL), left, right);
+		ref = ir_fold2(ctx, IR_OPT(predicate == LLVMRealUEQ ? IR_OR : IR_AND, IR_BOOL),
+			order, comparison);
+		ir_addrtab_set(ctx->binding, (uintptr_t)expr, ref);
+		return ref;
+	}
 	switch (predicate) {
-		case LLVMRealOEQ:
-		case LLVMRealUEQ: op = IR_EQ;  break;
-		case LLVMRealONE:
+		case LLVMRealOEQ: op = IR_EQ;  break;
 		case LLVMRealUNE: op = IR_NE;  break;
 		case LLVMRealUGT: op = IR_UGT; break;
 		case LLVMRealUGE: op = IR_UGE; break;
@@ -565,6 +577,11 @@ static ir_ref llvm2ir_fcmp_op(ir_ctx *ctx, LLVMValueRef expr)
 		case LLVMRealOLE: op = IR_LE;  break;
 		case LLVMRealUNO: op = IR_UNORDERED; break;
 		case LLVMRealORD: op = IR_ORDERED;   break;
+		case LLVMRealPredicateFalse:
+		case LLVMRealPredicateTrue:
+			ref = predicate == LLVMRealPredicateTrue ? IR_TRUE : IR_FALSE;
+			ir_addrtab_set(ctx->binding, (uintptr_t)expr, ref);
+			return ref;
 		default: IR_ASSERT(0); return 0;
 	}
 	ref = ir_fold2(ctx, IR_OPT(op, IR_BOOL), llvm2ir_op(ctx, op0, type), llvm2ir_op(ctx, op1, type));
