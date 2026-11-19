@@ -126,6 +126,7 @@ static void help(const char *cmd)
 		"  --debug-regalloc           - debug register allocator\n"
 		"  --debug-regset <bit-mask>  - restrict available register set\n"
 		"  --debug-bb-scheduling      - debug BB PLCEMENT optimization pass\n"
+		"  --debug-dessa              - debug SSA destruction\n"
 #endif
 		"Utility Options\n"
 		"  -fsyntax-only              - check the input files for syntax errors, but don't do anything beyond that\n"
@@ -1387,6 +1388,8 @@ int main(int argc, char **argv)
 			debug_flags |= IR_DEBUG_RA;
 		} else if (strcmp(argv[i], "--debug-bb-scheduling") == 0) {
 			debug_flags |= IR_DEBUG_BB_SCHEDULE;
+		} else if (strcmp(argv[i], "--debug-dessa") == 0) {
+			debug_flags |= IR_DEBUG_DESSA;
 #endif
 		} else if (strcmp(argv[i], "--debug-regset") == 0) {
 			if (i + 1 == argc || argv[i + 1][0] == '-') {

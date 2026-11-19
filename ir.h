@@ -692,6 +692,7 @@ void ir_strtab_free(ir_strtab *strtab);
 #define IR_DEBUG_SCHEDULE      (1<<3)
 #define IR_DEBUG_RA            (1<<4)
 #define IR_DEBUG_BB_SCHEDULE   (1<<5)
+#define IR_DEBUG_DESSA         (1<<6)
 
 typedef struct _ir_ctx           ir_ctx;
 typedef struct _ir_use_list      ir_use_list;
