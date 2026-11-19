@@ -523,14 +523,6 @@ static bool ir_is_dead_load_ex(const ir_ctx *ctx, ir_ref ref, uint32_t flags, co
 	return (flags & IR_OP_FLAG_NO_SIDE_EFFECT) && ctx->use_lists[ref].count == 1;
 }
 
-static bool ir_is_dead_load(const ir_ctx *ctx, ir_ref ref)
-{
-	if (ctx->use_lists[ref].count == 1) {
-		return (ir_op_flags[ctx->ir_base[ref].op] & IR_OP_FLAG_NO_SIDE_EFFECT) != 0;
-	}
-	return 0;
-}
-
 static bool ir_is_dead(const ir_ctx *ctx, ir_ref ref)
 {
 	if (ctx->use_lists[ref].count == 0) {
@@ -1115,6 +1107,9 @@ static bool ir_sccp_remove_unfeasible_merge_inputs(ir_ctx *ctx, ir_ref ref, ir_i
 						k++;
 					} else if (input > 0) {
 						ir_use_list_remove_one(ctx, input, use);
+						if (ir_is_dead(ctx, input)) {
+							ir_bitqueue_add(worklist, input);
+						}
 					}
 				}
 				while (k <= old_merge_inputs) {
