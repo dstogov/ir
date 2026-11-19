@@ -3180,13 +3180,7 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 	ir_live_interval *other;
 	ir_regset available, overlapped, scratch;
 
-	if (IR_IS_TYPE_FP(ival->type) || IR_IS_TYPE_VECTOR(ival->type)) {
-		available = IR_REGSET_FP;
-		/* set freeUntilPos of all physical registers to maxInt */
-		for (i = IR_REG_FP_FIRST; i <= IR_REG_FP_LAST; i++) {
-			freeUntilPos[i] = 0x7fffffff;
-		}
-	} else {
+	if (IR_IS_TYPE_INT(ival->type)) {
 		available = IR_REGSET_GP;
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
 			IR_REGSET_EXCL(available, IR_REG_FRAME_POINTER);
@@ -3203,9 +3197,17 @@ static ir_reg ir_try_allocate_free_reg(ir_ctx *ctx, ir_live_interval *ival, ir_l
 		for (i = IR_REG_GP_FIRST; i <= IR_REG_GP_LAST; i++) {
 			freeUntilPos[i] = 0x7fffffff;
 		}
+	} else {
+		IR_ASSERT(IR_IS_TYPE_FP(ival->type) || IR_IS_TYPE_VECTOR(ival->type));
+		available = IR_REGSET_FP;
+		/* set freeUntilPos of all physical registers to maxInt */
+		for (i = IR_REG_FP_FIRST; i <= IR_REG_FP_LAST; i++) {
+			freeUntilPos[i] = 0x7fffffff;
+		}
 	}
 
 	available = IR_REGSET_DIFFERENCE(available, (ir_regset)ctx->fixed_regset);
+	IR_ASSERT(!IR_REGSET_IS_EMPTY(available) && "No registers available. Allocation is not possible");
 
 	/* for each interval it in active */
 	other = *active;
@@ -3518,15 +3520,7 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 		next_use_pos = ival->range.end;
 	}
 
-	if (IR_IS_TYPE_FP(ival->type) || IR_IS_TYPE_VECTOR(ival->type)) {
-		available = IR_REGSET_FP;
-		/* set nextUsePos of all physical registers to maxInt */
-		for (i = IR_REG_FP_FIRST; i <= IR_REG_FP_LAST; i++) {
-			nextUsePos[i] = 0x7fffffff;
-			blockPos[i] = 0x7fffffff;
-			scores[i] = 0;
-		}
-	} else {
+	if (IR_IS_TYPE_INT(ival->type)) {
 		available = IR_REGSET_GP;
 		if (ctx->flags & IR_USE_FRAME_POINTER) {
 			IR_REGSET_EXCL(available, IR_REG_FRAME_POINTER);
@@ -3541,6 +3535,15 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 #endif
 		/* set nextUsePos of all physical registers to maxInt */
 		for (i = IR_REG_GP_FIRST; i <= IR_REG_GP_LAST; i++) {
+			nextUsePos[i] = 0x7fffffff;
+			blockPos[i] = 0x7fffffff;
+			scores[i] = 0;
+		}
+	} else {
+		IR_ASSERT(IR_IS_TYPE_FP(ival->type) || IR_IS_TYPE_VECTOR(ival->type));
+		available = IR_REGSET_FP;
+		/* set nextUsePos of all physical registers to maxInt */
+		for (i = IR_REG_FP_FIRST; i <= IR_REG_FP_LAST; i++) {
 			nextUsePos[i] = 0x7fffffff;
 			blockPos[i] = 0x7fffffff;
 			scores[i] = 0;
