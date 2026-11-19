@@ -1057,7 +1057,10 @@ static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_dessa_copy *copies, int count,
 		to = pred[to];
 		while (!IR_IS_CONST_REF(to) && ir_bitset_in(ready, to)) {
 			to = pred[to];
-			IR_ASSERT(!IR_IS_CONST_REF(to));
+			if (IR_IS_CONST_REF(to)) {
+				/* not a cycle: the chain ends in a constant */
+				break;
+			}
 			if (ir_bitset_in(visited, to)) {
 				/* We found a cycle. Resolve it. */
 				ir_bitset_incl(visited, to);
