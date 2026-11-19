@@ -66,12 +66,12 @@ typedef struct {
 #  define IR_REG_NAME_VAL(_reg, _type) ir_reg_name(IR_REG_NUM(_reg), _type)
 # endif
 # define IR_LOG(comment) do { \
-		if (ctx->flags & IR_DEBUG_RA) { \
+		if (ctx->debug_flags & IR_DEBUG_RA) { \
 			fprintf(stderr, "---- %s\n", comment); \
 		} \
 	} while (0)
 # define IR_LOG_ASSIGN(_ref, _pos, _x, _y, _reg) do { \
-		if (ctx->flags & IR_DEBUG_RA) { \
+		if (ctx->debug_flags & IR_DEBUG_RA) { \
 			fprintf(stderr, "  ---- Assign R%d (d_%d) to " IR_REG_NAME_FMT "%s at %d (%d.%d)\n", \
 				ctx->vregs[_ref], _ref, \
 				IR_REG_NAME_VAL(_reg, ctx->ir_base[_ref].type), \
@@ -80,7 +80,7 @@ typedef struct {
 		} \
 	} while (0)
 # define IR_LOG_ASSIGN_TMP(_type, _pos, _x, _y, _reg) do { \
-		if (ctx->flags & IR_DEBUG_RA) { \
+		if (ctx->debug_flags & IR_DEBUG_RA) { \
 			fprintf(stderr, "  ---- Assign TMP to " IR_REG_NAME_FMT "%s at %d (%d.%d)\n", \
 				IR_REG_NAME_VAL(_reg, _type), \
 				(((_reg) & IR_REG_SPILL_LOAD) ? " (spill)" : ""), \
@@ -88,33 +88,33 @@ typedef struct {
 		} \
 	} while (0)
 # define IR_LOG_ASSIGN_VAR(_var, _spill) do { \
-		if (IR_DEBUG_SPILLS && (ctx->flags & IR_DEBUG_RA)) { \
+		if (IR_DEBUG_SPILLS && (ctx->debug_flags & IR_DEBUG_RA)) { \
 			fprintf(stderr, "  ---- Spill VAR d_%d to 0x%x\n", \
 				_var, _spill); \
 		} \
 	} while (0)
 # define IR_LOG_ASSIGN_SPILL(_vreg, _spill) do { \
-		if (IR_DEBUG_SPILLS && (ctx->flags & IR_DEBUG_RA)) { \
+		if (IR_DEBUG_SPILLS && (ctx->debug_flags & IR_DEBUG_RA)) { \
 			fprintf(stderr, "  ---- Spill R%d to 0x%x\n", \
 				_vreg, _spill); \
 		} \
 	} while (0)
 # define IR_LOG_FREE(_ref, _reg) do { \
-		if (ctx->flags & IR_DEBUG_RA) { \
+		if (ctx->debug_flags & IR_DEBUG_RA) { \
 			fprintf(stderr, "  ---- Free R%d(d_%d) assigned to " IR_REG_NAME_FMT "\n", \
 				ctx->vregs[_ref], _ref, \
 				IR_REG_NAME_VAL(_reg, ctx->ir_base[_ref].type)); \
 		} \
 	} while (0)
 # define IR_LOG_EVICT(_ref, _reg) do { \
-		if (ctx->flags & IR_DEBUG_RA) { \
+		if (ctx->debug_flags & IR_DEBUG_RA) { \
 			fprintf(stderr, "  ---- Evict R%d(d_%d) assigned to " IR_REG_NAME_FMT "\n", \
 				ctx->vregs[_ref], _ref, \
 				IR_REG_NAME_VAL(_reg, ctx->ir_base[_ref].type)); \
 		} \
 	} while (0)
 # define IR_LOG_SPILL_LOAD(_ref, _pos, _x, _y, _reg) do { \
-		if (ctx->flags & IR_DEBUG_RA) { \
+		if (ctx->debug_flags & IR_DEBUG_RA) { \
 			fprintf(stderr, "  ---- Add Spill Load R%d (d_%d) to " IR_REG_NAME_FMT " at %d (%d.%d)\n", \
 				ctx->vregs[_ref], _ref, \
 				IR_REG_NAME_VAL(_reg, ctx->ir_base[_ref].type), \

@@ -126,6 +126,7 @@ static void help(const char *cmd)
 		"  --debug-regalloc           - debug register allocator\n"
 		"  --debug-regset <bit-mask>  - restrict available register set\n"
 		"  --debug-bb-scheduling      - debug BB PLCEMENT optimization pass\n"
+		"  --debug-dessa              - debug SSA destruction\n"
 #endif
 		"Utility Options\n"
 		"  -fsyntax-only              - check the input files for syntax errors, but don't do anything beyond that\n"
@@ -480,6 +481,7 @@ typedef struct _ir_main_loader {
 	ir_loader  loader;
 	int        opt_level;
 	uint32_t   mflags;
+	uint32_t   debug_flags;
 	uint64_t   debug_regset;
 	uint32_t   save_flags;
 	uint32_t   dump;
@@ -1037,6 +1039,7 @@ static bool ir_loader_func_init(ir_loader *loader, ir_ctx *ctx, const char *name
 
 	ir_init(ctx, loader->default_func_flags, 256, 1024);
 	ctx->mflags = l->mflags;
+	ctx->debug_flags = l->debug_flags;
 	ctx->fixed_regset = ~l->debug_regset;
 	ctx->loader = loader;
 	return 1;
@@ -1180,6 +1183,7 @@ int main(int argc, char **argv)
 	int opt_level = 2;
 	uint32_t flags = 0;
 	uint32_t mflags = 0;
+	uint32_t debug_flags = 0;
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
 	uint32_t mflags_disabled = 0;
 #endif
@@ -1373,17 +1377,19 @@ int main(int argc, char **argv)
 			disable_mem2ssa = 1;
 #ifdef IR_DEBUG
 		} else if (strcmp(argv[i], "--debug-sccp") == 0) {
-			flags |= IR_DEBUG_SCCP;
+			debug_flags |= IR_DEBUG_SCCP;
 		} else if (strcmp(argv[i], "--debug-gcm") == 0) {
-			flags |= IR_DEBUG_GCM;
+			debug_flags |= IR_DEBUG_GCM;
 		} else if (strcmp(argv[i], "--debug-gcm-split") == 0) {
-			flags |= IR_DEBUG_GCM_SPLIT;
+			debug_flags |= IR_DEBUG_GCM_SPLIT;
 		} else if (strcmp(argv[i], "--debug-scheduling") == 0) {
-			flags |= IR_DEBUG_SCHEDULE;
+			debug_flags |= IR_DEBUG_SCHEDULE;
 		} else if (strcmp(argv[i], "--debug-regalloc") == 0) {
-			flags |= IR_DEBUG_RA;
+			debug_flags |= IR_DEBUG_RA;
 		} else if (strcmp(argv[i], "--debug-bb-scheduling") == 0) {
-			flags |= IR_DEBUG_BB_SCHEDULE;
+			debug_flags |= IR_DEBUG_BB_SCHEDULE;
+		} else if (strcmp(argv[i], "--debug-dessa") == 0) {
+			debug_flags |= IR_DEBUG_DESSA;
 #endif
 		} else if (strcmp(argv[i], "--debug-regset") == 0) {
 			if (i + 1 == argc || argv[i + 1][0] == '-') {
@@ -1525,6 +1531,7 @@ int main(int argc, char **argv)
 
 	loader.opt_level = opt_level;
 	loader.mflags = mflags;
+	loader.debug_flags = debug_flags;
 	loader.debug_regset = debug_regset;
 	loader.save_flags = save_flags;
 	loader.dump = dump;

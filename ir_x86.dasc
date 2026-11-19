@@ -1316,8 +1316,13 @@ typedef struct _ir_x86_64_sysv_va_list {
 	void     *reg_save_area;
 } ir_x86_64_sysv_va_list;
 
-#define IR_GP_REG_NAME(code, name64, name32, name16, name8, name8h) \
+#ifdef IR_TARGET_X64
+# define IR_GP_REG_NAME(code, name64, name32, name16, name8, name8h) \
 	#name64,
+#else
+# define IR_GP_REG_NAME(code, name64, name32, name16, name8, name8h) \
+	#name32,
+#endif
 #define IR_GP_REG_NAME32(code, name64, name32, name16, name8, name8h) \
 	#name32,
 #define IR_GP_REG_NAME16(code, name64, name32, name16, name8, name8h) \
