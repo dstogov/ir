@@ -6334,6 +6334,25 @@ static void ir_emit_swap(ir_ctx *ctx, ir_type type, ir_reg dst, ir_reg src)
 	|	ASM_REG_REG_OP xchg, type, dst, src
 }
 
+#if IR_X86_I64
+/* Move a 64-bit value between register pairs without overwriting a source half before it is read */
+static void ir_emit_mov_i64_pair(ir_ctx *ctx, ir_reg dst_lo, ir_reg dst_hi, ir_reg src_lo, ir_reg src_hi)
+{
+	if (dst_lo == src_hi) {
+		IR_ASSERT(dst_hi != src_lo);
+		ir_emit_mov(ctx, IR_U32, dst_hi, src_hi);
+		ir_emit_mov(ctx, IR_U32, dst_lo, src_lo);
+	} else {
+		if (dst_lo != src_lo) {
+			ir_emit_mov(ctx, IR_U32, dst_lo, src_lo);
+		}
+		if (dst_hi != src_hi) {
+			ir_emit_mov(ctx, IR_U32, dst_hi, src_hi);
+		}
+	}
+}
+#endif
+
 static void ir_emit_mov_ext(ir_ctx *ctx, ir_type type, ir_reg dst, ir_reg src)
 {
 	ir_backend_data *data = ctx->data;
@@ -13924,12 +13943,7 @@ static void ir_emit_call_ex(ir_ctx *ctx, ir_ref def, ir_insn *insn, const ir_pro
 
 					def_reg = IR_REG_I64_LO(def_reg);
 					IR_ASSERT(cc->int_ret2_reg != IR_REG_NONE);
-					if (def_reg != cc->int_ret_reg) {
-						ir_emit_mov(ctx, IR_U32, def_reg, cc->int_ret_reg);
-					}
-					if (def_reg_hi != cc->int_ret2_reg) {
-						ir_emit_mov(ctx, IR_U32, def_reg_hi, cc->int_ret2_reg);
-					}
+					ir_emit_mov_i64_pair(ctx, def_reg, def_reg_hi, cc->int_ret_reg, cc->int_ret2_reg);
 					if (IR_REG_SPILLED(ctx->regs[def][0])) {
 						ir_emit_store_i64_lo(ctx, def, def_reg);
 						ir_emit_store_i64_hi(ctx, def, def_reg_hi);
@@ -18357,7 +18371,6 @@ static bool ir_emit_guard_cmp_i64(ir_ctx *ctx, uint32_t b, ir_ref def, ir_insn *
 static void ir_emit_return_i64(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
-	dasm_State **Dst = &data->dasm_state;
 	ir_reg ret_reg = data->ra_data.cc->int_ret_reg;
 	ir_reg ret2_reg = data->ra_data.cc->int_ret2_reg;
 	ir_reg op2_reg = ctx->regs[ref][2];
@@ -18366,12 +18379,7 @@ static void ir_emit_return_i64(ir_ctx *ctx, ir_ref ref, ir_insn *insn)
 	if (op2_reg != IR_REG_NONE && !IR_REG_SPILLED(op2_reg)) {
 		op2_reg_hi = IR_REG_I64_HI(op2_reg);
 		op2_reg = IR_REG_I64_LO(op2_reg);
-		if (op2_reg != ret_reg) {
-			|	mov Rd(ret_reg), Rd(op2_reg)
-		}
-		if (op2_reg_hi != ret2_reg) {
-			|	mov Rd(ret2_reg), Rd(op2_reg_hi)
-		}
+		ir_emit_mov_i64_pair(ctx, ret_reg, ret2_reg, op2_reg, op2_reg_hi);
 	} else {
 		ir_emit_load_i64_lo(ctx, ret_reg, insn->op2);
 		ir_emit_load_i64_hi(ctx, ret2_reg, insn->op2);
