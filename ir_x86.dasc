@@ -13380,6 +13380,27 @@ static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn, const ir_call_conv
 	return used_stack;
 }
 
+static ir_reg ir_stack_arg_source(const ir_ctx *ctx, ir_ref def, const ir_insn *insn,
+		ir_ref arg, ir_reg src_reg)
+{
+	if (IR_IS_CONST_REF(arg) || src_reg == IR_REG_NONE || IR_REG_SPILLED(src_reg) ||
+		ctx->use_lists[arg].count < 2) {
+		return src_reg;
+	}
+
+	/* A duplicate can carry the only reload for this register. Copy from
+	 * the spill slot in the third pass instead of using it in the first. */
+	for (uint32_t j = ir_insn_find_op_ex(insn, arg, 3); j;
+	     j = ir_insn_find_op_ex(insn, arg, j + 1)) {
+		ir_reg peer = ir_get_alocated_reg(ctx, def, j);
+		if (peer != IR_REG_NONE && IR_REG_SPILLED(peer) && IR_REG_NUM(peer) == src_reg) {
+			return IR_REG_NONE;
+		}
+	}
+
+	return src_reg;
+}
+
 static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const ir_proto_t *proto, const ir_call_conv_dsc *cc, ir_op op, ir_reg tmp_reg)
 {
 	ir_backend_data *data = ctx->data;
@@ -13602,6 +13623,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 			}
 		} else {
 			/* Pass register arguments to stack (REG->MEM moves) */
+			src_reg = ir_stack_arg_source(ctx, def, insn, arg, src_reg);
 			if (!IR_IS_CONST_REF(arg) && src_reg != IR_REG_NONE && !IR_REG_SPILLED(src_reg)) {
 #if IR_X86_I64
 				if (type == IR_I64 || type == IR_U64) {
@@ -13758,6 +13780,7 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 			} else {
 				ir_mem mem = IR_MEM_BO(IR_REG_STACK_POINTER, stack_offset);
 
+				src_reg = ir_stack_arg_source(ctx, def, insn, arg, src_reg);
 				if (IR_IS_TYPE_INT(type)) {
 #if IR_X86_I64
 					if (type == IR_I64 || type == IR_U64) {
