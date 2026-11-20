@@ -819,6 +819,16 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 			}
 
 			insn = ctx->ir_base + i;
+			if ((insn->op == IR_LOAD || insn->op == IR_LOAD_v)
+			 && ctx->use_lists[i].count == 1
+#if IR_X86_I64
+			 && insn->type != IR_I64 && insn->type != IR_U64
+#endif
+			) {
+				/* The backends don't emit a LOAD whose value is unused. Don't allocate
+				 * its operands, or a spill load attached to them would be lost. */
+				continue;
+			}
 			if (ctx->vregs[i] > 0) {
 				ir_live_interval *ival = ctx->live_intervals[ctx->vregs[i]];
 
