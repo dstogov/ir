@@ -1,0 +1,100 @@
+--TEST--
+002: CALL with a spilled value passed twice through the stack
+--CODE--
+func h8(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t): uint64_t
+{
+	uint64_t c_3 = 3;
+	uint64_t c_7 = 7;
+	l_1 = START(l_2);
+	uint64_t a = PARAM(l_1, "a", 1);
+	uint64_t b = PARAM(l_1, "b", 2);
+	uint64_t c = PARAM(l_1, "c", 3);
+	uint64_t d = PARAM(l_1, "d", 4);
+	uint64_t e = PARAM(l_1, "e", 5);
+	uint64_t f = PARAM(l_1, "f", 6);
+	uint64_t g = PARAM(l_1, "g", 7);
+	uint64_t h = PARAM(l_1, "h", 8);
+	uint64_t s_1 = ADD(a, b);
+	uint64_t s_2 = ADD(s_1, c);
+	uint64_t s_3 = ADD(s_2, d);
+	uint64_t s_4 = ADD(s_3, e);
+	uint64_t s_5 = ADD(s_4, f);
+	uint64_t g_3 = MUL(g, c_3);
+	uint64_t h_7 = MUL(h, c_7);
+	uint64_t s_6 = ADD(s_5, g_3);
+	uint64_t s_7 = ADD(s_6, h_7);
+	l_2 = RETURN(l_1, s_7);
+}
+func clob(uint64_t): uint64_t
+{
+	uint64_t c_1000 = 1000;
+	l_1 = START(l_2);
+	uint64_t x = PARAM(l_1, "x", 1);
+	uint64_t y = ADD(x, c_1000);
+	l_2 = RETURN(l_1, y);
+}
+func test(uintptr_t): uint64_t
+{
+	uintptr_t c_8 = 8;
+	uintptr_t f_clob = func clob(uint64_t): uint64_t;
+	uintptr_t f_h8 = func h8(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t): uint64_t;
+	l_1 = START(l_end);
+	uintptr_t p_0 = PARAM(l_1, "p", 1);
+	uint64_t v_0, l_2 = LOAD(l_1, p_0);
+	uintptr_t p_1 = ADD(p_0, c_8);
+	uint64_t v_1, l_3 = LOAD(l_2, p_1);
+	uintptr_t p_2 = ADD(p_1, c_8);
+	uint64_t v_2, l_4 = LOAD(l_3, p_2);
+	uintptr_t p_3 = ADD(p_2, c_8);
+	uint64_t v_3, l_5 = LOAD(l_4, p_3);
+	uintptr_t p_4 = ADD(p_3, c_8);
+	uint64_t v_4, l_6 = LOAD(l_5, p_4);
+	uintptr_t p_5 = ADD(p_4, c_8);
+	uint64_t v_5, l_7 = LOAD(l_6, p_5);
+	uintptr_t p_6 = ADD(p_5, c_8);
+	uint64_t v_6, l_8 = LOAD(l_7, p_6);
+	uint64_t r_1, l_9 = CALL/1(l_8, f_clob, v_6);
+	l_10 = STORE(l_9, p_6, r_1);
+	uint64_t r_2, l_11 = CALL/8(l_10, f_h8, v_2, v_5, v_1, v_1, v_0, v_4, v_3, v_3);
+	l_12 = STORE(l_11, p_0, r_2);
+	uint64_t s_1 = ADD(r_2, v_5);
+	l_end = RETURN(l_12, s_1);
+}
+func main(): int32_t
+{
+	int32_t c_0 = 0;
+	uintptr_t c_64 = 64;
+	uintptr_t c_8 = 8;
+	uint64_t c_10 = 10;
+	uint64_t c_20 = 20;
+	uint64_t c_30 = 30;
+	uint64_t c_40 = 40;
+	uint64_t c_50 = 50;
+	uint64_t c_60 = 60;
+	uint64_t c_70 = 70;
+	uintptr_t f_test = func test(uintptr_t): uint64_t;
+	uintptr_t printf = func printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%llu %llu %llu\n";
+	l_1 = START(l_end);
+	uintptr_t p_0, l_2 = ALLOCA(l_1, c_64, 16);
+	l_3 = STORE(l_2, p_0, c_10);
+	uintptr_t p_1 = ADD(p_0, c_8);
+	l_4 = STORE(l_3, p_1, c_20);
+	uintptr_t p_2 = ADD(p_1, c_8);
+	l_5 = STORE(l_4, p_2, c_30);
+	uintptr_t p_3 = ADD(p_2, c_8);
+	l_6 = STORE(l_5, p_3, c_40);
+	uintptr_t p_4 = ADD(p_3, c_8);
+	l_7 = STORE(l_6, p_4, c_50);
+	uintptr_t p_5 = ADD(p_4, c_8);
+	l_8 = STORE(l_7, p_5, c_60);
+	uintptr_t p_6 = ADD(p_5, c_8);
+	l_9 = STORE(l_8, p_6, c_70);
+	uint64_t r, l_10 = CALL/1(l_9, f_test, p_0);
+	uint64_t w_0, l_11 = LOAD(l_10, p_0);
+	uint64_t w_6, l_12 = LOAD(l_11, p_6);
+	int32_t d, l_13 = CALL/4(l_12, printf, fmt, r, w_0, w_6);
+	l_end = RETURN(l_13, c_0);
+}
+--EXPECT--
+650 590 1070
