@@ -3373,6 +3373,51 @@ static uint32_t ir_match_fuse_load_const_addr(ir_ctx *ctx, ir_ref ref, const ir_
 	return IR_FUSED | (IR_IS_TYPE_INT(ctx->ir_base[ref].type) ? IR_LOAD_INT : IR_LOAD_FP);
 }
 
+/* Check if "ref" is passed to "call" as an argument on the stack */
+static bool ir_match_is_stack_arg(ir_ctx *ctx, ir_insn *call, ir_ref ref)
+{
+	const ir_proto_t *proto = ir_call_proto(ctx, call);
+	const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(proto ? proto->flags : IR_CC_DEFAULT);
+	int j, n = call->inputs_count;
+	int int_param = 0;
+
+	for (j = 3; j <= n; j++) {
+		ir_ref arg = ir_insn_op(call, j);
+		ir_insn *arg_insn = &ctx->ir_base[arg];
+
+		if (IR_IS_TYPE_INT(arg_insn->type)) {
+			if (arg_insn->op == IR_ARGVAL && cc->pass_struct_by_val) {
+				continue;
+			}
+			if (arg == ref && int_param >= cc->int_param_regs_count) {
+				return 1;
+			}
+			int_param++;
+		} else if (cc->shadow_param_regs) {
+			int_param++;
+		}
+	}
+	return 0;
+}
+
+/* Check if a value that a fused address may need in a register is passed on the stack */
+static bool ir_match_addr_has_stack_arg(ir_ctx *ctx, ir_insn *call, ir_ref addr_ref, int depth)
+{
+	ir_insn *insn;
+
+	if (IR_IS_CONST_REF(addr_ref)) {
+		return 0;
+	} else if (ir_match_is_stack_arg(ctx, call, addr_ref)) {
+		return 1;
+	}
+	insn = &ctx->ir_base[addr_ref];
+	if (depth > 0 && (insn->op == IR_ADD || insn->op == IR_SUB || insn->op == IR_MUL)) {
+		return ir_match_addr_has_stack_arg(ctx, call, insn->op1, depth - 1) ||
+			ir_match_addr_has_stack_arg(ctx, call, insn->op2, depth - 1);
+	}
+	return 0;
+}
+
 static void ir_match_fuse_load(ir_ctx *ctx, ir_ref ref, ir_ref root)
 {
 	if (ir_in_same_block(ctx, ref) &&
@@ -3395,6 +3440,15 @@ static void ir_match_fuse_load(ir_ctx *ctx, ir_ref ref, ir_ref root)
 				// TODO: try to fuse static TLS addr ???
 				return;
 			} else {
+				ir_insn *use = &ctx->ir_base[root];
+
+				if ((use->op == IR_CALL || use->op == IR_TAILCALL)
+				 && ir_match_addr_has_stack_arg(ctx, use, addr_ref, 3)) {
+					/* The fused operand is formed after the arguments are passed, and
+					 * a stack argument that shares its register would be stored before
+					 * the operand reloads it. */
+					return;
+				}
 				ctx->rules[ref] = IR_FUSED | IR_SIMPLE | IR_LOAD;
 				ir_match_fuse_addr(ctx, addr_ref);
 				return;
