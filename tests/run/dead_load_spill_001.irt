@@ -1,0 +1,61 @@
+--TEST--
+-O0: a dead LOAD must not take the spill load of its address
+--CODE--
+func g(uintptr_t, uintptr_t, uintptr_t): uintptr_t
+{
+	uintptr_t c_10 = 10;
+	uintptr_t c_100 = 100;
+	l_1 = START(l_4);
+	uintptr_t a = PARAM(l_1, "a", 1);
+	uintptr_t b = PARAM(l_1, "b", 2);
+	uintptr_t c = PARAM(l_1, "c", 3);
+	uintptr_t x, l_2 = LOAD(l_1, b);
+	uintptr_t y, l_3 = LOAD(l_2, c);
+	uintptr_t x10 = MUL(x, c_10);
+	uintptr_t y100 = MUL(y, c_100);
+	uintptr_t s = ADD(a, x10);
+	uintptr_t t = ADD(s, y100);
+	l_4 = RETURN(l_3, t);
+}
+func test(uintptr_t, uintptr_t, uintptr_t): uintptr_t
+{
+	uintptr_t c_8 = 8;
+	uintptr_t f = func g(uintptr_t, uintptr_t, uintptr_t): uintptr_t;
+	l_1 = START(l_5);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	uintptr_t q = PARAM(l_1, "q", 2);
+	uintptr_t r = PARAM(l_1, "r", 3);
+	uintptr_t dead, l_2 = LOAD(l_1, p);
+	uintptr_t p8 = ADD(p, c_8);
+	uintptr_t x, l_3 = LOAD(l_2, p8);
+	uintptr_t v, l_4 = CALL/3(l_3, f, x, r, p);
+	l_5 = RETURN(l_4, v);
+}
+func main(): int32_t
+{
+	int32_t c_0 = 0;
+	uintptr_t c_16 = 16;
+	uintptr_t c_8 = 8;
+	uintptr_t c_1 = 1;
+	uintptr_t c_2 = 2;
+	uintptr_t c_30 = 30;
+	uintptr_t c_40 = 40;
+	uintptr_t c_5 = 5;
+	uintptr_t t = func test(uintptr_t, uintptr_t, uintptr_t): uintptr_t;
+	uintptr_t printf = func printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%lu\n";
+	l_1 = START(l_12);
+	uintptr_t a1, l_2 = ALLOCA(l_1, c_16, 16);
+	uintptr_t a2, l_3 = ALLOCA(l_2, c_16, 16);
+	l_4 = STORE(l_3, a1, c_1);
+	uintptr_t a1_8 = ADD(a1, c_8);
+	l_5 = STORE(l_4, a1_8, c_2);
+	l_6 = STORE(l_5, a2, c_30);
+	uintptr_t a2_8 = ADD(a2, c_8);
+	l_7 = STORE(l_6, a2_8, c_40);
+	uintptr_t v, l_8 = CALL/3(l_7, t, a1, c_5, a2);
+	int32_t d, l_9 = CALL/2(l_8, printf, fmt, v);
+	l_12 = RETURN(l_9, c_0);
+}
+--EXPECT--
+402
