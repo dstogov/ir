@@ -439,6 +439,20 @@ static void ir_hint_propagation(ir_ctx *ctx)
 	}
 }
 
+/* The backends don't emit a LOAD whose value is unused (except for 64-bit integer loads on
+ * 32-bit x86). Its operands must not get use positions, or a spill load placed there is lost. */
+static bool ir_is_skipped_load(const ir_ctx *ctx, ir_ref ref)
+{
+	const ir_insn *insn = &ctx->ir_base[ref];
+
+	return (insn->op == IR_LOAD || insn->op == IR_LOAD_v)
+		&& ctx->use_lists[ref].count == 1
+#if IR_X86_I64
+		&& insn->type != IR_I64 && insn->type != IR_U64
+#endif
+		;
+}
+
 #ifdef IR_BITSET_LIVENESS
 /* DFS + Loop-Forest livness for SSA using bitset(s) */
 static void ir_add_osr_entry_loads(ir_ctx *ctx, ir_block *bb, ir_bitset live, uint32_t len, uint32_t b)
@@ -746,6 +760,9 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					}
 					continue;
 				}
+				if (ir_is_skipped_load(ctx, ref)) {
+					continue;
+				}
 
 				def_flags = ir_get_target_constraints(ctx, ref, &constraints);
 				n = constraints.tmps_count;
@@ -823,9 +840,14 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					}
 					/* live.remove(opd) */
 					ir_bitset_excl(live, v);
-					/* intervals[opd].setFrom(op.id) */
-					ival = ir_fix_live_range(ctx, v,
-						IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
+					if (UNEXPECTED(!ctx->live_intervals[v])) {
+						/* The value is only used by a LOAD that isn't emitted (see ir_is_skipped_load()) */
+						ival = ir_add_live_range(ctx, v, def_pos, IR_END_LIVE_POS_FROM_REF(ref));
+					} else {
+						/* intervals[opd].setFrom(op.id) */
+						ival = ir_fix_live_range(ctx, v,
+							IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
+					}
 					ival->type = insn->type;
 					ir_add_use(ctx, ival, 0, def_pos, reg, def_flags, hint_ref);
 				} else {
@@ -1463,6 +1485,9 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					}
 					continue;
 				}
+				if (ir_is_skipped_load(ctx, ref)) {
+					continue;
+				}
 
 				def_flags = ir_get_target_constraints(ctx, ref, &constraints);
 				n = constraints.tmps_count;
@@ -1542,9 +1567,14 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						}
 						def_pos = IR_DEF_LIVE_POS_FROM_REF(ref);
 					}
-					/* intervals[opd].setFrom(op.id) */
-					ival = ir_fix_live_range(ctx, v,
-						IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
+					if (UNEXPECTED(!ctx->live_intervals[v])) {
+						/* The value is only used by a LOAD that isn't emitted (see ir_is_skipped_load()) */
+						ival = ir_add_live_range(ctx, v, def_pos, IR_END_LIVE_POS_FROM_REF(ref));
+					} else {
+						/* intervals[opd].setFrom(op.id) */
+						ival = ir_fix_live_range(ctx, v,
+							IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
+					}
 					ival->type = insn->type;
 					ir_add_use(ctx, ival, 0, def_pos, reg, def_flags, hint_ref);
 				} else {
