@@ -7845,13 +7845,6 @@ static void ir_emit_mem_shift(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg op2_reg = ctx->regs[insn->op3][2];
 	ir_mem mem;
 
-	if (insn->op == IR_STORE) {
-		mem = ir_fuse_mem(ctx, def, def, insn, ctx->regs[def][2]);
-	} else {
-		IR_ASSERT(insn->op == IR_VSTORE);
-		mem = ir_var_spill_slot(ctx, insn->op2);
-	}
-
 	if (op2_reg != IR_REG_NONE && IR_REG_SPILLED(op2_reg)) {
 		op2_reg = IR_REG_NUM(op2_reg);
 		ir_emit_load(ctx, type, op2_reg, op2);
@@ -7863,6 +7856,15 @@ static void ir_emit_mem_shift(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			ir_emit_load(ctx, type, IR_REG_RCX, op2);
 		}
 	}
+
+	/* Set up the address after the count is in RCX: the address may be loaded into the count's register */
+	if (insn->op == IR_STORE) {
+		mem = ir_fuse_mem(ctx, def, def, insn, ctx->regs[def][2]);
+	} else {
+		IR_ASSERT(insn->op == IR_VSTORE);
+		mem = ir_var_spill_slot(ctx, insn->op2);
+	}
+
 	switch (op_insn->op) {
 		default:
 			IR_ASSERT(0);

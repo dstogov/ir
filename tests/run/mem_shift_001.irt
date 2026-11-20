@@ -1,0 +1,97 @@
+--TEST--
+Fused memory shift: address setup must not overwrite the shift count
+--CODE--
+func nop(): int32_t
+{
+	int32_t c_0 = 0;
+	l_1 = START(l_2);
+	l_2 = RETURN(l_1, c_0);
+}
+func shl_mem(uintptr_t, uint64_t, uint64_t): uint32_t
+{
+	uintptr_t c_88 = 88;
+	uintptr_t f = func nop(): int32_t;
+	uint64_t k_0 = 7;
+	uint64_t k_1 = 1007;
+	uint64_t k_2 = 2007;
+	uint64_t k_3 = 3007;
+	uint64_t k_4 = 4007;
+	uint64_t k_5 = 5007;
+	uint64_t k_6 = 6007;
+	uint64_t k_7 = 7007;
+	uint64_t m_0 = 3;
+	uint64_t m_1 = 103;
+	uint64_t m_2 = 203;
+	uint64_t m_3 = 303;
+	uint64_t m_4 = 403;
+	uint64_t m_5 = 503;
+	uint64_t m_6 = 603;
+	uint64_t m_7 = 703;
+	l_1 = START(l_6);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	uint64_t u = PARAM(l_1, "u", 2);
+	uint64_t n = PARAM(l_1, "n", 3);
+	uintptr_t a = ADD(p, c_88);
+	uint64_t x_0 = MUL(u, k_0);
+	uint64_t x_1 = MUL(u, k_1);
+	uint64_t x_2 = MUL(u, k_2);
+	uint64_t x_3 = MUL(u, k_3);
+	uint64_t x_4 = MUL(u, k_4);
+	uint64_t x_5 = MUL(u, k_5);
+	uint64_t x_6 = MUL(u, k_6);
+	uint64_t x_7 = MUL(u, k_7);
+	int32_t d, l_2 = CALL(l_1, f);
+	uint64_t s_0 = ADD(x_0, n);
+	uint64_t s_1 = ADD(s_0, x_1);
+	uint64_t s_2 = ADD(s_1, x_2);
+	uint64_t s_3 = ADD(s_2, x_3);
+	uint64_t s_4 = ADD(s_3, x_4);
+	uint64_t s_5 = ADD(s_4, x_5);
+	uint64_t s_6 = ADD(s_5, x_6);
+	uint64_t s_7 = ADD(s_6, x_7);
+	uint64_t y_0 = MUL(s_7, m_0);
+	uint64_t y_1 = MUL(s_7, m_1);
+	uint64_t y_2 = MUL(s_7, m_2);
+	uint64_t y_3 = MUL(s_7, m_3);
+	uint64_t y_4 = MUL(s_7, m_4);
+	uint64_t y_5 = MUL(s_7, m_5);
+	uint64_t y_6 = MUL(s_7, m_6);
+	uint64_t y_7 = MUL(s_7, m_7);
+	uint64_t old, l_3 = LOAD(l_2, a);
+	uint64_t new = SHL(old, n);
+	l_4 = STORE(l_3, a, new);
+	uint64_t v, l_5 = LOAD_v(l_4, a);
+	uint64_t z_0 = ADD(v, y_0);
+	uint64_t z_1 = ADD(z_0, y_1);
+	uint64_t z_2 = ADD(z_1, y_2);
+	uint64_t z_3 = ADD(z_2, y_3);
+	uint64_t z_4 = ADD(z_3, y_4);
+	uint64_t z_5 = ADD(z_4, y_5);
+	uint64_t z_6 = ADD(z_5, y_6);
+	uint64_t z_7 = ADD(z_6, y_7);
+	uint64_t r = ADD(s_7, z_7);
+	uint32_t r32 = TRUNC(r);
+	l_6 = RETURN(l_5, r32);
+}
+func main(): int32_t
+{
+	int32_t c_0 = 0;
+	uintptr_t c_96 = 96;
+	uintptr_t c_88 = 88;
+	uint64_t c_1 = 1;
+	uint64_t c_u = 5;
+	uint64_t c_n = 3;
+	uintptr_t t = func shl_mem(uintptr_t, uint64_t, uint64_t): uint32_t;
+	uintptr_t printf = func printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%llu %u\n";
+	l_1 = START(l_7);
+	uintptr_t p, l_2 = ALLOCA(l_1, c_96, 16);
+	uintptr_t q = ADD(p, c_88);
+	l_3 = STORE(l_2, q, c_1);
+	uint32_t r, l_4 = CALL/3(l_3, t, p, c_u, c_n);
+	uint64_t s, l_5 = LOAD(l_4, q);
+	int32_t d, l_6 = CALL/3(l_5, printf, fmt, s, r);
+	l_7 = RETURN(l_6, c_0);
+}
+--EXPECT--
+8 396299483
