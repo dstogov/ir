@@ -3612,12 +3612,12 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 			if (overlap) {
 				ir_regset regset = IR_REGSET_INTERSECTION(available, ir_scratch_regset[reg - IR_REG_NUM]);
 				IR_REGSET_FOREACH(regset, reg) {
-					if (overlap < nextUsePos[reg]) {
-						nextUsePos[reg] = overlap;
-						scores[reg] = 0;
-					}
 					if (overlap < blockPos[reg]) {
 						blockPos[reg] = overlap;
+					}
+					if (blockPos[reg] < nextUsePos[reg]) {
+						nextUsePos[reg] = blockPos[reg];
+						scores[reg] = 0;
 					}
 				} IR_REGSET_FOREACH_END();
 			}
@@ -3626,12 +3626,12 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 
 			if (overlap) {
 				if (other->flags & (IR_LIVE_INTERVAL_FIXED|IR_LIVE_INTERVAL_TEMP)) {
-					if (overlap < nextUsePos[reg]) {
-						nextUsePos[reg] = overlap;
-						scores[reg] = 0;
-					}
 					if (overlap < blockPos[reg]) {
 						blockPos[reg] = overlap;
+					}
+					if (blockPos[reg] < nextUsePos[reg]) {
+						nextUsePos[reg] = blockPos[reg];
+						scores[reg] = 0;
 					}
 				} else {
 					pos = ir_first_use_pos_after(other, ival->range.start,
@@ -3653,12 +3653,12 @@ static ir_reg ir_allocate_blocked_reg(ir_ctx *ctx, ir_live_interval *ival, ir_li
 
 				if (overlap) {
 					if (other->flags & (IR_LIVE_INTERVAL_FIXED|IR_LIVE_INTERVAL_TEMP)) {
-						if (overlap < nextUsePos[reg]) {
-							nextUsePos[reg] = overlap;
-							scores[reg] = 0;
-						}
 						if (overlap < blockPos[reg]) {
 							blockPos[reg] = overlap;
+						}
+						if (blockPos[reg] < nextUsePos[reg]) {
+							nextUsePos[reg] = blockPos[reg];
+							scores[reg] = 0;
 						}
 					} else {
 						pos = ir_first_use_pos_after(other, ival->range.start,
@@ -3795,20 +3795,7 @@ select_register:
 			IR_LOG_LSRA("      ---- Queue", other, "");
 			return IR_REG_NONE;
 		}
-		if (split_pos >= block_pos) {
-try_next_available_register:
-			IR_REGSET_EXCL(available, reg);
-#if IR_X86_I64
-			if (reg_hi != IR_REG_NONE) IR_REGSET_EXCL(available, reg_hi);
-#endif
-			if (IR_REGSET_IS_EMPTY(available)) {
-				fprintf(stderr, "LSRA Internal Error: Unsolvable conflict. Allocation is not possible\n");
-				IR_ASSERT(0);
-				exit(-1);
-			}
-			IR_LOG_LSRA("      ---- Restart", ival, "");
-			goto select_register;
-		}
+		// ??? IR_ASSERT(split_pos != block_pos);
 		split_pos = ir_find_optimal_split_position(ctx, ival, split_pos, block_pos, 1);
 		other = ir_split_interval_at(ctx, ival, split_pos);
 		ir_add_to_unhandled(unhandled, other);
@@ -3848,7 +3835,18 @@ try_next_available_register:
 						}
 						IR_LOG_LSRA("      ---- Finish", other, "");
 					} else {
-						goto try_next_available_register;
+try_next_available_register:
+						IR_REGSET_EXCL(available, reg);
+#if IR_X86_I64
+						if (reg_hi != IR_REG_NONE) IR_REGSET_EXCL(available, reg_hi);
+#endif
+						if (IR_REGSET_IS_EMPTY(available)) {
+							fprintf(stderr, "LSRA Internal Error: Unsolvable conflict. Allocation is not possible\n");
+							IR_ASSERT(0);
+							exit(-1);
+						}
+						IR_LOG_LSRA("      ---- Restart", ival, "");
+						goto select_register;
 					}
 				} else {
 					child = other;
