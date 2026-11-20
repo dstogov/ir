@@ -22,7 +22,7 @@ typedef struct _ir_mem {uint64_t v;} ir_mem;
 
 # define IR_MEM_NONE                (ir_mem){0}
 # define IR_MEM_VAL(loc)            ((loc).v)
-# define IR_MEM_ADD(mem, offset)    IR_MEM(IR_MEM_BASE(mem), IR_MEM_OFFSET(mem) + (offset), IR_MEM_INDEX(mem), IR_MEM_SCALE(mem))
+# define IR_MEM_ADD(mem, offset)    IR_MEM(IR_MEM_BASE(mem), (int32_t)((uint32_t)IR_MEM_OFFSET(mem) + (uint32_t)(offset)), IR_MEM_INDEX(mem), IR_MEM_SCALE(mem))
 #else
 typedef uint64_t ir_mem;
 
@@ -3290,6 +3290,38 @@ static bool ir_match_may_fuse_SI(ir_ctx *ctx, ir_ref ref, ir_ref use)
 	return 0;
 }
 
+/* The stack offset of a fixed ALLOCA is added to a fused displacement only at emission.
+ * On x86-64 a literal outside the ALLOCA's object may then no longer fit into disp32,
+ * so such a literal isn't fused with the address of that ALLOCA. */
+static bool ir_match_alloca_offset_outside(ir_ctx *ctx, ir_ref alloca_ref, ir_ref offset_ref)
+{
+#ifdef IR_TARGET_X64
+	ir_insn *alloca_insn, *size_insn, *val_insn;
+	ir_insn *offset_insn = &ctx->ir_base[offset_ref];
+	int64_t offset;
+
+	if (IR_IS_CONST_REF(alloca_ref)) {
+		return 0;
+	}
+	alloca_insn = &ctx->ir_base[alloca_ref];
+	if (alloca_insn->op != IR_ALLOCA ||
+			!(ctx->flags & IR_FUNCTION) ||
+			ctx->cfg_map[alloca_ref] != 1 ||
+			!IR_IS_CONST_REF(alloca_insn->op2)) {
+		return 0;
+	}
+	size_insn = &ctx->ir_base[alloca_insn->op2];
+	val_insn = &ctx->ir_base[offset_insn->op2];
+	if (IR_IS_SYM_CONST(size_insn->op) || IR_IS_SYM_CONST(val_insn->op)) {
+		return 0;
+	}
+	offset = (offset_insn->op == IR_SUB) ? -(int64_t)val_insn->val.i32 : (int64_t)val_insn->val.i32;
+	return offset < 0 || offset >= size_insn->val.i64;
+#else
+	return 0;
+#endif
+}
+
 static bool ir_match_fuse_addr_all_useges(ir_ctx *ctx, ir_ref ref)
 {
 	uint32_t rule = ctx->rules[ref];
@@ -3960,6 +3992,9 @@ binop_vector:
 						return IR_COPY_INT | IR_MAY_REUSE;
 					} else if ((ir_type_size[insn->type] >= 4 && insn->op == IR_ADD && IR_IS_SIGNED_32BIT(op2_insn->val.i64)) ||
 							(ir_type_size[insn->type] >= 4 && insn->op == IR_SUB && IR_IS_SIGNED_NEG_32BIT(op2_insn->val.i64))) {
+						if (ir_match_alloca_offset_outside(ctx, insn->op1, ref)) {
+							goto binop_int;
+						}
 lea:
 						if (ctx->use_lists[insn->op1].count == 1 || ir_match_fuse_addr_all_useges(ctx, insn->op1)) {
 							uint32_t rule = ctx->rules[insn->op1];
@@ -3975,14 +4010,18 @@ lea:
 								/* z = ADD(X, MUL(Y, 2|4|8)) ... ADD(z, imm32) => SKIP ... LEA [X+Y*2|4|8+im32] */
 								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_SIB;
 								return IR_LEA_SIB_O;
-							} else if (rule == IR_LEA_IB || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_IB)) {
+							} else if ((rule == IR_LEA_IB || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_IB))
+							 && !ir_match_alloca_offset_outside(ctx, ctx->ir_base[insn->op1].op1, ref)
+							 && !ir_match_alloca_offset_outside(ctx, ctx->ir_base[insn->op1].op2, ref)) {
 								/* z = ADD(X, Y) ... ADD(z, imm32) => SKIP ... LEA [X+Y+im32] */
 								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_IB;
 								return IR_LEA_IB_O;
-							} else if (rule == IR_LEA_B_SI || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_B_SI)) {
+							} else if ((rule == IR_LEA_B_SI || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_B_SI))
+							 && !ir_match_alloca_offset_outside(ctx, ctx->ir_base[insn->op1].op1, ref)) {
 								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_B_SI;
 								return IR_LEA_B_SI_O;
-							} else if (rule == IR_LEA_SI_B || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_SI_B)) {
+							} else if ((rule == IR_LEA_SI_B || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_SI_B))
+							 && !ir_match_alloca_offset_outside(ctx, ctx->ir_base[insn->op1].op2, ref)) {
 								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_SI_B;
 								return IR_LEA_SI_B_O;
 							}
@@ -4015,7 +4054,7 @@ lea:
 							if (!rule) {
 								ctx->rules[insn->op1] = rule = ir_match_insn(ctx, insn->op1);
 							}
-							if (rule == IR_LEA_OB) {
+							if (rule == IR_LEA_OB && !ir_match_alloca_offset_outside(ctx, insn->op2, insn->op1)) {
 								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_OB;
 								if (ctx->use_lists[insn->op2].count == 1 || ir_match_fuse_addr_all_useges(ctx, insn->op2)) {
 									rule = ctx->rules[insn->op2];
@@ -4052,7 +4091,8 @@ lea:
 							if (!rule) {
 								ctx->rules[insn->op2] = rule = ir_match_insn(ctx, insn->op2);
 							}
-							if (rule == IR_LEA_OB || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_OB)) {
+							if ((rule == IR_LEA_OB || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_OB))
+							 && !ir_match_alloca_offset_outside(ctx, insn->op1, insn->op2)) {
 								ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_LEA_OB;
 								/* x = ADD(X, imm32) ... ADD(Y, x) => SKIP ... LEA */
 								return IR_LEA_I_OB;
@@ -6437,7 +6477,8 @@ static ir_mem ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 	ir_insn *op1_insn, *op2_insn, *offset_insn;
 	ir_ref base_reg_ref, index_reg_ref;
 	ir_reg base_reg = IR_REG_NONE, index_reg;
-	int32_t offset = 0, scale;
+	int64_t offset = 0;
+	int32_t scale;
 	intptr_t long_offset;
 	bool base_loaded = 0;
 
@@ -6715,7 +6756,14 @@ static ir_mem ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 		}
 	}
 
-	return IR_MEM(base_reg, offset, index_reg, scale);
+#ifdef IR_TARGET_X64
+	if (UNEXPECTED(!IR_IS_SIGNED_32BIT(offset))) {
+		/* The stack offset of a fixed ALLOCA pushed the displacement out of disp32 */
+		ctx->status = IR_ERROR_UNSUPPORTED_CODE_RULE;
+		offset = 0;
+	}
+#endif
+	return IR_MEM(base_reg, (int32_t)offset, index_reg, scale);
 }
 
 static ir_mem ir_fuse_mem(ir_ctx *ctx, ir_ref root, ir_ref ref, ir_insn *mem_insn, ir_reg reg)
