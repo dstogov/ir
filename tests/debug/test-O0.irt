@@ -89,8 +89,8 @@ test:
 	retq
 .L3:
 	movsd 8(%rsp), %xmm1
-	movl 0x10(%rsp), %eax
 	movsd (%rsp), %xmm0
+	movl 0x10(%rsp), %eax
 	jmp .L1
 .rodata
 	.db 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90

@@ -1073,61 +1073,6 @@ static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_dessa_copy *copies, int count,
 	}
 
 	/* finally we resolve remaining "windmill blades" - trees that set temporary registers */
-	if (tmp_reg != IR_REG_NONE && ir_bitset_in(todo, tmp_reg)) {
-		ir_mem tmp_spill_slot;
-		ir_type tmp_type;
-
-#if IR_DEBUG
-		if (ctx->debug_flags & IR_DEBUG_DESSA) {
-			fprintf(stderr, "\t; final tmp_reg blade:\n");
-		}
-#endif
-
-		ir_bitset_clear(ready, len);
-		to = tmp_reg;
-		tmp_type = types[to];
-		IR_MEM_VAL(tmp_spill_slot) = 0;
-		do {
-			ir_bitset_excl(todo, to);
-			type = types[to];
-			from = pred[to];
-			if (IR_IS_CONST_REF(from)) {
-				if (to >= IR_REG_NUM) {
-					/* Immediate to memory move inside a "blocked" blade requres an additional temporary register */
-					if (!IR_MEM_VAL(tmp_spill_slot)) {
-						/* Free a register, saving it in a temporary spill slot */
-						DESSA_LOG_EX("MOVE", tmp_reg, "->", DESSA_STACK, tmp_type, "free TMP");
-						tmp_spill_slot = IR_MEM_BO(IR_REG_STACK_POINTER, -16);
-						ir_emit_store_mem(ctx, tmp_type, tmp_spill_slot, tmp_reg);
-					}
-				}
-				ir_emit_dessa_move(ctx, mem_slots, type, to, from, tmp_reg, tmp_fp_reg);
-			} else {
-				int32_t r = loc[from];
-
-				/* Memory to memory move inside a "blocked" blade requres an additional temporary register */
-				if (to >= IR_REG_NUM && r >= IR_REG_NUM) {
-					if (!IR_MEM_VAL(tmp_spill_slot)) {
-						/* Free a register, saving it in a temporary spill slot */
-						DESSA_LOG_EX("MOVE", tmp_reg, "->", DESSA_STACK, tmp_type, "free TMP");
-						tmp_spill_slot = IR_MEM_BO(IR_REG_STACK_POINTER, -16);
-						ir_emit_store_mem(ctx, tmp_type, tmp_spill_slot, tmp_reg);
-					}
-				}
-				ir_emit_dessa_move(ctx, mem_slots, type, to, r, tmp_reg, tmp_fp_reg);
-				loc[from] = to;
-				if (from == r && ir_bitset_in(todo, from)) {
-					ir_bitset_incl(ready, from);
-				}
-			}
-		} while ((to = ir_bitset_pop_first(ready, len)) >= 0);
-
-		if (IR_MEM_VAL(tmp_spill_slot)) {
-			DESSA_LOG_EX("MOVE", DESSA_STACK, "->", tmp_reg, tmp_type, "restore TMP");
-			ir_emit_load_mem(ctx, tmp_type, tmp_reg, tmp_spill_slot);
-		}
-	}
-
 	if (tmp_fp_reg != IR_REG_NONE && ir_bitset_in(todo, tmp_fp_reg)) {
 		ir_mem tmp_spill_slot;
 		ir_type tmp_type;
@@ -1180,6 +1125,61 @@ static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_dessa_copy *copies, int count,
 		if (IR_MEM_VAL(tmp_spill_slot)) {
 			DESSA_LOG_EX("MOVE", DESSA_STACK, "->", tmp_fp_reg, tmp_type, "restore TMP");
 			ir_emit_load_mem(ctx, tmp_type, tmp_fp_reg, tmp_spill_slot);
+		}
+	}
+
+	if (tmp_reg != IR_REG_NONE && ir_bitset_in(todo, tmp_reg)) {
+		ir_mem tmp_spill_slot;
+		ir_type tmp_type;
+
+#if IR_DEBUG
+		if (ctx->debug_flags & IR_DEBUG_DESSA) {
+			fprintf(stderr, "\t; final tmp_reg blade:\n");
+		}
+#endif
+
+		ir_bitset_clear(ready, len);
+		to = tmp_reg;
+		tmp_type = types[to];
+		IR_MEM_VAL(tmp_spill_slot) = 0;
+		do {
+			ir_bitset_excl(todo, to);
+			type = types[to];
+			from = pred[to];
+			if (IR_IS_CONST_REF(from)) {
+				if (to >= IR_REG_NUM) {
+					/* Immediate to memory move inside a "blocked" blade requres an additional temporary register */
+					if (!IR_MEM_VAL(tmp_spill_slot)) {
+						/* Free a register, saving it in a temporary spill slot */
+						DESSA_LOG_EX("MOVE", tmp_reg, "->", DESSA_STACK, tmp_type, "free TMP");
+						tmp_spill_slot = IR_MEM_BO(IR_REG_STACK_POINTER, -16);
+						ir_emit_store_mem(ctx, tmp_type, tmp_spill_slot, tmp_reg);
+					}
+				}
+				ir_emit_dessa_move(ctx, mem_slots, type, to, from, tmp_reg, tmp_fp_reg);
+			} else {
+				int32_t r = loc[from];
+
+				/* Memory to memory move inside a "blocked" blade requres an additional temporary register */
+				if (to >= IR_REG_NUM && r >= IR_REG_NUM) {
+					if (!IR_MEM_VAL(tmp_spill_slot)) {
+						/* Free a register, saving it in a temporary spill slot */
+						DESSA_LOG_EX("MOVE", tmp_reg, "->", DESSA_STACK, tmp_type, "free TMP");
+						tmp_spill_slot = IR_MEM_BO(IR_REG_STACK_POINTER, -16);
+						ir_emit_store_mem(ctx, tmp_type, tmp_spill_slot, tmp_reg);
+					}
+				}
+				ir_emit_dessa_move(ctx, mem_slots, type, to, r, tmp_reg, tmp_fp_reg);
+				loc[from] = to;
+				if (from == r && ir_bitset_in(todo, from)) {
+					ir_bitset_incl(ready, from);
+				}
+			}
+		} while ((to = ir_bitset_pop_first(ready, len)) >= 0);
+
+		if (IR_MEM_VAL(tmp_spill_slot)) {
+			DESSA_LOG_EX("MOVE", DESSA_STACK, "->", tmp_reg, tmp_type, "restore TMP");
+			ir_emit_load_mem(ctx, tmp_type, tmp_reg, tmp_spill_slot);
 		}
 	}
 

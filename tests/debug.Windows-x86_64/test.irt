@@ -57,8 +57,8 @@ test:
 	movsd %xmm6, (%rsp)
 	subsd .L4(%rip), %xmm1
 	xorpd %xmm3, %xmm3
-	xorl %eax, %eax
 	xorpd %xmm2, %xmm2
+	xorl %eax, %eax
 	jmp .L2
 	nop
 	nop
