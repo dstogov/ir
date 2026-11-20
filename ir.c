@@ -2409,6 +2409,12 @@ static ir_alias ir_check_aliasing(const ir_ctx *ctx, ir_ref addr1, ir_ref addr2,
 	return IR_MAY_ALIAS;
 }
 
+/* Volatile accesses must be preserved and ordered, so they stop alias walks */
+IR_ALWAYS_INLINE bool ir_is_volatile_memory_op(ir_op op)
+{
+	return op == IR_LOAD_v || op == IR_STORE_v || op == IR_VLOAD_v || op == IR_VSTORE_v;
+}
+
 IR_ALWAYS_INLINE ir_ref ir_find_aliasing_load_i(const ir_ctx *ctx, ir_ref ref, ir_type type, ir_ref addr, ir_ref limit)
 {
 	const ir_insn *insn;
@@ -2472,6 +2478,7 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_load_i(const ir_ctx *ctx, ir_ref ref, i
 		} else if (insn->op == IR_MERGE
 				|| insn->op == IR_LOOP_BEGIN
 				|| insn->op == IR_VSTORE
+				|| ir_is_volatile_memory_op(insn->op)
 				|| (insn->op == IR_BEGIN && insn->op2)) {
 			return IR_UNUSED;
 		}
@@ -2540,6 +2547,7 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_vload_i(const ir_ctx *ctx, ir_ref ref, 
 		} else if (insn->op == IR_MERGE
 				|| insn->op == IR_LOOP_BEGIN
 				|| insn->op == IR_STORE
+				|| ir_is_volatile_memory_op(insn->op)
 				|| (insn->op == IR_BEGIN && insn->op2)) {
 			break;
 		}
@@ -2647,7 +2655,8 @@ check_aliasing:
 			} else {
 				break;
 			}
-		} else if (insn->op == IR_CALL) {
+		} else if (insn->op == IR_CALL
+				|| ir_is_volatile_memory_op(insn->op)) {
 			break;
 		}
 		next = ref;
@@ -2739,7 +2748,8 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_vstore_i(ir_ctx *ctx, ir_ref ref, ir_re
 			} else {
 				break;
 			}
-		} else if (insn->op == IR_CALL || insn->op == IR_LOAD || insn->op == IR_STORE) {
+		} else if (insn->op == IR_CALL || insn->op == IR_LOAD || insn->op == IR_STORE
+				|| ir_is_volatile_memory_op(insn->op)) {
 			break;
 		}
 		next = ref;
