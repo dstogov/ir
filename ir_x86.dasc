@@ -3202,6 +3202,7 @@ get_arg_hints:
 
 /* instruction selection */
 static uint32_t ir_match_insn(ir_ctx *ctx, ir_ref ref);
+static int32_t ir_call_used_stack(ir_ctx *ctx, ir_insn *insn, const ir_call_conv_dsc *cc, int *copy_stack_ptr);
 static bool ir_match_try_fuse_load(ir_ctx *ctx, ir_ref ref, ir_ref root);
 
 static void ir_swap_ops(ir_insn *insn)
@@ -4590,6 +4591,17 @@ binop_fp:
 			ctx->flags2 |= IR_HAS_CALLS;
 			IR_FALLTHROUGH;
 		case IR_TAILCALL:
+			if (insn->op == IR_TAILCALL && insn->inputs_count > 2) {
+				const ir_proto_t *proto = ir_call_proto(ctx, insn);
+				const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(proto ? proto->flags : IR_CC_DEFAULT);
+				int copy_stack;
+
+				/* Outgoing stack arguments lower to a call and return. */
+				if (ir_call_used_stack(ctx, insn, cc, &copy_stack) > cc->shadow_store_size) {
+					ctx->flags2 |= IR_HAS_CALLS;
+				}
+			}
+			IR_FALLTHROUGH;
 		case IR_IJMP:
 			if (!IR_IS_CONST_REF(insn->op2)) {
 				if (ctx->ir_base[insn->op2].op == IR_PROTO) {

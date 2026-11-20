@@ -1,0 +1,46 @@
+--TEST--
+TAILCALL with stack arguments aligns the stack for the call it falls back to
+--CODE--
+func h(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t): uintptr_t
+{
+	uintptr_t c_15 = 15;
+	uintptr_t c_16 = 16;
+	l_1 = START(l_4);
+	uintptr_t p_1 = PARAM(l_1, "p1", 1);
+	uintptr_t p_2 = PARAM(l_1, "p2", 2);
+	uintptr_t p_3 = PARAM(l_1, "p3", 3);
+	uintptr_t p_4 = PARAM(l_1, "p4", 4);
+	uintptr_t p_5 = PARAM(l_1, "p5", 5);
+	uintptr_t p_6 = PARAM(l_1, "p6", 6);
+	uintptr_t p_7 = PARAM(l_1, "p7", 7);
+	uintptr_t a, l_2 = ALLOCA(l_1, c_16, 16);
+	uintptr_t m = AND(a, c_15);
+	uintptr_t v, l_3 = LOAD(l_2, p_7);
+	uintptr_t r = ADD(m, v);
+	l_4 = RETURN(l_3, r);
+}
+func test(uintptr_t): uintptr_t
+{
+	uintptr_t f = func h(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t): uintptr_t;
+	l_1 = START(l_3);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	uintptr_t d, l_2 = TAILCALL/7(l_1, f, p, p, p, p, p, p, p);
+	l_3 = UNREACHABLE(l_2);
+}
+func main(): int32_t
+{
+	uintptr_t c_8 = 8;
+	uintptr_t c_42 = 42;
+	int32_t c_0 = 0;
+	uintptr_t t = func test(uintptr_t): uintptr_t;
+	uintptr_t printf = func printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%lu\n";
+	l_1 = START(l_6);
+	uintptr_t s, l_2 = ALLOCA(l_1, c_8, 8);
+	l_3 = STORE(l_2, s, c_42);
+	uintptr_t r, l_4 = CALL/1(l_3, t, s);
+	int32_t d, l_5 = CALL/2(l_4, printf, fmt, r);
+	l_6 = RETURN(l_5, c_0);
+}
+--EXPECT--
+42
