@@ -1,0 +1,21 @@
+--TEST--
+004: string argument of a CALL through PROTO is cast to uintptr_t
+--CODE--
+{
+	uintptr_t c_1 = "abc";
+	l_1 = START(l_5);
+	uintptr_t d_2 = PARAM(l_1, "p", 1);
+	uintptr_t d_3 = PROTO(d_2, func(uintptr_t): int32_t);
+	int32_t d_4, l_4 = CALL/1(l_1, d_3, c_1);
+	l_5 = RETURN(l_4, d_4);
+}
+--EXPECT--
+int32_t test(uintptr_t p)
+{
+	uintptr_t d_1 = p;
+	uintptr_t d_2;
+	int32_t d_3;
+	d_2 = (uintptr_t)((int32_t (*)(uintptr_t))d_1);
+	d_3 = ((int32_t (*)(uintptr_t))d_2)((uintptr_t)"abc");
+	return d_3;
+}

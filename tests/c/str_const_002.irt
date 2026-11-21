@@ -1,0 +1,15 @@
+--TEST--
+002: string argument of a TAILCALL to a constant address is cast to uintptr_t
+--CODE--
+{
+	uintptr_t c_1 = "abc";
+	uintptr_t c_2 = func *0x1234(uintptr_t): int32_t;
+	l_1 = START(l_3);
+	int32_t d_2, l_2 = TAILCALL/1(l_1, c_2, c_1);
+	l_3 = UNREACHABLE(l_2);
+}
+--EXPECT--
+int32_t test(void)
+{
+	return ((int32_t (*)(uintptr_t))0x1234)((uintptr_t)"abc");
+}
