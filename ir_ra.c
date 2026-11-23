@@ -725,16 +725,6 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 			if (ctx->rules) {
 				int n;
 
-#if IR_X86_I64
-				if (ctx->rules[ref] & IR_TWO_REGS) {
-					v = ctx->vregs[ref];
-					if (v > 0) {
-						IR_ASSERT(ctx->live_intervals[v]);
-						ctx->live_intervals[v]->flags |= IR_LIVE_INTERVAL_TWO_REGS;
-					}
-				}
-#endif
-
 				if (ctx->rules[ref] & (IR_FUSED|IR_SKIPPED)) {
 					if (((ctx->rules[ref] & IR_RULE_MASK) == IR_ALLOCA)
 					 && ctx->use_lists[ref].count > 0) {
@@ -841,6 +831,11 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						/* intervals[opd].setFrom(op.id) */
 						ival = ir_fix_live_range(ctx, v,
 							IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
+#if IR_X86_I64
+						if (ctx->rules && (ctx->rules[ref] & IR_TWO_REGS)) {
+							ival->flags |= IR_LIVE_INTERVAL_TWO_REGS;
+						}
+#endif
 						ival->type = insn->type;
 						ir_add_use(ctx, ival, 0, def_pos, reg, def_flags, hint_ref);
 					}
@@ -853,6 +848,11 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						/* Dead PHI */
 						ival = ir_add_live_range(ctx, v, IR_START_LIVE_POS_FROM_REF(bb->start), IR_SAVE_LIVE_POS_FROM_REF(ref));
 					}
+#if IR_X86_I64
+					if (ctx->rules && (ctx->rules[ref] & IR_TWO_REGS)) {
+						ival->flags |= IR_LIVE_INTERVAL_TWO_REGS;
+					}
+#endif
 					ival->type = insn->type;
 					ir_add_use(ctx, ival, 0, IR_DEF_LIVE_POS_FROM_REF(ref), IR_REG_NONE, IR_USE_SHOULD_BE_IN_REG, 0);
 					continue;
@@ -1458,16 +1458,6 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 			if (ctx->rules) {
 				int n;
 
-#if IR_X86_I64
-				if (ctx->rules[ref] & IR_TWO_REGS) {
-					v = ctx->vregs[ref];
-					if (v > 0) {
-						IR_ASSERT(ctx->live_intervals[v]);
-						ctx->live_intervals[v]->flags |= IR_LIVE_INTERVAL_TWO_REGS;
-					}
-				}
-#endif
-
 				if (ctx->rules[ref] & (IR_FUSED|IR_SKIPPED)) {
 					if (((ctx->rules[ref] & IR_RULE_MASK) == IR_ALLOCA)
 					 && ctx->use_lists[ref].count > 0) {
@@ -1576,6 +1566,11 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						/* intervals[opd].setFrom(op.id) */
 						ival = ir_fix_live_range(ctx, v,
 							IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
+#if IR_X86_I64
+						if (ctx->rules && (ctx->rules[ref] & IR_TWO_REGS)) {
+							ival->flags |= IR_LIVE_INTERVAL_TWO_REGS;
+						}
+#endif
 						ival->type = insn->type;
 						ir_add_use(ctx, ival, 0, def_pos, reg, def_flags, hint_ref);
 					}
@@ -1586,6 +1581,11 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						/* Dead PHI */
 						ival = ir_add_live_range(ctx, v, IR_START_LIVE_POS_FROM_REF(bb->start), IR_SAVE_LIVE_POS_FROM_REF(ref));
 					}
+#if IR_X86_I64
+					if (ctx->rules && (ctx->rules[ref] & IR_TWO_REGS)) {
+						ival->flags |= IR_LIVE_INTERVAL_TWO_REGS;
+					}
+#endif
 					ival->type = insn->type;
 					ir_add_use(ctx, ival, 0, IR_DEF_LIVE_POS_FROM_REF(ref), IR_REG_NONE, IR_USE_SHOULD_BE_IN_REG, 0);
 					continue;
