@@ -2200,11 +2200,9 @@ static void ir_emit_load_mem_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_mem me
 				} else if (width == 4) {
 					|	ldr Rs(reg-IR_REG_FP_FIRST), [Rx(base_reg), #offset]
 				} else if (width == 2) {
-					|	ldrh Rw(IR_REG_INT_TMP), [Rx(base_reg), #offset]
-					|	fmov Rs(reg-IR_REG_FP_FIRST), Rw(IR_REG_INT_TMP)
+					|	ldr Rh(reg-IR_REG_FP_FIRST), [Rx(base_reg), #offset]
 				} else if (width == 1) {
-					|	ldrb Rw(IR_REG_INT_TMP), [Rx(base_reg), #offset]
-					|	fmov Rs(reg-IR_REG_FP_FIRST), Rw(IR_REG_INT_TMP)
+					|	ldr Rb(reg-IR_REG_FP_FIRST), [Rx(base_reg), #offset]
 				} else {
 					IR_ASSERT(0 && "unsupported vector width");
 				}
@@ -2248,11 +2246,9 @@ static void ir_emit_load_mem_fp(ir_ctx *ctx, ir_type type, ir_reg reg, ir_mem me
 		} else if (width == 4) {
 			|	ldr Rs(reg-IR_REG_FP_FIRST), [Rx(base_reg), Rx(index_reg)]
 		} else if (width == 2) {
-			|	ldrh Rw(IR_REG_INT_TMP), [Rx(base_reg), Rx(index_reg)]
-			|	fmov Rs(reg-IR_REG_FP_FIRST), Rw(IR_REG_INT_TMP)
+			|	ldr Rh(reg-IR_REG_FP_FIRST), [Rx(base_reg), Rx(index_reg)]
 		} else if (width == 1) {
-			|	ldrb Rw(IR_REG_INT_TMP), [Rx(base_reg), Rx(index_reg)]
-			|	fmov Rs(reg-IR_REG_FP_FIRST), Rw(IR_REG_INT_TMP)
+			|	ldr Rb(reg-IR_REG_FP_FIRST), [Rx(base_reg), Rx(index_reg)]
 		} else {
 			IR_ASSERT(0 && "unsupported vector width");
 		}
@@ -2437,11 +2433,9 @@ static void ir_emit_store_mem_fp(ir_ctx *ctx, ir_type type, ir_mem mem, ir_reg r
 				} else if (width == 4) {
 					|	str Rs(reg-IR_REG_FP_FIRST), [Rx(base_reg), #offset]
 				} else if (width == 2) {
-					|	fmov Rw(IR_REG_INT_TMP), Rs(reg-IR_REG_FP_FIRST)
-					|	strh Rw(IR_REG_INT_TMP), [Rx(base_reg), #offset]
+					|	str Rh(reg-IR_REG_FP_FIRST), [Rx(base_reg), #offset]
 				} else if (width == 1) {
-					|	fmov Rw(IR_REG_INT_TMP), Rs(reg-IR_REG_FP_FIRST)
-					|	strb Rw(IR_REG_INT_TMP), [Rx(base_reg), #offset]
+					|	str Rb(reg-IR_REG_FP_FIRST), [Rx(base_reg), #offset]
 				} else {
 					IR_ASSERT(0 && "unsupported vector width");
 				}
@@ -2485,13 +2479,9 @@ static void ir_emit_store_mem_fp(ir_ctx *ctx, ir_type type, ir_mem mem, ir_reg r
 		} else if (width == 4) {
 			|	str Rs(reg-IR_REG_FP_FIRST), [Rx(base_reg), Rx(index_reg)]
 		} else if (width == 2) {
-			IR_ASSERT(index_reg != IR_REG_INT_TMP);
-			|	fmov Rw(IR_REG_INT_TMP), Rs(reg-IR_REG_FP_FIRST)
-			|	strh Rw(IR_REG_INT_TMP), [Rx(base_reg), Rx(index_reg)]
+			|	str Rh(reg-IR_REG_FP_FIRST), [Rx(base_reg), Rx(index_reg)]
 		} else if (width == 1) {
-			IR_ASSERT(index_reg != IR_REG_INT_TMP);
-			|	fmov Rw(IR_REG_INT_TMP), Rs(reg-IR_REG_FP_FIRST)
-			|	strb Rw(IR_REG_INT_TMP), [Rx(base_reg), Rx(index_reg)]
+			|	str Rb(reg-IR_REG_FP_FIRST), [Rx(base_reg), Rx(index_reg)]
 		} else {
 			IR_ASSERT(0 && "unsupported vector width");
 		}
