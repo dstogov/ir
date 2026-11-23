@@ -1610,6 +1610,10 @@ binop_fp:
 		case IR_PARAM:
 			return ctx->use_lists[ref].count > 0 ? IR_PARAM : IR_SKIPPED | IR_PARAM;
 		case IR_ALLOCA:
+			if (ctx->use_lists[ref].count == 1) {
+				/* dead ALLOCA */
+				return IR_NOP | IR_SKIPPED;
+			}
 			if (ctx->flags & IR_FUNCTION) {
 				if (IR_IS_CONST_REF(insn->op2) && ctx->cfg_map[ref] == 1) {
 					ir_insn *val = &ctx->ir_base[insn->op2];
@@ -1622,8 +1626,21 @@ binop_fp:
 				ctx->flags2 |= IR_HAS_ALLOCA;
 			}
 			return IR_ALLOCA;
+		case IR_BLOCK_BEGIN:
+		case IR_TLS_ADDR:
+		case IR_VLOAD:
+		case IR_VLOAD_v:
+			if (ctx->use_lists[ref].count == 1) {
+				/* dead load */
+				return IR_NOP | IR_SKIPPED;
+			}
+			return insn->op;
 		case IR_LOAD:
 		case IR_LOAD_v:
+			if (ctx->use_lists[ref].count == 1) {
+				/* dead load */
+				return IR_NOP | IR_SKIPPED;
+			}
 			if (ctx->ir_base[insn->op2].op == IR_TLS_ADDR && ir_may_fuse_tls_addr(ctx, insn->op2)) {
 				ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_TLS_ADDR;
 				return IR_TLS_LOAD;
@@ -1649,6 +1666,10 @@ binop_fp:
 			}
 			break;
 		case IR_RLOAD:
+			if (ctx->use_lists[ref].count == 1) {
+				/* dead load */
+				return IR_NOP | IR_SKIPPED;
+			}
 			if (IR_REGSET_IN(IR_REGSET_UNION((ir_regset)ctx->fixed_regset, IR_REGSET_FIXED), insn->op2)) {
 				return IR_SKIPPED | IR_RLOAD;
 			}
@@ -5272,10 +5293,6 @@ static void ir_emit_vload(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	int32_t slot, offset;
 	ir_mem mem;
 
-	if (ctx->use_lists[def].count == 1) {
-		/* dead load */
-		return;
-	}
 	IR_ASSERT(ctx->ir_base[insn->op2].op == IR_VAR);
 	fp = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
 	slot = ir_local_slot(ctx, insn->op2);
@@ -5360,10 +5377,6 @@ static void ir_emit_load_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 	ir_mem mem;
 
-	if (ctx->use_lists[def].count == 1) {
-		/* dead load */
-		return;
-	}
 	IR_ASSERT(def_reg != IR_REG_NONE);
 	if (op2_reg != IR_REG_NONE) {
 		if (IR_REG_SPILLED(op2_reg)) {
@@ -5400,10 +5413,6 @@ static void ir_emit_load_fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 	ir_mem mem;
 
-	if (ctx->use_lists[def].count == 1) {
-		/* dead load */
-		return;
-	}
 	IR_ASSERT(def_reg != IR_REG_NONE);
 	if (op2_reg != IR_REG_NONE) {
 		if (IR_REG_SPILLED(op2_reg)) {
@@ -5679,10 +5688,6 @@ static void ir_emit_block_begin(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 
-	if (ctx->use_lists[def].count == 1) {
-		/* dead load */
-		return;
-	}
 	|	mov Rx(def_reg), sp
 
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
@@ -7160,11 +7165,6 @@ static void ir_emit_tls_load(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_reg reg = IR_IS_TYPE_INT(insn->type) ? def_reg : ctx->regs[def][3];
 	ir_insn *addr_insn = &ctx->ir_base[insn->op2];
 	ir_mem mem;
-
-	if (ctx->use_lists[def].count == 1) {
-		/* dead load */
-		return;
-	}
 
 	IR_ASSERT(def_reg != IR_REG_NONE && reg != IR_REG_NONE);
 	IR_ASSERT(addr_insn->op == IR_TLS_ADDR);

@@ -823,6 +823,13 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					}
 					/* live.remove(opd) */
 					ir_bitset_excl(live, v);
+					if (!ival) {
+						if (IR_IS_FOLDABLE_OP(insn->op) || (ir_op_flags[insn->op] & IR_OP_FLAG_NO_SIDE_EFFECT)) {
+							ctx->rules[ref] = IR_SKIPPED | IR_NOP;
+						}
+						ctx->vregs[ref] = 0;
+						continue;
+					}
 					/* intervals[opd].setFrom(op.id) */
 					ival = ir_fix_live_range(ctx, v,
 						IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
@@ -1541,6 +1548,14 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							}
 						}
 						def_pos = IR_DEF_LIVE_POS_FROM_REF(ref);
+					}
+					ival = ctx->live_intervals[v];
+					if (!ival) {
+						if (IR_IS_FOLDABLE_OP(insn->op) || (ir_op_flags[insn->op] & IR_OP_FLAG_NO_SIDE_EFFECT)) {
+							ctx->rules[ref] = IR_SKIPPED | IR_NOP;
+						}
+						ctx->vregs[ref] = 0;
+						continue;
 					}
 					/* intervals[opd].setFrom(op.id) */
 					ival = ir_fix_live_range(ctx, v,

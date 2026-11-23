@@ -1,0 +1,129 @@
+--TEST--
+A spill load attached to a dead LOAD must not be lost (linear scan)
+--CODE--
+func nop(): int32_t
+{
+	int32_t c_0 = 0;
+	l_1 = START(l_2);
+	l_2 = RETURN(l_1, c_0);
+}
+func test(uintptr_t): uintptr_t
+{
+	uintptr_t f = func nop(): int32_t;
+	uintptr_t c_0 = 0;
+	uintptr_t c_1 = 8;
+	uintptr_t c_2 = 16;
+	uintptr_t c_3 = 24;
+	uintptr_t c_4 = 32;
+	uintptr_t c_5 = 40;
+	uintptr_t c_6 = 48;
+	uintptr_t c_7 = 56;
+	uintptr_t c_8 = 64;
+	uintptr_t c_9 = 72;
+	uintptr_t c_10 = 80;
+	uintptr_t c_11 = 88;
+	uintptr_t c_12 = 96;
+	uintptr_t c_13 = 104;
+	l_1 = START(l_ret);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	uintptr_t a_1p = ADD(p, c_1);
+	uintptr_t a_1, l_a1 = LOAD(l_1, a_1p);
+	uintptr_t a_2p = ADD(p, c_2);
+	uintptr_t a_2, l_a2 = LOAD(l_a1, a_2p);
+	uintptr_t a_3p = ADD(p, c_3);
+	uintptr_t a_3, l_a3 = LOAD(l_a2, a_3p);
+	uintptr_t a_4p = ADD(p, c_4);
+	uintptr_t a_4, l_a4 = LOAD(l_a3, a_4p);
+	uintptr_t a_5p = ADD(p, c_5);
+	uintptr_t a_5, l_a5 = LOAD(l_a4, a_5p);
+	uintptr_t a_6p = ADD(p, c_6);
+	uintptr_t a_6, l_a6 = LOAD(l_a5, a_6p);
+	uintptr_t a_7p = ADD(p, c_7);
+	uintptr_t a_7, l_a7 = LOAD(l_a6, a_7p);
+	uintptr_t a_8p = ADD(p, c_8);
+	uintptr_t a_8, l_a8 = LOAD(l_a7, a_8p);
+	uintptr_t a_9p = ADD(p, c_9);
+	uintptr_t a_9, l_a9 = LOAD(l_a8, a_9p);
+	uintptr_t a_10p = ADD(p, c_10);
+	uintptr_t a_10, l_a10 = LOAD(l_a9, a_10p);
+	uintptr_t a_11p = ADD(p, c_11);
+	uintptr_t a_11, l_a11 = LOAD(l_a10, a_11p);
+	uintptr_t a_12p = ADD(p, c_12);
+	uintptr_t a_12, l_a12 = LOAD(l_a11, a_12p);
+	int32_t d, l_call = CALL(l_a12, f);
+	uintptr_t b_1, l_b1 = LOAD(l_call, a_1);
+	uintptr_t b_2, l_b2 = LOAD(l_b1, a_2);
+	uintptr_t s_2 = ADD(b_1, b_2);
+	uintptr_t b_3, l_b3 = LOAD(l_b2, a_3);
+	uintptr_t s_3 = ADD(s_2, b_3);
+	uintptr_t b_4, l_b4 = LOAD(l_b3, a_4);
+	uintptr_t s_4 = ADD(s_3, b_4);
+	uintptr_t b_5, l_b5 = LOAD(l_b4, a_5);
+	uintptr_t s_5 = ADD(s_4, b_5);
+	uintptr_t b_6, l_b6 = LOAD(l_b5, a_6);
+	uintptr_t s_6 = ADD(s_5, b_6);
+	uintptr_t b_7, l_b7 = LOAD(l_b6, a_7);
+	uintptr_t s_7 = ADD(s_6, b_7);
+	uintptr_t b_8, l_b8 = LOAD(l_b7, a_8);
+	uintptr_t s_8 = ADD(s_7, b_8);
+	uintptr_t b_9, l_b9 = LOAD(l_b8, a_9);
+	uintptr_t s_9 = ADD(s_8, b_9);
+	uintptr_t b_10, l_b10 = LOAD(l_b9, a_10);
+	uintptr_t s_10 = ADD(s_9, b_10);
+	uintptr_t b_11, l_b11 = LOAD(l_b10, a_11);
+	uintptr_t s_11 = ADD(s_10, b_11);
+	uintptr_t b_12, l_b12 = LOAD(l_b11, a_12);
+	uintptr_t s_12 = ADD(s_11, b_12);
+	uintptr_t dz, l_dead = LOAD(l_b12, p);
+	uintptr_t yp = ADD(p, c_13);
+	uintptr_t y, l_y = LOAD(l_dead, yp);
+	uintptr_t r = ADD(s_12, y);
+	l_ret = RETURN(l_y, r);
+}
+func main(): int32_t
+{
+	int32_t c_0 = 0;
+	uintptr_t c_0u = 0;
+	uintptr_t c_1 = 1;
+	uintptr_t c_8 = 8;
+	uintptr_t c_160 = 160;
+	uintptr_t c_64 = 64;
+	uintptr_t c_n = 12;
+	uintptr_t c_sz = 512;
+	uintptr_t t = func test(uintptr_t): uintptr_t;
+	uintptr_t printf = func printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%lu\n";
+	l_1 = START(l_end);
+	uintptr_t b, l_2 = ALLOCA(l_1, c_sz, 16);
+	uintptr_t b8 = ADD(b, c_8);
+	l_3 = END(l_2);
+	l_4 = LOOP_BEGIN(l_3, l_8);
+	uintptr_t j = PHI(l_4, c_0u, j_1);
+	uintptr_t a = PHI(l_4, b, a_1);
+	l_5 = STORE(l_4, a, j);
+	uintptr_t a_1 = ADD(a, c_8);
+	uintptr_t j_1 = ADD(j, c_1);
+	bool cc = ULT(j_1, c_64);
+	l_6 = IF(l_5, cc);
+	l_7 = IF_TRUE(l_6);
+	l_8 = LOOP_END(l_7);
+	l_9 = IF_FALSE(l_6);
+	l_10 = END(l_9);
+	l_11 = LOOP_BEGIN(l_10, l_15);
+	uintptr_t k = PHI(l_11, c_1, k_1);
+	uintptr_t q = PHI(l_11, b8, q_1);
+	uintptr_t v = ADD(q, c_160);
+	l_12 = STORE(l_11, q, v);
+	uintptr_t q_1 = ADD(q, c_8);
+	uintptr_t k_1 = ADD(k, c_1);
+	bool cc2 = ULE(k_1, c_n);
+	l_13 = IF(l_12, cc2);
+	l_14 = IF_TRUE(l_13);
+	l_15 = LOOP_END(l_14);
+	l_16 = IF_FALSE(l_13);
+	uintptr_t r, l_17 = CALL/1(l_16, t, b);
+	int32_t d, l_18 = CALL/2(l_17, printf, fmt, r);
+	l_end = RETURN(l_18, c_0);
+}
+--EXPECT--
+331
