@@ -23,10 +23,10 @@ test:
 	str x19, [sp]
 	add x19, x19, x19
 	cbz x19, .L1
-	ldr x17, [sp]
+	ldr x16, [sp]
 	ldr x19, [sp, #8]
 	add sp, sp, #0x10
-	br x17
+	br x16
 .L1:
 	ldr x0, [sp]
 	ldr x19, [sp, #8]

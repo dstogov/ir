@@ -1,0 +1,108 @@
+--TEST--
+AArch64: an indirect TAILCALL target must survive a large-frame epilogue
+--CODE--
+func target(int32_t): int32_t
+{
+	int32_t c_1000 = 1000;
+	l_1 = START(l_2);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t r = ADD(x, c_1000);
+	l_2 = RETURN(l_1, r);
+}
+func other(int32_t): int32_t
+{
+	int32_t c_1 = 1;
+	l_1 = START(l_2);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t r = ADD(x, c_1);
+	l_2 = RETURN(l_1, r);
+}
+func test_saved(uintptr_t, int32_t): int32_t
+{
+	uintptr_t c_size = 40000;
+	uintptr_t c_off = 39992;
+	uintptr_t c_other = func other(int32_t): int32_t;
+	l_1 = START(l_end);
+	uintptr_t f = PARAM(l_1, "f", 1);
+	int32_t x = PARAM(l_1, "x", 2);
+	uintptr_t p, l_2 = ALLOCA(l_1, c_size, 16);
+	uintptr_t q = ADD(p, c_off);
+	l_3 = STORE_v(l_2, q, x);
+	int32_t y, l_4 = LOAD_v(l_3, q);
+	int32_t z, l_5 = CALL/1(l_4, c_other, y);
+	int32_t w = ADD(z, x);
+	int32_t r, l_6 = TAILCALL/1(l_5, f, w);
+	l_end = UNREACHABLE(l_6);
+}
+func test_spilled(uintptr_t, int32_t): int32_t
+{
+	uintptr_t c_size = 40000;
+	uintptr_t c_off = 39992;
+	uintptr_t c_other = func other(int32_t): int32_t;
+	int32_t k0 = 3;
+	int32_t k1 = 4;
+	int32_t k2 = 5;
+	int32_t k3 = 6;
+	int32_t k4 = 7;
+	int32_t k5 = 8;
+	int32_t k6 = 9;
+	int32_t k7 = 10;
+	int32_t k8 = 11;
+	int32_t k9 = 12;
+	int32_t k10 = 13;
+	int32_t k11 = 14;
+	int32_t k12 = 15;
+	l_1 = START(l_end);
+	uintptr_t f = PARAM(l_1, "f", 1);
+	int32_t x = PARAM(l_1, "x", 2);
+	uintptr_t p, l_2 = ALLOCA(l_1, c_size, 16);
+	uintptr_t q = ADD(p, c_off);
+	l_3 = STORE_v(l_2, q, x);
+	int32_t y, l_4 = LOAD_v(l_3, q);
+	int32_t v0 = MUL(y, k0);
+	int32_t v1 = MUL(y, k1);
+	int32_t v2 = MUL(y, k2);
+	int32_t v3 = MUL(y, k3);
+	int32_t v4 = MUL(y, k4);
+	int32_t v5 = MUL(y, k5);
+	int32_t v6 = MUL(y, k6);
+	int32_t v7 = MUL(y, k7);
+	int32_t v8 = MUL(y, k8);
+	int32_t v9 = MUL(y, k9);
+	int32_t v10 = MUL(y, k10);
+	int32_t v11 = MUL(y, k11);
+	int32_t v12 = MUL(y, k12);
+	int32_t z, l_5 = CALL/1(l_4, c_other, y);
+	int32_t s0 = ADD(z, v0);
+	int32_t s1 = ADD(s0, v1);
+	int32_t s2 = ADD(s1, v2);
+	int32_t s3 = ADD(s2, v3);
+	int32_t s4 = ADD(s3, v4);
+	int32_t s5 = ADD(s4, v5);
+	int32_t s6 = ADD(s5, v6);
+	int32_t s7 = ADD(s6, v7);
+	int32_t s8 = ADD(s7, v8);
+	int32_t s9 = ADD(s8, v9);
+	int32_t s10 = ADD(s9, v10);
+	int32_t s11 = ADD(s10, v11);
+	int32_t s12 = ADD(s11, v12);
+	int32_t r, l_6 = TAILCALL/1(l_5, f, s12);
+	l_end = UNREACHABLE(l_6);
+}
+func main(): int32_t
+{
+	uintptr_t c_t1 = func test_saved(uintptr_t, int32_t): int32_t;
+	uintptr_t c_t2 = func test_spilled(uintptr_t, int32_t): int32_t;
+	uintptr_t c_target = func target(int32_t): int32_t;
+	uintptr_t c_p = func printf(uintptr_t, ...): int32_t;
+	uintptr_t c_f = "%d %d\n";
+	int32_t c_5 = 5;
+	int32_t c_0 = 0;
+	l_1 = START(l_5);
+	int32_t d_1, l_2 = CALL/2(l_1, c_t1, c_target, c_5);
+	int32_t d_2, l_3 = CALL/2(l_2, c_t2, c_target, c_5);
+	int32_t d_3, l_4 = CALL/3(l_3, c_p, c_f, d_1, d_2);
+	l_5 = RETURN(l_4, c_0);
+}
+--EXPECT--
+1011 1591
