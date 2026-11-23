@@ -1,0 +1,89 @@
+--TEST--
+001: de-SSA saves a 32-byte temporary register inside the stack frame
+--ARGS--
+-S -O1 -mavx
+--CODE--
+func test(int32_t, uintptr_t, uintptr_t): void
+{
+	<int32_t*8> c_a = {1, 2, 3, 4, 5, 6, 7, 8};
+	<int32_t*8> c_b = {10, 20, 30, 40, 50, 60, 70, 80};
+	int32_t c_0 = 0;
+	int32_t c_1 = 1;
+	l_1 = START(l_9);
+	int32_t n = PARAM(l_1, "n", 1);
+	uintptr_t f = PARAM(l_1, "f", 2);
+	uintptr_t p = PARAM(l_1, "p", 3);
+	l_2 = END(l_1);
+	l_3 = LOOP_BEGIN(l_2, l_7);
+	<int32_t*8> a = PHI(l_3, c_a, b);
+	<int32_t*8> b = PHI(l_3, c_b, a);
+	int32_t i = PHI(l_3, c_0, i1);
+	l_4 = CALL(l_3, f);
+	int32_t i1 = ADD(i, c_1);
+	bool d = LT(i1, n);
+	l_5 = IF(l_4, d);
+	l_6 = IF_TRUE(l_5);
+	l_7 = LOOP_END(l_6);
+	l_8 = IF_FALSE(l_5);
+	l_8a = STORE(l_8, p, a);
+	l_9 = RETURN(l_8a);
+}
+--EXPECT--
+test:
+	pushq %rbx
+	pushq %rbp
+	pushq %r12
+	pushq %r13
+	subq $0x68, %rsp
+	movl %edi, %ebx
+	movq %rsi, %rbp
+	movq %rdx, %r12
+	xorl %r13d, %r13d
+	vmovdqa .L3(%rip), %ymm0
+	vmovdqu %ymm0, (%rsp)
+	vmovdqa .L4(%rip), %ymm0
+	vmovdqu %ymm0, 0x20(%rsp)
+	jmp .L2
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+.L1:
+	vmovdqu 0x20(%rsp), %ymm0
+	vmovdqu %ymm0, 0x40(%rsp)
+	vmovdqu (%rsp), %ymm0
+	vmovdqu %ymm0, 0x20(%rsp)
+	vmovdqu 0x40(%rsp), %ymm0
+	vmovdqu %ymm0, (%rsp)
+.L2:
+	callq *%rbp
+	leal 1(%r13), %r13d
+	cmpl %ebx, %r13d
+	jl .L1
+	vmovdqu (%rsp), %ymm1
+	vmovdqu %ymm1, (%r12)
+	addq $0x68, %rsp
+	popq %r13
+	popq %r12
+	popq %rbp
+	popq %rbx
+	retq
+.rodata
+	.db 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
+	.db 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
+.L3:
+	.db 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00
+	.db 0x05, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00
+.L4:
+	.db 0x0a, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00, 0x1e, 0x00, 0x00, 0x00, 0x28, 0x00, 0x00, 0x00
+	.db 0x32, 0x00, 0x00, 0x00, 0x3c, 0x00, 0x00, 0x00, 0x46, 0x00, 0x00, 0x00, 0x50, 0x00, 0x00, 0x00

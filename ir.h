@@ -783,6 +783,7 @@ struct _ir_ctx {
 	};
 	ir_snapshot_create_t   snapshot_create;
 	int32_t            stack_frame_size;        /* spill stack frame size (used by register allocator and code generator) */
+	int32_t            dessa_tmp_slot;          /* spill slot used to free a temporary register in de-SSA moves, or -1 */
 	int32_t            call_stack_size;         /* stack for parameter passing (used by register allocator and code generator) */
 	uint64_t           used_preserved_regs;
 #ifdef IR_TARGET_X86
