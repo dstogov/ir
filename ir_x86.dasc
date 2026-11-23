@@ -12863,15 +12863,14 @@ static void ir_emit_va_arg(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			|	add Ra(tmp_reg), IR_MAX(ir_type_size[type], sizeof(void*))
 		} else {
 			int size = IR_VA_ARG_SIZE(insn->op3);
+			int align = IR_VA_ARG_ALIGN(insn->op3);
 
+			IR_ASSERT(type == IR_ADDR);
+			if (align > (int)sizeof(void*)) {
+				|	add Ra(tmp_reg), (align-1)
+				|	and Ra(tmp_reg), ~(align-1)
+			}
 			if (def_reg != IR_REG_NONE) {
-				IR_ASSERT(type == IR_ADDR);
-				int align = IR_VA_ARG_ALIGN(insn->op3);
-
-				if (align > (int)sizeof(void*)) {
-					|	add Ra(tmp_reg), (align-1)
-					|	and Ra(tmp_reg), ~(align-1)
-				}
 				|	mov Ra(def_reg), Ra(tmp_reg)
 			}
 			|	add Ra(tmp_reg), IR_ALIGNED_SIZE(size, sizeof(void*))
