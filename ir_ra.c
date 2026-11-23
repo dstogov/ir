@@ -790,7 +790,11 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						if (!IR_IS_CONST_REF(insn->op1) && ctx->vregs[insn->op1] > 0) {
 							hint_ref = insn->op1;
 						}
-						def_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
+						if (def_flags & IR_DEF_CONFLICTS_WITH_INPUT_REGS) {
+							def_pos = IR_USE_LIVE_POS_FROM_REF(ref);
+						} else {
+							def_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
+						}
 					} else if (def_flags & IR_DEF_CONFLICTS_WITH_INPUT_REGS) {
 						def_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
 					} else {
@@ -929,7 +933,11 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							}
 						} else if (def_flags & IR_DEF_REUSES_OP1_REG) {
 							if (j == 1) {
-								use_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
+								if (def_flags & IR_DEF_CONFLICTS_WITH_INPUT_REGS) {
+									use_pos = IR_USE_LIVE_POS_FROM_REF(ref);
+								} else {
+									use_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
+								}
 								IR_ASSERT(ctx->vregs[ref] > 0);
 								hint_ref = ref;
 							} else if (input == insn->op1) {
