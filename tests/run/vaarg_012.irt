@@ -1,0 +1,62 @@
+--TEST--
+VA_ARG 012: an unused over-aligned struct VA_ARG still aligns the va_list on x86
+--TARGET--
+x86
+--CODE--
+func test1(int32_t, ...): int32_t
+{
+	int32_t c_1 = 32;
+	l_1 = START(l_8);
+	int32_t d_2 = PARAM(l_1, "n", 1);
+	uintptr_t d_3, l_3 = ALLOCA(l_1, c_1);
+	l_4 = VA_START(l_3, d_3);
+	uintptr_t d_5, l_5 = VA_ARG(l_4, d_3, 132); # 132 = ((16) << 3) | log2(16) ; 16 - size, 16 - align
+	int32_t d_7, l_7 = VA_ARG(l_5, d_3);
+	l_9 = VA_END(l_7, d_3);
+	l_8 = RETURN(l_9, d_7);
+}
+func test2(int32_t, ...): int32_t
+{
+	int32_t c_1 = 32;
+	l_1 = START(l_8);
+	int32_t d_2 = PARAM(l_1, "n", 1);
+	uintptr_t d_3, l_3 = ALLOCA(l_1, c_1);
+	l_4 = VA_START(l_3, d_3);
+	uintptr_t d_5, l_5 = VA_ARG(l_4, d_3, 132);
+	int32_t d_6, l_6 = LOAD(l_5, d_5);
+	int32_t d_7, l_7 = VA_ARG(l_6, d_3);
+	int32_t d_10 = ADD(d_7, d_6);
+	l_9 = VA_END(l_7, d_3);
+	l_8 = RETURN(l_9, d_10);
+}
+func main(): int32_t
+{
+	int32_t c_1 = 0;
+	uintptr_t c_2 = 16;
+	int32_t c_3 = 1;
+	int32_t c_4 = 23;
+	uintptr_t c_5 = func test1(int32_t, ...): int32_t;
+	uintptr_t c_6 = func test2(int32_t, ...): int32_t;
+	uintptr_t c_7 = func printf(uintptr_t, ...): int32_t;
+	uintptr_t c_8 = "%d %d\n";
+	uintptr_t c_9 = 4;
+	uintptr_t c_10 = 8;
+	uintptr_t c_11 = 12;
+	int32_t c_12 = 100;
+	l_1 = START(l_20);
+	uintptr_t d_2, l_2 = ALLOCA(l_1, c_2, 16);
+	l_3 = STORE(l_2, d_2, c_12);
+	uintptr_t d_4 = ADD(d_2, c_9);
+	l_4 = STORE(l_3, d_4, c_1);
+	uintptr_t d_5 = ADD(d_2, c_10);
+	l_5 = STORE(l_4, d_5, c_1);
+	uintptr_t d_6 = ADD(d_2, c_11);
+	l_6 = STORE(l_5, d_6, c_1);
+	uintptr_t d_7 = ARGVAL(d_2, 16, 16);
+	int32_t d_8, l_8 = CALL/3(l_6, c_5, c_3, d_7, c_4);
+	int32_t d_9, l_9 = CALL/3(l_8, c_6, c_3, d_7, c_4);
+	int32_t d_10, l_10 = CALL/3(l_9, c_7, c_8, d_8, d_9);
+	l_20 = RETURN(l_10, c_1);
+}
+--EXPECT--
+23 123
