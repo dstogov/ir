@@ -741,7 +741,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 				reg = _pick_free_reg(ctx, &data, IR_I32, 0, 0);
 				if (reg == IR_REG_NONE) {
 					reg = _pick_reg(ctx, &data, IR_I32, IR_REGSET_EMPTY, IR_USE_MUST_BE_IN_REG, 0, 0);
-					/* clear the assignment or the evicted register */
+					/* clear the assignment of the evicted register(s) */
 					n = use_list->count;
 					for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
 						ir_ref use = *p;
@@ -765,7 +765,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 				reg = _pick_free_reg(ctx, &data, IR_DOUBLE, 0, 0);
 				if (reg == IR_REG_NONE) {
 					reg = _pick_reg(ctx, &data, IR_DOUBLE, IR_REGSET_EMPTY, IR_USE_MUST_BE_IN_REG, 0, 0);
-					/* clear the assignment or the evicted register */
+					/* clear the assignment of the evicted register */
 					n = use_list->count;
 					for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
 						ir_ref use = *p;
