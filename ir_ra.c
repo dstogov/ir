@@ -4274,16 +4274,7 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 		}
 		if (unhandled) {
 			ir_live_interval *handled[7] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL};
-			ir_live_interval *old, **pool;
-#if IR_X86_I64
-			/* 64-bit integers are copied as two 32-bit halves (see ir_emit_dessa_moves()),
-			 * so a freed slot is reused only between 64-bit integers, never with a double */
-			ir_live_interval *handled_i64[7] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL};
-# define IR_SPILL_POOL(ival) \
-			(((ival)->type == IR_I64 || (ival)->type == IR_U64) ? handled_i64 : handled)
-#else
-# define IR_SPILL_POOL(ival) handled
-#endif
+			ir_live_interval *old;
 
 			((ir_reg_alloc_data*)(ctx->data))->handled = handled;
 			active = NULL;
@@ -4309,8 +4300,7 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 
 						IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8 || size == 16 || size == 32 || size == 64);
 						n = ir_ntz(size);
-						pool = IR_SPILL_POOL(other);
-						old = pool[n];
+						old = handled[n];
 						while (old) {
 							if (old->stack_spill_pos == other->stack_spill_pos) {
 								break;
@@ -4318,8 +4308,8 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 							old = old->list_next;
 						}
 						if (!old) {
-							other->list_next = pool[n];
-							pool[n] = other;
+							other->list_next = handled[n];
+							handled[n] = other;
 						}
 					} else {
 						prev = other;
@@ -4333,7 +4323,6 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 					size = 4;
 				}
 #endif
-				((ir_reg_alloc_data*)(ctx->data))->handled = IR_SPILL_POOL(ival);
 				ival->stack_spill_pos = ir_allocate_spill_slot(ctx, size, 0);
 				if (unhandled && ival->end > unhandled->range.start) {
 					ival->list_next = active;
@@ -4343,8 +4332,7 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 
 					IR_ASSERT(size == 1 || size == 2 || size == 4 || size == 8 || size == 16 || size == 32 || size == 64);
 					n = ir_ntz(size);
-					pool = IR_SPILL_POOL(ival);
-					old = pool[n];
+					old = handled[n];
 					while (old) {
 						if (old->stack_spill_pos == ival->stack_spill_pos) {
 							break;
@@ -4352,12 +4340,11 @@ static int ir_linear_scan(ir_ctx *ctx, ir_ref vars)
 						old = old->list_next;
 					}
 					if (!old) {
-						ival->list_next = pool[n];
-						pool[n] = ival;
+						ival->list_next = handled[n];
+						handled[n] = ival;
 					}
 				}
 			}
-#undef IR_SPILL_POOL
 			((ir_reg_alloc_data*)(ctx->data))->handled = NULL;
 		}
 	}

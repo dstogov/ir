@@ -1,0 +1,168 @@
+--TEST--
+DESSA 007: a PHI in half of a freed 8-byte spill slot must not overwrite a value that is still to be read
+--CODE--
+func g(double, uint64_t): double
+{
+	uint64_t c_1 = 65535;
+	l_1 = START(l_7);
+	double d_2 = PARAM(l_1, "x", 1);
+	uint64_t d_3 = PARAM(l_1, "y", 2);
+	uint64_t d_4 = AND(d_3, c_1);
+	double d_5 = INT2FP(d_4);
+	double d_6 = ADD(d_2, d_5);
+	l_7 = RETURN(l_1, d_6);
+}
+func test1(double, uint64_t, bool): int32_t
+{
+	uintptr_t c_1 = func g(double, uint64_t): double;
+	double c_2 = 1.375;
+	double c_3 = 2.375;
+	double c_4 = 3.375;
+	float c_5 = 4.625;
+	float c_6 = 5.625;
+	float c_7 = 6.625;
+	float c_8 = 7.625;
+	uintptr_t c_9 = func printf(uintptr_t, ...): int32_t;
+	uintptr_t c_10 = "%.4f %x %x\n";
+	int32_t c_11 = 0;
+	l_1 = START(l_32);
+	double d_a = PARAM(l_1, "a", 1);
+	uint64_t d_b = PARAM(l_1, "b", 2);
+	bool d_flag = PARAM(l_1, "flag", 3);
+	double d_2 = ADD(d_a, c_2);
+	l_3 = IF(l_1, d_flag);
+	l_4 = IF_TRUE(l_3);
+	double d_5 = MUL(d_a, c_3);
+	double d_6, l_7 = CALL/2(l_4, c_1, d_a, d_b);
+	l_8 = END(l_7);
+	l_9 = IF_FALSE(l_3);
+	double d_10, l_11 = CALL/2(l_9, c_1, d_a, d_b);
+	double d_12 = MUL(d_a, c_4);
+	l_13 = END(l_11);
+	l_14 = MERGE(l_8, l_13);
+	double d_15 = PHI(l_14, d_6, d_10);
+	float d_16 = PHI(l_14, c_7, c_8);
+	double d_17 = PHI(l_14, d_5, d_2);
+	double d_18 = PHI(l_14, d_2, d_12);
+	float d_19 = PHI(l_14, c_5, c_6);
+	double d_20 = ADD(d_a, d_15);
+	double d_21 = ADD(d_20, d_17);
+	double d_22 = ADD(d_21, d_18);
+	double d_23, l_24 = CALL/2(l_14, c_1, d_22, d_b);
+	uint32_t d_25 = BITCAST(d_19);
+	uint32_t d_26 = BITCAST(d_16);
+	int32_t d_27, l_27 = CALL/4(l_24, c_9, c_10, d_23, d_25, d_26);
+	l_32 = RETURN(l_27, c_11);
+}
+func test2(double, uint64_t, bool): uint64_t
+{
+	uintptr_t c_1 = func g(double, uint64_t): double;
+	double c_2 = 1.375;
+	double c_3 = 2.375;
+	double c_4 = 3.375;
+	double c_5 = 4.375;
+	double c_6 = 5.375;
+	double c_7 = 6.375;
+	double c_8 = 7.375;
+	double c_9 = 8.375;
+	double c_10 = 9.375;
+	double c_11 = 10.375;
+	double c_12 = 11.375;
+	double c_13 = 12.375;
+	double c_14 = 13.375;
+	double c_15 = 14.375;
+	float c_16 = 15.625;
+	float c_17 = 16.625;
+	float c_18 = 17.625;
+	float c_19 = 18.625;
+	l_1 = START(l_68);
+	double d_a = PARAM(l_1, "a", 1);
+	uint64_t d_b = PARAM(l_1, "b", 2);
+	bool d_flag = PARAM(l_1, "flag", 3);
+	double d_2 = ADD(d_a, c_2);
+	double d_3 = ADD(d_a, c_3);
+	double d_4 = ADD(d_a, c_4);
+	double d_5 = ADD(d_a, c_5);
+	l_6 = IF(l_1, d_flag);
+	l_7 = IF_TRUE(l_6);
+	double d_8 = MUL(d_a, c_6);
+	double d_9 = MUL(d_a, c_7);
+	double d_10 = MUL(d_a, c_8);
+	double d_11 = MUL(d_a, c_9);
+	double d_12 = SUB(d_a, c_10);
+	double d_13, l_14 = CALL/2(l_7, c_1, d_a, d_b);
+	double d_15 = ADD(d_13, d_12);
+	double d_16, l_17 = CALL/2(l_14, c_1, d_15, d_b);
+	l_18 = END(l_17);
+	l_19 = IF_FALSE(l_6);
+	double d_20 = MUL(d_a, c_11);
+	double d_21 = MUL(d_a, c_12);
+	double d_22 = MUL(d_a, c_13);
+	double d_23 = MUL(d_a, c_14);
+	double d_24 = SUB(d_a, c_15);
+	double d_25, l_26 = CALL/2(l_19, c_1, d_a, d_b);
+	double d_27 = ADD(d_25, d_24);
+	l_28 = END(l_26);
+	l_29 = MERGE(l_18, l_28);
+	float d_30 = PHI(l_29, c_16, c_17);
+	float d_31 = PHI(l_29, c_18, c_19);
+	double d_32 = PHI(l_29, d_8, d_2);
+	double d_33 = PHI(l_29, d_2, d_20);
+	double d_34 = PHI(l_29, d_9, d_3);
+	double d_35 = PHI(l_29, d_3, d_21);
+	double d_36 = PHI(l_29, d_10, d_4);
+	double d_37 = PHI(l_29, d_4, d_22);
+	double d_38 = PHI(l_29, d_11, d_5);
+	double d_39 = PHI(l_29, d_5, d_23);
+	double d_40 = PHI(l_29, d_16, d_27);
+	double d_41, l_42 = CALL/2(l_29, c_1, d_a, d_b);
+	uint32_t d_43 = BITCAST(d_31);
+	uint64_t d_44 = ZEXT(d_43);
+	uint64_t d_45 = BITCAST(d_41);
+	uint64_t d_46 = ADD(d_44, d_45);
+	uint64_t d_47 = BITCAST(d_32);
+	uint64_t d_48 = XOR(d_46, d_47);
+	uint64_t d_49 = BITCAST(d_34);
+	uint64_t d_50 = ADD(d_48, d_49);
+	uint64_t d_51 = BITCAST(d_35);
+	uint64_t d_52 = XOR(d_50, d_51);
+	uint64_t d_53 = BITCAST(d_39);
+	uint64_t d_54 = XOR(d_52, d_53);
+	uint64_t d_55 = BITCAST(d_40);
+	uint64_t d_56 = ADD(d_54, d_55);
+	uint64_t d_57 = BITCAST(d_37);
+	uint64_t d_58 = ADD(d_56, d_57);
+	uint32_t d_59 = BITCAST(d_30);
+	uint64_t d_60 = ZEXT(d_59);
+	uint64_t d_61 = ADD(d_58, d_60);
+	uint64_t d_62 = BITCAST(d_36);
+	uint64_t d_63 = ADD(d_61, d_62);
+	uint64_t d_64 = BITCAST(d_33);
+	uint64_t d_65 = XOR(d_63, d_64);
+	uint64_t d_66 = BITCAST(d_38);
+	uint64_t d_67 = ADD(d_65, d_66);
+	l_68 = RETURN(l_42, d_67);
+}
+func main(): int32_t
+{
+	int32_t c_1 = 0;
+	uintptr_t c_2 = func test1(double, uint64_t, bool): int32_t;
+	uintptr_t c_3 = func test2(double, uint64_t, bool): uint64_t;
+	uintptr_t c_4 = func printf(uintptr_t, ...): int32_t;
+	uintptr_t c_5 = "%llx %llx\n";
+	double c_6 = 2.5;
+	uint64_t c_7 = 1311768467463790320;
+	bool c_8 = 1;
+	bool c_9 = 0;
+	l_1 = START(l_7);
+	int32_t d_2, l_2 = CALL/3(l_1, c_2, c_6, c_7, c_8);
+	int32_t d_3, l_3 = CALL/3(l_2, c_2, c_6, c_7, c_9);
+	uint64_t d_4, l_4 = CALL/3(l_3, c_3, c_6, c_7, c_8);
+	uint64_t d_5, l_5 = CALL/3(l_4, c_3, c_6, c_7, c_9);
+	int32_t d_6, l_6 = CALL/3(l_5, c_4, c_5, d_4, d_5);
+	l_7 = RETURN(l_6, c_1);
+}
+--EXPECT--
+114158.8125 40940000 40d40000
+114161.3125 40b40000 40f40000
+8266dc0a83070000 821a9324831a0000
