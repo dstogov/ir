@@ -21,9 +21,9 @@ test:
 	str x0, [sp]
 	add x0, x0, x0
 	cbz x0, .L1
-	ldr x16, [sp]
+	ldr x17, [sp]
 	add sp, sp, #0x10
-	br x16
+	br x17
 .L1:
 	ldr x0, [sp]
 	add sp, sp, #0x10

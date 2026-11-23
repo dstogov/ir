@@ -15,7 +15,7 @@ test:
 	str x19, [x29, #0x18]
 	mov x19, x0
 	blr x19
-	mov x16, x19
+	mov x17, x19
 	ldr x19, [x29, #0x18]
 	ldp x29, x30, [sp], #0x20
-	br x16
+	br x17
