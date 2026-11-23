@@ -24784,7 +24784,7 @@ static void ir_emit_vector_fp2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (op1_reg != IR_REG_NONE) {
 		if (IR_REG_SPILLED(op1_reg)) {
 			op1_reg = IR_REG_NUM(op1_reg);
-			ir_emit_load(ctx, src_type, op1_reg, insn->op1);
+			ir_emit_load(ctx, ctx->ir_base[insn->op1].type, op1_reg, insn->op1);
 		}
 		if (src_type == dst_type) {
 			if (op1_reg != def_reg) {
@@ -24860,7 +24860,7 @@ static void ir_emit_vector_fp2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
-		ir_emit_store(ctx, dst_type, def, def_reg);
+		ir_emit_store(ctx, insn->type, def, def_reg);
 	}
 }
 
@@ -24885,6 +24885,11 @@ static void ir_emit_vector_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	IR_ASSERT(IR_IS_TYPE_FP(src_type) && IR_IS_TYPE_INT(dst_type));
 	IR_ASSERT(def_reg != IR_REG_NONE && op1_reg != IR_REG_NONE);
+
+	if (IR_REG_SPILLED(op1_reg)) {
+		op1_reg = IR_REG_NUM(op1_reg);
+		ir_emit_load(ctx, ctx->ir_base[insn->op1].type, op1_reg, insn->op1);
+	}
 
 	if (src_type == IR_FLOAT) {
 		if (IR_IS_TYPE_SIGNED(dst_type)) {
@@ -25695,7 +25700,7 @@ static void ir_emit_vector_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
-		ir_emit_store(ctx, dst_type, def, def_reg);
+		ir_emit_store(ctx, insn->type, def, def_reg);
 	}
 }
 
@@ -25720,6 +25725,11 @@ static void ir_emit_vector_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 
 	IR_ASSERT(IR_IS_TYPE_INT(src_type) && IR_IS_TYPE_FP(dst_type));
 	IR_ASSERT(def_reg != IR_REG_NONE && op1_reg != IR_REG_NONE);
+
+	if (IR_REG_SPILLED(op1_reg)) {
+		op1_reg = IR_REG_NUM(op1_reg);
+		ir_emit_load(ctx, ctx->ir_base[insn->op1].type, op1_reg, insn->op1);
+	}
 
 	if (dst_type == IR_FLOAT) {
 		if (IR_IS_TYPE_SIGNED(src_type)) {
@@ -26523,7 +26533,7 @@ static void ir_emit_vector_int2fp(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	}
 
 	if (IR_REG_SPILLED(ctx->regs[def][0])) {
-		ir_emit_store(ctx, dst_type, def, def_reg);
+		ir_emit_store(ctx, insn->type, def, def_reg);
 	}
 }
 #endif
