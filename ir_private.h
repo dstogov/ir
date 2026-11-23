@@ -1183,6 +1183,14 @@ void ir_iter_replace(ir_ctx *ctx, ir_ref ref, ir_ref new_ref, ir_bitqueue *workl
 void ir_iter_opt(ir_ctx *ctx, ir_bitqueue *worklist);
 void ir_iter_cleanup(ir_ctx *ctx);
 
+IR_ALWAYS_INLINE bool ir_is_dead_load(const ir_ctx *ctx, ir_ref ref)
+{
+	if (ctx->use_lists[ref].count == 1) {
+		return (ir_op_flags[ctx->ir_base[ref].op] & IR_OP_FLAG_NO_SIDE_EFFECT) != 0;
+	}
+	return 0;
+}
+
 /*** IR Basic Blocks info ***/
 #define IR_IS_BB_START(op) \
 	((ir_op_flags[op] & IR_OP_FLAG_BB_START) != 0)
