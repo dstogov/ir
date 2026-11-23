@@ -1544,15 +1544,11 @@ void ir_build_def_use_lists(ir_ctx *ctx)
 	ir_use_list *use_list;
 	ir_ref *linked_lists;
 
-	ctx->flags2 &= ~IR_HAS_AFREE;
 	linked_lists_size = IR_ALIGNED_SIZE(ctx->insns_count, 1024);
 	linked_lists = ir_mem_malloc(linked_lists_size * sizeof(ir_ref));
 	for (i = IR_UNUSED + 1, insn = ctx->ir_base + i; i < ctx->insns_count;) {
 		uint32_t flags = ir_op_flags[insn->op];
 
-		if (insn->op == IR_AFREE) {
-			ctx->flags2 |= IR_HAS_AFREE;
-		}
 		if (UNEXPECTED(IR_OP_HAS_VAR_INPUTS(flags))) {
 			n = insn->inputs_count;
 		} else {
