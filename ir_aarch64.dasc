@@ -2484,14 +2484,15 @@ static void ir_emit_store_mem_fp(ir_ctx *ctx, ir_type type, ir_mem mem, ir_reg r
 			|	str Rd(reg-IR_REG_FP_FIRST), [Rx(base_reg), Rx(index_reg)]
 		} else if (width == 4) {
 			|	str Rs(reg-IR_REG_FP_FIRST), [Rx(base_reg), Rx(index_reg)]
-		} else if (width == 2) {
-			IR_ASSERT(index_reg != IR_REG_INT_TMP);
-			|	fmov Rw(IR_REG_INT_TMP), Rs(reg-IR_REG_FP_FIRST)
-			|	strh Rw(IR_REG_INT_TMP), [Rx(base_reg), Rx(index_reg)]
-		} else if (width == 1) {
-			IR_ASSERT(index_reg != IR_REG_INT_TMP);
-			|	fmov Rw(IR_REG_INT_TMP), Rs(reg-IR_REG_FP_FIRST)
-			|	strb Rw(IR_REG_INT_TMP), [Rx(base_reg), Rx(index_reg)]
+		} else if (width == 1 || width == 2) {
+			/* Store directly from the vector register: IR_REG_INT_TMP may
+			 * hold the address offset. DynASM lacks the B/H register forms. */
+			IR_ASSERT(reg >= IR_REG_FP_FIRST && reg <= IR_REG_FP_LAST);
+			IR_ASSERT(base_reg >= IR_REG_GP_FIRST && base_reg <= IR_REG_GP_LAST);
+			IR_ASSERT(index_reg >= IR_REG_GP_FIRST && index_reg <= IR_REG_GP_LAST);
+			uint32_t code = 0x3c206800 | (width == 2 ? 0x40000000 : 0) |
+				(index_reg << 16) | (base_reg << 5) | (reg-IR_REG_FP_FIRST);
+			|	.long code
 		} else {
 			IR_ASSERT(0 && "unsupported vector width");
 		}
