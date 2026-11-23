@@ -2822,9 +2822,9 @@ static void ir_emit_epilogue(ir_ctx *ctx)
 							|	ldr Rd(i-IR_REG_FP_FIRST), [Rx(fp), #(offset+8)]
 						} else {
 							ir_emit_load_imm_int(ctx, IR_ADDR, IR_REG_INT_TMP, offset);
-							|	ldr Rx(prev-IR_REG_FP_FIRST), [Rx(fp), Rx(IR_REG_INT_TMP)]
+							|	ldr Rd(prev-IR_REG_FP_FIRST), [Rx(fp), Rx(IR_REG_INT_TMP)]
 							|	add Rx(IR_REG_INT_TMP), Rx(IR_REG_INT_TMP), #8
-							|	ldr Rx(i-IR_REG_FP_FIRST), [Rx(fp), Rx(IR_REG_INT_TMP)]
+							|	ldr Rd(i-IR_REG_FP_FIRST), [Rx(fp), Rx(IR_REG_INT_TMP)]
 						}
 					}
 					prev = IR_REG_NONE;
