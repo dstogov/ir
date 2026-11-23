@@ -1,0 +1,33 @@
+--TEST--
+Skipped-only stack parameter must not require a pre-existing interval
+--CODE--
+func test(uintptr_t,uintptr_t,uintptr_t,uintptr_t,uintptr_t,uintptr_t,uintptr_t,uintptr_t,uintptr_t): int32_t
+{
+    int32_t answer = 23;
+    l1 = START(l3);
+    uintptr_t p1 = PARAM(l1, "p1", 1);
+    uintptr_t p2 = PARAM(l1, "p2", 2);
+    uintptr_t p3 = PARAM(l1, "p3", 3);
+    uintptr_t p4 = PARAM(l1, "p4", 4);
+    uintptr_t p5 = PARAM(l1, "p5", 5);
+    uintptr_t p6 = PARAM(l1, "p6", 6);
+    uintptr_t p7 = PARAM(l1, "p7", 7);
+    uintptr_t p8 = PARAM(l1, "p8", 8);
+    uintptr_t p9 = PARAM(l1, "p9", 9);
+    int32_t unused, l2 = LOAD(l1, p9);
+    l3 = RETURN(l2, answer);
+}
+func main(): int32_t
+{
+    int32_t zero = 0;
+    uintptr_t pzero = 0;
+    uintptr_t t = func test(uintptr_t,uintptr_t,uintptr_t,uintptr_t,uintptr_t,uintptr_t,uintptr_t,uintptr_t,uintptr_t): int32_t;
+    uintptr_t print = func printf(uintptr_t, ...): int32_t;
+    uintptr_t fmt = "%d\n";
+    l1 = START(l4);
+    int32_t result, l2 = CALL/9(l1, t, pzero, pzero, pzero, pzero, pzero, pzero, pzero, pzero, pzero);
+    int32_t printed, l3 = CALL/2(l2, print, fmt, result);
+    l4 = RETURN(l3, zero);
+}
+--EXPECT--
+23

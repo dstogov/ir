@@ -41,7 +41,7 @@ test:
 	mov x29, sp
 	stp x19, x20, [x29, #0x30]
 	stp x21, x22, [x29, #0x20]
-	stp x23, x24, [x29, #0x10]
+	str x23, [x29, #0x18]
 	mov w19, w0
 	mov x20, x1
 	lsl w21, w19, #2
@@ -49,15 +49,11 @@ test:
 	b .L2
 .L1:
 	mov x23, sp
-	add x24, x21, #0xf
-	and x24, x24, #0xfffffffffffffff0
-	sub sp, sp, x24
-	mov x24, sp
-	mov x0, x24
+	add x0, x21, #0xf
+	and x0, x0, #0xfffffffffffffff0
+	sub sp, sp, x0
+	mov x0, sp
 	blr x20
-	sxtw x0, w0
-	lsl x0, x0, #2
-	add x0, x0, x24
 	mov sp, x23
 	add w22, w22, #1
 .L2:
@@ -65,7 +61,7 @@ test:
 	b.lt .L1
 	ldp x19, x20, [x29, #0x30]
 	ldp x21, x22, [x29, #0x20]
-	ldp x23, x24, [x29, #0x10]
+	ldr x23, [x29, #0x18]
 	mov sp, x29
 	ldp x29, x30, [sp], #0x40
 	ret

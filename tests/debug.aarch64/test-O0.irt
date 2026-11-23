@@ -91,8 +91,8 @@ test:
 	ret
 .L3:
 	ldr d1, [sp, #8]
-	ldr w0, [sp, #0x10]
 	ldr d0, [sp]
+	ldr w0, [sp, #0x10]
 	b .L1
 .rodata
 .L4:

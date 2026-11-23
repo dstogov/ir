@@ -811,8 +811,8 @@ map_op = {
   ["strh_*"]  = "78000000DwL",
   ["ldrh_*"]  = "78400000DwL",
   ["ldrsh_*"] = "78c00000DwL|78800000DxL",
-  ["str_*"]   = "b8000000DwL|f8000000DxL|bc000000DsL|fc000000DdL|3c800000DqL",
-  ["ldr_*"]   = "18000000DwB|58000000DxB|1c000000DsB|5c000000DdB|9c000000DqB|b8400000DwL|f8400000DxL|bc400000DsL|fc400000DdL|3cc00000DqL",
+  ["str_*"]   = "b8000000DwL|f8000000DxL|bc000000DsL|fc000000DdL|3c800000DqL|3c000000DbL|7c000000DhL",
+  ["ldr_*"]   = "18000000DwB|58000000DxB|1c000000DsB|5c000000DdB|9c000000DqB|b8400000DwL|f8400000DxL|bc400000DsL|fc400000DdL|3cc00000DqL|3c400000DbL|7c400000DhL",
   ["ldrsw_*"] = "98000000DxB|b8800000DxL",
   -- NOTE: ldur etc. are handled by ldr et al.
 
@@ -962,7 +962,7 @@ local function parse_template(params, template, nparams, pos)
 	werror("bad register type")
       end
       parse_reg_type = false
-    elseif p == "x" or p == "w" or p == "d" or p == "s" or p == "q" then
+    elseif p == "x" or p == "w" or p == "d" or p == "s" or p == "q" or p == "h" or p == "b" then
       if parse_reg_type ~= p then
 	werror("register size mismatch")
       end

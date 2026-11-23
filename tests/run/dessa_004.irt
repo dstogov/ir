@@ -1,0 +1,85 @@
+--TEST--
+DESSA 004: integer move in the FP temporary's blade must not clobber tmp_reg
+--TARGET--
+*64-*
+--CODE--
+func g(double, uint64_t): double
+{
+	uint64_t c_1 = 65535;
+	l_1 = START(l_7);
+	double d_2 = PARAM(l_1, "x", 1);
+	uint64_t d_3 = PARAM(l_1, "y", 2);
+	uint64_t d_4 = AND(d_3, c_1);
+	double d_5 = INT2FP(d_4);
+	double d_6 = ADD(d_2, d_5);
+	l_7 = RETURN(l_1, d_6);
+}
+func h(uint64_t, double): uint64_t
+{
+	l_1 = START(l_5);
+	uint64_t d_2 = PARAM(l_1, "x", 1);
+	double d_3 = PARAM(l_1, "y", 2);
+	uint64_t d_4 = ADD(d_2, d_2);
+	l_5 = RETURN(l_1, d_4);
+}
+func test(uint64_t, double, bool): uint64_t
+{
+	uintptr_t c_1 = func g(double, uint64_t): double;
+	uintptr_t c_2 = func h(uint64_t, double): uint64_t;
+	uint64_t c_3 = 3771334343958392850;
+	uint64_t c_4 = 1311768467463790320;
+	uint64_t c_5 = 18364758544493064720;
+	uint64_t c_6 = 9223372036854775809;
+	l_1 = START(l_35);
+	uint64_t d_2 = PARAM(l_1, "p1", 1);
+	double d_3 = PARAM(l_1, "p2", 2);
+	bool d_4 = PARAM(l_1, "flag", 3);
+	l_5 = IF(l_1, d_4);
+	l_6 = IF_TRUE(l_5);
+	uint64_t d_7 = XOR(d_2, d_2);
+	uint64_t d_8 = SUB(d_7, d_2);
+	double d_9 = ADD(d_3, d_3);
+	uint64_t d_10, l_10 = CALL/2(l_6, c_2, d_2, d_3);
+	l_11 = END(l_10);
+	l_12 = IF_FALSE(l_5);
+	l_13 = END(l_12);
+	l_14 = MERGE(l_11, l_13);
+	uint64_t d_15 = PHI(l_14, c_3, c_4);
+	uint64_t d_16 = PHI(l_14, c_5, d_2);
+	uint64_t d_17 = PHI(l_14, c_5, c_4);
+	double d_18 = PHI(l_14, d_9, d_3);
+	uint64_t d_19 = PHI(l_14, d_8, d_2);
+	uint64_t d_20 = PHI(l_14, d_8, c_4);
+	uint64_t d_21 = PHI(l_14, c_6, c_5);
+	uint64_t d_22 = PHI(l_14, d_8, d_2);
+	uint64_t d_23 = ADD(d_17, d_19);
+	uint64_t d_24 = ADD(d_23, d_2);
+	double d_25, l_25 = CALL/2(l_14, c_1, d_18, d_24);
+	uint64_t d_26 = XOR(d_15, d_16);
+	uint64_t d_27 = ADD(d_26, d_20);
+	uint64_t d_28 = ADD(d_27, d_21);
+	uint64_t d_29 = ADD(d_28, d_22);
+	uint64_t d_30 = ADD(d_29, d_2);
+	uint64_t d_31 = XOR(d_30, d_2);
+	uint64_t d_32 = BITCAST(d_25);
+	uint64_t d_33 = ADD(d_31, d_32);
+	uint64_t d_34 = ADD(d_33, d_2);
+	l_35 = RETURN(l_25, d_34);
+}
+func main(): int32_t
+{
+	int32_t c_1 = 0;
+	uintptr_t c_2 = func printf(uintptr_t, ...): int32_t;
+	uintptr_t c_3 = func test(uint64_t, double, bool): uint64_t;
+	uintptr_t c_4 = "%llx\n";
+	uint64_t c_5 = 1229782938247303441;
+	double c_6 = 2.5;
+	bool c_7 = 1;
+	l_1 = START(l_4);
+	uint64_t d_2, l_2 = CALL/3(l_1, c_3, c_5, c_6, c_7);
+	int32_t d_3, l_3 = CALL/2(l_2, c_2, c_4, d_2);
+	l_4 = RETURN(l_3, c_1);
+}
+--EXPECT--
+7a42bd71b979b2f4
+

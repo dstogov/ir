@@ -1,0 +1,146 @@
+--TEST--
+Vector FP2INT truncates toward zero
+--CODE--
+func float4(uintptr_t): int32_t
+{
+	int32_t c_0 = 0;
+	int32_t c_1 = 1;
+	int32_t c_2 = 2;
+	int32_t c_3 = 3;
+	uintptr_t printf = func printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt_s = "%d %d %d %d\n";
+	uintptr_t fmt_u = "%u %u %u %u\n";
+	l_1 = START(l_8);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	<float*4> v, l_2 = LOAD(l_1, p);
+	<int8_t*4> int8 = FP2INT(v);
+	<int16_t*4> int16 = FP2INT(v);
+	<int32_t*4> int32 = FP2INT(v);
+	<uint8_t*4> uint8 = FP2INT(v);
+	<uint16_t*4> uint16 = FP2INT(v);
+	int8_t int8_0 = EXTRACT(int8, c_0);
+	int32_t int8_0x = SEXT(int8_0);
+	int8_t int8_1 = EXTRACT(int8, c_1);
+	int32_t int8_1x = SEXT(int8_1);
+	int8_t int8_2 = EXTRACT(int8, c_2);
+	int32_t int8_2x = SEXT(int8_2);
+	int8_t int8_3 = EXTRACT(int8, c_3);
+	int32_t int8_3x = SEXT(int8_3);
+	int16_t int16_0 = EXTRACT(int16, c_0);
+	int32_t int16_0x = SEXT(int16_0);
+	int16_t int16_1 = EXTRACT(int16, c_1);
+	int32_t int16_1x = SEXT(int16_1);
+	int16_t int16_2 = EXTRACT(int16, c_2);
+	int32_t int16_2x = SEXT(int16_2);
+	int16_t int16_3 = EXTRACT(int16, c_3);
+	int32_t int16_3x = SEXT(int16_3);
+	int32_t int32_0 = EXTRACT(int32, c_0);
+	int32_t int32_1 = EXTRACT(int32, c_1);
+	int32_t int32_2 = EXTRACT(int32, c_2);
+	int32_t int32_3 = EXTRACT(int32, c_3);
+	uint8_t uint8_0 = EXTRACT(uint8, c_0);
+	uint32_t uint8_0x = ZEXT(uint8_0);
+	uint8_t uint8_1 = EXTRACT(uint8, c_1);
+	uint32_t uint8_1x = ZEXT(uint8_1);
+	uint8_t uint8_2 = EXTRACT(uint8, c_2);
+	uint32_t uint8_2x = ZEXT(uint8_2);
+	uint8_t uint8_3 = EXTRACT(uint8, c_3);
+	uint32_t uint8_3x = ZEXT(uint8_3);
+	uint16_t uint16_0 = EXTRACT(uint16, c_0);
+	uint32_t uint16_0x = ZEXT(uint16_0);
+	uint16_t uint16_1 = EXTRACT(uint16, c_1);
+	uint32_t uint16_1x = ZEXT(uint16_1);
+	uint16_t uint16_2 = EXTRACT(uint16, c_2);
+	uint32_t uint16_2x = ZEXT(uint16_2);
+	uint16_t uint16_3 = EXTRACT(uint16, c_3);
+	uint32_t uint16_3x = ZEXT(uint16_3);
+	int32_t d_int8, l_3 = CALL/5(l_2, printf, fmt_s, int8_0x, int8_1x, int8_2x, int8_3x);
+	int32_t d_int16, l_4 = CALL/5(l_3, printf, fmt_s, int16_0x, int16_1x, int16_2x, int16_3x);
+	int32_t d_int32, l_5 = CALL/5(l_4, printf, fmt_s, int32_0, int32_1, int32_2, int32_3);
+	int32_t d_uint8, l_6 = CALL/5(l_5, printf, fmt_u, uint8_0x, uint8_1x, uint8_2x, uint8_3x);
+	int32_t d_uint16, l_7 = CALL/5(l_6, printf, fmt_u, uint16_0x, uint16_1x, uint16_2x, uint16_3x);
+	l_8 = RETURN(l_7, c_0);
+}
+func double2(uintptr_t): int32_t
+{
+	int32_t c_0 = 0;
+	int32_t c_1 = 1;
+	uintptr_t printf = func printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt_s = "%d %d\n";
+	uintptr_t fmt_u = "%u %u\n";
+	l_1 = START(l_8);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	<double*2> v, l_2 = LOAD(l_1, p);
+	<int8_t*2> int8 = FP2INT(v);
+	<int16_t*2> int16 = FP2INT(v);
+	<int32_t*2> int32 = FP2INT(v);
+	<uint8_t*2> uint8 = FP2INT(v);
+	<uint16_t*2> uint16 = FP2INT(v);
+	int8_t int8_0 = EXTRACT(int8, c_0);
+	int32_t int8_0x = SEXT(int8_0);
+	int8_t int8_1 = EXTRACT(int8, c_1);
+	int32_t int8_1x = SEXT(int8_1);
+	int16_t int16_0 = EXTRACT(int16, c_0);
+	int32_t int16_0x = SEXT(int16_0);
+	int16_t int16_1 = EXTRACT(int16, c_1);
+	int32_t int16_1x = SEXT(int16_1);
+	int32_t int32_0 = EXTRACT(int32, c_0);
+	int32_t int32_1 = EXTRACT(int32, c_1);
+	uint8_t uint8_0 = EXTRACT(uint8, c_0);
+	uint32_t uint8_0x = ZEXT(uint8_0);
+	uint8_t uint8_1 = EXTRACT(uint8, c_1);
+	uint32_t uint8_1x = ZEXT(uint8_1);
+	uint16_t uint16_0 = EXTRACT(uint16, c_0);
+	uint32_t uint16_0x = ZEXT(uint16_0);
+	uint16_t uint16_1 = EXTRACT(uint16, c_1);
+	uint32_t uint16_1x = ZEXT(uint16_1);
+	int32_t d_int8, l_3 = CALL/3(l_2, printf, fmt_s, int8_0x, int8_1x);
+	int32_t d_int16, l_4 = CALL/3(l_3, printf, fmt_s, int16_0x, int16_1x);
+	int32_t d_int32, l_5 = CALL/3(l_4, printf, fmt_s, int32_0, int32_1);
+	int32_t d_uint8, l_6 = CALL/3(l_5, printf, fmt_u, uint8_0x, uint8_1x);
+	int32_t d_uint16, l_7 = CALL/3(l_6, printf, fmt_u, uint16_0x, uint16_1x);
+	l_8 = RETURN(l_7, c_0);
+}
+func main(): int32_t
+{
+	uintptr_t c_32 = 32;
+	uintptr_t c_4 = 4;
+	uintptr_t c_8 = 8;
+	uintptr_t c_12 = 12;
+	float f_0 = -0.75;
+	float f_1 = 14.875;
+	float f_2 = 3.5;
+	float f_3 = 8.25;
+	double g_0 = -0.75;
+	double g_1 = 14.875;
+	int32_t c_0 = 0;
+	uintptr_t t_1 = func float4(uintptr_t): int32_t;
+	uintptr_t t_2 = func double2(uintptr_t): int32_t;
+	l_1 = START(l_12);
+	uintptr_t a, l_2 = ALLOCA(l_1, c_32, 16);
+	l_3 = STORE(l_2, a, f_0);
+	uintptr_t a_4 = ADD(a, c_4);
+	l_4 = STORE(l_3, a_4, f_1);
+	uintptr_t a_8 = ADD(a, c_8);
+	l_5 = STORE(l_4, a_8, f_2);
+	uintptr_t a_12 = ADD(a, c_12);
+	l_6 = STORE(l_5, a_12, f_3);
+	int32_t r_1, l_7 = CALL/1(l_6, t_1, a);
+	uintptr_t b, l_8 = ALLOCA(l_7, c_32, 16);
+	l_9 = STORE(l_8, b, g_0);
+	uintptr_t b_8 = ADD(b, c_8);
+	l_10 = STORE(l_9, b_8, g_1);
+	int32_t r_2, l_11 = CALL/1(l_10, t_2, b);
+	l_12 = RETURN(l_11, c_0);
+}
+--EXPECT--
+0 14 3 8
+0 14 3 8
+0 14 3 8
+0 14 3 8
+0 14 3 8
+0 14
+0 14
+0 14
+0 14
+0 14

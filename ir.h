@@ -667,16 +667,6 @@ void ir_strtab_free(ir_strtab *strtab);
 #define IR_OPT_TAILCALL        (1<<24)
 #define IR_NO_OPT              (1<<25)
 
-/* debug related */
-#ifdef IR_DEBUG
-# define IR_DEBUG_SCCP         (1<<26)
-# define IR_DEBUG_GCM          (1<<27)
-# define IR_DEBUG_GCM_SPLIT    (1<<28)
-# define IR_DEBUG_SCHEDULE     (1<<29)
-# define IR_DEBUG_RA           (1<<30)
-# define IR_DEBUG_BB_SCHEDULE  (1U<<31)
-#endif
-
 /* Calling Conventions */
 #define IR_CC_DEFAULT          0x00
 #define IR_CC_BUILTIN          0x01
@@ -694,6 +684,15 @@ void ir_strtab_free(ir_strtab *strtab);
 /* Deprecated constants */
 #define IR_BUILTIN_FUNC        IR_CC_BUILTIN
 #define IR_FASTCALL_FUNC       IR_CC_FASTCALL
+
+/* Flags for ir_ctx.debug_flags (they work only in "debug" build) */
+#define IR_DEBUG_SCCP          (1<<0)
+#define IR_DEBUG_GCM           (1<<1)
+#define IR_DEBUG_GCM_SPLIT     (1<<2)
+#define IR_DEBUG_SCHEDULE      (1<<3)
+#define IR_DEBUG_RA            (1<<4)
+#define IR_DEBUG_BB_SCHEDULE   (1<<5)
+#define IR_DEBUG_DESSA         (1<<6)
 
 typedef struct _ir_ctx           ir_ctx;
 typedef struct _ir_use_list      ir_use_list;
@@ -739,6 +738,7 @@ struct _ir_ctx {
 	uint32_t           flags2;                  /* IR context private flags (see IR_* defines in ir_private.h) */
 	ir_type            ret_type;                /* Function return type */
 	uint32_t           mflags;                  /* CPU specific flags (see IR_X86_... macros below) */
+	uint32_t           debug_flags;             /* Debug flags (see IR_DEBUG_... macros, work only in DEBUG build) */
 	int32_t            status;                  /* non-zero error code (see IR_ERROR_... macros), app may use negative codes */
 	ir_ref             fold_cse_limit;          /* CSE finds identical insns backward from "insn_count" to "fold_cse_limit" */
 	ir_insn            fold_insn;               /* temporary storage for folding engine */

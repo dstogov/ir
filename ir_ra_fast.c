@@ -66,12 +66,12 @@ typedef struct {
 #  define IR_REG_NAME_VAL(_reg, _type) ir_reg_name(IR_REG_NUM(_reg), _type)
 # endif
 # define IR_LOG(comment) do { \
-		if (ctx->flags & IR_DEBUG_RA) { \
+		if (ctx->debug_flags & IR_DEBUG_RA) { \
 			fprintf(stderr, "---- %s\n", comment); \
 		} \
 	} while (0)
 # define IR_LOG_ASSIGN(_ref, _pos, _x, _y, _reg) do { \
-		if (ctx->flags & IR_DEBUG_RA) { \
+		if (ctx->debug_flags & IR_DEBUG_RA) { \
 			fprintf(stderr, "  ---- Assign R%d (d_%d) to " IR_REG_NAME_FMT "%s at %d (%d.%d)\n", \
 				ctx->vregs[_ref], _ref, \
 				IR_REG_NAME_VAL(_reg, ctx->ir_base[_ref].type), \
@@ -80,7 +80,7 @@ typedef struct {
 		} \
 	} while (0)
 # define IR_LOG_ASSIGN_TMP(_type, _pos, _x, _y, _reg) do { \
-		if (ctx->flags & IR_DEBUG_RA) { \
+		if (ctx->debug_flags & IR_DEBUG_RA) { \
 			fprintf(stderr, "  ---- Assign TMP to " IR_REG_NAME_FMT "%s at %d (%d.%d)\n", \
 				IR_REG_NAME_VAL(_reg, _type), \
 				(((_reg) & IR_REG_SPILL_LOAD) ? " (spill)" : ""), \
@@ -88,33 +88,33 @@ typedef struct {
 		} \
 	} while (0)
 # define IR_LOG_ASSIGN_VAR(_var, _spill) do { \
-		if (IR_DEBUG_SPILLS && (ctx->flags & IR_DEBUG_RA)) { \
+		if (IR_DEBUG_SPILLS && (ctx->debug_flags & IR_DEBUG_RA)) { \
 			fprintf(stderr, "  ---- Spill VAR d_%d to 0x%x\n", \
 				_var, _spill); \
 		} \
 	} while (0)
 # define IR_LOG_ASSIGN_SPILL(_vreg, _spill) do { \
-		if (IR_DEBUG_SPILLS && (ctx->flags & IR_DEBUG_RA)) { \
+		if (IR_DEBUG_SPILLS && (ctx->debug_flags & IR_DEBUG_RA)) { \
 			fprintf(stderr, "  ---- Spill R%d to 0x%x\n", \
 				_vreg, _spill); \
 		} \
 	} while (0)
 # define IR_LOG_FREE(_ref, _reg) do { \
-		if (ctx->flags & IR_DEBUG_RA) { \
+		if (ctx->debug_flags & IR_DEBUG_RA) { \
 			fprintf(stderr, "  ---- Free R%d(d_%d) assigned to " IR_REG_NAME_FMT "\n", \
 				ctx->vregs[_ref], _ref, \
 				IR_REG_NAME_VAL(_reg, ctx->ir_base[_ref].type)); \
 		} \
 	} while (0)
 # define IR_LOG_EVICT(_ref, _reg) do { \
-		if (ctx->flags & IR_DEBUG_RA) { \
+		if (ctx->debug_flags & IR_DEBUG_RA) { \
 			fprintf(stderr, "  ---- Evict R%d(d_%d) assigned to " IR_REG_NAME_FMT "\n", \
 				ctx->vregs[_ref], _ref, \
 				IR_REG_NAME_VAL(_reg, ctx->ir_base[_ref].type)); \
 		} \
 	} while (0)
 # define IR_LOG_SPILL_LOAD(_ref, _pos, _x, _y, _reg) do { \
-		if (ctx->flags & IR_DEBUG_RA) { \
+		if (ctx->debug_flags & IR_DEBUG_RA) { \
 			fprintf(stderr, "  ---- Add Spill Load R%d (d_%d) to " IR_REG_NAME_FMT " at %d (%d.%d)\n", \
 				ctx->vregs[_ref], _ref, \
 				IR_REG_NAME_VAL(_reg, ctx->ir_base[_ref].type), \
@@ -738,10 +738,44 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 
 			/* Add tmp registers for MEM->MEM DESSA moves */
 			if (needs_tmp_gp) {
-				ctx->regs[bb->end][0] = _pick_reg(ctx, &data, IR_I32, IR_REGSET_EMPTY, IR_USE_MUST_BE_IN_REG, 0, 0);
+				reg = _pick_free_reg(ctx, &data, IR_I32, 0, 0);
+				if (reg == IR_REG_NONE) {
+					reg = _pick_reg(ctx, &data, IR_I32, IR_REGSET_EMPTY, IR_USE_MUST_BE_IN_REG, 0, 0);
+					/* clear the assignment of the evicted register(s) */
+					n = use_list->count;
+					for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
+						ir_ref use = *p;
+						ir_reg old_reg = ir_get_alocated_reg(ctx, use, k);
+						if (old_reg == reg) {
+							ir_set_alocated_reg(ctx, use, k, IR_REG_NONE);
+						}
+#if IR_X86_I64
+						if (old_reg != IR_REG_NONE
+						 && (ctx->ir_base[use].type == IR_I64 || ctx->ir_base[use].type == IR_U64)) {
+							if (IR_REG_I64_LO(old_reg) == reg || IR_REG_I64_HI(old_reg) == reg) {
+								ir_set_alocated_reg(ctx, use, k, IR_REG_NONE);
+							}
+						}
+#endif
+					}
+				}
+				ctx->regs[bb->end][0] = reg;
 			}
 			if (needs_tmp_fp) {
-				ctx->regs[bb->end][1] = _pick_reg(ctx, &data, IR_DOUBLE, IR_REGSET_EMPTY, IR_USE_MUST_BE_IN_REG, 0, 0);
+				reg = _pick_free_reg(ctx, &data, IR_DOUBLE, 0, 0);
+				if (reg == IR_REG_NONE) {
+					reg = _pick_reg(ctx, &data, IR_DOUBLE, IR_REGSET_EMPTY, IR_USE_MUST_BE_IN_REG, 0, 0);
+					/* clear the assignment of the evicted register */
+					n = use_list->count;
+					for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
+						ir_ref use = *p;
+						ir_reg old_reg = ir_get_alocated_reg(ctx, use, k);
+						if (old_reg == reg) {
+							ir_set_alocated_reg(ctx, use, k, IR_REG_NONE);
+						}
+					}
+				}
+				ctx->regs[bb->end][1] = reg;
 			}
 		}
 

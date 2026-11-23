@@ -56,8 +56,8 @@ test:
 	ldr d2, .L4
 	fsub d1, d1, d2
 	fmov d3, xzr
-	mov w0, wzr
 	fmov d2, xzr
+	mov w0, wzr
 	b .L2
 .L1:
 	fmul d3, d2, d3

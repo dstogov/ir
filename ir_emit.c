@@ -693,6 +693,69 @@ static int ir_parallel_copy(ir_ctx *ctx, ir_copy *copies, int count, ir_reg tmp_
 	return 1;
 }
 
+#if IR_DEBUG
+# define DESSA_STACK ((ir_ref)(0x80000000))
+
+static void _print_dessa_operand(ir_ctx *ctx, ir_mem *mem_slots, ir_ref from, ir_type type)
+{
+	if (from == DESSA_STACK) {
+		fprintf(stderr, "STACK");
+	} else if (from < 0) {
+		if (-from < ctx->consts_count) {
+			ir_print_const(ctx, &ctx->ir_base[from], stderr, 1);
+		} else {
+			ir_reg base = (ctx->flags & IR_USE_FRAME_POINTER) ? IR_REG_FRAME_POINTER : IR_REG_STACK_POINTER;
+			int32_t offset = ir_local_offset(ctx, -from - ctx->consts_count);
+			if (offset >= 0) {
+				fprintf(stderr, "([%%%s+0x%x])", _ir_reg_name[base], offset);
+			} else {
+				fprintf(stderr, "([%%%s-0x%x])", _ir_reg_name[base], -offset);
+			}
+		}
+	} else if (from < IR_REG_NUM) {
+#if IR_X86_I64
+		if (type == IR_U32_HI) {
+			type = IR_U32;
+		}
+#endif
+		fprintf(stderr, "%%%s", ir_reg_name(from, type));
+	} else {
+		ir_mem mem = mem_slots[from - IR_REG_NUM];
+		if (IR_MEM_OFFSET(mem) >= 0) {
+			fprintf(stderr, "[%%%s+0x%x]", _ir_reg_name[IR_MEM_BASE(mem)], IR_MEM_OFFSET(mem));
+		} else {
+			fprintf(stderr, "[%%%s-0x%x]", _ir_reg_name[IR_MEM_BASE(mem)], -IR_MEM_OFFSET(mem));
+		}
+	}
+}
+
+static void _print_dessa_op(ir_ctx *ctx, ir_mem *mem_slots, const char *op, ir_ref from, const char *sep, ir_ref to, ir_type type, const char *comments)
+{
+	fprintf(stderr, "\t%s ", op);
+	_print_dessa_operand(ctx, mem_slots, from, type);
+	fprintf(stderr, " %s ", sep);
+	_print_dessa_operand(ctx, mem_slots, to, type);
+	if (comments) {
+		fprintf(stderr, " ; %s", comments);
+	}
+	fprintf(stderr, "\n");
+}
+
+# define DESSA_LOG(op, from, sep, to, type) do { \
+		if (ctx->debug_flags & IR_DEBUG_DESSA) { \
+			_print_dessa_op(ctx, mem_slots, op, from, sep, to, type, NULL); \
+		} \
+	} while (0)
+# define DESSA_LOG_EX(op, from, sep, to, type, comments) do { \
+		if (ctx->debug_flags & IR_DEBUG_DESSA) { \
+			_print_dessa_op(ctx, mem_slots, op, from, sep, to, type, comments); \
+		} \
+	} while (0)
+#else
+# define DESSA_LOG(op, from, sep, to, type)
+# define DESSA_LOG_EX(op, from, sep, to, type, comments)
+#endif
+
 static void ir_emit_dessa_move(ir_ctx *ctx, ir_mem *mem_slots,
                                ir_type type, ir_ref to, ir_ref from,
                                ir_reg tmp_reg, ir_reg tmp_fp_reg)
@@ -703,24 +766,33 @@ static void ir_emit_dessa_move(ir_ctx *ctx, ir_mem *mem_slots,
 	if (to < IR_REG_NUM) {
 		if (IR_IS_CONST_REF(from)) {
 			if (-from < ctx->consts_count) {
+				/* constant reference */
 #if IR_X86_I64
 				if (type == IR_U32_HI) {
+					DESSA_LOG_EX("MOVE", from, "->", to, type, "move high bits of 64-bit");
 					ir_emit_load_i64_hi(ctx, to, from);
-				} else
-#endif
-				/* constant reference */
+				} else {
+					DESSA_LOG("MOVE", from, "->", to, type);
+					ir_emit_load(ctx, type, to, from);
+				}
+#else
+				DESSA_LOG("MOVE", from, "->", to, type);
 				ir_emit_load(ctx, type, to, from);
+#endif
 			} else {
 				/* local variable address */
+				DESSA_LOG("MOVE", from, "->", to, type);
 				ir_load_local_addr(ctx, to, -from - ctx->consts_count);
 			}
 		} else if (from < IR_REG_NUM) {
+			DESSA_LOG("MOVE", from, "->", to, type);
 			if (IR_IS_TYPE_INT(type)) {
 				ir_emit_mov(ctx, type, to, from);
 			} else {
 				ir_emit_fp_mov(ctx, type, to, from);
 			}
 		} else {
+			DESSA_LOG("MOVE", from, "->", to, type);
 			mem_from = mem_slots[from - IR_REG_NUM];
 			ir_emit_load_mem(ctx, type, to, mem_from);
 		}
@@ -732,9 +804,12 @@ static void ir_emit_dessa_move(ir_ctx *ctx, ir_mem *mem_slots,
 #if IR_X86_I64
 				if (type == IR_U32_HI) {
 #if defined(IR_TARGET_X86) || defined(IR_TARGET_X64)
+					DESSA_LOG_EX("MOVE", from, "->", to, type, "move high bits of 64-bit");
 					ir_emit_store_mem_imm(ctx, IR_U32, mem_to, ctx->ir_base[from].val.u32_hi);
 #else
 					IR_ASSERT(tmp_reg != IR_REG_NONE);
+					DESSA_LOG_EX("MOVE", from, "->", tmp_reg, type, "load high bits of 64-bit into TMP");
+					DESSA_LOG_EX("MOVE", tmp_tmp, "->", to, type, "move high bits of 64-bit");
 					ir_emit_load_i64_hi(ctx, tmp_reg, from);
 					ir_emit_store_mem(ctx, IR_U32, mem_to, tmp_reg);
 #endif
@@ -745,28 +820,36 @@ static void ir_emit_dessa_move(ir_ctx *ctx, ir_mem *mem_slots,
 				if (IR_IS_TYPE_INT(type)
 				 && !IR_IS_SYM_CONST(ctx->ir_base[from].op)
 				 && (ir_type_size[type] != 8 || IR_IS_SIGNED_32BIT(ctx->ir_base[from].val.i64))) {
+					DESSA_LOG("MOVE", from, "->", to, type);
 					ir_emit_store_mem_imm(ctx, type, mem_to, ctx->ir_base[from].val.i32);
 					return;
 				}
 #endif
 				ir_reg tmp = IR_IS_TYPE_INT(type) ? tmp_reg : tmp_fp_reg;
 				IR_ASSERT(tmp != IR_REG_NONE);
+				DESSA_LOG_EX("MOVE", from, "->", tmp, type, "load into TMP");
+				DESSA_LOG("MOVE", tmp, "->", to, type);
 				ir_emit_load(ctx, type, tmp, from);
 				ir_emit_store_mem(ctx, type, mem_to, tmp);
 			} else {
 				/* local variable address */
 				IR_ASSERT(IR_IS_TYPE_INT(type));
 				IR_ASSERT(tmp_reg != IR_REG_NONE);
+				DESSA_LOG_EX("MOVE", from, "->", tmp_reg, type, "load into TMP");
+				DESSA_LOG("MOVE", tmp_reg, "->", to, type);
 				ir_load_local_addr(ctx, tmp_reg, -from - ctx->consts_count);
 				ir_emit_store_mem(ctx, type, mem_to, tmp_reg);
 			}
 		} else if (from < IR_REG_NUM) {
+			DESSA_LOG("MOVE", from, "->", to, type);
 			ir_emit_store_mem(ctx, type, mem_to, from);
 		} else {
 			mem_from = mem_slots[from - IR_REG_NUM];
 			IR_ASSERT(IR_MEM_VAL(mem_to) != IR_MEM_VAL(mem_from));
 			ir_reg tmp = IR_IS_TYPE_INT(type) ?  tmp_reg : tmp_fp_reg;
 			IR_ASSERT(tmp != IR_REG_NONE);
+			DESSA_LOG_EX("MOVE", from, "->", tmp, type, "load into TMP");
+			DESSA_LOG("MOVE", tmp, "->", to, type);
 			ir_emit_load_mem(ctx, type, tmp, mem_from);
 			ir_emit_store_mem(ctx, type, mem_to, tmp);
 		}
@@ -790,6 +873,18 @@ IR_ALWAYS_INLINE void ir_dessa_resolve_cycle(ir_ctx *ctx, ir_mem *mem_slots, int
 	IR_ASSERT(from != to);
 	IR_ASSERT(loc[from] == from);
 
+#if IR_DEBUG
+	if (ctx->debug_flags & IR_DEBUG_DESSA) {
+		fprintf(stderr, "\t; cycle: ");
+		do {
+			_print_dessa_operand(ctx, mem_slots, to, types[pred[to]]);
+			fprintf(stderr, " -> ");
+			to = pred[to];
+		} while (to != root);
+		fprintf(stderr, "\n");
+	}
+#endif
+
 	if (IR_IS_TYPE_INT(type)) {
 #ifdef IR_HAVE_SWAP_INT
 		if (pred[from] == to && to < IR_REG_NUM && from < IR_REG_NUM) {
@@ -797,6 +892,7 @@ IR_ALWAYS_INLINE void ir_dessa_resolve_cycle(ir_ctx *ctx, ir_mem *mem_slots, int
 			if (ir_type_size[types[to]] > ir_type_size[type]) {
 				type = types[to];
 			}
+			DESSA_LOG("SWAP", from, "<->", to, type);
 			ir_emit_swap(ctx, type, to, from);
 			ir_bitset_excl(todo, from);
 			ir_bitset_excl(todo, to);
@@ -808,6 +904,7 @@ IR_ALWAYS_INLINE void ir_dessa_resolve_cycle(ir_ctx *ctx, ir_mem *mem_slots, int
 		IR_ASSERT(tmp_reg != IR_REG_NONE);
 		IR_ASSERT(tmp_reg >= IR_REG_GP_FIRST && tmp_reg <= IR_REG_GP_LAST);
 		loc[to] = tmp_reg;
+		DESSA_LOG_EX("MOVE", to, "->", tmp_reg, type, "breake cycle, move root into TMP");
 		if (to < IR_REG_NUM) {
 			ir_emit_mov(ctx, type, tmp_reg, to);
 		} else {
@@ -817,6 +914,7 @@ IR_ALWAYS_INLINE void ir_dessa_resolve_cycle(ir_ctx *ctx, ir_mem *mem_slots, int
 #ifdef IR_HAVE_SWAP_FP
 		if (pred[from] == to && to < IR_REG_NUM && from < IR_REG_NUM && types[to] == type) {
 			/* a simple cycle from 2 elements */
+			DESSA_LOG("SWAP", from, "<->", to, type);
 			ir_emit_swap_fp(ctx, type, to, from);
 			IR_REGSET_EXCL(todo, from);
 			IR_REGSET_EXCL(todo, to);
@@ -828,6 +926,7 @@ IR_ALWAYS_INLINE void ir_dessa_resolve_cycle(ir_ctx *ctx, ir_mem *mem_slots, int
 		IR_ASSERT(tmp_fp_reg != IR_REG_NONE);
 		IR_ASSERT(tmp_fp_reg >= IR_REG_FP_FIRST && tmp_fp_reg <= IR_REG_FP_LAST);
 		loc[to] = tmp_fp_reg;
+		DESSA_LOG_EX("MOVE", to, "->", tmp_fp_reg, type, "break cycle, move into TMP");
 		if (to < IR_REG_NUM) {
 			ir_emit_fp_mov(ctx, type, tmp_fp_reg, to);
 		} else {
@@ -850,6 +949,7 @@ IR_ALWAYS_INLINE void ir_dessa_resolve_cycle(ir_ctx *ctx, ir_mem *mem_slots, int
 
 			if (!IR_MEM_VAL(tmp_spill_slot)) {
 				/* Free a register, saving it in a temporary spill slot */
+				DESSA_LOG_EX("MOVE", tmp, "->", DESSA_STACK, type, "free TMP");
 				tmp_spill_slot = IR_MEM_BO(IR_REG_STACK_POINTER, -16);
 				ir_emit_store_mem(ctx, type, tmp_spill_slot, tmp);
 			}
@@ -864,7 +964,9 @@ IR_ALWAYS_INLINE void ir_dessa_resolve_cycle(ir_ctx *ctx, ir_mem *mem_slots, int
 
 	type = types[to];
 	if (IR_MEM_VAL(tmp_spill_slot)) {
-		ir_emit_load_mem(ctx, type, IR_IS_TYPE_INT(type) ? tmp_reg : tmp_fp_reg, tmp_spill_slot);
+		ir_reg reg = IR_IS_TYPE_INT(type) ? tmp_reg : tmp_fp_reg;
+		DESSA_LOG_EX("MOVE", DESSA_STACK, "->", reg, type, "restore TMP");
+		ir_emit_load_mem(ctx, type, reg, tmp_spill_slot);
 	}
 	ir_emit_dessa_move(ctx, mem_slots, type, to, loc[from], IR_REG_NONE, IR_REG_NONE);
 	ir_bitset_excl(todo, to);
@@ -955,7 +1057,10 @@ static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_dessa_copy *copies, int count,
 		to = pred[to];
 		while (!IR_IS_CONST_REF(to) && ir_bitset_in(ready, to)) {
 			to = pred[to];
-			IR_ASSERT(!IR_IS_CONST_REF(to));
+			if (IR_IS_CONST_REF(to)) {
+				/* not a cycle: the chain ends in a constant */
+				break;
+			}
 			if (ir_bitset_in(visited, to)) {
 				/* We found a cycle. Resolve it. */
 				ir_bitset_incl(visited, to);
@@ -968,55 +1073,15 @@ static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_dessa_copy *copies, int count,
 	}
 
 	/* finally we resolve remaining "windmill blades" - trees that set temporary registers */
-	if (tmp_reg != IR_REG_NONE && ir_bitset_in(todo, tmp_reg)) {
-		ir_mem tmp_spill_slot;
-		ir_type tmp_type;
-
-		ir_bitset_clear(ready, len);
-		to = tmp_reg;
-		tmp_type = types[to];
-		IR_MEM_VAL(tmp_spill_slot) = 0;
-		do {
-			ir_bitset_excl(todo, to);
-			type = types[to];
-			from = pred[to];
-			if (IR_IS_CONST_REF(from)) {
-				if (to >= IR_REG_NUM) {
-					/* Immediate to memory move inside a "blocked" blade requres an additional temporary register */
-					if (!IR_MEM_VAL(tmp_spill_slot)) {
-						/* Free a register, saving it in a temporary spill slot */
-						tmp_spill_slot = IR_MEM_BO(IR_REG_STACK_POINTER, -16);
-						ir_emit_store_mem(ctx, tmp_type, tmp_spill_slot, tmp_reg);
-					}
-				}
-				ir_emit_dessa_move(ctx, mem_slots, type, to, from, tmp_reg, tmp_fp_reg);
-			} else {
-				int32_t r = loc[from];
-
-				/* Memory to memory move inside a "blocked" blade requres an additional temporary register */
-				if (to >= IR_REG_NUM && r >= IR_REG_NUM) {
-					if (!IR_MEM_VAL(tmp_spill_slot)) {
-						/* Free a register, saving it in a temporary spill slot */
-						tmp_spill_slot = IR_MEM_BO(IR_REG_STACK_POINTER, -16);
-						ir_emit_store_mem(ctx, tmp_type, tmp_spill_slot, tmp_reg);
-					}
-				}
-				ir_emit_dessa_move(ctx, mem_slots, type, to, r, tmp_reg, tmp_fp_reg);
-				loc[from] = to;
-				if (from == r && ir_bitset_in(todo, from)) {
-					ir_bitset_incl(ready, from);
-				}
-			}
-		} while ((to = ir_bitset_pop_first(ready, len)) >= 0);
-
-		if (IR_MEM_VAL(tmp_spill_slot)) {
-			ir_emit_load_mem(ctx, tmp_type, tmp_reg, tmp_spill_slot);
-		}
-	}
-
 	if (tmp_fp_reg != IR_REG_NONE && ir_bitset_in(todo, tmp_fp_reg)) {
 		ir_mem tmp_spill_slot;
 		ir_type tmp_type;
+
+#if IR_DEBUG
+		if (ctx->debug_flags & IR_DEBUG_DESSA) {
+			fprintf(stderr, "\t; final tmp_fp_reg blade:\n");
+		}
+#endif
 
 		ir_bitset_clear(ready, len);
 		to = tmp_fp_reg;
@@ -1031,6 +1096,7 @@ static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_dessa_copy *copies, int count,
 				if (to >= IR_REG_NUM) {
 					if (!IR_MEM_VAL(tmp_spill_slot)) {
 						/* Free a register, saving it in a temporary spill slot */
+						DESSA_LOG_EX("MOVE", tmp_fp_reg, "->", DESSA_STACK, tmp_type, "free TMP");
 						tmp_spill_slot = IR_MEM_BO(IR_REG_STACK_POINTER, -16);
 						ir_emit_store_mem(ctx, tmp_type, tmp_spill_slot, tmp_fp_reg);
 					}
@@ -1043,6 +1109,7 @@ static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_dessa_copy *copies, int count,
 				if (to >= IR_REG_NUM && r >= IR_REG_NUM) {
 					if (!IR_MEM_VAL(tmp_spill_slot)) {
 						/* Free a register, saving it in a temporary spill slot */
+						DESSA_LOG_EX("MOVE", tmp_fp_reg, "->", DESSA_STACK, tmp_type, "frss TMP");
 						tmp_spill_slot = IR_MEM_BO(IR_REG_STACK_POINTER, -16);
 						ir_emit_store_mem(ctx, tmp_type, tmp_spill_slot, tmp_fp_reg);
 					}
@@ -1056,7 +1123,63 @@ static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_dessa_copy *copies, int count,
 		} while ((to = ir_bitset_pop_first(ready, len)) >= 0);
 
 		if (IR_MEM_VAL(tmp_spill_slot)) {
+			DESSA_LOG_EX("MOVE", DESSA_STACK, "->", tmp_fp_reg, tmp_type, "restore TMP");
 			ir_emit_load_mem(ctx, tmp_type, tmp_fp_reg, tmp_spill_slot);
+		}
+	}
+
+	if (tmp_reg != IR_REG_NONE && ir_bitset_in(todo, tmp_reg)) {
+		ir_mem tmp_spill_slot;
+		ir_type tmp_type;
+
+#if IR_DEBUG
+		if (ctx->debug_flags & IR_DEBUG_DESSA) {
+			fprintf(stderr, "\t; final tmp_reg blade:\n");
+		}
+#endif
+
+		ir_bitset_clear(ready, len);
+		to = tmp_reg;
+		tmp_type = types[to];
+		IR_MEM_VAL(tmp_spill_slot) = 0;
+		do {
+			ir_bitset_excl(todo, to);
+			type = types[to];
+			from = pred[to];
+			if (IR_IS_CONST_REF(from)) {
+				if (to >= IR_REG_NUM) {
+					/* Immediate to memory move inside a "blocked" blade requres an additional temporary register */
+					if (!IR_MEM_VAL(tmp_spill_slot)) {
+						/* Free a register, saving it in a temporary spill slot */
+						DESSA_LOG_EX("MOVE", tmp_reg, "->", DESSA_STACK, tmp_type, "free TMP");
+						tmp_spill_slot = IR_MEM_BO(IR_REG_STACK_POINTER, -16);
+						ir_emit_store_mem(ctx, tmp_type, tmp_spill_slot, tmp_reg);
+					}
+				}
+				ir_emit_dessa_move(ctx, mem_slots, type, to, from, tmp_reg, tmp_fp_reg);
+			} else {
+				int32_t r = loc[from];
+
+				/* Memory to memory move inside a "blocked" blade requres an additional temporary register */
+				if (to >= IR_REG_NUM && r >= IR_REG_NUM) {
+					if (!IR_MEM_VAL(tmp_spill_slot)) {
+						/* Free a register, saving it in a temporary spill slot */
+						DESSA_LOG_EX("MOVE", tmp_reg, "->", DESSA_STACK, tmp_type, "free TMP");
+						tmp_spill_slot = IR_MEM_BO(IR_REG_STACK_POINTER, -16);
+						ir_emit_store_mem(ctx, tmp_type, tmp_spill_slot, tmp_reg);
+					}
+				}
+				ir_emit_dessa_move(ctx, mem_slots, type, to, r, tmp_reg, tmp_fp_reg);
+				loc[from] = to;
+				if (from == r && ir_bitset_in(todo, from)) {
+					ir_bitset_incl(ready, from);
+				}
+			}
+		} while ((to = ir_bitset_pop_first(ready, len)) >= 0);
+
+		if (IR_MEM_VAL(tmp_spill_slot)) {
+			DESSA_LOG_EX("MOVE", DESSA_STACK, "->", tmp_reg, tmp_type, "restore TMP");
+			ir_emit_load_mem(ctx, tmp_type, tmp_reg, tmp_spill_slot);
 		}
 	}
 
@@ -1232,7 +1355,32 @@ static void ir_emit_dessa_moves(ir_ctx *ctx, int b, ir_block *bb)
 	}
 
 	if (n > 0) {
+#ifdef IR_DEBUG
+		if (ctx->debug_flags & IR_DEBUG_DESSA) {
+			uint32_t i;
+
+			fprintf(stderr, "DESSA: BB%d -> BB%d (copy_count=%d", b, succ, n);
+			if (tmp_reg != IR_REG_NONE) {
+				fprintf(stderr, " tmp_reg=%%%s", _ir_reg_name[tmp_reg]);
+			}
+			if (tmp_fp_reg != IR_REG_NONE) {
+				fprintf(stderr, " tmp_fp_reg=%%%s", _ir_reg_name[tmp_fp_reg]);
+			}
+			fprintf(stderr, ") {\n");
+			for (i = 0; i < n; i++) {
+				_print_dessa_op(ctx, mem_slots, "COPY", copies[i].from, "=>", copies[i].to, copies[i].type, NULL);
+			}
+			fprintf(stderr, "====\n");
+		}
+#endif
+
 		ir_dessa_parallel_copy(ctx, copies, n, mem_slots, mem_slots_count, tmp_reg, tmp_fp_reg);
+
+#ifdef IR_DEBUG
+		if (ctx->debug_flags & IR_DEBUG_DESSA) {
+			fprintf(stderr, "}\n");
+		}
+#endif
 	}
 }
 

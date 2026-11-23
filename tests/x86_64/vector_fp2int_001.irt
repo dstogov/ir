@@ -1,0 +1,27 @@
+--TEST--
+001: vector FP2INT double to uint8 with AVX
+--ARGS--
+-S -O2 -mavx
+--CODE--
+{
+	uintptr_t c_16 = 16;
+	l_1 = START(l_4);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	uintptr_t q = PARAM(l_1, "q", 2);
+	<double*2> v, l_2 = LOAD(l_1, p);
+	<uint8_t*2> r = FP2INT(v);
+	l_3 = STORE(l_2, q, r);
+	uintptr_t q2 = ADD(q, c_16);
+	l_5 = STORE(l_3, q2, v);
+	l_4 = RETURN(l_5);
+}
+--EXPECT--
+test:
+	vmovapd (%rdi), %xmm0
+	vcvttpd2dq %xmm0, %xmm1
+	vpshuflw $0xe8, %xmm1, %xmm1
+	vpackuswb %xmm1, %xmm1, %xmm1
+	vmovd %xmm1, %eax
+	movw %ax, (%rsi)
+	vmovapd %xmm0, 0x10(%rsi)
+	retq

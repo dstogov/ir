@@ -2607,7 +2607,8 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_store_i(ir_ctx *ctx, ir_ref ref, ir_ref
 								}
 								if (!IR_IS_CONST_REF(insn->op3)) {
 									ir_use_list_remove_one(ctx, insn->op3, ref);
-									if (ctx->iter_worklist && ctx->use_lists[insn->op3].count == 0) {
+									if (ctx->iter_worklist && (ctx->use_lists[insn->op3].count == 0
+									 || ir_is_dead_load(ctx, insn->op3))) {
 										ir_bitqueue_add(ctx->iter_worklist, insn->op3);
 									}
 								}
@@ -2710,7 +2711,8 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_vstore_i(ir_ctx *ctx, ir_ref ref, ir_re
 							}
 							if (!IR_IS_CONST_REF(insn->op3)) {
 								ir_use_list_remove_one(ctx, insn->op3, ref);
-								if (ctx->iter_worklist && ctx->use_lists[insn->op3].count == 0) {
+								if (ctx->iter_worklist && (ctx->use_lists[insn->op3].count == 0
+								 || ir_is_dead_load(ctx, insn->op3))) {
 									ir_bitqueue_add(ctx->iter_worklist, insn->op3);
 								}
 							}

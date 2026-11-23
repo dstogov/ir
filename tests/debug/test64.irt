@@ -55,8 +55,8 @@ Mandelbrot Test
 test:
 	subsd .L4(%rip), %xmm1
 	xorpd %xmm3, %xmm3
-	movabsq $0x200000000, %rax
 	xorpd %xmm2, %xmm2
+	movabsq $0x200000000, %rax
 	jmp .L2
 	nop
 	nop

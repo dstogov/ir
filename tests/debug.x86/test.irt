@@ -57,8 +57,8 @@ test:
 	movsd 0xc(%esp), %xmm1
 	subsd .L4, %xmm1
 	xorpd %xmm3, %xmm3
-	xorl %eax, %eax
 	xorpd %xmm2, %xmm2
+	xorl %eax, %eax
 	jmp .L2
 .L1:
 	mulsd %xmm2, %xmm3

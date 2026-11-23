@@ -1,0 +1,35 @@
+--TEST--
+AArch64 1-byte vector stores preserve a large frame offset
+--CODE--
+func main(): int32_t
+{
+	uintptr_t n = 8208;
+	uintptr_t off1 = 4000;
+	uintptr_t off2 = 4096;
+	uintptr_t offsrc = 8;
+	uint64_t marker = 12345;
+	uint64_t zero = 0;
+	uintptr_t print = func printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%llu %llu %llu\n";
+	int32_t rc = 0;
+	l_1 = START(l_ret);
+	uintptr_t p, l_2 = ALLOCA(l_1, n, 16);
+	uintptr_t p1 = ADD(p, off1);
+	uintptr_t p2 = ADD(p, off2);
+	uintptr_t src = ADD(p, offsrc);
+	l_3 = STORE_v(l_2, p, marker);
+	l_4 = STORE_v(l_3, p1, marker);
+	l_5 = STORE_v(l_4, p2, marker);
+	l_6 = STORE_v(l_5, src, zero);
+	<uint8_t*1> v1, l_7 = LOAD_v(l_6, src);
+	l_s1 = STORE_v(l_7, p1, v1);
+	<uint8_t*1> v2, l_s2 = LOAD_v(l_s1, src);
+	l_8 = STORE_v(l_s2, p2, v2);
+	uint64_t a, l_9 = LOAD_v(l_8, p);
+	uint64_t b, l_10 = LOAD_v(l_9, p1);
+	uint64_t c, l_11 = LOAD_v(l_10, p2);
+	int32_t d, l_12 = CALL/4(l_11, print, fmt, a, b, c);
+	l_ret = RETURN(l_12, rc);
+}
+--EXPECT--
+12345 12288 12288
