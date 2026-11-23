@@ -1,0 +1,53 @@
+--TEST--
+VA_ARG 011: unused 64-bit integer and double VA_ARGs still advance the va_list
+--TARGET--
+*64*
+--CODE--
+func test1(int32_t, ...): uint64_t
+{
+	int32_t c_1 = 32;
+	l_1 = START(l_8);
+	int32_t d_2 = PARAM(l_1, "n", 1);
+	uintptr_t d_3, l_3 = ALLOCA(l_1, c_1);
+	l_4 = VA_START(l_3, d_3);
+	uint64_t d_5, l_5 = VA_ARG(l_4, d_3);
+	uintptr_t d_6 = BITCAST(d_5);
+	int32_t d_7, l_6 = LOAD(l_5, d_6);
+	uint64_t d_8, l_7 = VA_ARG(l_6, d_3);
+	l_9 = VA_END(l_7, d_3);
+	l_8 = RETURN(l_9, d_8);
+}
+func test2(int32_t, ...): double
+{
+	int32_t c_1 = 32;
+	l_1 = START(l_8);
+	int32_t d_2 = PARAM(l_1, "n", 1);
+	uintptr_t d_3, l_3 = ALLOCA(l_1, c_1);
+	l_4 = VA_START(l_3, d_3);
+	double d_5, l_5 = VA_ARG(l_4, d_3);
+	uint64_t d_6 = BITCAST(d_5);
+	uintptr_t d_7 = BITCAST(d_6);
+	int32_t d_8, l_6 = LOAD(l_5, d_7);
+	double d_9, l_7 = VA_ARG(l_6, d_3);
+	l_9 = VA_END(l_7, d_3);
+	l_8 = RETURN(l_9, d_9);
+}
+func main(): int32_t
+{
+	int32_t c_1 = 0;
+	uint64_t c_2 = 17;
+	uint64_t c_3 = 23;
+	double c_4 = 3.25;
+	double c_5 = 4.25;
+	uintptr_t c_6 = func test1(int32_t, ...): uint64_t;
+	uintptr_t c_7 = func test2(int32_t, ...): double;
+	uintptr_t c_8 = func printf(uintptr_t, ...): int32_t;
+	uintptr_t c_9 = "%llu %g\n";
+	l_1 = START(l_5);
+	uint64_t d_2, l_2 = CALL/3(l_1, c_6, c_1, c_2, c_3);
+	double d_3, l_3 = CALL/3(l_2, c_7, c_1, c_4, c_5);
+	int32_t d_4, l_4 = CALL/3(l_3, c_8, c_9, d_2, d_3);
+	l_5 = RETURN(l_4, c_1);
+}
+--EXPECT--
+23 4.25
