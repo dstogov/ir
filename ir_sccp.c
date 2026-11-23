@@ -2318,7 +2318,9 @@ static bool ir_try_promote_induction_var_ext(ir_ctx *ctx, ir_ref ext_ref, ir_ref
 			if (use_insn->op1 != phi_ref) {
 				if (IR_IS_CONST_REF(use_insn->op1)
 				 && !IR_IS_SYM_CONST(ctx->ir_base[use_insn->op1].op)) {
-					ctx->ir_base[use].op1 = ir_ext_const(ctx, &ctx->ir_base[use_insn->op1], op, type);
+					ir_ref tmp = ir_ext_const(ctx, &ctx->ir_base[use_insn->op1], op, type);
+					use_insn = &ctx->ir_base[use];
+					use_insn->op1 = tmp;
 				} else {
 					ir_ref tmp = ir_ext_ref(ctx, use, use_insn->op1, op, type);
 					use_insn = &ctx->ir_base[use];
@@ -2329,7 +2331,9 @@ static bool ir_try_promote_induction_var_ext(ir_ctx *ctx, ir_ref ext_ref, ir_ref
 			if (use_insn->op2 != phi_ref) {
 				if (IR_IS_CONST_REF(use_insn->op2)
 				 && !IR_IS_SYM_CONST(ctx->ir_base[use_insn->op2].op)) {
-					ctx->ir_base[use].op2 = ir_ext_const(ctx, &ctx->ir_base[use_insn->op2], op, type);
+					ir_ref tmp = ir_ext_const(ctx, &ctx->ir_base[use_insn->op2], op, type);
+					use_insn = &ctx->ir_base[use];
+					use_insn->op2 = tmp;
 				} else {
 					ir_ref tmp = ir_ext_ref(ctx, use, use_insn->op2, op, type);
 					use_insn = &ctx->ir_base[use];
@@ -2359,7 +2363,9 @@ static bool ir_try_promote_induction_var_ext(ir_ctx *ctx, ir_ref ext_ref, ir_ref
 				if (use_insn->op1 != op_ref) {
 					if (IR_IS_CONST_REF(use_insn->op1)
 					 && !IR_IS_SYM_CONST(ctx->ir_base[use_insn->op1].op)) {
-						ctx->ir_base[use].op1 = ir_ext_const(ctx, &ctx->ir_base[use_insn->op1], op, type);
+						ir_ref tmp = ir_ext_const(ctx, &ctx->ir_base[use_insn->op1], op, type);
+						use_insn = &ctx->ir_base[use];
+						use_insn->op1 = tmp;
 					} else {
 						ir_ref tmp = ir_ext_ref(ctx, use, use_insn->op1, op, type);
 						use_insn = &ctx->ir_base[use];
@@ -2370,7 +2376,9 @@ static bool ir_try_promote_induction_var_ext(ir_ctx *ctx, ir_ref ext_ref, ir_ref
 				if (use_insn->op2 != op_ref) {
 					if (IR_IS_CONST_REF(use_insn->op2)
 					 && !IR_IS_SYM_CONST(ctx->ir_base[use_insn->op2].op)) {
-						ctx->ir_base[use].op2 = ir_ext_const(ctx, &ctx->ir_base[use_insn->op2], op, type);
+						ir_ref tmp = ir_ext_const(ctx, &ctx->ir_base[use_insn->op2], op, type);
+						use_insn = &ctx->ir_base[use];
+						use_insn->op2 = tmp;
 					} else {
 						ir_ref tmp = ir_ext_ref(ctx, use, use_insn->op2, op, type);
 						use_insn = &ctx->ir_base[use];
@@ -2394,7 +2402,8 @@ static bool ir_try_promote_induction_var_ext(ir_ctx *ctx, ir_ref ext_ref, ir_ref
 	phi_insn->type = type;
 	if (IR_IS_CONST_REF(phi_insn->op2)
 	 && !IR_IS_SYM_CONST(ctx->ir_base[phi_insn->op2].op)) {
-		ctx->ir_base[phi_ref].op2 = ir_ext_const(ctx, &ctx->ir_base[phi_insn->op2], op, type);
+		ir_ref tmp = ir_ext_const(ctx, &ctx->ir_base[phi_insn->op2], op, type);
+		ctx->ir_base[phi_ref].op2 = tmp;
 	} else {
 		ir_ref tmp = ir_ext_ref(ctx, phi_ref, phi_insn->op2, op, type);
 		ctx->ir_base[phi_ref].op2 = tmp;
@@ -2451,10 +2460,15 @@ static bool ir_try_promote_ext(ir_ctx *ctx, ir_ref ext_ref, ir_insn *insn)
 
 		ir_op op = ctx->ir_base[ext_ref].op;
 		ir_type type = ctx->ir_base[ext_ref].type;
+		ir_ref tmp;
 
 		insn->type = type;
-		insn->op2 = ir_ext_const(ctx, &ctx->ir_base[insn->op2], op, type);;
-		insn->op3 = ir_ext_const(ctx, &ctx->ir_base[insn->op3], op, type);;
+		tmp = ir_ext_const(ctx, &ctx->ir_base[insn->op2], op, type);
+		insn = &ctx->ir_base[ref];
+		insn->op2 = tmp;
+		tmp = ir_ext_const(ctx, &ctx->ir_base[insn->op3], op, type);
+		insn = &ctx->ir_base[ref];
+		insn->op3 = tmp;
 		ir_iter_replace_insn(ctx, ext_ref, ref);
 	}
 
