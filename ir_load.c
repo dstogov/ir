@@ -47,6 +47,7 @@ typedef struct _ir_parser_ctx {
 } ir_parser_ctx;
 
 static ir_parser_ctx *yy_ctx = NULL; /* we keep this global only to cleanum memory on syntax errors */
+static char *yy_str_buf = NULL; /* unescaped large string, also freed on syntax errors */
 static ir_strtab op_tab;
 
 #define IR_UNRESOLVED_MASK            0xc0000000
@@ -224,20 +225,59 @@ static size_t yy_unescape_str(char *buf, const char *str, size_t len)
 	return p - buf;
 }
 
+#define YY_MAX_ALLOCA_STR 4096 /* longer strings are not unescaped on the stack */
+
+static char *yy_alloc_str_buf(size_t len)
+{
+	IR_ASSERT(!yy_str_buf);
+	yy_str_buf = ir_mem_malloc(len + 1);
+	return yy_str_buf;
+}
+
+static void yy_free_str_buf(void)
+{
+	if (yy_str_buf) {
+		ir_mem_free(yy_str_buf);
+		yy_str_buf = NULL;
+	}
+}
+
 static ir_ref ir_make_const_str(ir_ctx *ctx, const char *str, size_t len)
 {
-	char *buf = alloca(len + 1);
+	char *buf;
+	ir_ref ref;
 
+	if (len < YY_MAX_ALLOCA_STR) {
+		buf = alloca(len + 1);
+	} else {
+		buf = yy_alloc_str_buf(len);
+		if (!buf) {
+			yy_error("insufficient memory");
+		}
+	}
 	len = yy_unescape_str(buf, str, len);
-	return ir_const_str(ctx, ir_stringl(ctx, buf, len));
+	ref = ir_const_str(ctx, ir_stringl(ctx, buf, len));
+	yy_free_str_buf();
+	return ref;
 }
 
 static bool ir_loader_sym_data_str(ir_loader *loader, const char *str, size_t len)
 {
-	char *buf = alloca(len + 1);
+	char *buf;
+	bool ret;
 
+	if (len < YY_MAX_ALLOCA_STR) {
+		buf = alloca(len + 1);
+	} else {
+		buf = yy_alloc_str_buf(len);
+		if (!buf) {
+			return 0;
+		}
+	}
 	len = yy_unescape_str(buf, str, len);
-	return loader->sym_data_str(loader, buf, len);
+	ret = loader->sym_data_str(loader, buf, len);
+	yy_free_str_buf();
+	return ret;
 }
 
 static uint64_t read_dec(const char *p, const char *e)
@@ -2556,6 +2596,7 @@ int ir_load(ir_loader *loader, FILE *f) {
 		ret = 0;
 	}
 
+	yy_free_str_buf();
 	ir_mem_free((void*)yy_buf);
 
 	return ret;
