@@ -832,7 +832,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						ival = ir_fix_live_range(ctx, v,
 							IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
 #if IR_X86_I64
-						if (ctx->rules && (ctx->rules[ref] & IR_TWO_REGS)) {
+						if (insn->type == IR_I64 || insn->type == IR_U64) {
 							ival->flags |= IR_LIVE_INTERVAL_TWO_REGS;
 						}
 #endif
@@ -849,7 +849,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						ival = ir_add_live_range(ctx, v, IR_START_LIVE_POS_FROM_REF(bb->start), IR_SAVE_LIVE_POS_FROM_REF(ref));
 					}
 #if IR_X86_I64
-					if (ctx->rules && (ctx->rules[ref] & IR_TWO_REGS)) {
+					if (insn->type == IR_I64 || insn->type == IR_U64) {
 						ival->flags |= IR_LIVE_INTERVAL_TWO_REGS;
 					}
 #endif
@@ -1567,7 +1567,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						ival = ir_fix_live_range(ctx, v,
 							IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
 #if IR_X86_I64
-						if (ctx->rules && (ctx->rules[ref] & IR_TWO_REGS)) {
+						if (insn->type == IR_I64 || insn->type == IR_U64) {
 							ival->flags |= IR_LIVE_INTERVAL_TWO_REGS;
 						}
 #endif
@@ -1582,7 +1582,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						ival = ir_add_live_range(ctx, v, IR_START_LIVE_POS_FROM_REF(bb->start), IR_SAVE_LIVE_POS_FROM_REF(ref));
 					}
 #if IR_X86_I64
-					if (ctx->rules && (ctx->rules[ref] & IR_TWO_REGS)) {
+					if (insn->type == IR_I64 || insn->type == IR_U64) {
 						ival->flags |= IR_LIVE_INTERVAL_TWO_REGS;
 					}
 #endif
