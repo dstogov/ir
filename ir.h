@@ -410,7 +410,7 @@ typedef enum _ir_type {
 	\
 	/* memory reference and load/store ops                              */ \
 	_(ALLOCA,       a2X1, src, def, alg) /* alloca(def)                 */ \
-	_(AFREE,        s2,   src, def, ___) /* revert alloca(def)          */ \
+	_(AFREE,        s3,   src, def, def) /* revert alloca(def), size    */ \
 	_(BLOCK_BEGIN,  a1,   src, ___, ___) /* stacksave                   */ \
 	_(BLOCK_END,    s2,   src, def, ___) /* stackrestore                */ \
 	_(VLOAD,        l2,   src, var, ___) /* load value of local var     */ \

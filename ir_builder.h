@@ -532,7 +532,7 @@ extern "C" {
 #define ir_TAILCALL_N(type, func, count, args)        _ir_TAILCALL_N(_ir_CTX, type, func, count, args)
 
 #define ir_ALLOCA(_size)                  _ir_ALLOCA(_ir_CTX, (_size))
-#define ir_AFREE(_size)                   _ir_AFREE(_ir_CTX, (_size))
+#define ir_AFREE(_alloca)                 _ir_AFREE(_ir_CTX, (_alloca))
 #define ir_VADDR(_var)                    ir_fold1(_ir_CTX, IR_OPT(IR_VADDR, IR_ADDR), (_var))
 #define ir_VLOAD(_type, _var)             _ir_VLOAD(_ir_CTX, (_type), (_var))
 #define ir_VLOAD_B(_var)                  _ir_VLOAD(_ir_CTX, IR_BOOL, (_var))
@@ -667,7 +667,7 @@ void   _ir_TAILCALL_5(ir_ctx *ctx, ir_type type, ir_ref func, ir_ref arg1, ir_re
 void   _ir_TAILCALL_6(ir_ctx *ctx, ir_type type, ir_ref func, ir_ref arg1, ir_ref arg2, ir_ref arg3, ir_ref arg4, ir_ref arg5, ir_ref arg6);
 void   _ir_TAILCALL_N(ir_ctx *ctx, ir_type type, ir_ref func, uint32_t count, ir_ref *args);
 ir_ref _ir_ALLOCA(ir_ctx *ctx, ir_ref size);
-void   _ir_AFREE(ir_ctx *ctx, ir_ref size);
+void   _ir_AFREE(ir_ctx *ctx, ir_ref alloca);
 ir_ref _ir_VLOAD(ir_ctx *ctx, ir_type type, ir_ref var);
 void   _ir_VSTORE(ir_ctx *ctx, ir_ref var, ir_ref val);
 ir_ref _ir_VLOAD_v(ir_ctx *ctx, ir_type type, ir_ref var);

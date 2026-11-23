@@ -2394,6 +2394,15 @@ get_arg_hints:
 				n = 2;
 			}
 			break;
+		case IR_AFREE:
+			/* the ALLOCA operand only links AFREE to it, op3 is the size */
+			flags = IR_OP3_MUST_BE_IN_REG;
+			insn = &ctx->ir_base[ref];
+			if (!IR_IS_CONST_REF(insn->op3)) {
+				constraints->tmp_regs[0] = IR_TMP_REG(0, IR_ADDR, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
+				n = 1;
+			}
+			break;
 		case IR_VA_ARG:
 			flags = IR_USE_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG | IR_DEF_CONFLICTS_WITH_INPUT_REGS;
 			constraints->tmp_regs[0] = IR_TMP_REG(3, IR_ADDR, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
@@ -12546,8 +12555,12 @@ static void ir_emit_afree(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
-	if (IR_IS_CONST_REF(insn->op2)) {
-		ir_insn *val = &ctx->ir_base[insn->op2];
+	if (ir_rule(ctx, insn->op2) == IR_STATIC_ALLOCA) {
+		/* the ALLOCA became a part of the stack frame */
+		return;
+	}
+	if (IR_IS_CONST_REF(insn->op3)) {
+		ir_insn *val = &ctx->ir_base[insn->op3];
 		int32_t size = val->val.i32;
 
 		IR_ASSERT(IR_IS_TYPE_INT(val->type));
@@ -12562,19 +12575,27 @@ static void ir_emit_afree(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			ctx->call_stack_size -= size;
 		}
 	} else {
-//		int32_t alignment = 16;
-		ir_reg op2_reg = ctx->regs[def][2];
-		ir_type type = ctx->ir_base[insn->op2].type;
+		int32_t alignment = 16;
+		ir_reg op3_reg = ctx->regs[def][3];
+		ir_reg tmp_reg = ctx->regs[def][0];
+		ir_type type = ctx->ir_base[insn->op3].type;
 
 		IR_ASSERT(ctx->flags & IR_FUNCTION);
-		if (op2_reg != IR_REG_NONE && IR_REG_SPILLED(op2_reg)) {
-			op2_reg = IR_REG_NUM(op2_reg);
-			ir_emit_load(ctx, type, op2_reg, insn->op2);
+		IR_ASSERT(tmp_reg != IR_REG_NONE);
+		if (op3_reg != IR_REG_NONE && IR_REG_SPILLED(op3_reg)) {
+			op3_reg = IR_REG_NUM(op3_reg);
+			ir_emit_load(ctx, type, op3_reg, insn->op3);
+		}
+		if (op3_reg != IR_REG_NONE) {
+			ir_emit_mov(ctx, type, tmp_reg, op3_reg);
+		} else {
+			ir_emit_load(ctx, type, tmp_reg, insn->op3);
 		}
 
-		// TODO: alignment ???
-
-		|	ASM_REG_REG_OP add, IR_ADDR, IR_REG_RSP, op2_reg
+		/* the same alignment as in ir_emit_alloca() */
+		|	ASM_REG_IMM_OP add, IR_ADDR, tmp_reg, (alignment-1)
+		|	ASM_REG_IMM_OP and, IR_ADDR, tmp_reg, ~(alignment-1)
+		|	ASM_REG_REG_OP add, IR_ADDR, IR_REG_RSP, tmp_reg
 	}
 }
 
