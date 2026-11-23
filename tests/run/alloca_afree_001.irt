@@ -1,0 +1,67 @@
+--TEST--
+AFREE must revert an ALLOCA even if the ALLOCA is unused or became a frame slot
+--CODE--
+func test1(uint32_t): uintptr_t
+{
+	l_1 = START(l_8);
+	uint32_t d_2 = PARAM(l_1, "size", 1);
+	uintptr_t d_3, l_3 = BLOCK_BEGIN(l_1);
+	uintptr_t d_4, l_4 = ALLOCA(l_3, d_2);
+	int32_t d_5, l_5 = LOAD(l_4, d_4);
+	l_6 = AFREE(l_5, d_2);
+	uintptr_t d_7, l_7 = BLOCK_BEGIN(l_6);
+	uintptr_t d_8 = SUB(d_7, d_3);
+	l_9 = BLOCK_END(l_7, d_3);
+	l_8 = RETURN(l_9, d_8);
+}
+func test2(uint32_t): uintptr_t
+{
+	uint32_t c_1 = 32;
+	l_1 = START(l_8);
+	uint32_t d_2 = PARAM(l_1, "size", 1);
+	uintptr_t d_3, l_3 = BLOCK_BEGIN(l_1);
+	uintptr_t d_4, l_4 = ALLOCA(l_3, c_1);
+	l_6 = AFREE(l_4, c_1);
+	uintptr_t d_7, l_7 = BLOCK_BEGIN(l_6);
+	uintptr_t d_8 = SUB(d_7, d_3);
+	l_9 = BLOCK_END(l_7, d_3);
+	l_8 = RETURN(l_9, d_8);
+}
+func test3(uint32_t): uintptr_t
+{
+	uint32_t c_1 = 16;
+	int32_t c_2 = 1;
+	uintptr_t c_3 = 4;
+	uintptr_t c_4 = func memset(uintptr_t, int32_t, uintptr_t): uintptr_t;
+	l_1 = START(l_8);
+	uint32_t d_2 = PARAM(l_1, "size", 1);
+	uintptr_t d_3, l_3 = BLOCK_BEGIN(l_1);
+	uintptr_t d_4, l_4 = ALLOCA(l_3, c_1);
+	uintptr_t d_5, l_5 = CALL/3(l_4, c_4, d_4, c_2, c_3);
+	uint16_t d_6, l_6 = LOAD(l_5, d_4);
+	l_7 = AFREE(l_6, c_1);
+	uintptr_t d_10, l_10 = BLOCK_BEGIN(l_7);
+	uintptr_t d_11 = SUB(d_10, d_3);
+	uintptr_t d_12 = ZEXT(d_6);
+	uintptr_t d_13 = ADD(d_11, d_12);
+	l_9 = BLOCK_END(l_10, d_3);
+	l_8 = RETURN(l_9, d_13);
+}
+func main(): int32_t
+{
+	int32_t c_1 = 0;
+	uint32_t c_2 = 16;
+	uintptr_t c_3 = func test1(uint32_t): uintptr_t;
+	uintptr_t c_4 = func test2(uint32_t): uintptr_t;
+	uintptr_t c_5 = func test3(uint32_t): uintptr_t;
+	uintptr_t c_6 = func printf(uintptr_t, ...): int32_t;
+	uintptr_t c_7 = "%zu %zu %zx\n";
+	l_1 = START(l_6);
+	uintptr_t d_2, l_2 = CALL/1(l_1, c_3, c_2);
+	uintptr_t d_3, l_3 = CALL/1(l_2, c_4, c_2);
+	uintptr_t d_4, l_4 = CALL/1(l_3, c_5, c_2);
+	int32_t d_5, l_5 = CALL/4(l_4, c_6, c_7, d_2, d_3, d_4);
+	l_6 = RETURN(l_5, c_1);
+}
+--EXPECT--
+0 0 101

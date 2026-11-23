@@ -100,7 +100,8 @@ int ir_assign_virtual_registers(ir_ctx *ctx)
 			uint32_t flags = ir_op_flags[insn->op];
 
 			if ((flags & IR_OP_FLAG_DATA)
-			 || ((flags & IR_OP_FLAG_MEM) && ctx->use_lists[i].count > 1)) {
+			 || ((flags & IR_OP_FLAG_MEM) && ctx->use_lists[i].count > 1)
+			 || (insn->op == IR_ALLOCA && (ctx->flags2 & IR_HAS_AFREE))) {
 				v = ++vregs_count;
 			}
 		}
@@ -825,7 +826,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					ir_bitset_excl(live, v);
 					ival = ctx->live_intervals[v];
 					if (!ival) {
-						if (IR_IS_FOLDABLE_OP(insn->op) || (ir_op_flags[insn->op] & IR_OP_FLAG_NO_SIDE_EFFECT)) {
+						if (IR_IS_FOLDABLE_OP(insn->op) || ir_op_has_no_side_effect(ctx, insn->op)) {
 							/* lightweigh dead code elimination */
 							ctx->rules[ref] = IR_SKIPPED | IR_NOP;
 							ctx->vregs[ref] = 0;
@@ -835,8 +836,14 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							ctx->rules[ref] = IR_SKIPPED | IR_PARAM;
 							ctx->vregs[ref] = 0;
 							continue;
+						} else if (insn->op == IR_ALLOCA) {
+							/* unused ALLOCA (kept for AFREE) still needs a register */
+							ival = ir_add_live_range(ctx, v, def_pos, IR_SAVE_LIVE_POS_FROM_REF(ref));
+							ival->type = insn->type;
+							ir_add_use(ctx, ival, 0, def_pos, reg, def_flags, hint_ref);
+						} else {
+							ctx->vregs[ref] = 0;
 						}
-						ctx->vregs[ref] = 0;
 					} else {
 						/* intervals[opd].setFrom(op.id) */
 						ival = ir_fix_live_range(ctx, v,
@@ -1560,7 +1567,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					}
 					ival = ctx->live_intervals[v];
 					if (!ival) {
-						if (IR_IS_FOLDABLE_OP(insn->op) || (ir_op_flags[insn->op] & IR_OP_FLAG_NO_SIDE_EFFECT)) {
+						if (IR_IS_FOLDABLE_OP(insn->op) || ir_op_has_no_side_effect(ctx, insn->op)) {
 							/* lightweigh dead code elimination */
 							ctx->rules[ref] = IR_SKIPPED | IR_NOP;
 							ctx->vregs[ref] = 0;
@@ -1570,8 +1577,14 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							ctx->rules[ref] = IR_SKIPPED | IR_PARAM;
 							ctx->vregs[ref] = 0;
 							continue;
+						} else if (insn->op == IR_ALLOCA) {
+							/* unused ALLOCA (kept for AFREE) still needs a register */
+							ival = ir_add_live_range(ctx, v, def_pos, IR_SAVE_LIVE_POS_FROM_REF(ref));
+							ival->type = insn->type;
+							ir_add_use(ctx, ival, 0, def_pos, reg, def_flags, hint_ref);
+						} else {
+							ctx->vregs[ref] = 0;
 						}
-						ctx->vregs[ref] = 0;
 					} else {
 						/* intervals[opd].setFrom(op.id) */
 						ival = ir_fix_live_range(ctx, v,

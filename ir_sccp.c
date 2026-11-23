@@ -520,7 +520,7 @@ make_bottom:
 
 static bool ir_is_dead_load_ex(const ir_ctx *ctx, ir_ref ref, uint32_t flags, const ir_insn *insn)
 {
-	return (flags & IR_OP_FLAG_NO_SIDE_EFFECT) && ctx->use_lists[ref].count == 1;
+	return ir_op_has_no_side_effect(ctx, insn->op) && ctx->use_lists[ref].count == 1;
 }
 
 static bool ir_is_dead(const ir_ctx *ctx, ir_ref ref)

@@ -1094,6 +1094,7 @@ IR_ALWAYS_INLINE uint32_t ir_insn_len(const ir_insn *insn)
 #define IR_RECURSIVE_TAILCALL  (1<<14)
 #define IR_HAS_MEMCPY          (1<<15)
 #define IR_HAS_LONG_CONSTANTS  (1<<16)
+#define IR_HAS_AFREE           (1<<17)
 
 /* Temporary: MEM2SSA -> SCCP */
 #define IR_MEM2SSA_VARS        (1<<25)
@@ -1183,10 +1184,18 @@ void ir_iter_replace(ir_ctx *ctx, ir_ref ref, ir_ref new_ref, ir_bitqueue *workl
 void ir_iter_opt(ir_ctx *ctx, ir_bitqueue *worklist);
 void ir_iter_cleanup(ir_ctx *ctx);
 
+/* AFREE reverts an ALLOCA by its size, so in a function with AFREE even an unused
+ * ALLOCA has to adjust the stack pointer. */
+IR_ALWAYS_INLINE bool ir_op_has_no_side_effect(const ir_ctx *ctx, uint32_t op)
+{
+	return (ir_op_flags[op] & IR_OP_FLAG_NO_SIDE_EFFECT)
+		&& (op != IR_ALLOCA || !(ctx->flags2 & IR_HAS_AFREE));
+}
+
 IR_ALWAYS_INLINE bool ir_is_dead_load(const ir_ctx *ctx, ir_ref ref)
 {
 	if (ctx->use_lists[ref].count == 1) {
-		return (ir_op_flags[ctx->ir_base[ref].op] & IR_OP_FLAG_NO_SIDE_EFFECT) != 0;
+		return ir_op_has_no_side_effect(ctx, ctx->ir_base[ref].op);
 	}
 	return 0;
 }

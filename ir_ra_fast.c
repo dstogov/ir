@@ -823,7 +823,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 				ir_live_interval *ival = ctx->live_intervals[ctx->vregs[i]];
 
 				if (!ival || (ival->reg == IR_REG_NONE && ival->stack_spill_pos == -1)) {
-					if (IR_IS_FOLDABLE_OP(insn->op) || (ir_op_flags[insn->op] & IR_OP_FLAG_NO_SIDE_EFFECT)) {
+					if (IR_IS_FOLDABLE_OP(insn->op) || ir_op_has_no_side_effect(ctx, insn->op)) {
 						/* lightweigh dead code elimination */
 						ctx->rules[i] = IR_SKIPPED | IR_NOP;
 						ctx->vregs[i] = 0;

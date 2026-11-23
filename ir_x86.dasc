@@ -4640,13 +4640,13 @@ binop_fp:
 #endif
 			return ctx->use_lists[ref].count > 0 ? IR_PARAM : IR_SKIPPED | IR_PARAM;
 		case IR_ALLOCA:
-			if (ctx->use_lists[ref].count == 1) {
+			if (ctx->use_lists[ref].count == 1 && !(ctx->flags2 & IR_HAS_AFREE)) {
 				/* dead ALLOCA */
 				return IR_NOP | IR_SKIPPED;
 			}
 			/* alloca() may be used only in functions */
 			if (ctx->flags & IR_FUNCTION) {
-				if (IR_IS_CONST_REF(insn->op2) && ctx->cfg_map[ref] == 1) {
+				if (IR_IS_CONST_REF(insn->op2) && ctx->cfg_map[ref] == 1 && !(ctx->flags2 & IR_HAS_AFREE)) {
 					ir_insn *val = &ctx->ir_base[insn->op2];
 
 					if (!IR_IS_SYM_CONST(val->op)) {
@@ -12488,7 +12488,7 @@ static void ir_emit_alloca(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	dasm_State **Dst = &data->dasm_state;
 	ir_reg def_reg = IR_REG_NUM(ctx->regs[def][0]);
 
-	if (ctx->use_lists[def].count == 1) {
+	if (ctx->use_lists[def].count == 1 && !(ctx->flags2 & IR_HAS_AFREE)) {
 		/* dead alloca */
 		return;
 	}

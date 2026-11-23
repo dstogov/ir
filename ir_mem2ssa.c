@@ -914,7 +914,7 @@ int ir_mem2ssa(ir_ctx *ctx)
 		ref = insn->op1;
 		while (ref != start) {
 			insn = &ctx->ir_base[ref];
-			if (insn->op == IR_ALLOCA) {
+			if (insn->op == IR_ALLOCA && !(ctx->flags2 & IR_HAS_AFREE)) {
 				ir_type type;
 				int convert;
 
