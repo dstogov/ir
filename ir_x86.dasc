@@ -24891,7 +24891,7 @@ static void ir_emit_vector_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			if (dst_type == IR_I8) {
 				if (ctx->mflags & IR_X86_AVX) {
 					if (src_width == 32) {
-						|	vcvtps2dq ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
+						|	vcvttps2dq ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
 						if (ctx->mflags & IR_X86_AVX2) {
 							|	vextracti128 xmm(tmp1_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), 1
 						} else {
@@ -24901,20 +24901,20 @@ static void ir_emit_vector_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	vpacksswb xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					} else {
 						IR_ASSERT(src_width <= 16);
-						|	vcvtps2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						|	vcvttps2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 						|	vpackssdw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 						|	vpacksswb xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					}
 				} else {
 					IR_ASSERT(src_width <= 16);
-					|	cvtps2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+					|	cvttps2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 					|	packssdw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	packsswb xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 				}
 			} else if (dst_type == IR_I16) {
 				if (ctx->mflags & IR_X86_AVX) {
 					if (src_width == 32) {
-						|	vcvtps2dq ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
+						|	vcvttps2dq ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
 						if (ctx->mflags & IR_X86_AVX2) {
 							|	vextracti128 xmm(tmp1_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), 1
 						} else {
@@ -24923,25 +24923,25 @@ static void ir_emit_vector_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	vpackssdw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp1_reg-IR_REG_FP_FIRST)
 					} else {
 						IR_ASSERT(src_width <= 16);
-						|	vcvtps2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						|	vcvttps2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 						|	vpackssdw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					}
 				} else {
 					IR_ASSERT(src_width <= 16);
-					|	cvtps2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+					|	cvttps2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 					|	packssdw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 				}
 			} else if (dst_type == IR_I32) {
 				if (ctx->mflags & IR_X86_AVX) {
 					if (src_width == 32) {
-						|	vcvtps2dq ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
+						|	vcvttps2dq ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
 					} else {
 						IR_ASSERT(src_width <= 16);
-						|	vcvtps2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						|	vcvttps2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 					}
 				} else {
 					IR_ASSERT(src_width <= 16);
-					|	cvtps2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+					|	cvttps2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 				}
 			} else if (dst_type == IR_I64) {
 #if defined(IR_TARGET_X64)
@@ -25039,7 +25039,7 @@ static void ir_emit_vector_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			if (dst_type == IR_U8) {
 				if (ctx->mflags & IR_X86_AVX) {
 					if (src_width == 32) {
-						|	vcvtps2dq ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
+						|	vcvttps2dq ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
 						if (ctx->mflags & IR_X86_AVX2) {
 							|	vextracti128 xmm(tmp1_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), 1
 						} else {
@@ -25049,20 +25049,20 @@ static void ir_emit_vector_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	vpackuswb xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					} else {
 						IR_ASSERT(src_width <= 16);
-						|	vcvtps2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						|	vcvttps2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 						|	vpackusdw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 						|	vpackuswb xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					}
 				} else {
 					IR_ASSERT(src_width <= 16);
-					|	cvtps2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+					|	cvttps2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 					|	packusdw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					|	packuswb xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 				}
 			} else if (dst_type == IR_U16) {
 				if (ctx->mflags & IR_X86_AVX) {
 					if (src_width == 32) {
-						|	vcvtps2dq ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
+						|	vcvttps2dq ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
 						if (ctx->mflags & IR_X86_AVX2) {
 							|	vextracti128 xmm(tmp1_reg-IR_REG_FP_FIRST), ymm(def_reg-IR_REG_FP_FIRST), 1
 						} else {
@@ -25071,12 +25071,12 @@ static void ir_emit_vector_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 						|	vpackusdw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(tmp1_reg-IR_REG_FP_FIRST)
 					} else {
 						IR_ASSERT(src_width <= 16);
-						|	vcvtps2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						|	vcvttps2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 						|	vpackusdw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					}
 				} else {
 					IR_ASSERT(src_width <= 16);
-					|	cvtps2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+					|	cvttps2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 					|	packusdw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 				}
 			} else if (dst_type == IR_U32) {
@@ -25314,47 +25314,47 @@ static void ir_emit_vector_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			if (dst_type == IR_I8) {
 				if (ctx->mflags & IR_X86_AVX) {
 					if (src_width == 32) {
-						|	vcvtpd2dq ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
+						|	vcvttpd2dq xmm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
 						|	vpackssdw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 						|	vpacksswb xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					} else {
-						|	vcvtpd2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						|	vcvttpd2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 						|	vpshuflw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), 232
 						|	vpacksswb xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 						IR_ASSERT(src_width <= 16);
 					}
 				} else {
 					IR_ASSERT(src_width <= 16);
-					|	cvtpd2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+					|	cvttpd2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 					|	pshuflw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), 232
 					|	packsswb xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 				}
 			} else if (dst_type == IR_I16) {
 				if (ctx->mflags & IR_X86_AVX) {
 					if (src_width == 32) {
-						|	vcvtpd2dq ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
+						|	vcvttpd2dq xmm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
 						|	vpackssdw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					} else {
 						IR_ASSERT(src_width <= 16);
-						|	vcvtpd2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						|	vcvttpd2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 						|	vpshuflw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), 232
 					}
 				} else {
 					IR_ASSERT(src_width <= 16);
-					|	cvtpd2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+					|	cvttpd2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 					|	pshuflw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), 232
 				}
 			} else if (dst_type == IR_I32) {
 				if (ctx->mflags & IR_X86_AVX) {
 					if (src_width == 32) {
-						|	vcvtpd2dq ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
+						|	vcvttpd2dq xmm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
 					} else {
 						IR_ASSERT(src_width <= 16);
-						|	vcvtpd2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						|	vcvttpd2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 					}
 				} else {
 					IR_ASSERT(src_width <= 16);
-					|	cvtpd2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+					|	cvttpd2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 				}
 			} else if (dst_type == IR_I64) {
 #if defined(IR_TARGET_X64)
@@ -25448,34 +25448,34 @@ static void ir_emit_vector_fp2int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			if (dst_type == IR_U8) {
 				if (ctx->mflags & IR_X86_AVX) {
 					if (src_width == 32) {
-						|	vcvtpd2dq ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
+						|	vcvttpd2dq xmm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
 						|	vpackusdw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
-						|	vpackuswb xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						|	vpackuswb xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					} else {
 						IR_ASSERT(src_width <= 16);
-						|	vcvtpd2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						|	vcvttpd2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 						|	vpshuflw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), 232
-						|	vpackuswb xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						|	vpackuswb xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					}
 				} else {
 					IR_ASSERT(src_width <= 16);
-					|	cvtpd2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+					|	cvttpd2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 					|	pshuflw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), 232
-					|	packuswb xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+					|	packuswb xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 				}
 			} else if (dst_type == IR_U16) {
 				if (ctx->mflags & IR_X86_AVX) {
 					if (src_width == 32) {
-						|	vcvtpd2dq ymm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
+						|	vcvttpd2dq xmm(def_reg-IR_REG_FP_FIRST), ymm(op1_reg-IR_REG_FP_FIRST)
 						|	vpackusdw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST)
 					} else {
 						IR_ASSERT(src_width <= 16);
-						|	vcvtpd2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+						|	vcvttpd2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 						|	vpshuflw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), 232
 					}
 				} else {
 					IR_ASSERT(src_width <= 16);
-					|	cvtpd2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
+					|	cvttpd2dq xmm(def_reg-IR_REG_FP_FIRST), xmm(op1_reg-IR_REG_FP_FIRST)
 					|	pshuflw xmm(def_reg-IR_REG_FP_FIRST), xmm(def_reg-IR_REG_FP_FIRST), 232
 				}
 			} else if (dst_type == IR_U32) {
