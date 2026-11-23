@@ -823,6 +823,7 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					}
 					/* live.remove(opd) */
 					ir_bitset_excl(live, v);
+					ival = ctx->live_intervals[v];
 					if (!ival) {
 						if (IR_IS_FOLDABLE_OP(insn->op) || (ir_op_flags[insn->op] & IR_OP_FLAG_NO_SIDE_EFFECT)) {
 							/* lightweigh dead code elimination */
