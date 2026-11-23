@@ -725,16 +725,6 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 			if (ctx->rules) {
 				int n;
 
-#if IR_X86_I64
-				if (ctx->rules[ref] & IR_TWO_REGS) {
-					v = ctx->vregs[ref];
-					if (v > 0) {
-						IR_ASSERT(ctx->live_intervals[v]);
-						ctx->live_intervals[v]->flags |= IR_LIVE_INTERVAL_TWO_REGS;
-					}
-				}
-#endif
-
 				if (ctx->rules[ref] & (IR_FUSED|IR_SKIPPED)) {
 					if (((ctx->rules[ref] & IR_RULE_MASK) == IR_ALLOCA)
 					 && ctx->use_lists[ref].count > 0) {
@@ -790,7 +780,11 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						if (!IR_IS_CONST_REF(insn->op1) && ctx->vregs[insn->op1] > 0) {
 							hint_ref = insn->op1;
 						}
-						def_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
+						if (def_flags & IR_DEF_CONFLICTS_WITH_INPUT_REGS) {
+							def_pos = IR_USE_LIVE_POS_FROM_REF(ref);
+						} else {
+							def_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
+						}
 					} else if (def_flags & IR_DEF_CONFLICTS_WITH_INPUT_REGS) {
 						def_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
 					} else {
@@ -825,22 +819,29 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					ir_bitset_excl(live, v);
 					ival = ctx->live_intervals[v];
 					if (!ival) {
-						if (IR_IS_FOLDABLE_OP(insn->op) || (ir_op_flags[insn->op] & IR_OP_FLAG_NO_SIDE_EFFECT)) {
-							/* lightweigh dead code elimination */
-							ctx->rules[ref] = IR_SKIPPED | IR_NOP;
-							ctx->vregs[ref] = 0;
-							continue;
-						} else if (insn->op == IR_PARAM) {
-							/* unused PARAM */
-							ctx->rules[ref] = IR_SKIPPED | IR_PARAM;
-							ctx->vregs[ref] = 0;
-							continue;
+						if (ctx->rules) {
+							if (IR_IS_FOLDABLE_OP(insn->op) || (ir_op_flags[insn->op] & IR_OP_FLAG_NO_SIDE_EFFECT)) {
+								/* lightweigh dead code elimination */
+								ctx->rules[ref] = IR_SKIPPED | IR_NOP;
+								ctx->vregs[ref] = 0;
+								continue;
+							} else if (insn->op == IR_PARAM) {
+								/* unused PARAM */
+								ctx->rules[ref] = IR_SKIPPED | IR_PARAM;
+								ctx->vregs[ref] = 0;
+								continue;
+							}
 						}
 						ctx->vregs[ref] = 0;
 					} else {
 						/* intervals[opd].setFrom(op.id) */
 						ival = ir_fix_live_range(ctx, v,
 							IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
+#if IR_X86_I64
+						if (insn->type == IR_I64 || insn->type == IR_U64) {
+							ival->flags |= IR_LIVE_INTERVAL_TWO_REGS;
+						}
+#endif
 						ival->type = insn->type;
 						ir_add_use(ctx, ival, 0, def_pos, reg, def_flags, hint_ref);
 					}
@@ -853,6 +854,11 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						/* Dead PHI */
 						ival = ir_add_live_range(ctx, v, IR_START_LIVE_POS_FROM_REF(bb->start), IR_SAVE_LIVE_POS_FROM_REF(ref));
 					}
+#if IR_X86_I64
+					if (insn->type == IR_I64 || insn->type == IR_U64) {
+						ival->flags |= IR_LIVE_INTERVAL_TWO_REGS;
+					}
+#endif
 					ival->type = insn->type;
 					ir_add_use(ctx, ival, 0, IR_DEF_LIVE_POS_FROM_REF(ref), IR_REG_NONE, IR_USE_SHOULD_BE_IN_REG, 0);
 					continue;
@@ -929,7 +935,11 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 							}
 						} else if (def_flags & IR_DEF_REUSES_OP1_REG) {
 							if (j == 1) {
-								use_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
+								if (def_flags & IR_DEF_CONFLICTS_WITH_INPUT_REGS) {
+									use_pos = IR_USE_LIVE_POS_FROM_REF(ref);
+								} else {
+									use_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
+								}
 								IR_ASSERT(ctx->vregs[ref] > 0);
 								hint_ref = ref;
 							} else if (input == insn->op1) {
@@ -1458,16 +1468,6 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 			if (ctx->rules) {
 				int n;
 
-#if IR_X86_I64
-				if (ctx->rules[ref] & IR_TWO_REGS) {
-					v = ctx->vregs[ref];
-					if (v > 0) {
-						IR_ASSERT(ctx->live_intervals[v]);
-						ctx->live_intervals[v]->flags |= IR_LIVE_INTERVAL_TWO_REGS;
-					}
-				}
-#endif
-
 				if (ctx->rules[ref] & (IR_FUSED|IR_SKIPPED)) {
 					if (((ctx->rules[ref] & IR_RULE_MASK) == IR_ALLOCA)
 					 && ctx->use_lists[ref].count > 0) {
@@ -1560,22 +1560,29 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 					}
 					ival = ctx->live_intervals[v];
 					if (!ival) {
-						if (IR_IS_FOLDABLE_OP(insn->op) || (ir_op_flags[insn->op] & IR_OP_FLAG_NO_SIDE_EFFECT)) {
-							/* lightweigh dead code elimination */
-							ctx->rules[ref] = IR_SKIPPED | IR_NOP;
-							ctx->vregs[ref] = 0;
-							continue;
-						} else if (insn->op == IR_PARAM) {
-							/* unused PARAM */
-							ctx->rules[ref] = IR_SKIPPED | IR_PARAM;
-							ctx->vregs[ref] = 0;
-							continue;
+						if (ctx->rules) {
+							if (IR_IS_FOLDABLE_OP(insn->op) || (ir_op_flags[insn->op] & IR_OP_FLAG_NO_SIDE_EFFECT)) {
+								/* lightweigh dead code elimination */
+								ctx->rules[ref] = IR_SKIPPED | IR_NOP;
+								ctx->vregs[ref] = 0;
+								continue;
+							} else if (insn->op == IR_PARAM) {
+								/* unused PARAM */
+								ctx->rules[ref] = IR_SKIPPED | IR_PARAM;
+								ctx->vregs[ref] = 0;
+								continue;
+							}
 						}
 						ctx->vregs[ref] = 0;
 					} else {
 						/* intervals[opd].setFrom(op.id) */
 						ival = ir_fix_live_range(ctx, v,
 							IR_START_LIVE_POS_FROM_REF(bb->start), def_pos);
+#if IR_X86_I64
+						if (insn->type == IR_I64 || insn->type == IR_U64) {
+							ival->flags |= IR_LIVE_INTERVAL_TWO_REGS;
+						}
+#endif
 						ival->type = insn->type;
 						ir_add_use(ctx, ival, 0, def_pos, reg, def_flags, hint_ref);
 					}
@@ -1586,6 +1593,11 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 						/* Dead PHI */
 						ival = ir_add_live_range(ctx, v, IR_START_LIVE_POS_FROM_REF(bb->start), IR_SAVE_LIVE_POS_FROM_REF(ref));
 					}
+#if IR_X86_I64
+					if (insn->type == IR_I64 || insn->type == IR_U64) {
+						ival->flags |= IR_LIVE_INTERVAL_TWO_REGS;
+					}
+#endif
 					ival->type = insn->type;
 					ir_add_use(ctx, ival, 0, IR_DEF_LIVE_POS_FROM_REF(ref), IR_REG_NONE, IR_USE_SHOULD_BE_IN_REG, 0);
 					continue;

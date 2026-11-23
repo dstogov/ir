@@ -1,0 +1,31 @@
+--TEST--
+VA_ARG 010: an unused pointer VA_ARG still advances the va_list
+--CODE--
+func test(int32_t, ...): uintptr_t
+{
+	int32_t c_1 = 32;
+	l_1 = START(l_8);
+	int32_t d_2 = PARAM(l_1, "n", 1);
+	uintptr_t d_3, l_3 = ALLOCA(l_1, c_1);
+	l_4 = VA_START(l_3, d_3);
+	uintptr_t d_5, l_5 = VA_ARG(l_4, d_3);
+	int32_t d_6, l_6 = LOAD(l_5, d_5);
+	uintptr_t d_7, l_7 = VA_ARG(l_6, d_3);
+	l_9 = VA_END(l_7, d_3);
+	l_8 = RETURN(l_9, d_7);
+}
+func main(): int32_t
+{
+	int32_t c_1 = 0;
+	uintptr_t c_2 = "unused";
+	uintptr_t c_3 = 23;
+	uintptr_t c_4 = func test(int32_t, ...): uintptr_t;
+	uintptr_t c_5 = func printf(uintptr_t, ...): int32_t;
+	uintptr_t c_6 = "%zu\n";
+	l_1 = START(l_4);
+	uintptr_t d_2, l_2 = CALL/3(l_1, c_4, c_1, c_2, c_3);
+	int32_t d_3, l_3 = CALL/2(l_2, c_5, c_6, d_2);
+	l_4 = RETURN(l_3, c_1);
+}
+--EXPECT--
+23
