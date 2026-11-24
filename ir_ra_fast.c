@@ -1026,6 +1026,8 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 								/* Input is the same as "op1" */
 								use_pos = IR_LOAD_SUB_REF;
 							}
+						} else if ((def_flags & IR_CALL_WITH_ARGS) && j > 2) {
+							use_pos = IR_LOAD_SUB_REF;
 						}
 						_add_reg(&data, ctx->ir_base[input].type, IR_LOAD_SUB_REF, use_pos, reg, use_flags,
 							IR_UNUSED, i, j, input);

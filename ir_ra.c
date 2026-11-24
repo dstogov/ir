@@ -946,6 +946,8 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 								/* Input is the same as "op1" */
 								use_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
 							}
+						} else if ((def_flags & IR_CALL_WITH_ARGS) && j > 2) {
+							use_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
 						}
 						if (!ir_bitset_in(live, v)) {
 							/* live.add(opd) */
@@ -1688,6 +1690,8 @@ int ir_compute_live_ranges(ir_ctx *ctx)
 								/* Input is the same as "op1" */
 								use_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
 							}
+						} else if ((def_flags & IR_CALL_WITH_ARGS) && j > 2) {
+							use_pos = IR_LOAD_LIVE_POS_FROM_REF(ref);
 						}
 						if (!IS_LIVE_IN_BLOCK(v, b)) {
 							/* live.add(opd) */
