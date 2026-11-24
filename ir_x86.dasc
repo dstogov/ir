@@ -13634,18 +13634,35 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 			}
 		} else {
 			/* Pass register arguments to stack (REG->MEM moves) */
-			if (!IR_IS_CONST_REF(arg) && src_reg != IR_REG_NONE && !IR_REG_SPILLED(src_reg)) {
+			if (!IR_IS_CONST_REF(arg) && src_reg != IR_REG_NONE) {
 #if IR_X86_I64
 				if (type == IR_I64 || type == IR_U64) {
 					ir_mem mem = IR_MEM_BO(IR_REG_STACK_POINTER, stack_offset);
 					ir_mem mem_hi = IR_MEM_I64_HI(mem);
-					ir_reg src_reg_hi = IR_REG_I64_HI(src_reg);
-					src_reg = IR_REG_I64_LO(src_reg);
+					ir_reg src_reg_hi;
+
+					if (IR_REG_SPILLED(src_reg)) {
+						src_reg = IR_REG_NUM(src_reg);
+						src_reg_hi = IR_REG_I64_HI(src_reg);
+						src_reg = IR_REG_I64_LO(src_reg);
+						ir_emit_load_i64_lo(ctx, src_reg, arg);
+						ir_emit_load_i64_hi(ctx, src_reg_hi, arg);
+					} else {
+						src_reg_hi = IR_REG_I64_HI(src_reg);
+						src_reg = IR_REG_I64_LO(src_reg);
+				    }
 					ir_emit_store_mem(ctx, IR_U32, mem, src_reg);
 					ir_emit_store_mem(ctx, IR_U32, mem_hi, src_reg_hi);
-				} else
+				} else {
 #endif
-				ir_emit_store_mem(ctx, type, IR_MEM_BO(IR_REG_STACK_POINTER, stack_offset), src_reg);
+					if (IR_REG_SPILLED(src_reg)) {
+						src_reg = IR_REG_NUM(src_reg);
+						ir_emit_load(ctx, type, src_reg, arg);
+					}
+					ir_emit_store_mem(ctx, type, IR_MEM_BO(IR_REG_STACK_POINTER, stack_offset), src_reg);
+#if IR_X86_I64
+				}
+#endif
 			} else {
 				do_pass3 = 1;
 			}
@@ -13805,16 +13822,6 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 							ir_emit_store_mem_int(ctx, IR_U32, mem, tmp_reg);
 							ir_emit_load_i64_hi(ctx, tmp_reg, arg);
 							ir_emit_store_mem_int(ctx, IR_U32, mem_hi, tmp_reg);
-						} else if (IR_REG_SPILLED(src_reg)) {
-							ir_reg src_reg_hi;
-
-							src_reg = IR_REG_NUM(src_reg);
-							src_reg_hi = IR_REG_I64_HI(src_reg);
-							src_reg = IR_REG_I64_LO(src_reg);
-							ir_emit_load_i64_lo(ctx, src_reg, arg);
-							ir_emit_load_i64_hi(ctx, src_reg_hi, arg);
-							ir_emit_store_mem_int(ctx, IR_U32, mem, src_reg);
-							ir_emit_store_mem_int(ctx, IR_U32, mem_hi, src_reg_hi);
 						}
 					} else
 #endif
@@ -13824,10 +13831,6 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 						IR_ASSERT(tmp_reg != IR_REG_NONE);
 						ir_emit_load(ctx, type, tmp_reg, arg);
 						ir_emit_store_mem_int(ctx, type, mem, tmp_reg);
-					} else if (IR_REG_SPILLED(src_reg)) {
-						src_reg = IR_REG_NUM(src_reg);
-						ir_emit_load(ctx, type, src_reg, arg);
-						ir_emit_store_mem_int(ctx, type, mem, src_reg);
 					}
 				} else {
 					if (IR_IS_CONST_REF(arg)) {
@@ -13836,10 +13839,6 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 						IR_ASSERT(tmp_fp_reg != IR_REG_NONE);
 						ir_emit_load(ctx, type, tmp_fp_reg, arg);
 						ir_emit_store_mem_fp(ctx, type, mem, tmp_fp_reg);
-					} else if (IR_REG_SPILLED(src_reg)) {
-						src_reg = IR_REG_NUM(src_reg);
-						ir_emit_load(ctx, type, src_reg, arg);
-						ir_emit_store_mem_fp(ctx, type, mem, src_reg);
 					}
 				}
 				stack_offset += IR_MAX(sizeof(void*), ir_get_type_size(type));
