@@ -22,6 +22,18 @@
 #include "ir_private.h"
 
 typedef struct {
+	uint8_t type;
+	int8_t  start;
+	int8_t  end;
+	int8_t  hint;
+	int8_t  flags;
+	ir_ref  root;
+	ir_ref  ref;
+	ir_ref  op;
+	ir_ref  def;
+} ir_reg_info;
+
+typedef struct {
 	ir_reg_alloc_data ra_data;
 	ir_block *bb;
 	int32_t  num;
@@ -38,17 +50,7 @@ typedef struct {
 		ir_ref use;
 		ir_ref op;
 	} state[IR_REG_NUM];
-	struct {
-		uint8_t type;
-		int8_t  start;
-		int8_t  end;
-		int8_t  hint;
-		int8_t  flags;
-		ir_ref  root;
-		ir_ref  ref;
-		ir_ref  op;
-		ir_ref  def;
-	} regs[32], tmp_regs[32];
+	ir_reg_info regs[32], tmp_regs[32];
 } ir_reg_alloc_fast_data;
 
 #ifdef IR_DEBUG
@@ -443,6 +445,36 @@ static bool _may_coalesce(ir_ctx *ctx, ir_ref input, ir_ref def)
 {
 	/* Coalescing of values connected trough PHI requires global live range analyzes */
 	return 0;
+}
+
+static void _sort_input_regs(ir_reg_alloc_fast_data *data)
+{
+	int i, n = data->num;
+
+	for (i = 1; i < n; i++) {
+#if 0
+		ir_reg_info tmp = data->regs[i];
+		int j = i - 1;
+		while (j >= 0 && tmp.end < data->regs[j].end) {
+			data->regs[j + 1] = data->regs[j];
+			j--;
+		}
+		data->regs[j + 1] = tmp;
+#else
+		int8_t pos = data->regs[i].end;
+
+		if (pos < data->regs[i-1].end) {
+			int j = i - 1;
+			ir_reg_info tmp = data->regs[i];
+
+			do {
+				data->regs[j + 1] = data->regs[j];
+				j--;
+			} while (j >= 0 && pos < data->regs[j].end);
+			data->regs[j + 1] = tmp;
+		}
+#endif
+	}
 }
 
 static void ir_add_fusion_data(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_reg_alloc_fast_data *data, ir_ref start)
@@ -1041,6 +1073,11 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 				}
 			}
 
+			if ((def_flags & IR_CALL_WITH_ARGS) && !IR_IS_CONST_REF(insn->op2)) {
+				/* stable sort according to "end" pos */
+				_sort_input_regs(&data);
+			}
+
 			/* allocate output register */
 			if (ctx->vregs[i] > 0) {
 				ir_live_interval *ival;
@@ -1266,7 +1303,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 			}
 
 			/* allocate input registers */
-			for (j = 0; j < data.num; j++) {
+			for (j = data.num - 1; j >= 0; j--) {
 				ir_regset used = data.clobbered_args;
 				ir_live_interval *ival;
 
@@ -1289,22 +1326,15 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 						if (reg_lo != IR_REG_NONE && reg_hi != IR_REG_NONE) {
 							IR_ASSERT(data.state[reg_lo].def == data.regs[j].def);
 							IR_ASSERT(data.state[reg_hi].def == data.regs[j].def);
-							if ((data.state[reg_lo].root == 0 && data.state[reg_lo].use == i)
-							 || data.state[reg_lo].root == i) {
-								/* keep previous operand of the same instraction as "last use" */
-								break;
-							} else {
-								/* update "last use" */
-								IR_ASSERT(!IR_REGSET_IN(used, reg_lo) && !IR_REGSET_IN(used, ival->reg_hi));
-								data.state[reg_lo].root = data.regs[j].root;
-								data.state[reg_lo].use = data.regs[j].ref;
-								data.state[reg_lo].op = data.regs[j].op;
-								data.state[reg_hi].root = data.regs[j].root;
-								data.state[reg_hi].use = data.regs[j].ref;
-								data.state[reg_hi].op = data.regs[j].op;
-								reg = IR_REG_I64_PAIR(reg_lo, reg_hi);
-								break;
-							}
+							/* update "last use" */
+							data.state[reg_lo].root = data.regs[j].root;
+							data.state[reg_lo].use = data.regs[j].ref;
+							data.state[reg_lo].op = data.regs[j].op;
+							data.state[reg_hi].root = data.regs[j].root;
+							data.state[reg_hi].use = data.regs[j].ref;
+							data.state[reg_hi].op = data.regs[j].op;
+							reg = IR_REG_I64_PAIR(reg_lo, reg_hi);
+							break;
 						}
 
 						/* try fixed register hint */
@@ -1402,18 +1432,11 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 					/* reuse previously allocated registers if possible */
 					if (reg != IR_REG_NONE) {
 						IR_ASSERT(data.state[reg].def == data.regs[j].def);
-						if ((data.state[reg].root == 0 && data.state[reg].use == i)
-						 || data.state[reg].root == i) {
-							/* keep previous operand of the same instraction as "last use" */
-							break;
-						} else {
-							/* update "last use" */
-							IR_ASSERT(!IR_REGSET_IN(used, reg));
-							data.state[reg].root = data.regs[j].root;
-							data.state[reg].use = data.regs[j].ref;
-							data.state[reg].op = data.regs[j].op;
-							break;
-						}
+						/* update "last use" */
+						data.state[reg].root = data.regs[j].root;
+						data.state[reg].use = data.regs[j].ref;
+						data.state[reg].op = data.regs[j].op;
+						break;
 					}
 
 					reg = data.regs[j].hint;
