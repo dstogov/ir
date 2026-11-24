@@ -449,18 +449,10 @@ static bool _may_coalesce(ir_ctx *ctx, ir_ref input, ir_ref def)
 
 static void _sort_input_regs(ir_reg_alloc_fast_data *data)
 {
+	/* insert sort */
 	int i, n = data->num;
 
 	for (i = 1; i < n; i++) {
-#if 0
-		ir_reg_info tmp = data->regs[i];
-		int j = i - 1;
-		while (j >= 0 && tmp.end < data->regs[j].end) {
-			data->regs[j + 1] = data->regs[j];
-			j--;
-		}
-		data->regs[j + 1] = tmp;
-#else
 		int8_t pos = data->regs[i].end;
 
 		if (pos < data->regs[i-1].end) {
@@ -473,7 +465,6 @@ static void _sort_input_regs(ir_reg_alloc_fast_data *data)
 			} while (j >= 0 && pos < data->regs[j].end);
 			data->regs[j + 1] = tmp;
 		}
-#endif
 	}
 }
 
