@@ -126,15 +126,15 @@ test:
 	movl %eax, 0x38(%rsp)
 	jmp .L1
 .L4:
-	movl 0x1c(%rsp), %eax
-	addl 0x20(%rsp), %eax
-	addl 0x18(%rsp), %eax
-	addl 0x14(%rsp), %eax
-	addl 0x10(%rsp), %eax
-	addl 0xc(%rsp), %eax
-	addl 8(%rsp), %eax
-	addl 4(%rsp), %eax
-	movl (%rsp), %ecx
-	leal 1(%rax, %rcx), %eax
+	movl 0x1c(%rsp), %ecx
+	addl 0x20(%rsp), %ecx
+	addl 0x18(%rsp), %ecx
+	addl 0x14(%rsp), %ecx
+	addl 0x10(%rsp), %ecx
+	addl 0xc(%rsp), %ecx
+	addl 8(%rsp), %ecx
+	addl 4(%rsp), %ecx
+	movl (%rsp), %eax
+	leal 1(%rcx, %rax), %eax
 	addq $0x40, %rsp
 	retq
