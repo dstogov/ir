@@ -523,6 +523,8 @@ int ir_get_target_constraints(ir_ctx *ctx, ir_ref ref, ir_target_constraints *co
 			if (insn->op == IR_MOD) {
 				constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_LOAD_SUB_REF, IR_DEF_SUB_REF);
 				n++;
+			} else if (insn->op == IR_SUB_OV && ir_type_size[insn->type] < 4) {
+				flags |= IR_DEF_CONFLICTS_WITH_INPUT_REGS;
 			} else if (insn->op == IR_MUL_OV && ir_type_size[insn->type] != 4) {
 				constraints->tmp_regs[n] = IR_TMP_REG(3, insn->type, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
 				n++;
@@ -2952,9 +2954,7 @@ static void ir_emit_binop_int(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 				if (ir_type_size[type] >= 4) {
 					|	ASM_REG_REG_REG_OP subs, type, def_reg, op1_reg, op2_reg
 				} else {
-					if (def_reg == op2_reg) {
-						SWAP_REGS(op1_reg, op2_reg);
-					}
+					IR_ASSERT(def_reg != op2_reg);
 					if (ir_type_size[type] == 2) {
 						if (IR_IS_TYPE_SIGNED(type)) {
 							|	sxth Rw(def_reg), Rw(op1_reg)
