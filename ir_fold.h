@@ -2259,6 +2259,8 @@ IR_FOLD(GT(SEXT, C_ADDR))
 		/* pass */
 	} else {
 		ir_type type = ctx->ir_base[op1_insn->op1].type;
+		/* unsigned constants are stored zero-extended; take the sign from the compare width */
+		int64_t cval = (int64_t)ir_fix_signed(op2_insn->type, op2_insn->val.u64);
 
 		if (type == IR_BOOL) {
 			if ((((opt & IR_OPT_OP_MASK) == IR_NE) && (op2_insn->val.u64 == 1))
@@ -2273,7 +2275,7 @@ IR_FOLD(GT(SEXT, C_ADDR))
 			}
 		}
 		if ((op2_insn->val.u64 >> (ir_type_size[type] * 8)) != 0
-		 && (op1_insn->op != IR_SEXT || (op2_insn->val.i64 >> (ir_type_size[type] * 8)) != -1)) {
+		 && (op1_insn->op != IR_SEXT || (cval >> (ir_type_size[type] * 8)) != -1)) {
 			if ((opt & IR_OPT_OP_MASK) == IR_EQ
 			 || (opt & IR_OPT_OP_MASK) == IR_UGT
 			 || (opt & IR_OPT_OP_MASK) == IR_UGE) {
@@ -2283,9 +2285,9 @@ IR_FOLD(GT(SEXT, C_ADDR))
 			 || (opt & IR_OPT_OP_MASK) == IR_ULE) {
 				IR_FOLD_COPY(IR_TRUE);
 			} else if ((opt & IR_OPT_OP_MASK) == IR_GT || (opt & IR_OPT_OP_MASK) == IR_GE) {
-				IR_FOLD_COPY(op2_insn->val.i64 >= 0 ? IR_FALSE : IR_TRUE);
+				IR_FOLD_COPY(cval >= 0 ? IR_FALSE : IR_TRUE);
 			} else if ((opt & IR_OPT_OP_MASK) == IR_LT || (opt & IR_OPT_OP_MASK) == IR_LE) {
-				IR_FOLD_COPY(op2_insn->val.i64 >= 0 ? IR_TRUE : IR_FALSE);
+				IR_FOLD_COPY(cval >= 0 ? IR_TRUE : IR_FALSE);
 			}
 			IR_FOLD_NEXT;
 		}
