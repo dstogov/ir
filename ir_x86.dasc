@@ -13463,9 +13463,25 @@ static int32_t ir_emit_arguments(ir_ctx *ctx, ir_ref def, ir_insn *insn, const i
 		 && used_stack <= ctx->fixed_call_stack_size
 		 && !cc->cleanup_stack_by_callee) {
 			used_stack = 0;
-		} else {
+		} else if (used_stack) {
 			/* Stack must be 16 byte aligned */
 			int32_t aligned_stack = IR_ALIGNED_SIZE(used_stack, 16);
+
+			if (op == IR_TAILCALL && !(ctx->flags2 & (IR_16B_FRAME_ALIGNMENT|IR_HAS_CALLS))) {
+				if (!(ctx->flags & IR_FUNCTION)) {
+					while (IR_ALIGNED_SIZE(ctx->stack_frame_size + aligned_stack, 16) != ctx->stack_frame_size + aligned_stack) {
+						aligned_stack += sizeof(void*);
+					}
+				} else if (ctx->flags & IR_USE_FRAME_POINTER) {
+					while (IR_ALIGNED_SIZE(ctx->stack_frame_size + aligned_stack + sizeof(void*) * 2, 16) != ctx->stack_frame_size + aligned_stack + sizeof(void*) * 2) {
+						aligned_stack += sizeof(void*);
+					}
+				} else {
+					while (IR_ALIGNED_SIZE(ctx->stack_frame_size + aligned_stack + sizeof(void*), 16) != ctx->stack_frame_size + aligned_stack + sizeof(void*)) {
+						aligned_stack += sizeof(void*);
+					}
+				}
+			}
 			ctx->call_stack_size += aligned_stack;
 			if (aligned_stack) {
 				ir_stack_alloca(ctx, aligned_stack);
@@ -14067,7 +14083,7 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_ref func = insn->op2;
 
 	if (used_stack != 0) {
-		ir_emit_call_ex(ctx, def, insn, proto, cc, used_stack);
+		ir_emit_call_ex(ctx, def, insn, proto, cc, 0);
 		ir_emit_return_void(ctx);
 		return;
 	}
