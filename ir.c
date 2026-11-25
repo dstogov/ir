@@ -2409,12 +2409,6 @@ static ir_alias ir_check_aliasing(const ir_ctx *ctx, ir_ref addr1, ir_ref addr2,
 	return IR_MAY_ALIAS;
 }
 
-/* Volatile accesses must be preserved and ordered, so they stop alias walks */
-IR_ALWAYS_INLINE bool ir_is_volatile_memory_op(ir_op op)
-{
-	return op == IR_LOAD_v || op == IR_STORE_v || op == IR_VLOAD_v || op == IR_VSTORE_v;
-}
-
 IR_ALWAYS_INLINE ir_ref ir_find_aliasing_load_i(const ir_ctx *ctx, ir_ref ref, ir_type type, ir_ref addr, ir_ref limit)
 {
 	const ir_insn *insn;
@@ -2422,7 +2416,7 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_load_i(const ir_ctx *ctx, ir_ref ref, i
 
 	while (ref > limit) {
 		insn = &ctx->ir_base[ref];
-		if (insn->op == IR_LOAD) {
+		if (insn->op == IR_LOAD || insn->op == IR_LOAD_v) {
 			if (insn->op2 == addr) {
 				if (insn->type == type) {
 					return ref; /* load forwarding (L2L) */
@@ -2433,7 +2427,7 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_load_i(const ir_ctx *ctx, ir_ref ref, i
 					return ref; /* partial load forwarding (L2L) */
 				}
 			}
-		} else if (insn->op == IR_STORE) {
+		} else if (insn->op == IR_STORE || insn->op == IR_STORE_v) {
 			ir_type type2 = ctx->ir_base[insn->op3].type;
 
 			if (insn->op2 == addr) {
@@ -2478,7 +2472,6 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_load_i(const ir_ctx *ctx, ir_ref ref, i
 		} else if (insn->op == IR_MERGE
 				|| insn->op == IR_LOOP_BEGIN
 				|| insn->op == IR_VSTORE
-				|| ir_is_volatile_memory_op(insn->op)
 				|| (insn->op == IR_BEGIN && insn->op2)) {
 			return IR_UNUSED;
 		}
@@ -2499,7 +2492,7 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_vload_i(const ir_ctx *ctx, ir_ref ref, 
 
 	while (ref > var) {
 		insn = &ctx->ir_base[ref];
-		if (insn->op == IR_VLOAD) {
+		if (insn->op == IR_VLOAD || insn->op == IR_VLOAD_v) {
 			if (insn->op2 == var) {
 				if (insn->type == type) {
 					return ref; /* load forwarding (L2L) */
@@ -2510,7 +2503,7 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_vload_i(const ir_ctx *ctx, ir_ref ref, 
 					return ref; /* partial load forwarding (L2L) */
 				}
 			}
-		} else if (insn->op == IR_VSTORE) {
+		} else if (insn->op == IR_VSTORE || insn->op == IR_VSTORE_v) {
 			ir_type type2 = ctx->ir_base[insn->op3].type;
 
 			if (insn->op2 == var) {
@@ -2547,7 +2540,6 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_vload_i(const ir_ctx *ctx, ir_ref ref, 
 		} else if (insn->op == IR_MERGE
 				|| insn->op == IR_LOOP_BEGIN
 				|| insn->op == IR_STORE
-				|| ir_is_volatile_memory_op(insn->op)
 				|| (insn->op == IR_BEGIN && insn->op2)) {
 			break;
 		}
@@ -2582,14 +2574,14 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_store_i(ir_ctx *ctx, ir_ref ref, ir_ref
 
 	while (ref > limit) {
 		insn = &ctx->ir_base[ref];
-		if (insn->op == IR_STORE) {
+		if (insn->op == IR_STORE || insn->op == IR_STORE_v) {
 			if (insn->op2 == addr) {
 				if (ctx->ir_base[insn->op3].type == type) {
 					if (insn->op3 == val) {
 						/* dead STORE (store the same value once again) */
 						return ref;
 					} else {
-						if (!guarded) {
+						if (!guarded && insn->op == IR_STORE) {
 							/* the previous STORE is dead (there are no LOADs) */
 							if (!ctx->use_lists) {
 								if (next) {
@@ -2632,7 +2624,7 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_store_i(ir_ctx *ctx, ir_ref ref, ir_ref
 				type2 = ctx->ir_base[insn->op3].type;
 				goto check_aliasing;
 			}
-		} else if (insn->op == IR_LOAD) {
+		} else if (insn->op == IR_LOAD || insn->op == IR_LOAD_v) {
 			if (insn->op2 == addr) {
 				if (ref == val) {
 					/* dead STORE (store the value that was loaded before) */
@@ -2655,8 +2647,7 @@ check_aliasing:
 			} else {
 				break;
 			}
-		} else if (insn->op == IR_CALL
-				|| ir_is_volatile_memory_op(insn->op)) {
+		} else if (insn->op == IR_CALL) {
 			break;
 		}
 		next = ref;
@@ -2690,13 +2681,13 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_vstore_i(ir_ctx *ctx, ir_ref ref, ir_re
 
 	while (ref > limit) {
 		insn = &ctx->ir_base[ref];
-		if (insn->op == IR_VSTORE) {
+		if (insn->op == IR_VSTORE || insn->op == IR_VSTORE_v) {
 			if (insn->op2 == var) {
 				if (insn->op3 == val) {
 					/* dead VSTORE */
 					return ref;
 				} else {
-					if (!guarded) {
+					if (!guarded && insn->op == IR_VSTORE) {
 						/* the previous VSTORE is dead (there are no VLOADs) */
 						if (!ctx->use_lists) {
 							if (next) {
@@ -2730,7 +2721,7 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_vstore_i(ir_ctx *ctx, ir_ref ref, ir_re
 					break;
 				}
 			}
-		} else if (insn->op == IR_VLOAD) {
+		} else if (insn->op == IR_VLOAD || insn->op == IR_VLOAD_v) {
 			if (insn->op2 == var) {
 				if (ref == val) {
 					/* dead VSTORE */
@@ -2748,8 +2739,7 @@ IR_ALWAYS_INLINE ir_ref ir_find_aliasing_vstore_i(ir_ctx *ctx, ir_ref ref, ir_re
 			} else {
 				break;
 			}
-		} else if (insn->op == IR_CALL || insn->op == IR_LOAD || insn->op == IR_STORE
-				|| ir_is_volatile_memory_op(insn->op)) {
+		} else if (insn->op == IR_CALL || insn->op == IR_LOAD || insn->op == IR_STORE) {
 			break;
 		}
 		next = ref;
