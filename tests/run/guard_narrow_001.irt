@@ -1,5 +1,7 @@
 --TEST--
 GUARD/GUARD_NOT on narrow integers with not normalized upper bits
+--ARGS--
+-O2 --run
 --CODE--
 extern func @printf(uintptr_t, ...): int32_t;
 func @h(): int32_t
