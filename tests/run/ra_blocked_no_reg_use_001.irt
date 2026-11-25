@@ -1,0 +1,87 @@
+--TEST--
+LSRA: a blocking interval without uses that need a register must be spilled, not skipped
+--CODE--
+func g(double, uint64_t): double
+{
+	uint64_t c_1 = 65535;
+	l_1 = START(l_7);
+	double d_2 = PARAM(l_1, "x", 1);
+	uint64_t d_3 = PARAM(l_1, "y", 2);
+	uint64_t d_4 = AND(d_3, c_1);
+	double d_5 = INT2FP(d_4);
+	double d_6 = ADD(d_2, d_5);
+	l_7 = RETURN(l_1, d_6);
+}
+func test(double, uint64_t, int32_t): uint64_t
+{
+	uintptr_t c_1 = func g(double, uint64_t): double;
+	int32_t c_2 = 0;
+	int32_t c_3 = 1;
+	uint64_t c_4 = 0;
+	uint64_t c_5 = 522107357238331378;
+	uint32_t c_6 = 22738201;
+	uint64_t c_7 = 205998744960586278;
+	double c_8 = 11.125;
+	uint64_t c_13 = 571124822803;
+	uint64_t c_16 = 972850908339;
+	double c_20 = 11.375;
+	uint32_t c_27 = 2130575616;
+	l_1 = START(l_ret);
+	double pa = PARAM(l_1, "a", 1);
+	uint64_t pb = PARAM(l_1, "b", 2);
+	int32_t pn = PARAM(l_1, "n", 3);
+	l_2 = END(l_1);
+	l_3 = LOOP_BEGIN(l_2, l_le);
+	int32_t i = PHI(l_3, c_2, i_next);
+	uint64_t acc = PHI(l_3, c_4, acc_next);
+	uint64_t ph_0 = PHI(l_3, c_5, back_0);
+	uint32_t ph_1 = PHI(l_3, c_6, back_1);
+	uint64_t ph_2 = PHI(l_3, c_7, back_2);
+	double ph_3 = PHI(l_3, c_8, back_3);
+	bool cnd = LT(i, pn);
+	l_4 = IF(l_3, cnd);
+	l_5 = IF_TRUE(l_4);
+	double r_9, l_10 = CALL/2(l_5, c_1, pa, acc);
+	uint64_t t_12 = BITCAST(r_9);
+	uint64_t x_11 = ADD(t_12, c_13);
+	uint64_t t_15 = BITCAST(r_9);
+	uint64_t x_14 = ADD(t_15, c_16);
+	uint64_t u_17 = ZEXT(ph_1);
+	uint64_t a_18 = XOR(acc, u_17);
+	double x_19 = ADD(r_9, c_20);
+	uint64_t a_21 = XOR(a_18, ph_2);
+	uint64_t u_22 = BITCAST(ph_3);
+	uint64_t a_23 = XOR(a_21, u_22);
+	float t_25 = FP2FP(r_9);
+	uint32_t w_26 = BITCAST(t_25);
+	uint32_t x_24 = XOR(w_26, c_27);
+	double r_28, l_29 = CALL/2(l_10, c_1, r_9, a_23);
+	uint64_t a_30 = XOR(a_23, ph_0);
+	uint64_t u_31 = BITCAST(r_28);
+	uint64_t a_32 = XOR(a_30, u_31);
+	uint64_t back_0 = COPY(x_11);
+	uint32_t back_1 = COPY(x_24);
+	uint64_t back_2 = COPY(x_14);
+	double back_3 = COPY(x_19);
+	uint64_t acc_next = COPY(a_32);
+	int32_t i_next = ADD(i, c_3);
+	l_le = LOOP_END(l_29);
+	l_8 = IF_FALSE(l_4);
+	l_ret = RETURN(l_8, acc);
+}
+func main(): int32_t
+{
+	int32_t zero = 0;
+	double a = 2.5;
+	uint64_t b = 1311768467463790320;
+	int32_t n = 3;
+	uintptr_t t = func test(double, uint64_t, int32_t): uint64_t;
+	uintptr_t print = func printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%llx\n";
+	l_1 = START(l_4);
+	uint64_t result, l_2 = CALL/3(l_1, t, a, b, n);
+	int32_t printed, l_3 = CALL/2(l_2, print, fmt, result);
+	l_4 = RETURN(l_3, zero);
+}
+--EXPECT--
+5fff1e06d186f4d
