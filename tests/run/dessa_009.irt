@@ -1,0 +1,118 @@
+--TEST--
+DESSA 009: a copy on a loop's back edge must not overwrite a value in the upper half of its 8-byte destination slot
+--CODE--
+func g(double, uint64_t): double
+{
+	uint64_t c_1 = 65535;
+	l_1 = START(l_7);
+	double d_2 = PARAM(l_1, "x", 1);
+	uint64_t d_3 = PARAM(l_1, "y", 2);
+	uint64_t d_4 = AND(d_3, c_1);
+	double d_5 = INT2FP(d_4);
+	double d_6 = ADD(d_2, d_5);
+	l_7 = RETURN(l_1, d_6);
+}
+func test(double, uint64_t, int32_t): uint64_t
+{
+	uintptr_t c_1 = func g(double, uint64_t): double;
+	int32_t c_2 = 0;
+	int32_t c_3 = 1;
+	uint64_t c_4 = 0;
+	float c_5 = 2.25;
+	double c_6 = 10.125;
+	float c_7 = 13.25;
+	float c_8 = 17.25;
+	float c_9 = 18.25;
+	float c_10 = 25.25;
+	float c_11 = 26.25;
+	double c_12 = 10.375;
+	float c_13 = 2.625;
+	float c_14 = 17.625;
+	float c_15 = 25.625;
+	float c_16 = 18.625;
+	float c_17 = 26.625;
+	float c_18 = 13.625;
+	l_1 = START(l_67);
+	double d_a = PARAM(l_1, "a", 1);
+	uint64_t d_b = PARAM(l_1, "b", 2);
+	int32_t d_n = PARAM(l_1, "n", 3);
+	l_5 = END(l_1);
+	l_6 = LOOP_BEGIN(l_5, l_65);
+	int32_t d_7 = PHI(l_6, c_2, d_64);
+	uint64_t d_8 = PHI(l_6, c_4, d_63);
+	float d_9 = PHI(l_6, c_5, d_56);
+	double d_10 = PHI(l_6, c_6, d_57);
+	float d_11 = PHI(l_6, c_7, d_58);
+	float d_12 = PHI(l_6, c_8, d_59);
+	float d_13 = PHI(l_6, c_9, d_60);
+	float d_14 = PHI(l_6, c_10, d_61);
+	float d_15 = PHI(l_6, c_11, d_62);
+	bool d_16 = LT(d_7, d_n);
+	l_17 = IF(l_6, d_16);
+	l_18 = IF_TRUE(l_17);
+	uint32_t d_19 = BITCAST(d_15);
+	uint64_t d_20 = ZEXT(d_19);
+	uint64_t d_21 = ADD(d_8, d_20);
+	double d_22 = ADD(d_a, c_12);
+	double d_23, l_23 = CALL/2(l_18, c_1, d_a, d_21);
+	uint64_t d_24 = BITCAST(d_10);
+	uint64_t d_25 = XOR(d_21, d_24);
+	float d_26 = FP2FP(d_23);
+	float d_27 = ADD(d_26, c_13);
+	float d_28 = FP2FP(d_23);
+	float d_29 = ADD(d_28, c_14);
+	uint32_t d_30 = BITCAST(d_14);
+	uint64_t d_31 = ZEXT(d_30);
+	uint64_t d_32 = XOR(d_25, d_31);
+	uint32_t d_33 = BITCAST(d_13);
+	uint64_t d_34 = ZEXT(d_33);
+	uint64_t d_35 = ADD(d_32, d_34);
+	float d_36 = FP2FP(d_23);
+	float d_37 = ADD(d_36, c_15);
+	float d_38 = FP2FP(d_23);
+	float d_39 = ADD(d_38, c_16);
+	uint32_t d_40 = BITCAST(d_11);
+	uint64_t d_41 = ZEXT(d_40);
+	uint64_t d_42 = XOR(d_35, d_41);
+	uint32_t d_43 = BITCAST(d_9);
+	uint64_t d_44 = ZEXT(d_43);
+	uint64_t d_45 = XOR(d_42, d_44);
+	float d_46 = FP2FP(d_23);
+	float d_47 = ADD(d_46, c_17);
+	double d_48, l_48 = CALL/2(l_23, c_1, d_23, d_45);
+	float d_49 = FP2FP(d_48);
+	float d_50 = ADD(d_49, c_18);
+	uint32_t d_51 = BITCAST(d_12);
+	uint64_t d_52 = ZEXT(d_51);
+	uint64_t d_53 = XOR(d_45, d_52);
+	uint64_t d_54 = BITCAST(d_48);
+	uint64_t d_55 = XOR(d_53, d_54);
+	float d_56 = COPY(d_27);
+	double d_57 = COPY(d_22);
+	float d_58 = COPY(d_50);
+	float d_59 = COPY(d_29);
+	float d_60 = COPY(d_39);
+	float d_61 = COPY(d_37);
+	float d_62 = COPY(d_47);
+	uint64_t d_63 = COPY(d_55);
+	int32_t d_64 = ADD(d_7, c_3);
+	l_65 = LOOP_END(l_48);
+	l_66 = IF_FALSE(l_17);
+	l_67 = RETURN(l_66, d_8);
+}
+func main(): int32_t
+{
+	int32_t zero = 0;
+	double a = 2.5;
+	uint64_t b = 1311768467463790320;
+	int32_t n = 3;
+	uintptr_t t = func test(double, uint64_t, int32_t): uint64_t;
+	uintptr_t print = func printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%llx\n";
+	l_1 = START(l_4);
+	uint64_t result, l_2 = CALL/3(l_1, t, a, b, n);
+	int32_t printed, l_3 = CALL/2(l_2, print, fmt, result);
+	l_4 = RETURN(l_3, zero);
+}
+--EXPECT--
+20400009800000
