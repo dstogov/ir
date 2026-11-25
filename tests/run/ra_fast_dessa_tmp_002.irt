@@ -1,0 +1,116 @@
+--TEST--
+Fast RA: a PHI input evicted for a DESSA temporary register must be read from its spill slot
+--CODE--
+func g(double, uint64_t): double
+{
+	uint64_t c_1 = 65535;
+	l_1 = START(l_7);
+	double d_2 = PARAM(l_1, "x", 1);
+	uint64_t d_3 = PARAM(l_1, "y", 2);
+	uint64_t d_4 = AND(d_3, c_1);
+	double c_5 = INT2FP(d_4);
+	double c_6 = ADD(d_2, c_5);
+	l_7 = RETURN(l_1, c_6);
+}
+func test(double, uint64_t, bool): uint64_t
+{
+	uintptr_t c_1 = func g(double, uint64_t): double;
+	double c_2 = 1.375;
+	double c_3 = 2.375;
+	double c_4 = 3.375;
+	uint64_t c_5 = 371346220568793587;
+	uint64_t c_6 = 443686393406870260;
+	double c_12 = 11.375;
+	double c_13 = 12.375;
+	double c_14 = 13.375;
+	uint64_t c_15 = 1094747948949560317;
+	uint64_t c_16 = 1167088121787636990;
+	double c_17 = 16.375;
+	double c_18 = 17.375;
+	double c_19 = 18.375;
+	double c_20 = 19.375;
+	uint64_t c_21 = 1528788985978020355;
+	l_1 = START(l_114);
+	double d_a = PARAM(l_1, "a", 1);
+	uint64_t d_b = PARAM(l_1, "b", 2);
+	bool d_flag = PARAM(l_1, "flag", 3);
+	double d_2 = ADD(d_a, c_2);
+	double d_3 = ADD(d_a, c_3);
+	double d_4 = ADD(d_a, c_4);
+	l_12 = IF(l_1, d_flag);
+	l_13 = IF_TRUE(l_12);
+	double d_14 = MUL(d_a, c_12);
+	double d_15 = MUL(d_a, c_13);
+	double d_16 = MUL(d_a, c_14);
+	uint64_t d_17 = MUL(d_b, c_15);
+	uint64_t d_18 = XOR(d_b, c_16);
+	double d_19 = MUL(d_a, c_17);
+	double d_20 = MUL(d_a, c_18);
+	double d_21 = MUL(d_a, c_19);
+	double d_22 = MUL(d_a, c_20);
+	uint64_t d_23 = XOR(d_b, c_21);
+	double d_32, l_33 = CALL/2(l_13, c_1, c_2, d_b);
+	l_34 = END(l_33);
+	l_35 = IF_FALSE(l_12);
+	l_54 = END(l_35);
+	l_55 = MERGE(l_34, l_54);
+	double d_58 = PHI(l_55, d_14, d_2);
+	double d_60 = PHI(l_55, d_15, d_3);
+	double d_62 = PHI(l_55, d_16, d_4);
+	uint64_t d_64 = PHI(l_55, d_17, c_5);
+	uint64_t d_66 = PHI(l_55, d_18, c_6);
+	double d_68 = PHI(l_55, d_19, c_2);
+	double d_70 = PHI(l_55, d_20, c_2);
+	double d_72 = PHI(l_55, d_21, c_2);
+	double d_74 = PHI(l_55, d_22, c_2);
+	uint64_t d_76 = PHI(l_55, d_23, c_5);
+	double d_78 = PHI(l_55, d_32, c_2);
+	double d_79 = ADD(d_a, d_58);
+	double d_80 = ADD(d_79, c_2);
+	double d_81 = ADD(d_80, c_2);
+	double d_82 = ADD(d_81, d_68);
+	double d_83 = ADD(d_82, c_2);
+	double d_84 = ADD(d_83, c_2);
+	double d_85 = ADD(d_84, d_72);
+	double d_86 = ADD(d_85, d_78);
+	double d_87, l_88 = CALL/2(l_55, c_1, d_86, d_b);
+	uint64_t d_89 = ADD(d_64, d_66);
+	uint64_t d_91 = XOR(d_89, c_5);
+	uint64_t d_92 = ADD(d_91, d_76);
+	uint64_t d_93 = BITCAST(d_74);
+	uint64_t d_94 = ADD(d_92, d_93);
+	uint64_t d_96 = XOR(d_94, c_5);
+	uint64_t d_97 = XOR(d_96, c_5);
+	uint64_t d_99 = XOR(d_97, c_5);
+	uint64_t d_100 = BITCAST(d_60);
+	uint64_t d_101 = XOR(d_99, d_100);
+	uint64_t d_102 = BITCAST(d_87);
+	uint64_t d_103 = XOR(d_101, d_102);
+	uint64_t d_105 = ADD(d_103, c_5);
+	uint64_t d_106 = BITCAST(d_62);
+	uint64_t d_107 = ADD(d_105, d_106);
+	uint64_t d_108 = BITCAST(d_70);
+	uint64_t d_109 = XOR(d_107, d_108);
+	uint64_t d_110 = ADD(d_109, c_5);
+	uint64_t d_112 = XOR(d_110, c_5);
+	uint64_t d_113 = XOR(d_112, c_5);
+	l_114 = RETURN(l_88, d_113);
+}
+func main(): int32_t
+{
+	int32_t c_1 = 0;
+	uintptr_t c_2 = func printf(uintptr_t, ...): int32_t;
+	uintptr_t c_3 = func test(double, uint64_t, bool): uint64_t;
+	uintptr_t c_4 = "%llx %llx\n";
+	double c_5 = 2.5;
+	uint64_t c_6 = 1311768467463790320;
+	bool c_7 = 1;
+	bool c_8 = 0;
+	l_1 = START(l_5);
+	uint64_t d_2, l_2 = CALL/3(l_1, c_3, c_5, c_6, c_7);
+	uint64_t d_3, l_3 = CALL/3(l_2, c_3, c_5, c_6, c_8);
+	int32_t d_4, l_4 = CALL/3(l_3, c_2, c_4, d_2, d_3);
+	l_5 = RETURN(l_4, c_1);
+}
+--EXPECT--
+ea03465a41320419 a989204bae303ada
