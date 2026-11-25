@@ -1,0 +1,40 @@
+--TEST--
+ADD_OV/SUB_OV(x, 0) must not fold to an overflowing x
+--CODE--
+{
+	int32_t c_1 = 0;
+	l_1 = START(l_17);
+	int32_t d_2 = PARAM(l_1, "a", 1);
+	int32_t d_3 = PARAM(l_1, "b", 2);
+	int32_t d_4 = ADD_OV(d_2, d_3);
+	int32_t d_5 = ADD_OV(d_4, c_1);
+	bool d_6 = OVERFLOW(d_5);
+	int32_t d_7 = COND(d_6, c_1, d_5);
+	int32_t d_8 = MUL_OV(d_2, d_3);
+	int32_t d_9 = SUB_OV(d_8, c_1);
+	bool d_10 = OVERFLOW(d_9);
+	int32_t d_11 = COND(d_10, c_1, d_9);
+	int32_t d_12 = ADD_OV(d_2, c_1);
+	bool d_13 = OVERFLOW(d_12);
+	int32_t d_14 = COND(d_13, c_1, d_12);
+	int32_t d_15 = ADD(d_7, d_11);
+	int32_t d_16 = ADD(d_15, d_14);
+	l_17 = RETURN(l_1, d_16);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 0;
+	l_1 = START(l_10);
+	int32_t d_2 = PARAM(l_1, "a", 1);
+	int32_t d_3 = PARAM(l_1, "b", 2);
+	int32_t d_4 = ADD_OV(d_3, d_2);
+	int32_t d_5 = ADD_OV(d_4, c_4);
+	int32_t d_6 = MUL_OV(d_3, d_2);
+	int32_t d_7 = SUB_OV(d_6, c_4);
+	int32_t d_8 = ADD(d_7, d_5);
+	int32_t d_9 = ADD(d_8, d_2);
+	l_10 = RETURN(l_1, d_9);
+}
