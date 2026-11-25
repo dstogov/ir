@@ -1327,6 +1327,8 @@ typedef struct _ir_use_pos       ir_use_pos;
 #define IR_FUSED_USE                     (1<<6)
 #define IR_PHI_USE                       (1<<7)
 
+#define IR_CALL_WITH_ARGS                (1<<8)
+
 #define IR_OP1_MUST_BE_IN_REG            (1<<16)
 #define IR_OP1_SHOULD_BE_IN_REG          (1<<17)
 #define IR_OP1_HINT_TWO_REGS             (1<<18)

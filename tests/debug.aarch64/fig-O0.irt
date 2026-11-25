@@ -79,9 +79,9 @@ test:
 .L1:
 	ldr w0, [sp, #0x40]
 	cbz w0, .L2
-	ldr w0, [sp, #0x18]
-	ldr w1, [sp, #0x20]
-	mul w1, w0, w1
+	ldr w1, [sp, #0x18]
+	ldr w0, [sp, #0x20]
+	mul w1, w1, w0
 	add w2, w1, #4
 	ldr w0, [sp, #0x18]
 	str w0, [sp, #0x1c]
@@ -96,10 +96,10 @@ test:
 	b .L3
 .L2:
 	ldr w0, [sp, #0x18]
-	ldr w3, [sp, #0x20]
-	mul w1, w0, w3
-	ldr w2, [sp, #0x28]
-	mul w2, w2, w3
+	ldr w2, [sp, #0x20]
+	mul w1, w0, w2
+	ldr w3, [sp, #0x28]
+	mul w2, w3, w2
 	add w3, w2, #1
 	ldr w4, [sp, #0x28]
 	str w4, [sp, #0x1c]
@@ -110,9 +110,9 @@ test:
 	str w2, [sp, #8]
 	str w3, [sp, #4]
 .L3:
-	ldr w1, [sp, #0x1c]
-	ldr w2, [sp, #0x20]
-	mul w1, w1, w2
+	ldr w2, [sp, #0x1c]
+	ldr w1, [sp, #0x20]
+	mul w1, w2, w1
 	add w1, w1, #1
 	str w1, [sp]
 	ldr w0, [sp, #0x48]
@@ -129,22 +129,22 @@ test:
 	str w0, [sp, #0x38]
 	b .L1
 .L4:
-	ldr w0, [sp, #0x1c]
-	ldr w8, [sp, #0x20]
-	add w0, w0, w8
-	ldr w7, [sp, #0x18]
-	add w0, w0, w7
-	ldr w6, [sp, #0x14]
-	add w0, w0, w6
-	ldr w5, [sp, #0x10]
-	add w0, w0, w5
-	ldr w4, [sp, #0xc]
-	add w0, w0, w4
-	ldr w3, [sp, #8]
-	add w0, w0, w3
-	ldr w2, [sp, #4]
-	add w0, w0, w2
-	ldr w1, [sp]
-	add w0, w0, w1
+	ldr w8, [sp, #0x1c]
+	ldr w7, [sp, #0x20]
+	add w7, w8, w7
+	ldr w6, [sp, #0x18]
+	add w6, w7, w6
+	ldr w5, [sp, #0x14]
+	add w5, w6, w5
+	ldr w4, [sp, #0x10]
+	add w4, w5, w4
+	ldr w3, [sp, #0xc]
+	add w3, w4, w3
+	ldr w2, [sp, #8]
+	add w2, w3, w2
+	ldr w1, [sp, #4]
+	add w1, w2, w1
+	ldr w0, [sp]
+	add w0, w1, w0
 	add sp, sp, #0x40
 	ret

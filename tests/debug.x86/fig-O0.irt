@@ -128,16 +128,16 @@ test:
 	movl %eax, 0x38(%esp)
 	jmp .L1
 .L4:
-	movl 0x1c(%esp), %eax
-	addl 0x54(%esp), %eax
-	addl 0x58(%esp), %eax
-	addl 0x14(%esp), %eax
-	addl 0x10(%esp), %eax
-	addl 0xc(%esp), %eax
-	addl 8(%esp), %eax
-	addl 4(%esp), %eax
-	movl (%esp), %ecx
-	leal 1(%eax, %ecx), %eax
+	movl 0x1c(%esp), %ecx
+	addl 0x54(%esp), %ecx
+	addl 0x58(%esp), %ecx
+	addl 0x14(%esp), %ecx
+	addl 0x10(%esp), %ecx
+	addl 0xc(%esp), %ecx
+	addl 8(%esp), %ecx
+	addl 4(%esp), %ecx
+	movl (%esp), %eax
+	leal 1(%ecx, %eax), %eax
 	addl $0x40, %esp
 	popl %esi
 	popl %ebp

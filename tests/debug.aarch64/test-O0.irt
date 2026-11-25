@@ -64,18 +64,18 @@ test:
 .L1:
 	add w0, w0, #1
 	str w0, [sp, #0x10]
-	fmul d2, d1, d0
-	fmul d1, d1, d1
+	fmul d3, d0, d1
 	fmul d0, d0, d0
-	fsub d4, d1, d0
-	ldr d5, [sp, #0x20]
-	fadd d4, d4, d5
+	fmul d1, d1, d1
+	fsub d5, d0, d1
+	ldr d4, [sp, #0x20]
+	fadd d4, d5, d4
 	str d4, [sp, #8]
-	fadd d2, d2, d2
-	ldr d3, [sp, #0x18]
-	fadd d2, d2, d3
+	fadd d3, d3, d3
+	ldr d2, [sp, #0x18]
+	fadd d2, d3, d2
 	str d2, [sp]
-	fadd d1, d0, d1
+	fadd d1, d1, d0
 	ldr d0, .L5
 	fcmp d1, d0
 	b.le .L2
@@ -90,8 +90,8 @@ test:
 	add sp, sp, #0x30
 	ret
 .L3:
-	ldr d1, [sp, #8]
-	ldr d0, [sp]
+	ldr d1, [sp]
+	ldr d0, [sp, #8]
 	ldr w0, [sp, #0x10]
 	b .L1
 .rodata
