@@ -295,7 +295,13 @@ static void ir_emit_ref(ir_ctx *ctx, FILE *f, ir_ref ref)
 			ir_insn *var = &ctx->ir_base[insn->op2];
 
 			IR_ASSERT(var->op == IR_VAR/* || var->op == IR_PARAM*/);
-			fprintf(f, "%s", ir_get_str(ctx, var->op2));
+			if (insn->op == IR_VLOAD) {
+				fprintf(f, "%s", ir_get_str(ctx, var->op2));
+			} else {
+				fprintf(f, "*((volatile ");
+				ir_emit_c_type_name(insn->type, f);
+				fprintf(f, "*)&%s)", ir_get_str(ctx, var->op2));
+			}
 			return;
 		}
 		fprintf(f, "d_%d", ctx->vregs[ref]);
@@ -1106,7 +1112,14 @@ static void ir_emit_vstore(ir_ctx *ctx, FILE *f, ir_insn *insn)
 	IR_ASSERT(insn->op2 > 0);
 	var = &ctx->ir_base[insn->op2];
 	IR_ASSERT(var->op == IR_VAR/* || var->op == IR_PARAM*/);
-	fprintf(f, "\t%s = ", ir_get_str(ctx, var->op2));
+	if (insn->op == IR_VSTORE) {
+		fprintf(f, "\t%s = ", ir_get_str(ctx, var->op2));
+	} else {
+		IR_ASSERT(insn->op == IR_VSTORE_v);
+		fprintf(f, "\t*((volatile ");
+		ir_emit_c_type_name(var->type, f);
+		fprintf(f, "*)&%s) = ", ir_get_str(ctx, var->op2));
+	}
 	ir_emit_ref(ctx, f, insn->op3);
 	fprintf(f, ";\n");
 }
@@ -1119,6 +1132,9 @@ static void ir_emit_load(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 		fprintf(f, "\t");
 	}
 	fprintf(f, "*((");
+	if (insn->op == IR_LOAD_v) {
+		fprintf(f, "volatile ");
+	}
 	ir_emit_c_type_name(insn->type, f);
 	fprintf(f, "*)");
 	if (IR_IS_CONST_REF(insn->op2)) {
@@ -1134,6 +1150,9 @@ static void ir_emit_store(ir_ctx *ctx, FILE *f, ir_insn *insn)
 	ir_type type = ctx->ir_base[insn->op3].type;
 
 	fprintf(f, "\t*((");
+	if (insn->op == IR_STORE_v) {
+		fprintf(f, "volatile ");
+	}
 	ir_emit_c_type_name(type, f);
 	fprintf(f, "*)");
 	if (IR_IS_CONST_REF(insn->op2)) {

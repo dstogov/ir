@@ -1,0 +1,17 @@
+--TEST--
+001: STORE_v
+--CODE--
+{
+	int32_t c_0 = 0;
+	l_1 = START(l_4);
+	uintptr_t d_2 = PARAM(l_1, "a", 0);
+	l_3 = STORE_v(l_1, d_2, c_0);
+	l_4 = RETURN(l_3);
+}
+--EXPECT--
+void test(uintptr_t a)
+{
+	uintptr_t d_1 = a;
+	*((volatile int32_t*)d_1) = 0;
+	return;
+}
