@@ -2272,22 +2272,25 @@ IR_FOLD(GT(SEXT, C_ADDR))
 				IR_FOLD_COPY(op1_insn->op1);
 			}
 		}
-		if ((op2_insn->val.u64 >> (ir_type_size[type] * 8)) != 0
-		 && (op1_insn->op != IR_SEXT || (op2_insn->val.i64 >> (ir_type_size[type] * 8)) != -1)) {
-			if ((opt & IR_OPT_OP_MASK) == IR_EQ
-			 || (opt & IR_OPT_OP_MASK) == IR_UGT
-			 || (opt & IR_OPT_OP_MASK) == IR_UGE) {
-				IR_FOLD_COPY(IR_FALSE);
-			} else if ((opt & IR_OPT_OP_MASK) == IR_NE
-			 || (opt & IR_OPT_OP_MASK) == IR_ULT
-			 || (opt & IR_OPT_OP_MASK) == IR_ULE) {
-				IR_FOLD_COPY(IR_TRUE);
-			} else if ((opt & IR_OPT_OP_MASK) == IR_GT || (opt & IR_OPT_OP_MASK) == IR_GE) {
-				IR_FOLD_COPY(op2_insn->val.i64 >= 0 ? IR_FALSE : IR_TRUE);
-			} else if ((opt & IR_OPT_OP_MASK) == IR_LT || (opt & IR_OPT_OP_MASK) == IR_LE) {
-				IR_FOLD_COPY(op2_insn->val.i64 >= 0 ? IR_TRUE : IR_FALSE);
+		if ((op2_insn->val.u64 >> (ir_type_size[type] * 8)) != 0) {
+			int64_t sval = ir_fix_signed(op2_insn->type, op2_insn->val.u64);
+
+			if (op1_insn->op != IR_SEXT || (sval >> (ir_type_size[type] * 8)) != -1) {
+				if ((opt & IR_OPT_OP_MASK) == IR_EQ
+				 || (opt & IR_OPT_OP_MASK) == IR_UGT
+				 || (opt & IR_OPT_OP_MASK) == IR_UGE) {
+					IR_FOLD_COPY(IR_FALSE);
+				} else if ((opt & IR_OPT_OP_MASK) == IR_NE
+					 || (opt & IR_OPT_OP_MASK) == IR_ULT
+					 || (opt & IR_OPT_OP_MASK) == IR_ULE) {
+					IR_FOLD_COPY(IR_TRUE);
+				} else if ((opt & IR_OPT_OP_MASK) == IR_GT || (opt & IR_OPT_OP_MASK) == IR_GE) {
+					IR_FOLD_COPY(sval >= 0 ? IR_FALSE : IR_TRUE);
+				} else if ((opt & IR_OPT_OP_MASK) == IR_LT || (opt & IR_OPT_OP_MASK) == IR_LE) {
+					IR_FOLD_COPY(sval >= 0 ? IR_TRUE : IR_FALSE);
+				}
+				IR_FOLD_NEXT;
 			}
-			IR_FOLD_NEXT;
 		}
 		if (IR_IS_TYPE_SIGNED(type)) {
 			switch (ir_type_size[type]) {
