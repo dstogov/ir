@@ -408,6 +408,24 @@ static void ir_emit_unsigned_binary_op(ir_ctx *ctx, FILE *f, int def, ir_insn *i
 	fprintf(f, ";\n");
 }
 
+static void ir_emit_signed_comparison_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *op)
+{
+	uint8_t t1 = ctx->ir_base[insn->op1].type;
+	uint8_t t2 = ctx->ir_base[insn->op2].type;
+
+	ir_emit_def_ref(ctx, f, def);
+	if (IR_IS_TYPE_INT(t1)) {
+		ir_emit_signed_cast(f, t1);
+	}
+	ir_emit_ref(ctx, f, insn->op1);
+	fprintf(f, " %s ", op);
+	if (IR_IS_TYPE_INT(t2)) {
+		ir_emit_signed_cast(f, t2);
+	}
+	ir_emit_ref(ctx, f, insn->op2);
+	fprintf(f, ";\n");
+}
+
 static void ir_emit_unsigned_comparison_op(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, const char *op, const char *fop)
 {
 	uint8_t t1 = ctx->ir_base[insn->op1].type;
@@ -1342,16 +1360,16 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 					ir_emit_binary_op(ctx, f, i, insn, "!=");
 					break;
 				case IR_LT:
-					ir_emit_binary_op(ctx, f, i, insn, "<");
+					ir_emit_signed_comparison_op(ctx, f, i, insn, "<");
 					break;
 				case IR_GE:
-					ir_emit_binary_op(ctx, f, i, insn, ">=");
+					ir_emit_signed_comparison_op(ctx, f, i, insn, ">=");
 					break;
 				case IR_LE:
-					ir_emit_binary_op(ctx, f, i, insn, "<=");
+					ir_emit_signed_comparison_op(ctx, f, i, insn, "<=");
 					break;
 				case IR_GT:
-					ir_emit_binary_op(ctx, f, i, insn, ">");
+					ir_emit_signed_comparison_op(ctx, f, i, insn, ">");
 					break;
 				case IR_ULT:
 					ir_emit_unsigned_comparison_op(ctx, f, i, insn, "<", ">=");
