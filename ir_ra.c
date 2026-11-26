@@ -3925,6 +3925,20 @@ try_next_available_register:
 					// TODO: this may cause endless loop
 					ir_add_to_unhandled(unhandled, child);
 					IR_LOG_LSRA("      ---- Queue", child, "");
+				} else if (split_pos >= child->end
+						&& !(other->flags & (IR_LIVE_INTERVAL_FIXED|IR_LIVE_INTERVAL_TEMP))) {
+					/* no use of "other" needs a register, so spill all of it */
+					other->reg = IR_REG_NONE;
+#if IR_X86_I64
+					other->reg_hi = IR_REG_NONE;
+#endif
+					if (prev) {
+						prev->list_next = other->list_next;
+					} else {
+						*active = other->list_next;
+					}
+					ctx->flags2 |= IR_RA_HAVE_SPILLS;
+					IR_LOG_LSRA("      ---- Spill", other, "");
 				} else {
 					goto try_next_available_register;
 				}
