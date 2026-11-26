@@ -563,6 +563,41 @@ static void ir_add_fusion_data(ir_ctx *ctx, ir_ref ref, ir_ref input, ir_reg_all
 	}
 }
 
+/* _pick_reg() evicted "reg" to get a temporary register for the DESSA moves. Let these moves
+ * read every PHI input that was in "reg" from its spill slot. Only PHIs of the same register
+ * class are affected: other uses of the MERGE aren't DESSA moves, and on 32-bit x86 a register
+ * pair is encoded as "lo | (hi << 3)", which may look like an FP register. */
+static void _clear_evicted_phi_inputs(ir_ctx *ctx, ir_use_list *use_list, ir_ref k, ir_reg reg, bool fp)
+{
+	ir_ref n = use_list->count, *p = ctx->use_edges + use_list->refs;
+
+	for (; n > 0; p++, n--) {
+		ir_ref use = *p;
+		ir_insn *insn = &ctx->ir_base[use];
+		ir_reg old_reg;
+
+		if (insn->op != IR_PHI || IR_IS_TYPE_INT(insn->type) == fp) {
+			continue;
+		}
+		old_reg = ir_get_alocated_reg(ctx, use, k);
+		if (old_reg == IR_REG_NONE) {
+			continue;
+		}
+#if IR_X86_I64
+		if (insn->type == IR_I64 || insn->type == IR_U64) {
+			if (IR_REG_I64_LO(old_reg) == reg || IR_REG_I64_HI(old_reg) == reg) {
+				ir_set_alocated_reg(ctx, use, k, IR_REG_NONE);
+			}
+			continue;
+		}
+#endif
+		/* _evict_reg() may have marked the input with IR_REG_SPILL_LOAD */
+		if (IR_REG_NUM(old_reg) == reg) {
+			ir_set_alocated_reg(ctx, use, k, IR_REG_NONE);
+		}
+	}
+}
+
 int ir_reg_alloc_fast(ir_ctx *ctx)
 {
 	uint32_t b;
@@ -764,23 +799,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 				reg = _pick_free_reg(ctx, &data, IR_I32, 0, 0);
 				if (reg == IR_REG_NONE) {
 					reg = _pick_reg(ctx, &data, IR_I32, IR_REGSET_EMPTY, IR_USE_MUST_BE_IN_REG, 0, 0);
-					/* clear the assignment of the evicted register(s) */
-					n = use_list->count;
-					for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
-						ir_ref use = *p;
-						ir_reg old_reg = ir_get_alocated_reg(ctx, use, k);
-						if (old_reg == reg) {
-							ir_set_alocated_reg(ctx, use, k, IR_REG_NONE);
-						}
-#if IR_X86_I64
-						if (old_reg != IR_REG_NONE
-						 && (ctx->ir_base[use].type == IR_I64 || ctx->ir_base[use].type == IR_U64)) {
-							if (IR_REG_I64_LO(old_reg) == reg || IR_REG_I64_HI(old_reg) == reg) {
-								ir_set_alocated_reg(ctx, use, k, IR_REG_NONE);
-							}
-						}
-#endif
-					}
+					_clear_evicted_phi_inputs(ctx, use_list, k, reg, 0);
 				}
 				ctx->regs[bb->end][0] = reg;
 			}
@@ -788,15 +807,7 @@ int ir_reg_alloc_fast(ir_ctx *ctx)
 				reg = _pick_free_reg(ctx, &data, IR_DOUBLE, 0, 0);
 				if (reg == IR_REG_NONE) {
 					reg = _pick_reg(ctx, &data, IR_DOUBLE, IR_REGSET_EMPTY, IR_USE_MUST_BE_IN_REG, 0, 0);
-					/* clear the assignment of the evicted register */
-					n = use_list->count;
-					for (p = ctx->use_edges + use_list->refs; n > 0; p++, n--) {
-						ir_ref use = *p;
-						ir_reg old_reg = ir_get_alocated_reg(ctx, use, k);
-						if (old_reg == reg) {
-							ir_set_alocated_reg(ctx, use, k, IR_REG_NONE);
-						}
-					}
+					_clear_evicted_phi_inputs(ctx, use_list, k, reg, 1);
 				}
 				ctx->regs[bb->end][1] = reg;
 			}
