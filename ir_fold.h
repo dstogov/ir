@@ -1013,6 +1013,12 @@ IR_FOLD(OVERFLOW(_))
 	if (op1_insn->op != IR_ADD_OV && op1_insn->op != IR_SUB_OV && op1_insn->op != IR_MUL_OV) {
 		IR_FOLD_COPY(IR_FALSE);
 	}
+	if (IR_IS_CONST_REF(op1_insn->op2)
+	 && !IR_IS_SYM_CONST(ctx->ir_base[op1_insn->op2].op)
+	 && ctx->ir_base[op1_insn->op2].val.u64 == 0) {
+		/* x +/- 0 and x * 0 never overflow */
+		IR_FOLD_COPY(IR_FALSE);
+	}
 	IR_FOLD_NEXT;
 }
 
@@ -2440,6 +2446,10 @@ IR_FOLD(SUB_OV(_, C_ADDR))
 {
 	if (op2_insn->val.u64 == 0) {
 		/* a +/- 0 => a */
+		if (op1_insn->op >= IR_ADD_OV && op1_insn->op <= IR_MUL_OV) {
+			/* OVERFLOW() of the result would test op1's overflow flag */
+			IR_FOLD_NEXT;
+		}
 		if (op1_insn->type != IR_OPT_TYPE(opt)) {
 			opt = IR_BITCAST | (opt & IR_OPT_TYPE_MASK);
 			op2 = IR_UNUSED;

@@ -1,0 +1,68 @@
+--TEST--
+OVERFLOW of ADD_OV/SUB_OV(x, 0) when x itself overflows
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @add_ov_add0(int32_t, int32_t): int32_t;
+func @add_ov_add0(int32_t, int32_t): int32_t
+{
+	int32_t z = 0;
+	l_1 = START(l_E);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t y = PARAM(l_1, "y", 2);
+	int32_t a = ADD_OV(x, y);
+	int32_t b = ADD_OV(a, z);
+	bool ov = OVERFLOW(b);
+	int32_t r = ZEXT(ov);
+	l_E = RETURN(l_1, r);
+}
+func @mul_ov_sub0(int32_t, int32_t): int32_t;
+func @mul_ov_sub0(int32_t, int32_t): int32_t
+{
+	int32_t z = 0;
+	l_1 = START(l_E);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t y = PARAM(l_1, "y", 2);
+	int32_t a = MUL_OV(x, y);
+	int32_t b = SUB_OV(a, z);
+	bool ov = OVERFLOW(b);
+	int32_t r = ZEXT(ov);
+	l_E = RETURN(l_1, r);
+}
+func @add_ov_add0_val(int32_t, int32_t): int32_t;
+func @add_ov_add0_val(int32_t, int32_t): int32_t
+{
+	int32_t z = 0;
+	l_1 = START(l_E);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t y = PARAM(l_1, "y", 2);
+	int32_t a = ADD_OV(x, y);
+	int32_t b = ADD_OV(a, z);
+	bool ov = OVERFLOW(b);
+	int32_t r = COND(ov, z, b);
+	l_E = RETURN(l_1, r);
+}
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%d %d %d\n";
+	uintptr_t f_add = func @add_ov_add0(int32_t, int32_t): int32_t;
+	uintptr_t f_mul = func @mul_ov_sub0(int32_t, int32_t): int32_t;
+	uintptr_t f_val = func @add_ov_add0_val(int32_t, int32_t): int32_t;
+	int32_t z = 0;
+	int32_t one = 1;
+	int32_t two = 2;
+	int32_t max = 2147483647;
+	l_0 = START(l_end);
+	int32_t r0, c0 = CALL/2(l_0, f_add, max, one);
+	int32_t r1, c1 = CALL/2(c0, f_mul, max, two);
+	int32_t r2, c2 = CALL/2(c1, f_val, max, one);
+	p0 = CALL/4(c2, fp, fmt, r0, r1, r2);
+	int32_t r3, c3 = CALL/2(p0, f_add, one, two);
+	int32_t r4, c4 = CALL/2(c3, f_mul, one, two);
+	int32_t r5, c5 = CALL/2(c4, f_val, one, two);
+	p1 = CALL/4(c5, fp, fmt, r3, r4, r5);
+	l_end = RETURN(p1, z);
+}
+--EXPECT--
+0 0 -2147483648
+0 0 3
