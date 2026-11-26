@@ -1,5 +1,5 @@
 --TEST--
-DESSA 008: cycles of spilled values must not overwrite other stack data
+DESSA: cycles of spilled values must not overwrite other stack data
 --CODE--
 func nop(): void
 {
