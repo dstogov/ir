@@ -3590,10 +3590,11 @@ ir_ref _ir_ALLOCA(ir_ctx *ctx, ir_ref size)
 	return ctx->control = ir_emit2(ctx, IR_OPT(IR_ALLOCA, IR_ADDR), ctx->control, size);
 }
 
-void _ir_AFREE(ir_ctx *ctx, ir_ref size)
+void _ir_AFREE(ir_ctx *ctx, ir_ref alloca)
 {
 	IR_ASSERT(ctx->control);
-	ctx->control = ir_emit2(ctx, IR_AFREE, ctx->control, size);
+	IR_ASSERT(ctx->ir_base[alloca].op == IR_ALLOCA);
+	ctx->control = ir_emit3(ctx, IR_AFREE, ctx->control, alloca, ctx->ir_base[alloca].op2);
 }
 
 ir_ref _ir_VLOAD(ir_ctx *ctx, ir_type type, ir_ref var)

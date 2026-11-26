@@ -839,6 +839,10 @@ get_arg_hints:
 				n = 2;
 			}
 			break;
+		case IR_AFREE:
+			/* the ALLOCA operand only links AFREE to it, op3 is the size */
+			flags = IR_OP3_MUST_BE_IN_REG;
+			break;
 		case IR_VA_ARG:
 			flags = IR_USE_MUST_BE_IN_REG | IR_OP2_MUST_BE_IN_REG | IR_DEF_CONFLICTS_WITH_INPUT_REGS;
 			constraints->tmp_regs[0] = IR_TMP_REG(3, IR_ADDR, IR_LOAD_SUB_REF, IR_SAVE_SUB_REF);
@@ -5635,8 +5639,12 @@ static void ir_emit_afree(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
 
-	if (IR_IS_CONST_REF(insn->op2)) {
-		ir_insn *val = &ctx->ir_base[insn->op2];
+	if (ir_rule(ctx, insn->op2) == IR_STATIC_ALLOCA) {
+		/* the ALLOCA became a part of the stack frame */
+		return;
+	}
+	if (IR_IS_CONST_REF(insn->op3)) {
+		ir_insn *val = &ctx->ir_base[insn->op3];
 		int32_t size = val->val.i32;
 
 		IR_ASSERT(IR_IS_TYPE_INT(val->type));
@@ -5655,20 +5663,21 @@ static void ir_emit_afree(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 			ctx->call_stack_size -= size;
 		}
 	} else {
-//		int32_t alignment = 16;
-		ir_reg op2_reg = ctx->regs[def][2];
-		ir_type type = ctx->ir_base[insn->op2].type;
+		int32_t alignment = 16;
+		ir_reg op3_reg = ctx->regs[def][3];
+		ir_type type = ctx->ir_base[insn->op3].type;
 
 		IR_ASSERT(ctx->flags & IR_FUNCTION);
-		IR_ASSERT(op2_reg != IR_REG_NONE);
-		if (IR_REG_SPILLED(op2_reg)) {
-			op2_reg = IR_REG_NUM(op2_reg);
-			ir_emit_load(ctx, type, op2_reg, insn->op2);
+		IR_ASSERT(op3_reg != IR_REG_NONE);
+		if (IR_REG_SPILLED(op3_reg)) {
+			op3_reg = IR_REG_NUM(op3_reg);
+			ir_emit_load(ctx, type, op3_reg, insn->op3);
 		}
 
-		// TODO: alignment
-
-		|	add sp, sp, Rx(op2_reg);
+		/* the same alignment as in ir_emit_alloca() */
+		|	add Rx(IR_REG_INT_TMP), Rx(op3_reg), #(alignment-1)
+		|	and Rx(IR_REG_INT_TMP), Rx(IR_REG_INT_TMP), #(~(alignment-1))
+		|	add sp, sp, Rx(IR_REG_INT_TMP)
 	}
 }
 
