@@ -3290,35 +3290,43 @@ static bool ir_match_may_fuse_SI(ir_ctx *ctx, ir_ref ref, ir_ref use)
 	return 0;
 }
 
+/* The displacement that ADD/SUB(X, imm32) adds to a fused address */
+static int64_t ir_lea_offset(ir_ctx *ctx, ir_ref ref)
+{
+	ir_insn *insn = &ctx->ir_base[ref];
+	ir_insn *val_insn = &ctx->ir_base[insn->op2];
+
+	if (IR_IS_SYM_CONST(val_insn->op)) {
+		return (intptr_t)ir_sym_addr(ctx, val_insn);
+	}
+	return (insn->op == IR_SUB) ? -val_insn->val.i64 : val_insn->val.i64;
+}
+
 /* The stack offset of a fixed ALLOCA is added to a fused displacement only at emission.
- * On x86-64 a literal outside the ALLOCA's object may then no longer fit into disp32,
- * so such a literal isn't fused with the address of that ALLOCA. */
-static bool ir_match_alloca_offset_outside(ir_ctx *ctx, ir_ref alloca_ref, ir_ref offset_ref)
+ * On x86-64 an offset outside the ALLOCA's object may then no longer fit into disp32,
+ * so such an offset isn't fused with the address of that ALLOCA. */
+static bool ir_may_fuse_offset(ir_ctx *ctx, ir_ref base_ref, int64_t offset)
 {
 #ifdef IR_TARGET_X64
-	ir_insn *alloca_insn, *size_insn, *val_insn;
-	ir_insn *offset_insn = &ctx->ir_base[offset_ref];
-	int64_t offset;
+	ir_insn *base_insn, *size_insn;
 
-	if (IR_IS_CONST_REF(alloca_ref)) {
-		return 0;
+	if (IR_IS_CONST_REF(base_ref)) {
+		return 1;
 	}
-	alloca_insn = &ctx->ir_base[alloca_ref];
-	if (alloca_insn->op != IR_ALLOCA ||
+	base_insn = &ctx->ir_base[base_ref];
+	if (base_insn->op != IR_ALLOCA ||
 			!(ctx->flags & IR_FUNCTION) ||
-			ctx->cfg_map[alloca_ref] != 1 ||
-			!IR_IS_CONST_REF(alloca_insn->op2)) {
-		return 0;
+			ctx->cfg_map[base_ref] != 1 ||
+			!IR_IS_CONST_REF(base_insn->op2)) {
+		return 1;
 	}
-	size_insn = &ctx->ir_base[alloca_insn->op2];
-	val_insn = &ctx->ir_base[offset_insn->op2];
-	if (IR_IS_SYM_CONST(size_insn->op) || IR_IS_SYM_CONST(val_insn->op)) {
-		return 0;
+	size_insn = &ctx->ir_base[base_insn->op2];
+	if (IR_IS_SYM_CONST(size_insn->op)) {
+		return 1;
 	}
-	offset = (offset_insn->op == IR_SUB) ? -(int64_t)val_insn->val.i32 : (int64_t)val_insn->val.i32;
-	return offset < 0 || offset >= size_insn->val.i64;
+	return offset >= 0 && offset < size_insn->val.i64;
 #else
-	return 0;
+	return 1;
 #endif
 }
 
@@ -3992,7 +4000,7 @@ binop_vector:
 						return IR_COPY_INT | IR_MAY_REUSE;
 					} else if ((ir_type_size[insn->type] >= 4 && insn->op == IR_ADD && IR_IS_SIGNED_32BIT(op2_insn->val.i64)) ||
 							(ir_type_size[insn->type] >= 4 && insn->op == IR_SUB && IR_IS_SIGNED_NEG_32BIT(op2_insn->val.i64))) {
-						if (ir_match_alloca_offset_outside(ctx, insn->op1, ref)) {
+						if (!ir_may_fuse_offset(ctx, insn->op1, ir_lea_offset(ctx, ref))) {
 							goto binop_int;
 						}
 lea:
@@ -4011,17 +4019,17 @@ lea:
 								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_SIB;
 								return IR_LEA_SIB_O;
 							} else if ((rule == IR_LEA_IB || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_IB))
-							 && !ir_match_alloca_offset_outside(ctx, ctx->ir_base[insn->op1].op1, ref)
-							 && !ir_match_alloca_offset_outside(ctx, ctx->ir_base[insn->op1].op2, ref)) {
+							 && ir_may_fuse_offset(ctx, ctx->ir_base[insn->op1].op1, ir_lea_offset(ctx, ref))
+							 && ir_may_fuse_offset(ctx, ctx->ir_base[insn->op1].op2, ir_lea_offset(ctx, ref))) {
 								/* z = ADD(X, Y) ... ADD(z, imm32) => SKIP ... LEA [X+Y+im32] */
 								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_IB;
 								return IR_LEA_IB_O;
 							} else if ((rule == IR_LEA_B_SI || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_B_SI))
-							 && !ir_match_alloca_offset_outside(ctx, ctx->ir_base[insn->op1].op1, ref)) {
+							 && ir_may_fuse_offset(ctx, ctx->ir_base[insn->op1].op1, ir_lea_offset(ctx, ref))) {
 								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_B_SI;
 								return IR_LEA_B_SI_O;
 							} else if ((rule == IR_LEA_SI_B || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_SI_B))
-							 && !ir_match_alloca_offset_outside(ctx, ctx->ir_base[insn->op1].op2, ref)) {
+							 && ir_may_fuse_offset(ctx, ctx->ir_base[insn->op1].op2, ir_lea_offset(ctx, ref))) {
 								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_SI_B;
 								return IR_LEA_SI_B_O;
 							}
@@ -4054,7 +4062,7 @@ lea:
 							if (!rule) {
 								ctx->rules[insn->op1] = rule = ir_match_insn(ctx, insn->op1);
 							}
-							if (rule == IR_LEA_OB && !ir_match_alloca_offset_outside(ctx, insn->op2, insn->op1)) {
+							if (rule == IR_LEA_OB && ir_may_fuse_offset(ctx, insn->op2, ir_lea_offset(ctx, insn->op1))) {
 								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_OB;
 								if (ctx->use_lists[insn->op2].count == 1 || ir_match_fuse_addr_all_useges(ctx, insn->op2)) {
 									rule = ctx->rules[insn->op2];
@@ -4092,7 +4100,7 @@ lea:
 								ctx->rules[insn->op2] = rule = ir_match_insn(ctx, insn->op2);
 							}
 							if ((rule == IR_LEA_OB || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_OB))
-							 && !ir_match_alloca_offset_outside(ctx, insn->op1, insn->op2)) {
+							 && ir_may_fuse_offset(ctx, insn->op1, ir_lea_offset(ctx, insn->op2))) {
 								ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_LEA_OB;
 								/* x = ADD(X, imm32) ... ADD(Y, x) => SKIP ... LEA */
 								return IR_LEA_I_OB;
@@ -6477,7 +6485,11 @@ static ir_mem ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 	ir_insn *op1_insn, *op2_insn, *offset_insn;
 	ir_ref base_reg_ref, index_reg_ref;
 	ir_reg base_reg = IR_REG_NONE, index_reg;
+#ifdef IR_TARGET_X64
 	int64_t offset = 0;
+#else
+	int32_t offset = 0;
+#endif
 	int32_t scale;
 	intptr_t long_offset;
 	bool base_loaded = 0;
@@ -6712,18 +6724,23 @@ static ir_mem ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 
 	if (offset_insn) {
 		ir_insn *addr_insn = &ctx->ir_base[offset_insn->op2];
+		int32_t disp;
 
 		if (IR_IS_SYM_CONST(addr_insn->op)) {
 			void *addr = ir_sym_val(ctx, addr_insn);
 			IR_ASSERT(sizeof(void*) != 8 || IR_IS_SIGNED_32BIT((intptr_t)addr));
-			offset += (int32_t)(intptr_t)(addr);
+			disp = (int32_t)(intptr_t)(addr);
+		} else if (offset_insn->op == IR_SUB) {
+			disp = -addr_insn->val.i32;
 		} else {
-			if (offset_insn->op == IR_SUB) {
-				offset -= addr_insn->val.i32;
-			} else {
-				offset += addr_insn->val.i32;
-			}
+			disp = addr_insn->val.i32;
 		}
+#ifdef IR_TARGET_X64
+		offset += disp;
+#else
+		/* On 32-bit x86 the displacement wraps around, as the address does */
+		offset = (int32_t)((uint32_t)offset + (uint32_t)disp);
+#endif
 	}
 
 	if (base_reg_ref) {
@@ -6759,7 +6776,8 @@ static ir_mem ir_fuse_addr(ir_ctx *ctx, ir_ref root, ir_ref ref)
 #ifdef IR_TARGET_X64
 	if (UNEXPECTED(!IR_IS_SIGNED_32BIT(offset))) {
 		/* The stack offset of a fixed ALLOCA pushed the displacement out of disp32 */
-		ctx->status = IR_ERROR_UNSUPPORTED_CODE_RULE;
+		IR_ASSERT(0 && "fused offset is too large");
+		ctx->status = IR_ERROR_FUSION;
 		offset = 0;
 	}
 #endif
