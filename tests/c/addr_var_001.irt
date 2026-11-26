@@ -1,0 +1,33 @@
+--TEST--
+001: VAR holding an address at -O0
+--ARGS--
+-O0 --emit-c
+--CODE--
+{
+	uintptr_t c_1 = 0x8;
+	l_1 = START(l_6);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	uintptr_t v = VAR(l_1, "v");
+	l_2 = VSTORE(l_1, v, p);
+	uintptr_t d_3, l_3 = VLOAD(l_2, v);
+	uintptr_t d_4 = ADD(d_3, c_1);
+	l_4 = VSTORE(l_3, v, d_4);
+	uintptr_t d_5 = VADDR(v);
+	uintptr_t d_6, l_5 = LOAD(l_4, d_5);
+	l_6 = RETURN(l_5, d_6);
+}
+--EXPECT--
+void* test(void* p)
+{
+	uintptr_t d_1 = (uintptr_t)p;
+	uintptr_t v;
+	uintptr_t d_3;
+	uintptr_t d_4;
+	uintptr_t d_5;
+	v = d_1;
+	d_3 = v + 0x8;
+	v = d_3;
+	d_4 = (uintptr_t)&v;
+	d_5 = *((uintptr_t*)d_4);
+	return (void*)d_5;
+}

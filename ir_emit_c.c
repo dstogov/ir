@@ -56,6 +56,16 @@ static void ir_emit_c_type_name(ir_type type, FILE *f)
 	}
 }
 
+/* ADDR values are uintptr_t, but function signatures use void* to interoperate with C code */
+static void ir_emit_c_abi_type_name(ir_type type, FILE *f)
+{
+	if (type == IR_ADDR) {
+		fprintf(f, "void*");
+	} else {
+		ir_emit_c_type_name(type, f);
+	}
+}
+
 static bool ir_emit_c_call_conv(FILE *f, uint32_t flags)
 {
 	switch (flags & IR_CALL_CONV_MASK) {
@@ -86,7 +96,7 @@ static bool ir_emit_c_call_conv(FILE *f, uint32_t flags)
 
 static void ir_emit_c_func_proto(const char *name, uint32_t flags, ir_type ret_type, uint32_t params_count, const uint8_t *param_types, bool is_ptr, FILE *f)
 {
-	ir_emit_c_type_name(ret_type, f);
+	ir_emit_c_abi_type_name(ret_type, f);
 
 	if (is_ptr) {
 		fprintf(f, " (");
@@ -116,7 +126,7 @@ static void ir_emit_c_func_proto(const char *name, uint32_t flags, ir_type ret_t
 			if (i) {
 				fprintf(f, ", ");
 			}
-			ir_emit_c_type_name(param_types[i], f);
+			ir_emit_c_abi_type_name(param_types[i], f);
 		}
 		if (flags & IR_VARARG_FUNC) {
 			fprintf(f, ", ...");
@@ -235,7 +245,7 @@ static void ir_emit_c_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 			data->resolved_label_syms = 1;
 			ir_resolve_label_syms(ctx);
 		}
-		fprintf(f, "&&bb%d", insn->val.u32_hi);
+		fprintf(f, "(uintptr_t)&&bb%d", insn->val.u32_hi);
 	} else if (IR_IS_TYPE_FP(insn->type)) {
 		ir_emit_c_fp_const(insn->type == IR_DOUBLE ? insn->val.d : insn->val.f, insn->type == IR_FLOAT, f);
 	} else if (IR_IS_TYPE_VECTOR(insn->type)) {
@@ -252,7 +262,9 @@ static void ir_emit_c_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 		fprintf(f, "(-9223372036854775807-1)");
 	} else {
 		if (insn->op == IR_SYM) {
-			fprintf(f, "&");
+			fprintf(f, "(uintptr_t)&");
+		} else if (insn->op == IR_STR || insn->op == IR_FUNC) {
+			fprintf(f, "(uintptr_t)");
 		}
 		if (insn->op == IR_FUNC || insn->op == IR_SYM || insn->op == IR_LABEL) {
 			ir_emit_c_sym_name(ir_get_str(ctx, insn->val.name), f);
@@ -810,10 +822,14 @@ static void ir_emit_overflow_math(ir_ctx *ctx, FILE *f, int def, ir_insn *insn, 
 	} else {
 		fprintf(f, "\t");
 	}
-	fprintf(f, "__builtin_%s%s%s_overflow(",
-		ir_type_size[type] < 4 ? "" : (IR_IS_TYPE_SIGNED(type) ? "s" : "u"),
-		func,
-		ir_type_size[type] == 8 ? "ll" : "");
+	if (type == IR_ADDR) {
+		fprintf(f, "__builtin_%s_overflow(", func);
+	} else {
+		fprintf(f, "__builtin_%s%s%s_overflow(",
+			ir_type_size[type] < 4 ? "" : (IR_IS_TYPE_SIGNED(type) ? "s" : "u"),
+			func,
+			ir_type_size[type] == 8 ? "ll" : "");
+	}
 	ir_emit_ref(ctx, f, insn->op1);
 	fprintf(f, ", ");
 	ir_emit_ref(ctx, f, insn->op2);
@@ -860,7 +876,7 @@ static void ir_emit_guard(ir_ctx *ctx, FILE *f, ir_insn *insn)
 	fprintf(f, ") return ");
 	// Treat guard as a function with the same return type and no arguments
 	fprintf(f, "((");
-	ir_emit_c_type_name(ctx->ret_type, f);
+	ir_emit_c_abi_type_name(ctx->ret_type, f);
 	fprintf(f, " (*)(void))(");
 	ir_emit_ref(ctx, f, insn->op3);
 	fprintf(f, "))();\n");
@@ -1020,13 +1036,51 @@ static void ir_emit_func_cast(ir_ctx *ctx, FILE *f, ir_ref ref, const ir_proto_t
 	fprintf(f, ")");
 }
 
+/* Emits a value passed or returned as the C type of "type" (see ir_emit_c_abi_type_name()) */
+static void ir_emit_abi_ref(ir_ctx *ctx, FILE *f, ir_ref ref, ir_type type)
+{
+	ir_insn *insn = &ctx->ir_base[ref];
+
+	if (type != IR_ADDR) {
+		ir_emit_ref(ctx, f, ref);
+	} else if (IR_IS_CONST_REF(ref) && insn->op == IR_STR) {
+		ir_print_const(ctx, insn, f, true);
+	} else if (IR_IS_CONST_REF(ref) && (insn->op == IR_SYM || insn->op == IR_FUNC)) {
+		fprintf(f, insn->op == IR_SYM ? "&" : "(void*)");
+		ir_emit_c_sym_name(ir_get_str(ctx, insn->val.name), f);
+	} else {
+		fprintf(f, "(void*)");
+		ir_emit_ref(ctx, f, ref);
+	}
+}
+
+static void ir_emit_call_args(ir_ctx *ctx, FILE *f, ir_insn *insn, const ir_proto_t *proto)
+{
+	int j, n = insn->inputs_count;
+
+	for (j = 3; j <= n; j++) {
+		ir_ref arg = ir_insn_op(insn, j);
+
+		if (j != 3) {
+			fprintf(f, ", ");
+		}
+		if (ctx->ir_base[arg].op == IR_ARGVAL) {
+			arg = ctx->ir_base[arg].op1;
+		}
+		ir_emit_abi_ref(ctx, f, arg,
+			proto && (uint32_t)(j - 3) < proto->params_count ? proto->param_types[j - 3] : ctx->ir_base[arg].type);
+	}
+}
+
 static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 {
-	int j, n;
 	const ir_proto_t *proto = ir_call_proto(ctx, insn);
 
 	if (insn->type != IR_VOID && ctx->vregs[def] > 0) {
 		ir_emit_def_ref(ctx, f, def);
+		if ((proto ? proto->ret_type : insn->type) == IR_ADDR) {
+			fprintf(f, "(uintptr_t)");
+		}
 	} else {
 		fprintf(f, "\t");
 	}
@@ -1043,27 +1097,22 @@ static void ir_emit_call(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 		ir_emit_ref(ctx, f, insn->op2);
 	}
 	fprintf(f, "(");
-	n = insn->inputs_count;
-	for (j = 3; j <= n; j++) {
-		if (j != 3) {
-			fprintf(f, ", ");
-		}
-		ir_ref arg = ir_insn_op(insn, j);
-		if (ctx->ir_base[arg].op == IR_ARGVAL) {
-			arg = ctx->ir_base[arg].op1;
-		}
-		ir_emit_ref(ctx, f, arg);
-	}
+	ir_emit_call_args(ctx, f, insn, proto);
 	fprintf(f, ");\n");
 }
 
 static void ir_emit_tailcall(ir_ctx *ctx, FILE *f, ir_insn *insn)
 {
-	int j, n;
 	const ir_proto_t *proto = ir_call_proto(ctx, insn);
+	ir_type ret_type = proto ? proto->ret_type : insn->type;
 
 	if (insn->type != IR_VOID) {
 		fprintf(f, "\treturn ");
+		if (ret_type == IR_ADDR && ctx->ret_type != IR_ADDR) {
+			fprintf(f, "(uintptr_t)");
+		} else if (ret_type != IR_ADDR && ctx->ret_type == IR_ADDR) {
+			fprintf(f, "(void*)");
+		}
 	} else {
 		fprintf(f, "\t");
 	}
@@ -1080,13 +1129,7 @@ static void ir_emit_tailcall(ir_ctx *ctx, FILE *f, ir_insn *insn)
 		ir_emit_ref(ctx, f, insn->op2);
 	}
 	fprintf(f, "(");
-	n = insn->inputs_count;
-	for (j = 3; j <= n; j++) {
-		if (j != 3) {
-			fprintf(f, ", ");
-		}
-		ir_emit_ref(ctx, f, ir_insn_op(insn, j));
-	}
+	ir_emit_call_args(ctx, f, insn, proto);
 	fprintf(f, ");\n");
 	if (insn->type == IR_VOID) {
 		fprintf(f, "\treturn;\n");
@@ -1117,7 +1160,7 @@ static void ir_emit_vaddr(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 	ir_insn *var = &ctx->ir_base[insn->op1];
 
 	ir_emit_def_ref(ctx, f, def);
-	fprintf(f, "&");
+	fprintf(f, "(uintptr_t)&");
 	IR_ASSERT(var->op == IR_VAR/* || var->op == IR_PARAM*/);
 	fprintf(f, "%s", ir_get_str(ctx, var->op2));
 	fprintf(f, ";\n");
@@ -1187,7 +1230,7 @@ static void ir_emit_tls_addr(ir_ctx *ctx, FILE *f, ir_ref def, ir_insn *insn)
 {
 	if (insn->op2 < 0 && insn->op3 == 0) {
 		ir_emit_def_ref(ctx, f, def);
-		fprintf(f, "__builtin_thread_pointer();\n");
+		fprintf(f, "(uintptr_t)__builtin_thread_pointer();\n");
 	} else {
 		fprintf(stderr, "ERROR: IR_%s is not implemented yet\n", ir_op_name[insn->op]);
 		exit(1);
@@ -1213,7 +1256,7 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 	if (ctx->flags & IR_STATIC) {
 		fprintf(f, "static ");
 	}
-	ir_emit_c_type_name(ctx->ret_type != (ir_type)-1 ? ctx->ret_type : IR_VOID, f);
+	ir_emit_c_abi_type_name(ctx->ret_type != (ir_type)-1 ? ctx->ret_type : IR_VOID, f);
 	fprintf(f, " ");
 	if (ir_emit_c_call_conv(f, ctx->flags)) {
 		fprintf(f, " ");
@@ -1230,7 +1273,7 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 			} else {
 				fprintf(f, ", ");
 			}
-			ir_emit_c_type_name(insn->type, f);
+			ir_emit_c_abi_type_name(insn->type, f);
 			if (insn->op2) {
 				fprintf(f, " %s", ir_get_str(ctx, insn->op2));
 			}
@@ -1283,7 +1326,8 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 					if (insn->op == IR_PARAM) {
 						fprintf(f, "\t");
 						ir_emit_c_type_name(insn->type, f);
-						fprintf(f, " d_%d = %s;\n", ctx->vregs[i], ir_get_str(ctx, insn->op2));
+						fprintf(f, " d_%d = %s%s;\n", ctx->vregs[i],
+							insn->type == IR_ADDR ? "(uintptr_t)" : "", ir_get_str(ctx, insn->op2));
 					} else if (insn->op == IR_VLOAD || insn->op == IR_VLOAD_v) {
 						/* skip, we use variable name instead */
 					} else {
@@ -1517,7 +1561,7 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 						fprintf(f, ";\n");
 					} else {
 						fprintf(f, " ");
-						ir_emit_ref(ctx, f, insn->op2);
+						ir_emit_abi_ref(ctx, f, insn->op2, ctx->ret_type);
 						fprintf(f, ";\n");
 					}
 					break;
@@ -1574,7 +1618,7 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 					break;
 				case IR_FRAME_ADDR:
 					ir_emit_def_ref(ctx, f, i);
-					fprintf(f, "__builtin_frame_address(0);");
+					fprintf(f, "(uintptr_t)__builtin_frame_address(0);\n");
 					break;
 				case IR_VA_START:
 					fprintf(f, "\tva_start(");
@@ -1599,10 +1643,13 @@ static int ir_emit_c_func(ir_ctx *ctx, const char *name, FILE *f)
 					} else {
 						fprintf(f, "\t");
 					}
+					if (insn->type == IR_ADDR) {
+						fprintf(f, "(uintptr_t)");
+					}
 					fprintf(f, "va_arg(");
 					ir_emit_ref(ctx, f, insn->op2);
 					fprintf(f, ", ");
-					ir_emit_c_type_name(insn->type, f);
+					ir_emit_c_abi_type_name(insn->type, f);
 					fprintf(f, ");\n");
 					break;
 				case IR_TRAP:

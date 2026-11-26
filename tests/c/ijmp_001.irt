@@ -7,8 +7,8 @@
 	l_2 = IJMP(l_1, p);
 }
 --EXPECT--
-void test(uintptr_t p)
+void test(void* p)
 {
-	uintptr_t d_1 = p;
+	uintptr_t d_1 = (uintptr_t)p;
 	goto *(void**)(d_1);
 }

@@ -1,0 +1,47 @@
+--TEST--
+001: swap of address PHIs through a temporary
+--CODE--
+{
+	uintptr_t c_0 = 0;
+	uintptr_t c_1 = 0x8;
+	l_1 = START(l_12);
+	uintptr_t a = PARAM(l_1, "a", 1);
+	uintptr_t b = PARAM(l_1, "b", 2);
+	uintptr_t n = PARAM(l_1, "n", 3);
+	l_2 = END(l_1);
+	l_3 = LOOP_BEGIN(l_2, l_10);
+	uintptr_t d_x = PHI(l_3, a, d_y);
+	uintptr_t d_y = PHI(l_3, b, d_x);
+	uintptr_t d_i = PHI(l_3, c_0, d_j);
+	uintptr_t d_j = ADD(d_i, c_1);
+	bool d_c = ULT(d_j, n);
+	l_4 = IF(l_3, d_c);
+	l_9 = IF_TRUE(l_4);
+	l_10 = LOOP_END(l_9);
+	l_11 = IF_FALSE(l_4);
+	uintptr_t d_r = SUB(d_x, d_y);
+	l_12 = RETURN(l_11, d_r);
+}
+--EXPECT--
+void* test(void* a, void* b, void* n)
+{
+	uintptr_t d_1 = (uintptr_t)a;
+	uintptr_t d_2 = (uintptr_t)b;
+	uintptr_t d_3 = (uintptr_t)n;
+	uintptr_t d_4;
+	bool d_5;
+	uintptr_t d_6;
+	uintptr_t tmp_addr;
+	d_4 = 0;
+	goto bb2;
+bb3:
+	tmp_addr = d_1;
+	d_1 = d_2;
+	d_2 = tmp_addr;
+bb2:
+	d_4 = d_4 + 0x8;
+	d_5 = d_4 < d_3;
+	if (d_5) goto bb3;
+	d_6 = d_1 - d_2;
+	return (void*)d_6;
+}

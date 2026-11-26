@@ -1,0 +1,31 @@
+--TEST--
+001: address constants are emitted as uintptr_t
+--CODE--
+extern var foo;
+extern func bar(uintptr_t): uintptr_t;
+func test(): uintptr_t
+{
+	uintptr_t c_1 = sym(foo);
+	uintptr_t c_2 = func bar(uintptr_t): uintptr_t;
+	uintptr_t c_3 = 0x1234;
+	uintptr_t c_4 = 0;
+	l_1 = START(l_6);
+	uintptr_t d_2, l_2 = LOAD(l_1, c_3);
+	l_3 = STORE(l_2, c_3, c_1);
+	uintptr_t d_4, l_4 = CALL/1(l_3, c_2, c_2);
+	l_5 = STORE(l_4, d_4, c_4);
+	l_6 = RETURN(l_5, d_2);
+}
+--EXPECT--
+extern uint8_t foo[];
+extern void* bar(void*);
+void* test(void)
+{
+	uintptr_t d_1;
+	uintptr_t d_2;
+	d_1 = *((uintptr_t*)0x1234);
+	*((uintptr_t*)0x1234) = (uintptr_t)&foo;
+	d_2 = (uintptr_t)bar((void*)bar);
+	*((uintptr_t*)d_2) = 0;
+	return (void*)d_1;
+}

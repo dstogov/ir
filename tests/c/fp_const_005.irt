@@ -12,10 +12,10 @@
 	l_4 = RETURN(l_3);
 }
 --EXPECT--
-void test(uintptr_t p, uintptr_t q)
+void test(void* p, void* q)
 {
-	uintptr_t d_1 = p;
-	uintptr_t d_2 = q;
+	uintptr_t d_1 = (uintptr_t)p;
+	uintptr_t d_2 = (uintptr_t)q;
 	*((double __attribute__((__vector_size__(16)))*)d_1) = (double __attribute__((__vector_size__(16)))){-__builtin_inf(), -0.0};
 	*((float __attribute__((__vector_size__(16)))*)d_2) = (float __attribute__((__vector_size__(16)))){__builtin_nanf(""), -0.0f, 3.0f, 1.5f};
 	return;

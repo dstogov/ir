@@ -1,0 +1,41 @@
+--TEST--
+001: integer arithmetic on addresses goes through uintptr_t
+--CODE--
+{
+	uintptr_t c_1 = 0x10;
+	uintptr_t c_2 = 0xfffffffffffffff0;
+	l_1 = START(l_3);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	uint32_t n = PARAM(l_1, "n", 2);
+	uintptr_t q = PARAM(l_1, "q", 3);
+	uintptr_t d_3 = ADD(p, c_1);
+	uintptr_t d_4 = AND(d_3, c_2);
+	uintptr_t d_5 = ZEXT(n);
+	uintptr_t d_6 = SUB(d_4, d_5);
+	uintptr_t d_7 = SUB(d_6, q);
+	uintptr_t d_8 = MUL(d_7, d_5);
+	uintptr_t d_9 = SHR(d_8, c_1);
+	l_3 = RETURN(l_1, d_9);
+}
+--EXPECT--
+void* test(void* p, uint32_t n, void* q)
+{
+	uintptr_t d_1 = (uintptr_t)p;
+	uint32_t d_2 = n;
+	uintptr_t d_3 = (uintptr_t)q;
+	uintptr_t d_4;
+	uintptr_t d_5;
+	uintptr_t d_6;
+	uintptr_t d_7;
+	uintptr_t d_8;
+	uintptr_t d_9;
+	uintptr_t d_10;
+	d_4 = d_1 + 0x10;
+	d_5 = d_4 & 0xfffffffffffffff0;
+	d_6 = (uint64_t)(uint32_t)d_2;
+	d_7 = d_5 - d_6;
+	d_8 = d_7 - d_3;
+	d_9 = d_8 * d_6;
+	d_10 = d_9 >> 0x10;
+	return (void*)d_10;
+}

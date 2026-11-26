@@ -1,0 +1,27 @@
+--TEST--
+001: GUARD, PROTO and TAILCALL through numeric addresses
+--CODE--
+{
+	uintptr_t c_1 = 0x1000;
+	uintptr_t c_2 = func *0x2000(uintptr_t): uintptr_t;
+	l_1 = START(l_6);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	bool b = PARAM(l_1, "b", 2);
+	l_2 = GUARD(l_1, b, c_1);
+	uintptr_t d_3 = PROTO(c_2, func(uintptr_t): uintptr_t);
+	uintptr_t d_4, l_4 = CALL/1(l_2, d_3, p);
+	uintptr_t d_5, l_5 = TAILCALL/1(l_4, c_2, d_4);
+	l_6 = UNREACHABLE(l_5);
+}
+--EXPECT--
+void* test(void* p, bool b)
+{
+	uintptr_t d_1 = (uintptr_t)p;
+	bool d_2 = b;
+	uintptr_t d_3;
+	uintptr_t d_4;
+	if (!d_2) return ((void* (*)(void))(0x1000))();
+	d_3 = (uintptr_t)((void* (*)(void*))0x2000);
+	d_4 = (uintptr_t)((void* (*)(void*))d_3)((void*)d_1);
+	return ((void* (*)(void*))0x2000)((void*)d_4);
+}
