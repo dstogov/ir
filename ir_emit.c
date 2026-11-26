@@ -973,6 +973,248 @@ IR_ALWAYS_INLINE void ir_dessa_resolve_cycle(ir_ctx *ctx, ir_mem *mem_slots, int
 	loc[from] = to;
 }
 
+static int ir_dessa_type_size(ir_type type)
+{
+#if IR_X86_I64
+	if (type == IR_U32_HI) {
+		return 4;
+	}
+#endif
+	return ir_type_size[type];
+}
+
+/* Check if the stack locations "a" and "b" overlap, but don't start at the same address */
+static bool ir_dessa_partial_overlap(ir_mem *mem_slots, int32_t a, ir_type a_type, int32_t b, ir_type b_type)
+{
+	ir_mem m1, m2;
+	int32_t o1, o2;
+
+	if (a < IR_REG_NUM || b < IR_REG_NUM || a == b) {
+		return 0;
+	}
+	m1 = mem_slots[a - IR_REG_NUM];
+	m2 = mem_slots[b - IR_REG_NUM];
+	o1 = IR_MEM_OFFSET(m1);
+	o2 = IR_MEM_OFFSET(m2);
+	return IR_MEM_BASE(m1) == IR_MEM_BASE(m2)
+		&& o1 < o2 + ir_dessa_type_size(b_type)
+		&& o2 < o1 + ir_dessa_type_size(a_type);
+}
+
+/* Copy "j" still has to read a value that copy "i" would overwrite */
+static bool ir_dessa_blocks(ir_mem *mem_slots, ir_dessa_copy *copies, int32_t *src, int i, int j)
+{
+	if (src[j] < 0 || src[j] == src[i]) {
+		/* constants don't block, and copies of the same value are redirected to the copied one */
+		return 0;
+	}
+	return src[j] == copies[i].to
+		|| ir_dessa_partial_overlap(mem_slots, copies[i].to, copies[i].type, src[j], copies[j].type);
+}
+
+static void ir_dessa_overlapped_move(ir_ctx *ctx, ir_mem *mem_slots, ir_dessa_copy *copies, int count,
+                                     int32_t *src, int8_t *done, int i,
+                                     ir_reg tmp_reg, ir_reg tmp_fp_reg, int8_t *busy, ir_type *busy_type)
+{
+	ir_type type = copies[i].type;
+	int32_t to = copies[i].to;
+	int32_t from = src[i];
+	int c = IR_IS_TYPE_INT(type) ? 0 : 1;
+	ir_reg tmp = c ? tmp_fp_reg : tmp_reg;
+	int j;
+
+	if (from != to) {
+		if (to >= IR_REG_NUM && from < IR_REG_NUM && from >= 0) {
+			/* register to memory */
+			ir_emit_dessa_move(ctx, mem_slots, type, to, from, IR_REG_NONE, IR_REG_NONE);
+		} else if (to >= IR_REG_NUM && busy[c]) {
+			/* the temporary register is in use, save it */
+			ir_mem tmp_spill_slot = IR_MEM_BO(IR_REG_STACK_POINTER, -16);
+
+			DESSA_LOG_EX("MOVE", tmp, "->", DESSA_STACK, busy_type[c], "free TMP");
+			ir_emit_store_mem(ctx, busy_type[c], tmp_spill_slot, tmp);
+			ir_emit_dessa_move(ctx, mem_slots, type, to, from, tmp_reg, tmp_fp_reg);
+			DESSA_LOG_EX("MOVE", DESSA_STACK, "->", tmp, busy_type[c], "restore TMP");
+			ir_emit_load_mem(ctx, busy_type[c], tmp, tmp_spill_slot);
+		} else {
+			ir_emit_dessa_move(ctx, mem_slots, type, to, from, tmp_reg, tmp_fp_reg);
+		}
+	}
+	done[i] = 1;
+	if (from >= 0) {
+		/* the following copies of the same value may use the new location */
+		for (j = 0; j < count; j++) {
+			if (!done[j] && src[j] == from) {
+				src[j] = to;
+			}
+		}
+	}
+}
+
+/* Find a copy, that blocks a copy on a cycle of blocked copies (DFS over "j blocks i") */
+static int ir_dessa_find_cycle(ir_mem *mem_slots, ir_dessa_copy *copies, int count, int32_t *src,
+                               int8_t *done, int8_t *state, int i, ir_reg tmp_reg, ir_reg tmp_fp_reg)
+{
+	int j, ret;
+
+	state[i] = 1; /* on stack */
+	for (j = 0; j < count; j++) {
+		if (j != i && !done[j] && ir_dessa_blocks(mem_slots, copies, src, i, j)
+		 && copies[j].to != tmp_reg && copies[j].to != tmp_fp_reg) {
+			if (state[j] == 1) {
+				return j;
+			} else if (state[j] == 0) {
+				ret = ir_dessa_find_cycle(mem_slots, copies, count, src, done, state, j, tmp_reg, tmp_fp_reg);
+				if (ret >= 0) {
+					return ret;
+				}
+			}
+		}
+	}
+	state[i] = 2; /* visited */
+	return -1;
+}
+
+/* Parallel copy, where some stack destination partially overlaps a stack source of
+ * another copy. (E.g. a 4-byte PHI was spilled to the half of the 8-byte slot of a
+ * dying double, or the high half of a 64-bit integer on 32-bit x86 overlaps a double.)
+ * A destination is written only when all the sources that overlap it are read.
+ * If all remaining copies are blocked, one blocking source is moved into the temporary
+ * register, as in a cycle. The temporary registers themselves are written last. */
+static int ir_dessa_overlapped_parallel_copy(ir_ctx *ctx, ir_dessa_copy *copies, int count,
+                                             ir_mem *mem_slots, ir_reg tmp_reg, ir_reg tmp_fp_reg)
+{
+	int i, j;
+	int32_t *src = ir_mem_malloc(count * sizeof(int32_t) + count * 2);
+	int8_t *done = (int8_t*)(src + count);
+	int8_t *state = done + count;
+	int8_t busy[2] = {0, 0};
+	ir_type busy_type[2] = {IR_VOID, IR_VOID};
+	bool progress;
+
+	for (i = 0; i < count; i++) {
+		src[i] = copies[i].from;
+		done[i] = 0;
+	}
+
+	while (1) {
+		bool blocked = 0;
+
+		progress = 0;
+		for (i = 0; i < count; i++) {
+			if (done[i] || copies[i].to == tmp_reg || copies[i].to == tmp_fp_reg) {
+				continue;
+			}
+			for (j = 0; j < count; j++) {
+				if (j != i && !done[j] && ir_dessa_blocks(mem_slots, copies, src, i, j)) {
+					break;
+				}
+			}
+			if (j == count) {
+				ir_dessa_overlapped_move(ctx, mem_slots, copies, count, src, done, i,
+					tmp_reg, tmp_fp_reg, busy, busy_type);
+				progress = 1;
+			} else {
+				blocked = 1;
+			}
+		}
+
+		/* the evacuated values that are not used any more release the temporary registers */
+		for (i = 0; i < 2; i++) {
+			if (busy[i] == 1) {
+				ir_reg tmp = i ? tmp_fp_reg : tmp_reg;
+
+				for (j = 0; j < count; j++) {
+					if (!done[j] && src[j] == tmp) {
+						break;
+					}
+				}
+				if (j == count) {
+					busy[i] = 0;
+				}
+			}
+		}
+
+		if (progress) {
+			continue;
+		}
+		if (!blocked) {
+			break;
+		}
+
+		/* All the remaining copies are blocked. First, break a cycle of blocked copies
+		 * moving one of the blocking values into a temporary register. Then, write a temporary
+		 * register, that is a destination of a blocking value. (It's saved and restored
+		 * when it's needed as a temporary later.) */
+		int best = -1, best_kind = 0;
+
+		for (i = 0; i < count && best < 0; i++) {
+			if (!done[i] && copies[i].to != tmp_reg && copies[i].to != tmp_fp_reg) {
+				memset(state, 0, count);
+				best = ir_dessa_find_cycle(mem_slots, copies, count, src, done, state, i, tmp_reg, tmp_fp_reg);
+				if (best >= 0 && busy[IR_IS_TYPE_INT(copies[best].type) ? 0 : 1]) {
+					/* the temporary register is still in use, try another cycle */
+					best = -1;
+				}
+			}
+		}
+		if (best < 0) {
+			best_kind = 1;
+			for (i = 0; i < count && best < 0; i++) {
+				if (done[i] || copies[i].to == tmp_reg || copies[i].to == tmp_fp_reg) {
+					continue;
+				}
+				for (j = 0; j < count; j++) {
+					if (j != i && !done[j] && ir_dessa_blocks(mem_slots, copies, src, i, j)
+					 && (copies[j].to == tmp_reg || copies[j].to == tmp_fp_reg)) {
+						best = j;
+						break;
+					}
+				}
+			}
+		}
+		IR_ASSERT(best >= 0);
+		IR_ASSERT(!busy[IR_IS_TYPE_INT(copies[best].type) ? 0 : 1]);
+
+		ir_type type = copies[best].type;
+		int c = IR_IS_TYPE_INT(type) ? 0 : 1;
+		ir_reg tmp = c ? tmp_fp_reg : tmp_reg;
+		int32_t from = src[best];
+
+		IR_ASSERT(tmp != IR_REG_NONE);
+		if (best_kind == 1) {
+			/* write the temporary register now, and save/restore it when it's needed as a temporary */
+			ir_dessa_overlapped_move(ctx, mem_slots, copies, count, src, done, best,
+				tmp_reg, tmp_fp_reg, busy, busy_type);
+			busy[c] = 2;
+		} else {
+			/* move the blocking value into the temporary register */
+			ir_emit_dessa_move(ctx, mem_slots, type, tmp, from, IR_REG_NONE, IR_REG_NONE);
+			for (j = 0; j < count; j++) {
+				if (!done[j] && src[j] == from) {
+					src[j] = tmp;
+				}
+			}
+			busy[c] = 1;
+		}
+		busy_type[c] = type;
+	}
+
+	/* finally write the temporary registers */
+	for (i = 0; i < count; i++) {
+		if (!done[i]) {
+			IR_ASSERT(copies[i].to == tmp_reg || copies[i].to == tmp_fp_reg);
+			if (src[i] != copies[i].to) {
+				ir_emit_dessa_move(ctx, mem_slots, copies[i].type, copies[i].to, src[i], IR_REG_NONE, IR_REG_NONE);
+			}
+			done[i] = 1;
+		}
+	}
+
+	ir_mem_free(src);
+	return 1;
+}
+
 static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_dessa_copy *copies, int count,
                                   ir_mem *mem_slots, int mem_slots_count,
                                   ir_reg tmp_reg, ir_reg tmp_fp_reg)
@@ -991,6 +1233,22 @@ static int ir_dessa_parallel_copy(ir_ctx *ctx, ir_dessa_copy *copies, int count,
 		type = copies[0].type;
 		ir_emit_dessa_move(ctx, mem_slots, type, to, from, tmp_reg, tmp_fp_reg);
 		return 1;
+	}
+
+	for (i = 0; i < count && mem_slots_count > 1; i++) {
+		int j;
+
+		if (copies[i].to >= IR_REG_NUM) {
+			for (j = 0; j < count; j++) {
+				if (ir_dessa_partial_overlap(mem_slots, copies[i].to, copies[i].type, copies[j].from, copies[j].type)
+				 || (copies[j].from == copies[i].to
+				  && IR_IS_TYPE_INT(copies[j].type) != IR_IS_TYPE_INT(copies[i].type))) {
+					/* A stack slot partially overlaps another one, or it's reused for a value
+					 * of another register class (that ir_dessa_resolve_cycle() can't handle). */
+					return ir_dessa_overlapped_parallel_copy(ctx, copies, count, mem_slots, tmp_reg, tmp_fp_reg);
+				}
+			}
+		}
 	}
 
 	len = IR_REG_NUM + mem_slots_count + 1;
