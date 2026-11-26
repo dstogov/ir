@@ -1,4 +1,5 @@
 *.o
+libir.a
 *.log
 *.dot
 *.pdf
@@ -28,3 +29,6 @@ win32/build_*
 
 fuzz/build/
 fuzz/corpus/
+
+# macOS debug symbols (clang -g)
+*.dSYM/
