@@ -1,0 +1,33 @@
+--TEST--
+OVERFLOW of MUL_OV(x, 0)
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @mul_ov_mul0(int32_t, int32_t): int32_t;
+func @mul_ov_mul0(int32_t, int32_t): int32_t
+{
+	int32_t z = 0;
+	l_1 = START(l_E);
+	int32_t x = PARAM(l_1, "x", 1);
+	int32_t y = PARAM(l_1, "y", 2);
+	int32_t a = MUL_OV(x, z);
+	bool ov = OVERFLOW(a);
+	int32_t r = COND(ov, y, a);
+	l_E = RETURN(l_1, r);
+}
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%d %d\n";
+	uintptr_t f = func @mul_ov_mul0(int32_t, int32_t): int32_t;
+	int32_t z = 0;
+	int32_t one = 1;
+	int32_t two = 2;
+	int32_t max = 2147483647;
+	l_0 = START(l_end);
+	int32_t r0, c0 = CALL/2(l_0, f, max, one);
+	int32_t r1, c1 = CALL/2(c0, f, one, two);
+	p0 = CALL/3(c1, fp, fmt, r0, r1);
+	l_end = RETURN(p0, z);
+}
+--EXPECT--
+0 0

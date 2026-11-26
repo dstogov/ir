@@ -1013,11 +1013,10 @@ IR_FOLD(OVERFLOW(_))
 	if (op1_insn->op != IR_ADD_OV && op1_insn->op != IR_SUB_OV && op1_insn->op != IR_MUL_OV) {
 		IR_FOLD_COPY(IR_FALSE);
 	}
-	if (op1_insn->op != IR_MUL_OV
-	 && IR_IS_CONST_REF(op1_insn->op2)
+	if (IR_IS_CONST_REF(op1_insn->op2)
 	 && !IR_IS_SYM_CONST(ctx->ir_base[op1_insn->op2].op)
 	 && ctx->ir_base[op1_insn->op2].val.u64 == 0) {
-		/* x +/- 0 never overflows */
+		/* x +/- 0 and x * 0 never overflow */
 		IR_FOLD_COPY(IR_FALSE);
 	}
 	IR_FOLD_NEXT;
