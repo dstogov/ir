@@ -14077,6 +14077,7 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 {
 	ir_backend_data *data = ctx->data;
 	dasm_State **Dst = &data->dasm_state;
+	uint32_t old_call_stack_size = ctx->call_stack_size;
 	const ir_proto_t *proto = ir_call_proto(ctx, insn);
 	const ir_call_conv_dsc *cc = ir_get_call_conv_dsc(proto ? proto->flags : IR_CC_DEFAULT);
 	int32_t used_stack = ir_emit_arguments(ctx, def, insn, proto, cc, IR_TAILCALL, ctx->regs[def][1]);
@@ -14085,6 +14086,7 @@ static void ir_emit_tailcall(ir_ctx *ctx, ir_ref def, ir_insn *insn)
 	if (used_stack != 0) {
 		ir_emit_call_ex(ctx, def, insn, proto, cc, 0);
 		ir_emit_return_void(ctx);
+		ctx->call_stack_size = old_call_stack_size;
 		return;
 	}
 
