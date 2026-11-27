@@ -4024,13 +4024,8 @@ void ir_iter_opt(ir_ctx *ctx, ir_bitqueue *worklist)
 						}
 						goto folding;
 					case IR_FP2INT:
-						if (ctx->ir_base[insn->op1].type == IR_DOUBLE) {
-							if (ir_may_promote_d2f(ctx, insn->op1)) {
-								ir_ref ref = ir_promote_d2f(ctx, insn->op1, i);
-								insn = &ctx->ir_base[i];
-								insn->op1 = ref;
-							}
-						} else if (ctx->ir_base[insn->op1].type == IR_FLOAT) {
+						/* d2f is exact only when the result is rounded to float afterwards */
+						if (ctx->ir_base[insn->op1].type == IR_FLOAT) {
 							if (ir_may_promote_f2d(ctx, insn->op1)) {
 								ir_ref ref = ir_promote_f2d(ctx, insn->op1, i);
 								insn = &ctx->ir_base[i];
