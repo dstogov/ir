@@ -2278,10 +2278,10 @@ IR_FOLD(GT(SEXT, C_ADDR))
 				IR_FOLD_COPY(op1_insn->op1);
 			}
 		}
-		if ((op2_insn->val.u64 >> (ir_type_size[type] * 8)) != 0) {
+		if ((op2_insn->val.u64 >> (ir_type_size[type] * 8 - (op1_insn->op == IR_SEXT))) != 0) {
 			int64_t sval = ir_fix_signed(op2_insn->type, op2_insn->val.u64);
 
-			if (op1_insn->op != IR_SEXT || (sval >> (ir_type_size[type] * 8)) != -1) {
+			if (op1_insn->op != IR_SEXT || (sval >> (ir_type_size[type] * 8 - 1)) != -1) {
 				if ((opt & IR_OPT_OP_MASK) == IR_EQ
 				 || (opt & IR_OPT_OP_MASK) == IR_UGT
 				 || (opt & IR_OPT_OP_MASK) == IR_UGE) {
