@@ -1,0 +1,45 @@
+--TEST--
+TRUNC is not pushed through MIN
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @smin(int16_t): int8_t;
+func @smin(int16_t): int8_t
+{
+	int32_t c = 5;
+	l_1 = START(l_E);
+	int16_t x = PARAM(l_1, "x", 1);
+	int32_t s = SEXT(x);
+	int32_t m = MIN(s, c);
+	int8_t r = TRUNC(m);
+	l_E = RETURN(l_1, r);
+}
+func @umin(uint16_t): uint8_t;
+func @umin(uint16_t): uint8_t
+{
+	uint32_t c = 5;
+	l_1 = START(l_E);
+	uint16_t x = PARAM(l_1, "x", 1);
+	uint32_t z = ZEXT(x);
+	uint32_t m = MIN(z, c);
+	uint8_t r = TRUNC(m);
+	l_E = RETURN(l_1, r);
+}
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%d %u\n";
+	int32_t z = 0;
+	int16_t s256 = 256;
+	uint16_t u256 = 256;
+	uintptr_t f_smin = func @smin(int16_t): int8_t;
+	uintptr_t f_umin = func @umin(uint16_t): uint8_t;
+	l_0 = START(l_end);
+	int8_t r0, c0 = CALL/1(l_0, f_smin, s256);
+	uint8_t r1, c1 = CALL/1(c0, f_umin, u256);
+	int32_t e0 = SEXT(r0);
+	uint32_t e1 = ZEXT(r1);
+	p0 = CALL/3(c1, fp, fmt, e0, e1);
+	l_end = RETURN(p0, z);
+}
+--EXPECT--
+5 5

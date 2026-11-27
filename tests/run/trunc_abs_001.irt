@@ -1,0 +1,29 @@
+--TEST--
+TRUNC is not pushed through ABS
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @tabs(int16_t): int8_t;
+func @tabs(int16_t): int8_t
+{
+	l_1 = START(l_E);
+	int16_t x = PARAM(l_1, "x", 1);
+	int32_t s = SEXT(x);
+	int32_t a = ABS(s);
+	int8_t r = TRUNC(a);
+	l_E = RETURN(l_1, r);
+}
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%d\n";
+	int32_t z = 0;
+	int16_t v511 = 511;
+	uintptr_t f_tabs = func @tabs(int16_t): int8_t;
+	l_0 = START(l_end);
+	int8_t r0, c0 = CALL/1(l_0, f_tabs, v511);
+	int32_t e0 = SEXT(r0);
+	p0 = CALL/2(c0, fp, fmt, e0);
+	l_end = RETURN(p0, z);
+}
+--EXPECT--
+-1
