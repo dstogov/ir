@@ -22,7 +22,12 @@ typedef struct _ir_mem {uint64_t v;} ir_mem;
 
 # define IR_MEM_NONE                (ir_mem){0}
 # define IR_MEM_VAL(loc)            ((loc).v)
-# define IR_MEM_ADD(mem, offset)    IR_MEM(IR_MEM_BASE(mem), (int32_t)((uint32_t)IR_MEM_OFFSET(mem) + (uint32_t)(offset)), IR_MEM_INDEX(mem), IR_MEM_SCALE(mem))
+# ifdef IR_TARGET_X64
+#  define IR_MEM_ADD(mem, offset)   IR_MEM(IR_MEM_BASE(mem), IR_MEM_OFFSET(mem) + (offset), IR_MEM_INDEX(mem), IR_MEM_SCALE(mem))
+# else
+/* On 32-bit x86 the displacement wraps around, as the address does */
+#  define IR_MEM_ADD(mem, offset)   IR_MEM(IR_MEM_BASE(mem), (int32_t)((uint32_t)IR_MEM_OFFSET(mem) + (uint32_t)(offset)), IR_MEM_INDEX(mem), IR_MEM_SCALE(mem))
+# endif
 #else
 typedef uint64_t ir_mem;
 
