@@ -1,0 +1,35 @@
+--TEST--
+001: SWITCH on an address
+--CODE--
+{
+	uintptr_t c_1 = 0x10;
+	uintptr_t c_2 = 0x20;
+	int32_t c_3 = 1;
+	int32_t c_4 = 2;
+	int32_t c_5 = 3;
+	l_1 = START(l_8);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	l_2 = SWITCH(l_1, p);
+	l_3 = CASE_VAL(l_2, c_1);
+	l_4 = RETURN(l_3, c_3);
+	l_5 = CASE_VAL(l_2, c_2);
+	l_6 = RETURN(l_5, c_4, l_4);
+	l_7 = CASE_DEFAULT(l_2);
+	l_8 = RETURN(l_7, c_5, l_6);
+}
+--EXPECT--
+int32_t test(void* p)
+{
+	uintptr_t d_1 = (uintptr_t)p;
+	switch (d_1) {
+		case 0x10: goto bb2;
+		case 0x20: goto bb3;
+		default: goto bb4;
+	}
+bb2:
+	return 1;
+bb3:
+	return 2;
+bb4:
+	return 3;
+}

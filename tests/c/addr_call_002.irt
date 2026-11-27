@@ -1,0 +1,28 @@
+--TEST--
+002: symbol, frame address and vararg address arguments, and a TAILCALL returning a different type
+--CODE--
+extern var foo;
+extern func f(uintptr_t, ...): uintptr_t;
+func test(uintptr_t): uint64_t
+{
+	uintptr_t c_1 = sym(foo);
+	uintptr_t c_2 = func f(uintptr_t, ...): uintptr_t;
+	l_1 = START(l_5);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	uintptr_t d_2 = FRAME_ADDR();
+	uintptr_t d_3, l_3 = CALL/3(l_1, c_2, c_1, d_2, p);
+	uint64_t d_4, l_4 = TAILCALL/1(l_3, c_2, d_3);
+	l_5 = UNREACHABLE(l_4);
+}
+--EXPECT--
+extern uint8_t foo[];
+extern void* f(void*, ...);
+uint64_t test(void* p)
+{
+	uintptr_t d_1 = (uintptr_t)p;
+	uintptr_t d_2;
+	uintptr_t d_3;
+	d_2 = (uintptr_t)__builtin_frame_address(0);
+	d_3 = (uintptr_t)f(&foo, (void*)d_2, (void*)d_1);
+	return (uintptr_t)f((void*)d_3);
+}

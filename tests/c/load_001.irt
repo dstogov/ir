@@ -10,9 +10,9 @@
 	l_4 = RETURN(l_3);
 }
 --EXPECT--
-void test(uintptr_t a)
+void test(void* a)
 {
-	uintptr_t d_1 = a;
+	uintptr_t d_1 = (uintptr_t)a;
 	*((int32_t*)d_1);
 	return;
 }

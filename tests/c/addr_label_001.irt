@@ -1,0 +1,27 @@
+--TEST--
+001: label addresses are stored and jumped to as uintptr_t
+--ARGS--
+-O0 --emit-c
+--CODE--
+{
+	uintptr_t c_1 = label(L1);
+	int32_t c_2 = 1;
+	l_1 = START(l_6);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	l_2 = STORE(l_1, p, c_1);
+	uintptr_t d_3, l_3 = LOAD(l_2, p);
+	l_4 = IGOTO(l_3, d_3);
+	l_5 = BEGIN(l_4, c_1);
+	l_6 = RETURN(l_5, c_2);
+}
+--EXPECT--
+int32_t test(void* p)
+{
+	uintptr_t d_1 = (uintptr_t)p;
+	uintptr_t d_2;
+	*((uintptr_t*)d_1) = (uintptr_t)&&bb2;
+	d_2 = *((uintptr_t*)d_1);
+	goto *(void**)(d_2);
+bb2:
+	return 1;
+}

@@ -1,0 +1,49 @@
+--TEST--
+001: PHI, COND and CALL arguments mixing addresses and uint64_t
+--CODE--
+extern func f(uintptr_t, uint64_t): uint64_t;
+func test(uintptr_t, uint64_t, bool): uintptr_t
+{
+	uintptr_t c_f = func f(uintptr_t, uint64_t): uint64_t;
+	l_1 = START(l_9);
+	uintptr_t d_p = PARAM(l_1, "p", 1);
+	uint64_t d_n = PARAM(l_1, "n", 2);
+	bool d_b = PARAM(l_1, "b", 3);
+	l_3 = IF(l_1, d_b);
+	l_4 = IF_TRUE(l_3);
+	l_5 = END(l_4);
+	l_6 = IF_FALSE(l_3);
+	l_7 = END(l_6);
+	l_8 = MERGE(l_5, l_7);
+	uintptr_t d_4 = PHI(l_8, d_p, d_n);
+	uint64_t d_5 = PHI(l_8, d_n, d_p);
+	uintptr_t d_6 = COND(d_b, d_4, d_n);
+	uint64_t d_9, l_2 = CALL/2(l_8, c_f, d_n, d_p);
+	l_10 = STORE(l_2, d_4, d_6);
+	l_11 = STORE(l_10, d_6, d_5);
+	l_9 = RETURN(l_11, d_4);
+}
+--EXPECT--
+extern uint64_t f(void*, uint64_t);
+void* test(void* p, uint64_t n, bool b)
+{
+	uintptr_t d_1 = (uintptr_t)p;
+	uint64_t d_2 = n;
+	bool d_3 = b;
+	uintptr_t d_4;
+	uint64_t d_5;
+	uintptr_t d_6;
+	if (!d_3) goto bb3;
+	d_4 = d_1;
+	d_5 = d_2;
+	goto bb4;
+bb3:
+	d_4 = d_2;
+	d_5 = d_1;
+bb4:
+	d_6 = d_3 ? d_4 : d_2;
+	f((void*)d_2, d_1);
+	*((uintptr_t*)d_4) = d_6;
+	*((uint64_t*)d_6) = d_5;
+	return (void*)d_4;
+}

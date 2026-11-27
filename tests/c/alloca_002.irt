@@ -8,10 +8,10 @@
 	l_4 = RETURN(l_2, ret);
 }
 --EXPECT--
-uintptr_t test(int32_t x)
+void* test(int32_t x)
 {
 	int32_t d_1 = x;
 	uintptr_t d_2;
 	d_2 = (uintptr_t)alloca(d_1);
-	return d_2;
+	return (void*)d_2;
 }

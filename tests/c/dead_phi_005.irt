@@ -24,11 +24,11 @@ C: dead PHI with a constant input as the only PHI of a merge
 	l_20 = RETURN(l_11, r);
 }
 --EXPECT--
-int32_t test(int32_t x, int32_t y, uintptr_t ptr)
+int32_t test(int32_t x, int32_t y, void* ptr)
 {
 	int32_t d_1 = x;
 	int32_t d_2 = y;
-	uintptr_t d_3 = ptr;
+	uintptr_t d_3 = (uintptr_t)ptr;
 	bool d_4;
 	int32_t d_5;
 	d_4 = d_1 > 0;

@@ -21,11 +21,11 @@ func foo(int32_t, uintptr_t, uintptr_t): int32_t
 	l_26 = RETURN(l_20, d_24);
 }
 --EXPECT--
-int32_t foo(int32_t cond, uintptr_t x, uintptr_t y)
+int32_t foo(int32_t cond, void* x, void* y)
 {
 	int32_t d_1 = cond;
-	uintptr_t d_2 = x;
-	uintptr_t d_3 = y;
+	uintptr_t d_2 = (uintptr_t)x;
+	uintptr_t d_3 = (uintptr_t)y;
 	int32_t d_4;
 	int32_t d_5;
 	int32_t d_6;

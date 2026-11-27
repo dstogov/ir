@@ -1,0 +1,43 @@
+--TEST--
+001: conversions between addresses and integer or floating-point values
+--CODE--
+{
+	l_1 = START(l_3);
+	int32_t i = PARAM(l_1, "i", 1);
+	double x = PARAM(l_1, "x", 2);
+	uintptr_t p = PARAM(l_1, "p", 3);
+	uintptr_t d_1 = SEXT(i);
+	uintptr_t d_2 = BITCAST(x);
+	double d_3 = BITCAST(p);
+	uintptr_t d_4 = FP2INT(d_3);
+	double d_5 = INT2FP(d_4);
+	uint8_t d_6 = TRUNC(d_2);
+	int64_t d_7 = BITCAST(d_1);
+	uintptr_t d_8 = BITCAST(d_7);
+	uintptr_t d_9 = ZEXT(d_6);
+	l_2 = STORE(l_1, d_8, d_5);
+	l_3 = RETURN(l_2, d_9);
+}
+--EXPECT--
+void* test(int32_t i, double x, void* p)
+{
+	int32_t d_1 = i;
+	double d_2 = x;
+	uintptr_t d_3 = (uintptr_t)p;
+	uintptr_t d_4;
+	uintptr_t d_5;
+	double d_6;
+	uintptr_t d_7;
+	double d_8;
+	uint8_t d_9;
+	uintptr_t d_10;
+	d_4 = (int64_t)(int32_t)d_1;
+	{union {double d; uint64_t bits;} _u; _u.d = d_2; d_5 = _u.bits;}
+	{union {double d; uint64_t bits;} _u; _u.bits = d_3; d_6 = _u.d;}
+	d_7 = d_6;
+	d_8 = d_7;
+	d_9 = (uint8_t)(uint64_t)d_5;
+	d_10 = (uint64_t)(uint8_t)d_9;
+	*((double*)d_4) = d_8;
+	return (void*)d_10;
+}

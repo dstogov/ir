@@ -31,10 +31,10 @@ func test(int32_t, uintptr_t): void
 	l_20 = LOOP_END(l_18);
 }
 --EXPECT--
-void test(int32_t arg_1, uintptr_t arg_2)
+void test(int32_t arg_1, void* arg_2)
 {
 	int32_t d_1 = arg_1;
-	uintptr_t d_2 = arg_2;
+	uintptr_t d_2 = (uintptr_t)arg_2;
 	int32_t d_3;
 	int32_t d_4;
 	bool d_5;
@@ -46,7 +46,7 @@ void test(int32_t arg_1, uintptr_t arg_2)
 bb4:
 {
 	d_7 = (uintptr_t)alloca(d_3);
-	d_2(d_7);
+	d_2((void*)d_7);
 }
 	d_4 = d_4 + 1;
 bb2:
