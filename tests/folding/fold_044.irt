@@ -1,0 +1,70 @@
+--TEST--
+044: FOLD: CTLZ(ZEXT(x)) - c with a 64-bit ZEXT
+--TARGET--
+*64-*
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uint64_t c_4 = 48;
+	uint64_t c_5 = 32;
+	int32_t c_6 = 32;
+	uint32_t c_7 = 48;
+	uint64_t c_8 = 31;
+	uint32_t c_9 = 16;
+	l_1 = START(l_25);
+	uint16_t d_2 = PARAM(l_1, "x", 1);
+	uint32_t d_3 = PARAM(l_1, "z", 2);
+	uint64_t d_4 = ZEXT(d_2);
+	uint64_t d_5 = CTLZ(d_4);
+	uint64_t d_6 = SUB(d_5, c_4);
+	uint64_t d_7 = ZEXT(d_3);
+	uint64_t d_8 = CTLZ(d_7);
+	uint64_t d_9 = SUB(d_8, c_5);
+	int32_t d_10 = CTLZ(d_7);
+	int32_t d_11 = SUB(d_10, c_6);
+	uint32_t d_12 = BITCAST(d_11);
+	uint32_t d_13 = CTLZ(d_4);
+	uint32_t d_14 = SUB(d_13, c_7);
+	uint64_t d_15 = CTLZ(d_7);
+	uint64_t d_16 = SUB(d_15, c_8);
+	uint32_t d_17 = CTLZ(d_4);
+	uint32_t d_18 = SUB(d_17, c_9);
+	uint32_t d_19 = ADD(d_12, d_14);
+	uint32_t d_20 = ADD(d_19, d_18);
+	uint64_t d_21 = ZEXT(d_20);
+	uint64_t d_22 = ADD(d_21, d_6);
+	uint64_t d_23 = ADD(d_22, d_9);
+	uint64_t d_24 = ADD(d_23, d_16);
+	l_25 = RETURN(l_1, d_24);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	uint64_t c_4 = 31;
+	uint32_t c_5 = 16;
+	l_1 = START(l_21);
+	uint16_t d_2 = PARAM(l_1, "x", 1);
+	uint32_t d_3 = PARAM(l_1, "z", 2);
+	uint64_t d_4 = ZEXT(d_2);
+	uint64_t d_5 = CTLZ(d_2);
+	uint64_t d_6 = ZEXT(d_3);
+	uint64_t d_7 = CTLZ(d_6);
+	uint64_t d_8 = CTLZ(d_3);
+	int32_t d_9 = CTLZ(d_3);
+	uint32_t d_10 = BITCAST(d_9);
+	uint32_t d_11 = CTLZ(d_4);
+	uint32_t d_12 = CTLZ(d_2);
+	uint64_t d_13 = SUB(d_7, c_4);
+	uint32_t d_14 = SUB(d_11, c_5);
+	uint32_t d_15 = ADD(d_12, d_10);
+	uint32_t d_16 = ADD(d_15, d_14);
+	uint64_t d_17 = ZEXT(d_16);
+	uint64_t d_18 = ADD(d_17, d_5);
+	uint64_t d_19 = ADD(d_18, d_8);
+	uint64_t d_20 = ADD(d_19, d_13);
+	l_21 = RETURN(l_1, d_20);
+}

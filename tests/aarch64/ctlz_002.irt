@@ -1,0 +1,21 @@
+--TEST--
+002: CTLZ(ZEXT(x)) - 32 folds into a 32-bit CTLZ
+--TARGET--
+aarch64
+--ARGS--
+-S
+--CODE--
+{
+	int32_t c_1 = 32;
+	l_1 = START(l_6);
+	uint32_t x = PARAM(l_1, "x", 1);
+	uint64_t ext = ZEXT(x);
+	int32_t clz = CTLZ(ext);
+	int32_t ret = SUB(clz, c_1);
+	l_6 = RETURN(l_1, ret);
+}
+--EXPECT--
+test:
+	clz w0, w0
+	ret
+
