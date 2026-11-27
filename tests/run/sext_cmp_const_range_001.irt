@@ -1,0 +1,53 @@
+--TEST--
+CMP(SEXT(x), C) with C outside the range of the narrow signed type
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @cmp(int8_t): int32_t;
+func @cmp(int8_t): int32_t
+{
+	int32_t c_200 = 200;
+	int32_t c_m200 = -200;
+	uint16_t c_ff38 = 65336;
+	int32_t c_1 = 1;
+	int32_t c_2 = 2;
+	int32_t c_3 = 3;
+	l_1 = START(l_E);
+	int8_t x = PARAM(l_1, "x", 1);
+	int32_t s1 = SEXT(x);
+	bool eq = EQ(s1, c_200);
+	int32_t s2 = SEXT(x);
+	bool lt = LT(s2, c_200);
+	int32_t s3 = SEXT(x);
+	bool ge = GE(s3, c_m200);
+	uint16_t s4 = SEXT(x);
+	bool eq16 = EQ(s4, c_ff38);
+	int32_t r1 = ZEXT(eq);
+	int32_t r2 = ZEXT(lt);
+	int32_t r3 = ZEXT(ge);
+	int32_t r4 = ZEXT(eq16);
+	int32_t t2 = SHL(r2, c_1);
+	int32_t t3 = SHL(r3, c_2);
+	int32_t t4 = SHL(r4, c_3);
+	int32_t o1 = OR(r1, t2);
+	int32_t o2 = OR(t3, t4);
+	int32_t r = OR(o1, o2);
+	l_E = RETURN(l_1, r);
+}
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t f = func @cmp(int8_t): int32_t;
+	uintptr_t fmt = "%d %d %d\n";
+	int8_t a = -56;
+	int8_t b = 0;
+	int8_t c = 56;
+	int32_t z = 0;
+	l_1 = START(l_E);
+	int32_t ra, l_2 = CALL/1(l_1, f, a);
+	int32_t rb, l_3 = CALL/1(l_2, f, b);
+	int32_t rc, l_4 = CALL/1(l_3, f, c);
+	l_5 = CALL/4(l_4, fp, fmt, ra, rb, rc);
+	l_E = RETURN(l_5, z);
+}
+--EXPECT--
+6 6 6

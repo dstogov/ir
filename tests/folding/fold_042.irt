@@ -1,0 +1,35 @@
+--TEST--
+042: FOLD: CMP(SEXT(x), C) with C outside the range of the narrow signed type
+--CODE--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int32_t c_4 = 200;
+	int32_t c_5 = -200;
+	uint16_t c_6 = 65336;
+	l_1 = START(l_15);
+	int8_t d_2 = PARAM(l_1, "x", 1);
+	int32_t d_3 = SEXT(d_2);
+	bool d_4 = EQ(d_3, c_4);
+	int32_t d_5 = SEXT(d_2);
+	bool d_6 = LT(d_5, c_4);
+	int32_t d_7 = SEXT(d_2);
+	bool d_8 = GE(d_7, c_5);
+	uint16_t d_9 = SEXT(d_2);
+	bool d_10 = EQ(d_9, c_6);
+	bool d_11 = OR(d_4, d_10);
+	bool d_12 = NOT(d_11);
+	bool d_13 = AND(d_6, d_8);
+	bool d_14 = AND(d_12, d_13);
+	l_15 = RETURN(l_1, d_14);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	l_1 = START(l_3);
+	int8_t d_2 = PARAM(l_1, "x", 1);
+	l_3 = RETURN(l_1, c_3);
+}
