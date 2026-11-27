@@ -1,0 +1,56 @@
+--TEST--
+CTLZ 004: CTLZ(ZEXT(x)) - (dst_bits - src_bits) with a 64-bit ZEXT
+--TARGET--
+*64-*
+--ARGS--
+--run
+--CODE--
+extern func printf(uintptr_t, ...): int32_t;
+func ctlz32(uint32_t): int32_t
+{
+	int32_t c_1 = 32;
+	l_1 = START(l_6);
+	uint32_t d_2 = PARAM(l_1, "arg_1", 1);
+	uint64_t d_3 = ZEXT(d_2);
+	int32_t d_4 = CTLZ(d_3);
+	int32_t d_5 = SUB(d_4, c_1);
+	l_6 = RETURN(l_1, d_5);
+}
+func ctlz16(uint16_t): uint32_t
+{
+	uint32_t c_1 = 48;
+	l_1 = START(l_6);
+	uint16_t d_2 = PARAM(l_1, "arg_1", 1);
+	uint64_t d_3 = ZEXT(d_2);
+	uint32_t d_4 = CTLZ(d_3);
+	uint32_t d_5 = SUB(d_4, c_1);
+	l_6 = RETURN(l_1, d_5);
+}
+func main(void): int32_t
+{
+	uintptr_t c_1 = func ctlz32(uint32_t): int32_t;
+	uint32_t c_2 = 1;
+	uint32_t c_3 = 393216;
+	uint32_t c_4 = 2147483648;
+	uintptr_t c_5 = "u32: %d %d %d\n";
+	uintptr_t c_6 = func printf(uintptr_t, ...): int32_t;
+	uintptr_t c_7 = func ctlz16(uint16_t): uint32_t;
+	uint16_t c_8 = 1;
+	uint16_t c_9 = 1536;
+	uint16_t c_10 = 32768;
+	uintptr_t c_11 = "u16: %u %u %u\n";
+	int32_t c_12 = 0;
+	l_1 = START(l_10);
+	int32_t d_2, l_2 = CALL/1(l_1, c_1, c_2);
+	int32_t d_3, l_3 = CALL/1(l_2, c_1, c_3);
+	int32_t d_4, l_4 = CALL/1(l_3, c_1, c_4);
+	int32_t d_5, l_5 = CALL/4(l_4, c_6, c_5, d_2, d_3, d_4);
+	uint32_t d_6, l_6 = CALL/1(l_5, c_7, c_8);
+	uint32_t d_7, l_7 = CALL/1(l_6, c_7, c_9);
+	uint32_t d_8, l_8 = CALL/1(l_7, c_7, c_10);
+	int32_t d_9, l_9 = CALL/4(l_8, c_6, c_11, d_6, d_7, d_8);
+	l_10 = RETURN(l_9, c_12);
+}
+--EXPECT--
+u32: 31 13 0
+u16: 15 5 0
