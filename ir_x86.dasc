@@ -26965,6 +26965,8 @@ void ir_fix_stack_frame(ir_ctx *ctx)
 {
 	uint32_t additional_size = 0;
 
+	ir_dessa_reserve_tmp_slot(ctx);
+
 	ctx->locals_area_size = ctx->stack_frame_size;
 
 	if ((ctx->flags & IR_VARARG_FUNC) && (ctx->flags2 & IR_HAS_VA_START)) {
