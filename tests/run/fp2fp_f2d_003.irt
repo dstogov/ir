@@ -1,0 +1,31 @@
+--TEST--
+FP2FP(double) of float SUB keeps float rounding
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @sub(double, double): double;
+func @sub(double, double): double
+{
+	l_1 = START(l_E);
+	double x = PARAM(l_1, "x", 1);
+	double y = PARAM(l_1, "y", 2);
+	float fx = FP2FP(x);
+	float fy = FP2FP(y);
+	float a = SUB(fx, fy);
+	double r = FP2FP(a);
+	l_E = RETURN(l_1, r);
+}
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%.17g\n";
+	uintptr_t f = func @sub(double, double): double;
+	int32_t z = 0;
+	double a = 1.0;
+	double b = 9.313225746154785e-10;
+	l_0 = START(l_end);
+	double r, c = CALL/2(l_0, f, a, b);
+	p = CALL/2(c, fp, fmt, r);
+	l_end = RETURN(p, z);
+}
+--EXPECT--
+1

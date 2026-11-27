@@ -1,0 +1,27 @@
+--TEST--
+FP2FP(double) of FP2FP(float) keeps float rounding
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @rt(double): double;
+func @rt(double): double
+{
+	l_1 = START(l_E);
+	double x = PARAM(l_1, "x", 1);
+	float fx = FP2FP(x);
+	double r = FP2FP(fx);
+	l_E = RETURN(l_1, r);
+}
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%.17g\n";
+	uintptr_t f = func @rt(double): double;
+	int32_t z = 0;
+	double a = 0.1;
+	l_0 = START(l_end);
+	double r, c = CALL/1(l_0, f, a);
+	p = CALL/2(c, fp, fmt, r);
+	l_end = RETURN(p, z);
+}
+--EXPECT--
+0.10000000149011612
