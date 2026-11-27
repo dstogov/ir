@@ -3292,7 +3292,8 @@ static bool ir_match_may_fuse_SI(ir_ctx *ctx, ir_ref ref, ir_ref use)
 
 /* The stack offset of a fixed ALLOCA is added to a fused displacement only at emission.
  * On x86-64 an offset outside the ALLOCA's object may then no longer fit into disp32,
- * so such an offset isn't fused with the address of that ALLOCA. */
+ * so such an offset isn't fused with the address of that ALLOCA. The end of the object
+ * is still fused, e.g. for a pointer used to iterate backwards. */
 static bool ir_may_fuse_alloca_offset(ir_ctx *ctx, ir_ref base_ref, ir_insn *base_insn, ir_op op, int64_t offset)
 {
 #ifdef IR_TARGET_X64
@@ -3311,7 +3312,7 @@ static bool ir_may_fuse_alloca_offset(ir_ctx *ctx, ir_ref base_ref, ir_insn *bas
 		offset = -offset;
 	}
 
-	return offset >= 0 && offset < size_insn->val.i64;
+	return offset >= 0 && offset <= size_insn->val.i64;
 #else
 	return 1;
 #endif
