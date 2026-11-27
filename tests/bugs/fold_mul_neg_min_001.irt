@@ -1,0 +1,55 @@
+--TEST--
+MUL(NEG(x), MIN) folds to a constant that fits its type
+--CODE--
+{
+	int8_t c_1 = -128;
+	int16_t c_2 = -32768;
+	int32_t c_3 = -2147483648;
+	int64_t c_4 = -9223372036854775808;
+	l_1 = START(l_25);
+	int8_t d_2 = PARAM(l_1, "a", 1);
+	int16_t d_3 = PARAM(l_1, "b", 2);
+	int32_t d_4 = PARAM(l_1, "c", 3);
+	int64_t d_5 = PARAM(l_1, "d", 4);
+	int8_t d_6 = NEG(d_2);
+	int8_t d_7 = MUL(d_6, c_1);
+	int16_t d_8 = NEG(d_3);
+	int16_t d_9 = MUL(d_8, c_2);
+	int32_t d_10 = NEG(d_4);
+	int32_t d_11 = MUL(d_10, c_3);
+	int64_t d_12 = NEG(d_5);
+	int64_t d_13 = MUL(d_12, c_4);
+	int64_t d_14 = SEXT(d_7);
+	int64_t d_15 = SEXT(d_9);
+	int64_t d_16 = SEXT(d_11);
+	int64_t d_17 = ADD(d_14, d_15);
+	int64_t d_18 = ADD(d_17, d_16);
+	int64_t d_19 = ADD(d_18, d_13);
+	l_25 = RETURN(l_1, d_19);
+}
+--EXPECT--
+{
+	uintptr_t c_1 = 0;
+	bool c_2 = 0;
+	bool c_3 = 1;
+	int8_t c_4 = -128;
+	int16_t c_5 = -32768;
+	int32_t c_6 = -2147483648;
+	int64_t c_7 = -9223372036854775808;
+	l_1 = START(l_16);
+	int8_t d_2 = PARAM(l_1, "a", 1);
+	int16_t d_3 = PARAM(l_1, "b", 2);
+	int32_t d_4 = PARAM(l_1, "c", 3);
+	int64_t d_5 = PARAM(l_1, "d", 4);
+	int8_t d_6 = MUL(d_2, c_4);
+	int16_t d_7 = MUL(d_3, c_5);
+	int32_t d_8 = MUL(d_4, c_6);
+	int64_t d_9 = MUL(d_5, c_7);
+	int64_t d_10 = SEXT(d_6);
+	int64_t d_11 = SEXT(d_7);
+	int64_t d_12 = SEXT(d_8);
+	int64_t d_13 = ADD(d_11, d_10);
+	int64_t d_14 = ADD(d_13, d_12);
+	int64_t d_15 = ADD(d_14, d_9);
+	l_16 = RETURN(l_1, d_15);
+}

@@ -2732,7 +2732,7 @@ IR_FOLD(MUL(NEG, C_I32))
 IR_FOLD(MUL(NEG, C_I64))
 {
 	op1 = op1_insn->op1;
-	val.u64 = (0 - op2_insn->val.u64);
+	val.u64 = ir_fix_signed(IR_OPT_TYPE(opt), 0 - op2_insn->val.u64);
 	op2 = ir_const(ctx, val, op2_insn->type);
 	IR_FOLD_RESTART;
 }
