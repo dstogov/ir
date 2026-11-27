@@ -1,0 +1,204 @@
+--TEST--
+A literal outside a fixed ALLOCA must not overflow the final x86-64 displacement
+--CODE--
+func lit_first(uintptr_t): uint64_t
+{
+	uintptr_t c_64 = 64;
+	uintptr_t c_8 = 8;
+	uintptr_t c_d = 2147483647;
+	uint64_t c_519 = 519;
+	uint64_t c_42 = 42;
+	l_1 = START(l_8);
+	uintptr_t idx = PARAM(l_1, "idx", 1);
+	uintptr_t keep, l_2 = ALLOCA(l_1, c_64);
+	uintptr_t target, l_3 = ALLOCA(l_2, c_64);
+	l_4 = STORE(l_3, keep, c_519);
+	uintptr_t t_8 = ADD(target, c_8);
+	l_5 = STORE(l_4, t_8, c_42);
+	uintptr_t a1 = ADD(target, c_d);
+	uintptr_t a2 = ADD(a1, idx);
+	uint64_t v, l_6 = LOAD(l_5, a2);
+	uint64_t k, l_7 = LOAD_v(l_6, keep);
+	uint64_t r = ADD(v, k);
+	l_8 = RETURN(l_7, r);
+}
+func idx_first(uintptr_t): uint64_t
+{
+	uintptr_t c_64 = 64;
+	uintptr_t c_8 = 8;
+	uintptr_t c_d = 2147483647;
+	uint64_t c_519 = 519;
+	uint64_t c_42 = 42;
+	l_1 = START(l_8);
+	uintptr_t idx = PARAM(l_1, "idx", 1);
+	uintptr_t keep, l_2 = ALLOCA(l_1, c_64);
+	uintptr_t target, l_3 = ALLOCA(l_2, c_64);
+	l_4 = STORE(l_3, keep, c_519);
+	uintptr_t t_8 = ADD(target, c_8);
+	l_5 = STORE(l_4, t_8, c_42);
+	uintptr_t a1 = ADD(target, idx);
+	uintptr_t a2 = ADD(a1, c_d);
+	uint64_t v, l_6 = LOAD(l_5, a2);
+	uint64_t k, l_7 = LOAD_v(l_6, keep);
+	uint64_t r = ADD(v, k);
+	l_8 = RETURN(l_7, r);
+}
+func ob_i(uintptr_t): uint64_t
+{
+	uintptr_t c_64 = 64;
+	uintptr_t c_8 = 8;
+	uintptr_t c_d = 2147483647;
+	uint64_t c_519 = 519;
+	uint64_t c_42 = 42;
+	l_1 = START(l_8);
+	uintptr_t idx = PARAM(l_1, "idx", 1);
+	uintptr_t keep, l_2 = ALLOCA(l_1, c_64);
+	uintptr_t target, l_3 = ALLOCA(l_2, c_64);
+	l_4 = STORE(l_3, keep, c_519);
+	uintptr_t t_8 = ADD(target, c_8);
+	l_5 = STORE(l_4, t_8, c_42);
+	uintptr_t a1 = ADD(idx, c_d);
+	uintptr_t a2 = ADD(a1, target);
+	uint64_t v, l_6 = LOAD(l_5, a2);
+	uint64_t k, l_7 = LOAD_v(l_6, keep);
+	uint64_t r = ADD(v, k);
+	l_8 = RETURN(l_7, r);
+}
+func i_ob(uintptr_t): uint64_t
+{
+	uintptr_t c_64 = 64;
+	uintptr_t c_8 = 8;
+	uintptr_t c_d = 2147483647;
+	uint64_t c_519 = 519;
+	uint64_t c_42 = 42;
+	l_1 = START(l_8);
+	uintptr_t idx = PARAM(l_1, "idx", 1);
+	uintptr_t keep, l_2 = ALLOCA(l_1, c_64);
+	uintptr_t target, l_3 = ALLOCA(l_2, c_64);
+	l_4 = STORE(l_3, keep, c_519);
+	uintptr_t t_8 = ADD(target, c_8);
+	l_5 = STORE(l_4, t_8, c_42);
+	uintptr_t a1 = ADD(idx, c_d);
+	uintptr_t a2 = ADD(target, a1);
+	uint64_t v, l_6 = LOAD(l_5, a2);
+	uint64_t k, l_7 = LOAD_v(l_6, keep);
+	uint64_t r = ADD(v, k);
+	l_8 = RETURN(l_7, r);
+}
+func sub_first(uintptr_t): uint64_t
+{
+	uintptr_t c_64 = 64;
+	uintptr_t c_8 = 8;
+	uintptr_t c_nd = -2147483647;
+	uint64_t c_519 = 519;
+	uint64_t c_42 = 42;
+	l_1 = START(l_8);
+	uintptr_t idx = PARAM(l_1, "idx", 1);
+	uintptr_t keep, l_2 = ALLOCA(l_1, c_64);
+	uintptr_t target, l_3 = ALLOCA(l_2, c_64);
+	l_4 = STORE(l_3, keep, c_519);
+	uintptr_t t_8 = ADD(target, c_8);
+	l_5 = STORE(l_4, t_8, c_42);
+	uintptr_t a1 = SUB(target, c_nd);
+	uintptr_t a2 = ADD(a1, idx);
+	uint64_t v, l_6 = LOAD(l_5, a2);
+	uint64_t k, l_7 = LOAD_v(l_6, keep);
+	uint64_t r = ADD(v, k);
+	l_8 = RETURN(l_7, r);
+}
+func b_si(uintptr_t): uint64_t
+{
+	uintptr_t c_64 = 64;
+	uintptr_t c_8 = 8;
+	uintptr_t c_d = 2147483647;
+	uintptr_t c_d8 = 2147483640;
+	uint64_t c_519 = 519;
+	uint64_t c_42 = 42;
+	l_1 = START(l_8);
+	uintptr_t idx = PARAM(l_1, "idx", 1);
+	uintptr_t keep, l_2 = ALLOCA(l_1, c_64);
+	uintptr_t target, l_3 = ALLOCA(l_2, c_64);
+	l_4 = STORE(l_3, keep, c_519);
+	uintptr_t t_8 = ADD(target, c_8);
+	l_5 = STORE(l_4, t_8, c_42);
+	uintptr_t s = MUL(idx, c_8);
+	uintptr_t a1 = ADD(target, s);
+	uintptr_t a2 = ADD(a1, c_d8);
+	uint64_t v, l_6 = LOAD(l_5, a2);
+	uint64_t k, l_7 = LOAD_v(l_6, keep);
+	uint64_t r = ADD(v, k);
+	l_8 = RETURN(l_7, r);
+}
+func si_b(uintptr_t): uint64_t
+{
+	uintptr_t c_64 = 64;
+	uintptr_t c_8 = 8;
+	uintptr_t c_d = 2147483647;
+	uintptr_t c_d8 = 2147483640;
+	uint64_t c_519 = 519;
+	uint64_t c_42 = 42;
+	l_1 = START(l_8);
+	uintptr_t idx = PARAM(l_1, "idx", 1);
+	uintptr_t keep, l_2 = ALLOCA(l_1, c_64);
+	uintptr_t target, l_3 = ALLOCA(l_2, c_64);
+	l_4 = STORE(l_3, keep, c_519);
+	uintptr_t t_8 = ADD(target, c_8);
+	l_5 = STORE(l_4, t_8, c_42);
+	uintptr_t s = MUL(idx, c_8);
+	uintptr_t a1 = ADD(s, target);
+	uintptr_t a2 = ADD(a1, c_d8);
+	uint64_t v, l_6 = LOAD(l_5, a2);
+	uint64_t k, l_7 = LOAD_v(l_6, keep);
+	uint64_t r = ADD(v, k);
+	l_8 = RETURN(l_7, r);
+}
+func main(): int32_t
+{
+	int32_t c_0 = 0;
+	uintptr_t c_1 = 1;
+	uintptr_t c_8 = 8;
+	uintptr_t c_d = 2147483647;
+	uintptr_t c_s = 268435455;
+	uintptr_t f_lit_first = func lit_first(uintptr_t): uint64_t;
+	uintptr_t f_idx_first = func idx_first(uintptr_t): uint64_t;
+	uintptr_t f_ob_i = func ob_i(uintptr_t): uint64_t;
+	uintptr_t f_i_ob = func i_ob(uintptr_t): uint64_t;
+	uintptr_t f_sub_first = func sub_first(uintptr_t): uint64_t;
+	uintptr_t f_b_si = func b_si(uintptr_t): uint64_t;
+	uintptr_t f_si_b = func si_b(uintptr_t): uint64_t;
+	uintptr_t printf = func printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%s %llu\n";
+	uintptr_t n_lit_first = "lit_first";
+	uintptr_t n_idx_first = "idx_first";
+	uintptr_t n_ob_i = "ob_i";
+	uintptr_t n_i_ob = "i_ob";
+	uintptr_t n_sub_first = "sub_first";
+	uintptr_t n_b_si = "b_si";
+	uintptr_t n_si_b = "si_b";
+	l_1 = START(l_end);
+	uintptr_t idx = SUB(c_8, c_d);
+	uintptr_t idx_s = SUB(c_1, c_s);
+	uint64_t r_0, l_c0 = CALL/1(l_1, f_lit_first, idx);
+	int32_t d_0, l_p0 = CALL/3(l_c0, printf, fmt, n_lit_first, r_0);
+	uint64_t r_1, l_c1 = CALL/1(l_p0, f_idx_first, idx);
+	int32_t d_1, l_p1 = CALL/3(l_c1, printf, fmt, n_idx_first, r_1);
+	uint64_t r_2, l_c2 = CALL/1(l_p1, f_ob_i, idx);
+	int32_t d_2, l_p2 = CALL/3(l_c2, printf, fmt, n_ob_i, r_2);
+	uint64_t r_3, l_c3 = CALL/1(l_p2, f_i_ob, idx);
+	int32_t d_3, l_p3 = CALL/3(l_c3, printf, fmt, n_i_ob, r_3);
+	uint64_t r_4, l_c4 = CALL/1(l_p3, f_sub_first, idx);
+	int32_t d_4, l_p4 = CALL/3(l_c4, printf, fmt, n_sub_first, r_4);
+	uint64_t r_5, l_c5 = CALL/1(l_p4, f_b_si, idx_s);
+	int32_t d_5, l_p5 = CALL/3(l_c5, printf, fmt, n_b_si, r_5);
+	uint64_t r_6, l_c6 = CALL/1(l_p5, f_si_b, idx_s);
+	int32_t d_6, l_p6 = CALL/3(l_c6, printf, fmt, n_si_b, r_6);
+	l_end = RETURN(l_p6, c_0);
+}
+--EXPECT--
+lit_first 561
+idx_first 561
+ob_i 561
+i_ob 561
+sub_first 561
+b_si 561
+si_b 561
