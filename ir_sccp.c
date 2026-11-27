@@ -1618,17 +1618,17 @@ static bool ir_may_promote_f2d(const ir_ctx *ctx, ir_ref ref)
 		return !IR_IS_SYM_CONST(insn->op) && insn->val.f == (float)(double)insn->val.f;
 	} else {
 		switch (insn->op) {
-			case IR_FP2FP:
-				return 1;
+//			case IR_FP2FP:
+//				return 1;
 //			case IR_INT2FP:
 //				return ctx->use_lists[ref].count == 1;
 			case IR_NEG:
 			case IR_ABS:
 				return ctx->use_lists[ref].count == 1 &&
 					ir_may_promote_f2d(ctx, insn->op1);
-			case IR_ADD:
-			case IR_SUB:
-			case IR_MUL:
+//			case IR_ADD:
+//			case IR_SUB:
+//			case IR_MUL:
 //			case IR_DIV:
 			case IR_MIN:
 			case IR_MAX:

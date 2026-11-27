@@ -1,0 +1,31 @@
+--TEST--
+FP2INT of float ADD keeps float rounding
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @add(double, double): int32_t;
+func @add(double, double): int32_t
+{
+	l_1 = START(l_E);
+	double x = PARAM(l_1, "x", 1);
+	double y = PARAM(l_1, "y", 2);
+	float fx = FP2FP(x);
+	float fy = FP2FP(y);
+	float a = ADD(fx, fy);
+	int32_t r = FP2INT(a);
+	l_E = RETURN(l_1, r);
+}
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%d\n";
+	uintptr_t f = func @add(double, double): int32_t;
+	int32_t z = 0;
+	double a = 1.0;
+	double b = 16777216.0;
+	l_0 = START(l_end);
+	int32_t r, c = CALL/2(l_0, f, a, b);
+	p = CALL/2(c, fp, fmt, r);
+	l_end = RETURN(p, z);
+}
+--EXPECT--
+16777216
