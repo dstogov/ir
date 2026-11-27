@@ -1815,15 +1815,12 @@ static bool ir_may_promote_trunc(const ir_ctx *ctx, ir_type type, ir_ref ref)
 			case IR_TRUNC:
 				return ctx->ir_base[insn->op1].type == type || ctx->use_lists[ref].count == 1;
 			case IR_NEG:
-			case IR_ABS:
 			case IR_NOT:
 				return ctx->use_lists[ref].count == 1 &&
 					ir_may_promote_trunc(ctx, type, insn->op1);
 			case IR_ADD:
 			case IR_SUB:
 			case IR_MUL:
-			case IR_MIN:
-			case IR_MAX:
 			case IR_OR:
 			case IR_AND:
 			case IR_XOR:
@@ -1946,7 +1943,6 @@ static ir_ref ir_promote_i2i(ir_ctx *ctx, ir_type type, ir_ref ref, ir_ref use)
 				}
 				return insn->op1;
 			case IR_NEG:
-			case IR_ABS:
 			case IR_NOT:
 				op = ir_promote_i2i(ctx, type, insn->op1, ref);
 				insn = &ctx->ir_base[ref];
@@ -1956,8 +1952,6 @@ static ir_ref ir_promote_i2i(ir_ctx *ctx, ir_type type, ir_ref ref, ir_ref use)
 			case IR_ADD:
 			case IR_SUB:
 			case IR_MUL:
-			case IR_MIN:
-			case IR_MAX:
 			case IR_OR:
 			case IR_AND:
 			case IR_XOR:
