@@ -1,0 +1,31 @@
+--TEST--
+FP2INT of double MUL of FP2FP(float) operands keeps double precision
+--CODE--
+extern func @printf(uintptr_t, ...): int32_t;
+func @f(float, float): int32_t;
+func @f(float, float): int32_t
+{
+	l_1 = START(l_E);
+	float x = PARAM(l_1, "x", 1);
+	float y = PARAM(l_1, "y", 2);
+	double dx = FP2FP(x);
+	double dy = FP2FP(y);
+	double a = MUL(dx, dy);
+	int32_t r = FP2INT(a);
+	l_E = RETURN(l_1, r);
+}
+func @main(): int32_t
+{
+	uintptr_t fp = func @printf(uintptr_t, ...): int32_t;
+	uintptr_t fmt = "%d\n";
+	uintptr_t f = func @f(float, float): int32_t;
+	int32_t z = 0;
+	float a = 4097.0;
+	float b = 4097.0;
+	l_0 = START(l_end);
+	int32_t r, c = CALL/2(l_0, f, a, b);
+	p = CALL/2(c, fp, fmt, r);
+	l_end = RETURN(p, z);
+}
+--EXPECT--
+16785409
