@@ -3290,40 +3290,27 @@ static bool ir_match_may_fuse_SI(ir_ctx *ctx, ir_ref ref, ir_ref use)
 	return 0;
 }
 
-/* The displacement that ADD/SUB(X, imm32) adds to a fused address */
-static int64_t ir_lea_offset(ir_ctx *ctx, ir_ref ref)
-{
-	ir_insn *insn = &ctx->ir_base[ref];
-	ir_insn *val_insn = &ctx->ir_base[insn->op2];
-
-	if (IR_IS_SYM_CONST(val_insn->op)) {
-		return (intptr_t)ir_sym_addr(ctx, val_insn);
-	}
-	return (insn->op == IR_SUB) ? -val_insn->val.i64 : val_insn->val.i64;
-}
-
 /* The stack offset of a fixed ALLOCA is added to a fused displacement only at emission.
  * On x86-64 an offset outside the ALLOCA's object may then no longer fit into disp32,
  * so such an offset isn't fused with the address of that ALLOCA. */
-static bool ir_may_fuse_offset(ir_ctx *ctx, ir_ref base_ref, int64_t offset)
+static bool ir_may_fuse_alloca_offset(ir_ctx *ctx, ir_ref base_ref, ir_insn *base_insn, ir_op op, int64_t offset)
 {
 #ifdef IR_TARGET_X64
-	ir_insn *base_insn, *size_insn;
+	ir_insn *size_insn;
 
-	if (IR_IS_CONST_REF(base_ref)) {
+	IR_ASSERT(base_insn->op == IR_ALLOCA);
+
+	if (!(ctx->flags & IR_FUNCTION) || ctx->cfg_map[base_ref] != 1 || !IR_IS_CONST_REF(base_insn->op2)) {
 		return 1;
 	}
-	base_insn = &ctx->ir_base[base_ref];
-	if (base_insn->op != IR_ALLOCA ||
-			!(ctx->flags & IR_FUNCTION) ||
-			ctx->cfg_map[base_ref] != 1 ||
-			!IR_IS_CONST_REF(base_insn->op2)) {
-		return 1;
-	}
+
 	size_insn = &ctx->ir_base[base_insn->op2];
-	if (IR_IS_SYM_CONST(size_insn->op)) {
-		return 1;
+	IR_ASSERT(IR_IS_TYPE_INT(size_insn->type) && !IR_IS_SYM_CONST(size_insn->op));
+
+	if (op == IR_SUB) {
+		offset = -offset;
 	}
+
 	return offset >= 0 && offset < size_insn->val.i64;
 #else
 	return 1;
@@ -3974,6 +3961,8 @@ binop_vector:
 				}
 #endif
 				if (IR_IS_CONST_REF(insn->op2)) {
+					bool check_offset;
+
 					op2_insn = &ctx->ir_base[insn->op2];
 					if (IR_IS_CONST_REF(insn->op1)) {
 						ir_insn *op1_insn = &ctx->ir_base[insn->op1];
@@ -3993,6 +3982,7 @@ binop_vector:
 						// TODO: add support for sym+offset ???
 					} else if (IR_IS_SYM_CONST(op2_insn->op)) {
 						if (insn->op == IR_ADD && ir_may_fuse_addr(ctx, op2_insn)) {
+							check_offset = 0;
 							goto lea;
 						}
 						/* pass */
@@ -4000,9 +3990,7 @@ binop_vector:
 						return IR_COPY_INT | IR_MAY_REUSE;
 					} else if ((ir_type_size[insn->type] >= 4 && insn->op == IR_ADD && IR_IS_SIGNED_32BIT(op2_insn->val.i64)) ||
 							(ir_type_size[insn->type] >= 4 && insn->op == IR_SUB && IR_IS_SIGNED_NEG_32BIT(op2_insn->val.i64))) {
-						if (!ir_may_fuse_offset(ctx, insn->op1, ir_lea_offset(ctx, ref))) {
-							goto binop_int;
-						}
+						check_offset = 1;
 lea:
 						if (ctx->use_lists[insn->op1].count == 1 || ir_match_fuse_addr_all_useges(ctx, insn->op1)) {
 							uint32_t rule = ctx->rules[insn->op1];
@@ -4018,20 +4006,53 @@ lea:
 								/* z = ADD(X, MUL(Y, 2|4|8)) ... ADD(z, imm32) => SKIP ... LEA [X+Y*2|4|8+im32] */
 								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_SIB;
 								return IR_LEA_SIB_O;
-							} else if ((rule == IR_LEA_IB || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_IB))
-							 && ir_may_fuse_offset(ctx, ctx->ir_base[insn->op1].op1, ir_lea_offset(ctx, ref))
-							 && ir_may_fuse_offset(ctx, ctx->ir_base[insn->op1].op2, ir_lea_offset(ctx, ref))) {
+							} else if (rule == IR_LEA_IB || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_IB)) {
 								/* z = ADD(X, Y) ... ADD(z, imm32) => SKIP ... LEA [X+Y+im32] */
+								if (check_offset) {
+									ir_insn *op1_insn = &ctx->ir_base[insn->op1];
+									ir_insn *base_insn = &ctx->ir_base[op1_insn->op1];
+									if (base_insn->op == IR_ALLOCA
+									 && !ir_may_fuse_alloca_offset(ctx, op1_insn->op1, base_insn, insn->op, op2_insn->val.i64)) {
+										goto binop_int;
+									}
+									base_insn = &ctx->ir_base[op1_insn->op2];
+									if (base_insn->op == IR_ALLOCA
+									 && !ir_may_fuse_alloca_offset(ctx, op1_insn->op2, base_insn, insn->op, op2_insn->val.i64)) {
+										goto binop_int;
+									}
+								}
 								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_IB;
 								return IR_LEA_IB_O;
-							} else if ((rule == IR_LEA_B_SI || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_B_SI))
-							 && ir_may_fuse_offset(ctx, ctx->ir_base[insn->op1].op1, ir_lea_offset(ctx, ref))) {
+							} else if (rule == IR_LEA_B_SI || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_B_SI)) {
+								if (check_offset) {
+									ir_insn *op1_insn = &ctx->ir_base[insn->op1];
+									ir_insn *base_insn = &ctx->ir_base[op1_insn->op1];
+									if (base_insn->op == IR_ALLOCA
+									 && !ir_may_fuse_alloca_offset(ctx, op1_insn->op1, base_insn, insn->op, op2_insn->val.i64)) {
+										goto binop_int;
+									}
+								}
 								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_B_SI;
 								return IR_LEA_B_SI_O;
-							} else if ((rule == IR_LEA_SI_B || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_SI_B))
-							 && ir_may_fuse_offset(ctx, ctx->ir_base[insn->op1].op2, ir_lea_offset(ctx, ref))) {
+							} else if (rule == IR_LEA_SI_B || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_SI_B)) {
+								if (check_offset) {
+									ir_insn *op1_insn = &ctx->ir_base[insn->op1];
+									ir_insn *base_insn = &ctx->ir_base[op1_insn->op2];
+									if (base_insn->op == IR_ALLOCA) {
+										if (!ir_may_fuse_alloca_offset(ctx, op1_insn->op2, base_insn, insn->op, op2_insn->val.i64)) {
+											goto binop_int;
+										}
+									}
+								}
 								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_SI_B;
 								return IR_LEA_SI_B_O;
+							}
+						}
+						if (check_offset) {
+							ir_insn *base_insn = &ctx->ir_base[insn->op1];
+							if (base_insn->op == IR_ALLOCA
+							 && !ir_may_fuse_alloca_offset(ctx, insn->op1, base_insn, insn->op, op2_insn->val.i64)) {
+								goto binop_int;
 							}
 						}
 						/* ADD(X, imm32) => LEA [X+imm32] */
@@ -4062,7 +4083,18 @@ lea:
 							if (!rule) {
 								ctx->rules[insn->op1] = rule = ir_match_insn(ctx, insn->op1);
 							}
-							if (rule == IR_LEA_OB && ir_may_fuse_offset(ctx, insn->op2, ir_lea_offset(ctx, insn->op1))) {
+							if (rule == IR_LEA_OB) {
+								ir_insn *op2_insn = &ctx->ir_base[insn->op2];
+
+								if (op2_insn->op == IR_ALLOCA) {
+									ir_insn *op1_insn = &ctx->ir_base[insn->op1];
+									ir_insn *val_insn = &ctx->ir_base[op1_insn->op2];
+
+									if (!IR_IS_SYM_CONST(val_insn->op)
+									 && !ir_may_fuse_alloca_offset(ctx, insn->op2, op2_insn, op1_insn->op, val_insn->val.i64)) {
+										return IR_LEA_IB;
+									}
+								}
 								ctx->rules[insn->op1] = IR_FUSED | IR_SIMPLE | IR_LEA_OB;
 								if (ctx->use_lists[insn->op2].count == 1 || ir_match_fuse_addr_all_useges(ctx, insn->op2)) {
 									rule = ctx->rules[insn->op2];
@@ -4099,8 +4131,18 @@ lea:
 							if (!rule) {
 								ctx->rules[insn->op2] = rule = ir_match_insn(ctx, insn->op2);
 							}
-							if ((rule == IR_LEA_OB || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_OB))
-							 && ir_may_fuse_offset(ctx, insn->op1, ir_lea_offset(ctx, insn->op2))) {
+							if (rule == IR_LEA_OB || rule == (IR_FUSED | IR_SIMPLE | IR_LEA_OB)) {
+								ir_insn *op1_insn = &ctx->ir_base[insn->op1];
+
+								if (op1_insn->op == IR_ALLOCA) {
+									ir_insn *op2_insn = &ctx->ir_base[insn->op2];
+									ir_insn *val_insn = &ctx->ir_base[op2_insn->op2];
+
+									if (!IR_IS_SYM_CONST(val_insn->op)
+									 && !ir_may_fuse_alloca_offset(ctx, insn->op1, op1_insn, op2_insn->op, val_insn->val.i64)) {
+										return IR_LEA_IB;
+									}
+								}
 								ctx->rules[insn->op2] = IR_FUSED | IR_SIMPLE | IR_LEA_OB;
 								/* x = ADD(X, imm32) ... ADD(Y, x) => SKIP ... LEA */
 								return IR_LEA_I_OB;
