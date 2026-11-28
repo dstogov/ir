@@ -1,0 +1,22 @@
+--TEST--
+004: Negative and signaling NaNs in vector constants
+--CODE--
+{
+	<double*2> c_1 = {nan(0x7FF0000000000001), nan(0xFFF8000000000002)};
+	<float*4> c_2 = {nan(0x7F800001), nan(0xFFC00002), nan, -nan};
+	l_1 = START(l_4);
+	uintptr_t p = PARAM(l_1, "p", 1);
+	uintptr_t q = PARAM(l_1, "q", 2);
+	l_2 = STORE(l_1, p, c_1);
+	l_3 = STORE(l_2, q, c_2);
+	l_4 = RETURN(l_3);
+}
+--EXPECT--
+void test(uintptr_t p, uintptr_t q)
+{
+	uintptr_t d_1 = p;
+	uintptr_t d_2 = q;
+	*((double __attribute__((__vector_size__(16)))*)d_1) = (double __attribute__((__vector_size__(16)))){__builtin_nans("0x1"), -__builtin_nan("0x2")};
+	*((float __attribute__((__vector_size__(16)))*)d_2) = (float __attribute__((__vector_size__(16)))){__builtin_nansf("0x1"), -__builtin_nanf("0x2"), __builtin_nanf(""), -__builtin_nanf("")};
+	return;
+}
