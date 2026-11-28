@@ -1,0 +1,29 @@
+--TEST--
+002: Negative and signaling NaN constants keep their sign and quiet bit
+--CODE--
+extern func fd(double, double, double): void;
+extern func ff(float, float, float): void;
+func test(): void
+{
+	uintptr_t c_1 = func fd(double, double, double): void;
+	uintptr_t c_2 = func ff(float, float, float): void;
+	double c_3 = nan(0xFFF8000000000001);
+	double c_4 = nan(0x7FF0000000000001);
+	double c_5 = nan(0xFFF0000000000002);
+	float c_6 = nan(0xFFC00001);
+	float c_7 = nan(0x7F800001);
+	float c_8 = nan(0xFF800002);
+	l_1 = START(l_4);
+	l_2 = CALL/3(l_1, c_1, c_3, c_4, c_5);
+	l_3 = CALL/3(l_2, c_2, c_6, c_7, c_8);
+	l_4 = RETURN(l_3);
+}
+--EXPECT--
+extern void fd(double, double, double);
+extern void ff(float, float, float);
+void test(void)
+{
+	fd(-__builtin_nan("0x1"), __builtin_nans("0x1"), -__builtin_nans("0x2"));
+	ff(-__builtin_nanf("0x1"), __builtin_nansf("0x1"), -__builtin_nansf("0x2"));
+	return;
+}

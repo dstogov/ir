@@ -129,43 +129,23 @@ static void ir_emit_c_func_proto(const char *name, uint32_t flags, ir_type ret_t
 	fprintf(f, ")");
 }
 
-static void ir_emit_c_fp_const(double v, bool is_float, FILE *f)
+static void ir_emit_c_fp_const(ir_val val, bool is_float, FILE *f)
 {
 	const char *suffix = is_float ? "f" : "";
+	double v = is_float ? val.f : val.d;
 	char buf[64];
 
 	if (isnan(v)) {
-		if (is_float) {
-			union {
-				float f;
-				int i;
-			} u1, u2, u3;
-			u1.f = v;
-			u2.f = NAN;
-			u3.f = -NAN;
-			if (u1.i == u2.i) {
-				fprintf(f, "__builtin_nanf(\"\")");
-			} else if (u1.i == u3.i) {
-				fprintf(f, "-__builtin_nanf(\"\")");
-			} else {
-				fprintf(f, "__builtin_nanf(\"0x%x\")", u1.i);
-			}
-		} else {
-			union {
-				double d;
-				long long i;
-			} u1, u2, u3;
-			u1.d = v;
-			u2.d = NAN;
-			u3.d = -NAN;
-			if (u1.i == u2.i) {
-				fprintf(f, "__builtin_nan(\"\")");
-			} else if (u1.i == u3.i) {
-				fprintf(f, "-__builtin_nan(\"\")");
-			} else {
-				fprintf(f, "__builtin_nan(\"0x%llx\")", u1.i);
-			}
+		/* __builtin_nan() takes only the payload; it always sets the quiet bit and never the sign */
+		uint64_t bits = is_float ? val.u32 : val.u64;
+		uint64_t quiet_bit = is_float ? 1ULL << 22 : 1ULL << 51;
+		uint64_t payload = bits & (quiet_bit - 1);
+
+		fprintf(f, "%s__builtin_nan%s%s(\"", (bits >> (is_float ? 31 : 63)) ? "-" : "", (bits & quiet_bit) ? "" : "s", suffix);
+		if (payload) {
+			fprintf(f, "0x%llx", (unsigned long long)payload);
 		}
+		fprintf(f, "\")");
 	} else if (isinf(v)) {
 		fprintf(f, "%s__builtin_inf%s()", v < 0 ? "-" : "", suffix);
 	} else {
@@ -195,17 +175,24 @@ static void ir_emit_c_fp_const(double v, bool is_float, FILE *f)
 
 static void ir_emit_c_fp_vector_const(ir_insn *insn, FILE *f)
 {
-	const double *d = (const double*)(insn + 1);
-	const float *s = (const float*)(insn + 1);
+	const uint64_t *d = (const uint64_t*)(insn + 1);
+	const uint32_t *s = (const uint32_t*)(insn + 1);
 	bool is_double = IR_VECTOR_BASE_TYPE(insn->type) == IR_DOUBLE;
 	uint32_t i, n = IR_VECTOR_LENGTH(insn->type);
 
 	fprintf(f, "{");
 	for (i = 0; i < n; i++) {
+		ir_val val;
+
 		if (i) {
 			fprintf(f, ", ");
 		}
-		ir_emit_c_fp_const(is_double ? d[i] : s[i], !is_double, f);
+		if (is_double) {
+			val.u64 = d[i];
+		} else {
+			val.u32 = s[i];
+		}
+		ir_emit_c_fp_const(val, !is_double, f);
 	}
 	fprintf(f, "}");
 }
@@ -237,7 +224,7 @@ static void ir_emit_c_const(ir_ctx *ctx, ir_insn *insn, FILE *f)
 		}
 		fprintf(f, "&&bb%d", insn->val.u32_hi);
 	} else if (IR_IS_TYPE_FP(insn->type)) {
-		ir_emit_c_fp_const(insn->type == IR_DOUBLE ? insn->val.d : insn->val.f, insn->type == IR_FLOAT, f);
+		ir_emit_c_fp_const(insn->val, insn->type == IR_FLOAT, f);
 	} else if (IR_IS_TYPE_VECTOR(insn->type)) {
 		fprintf(f, "(");
 		ir_emit_c_type_name(insn->type, f);
