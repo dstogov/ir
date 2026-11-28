@@ -36,7 +36,7 @@ extern void test_d(double, double, double, double, double, double, double);
 extern void test_f(float, float, float, float, float, float, float);
 int32_t main(void)
 {
-	test_d(-__builtin_nan(""), __builtin_nan(""), __builtin_nan("0x7ff8000000000001"), -__builtin_inf(), __builtin_inf(), -0.0, 0.0);
-	test_f(-__builtin_nanf(""), __builtin_nanf(""), __builtin_nanf("0x7fc00001"), -__builtin_inff(), __builtin_inff(), -0.0f, 0.0f);
+	test_d(-__builtin_nan(""), __builtin_nan(""), __builtin_nan("0x1"), -__builtin_inf(), __builtin_inf(), -0.0, 0.0);
+	test_f(-__builtin_nanf(""), __builtin_nanf(""), __builtin_nanf("0x1"), -__builtin_inff(), __builtin_inff(), -0.0f, 0.0f);
 	return 0;
 }

@@ -1,0 +1,27 @@
+--TEST--
+003: NaN constants with the largest payload
+--CODE--
+extern func fd(double, double): void;
+extern func ff(float, float): void;
+func test(): void
+{
+	uintptr_t c_1 = func fd(double, double): void;
+	uintptr_t c_2 = func ff(float, float): void;
+	double c_3 = nan(0x7FFFFFFFFFFFFFFF);
+	double c_4 = nan(0xFFF7FFFFFFFFFFFF);
+	float c_5 = nan(0x7FFFFFFF);
+	float c_6 = nan(0xFFBFFFFF);
+	l_1 = START(l_4);
+	l_2 = CALL/2(l_1, c_1, c_3, c_4);
+	l_3 = CALL/2(l_2, c_2, c_5, c_6);
+	l_4 = RETURN(l_3);
+}
+--EXPECT--
+extern void fd(double, double);
+extern void ff(float, float);
+void test(void)
+{
+	fd(__builtin_nan("0x7ffffffffffff"), -__builtin_nans("0x7ffffffffffff"));
+	ff(__builtin_nanf("0x3fffff"), -__builtin_nansf("0x3fffff"));
+	return;
+}
